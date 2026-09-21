@@ -9,8 +9,14 @@
  *   silent         emit nothing and stay alive (timeout path)
  *   crash          exit 1 immediately (start-failure path)
  *   ignore-sigterm emit ready, ignore SIGTERM, never exit on its own
+ *   malformed-models answer get_available_models with data.models as an object
+ *   stubborn-grandchild  handle the protocol, spawn a same-group grandchild that
+ *                        ignores SIGTERM, and exit on SIGTERM (grandchild lingers)
  */
 import { createInterface } from "node:readline";
+import { spawn } from "node:child_process";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 const scenario = process.env.FAKE_SCENARIO || "normal";
 const READY = {
@@ -53,6 +59,11 @@ function answer(msg) {
       write({ id: msg.id, type: "response", command: "negotiate_protocol", success: true, data: { protocolVersion: 2 } });
     }
   } else if (msg.type === "get_available_models") {
+    if (scenario === "malformed-models") {
+      // success:true but data.models is an object, not an array.
+      write({ id: msg.id, type: "response", command: "get_available_models", success: true, data: { models: {} } });
+      return;
+    }
     const data = { models: [{ id: "local-model", name: "本地模型", api: "openai-completions", provider: "m0mock", baseUrl: "http://127.0.0.1:9" }] };
     const resp = { id: msg.id, type: "response", command: "get_available_models", success: true, data };
     if (scenario === "split") writeSplit(resp);
@@ -69,6 +80,17 @@ if (scenario === "crash") {
   process.on("SIGTERM", () => process.stderr.write("ignoring SIGTERM\n"));
   write(READY);
   setInterval(() => {}, 1000);
+} else if (scenario === "stubborn-grandchild") {
+  // A same-group grandchild that ignores SIGTERM; the parent exits on SIGTERM.
+  const grandchild = spawn(process.execPath, ["-e", "process.on('SIGTERM',()=>{});setInterval(()=>{},1000);"], { stdio: "ignore" });
+  try { writeFileSync(join(process.cwd(), "grandchild.pid"), String(grandchild.pid)); } catch {}
+  write(READY);
+  const rl = createInterface({ input: process.stdin });
+  rl.on("line", (line) => {
+    let msg;
+    try { msg = JSON.parse(line); } catch { return; }
+    answer(msg);
+  });
 } else {
   if (scenario === "split") writeSplit(READY);
   else write(READY);

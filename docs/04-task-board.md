@@ -53,7 +53,7 @@ T23 不阻塞仅面向 macOS arm64 的首次交付，但未通过前不能宣称
 - **T03 隔离/UI**：开发版以 `PI_DESKTOP_DATA_DIR` 隔离，`pi.sqlite`/`secrets/.machine-key`/日志/插件写入 `.dev-data/pi-desktop`，`~/.pi-desktop` 零写入，更新源 dev 构建 `disabled`；Electron 43.6.0 启动，CDP 截取项目列表/设置-MCP/模型/扩展 5 张基线截图。
 - **OMP 协议启动（M0 步骤 7，T04 前置）**：`bun setup` 成功；`node docs/validation/M0-rpc/verify-rpc.mjs`（绑定 `upstream/oh-my-pi/.../scripts/omp` 的 repo 路径入口，gitlink=submodule SHA=`d49918fab`、版本 18.2.7 核对一致；全量隔离 + readline 分帧 + 进程树回收）输出 `ready`、`negotiate_protocol`(v2)、`get_available_models`（mock 模型，无付费模型调用）。
 
-> 复审返修（2026-09-22，两轮）：第一轮 6 项 + 第二轮 6 项均已修复并重验（OMP 版本入口、OMP/桌面环境隔离、可复现脚本+fixture、假进程针对性验证、模型设置页截图、测试表述）。详见 `docs/validation/M0-baseline.md` 顶部两段“返修记录”。
+> 复审返修（2026-09-22，三轮）：第一轮 6 项 + 第二轮 6 项 + 第三轮 4 项及临时目录清理均已修复并重验（OMP 版本入口、OMP/桌面环境隔离、可复现脚本+fixture、假进程针对性验证、模型设置页截图、测试表述、首次运行父目录、异常统一清理、进程组回收、隔离路径验收、临时目录回收）。详见 `docs/validation/M0-baseline.md` 顶部三段“返修记录”。
 
 ## 单任务记录模板
 

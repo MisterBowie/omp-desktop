@@ -37,6 +37,29 @@ node docs/validation/M0-rpc/verify-rpc.mjs               # PASS: ready + negotia
 
 真实运行关键输出：launcher 为 repo 路径、gitlink=submodule SHA=`d49918fab…`、pinned ver 18.2.7（reported 18.2.7）、config root `~/.omp-m0-<hex>`、resolved 全部 `=true`、`ready`/`negotiate_protocol(v2)`/`get_available_models` 均通过。
 
+## 返修记录（第三轮复审，2026-09-22）
+
+对提交 `a2ce8bf` 的复审针对 `verify-rpc.mjs` 提出 4 项问题 + 临时目录清理遗漏。本轮先补失败测试复现，再修复：
+
+1. **首次运行**（一）：原 `main()` 在 `.dev-data` 不存在时直接 `mkdtempSync` → ENOENT。新增 `prepareRunRoot(baseDir)` 先 `mkdirSync(base,{recursive:true})` 再建 run root；新增测试 `first run: run root is created even when its parent dir is missing`，并在移除 `.dev-data` 的干净工作树上实测脚本退出码 0。
+2. **统一异常清理**（二）：`runProtocolCheck` 改为单 try/catch/finally 覆盖整个生命周期，成功/断言失败/解析异常/流错误/超时/启动失败均经同一 `finally` 回收；响应结构用 `Array.isArray` 校验（不再 `.map` 直接抛）。复现场景（`success:true, data.models:{}`）在旧实现抛 `TypeError: … .map is not a function` 且子进程存活，修复后返回明确失败并回收子进程。
+3. **完整回收进程组**（三）：`terminateTree` 不再以直接子进程退出为结束条件——SIGTERM 整组 → 等直接子进程 → 等进程组清空（`process.kill(-pgid,0)`）→ 超时 SIGKILL 整组 → 再等清空，仅在组清空时返回 `true`；清理失败时 `runProtocolCheck` 置 `ok=false`、`reaped=false`。复现场景（同组孙进程忽略 SIGTERM、父进程正常退出）在旧实现遗留孙进程，修复后被 SIGKILL 回收。只对本次 `detached` 创建的组发信号（`-child.pid`），不误杀其他进程。
+4. **隔离路径验收条件**（四）：`verifyResolvedPaths` 拆出 required（`agent.db`/`models.db`/`sessions`）与 optional（`logs`/`run`/`launch`），并校验 scope（agent/launch 在 run root 内、config root 非 `~/.omp` 且名为 `.omp-m0-*`）；`ok = required && scope`。`main()` 在 `!paths.ok` 时非零退出，不再仅凭 `leaksIntoUserHome` 判断。
+5. **临时目录回收**（五）：`verifyPinnedSource` 的版本探测目录（`omp-ver-*`）与探测用 config root 在 `finally` 回收；`main()` 用 try/finally 在成功/失败/异常路径统一回收本次 run root 与 config root；`--keep` 明确为保留本次 run root + config root（仅限本次创建），默认不留临时目录。只清理本次运行创建且拥有的目录。
+
+测试先行证据（旧实现 → 修复后）：
+
+```bash
+# 修复前（a2ce8bf）：15 tests, 9 pass, 6 fail
+#   失败含 TypeError: ((intermediate value) ?? []).map is not a function
+#   并遗留 1 个 fake-omp 子进程与 3 个 /tmp/omp-ver-* 目录
+node --test docs/validation/M0-rpc/verify-rpc.test.mjs
+# 修复后：15 tests, 15 pass, 0 fail
+node --test docs/validation/M0-rpc/verify-rpc.test.mjs
+node docs/validation/M0-rpc/verify-rpc.mjs                      # exit 0
+rm -rf .dev-data && node docs/validation/M0-rpc/verify-rpc.mjs  # clean tree, exit 0
+```
+
 ## 1. 环境与版本
 
 | 项目 | 版本/事实 | 说明 |

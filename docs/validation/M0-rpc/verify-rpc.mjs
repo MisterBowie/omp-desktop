@@ -1,38 +1,35 @@
 #!/usr/bin/env node
 /**
- * Reproducible OMP protocol startup verification (M0), second rework.
+ * Reproducible OMP protocol startup verification (M0), third rework.
  *
- * Hardened against the second-review findings:
- *   - binds the pinned source launcher inside `upstream/oh-my-pi` (never the
- *     global `~/.bun/bin/omp` link), verifies the submodule SHA against the
- *     repo gitlink and the runtime version against `packages/utils/package.json`;
- *   - builds a controlled child environment: sets `PI_CONFIG_DIR`,
- *     `PI_CODING_AGENT_DIR`, `OMP_DEV_LAUNCH_DIR`, and strips `OMP_PROFILE` /
- *     `PI_PROFILE` / `XDG_*` / session-dir / credential vars so a named profile
- *     or XDG redirect cannot steer OMP back onto the user's `~/.omp`;
- *   - frames stdout with `readline` (full lines only; split/merged/UTF-8 safe)
- *     and matches responses by parsed `type`/`command`/`id`/`success`, not by
- *     string `includes`;
- *   - guarantees process-tree cleanup on every path (success, assert failure,
- *     timeout, start failure): SIGTERM the group, wait, then SIGKILL, and only
- *     then return the exit code.
+ * Hardened against the third-review findings:
+ *   - run-root creation makes its parent directory first (clean worktree);
+ *   - the whole protocol lifecycle runs inside one try/catch/finally, so the
+ *     process tree is reaped on success, assertion failure, malformed data,
+ *     stream error, timeout, and start failure alike;
+ *   - cleanup reaps the whole process group, not just the direct child: after
+ *     SIGTERM it waits for the group to empty and escalates to SIGKILL, and it
+ *     reports failure when the group cannot be emptied;
+ *   - resolved-path checks are an acceptance condition: required artifacts must
+ *     exist and every isolation path must stay inside this run's scope, or the
+ *     run exits non-zero;
+ *   - every temporary directory this run creates (version probe + protocol run,
+ *     including the isolated config root) is removed in a finally unless
+ *     `--keep` is given.
  *
- * Each run uses a fresh, run-unique isolation directory so concurrent runs and
- * different worktrees never share state; the script removes its own temporary
- * directories afterwards (never touching the user's real data).
+ * It never inherits `OMP_PROFILE`/`PI_PROFILE`/`XDG_*`/credential variables, and
+ * each run uses a run-unique isolation scope. It only ever removes directories
+ * it created itself.
  *
  * Usage:
  *   node verify-rpc.mjs            # real pinned-source RPC startup (no paid model)
- *   node verify-rpc.mjs --keep     # same, but leave the isolation dirs for inspection
- *
- * Exits 0 only when ready + negotiate_protocol(v2) + get_available_models all
- * pass against the pinned source; non-zero otherwise.
+ *   node verify-rpc.mjs --keep     # keep this run's isolation dirs for inspection
  */
 import { spawn, spawnSync } from "node:child_process";
 import { createInterface } from "node:readline";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, readdirSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join, dirname, resolve } from "node:path";
+import { join, dirname, resolve, basename, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { randomBytes } from "node:crypto";
 
@@ -72,33 +69,41 @@ export function readPinnedVersion(repoRoot = resolveRepoRoot()) {
   }
 }
 
-/** Returns { ok, reason, gitlink, actual, pinnedVersion, reportedVersion }. */
+/**
+ * Verify launcher present, submodule SHA == gitlink, and the launcher's
+ * `--version` == the pinned `packages/utils/package.json` version. The version
+ * probe uses its own throwaway directories, removed before returning.
+ * Returns { ok, reason, gitlink, actual, pinnedVersion, reportedVersion }.
+ */
 export function verifyPinnedSource(repoRoot = resolveRepoRoot()) {
   const launcher = findPinnedLauncher(repoRoot);
   const gitlink = readGitlinkSha(repoRoot);
   const actual = readSubmoduleSha(repoRoot);
   const pinnedVersion = readPinnedVersion(repoRoot);
-  if (!existsSync(launcher)) return { ok: false, reason: `pinned launcher missing: ${launcher}`, gitlink, actual, pinnedVersion };
-  if (!gitlink) return { ok: false, reason: "could not read gitlink SHA for upstream/oh-my-pi", gitlink, actual, pinnedVersion };
-  if (gitlink !== actual) {
-    return { ok: false, reason: `submodule SHA mismatch: gitlink=${gitlink} actual=${actual}`, gitlink, actual, pinnedVersion };
+  const fail = (reason, reportedVersion = null) => ({ ok: false, reason, gitlink, actual, pinnedVersion, reportedVersion });
+
+  if (!existsSync(launcher)) return fail(`pinned launcher missing: ${launcher}`);
+  if (!gitlink) return fail("could not read gitlink SHA for upstream/oh-my-pi");
+  if (gitlink !== actual) return fail(`submodule SHA mismatch: gitlink=${gitlink} actual=${actual}`);
+
+  const probeRoot = mkdtempSync(join(tmpdir(), "omp-ver-"));
+  const configDirName = makeConfigDirName();
+  const { env } = buildIsolatedEnv({ repoRoot, runRoot: probeRoot, configDirName });
+  try {
+    const r = spawnSync(launcher, ["--version"], { env, encoding: "utf8", timeout: 30_000 });
+    const reported = (r.stdout ?? "").trim();
+    const reportedVersion = /^omp\/(.+)$/m.exec(reported)?.[1] ?? null;
+    if (r.status !== 0 || reportedVersion !== pinnedVersion) {
+      return fail(
+        `runtime version mismatch: reported=${reportedVersion ?? `(exit ${r.status}, ${reported || r.stderr})`} pinned=${pinnedVersion}`,
+        reportedVersion,
+      );
+    }
+    return { ok: true, reason: "ok", gitlink, actual, pinnedVersion, reportedVersion };
+  } finally {
+    rmSync(probeRoot, { recursive: true, force: true });
+    safeRmConfigRoot(join(env.HOME, configDirName));
   }
-  // Runtime version: launcher --version must equal the pinned pi-utils version.
-  const r = spawnSync(findPinnedLauncher(repoRoot), ["--version"], {
-    env: buildIsolatedEnv({ repoRoot, runRoot: mkdtempSync(join(tmpdir(), "omp-ver-")), keep: false }).env,
-    encoding: "utf8",
-    timeout: 30_000,
-  });
-  const reported = (r.stdout ?? "").trim();
-  const reportedVersion = /^omp\/(.+)$/m.exec(reported)?.[1] ?? null;
-  if (r.status !== 0 || reportedVersion !== pinnedVersion) {
-    return {
-      ok: false,
-      reason: `runtime version mismatch: reported=${reportedVersion ?? `(exit ${r.status}, ${reported || r.stderr})`} pinned=${pinnedVersion}`,
-      gitlink, actual, pinnedVersion, reportedVersion,
-    };
-  }
-  return { ok: true, reason: "ok", gitlink, actual, pinnedVersion, reportedVersion };
 }
 
 // ---------------------------------------------------------------------------
@@ -115,20 +120,22 @@ const STEER_VARS = [
 /** Name patterns for credentials that must never reach the child. */
 const CRED_RE = /(API_KEY|_TOKEN|_SECRET|_PASSWORD|_PASSWD|_CREDENTIAL|_AUTH|AWS_ACCESS|AWS_SECRET|AWS_SESSION|BEDROCK_|GEMINI_|GOOGLE_|OPENAI_|ANTHROPIC_|AZURE_|COHERE_|MISTRAL_|GROQ_|XAI_|DEEPSEEK_|COPILOT_|CODEX_)/i;
 
-export function buildIsolatedEnv({ repoRoot, runRoot, keep = false }) {
+/** A run-unique, home-relative config root name (never the user's `.omp`). */
+export function makeConfigDirName() {
+  return `.omp-m0-${randomBytes(4).toString("hex")}`;
+}
+
+export function buildIsolatedEnv({ repoRoot, runRoot, configDirName = makeConfigDirName() }) {
   const env = {};
-  // Copy only the variables OMP legitimately needs; do not inherit credentials,
-  // profiles, or XDG redirects.
+  // Copy only what OMP legitimately needs; never inherit credentials, profiles,
+  // or XDG redirects that could steer it back onto the user's real dirs.
   for (const k of Object.keys(process.env)) {
     if (STEER_VARS.includes(k)) continue;
     if (CRED_RE.test(k)) continue;
     env[k] = process.env[k];
   }
-  // Locale bits are safe to keep (already copied); ensure HOME is present.
   env.HOME = process.env.HOME ?? homedir();
-  const suffix = randomBytes(4).toString("hex");
-  const configDirName = `.omp-m0-${suffix}`; // homedir-relative config root
-  env.PI_CONFIG_DIR = configDirName;
+  env.PI_CONFIG_DIR = configDirName; // homedir-relative config root
   env.PI_CODING_AGENT_DIR = join(runRoot, "agent");
   env.OMP_DEV_LAUNCH_DIR = join(runRoot, "dev-cwd");
   env.PATH = [
@@ -142,8 +149,24 @@ export function buildIsolatedEnv({ repoRoot, runRoot, keep = false }) {
   return { env, configDirName, configRoot: join(env.HOME, configDirName) };
 }
 
+/** Create (if needed) `baseDir`, then a run-unique directory inside it. */
+export function prepareRunRoot(baseDir) {
+  mkdirSync(baseDir, { recursive: true });
+  return mkdtempSync(join(baseDir, "omp-run-"));
+}
+
+/** Remove a config root only when it is one of our own isolated roots. */
+function safeRmConfigRoot(configRoot) {
+  if (!configRoot) return;
+  const abs = resolve(configRoot);
+  const home = resolve(process.env.HOME ?? homedir());
+  if (!basename(abs).startsWith(".omp-m0-")) return;
+  if (abs === home || !abs.startsWith(home + sep)) return;
+  rmSync(abs, { recursive: true, force: true });
+}
+
 // ---------------------------------------------------------------------------
-// 3. Process-tree cleanup (signal sent ≠ reaped)
+// 3. Process-tree cleanup (signal sent ≠ reaped, and child exit ≠ group empty)
 // ---------------------------------------------------------------------------
 
 function waitExit(child, timeoutMs) {
@@ -155,21 +178,40 @@ function waitExit(child, timeoutMs) {
   });
 }
 
-async function signalGroup(pid, signal) {
-  try { process.kill(-pid, signal); return; } catch {}
-  try { process.kill(pid, signal); } catch {}
+/** True while any process remains in the verification process group. */
+function groupAlive(pgid) {
+  try { process.kill(-pgid, 0); return true; }
+  catch (e) { return e.code !== "ESRCH"; } // EPERM ⇒ it exists but is not ours to signal
 }
 
-/** SIGTERM the group, wait, then SIGKILL; resolves true once the child is reaped. */
-export async function terminateTree(child, timeoutMs = 5000) {
-  if (child.exitCode !== null || child.signalCode !== null) return true;
-  await signalGroup(child.pid, "SIGTERM");
-  const exited = await waitExit(child, timeoutMs);
-  if (!exited) {
-    await signalGroup(child.pid, "SIGKILL");
-    return waitExit(child, 2000);
+async function waitGroupEmpty(pgid, timeoutMs) {
+  const start = Date.now();
+  for (;;) {
+    if (!groupAlive(pgid)) return true;
+    if (Date.now() - start > timeoutMs) return false;
+    await new Promise((r) => setTimeout(r, 100));
   }
-  return true;
+}
+
+async function signalGroup(pgid, signal) {
+  try { process.kill(-pgid, signal); return; } catch {}
+  try { process.kill(pgid, signal); } catch {}
+}
+
+/**
+ * Reap the whole verification process group: SIGTERM, wait for the direct child,
+ * wait for the group to empty, then SIGKILL the group and wait again. Resolves
+ * true only when no process remains in the group. Only ever signals `-child.pid`
+ * (the group this harness created), never an unrelated group.
+ */
+export async function terminateTree(child, timeoutMs = 5000) {
+  const pgid = child.pid;
+  if (!pgid) return true;
+  if (groupAlive(pgid)) await signalGroup(pgid, "SIGTERM");
+  await waitExit(child, timeoutMs);
+  if (await waitGroupEmpty(pgid, timeoutMs)) return true;
+  await signalGroup(pgid, "SIGKILL");
+  return waitGroupEmpty(pgid, 2000);
 }
 
 // ---------------------------------------------------------------------------
@@ -178,142 +220,162 @@ export async function terminateTree(child, timeoutMs = 5000) {
 
 /**
  * Spawn `command args`, frame stdout with readline, and run the protocol.
- * Resolves with a result object; never rejects (all errors become the result)
- * and always cleans the process tree before resolving.
+ * Never rejects: any spawn error, malformed response, thrown exception, timeout,
+ * or stream error becomes an explicit failure result. The process group is
+ * always reaped before resolving; `result.reaped === false` means cleanup failed.
  */
 export async function runProtocolCheck({
   command, args, env, cwd, model = "m0mock/local-model",
   readyTimeoutMs = 30_000, stepTimeoutMs = 8_000, termTimeoutMs = 5_000,
 }) {
-  let child;
+  let child = null;
   const messages = [];
   let stderr = "";
   let spawnError = null;
 
-  const onLine = (line) => {
-    const t = line.trim();
-    if (!t) return;
-    try { messages.push(JSON.parse(t)); } catch { /* non-JSON line, ignore */ }
-  };
-
   const result = {
     ok: false, stage: "start", reason: "", pid: null,
     ready: null, negotiate: null, models: null,
-    exitCode: null, signalCode: null,
+    exitCode: null, signalCode: null, reaped: null,
   };
+
+  const fail = (stage, reason) => { result.ok = false; result.stage = stage; result.reason = reason; };
 
   try {
     child = spawn(command, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"], detached: true });
     result.pid = child.pid;
-  } catch (e) {
-    result.reason = `spawn failed: ${e.message}`;
-    return result;
-  }
 
-  const rl = createInterface({ input: child.stdout, crlfDelay: Infinity });
-  rl.on("line", onLine);
-  child.stderr.on("data", (d) => { stderr += d.toString(); });
-  const exited = new Promise((res) => child.once("exit", (code, sig) => {
-    result.exitCode = code; result.signalCode = sig; res();
-  }));
-  child.on("error", (e) => { spawnError = e; });
+    const rl = createInterface({ input: child.stdout, crlfDelay: Infinity });
+    rl.on("line", (line) => {
+      const t = line.trim();
+      if (!t) return;
+      try { messages.push(JSON.parse(t)); } catch { /* non-JSON line, ignore */ }
+    });
+    child.stderr.on("data", (d) => { stderr += d.toString(); });
+    child.on("exit", (code, sig) => { result.exitCode = code; result.signalCode = sig; });
+    child.on("error", (e) => { spawnError = e; });
 
-  const waitFor = async (pred, timeoutMs) => {
-    const start = Date.now();
-    for (;;) {
-      const hit = messages.find(pred);
-      if (hit) return hit;
-      if (result.exitCode !== null || result.signalCode !== null) return null;
-      if (Date.now() - start > timeoutMs) return null;
-      await new Promise((r) => setTimeout(r, 100));
+    const waitFor = async (pred, timeoutMs) => {
+      const start = Date.now();
+      for (;;) {
+        const hit = messages.find(pred);
+        if (hit) return hit;
+        if (result.exitCode !== null || result.signalCode !== null) return null;
+        if (Date.now() - start > timeoutMs) return null;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+    };
+
+    // 1. ready
+    result.ready = await waitFor((m) => m && m.type === "ready", readyTimeoutMs);
+    if (!result.ready) {
+      const reason = spawnError
+        ? `spawn error: ${spawnError.message}`
+        : `no ready frame within ${readyTimeoutMs}ms${stderr ? ` (stderr: ${stderr.slice(-200)})` : ""}${result.exitCode !== null ? ` (exit ${result.exitCode})` : ""}`;
+      fail("ready", reason);
+      return result;
     }
-  };
+    if (!Array.isArray(result.ready.supportedProtocolVersions) || !result.ready.supportedProtocolVersions.includes(2)) {
+      fail("ready", `ready does not advertise protocol v2: ${JSON.stringify(result.ready)}`);
+      return result;
+    }
 
-  // 1. ready
-  result.ready = await waitFor((m) => m && m.type === "ready", readyTimeoutMs);
-  if (!result.ready) {
-    result.stage = "ready";
-    result.reason = spawnError ? `spawn error: ${spawnError.message}` : `no ready frame within ${readyTimeoutMs}ms${stderr ? ` (stderr: ${stderr.slice(-200)})` : ""}${result.exitCode !== null ? ` (exit ${result.exitCode})` : ""}`;
-    await terminateTree(child, termTimeoutMs);
-    return result;
-  }
-  if (result.ready.supportedProtocolVersions?.indexOf?.(2) < 0) {
-    result.stage = "ready";
-    result.reason = `ready does not advertise protocol v2: ${JSON.stringify(result.ready)}`;
-    await terminateTree(child, termTimeoutMs);
-    return result;
-  }
+    // 2. negotiate_protocol
+    child.stdin.write(JSON.stringify({ id: "m0", type: "negotiate_protocol", protocolVersion: 2 }) + "\n");
+    result.negotiate = await waitFor(
+      (m) => m && m.type === "response" && m.command === "negotiate_protocol" && m.id === "m0",
+      stepTimeoutMs,
+    );
+    if (!result.negotiate || result.negotiate.success !== true || result.negotiate.data?.protocolVersion !== 2) {
+      fail("negotiate_protocol", `negotiate_protocol failed: ${result.negotiate ? JSON.stringify(result.negotiate) : "no response"}`);
+      return result;
+    }
 
-  // 2. negotiate_protocol
-  child.stdin.write(JSON.stringify({ id: "m0", type: "negotiate_protocol", protocolVersion: 2 }) + "\n");
-  result.negotiate = await waitFor(
-    (m) => m && m.type === "response" && m.command === "negotiate_protocol" && m.id === "m0",
-    stepTimeoutMs,
-  );
-  if (!result.negotiate || result.negotiate.success !== true || result.negotiate.data?.protocolVersion !== 2) {
-    result.stage = "negotiate_protocol";
-    result.reason = `negotiate_protocol failed: ${result.negotiate ? JSON.stringify(result.negotiate) : "no response"}`;
-    await terminateTree(child, termTimeoutMs);
-    return result;
-  }
+    // 3. get_available_models
+    child.stdin.write(JSON.stringify({ id: "m1", type: "get_available_models" }) + "\n");
+    result.models = await waitFor(
+      (m) => m && m.type === "response" && m.command === "get_available_models" && m.id === "m1",
+      stepTimeoutMs,
+    );
+    if (!result.models || result.models.success !== true) {
+      fail("get_available_models", `get_available_models failed: ${result.models ? JSON.stringify(result.models) : "no response"}`);
+      return result;
+    }
+    const models = result.models.data?.models;
+    if (!Array.isArray(models)) {
+      fail("get_available_models", `models response is not an array: ${JSON.stringify(result.models.data)}`);
+      return result;
+    }
+    const ids = models.map((m) => (m && typeof m === "object" ? m.id : undefined));
+    if (!ids.includes("local-model")) {
+      fail("get_available_models", `mock model not returned: ${JSON.stringify(ids)}`);
+      return result;
+    }
 
-  // 3. get_available_models
-  child.stdin.write(JSON.stringify({ id: "m1", type: "get_available_models" }) + "\n");
-  result.models = await waitFor(
-    (m) => m && m.type === "response" && m.command === "get_available_models" && m.id === "m1",
-    stepTimeoutMs,
-  );
-  if (!result.models || result.models.success !== true) {
-    result.stage = "get_available_models";
-    result.reason = `get_available_models failed: ${result.models ? JSON.stringify(result.models) : "no response"}`;
-    await terminateTree(child, termTimeoutMs);
+    result.ok = true;
+    result.stage = "done";
     return result;
-  }
-  const ids = (result.models.data?.models ?? []).map((m) => m.id);
-  if (!ids.includes("local-model")) {
-    result.stage = "get_available_models";
-    result.reason = `mock model not returned: ${JSON.stringify(ids)}`;
-    await terminateTree(child, termTimeoutMs);
+  } catch (e) {
+    fail(result.stage === "start" ? "error" : result.stage, `exception: ${e?.message ?? e}`);
     return result;
+  } finally {
+    if (child) {
+      let reaped = false;
+      try { reaped = await terminateTree(child, termTimeoutMs); } catch { reaped = false; }
+      result.reaped = reaped;
+      if (!reaped) {
+        result.ok = false;
+        result.stage = "cleanup";
+        result.reason = `verification process group was not fully reaped${result.reason ? ` (${result.reason})` : ""}`;
+      }
+    }
   }
-
-  result.ok = true;
-  result.stage = "done";
-  await terminateTree(child, termTimeoutMs);
-  await exited; // confirm reaped
-  return result;
 }
 
 // ---------------------------------------------------------------------------
-// 5. Resolved-path verification (isolation evidence)
+// 5. Resolved-path verification (isolation acceptance condition)
 // ---------------------------------------------------------------------------
 
-export function verifyResolvedPaths({ runRoot, configRoot }) {
+/** True when `p` is `base` or lies inside it. */
+function inside(p, base) {
+  const a = resolve(p);
+  const b = resolve(base);
+  return a === b || a.startsWith(b + sep);
+}
+
+/**
+ * Required artifacts must exist and every isolation path must stay inside this
+ * run's scope. `ok` is the acceptance condition the CLI enforces.
+ */
+export function verifyResolvedPaths({ runRoot, configRoot, home = process.env.HOME ?? homedir() }) {
   const agentDir = join(runRoot, "agent");
   const launchDir = join(runRoot, "dev-cwd");
-  const checks = {
+  const required = {
     agentDb: existsSync(join(agentDir, "agent.db")),
     modelsDb: existsSync(join(agentDir, "models.db")),
     sessions: existsSync(join(agentDir, "sessions")),
+  };
+  const optional = {
     configLogs: existsSync(join(configRoot, "logs")),
     configRun: existsSync(join(configRoot, "run")),
     launchDir: existsSync(launchDir),
   };
-  const leaksIntoUserHome = configRoot === join(process.env.HOME ?? homedir(), ".omp");
-  return { ...checks, agentDir, launchDir, configRoot, leaksIntoUserHome };
+  const scope = {
+    agentDirInRunRoot: inside(agentDir, runRoot),
+    launchDirInRunRoot: inside(launchDir, runRoot),
+    configRootNotUserOmp: resolve(configRoot) !== resolve(join(home, ".omp")),
+    configRootIsolatedName: basename(resolve(configRoot)).startsWith(".omp-m0-"),
+  };
+  const requiredOk = Object.values(required).every(Boolean);
+  const scopeOk = Object.values(scope).every(Boolean);
+  return { required, optional, scope, ok: requiredOk && scopeOk, agentDir, launchDir, configRoot };
 }
 
 // ---------------------------------------------------------------------------
 // 6. CLI
 // ---------------------------------------------------------------------------
 
-async function main() {
-  const keep = process.argv.includes("--keep");
-  const repoRoot = resolveRepoRoot();
-  const runRoot = mkdtempSync(join(repoRoot, ".dev-data", "omp-run-"));
-  mkdirSync(join(runRoot, "agent"), { recursive: true });
-  mkdirSync(join(runRoot, "dev-cwd"), { recursive: true });
-
+async function performChecks({ repoRoot, runRoot }) {
   const launcher = findPinnedLauncher(repoRoot);
   const pin = verifyPinnedSource(repoRoot);
   console.log(`launcher     : ${launcher}`);
@@ -322,11 +384,12 @@ async function main() {
   console.log(`pinned ver   : ${pin.pinnedVersion} (reported ${pin.reportedVersion ?? "n/a"})`);
   if (!pin.ok) {
     console.error(`FAIL: ${pin.reason}`);
-    rmSync(runRoot, { recursive: true, force: true });
-    process.exit(1);
+    return { exitCode: 1, configRoot: null };
   }
 
-  const { env, configRoot } = buildIsolatedEnv({ repoRoot, runRoot, keep });
+  const configDirName = makeConfigDirName();
+  const { env } = buildIsolatedEnv({ repoRoot, runRoot, configDirName });
+  const configRoot = join(env.HOME, configDirName);
   writeFileSync(join(runRoot, "agent", "models.yml"), readFileSync(join(__dirname, "models.yml")));
   console.log(`config root  : ${configRoot}`);
   console.log(`agent dir    : ${join(runRoot, "agent")}`);
@@ -340,26 +403,55 @@ async function main() {
   });
 
   const paths = verifyResolvedPaths({ runRoot, configRoot });
-  console.log(`resolved     : agent.db=${paths.agentDb} models.db=${paths.modelsDb} sessions=${paths.sessions} logs=${paths.configLogs} run=${paths.configRun}`);
-  if (paths.leaksIntoUserHome) {
-    console.error(`FAIL: config root resolved to the user's ~/.omp (${configRoot})`);
-    process.exit(1);
-  }
+  console.log(`resolved     : agent.db=${paths.required.agentDb} models.db=${paths.required.modelsDb} sessions=${paths.required.sessions} logs=${paths.optional.configLogs} run=${paths.optional.configRun}`);
+  console.log(`scope        : ${JSON.stringify(paths.scope)}`);
 
+  if (!paths.ok) {
+    console.error(`FAIL: isolation path checks failed: required=${JSON.stringify(paths.required)} scope=${JSON.stringify(paths.scope)}`);
+    return { exitCode: 1, configRoot };
+  }
   if (!result.ok) {
     console.error(`FAIL: ${result.stage}: ${result.reason}`);
-    process.exit(1);
+    return { exitCode: 1, configRoot };
+  }
+  if (result.reaped === false) {
+    console.error("FAIL: verification process group was not fully reaped");
+    return { exitCode: 1, configRoot };
   }
 
   console.log(`ready        : ${JSON.stringify(result.ready)}`);
   console.log(`negotiate    : ${JSON.stringify(result.negotiate)}`);
-  console.log(`models       : ${(result.models.data?.models ?? []).map((m) => m.id).join(",")}`);
+  console.log(`models       : ${result.models.data.models.map((m) => m.id).join(",")}`);
   console.log("PASS: ready + negotiate_protocol(v2) + get_available_models (no paid model call)");
+  return { exitCode: 0, configRoot };
+}
 
-  if (!keep) {
-    rmSync(runRoot, { recursive: true, force: true });
-    rmSync(configRoot, { recursive: true, force: true });
+async function main() {
+  const keep = process.argv.includes("--keep");
+  const repoRoot = resolveRepoRoot();
+  let runRoot = null;
+  let configRoot = null;
+  let exitCode = 1;
+  try {
+    runRoot = prepareRunRoot(join(repoRoot, ".dev-data"));
+    mkdirSync(join(runRoot, "agent"), { recursive: true });
+    mkdirSync(join(runRoot, "dev-cwd"), { recursive: true });
+    const outcome = await performChecks({ repoRoot, runRoot });
+    configRoot = outcome.configRoot;
+    exitCode = outcome.exitCode;
+  } catch (e) {
+    console.error(`FAIL: ${e.stack || e}`);
+    exitCode = 1;
+  } finally {
+    if (keep) {
+      if (runRoot) console.log(`kept run root    : ${runRoot}`);
+      if (configRoot) console.log(`kept config root : ${configRoot}`);
+    } else {
+      if (runRoot) rmSync(runRoot, { recursive: true, force: true });
+      safeRmConfigRoot(configRoot);
+    }
   }
+  process.exit(exitCode);
 }
 
 if (isMain) {
