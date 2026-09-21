@@ -17,6 +17,26 @@
 5. **模型设置页**（4.3 更新）：`02-settings-models.png` 已重拍为真实“模型配置”页（默认模型/生图模型/AI 服务/厂商账户，无 AI 服务）；`02-settings.png` 重拍为隔离后的 MCP 页（仅 fixture）。
 6. **测试表述**（3.1 修正）：单文件 14 项通过不再当作完整套件通过；完整 desktop 套件 `env -u SSH_ASKPASS node --test test/*.test.mjs` 实测 2523 项 / 2519 通过 / 0 失败 / 4 跳过（退出码 0）。
 
+## 返修记录（第二轮复审，2026-09-22）
+
+对提交 `f3ed7f3` 的第二轮复审针对 `verify-rpc.mjs` 提出 6 项问题，本轮重写脚本并补充假进程测试；历史事实保留，新增证据如下：
+
+1. **运行环境隔离**（一）：脚本不再 `...process.env` 直接继承。`buildIsolatedEnv` 显式剔除 `OMP_PROFILE`/`PI_PROFILE`/`XDG_DATA_HOME`/`XDG_STATE_HOME`/`XDG_CACHE_HOME`/`XDG_CONFIG_HOME`/`PI_CODING_AGENT_SESSION_DIR` 及凭据类变量，再显式设 `PI_CONFIG_DIR`（每次运行唯一 `~/.omp-m0-<hex>`）、`PI_CODING_AGENT_DIR`、`OMP_DEV_LAUNCH_DIR`。隔离目录每次运行唯一（`mkdtemp`），并发/跨 worktree 不共享状态；运行后 `verifyResolvedPaths` 核对 `agent.db`/`models.db`/`sessions`/`logs`/`run` 均落在隔离目录并打印。
+2. **进程清理**（二）：`terminateTree` 以 `detached` 启动子进程为进程组，SIGTERM 整组 → 等待退出 → 超时 SIGKILL → 确认回收后才返回；成功、断言失败、超时、启动失败与异常路径统一走该清理，`runProtocolCheck` 绝不 reject。`signalCode=SIGKILL` 与 `isAlive(pid)=false` 断言覆盖“子进程忽略 SIGTERM 被强制回收”场景。
+3. **stdout 分帧**（三）：改用 `readline` 按完整行解析，逐行 `JSON.parse`（非 JSON 行忽略），按解析后的 `type`/`command`/`id`/`success` 匹配响应，不再用字符串 `includes`。
+4. **固定源码入口**（四）：`findPinnedLauncher` 定位 `upstream/oh-my-pi/packages/coding-agent/scripts/omp`（repo 路径，不依赖全局 `~/.bun/bin/omp` 链接）；`verifyPinnedSource` 用 `git ls-tree HEAD` 取 gitlink、`git -C … rev-parse HEAD` 取实际 SHA 比对，并以启动器 `--version` 与 `packages/utils/package.json` 版本（18.2.7）比对，不一致即失败退出。未修改用户全局 OMP 链接或参考源码。
+5. **针对性验证**（五）：新增 `verify-rpc.test.mjs`（node:test，9 项）与 `fake-omp.mjs` 假进程，覆盖：正常传输、分段/合并/UTF-8 跨块重组、错误响应非零退出、启动失败非零退出、超时非零退出、忽略 SIGTERM 强制回收、profile/XDG/凭据剥离、入口绑定、缺失/不一致失败。测试不调用真实模型、不读取或输出用户密钥。
+6. **交付表述**（六）：看板“全通过”明确为 desktop 包套件（`apps/desktop`）通过；未重跑完整 workspace 套件前不写“workspace 全通过”。HANDOFF 不写“复审通过”。
+
+本轮实际执行（`docs/validation/M0-rpc/` 下）：
+
+```bash
+node --test docs/validation/M0-rpc/verify-rpc.test.mjs   # 9 tests, 9 pass, 0 fail (exit 0)
+node docs/validation/M0-rpc/verify-rpc.mjs               # PASS: ready + negotiate v2 + models (exit 0)
+```
+
+真实运行关键输出：launcher 为 repo 路径、gitlink=submodule SHA=`d49918fab…`、pinned ver 18.2.7（reported 18.2.7）、config root `~/.omp-m0-<hex>`、resolved 全部 `=true`、`ready`/`negotiate_protocol(v2)`/`get_available_models` 均通过。
+
 ## 1. 环境与版本
 
 | 项目 | 版本/事实 | 说明 |

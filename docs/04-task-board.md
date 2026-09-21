@@ -49,11 +49,11 @@ T23 不阻塞仅面向 macOS arm64 的首次交付，但未通过前不能宣称
 证据详见 `docs/validation/M0-baseline.md`（命令、退出码、版本、SHA、界面截图均已记录）。
 
 - **T01 环境**：Node v24.14.0（nvm）、pnpm 10.34.5（corepack）、Bun 1.4.2、rustc stable 1.95.0 + nightly-2026-08-12（1.99.0-nightly）、cmake 4.4.3 + ninja 1.13.2（pip）；参考子模块浅取到固定 SHA（pi-desktop `0111e306`、oh-my-pi `d49918fab`）。
-- **T02 构建/测试**：`pnpm install --frozen-lockfile`、`build:js`、`typecheck`、`lint`、`cargo build -p host-core --locked`、`cargo test -p host-core --locked`（577 通过）、`cargo fmt --check` 均通过；`pnpm -r --if-present test` 1 项失败（`remote-host-ssh-password.test.mjs`，本机 `SSH_ASKPASS` 环境变量触发，非回归，`env -u SSH_ASKPASS` 后全通过）。
+- **T02 构建/测试**：`pnpm install --frozen-lockfile`、`build:js`、`typecheck`、`lint`、`cargo build -p host-core --locked`、`cargo test -p host-core --locked`（577 通过）、`cargo fmt --check` 均通过；`pnpm -r --if-present test` 1 项失败（`remote-host-ssh-password.test.mjs`，本机 `SSH_ASKPASS` 环境变量触发，非回归）；重跑范围明确为 **desktop 包套件**（`env -u SSH_ASKPASS node --test apps/desktop/test/*.test.mjs` → 2523 项 / 2519 通过 / 0 失败 / 4 跳过），其余 workspace 包未重跑。
 - **T03 隔离/UI**：开发版以 `PI_DESKTOP_DATA_DIR` 隔离，`pi.sqlite`/`secrets/.machine-key`/日志/插件写入 `.dev-data/pi-desktop`，`~/.pi-desktop` 零写入，更新源 dev 构建 `disabled`；Electron 43.6.0 启动，CDP 截取项目列表/设置-MCP/模型/扩展 5 张基线截图。
-- **OMP 协议启动（M0 步骤 7，T04 前置）**：`bun setup` 成功；`node docs/validation/M0-rpc/verify-rpc.mjs`（固定源码入口 `~/.bun/bin/omp`，全量隔离 `PI_CONFIG_DIR`/`PI_CODING_AGENT_DIR`/`OMP_DEV_LAUNCH_DIR`）输出 `ready`、`negotiate_protocol`(v2)、`get_available_models`（mock 模型，无付费模型调用）。版本 18.2.7（来自 `packages/utils/package.json`）。
+- **OMP 协议启动（M0 步骤 7，T04 前置）**：`bun setup` 成功；`node docs/validation/M0-rpc/verify-rpc.mjs`（绑定 `upstream/oh-my-pi/.../scripts/omp` 的 repo 路径入口，gitlink=submodule SHA=`d49918fab`、版本 18.2.7 核对一致；全量隔离 + readline 分帧 + 进程树回收）输出 `ready`、`negotiate_protocol`(v2)、`get_available_models`（mock 模型，无付费模型调用）。
 
-> 复审返修（2026-09-22）：6 项问题已修复并重验（OMP 版本入口、OMP 运行环境隔离、桌面 `~/.agents` 隔离、可复现验证脚本+fixture、模型设置页截图、测试表述）。详见 `docs/validation/M0-baseline.md` 顶部“返修记录”。
+> 复审返修（2026-09-22，两轮）：第一轮 6 项 + 第二轮 6 项均已修复并重验（OMP 版本入口、OMP/桌面环境隔离、可复现脚本+fixture、假进程针对性验证、模型设置页截图、测试表述）。详见 `docs/validation/M0-baseline.md` 顶部两段“返修记录”。
 
 ## 单任务记录模板
 
