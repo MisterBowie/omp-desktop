@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  js:
+    name: JS build / typecheck / lint / architecture / test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          # Match the Node that Electron 43 bundles (24.18), so CI type-checks
+          # and tests against the same runtime the app actually ships.
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        run: pnpm build:js
+
+      - name: Typecheck Desktop
+        # Workspace dependency builds already run tsc; Vite does not check the app.
+        run: pnpm --filter @pi-desktop/desktop typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Check architecture budgets
+        env:
+          ARCHITECTURE_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
+        run: node scripts/check-architecture.mjs
+
+      - name: Unit tests
+        run: pnpm -r --if-present test
+
+  rust:
+    name: Rust host-core format / lint / test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features
+
+      - name: Test
+        run: cargo test -p host-core --locked

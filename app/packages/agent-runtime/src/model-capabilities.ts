@@ -1,0 +1,191 @@
+import {
+  effectiveContextWindow,
+  THINKING_LEVELS,
+  type ModelBinding,
+  type ModelInfo,
+  type ModelModality,
+  type ThinkingLevel,
+} from "@pi-desktop/shared";
+import type { ModelConfig, ThinkingCapabilitySet } from "./thinking-level.js";
+
+export {
+  agentThinkingLevel,
+  clampThinkingLevel,
+  omitThinkingModel,
+  type ModelConfig,
+  type ThinkingCapabilitySet,
+} from "./thinking-level.js";
+
+export type ModelCapabilities = ThinkingCapabilitySet;
+/** Compatibility name used by Electron main and existing runtime callers. */
+export type ThinkingCapabilities = ModelCapabilities;
+
+/** Resolve reasoning capability from the model metadata supplied by main. */
+export function capabilitiesFromModelConfig(
+  model?: Pick<ModelConfig, "reasoning" | "supportedThinkingLevels"> | null,
+): ModelCapabilities {
+  if (!model?.reasoning) {
+    return {
+      supportsReasoning: false,
+      supportedThinkingLevels: ["off"],
+    };
+  }
+  return {
+    supportsReasoning: true,
+    supportedThinkingLevels: model.supportedThinkingLevels?.length
+      ? [...model.supportedThinkingLevels]
+      : ["low", "medium", "high"],
+  };
+}
+
+/** Resolve image transport from the full models.dev input modalities. */
+export function visionFromModelConfig(
+  model?: Pick<ModelConfig, "modalities" | "input"> | null,
+): boolean {
+  return model?.modalities?.input.includes("image") === true ||
+    model?.input.includes("image") === true;
+}
+
+/** Map a public catalog row to the capability shape used by settings helpers. */
+export function capabilitiesFromModelInfo(model?: ModelInfo | null): ModelCapabilities {
+  if (!model?.reasoning) {
+    return {
+      supportsReasoning: false,
+      supportedThinkingLevels: ["off"],
+    };
+  }
+  return {
+    supportsReasoning: true,
+    supportedThinkingLevels: model.supportedThinkingLevels?.length
+      ? [...model.supportedThinkingLevels]
+      : ["low", "medium", "high"],
+  };
+}
+
+/**
+ * Apply explicit per-provider model settings. Thinking levels and output limits
+ * come from the user's binding. A legacy/generated 128k context value is treated
+ * as the generic fallback when a published catalog window is available; every
+ * other context value remains an explicit Advanced override.
+ */
+export function modelConfigWithBinding(
+  model: ModelConfig,
+  binding?:
+    | Pick<
+        ModelBinding,
+        | "contextWindow"
+        | "maxTokens"
+        | "thinkingLevels"
+        | "supportsImages"
+        | "supportsDocuments"
+        | "nativeWebSearch"
+      >
+    | null,
+): ModelConfig {
+  if (!binding) return model;
+  const enabledThinkingLevels = THINKING_LEVELS.filter((level) =>
+    binding.thinkingLevels.includes(level),
+  );
+  const thinkingLevelMap = { ...(model.thinkingLevelMap ?? {}) };
+  // pi-ai treats xhigh/max as unsupported when their adapter-facing mapping
+  // is absent or null. The explicit binding is authoritative, so an enabled
+  // extended level without a catalog translation must pass through as-is.
+  for (const level of ["xhigh", "max"] as const) {
+    if (
+      enabledThinkingLevels.includes(level) &&
+      thinkingLevelMap[level] == null
+    ) {
+      thinkingLevelMap[level] = level;
+    }
+  }
+  const contextWindow =
+    effectiveContextWindow(model.contextWindow, binding.contextWindow) ??
+    model.contextWindow;
+  const catalogContextWindow =
+    model.catalogContextWindow ??
+    (model.source === "models.dev" && model.contextWindow > 0
+      ? model.contextWindow
+      : undefined);
+  return {
+    ...model,
+    ...(catalogContextWindow !== undefined ? { catalogContextWindow } : {}),
+    contextWindow,
+    limit: {
+      ...(model.limit ?? {}),
+      context: contextWindow,
+    },
+    maxTokens: binding.maxTokens,
+    reasoning: enabledThinkingLevels.some((level) => level !== "off"),
+    supportedThinkingLevels: enabledThinkingLevels,
+    ...(Object.keys(thinkingLevelMap).length > 0 ? { thinkingLevelMap } : {}),
+    ...modalityOverride(model, binding),
+    ...(binding.nativeWebSearch === true ? { webSearch: true } : {}),
+  };
+}
+
+/**
+ * Apply the binding's attachment overrides to the adapter-facing modality
+ * arrays. Unlike thinking levels these are not narrowed to what models.dev
+ * published: a self-hosted or proxied endpoint routinely accepts images the
+ * catalog entry does not mention, and refusing the override would leave the user
+ * with a switch that does nothing. `null`/absent still follows the catalog.
+ */
+function modalityOverride(
+  model: ModelConfig,
+  binding: Pick<ModelBinding, "supportsImages" | "supportsDocuments">,
+): Partial<ModelConfig> {
+  const images = binding.supportsImages;
+  const documents = binding.supportsDocuments;
+  if (typeof images !== "boolean" && typeof documents !== "boolean") return {};
+  const publishedInput = model.modalities?.input ?? [];
+  const nextInput = new Set<ModelModality>(publishedInput);
+  if (typeof images === "boolean") {
+    if (images) nextInput.add("image");
+    else nextInput.delete("image");
+  }
+  if (typeof documents === "boolean") {
+    if (documents) nextInput.add("pdf");
+    else nextInput.delete("pdf");
+  }
+  nextInput.add("text");
+  const input = [...nextInput];
+  return {
+    modalities: {
+      input,
+      output: model.modalities?.output ?? ["text"],
+    },
+    // The adapter subset carries only what pi-ai can encode as a content block.
+    input: input.filter(
+      (modality): modality is "text" | "image" =>
+        modality === "text" || modality === "image",
+    ),
+  };
+}
+
+/**
+ * Unknown IDs remain runnable without invented catalog semantics. This is a
+ * transport-safe generic shape, not a second model catalog.
+ */
+export function genericModelConfig(
+  modelId: string,
+  baseUrl = "",
+): ModelConfig {
+  return {
+    source: "generic",
+    name: modelId,
+    baseUrl,
+    reasoning: false,
+    modalities: { input: ["text"], output: ["text"] },
+    limit: { context: 128_000, input: 128_000, output: 8_192 },
+    cost: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+    },
+    input: ["text"],
+    contextWindow: 128_000,
+    maxTokens: 8_192,
+    supportedThinkingLevels: [],
+  };
+}

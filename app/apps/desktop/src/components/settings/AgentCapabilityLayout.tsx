@@ -1,0 +1,592 @@
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { useTranslation } from "react-i18next";
+import type { ProjectRecord } from "@pi-desktop/shared";
+import { api } from "../../lib/api";
+import { useAppStore } from "../../stores/app-store";
+import { Button, TooltipButton, cx } from "../ui";
+import { AnchoredMenu } from "./AnchoredMenu";
+import { SettingsMenuSelect } from "./SettingsMenuSelect";
+import {
+  IconFolder,
+  IconFolderOpen,
+  IconMore,
+  IconSearch,
+  IconX,
+} from "../icons";
+
+export type AgentProjectOption = {
+  name: string;
+  path: string;
+};
+
+/** Which level the workbench is currently showing. */
+export type CapabilityFilter = "all" | "global" | "project";
+
+export function projectDisplayName(path: string, fallback?: string): string {
+  if (fallback?.trim()) return fallback.trim();
+  const parts = path.replaceAll("\\", "/").split("/").filter(Boolean);
+  return parts.at(-1) || path;
+}
+
+/** Recent projects plus the project currently open in the window. */
+export function useAgentProjects() {
+  const currentProjectPath = useAppStore((state) => state.workspace?.path ?? null);
+  const [projects, setProjects] = useState<ProjectRecord[]>([]);
+  const [selectedProjectPath, setSelectedProjectPath] = useState<string | null>(
+    currentProjectPath,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .listProjects()
+      .then((result) => {
+        if (cancelled) return;
+        setProjects(result.projects ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setProjects([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (currentProjectPath) setSelectedProjectPath(currentProjectPath);
+  }, [currentProjectPath]);
+
+  const options = useMemo<AgentProjectOption[]>(() => {
+    const seen = new Set<string>();
+    const result: AgentProjectOption[] = [];
+    const add = (path: string | null | undefined, name?: string) => {
+      const normalized = path?.trim();
+      if (!normalized) return;
+      const key = normalized.toLocaleLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      result.push({ path: normalized, name: projectDisplayName(normalized, name) });
+    };
+    add(currentProjectPath);
+    for (const project of projects) add(project.path, project.name);
+    return result;
+  }, [currentProjectPath, projects]);
+
+  useEffect(() => {
+    if (options.length === 0) {
+      if (selectedProjectPath) setSelectedProjectPath(null);
+      return;
+    }
+    if (
+      !selectedProjectPath ||
+      !options.some((project) => project.path === selectedProjectPath)
+    ) {
+      setSelectedProjectPath(options[0].path);
+    }
+  }, [options, selectedProjectPath]);
+
+  return {
+    currentProjectPath,
+    selectedProjectPath,
+    setSelectedProjectPath,
+    projects,
+    options,
+  };
+}
+
+/**
+ * The two-click delete every capability row uses. The arm-and-expire rule is
+ * shared with the session and project rows, so the settings pages re-export it
+ * from the layout they already share instead of keeping a second copy.
+ */
+export { useArmedDelete } from "../../hooks/use-armed-delete";
+
+/** Case-insensitive substring match across whichever fields a row exposes. */
+export function matchesCapabilitySearch(
+  query: string,
+  ...fields: readonly (string | undefined | null)[]
+): boolean {
+  const needle = query.trim().toLocaleLowerCase();
+  if (!needle) return true;
+  return fields.some((field) => field?.toLocaleLowerCase().includes(needle));
+}
+
+export function AgentProjectPicker({
+  value,
+  options,
+  label,
+  disabled,
+  onChange,
+}: {
+  value: string | null;
+  options: readonly AgentProjectOption[];
+  label: string;
+  disabled?: boolean;
+  onChange: (path: string) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="agent-capability-project-picker">
+      <IconFolder size={13} aria-hidden="true" />
+      <SettingsMenuSelect
+        className="agent-capability-project-select"
+        label={label}
+        value={value ?? ""}
+        disabled={disabled || options.length === 0}
+        onChange={onChange}
+        options={
+          options.length === 0
+            ? [{ id: "", label: t("settings.noProjects"), disabled: true }]
+            : options.map((project) => ({
+                id: project.path,
+                label: project.name,
+              }))
+        }
+      />
+    </div>
+  );
+}
+
+export function CapabilityToggle({
+  checked,
+  label,
+  disabled,
+  busy,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  disabled?: boolean;
+  busy?: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={cx("settings-toggle", checked && "on", busy && "is-busy")}
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      aria-busy={busy || undefined}
+      disabled={disabled || busy}
+      onClick={onChange}
+    >
+      <span className="settings-toggle-thumb" />
+    </button>
+  );
+}
+
+/**
+ * Page shell. The heading is owned by SettingsPage, so this contributes the
+ * toolbar and the single panel the rows live in.
+ */
+export function AgentCapabilityPage({
+  toolbar,
+  children,
+  className,
+}: {
+  toolbar: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cx("agent-capability-page", className)}>
+      {toolbar}
+      {children}
+    </div>
+  );
+}
+
+/**
+ * One toolbar for the whole page: the level filter demoted from a page section
+ * to a segmented control with live counts, one search field, the project the
+ * project level resolves against, and the page's primary actions.
+ */
+export function CapabilityToolbar({
+  filter,
+  onFilterChange,
+  counts,
+  search,
+  onSearchChange,
+  searchPlaceholder,
+  projectPicker,
+  actions,
+}: {
+  /** Omit to hide the filter entirely, as the global-only subagents page does. */
+  filter?: CapabilityFilter;
+  onFilterChange?: (filter: CapabilityFilter) => void;
+  counts?: { all: number; global: number; project: number };
+  search: string;
+  onSearchChange: (value: string) => void;
+  searchPlaceholder: string;
+  projectPicker?: ReactNode;
+  actions?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const segments: readonly { id: CapabilityFilter; label: string; count: number }[] =
+    counts
+      ? [
+          { id: "all", label: t("settings.capabilityFilterAll"), count: counts.all },
+          {
+            id: "global",
+            label: t("settings.capabilityFilterGlobal"),
+            count: counts.global,
+          },
+          {
+            id: "project",
+            label: t("settings.capabilityFilterProject"),
+            count: counts.project,
+          },
+        ]
+      : [];
+  return (
+    <div className="agent-capability-toolbar">
+      {filter && onFilterChange && segments.length > 0 ? (
+        <div
+          className="settings-segment agent-capability-segment"
+          role="radiogroup"
+          aria-label={t("settings.capabilityFilterLabel")}
+        >
+          {segments.map((segment) => (
+            <button
+              key={segment.id}
+              type="button"
+              role="radio"
+              aria-checked={filter === segment.id}
+              className={cx(
+                "settings-segment-item",
+                "agent-capability-segment-btn",
+                filter === segment.id && "active",
+              )}
+              onClick={() => onFilterChange(segment.id)}
+            >
+              {segment.label}
+              <span className="agent-capability-segment-count">{segment.count}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <div className="agent-capability-search-wrap">
+        <IconSearch size={13} aria-hidden="true" />
+        <input
+          className="agent-capability-search"
+          type="search"
+          value={search}
+          placeholder={searchPlaceholder}
+          aria-label={searchPlaceholder}
+          onChange={(event) => onSearchChange(event.target.value)}
+        />
+        {search ? (
+          <TooltipButton
+            type="button"
+            className="agent-capability-search-clear"
+            tooltip={t("settings.clearSearch")}
+            ariaLabel={t("settings.clearSearch")}
+            onClick={() => onSearchChange("")}
+          >
+            <IconX size={11} />
+          </TooltipButton>
+        ) : null}
+      </div>
+      {projectPicker}
+      {actions ? <div className="agent-capability-toolbar-actions">{actions}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * The one panel every row lives in. `loading` is first paint only; a refresh
+ * that already has rows to show keeps them and dims instead, so toggling a
+ * switch never replaces the list with skeletons.
+ */
+export function CapabilityPanel({
+  loading,
+  refreshing,
+  loadingLabel,
+  children,
+}: {
+  loading: boolean;
+  refreshing?: boolean;
+  loadingLabel: string;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div
+      className={cx(
+        "settings-panel",
+        "agent-capability-panel",
+        refreshing && !loading && "is-refreshing",
+      )}
+    >
+      {refreshing && !loading ? (
+        <span className="sr-only" role="status" aria-live="polite">
+          {t("settings.capabilityRefreshing")}
+        </span>
+      ) : null}
+      <div className="agent-capability-list" role="list" aria-busy={loading || undefined}>
+        {loading ? <CapabilitySkeleton label={loadingLabel} /> : children}
+      </div>
+    </div>
+  );
+}
+
+/** Level divider inside the panel: which level, where it lives, how many. */
+export function CapabilityGroupHeader({
+  label,
+  path,
+  count,
+  action,
+}: {
+  label: string;
+  /** Resolved `.agents` path; omit for shipped sources that have no file. */
+  path?: string;
+  count: number;
+  action?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="agent-capability-group" role="presentation">
+      <span className="agent-capability-group-label">{label}</span>
+      {path ? (
+        <code className="agent-capability-group-path" title={path}>
+          {path}
+        </code>
+      ) : (
+        <span className="agent-capability-group-path" aria-hidden="true" />
+      )}
+      <span
+        className="agent-capability-group-count"
+        title={t("settings.capabilityCount", { count })}
+      >
+        {count}
+      </span>
+      {action ? <span className="agent-capability-group-action">{action}</span> : null}
+    </div>
+  );
+}
+
+/**
+ * One capability. The level badge is on the row itself, not only in the group
+ * header, so a row scrolled away from its divider still says where it lives.
+ */
+export function CapabilityRow({
+  glyph,
+  glyphState,
+  name,
+  badges,
+  command,
+  description,
+  meta,
+  actions,
+  off,
+  menuOpen,
+}: {
+  glyph: ReactNode;
+  /** Tints the glyph for capabilities that carry live state, e.g. MCP handshakes. */
+  glyphState?: string;
+  name: string;
+  badges?: ReactNode;
+  command?: string;
+  description: string;
+  meta?: ReactNode;
+  actions: ReactNode;
+  off?: boolean;
+  menuOpen?: boolean;
+}) {
+  return (
+    <div
+      className={cx(
+        "agent-capability-row",
+        off && "is-off",
+        menuOpen && "menu-open",
+      )}
+      role="listitem"
+    >
+      <span
+        className={cx("agent-capability-glyph", glyphState && `is-${glyphState}`)}
+        aria-hidden="true"
+      >
+        {glyph}
+      </span>
+      <div className="agent-capability-copy">
+        <div className="agent-capability-row-title">
+          <span className="agent-capability-name">{name}</span>
+          {badges}
+        </div>
+        {command ? (
+          <code className="agent-capability-command" title={command}>
+            {command}
+          </code>
+        ) : null}
+        <p className="agent-capability-description" title={description}>
+          {description}
+        </p>
+        {meta ? <div className="agent-capability-meta">{meta}</div> : null}
+      </div>
+      <div className="agent-capability-row-actions">{actions}</div>
+    </div>
+  );
+}
+
+export type CapabilityMenuItem = {
+  key: string;
+  label: string;
+  icon?: ReactNode;
+  danger?: boolean;
+  disabled?: boolean;
+  onSelect: () => void;
+};
+
+/**
+ * Overflow menu for one row. Open state is owned by the page so only one row's
+ * menu can be open, and Escape or any outside press dismisses it.
+ */
+export function CapabilityRowMenu({
+  label,
+  items,
+  open,
+  disabled,
+  onOpenChange,
+}: {
+  label: string;
+  items: readonly CapabilityMenuItem[];
+  open: boolean;
+  disabled?: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <AnchoredMenu
+      className="agent-capability-menu-wrap"
+      open={open}
+      onClose={() => onOpenChange(false)}
+      menuClassName="agent-capability-menu"
+      label={label}
+      role="menu"
+      align="end"
+      trigger={(ref) => (
+        <TooltipButton
+          ref={ref}
+          type="button"
+          className="settings-icon-button"
+          tooltip={label}
+          ariaLabel={label}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          disabled={disabled}
+          onClick={() => onOpenChange(!open)}
+        >
+          <IconMore size={16} />
+        </TooltipButton>
+      )}
+    >
+          {items.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              role="menuitem"
+              className={cx(item.danger && "danger")}
+              disabled={item.disabled}
+              onClick={item.onSelect}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+    </AnchoredMenu>
+  );
+}
+
+/** Ghost rows that mirror the real row anatomy while the host responds. */
+export function CapabilitySkeleton({ label }: { label: string }) {
+  return (
+    <div className="agent-capability-skeleton" role="status" aria-live="polite">
+      <span className="sr-only">{label}</span>
+      {[0, 1, 2].map((row) => (
+        <div key={row} className="agent-capability-skeleton-row" aria-hidden="true">
+          <span className="agent-capability-skeleton-glyph" />
+          <span className="agent-capability-skeleton-lines">
+            <span className="agent-capability-skeleton-line is-title" />
+            <span className="agent-capability-skeleton-line is-desc" />
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Empty state. `action` keeps it from being a dead end. */
+export function CapabilityEmpty({
+  message,
+  hint,
+  icon,
+  action,
+}: {
+  message: string;
+  hint?: string;
+  icon?: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="agent-capability-empty" role="status">
+      <span className="agent-capability-empty-icon" aria-hidden="true">
+        {icon ?? <IconFolderOpen size={18} />}
+      </span>
+      <span className="agent-capability-empty-message">{message}</span>
+      {hint ? <span className="agent-capability-empty-hint">{hint}</span> : null}
+      {action ? <div className="agent-capability-empty-action">{action}</div> : null}
+    </div>
+  );
+}
+
+export function CapabilityButton({
+  children,
+  onClick,
+  variant = "secondary",
+  disabled,
+  busy,
+  title,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  variant?: "primary" | "secondary";
+  disabled?: boolean;
+  busy?: boolean;
+  title?: string;
+}) {
+  // No `size="sm"`: its utilities live in Tailwind's `utilities` layer while the
+  // style partials are unlayered, so `.btn` wins regardless. Toolbar buttons get
+  // their compact geometry from `.agent-capability-toolbar-actions > .btn`.
+  const className = cx(
+    "btn",
+    variant === "primary" ? "btn-primary" : "btn-secondary",
+  );
+  if (title) {
+    return (
+      <TooltipButton
+        tooltip={title}
+        className={className}
+        disabled={disabled || busy}
+        aria-busy={busy || undefined}
+        onClick={onClick}
+      >
+        {children}
+      </TooltipButton>
+    );
+  }
+  return (
+    <Button
+      variant={variant}
+      disabled={disabled || busy}
+      aria-busy={busy || undefined}
+      onClick={onClick}
+    >
+      {children}
+    </Button>
+  );
+}

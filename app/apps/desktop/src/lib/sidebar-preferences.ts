@@ -1,0 +1,390 @@
+import type { ProjectWorkspace, SessionSummary, SessionSort } from "@pi-desktop/shared";
+export type { SessionSort } from "@pi-desktop/shared";
+export { sortSessions, sessionIsPinned, sessionIsArchived } from "@pi-desktop/shared";
+
+/** Local copy keeps this pure module runnable in Node's TS test loader. */
+export function normalizeProjectPath(projectPath?: string | null): string | null {
+  const value = projectPath?.trim();
+  if (!value) return null;
+  let normalized = value.replace(/\\/g, "/");
+  // Strip the Windows extended-length prefix (`//?/C:/...` → `C:/...`)
+  if (/^\/\/\?\/[A-Za-z]:\//.test(normalized)) {
+    normalized = normalized.slice(4);
+  }
+  // Remove trailing slashes but keep the one after a drive letter (e.g. `C:/`)
+  normalized = normalized.replace(/(?<![A-Za-z]:)\/+$/, "");
+  return normalized || "/";
+}
+
+export type ProjectSort = "recent" | "created" | "oldest" | "name" | "manual";
+export type SessionMeta = {
+  pinned?: boolean;
+  archived?: boolean;
+  order?: number;
+  /** Survives renderer restarts so automatic titles never replace a manual one. */
+  manualTitle?: boolean;
+};
+export const MAX_PROJECT_NAME_CHARS = 80;
+export type ProjectMeta = {
+  /** Renderer-only display name; the project path remains authoritative. */
+  name?: string;
+  pinned?: boolean;
+  archived?: boolean;
+  collapsed?: boolean;
+  order?: number;
+};
+export type SidebarPreferences = {
+  sessionMeta: Record<string, SessionMeta>;
+  projectMeta: Record<string, ProjectMeta>;
+  projectSort: ProjectSort;
+  sessionView: { sort: SessionSort; archived: boolean };
+  openProjectPaths: string[];
+};
+
+export const SIDEBAR_PREFERENCES_KEY = "pi.desktop.sidebarPreferences";
+export const SIDEBAR_WIDTH_KEY = "pi.desktop.sidebarWidth";
+export const SIDEBAR_WIDTH_MIN = 240;
+export const SIDEBAR_WIDTH_DEFAULT = 275;
+export const SIDEBAR_WIDTH_MAX = 520;
+
+export function clampSidebarWidth(value: number, max = SIDEBAR_WIDTH_MAX): number {
+  if (!Number.isFinite(value)) return SIDEBAR_WIDTH_DEFAULT;
+  const upper = Math.min(
+    SIDEBAR_WIDTH_MAX,
+    Math.max(SIDEBAR_WIDTH_MIN, Math.round(max)),
+  );
+  return Math.round(Math.min(upper, Math.max(SIDEBAR_WIDTH_MIN, value)));
+}
+
+function storage(): Storage | null {
+  try {
+    return typeof globalThis !== "undefined" && "localStorage" in globalThis
+      ? globalThis.localStorage
+      : null;
+  } catch {
+    return null;
+  }
+}
+function read(key: string): unknown {
+  const store = storage();
+  if (!store) return undefined;
+  try {
+    const value = store.getItem(key);
+    return value ? JSON.parse(value) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+function write(key: string, value: unknown): void {
+  const store = storage();
+  if (!store) return;
+  try {
+    store.setItem(key, JSON.stringify(value));
+  } catch {
+    // Preferences are best effort and must never block the app.
+  }
+}
+function object(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+function bool(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+function number(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+function manualOrder(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : undefined;
+}
+export function normalizeProjectName(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const name = value.trim();
+  if (!name || Array.from(name).length > MAX_PROJECT_NAME_CHARS) return undefined;
+  return name;
+}
+function cleanSessionMeta(value: unknown): Record<string, SessionMeta> {
+  if (!object(value)) return {};
+  const output: Record<string, SessionMeta> = {};
+  for (const [id, raw] of Object.entries(value)) {
+    if (!id || !object(raw)) continue;
+    const item: SessionMeta = {};
+    const pinned = bool(raw.pinned);
+    const archived = bool(raw.archived);
+    const order = manualOrder(raw.order);
+    const manualTitle = bool(raw.manualTitle);
+    if (pinned !== undefined) item.pinned = pinned;
+    if (archived !== undefined) item.archived = archived;
+    if (order !== undefined) item.order = order;
+    if (manualTitle !== undefined) item.manualTitle = manualTitle;
+    if (Object.keys(item).length) output[id] = item;
+  }
+  return output;
+}
+function cleanProjectMeta(value: unknown): Record<string, ProjectMeta> {
+  if (!object(value)) return {};
+  const output: Record<string, ProjectMeta> = {};
+  for (const [rawPath, raw] of Object.entries(value)) {
+    const path = normalizeProjectPath(rawPath);
+    if (!path || !object(raw)) continue;
+    const item: ProjectMeta = {};
+    const name = normalizeProjectName(raw.name);
+    const pinned = bool(raw.pinned);
+    const archived = bool(raw.archived);
+    const collapsed = bool(raw.collapsed);
+    const order = manualOrder(raw.order);
+    if (name !== undefined) item.name = name;
+    if (pinned !== undefined) item.pinned = pinned;
+    if (archived !== undefined) item.archived = archived;
+    if (collapsed !== undefined) item.collapsed = collapsed;
+    if (order !== undefined) item.order = order;
+    if (Object.keys(item).length) output[path] = item;
+  }
+  return output;
+}
+function cleanPaths(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const output: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    const path = normalizeProjectPath(item);
+    if (!path || seen.has(path)) continue;
+    seen.add(path);
+    output.push(item.trim());
+  }
+  return output;
+}
+function sessionSort(value: unknown): SessionSort {
+  return value === "created" || value === "oldest" || value === "name" || value === "manual"
+    ? value
+    : "recent";
+}
+function projectSort(value: unknown): ProjectSort {
+  return value === "created" || value === "oldest" || value === "name" || value === "manual"
+    ? value
+    : "recent";
+}
+
+export function loadSidebarPreferences(): SidebarPreferences {
+  const raw = read(SIDEBAR_PREFERENCES_KEY);
+  const root = object(raw) ? raw : {};
+  const view = object(root.sessionView) ? root.sessionView : {};
+  const result: SidebarPreferences = {
+    sessionMeta: cleanSessionMeta(root.sessionMeta),
+    projectMeta: cleanProjectMeta(root.projectMeta),
+    projectSort: projectSort(root.projectSort),
+    sessionView: {
+      sort: sessionSort(view.sort),
+      archived:
+        typeof view.archived === "boolean"
+          ? view.archived
+          : typeof view.showArchived === "boolean"
+            ? view.showArchived
+            : false,
+    },
+    openProjectPaths: cleanPaths(root.openProjectPaths),
+  };
+  // Migrate the old pin-only preferences once. Do not re-apply them after
+  // the new record has been written, otherwise an explicit unpin is lost.
+  if (!object(raw)) {
+    const oldSessionPins = read("pi.desktop.pinnedSessions");
+    if (Array.isArray(oldSessionPins)) {
+      for (const id of oldSessionPins) {
+        if (typeof id === "string" && id) {
+          result.sessionMeta[id] = { ...result.sessionMeta[id], pinned: true };
+        }
+      }
+    }
+    const oldProjectPins = read("pi.desktop.pinnedProjects");
+    if (Array.isArray(oldProjectPins)) {
+      for (const rawPath of oldProjectPins) {
+        if (typeof rawPath !== "string") continue;
+        const path = normalizeProjectPath(rawPath);
+        if (path) result.projectMeta[path] = { ...result.projectMeta[path], pinned: true };
+      }
+    }
+  }
+  return result;
+}
+
+export function saveSidebarPreferences(value: SidebarPreferences): void {
+  write(SIDEBAR_PREFERENCES_KEY, {
+    sessionMeta: cleanSessionMeta(value.sessionMeta),
+    projectMeta: cleanProjectMeta(value.projectMeta),
+    projectSort: projectSort(value.projectSort),
+    sessionView: {
+      sort: sessionSort(value.sessionView.sort),
+      archived: value.sessionView.archived === true,
+    },
+    openProjectPaths: cleanPaths(value.openProjectPaths),
+  });
+}
+
+export function loadSidebarWidth(): number {
+  const value = read(SIDEBAR_WIDTH_KEY);
+  return typeof value === "number" ? clampSidebarWidth(value) : SIDEBAR_WIDTH_DEFAULT;
+}
+
+export function saveSidebarWidth(value: number): void {
+  write(SIDEBAR_WIDTH_KEY, clampSidebarWidth(value));
+}
+
+export function projectIsPinned(path: string, meta: Record<string, ProjectMeta>): boolean {
+  const key = normalizeProjectPath(path);
+  return !!key && meta[key]?.pinned === true;
+}
+export function projectIsArchived(path: string, meta: Record<string, ProjectMeta>): boolean {
+  const key = normalizeProjectPath(path);
+  return !!key && meta[key]?.archived === true;
+}
+export function projectIsCollapsed(path: string, meta: Record<string, ProjectMeta>): boolean {
+  const key = normalizeProjectPath(path);
+  return !!key && meta[key]?.collapsed === true;
+}
+
+export type SidebarProject = Pick<ProjectWorkspace, "path" | "name" | "branch"> & {
+  openedAt?: number;
+  createdAt?: number;
+};
+function compareOptionalNumber(
+  a: number | undefined,
+  b: number | undefined,
+  descending: boolean,
+): number {
+  const hasA = typeof a === "number" && Number.isFinite(a);
+  const hasB = typeof b === "number" && Number.isFinite(b);
+  if (!hasA && !hasB) return 0;
+  if (!hasA) return 1;
+  if (!hasB) return -1;
+  return descending ? (b as number) - (a as number) : (a as number) - (b as number);
+}
+export function sortProjects<T extends SidebarProject>(
+  projects: T[],
+  meta: Record<string, ProjectMeta>,
+  sort: ProjectSort = "recent",
+): T[] {
+  return [...projects].sort((a, b) => {
+    const pinned = Number(projectIsPinned(b.path, meta)) - Number(projectIsPinned(a.path, meta));
+    if (pinned) return pinned;
+    const ak = normalizeProjectPath(a.path) || a.path;
+    const bk = normalizeProjectPath(b.path) || b.path;
+    if (sort === "name") {
+      const byName = (a.name || a.path).localeCompare(b.name || b.path, undefined, {
+        sensitivity: "base",
+      });
+      if (byName) return byName;
+    } else if (sort === "created") {
+      const byCreated = compareOptionalNumber(a.createdAt, b.createdAt, true);
+      if (byCreated) return byCreated;
+    } else if (sort === "oldest") {
+      const byCreated = compareOptionalNumber(a.createdAt, b.createdAt, false);
+      if (byCreated) return byCreated;
+    } else if (sort === "manual") {
+      const byOrder = (manualOrder(meta[ak]?.order) ?? Number.MAX_SAFE_INTEGER) -
+        (manualOrder(meta[bk]?.order) ?? Number.MAX_SAFE_INTEGER);
+      if (byOrder) return byOrder;
+    } else {
+      const byOpened = compareOptionalNumber(a.openedAt, b.openedAt, true);
+      if (byOpened) return byOpened;
+    }
+    return ak.localeCompare(bk, undefined, { sensitivity: "base" });
+  });
+}
+export function projectWorkspaceFromPath(path: string): ProjectWorkspace {
+  const normalized = normalizeProjectPath(path) || path;
+  const parts = normalized.split("/").filter(Boolean);
+  return { path, name: parts[parts.length - 1] || path };
+}
+
+export type SwitcherProject = {
+  key: string;
+  path: string;
+  name: string;
+  pinned: boolean;
+  openedAt?: number;
+};
+
+export function switcherProjectName(
+  path: string,
+  fallback?: string | null,
+): string {
+  const named = fallback?.trim();
+  if (named) return named;
+  return projectWorkspaceFromPath(path).name;
+}
+
+/**
+ * Open sidebar projects in the same set the home switcher lists: retained
+ * tabs, the active workspace, minus archived records.
+ */
+export function listSwitcherProjects(input: {
+  openProjectPaths: readonly string[];
+  openProjects: readonly { path: string; name?: string }[];
+  workspace?: { path?: string | null; name?: string | null } | null;
+  projectMeta: Record<string, ProjectMeta>;
+  projectSort: ProjectSort;
+}): SwitcherProject[] {
+  const byKey = new Map<string, SwitcherProject>();
+  const add = (
+    rawPath: string | null | undefined,
+    name?: string | null,
+    openedAt?: number,
+  ) => {
+    const trimmed = rawPath?.trim();
+    const key = normalizeProjectPath(trimmed);
+    if (!trimmed || !key) return;
+    if (projectIsArchived(trimmed, input.projectMeta)) return;
+    const existing = byKey.get(key);
+    const metaName = input.projectMeta[key]?.name;
+    const display = switcherProjectName(
+      trimmed,
+      metaName ?? name ?? existing?.name,
+    );
+    if (existing) {
+      existing.name = display;
+      existing.pinned ||= projectIsPinned(trimmed, input.projectMeta);
+      if (typeof openedAt === "number") {
+        existing.openedAt = Math.max(existing.openedAt ?? 0, openedAt);
+      }
+      return;
+    }
+    byKey.set(key, {
+      key,
+      path: trimmed,
+      name: display,
+      pinned: projectIsPinned(trimmed, input.projectMeta),
+      openedAt,
+    });
+  };
+
+  for (const [index, path] of input.openProjectPaths.entries()) {
+    const record = input.openProjects.find(
+      (project) => normalizeProjectPath(project.path) === normalizeProjectPath(path),
+    );
+    add(path, record?.name, index + 1);
+  }
+  if (input.workspace?.path) {
+    add(
+      input.workspace.path,
+      input.workspace.name,
+      input.openProjectPaths.length + 1,
+    );
+  }
+
+  return sortProjects([...byKey.values()], input.projectMeta, input.projectSort);
+}
+
+export function filterSwitcherProjects(
+  projects: readonly SwitcherProject[],
+  query: string,
+): SwitcherProject[] {
+  const needle = query.trim().toLocaleLowerCase();
+  if (!needle) return [...projects];
+  return projects.filter(
+    (project) =>
+      project.name.toLocaleLowerCase().includes(needle) ||
+      project.path.toLocaleLowerCase().includes(needle),
+  );
+}

@@ -1,0 +1,309 @@
+/*
+  Light-theme density and chrome overrides (LIGHT_CODEX_OVERRIDES) layered on
+  top of the semantic tokens, together with the sidebar footer, build chip, and
+  composer toolbar chips they interleave with.
+*/
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.page-title {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-strong);
+  letter-spacing: var(--tracking-tighter);
+}
+
+.page-card {
+  border-radius: var(--radius-lg-plus);
+  background: var(--ds-tile);
+}
+
+.page-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 56px 24px;
+}
+
+.page-empty-icon {
+  display: flex;
+  height: 44px;
+  width: 44px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 6%, transparent);
+  color: var(--ds-text-secondary);
+}
+
+/* LIGHT_CODEX_OVERRIDES — density/chrome tweaks on top of semantic tokens */
+:root[data-theme="light"] .composer-shell {
+  /* WorkBuddy-style restraint: one solid plate, no decorative gradient. */
+  background: var(--ds-bg-composer);
+  background-image: none;
+  box-shadow: var(--ds-shadow-composer);
+  outline: none;
+  border: 0;
+}
+
+/* Home and thread-docked composers share the base shell metrics. The home
+ * variant only controls placement and placeholder copy; visual spacing stays
+ * identical in both conversation states. */
+:root[data-theme="light"] .composer-toolbar .icon-btn,
+:root[data-theme="light"] .mode-chip {
+  color: color-mix(in oklab, var(--ds-text-primary) 84%, transparent) !important;
+}
+
+:root[data-theme="light"] .composer-input::placeholder,
+:root[data-theme="light"] .composer-placeholder {
+  /* Gold empty-home placeholder ink (--ds-placeholder-ink). */
+  color: var(--ds-placeholder-ink);
+  -webkit-text-fill-color: var(--ds-placeholder-ink);
+  opacity: 1;
+}
+
+/*
+  This rule looks redundant next to the tokenized base rule, but it keeps the
+  cascade the light theme already had: at (0,3,0) it out-specifies
+  `.tool-row-content.is-error` (0,2,0) and ties with
+  `.tool-block.is-plain .tool-row-content` (0,3,0) by winning on import order.
+  Dropping it would tint error output and give plain tool blocks a fill in light
+  only. Reading the token keeps the built-in paint identical while letting a
+  contributed theme move the light tile (issue #341).
+*/
+:root[data-theme="light"] .tool-row-content {
+  background: var(--ds-tool-row-bg);
+}
+
+.footer-notification {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  color: var(--ds-text-muted);
+  flex: 0 0 auto;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.footer-notification:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.footer-notification.active {
+  background: var(--ds-bg-active);
+  color: var(--ds-text-primary);
+}
+
+.sidebar-footer {
+  /* Positioning context for the notification popover. */
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin-top: auto;
+  /* No side padding: .sidebar-body's 8px already sets the content grid, so the
+     chip's own padding lands its text on the 16px nav inset and the trailing
+     icon's hover fill ends flush with the nav rows above. */
+  padding: 7px 0 2px;
+  background: transparent;
+}
+
+:root[data-theme="light"] .sidebar-footer {
+  background: transparent;
+}
+
+/* Build chip: quiet by default, accented only when an update is actionable. */
+.footer-build {
+  display: inline-flex;
+  min-width: 0;
+  margin-left: auto;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-normal);
+  line-height: var(--leading-none);
+  transition: background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.footer-build:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-secondary);
+}
+
+.footer-build-version {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.footer-build.has-update {
+  color: var(--ds-text-primary);
+}
+
+.footer-build-dot {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  background: var(--ds-accent);
+}
+
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+/* Shares the notification trigger's 32px hit target so the row reads as one bar. */
+.footer-action {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  color: var(--ds-text-muted);
+  transition: background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.footer-action:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.footer-action.active {
+  background: var(--ds-bg-active);
+  color: var(--ds-text-primary);
+}
+
+.composer-toolbar .icon-btn {
+  height: 28px;
+  min-width: 28px;
+  border-radius: var(--radius-full);
+}
+
+.mode-chip {
+  height: 28px !important;
+  padding: 0 10px !important;
+  gap: 6px !important;
+  border-radius: var(--radius-full) !important;
+  color: var(--ds-text-secondary) !important;
+  /* Keep labels fully inked; tight line-height under overflow clips descenders. */
+  line-height: var(--leading-compact);
+  overflow: visible;
+  white-space: nowrap;
+}
+
+/* Keep the Agent/Plan/Goal control stable while its localized label changes. */
+.composer-mode-chip {
+  width: 88px;
+  min-width: 88px;
+  max-width: 88px;
+  flex: 0 0 88px;
+  justify-content: flex-start;
+}
+
+.composer-mode-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mode-chip > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mode-chip > span,
+.composer-mode-chip-label,
+.composer-model-thinking-model,
+.composer-model-thinking-level {
+  line-height: var(--leading-compact);
+}
+
+.mode-chip:hover {
+  background: var(--ds-bg-hover) !important;
+  color: var(--ds-text-primary) !important;
+}
+
+/* Goal keeps the same chip geometry while presenting a non-editable Auto state. */
+.composer-permission .mode-chip:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.composer-permission .mode-chip:disabled:hover {
+  background: transparent !important;
+  color: var(--ds-text-secondary) !important;
+}
+
+/* Tone and truncation only. The label-driven chip sets its own padding with
+   `!important`, so the inline padding that used to sit here only ever widened
+   the icon-only controls in this row. */
+.composer-right .icon-btn {
+  max-width: 220px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.composer-plus {
+  position: relative;
+}
+
+.composer-plus-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  color: var(--ds-text-primary);
+  font-size: var(--text-md);
+  line-height: var(--leading-compact);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.composer-plus-item svg {
+  flex: 0 0 auto;
+  color: var(--ds-text-secondary);
+}
+
+.composer-plus-item:hover {
+  background: var(--ds-bg-hover);
+}
+
+.composer-plus-item span {
+  min-width: 0;
+}
+
+/* Menu sections are separated by space, not a rule (D297). */
+.composer-plus-sep {
+  height: 6px;
+}

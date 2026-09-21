@@ -1,0 +1,59 @@
+import { readSettingsSource, readPluginsSource } from "./helpers/source-contracts.mjs";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+import { readComposerSource } from "./helpers/composer-source.mjs";
+import { readTranscriptSource } from "./helpers/transcript-source.mjs";
+
+const read = (rel) => readFile(new URL(rel, import.meta.url), "utf8");
+
+const NO_CORRECTION = [
+  "spellCheck={false}",
+  'autoCorrect="off"',
+  'autoCapitalize="off"',
+];
+
+test("shared Input/Textarea primitives default text correction off", async () => {
+  const src = await read("../src/components/ui.tsx");
+  assert.match(
+    src,
+    /export function Input\(\{[\s\S]*?spellCheck = false[\s\S]*?autoCorrect = "off"[\s\S]*?autoCapitalize = "off"/,
+  );
+  assert.match(
+    src,
+    /export function Textarea\(\{[\s\S]*?spellCheck = false[\s\S]*?autoCorrect = "off"[\s\S]*?autoCapitalize = "off"/,
+  );
+  assert.match(src, /spellCheck=\{spellCheck\}/);
+  assert.match(src, /autoCorrect=\{autoCorrect\}/);
+  assert.match(src, /autoCapitalize=\{autoCapitalize\}/);
+});
+
+test("primary editable surfaces disable browser text correction", async () => {
+  const files = [
+    ["../src/components/Composer.tsx", await readComposerSource()],
+    ["../src/components/ChatTranscript.tsx", await readTranscriptSource()],
+    ["../src/components/SearchDialog.tsx", await read("../src/components/SearchDialog.tsx")],
+    ["../src/pages/SettingsPage.tsx", await readSettingsSource()],
+    ["../src/pages/ProjectsPage.tsx", await read("../src/pages/ProjectsPage.tsx")],
+    ["../src/pages/PluginsPage.tsx", await readPluginsSource()],
+    [
+      "../src/components/settings/ModelSelectionPanes.tsx",
+      await read("../src/components/settings/ModelSelectionPanes.tsx"),
+    ],
+  ];
+
+  for (const [rel, src] of files) {
+    for (const token of NO_CORRECTION) {
+      assert.ok(src.includes(token), `${rel} must include ${token}`);
+    }
+  }
+});
+
+test("bundled browser URL bar disables text correction", async () => {
+  const src = await read(
+    "../resources/plugins/pi.browser/views/browser.html",
+  );
+  assert.ok(src.includes('spellcheck="false"'));
+  assert.ok(src.includes('autocorrect="off"'));
+  assert.ok(src.includes('autocapitalize="off"'));
+});

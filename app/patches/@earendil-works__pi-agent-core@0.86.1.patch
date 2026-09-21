@@ -1,0 +1,16 @@
+diff --git a/dist/agent-loop.js b/dist/agent-loop.js
+--- a/dist/agent-loop.js
++++ b/dist/agent-loop.js
+@@ -256,6 +256,12 @@
+             case "toolcall_start":
+             case "toolcall_delta":
+             case "toolcall_end":
++            // Hosted web search (PI-Desktop): the pi-ai adapters push
++            // `hosted_search_update` when a provider-side search block starts
++            // or completes. Forward it like any other progress event so the
++            // application renders each search round as it happens instead of
++            // only learning about searches from the final message.
++            case "hosted_search_update":
+                 if (partialMessage) {
+                     partialMessage = event.partial;
+                     context.messages[context.messages.length - 1] = partialMessage;

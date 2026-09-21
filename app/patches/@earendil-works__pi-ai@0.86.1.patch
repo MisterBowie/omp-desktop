@@ -1,0 +1,518 @@
+diff --git a/dist/api/anthropic-messages.js b/dist/api/anthropic-messages.js
+--- a/dist/api/anthropic-messages.js
++++ b/dist/api/anthropic-messages.js
+@@ -474,6 +474,39 @@
+                         output.content.push(block);
+                         stream.push({ type: "toolcall_start", contentIndex: output.content.length - 1, partial: output });
+                     }
++                    // Hosted web search (PI-Desktop): server-side search blocks
++                    // are captured whole. The paired `server_tool_use` +
++                    // `web_search_tool_result` blocks round-trip verbatim via
++                    // the hostedSearch block so multi-turn conversations keep
++                    // their grounding (encrypted content included).
++                    else if (event.content_block.type === "server_tool_use") {
++                        const block = {
++                            type: "hostedSearch",
++                            phase: "server_tool_use",
++                            blockId: event.content_block.id,
++                            name: event.content_block.name,
++                            input: event.content_block.input,
++                            inputJson: "",
++                            index: event.index,
++                        };
++                        output.content.push(block);
++                        stream.push({ type: "hosted_search_update", contentIndex: output.content.length - 1, partial: output });
++                    }
++                    else if (event.content_block.type === "web_search_tool_result" ||
++                        event.content_block.type === "web_search_tool_result_error") {
++                        const isError = event.content_block.type === "web_search_tool_result_error";
++                        const block = {
++                            type: "hostedSearch",
++                            phase: "web_search_tool_result",
++                            blockId: event.content_block.tool_use_id,
++                            isError,
++                            // The raw block is the replay payload; keep it verbatim.
++                            wire: event.content_block,
++                            index: event.index,
++                        };
++                        output.content.push(block);
++                        stream.push({ type: "hosted_search_update", contentIndex: output.content.length - 1, partial: output });
++                    }
+                 }
+                 else if (event.type === "content_block_delta") {
+                     if (event.delta.type === "text_delta") {
+@@ -515,6 +548,18 @@
+                                 partial: output,
+                             });
+                         }
++                        // Hosted web search (PI-Desktop): server_tool_use input
++                        // (the query) streams as input_json_delta like any tool
++                        // call; accumulate it so the row can show the query live.
++                        else if (block && block.type === "hostedSearch" && block.phase === "server_tool_use") {
++                            block.inputJson = (block.inputJson ?? "") + event.delta.partial_json;
++                            block.input = parseStreamingJson(block.inputJson);
++                            stream.push({
++                                type: "hosted_search_update",
++                                contentIndex: index,
++                                partial: output,
++                            });
++                        }
+                     }
+                     else if (event.delta.type === "signature_delta") {
+                         const index = blocks.findIndex((b) => b.index === event.index);
+@@ -522,6 +567,16 @@
+                         if (block && block.type === "thinking") {
+                             block.thinkingSignature = block.thinkingSignature || "";
+                             block.thinkingSignature += event.delta.signature;
++                        }
++                    }
++                    // Hosted web search (PI-Desktop): citations arrive as deltas
++                    // on the text block that follows the search result. Collect
++                    // them on the message for the application to render.
++                    else if (event.delta.type === "citations_delta") {
++                        const citation = event.delta.citation;
++                        if (citation && typeof citation === "object") {
++                            output.hostedSearchCitations = output.hostedSearchCitations ?? [];
++                            output.hostedSearchCitations.push(citation);
+                         }
+                     }
+                 }
+@@ -557,6 +612,12 @@
+                                 toolCall: block,
+                                 partial: output,
+                             });
++                        }
++                        // Hosted search blocks carry no streaming scratch
++                        // state; closing one just drops the index marker.
++                        else if (block.type === "hostedSearch") {
++                            delete block.index;
++                            delete block.inputJson;
+                         }
+                     }
+                 }
+@@ -868,6 +929,15 @@
+             params.tools = convertTools(tools, isOAuthToken, compat.supportsEagerToolInputStreaming, compat.supportsStrictTools, toolCacheControl);
+         }
+     }
++    // Hosted web search (PI-Desktop): attach the server-side tool when the
++    // model record opts in. A hosted tool has no client execute; its blocks
++    // are extracted by the stream loop below and replayed by convertMessages.
++    if (model.webSearch === true) {
++        params.tools = [
++            ...(params.tools ?? []),
++            { type: "web_search_20250305", name: "web_search" },
++        ];
++    }
+     // Managed effort models always use adaptive thinking so prefix mismatches can
+     // be dropped instead of surfacing as persistent 400 responses.
+     if (model.compat?.supportsMidConvoEffort === true) {
+@@ -1072,6 +1142,30 @@
+                         input: block.arguments ?? {},
+                     });
+                 }
++                // Hosted web search (PI-Desktop): replay both halves of the
++                // pair in place, in their original order. `server_tool_use`
++                // carries the query; the result block carries the encrypted
++                // content Anthropic requires verbatim on later turns.
++                else if (block.type === "hostedSearch" && block.phase === "server_tool_use") {
++                    blocks.push({
++                        type: "server_tool_use",
++                        id: block.blockId,
++                        name: block.name,
++                        input: block.input ?? {},
++                    });
++                }
++                else if (block.type === "hostedSearch" && block.phase === "web_search_tool_result") {
++                    const wire = block.wire;
++                    if (wire && typeof wire === "object") {
++                        const replay = { ...wire };
++                        delete replay.type;
++                        blocks.push({
++                            type: block.isError ? "web_search_tool_result_error" : "web_search_tool_result",
++                            tool_use_id: block.blockId,
++                            ...replay,
++                        });
++                    }
++                }
+             }
+             if (blocks.length === 0)
+                 continue;
+diff --git a/dist/api/azure-openai-responses.js b/dist/api/azure-openai-responses.js
+--- a/dist/api/azure-openai-responses.js
++++ b/dist/api/azure-openai-responses.js
+@@ -235,6 +235,12 @@
+     if (options?.toolChoice !== undefined) {
+         params.tool_choice = options.toolChoice;
+     }
++    // Hosted web search (PI-Desktop): same opt-in as openai-responses; the
++    // azure adapter reuses the shared stream processor, which already knows
++    // how to extract web_search_call items.
++    if (model.webSearch === true) {
++        params.tools = [...(params.tools ?? []), { type: "web_search" }];
++    }
+     if (model.reasoning) {
+         if (options?.reasoningEffort || options?.reasoningSummary) {
+             const effort = options?.reasoningEffort
+@@ -252,6 +258,12 @@
+             };
+         }
+     }
++    // Hosted web search (PI-Desktop): sources ride the opt-in `include`
++    // channel; merged here because the reasoning block above assigns
++    // `params.include` outright.
++    if (model.webSearch === true) {
++        params.include = [...new Set([...(params.include ?? []), "web_search_call.action.sources"])];
++    }
+     // Last so custom keys override the named request fields.
+     if (options?.samplingParams) {
+         Object.assign(params, options.samplingParams);
+diff --git a/dist/api/openai-completions.js b/dist/api/openai-completions.js
+--- a/dist/api/openai-completions.js
++++ b/dist/api/openai-completions.js
+@@ -1039,21 +1039,27 @@
+             if (preservedReasoningDetails) {
+                 assistantMsg.reasoning_details = preservedReasoningDetails;
+             }
+-            if (compat.requiresReasoningContentOnAssistantMessages &&
+-                model.reasoning &&
+-                assistantMsg.reasoning_content === undefined) {
+-                assistantMsg.reasoning_content = "";
+-            }
++            // Catalogue-model empty fill moved to the history-wide pass below so
++            // empty-string (#223) and non-empty placeholder (strict relays) share one path.
++
+             // Skip assistant messages that have no content and no tool calls.
+             // Some providers require "either content or tool_calls, but not none".
+             // Other providers also don't accept empty assistant messages.
+             // This handles aborted assistant responses that got no content.
++            // Keep reasoning-only assistants (#296 retained thinking): map a
++            // minimal content stand-in so the already-set reasoning_* field
++            // still reaches the wire.
+             const content = assistantMsg.content;
+             const hasContent = content !== null &&
+                 content !== undefined &&
+                 (typeof content === "string" ? content.length > 0 : content.length > 0);
++            const hasReasoningReplay = OPENAI_COMPLETIONS_REASONING_FIELDS.some((field) => typeof assistantMsg[field] === "string" &&
++                assistantMsg[field].length > 0);
+             if (!hasContent && !assistantMsg.tool_calls) {
+-                continue;
++                if (!hasReasoningReplay) {
++                    continue;
++                }
++                assistantMsg.content = ".";
+             }
+             params.push(assistantMsg);
+         }
+@@ -1120,6 +1126,41 @@
+             continue;
+         }
+         lastRole = msg.role;
++    }
++    // DeepSeek-style endpoints reject a history in which only some assistant
++    // messages carry a reasoning field, while all-or-none is accepted. Prefer
++    // the field already present on the history (reasoning_content,
++    // reasoning_text, or reasoning). Relayed models outside the catalogue are
++    // often not flagged `reasoning`, so this pass also covers them (#223).
++    // Official DeepSeek accepts ""; OpenCode/third-party relays that require a
++    // real echo set requiresNonEmptyReasoningReplay and receive a documented
++    // placeholder instead of a silent empty string (#296).
++    // Placeholder text must match DEEPSEEK_REASONING_REPLAY_PLACEHOLDER in
++    // @pi-desktop/shared provider-presets.
++    const reasoningFields = ["reasoning_content", "reasoning_text", "reasoning"];
++    if (compat.requiresReasoningContentOnAssistantMessages) {
++        let activeField;
++        for (const field of reasoningFields) {
++            if (params.some((m) => m.role === "assistant" &&
++                typeof m[field] === "string" &&
++                m[field].length > 0)) {
++                activeField = field;
++                break;
++            }
++        }
++        if (!activeField && model.reasoning) {
++            activeField = "reasoning_content";
++        }
++        if (activeField) {
++            const fill = compat.requiresNonEmptyReasoningReplay
++                ? "[reasoning not retained for this turn]"
++                : "";
++            for (const m of params) {
++                if (m.role === "assistant" && m[activeField] === undefined) {
++                    m[activeField] = fill;
++                }
++            }
++        }
+     }
+     return params;
+ }
+diff --git a/dist/api/openai-responses-shared.js b/dist/api/openai-responses-shared.js
+--- a/dist/api/openai-responses-shared.js
++++ b/dist/api/openai-responses-shared.js
+@@ -202,6 +202,11 @@
+                         phase: parsedSignature?.phase,
+                     });
+                 }
++                // Hosted web search (PI-Desktop): replay the search item in
++                // place so follow-up turns keep the search state.
++                else if (block.type === "hostedSearch" && block.phase === "web_search_call" && isSameModel) {
++                    output.push({ ...(block.wire ?? { type: "web_search_call", id: block.blockId, status: "completed" }) });
++                }
+                 else if (block.type === "toolCall") {
+                     const toolCall = block;
+                     const [callId, itemIdRaw] = toolCall.id.split("|");
+@@ -405,6 +410,28 @@
+             stream.push({ type: "toolcall_start", contentIndex: slot.contentIndex, partial: output });
+             return slot;
+         }
++        // Hosted web search (PI-Desktop): a server-side search call. The raw
++        // item is kept whole; `response.web_search_call.*` status events and
++        // the done item update the same slot. Replay pushes the item back as
++        // an output item so multi-turn search state survives.
++        if (item.type === "web_search_call") {
++            const block = {
++                type: "hostedSearch",
++                phase: "web_search_call",
++                blockId: item.id,
++                status: item.status ?? "in_progress",
++                wire: item,
++            };
++            output.content.push(block);
++            const slot = {
++                type: "hostedSearch",
++                block,
++                contentIndex: output.content.length - 1,
++            };
++            outputSlots.set(outputIndex, slot);
++            stream.push({ type: "hosted_search_update", contentIndex: slot.contentIndex, partial: output });
++            return slot;
++        }
+         return undefined;
+     };
+     const getOrCreateSlot = (outputIndex, item) => {
+@@ -528,6 +555,27 @@
+                 delta: event.delta,
+                 partial: output,
+             });
++        }
++        // Hosted web search (PI-Desktop): citation annotations arrive while
++        // the text streams. They are collected on the output message so the
++        // application can render sources without parsing text offsets.
++        else if (event.type === "response.output_text.annotation.added") {
++            const annotation = event.annotation;
++            if (annotation?.type === "url_citation" && typeof annotation.url === "string") {
++                output.hostedSearchCitations = output.hostedSearchCitations ?? [];
++                output.hostedSearchCitations.push({
++                    url: annotation.url,
++                    title: typeof annotation.title === "string" ? annotation.title : undefined,
++                });
++            }
++        }
++        // Hosted web search status transitions (`response.web_search_call.in_progress`
++        // / `.completed` / `.failed`); the payload mirrors the item.
++        else if (typeof event.type === "string" && event.type.startsWith("response.web_search_call.")) {
++            const item = event.item ?? event.output_item;
++            if (item && typeof item === "object" && item.type === "web_search_call") {
++                getOrCreateSlot(event.output_index, item);
++            }
+         }
+         else if (event.type === "response.refusal.delta") {
+             const slot = getSlot(event.output_index, "text");
+@@ -633,9 +681,25 @@
+                 });
+                 outputSlots.delete(event.output_index);
+             }
++            // Hosted web search (PI-Desktop): finalize the slot with the
++            // done item so replay carries the server's final representation.
++            else if (item.type === "web_search_call" && slot?.type === "hostedSearch") {
++                slot.block.status = item.status ?? slot.block.status;
++                slot.block.wire = item;
++                stream.push({
++                    type: "hosted_search_update",
++                    contentIndex: slot.contentIndex,
++                    partial: output,
++                });
++                outputSlots.delete(event.output_index);
++            }
+         }
+         else if (event.type === "response.completed" || event.type === "response.incomplete") {
+             finalizeResponse(event.response);
++            // The response is fully delivered: stop consuming the stream so the
++            // request does not hang when the server (or a reverse proxy) never
++            // closes the connection after the terminal event.
++            break;
+         }
+         else if (event.type === "error") {
+             throw new Error(`Error Code ${event.code}: ${event.message}` || "Unknown error");
+diff --git a/dist/api/openai-responses.js b/dist/api/openai-responses.js
+--- a/dist/api/openai-responses.js
++++ b/dist/api/openai-responses.js
+@@ -242,6 +242,12 @@
+             supportsOpenAIGrammarTools: compat.supportsOpenAIGrammarTools,
+         });
+     }
++    // Hosted web search (PI-Desktop): attach the server-side tool when the
++    // model record opts in. The Responses `web_search` tool definition is a
++    // bare tagged object; it never passes through convertResponsesTools.
++    if (model.webSearch === true) {
++        params.tools = [...(params.tools ?? []), { type: "web_search" }];
++    }
+     if (options?.toolChoice !== undefined) {
+         params.tool_choice = options.toolChoice;
+     }
+@@ -264,6 +270,12 @@
+         if (model.provider === "xai")
+             params.include = ["reasoning.encrypted_content"];
+     }
++    // Hosted web search (PI-Desktop): sources ride the opt-in `include`
++    // channel; merged here because the reasoning block above assigns
++    // `params.include` outright.
++    if (model.webSearch === true) {
++        params.include = [...new Set([...(params.include ?? []), "web_search_call.action.sources"])];
++    }
+     // Last so custom keys override the named request fields.
+     if (options?.samplingParams) {
+         Object.assign(params, options.samplingParams);
+diff --git a/dist/auth/oauth/anthropic.js b/dist/auth/oauth/anthropic.js
+--- a/dist/auth/oauth/anthropic.js
++++ b/dist/auth/oauth/anthropic.js
+@@ -140,21 +140,90 @@
+         });
+     });
+ }
++class AnthropicOAuthTokenError extends Error {
++    constructor(status, code, grantType) {
++        const recovery = grantType === "authorization_code"
++            ? "Wait, close this dialog, and start a new sign-in attempt."
++            : "Wait before retrying. If the problem continues, sign in again.";
++        const reason = code === "invalid_grant"
++            ? "Anthropic rejected the authorization grant. Please sign in again."
++            : code === "invalid_response"
++                ? `Anthropic returned an invalid token response. ${recovery}`
++                : status === 429
++                    ? `Anthropic token requests are rate limited. ${recovery}`
++                    : `Anthropic token request failed (HTTP ${status}). ${recovery}`;
++        super(reason);
++        this.name = "AnthropicOAuthTokenError";
++        this.status = status;
++        this.code = code;
++    }
++}
++function tokenRetryDelay(header, attempt) {
++    const fallback = 1000 * 2 ** attempt;
++    const value = header?.trim();
++    if (!value || value.length > 128)
++        return fallback;
++    const serverDelay = /^\d+$/.test(value)
++        ? Number(value) * 1000
++        : /^[A-Za-z]{3}, /.test(value)
++            ? Date.parse(value) - Date.now()
++            : NaN;
++    return Number.isNaN(serverDelay) ? fallback : Math.max(fallback, serverDelay);
++}
++function waitForTokenRetry(delay, signal) {
++    signal.throwIfAborted();
++    return new Promise((resolve, reject) => {
++        const timer = setTimeout(() => {
++            signal.removeEventListener("abort", abort);
++            resolve();
++        }, delay);
++        const abort = () => {
++            clearTimeout(timer);
++            signal.removeEventListener("abort", abort);
++            reject(signal.reason);
++        };
++        signal.addEventListener("abort", abort, { once: true });
++    });
++}
+ async function postJson(url, body, signal) {
+-    const response = await fetch(url, {
+-        method: "POST",
+-        headers: {
+-            "Content-Type": "application/json",
+-            Accept: "application/json",
+-        },
+-        body: JSON.stringify(body),
+-        signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
+-    });
+-    const responseBody = await response.text();
+-    if (!response.ok) {
+-        throw new Error(`HTTP request failed. status=${response.status}; url=${url}; body=${responseBody}`);
+-    }
+-    return responseBody;
++    // Keep one deadline for all attempts, including response bodies and waits.
++    // The caller's signal can impose an earlier refresh deadline or cancellation.
++    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(30_000)]);
++    const deadline = performance.now() + 30_000;
++    const serialized = JSON.stringify(body);
++    for (let attempt = 0; ; attempt++) {
++        requestSignal.throwIfAborted();
++        const response = await fetch(url, {
++            method: "POST",
++            headers: {
++                "Content-Type": "application/json",
++                Accept: "application/json",
++            },
++            body: serialized,
++            signal: requestSignal,
++        });
++        const responseBody = await response.text();
++        if (response.ok)
++            return responseBody;
++        // Never put a token endpoint's response body in an error or log.
++        let invalidGrant = false;
++        try {
++            const data = JSON.parse(responseBody);
++            invalidGrant = data?.error === "invalid_grant" || data?.error?.type === "invalid_grant";
++        }
++        catch { /* Non-JSON errors are reported by status only. */ }
++        const failure = new AnthropicOAuthTokenError(response.status,
++            invalidGrant ? "invalid_grant" : response.status === 429 ? "rate_limited" : "http_error",
++            body.grant_type);
++        // Only an explicit rate-limit rejection is replayed. Network errors,
++        // 5xx and invalid_grant may follow a consumed/rotated grant: do not retry.
++        if (response.status !== 429 || invalidGrant || attempt >= 2)
++            throw failure;
++        const delay = tokenRetryDelay(response.headers.get("Retry-After"), attempt);
++        if (delay >= deadline - performance.now())
++            throw failure; // Never shorten the server's requested wait.
++        await waitForTokenRetry(delay, requestSignal);
++    }
+ }
+ async function exchangeAuthorizationCode(code, state, verifier, redirectUri, signal) {
+     let responseBody;
+@@ -169,6 +238,8 @@
+         }, signal);
+     }
+     catch (error) {
++        if (error instanceof AnthropicOAuthTokenError || error?.name === "AbortError" || error?.name === "TimeoutError")
++            throw error;
+         throw new Error(`Token exchange request failed. url=${TOKEN_URL}; redirect_uri=${redirectUri}; response_type=authorization_code; details=${formatErrorDetails(error)}`);
+     }
+     let tokenData;
+@@ -176,7 +247,7 @@
+         tokenData = JSON.parse(responseBody);
+     }
+     catch (error) {
+-        throw new Error(`Token exchange returned invalid JSON. url=${TOKEN_URL}; body=${responseBody}; details=${formatErrorDetails(error)}`);
++        throw new AnthropicOAuthTokenError(0, "invalid_response", "authorization_code");
+     }
+     return {
+         type: "oauth",
+@@ -280,6 +351,8 @@
+         }, signal);
+     }
+     catch (error) {
++        if (error instanceof AnthropicOAuthTokenError || error?.name === "AbortError" || error?.name === "TimeoutError")
++            throw error;
+         throw new Error(`Anthropic token refresh request failed. url=${TOKEN_URL}; details=${formatErrorDetails(error)}`);
+     }
+     let data;
+@@ -287,7 +360,7 @@
+         data = JSON.parse(responseBody);
+     }
+     catch (error) {
+-        throw new Error(`Anthropic token refresh returned invalid JSON. url=${TOKEN_URL}; body=${responseBody}; details=${formatErrorDetails(error)}`);
++        throw new AnthropicOAuthTokenError(0, "invalid_response", "refresh_token");
+     }
+     return {
+         type: "oauth",

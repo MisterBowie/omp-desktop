@@ -1,0 +1,125 @@
+/*
+  Destination list chrome shared by the Projects / PRs / Scheduled pages —
+  toolbar, filters, rows, and the create affordance.
+*/
+
+/* Destination list chrome (PRs / Scheduled / Plugins) */
+.dest-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.dest-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
+}
+
+.dest-filter {
+  border-radius: var(--radius-full);
+  padding: 5px 12px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-tighter);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.dest-filter:hover {
+  color: var(--ds-text-primary);
+  background: var(--ds-bg-hover);
+}
+
+.dest-filter.active {
+  background: var(--ds-raised);
+  color: var(--ds-text-primary);
+  box-shadow: var(--ds-raised-shadow);
+}
+
+.dest-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dest-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  border-radius: var(--radius-lg);
+  background: var(--ds-tile);
+  padding: 12px 14px;
+  text-align: left;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.dest-row:hover {
+  background: var(--ds-tile-hover);
+}
+
+.dest-row-icon {
+  display: inline-flex;
+  height: 32px;
+  width: 32px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
+  color: var(--ds-text-secondary);
+}
+
+.dest-row-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.dest-row-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--ds-text-primary);
+  font-size: var(--text-md-plus);
+  font-weight: var(--font-weight-medium);
+}
+
+.dest-row-meta {
+  margin-top: 3px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+}
+
+.dest-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+/* The create form is one soft tile; its fields are filled controls inside it
+   (ui-kit), so nothing draws a frame within a frame (D297). */
+.dest-create {
+  margin-bottom: 16px;
+  border-radius: var(--radius-lg-plus);
+  background: var(--ds-tile);
+  padding: 14px;
+}
+
+.dest-section-label {
+  margin: 4px 0 10px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}

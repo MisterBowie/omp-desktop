@@ -1,0 +1,8 @@
+[submodule "upstream/pi-desktop"]
+	path = upstream/pi-desktop
+	url = https://github.com/vastsa/PI-Desktop.git
+	shallow = true
+[submodule "upstream/oh-my-pi"]
+	path = upstream/oh-my-pi
+	url = https://github.com/can1357/oh-my-pi.git
+	shallow = true

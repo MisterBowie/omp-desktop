@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <meta name="pi-plugin-chrome" content="v2" />
+      <title>Hello Panel</title>
+      <style>
+      :root {
+        color-scheme: dark;
+        --bg: #181818;
+        --surface: #212121;
+        --surface-hover: color-mix(in oklab, #ffffff 6%, transparent);
+        --fg: #ffffff;
+        --secondary: color-mix(in oklab, #ffffff 70%, transparent);
+        --muted: color-mix(in oklab, #ffffff 52%, transparent);
+        --border: color-mix(in oklab, #ffffff 10%, transparent);
+        --accent: #ffffff;
+      }
+      :root[data-base="light"] {
+        color-scheme: light;
+        --bg: #ffffff;
+        --surface: #f9f9f9;
+        --surface-hover: color-mix(in oklab, #1a1c1f 5%, transparent);
+        --fg: #1a1c1f;
+        --secondary: color-mix(in oklab, #1a1c1f 74%, transparent);
+        --muted: #5d5d5d;
+        --border: color-mix(in oklab, #1a1c1f 10%, transparent);
+        --accent: #1a1c1f;
+      }
+      * { box-sizing: border-box; }
+      /*
+       * A docked work panel view is the same isolated page as `ui.panel`, but
+       * it is composited inside the host window instead of a separate one, so
+       * it gets no window-control capsule and no 46px drag band. Read
+       * `--pi-plugin-titlebar-height` rather than hard-coding a value: the host
+       * publishes 0px here and 46px in a detached panel window, so one entry
+       * file lays out correctly in both placements.
+       */
+      body {
+        margin: 0;
+        min-height: 100%;
+        padding: var(--pi-plugin-titlebar-height, 0px) 12px 12px;
+        font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      h2 {
+        margin: 0 0 4px;
+        font-size: 14px;
+      }
+      p {
+        margin: 0 0 12px;
+        color: var(--muted);
+      }
+      button {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 7px 11px;
+        background: var(--accent);
+        color: var(--bg);
+        cursor: pointer;
+        font: inherit;
+      }
+      #log {
+        margin-top: 12px;
+        border-radius: 8px;
+        padding: 8px;
+        background: var(--surface);
+        color: var(--secondary);
+        font-size: 12px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Hello Panel</h2>
+    <p>A plugin-contributed view, docked in the work panel.</p>
+    <button id="ping">Toast from the view</button>
+    <div id="log">Ready.</div>
+    <script>
+      const applyAppearance = (appearance) => {
+        const base = appearance?.base;
+        document.documentElement.dataset.base = base === "light" || base === "dark"
+          ? base
+          : window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      };
+      window.pluginBridge?.on("appearance:changed", applyAppearance);
+      window.pluginBridge?.invoke("app.getAppearance").then(applyAppearance).catch(() => applyAppearance(null));
+      const log = document.getElementById("log");
+      // The bridge is identical in a docked view and a detached panel window.
+      document.getElementById("ping").addEventListener("click", async () => {
+        try {
+          await window.pluginBridge.invoke("ui.showToast", {
+            message: "Hello from a docked plugin view",
+          });
+          log.textContent = "Sent ui.showToast through the panel bridge.";
+        } catch (error) {
+          log.textContent = `Bridge call failed: ${error}`;
+        }
+      });
+    </script>
+  </body>
+</html>

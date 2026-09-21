@@ -1,0 +1,1180 @@
+/*
+  Work panel — dock, header and tab switcher, plus the review (diff), browser,
+  files, and plugin-contributed views.
+*/
+
+/* ---------- Work panel (review / browser / files / plugin views) ---------- */
+
+.work-panel {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  flex: 0 0 var(--work-panel-width);
+  width: var(--work-panel-width);
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  z-index: 20;
+  /* The dock is a step lighter than the conversation pane, and that tone
+     change is its only edge (D297): no divider against the chat column.
+     `--ds-bg-dock` is a token, not a literal, so a contributed theme can move
+     the whole column (D419). */
+  background: var(--ds-bg-dock);
+  /*
+   * Animate the allocated dock width as well as its small compositor slide.
+   * Transform-only feedback used to leave the flex item at full width before
+   * the animation painted, which made the chat column jump on every open or
+   * close.
+   */
+  animation: work-panel-in var(--motion-duration-normal) var(--motion-ease-out)
+    both;
+}
+
+.work-panel.is-exit-pending,
+.work-panel.is-exiting {
+  pointer-events: none;
+}
+
+.work-panel.is-exiting {
+  overflow: hidden;
+  animation: work-panel-out var(--motion-duration-fast) var(--motion-ease-in)
+    both;
+}
+
+@keyframes work-panel-in {
+  from {
+    opacity: 0;
+    flex-basis: 0;
+    width: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    flex-basis: var(--work-panel-width);
+    width: var(--work-panel-width);
+    transform: translateX(0);
+  }
+}
+
+@keyframes work-panel-out {
+  from {
+    opacity: 1;
+    flex-basis: var(--work-panel-width);
+    width: var(--work-panel-width);
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    flex-basis: 0;
+    width: 0;
+    transform: translateX(8px);
+  }
+}
+
+.work-panel-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.work-panel-resize {
+  position: absolute;
+  inset-block: 0;
+  left: -5px;
+  width: 10px;
+  z-index: 30;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.work-panel-resize::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 20%, transparent);
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.work-panel-resize:hover::after,
+.work-panel-resize:active::after,
+.work-panel-resize:focus-visible::after,
+.work-panel[data-resizing="true"] .work-panel-resize::after {
+  opacity: 1;
+}
+
+.work-panel-resize:focus-visible {
+  outline: none;
+}
+
+.work-panel-resize:focus-visible::after,
+.work-panel-resize:active::after,
+.work-panel[data-resizing="true"] .work-panel-resize::after {
+  background: var(--ds-accent);
+}
+
+:root[data-work-panel-resizing="true"],
+:root[data-work-panel-resizing="true"] * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+.work-panel-header {
+  position: relative;
+  display: flex;
+  height: var(--ds-toolbar-height);
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--ds-work-panel-control-gap);
+  background: var(--ds-bg-dock-raised);
+  /* Keep the fixed work-panel toggle in its own hit-target lane. The reserve is
+     spent from the toggle's size/inset tokens plus the header's own control
+     gap, so the last panel control ends exactly one button gap before the
+     toggle instead of behind a divider. */
+  padding: 0
+    calc(
+      var(--ds-work-panel-toggle-size) + var(--ds-work-panel-toggle-inset) +
+        var(--ds-work-panel-control-gap)
+    )
+    0 12px;
+  -webkit-app-region: drag;
+}
+
+.app-shell.work-panel-maximized .work-panel-header {
+  margin-left: calc(var(--preview-chrome-inset) + var(--preview-chrome-action-lane));
+  padding-left: 0;
+}
+
+.app-shell.work-panel-maximized .work-panel-main {
+  background: linear-gradient(
+    var(--ds-bg-dock-raised) 0 var(--ds-toolbar-height),
+    transparent var(--ds-toolbar-height)
+  );
+}
+
+:root[data-platform="win32"] .work-panel-header,
+:root[data-platform="linux"] .work-panel-header {
+  /* End this header's box — and therefore its native drag rectangle — before
+     the viewport-fixed control band. The drag rectangle is the border box, so
+     padding the content clear of the band still leaves that rectangle across
+     the controls, and Electron swallows their hover and click. The shared
+     right-side control lane keeps the same content inset once the box stops
+     early. */
+  margin-right: var(--ds-window-controls-width);
+}
+
+/* The header is a clipped tab strip plus a fixed add trigger. On Windows/Linux
+   the shared control lane and 120px margin reserve the toggle and native
+   controls without allowing the strip to claim either hit target. */
+.work-panel-tab-strip-wrap {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  overflow: hidden;
+}
+
+.work-panel-tab-strip {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  height: 32px;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scroll-padding-inline: 2px;
+}
+
+.work-panel-tab-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.work-panel-tab {
+  display: inline-flex;
+  min-width: 92px;
+  max-width: 180px;
+  height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--ds-text-muted);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.work-panel-tab:hover,
+.work-panel-tab.active {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.work-panel-tab-button {
+  display: inline-flex;
+  min-width: 0;
+  height: 28px;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px 0 10px;
+  color: inherit;
+  text-align: left;
+}
+
+.work-panel-tab-button > svg {
+  flex: 0 0 auto;
+}
+
+.work-panel-tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-medium);
+}
+
+.work-panel-tab-button:focus-visible,
+.work-panel-tab-close:focus-visible {
+  outline: 2px solid var(--ds-focus);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+.work-panel-tab-close {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--ds-text-muted);
+  opacity: 0;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out),
+    opacity var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.work-panel-tab:hover .work-panel-tab-close,
+.work-panel-tab.active .work-panel-tab-close,
+.work-panel-tab-close:focus-visible {
+  opacity: 1;
+}
+
+.work-panel-tab-close:hover {
+  background: var(--ds-bg-active);
+  color: var(--ds-text-primary);
+}
+
+/* One button group with the viewport-fixed collapse toggle: the same control
+   gap the header reserves for it, and no divider, inset, or margin of its own.
+   The rule owns spacing only — `+` and maximize take the shared chrome-control
+   geometry and transparent seat from chrome.css, beside the subagent back
+   control's own matching rule, so the group reads as quiet icon controls. */
+.work-panel-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--ds-work-panel-control-gap);
+}
+
+.work-panel-subagent-back {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  color: var(--ds-text-secondary);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.work-panel-subagent-back:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+/* Preview mode: the panel takes MainChat's width as well, so the divider has no
+   second column to trade width with and the dock fills its flex row. */
+.work-panel.is-maximized {
+  flex: 1 1 auto;
+  width: auto;
+  max-width: none;
+}
+
+.work-panel.is-maximized .work-panel-resize {
+  cursor: default;
+}
+
+.work-panel-subagent-heading {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px;
+  color: var(--ds-text-secondary);
+}
+
+.work-panel-subagent-heading span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-medium);
+}
+
+.work-panel-body {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.work-panel-tabpane {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.work-panel-tabpane.is-hidden {
+  display: none;
+}
+
+/* ---------- Subagent detail dock --------------------------------------- */
+
+.subagent-panel {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  background: transparent;
+}
+
+.subagent-panel-scroll {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0 0 32px;
+  background: transparent;
+}
+
+.subagent-panel-jump {
+  bottom: 12px;
+  z-index: 6;
+}
+
+.subagent-panel-empty {
+  display: grid;
+  min-height: 160px;
+  place-items: center;
+  padding: 0 16px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm-plus);
+  text-align: center;
+}
+
+.subagent-panel-switcher:hover {
+  background: transparent;
+}
+
+.subagent-detail {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Sticky identity so the sheet keeps the agent in view while the process scrolls. */
+.subagent-detail-hero {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 16px 12px;
+  background: var(--ds-bg-dock);
+}
+
+.subagent-detail-heading {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+}
+
+.subagent-detail-avatar {
+  position: relative;
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-round);
+  background: var(--ds-tile-deep);
+  color: var(--ds-text-secondary);
+}
+
+.subagent-detail-status {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--ds-bg-dock);
+  border-radius: var(--radius-round);
+  background: var(--ds-text-muted);
+}
+
+.subagent-detail-status.outcome-completed {
+  background: var(--ds-success);
+}
+
+.subagent-detail-status.outcome-running {
+  background: var(--ds-accent);
+  animation: subagent-status-pulse 1.6s var(--motion-ease-standard) infinite;
+}
+
+.subagent-detail-status.outcome-failed,
+.subagent-detail-status.outcome-denied {
+  background: var(--ds-error);
+}
+
+.subagent-detail-status.outcome-truncated,
+.subagent-detail-status.outcome-timed-out {
+  background: var(--ds-warning);
+}
+
+@keyframes subagent-status-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .subagent-detail-status.outcome-running,
+  .subagent-detail-status.outcome-creating {
+    animation: none;
+  }
+}
+
+.subagent-detail-heading-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.subagent-detail-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ds-text-primary);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subagent-detail-model {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subagent-detail-summary {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--ds-text-muted);
+}
+
+.subagent-detail-badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--radius-full);
+  background: var(--ds-tile-deep);
+  color: var(--ds-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-none);
+  white-space: nowrap;
+}
+
+.subagent-detail-badge.outcome-completed {
+  background: color-mix(in oklab, var(--ds-success) 16%, transparent);
+  color: var(--ds-success);
+}
+
+.subagent-detail-badge.outcome-running {
+  background: var(--ds-tile-deep);
+  color: var(--ds-text-primary);
+}
+
+.subagent-detail-badge.outcome-creating {
+  background: color-mix(in oklab, var(--ds-purple) 16%, transparent);
+  color: var(--ds-purple);
+}
+
+.subagent-detail-status.outcome-creating {
+  background: var(--ds-purple);
+  animation: subagent-status-pulse 1.6s var(--motion-ease-standard) infinite;
+}
+
+.subagent-detail-badge.outcome-failed,
+.subagent-detail-badge.outcome-denied {
+  background: color-mix(in oklab, var(--ds-error) 16%, transparent);
+  color: var(--ds-error);
+}
+
+.subagent-detail-badge.outcome-truncated,
+.subagent-detail-badge.outcome-timed-out,
+.subagent-detail-badge.outcome-aborted,
+.subagent-detail-badge.outcome-stopped {
+  background: color-mix(in oklab, var(--ds-warning) 16%, transparent);
+  color: var(--ds-warning);
+}
+
+.subagent-detail-meta {
+  flex: none;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading-row);
+  white-space: nowrap;
+}
+
+.subagent-detail-task,
+.subagent-detail > .subagent-run {
+  padding: 0 16px;
+}
+
+/* Issue #161: the failure card closes out a settled delegate, so it lines up
+   with the task card and the run rows instead of the panel's own edges. The
+   card carries its own padding, so it is inset with margins. */
+.subagent-detail > .subagent-failure {
+  width: auto;
+  margin: 0 16px;
+}
+
+.subagent-detail-section-label,
+.subagent-detail > .subagent-run .subagent-run-heading.is-dock {
+  min-height: 20px;
+  margin: 0;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  line-height: var(--leading-row);
+  text-transform: uppercase;
+}
+
+:lang(zh-CN) .subagent-detail-section-label,
+:lang(zh-CN) .subagent-detail > .subagent-run .subagent-run-heading.is-dock,
+:lang(zh-TW) .subagent-detail-section-label,
+:lang(zh-TW) .subagent-detail > .subagent-run .subagent-run-heading.is-dock,
+:lang(ko) .subagent-detail-section-label,
+:lang(ko) .subagent-detail > .subagent-run .subagent-run-heading.is-dock {
+  letter-spacing: var(--tracking-normal);
+  text-transform: none;
+}
+
+.subagent-detail-task {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.subagent-detail-task-card {
+  min-width: 0;
+  border-radius: var(--radius-md);
+  background: var(--ds-tile);
+  padding: 12px 14px;
+}
+
+.subagent-task-message-body {
+  color: var(--ds-text-primary);
+  font-size: var(--text-md);
+  line-height: var(--leading-body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.subagent-task-message-body.is-collapsed {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.subagent-task-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 0;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-row);
+}
+
+.subagent-task-toggle svg {
+  flex: none;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.subagent-task-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.subagent-task-toggle:hover {
+  color: var(--ds-text-primary);
+}
+
+.subagent-detail > .subagent-run {
+  /* This is a flex child of the detail column. Without an explicit zero
+     minimum, a long command/path can win the min-content calculation and push
+     the whole side sheet past the work-panel edge. */
+  min-width: 0;
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 16px;
+}
+
+.subagent-detail > .subagent-run .subagent-run-heading.is-dock {
+  gap: 8px;
+}
+
+.subagent-detail > .subagent-run .subagent-run-heading.is-dock .subagent-run-count {
+  color: var(--ds-text-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-normal);
+  text-transform: none;
+}
+
+.subagent-detail > .subagent-run .subagent-run-rows {
+  position: relative;
+  margin-top: 6px;
+  padding: 2px 0 8px 16px;
+  border-left: 1px solid var(--ds-border-subtle);
+  border-radius: 0;
+  background: transparent;
+}
+
+.subagent-detail > .subagent-run .subagent-run-rows.is-panel-flow > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.subagent-detail > .subagent-run .subagent-run-rows.is-panel-flow > div > .tool-row,
+.subagent-detail > .subagent-run .subagent-run-rows.is-panel-flow > div > .subagent-answer {
+  position: relative;
+  min-width: 0;
+}
+
+.subagent-detail > .subagent-run .subagent-run-rows.is-panel-flow > div > .tool-row::before,
+.subagent-detail > .subagent-run .subagent-run-rows.is-panel-flow > div > .subagent-answer::before {
+  position: absolute;
+  top: 12px;
+  left: -20px;
+  width: 7px;
+  height: 7px;
+  border: 2px solid var(--ds-bg-dock);
+  border-radius: var(--radius-round);
+  background: var(--ds-text-muted);
+  content: "";
+}
+
+.subagent-detail > .subagent-run .subagent-run-rows.is-panel-flow > div > .tool-row:last-child::before,
+.subagent-detail > .subagent-run .subagent-run-rows.is-panel-flow > div > .subagent-answer:last-child::before {
+  background: var(--ds-accent);
+}
+
+/* Shared per-tool empty state used by Files and plugin fallback surfaces. */
+.work-tab-empty {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 28px 24px;
+  color: var(--ds-text-muted);
+  text-align: center;
+}
+
+.work-tab-empty-icon {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
+  color: var(--ds-text-secondary);
+}
+
+.work-tab-empty-title {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-base-plus);
+  font-weight: var(--font-weight-medium-plus);
+}
+
+.work-tab-empty-body {
+  max-width: 34ch;
+  margin: 0;
+  color: var(--ds-text-muted);
+  font-size: var(--text-md);
+  line-height: var(--leading-body);
+}
+
+.work-panel-launcher {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 10px;
+}
+
+.work-panel-launcher-title {
+  padding: 0 8px 4px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.work-panel-launcher-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.work-panel-launcher-row {
+  display: flex;
+  min-width: 0;
+  height: 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  color: var(--ds-text-primary);
+  font-size: var(--text-md);
+  text-align: left;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.work-panel-launcher-row:hover {
+  background: var(--ds-bg-hover);
+}
+
+.work-panel-launcher-row:focus-visible {
+  outline: 2px solid var(--ds-focus);
+  outline-offset: -2px;
+}
+
+.work-panel-launcher-icon {
+  display: inline-flex;
+  width: 18px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-text-secondary);
+}
+
+.work-panel-launcher-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-panel-launcher-row kbd {
+  margin-left: auto;
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+}
+
+/* Work panel — review tab */
+
+.review-tab {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.review-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 10px;
+}
+
+.review-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+}
+
+.review-toolbar-counts {
+  gap: 7px;
+  font-size: var(--text-2xs);
+}
+
+.review-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 4px 8px 12px;
+}
+
+.diff-counts {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  font-size: var(--text-2xs);
+  font-family: var(--font-mono);
+}
+
+.diff-count-add {
+  color: var(--ds-success);
+}
+
+.diff-count-del {
+  color: var(--ds-error);
+}
+
+/* Hunks are set apart by a gap; each opens with its own tinted header line. */
+.diff-hunk + .diff-hunk {
+  margin-top: 8px;
+}
+
+.diff-line {
+  display: flex;
+  min-width: 0;
+  align-items: stretch;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-relaxed);
+}
+
+.diff-line-sign {
+  flex: 0 0 auto;
+  width: 18px;
+  text-align: center;
+  user-select: none;
+  color: var(--ds-text-muted);
+}
+
+.diff-line-text {
+  flex: 1;
+  min-width: 0;
+  padding-right: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diff-line.add {
+  background: color-mix(in oklab, var(--ds-success) 12%, transparent);
+}
+
+.diff-line.add .diff-line-sign {
+  color: var(--ds-success);
+}
+
+.diff-line.del {
+  background: color-mix(in oklab, var(--ds-error) 12%, transparent);
+}
+
+.diff-line.del .diff-line-sign {
+  color: var(--ds-error);
+}
+
+.diff-line.hunk {
+  padding: 2px 8px;
+  background: color-mix(in oklab, var(--ds-text-primary) 4%, transparent);
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+}
+
+/* Work panel — browser tab */
+
+.work-browser {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.work-browser-chrome {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--ds-bg-dock-raised);
+}
+
+.work-browser-url {
+  flex: 1;
+  min-width: 0;
+}
+
+.work-browser-url input {
+  width: 100%;
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--ds-tile-hover);
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+/* Filled field, accent ring only while focused (D297). */
+.work-browser-url input:focus {
+  outline: none;
+  background: var(--ds-raised);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ds-accent) 22%, transparent);
+}
+
+.work-browser-surface {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+}
+
+/* Work panel — plugin views (ADR 0104)
+
+   The page itself is a native WebContentsView composited above the renderer,
+   so this is only the rect it is positioned against. It still paints a
+   background: during the first load the view has not drawn yet, and a
+   transparent hole would show the conversation behind the panel. The panel
+   itself is opaque, so the surface inherits that paint rather than restating
+   the chat tone (D297). */
+
+.work-plugin-view {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.work-plugin-view-surface {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+}
+
+/* Fallback for a view whose icon token this build does not know. Sized to the
+   15px icon box the launcher rows use so rows never shift between tools. */
+.work-panel-view-initial {
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-3xs);
+  background: color-mix(in oklab, var(--ds-text-primary) 10%, transparent);
+  color: var(--ds-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium-plus);
+  line-height: var(--leading-none);
+}
+
+/* Work panel — files tab */
+
+.file-tree {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 6px 6px 16px;
+}
+
+.file-tree-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  padding-right: 8px;
+  border-radius: var(--radius-2xs);
+  text-align: left;
+  font-size: var(--text-sm);
+  color: var(--ds-text-secondary);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.file-tree-row:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.file-tree-row.active {
+  background: var(--ds-bg-active);
+  color: var(--ds-text-primary);
+}
+
+.file-tree-caret {
+  display: inline-flex;
+  width: 12px;
+  flex: 0 0 auto;
+  color: var(--ds-text-muted);
+  transition: transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.file-tree-caret.open {
+  transform: rotate(90deg);
+}
+
+.file-tree-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-tree-note {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  font-size: var(--text-sm);
+  color: var(--ds-text-muted);
+}
+
+.file-viewer {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.file-viewer-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--ds-bg-dock-raised);
+}
+
+.file-viewer-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-plus);
+  color: var(--ds-text-primary);
+}
+
+.file-viewer-size {
+  flex: 0 0 auto;
+  font-size: var(--text-2xs);
+  color: var(--ds-text-muted);
+}
+
+.file-viewer-body {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.file-viewer-code {
+  margin: 0;
+  padding: 10px 12px 20px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-relaxed);
+  white-space: pre;
+  min-width: max-content;
+}
+
+.file-viewer-line {
+  min-height: 1em;
+}
+
+.file-viewer-cap {
+  padding: 8px 0;
+  color: var(--ds-text-muted);
+}
+
+.file-viewer-image {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.file-viewer-image img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--radius-sm);
+}

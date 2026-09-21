@@ -1,0 +1,283 @@
+{
+  "name": "@pi-desktop/desktop",
+  "version": "0.15.2",
+  "desktopName": "pi-desktop.desktop",
+  "private": true,
+  "description": "PI-Desktop Electron application",
+  "homepage": "https://github.com/vastsa/PI-Desktop",
+  "author": {
+    "name": "vastsa",
+    "email": "hhxk666@gmail.com"
+  },
+  "main": "./out/main/index.js",
+  "type": "module",
+  "scripts": {
+    "build:deps": "pnpm --filter '@pi-desktop/desktop^...' build",
+    "predev": "pnpm run build:deps && cargo build --manifest-path ../../Cargo.toml -p host-core",
+    "dev": "node ../../scripts/dev-electron.mjs",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "postinstall": "electron-builder install-app-deps",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test test/*.test.mjs",
+    "lint": "node ../../scripts/check-style-tokens.mjs",
+    "clean": "node -e \"fs.rmSync('out',{recursive:true,force:true});fs.rmSync('dist',{recursive:true,force:true})\"",
+    "build:host-release": "cargo build --release --manifest-path ../../Cargo.toml -p host-core",
+    "bundle:runtime": "pnpm -C ../../packages/agent-runtime bundle",
+    "pack": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --dir",
+    "dist": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --publish never",
+    "dist:mac": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --mac --publish never",
+    "dist:win": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --win --publish never",
+    "dist:linux": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --linux --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "0.86.1",
+    "@pi-desktop/agent-host": "workspace:*",
+    "@pi-desktop/agent-runtime": "workspace:*",
+    "@pi-desktop/host-runtime": "workspace:*",
+    "@pi-desktop/i18n": "workspace:*",
+    "@pi-desktop/plugin-devkit": "workspace:*",
+    "@pi-desktop/plugin-sdk": "workspace:*",
+    "@pi-desktop/racp": "workspace:*",
+    "@pi-desktop/shared": "workspace:*",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^4.6.0",
+    "dompurify": "^3.4.13",
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^4.0.0",
+    "i18next": "^26.3.6",
+    "katex": "^0.16.47",
+    "lucide-react": "^1.31.0",
+    "marked": "^18.0.9",
+    "mermaid": "^11.16.1",
+    "pinyin-pro": "3.29.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-i18next": "^15.6.0",
+    "react-markdown": "^10.1.0",
+    "rehype-katex": "^7.0.1",
+    "rehype-raw": "^7.0.0",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "shiki": "^4.4.3",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6",
+    "ws": "8.21.1",
+    "zustand": "^5.0.15"
+  },
+  "build": {
+    "appId": "net.aiuo.pi-desktop",
+    "productName": "PI-Desktop",
+    "directories": {
+      "output": "release"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "vastsa",
+        "repo": "PI-Desktop"
+      }
+    ],
+    "files": [
+      "out/**/*",
+      "package.json",
+      "!**/*.map",
+      "!**/node_modules/*/{test,tests,__tests__,powered-test,example,examples}/**",
+      "!**/node_modules/**/*.{test,spec}.{js,cjs,mjs}",
+      "!**/node_modules/node-addon-api/tools/**",
+      "!**/node_modules/node-addon-api/*.{c,gyp,gypi,h,js,json}",
+      "!**/node_modules/node-addon-api/README.md"
+    ],
+    "electronLanguages": [
+      "en-US",
+      "zh-CN",
+      "zh_CN",
+      "zh-TW",
+      "zh_TW",
+      "tr",
+      "de",
+      "es",
+      "fr",
+      "ko"
+    ],
+    "extraResources": [
+      {
+        "from": "build/icon.png",
+        "to": "tray-icon.png"
+      },
+      {
+        "from": "../../packages/agent-runtime/dist-bundle",
+        "to": "agent-runtime"
+      },
+      {
+        "from": "resources/skills",
+        "to": "skills"
+      },
+      {
+        "from": "resources/plugins",
+        "to": "plugins"
+      },
+      {
+        "from": "resources/models.dev",
+        "to": "models.dev"
+      }
+    ],
+    "mac": {
+      "artifactName": "PI-Desktop-${version}-${arch}-mac.${ext}",
+      "target": [
+        {
+          "target": "dmg"
+        },
+        {
+          "target": "zip"
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSLocalNetworkUsageDescription": "PI-Desktop needs local network access so agents can reach OpenAI-compatible providers, Ollama, and other AI endpoints running on your LAN. / PI-Desktop 需要本地网络访问权限，以便助手请求同一局域网中的 OpenAI 兼容服务、Ollama 等本地 AI 端点。",
+        "NSMicrophoneUsageDescription": "PI-Desktop plugins may use the microphone after you grant them audio access. / 在你授权后，PI-Desktop 插件可以使用麦克风。",
+        "NSBonjourServices": [
+          "_http._tcp",
+          "_https._tcp"
+        ]
+      },
+      "extraResources": [
+        {
+          "from": "../../target/release/pi-desktop-host-core",
+          "to": "bin/pi-desktop-host-core"
+        },
+        {
+          "from": "build/tray-icon-mac.png",
+          "to": "tray-icon-mac.png"
+        }
+      ],
+      "extraDistFiles": [
+        "PI-Desktop-macOS-open.command",
+        "PI-Desktop-macOS-opening-help.txt"
+      ]
+    },
+    "dmg": {
+      "artifactName": "PI-Desktop-${version}-${arch}.${ext}",
+      "background": "build/dmg-background.png",
+      "icon": "build/icon.icns",
+      "window": {
+        "width": 720,
+        "height": 440
+      },
+      "iconSize": 128,
+      "iconTextSize": 12,
+      "contents": [
+        {
+          "x": 180,
+          "y": 196
+        },
+        {
+          "x": 540,
+          "y": 196,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "win": {
+      "executableName": "PI-Desktop",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "extraResources": [
+        {
+          "from": "../../target/release/pi-desktop-host-core.exe",
+          "to": "bin/pi-desktop-host-core.exe"
+        },
+        {
+          "from": "build/icon.ico",
+          "to": "app-icon.ico"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "PI-Desktop",
+      "artifactName": "PI-Desktop-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "PI-Desktop-Portable-${version}.${ext}",
+      "requestExecutionLevel": "user",
+      "unpackDirName": "PI-Desktop-Portable"
+    },
+    "deb": {
+      "packageName": "pi-desktop",
+      "artifactName": "pi-desktop_${version}_${arch}.${ext}"
+    },
+    "rpm": {
+      "packageName": "pi-desktop",
+      "artifactName": "pi-desktop-${version}-${arch}.${ext}",
+      "fpm": [
+        "--rpm-rpmbuild-define",
+        "_build_id_links none"
+      ]
+    },
+    "linux": {
+      "executableName": "pi-desktop",
+      "syncDesktopName": true,
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "rpm",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Development",
+      "icon": "build/icon.png",
+      "extraResources": [
+        {
+          "from": "../../target/release/pi-desktop-host-core",
+          "to": "bin/pi-desktop-host-core"
+        }
+      ]
+    },
+    "asar": {
+      "smartUnpack": false
+    }
+  }
+}

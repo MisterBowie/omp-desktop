@@ -1,0 +1,640 @@
+/**
+ * Subagent definitions: the Markdown documents that describe a delegate the
+ * main agent can spawn through the `Task` tool.
+ *
+ * The format deliberately mirrors `.pi/prompts/*.md` (D123): YAML-ish
+ * frontmatter followed by a Markdown body that becomes the delegate's system
+ * prompt. Discovery and provider resolution live in `agent-runtime`
+ * (`subagent-definitions.ts`); this module owns only the shape, the parser and
+ * the safety defaults so the renderer, main and the sidecar agree on what a
+ * definition means.
+ *
+ * Two defaults matter for safety:
+ * - a delegate that does not declare `tools` is read-only, and
+ * - a delegate never inherits mutation rights unless it opts in with
+ *   `tools: inherit` (nested Task / mode-switch tools stay denied).
+ */
+
+import {
+  SUBAGENT_THINKING_LEVELS,
+  type SubagentThinkingLevel,
+} from "./types.js";
+
+/**
+ * Where a definition came from. User-owned global documents shadow builtins by
+ * name; project workspaces do not provide subagent definitions (D202).
+ */
+export type SubagentSource = "builtin" | "user";
+
+/** Provider/model pin declared by a definition (resolved in Electron main). */
+export type SubagentModelPin = {
+  providerId: string;
+  modelId: string;
+};
+
+export type SubagentDefinition = {
+  /** Delegate id used as the `Task` argument, e.g. "code-reviewer". */
+  name: string;
+  /** One line telling the parent model when to delegate to this agent. */
+  description: string;
+  /** Tools the delegate may call; read-only by default. */
+  tools: string[];
+  /**
+   * When true, the delegate also receives the parent session's live tool
+   * catalog minus {@link SUBAGENT_INHERIT_DENY_TOOLS}. Set by `tools: inherit`
+   * (alone or alongside assignable extras). The session runtime resolves the
+   * inherited set at spawn time from `toolCatalog`, including deferred plugin
+   * and MCP tools the parent is allowed to call.
+   */
+  inheritTools?: boolean;
+  /** Provider/model this definition pins, when it pins one. */
+  model?: SubagentModelPin;
+  /** Ordered, definition-scoped alternatives after a provider failure. */
+  fallbackModels?: SubagentModelPin[];
+  /**
+   * Reasoning level for the delegate, clamped against the model in main.
+   * omit leaves the provider's own default untouched.
+   */
+  thinkingLevel?: SubagentThinkingLevel;
+  /**
+   * Permission scope for the delegate's tool calls (ADR 0089). `inherit`
+   * follows the session's effective mode; the other values override it for the
+   * delegate's calls only, with host-core's external-path gate still in force
+   * (a delegate never unlocks paths outside the workspace and scratch roots).
+   */
+  permission?: SubagentPermission;
+  /**
+   * Output-token cap for one delegate response. Omitted follows the model's
+   * own published limit, which is what every definition did before this field
+   * existed (D383). A delegate is a bounded worker, so the cap is per response
+   * rather than per run.
+   */
+  maxTokens?: number;
+  /** Idle watchdog in seconds; parser materializes the default for documents. */
+  idleTimeoutSeconds?: number;
+  /** Total runtime watchdog in seconds; parser materializes the default. */
+  maxDurationSeconds?: number;
+  /** Markdown body used as the delegate's system prompt. */
+  prompt: string;
+  source: SubagentSource;
+  /** Absolute path of a user-owned global document. */
+  filePath?: string;
+};
+
+/** Tools a definition may declare by name. Plugin, skill, mode and meta tools
+ * are not on this list; a document opts into the parent's live catalog with
+ * `tools: inherit` instead (ADR 0246). */
+export const SUBAGENT_ASSIGNABLE_TOOLS = [
+  "Read",
+  "Glob",
+  "Grep",
+  "BrowserPreview",
+  "Bash",
+  "Edit",
+  "Write",
+] as const;
+
+export type SubagentAssignableTool = (typeof SUBAGENT_ASSIGNABLE_TOOLS)[number];
+
+/** Frontmatter token that opts a definition into parent-tool inheritance. */
+export const SUBAGENT_INHERIT_TOKEN = "inherit";
+
+/**
+ * Tools that are never inherited, even with `tools: inherit`. Nested fan-out
+ * and mode switches stay with the parent; the user-facing ask tool is out of
+ * reach because a delegate has no user. `ToolSearch` and `new_context` mutate
+ * the parent runtime's deferred-tool set and compaction flag, so they stay
+ * denied even though the child receives the full catalog without searching.
+ */
+export const SUBAGENT_INHERIT_DENY_TOOLS: readonly string[] = [
+  "Task",
+  "TaskWait",
+  "TaskList",
+  "TaskStop",
+  "EnterPlanMode",
+  "EnterGoalMode",
+  "asktool",
+  "new_context",
+  "ToolSearch",
+];
+
+/**
+ * Resolve the tool-name set a delegate should receive at spawn time.
+ *
+ * - Without `inheritTools`, this is the declared list only (today's behavior).
+ * - With `inheritTools`, the parent's live tool catalog is unioned in after
+ *   dropping {@link SUBAGENT_INHERIT_DENY_TOOLS}. Explicit assignable extras
+ *   are still included so a definition can add Bash on top of inherit.
+ */
+export function resolveSubagentToolNames(
+  definition: Pick<SubagentDefinition, "tools" | "inheritTools">,
+  parentToolNames: readonly string[],
+): string[] {
+  const declared = definition.tools.filter(
+    (name) => name !== SUBAGENT_INHERIT_TOKEN,
+  );
+  if (!definition.inheritTools) return [...declared];
+  const deny = new Set(SUBAGENT_INHERIT_DENY_TOOLS);
+  const resolved: string[] = [];
+  for (const name of [...parentToolNames, ...declared]) {
+    if (deny.has(name)) continue;
+    if (resolved.includes(name)) continue;
+    resolved.push(name);
+  }
+  return resolved;
+}
+
+/** Tools that can change the workspace; declaring one makes a delegate
+ * write-capable, which drives the write lock and permission attribution. */
+export const SUBAGENT_MUTATING_TOOLS = ["Bash", "Edit", "Write"] as const;
+
+/** What a definition gets when it stays silent about tools. */
+export const DEFAULT_SUBAGENT_TOOLS: readonly SubagentAssignableTool[] = [
+  "Read",
+  "Glob",
+  "Grep",
+];
+
+/**
+ * Defensive ceiling for a declared output cap. No published model accepts an
+ * output limit above 128k, so a value past this is a typo rather than an
+ * intent; the clamp keeps a document from asking a provider for something it
+ * can only reject. The floor is 1 — a cap of 0 would mean "no output", which
+ * is what leaving the field out already expresses.
+ */
+export const MAX_SUBAGENT_MAX_TOKENS = 200_000;
+export const MIN_SUBAGENT_MAX_TOKENS = 1;
+/**
+ * Parsed from definition frontmatter for compatibility. Idle and duration
+ * watchdogs are withdrawn (D328): the parent agent decides when to stop a
+ * delegate via TaskStop, and the user via Stop. These constants remain so
+ * existing documents still parse.
+ */
+export const DEFAULT_SUBAGENT_IDLE_TIMEOUT_SECONDS = 300;
+export const MIN_SUBAGENT_IDLE_TIMEOUT_SECONDS = 10;
+export const MAX_SUBAGENT_IDLE_TIMEOUT_SECONDS = 21_600;
+export const DEFAULT_SUBAGENT_MAX_DURATION_SECONDS = 21_600;
+export const MIN_SUBAGENT_MAX_DURATION_SECONDS = 60;
+export const MAX_SUBAGENT_MAX_DURATION_SECONDS = 21_600;
+
+/**
+ * Permission scope a delegate's tool calls resolve under, when its definition
+ * overrides the session mode. Mirrors the session permission modes; `inherit`
+ * is the default and means "use the session's effective mode as today".
+ */
+export const SUBAGENT_PERMISSIONS = [
+  "inherit",
+  "ask",
+  "accept-edits",
+  "auto",
+] as const;
+export type SubagentPermission = (typeof SUBAGENT_PERMISSIONS)[number];
+export const DEFAULT_SUBAGENT_PERMISSION: SubagentPermission = "inherit";
+
+export function isSubagentPermission(value: unknown): value is SubagentPermission {
+  return (
+    typeof value === "string" &&
+    (SUBAGENT_PERMISSIONS as readonly string[]).includes(value)
+  );
+}
+
+/** Builtins and global user documents may declare a permission scope. */
+export const PERMISSION_DECLARING_SOURCES: ReadonlySet<SubagentSource> = new Set(
+  ["builtin", "user"] as const,
+);
+
+/** Caps that keep delegation cheap and predictable (see ADR 0062). */
+export const MAX_SUBAGENT_DEFINITIONS = 16;
+export const MAX_SUBAGENT_PROVIDERS = 8;
+/** Running delegates per session, across batches (see ADR 0089). */
+export const MAX_SUBAGENT_CONCURRENCY = 10;
+/** Resumable chains kept per subagent name before the oldest is evicted
+ * (ADR 0279). A chain is one delegate session across any number of `resume`s. */
+export const MAX_RESUMABLE_CHAINS_PER_AGENT = 2;
+/** Cumulative lines a chain's read-only tools may read before it leaves the
+ * resumable list and the next delegation for that work runs cold (ADR 0279). */
+export const MAX_RESUMABLE_READ_LINES = 50_000;
+/** Files listed per chain in the parent's resumable-session prompt block. */
+export const MAX_RESUMABLE_LISTED_FILES = 8;
+
+const NAME_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
+
+export function isSubagentAssignableTool(
+  value: unknown,
+): value is SubagentAssignableTool {
+  return (
+    typeof value === "string" &&
+    (SUBAGENT_ASSIGNABLE_TOOLS as readonly string[]).includes(value)
+  );
+}
+
+export function isSubagentMutatingTool(value: string): boolean {
+  return (SUBAGENT_MUTATING_TOOLS as readonly string[]).includes(value);
+}
+
+/** Whether this delegate can change the workspace. */
+export function subagentCanMutate(
+  definition: SubagentDefinition,
+  resolvedTools?: readonly string[],
+): boolean {
+  if (resolvedTools) return resolvedTools.some(isSubagentMutatingTool);
+  // Inherit is resolved at spawn. Until then, treat it as write-capable:
+  // Agent-mode parents always expose Bash/Edit/Write in the live catalog.
+  if (definition.inheritTools) return true;
+  return definition.tools.some(isSubagentMutatingTool);
+}
+
+/** Compact `tools:` label for the Task catalog and fallback prompt text. */
+export function subagentToolsLabel(
+  definition: Pick<SubagentDefinition, "tools" | "inheritTools">,
+): string {
+  if (definition.inheritTools) {
+    return definition.tools.length > 0
+      ? `inherit + ${definition.tools.join(", ")}`
+      : "inherit";
+  }
+  return definition.tools.join(", ") || "none";
+}
+
+/** Filename (or frontmatter `name`) to definition id. */
+export function normalizeSubagentName(value: string): string {
+  const basename = value
+    .replace(/\\/g, "/")
+    .replace(/\/+$/, "")
+    .split("/")
+    .pop()!
+    .replace(/\.md$/i, "");
+  return basename.trim().toLowerCase().replace(/[\s_]+/g, "-");
+}
+
+export type SubagentParseResult =
+  | { ok: true; definition: SubagentDefinition; warnings: string[] }
+  | { ok: false; errors: string[]; warnings: string[] };
+
+type Frontmatter = Map<string, string | string[]>;
+
+/** Frontmatter keys are matched loosely, so `max-tokens` and `maxTokens` land
+ * on the same field. */
+function normalizeKey(key: string): string {
+  return key.trim().toLowerCase().replace(/[-_\s]/g, "");
+}
+
+function unquote(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.length >= 2) {
+    const first = trimmed[0];
+    const last = trimmed[trimmed.length - 1];
+    if ((first === '"' || first === "'") && first === last) {
+      return trimmed.slice(1, -1);
+    }
+  }
+  return trimmed;
+}
+
+/**
+ * Read the leading `---` block. Only the flat subset used by definitions is
+ * supported: `key: value` scalars and list values written inline
+ * (`[a, b]` / `a, b`) or as following `- item` lines.
+ */
+function splitFrontmatter(
+  raw: string,
+): { frontmatter: Frontmatter; body: string } {
+  const normalized = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const frontmatter: Frontmatter = new Map();
+  if (!normalized.startsWith("---\n")) {
+    return { frontmatter, body: normalized.trim() };
+  }
+  const end = normalized.indexOf("\n---", 3);
+  if (end === -1) return { frontmatter, body: normalized.trim() };
+  const block = normalized.slice(4, end);
+  const body = normalized.slice(end + 4).replace(/^[ \t]*\n/, "");
+
+  let lastKey: string | null = null;
+  for (const line of block.split("\n")) {
+    if (!line.trim() || line.trim().startsWith("#")) continue;
+    const item = line.match(/^[ \t]*-[ \t]+(.*)$/);
+    if (item && lastKey) {
+      const existing = frontmatter.get(lastKey);
+      const list = Array.isArray(existing) ? existing : [];
+      const value = unquote(item[1]);
+      if (value) list.push(value);
+      frontmatter.set(lastKey, list);
+      continue;
+    }
+    const pair = line.match(/^([A-Za-z][A-Za-z0-9_\- ]*):[ \t]*(.*)$/);
+    if (!pair) continue;
+    lastKey = normalizeKey(pair[1]);
+    const value = pair[2].trim();
+    // An empty scalar opens a block list; the `- item` branch fills it in.
+    frontmatter.set(lastKey, value ? unquote(value) : []);
+  }
+  return { frontmatter, body: body.trim() };
+}
+
+function asScalar(value: string | string[] | undefined): string | undefined {
+  if (typeof value === "string") return value || undefined;
+  if (Array.isArray(value) && value.length === 1) return value[0];
+  return undefined;
+}
+
+function asList(value: string | string[] | undefined): string[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return [];
+  const inner = value.replace(/^\[/, "").replace(/\]$/, "");
+  return inner
+    .split(",")
+    .map((entry) => unquote(entry))
+    .filter((entry) => entry.length > 0);
+}
+
+/**
+ * Parse one definition document.
+ *
+ * `fallbackName` is the filename stem: a document may omit `name`, and the
+ * file it lives in is a better identity than a parse failure. `description`
+ * is required — without it the parent model cannot decide when to delegate.
+ */
+export function parseSubagentDefinition(
+  raw: string,
+  options: {
+    source: SubagentSource;
+    fallbackName?: string;
+    filePath?: string;
+  },
+): SubagentParseResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const { frontmatter, body } = splitFrontmatter(raw);
+
+  const declaredName = asScalar(frontmatter.get("name"));
+  const name = normalizeSubagentName(
+    declaredName ?? options.fallbackName ?? "",
+  );
+  if (!name) errors.push("missing `name` and no filename to fall back on");
+  else if (!NAME_RE.test(name)) {
+    errors.push(
+      `invalid name "${name}": use lowercase letters, digits and dashes (max 40 chars)`,
+    );
+  }
+
+  const description = asScalar(frontmatter.get("description"))?.trim() ?? "";
+  if (!description) errors.push("missing `description`");
+
+  const declaredTools = asList(frontmatter.get("tools"));
+  let tools: string[];
+  let inheritTools = false;
+  if (declaredTools.length === 0) {
+    tools = [...DEFAULT_SUBAGENT_TOOLS];
+  } else if (declaredTools.length === 1 && declaredTools[0] === "*") {
+    tools = [...SUBAGENT_ASSIGNABLE_TOOLS];
+  } else {
+    const accepted: string[] = [];
+    for (const tool of declaredTools) {
+      if (tool === SUBAGENT_INHERIT_TOKEN) {
+        inheritTools = true;
+        continue;
+      }
+      if (isSubagentAssignableTool(tool)) {
+        if (!accepted.includes(tool)) accepted.push(tool);
+      } else {
+        warnings.push(`ignoring unknown tool "${tool}"`);
+      }
+    }
+    if (inheritTools) {
+      // `tools: inherit` alone still lists nothing at parse time; the runtime
+      // fills the parent's set at spawn. Keep extras the definition declared.
+      tools = accepted;
+    } else if (accepted.length === 0) {
+      errors.push("`tools` lists no usable tool");
+      tools = [...DEFAULT_SUBAGENT_TOOLS];
+    } else {
+      tools = accepted;
+    }
+  }
+
+  const model = parseModelPin(frontmatter, errors);
+  const fallbackModels: SubagentModelPin[] = [];
+  for (const value of asList(frontmatter.get("fallbackmodels"))) {
+    const pin = parseModelPin(new Map([["model", value]]), errors);
+    if (pin && !fallbackModels.some((entry) => subagentModelKey(entry) === subagentModelKey(pin))) {
+      fallbackModels.push(pin);
+    }
+  }
+
+  const declaredThinking = asScalar(frontmatter.get("thinkinglevel"));
+  let thinkingLevel: SubagentThinkingLevel | undefined;
+  if (declaredThinking) {
+    const candidate = declaredThinking.trim().toLowerCase();
+    if ((SUBAGENT_THINKING_LEVELS as readonly string[]).includes(candidate)) {
+      thinkingLevel = candidate as SubagentThinkingLevel;
+    } else {
+      warnings.push(`ignoring unknown thinking level "${declaredThinking}"`);
+    }
+  }
+
+  const declaredPermission = asScalar(frontmatter.get("permission"))?.trim();
+  let permission: SubagentPermission | undefined;
+  if (declaredPermission) {
+    const candidate = declaredPermission.toLowerCase();
+    if (!isSubagentPermission(candidate)) {
+      warnings.push(
+        `ignoring unknown permission "${declaredPermission}" (use inherit, ask, accept-edits or auto)`,
+      );
+    } else if (
+      candidate !== DEFAULT_SUBAGENT_PERMISSION &&
+      PERMISSION_DECLARING_SOURCES.has(options.source)
+    ) {
+      permission = candidate;
+    }
+  }
+
+  const maxTokens = parseMaxTokens(
+    asScalar(frontmatter.get("maxtokens")),
+    warnings,
+  );
+  const idleTimeoutSeconds = parseTimeoutSeconds(
+    asScalar(frontmatter.get("idletimeout")) ??
+      asScalar(frontmatter.get("idletimeoutseconds")),
+    "idle-timeout",
+    DEFAULT_SUBAGENT_IDLE_TIMEOUT_SECONDS,
+    MIN_SUBAGENT_IDLE_TIMEOUT_SECONDS,
+    MAX_SUBAGENT_IDLE_TIMEOUT_SECONDS,
+    warnings,
+  );
+  const maxDurationSeconds = parseTimeoutSeconds(
+    asScalar(frontmatter.get("maxduration")) ??
+      asScalar(frontmatter.get("maxdurationseconds")),
+    "max-duration",
+    DEFAULT_SUBAGENT_MAX_DURATION_SECONDS,
+    MIN_SUBAGENT_MAX_DURATION_SECONDS,
+    MAX_SUBAGENT_MAX_DURATION_SECONDS,
+    warnings,
+  );
+
+  const prompt = body.trim();
+  if (!prompt) errors.push("document body is empty (nothing to instruct)");
+
+  if (errors.length > 0) return { ok: false, errors, warnings };
+  return {
+    ok: true,
+    definition: {
+      name,
+      description,
+      tools,
+      ...(inheritTools ? { inheritTools: true } : {}),
+      ...(model ? { model } : {}),
+      ...(fallbackModels.length ? { fallbackModels } : {}),
+      ...(thinkingLevel ? { thinkingLevel } : {}),
+      ...(permission ? { permission } : {}),
+      ...(maxTokens !== undefined ? { maxTokens } : {}),
+      idleTimeoutSeconds,
+      maxDurationSeconds,
+      prompt,
+      source: options.source,
+      ...(options.filePath ? { filePath: options.filePath } : {}),
+    },
+    warnings,
+  };
+}
+
+/**
+ * `model: <provider>/<model>` is the compact spelling; `provider:` plus
+ * `model:` is the explicit one. A model id can itself contain slashes
+ * (`openrouter` style), so only the first segment is the provider.
+ */
+function parseModelPin(
+  frontmatter: Frontmatter,
+  errors: string[],
+): SubagentModelPin | undefined {
+  const declaredProvider = asScalar(frontmatter.get("provider"))?.trim();
+  const declaredModel = asScalar(frontmatter.get("model"))?.trim();
+  if (!declaredProvider && !declaredModel) return undefined;
+  if (!declaredModel) {
+    errors.push("`provider` given without `model`");
+    return undefined;
+  }
+  if (declaredProvider) {
+    return { providerId: declaredProvider, modelId: declaredModel };
+  }
+  const slash = declaredModel.indexOf("/");
+  if (slash <= 0 || slash === declaredModel.length - 1) {
+    errors.push(
+      `\`model\` must be "<provider>/<model>" or paired with \`provider\` (got "${declaredModel}")`,
+    );
+    return undefined;
+  }
+  return {
+    providerId: declaredModel.slice(0, slash),
+    modelId: declaredModel.slice(slash + 1),
+  };
+}
+
+/**
+ * Parse the delegate's output cap.
+ *
+ * Everything that means "no cap" — an absent key, `none`, or `0` — returns
+ * `undefined` rather than a number, so a definition without the field keeps
+ * following the model's published limit. A negative or fractional value is a
+ * typo, not a cap, so it is ignored with a warning instead of being coerced
+ * into something the provider would reject.
+ */
+function parseMaxTokens(
+  value: string | undefined,
+  warnings: string[],
+): number | undefined {
+  if (!value || value.trim().toLowerCase() === "none") {
+    return undefined;
+  }
+  const parsed = Number(value);
+  if (parsed === 0) return undefined;
+  if (!Number.isInteger(parsed) || parsed < MIN_SUBAGENT_MAX_TOKENS) {
+    warnings.push(
+      `ignoring invalid \`maxTokens\` "${value}" (following the model limit)`,
+    );
+    return undefined;
+  }
+  if (parsed > MAX_SUBAGENT_MAX_TOKENS) {
+    warnings.push(
+      `clamping \`maxTokens\` ${parsed} to ${MAX_SUBAGENT_MAX_TOKENS}`,
+    );
+    return MAX_SUBAGENT_MAX_TOKENS;
+  }
+  return parsed;
+}
+
+function parseTimeoutSeconds(
+  value: string | undefined,
+  key: "idle-timeout" | "max-duration",
+  fallback: number,
+  minimum: number,
+  maximum: number,
+  warnings: string[],
+): number {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || !Number.isFinite(parsed)) {
+    warnings.push(`ignoring invalid \`${key}\` "${value}" (using ${fallback})`);
+    return fallback;
+  }
+  const clamped = Math.min(maximum, Math.max(minimum, parsed));
+  if (clamped !== parsed) {
+    warnings.push(`clamping \`${key}\` ${parsed} to ${clamped}`);
+  }
+  return clamped;
+}
+
+/**
+ * Merge discovered definitions into the list the runtime offers.
+ *
+ * Precedence is user registry > builtin, so a global document retunes a
+ * builtin without renaming it. The result is capped: past
+ * `MAX_SUBAGENT_DEFINITIONS` the catalog stops being a menu the model can
+ * reason about, and every extra entry costs prompt tokens on every turn.
+ */
+export function mergeSubagentDefinitions(
+  definitions: readonly SubagentDefinition[],
+): { definitions: SubagentDefinition[]; dropped: string[] } {
+  const byName = new Map<string, SubagentDefinition>();
+  // Highest-precedence source first, so the first entry for a name wins it.
+  const ordered = [
+    ...definitions.filter((d) => d.source === "user"),
+    ...definitions.filter((d) => d.source === "builtin"),
+  ];
+  const dropped: string[] = [];
+  for (const definition of ordered) {
+    if (byName.has(definition.name)) continue;
+    if (byName.size >= MAX_SUBAGENT_DEFINITIONS) {
+      dropped.push(definition.name);
+      continue;
+    }
+    byName.set(definition.name, definition);
+  }
+  return { definitions: [...byName.values()], dropped };
+}
+
+/**
+ * Key of one resolved pin. Electron main resolves each distinct pin once and
+ * hands the sidecar a map under these keys; the sidecar looks a delegate's
+ * provider up by the same key, so an unresolvable pin is a missing entry rather
+ * than a silent fallback to the session model.
+ */
+export function subagentModelKey(pin: SubagentModelPin): string {
+  return `${pin.providerId}/${pin.modelId}`;
+}
+
+/** Distinct providers pinned across a definition list, capped for the same
+ * reason as the definition count: each one is a live client in the sidecar. */
+export function subagentPinnedProviders(
+  definitions: readonly SubagentDefinition[],
+): string[] {
+  const providers: string[] = [];
+  for (const definition of definitions) {
+    for (const pin of [definition.model, ...(definition.fallbackModels ?? [])]) {
+      const providerId = pin?.providerId;
+      if (!providerId || providers.includes(providerId)) continue;
+      if (providers.length >= MAX_SUBAGENT_PROVIDERS) return providers;
+      providers.push(providerId);
+    }
+  }
+  return providers;
+}

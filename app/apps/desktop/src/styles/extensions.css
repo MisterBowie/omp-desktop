@@ -1,0 +1,1556 @@
+/*
+ * Extensions: MCP servers, user skills, and the activation-scope control the
+ * three extension kinds share.
+ *
+ * Kept beside plugins.css rather than inside it because these surfaces are new
+ * and self-contained, and because the scope control is used from the plugin rows
+ * too — one file that owns it is easier to keep coherent than a block wedged
+ * into the middle of the plugin page's styles.
+ */
+
+/* ---------------------------------------------------------------- section */
+
+.ext-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.ext-section-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ext-section-copy {
+  display: flex;
+  flex: 1 1 320px;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ext-section-title {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-medium-plus);
+  letter-spacing: var(--tracking-tight);
+}
+
+.ext-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.ext-inline-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--ds-error) 10%, transparent);
+  padding: 9px 12px;
+  color: var(--ds-error);
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-body);
+}
+
+.ext-inline-error > svg {
+  margin-top: 1px;
+  flex: 0 0 auto;
+}
+
+/* Empty states reuse the plugin page's proportions so the tabs feel like one page. */
+.ext-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 36px 24px 30px;
+  text-align: center;
+}
+
+.ext-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  margin-bottom: 6px;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
+  color: var(--ds-text-secondary);
+}
+
+.ext-empty-title {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-base-plus);
+  font-weight: var(--font-weight-medium-plus);
+}
+
+.ext-empty-body {
+  margin: 0;
+  max-width: 48ch;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-md);
+  line-height: var(--leading-body);
+}
+
+.ext-empty-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* -------------------------------------------------------------------- rows */
+
+/* D297: rows are tiles with a gap between them; nothing is ruled off, and
+   nothing clips, so row menus overhang freely. */
+.ext-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  overflow: visible;
+}
+
+.ext-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md-plus);
+  background: var(--ds-tile);
+  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.ext-row:hover,
+.ext-row:focus-within,
+.ext-row.menu-open {
+  background: var(--ds-tile-hover);
+}
+
+/*
+ * The glyph doubles as the connection light: colour comes from the MCP state, so
+ * the answer to "is this thing working" is the first thing in the row.
+ */
+.ext-row-glyph {
+  position: relative;
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-secondary);
+  flex: 0 0 auto;
+}
+
+.ext-row-glyph.is-ready {
+  background: color-mix(in oklab, var(--ds-success) 14%, transparent);
+  color: var(--ds-success);
+}
+
+.ext-row-glyph.is-connecting {
+  background: color-mix(in oklab, var(--ds-warning) 14%, transparent);
+  color: var(--ds-warning);
+}
+
+.ext-row-glyph.is-failed {
+  background: color-mix(in oklab, var(--ds-error) 14%, transparent);
+  color: var(--ds-error);
+}
+
+.ext-row.is-off .ext-row-glyph {
+  opacity: 0.55;
+  background: color-mix(in oklab, var(--ds-text-primary) 6%, transparent);
+  color: var(--ds-text-muted);
+}
+
+.ext-row-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ext-row-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.ext-row-name {
+  color: var(--ds-text-primary);
+  font-size: var(--text-md-plus);
+  font-weight: var(--font-weight-medium-plus);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ext-row.is-off .ext-row-copy {
+  opacity: 0.5;
+}
+
+.ext-row-id,
+.ext-row-cmd {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-plus);
+  color: var(--ds-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.ext-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  min-width: 0;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+}
+
+.ext-row-desc {
+  margin: 0;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-body);
+}
+
+.ext-row-desc.is-muted {
+  color: var(--ds-text-faint);
+  font-style: italic;
+}
+
+.ext-row-error {
+  margin: 0;
+  color: var(--ds-error);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  word-break: break-word;
+}
+
+.ext-row-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding-top: 2px;
+}
+
+/* Keep row actions visible so available operations are discoverable at rest. */
+.ext-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  opacity: 1;
+}
+
+.ext-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-secondary);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-medium);
+  padding: 1px 7px;
+  line-height: var(--leading-normal);
+}
+
+.ext-state-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  padding: 1px 7px;
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-normal);
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-secondary);
+}
+
+.ext-state-tag.is-ready {
+  background: color-mix(in oklab, var(--ds-success) 15%, transparent);
+  color: var(--ds-success);
+}
+
+.ext-state-tag.is-connecting,
+.ext-state-tag.is-warn {
+  background: color-mix(in oklab, var(--ds-warning) 15%, transparent);
+  color: var(--ds-warning);
+}
+
+.ext-state-tag.is-failed {
+  background: color-mix(in oklab, var(--ds-error) 15%, transparent);
+  color: var(--ds-error);
+}
+
+.ext-tool-chips {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.ext-tool-chip {
+  border-radius: var(--radius-xs);
+  background: color-mix(in oklab, var(--ds-text-primary) 6%, transparent);
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-3xs);
+  padding: 1px 6px;
+  line-height: var(--leading-normal);
+}
+
+.ext-tool-chip.is-more {
+  font-family: inherit;
+}
+
+/*
+ * A tool that can change the workspace is tinted, because the tool grant is the
+ * only part of a subagent definition with a safety consequence (ADR 0062) and
+ * the row is where the user scans for it.
+ */
+.ext-tool-chip.is-mutating {
+  background: color-mix(in oklab, var(--ds-warning) 16%, transparent);
+  color: var(--ds-warning);
+}
+
+/* ------------------------------------------------------------- subagents */
+
+.ext-row-glyph.is-subagent {
+  background: color-mix(in oklab, var(--ds-accent) 14%, transparent);
+  color: var(--ds-accent);
+}
+
+/* A second heading inside the panel, for the read-only sources. */
+.ext-section-head.is-sub {
+  margin-top: 4px;
+}
+
+.ext-section-head.is-sub .ext-section-title {
+  font-size: var(--text-base-plus);
+}
+
+/*
+ * The tool grant is a checkbox group rather than a select: every option has to be
+ * visible at once for the read-only default to read as a choice.
+ */
+.ext-tool-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ext-tool-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-full);
+  padding: 3px 10px 3px 8px;
+  background: var(--ds-tile-hover);
+  color: var(--ds-text-secondary);
+  font-size: var(--text-xs-plus);
+  cursor: pointer;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.ext-tool-opt code {
+  font-family: var(--font-mono);
+}
+
+.ext-tool-opt:hover {
+  background: var(--ds-tile-deep);
+}
+
+/* On reads through the fill alone (D297); the tint says which kind. */
+.ext-tool-opt.is-on {
+  background: color-mix(in oklab, var(--ds-accent) 14%, transparent);
+  color: var(--ds-text-primary);
+}
+
+.ext-tool-opt.is-on.is-mutating {
+  background: color-mix(in oklab, var(--ds-warning) 16%, transparent);
+}
+/* ----------------------------------------------------------- preset picker */
+/*
+ * Issue #60: the subagent editor offers built-in templates (explorer /
+ * code-reviewer / test-runner / fixer). The chips are the same wrapping
+ * pills as the tool-grant row: name only, one shared caption under the
+ * row, accent-tint for the chosen option.
+ */
+.ext-preset-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ext-preset-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  background: var(--ds-tile-hover);
+  border: 0;
+  border-radius: var(--radius-full);
+  color: var(--ds-text-secondary);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.ext-preset-chip:hover {
+  background: var(--ds-tile-deep);
+}
+
+.ext-preset-chip:focus-visible,
+.ext-sheet-advanced-toggle:focus-visible {
+  outline: 2px solid var(--ds-accent-soft);
+  outline-offset: 1px;
+}
+
+.ext-preset-chip.is-selected {
+  background: color-mix(in oklab, var(--ds-accent) 14%, transparent);
+  color: var(--ds-text-primary);
+}
+
+.ext-preset-chip-name {
+  font-weight: var(--font-weight-medium);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.ext-preset-desc {
+  margin: 0;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-body);
+}
+
+
+/* --------------------------------------------------------- scope control */
+
+.scope-control {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.scope-control.is-compact {
+  gap: 0;
+}
+
+.scope-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
+}
+
+.scope-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.scope-compact-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.scope-compact-menu-anchor {
+  display: contents;
+}
+
+.scope-compact-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 156px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  padding: 0 8px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-xs-plus);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  background: color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.scope-compact-trigger > svg:first-child,
+.scope-compact-chevron {
+  flex: 0 0 auto;
+}
+
+.scope-compact-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scope-compact-chevron {
+  color: var(--ds-text-faint);
+}
+
+.scope-compact-trigger.is-off {
+  color: var(--ds-text-secondary);
+}
+
+.scope-compact-trigger.is-global {
+  color: var(--ds-text-primary);
+}
+
+.scope-compact-trigger:hover:not(:disabled),
+.scope-compact-trigger[aria-expanded="true"] {
+  background: color-mix(in oklab, var(--ds-text-primary) 10%, transparent);
+  color: var(--ds-text-primary);
+}
+
+.scope-compact-trigger:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+
+.scope-compact-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: auto;
+  bottom: auto;
+  z-index: 30;
+  display: flex;
+  width: min(252px, calc(100vw - 40px));
+  flex-direction: column;
+  gap: 1px;
+  border-radius: var(--radius-md-plus);
+  background: var(--ds-bg-elevated-opaque, var(--ds-bg-primary));
+  box-shadow: 0 0 0 0.5px var(--ds-border-default), 0 14px 38px rgba(0, 0, 0, 0.22);
+  padding: 5px;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.scope-compact-menu.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  animation: scope-popover-in var(--motion-duration-fast) var(--motion-ease-out) both;
+}
+
+.scope-compact-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  border-radius: var(--radius-2xs);
+  padding: 7px 8px;
+  color: var(--ds-text-secondary);
+  text-align: left;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.scope-compact-option > svg:first-child {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.scope-compact-option:hover,
+.scope-compact-option.is-active {
+  background: color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
+  color: var(--ds-text-primary);
+}
+
+.scope-compact-option-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.scope-compact-option-label {
+  color: inherit;
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-medium);
+}
+
+.scope-compact-option-hint {
+  color: var(--ds-text-faint);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-normal);
+}
+
+.scope-compact-option > svg:last-child {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--ds-accent);
+}
+
+.scope-projects.is-compact {
+  position: static;
+  width: 0;
+  height: 0;
+  margin: 0;
+}
+
+.scope-seg > svg {
+  flex: 0 0 auto;
+}
+
+.scope-seg:hover:not(.is-active) {
+  color: var(--ds-text-primary);
+}
+
+.scope-seg.is-active {
+  background: var(--ds-raised);
+  color: var(--ds-text-primary);
+  box-shadow: var(--ds-raised-shadow);
+}
+
+/* Off reads as off: the active segment stays quiet instead of looking selected. */
+.scope-seg.is-active:first-child {
+  color: var(--ds-text-secondary);
+}
+
+.scope-seg:last-child.is-active {
+  color: var(--ds-text-primary);
+}
+
+.scope-seg:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.scope-projects {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.scope-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 190px;
+  border-radius: var(--radius-full);
+  padding: 2px 9px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
+  background: var(--ds-tile-hover);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.scope-chip > svg {
+  flex: 0 0 auto;
+  color: var(--ds-text-faint);
+}
+
+.scope-chip:hover,
+.scope-chip.is-open {
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-primary);
+}
+
+.scope-chip.is-empty {
+  color: var(--ds-warning);
+  background: color-mix(in oklab, var(--ds-warning) 12%, transparent);
+}
+
+/* Stacked rather than wrapped: `flex-basis: 100%` resolves against a
+   max-content container, so the warning sat beside the chip and folded into a
+   ragged two-line block instead of taking a line of its own. */
+.scope-warn {
+  color: var(--ds-warning);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-normal);
+  max-width: 34ch;
+  text-align: right;
+}
+
+.scope-popover {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: auto;
+  bottom: auto;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: 304px;
+  max-height: 320px;
+  border-radius: var(--radius-md-plus);
+  background: var(--ds-bg-elevated-opaque, var(--ds-bg-primary));
+  box-shadow: 0 0 0 0.5px var(--ds-border-default), 0 14px 38px rgba(0, 0, 0, 0.22);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  overflow: hidden;
+}
+
+.scope-popover.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  animation: scope-popover-in var(--motion-duration-fast) var(--motion-ease-out) both;
+}
+
+@keyframes scope-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.scope-popover-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 10px 8px 12px;
+}
+
+.scope-popover-title {
+  flex: 1;
+  min-width: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-medium-plus);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scope-popover-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-2xs);
+  color: var(--ds-text-faint);
+  flex: 0 0 auto;
+}
+
+.scope-popover-close:hover {
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-primary);
+}
+
+.scope-popover-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 10px 6px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
+  padding: 0 9px;
+  height: 28px;
+  color: var(--ds-text-faint);
+}
+
+.scope-popover-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  outline: none;
+}
+
+.scope-popover-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 6px 6px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.scope-popover-empty {
+  margin: 0;
+  padding: 14px 8px;
+  color: var(--ds-text-faint);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.scope-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border-radius: var(--radius-2xs);
+  padding: 6px 8px;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.scope-option:hover {
+  background: var(--ds-bg-hover);
+}
+
+.scope-option-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
+  border-radius: var(--radius-2xs);
+  background: var(--ds-tile-deep);
+  color: transparent;
+  flex: 0 0 auto;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.scope-option.is-on .scope-option-check {
+  background: var(--ds-accent);
+  color: var(--ds-bg-primary);
+}
+
+.scope-option-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.scope-option-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scope-option-tag {
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-muted);
+  font-size: var(--text-3xs);
+  padding: 0 6px;
+}
+
+.scope-option-path {
+  color: var(--ds-text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-3xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scope-popover-foot {
+  margin: 0;
+  padding: 4px 12px 9px;
+  color: var(--ds-text-faint);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-normal);
+}
+
+/*
+ * Inside a form the control is a field like any other, so it reads from the left
+ * edge and its popover opens the same way. In a list row it stays right-aligned
+ * with the other row controls.
+ */
+.ext-field-group > .scope-control {
+  align-items: flex-start;
+}
+
+.ext-field-group > .scope-control .scope-projects {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.ext-field-group > .scope-control .scope-warn {
+  text-align: left;
+}
+
+/*
+ * In a sheet the picker expands in place instead of floating: the sheet body
+ * scrolls, and a popover positioned inside a scrolling box gets clipped exactly
+ * when it matters — near the bottom, which is where this field sits.
+ */
+.ext-field-group > .scope-control .scope-popover {
+  position: static;
+  flex: 0 0 100%;
+  width: 100%;
+  max-height: 268px;
+  margin-top: 2px;
+  background: var(--ds-tile);
+  box-shadow: none;
+}
+
+/* ------------------------------------------------------------------ sheets */
+
+.ext-sheet-overlay {
+  align-items: flex-start;
+  padding: 28px 20px;
+  overflow-y: auto;
+}
+
+.ext-sheet {
+  display: flex;
+  width: min(100%, 520px);
+  max-height: calc(100vh - 56px);
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  margin: auto;
+}
+
+.ext-sheet.is-narrow {
+  width: min(100%, 480px);
+}
+
+/* D297: head, body and actions are set apart by spacing, not rules. */
+.ext-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px 10px;
+}
+
+.ext-sheet-head > div:first-child {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ext-sheet-title {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-base-plus);
+  font-weight: var(--font-weight-medium-plus);
+  letter-spacing: var(--tracking-tight);
+}
+
+.ext-sheet-sub {
+  margin: 0;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-body);
+}
+
+.ext-sheet-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-2xs);
+  color: var(--ds-text-faint);
+  flex: 0 0 auto;
+}
+
+.ext-sheet-close:hover {
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-primary);
+}
+
+.ext-sheet-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 14px;
+  padding: 10px 20px 14px;
+  overflow-y: auto;
+}
+
+/*
+ * The shared field primitive is intentionally roomy enough for normal Settings
+ * rows. A create/edit sheet carries several fields in one viewport, so its
+ * controls use the same filled-well language at a calmer, denser scale. Keep
+ * this override local to subagent sheets so the rest of the Settings surface
+ * does not silently change density.
+ */
+.ext-sheet .field-input,
+.ext-sheet .field-select,
+.ext-sheet .field-textarea {
+  min-height: 34px;
+  border-radius: var(--radius-xs);
+  background: var(--ds-tile);
+  padding: 7px 10px;
+  font-size: var(--text-md);
+  line-height: var(--leading-compact);
+}
+
+.ext-sheet .field-input:hover,
+.ext-sheet .field-select:hover,
+.ext-sheet .field-textarea:hover {
+  background: var(--ds-tile-hover);
+}
+
+.ext-sheet .field-input:focus,
+.ext-sheet .field-select:focus,
+.ext-sheet .field-textarea:focus {
+  background: var(--ds-raised);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ds-accent) 22%, transparent);
+}
+
+.ext-sheet .field-textarea {
+  min-height: 68px;
+}
+
+.ext-sheet .ext-skill-body {
+  min-height: 166px;
+  padding: 10px 12px;
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-relaxed);
+}
+
+.ext-sheet-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ext-sheet-advanced-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  margin: 0 0 0 -7px;
+  border-radius: var(--radius-xs);
+  padding: 5px 7px;
+  border: 0;
+  background: transparent;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.ext-sheet-advanced-toggle:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.ext-sheet-advanced-toggle svg {
+  flex: 0 0 auto;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.ext-sheet-advanced-toggle[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
+.ext-sheet-advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ext-sheet-advanced-body[hidden] {
+  display: none;
+}
+
+.ext-sheet-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 20px 16px;
+}
+
+.ext-sheet-actions-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.ext-sheet-note {
+  color: var(--ds-text-faint);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-normal);
+  max-width: 30ch;
+}
+
+.ext-sheet-warning {
+  margin: -4px 0 0;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--ds-warning) 10%, transparent);
+  padding: 8px 10px;
+  color: var(--ds-warning);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-body);
+}
+
+.ext-sheet-error {
+  margin: 0 20px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--ds-error) 8%, transparent);
+  padding: 8px 12px;
+  color: var(--ds-error);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
+.ext-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ext-field-label {
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-medium);
+}
+
+.ext-field-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ext-field-hint {
+  margin: -2px 0 2px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-body);
+}
+
+.ext-field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* A field with nothing to pick yet: the action replaces the control. */
+.ext-field-empty {
+  display: flex;
+  align-items: center;
+}
+
+/* The transport choice is two cards, not a select: it changes the whole form. */
+.ext-transport-pick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.ext-transport-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  text-align: left;
+  border-radius: var(--radius-md);
+  background: var(--ds-tile);
+  padding: 10px 11px;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.ext-transport-card:hover {
+  background: var(--ds-tile-hover);
+}
+
+/* The chosen transport is the raised card (D297), not the outlined one. */
+.ext-transport-card.is-active {
+  background: var(--ds-raised);
+  box-shadow: var(--ds-raised-shadow);
+}
+
+.ext-transport-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-xs);
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-secondary);
+  flex: 0 0 auto;
+}
+
+.ext-transport-card.is-active .ext-transport-icon {
+  color: var(--ds-text-primary);
+}
+
+.ext-transport-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ext-transport-name {
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-medium);
+}
+
+.ext-test-result {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
+  padding: 9px 12px;
+  font-size: var(--text-sm-plus);
+  color: var(--ds-text-secondary);
+}
+
+.ext-test-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--ds-text-faint);
+  flex: 0 0 auto;
+  transform: translateY(-1px);
+}
+
+.ext-test-result.is-ready {
+  background: color-mix(in oklab, var(--ds-success) 10%, transparent);
+  color: var(--ds-success);
+}
+
+.ext-test-result.is-ready .ext-test-dot {
+  background: var(--ds-success);
+}
+
+.ext-test-result.is-connecting .ext-test-dot {
+  background: var(--ds-warning);
+}
+
+.ext-test-result.is-failed {
+  background: color-mix(in oklab, var(--ds-error) 10%, transparent);
+  color: var(--ds-error);
+}
+
+.ext-test-result.is-failed .ext-test-dot {
+  background: var(--ds-error);
+}
+
+.ext-test-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: var(--leading-body);
+  word-break: break-word;
+}
+
+.ext-test-tools {
+  flex: 1 1 100%;
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-body);
+  word-break: break-word;
+}
+
+.ext-byte-count {
+  color: var(--ds-text-faint);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.ext-byte-count.is-near {
+  color: var(--ds-warning);
+}
+
+.ext-byte-count.is-over {
+  color: var(--ds-error);
+}
+
+.ext-skill-body {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-body);
+  resize: vertical;
+}
+
+/* ------------------------------------------------------------ paste import */
+
+.ext-import-box {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  resize: vertical;
+}
+
+.ext-import-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--ds-error) 10%, transparent);
+  padding: 8px 11px;
+  color: var(--ds-error);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
+.ext-import-error > svg {
+  margin-top: 1px;
+  flex: 0 0 auto;
+}
+
+.ext-import-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: var(--radius-md);
+  background: var(--ds-tile);
+  padding: 8px;
+}
+
+.ext-import-count {
+  padding: 0 4px 4px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.ext-import-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-2xs);
+  padding: 5px 6px;
+  min-width: 0;
+}
+
+.ext-import-row:hover {
+  background: var(--ds-bg-hover);
+}
+
+.ext-import-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-text-faint);
+  flex: 0 0 auto;
+}
+
+.ext-import-row.is-skipped .ext-import-icon {
+  color: var(--ds-warning);
+}
+
+.ext-import-name {
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-medium);
+  flex: 0 0 auto;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ext-import-row.is-skipped .ext-import-name {
+  color: var(--ds-text-muted);
+  text-decoration: line-through;
+}
+
+.ext-import-detail {
+  flex: 1;
+  min-width: 0;
+  color: var(--ds-text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-3xs);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------- key/value editor */
+
+.kv-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.kv-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.kv-key {
+  flex: 0 1 40%;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.kv-value {
+  flex: 1 1 60%;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.kv-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-2xs);
+  color: var(--ds-text-faint);
+  flex: 0 0 auto;
+}
+
+.kv-remove:hover {
+  background: color-mix(in oklab, var(--ds-error) 12%, transparent);
+  color: var(--ds-error);
+}
+
+.kv-add {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 5px;
+  border-radius: var(--radius-full);
+  padding: 3px 10px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-xs-plus);
+  font-weight: var(--font-weight-medium);
+  background: var(--ds-tile-hover);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.kv-add:hover {
+  background: var(--ds-tile-deep);
+  color: var(--ds-text-primary);
+}
+
+/*
+ * Narrow layout: the row controls drop below the copy rather than squeezing the
+ * name into two characters, and the scope popover spans the row.
+ */
+@media (max-width: 720px) {
+  .ext-row {
+    flex-wrap: wrap;
+  }
+
+  .ext-row-controls {
+    width: 100%;
+    justify-content: space-between;
+    padding-left: 42px;
+  }
+
+  .ext-field-pair,
+  .ext-transport-pick {
+    grid-template-columns: 1fr;
+  }
+
+  .scope-popover {
+    width: min(304px, calc(100vw - 56px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scope-popover,
+  .scope-compact-menu {
+    animation: none;
+  }
+
+  .ext-row,
+  .ext-row-actions,
+    .scope-seg,
+    .scope-compact-trigger,
+    .scope-compact-option,
+    .scope-chip,
+  .ext-transport-card,
+  .ext-preset-chip,
+  .ext-sheet-advanced-toggle svg,
+  .scope-option,
+  .scope-option-check,
+  .kv-add {
+    transition: none;
+  }
+}

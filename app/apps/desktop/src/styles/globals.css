@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+/*
+  Renderer stylesheet entry point.
+
+  This file only sequences the layers below — put new rules in the partial
+  that owns the surface, not here. Import order IS the cascade: tokens and
+  base first, feature layers in the order the UI was built, and the
+  responsive/reduced-motion tail last so it can override what precedes it.
+  Reordering these imports changes rendering.
+*/
+@import "./tokens.css";
+@import "./base.css";
+@import "./chrome.css";
+@import "./chat-shell.css";
+@import "./composer.css";
+@import "./sidebar-threads.css";
+@import "./messages.css";
+@import "./prose.css";
+@import "./ui-kit.css";
+@import "./overlays.css";
+@import "./session-search.css";
+@import "./theme-overrides.css";
+@import "./composer-menus.css";
+@import "./settings.css";
+@import "./destinations.css";
+@import "./projects.css";
+@import "./project-create-dialog.css";
+@import "./sessions.css";
+@import "./work-panel.css";
+@import "./providers.css";
+@import "./model-config.css";
+@import "./chat-links.css";
+@import "./composer-autocomplete.css";
+@import "./plugins.css";
+@import "./extensions.css";
+@import "./plugin-launcher.css";
+@import "./responsive.css";

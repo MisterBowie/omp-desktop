@@ -1,0 +1,996 @@
+import { describe, expect, it, vi } from "vitest";
+import {
+  createAssistantMessageEventStream,
+  type AssistantMessage,
+} from "@earendil-works/pi-ai";
+import {
+  captureProviderResponse,
+  carriesRetryDelayHeaders,
+  classifyProviderError,
+  createProviderRetryStream,
+  delayWithAbort,
+  isOpaqueBadRequest,
+  isTransientProviderRetryCode,
+  PROVIDER_RATE_LIMIT_MAX_RETRIES,
+  PROVIDER_TRANSIENT_MAX_RETRIES,
+  providerRateLimitDelayMs,
+  providerSetupRetryDelayMs,
+  STREAM_IDLE_TIMEOUT_DEFAULT_MS,
+  STREAM_IDLE_TIMEOUT_FLOOR_MS,
+  streamIdleTimeoutMs,
+  stripOutputLimitFields,
+  withoutDerivedOutputLimit,
+  withStreamIdleTimeout,
+} from "./provider-retry.js";
+import { activeNodeTransportRoute } from "./node-proxy.js";
+import { describeProviderFetchFailure } from "./provider-transport-recovery.js";
+import type { ClassifiedAgentError } from "./agent-errors.js";
+
+const model = {
+  id: "model",
+  api: "openai-completions",
+  provider: "provider",
+  reasoning: false,
+  input: ["text"],
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  contextWindow: 32_000,
+  maxTokens: 4_000,
+  baseUrl: "https://provider.invalid/v1",
+} as any;
+
+const context = { messages: [], tools: [] };
+
+function assistantMessage(overrides: Partial<AssistantMessage> = {}): AssistantMessage {
+  return {
+    role: "assistant",
+    content: [],
+    api: "openai-completions",
+    provider: "provider",
+    model: "model",
+    usage: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
+    stopReason: "error",
+    errorMessage: "429: too many requests",
+    timestamp: Date.now(),
+    ...overrides,
+  };
+}
+
+function failedStream(
+  overrides: Partial<AssistantMessage> = {},
+): ReturnType<typeof createAssistantMessageEventStream> {
+  const stream = createAssistantMessageEventStream();
+  const error = assistantMessage(overrides);
+  queueMicrotask(() => {
+    stream.push({ type: "error", reason: "error", error });
+    stream.end(error);
+  });
+  return stream;
+}
+
+function successfulStream(): ReturnType<typeof createAssistantMessageEventStream> {
+  const stream = createAssistantMessageEventStream();
+  const message = assistantMessage({
+    content: [{ type: "text", text: "recovered" }],
+    stopReason: "stop",
+    errorMessage: undefined,
+  });
+  queueMicrotask(() => {
+    stream.push({ type: "start", partial: message });
+    stream.push({ type: "done", reason: "stop", message });
+    stream.end(message);
+  });
+  return stream;
+}
+
+describe("provider rate-limit retry", () => {
+  it("uses a captured 429 status when the provider body is generic", () => {
+    expect(classifyProviderError("upstream unavailable", 429)).toMatchObject({
+      code: "PROVIDER_RATE_LIMITED",
+      retriable: true,
+      details: { providerStatus: 429 },
+    });
+    expect(classifyProviderError("authentication failed", 429)).toMatchObject({
+      code: "PROVIDER_UNAUTHORIZED",
+      retriable: false,
+    });
+  });
+
+  it("prefers retry headers and bounds exponential fallback", () => {
+    expect(providerRateLimitDelayMs(1, { "retry-after-ms": "1250" }, 0, 0)).toBe(1250);
+    expect(providerRateLimitDelayMs(1, { "retry-after": "2" }, 0, 0)).toBe(2000);
+    expect(
+      providerRateLimitDelayMs(
+        1,
+        { "retry-after": new Date(5_000).toUTCString() },
+        0,
+        0,
+      ),
+    ).toBe(5000);
+    expect(
+      providerRateLimitDelayMs(
+        1,
+        { "retry-after": new Date(-5_000).toUTCString() },
+        0,
+        0,
+      ),
+    ).toBe(0);
+    expect(providerRateLimitDelayMs(1, undefined, 0, 0)).toBe(2000);
+    expect(providerRateLimitDelayMs(1, undefined, 0, 1)).toBe(2500);
+    expect(providerRateLimitDelayMs(20, { "retry-after": "120" }, 0, 0)).toBe(30_000);
+  });
+
+  it("silently retries pre-stream 429s and forwards only the successful stream", async () => {
+    let attempts = 0;
+    const claims: Array<{ phase: string; attempt: number }> = [];
+    const sleep = vi.fn(async () => undefined);
+    const stream = createProviderRetryStream(
+      model,
+      context,
+      {},
+      () => {
+        attempts += 1;
+        return attempts < 3 ? failedStream() : successfulStream();
+      },
+      {
+        claim: (_error, phase) => {
+          const attempt = attempts;
+          claims.push({ phase, attempt });
+          return attempt <= 2 ? attempt : undefined;
+        },
+        headers: () => ({ "retry-after-ms": "1" }),
+        sleep,
+      },
+    );
+
+    const events: string[] = [];
+    for await (const event of stream) events.push(event.type);
+
+    expect(attempts).toBe(3);
+    expect(claims).toEqual([
+      { phase: "request", attempt: 1 },
+      { phase: "request", attempt: 2 },
+    ]);
+    expect(sleep).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenNthCalledWith(1, 1, undefined);
+    expect(sleep).toHaveBeenNthCalledWith(2, 1, undefined);
+    expect(events).toEqual(["start", "done"]);
+  });
+
+  it("uses the captured HTTP status when the error body omits rate-limit text", async () => {
+    let attempts = 0;
+    const claimedCodes: string[] = [];
+    const stream = createProviderRetryStream(
+      model,
+      context,
+      {},
+      () => {
+        attempts += 1;
+        if (attempts === 1) {
+          const result = createAssistantMessageEventStream();
+          const error = assistantMessage({ errorMessage: "upstream unavailable" });
+          queueMicrotask(() => {
+            result.push({ type: "error", reason: "error", error });
+            result.end(error);
+          });
+          return result;
+        }
+        return successfulStream();
+      },
+      {
+        claim: (error) => {
+          claimedCodes.push(error.code);
+          return 1;
+        },
+        headers: () => undefined,
+        status: () => 429,
+        sleep: vi.fn(async () => undefined),
+      },
+    );
+
+    const events: string[] = [];
+    for await (const event of stream) events.push(event.type);
+
+    expect(attempts).toBe(2);
+    expect(claimedCodes).toEqual(["PROVIDER_RATE_LIMITED"]);
+    expect(events).toEqual(["start", "done"]);
+  });
+
+  it("does not promote known non-retryable errors just because status is 429", async () => {
+    const claim = vi.fn(() => undefined);
+    const stream = createProviderRetryStream(
+      model,
+      context,
+      {},
+      () => {
+        const result = createAssistantMessageEventStream();
+        const error = assistantMessage({ errorMessage: "authentication failed" });
+        queueMicrotask(() => {
+          result.push({ type: "error", reason: "error", error });
+          result.end(error);
+        });
+        return result;
+      },
+      {
+        claim,
+        headers: () => undefined,
+        status: () => 429,
+        sleep: vi.fn(async () => undefined),
+      },
+    );
+
+    const events: string[] = [];
+    for await (const event of stream) events.push(event.type);
+
+    expect(claim).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "PROVIDER_UNAUTHORIZED", retriable: false }),
+      "request",
+    );
+    expect(events).toEqual(["error"]);
+  });
+
+  it("clears a captured 429 before a fetch fails without a response", async () => {
+    let calls = 0;
+    let snapshot: { status: number; headers: Record<string, string> } | undefined;
+    const wrapped = captureProviderResponse(
+      async () => {
+        calls += 1;
+        if (calls === 1) {
+          return new Response("rate limited", { status: 429 });
+        }
+        throw new Error("fetch failed");
+      },
+      (response) => {
+        snapshot = response;
+      },
+    );
+
+    await wrapped("https://provider.invalid", {});
+    expect(snapshot?.status).toBe(429);
+    await expect(wrapped("https://provider.invalid", {})).rejects.toThrow("fetch failed");
+    expect(snapshot).toBeUndefined();
+  });
+
+  it("describes the transport cause of a rejected fetch and keeps the error", async () => {
+    const failures: Array<ReturnType<typeof describeProviderFetchFailure>> = [];
+    const original = Object.assign(new TypeError("fetch failed"), {
+      cause: Object.assign(new Error("read ECONNRESET"), {
+        code: "ECONNRESET",
+        syscall: "read",
+      }),
+    });
+    const wrapped = captureProviderResponse(
+      async () => {
+        throw original;
+      },
+      (_response, _requestBytes, failure) => {
+        failures.push(failure);
+      },
+    );
+
+    await expect(
+      wrapped("https://chatgpt.com/backend-api/codex/responses", {}),
+    ).rejects.toBe(original);
+    // The first entry is the clear before the attempt, the last is the cause.
+    expect(failures).toEqual([
+      undefined,
+      {
+        origin: "https://chatgpt.com",
+        category: "reset",
+        fields: {
+          networkCategory: "reset",
+          networkCode: "ECONNRESET",
+          networkSyscall: "read",
+          networkRoute: activeNodeTransportRoute(),
+        },
+      },
+    ]);
+  });
+  it("names the failing layer on the retried error, not just fetch failed", async () => {
+    let attempts = 0;
+    const retried: ClassifiedAgentError[] = [];
+    const failure = describeProviderFetchFailure(
+      Object.assign(new TypeError("fetch failed"), {
+        cause: Object.assign(new Error("read ECONNRESET"), {
+          code: "ECONNRESET",
+        }),
+      }),
+      "https://chatgpt.com/backend-api/codex/responses",
+    );
+    const stream = createProviderRetryStream(
+      model,
+      context,
+      {},
+      () => {
+        attempts += 1;
+        return failedStream({ errorMessage: "fetch failed" });
+      },
+      {
+        claim: () => (attempts <= 1 ? attempts : undefined),
+        headers: () => undefined,
+        status: () => undefined,
+        failure: () => failure,
+        onRetry: ({ error }) => {
+          retried.push(error);
+        },
+      },
+    );
+
+    const final = await stream.result();
+
+    // The retry indicator renders this object, so the errno has to be on it;
+    // the provider message itself stays untouched.
+    expect(retried).toHaveLength(1);
+    expect(retried[0]).toMatchObject({
+      code: "NETWORK_ERROR",
+      message: "fetch failed",
+      details: { networkCategory: "reset", networkCode: "ECONNRESET" },
+    });
+    expect(final.errorMessage).toBe("fetch failed");
+  });
+
+  it("reports the request body size even when the request dies first", async () => {
+    const seen: Array<[number | undefined, number | undefined]> = [];
+    const body = JSON.stringify({ model: "gpt-5.6-sol", input: "hello" });
+    const wrapped = captureProviderResponse(
+      async () => {
+        throw new Error("fetch failed");
+      },
+      (response, requestBytes) => {
+        seen.push([response?.status, requestBytes]);
+      },
+    );
+
+    await expect(
+      wrapped("https://provider.invalid", { method: "POST", body }),
+    ).rejects.toThrow("fetch failed");
+
+    // The clearing call, then the failure: only the size survives, never the
+    // body content, and a request that never got headers still reports it.
+    expect(seen).toEqual([
+      [undefined, undefined],
+      [undefined, Buffer.byteLength(body, "utf8")],
+    ]);
+  });
+
+  it("reports no request size when the body cannot be measured unread", async () => {
+    const sizes: Array<number | undefined> = [];
+    const wrapped = captureProviderResponse(
+      async () => new Response("ok", { status: 200 }),
+      (_response, requestBytes) => {
+        sizes.push(requestBytes);
+      },
+    );
+
+    // A body the transport does not expose as a string/buffer/blob reports no
+    // size instead of throwing or being read.
+    await wrapped("https://provider.invalid", {
+      method: "POST",
+      body: new FormData(),
+    });
+    expect(sizes.at(-1)).toBeUndefined();
+
+    await wrapped("https://provider.invalid", {
+      method: "POST",
+      body: new Uint8Array([1, 2, 3, 4]),
+    });
+    expect(sizes.at(-1)).toBe(4);
+  });
+
+  it("rejects an abortable retry delay without waiting for the timer", async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    try {
+      const pending = delayWithAbort(30_000, controller.signal);
+      controller.abort();
+      await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps an exhausted setup 429 classified when its body omits status text", async () => {
+    const stream = createProviderRetryStream(
+      model,
+      context,
+      {},
+      () => {
+        const result = createAssistantMessageEventStream();
+        const error = assistantMessage({ errorMessage: "upstream unavailable" });
+        queueMicrotask(() => {
+          result.push({ type: "error", reason: "error", error });
+          result.end(error);
+        });
+        return result;
+      },
+      {
+        claim: vi.fn(() => undefined),
+        headers: () => undefined,
+        status: () => 429,
+        sleep: vi.fn(async () => undefined),
+      },
+    );
+
+    const events: Array<{ type: string; error?: AssistantMessage }> = [];
+    for await (const event of stream) events.push(event as typeof events[number]);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: "error",
+      error: { errorMessage: "429: upstream unavailable" },
+    });
+  });
+
+  it("does not hide a 429 after a stream has started", async () => {
+    const stream = createProviderRetryStream(
+      model,
+      context,
+      {},
+      () => {
+        const result = createAssistantMessageEventStream();
+        const partial = assistantMessage({ stopReason: "pending" });
+        const error = assistantMessage();
+        queueMicrotask(() => {
+          result.push({ type: "start", partial });
+          result.push({ type: "error", reason: "error", error });
+          result.end(error);
+        });
+        return result;
+      },
+      {
+        claim: vi.fn(() => 1),
+        headers: () => undefined,
+        sleep: vi.fn(async () => undefined),
+      },
+    );
+
+    const events: string[] = [];
+    for await (const event of stream) events.push(event.type);
+
+    expect(events).toEqual(["start", "error"]);
+  });
+});
+
+describe("bounded transient provider retry", () => {
+  it("admits only the transport/gateway codes into the shared budget", () => {
+    for (const code of [
+      "NETWORK_ERROR",
+      "TIMEOUT",
+      "STREAM_FAILED",
+      "PROVIDER_ERROR",
+    ]) {
+      expect(isTransientProviderRetryCode(code)).toBe(true);
+    }
+    for (const code of [
+      "PROVIDER_RATE_LIMITED",
+      "PROVIDER_UNAUTHORIZED",
+      "CONTEXT_TOO_LARGE",
+      "MODEL_NOT_CONFIGURED",
+      "EMPTY_MODEL_RESPONSE",
+      "TURN_ABORTED",
+    ]) {
+      expect(isTransientProviderRetryCode(code)).toBe(false);
+    }
+  });
+
+  it("classifies an upstream gateway 502 as a retryable provider error", () => {
+    const classified = classifyProviderError(
+      'OpenAI API error (502): {"type":"api_error","message":"Upstream API request failed."}',
+    );
+    expect(classified).toMatchObject({
+      code: "PROVIDER_ERROR",
+      retriable: true,
+      details: { providerStatus: 502 },
+    });
+    expect(isTransientProviderRetryCode(classified.code)).toBe(true);
+  });
+
+  it("keeps retry headers for every status that can state a delay", () => {
+    expect(carriesRetryDelayHeaders(429)).toBe(true);
+    expect(carriesRetryDelayHeaders(408)).toBe(true);
+    expect(carriesRetryDelayHeaders(409)).toBe(true);
+    expect(carriesRetryDelayHeaders(502)).toBe(true);
+    expect(carriesRetryDelayHeaders(503)).toBe(true);
+    expect(carriesRetryDelayHeaders(400)).toBe(false);
+    expect(carriesRetryDelayHeaders(401)).toBe(false);
+    expect(carriesRetryDelayHeaders(undefined)).toBe(false);
+  });
+
+  it("allows ten transient retries and caps the later waits at 8s", () => {
+    expect(PROVIDER_RATE_LIMIT_MAX_RETRIES).toBe(10);
+    expect(PROVIDER_TRANSIENT_MAX_RETRIES).toBe(10);
+    expect(providerSetupRetryDelayMs(1)).toBe(1_000);
+    expect(providerSetupRetryDelayMs(2)).toBe(2_000);
+    expect(providerSetupRetryDelayMs(3)).toBe(4_000);
+    expect(providerSetupRetryDelayMs(4)).toBe(8_000);
+    // The schedule is deterministic: the unused random argument cannot shift it.
+    expect(providerSetupRetryDelayMs(2, 0)).toBe(2_000);
+    expect(providerSetupRetryDelayMs(2, 1)).toBe(2_000);
+    // Beyond the budget the cap holds.
+    expect(providerSetupRetryDelayMs(20)).toBe(8_000);
+  });
+
+  it("prefers a gateway Retry-After over the fixed backoff schedule", () => {
+    expect(providerSetupRetryDelayMs(1, 0, { "retry-after-ms": "1250" })).toBe(1250);
+    expect(providerSetupRetryDelayMs(1, 0, { "retry-after": "2" })).toBe(2_000);
+    expect(
+      providerSetupRetryDelayMs(1, 0, { "retry-after": new Date(5_000).toUTCString() }, 0),
+    ).toBe(5_000);
+    // A hostile or stale header cannot hold the turn past the non-429 cap.
+    expect(providerSetupRetryDelayMs(1, 0, { "retry-after": "600" })).toBe(8_000);
+  });
+
+  it("lets a server ask for a shorter wait than the schedule", () => {
+    // A gateway that says it is ready sooner is believed, and a stale or
+    // hostile value still cannot exceed the cap.
+    expect(providerSetupRetryDelayMs(1, 0, { "retry-after-ms": "100" })).toBe(100);
+    expect(providerSetupRetryDelayMs(4, 0, { "retry-after-ms": "250" })).toBe(250);
+    expect(providerSetupRetryDelayMs(1, 0, { "retry-after": "600" })).toBe(8_000);
+  });
+
+  it("retries repeated pre-stream 502s until the shared budget is spent", async () => {
+    let attempts = 0;
+    const claims: Array<{ code: string; attempt: number }> = [];
+    const delays: number[] = [];
+    const stream = createProviderRetryStream(
+      model,
+      context,
+      {},
+      () => {
+        attempts += 1;
+        return attempts <= PROVIDER_TRANSIENT_MAX_RETRIES
+          ? failedStream({
+              errorMessage:
+                'OpenAI API error (502): {"type":"api_error","message":"Upstream API request failed."}',
+            })
+          : successfulStream();
+      },
+      {
+        claim: (error) => {
+          if (!isTransientProviderRetryCode(error.code)) return undefined;
+          if (claims.length >= PROVIDER_TRANSIENT_MAX_RETRIES) return undefined;
+          const attempt = claims.length + 1;
+          claims.push({ code: error.code, attempt });
+          return attempt;
+        },
+        headers: () => undefined,
+        status: () => 502,
+        sleep: async (ms) => {
+          delays.push(ms);
+        },
+      },
+    );
+
+    const events: string[] = [];
+    for await (const event of stream) events.push(event.type);
+
+    // Ten retries after the initial attempt, so eleven provider attempts.
+    expect(attempts).toBe(PROVIDER_TRANSIENT_MAX_RETRIES + 1);
+    expect(claims.map((claim) => claim.attempt)).toEqual(
+      Array.from({ length: PROVIDER_TRANSIENT_MAX_RETRIES }, (_, index) => index + 1),
+    );
+    expect(claims.every((claim) => claim.code === "PROVIDER_ERROR")).toBe(true);
+    expect(delays).toEqual([
+      1_000,
+      2_000,
+      4_000,
+      ...Array.from({ length: PROVIDER_TRANSIENT_MAX_RETRIES - 3 }, () => 8_000),
+    ]);
+    // No intermediate error event reaches the consumer.
+    expect(events).toEqual(["start", "done"]);
+    expect((await stream.result()).stopReason).toBe("stop");
+  });
+
+  it("surfaces the 502 once the budget refuses a further attempt", async () => {
+    let attempts = 0;
+    const stream = createProviderRetryStream(
+      model,
+      context,
+      {},
+      () => {
+        attempts += 1;
+        return failedStream({
+          errorMessage:
+            'OpenAI API error (502): {"type":"api_error","message":"Upstream API request failed."}',
+        });
+      },
+      {
+        claim: () =>
+          attempts <= PROVIDER_TRANSIENT_MAX_RETRIES ? attempts : undefined,
+        headers: () => undefined,
+        status: () => 502,
+        sleep: async () => undefined,
+      },
+    );
+
+    const events: string[] = [];
+    for await (const event of stream) events.push(event.type);
+
+    expect(attempts).toBe(PROVIDER_TRANSIENT_MAX_RETRIES + 1);
+    expect(events).toEqual(["error"]);
+    const result = await stream.result();
+    expect(result.stopReason).toBe("error");
+    expect(result.errorMessage).toContain("502");
+  });
+});
+
+describe("opaque bad-request repair", () => {
+  it("detects terminal 400/422s whose body was empty", () => {
+    expect(
+      isOpaqueBadRequest(classifyProviderError("400 status code (no body)", 400)),
+    ).toBe(true);
+    expect(
+      isOpaqueBadRequest(classifyProviderError("422 status code (no body)", 422)),
+    ).toBe(true);
+    // Message-derived status still applies when the capture missed the response.
+    expect(isOpaqueBadRequest(classifyProviderError("400 status code (no body)"))).toBe(
+      true,
+    );
+    // Descriptive bodies and other statuses stay untouched.
+    expect(
+      isOpaqueBadRequest(
+        classifyProviderError('400: {"error":{"message":"nope"}}', 400),
+      ),
+    ).toBe(false);
+    expect(
+      isOpaqueBadRequest(classifyProviderError("403 status code (no body)", 403)),
+    ).toBe(false);
+    expect(
+      isOpaqueBadRequest(classifyProviderError("upstream unavailable", 429)),
+    ).toBe(false);
+  });
+
+  it("repairs a pre-stream 400 with no body by dropping the derived output limit", async () => {
+    let attempts = 0;
+    let repairOptions: { onPayload?: (payload: unknown) => Promise<unknown> } | undefined;
+    const claim = vi.fn(() => undefined);
+    const sleep = vi.fn(async () => undefined);
+    const stream = createProviderRetryStream(
+      model,
+      context,
+      {
+        onPayload: async (payload: unknown) => ({
+          ...(payload as Record<string, unknown>),
+          marked: true,
+        }),
+      } as any,
+      (options) => {
+        attempts += 1;
+        if (attempts === 1) {
+          return failedStream({ errorMessage: "400 status code (no body)" });
+        }
+        repairOptions = options as typeof repairOptions;
+        return successfulStream();
+      },
+      {
+        claim,
+        headers: () => undefined,
+        status: () => 400,
+        sleep,
+      },
+    );
+
+    const events: string[] = [];
+    for await (const event of stream) events.push(event.type);
+
+    expect(attempts).toBe(2);
+    expect(events).toEqual(["start", "done"]);
+    expect((await stream.result()).stopReason).toBe("stop");
+    // The repair is neither a budget retry nor a paced one.
+    expect(claim).not.toHaveBeenCalled();
+    expect(sleep).not.toHaveBeenCalled();
+    // The repair wraps the caller hook: its rewrite survives, the limit does not.
+    const repaired = await repairOptions?.onPayload?.({
+      model: "glm-5.3-flash",
+      max_tokens: 4096,
+      max_completion_tokens: 1_044_472,
+      max_output_tokens: 1_044_472,
+      messages: [{ role: "user", content: "hi" }],
+    });
+    expect(repaired).toEqual({
+      marked: true,
+      model: "glm-5.3-flash",
+      messages: [{ role: "user", content: "hi" }],
+    });
+  });
+
+  it("does not start the repair after the request is aborted", async () => {
+    const abortController = new AbortController();
+    let attempts = 0;
+    const stream = createProviderRetryStream(
+      model,
+      context,
+      { signal: abortController.signal },
+      () => {
+        attempts += 1;
+        const result = createAssistantMessageEventStream();
+        const error = assistantMessage({ errorMessage: "400 status code (no body)" });
+        queueMicrotask(() => {
+          result.push({ type: "error", reason: "error", error });
+          abortController.abort();
+          result.end(error);
+        });
+        return result;
+      },
+      {
+        claim: vi.fn(() => undefined),
+        headers: () => undefined,
+        status: () => 400,
+        sleep: async () => undefined,
+      },
+    );
+
+    const events: string[] = [];
+    for await (const event of stream) events.push(event.type);
+
+    expect(attempts).toBe(1);
+    expect(events).toEqual(["error"]);
+    expect((await stream.result()).stopReason).toBe("aborted");
+  });
+
+  it("surfaces the original error when the repaired attempt fails the same way", async () => {
+    let attempts = 0;
+    const claim = vi.fn(() => undefined);
+    const stream = createProviderRetryStream(
+      model,
+      context,
+      {},
+      () => {
+        attempts += 1;
+        return failedStream({ errorMessage: "400 status code (no body)" });
+      },
+      {
+        claim,
+        headers: () => undefined,
+        status: () => 400,
+        sleep: async () => undefined,
+      },
+    );
+
+    const events: string[] = [];
+    for await (const event of stream) events.push(event.type);
+
+    expect(attempts).toBe(2);
+    expect(events).toEqual(["error"]);
+    const result = await stream.result();
+    expect(result.stopReason).toBe("error");
+    expect(result.errorMessage).toBe("400 status code (no body)");
+    // Only the failed repair reaches the budget; the opaque first failure never did.
+    expect(claim).toHaveBeenCalledTimes(1);
+    expect(claim).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "PROVIDER_ERROR", retriable: false }),
+      "request",
+    );
+  });
+
+  it("surfaces descriptive 400 bodies without attempting a repair", async () => {
+    let attempts = 0;
+    const claim = vi.fn(() => undefined);
+    const stream = createProviderRetryStream(
+      model,
+      context,
+      {},
+      () => {
+        attempts += 1;
+        return failedStream({
+          errorMessage: '400: {"error":{"message":"Model does not exist."}}',
+        });
+      },
+      {
+        claim,
+        headers: () => undefined,
+        status: () => 400,
+        sleep: async () => undefined,
+      },
+    );
+
+    const events: string[] = [];
+    for await (const event of stream) events.push(event.type);
+
+    expect(attempts).toBe(1);
+    expect(events).toEqual(["error"]);
+    // A descriptive body is terminal, and the budget is consulted and refuses it.
+    expect(claim).toHaveBeenCalledTimes(1);
+    expect(claim).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "PROVIDER_ERROR", retriable: false }),
+      "request",
+    );
+  });
+
+  it("strips only the output-limit fields", () => {
+    expect(
+      stripOutputLimitFields({
+        model: "m",
+        max_tokens: 1,
+        max_completion_tokens: 2,
+        max_output_tokens: 3,
+        stream: true,
+      }),
+    ).toEqual({ model: "m", stream: true });
+    expect(stripOutputLimitFields("raw")).toBe("raw");
+  });
+
+  it("keeps the repair options otherwise unchanged", () => {
+    const options = { maxRetries: 0, fetch: globalThis.fetch } as any;
+    const repaired = withoutDerivedOutputLimit(options);
+    expect(repaired.maxRetries).toBe(0);
+    expect(repaired.fetch).toBe(options.fetch);
+    expect(typeof repaired.onPayload).toBe("function");
+  });
+});
+
+describe("stream idle watchdog", () => {
+  it("reads the idle budget from the environment with a safe default", () => {
+    const previous = process.env.PI_DESKTOP_STREAM_IDLE_TIMEOUT_MS;
+    try {
+      delete process.env.PI_DESKTOP_STREAM_IDLE_TIMEOUT_MS;
+      expect(streamIdleTimeoutMs()).toBe(STREAM_IDLE_TIMEOUT_DEFAULT_MS);
+      process.env.PI_DESKTOP_STREAM_IDLE_TIMEOUT_MS = "45000";
+      expect(streamIdleTimeoutMs()).toBe(45_000);
+      process.env.PI_DESKTOP_STREAM_IDLE_TIMEOUT_MS = "0";
+      expect(streamIdleTimeoutMs()).toBe(0);
+      process.env.PI_DESKTOP_STREAM_IDLE_TIMEOUT_MS = "not-a-number";
+      expect(streamIdleTimeoutMs()).toBe(STREAM_IDLE_TIMEOUT_DEFAULT_MS);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.PI_DESKTOP_STREAM_IDLE_TIMEOUT_MS;
+      } else {
+        process.env.PI_DESKTOP_STREAM_IDLE_TIMEOUT_MS = previous;
+      }
+    }
+  });
+
+  it("clamps a positive override up to the retry backoff floor", () => {
+    const previous = process.env.PI_DESKTOP_STREAM_IDLE_TIMEOUT_MS;
+    try {
+      // The watchdog wraps the retry adapter, so a budget under the largest
+      // retry delay would end a turn that is backing off exactly as the
+      // provider asked it to. `0` still disables it outright.
+      process.env.PI_DESKTOP_STREAM_IDLE_TIMEOUT_MS = "1000";
+      expect(streamIdleTimeoutMs()).toBe(STREAM_IDLE_TIMEOUT_FLOOR_MS);
+      expect(STREAM_IDLE_TIMEOUT_FLOOR_MS).toBeGreaterThan(1_000);
+      process.env.PI_DESKTOP_STREAM_IDLE_TIMEOUT_MS = "0";
+      expect(streamIdleTimeoutMs()).toBe(0);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.PI_DESKTOP_STREAM_IDLE_TIMEOUT_MS;
+      } else {
+        process.env.PI_DESKTOP_STREAM_IDLE_TIMEOUT_MS = previous;
+      }
+    }
+  });
+
+  it("passes the stream through unchanged when the watchdog is disabled", () => {
+    const stream = createAssistantMessageEventStream();
+    expect(withStreamIdleTimeout(stream, model, 0)).toBe(stream);
+  });
+
+  it("forwards a productive stream unchanged", async () => {
+    const wrapped = withStreamIdleTimeout(successfulStream(), model, 1_000);
+    const events: string[] = [];
+    for await (const event of wrapped) events.push(event.type);
+    expect(events).toEqual(["start", "done"]);
+    expect(await wrapped.result()).toMatchObject({
+      stopReason: "stop",
+      errorMessage: undefined,
+    });
+  });
+
+  it("ends a silent stream as a retriable stream failure", async () => {
+    vi.useFakeTimers();
+    try {
+      const stalled = createAssistantMessageEventStream();
+      stalled.push({ type: "start", partial: assistantMessage() });
+      const wrapped = withStreamIdleTimeout(stalled, model, 1_000);
+
+      const events: string[] = [];
+      const collected = (async () => {
+        for await (const event of wrapped) events.push(event.type);
+      })();
+      await vi.advanceTimersByTimeAsync(600);
+      expect(events).toEqual(["start"]);
+      await vi.advanceTimersByTimeAsync(400);
+      await collected;
+
+      expect(events).toEqual(["start", "error"]);
+      const result = await wrapped.result();
+      expect(result.stopReason).toBe("error");
+      expect(result.errorMessage).toContain("stream stalled");
+      // The timeout must merge into the existing transient retry path: the
+      // classified code is retriable and claims the shared budget.
+      const classified = classifyProviderError(result.errorMessage);
+      expect(classified).toMatchObject({
+        code: "STREAM_FAILED",
+        retriable: true,
+      });
+      expect(isTransientProviderRetryCode(classified.code)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("resets the idle timer on every event", async () => {
+    vi.useFakeTimers();
+    try {
+      const slow = createAssistantMessageEventStream();
+      slow.push({ type: "start", partial: assistantMessage() });
+      const wrapped = withStreamIdleTimeout(slow, model, 1_000);
+
+      const events: string[] = [];
+      const collected = (async () => {
+        for await (const event of wrapped) events.push(event.type);
+      })();
+      // An event at t=800 re-arms the watchdog; without the reset the stream
+      // would already have failed at t=1000.
+      await vi.advanceTimersByTimeAsync(800);
+      slow.push({ type: "text_start", contentIndex: 0, partial: assistantMessage() });
+      await vi.advanceTimersByTimeAsync(800);
+      expect(events).toEqual(["start", "text_start"]);
+      await vi.advanceTimersByTimeAsync(400);
+      await collected;
+      expect(events).toEqual(["start", "text_start", "error"]);
+      expect((await wrapped.result()).errorMessage).toContain("stream stalled");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops the retry adapter it abandons instead of letting it issue a second request", async () => {
+    vi.useFakeTimers();
+    try {
+      const controller = new AbortController();
+      let attempts = 0;
+      const adapter = createProviderRetryStream(
+        model,
+        context,
+        { signal: controller.signal } as any,
+        () => {
+          attempts += 1;
+          return failedStream({
+            errorMessage:
+              'OpenAI API error (502): {"type":"api_error","message":"Upstream API request failed."}',
+          });
+        },
+        {
+          claim: (error) =>
+            isTransientProviderRetryCode(error.code) ? 1 : undefined,
+          headers: () => undefined,
+          status: () => 502,
+        },
+      );
+      // 500 ms: inside the adapter's first 1 s backoff, which is zero-event time
+      // to this wrapper. The real `sleep` is used on purpose — it is the thing
+      // the abort has to reject.
+      const wrapped = withStreamIdleTimeout(adapter, model, 500, () =>
+        controller.abort(),
+      );
+
+      const events: string[] = [];
+      const collected = (async () => {
+        for await (const event of wrapped) events.push(event.type);
+      })();
+      // The first attempt fails retriably and the adapter starts backing off.
+      // That wait is zero-event time to the watchdog, which fires inside it and
+      // aborts the request: the backoff rejects instead of resolving, so the
+      // adapter never opens the second request the runtime's own retry is
+      // already covering.
+      await vi.advanceTimersByTimeAsync(120_000);
+      await collected;
+
+      expect(controller.signal.aborted).toBe(true);
+      expect(events).toEqual(["error"]);
+      expect(attempts).toBe(1);
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(attempts).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

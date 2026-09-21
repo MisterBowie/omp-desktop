@@ -1,0 +1,192 @@
+/*
+  Base layer — box model, html/body/#root shell, and the selection contract.
+  The renderer is an app shell, not a document: chrome is unselectable and
+  document-like surfaces opt back in.
+*/
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  /*
+    App shell, not a document: panes scroll internally. Without this, any
+    transient overflow (work panel opening before the OS window finishes
+    growing, or a denied grow when maximized) puts a scrollbar on the page.
+  */
+  overflow: hidden;
+  background: var(--ds-bg-primary);
+  color: var(--ds-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /*
+    The renderer is an application shell rather than a document. Keep
+    chrome from leaving an accidental text highlight while it is dragged.
+    Document-like surfaces opt back into selection below.
+  */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+/*
+  Native select menus are rendered outside the page box by Chromium on some
+  platforms (notably Windows). Keep both the trigger and its opened list on
+  the active theme instead of relying on the OS default palette.
+*/
+select {
+  color-scheme: inherit;
+  background-color: var(--ds-bg-elevated-opaque);
+  color: var(--ds-text-primary);
+}
+
+select option,
+select optgroup {
+  background-color: var(--ds-bg-elevated-opaque);
+  color: var(--ds-text-primary);
+}
+
+/*
+  Preserve editing and copy affordances inside the non-selectable shell.
+  `-webkit-user-select` is required by the Chromium runtime used by Electron.
+*/
+input,
+textarea,
+select,
+[contenteditable],
+.selectable,
+.message-bubble,
+.message-user-text,
+.prose-chat,
+.tool-row-content,
+pre,
+code {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/*
+  Selectable message/prose surfaces can contain controls and chrome of their
+  own. Keep those controls inert while their surrounding content remains
+  copyable.
+*/
+button,
+[role="button"],
+.code-block-head,
+.message-actions {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+button:disabled,
+input:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+:focus-visible {
+  outline: 1.5px solid color-mix(in oklab, var(--ds-accent) 80%, transparent);
+  outline-offset: 2px;
+}
+
+/* Theme-aware text selection keeps the monochrome accent contract on
+ * copyable surfaces (transcript, code, inputs). Chrome stays non-selectable. */
+::selection {
+  background: color-mix(in oklab, var(--ds-text-primary) 18%, transparent);
+  color: var(--ds-text-primary);
+}
+
+html {
+  caret-color: var(--ds-text-primary);
+  accent-color: var(--ds-accent);
+}
+
+/*
+  Scrollbars are quiet at rest: 6px, trackless, thumb transparent. The thumb
+  appears only while the pointer is over the owning scroll region (`:hover`),
+  the region contains keyboard focus (`:focus-within`), or the region is
+  scrolling (`[data-scrolling]`, set by
+  lib/scrollbar-reveal.ts for a short hold after the last scroll event), then
+  strengthens under the pointer. Everything goes through the
+  ::-webkit-scrollbar pseudo-elements: WebKit and Chromium ignore them on any
+  element that also sets `scrollbar-width` or `scrollbar-color`, so partials
+  must not use those standard properties (a per-surface width override on
+  `::-webkit-scrollbar` is fine).
+*/
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  background-clip: content-box;
+}
+:hover::-webkit-scrollbar-thumb,
+:focus-within::-webkit-scrollbar-thumb,
+[data-scrolling]::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--ds-text-primary) 16%, transparent);
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background: color-mix(in oklab, var(--ds-text-primary) 28%, transparent);
+  background-clip: content-box;
+}
+
+.app-shell {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  background: var(--ds-bg-primary);
+  color: var(--ds-text-primary);
+}
+
+.app-shell > :not(.app-scenic-backdrop) {
+  z-index: 1;
+}
+
+.app-scenic-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.app-shell-boot {
+  align-items: center;
+  justify-content: center;
+}
+
+.app-shell.is-booting {
+  /* Keep shell painted under the splash so exit reveals a ready surface. */
+}

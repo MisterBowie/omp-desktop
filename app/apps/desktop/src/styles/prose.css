@@ -1,0 +1,758 @@
+/*
+  Markdown prose — the .prose-chat reading surface (headings, lists, quotes,
+  links, tables, math), fenced code blocks, Mermaid diagrams, and the quieter
+  thinking-prose variant.
+*/
+
+/*
+  Chat prose — refined markdown typography for the assistant transcript.
+  Goal: calm reading surface with clear hierarchy — headings without rules,
+  links always discoverable, borderless inline code, quotes as soft tiles, and
+  code/table shells that sit in the same family as the rest of the UI. No block
+  draws a stroke (D297): tone and spacing carry the structure.
+  Blocks render as direct children of .prose-chat.
+*/
+.prose-chat {
+  color: var(--ds-text-primary);
+  font-size: var(--text-base);
+  line-height: var(--leading-prose);
+  overflow-wrap: break-word;
+  word-break: break-word;
+  text-wrap: pretty;
+  letter-spacing: var(--tracking-normal);
+}
+
+.prose-chat > :first-child {
+  margin-top: 0 !important;
+}
+
+.prose-chat > :last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Body rhythm: breathing room between blocks so multi-part answers read as
+   distinct thoughts, while consecutive paragraphs stay conversational. */
+.prose-chat p {
+  margin: 0.65em 0;
+}
+
+.prose-chat p + p {
+  margin-top: 0.8em;
+}
+
+.prose-chat strong {
+  color: var(--ds-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.prose-chat em {
+  font-style: italic;
+}
+
+.prose-chat del,
+.prose-chat s {
+  color: var(--ds-text-secondary);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+/* Superscript refs keep the line box from stretching. */
+.prose-chat sup {
+  line-height: 0;
+}
+
+/* GFM footnotes: quiet appendix set apart by space (their <hr> is hidden). */
+.prose-chat .footnotes {
+  margin: 1.6em 0 0;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm-plus);
+}
+
+.prose-chat .footnotes hr {
+  display: none;
+}
+
+.prose-chat .footnotes ol {
+  margin: 0.3em 0;
+  padding-left: 1.3em;
+}
+
+.prose-chat .footnotes li {
+  margin: 0.15em 0;
+}
+
+/* Heading ramp: clear size steps without rules or boxes — hierarchy comes
+   from weight, tracking, and the space above, not from chrome. */
+.prose-chat h1,
+.prose-chat h2,
+.prose-chat h3,
+.prose-chat h4,
+.prose-chat h5,
+.prose-chat h6 {
+  margin: 1.25em 0 0.45em;
+  color: var(--ds-text-primary);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+  text-wrap: balance;
+}
+
+.prose-chat h1 {
+  font-size: var(--text-xl);
+  letter-spacing: var(--tracking-tighter);
+  line-height: var(--leading-tighter);
+}
+
+.prose-chat h2 {
+  font-size: var(--text-lg-plus);
+}
+
+:root[data-theme="light"] .prose-chat h5,
+:root[data-theme="light"] .prose-chat h6 {
+  color: color-mix(in oklab, var(--ds-text-primary) 62%, transparent);
+}
+
+.prose-chat h3 {
+  font-size: var(--text-lg);
+}
+
+.prose-chat h4 {
+  font-size: var(--text-base-plus);
+  font-weight: var(--font-weight-medium-plus);
+}
+
+.prose-chat h5,
+.prose-chat h6 {
+  font-size: var(--text-base);
+  color: var(--ds-text-secondary);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-normal);
+}
+
+.prose-chat h1 + *,
+.prose-chat h2 + *,
+.prose-chat h3 + *,
+.prose-chat h4 + *,
+.prose-chat h5 + *,
+.prose-chat h6 + * {
+  margin-top: 0.4em;
+}
+
+/* Consecutive headings stack tighter — the second one belongs to the same
+   section, not a new one. */
+.prose-chat h1 + h2,
+.prose-chat h2 + h3,
+.prose-chat h3 + h4,
+.prose-chat h4 + h5,
+.prose-chat h5 + h6 {
+  margin-top: 0.75em;
+}
+
+.prose-chat ul,
+.prose-chat ol {
+  margin: 0.65em 0;
+  padding-left: 1.4em;
+}
+
+.prose-chat ul {
+  list-style: disc;
+}
+
+.prose-chat ol {
+  list-style: decimal;
+  font-variant-numeric: tabular-nums;
+}
+
+.prose-chat li {
+  margin: 0.28em 0;
+  padding-left: 0.15em;
+}
+
+.prose-chat li::marker {
+  color: color-mix(in oklab, var(--ds-text-muted) 88%, var(--ds-text-primary));
+  font-weight: var(--font-weight-medium);
+}
+
+:root[data-theme="light"] .prose-chat li::marker {
+  color: color-mix(in oklab, var(--ds-text-primary) 40%, transparent);
+}
+
+.prose-chat li > p {
+  margin: 0.25em 0;
+}
+
+.prose-chat li > ul,
+.prose-chat li > ol {
+  margin: 0.25em 0 0.3em;
+}
+
+.prose-chat .contains-task-list {
+  padding-left: 0.15em;
+  list-style: none;
+}
+
+.prose-chat .task-list-item {
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45em;
+  margin: 0.28em 0;
+  padding-left: 0;
+}
+
+.prose-chat .task-list-item > input[type="checkbox"] {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin: 0.28em 0 0;
+  accent-color: var(--ds-accent);
+  border-radius: var(--radius-3xs);
+}
+
+.prose-chat .task-list-item > p {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Blockquote: a soft tile plus muted text (D297) — the rail is gone, and the
+   tint stays faint so long citations don't read as heavy boxes. */
+.prose-chat blockquote {
+  position: relative;
+  margin: 0.85em 0;
+  padding: 0.55em 0.9em;
+  border-radius: var(--radius-md);
+  background: var(--ds-tile);
+  color: var(--ds-text-secondary);
+}
+
+:root[data-theme="light"] .prose-chat blockquote {
+  color: color-mix(in oklab, var(--ds-text-primary) 72%, transparent);
+}
+
+.prose-chat blockquote > :first-child {
+  margin-top: 0;
+}
+
+.prose-chat blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.prose-chat blockquote blockquote {
+  margin: 0.5em 0;
+}
+
+/* A thematic break is pure space: no line is drawn (D297). */
+.prose-chat hr {
+  margin: 1.8em 0;
+  border: 0;
+  height: 0;
+  background: none;
+}
+
+/* Links stay monochrome but are always discoverable: a soft permanent
+   underline that firms up on hover, instead of relying on color alone. */
+.prose-chat a {
+  color: var(--ds-text-primary);
+  text-decoration-line: underline;
+  text-decoration-color: color-mix(in oklab, var(--ds-text-primary) 32%, transparent);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  transition: color var(--motion-duration-fast) var(--motion-ease-out), text-decoration-color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.prose-chat a:hover {
+  color: var(--ds-text-primary);
+  text-decoration-color: color-mix(in oklab, var(--ds-text-primary) 85%, transparent);
+}
+
+.prose-chat a:focus-visible {
+  outline-offset: 3px;
+  border-radius: var(--radius-3xs);
+}
+
+/* Light only softens the permanent underline; the base rule already paints the
+   `--ds-text-primary` ink, so the colour line is not duplicated here. */
+:root[data-theme="light"] .prose-chat a {
+  text-decoration-color: color-mix(in oklab, var(--ds-text-primary) 30%, transparent);
+}
+
+:root[data-theme="light"] .prose-chat a:hover {
+  text-decoration-color: color-mix(in oklab, var(--ds-text-primary) 80%, transparent);
+}
+
+.prose-chat img,
+.prose-chat .chat-image-remote {
+  display: block;
+  max-width: min(100%, 560px);
+  margin: 0.65em 0;
+  border-radius: var(--radius-md-plus);
+  background: var(--ds-tile);
+}
+
+.prose-chat kbd {
+  display: inline-block;
+  padding: 0.05em 0.4em;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-normal);
+  border-radius: var(--radius-3xs);
+  background: var(--ds-tile-deep);
+  color: var(--ds-prose-kbd-fg);
+  white-space: nowrap;
+}
+
+/* Inline code: borderless soft chip — the hairline frame used to add noise
+   around every token in dense technical answers. */
+.prose-chat code {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-plus);
+  font-variant-ligatures: none;
+  background: color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
+  border-radius: var(--radius-3xs);
+  padding: 0.14em 0.4em;
+  color: color-mix(in oklab, var(--ds-text-primary) 94%, var(--ds-accent-soft));
+}
+
+:root[data-theme="light"] .prose-chat code {
+  background: color-mix(in oklab, var(--ds-text-primary) 6%, transparent);
+  color: var(--ds-text-primary);
+}
+
+/* Fallback for a bare <pre> that bypassed the code-block chrome */
+.prose-chat pre {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-relaxed);
+  background: #282c34;
+  border-radius: var(--radius-md-plus);
+  padding: 14px 16px;
+  overflow: auto;
+  margin: 0.85em 0;
+  box-shadow: none;
+  color: #abb2bf;
+}
+
+/* Shiki one-light plate + ink. The Shiki theme owns this pair
+   (apps/desktop/src/lib/shiki.ts); see the guard header. */
+:root[data-theme="light"] .prose-chat pre {
+  background: #fafafa;
+  box-shadow: none;
+  color: #383a42;
+}
+
+.prose-chat pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+  border-radius: 0;
+}
+
+/* GFM tables (D297): no shell, no cell rules. The header row is the deepest
+   tile, body rows alternate a faint tile, and hover lifts the row a step. */
+.prose-chat .table-wrap {
+  margin: 0.9em 0;
+  max-width: 100%;
+  width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-md-plus);
+}
+
+.prose-chat .table-wrap table {
+  margin: 0;
+  width: 100%;
+  table-layout: auto;
+  border-collapse: collapse;
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+}
+
+.prose-chat th,
+.prose-chat td {
+  padding: 9px 14px;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.prose-chat th {
+  font-weight: var(--font-weight-medium);
+  color: var(--ds-text-primary);
+  background: var(--ds-tile-deep);
+  font-size: var(--text-sm-plus);
+  letter-spacing: var(--tracking-wide);
+}
+
+.prose-chat tbody tr:nth-child(even) td {
+  background: var(--ds-tile);
+}
+
+.prose-chat tbody tr td {
+  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.prose-chat tbody tr:hover td {
+  background: var(--ds-tile-hover);
+}
+
+.prose-chat td code {
+  font-size: var(--text-sm);
+}
+
+/* KaTeX display math: keep long formulas scrollable, not overflowing */
+.prose-chat .katex-display {
+  margin: 0.85em 0;
+  padding: 0.55em 0.75em;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--ds-tile);
+}
+
+.prose-chat .katex {
+  font-size: var(--text-base-plus);
+}
+
+/*
+  Code block — single surface + slim language rail.
+  Body background is transparent so Shiki (one-dark-pro / one-light) owns the
+  palette; we only paint the outer card once (no nested pre/code wash).
+*/
+.code-block {
+  --code-block-bg: #282c34; /* one-dark-pro editor background */
+  margin: 0.9em 0;
+  border-radius: var(--radius-md-plus);
+  background: var(--code-block-bg);
+  overflow: hidden;
+  box-shadow: none;
+  color: #abb2bf;
+}
+
+/* Shiki one-light plate + ink, the same pair as the bare `pre` fallback. */
+:root[data-theme="light"] .code-block {
+  --code-block-bg: #fafafa; /* one-light editor background */
+  color: #383a42;
+}
+
+.code-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 32px;
+  padding: 3px 6px 3px 14px;
+  /* The head is a slightly lighter band on the editor surface; no rule. */
+  background: var(--ds-code-head-bg);
+}
+
+/* Shiki one-light token ink for the language rail and the copy button. */
+:root[data-theme="light"] .code-block-lang {
+  color: color-mix(in oklab, #383a42 62%, transparent);
+}
+
+:root[data-theme="light"] .code-block .code-copy-btn {
+  color: color-mix(in oklab, #383a42 62%, transparent);
+  opacity: 0.9;
+}
+
+/* The hover fill is ours (--ds-code-hover-bg); the ink is the Shiki token. */
+:root[data-theme="light"] .code-block .code-copy-btn:hover {
+  color: #383a42;
+}
+
+.code-block-lang {
+  color: color-mix(in oklab, #abb2bf 72%, transparent);
+  font-size: var(--text-xs-plus);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-wide);
+  text-transform: lowercase;
+  font-family: var(--font-mono);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.code-block .code-copy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-xs);
+  color: color-mix(in oklab, #abb2bf 72%, transparent);
+  transition: background var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out), opacity var(--motion-duration-fast) var(--motion-ease-out);
+  opacity: 0.75;
+}
+
+.code-block:hover .code-copy-btn,
+.code-block:focus-within .code-copy-btn,
+.code-block .code-copy-btn.copied {
+  opacity: 1;
+}
+
+.code-block .code-copy-btn:hover {
+  color: #d7dae0;
+  background: var(--ds-code-hover-bg);
+}
+
+.code-block .code-copy-btn.copied {
+  color: var(--ds-success);
+}
+
+.prose-chat .code-block pre {
+  margin: 0;
+  padding: 13px 16px 15px;
+  border: 0;
+  border-radius: 0;
+  background: transparent !important;
+  overflow-x: auto;
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-relaxed);
+  box-shadow: none;
+  tab-size: 2;
+  color: inherit;
+}
+
+.prose-chat .code-block pre code {
+  display: block;
+  width: fit-content;
+  min-width: 100%;
+  font-size: var(--text-sm-plus);
+  white-space: pre;
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0;
+  color: inherit;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Defensive: never reintroduce a nested wash on fenced code. */
+.code-block pre,
+.code-block code,
+.code-block .line,
+.code-block span {
+  background-color: transparent;
+}
+
+/* Mermaid diagrams keep code-card density while using a paper-like canvas. */
+.mermaid-block {
+  margin: 0.85em 0;
+  overflow: hidden;
+  border-radius: var(--radius-md-plus);
+  background: var(--ds-tile);
+  color: var(--ds-text-primary);
+}
+
+.mermaid-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 32px;
+  padding: 3px 6px 3px 14px;
+  background: var(--ds-tile-deep);
+}
+
+.mermaid-block-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ds-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-compact);
+  letter-spacing: var(--tracking-wide);
+  text-transform: lowercase;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.mermaid-block-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+.mermaid-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-xs);
+  color: var(--ds-text-muted);
+  transition: background var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.mermaid-action-btn:hover,
+.mermaid-action-btn:focus-visible,
+.mermaid-action-btn.active {
+  color: var(--ds-text-primary);
+  background: color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
+}
+
+.mermaid-action-btn.copied {
+  color: var(--ds-success);
+}
+
+.mermaid-block-body {
+  min-width: 0;
+  background: var(--ds-mermaid-canvas);
+}
+
+.mermaid-svg {
+  min-height: 144px;
+  padding: 18px;
+  overflow: auto;
+  display: grid;
+  place-items: center;
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.mermaid-svg.refreshing {
+  opacity: 0.72;
+}
+
+.mermaid-svg > svg {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  margin: auto;
+}
+
+.mermaid-loading {
+  display: grid;
+  align-content: center;
+  gap: 9px;
+  min-height: 144px;
+  padding: 24px 18%;
+}
+
+.mermaid-loading > span {
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  animation: mermaid-loading-pulse 0.9s var(--motion-ease-standard) infinite;
+}
+
+.mermaid-loading > span:nth-child(2) {
+  width: 78%;
+  animation-delay: 100ms;
+}
+
+.mermaid-loading > span:nth-child(3) {
+  width: 58%;
+  animation-delay: 200ms;
+}
+
+@keyframes mermaid-loading-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mermaid-loading > span {
+    animation: none;
+    opacity: 0.65;
+  }
+  .mermaid-svg {
+    transition: none;
+  }
+}
+
+.mermaid-block-error {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px;
+  color: var(--ds-error);
+  background: color-mix(in oklab, var(--ds-error) 6%, transparent);
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-normal);
+}
+
+.prose-chat .mermaid-source {
+  margin: 0;
+  padding: 13px 14px 15px;
+  border: 0;
+  border-radius: 0;
+  background: #282c34;
+  color: #abb2bf;
+  overflow: auto;
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-relaxed);
+  box-shadow: none;
+}
+
+/* Shiki one-light plate + ink, the same pair as the code card above. */
+:root[data-theme="light"] .prose-chat .mermaid-source {
+  background: #fafafa;
+  color: #383a42;
+}
+
+.prose-chat .mermaid-source code {
+  display: block;
+  width: fit-content;
+  min-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  white-space: pre;
+}
+
+/* Thinking prose stays quieter than answer prose but inherits hierarchy. */
+.thinking-prose {
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-chat);
+}
+
+:root[data-theme="light"] .thinking-prose {
+  color: color-mix(in oklab, var(--ds-text-primary) 58%, transparent);
+}
+
+:root[data-theme="light"] .thinking-prose code {
+  color: color-mix(in oklab, var(--ds-text-primary) 68%, transparent);
+}
+
+.thinking-prose h1,
+.thinking-prose h2,
+.thinking-prose h3,
+.thinking-prose h4,
+.thinking-prose h5,
+.thinking-prose h6 {
+  color: var(--ds-text-secondary);
+}
+
+.thinking-prose a {
+  color: var(--ds-text-secondary);
+  text-decoration-color: color-mix(in oklab, var(--ds-text-secondary) 45%, transparent);
+}
+
+.thinking-prose a:hover {
+  color: var(--ds-text-primary);
+  text-decoration-color: color-mix(in oklab, var(--ds-text-primary) 70%, transparent);
+}
+
+.thinking-prose code {
+  background: var(--ds-thinking-code-bg);
+  color: var(--ds-text-secondary);
+}
+
+.thinking-prose blockquote {
+  background: var(--ds-tile);
+}

@@ -1,0 +1,323 @@
+/*
+  Sidebar thread rows — session row pitch, titles, status dots, and group
+  headers. More sidebar session management (lists, popovers, sort, disclosure)
+  lives in sessions.css.
+*/
+
+.thread-item,
+.sidebar-session-group-header {
+  min-height: 28px;
+  border-radius: var(--radius-sm);
+  color: var(--ds-text-secondary);
+  transition: background var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.thread-item {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+  padding: 0 2px 0 0;
+}
+
+.thread-item-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 6px 5px 20px;
+  text-align: left;
+  color: inherit;
+}
+
+.thread-item-title {
+  overflow: hidden;
+  font-size: var(--text-md); /* session titles stay compact within the sidebar */
+  line-height: var(--leading-row);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thread-item:hover,
+.thread-item.active,
+.project-group > .sidebar-session-group-header:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+/* Window blur releases hover, not selection or drag feedback. */
+.sidebar[data-window-blur="true"] .thread-item:hover:not(.active),
+.sidebar[data-window-blur="true"] .project-group:not(.is-drop-target) > .sidebar-session-group-header:hover {
+  background: transparent;
+  color: var(--ds-text-secondary);
+}
+
+.thread-item.active {
+  background: var(--ds-bg-active);
+}
+
+.sidebar-session-groups {
+  display: flex;
+  min-height: 0;
+  /* Basis 0, not auto: with a content-derived basis the scroller's resolved
+     height is re-solved from its own content, so collapsing the first project
+     nudges the whole list up a few pixels before it settles back. */
+  flex: 1 1 0;
+  flex-direction: column;
+  /* Baseline of the group ladder: adjacent rows and group headers sit 1px
+     apart. The extra air around an expanded group belongs to the group itself
+     (see `.sidebar-session-group-body.project`), so this gap stays uniform and
+     a collapsed group cannot fork the spacing on its neighbour's state. */
+  gap: 1px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding-top: 2px;
+}
+
+.sidebar-session-group {
+  min-width: 0;
+}
+
+.sidebar-session-group.project-group {
+  position: relative;
+}
+
+.sidebar-session-group-header {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px;
+}
+
+.project-group.is-dragging {
+  opacity: 0.5;
+}
+
+.sidebar-session-group-title.project-toggle {
+  cursor: grab;
+}
+
+.project-group.is-dragging .sidebar-session-group-title {
+  cursor: grabbing;
+}
+
+.project-group.is-drop-before::before,
+.project-group.is-drop-after::after {
+  position: absolute;
+  right: 8px;
+  left: 8px;
+  z-index: 1;
+  height: 2px;
+  border-radius: var(--radius-round);
+  background: var(--ds-accent);
+  content: "";
+  pointer-events: none;
+}
+
+.project-group.is-drop-before::before {
+  top: -1px;
+}
+
+.project-group.is-drop-after::after {
+  bottom: -1px;
+}
+
+.project-group.is-drop-target > .sidebar-session-group-header {
+  outline: 1px solid var(--ds-accent);
+  outline-offset: -1px;
+  background: color-mix(in oklab, var(--ds-accent) 12%, transparent);
+}
+.sidebar-session-group-title {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 5px;
+  border-radius: var(--radius-sm);
+  padding: 5px 6px;
+  background: transparent;
+  color: inherit;
+  font-size: var(--text-md); /* project/group labels one step quieter than sessions */
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-compact);
+  text-align: left;
+  user-select: none;
+  touch-action: pan-y;
+}
+
+.sidebar-session-group-title:focus-visible {
+  color: var(--ds-text-primary);
+}
+
+.sidebar-session-group-title svg {
+  flex: 0 0 auto;
+  color: var(--ds-text-muted);
+}
+
+.sidebar-session-group-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-session-group-add {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-2xs);
+  color: var(--ds-text-muted);
+  opacity: 0;
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-ease-out),
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out),
+    transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.sidebar-session-group-add:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.sidebar-session-group-body {
+  display: flex;
+  flex-direction: column;
+  /* One hairline between list rows: adjacent rounded row fills read as
+     separate rows instead of one block. A time-group header and the load-more
+     affordance are ordinary rows in that same rhythm. */
+  gap: 1px;
+  overflow: hidden;
+}
+
+/* Nested session rows read as children through the indent alone; the tree
+   rail is gone (D297). */
+.sidebar-session-group-body.project {
+  /* A one-row grid: the fold is a real fraction of the measured content, and
+     `opacity` stays 1 — the rows are clipped, never faded. */
+  display: grid;
+  grid-template-rows: 1fr;
+  margin-left: 13px;
+  padding-left: 9px;
+  transition: grid-template-rows var(--motion-duration-normal) var(--motion-ease-out);
+}
+
+.sidebar-session-group-body.project.collapsed {
+  grid-template-rows: 0fr;
+  pointer-events: none;
+}
+
+/* The `0fr` row closes only if the clip can shrink below its content. */
+.sidebar-session-group-clip {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The group's inset: 2px between the header and the first row, 7px after the
+   last one, so the container's 1px gap completes the 8px before the next group.
+   Vertical padding on the animating box instead would hold a `0fr` row open. */
+.sidebar-session-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-top: 2px;
+  padding-bottom: 7px;
+}
+
+.sidebar-session-group-body.temporary {
+  margin-left: 13px;
+  padding-left: 9px;
+}
+
+.sidebar-time-group-header {
+  padding: 4px 6px 4px 20px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-load-more {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  padding: 4px 6px 4px 20px;
+  border-radius: var(--radius-sm);
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  text-align: left;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.sidebar-load-more:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-secondary);
+}
+
+.sidebar-session-group-body.standalone {
+  /* Five compact 28px rows plus the four 1px gaps between them, and the 2px
+     label inset, before the list starts scrolling internally. */
+  max-height: 146px;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  /* 2px below the section label, matching every label-to-content pair. */
+  padding: 2px 2px 0;
+}
+
+.sidebar-standalone-sessions {
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.sidebar-session-empty {
+  padding: 5px 8px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-md); /* empty-state copy tracks group titles */
+  line-height: var(--leading-compact);
+}
+
+.sidebar-pinned-sessions {
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.sidebar-session-group-body.pinned {
+  /* Eight compact 28px rows plus their seven 1px gaps, and the 2px label
+     inset. */
+  max-height: min(233px, 30vh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  /* 2px below the section label, matching every label-to-content pair. */
+  padding: 2px 2px 0;
+}
+
+.sidebar-pinned-sessions .thread-item-title {
+  min-width: 0;
+  flex: 1;
+}
+
+.thread-item-project {
+  min-width: 0;
+  max-width: 40%;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

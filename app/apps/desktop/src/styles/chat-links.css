@@ -1,0 +1,137 @@
+/*
+  Chat → work-panel preview links — inline code/path/URL refs and the media
+  (image/audio/video) attachment surfaces that open in the work panel.
+*/
+
+/* ---------- chat → work-panel preview links ---------- */
+
+/* Inline-code file/URL refs: keep the code-chip look, add link affordance. */
+.chat-code-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.chat-code-link code {
+  text-decoration: underline dotted
+    color-mix(in oklab, var(--ds-text-muted) 70%, transparent);
+  text-underline-offset: 2px;
+}
+.chat-code-link:hover code,
+.chat-code-link:focus-visible code {
+  color: var(--ds-accent);
+  text-decoration-color: var(--ds-accent);
+}
+
+/* Sent-message file node: same .composer-chip surface, button reset + hover. */
+.chat-file-chip {
+  border: 0;
+  padding-right: 6px;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.chat-file-chip:hover,
+.chat-file-chip:focus-visible {
+  color: var(--ds-text-primary);
+  background: var(--ds-tile-hover);
+}
+
+/* Path/URL tokens inside plain user-message text. */
+.chat-text-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  /* Chromium centers button labels by default; wrapped links should read as text. */
+  text-align: start;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+.chat-text-link:hover,
+.chat-text-link:focus-visible {
+  color: var(--ds-accent);
+}
+
+/* Tool-row summaries that resolve to a previewable file/URL. */
+.tool-row-summary.linked {
+  cursor: pointer;
+}
+.tool-row-summary.linked:hover {
+  color: var(--ds-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Local image references render inline via a bounded data URL; the chip is
+   the fallback when the file cannot be resolved. */
+.chat-image-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--ds-text-primary);
+  background: var(--ds-tile);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.chat-image-chip:hover {
+  color: var(--ds-accent);
+  background: var(--ds-tile-hover);
+}
+
+.chat-image-local,
+.chat-image-remote {
+  cursor: pointer;
+}
+
+.chat-image-local {
+  max-width: min(100%, 560px);
+  border-radius: var(--radius-md);
+}
+
+/* Audio player in chat messages */
+.chat-audio {
+  margin: 0.65em 0;
+  max-width: min(100%, 560px);
+}
+
+.chat-audio audio {
+  width: 100%;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+
+/* Video player in chat messages */
+.chat-video {
+  margin: 0.65em 0;
+  max-width: min(100%, 560px);
+  border-radius: var(--radius-md-plus);
+  background: var(--ds-tile);
+  overflow: hidden;
+}
+
+.chat-video video {
+  display: block;
+  width: 100%;
+  max-height: 400px;
+  outline: none;
+}
+
+/* Row variant without the divider, for copy that leads a full-width control
+ * (e.g. the theme card grid) inside the same panel. */
+.settings-row.settings-row-plain {
+  border-bottom: 0;
+}

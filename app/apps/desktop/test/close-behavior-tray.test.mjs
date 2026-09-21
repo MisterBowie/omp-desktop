@@ -1,0 +1,159 @@
+import {
+  readMainSource,
+  readMainModule,
+} from "./helpers/source-contracts.mjs";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+const mainSource = await readMainSource();
+const closeBehaviorSource = await readMainModule("bootstrap/close-behavior.ts");
+const windowSource = await readMainModule("bootstrap/window.ts");
+const shutdownSource = await readMainModule("bootstrap/shutdown.ts");
+
+test("one tray owns both minimize-to-tray and close-to-tray", () => {
+  // D216's tray and D210's close-to-tray tray are the same icon. A second
+  // creator would resolve its own icon path and register its own click
+  // handler, so the two features would drift apart the moment either changed.
+  assert.doesNotMatch(mainSource, /function createTrayIcon\b/);
+  assert.doesNotMatch(mainSource, /function revealMainWindow\b/);
+  assert.match(mainSource, /function createTray\(\)/);
+  assert.match(mainSource, /function trayIconPath\(\)/);
+  assert.match(mainSource, /function restoreMainWindow\(\)/);
+});
+
+test("the tray icon resolves through the packaged resource path", () => {
+  // A hardcoded `app.getAppPath()/build/icon.png` exists only in development;
+  // packaged builds ship it as `tray-icon.png` under `process.resourcesPath`.
+  assert.doesNotMatch(
+    mainSource,
+    /join\(app\.getAppPath\(\), "build", "icon\.png"\)/,
+  );
+  assert.match(mainSource, /app\.isPackaged\s*\n?\s*\?\s*process\.resourcesPath/);
+});
+
+test("choosing quit never destroys the resident tray", () => {
+  // The tray is the only way back from a minimized (hidden) window, so
+  // switching close behavior away from "tray" must leave it alone.
+  const apply = closeBehaviorSource.slice(
+    closeBehaviorSource.indexOf("const applyCloseBehavior"),
+  );
+  const body = apply.slice(0, apply.indexOf("\n}\n") + 2);
+  assert.match(body, /if \(next === "tray"\) createTray\(\)/);
+  assert.doesNotMatch(body, /tray\.destroy\(\)/);
+});
+
+test("Windows/Linux minimize stays in the taskbar while macOS may hide to tray", () => {
+  const minimize = windowSource.slice(windowSource.indexOf('window.on("minimize"'));
+  const body = minimize.slice(0, minimize.indexOf("});") + 3);
+  assert.match(
+    body,
+    /if \(windowState\.quitting \|\| !windowState\.tray \|\| process\.platform !== "darwin"\) return;/,
+  );
+  assert.match(body, /window\.hide\(\)/);
+
+  const windowControl = mainSource.slice(
+    mainSource.indexOf(
+      'case "minimize":',
+      mainSource.indexOf("IPC.invoke.windowControl"),
+    ),
+  );
+  assert.match(
+    windowControl.slice(0, windowControl.indexOf('case "toggleMaximize":')),
+    /mainWindow\.minimize\(\)/,
+  );
+});
+
+test("a stored quit preference still quits while the tray is resident", () => {
+  // `window-all-closed` used to skip `app.quit()` whenever a tray existed.
+  // With D216's always-present tray that meant a "quit" user could never
+  // exit, so the guard now reads the user's choice instead of the tray.
+  const handler = shutdownSource.slice(
+    shutdownSource.indexOf('app.on("window-all-closed"'),
+  );
+  const body = handler.slice(0, handler.indexOf("});") + 3);
+  assert.doesNotMatch(body, /!tray/);
+  assert.match(body, /state\.closeBehavior === "tray" && state\.tray/);
+  assert.match(body, /app\.quit\(\)/);
+
+  // The close path itself quits directly rather than relying on that handler.
+  assert.match(
+    mainSource,
+    /windowsAllowedToClose\.add\(window\);\s*\n\s*app\.quit\(\);/,
+  );
+});
+
+test("permission to close does not leak into the next window", () => {
+  // A module-level latch stayed true after the window it was set for closed,
+  // so the window `ensureWindow()` created next skipped the prompt entirely.
+  assert.doesNotMatch(mainSource, /let allowWindowClose\b/);
+  assert.match(
+    mainSource,
+    /const windowsAllowedToClose = new WeakSet<BrowserWindow>\(\)/,
+  );
+  assert.match(mainSource, /windowsAllowedToClose\.has\(window\)/);
+});
+
+test("the stored close behavior is loaded before the first window", () => {
+  const ready = mainSource.slice(mainSource.indexOf("app.whenReady()"));
+  const readIndex = ready.indexOf("readCloseBehavior(dataDir)");
+  const windowIndex = ready.indexOf("await ensureWindow()");
+  assert.ok(readIndex > -1 && windowIndex > -1);
+  assert.ok(
+    readIndex < windowIndex,
+    "close behavior must be read before a window can observe it",
+  );
+});
+
+test("close behavior is not settable on macOS", () => {
+  const setter = mainSource.slice(
+    mainSource.indexOf("IPC.invoke.closeBehaviorSet"),
+  );
+  const body = setter.slice(0, setter.indexOf("\n  });") + 6);
+  assert.match(body, /process\.platform === "darwin"/);
+  assert.match(body, /ErrorCodes\.INVALID_ARGUMENT/);
+  assert.match(body, /behavior !== "tray" && behavior !== "quit"/);
+});
+
+test("explicit quit asks for confirmation except probes and update restarts", () => {
+  assert.match(closeBehaviorSource, /const confirmQuitDialog = async/);
+  assert.match(closeBehaviorSource, /labels\.tray\.confirmQuitTitle/);
+  const quitHandler = shutdownSource.slice(
+    shutdownSource.indexOf('app.on("before-quit"'),
+  );
+  const body = quitHandler.slice(0, quitHandler.indexOf("shutdownPromise ="));
+  assert.match(body, /PI_DESKTOP_BOOT_PROBE/);
+  assert.match(
+    body,
+    /!state\.quitConfirmed && !isAutomatedMode && !isUpdateRestart/,
+    "automated probes and update restarts are the only confirmation exemptions",
+  );
+  assert.match(
+    body,
+    /const isUpdateRestart = updater\.isInstallingUpdate\(\)/,
+    "the updater is asked whether this quit is an update restart",
+  );
+  // The installer for an in-app update is spawned before app.quit(); a dialog
+  // in front of that quit makes the installer time out and the update fail.
+  assert.ok(
+    body.indexOf("isUpdateRestart") < body.indexOf("confirmQuitDialog()"),
+    "the update-restart exemption must gate the dialog, not follow it",
+  );
+  assert.match(body, /confirmQuitDialog\(\)/);
+  // Window-close Quit already chose to exit in the close-behavior dialog.
+  assert.match(
+    windowSource,
+    /already chose to quit in the close-behavior dialog[\s\S]*?windowState\.quitConfirmed = true/,
+  );
+});
+
+test("macOS tray keeps the native status item instead of mouse-enter tracking", async () => {
+  const lifecycle = await readMainModule("bootstrap/app-lifecycle.ts");
+  const create = lifecycle.slice(lifecycle.indexOf("function createTray()"));
+  const body = create.slice(0, create.indexOf("function resetMenuRendererReady"));
+  assert.match(
+    body,
+    /if \(process\.platform !== "darwin"\) \{[\s\S]*on\("mouse-enter"[\s\S]*on\("right-click"/,
+  );
+  assert.equal((body.match(/on\("mouse-enter"/g) || []).length, 1);
+});

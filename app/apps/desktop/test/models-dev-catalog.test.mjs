@@ -1,0 +1,860 @@
+import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+import { apiStyleForAdapter, modelIdsMatch } from "@pi-desktop/shared";
+
+import {
+  MODELS_DEV_API_URL,
+  ModelsDevCatalog,
+  modelConfigFromModelsDev,
+  modelInfoFromModelsDev,
+  parseModelsDevCatalog,
+  thinkingLevelsFromModelsDev,
+} from "../electron/main/models-dev-catalog.ts";
+
+const catalogFixture = {
+  anthropic: {
+    name: "Anthropic",
+    models: {
+      "claude-opus-4.6": {
+        id: "claude-opus-4.6",
+        name: "Claude 4.6 Opus",
+        description: "High-end Claude for difficult coding, planning, and slower expert reasoning",
+        family: "claude-opus",
+        attachment: true,
+        reasoning: true,
+        reasoning_options: [{
+          type: "effort",
+          values: ["low", "medium", "high", "xhigh", "max"],
+        }],
+        tool_call: true,
+        structured_output: true,
+        temperature: false,
+        knowledge: "2025-05-31",
+        release_date: "2026-02-05",
+        last_updated: "2026-03-13",
+        modalities: {
+          input: ["text", "image", "pdf"],
+          output: ["text"],
+        },
+        open_weights: false,
+        limit: {
+          context: 1_000_000,
+          input: 1_000_000,
+          output: 128_000,
+        },
+        cost: {
+          input: 5,
+          output: 25,
+          cache_read: 0.5,
+          cache_write: 6.25,
+          reasoning: 25,
+          input_audio: 7,
+          output_audio: 28,
+          tiers: [{
+            input: 10,
+            output: 37.5,
+            cache_read: 1,
+            tier: { type: "context", size: 200_000 },
+          }],
+          context_over_200k: {
+            input: 10,
+            output: 37.5,
+            cache_read: 1,
+            cache_write: 12.5,
+          },
+        },
+        interleaved: { field: "reasoning_content" },
+        status: "stable",
+        experimental: { modes: { fast: { enabled: true } } },
+        provider: { npm: "@ai-sdk/anthropic" },
+      },
+      "audio-only": {
+        id: "audio-only",
+        modalities: { input: ["audio"], output: ["text"] },
+      },
+      "metadata-sparse": { id: "metadata-sparse" },
+    },
+  },
+};
+
+function responseFor(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+async function loadFixtureCatalog(t, fixture = catalogFixture) {
+  const dir = await mkdtemp(join(tmpdir(), "pi-models-dev-cache-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const catalogPath = join(dir, "api.json");
+  await writeFile(catalogPath, JSON.stringify(fixture), "utf8");
+  const catalog = new ModelsDevCatalog({ catalogPath });
+  assert.equal(await catalog.ensureLoaded(), true);
+  return catalog;
+}
+
+function observeModelIdReads(model) {
+  const modelId = model.modelId;
+  let reads = 0;
+  Object.defineProperty(model, "modelId", {
+    configurable: true,
+    get() {
+      reads += 1;
+      return modelId;
+    },
+  });
+  return () => reads;
+}
+
+test("repeated model matches and misses resolve through the bounded catalog index", async (t) => {
+  const catalog = await loadFixtureCatalog(t);
+  const input = { vendorKey: "anthropic", modelId: "claude-opus-4.6" };
+  const match = catalog.findModel(input);
+  assert.ok(match);
+  const reads = observeModelIdReads(match);
+  const perQuery = reads();
+
+  assert.equal(catalog.findModel({ ...input }), match);
+  assert.equal(catalog.findModel({ ...input, modelId: " CLAUDE-OPUS-4.6 " }), match);
+  // A repeated exact match returns the same catalog object and touches only the
+  // constant-sized candidate bucket, not a full catalog scan.
+  assert.ok(reads() - perQuery <= 8, "a repeated match must reuse the catalog result");
+
+  const missing = { ...input, modelId: "unpublished-model" };
+  assert.equal(catalog.findModel(missing), undefined);
+  const afterMiss = reads();
+  assert.equal(catalog.findModel({ ...missing }), undefined);
+  assert.equal(catalog.findModel({ ...missing, modelId: " UNPUBLISHED-MODEL " }), undefined);
+  // A miss resolves through an empty bucket without scanning or growing the index.
+  assert.equal(reads(), afterMiss, "a repeated miss must not search again");
+});
+
+test("cached matches remain scoped to the requested provider and endpoint", async (t) => {
+  const fixture = Object.fromEntries(["alpha", "beta"].map((key) => [key, {
+    name: key,
+    api: `https://${key}.example/v1`,
+    models: {
+      "shared-model": {
+        id: "shared-model",
+        name: `${key} model`,
+        modalities: { input: ["text"], output: ["text"] },
+      },
+    },
+  }]));
+  const catalog = await loadFixtureCatalog(t, fixture);
+  const queries = [
+    [{ vendorKey: "alpha", modelId: "shared-model" }, "alpha"],
+    [{ vendorKey: "beta", modelId: "shared-model" }, "beta"],
+    [{ vendorKey: "custom", baseUrl: "https://alpha.example/v1", modelId: "shared-model" }, "alpha"],
+    [{ vendorKey: "custom", baseUrl: "https://beta.example/v1", modelId: "shared-model" }, "beta"],
+    [{ vendorKey: "alpha", baseUrl: "https://beta.example/v1", modelId: "shared-model" }, "beta"],
+  ];
+  for (const [input, providerKey] of [...queries, ...queries.toReversed()]) {
+    assert.equal(catalog.findModel(input)?.providerKey, providerKey);
+  }
+});
+
+test("model lookup memory is bounded by the catalog, not by query count", async (t) => {
+  const catalog = await loadFixtureCatalog(t);
+  const input = { vendorKey: "anthropic", modelId: "claude-opus-4.6" };
+  const match = catalog.findModel(input);
+  assert.ok(match);
+  const reads = observeModelIdReads(match);
+
+  // Thousands of distinct miss queries do not grow the per-generation index and
+  // do not evict an already-resolved key from it.
+  for (let index = 0; index < 3_000; index += 1) {
+    assert.equal(catalog.findModel({ ...input, modelId: `unknown-${index}` }), undefined);
+  }
+  const beforeRepeat = reads();
+  assert.equal(catalog.findModel(input), match);
+  // The resolved key stays resolvable to the same object without a catalog rescan.
+  assert.ok(reads() - beforeRepeat <= 8, "a resolved key stays usable after many distinct queries");
+});
+
+test("one read with more distinct keys than any cache budget does not rescan a resolved key", async (t) => {
+  const catalog = await loadFixtureCatalog(t);
+  const input = { vendorKey: "anthropic", modelId: "claude-opus-4.6" };
+  const match = catalog.findModel(input);
+  assert.ok(match);
+  const reads = observeModelIdReads(match);
+  const baseline = reads();
+  const exactRepeats = 2_000;
+  // Interleave the originally resolved key among a burst of distinct keys far
+  // larger than the former 1,024-entry per-key eviction cache.
+  for (let index = 0; index < exactRepeats; index += 1) {
+    catalog.findModel({ ...input, modelId: `unknown-${index}` });
+    catalog.findModel(input);
+  }
+  const touches = reads() - baseline;
+  // Each exact re-query resolves through a bounded candidate bucket, so the work
+  // stays proportional to the repeated queries and independent of the distinct
+  // keys interleaved between them. The old 1,024-entry eviction cache would rescan
+  // the whole catalog (thousands of model reads) on every repeat once its budget
+  // was exceeded, growing with the distinct-key burst.
+  assert.ok(
+    touches <= exactRepeats * 8,
+    `exact re-queries touched the model ${touches} times, expected <= ${exactRepeats * 8}`,
+  );
+});
+
+test("model IDs match provider namespaces without matching model variants", () => {
+  assert.equal(modelIdsMatch("anthropic-claude-opus-5", "claude-opus-5"), true);
+  assert.equal(modelIdsMatch("anthropic/claude-opus-5", "claude-opus-5"), true);
+  assert.equal(modelIdsMatch("claude-opus-5@default", "claude-opus-5"), true);
+  assert.equal(modelIdsMatch("claude-opus-5-fast", "claude-opus-5"), false);
+});
+
+test("models.dev records retain all published model parameters and modalities", () => {
+  const [provider] = parseModelsDevCatalog(catalogFixture);
+  assert.equal(provider.providerKey, "anthropic");
+  assert.equal(provider.models.length, 3, "raw parsing keeps non-text records too");
+
+  const model = provider.models.find((item) => item.modelId === "claude-opus-4.6");
+  assert.equal(model.providerApi, undefined);
+  assert.equal(model.displayName, "Claude 4.6 Opus");
+  assert.equal(model.description, "High-end Claude for difficult coding, planning, and slower expert reasoning");
+  assert.equal(model.family, "claude-opus");
+  assert.equal(model.attachment, true);
+  assert.equal(model.reasoning, true);
+  assert.deepEqual(model.reasoningOptions, [{
+    type: "effort",
+    values: ["low", "medium", "high", "xhigh", "max"],
+  }]);
+  assert.deepEqual(model.modalities, {
+    input: ["text", "image", "pdf"],
+    output: ["text"],
+  });
+  assert.deepEqual(model.limit, {
+    context: 1_000_000,
+    input: 1_000_000,
+    output: 128_000,
+  });
+  assert.deepEqual(model.cost, {
+    input: 5,
+    output: 25,
+    cacheRead: 0.5,
+    cacheWrite: 6.25,
+    reasoning: 25,
+    inputAudio: 7,
+    outputAudio: 28,
+    tiers: [{
+      input: 10,
+      output: 37.5,
+      cacheRead: 1,
+      tier: { type: "context", size: 200_000 },
+    }],
+    contextOver200k: {
+      input: 10,
+      output: 37.5,
+      cacheRead: 1,
+      cacheWrite: 12.5,
+    },
+  });
+  assert.deepEqual(model.interleaved, { field: "reasoning_content" });
+  assert.equal(model.status, "stable");
+  assert.equal(model.temperature, false);
+  assert.deepEqual(model.experimental, { modes: { fast: { enabled: true } } });
+  assert.deepEqual(model.provider, { npm: "@ai-sdk/anthropic" });
+
+  const info = modelInfoFromModelsDev(model, "provider-row");
+  assert.equal(info.providerId, "provider-row");
+  assert.equal(info.contextWindow, 1_000_000);
+  assert.equal(info.maxTokens, 128_000);
+  assert.ok(info.capabilities.includes("text"));
+  assert.ok(info.capabilities.includes("tools"));
+  assert.ok(info.capabilities.includes("vision"));
+  assert.ok(info.capabilities.includes("pdf"));
+  assert.ok(info.capabilities.includes("reasoning"));
+  assert.ok(info.capabilities.includes("json"));
+  assert.ok(info.capabilities.includes("attachments"));
+  assert.equal(info.capabilities.includes("temperature"), false);
+  assert.equal(info.catalogSource, "models.dev");
+  assert.deepEqual(info.thinkingLevelMap, {
+    low: "low",
+    medium: "medium",
+    high: "high",
+    xhigh: "xhigh",
+    max: "max",
+    // Effort ladder without a published none/off value (#603).
+    off: null,
+  });
+  assert.deepEqual(info.provider, { npm: "@ai-sdk/anthropic" });
+  assert.deepEqual(info.experimental, { modes: { fast: { enabled: true } } });
+  assert.ok(
+    modelInfoFromModelsDev({ ...model, temperature: true }, "provider-row").capabilities.includes(
+      "temperature",
+    ),
+  );
+  const allModalities = {
+    input: ["text", "image", "audio", "video", "pdf"],
+    output: ["text", "image", "audio", "video", "pdf"],
+  };
+  const multimodalInfo = modelInfoFromModelsDev(
+    { ...model, modalities: allModalities },
+    "provider-row",
+  );
+  assert.deepEqual(multimodalInfo.modalities, allModalities);
+  for (const capability of ["vision", "audio", "video", "pdf"]) {
+    assert.ok(multimodalInfo.capabilities.includes(capability), capability);
+  }
+
+  const config = modelConfigFromModelsDev(model, "https://api.anthropic.com");
+  assert.equal(config.source, "models.dev");
+  assert.equal(config.name, "Claude 4.6 Opus");
+  assert.equal(config.contextWindow, 1_000_000);
+  assert.equal(config.maxTokens, 128_000);
+  assert.deepEqual(config.input, ["text", "image"]);
+  assert.deepEqual(config.modalities, info.modalities);
+  assert.deepEqual(config.supportedThinkingLevels, ["low", "medium", "high", "xhigh", "max"]);
+  assert.deepEqual(config.thinkingLevelMap, {
+    low: "low",
+    medium: "medium",
+    high: "high",
+    xhigh: "xhigh",
+    max: "max",
+    // Effort ladder without a published none/off value (#603).
+    off: null,
+  });
+  assert.equal(config.cost.reasoning, 25);
+  assert.deepEqual(config.provider, { npm: "@ai-sdk/anthropic" });
+  assert.deepEqual(config.catalogProvider, { npm: "@ai-sdk/anthropic" });
+  assert.deepEqual(config.experimental, { modes: { fast: { enabled: true } } });
+  assert.equal(config.cost.inputAudio, 7);
+  assert.equal(config.cost.outputAudio, 28);
+  assert.equal(config.cost.tiers?.[0]?.tier?.size, 200_000);
+  assert.equal(config.interleaved?.field, "reasoning_content");
+
+  const sparse = provider.models.find((item) => item.modelId === "metadata-sparse");
+  assert.equal(sparse.reasoningPublished, false);
+  assert.equal(sparse.modalitiesPublished, false);
+});
+
+test("models.dev parsing keeps the per-model wire API with a responses-only fallback", () => {
+  const [provider, llmGateway] = parseModelsDevCatalog({
+    "opencode-go": {
+      name: "OpenCode Go",
+      api: "https://opencode.ai/zen/go/v1",
+      models: {
+        "muse-spark-1.3-contributor": { id: "muse-spark-1.3-contributor" },
+        "deepseek-v4-flash": { id: "deepseek-v4-flash" },
+        "custom-responses": { id: "custom-responses", api: "openai-responses" },
+      },
+    },
+    "llmgateway": {
+      name: "LLM Gateway",
+      models: {
+        "muse-spark-1.3-contributor": { id: "muse-spark-1.3-contributor" },
+      },
+    },
+  });
+  const byId = Object.fromEntries(provider.models.map((model) => [model.modelId, model]));
+  assert.equal(byId["muse-spark-1.3-contributor"].modelApi, "openai-responses");
+  assert.equal(byId["deepseek-v4-flash"].modelApi, undefined);
+  assert.equal(byId["custom-responses"].modelApi, "openai-responses");
+  const gatewayMuse = llmGateway.models.find((model) => model.modelId === "muse-spark-1.3-contributor");
+  assert.equal(gatewayMuse.modelApi, undefined);
+  const config = modelConfigFromModelsDev(
+    byId["muse-spark-1.3-contributor"],
+    "https://opencode.ai/zen/go/v1",
+  );
+  assert.equal(config.api, "openai-responses");
+});
+
+test("models.dev parsing retains every model in a provider", () => {
+  const models = Object.fromEntries(
+    Array.from({ length: 627 }, (_, index) => [
+      `model-${String(index).padStart(4, "0")}`,
+      { id: `model-${String(index).padStart(4, "0")}` },
+    ]),
+  );
+  const [provider] = parseModelsDevCatalog({
+    provider: { name: "Provider", models },
+  });
+  assert.equal(provider.models.length, 627);
+  assert.equal(provider.models.at(-1)?.modelId, "model-0626");
+});
+
+test("matches vendor-prefixed models when the catalog provider key is a gateway", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pi-models-dev-provider-match-"));
+  const catalogPath = join(dir, "api.json");
+  await writeFile(
+    catalogPath,
+    JSON.stringify({
+      gateway: {
+        name: "Gateway",
+        api: "https://gateway.example/v1",
+        models: {
+          "deepseek/deepseek-v4": {
+            id: "deepseek/deepseek-v4",
+            name: "DeepSeek V4",
+            modalities: { input: ["text", "image", "pdf"], output: ["text"] },
+            limit: { context: 128_000, output: 16_000 },
+          },
+        },
+      },
+    }),
+    "utf8",
+  );
+  try {
+    const catalog = new ModelsDevCatalog({ catalogPath });
+    assert.equal(await catalog.ensureLoaded(), true);
+    const match = catalog.findModel({
+      vendorKey: "deepseek",
+      modelId: "deepseek-v4",
+    });
+    assert.equal(match?.modelId, "deepseek/deepseek-v4");
+    assert.deepEqual(match?.modalities.input, ["text", "image", "pdf"]);
+    assert.equal(
+      catalog.modelsForProvider({ vendorKey: "deepseek", providerId: "row" }).length,
+      1,
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("maps the OpenAI Codex account to OpenAI models.dev metadata", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pi-models-dev-openai-codex-"));
+  const catalogPath = join(dir, "api.json");
+  await writeFile(
+    catalogPath,
+    JSON.stringify({
+      openai: {
+        name: "OpenAI",
+        models: {
+          "gpt-5.6-sol": {
+            id: "gpt-5.6-sol",
+            name: "GPT-5.6 Sol",
+            reasoning: true,
+            reasoning_options: [{
+              type: "effort",
+              values: ["none", "low", "medium", "high", "xhigh", "max"],
+            }],
+            modalities: { input: ["text", "image", "pdf"], output: ["text"] },
+            limit: { context: 1_050_000, output: 128_000 },
+          },
+        },
+      },
+    }),
+    "utf8",
+  );
+  try {
+    const catalog = new ModelsDevCatalog({ catalogPath });
+    assert.equal(await catalog.ensureLoaded(), true);
+
+    const input = {
+      vendorKey: "openai-codex",
+      baseUrl: "https://chatgpt.com/backend-api",
+      modelId: "gpt-5.6-sol",
+    };
+    const match = catalog.findModel(input);
+    assert.equal(match?.providerKey, "openai");
+    assert.equal(match?.reasoning, true);
+    assert.deepEqual(match?.thinkingLevels, [
+      "off",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+    ]);
+    assert.equal(match?.limit.context, 1_050_000);
+    assert.equal(match?.limit.output, 128_000);
+    assert.equal(catalog.providerKeyForRow(input), "openai");
+
+    const fallback = catalog.modelsForProvider({
+      vendorKey: input.vendorKey,
+      baseUrl: input.baseUrl,
+      providerId: "oauth-row",
+    });
+    assert.equal(fallback.length, 1);
+    assert.equal(fallback[0].modelId, "gpt-5.6-sol");
+    assert.deepEqual(fallback[0].supportedThinkingLevels, [
+      "off",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+    ]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("matches Zhipu and Z.AI endpoints by catalog URL and vendor aliases", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pi-models-dev-zhipu-"));
+  const catalogPath = join(dir, "api.json");
+  await writeFile(
+    catalogPath,
+    JSON.stringify({
+      zhipuai: {
+        name: "Zhipu AI",
+        api: "https://open.bigmodel.cn/api/paas/v4",
+        models: {
+          "glm-5": {
+            id: "glm-5",
+            name: "GLM-5",
+            modalities: { input: ["text"], output: ["text"] },
+            limit: { context: 204_800, output: 131_072 },
+          },
+        },
+      },
+      "zhipuai-coding-plan": {
+        name: "Zhipu AI Coding Plan",
+        api: "https://open.bigmodel.cn/api/coding/paas/v4",
+        models: {
+          "glm-5.3": {
+            id: "glm-5.3",
+            name: "GLM-5.3",
+            modalities: { input: ["text"], output: ["text"] },
+            limit: { context: 1_000_000, output: 131_072 },
+          },
+        },
+      },
+      zai: {
+        name: "Z.AI",
+        api: "https://api.z.ai/api/paas/v4",
+        models: {
+          "glm-5.1": {
+            id: "glm-5.1",
+            name: "GLM-5.1",
+            modalities: { input: ["text"], output: ["text"] },
+            limit: { context: 200_000, output: 131_072 },
+          },
+        },
+      },
+      "zai-coding-plan": {
+        name: "Z.AI Coding Plan",
+        api: "https://api.z.ai/api/coding/paas/v4",
+        models: {
+          "glm-5.2": {
+            id: "glm-5.2",
+            name: "GLM-5.2",
+            modalities: { input: ["text"], output: ["text"] },
+            limit: { context: 1_000_000, output: 131_072 },
+          },
+        },
+      },
+    }),
+    "utf8",
+  );
+  try {
+    const catalog = new ModelsDevCatalog({ catalogPath });
+    assert.equal(await catalog.ensureLoaded(), true);
+
+    const chinaApi = catalog.findModel({
+      vendorKey: "custom",
+      baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+      modelId: "glm-5",
+    });
+    assert.equal(chinaApi?.providerKey, "zhipuai");
+
+    const chinaCoding = catalog.findModel({
+      vendorKey: "zai-coding-cn",
+      modelId: "glm-5.3",
+    });
+    assert.equal(chinaCoding?.providerKey, "zhipuai-coding-plan");
+    assert.equal(chinaCoding?.modelId, "glm-5.3");
+
+    const intlCoding = catalog.findModel({
+      vendorKey: "custom",
+      baseUrl: "https://api.z.ai/api/coding/paas/v4",
+      modelId: "glm-5.2",
+    });
+    assert.equal(intlCoding?.providerKey, "zai-coding-plan");
+    assert.equal(
+      catalog.providerKeyForRow({
+        vendorKey: "bigmodel",
+        baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+      }),
+      "zhipuai",
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("maps MiniMax OpenAI-compatible endpoints to multimodal catalog metadata", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pi-models-dev-minimax-openai-"));
+  const catalogPath = join(dir, "api.json");
+  await writeFile(
+    catalogPath,
+    JSON.stringify({
+      "minimax-cn": {
+        name: "MiniMax (China)",
+        api: "https://api.minimaxi.com/anthropic/v1",
+        models: {
+          "MiniMax-M3": {
+            id: "MiniMax-M3",
+            name: "MiniMax-M3",
+            attachment: true,
+            reasoning: true,
+            modalities: { input: ["text", "image", "video"], output: ["text"] },
+            limit: { context: 1_048_576, output: 524_288 },
+          },
+        },
+      },
+    }),
+    "utf8",
+  );
+  try {
+    const catalog = new ModelsDevCatalog({ catalogPath });
+    assert.equal(await catalog.ensureLoaded(), true);
+    const input = {
+      vendorKey: "custom",
+      baseUrl: "https://api.minimaxi.com/v1",
+      providerId: "custom-row",
+    };
+    const match = catalog.findModel({ ...input, modelId: "MiniMax-M3" });
+    assert.equal(match?.providerKey, "minimax-cn");
+    assert.deepEqual(match?.modalities.input, ["text", "image", "video"]);
+    assert.equal(match?.attachment, true);
+    assert.equal(catalog.modelsForProvider(input)[0]?.modelId, "MiniMax-M3");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("models.dev reasoning options map to canonical levels", () => {
+  assert.deepEqual(
+    thinkingLevelsFromModelsDev(true, [{
+      type: "effort",
+      values: ["max", "low", "none", "invalid"],
+    }]),
+    ["off", "low", "max"],
+  );
+  assert.deepEqual(thinkingLevelsFromModelsDev(true, [{ type: "toggle" }]), ["off", "medium"]);
+  assert.deepEqual(thinkingLevelsFromModelsDev(true, [{ type: "budget_tokens", min: 1024 }]), ["off", "medium"]);
+  assert.deepEqual(thinkingLevelsFromModelsDev(true, []), ["low", "medium", "high"]);
+  assert.deepEqual(thinkingLevelsFromModelsDev(false, [{ type: "effort", values: ["high"] }]), []);
+});
+
+test("toggle ladders still map off to none", () => {
+  const [provider] = parseModelsDevCatalog({
+    vendor: {
+      name: "Vendor",
+      models: {
+        "toggle-model": {
+          id: "toggle-model",
+          reasoning: true,
+          reasoning_options: [{ type: "toggle" }],
+        },
+      },
+    },
+  });
+  const info = modelInfoFromModelsDev(provider.models[0], "row");
+  assert.equal(info.thinkingLevelMap?.off, "none");
+});
+
+test("the application loads the bundled release snapshot without network access", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pi-models-dev-release-"));
+  const catalogPath = join(dir, "api.json");
+  await writeFile(catalogPath, JSON.stringify(catalogFixture), "utf8");
+  let calls = 0;
+  try {
+    const catalog = new ModelsDevCatalog({
+      catalogPath,
+      fetchImpl: async () => {
+        calls += 1;
+        throw new Error("startup must not fetch");
+      },
+    });
+    assert.equal(
+      catalog.findModel({ vendorKey: "anthropic", modelId: "claude-opus-4.6" }),
+      undefined,
+      "a lookup before the bundled snapshot loads can miss",
+    );
+    assert.equal(await catalog.ensureLoaded(), true);
+    assert.equal(calls, 0);
+    assert.equal(catalog.getStatus().source, "bundled");
+    assert.equal(catalog.getStatus().catalogPath, catalogPath);
+    assert.equal(
+      catalog.findModel({ vendorKey: "anthropic", modelId: "claude-opus-4.6" })?.family,
+      "claude-opus",
+    );
+    assert.equal(
+      catalog.modelsForProvider({ vendorKey: "anthropic", providerId: "row" }).length,
+      2,
+      "only text-capable models enter the agent picker",
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("concurrent catalog reads share the bundled snapshot load", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pi-models-dev-concurrent-load-"));
+  const catalogPath = join(dir, "api.json");
+  await writeFile(catalogPath, JSON.stringify(catalogFixture), "utf8");
+  try {
+    const catalog = new ModelsDevCatalog({ catalogPath });
+    const first = catalog.ensureLoaded();
+    const second = catalog.ensureLoaded();
+    assert.equal(await first, true);
+    assert.equal(await second, true);
+    assert.equal(
+      catalog.findModel({ vendorKey: "anthropic", modelId: "claude-opus-4.6" })?.family,
+      "claude-opus",
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("Settings refresh always refetches models.dev and only updates memory", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pi-models-dev-refresh-"));
+  const catalogPath = join(dir, "api.json");
+  await writeFile(catalogPath, JSON.stringify(catalogFixture), "utf8");
+  const refreshedFixture = {
+    ...catalogFixture,
+    anthropic: {
+      ...catalogFixture.anthropic,
+      models: {
+        ...catalogFixture.anthropic.models,
+        "claude-opus-4.6": {
+          ...catalogFixture.anthropic.models["claude-opus-4.6"],
+          name: "Updated Claude",
+        },
+        "new-model": {
+          id: "new-model",
+          name: "New Model",
+          modalities: { input: ["text"], output: ["text"] },
+          limit: { context: 64_000, output: 4_000 },
+        },
+      },
+    },
+  };
+  const calls = [];
+  try {
+    const catalog = new ModelsDevCatalog({
+      catalogPath,
+      fetchImpl: async (url, options) => {
+        calls.push({ url, options });
+        return responseFor(refreshedFixture);
+      },
+    });
+    assert.equal(await catalog.ensureLoaded(), true);
+    const existingInput = { vendorKey: "anthropic", modelId: "claude-opus-4.6" };
+    const previousMatch = catalog.findModel(existingInput);
+    assert.ok(previousMatch);
+    assert.equal(catalog.findModel({ vendorKey: "anthropic", modelId: "new-model" }), undefined);
+    assert.equal(calls.length, 0);
+    assert.equal(await catalog.refresh(), true);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, MODELS_DEV_API_URL);
+    assert.deepEqual(calls[0].options.headers, { Accept: "application/json" });
+    const refreshedMatch = catalog.findModel(existingInput);
+    assert.notEqual(refreshedMatch, previousMatch);
+    assert.equal(refreshedMatch?.displayName, "Updated Claude");
+    assert.equal(
+      catalog.findModel({ vendorKey: "anthropic", modelId: "new-model" })?.displayName,
+      "New Model",
+    );
+    assert.deepEqual(
+      JSON.parse(await readFile(catalogPath, "utf8")),
+      catalogFixture,
+      "settings refresh must not write the bundled release resource",
+    );
+    assert.equal(await catalog.refresh(), true, "a second settings refresh is also remote");
+    assert.equal(calls.length, 2);
+    assert.equal(catalog.getStatus().source, "remote");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("a failed settings refresh preserves the bundled snapshot in memory", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pi-models-dev-failure-"));
+  const catalogPath = join(dir, "api.json");
+  await writeFile(catalogPath, JSON.stringify(catalogFixture), "utf8");
+  try {
+    const catalog = new ModelsDevCatalog({
+      catalogPath,
+      fetchImpl: async () => {
+        throw new Error("offline");
+      },
+    });
+    assert.equal(await catalog.ensureLoaded(), true);
+    const input = { vendorKey: "anthropic", modelId: "claude-opus-4.6" };
+    const match = catalog.findModel(input);
+    assert.ok(match);
+    const reads = observeModelIdReads(match);
+    const missing = { ...input, modelId: "unpublished-model" };
+    assert.equal(catalog.findModel(missing), undefined);
+    const beforeRefresh = reads();
+    assert.equal(await catalog.refresh(), false);
+    assert.equal(catalog.findModel(input), match);
+    assert.equal(catalog.findModel(missing), undefined);
+    assert.equal(reads(), beforeRefresh, "a failed refresh preserves both cached matches and misses");
+    assert.equal(
+      catalog.findModel({ vendorKey: "anthropic", modelId: "claude-opus-4.6" })?.family,
+      "claude-opus",
+    );
+    assert.match(catalog.getStatus().lastError, /offline/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+/*
+  The published `npm` / `env` / `doc` fields survive parsing because the setup
+  form still derives the wire API from the adapter package and still points the
+  user at the provider's own docs. Migrated here when the catalog-search suite
+  was removed with the browsable-catalog UI.
+*/
+test("parsed providers keep the published npm, env and doc fields", () => {
+  const providers = parseModelsDevCatalog({
+    anthropic: {
+      id: "anthropic",
+      name: "Anthropic",
+      npm: "@ai-sdk/anthropic",
+      api: "https://api.anthropic.com",
+      doc: "https://docs.anthropic.com",
+      env: ["ANTHROPIC_API_KEY"],
+      models: {
+        "claude-opus-4.6": {
+          id: "claude-opus-4.6",
+          name: "Claude 4.6 Opus",
+          modalities: { input: ["text"], output: ["text"] },
+          limit: { context: 200000, output: 64000 },
+        },
+      },
+    },
+    "openrouter-lite": {
+      id: "openrouter-lite",
+      name: "OpenRouter Lite",
+      npm: "@ai-sdk/openai-compatible",
+      models: {
+        "some-model": {
+          id: "some-model",
+          name: "Some Model",
+          modalities: { input: ["text"], output: ["text"] },
+        },
+      },
+    },
+  });
+  const anthropic = providers.find((item) => item.providerKey === "anthropic");
+  assert.equal(anthropic.npm, "@ai-sdk/anthropic");
+  assert.equal(anthropic.doc, "https://docs.anthropic.com");
+  assert.deepEqual(anthropic.env, ["ANTHROPIC_API_KEY"]);
+  assert.equal(anthropic.api, "https://api.anthropic.com");
+  const gateway = providers.find((item) => item.providerKey === "openrouter-lite");
+  assert.deepEqual(gateway.env, [], "a provider without env vars parses to an empty list");
+  assert.equal(gateway.doc, undefined);
+});
+
+test("the wire API style is derived from the published adapter package", () => {
+  assert.equal(apiStyleForAdapter("@ai-sdk/anthropic"), "anthropic_messages");
+  assert.equal(apiStyleForAdapter("@ai-sdk/google-vertex/anthropic"), "anthropic_messages");
+  assert.equal(apiStyleForAdapter("@ai-sdk/google"), "google_generative_ai");
+  assert.equal(apiStyleForAdapter("@ai-sdk/openai"), "responses");
+  // The long tail of gateways is OpenAI-compatible chat completions.
+  assert.equal(apiStyleForAdapter("@ai-sdk/openai-compatible"), "chat_completions");
+  assert.equal(apiStyleForAdapter(undefined), "chat_completions");
+});

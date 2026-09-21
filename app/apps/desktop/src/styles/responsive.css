@@ -1,0 +1,184 @@
+/*
+  Responsive and reduced-motion tails that must stay last so they override the
+  section rules above.
+*/
+
+@media (max-width: 720px) {
+  .plugins-toolbar-end {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+
+  .plugins-search-wrap {
+    flex: 1 1 auto;
+  }
+
+  .plugins-row-controls {
+    align-self: flex-start;
+  }
+}
+
+/*
+  Composer controls share one row, but the model chip is the first surface to
+  give up descriptive text as the chat column gets narrower. Keep the action
+  buttons at their normal hit target and let the combined model/reasoning
+  trigger carry the full selection in its menu and accessible name.
+*/
+.composer-left,
+.composer-right {
+  min-width: 0;
+}
+
+.composer-left,
+.composer-right,
+.composer-model-thinking {
+  flex: 0 1 auto;
+}
+
+.composer-right {
+  justify-content: flex-end;
+}
+
+.composer-model-thinking {
+  min-width: 0;
+}
+
+@container composer-stack (max-width: 560px) {
+  .composer-model-thinking-dot,
+  .composer-model-thinking-level {
+    display: none;
+  }
+
+  .composer-model-thinking-model {
+    max-width: 136px;
+  }
+}
+
+@container composer-stack (max-width: 480px) {
+  .composer-model-thinking-model {
+    max-width: 96px;
+  }
+}
+
+@container composer-stack (max-width: 450px) {
+  .composer-right .composer-model-thinking-chip {
+    width: 32px;
+    max-width: 32px;
+    flex: 0 0 32px;
+    justify-content: center;
+    gap: 0 !important;
+    padding: 0 !important;
+  }
+
+  .composer-model-thinking-model,
+  .composer-model-thinking-chevron {
+    display: none;
+  }
+
+  .composer-right .context-inspector-trigger {
+    gap: 0;
+    padding-inline: 3px;
+  }
+
+  .composer-right .context-inspector-ring-value {
+    display: none;
+  }
+
+  .composer-enhance-btn.is-loading {
+    width: 28px;
+    max-width: 28px;
+    padding-inline: 0;
+  }
+
+  .composer-enhance-btn.is-loading > span:not(.tool-spinner) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plugins-menu,
+  .plugins-sheet,
+  .plugins-sheet-scrim,
+  .plugins-modal,
+  .plugins-modal-backdrop,
+  .plugins-skeleton-line {
+    animation: none;
+  }
+
+  .plugins-card:hover {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-surface,
+  .settings-content-enter,
+  .jump-latest-btn,
+  .chat-error-notice,
+  .work-panel,
+  .work-panel.is-exiting,
+  .sidebar,
+  .sidebar.is-exiting {
+    /* Near-zero (not none): exit unmount listens for animationend. */
+    animation-duration: 0.01ms !important;
+  }
+
+  /* The top bar's lead-in only exists to track the dock's motion. */
+  .conversation-topbar,
+  .conversation-topbar.ct-collapsed,
+  .conversation-topbar .ct-lead,
+  .conversation-topbar.ct-collapsed .ct-lead {
+    transition-duration: 0.01ms !important;
+  }
+
+  /* The project fold is a height change: keep both endpoints, drop the travel. */
+  .sidebar-session-group-body.project {
+    transition-duration: 0.01ms !important;
+  }
+
+  .thread-item,
+  .sidebar-session-group-header {
+    transition-duration: 0.01ms !important;
+  }
+
+  .route-pending-indicator {
+    animation: none;
+    border-color: var(--ds-text-muted);
+  }
+
+  .session-switch-progress > span {
+    width: 100%;
+    animation: none;
+    opacity: 0.55;
+    transform: none;
+  }
+
+  .composer-placeholder,
+  .composer-mode-chip-face,
+  .composer-mode-chip[data-planning="true"] svg {
+    animation: none;
+  }
+
+  .composer-shell,
+  .composer-shell:focus-within,
+  .btn,
+    .icon-btn,
+    .send-btn,
+    .stop-btn,
+    .title-nav-btn,
+    .nav-item,
+    .copy-btn,
+    .sidebar-toolbar-button,
+  .sidebar-session-group-add,
+  .review-change-card,
+  .review-change-card-header,
+  .review-change-card-caret,
+  .review-change-rollback {
+    transform: none !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .review-change-card-body {
+    animation: none;
+  }
+}

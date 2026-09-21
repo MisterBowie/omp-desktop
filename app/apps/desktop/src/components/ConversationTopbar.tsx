@@ -1,0 +1,106 @@
+import { useTranslation } from "react-i18next";
+import { useAppStore } from "../stores/app-store";
+import {
+  IconSidebar,
+  IconNewSession,
+  IconSearch,
+} from "./icons";
+import { TooltipButton } from "./ui";
+
+function projectName(path?: string | null, name?: string | null) {
+  if (name) return name;
+  if (!path) return null;
+  const parts = path.split(/[/\\]/).filter(Boolean);
+  return parts[parts.length - 1] || path;
+}
+
+function isDefaultSessionTitle(title?: string | null) {
+  const trimmed = (title || "").trim().toLowerCase();
+  if (!trimmed) return true;
+  return ["new task", "new chat", "新建任务", "新对话"].includes(trimmed);
+}
+
+export function ConversationTopbar({
+  sidebarCollapsed,
+  workPanelOpen,
+  onToggleSidebar,
+  onNewTask,
+  onOpenSearch,
+}: {
+  sidebarCollapsed: boolean;
+  workPanelOpen: boolean;
+  onToggleSidebar: () => void;
+  onNewTask: () => void;
+  onOpenSearch: () => void;
+}) {
+  const { t } = useTranslation();
+  const activeSessionId = useAppStore((s) => s.activeSessionId);
+  const sessions = useAppStore((s) => s.sessions);
+  const workspace = useAppStore((s) => s.workspace);
+
+  const activeSession = sessions.find((session) => session.id === activeSessionId);
+
+  const fullTaskTitle = isDefaultSessionTitle(activeSession?.title)
+    ? t("chat.untitledTask")
+    : activeSession?.title || t("chat.untitledTask");
+  const project = projectName(workspace?.path, workspace?.name);
+
+  return (
+    <div
+      className={`conversation-topbar${sidebarCollapsed ? " ct-collapsed" : ""}${
+        workPanelOpen ? " ct-work-panel-open" : ""
+      }`}
+      role="toolbar"
+      aria-label={t("nav.conversation")}
+    >
+      <div className="ct-left">
+        {/*
+          Always mounted: the slot animates from 0 to 28px with the dock, so
+          unmounting it would reintroduce the first-frame title jump. While the
+          sidebar is open the slot is zero-width and hidden from AT.
+        */}
+        <div className="ct-lead" aria-hidden={!sidebarCollapsed}>
+          <TooltipButton
+            type="button"
+            className="ct-icon-btn"
+            tooltip={t("nav.toggleSidebar")}
+            ariaLabel={t("nav.toggleSidebar")}
+            tabIndex={sidebarCollapsed ? undefined : -1}
+            onClick={onToggleSidebar}
+          >
+            <IconSidebar size={15} />
+          </TooltipButton>
+        </div>
+        <div
+          className="ct-title-wrap"
+          title={project ? `${project} · ${fullTaskTitle}` : fullTaskTitle}
+        >
+          <span className="ct-title">{fullTaskTitle}</span>
+        </div>
+      </div>
+
+      <div className="ct-right">
+        <div className="ct-actions">
+          <TooltipButton
+            type="button"
+            className="ct-icon-btn"
+            tooltip={t("nav.newTask")}
+            ariaLabel={t("nav.newTask")}
+            onClick={onNewTask}
+          >
+            <IconNewSession size={15} />
+          </TooltipButton>
+          <TooltipButton
+            type="button"
+            className="ct-icon-btn"
+            tooltip={t("nav.search")}
+            ariaLabel={t("nav.search")}
+            onClick={onOpenSearch}
+          >
+            <IconSearch size={15} />
+          </TooltipButton>
+        </div>
+      </div>
+    </div>
+  );
+}

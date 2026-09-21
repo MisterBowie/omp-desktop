@@ -1,0 +1,6638 @@
+use anyhow::{anyhow, Result};
+use rusqlite::{params, OptionalExtension};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use uuid::Uuid;
+
+use crate::db::{ms_to_ts, now_ms, ts_to_ms, Database};
+use crate::notifications::{self, Notification};
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+
+use crate::transcripts::{self, CompactionRecord, MessageRecord, RevisionRecord};
+
+pub const MODES: [&str; 3] = ["plan", "goal", "agent"];
+
+/// Maximum number of Unicode scalar values accepted for a user-defined title.
+pub const MAX_SESSION_TITLE_CHARS: usize = 80;
+
+/// Compatibility normalization for v7 callers and imported records. The
+/// persisted operating profile is now always `plan`, `goal` or `agent`.
+pub fn normalize_mode(mode: Option<&str>) -> String {
+    match mode {
+        Some("plan") | Some("chat") => "plan".into(),
+        Some("goal") => "goal".into(),
+        Some("agent") => "agent".into(),
+        _ => "agent".into(),
+    }
+}
+
+pub fn is_valid_mode(mode: &str) -> bool {
+    MODES.contains(&mode)
+}
+
+/// Plan and Goal negotiate a contract before executing (D198), so they share one
+/// tool allowlist and one hard deny. Agent is the only executing mode.
+pub fn is_contract_mode(mode: &str) -> bool {
+    matches!(mode, "plan" | "goal")
+}
+
+/// Values accepted by the persisted per-session thinking selector.  Keep this
+/// list in the host boundary so old clients cannot write arbitrary provider
+/// options into the session row. `omit` is a client choice to send no thinking
+/// override; it is not a catalog/binding capability (ADR 0295).
+pub const THINKING_LEVELS: [&str; 8] = [
+    "off", "minimal", "low", "medium", "high", "xhigh", "max", "omit",
+];
+
+pub fn is_valid_thinking_level(level: &str) -> bool {
+    THINKING_LEVELS.contains(&level)
+}
+
+fn default_thinking_level() -> String {
+    "off".to_string()
+}
+
+/// Per-session permission mode (D115). `inherit` defers to the global
+/// default in settings; the rest override it for this session only.
+pub const PERMISSION_MODES: [&str; 4] = ["inherit", "ask", "accept-edits", "auto"];
+
+pub fn is_valid_permission_mode(mode: &str) -> bool {
+    PERMISSION_MODES.contains(&mode)
+}
+
+fn default_permission_mode() -> String {
+    "inherit".to_string()
+}
+
+fn validate_permission_mode(mode: &str) -> Result<()> {
+    if is_valid_permission_mode(mode) {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "permissionMode must be one of {}",
+            PERMISSION_MODES.join(", ")
+        ))
+    }
+}
+
+fn validate_thinking_level(level: &str) -> Result<()> {
+    if is_valid_thinking_level(level) {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "thinkingLevel must be one of {}",
+            THINKING_LEVELS.join(", ")
+        ))
+    }
+}
+
+/// Wire format is unchanged from v1: RFC3339 timestamps, `projectPath`
+/// resolved from the projects table, flat tool fields on messages. Storage is
+/// schema v7 (D119): transcript content lives in per-session JSONL files and
+/// SQLite keeps session metadata plus per-message index rows (`seq`, `text`
+/// for FTS, promoted filter columns).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionSummary {
+    pub id: String,
+    pub title: String,
+    /// Number of messages in the current canonical transcript. This is the
+    /// current value of the session's last_seq allocator after rewrites.
+    #[serde(default)]
+    pub message_count: i64,
+    pub project_path: Option<String>,
+    pub model_id: Option<String>,
+    pub provider_id: Option<String>,
+    pub mode: String,
+    #[serde(default = "default_thinking_level")]
+    pub thinking_level: String,
+    #[serde(default = "default_permission_mode")]
+    pub permission_mode: String,
+    pub updated_at: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageUsage {
+    pub input_tokens: i64,
+    pub output_tokens: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_read_tokens: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_write_tokens: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_tokens: Option<i64>,
+    pub total_tokens: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageAttachment {
+    pub kind: String,
+    pub name: String,
+    #[serde(rename = "ref")]
+    pub reference: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mime_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UiMessage {
+    pub id: String,
+    pub role: String,
+    pub content: String,
+    /// Host-authenticated agent-to-agent origin, never a human authorization.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_message: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attachments: Option<Vec<MessageAttachment>>,
+    /// Accepted input to an existing turn, preserved by Stop after renderer reload.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub steering: Option<bool>,
+    pub created_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usage: Option<MessageUsage>,
+    /// Elapsed model streaming time for the response throughput statistic.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_duration_ms: Option<i64>,
+    /// Partial output estimate used when a user stops before final usage arrives.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_output_tokens: Option<i64>,
+    /// Structured AppError for an assistant turn that failed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<Value>,
+    /// Stable regenerate-family key shared across rewritten user prompts.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revision_root_id: Option<String>,
+    /// For user messages that own regenerate history: total revision count.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revision_count: Option<i64>,
+    /// 1-based active revision index for the branch rooted at this user turn.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_revision: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_args: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_result: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_completed_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_duration_ms: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_error: Option<bool>,
+    /// Set on rows a subagent produced: the `Task` tool call that spawned it
+    /// (ADR 0062). The transcript nests these under that call, and the agent
+    /// runtime excludes them from the parent's model context.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_tool_call_id: Option<String>,
+    /// Subagent definition name that produced the row.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_name: Option<String>,
+    /// Provider-hosted web search activity for this assistant turn. Persisted
+    /// as an additive `hostedSearch` transcript block; no SQL migration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hosted_search: Option<Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionDetail {
+    #[serde(flatten)]
+    pub summary: SessionSummary,
+    pub messages: Vec<UiMessage>,
+    /// Owning Task for a nested messageAround target, outside the page cursors.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub navigation_parent: Option<UiMessage>,
+    /// Zero-based offset of the first returned message when the caller asked
+    /// for a window. Omitted for the full-history form.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message_start: Option<i64>,
+    /// Exclusive physical end of a bounded read, including deduplicated lines.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message_end: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub has_more_after: Option<bool>,
+    /// True when older messages exist outside the returned window.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub has_more_before: Option<bool>,
+    /// The checkpoint that governs the next model request, i.e. the last of
+    /// `compactions`. Kept as its own field because that is what the runtime
+    /// restores on load.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compaction: Option<CompactionRecord>,
+    /// The whole checkpoint chain, oldest first, so the transcript can show one
+    /// row per compaction.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub compactions: Vec<CompactionRecord>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SessionReadOptions {
+    /// Center a bounded UI read on this stable message ID.
+    pub message_around: Option<String>,
+    /// Exclusive message sequence before which the window ends. When omitted,
+    /// the window is taken from the end of the canonical transcript.
+    pub message_before: Option<i64>,
+    pub message_limit: Option<i64>,
+    /// Maximum characters per UI text/value field. This is a presentation cap;
+    /// the full transcript remains available to the sidecar's uncapped read.
+    pub content_limit: Option<usize>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchHit {
+    pub session_id: String,
+    pub session_title: String,
+    pub message_id: String,
+    pub role: String,
+    pub snippet: String,
+    pub created_at: String,
+}
+
+fn is_default_title(title: &str) -> bool {
+    matches!(
+        title.trim(),
+        "" | "New task" | "New chat" | "新建任务" | "新对话"
+    )
+}
+
+// ---- UiMessage ⇄ transcript record mapping -----------------------------------
+
+/// UiMessage → persisted transcript record, plus the extracted plain text for
+/// the search index row (None for tool rows, matching the FTS triggers).
+pub(crate) fn ui_to_record(message: &UiMessage) -> (MessageRecord, Option<String>) {
+    let mut meta_obj = serde_json::Map::new();
+    if let Some(origin) = &message.session_message {
+        meta_obj.insert("sessionMessage".into(), origin.clone());
+    }
+    if let Some(steering) = message.steering {
+        meta_obj.insert("steering".into(), json!(steering));
+    }
+    if let Some(status) = &message.status {
+        meta_obj.insert("status".into(), json!(status));
+    }
+    if let Some(model_id) = &message.model_id {
+        meta_obj.insert("modelId".into(), json!(model_id));
+    }
+    if let Some(provider_id) = &message.provider_id {
+        meta_obj.insert("providerId".into(), json!(provider_id));
+    }
+    if let Some(usage) = &message.usage {
+        meta_obj.insert(
+            "usage".into(),
+            json!({
+                "inputTokens": usage.input_tokens,
+                "outputTokens": usage.output_tokens,
+                "cacheReadTokens": usage.cache_read_tokens,
+                "cacheWriteTokens": usage.cache_write_tokens,
+                "reasoningTokens": usage.reasoning_tokens,
+                "totalTokens": usage.total_tokens,
+            }),
+        );
+    }
+    if let Some(duration) = message.response_duration_ms {
+        meta_obj.insert("responseDurationMs".into(), json!(duration));
+    }
+    if let Some(tokens) = message.response_output_tokens {
+        meta_obj.insert("responseOutputTokens".into(), json!(tokens));
+    }
+    if let Some(error) = &message.error {
+        meta_obj.insert("error".into(), error.clone());
+    }
+    if let Some(root_id) = &message.revision_root_id {
+        meta_obj.insert("revisionRootId".into(), json!(root_id));
+    }
+    if let Some(count) = message.revision_count {
+        meta_obj.insert("revisionCount".into(), json!(count));
+    }
+    if let Some(active) = message.active_revision {
+        meta_obj.insert("activeRevision".into(), json!(active));
+    }
+    if let Some(parent) = &message.parent_tool_call_id {
+        meta_obj.insert("parentToolCallId".into(), json!(parent));
+    }
+    if let Some(agent) = &message.agent_name {
+        meta_obj.insert("agentName".into(), json!(agent));
+    }
+    let meta = if meta_obj.is_empty() {
+        None
+    } else {
+        Some(Value::Object(meta_obj))
+    };
+
+    let mut blocks = Vec::with_capacity(2 + message.attachments.as_ref().map_or(0, Vec::len));
+    if let Some(thinking) = &message.thinking {
+        blocks.push(json!({ "type": "thinking", "text": thinking }));
+    }
+    if let Some(hosted_search) = &message.hosted_search {
+        let mut block = serde_json::Map::new();
+        block.insert("type".into(), json!("hostedSearch"));
+        if let Value::Object(fields) = hosted_search {
+            for (key, value) in fields {
+                if key != "type" {
+                    block.insert(key.clone(), value.clone());
+                }
+            }
+        }
+        blocks.push(Value::Object(block));
+    }
+    let text = if message.role == "tool" {
+        let mut block = serde_json::Map::new();
+        block.insert("type".into(), json!("tool_call"));
+        if let Some(v) = &message.tool_call_id {
+            block.insert("callId".into(), json!(v));
+        }
+        if let Some(v) = &message.tool_name {
+            block.insert("name".into(), json!(v));
+        }
+        if let Some(v) = &message.tool_args {
+            block.insert("args".into(), v.clone());
+        }
+        if let Some(v) = &message.tool_result {
+            block.insert("result".into(), v.clone());
+        }
+        if let Some(v) = &message.tool_completed_at {
+            block.insert("completedAt".into(), json!(v));
+        }
+        if let Some(v) = message.tool_duration_ms {
+            block.insert("durationMs".into(), json!(v));
+        }
+        if let Some(v) = &message.tool_status {
+            block.insert("status".into(), json!(v));
+        }
+        if message.is_error.unwrap_or(false) {
+            block.insert("isError".into(), json!(true));
+        }
+        if !message.content.is_empty() {
+            block.insert("text".into(), json!(message.content));
+        }
+        blocks.push(Value::Object(block));
+        None
+    } else {
+        blocks.push(json!({ "type": "text", "text": message.content }));
+        if let Some(attachments) = &message.attachments {
+            for attachment in attachments {
+                let mut block = serde_json::Map::new();
+                block.insert("type".into(), json!("attachment"));
+                block.insert("kind".into(), json!(attachment.kind));
+                block.insert("name".into(), json!(attachment.name));
+                block.insert("ref".into(), json!(attachment.reference));
+                if let Some(mime_type) = &attachment.mime_type {
+                    block.insert("mimeType".into(), json!(mime_type));
+                }
+                if let Some(size) = attachment.size {
+                    block.insert("size".into(), json!(size));
+                }
+                blocks.push(Value::Object(block));
+            }
+        }
+        Some(message.content.clone())
+    };
+
+    (
+        MessageRecord {
+            id: message.id.clone(),
+            role: message.role.clone(),
+            tool_name: message.tool_name.clone(),
+            is_error: message.is_error.unwrap_or(false),
+            blocks: Value::Array(blocks),
+            meta,
+            created_at: message.created_at.clone(),
+        },
+        text,
+    )
+}
+
+pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
+    let blocks = match record.blocks {
+        Value::Array(items) => items,
+        _ => Vec::new(),
+    };
+    let meta = record.meta.unwrap_or(Value::Null);
+    let session_message = meta.get("sessionMessage").cloned();
+    let steering = meta.get("steering").and_then(Value::as_bool);
+    let status = meta
+        .get("status")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let model_id = meta
+        .get("modelId")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let provider_id = meta
+        .get("providerId")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let usage = meta.get("usage").and_then(|value| {
+        let input_tokens = value.get("inputTokens").and_then(|v| v.as_i64())?;
+        let output_tokens = value.get("outputTokens").and_then(|v| v.as_i64())?;
+        let total_tokens = value
+            .get("totalTokens")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(input_tokens + output_tokens);
+        Some(MessageUsage {
+            input_tokens,
+            output_tokens,
+            cache_read_tokens: value.get("cacheReadTokens").and_then(|v| v.as_i64()),
+            cache_write_tokens: value.get("cacheWriteTokens").and_then(|v| v.as_i64()),
+            reasoning_tokens: value.get("reasoningTokens").and_then(|v| v.as_i64()),
+            total_tokens,
+        })
+    });
+    let error = meta.get("error").cloned();
+    let response_duration_ms = meta.get("responseDurationMs").and_then(|v| v.as_i64());
+    let response_output_tokens = meta.get("responseOutputTokens").and_then(|v| v.as_i64());
+    let revision_root_id = meta
+        .get("revisionRootId")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let revision_count = meta.get("revisionCount").and_then(|v| v.as_i64());
+    let active_revision = meta.get("activeRevision").and_then(|v| v.as_i64());
+    let parent_tool_call_id = meta
+        .get("parentToolCallId")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let agent_name = meta
+        .get("agentName")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let thinking = blocks
+        .iter()
+        .filter_map(|b| {
+            (b.get("type").and_then(|t| t.as_str()) == Some("thinking"))
+                .then(|| b.get("text").and_then(|v| v.as_str()))
+                .flatten()
+        })
+        .collect::<Vec<_>>();
+    let thinking = (!thinking.is_empty()).then(|| thinking.concat());
+    let hosted_search = blocks
+        .iter()
+        .find(|b| b.get("type").and_then(|t| t.as_str()) == Some("hostedSearch"))
+        .map(|b| {
+            let mut fields = b.clone();
+            if let Value::Object(map) = &mut fields {
+                map.remove("type");
+            }
+            fields
+        });
+    let is_error = record.is_error.then_some(true);
+    let attachments = blocks
+        .iter()
+        .filter_map(|block| {
+            if block.get("type").and_then(|t| t.as_str()) != Some("attachment") {
+                return None;
+            }
+            Some(MessageAttachment {
+                kind: block.get("kind").and_then(|v| v.as_str())?.to_string(),
+                name: block.get("name").and_then(|v| v.as_str())?.to_string(),
+                reference: block.get("ref").and_then(|v| v.as_str())?.to_string(),
+                mime_type: block
+                    .get("mimeType")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
+                size: block.get("size").and_then(|v| v.as_i64()),
+            })
+        })
+        .collect::<Vec<_>>();
+    let attachments = (!attachments.is_empty()).then_some(attachments);
+
+    if record.role == "tool" {
+        let block = blocks
+            .iter()
+            .find(|b| b.get("type").and_then(|t| t.as_str()) == Some("tool_call"))
+            .cloned()
+            .unwrap_or(Value::Null);
+        let text = block
+            .get("text")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        UiMessage {
+            id: record.id,
+            role: record.role,
+            content: text,
+            session_message,
+            attachments: None,
+            steering,
+            created_at: record.created_at,
+            thinking,
+            status,
+            model_id,
+            provider_id,
+            usage,
+            response_duration_ms,
+            response_output_tokens,
+            error,
+            revision_root_id,
+            revision_count,
+            active_revision,
+            tool_name: record.tool_name,
+            tool_call_id: block
+                .get("callId")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            tool_status: block
+                .get("status")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            tool_args: block.get("args").cloned(),
+            tool_result: block.get("result").cloned(),
+            tool_completed_at: block
+                .get("completedAt")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            tool_duration_ms: block.get("durationMs").and_then(|v| v.as_i64()),
+            is_error,
+            parent_tool_call_id,
+            agent_name,
+            hosted_search: hosted_search.clone(),
+        }
+    } else {
+        let content = blocks
+            .iter()
+            .filter_map(|b| match b.get("type").and_then(|t| t.as_str()) {
+                Some("text") => b.get("text").and_then(|v| v.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("");
+        UiMessage {
+            id: record.id,
+            role: record.role,
+            content,
+            session_message,
+            attachments,
+            steering,
+            created_at: record.created_at,
+            thinking,
+            status,
+            model_id,
+            provider_id,
+            usage,
+            response_duration_ms,
+            response_output_tokens,
+            error,
+            revision_root_id,
+            revision_count,
+            active_revision,
+            tool_name: None,
+            tool_call_id: None,
+            tool_status: None,
+            tool_args: None,
+            tool_result: None,
+            tool_completed_at: None,
+            tool_duration_ms: None,
+            is_error,
+            parent_tool_call_id,
+            agent_name,
+            hosted_search,
+        }
+    }
+}
+
+const DISPLAY_TRUNCATION_MARKER: &str =
+    "\n\n[truncated for display; the full content remains in the transcript]";
+
+fn truncate_display_text(text: String, limit: usize) -> (String, bool) {
+    if text.chars().count() <= limit {
+        return (text, false);
+    }
+    let marker_len = DISPLAY_TRUNCATION_MARKER.chars().count();
+    if limit <= marker_len {
+        return (
+            DISPLAY_TRUNCATION_MARKER.chars().take(limit).collect(),
+            true,
+        );
+    }
+    let head = limit - marker_len;
+    (
+        format!(
+            "{}{}",
+            text.chars().take(head).collect::<String>(),
+            DISPLAY_TRUNCATION_MARKER
+        ),
+        true,
+    )
+}
+
+fn preview_value(value: Value, limit: usize) -> Value {
+    fn walk(value: Value, budget: &mut usize) -> Value {
+        if *budget == 0 {
+            return Value::String("[truncated for display]".into());
+        }
+        match value {
+            Value::String(text) => {
+                let (clipped, _) = truncate_display_text(text, *budget);
+                *budget = (*budget).saturating_sub(clipped.chars().count());
+                Value::String(clipped)
+            }
+            Value::Array(items) => {
+                let mut output = Vec::with_capacity(items.len().min(32));
+                for item in items {
+                    if *budget == 0 || output.len() >= 256 {
+                        output.push(Value::String("[truncated for display]".into()));
+                        break;
+                    }
+                    output.push(walk(item, budget));
+                }
+                Value::Array(output)
+            }
+            Value::Object(object) => {
+                let mut output = serde_json::Map::new();
+                for (key, item) in object {
+                    if *budget == 0 || output.len() >= 256 {
+                        output.insert("_truncated".into(), Value::Bool(true));
+                        break;
+                    }
+                    output.insert(key, walk(item, budget));
+                }
+                Value::Object(output)
+            }
+            other => other,
+        }
+    }
+
+    let mut budget = limit.max(1);
+    walk(value, &mut budget)
+}
+
+fn cap_record_block_value(value: &mut Value, budget: &mut usize) {
+    let original = std::mem::take(value);
+    *value = match original {
+        Value::String(text) if *budget > 0 => {
+            let (clipped, _) = truncate_display_text(text, *budget);
+            *budget = budget.saturating_sub(clipped.chars().count());
+            Value::String(clipped)
+        }
+        Value::String(_) => Value::String(String::new()),
+        other => other,
+    };
+}
+
+fn cap_record_blocks_for_display(record: &mut MessageRecord, limit: usize) {
+    let Some(blocks) = record.blocks.as_array_mut() else {
+        return;
+    };
+    let mut text_budget = limit.max(1);
+    let mut thinking_budget = limit.max(1);
+    for block in blocks {
+        let Some(object) = block.as_object_mut() else {
+            continue;
+        };
+        match object.get("type").and_then(Value::as_str) {
+            Some("text") => {
+                if let Some(text) = object.get_mut("text") {
+                    cap_record_block_value(text, &mut text_budget);
+                }
+            }
+            Some("thinking") => {
+                if let Some(text) = object.get_mut("text") {
+                    cap_record_block_value(text, &mut thinking_budget);
+                }
+            }
+            Some("tool_call") => {
+                for key in ["args", "result"] {
+                    if let Some(value) = object.get_mut(key) {
+                        *value = preview_value(std::mem::take(value), limit);
+                    }
+                }
+                if let Some(text) = object.get_mut("text") {
+                    cap_record_block_value(text, &mut text_budget);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn record_to_ui_for_display(mut record: MessageRecord, limit: usize) -> UiMessage {
+    // Bound the canonical block values before record_to_ui concatenates text
+    // blocks or clones tool payloads. This keeps a 50 MB selected line from
+    // producing another 50 MB temporary UI string on the host.
+    cap_record_blocks_for_display(&mut record, limit);
+    let mut message = record_to_ui(record);
+    let (content, _) = truncate_display_text(message.content, limit);
+    message.content = content;
+    if let Some(thinking) = message.thinking.take() {
+        let (thinking, _) = truncate_display_text(thinking, limit);
+        message.thinking = Some(thinking);
+    }
+    if let Some(args) = message.tool_args.take() {
+        message.tool_args = Some(preview_value(args, limit));
+    }
+    if let Some(result) = message.tool_result.take() {
+        message.tool_result = Some(preview_value(result, limit));
+    }
+    if let Some(error) = message.error.take() {
+        message.error = Some(preview_value(error, limit));
+    }
+    message
+}
+
+pub(crate) fn dedupe_records(records: Vec<MessageRecord>) -> Vec<MessageRecord> {
+    let mut ordered: Vec<MessageRecord> = Vec::with_capacity(records.len());
+    let mut by_id: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::with_capacity(records.len());
+    for record in records {
+        match by_id.get(&record.id) {
+            Some(&pos) => ordered[pos] = record,
+            None => {
+                by_id.insert(record.id.clone(), ordered.len());
+                ordered.push(record);
+            }
+        }
+    }
+    ordered
+}
+
+pub(crate) fn record_index_text(record: &MessageRecord) -> Option<String> {
+    if record.role == "tool" {
+        return None;
+    }
+    let text = record
+        .blocks
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|block| {
+            (block.get("type").and_then(Value::as_str) == Some("text"))
+                .then(|| block.get("text").and_then(Value::as_str))
+                .flatten()
+        })
+        .collect::<String>();
+    (!text.is_empty()).then_some(text)
+}
+
+fn collect_tool_call_ids(records: &[MessageRecord]) -> std::collections::HashMap<String, String> {
+    let mut ids = std::collections::HashMap::new();
+    for record in records {
+        let Some(blocks) = record.blocks.as_array() else {
+            continue;
+        };
+        for block in blocks {
+            let Some(object) = block.as_object() else {
+                continue;
+            };
+            for key in ["callId", "toolCallId"] {
+                if let Some(id) = object.get(key).and_then(Value::as_str) {
+                    ids.entry(id.to_string())
+                        .or_insert_with(|| Uuid::new_v4().to_string());
+                }
+            }
+        }
+    }
+    ids
+}
+
+fn clone_records_for_fork(
+    records: Vec<MessageRecord>,
+) -> (
+    Vec<MessageRecord>,
+    std::collections::HashMap<String, String>,
+    std::collections::HashMap<String, String>,
+) {
+    let records = dedupe_records(records);
+    let tool_call_ids = collect_tool_call_ids(&records);
+    let message_ids = records
+        .iter()
+        .map(|record| (record.id.clone(), Uuid::new_v4().to_string()))
+        .collect::<std::collections::HashMap<_, _>>();
+    let cloned = records
+        .into_iter()
+        .map(|mut record| {
+            record.id = message_ids
+                .get(&record.id)
+                .cloned()
+                .unwrap_or_else(|| Uuid::new_v4().to_string());
+            if let Some(meta) = record.meta.as_mut().and_then(Value::as_object_mut) {
+                meta.remove("revisionRootId");
+                meta.remove("revisionCount");
+                meta.remove("activeRevision");
+                if meta.is_empty() {
+                    record.meta = None;
+                }
+            }
+            if let Some(blocks) = record.blocks.as_array_mut() {
+                for block in blocks {
+                    let Some(object) = block.as_object_mut() else {
+                        continue;
+                    };
+                    for key in ["callId", "toolCallId"] {
+                        let Some(old_id) = object.get(key).and_then(Value::as_str) else {
+                            continue;
+                        };
+                        if let Some(new_id) = tool_call_ids.get(old_id) {
+                            object.insert(key.to_string(), json!(new_id));
+                        }
+                    }
+                    // Review snapshots are owned by the source session's
+                    // workspace. Keep the copied diff evidence visible, but
+                    // prevent a fork from offering a rollback against a
+                    // snapshot it does not own.
+                    if object.get("type").and_then(Value::as_str) == Some("tool_call") {
+                        if let Some(review) = object
+                            .get_mut("result")
+                            .and_then(Value::as_object_mut)
+                            .and_then(|result| result.get_mut("details"))
+                            .and_then(Value::as_object_mut)
+                            .and_then(|details| details.get_mut("review"))
+                            .and_then(Value::as_object_mut)
+                        {
+                            review.insert("reversible".into(), Value::Bool(false));
+                        }
+                    }
+                }
+            }
+            record
+        })
+        .collect();
+    (cloned, message_ids, tool_call_ids)
+}
+
+fn remap_value_strings(
+    value: &mut Value,
+    replacements: &std::collections::HashMap<String, String>,
+) {
+    match value {
+        Value::String(text) => {
+            if let Some(replacement) = replacements.get(text) {
+                *text = replacement.clone();
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                remap_value_strings(item, replacements);
+            }
+        }
+        Value::Object(object) => {
+            for item in object.values_mut() {
+                remap_value_strings(item, replacements);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn clone_compaction_for_fork(
+    mut compaction: CompactionRecord,
+    message_ids: &std::collections::HashMap<String, String>,
+    tool_call_ids: &std::collections::HashMap<String, String>,
+) -> Option<CompactionRecord> {
+    compaction.first_kept_message_id = compaction
+        .first_kept_message_id
+        .as_ref()
+        .and_then(|id| message_ids.get(id).cloned());
+    compaction.through_message_id = message_ids.get(&compaction.through_message_id)?.clone();
+    compaction.id = Uuid::new_v4().to_string();
+    if let Some(tail) = compaction.retained_tail.as_mut() {
+        remap_value_strings(tail, tool_call_ids);
+    }
+    Some(compaction)
+}
+
+/// Insert one search/index row for a message whose content lives in the
+/// transcript file.
+pub(crate) fn insert_index_row(
+    conn: &rusqlite::Connection,
+    session_id: &str,
+    seq: i64,
+    turn_id: Option<&str>,
+    record: &MessageRecord,
+    text: Option<&str>,
+) -> Result<()> {
+    let mut stmt = conn.prepare_cached(
+        "INSERT INTO messages (
+            id, session_id, turn_id, seq, role, tool_name, is_error, text, created_at
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+    )?;
+    stmt.execute(params![
+        record.id,
+        session_id,
+        turn_id,
+        seq,
+        record.role,
+        record.tool_name,
+        record.is_error,
+        text,
+        ts_to_ms(&record.created_at),
+    ])?;
+    Ok(())
+}
+
+fn recovered_session_title(records: &[MessageRecord]) -> String {
+    let title = records
+        .iter()
+        .find(|record| record.role == "user")
+        .and_then(record_index_text)
+        .map(|text| {
+            text.split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+                .chars()
+                .take(48)
+                .collect::<String>()
+        })
+        .unwrap_or_default();
+    if title.is_empty() {
+        "Recovered session".into()
+    } else {
+        title
+    }
+}
+
+fn insert_recovered_session_row(
+    tx: &rusqlite::Transaction<'_>,
+    session_id: &str,
+    title: &str,
+    last_seq: i64,
+    created_at: i64,
+    updated_at: i64,
+) -> Result<()> {
+    tx.prepare_cached(
+        "INSERT INTO sessions (
+            id, title, last_seq, thinking_level, permission_mode, created_at, updated_at
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+    )?
+    .execute(params![
+        session_id,
+        title,
+        last_seq,
+        default_thinking_level(),
+        default_permission_mode(),
+        created_at,
+        updated_at
+    ])?;
+    Ok(())
+}
+
+/// Restore a missing sessions row (and its search index) from an orphaned
+/// JSONL transcript. Returns true when a row was inserted (D318).
+pub fn restore_orphaned_session(db: &Database, session_id: &str) -> Result<bool> {
+    if session_created_at(db, session_id).is_ok() {
+        return Ok(false);
+    }
+    let path = transcripts::transcript_path(db.data_dir(), session_id)?;
+    if !path.exists() {
+        return Ok(false);
+    }
+    let read = transcripts::read_transcript_with_compactions(db.data_dir(), session_id)?;
+    let mut records = dedupe_records(read.messages);
+    let mut remapped = false;
+    for record in &mut records {
+        if let Some(owner) = message_owner(db, &record.id)? {
+            if owner != session_id {
+                record.id = namespaced_message_id(session_id, &record.id);
+                remapped = true;
+            }
+        }
+    }
+    if remapped {
+        let header = records
+            .first()
+            .map(|record| record.created_at.clone())
+            .unwrap_or_else(|| ms_to_ts(now_ms()));
+        transcripts::write_transcript_with_compactions(
+            db.data_dir(),
+            session_id,
+            &header,
+            &records,
+            &read.compactions,
+        )?;
+        invalidate_transcript_layout(session_id);
+    }
+    let created_at = records
+        .first()
+        .map(|record| ts_to_ms(&record.created_at))
+        .unwrap_or_else(now_ms);
+    let updated_at = records
+        .last()
+        .map(|record| ts_to_ms(&record.created_at))
+        .unwrap_or(created_at);
+    let title = recovered_session_title(&records);
+    let conn = db.conn();
+    let tx = conn.unchecked_transaction()?;
+    insert_recovered_session_row(
+        &tx,
+        session_id,
+        &title,
+        records.len() as i64,
+        created_at,
+        updated_at,
+    )?;
+    for (seq, record) in records.iter().enumerate() {
+        insert_index_row(
+            &tx,
+            session_id,
+            seq as i64,
+            None,
+            record,
+            record_index_text(record).as_deref(),
+        )?;
+    }
+    tx.commit()?;
+    tracing::info!(
+        %session_id,
+        messages = records.len(),
+        "restored orphaned session row from transcript"
+    );
+    Ok(true)
+}
+
+/// Boot sweep: every live transcript whose sessions row is gone is reinserted
+/// so the sidebar and the persistence outbox can see it again (D318).
+pub fn recover_orphaned_sessions(db: &Database) -> Result<usize> {
+    let mut restored = 0;
+    for session_id in transcripts::list_transcript_sessions(db.data_dir())? {
+        match restore_orphaned_session(db, &session_id) {
+            Ok(true) => restored += 1,
+            Ok(false) => {}
+            Err(error) => {
+                tracing::warn!(%session_id, %error, "orphaned session restore failed");
+            }
+        }
+    }
+    Ok(restored)
+}
+
+fn ensure_session_for_append(db: &Database, session_id: &str) -> Result<String> {
+    match session_created_at(db, session_id) {
+        Ok(created) => Ok(created),
+        Err(error) if error.to_string().starts_with("session not found") => {
+            if restore_orphaned_session(db, session_id)? {
+                return session_created_at(db, session_id);
+            }
+            let now = now_ms();
+            let conn = db.conn();
+            let tx = conn.unchecked_transaction()?;
+            insert_recovered_session_row(&tx, session_id, "Recovered session", 0, now, now)?;
+            tx.commit()?;
+            tracing::warn!(
+                %session_id,
+                "recreated missing session row so a persistence outbox can drain"
+            );
+            session_created_at(db, session_id)
+        }
+        Err(error) => Err(error),
+    }
+}
+
+/// The session's created_at (RFC3339, used as the transcript header stamp) —
+/// doubles as the existence check before any transcript file is touched.
+fn session_created_at(db: &Database, session_id: &str) -> Result<String> {
+    let ms: Option<i64> = db
+        .conn()
+        .prepare_cached("SELECT created_at FROM sessions WHERE id = ?1")?
+        .query_row(params![session_id], |r| r.get(0))
+        .optional()?;
+    ms.map(ms_to_ts)
+        .ok_or_else(|| anyhow!("session not found: {session_id}"))
+}
+
+const SUMMARY_SELECT: &str =
+    "SELECT s.id, s.title, s.last_seq, p.path, s.model_id, s.provider_id, s.mode,
+            s.thinking_level, s.permission_mode, s.updated_at, s.created_at
+     FROM sessions s LEFT JOIN projects p ON p.id = s.project_id
+     WHERE s.deleted_at IS NULL";
+
+pub(crate) fn summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionSummary> {
+    Ok(SessionSummary {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        message_count: row.get(2)?,
+        project_path: row.get(3)?,
+        model_id: row.get(4)?,
+        provider_id: row.get(5)?,
+        mode: row.get(6)?,
+        thinking_level: row.get(7)?,
+        permission_mode: row.get(8)?,
+        updated_at: ms_to_ts(row.get(9)?),
+        created_at: ms_to_ts(row.get(10)?),
+    })
+}
+
+// ---- sessions ---------------------------------------------------------------
+
+fn first_user_title(db: &Database, session_id: &str) -> Result<Option<String>> {
+    let mut stmt = db.conn().prepare_cached(
+        "SELECT text FROM messages
+         WHERE session_id = ?1 AND role = 'user' AND text IS NOT NULL
+         ORDER BY seq ASC LIMIT 1",
+    )?;
+    let content: Option<String> = stmt
+        .query_row(params![session_id], |row| row.get(0))
+        .optional()?;
+    Ok(content.and_then(|c| {
+        let t = c.trim().replace('\n', " ");
+        let t = t.split_whitespace().collect::<Vec<_>>().join(" ");
+        if t.is_empty() {
+            None
+        } else {
+            let mut out = t.chars().take(48).collect::<String>();
+            if t.chars().count() > 48 {
+                out.push('…');
+            }
+            Some(out)
+        }
+    }))
+}
+
+pub fn list_sessions(db: &Database) -> Result<Vec<SessionSummary>> {
+    let sql = format!("{SUMMARY_SELECT} ORDER BY s.updated_at DESC");
+    let mut stmt = db.conn().prepare_cached(&sql)?;
+    let rows = stmt.query_map([], summary_from_row)?;
+    let mut out = Vec::new();
+    for row in rows {
+        let mut session = row?;
+        if is_default_title(&session.title) {
+            if let Some(title) = first_user_title(db, &session.id)? {
+                // Persist so Recents stays stable across restarts.
+                let _ = rename_session(db, &session.id, &title);
+                session.title = title;
+            }
+        }
+        out.push(session);
+    }
+    Ok(out)
+}
+
+/// Backwards-compatible session constructor.  New callers that need an
+/// explicit thinking level should use [`create_session_with_thinking`].
+pub fn create_session(
+    db: &Database,
+    title: Option<String>,
+    mode: Option<String>,
+    provider_id: Option<String>,
+    model_id: Option<String>,
+    project_path: Option<String>,
+) -> Result<SessionSummary> {
+    create_session_with_thinking(db, title, mode, provider_id, model_id, project_path, None)
+}
+
+/// Inputs for creating a durable session. Keeping the optional permission mode
+/// in this value lets the host validate and persist the full configuration in
+/// one database operation without widening the legacy constructor signature.
+#[derive(Debug, Default)]
+pub struct SessionCreateOptions {
+    pub title: Option<String>,
+    pub mode: Option<String>,
+    pub provider_id: Option<String>,
+    pub model_id: Option<String>,
+    pub project_path: Option<String>,
+    pub thinking_level: Option<String>,
+    pub permission_mode: Option<String>,
+}
+
+pub fn create_session_with_thinking(
+    db: &Database,
+    title: Option<String>,
+    mode: Option<String>,
+    provider_id: Option<String>,
+    model_id: Option<String>,
+    project_path: Option<String>,
+    thinking_level: Option<String>,
+) -> Result<SessionSummary> {
+    create_session_with_options(
+        db,
+        SessionCreateOptions {
+            title,
+            mode,
+            provider_id,
+            model_id,
+            project_path,
+            thinking_level,
+            permission_mode: None,
+        },
+    )
+}
+
+/// Create a session with all optional configuration applied atomically.
+///
+/// Omitting `permission_mode` preserves the historical `inherit` default. The
+/// extra input is used by trusted desktop orchestration so a new worker can be
+/// created with its parent's permission ceiling in the same host transaction.
+pub fn create_session_with_options(
+    db: &Database,
+    options: SessionCreateOptions,
+) -> Result<SessionSummary> {
+    let SessionCreateOptions {
+        title,
+        mode,
+        provider_id,
+        model_id,
+        project_path,
+        thinking_level,
+        permission_mode,
+    } = options;
+    let now = now_ms();
+    let id = Uuid::new_v4().to_string();
+    let title = title.unwrap_or_else(|| "New task".into());
+    let mode = normalize_mode(mode.as_deref());
+    let thinking_level = thinking_level.unwrap_or_else(default_thinking_level);
+    validate_thinking_level(&thinking_level)?;
+    let permission_mode = permission_mode.unwrap_or_else(default_permission_mode);
+    validate_permission_mode(&permission_mode)?;
+    let project_id = match project_path
+        .as_deref()
+        .filter(|path| !path.trim().is_empty())
+    {
+        Some(path) => Some(db.ensure_project(path, false)?),
+        None => None,
+    };
+    let project_path = match project_id {
+        Some(id) => db.project_path(id)?,
+        None => None,
+    };
+    db.conn()
+        .prepare_cached(
+            "INSERT INTO sessions (
+                id, title, project_id, provider_id, model_id, mode, thinking_level,
+                permission_mode, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)",
+        )?
+        .execute(params![
+            id,
+            title,
+            project_id,
+            provider_id,
+            model_id,
+            mode,
+            thinking_level,
+            permission_mode,
+            now
+        ])?;
+    Ok(SessionSummary {
+        id,
+        title,
+        message_count: 0,
+        project_path,
+        model_id,
+        provider_id,
+        mode,
+        thinking_level,
+        permission_mode,
+        updated_at: ms_to_ts(now),
+        created_at: ms_to_ts(now),
+    })
+}
+
+/// The persisted per-session permission mode, or None for unknown sessions.
+pub fn session_permission_mode(db: &Database, id: &str) -> Result<Option<String>> {
+    Ok(db
+        .conn()
+        .prepare_cached("SELECT permission_mode FROM sessions WHERE id = ?1")?
+        .query_row(params![id], |row| row.get(0))
+        .optional()?)
+}
+
+/// Resolve the durable operating mode for authorization. Unknown sessions
+/// return None so callers can fail closed instead of trusting sidecar input.
+pub fn session_mode(db: &Database, id: &str) -> Result<Option<String>> {
+    Ok(db
+        .conn()
+        .prepare_cached("SELECT mode FROM sessions WHERE id = ?1")?
+        .query_row(params![id], |row| row.get::<_, String>(0))
+        .optional()?
+        .map(|mode| normalize_mode(Some(&mode))))
+}
+
+/// Process-wide cache of transcript layouts, keyed by session id.
+///
+/// The layout is derived data: it can always be rebuilt by scanning the file,
+/// and `file_len` makes a stale entry detectable. Caching it turns a repeated
+/// session open, and each older page, into a bounded seek-and-parse instead of
+/// another full-history scan.
+static TRANSCRIPT_LAYOUTS: OnceLock<Mutex<HashMap<String, transcripts::TranscriptLayout>>> =
+    OnceLock::new();
+
+fn layout_cache() -> &'static Mutex<HashMap<String, transcripts::TranscriptLayout>> {
+    TRANSCRIPT_LAYOUTS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Return an up-to-date layout for one session, reusing the cached offsets and
+/// scanning only what was appended since.
+pub(crate) fn session_layout(
+    db: &Database,
+    session_id: &str,
+) -> Result<transcripts::TranscriptLayout> {
+    let cached = layout_cache()
+        .lock()
+        .ok()
+        .and_then(|guard| guard.get(session_id).cloned())
+        .unwrap_or_default();
+    let layout = transcripts::refresh_layout(db.data_dir(), session_id, cached)?;
+    if let Ok(mut guard) = layout_cache().lock() {
+        guard.insert(session_id.to_string(), layout.clone());
+    }
+    Ok(layout)
+}
+
+/// Drop a session's cached layout. Called after a rewrite or a delete so the
+/// next read rebuilds from the file rather than trusting stale offsets.
+pub fn invalidate_transcript_layout(session_id: &str) {
+    if let Ok(mut guard) = layout_cache().lock() {
+        guard.remove(session_id);
+    }
+}
+
+pub fn get_session(db: &Database, id: &str) -> Result<Option<SessionDetail>> {
+    get_session_with_options(db, id, SessionReadOptions::default())
+}
+
+/// Load a session detail with an optional renderer-facing message window.
+/// The uncapped default is intentionally retained for the sidecar and for
+/// mutation paths that need the canonical transcript. Renderer callers should
+/// request a bounded tail and a display content limit.
+pub fn get_session_with_options(
+    db: &Database,
+    id: &str,
+    options: SessionReadOptions,
+) -> Result<Option<SessionDetail>> {
+    let sql = format!("{SUMMARY_SELECT} AND s.id = ?1");
+    let summary = db
+        .conn()
+        .prepare_cached(&sql)?
+        .query_row(params![id], summary_from_row)
+        .optional()?;
+    let Some(summary) = summary else {
+        return Ok(None);
+    };
+
+    let (records, compactions, message_start, has_more_before, message_end, has_more_after) =
+        if let Some(raw_limit) = options.message_limit.filter(|limit| *limit > 0) {
+            let limit = raw_limit.min(1_000) as usize;
+            // Window coordinates are physical transcript lines, so they must be
+            // clamped against the file layout rather than against `last_seq`.
+            // The index counter is a deduplicated logical count: a retried
+            // append leaves two lines with one id, and mixing the two spaces
+            // silently dropped the newest messages of a long session.
+            let layout = session_layout(db, id)?;
+            let total = layout.message_count();
+            let before = if let Some(message_id) = options.message_around.as_deref() {
+                let Some(position) =
+                    transcripts::find_message_position(db.data_dir(), id, &layout, message_id)?
+                else {
+                    return Ok(None);
+                };
+                (position + limit / 2 + 1).min(total)
+            } else {
+                match options.message_before {
+                    Some(value) => (value.max(0) as usize).min(total),
+                    None => total,
+                }
+            };
+            let start = before.saturating_sub(limit);
+            let read = transcripts::read_transcript_window_with_layout(
+                db.data_dir(),
+                id,
+                &layout,
+                start,
+                Some(before.saturating_sub(start)),
+            )?;
+            (
+                dedupe_records(read.messages),
+                read.compactions,
+                Some(start as i64),
+                Some(start > 0),
+                Some(before as i64),
+                Some(before < total),
+            )
+        } else {
+            let read = transcripts::read_transcript_with_compactions(db.data_dir(), id)?;
+            (
+                dedupe_records(read.messages),
+                read.compactions,
+                None,
+                None,
+                None,
+                None,
+            )
+        };
+    // Content comes from the transcript file; SQLite only indexes it. A
+    // renderer window may additionally request a display cap so a single
+    // pasted or tool-produced multi-megabyte message never crosses the UI IPC
+    // boundary. The uncapped path remains lossless for model reconstruction.
+    let messages: Vec<UiMessage> = match options.content_limit {
+        Some(limit) => records
+            .into_iter()
+            .map(|record| {
+                // An explicit search jump must retain the focused message's
+                // original text, including hits beyond the normal display cap.
+                // Neighbors and tool payloads keep their presentation limits.
+                let focused = options.message_around.as_deref() == Some(record.id.as_str())
+                    && matches!(record.role.as_str(), "user" | "assistant");
+                let content = focused.then(|| record_index_text(&record)).flatten();
+                let mut message = record_to_ui_for_display(record, limit);
+                if let Some(content) = content {
+                    message.content = content;
+                }
+                message
+            })
+            .collect(),
+        None => records.into_iter().map(record_to_ui).collect(),
+    };
+    let parent_call_id = options.message_around.as_deref().and_then(|target| {
+        messages
+            .iter()
+            .find(|message| message.id == target)
+            .and_then(|message| message.parent_tool_call_id.as_deref())
+    });
+    let navigation_parent = match parent_call_id {
+        Some(call_id) => {
+            transcripts::read_tool_call(db.data_dir(), id, &session_layout(db, id)?, call_id)?.map(
+                |record| match options.content_limit {
+                    Some(limit) => record_to_ui_for_display(record, limit),
+                    None => record_to_ui(record),
+                },
+            )
+        }
+        None => None,
+    };
+    Ok(Some(SessionDetail {
+        summary,
+        navigation_parent,
+        message_start,
+        message_end,
+        has_more_after,
+        has_more_before,
+        messages,
+        compaction: compactions.last().cloned(),
+        compactions,
+    }))
+}
+
+/// Create an independent session from the source session's current canonical
+/// transcript. Regenerate revisions, turns, artifacts, notifications, scratch
+/// data, and live runtime state are intentionally not copied.
+pub enum ForkSessionResult {
+    Created(Box<SessionDetail>),
+    NotFound,
+    Busy,
+}
+
+/// Whether the session currently owns a running turn.
+///
+/// A running turn owns its project's instructions, tools, and working
+/// directory, so an operation that crosses that boundary (fork, move, or the
+/// bulk delete of a project) is refused for as long as the turn lasts.
+pub fn session_has_running_turn(db: &Database, id: &str) -> Result<bool> {
+    let running: bool = db.conn().query_row(
+        "SELECT EXISTS(
+            SELECT 1 FROM turns WHERE session_id = ?1 AND status = 'running'
+         )",
+        params![id],
+        |row| row.get(0),
+    )?;
+    Ok(running)
+}
+
+/// Create an independent session from the source transcript, optionally
+/// stopping after one message. Message-scoped forks use this to keep later
+/// turns out of the child while preserving the same cache/runtime isolation as
+/// a full session fork.
+pub fn fork_session_through(
+    db: &Database,
+    source_id: &str,
+    title: Option<&str>,
+    through_message_id: Option<&str>,
+) -> Result<ForkSessionResult> {
+    let Some(source) = get_session(db, source_id)? else {
+        return Ok(ForkSessionResult::NotFound);
+    };
+    if session_has_running_turn(db, source_id)? {
+        return Ok(ForkSessionResult::Busy);
+    }
+    let mut source_records =
+        dedupe_records(transcripts::read_transcript(db.data_dir(), source_id)?);
+    if let Some(message_id) = through_message_id
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        let Some(position) = source_records
+            .iter()
+            .position(|record| record.id == message_id)
+        else {
+            return Ok(ForkSessionResult::NotFound);
+        };
+        source_records.truncate(position + 1);
+    }
+    let source_compactions = transcripts::read_compactions(db.data_dir(), source_id)?;
+    let (records, message_ids, tool_call_ids) = clone_records_for_fork(source_records);
+    // Each checkpoint is remapped on its own: a message-scoped fork can cut the
+    // anchor of a later checkpoint while the earlier ones stay intact.
+    let compactions: Vec<CompactionRecord> = source_compactions
+        .into_iter()
+        .filter_map(|record| clone_compaction_for_fork(record, &message_ids, &tool_call_ids))
+        .collect();
+    let texts = records.iter().map(record_index_text).collect::<Vec<_>>();
+    let id = Uuid::new_v4().to_string();
+    let now = now_ms();
+    let created_at = ms_to_ts(now);
+    let requested_title = title.map(str::trim).filter(|value| !value.is_empty());
+    let title = requested_title
+        .map(|value| value.chars().take(100).collect::<String>())
+        .unwrap_or_else(|| format!("{} (branch)", source.summary.title));
+
+    invalidate_transcript_layout(&id);
+    transcripts::write_transcript_with_compactions(
+        db.data_dir(),
+        &id,
+        &created_at,
+        &records,
+        &compactions,
+    )?;
+    let indexed = (|| -> Result<()> {
+        let tx = db.conn().unchecked_transaction()?;
+        let inserted = tx
+            .prepare_cached(
+                "INSERT INTO sessions (
+                    id, title, project_id, provider_id, model_id, mode, thinking_level,
+                    permission_mode, source, pinned, last_seq, created_at, updated_at
+                 )
+                 SELECT ?1, ?2, project_id, provider_id, model_id, mode, thinking_level,
+                        permission_mode, NULL, 0, ?3, ?4, ?4
+                 FROM sessions WHERE id = ?5",
+            )?
+            .execute(params![id, title, records.len() as i64, now, source_id])?;
+        if inserted == 0 {
+            return Err(anyhow!("session not found: {source_id}"));
+        }
+        for (seq, record) in records.iter().enumerate() {
+            insert_index_row(&tx, &id, seq as i64, None, record, texts[seq].as_deref())?;
+        }
+        tx.commit()?;
+        Ok(())
+    })();
+    if let Err(error) = indexed {
+        invalidate_transcript_layout(&id);
+        transcripts::remove_session_files(db.data_dir(), &id);
+        return Err(error);
+    }
+
+    let summary = SessionSummary {
+        id,
+        title,
+        message_count: records.len() as i64,
+        project_path: source.summary.project_path,
+        model_id: source.summary.model_id,
+        provider_id: source.summary.provider_id,
+        mode: source.summary.mode,
+        thinking_level: source.summary.thinking_level,
+        permission_mode: source.summary.permission_mode,
+        updated_at: created_at.clone(),
+        created_at,
+    };
+    let messages = records.into_iter().map(record_to_ui).collect();
+    Ok(ForkSessionResult::Created(Box::new(SessionDetail {
+        summary,
+        navigation_parent: None,
+        message_start: None,
+        message_end: None,
+        has_more_after: None,
+        has_more_before: None,
+        messages,
+        compaction: compactions.last().cloned(),
+        compactions,
+    })))
+}
+
+/// Backwards-compatible configurator.  Omitting the thinking level preserves
+/// the current persisted value.
+#[allow(dead_code)]
+pub fn configure_session(
+    db: &Database,
+    id: &str,
+    mode: &str,
+    provider_id: Option<&str>,
+    model_id: Option<&str>,
+) -> Result<Option<SessionSummary>> {
+    configure_session_with_thinking(db, id, mode, provider_id, model_id, None, None)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn configure_session_with_thinking(
+    db: &Database,
+    id: &str,
+    mode: &str,
+    provider_id: Option<&str>,
+    model_id: Option<&str>,
+    thinking_level: Option<&str>,
+    permission_mode: Option<&str>,
+) -> Result<Option<SessionSummary>> {
+    if !(is_valid_mode(mode) || mode == "chat") {
+        return Err(anyhow!("mode must be plan or agent"));
+    }
+    let mode = normalize_mode(Some(mode));
+    if let Some(level) = thinking_level {
+        validate_thinking_level(level)?;
+    }
+    if let Some(mode) = permission_mode {
+        validate_permission_mode(mode)?;
+    }
+    crate::plans::gate_session_configure(
+        db,
+        id,
+        &mode,
+        provider_id,
+        model_id,
+        thinking_level,
+        permission_mode,
+    )?;
+    let changed = db
+        .conn()
+        .prepare_cached(
+            "UPDATE sessions
+             SET mode = ?2, provider_id = COALESCE(?3, provider_id),
+                 model_id = COALESCE(?4, model_id),
+                 thinking_level = COALESCE(?5, thinking_level),
+                 permission_mode = COALESCE(?6, permission_mode), updated_at = ?7
+             WHERE id = ?1",
+        )?
+        .execute(params![
+            id,
+            mode,
+            provider_id,
+            model_id,
+            thinking_level,
+            permission_mode,
+            now_ms()
+        ])?;
+    if changed == 0 {
+        return Ok(None);
+    }
+    Ok(get_session(db, id)?.map(|detail| detail.summary))
+}
+
+pub fn delete_session(db: &Database, id: &str) -> Result<bool> {
+    let n = db
+        .conn()
+        .prepare_cached("DELETE FROM sessions WHERE id = ?1")?
+        .execute(params![id])?;
+    if n > 0 {
+        // Here rather than in the RPC handler so every deletion path (UI,
+        // failed scheduled-run cleanup) also drops the transcript files.
+        invalidate_transcript_layout(id);
+        transcripts::remove_session_files(db.data_dir(), id);
+    }
+    Ok(n > 0)
+}
+
+pub fn normalize_session_title(title: &str) -> Result<String> {
+    let title = title.trim();
+    if title.is_empty() {
+        return Err(anyhow!("session title must not be empty"));
+    }
+    if title.chars().count() > MAX_SESSION_TITLE_CHARS {
+        return Err(anyhow!(
+            "session title must be at most {MAX_SESSION_TITLE_CHARS} characters"
+        ));
+    }
+    Ok(title.to_string())
+}
+
+pub fn rename_session(db: &Database, id: &str, title: &str) -> Result<bool> {
+    let title = normalize_session_title(title)?;
+    let n = db
+        .conn()
+        .prepare_cached("UPDATE sessions SET title = ?1 WHERE id = ?2")?
+        .execute(params![title, id])?;
+    Ok(n > 0)
+}
+
+/// Outcome of moving a session to a different project.
+pub enum MoveSessionProjectResult {
+    Moved(Box<SessionSummary>),
+    NotFound,
+    Busy,
+}
+
+/// Move an idle session to another project.
+///
+/// Only the session's project association and `updated_at` change: transcript,
+/// revisions, artifacts, notifications, scratch data, and runtime state belong
+/// to the session rather than the project and stay untouched. A session with a
+/// running turn is rejected so a live agent never switches instruction roots
+/// mid-turn.
+pub fn move_session_project(
+    db: &Database,
+    id: &str,
+    project_path: &str,
+) -> Result<MoveSessionProjectResult> {
+    if get_session(db, id)?.is_none() {
+        return Ok(MoveSessionProjectResult::NotFound);
+    }
+    if session_has_running_turn(db, id)? {
+        return Ok(MoveSessionProjectResult::Busy);
+    }
+    let project_id = db.ensure_project(project_path, false)?;
+    db.conn()
+        .prepare_cached("UPDATE sessions SET project_id = ?1, updated_at = ?2 WHERE id = ?3")?
+        .execute(params![project_id, now_ms(), id])?;
+    let Some(moved) = get_session(db, id)? else {
+        return Ok(MoveSessionProjectResult::NotFound);
+    };
+    Ok(MoveSessionProjectResult::Moved(Box::new(moved.summary)))
+}
+
+/// Per-message records plus their extracted index text, in input order.
+fn records_and_texts(messages: &[UiMessage]) -> (Vec<MessageRecord>, Vec<Option<String>>) {
+    let mut records = Vec::with_capacity(messages.len());
+    let mut texts = Vec::with_capacity(messages.len());
+    for message in messages {
+        let (record, text) = ui_to_record(message);
+        records.push(record);
+        texts.push(text);
+    }
+    (records, texts)
+}
+
+pub fn append_message(
+    db: &Database,
+    session_id: &str,
+    message: &UiMessage,
+    turn_id: Option<&str>,
+) -> Result<()> {
+    let message = crate::session_collaboration::prepare_append(db, session_id, message, turn_id)?;
+    let session_created = ensure_session_for_append(db, session_id)?;
+    let (mut record, text) = ui_to_record(&message);
+    // Electron may replay an outbox entry after a host restart. Message ids
+    // are globally unique, so an existing row in this session is already the
+    // durable result. Provider toolCallIds are not globally unique: a collision
+    // with another session is remapped before any transcript write (D444).
+    // A steering input reserves its preceding streaming assistant's position;
+    // only a terminal assistant snapshot may replace that provisional row.
+    if message_indexed(db, session_id, &record.id)? {
+        if message.role == "assistant"
+            && message.status.as_deref() != Some("streaming")
+            && streaming_assistant_indexed(db, session_id, &record.id)?
+        {
+            invalidate_transcript_layout(session_id);
+            if !transcripts::update_message(db.data_dir(), session_id, &record)? {
+                return Err(anyhow!(
+                    "streaming assistant is missing from its transcript"
+                ));
+            }
+            db.conn().execute(
+                "UPDATE messages SET text = ?3, is_error = ?4 WHERE session_id = ?1 AND id = ?2",
+                params![session_id, record.id, text, record.is_error],
+            )?;
+        } else {
+            return Ok(());
+        }
+    } else {
+        if let Some(owner) = message_owner(db, &record.id)? {
+            if owner != session_id {
+                let original_id = record.id.clone();
+                record.id = namespaced_message_id(session_id, &record.id);
+                if message_indexed(db, session_id, &record.id)? {
+                    return Ok(());
+                }
+                // Old hosts wrote JSONL then failed UNIQUE. Replaying that
+                // leftover must not append a second remapped line (D444).
+                if transcript_contains_id(db, session_id, &original_id)? {
+                    return Ok(());
+                }
+            } else {
+                return Ok(());
+            }
+        }
+        append_record(
+            db,
+            session_id,
+            &session_created,
+            &record,
+            text.as_deref(),
+            turn_id,
+        )?;
+    }
+    if message.role == "assistant" && message.status.as_deref() == Some("streaming") {
+        // Even an empty reservation needs a checkpoint so a crash can settle
+        // it as aborted. Later stream checkpoints replace this snapshot.
+        let existing = transcripts::read_inflight(db.data_dir(), session_id)?;
+        if existing.as_ref().is_none_or(|checkpoint| {
+            ts_to_ms(&checkpoint.message.created_at) < ts_to_ms(&record.created_at)
+        }) {
+            transcripts::write_inflight(
+                db.data_dir(),
+                session_id,
+                &transcripts::InflightRecord {
+                    schema: transcripts::INFLIGHT_SCHEMA,
+                    session_id: session_id.to_string(),
+                    turn_id: turn_id.map(str::to_string),
+                    saved_at: ms_to_ts(now_ms()),
+                    message: record,
+                },
+            )?;
+        }
+        return Ok(());
+    }
+    // The final assistant row supersedes any checkpoint of the same message
+    // (D299). A checkpoint for a different id belongs to a newer fragment and
+    // stays until its own final row or the turn end settles it.
+    if record.role == "assistant" {
+        if let Some(inflight) = transcripts::read_inflight(db.data_dir(), session_id)? {
+            if inflight.message.id == record.id {
+                transcripts::remove_inflight(db.data_dir(), session_id)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Whether the session's index already carries `message_id`.
+fn message_indexed(db: &Database, session_id: &str, message_id: &str) -> Result<bool> {
+    let existing: Option<i64> = db
+        .conn()
+        .query_row(
+            "SELECT mid FROM messages WHERE id = ?1 AND session_id = ?2",
+            params![message_id, session_id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    Ok(existing.is_some())
+}
+
+/// Session that currently owns this globally unique message id, if any.
+fn message_owner(db: &Database, message_id: &str) -> Result<Option<String>> {
+    let owner: Option<String> = db
+        .conn()
+        .query_row(
+            "SELECT session_id FROM messages WHERE id = ?1",
+            params![message_id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    Ok(owner)
+}
+
+fn namespaced_message_id(session_id: &str, message_id: &str) -> String {
+    format!("{session_id}:{message_id}")
+}
+
+fn transcript_contains_id(db: &Database, session_id: &str, message_id: &str) -> Result<bool> {
+    Ok(transcripts::read_transcript(db.data_dir(), session_id)?
+        .iter()
+        .any(|record| record.id == message_id))
+}
+
+fn streaming_assistant_indexed(db: &Database, session_id: &str, message_id: &str) -> Result<bool> {
+    let layout = session_layout(db, session_id)?;
+    let mut end = layout.message_count();
+    while end > 0 {
+        let start = end.saturating_sub(64);
+        let window = transcripts::read_transcript_window_with_layout(
+            db.data_dir(),
+            session_id,
+            &layout,
+            start,
+            Some(end - start),
+        )?;
+        if let Some(record) = window
+            .messages
+            .iter()
+            .rev()
+            .find(|record| record.id == message_id)
+        {
+            return Ok(record.role == "assistant"
+                && record
+                    .meta
+                    .as_ref()
+                    .and_then(|meta| meta.get("status"))
+                    .and_then(Value::as_str)
+                    == Some("streaming"));
+        }
+        end = start;
+    }
+    Ok(false)
+}
+
+/// Append one canonical record: transcript line first, then the index row.
+fn append_record(
+    db: &Database,
+    session_id: &str,
+    session_created: &str,
+    record: &MessageRecord,
+    text: Option<&str>,
+    turn_id: Option<&str>,
+) -> Result<()> {
+    // File first: the transcript is the source of truth. A crash before the
+    // index commit costs one derived row (self-healed by the next rewrite),
+    // never message content.
+    transcripts::append_message(db.data_dir(), session_id, session_created, record)?;
+    let conn = db.conn();
+    let tx = conn.unchecked_transaction()?;
+    let now = now_ms();
+    let seq: Option<i64> = tx
+        .prepare_cached(
+            "UPDATE sessions SET last_seq = last_seq + 1, updated_at = ?2
+             WHERE id = ?1 RETURNING last_seq",
+        )?
+        .query_row(params![session_id, now], |r| r.get(0))
+        .optional()?;
+    let Some(seq) = seq else {
+        return Err(anyhow!("session not found: {session_id}"));
+    };
+    insert_index_row(&tx, session_id, seq - 1, turn_id, record, text)?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// Checkpoint the assistant message currently streaming for `session_id`
+/// (D299). The checkpoint is a single atomically replaced file beside the
+/// transcript, never a transcript line, so a long reply does not bloat the
+/// file with one copy per checkpoint. An empty message is not worth keeping;
+/// a message whose final row already landed must not be resurrected by a
+/// checkpoint that was still in flight when the row was appended.
+pub fn save_inflight_message(
+    db: &Database,
+    session_id: &str,
+    turn_id: Option<&str>,
+    message: &UiMessage,
+) -> Result<bool> {
+    session_created_at(db, session_id)?;
+    if message.role != "assistant" {
+        return Err(anyhow!("in-flight checkpoint must be an assistant message"));
+    }
+    let has_text = !message.content.trim().is_empty()
+        || message
+            .thinking
+            .as_deref()
+            .is_some_and(|thinking| !thinking.trim().is_empty());
+    if !has_text {
+        return Ok(false);
+    }
+    if message_indexed(db, session_id, &message.id)?
+        && !streaming_assistant_indexed(db, session_id, &message.id)?
+    {
+        transcripts::remove_inflight(db.data_dir(), session_id)?;
+        return Ok(false);
+    }
+    let (record, _) = ui_to_record(message);
+    transcripts::write_inflight(
+        db.data_dir(),
+        session_id,
+        &transcripts::InflightRecord {
+            schema: transcripts::INFLIGHT_SCHEMA,
+            session_id: session_id.to_string(),
+            turn_id: turn_id.map(str::to_string),
+            saved_at: ms_to_ts(now_ms()),
+            message: record,
+        },
+    )?;
+    Ok(true)
+}
+
+/// Settle the session's in-flight checkpoint once its turn can no longer
+/// finish on its own (D299, D327). The checkpoint is removed when the final
+/// row already landed; otherwise it is promoted into the transcript. A
+/// completed turn whose outbox append never arrived is promoted as
+/// `complete`; every other leftover is `aborted`. Returns the promoted
+/// message so the caller can echo it to the renderer.
+pub fn recover_inflight_message(
+    db: &Database,
+    session_id: &str,
+    include_completed: bool,
+) -> Result<Option<UiMessage>> {
+    let Some(inflight) = transcripts::read_inflight(db.data_dir(), session_id)? else {
+        return Ok(None);
+    };
+    let session_created = match session_created_at(db, session_id) {
+        Ok(created) => created,
+        // The session is gone; its checkpoint was an orphan.
+        Err(_) => {
+            transcripts::remove_inflight(db.data_dir(), session_id)?;
+            return Ok(None);
+        }
+    };
+    let indexed = message_indexed(db, session_id, &inflight.message.id)?;
+    if indexed && !streaming_assistant_indexed(db, session_id, &inflight.message.id)? {
+        transcripts::remove_inflight(db.data_dir(), session_id)?;
+        return Ok(None);
+    }
+    // A leftover checkpoint whose final row never landed is the durable
+    // reply. Boot skips `completed` turns so the outbox can still append the
+    // finished row first (D327). A later pass with `include_completed`
+    // promotes whatever the outbox did not land as `complete`. Mid-stream
+    // loss and sidecar-loss recovery stay aborted.
+    let turn_status: Option<String> = match inflight.turn_id.as_deref() {
+        Some(turn_id) => db
+            .conn()
+            .prepare_cached("SELECT status FROM turns WHERE id = ?1")?
+            .query_row(params![turn_id], |r| r.get(0))
+            .optional()?,
+        None => None,
+    };
+    let completed = turn_status.as_deref() == Some("completed");
+    if completed && !include_completed {
+        return Ok(None);
+    }
+    transcripts::remove_inflight(db.data_dir(), session_id)?;
+    let promoted_status = if completed { "complete" } else { "aborted" };
+    let mut record = inflight.message;
+    let mut meta = match record.meta.take() {
+        Some(Value::Object(map)) => map,
+        _ => serde_json::Map::new(),
+    };
+    meta.insert("status".into(), json!(promoted_status));
+    record.meta = Some(Value::Object(meta));
+    let text = record_index_text(&record);
+    if indexed {
+        append_message(
+            db,
+            session_id,
+            &record_to_ui(record.clone()),
+            inflight.turn_id.as_deref(),
+        )?;
+    } else {
+        append_record(
+            db,
+            session_id,
+            &session_created,
+            &record,
+            text.as_deref(),
+            inflight.turn_id.as_deref(),
+        )?;
+    }
+    Ok(Some(record_to_ui(record)))
+}
+
+/// Boot sweep companion to `Database::boot_maintenance` (D299, D327): every
+/// checkpoint left behind by a quit or crash is promoted or discarded before
+/// the first client request can read its session. A leftover whose turn
+/// already completed is promoted as `complete`.
+pub fn recover_inflight_messages(
+    db: &Database,
+    include_completed: bool,
+) -> Result<Vec<(String, UiMessage)>> {
+    let mut recovered = Vec::new();
+    for session_id in transcripts::list_inflight_sessions(db.data_dir())? {
+        match recover_inflight_message(db, &session_id, include_completed) {
+            Ok(Some(message)) => recovered.push((session_id, message)),
+            Ok(None) => {}
+            Err(error) => {
+                tracing::warn!(%session_id, %error, "in-flight reply recovery failed");
+            }
+        }
+    }
+    Ok(recovered)
+}
+
+pub fn append_compaction(
+    db: &Database,
+    session_id: &str,
+    compaction: &CompactionRecord,
+) -> Result<()> {
+    if compaction.id.trim().is_empty()
+        || compaction.summary.trim().is_empty()
+        || compaction.through_message_id.trim().is_empty()
+        || compaction.tokens_before < 0
+    {
+        return Err(anyhow!("invalid compaction record"));
+    }
+    let session_created = session_created_at(db, session_id)?;
+    transcripts::append_compaction(db.data_dir(), session_id, &session_created, compaction)
+}
+
+fn compaction_valid_for_records(compaction: &CompactionRecord, records: &[MessageRecord]) -> bool {
+    let Some(through_index) = records
+        .iter()
+        .position(|record| record.id == compaction.through_message_id)
+    else {
+        return false;
+    };
+    compaction.first_kept_message_id.as_ref().is_none_or(|id| {
+        records
+            .iter()
+            .position(|record| &record.id == id)
+            .is_some_and(|index| index <= through_index)
+    })
+}
+
+/// Store in full every regenerate family this rewrite is about to drop.
+///
+/// A branch that is still live is referenced rather than copied, so its
+/// reference line only resolves while its root is in the transcript. A rewrite
+/// that removes the root — deleting the turn that owns the family, a regenerate
+/// or edit that cuts a later family away, a revision switch that restores a
+/// prefix from before it — would otherwise leave the file naming a suffix that
+/// no longer exists. Every dropped family is written out first, from `before`,
+/// exactly as a revision switch writes the branch it pages away from.
+///
+/// A rewrite that only shortens a live branch is left alone: the reference then
+/// describes the transcript as the user just made it, which is the same
+/// authority the durable transcript has everywhere else.
+///
+/// `already_stored` names families the caller has just written itself, so the
+/// payload is not written twice.
+fn archive_dropped_live_branches(
+    db: &Database,
+    session_id: &str,
+    before: &[UiMessage],
+    kept: &[UiMessage],
+    already_stored: &[String],
+) -> Result<()> {
+    for root in dropped_revision_roots(db, session_id, kept, already_stored)? {
+        archive_live_branch(db, session_id, &root, before)?;
+    }
+    Ok(())
+}
+
+/// The families indexed for this session whose root `kept` no longer holds: the
+/// branches a rewrite from the current transcript would strand. Index rows only,
+/// so a rewrite that drops nothing pays no transcript read.
+fn dropped_revision_roots(
+    db: &Database,
+    session_id: &str,
+    kept: &[UiMessage],
+    already_stored: &[String],
+) -> Result<Vec<String>> {
+    let conn = db.conn();
+    let mut stmt = conn.prepare_cached(
+        "SELECT DISTINCT root_user_id FROM message_revisions WHERE session_id = ?1",
+    )?;
+    let rows = stmt.query_map(params![session_id], |row| row.get::<_, String>(0))?;
+    let mut dropped = Vec::new();
+    for row in rows {
+        let root = row?;
+        if already_stored.iter().any(|stored| stored == &root) {
+            continue;
+        }
+        if live_branch_start(kept, &root).is_none() {
+            dropped.push(root);
+        }
+    }
+    Ok(dropped)
+}
+
+/// Rewrite a session's whole transcript from `messages`, leaving every
+/// regenerate family the rewrite would drop stored in full.
+pub fn replace_messages(db: &Database, session_id: &str, messages: &[UiMessage]) -> Result<()> {
+    rewrite_transcript(db, session_id, messages, &[])
+}
+
+/// Rewrite the transcript and reseat the index rows.
+///
+/// `already_stored` names families the caller stored on its own way here, so
+/// [`archive_dropped_live_branches`] does not write them a second time.
+fn rewrite_transcript(
+    db: &Database,
+    session_id: &str,
+    messages: &[UiMessage],
+    already_stored: &[String],
+) -> Result<()> {
+    // The guard writes from the OLD transcript, so it has to read it before the
+    // rewrite below replaces it — and only when a family is actually dropped.
+    if !dropped_revision_roots(db, session_id, messages, already_stored)?.is_empty() {
+        if let Some(detail) = get_session(db, session_id)? {
+            archive_dropped_live_branches(
+                db,
+                session_id,
+                &detail.messages,
+                messages,
+                already_stored,
+            )?;
+        }
+    }
+    rewrite_transcript_body(db, session_id, messages)
+}
+
+/// The rewrite itself, with no regard for the revisions the caller drops.
+fn rewrite_transcript_body(db: &Database, session_id: &str, messages: &[UiMessage]) -> Result<()> {
+    let session_created = session_created_at(db, session_id)?;
+    crate::session_collaboration::validate_replacement(db, session_id, messages)?;
+    let (records, texts) = records_and_texts(messages);
+    let compactions: Vec<CompactionRecord> =
+        transcripts::read_compactions(db.data_dir(), session_id)?
+            .into_iter()
+            .filter(|record| compaction_valid_for_records(record, &records))
+            .collect();
+    invalidate_transcript_layout(session_id);
+    transcripts::write_transcript_with_compactions(
+        db.data_dir(),
+        session_id,
+        &session_created,
+        &records,
+        &compactions,
+    )?;
+    let conn = db.conn();
+    // A rewrite reseats every index row, so the turn each surviving message was
+    // produced in has to be carried across it. Dropping it here cost the whole
+    // session its turn/token attribution on any regenerate.
+    let mut owning_turns: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+    {
+        let mut stmt = conn.prepare_cached(
+            "SELECT id, turn_id FROM messages
+             WHERE session_id = ?1 AND turn_id IS NOT NULL",
+        )?;
+        let rows = stmt.query_map(params![session_id], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+        for row in rows {
+            let (id, turn_id) = row?;
+            owning_turns.insert(id, turn_id);
+        }
+    }
+    let tx = conn.unchecked_transaction()?;
+    tx.prepare_cached("DELETE FROM messages WHERE session_id = ?1")?
+        .execute(params![session_id])?;
+    for (seq, record) in records.iter().enumerate() {
+        insert_index_row(
+            &tx,
+            session_id,
+            seq as i64,
+            owning_turns.get(&record.id).map(String::as_str),
+            record,
+            texts[seq].as_deref(),
+        )?;
+    }
+    tx.prepare_cached("UPDATE sessions SET last_seq = ?1, updated_at = ?2 WHERE id = ?3")?
+        .execute(params![records.len() as i64, now_ms(), session_id])?;
+    tx.commit()?;
+    Ok(())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TruncateRevisionMeta {
+    pub root_user_id: String,
+    pub revision_count: i64,
+    pub active_revision: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TruncateFromResult {
+    pub ok: bool,
+    pub kept_count: i64,
+    pub discarded_count: i64,
+    pub aborted_turn_id: Option<String>,
+    pub revision: Option<TruncateRevisionMeta>,
+}
+
+/// Cut the live transcript at a named message (or a count) under the RPC lock.
+///
+/// Regenerating from Electron used to ship the kept prefix back through
+/// `session.replaceMessages`. That JSON-RPC line is one NDJSON record, so an
+/// 80 MB transcript both exceeds the 64 MiB stdin cap and races the 130 s
+/// client deadline. This call reads, archives the discarded tail, and rewrites
+/// the prefix inside host-core. No transcript snapshot crosses the process
+/// boundary.
+pub fn truncate_from(
+    db: &Database,
+    session_id: &str,
+    from_message_id: Option<&str>,
+    truncate_before: Option<i64>,
+) -> Result<TruncateFromResult> {
+    let Some(detail) = get_session(db, session_id)? else {
+        return Err(anyhow!("NOT_FOUND: session not found"));
+    };
+    let messages = detail.messages;
+    let cut = match from_message_id.map(str::trim).filter(|id| !id.is_empty()) {
+        Some(message_id) => messages
+            .iter()
+            .position(|message| message.id == message_id)
+            .ok_or_else(|| anyhow!("NOT_FOUND: truncateFromMessageId is not in this session"))?,
+        None => match truncate_before {
+            Some(count) if count >= 0 => (count as usize).min(messages.len()),
+            Some(_) => {
+                return Err(anyhow!(
+                    "INVALID_PARAMS: truncateBefore must be non-negative"
+                ));
+            }
+            None => {
+                return Err(anyhow!(
+                    "INVALID_PARAMS: fromMessageId or truncateBefore required"
+                ));
+            }
+        },
+    };
+    let discarded = &messages[cut..];
+    if discarded
+        .first()
+        .is_some_and(|message| message.session_message.is_some())
+    {
+        return Err(anyhow!(
+            "PERMISSION_DENIED: session messages cannot be edited or regenerated"
+        ));
+    }
+    let kept = &messages[..cut];
+
+    let aborted_turn_id = abort_running_turn(db, session_id)?;
+    let revision = archive_discarded_regenerate_branch(db, session_id, discarded)?;
+    // The regenerate root's branch is already stored above; every OTHER family
+    // the cut takes away is not, and the guard in `rewrite_transcript` stores
+    // those. Skipping the one that is done keeps it from being written twice.
+    let already_stored: Vec<String> = revision
+        .iter()
+        .map(|meta| meta.root_user_id.clone())
+        .collect();
+    rewrite_transcript(db, session_id, kept, &already_stored)?;
+    let _ = transcripts::remove_inflight(db.data_dir(), session_id);
+    Ok(TruncateFromResult {
+        ok: true,
+        kept_count: kept.len() as i64,
+        discarded_count: discarded.len() as i64,
+        aborted_turn_id,
+        revision,
+    })
+}
+
+fn abort_running_turn(db: &Database, session_id: &str) -> Result<Option<String>> {
+    let turn_id: Option<String> = db
+        .conn()
+        .query_row(
+            "SELECT id FROM turns WHERE session_id = ?1 AND status = 'running'",
+            params![session_id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let Some(turn_id) = turn_id else {
+        return Ok(None);
+    };
+    end_turn_settling(
+        db,
+        &turn_id,
+        "aborted",
+        Some("TURN_ABORTED"),
+        None,
+        false,
+        false,
+    )?;
+    Ok(Some(turn_id))
+}
+
+/// Archive the discarded regenerate tail the way Electron main used to, but
+/// without copying the branch across the JSON-RPC pipe.
+///
+/// The tail is about to be cut out of the transcript, so this always writes the
+/// payload in full: a live reference would stop resolving the moment
+/// `truncate_from` replaces the file.
+fn archive_discarded_regenerate_branch(
+    db: &Database,
+    session_id: &str,
+    discarded: &[UiMessage],
+) -> Result<Option<TruncateRevisionMeta>> {
+    let Some(root_user) = discarded
+        .iter()
+        .find(|message| message.role == "user" && !message.id.trim().is_empty())
+    else {
+        return Ok(None);
+    };
+    if discarded.is_empty() {
+        return Ok(None);
+    }
+    let stable_root = root_user
+        .revision_root_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+        .unwrap_or(root_user.id.as_str())
+        .to_string();
+    let existing = list_message_revisions(db, session_id, &stable_root)?;
+    let stamped = root_user.active_revision.unwrap_or(0);
+    let target = if stamped > 0 {
+        existing
+            .iter()
+            .find(|revision| revision.revision_index == stamped)
+    } else {
+        existing.iter().find(|revision| revision.is_active)
+    };
+    if let Some(target) = target {
+        refresh_message_revision(
+            db,
+            session_id,
+            &stable_root,
+            target.revision_index,
+            discarded,
+        )?;
+    } else {
+        save_message_revision(db, session_id, &stable_root, discarded, false)?;
+    }
+    let count = list_message_revisions(db, session_id, &stable_root)?.len() as i64;
+    Ok(Some(TruncateRevisionMeta {
+        root_user_id: stable_root,
+        revision_count: count + 1,
+        active_revision: count + 1,
+    }))
+}
+
+/// Persist the rollback state on the tool message that owns a review snapshot.
+/// The tool result remains the message-local source of truth after restart.
+pub fn update_tool_review_state(
+    db: &Database,
+    session_id: &str,
+    message_id: &str,
+    snapshot_id: &str,
+    state: &str,
+) -> Result<bool> {
+    let Some(detail) = get_session(db, session_id)? else {
+        return Ok(false);
+    };
+    let mut messages = detail.messages;
+    let mut changed = false;
+    for message in &mut messages {
+        if message.id != message_id || message.role != "tool" {
+            continue;
+        }
+        let Some(tool_result) = message.tool_result.as_mut().and_then(Value::as_object_mut) else {
+            continue;
+        };
+        let Some(details) = tool_result
+            .get_mut("details")
+            .and_then(Value::as_object_mut)
+        else {
+            continue;
+        };
+        let Some(review) = details.get_mut("review").and_then(Value::as_object_mut) else {
+            continue;
+        };
+        if review.get("snapshotId").and_then(Value::as_str) != Some(snapshot_id) {
+            continue;
+        }
+        review.insert("state".into(), Value::String(state.to_string()));
+        changed = true;
+        break;
+    }
+    if changed {
+        replace_messages(db, session_id, &messages)?;
+    }
+    Ok(changed)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageRevisionSummary {
+    pub revision_index: i64,
+    pub is_active: bool,
+    pub created_at: String,
+    pub message_count: i64,
+}
+
+/// Persist a discarded (or current) regenerate branch for a user root turn.
+/// The branch payload goes to the append-only revisions file; SQLite keeps
+/// the index row (identity, ordering, active flag, count).
+pub fn save_message_revision(
+    db: &Database,
+    session_id: &str,
+    root_user_id: &str,
+    messages: &[UiMessage],
+    make_active: bool,
+) -> Result<MessageRevisionSummary> {
+    if root_user_id.trim().is_empty() {
+        return Err(anyhow!("rootUserId required"));
+    }
+    if messages.is_empty() {
+        return Err(anyhow!("messages required"));
+    }
+    let conn = db.conn();
+    let next_index: i64 = conn
+        .query_row(
+            "SELECT COALESCE(MAX(revision_index), 0) + 1
+             FROM message_revisions
+             WHERE session_id = ?1 AND root_user_id = ?2",
+            params![session_id, root_user_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(1);
+    let created = now_ms();
+    let (records, _) = records_and_texts(messages);
+    let turns = owning_turns_for(db, session_id, messages)?;
+    transcripts::append_revision(
+        db.data_dir(),
+        session_id,
+        &RevisionRecord {
+            root_user_id: root_user_id.to_string(),
+            revision_index: next_index,
+            created_at: ms_to_ts(created),
+            messages: records,
+            turns,
+        },
+    )?;
+    let tx = conn.unchecked_transaction()?;
+    if make_active {
+        tx.prepare_cached(
+            "UPDATE message_revisions
+             SET is_active = 0
+             WHERE session_id = ?1 AND root_user_id = ?2",
+        )?
+        .execute(params![session_id, root_user_id])?;
+    }
+    let id = Uuid::new_v4().to_string();
+    tx.prepare_cached(
+        "INSERT INTO message_revisions (
+            id, session_id, root_user_id, revision_index, is_active, message_count, created_at
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+    )?
+    .execute(params![
+        id,
+        session_id,
+        root_user_id,
+        next_index,
+        if make_active { 1 } else { 0 },
+        messages.len() as i64,
+        created
+    ])?;
+    tx.commit()?;
+    Ok(MessageRevisionSummary {
+        revision_index: next_index,
+        is_active: make_active,
+        created_at: ms_to_ts(created),
+        message_count: messages.len() as i64,
+    })
+}
+
+/// Owning turn per message id, for the messages of one branch. The turn is
+/// index-row state, so an archived branch carries it explicitly.
+fn owning_turns_for(
+    db: &Database,
+    session_id: &str,
+    messages: &[UiMessage],
+) -> Result<HashMap<String, String>> {
+    let mut stmt = db.conn().prepare_cached(
+        "SELECT id, turn_id FROM messages
+         WHERE session_id = ?1 AND turn_id IS NOT NULL",
+    )?;
+    let rows = stmt.query_map(params![session_id], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    let mut all: HashMap<String, String> = HashMap::new();
+    for row in rows {
+        let (id, turn_id) = row?;
+        all.insert(id, turn_id);
+    }
+    Ok(messages
+        .iter()
+        .filter_map(|message| {
+            all.remove(&message.id)
+                .map(|turn_id| (message.id.clone(), turn_id))
+        })
+        .collect())
+}
+
+/// Re-archive an existing revision with the branch as it stands now.
+///
+/// A branch keeps growing after its first archive: every later prompt appends
+/// to it, and error-ended turns never reach the agent_end archive at all. The
+/// revisions file is append-only and `read_revision` takes the last record for
+/// a (root, index) pair, so a refresh is one more line plus a count update, and
+/// the DB stamp (identity, ordering, active flag) is untouched.
+pub fn refresh_message_revision(
+    db: &Database,
+    session_id: &str,
+    root_user_id: &str,
+    revision_index: i64,
+    messages: &[UiMessage],
+) -> Result<MessageRevisionSummary> {
+    if messages.is_empty() {
+        return Err(anyhow!("messages required"));
+    }
+    let conn = db.conn();
+    let (is_active, created): (i64, i64) = conn
+        .query_row(
+            "SELECT is_active, created_at FROM message_revisions
+             WHERE session_id = ?1 AND root_user_id = ?2 AND revision_index = ?3",
+            params![session_id, root_user_id, revision_index],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?
+        .ok_or_else(|| anyhow!("revision not found"))?;
+    let (records, _) = records_and_texts(messages);
+    let turns = owning_turns_for(db, session_id, messages)?;
+    transcripts::append_revision(
+        db.data_dir(),
+        session_id,
+        &RevisionRecord {
+            root_user_id: root_user_id.to_string(),
+            revision_index,
+            created_at: ms_to_ts(created),
+            messages: records,
+            turns,
+        },
+    )?;
+    conn.prepare_cached(
+        "UPDATE message_revisions SET message_count = ?4
+         WHERE session_id = ?1 AND root_user_id = ?2 AND revision_index = ?3",
+    )?
+    .execute(params![
+        session_id,
+        root_user_id,
+        revision_index,
+        messages.len() as i64
+    ])?;
+    Ok(MessageRevisionSummary {
+        revision_index,
+        is_active: is_active != 0,
+        created_at: ms_to_ts(created),
+        message_count: messages.len() as i64,
+    })
+}
+
+/// Record a branch that is still live as revision `revision_index` of its user
+/// root, without copying its messages: while the branch is live the transcript
+/// *is* the payload, so the file gets its identity and turn attribution, and
+/// the index row gets the count the pager reads.
+///
+/// The line is written before the index transaction, like every other
+/// transcript write, so a crash between the two costs an index row rather than
+/// content.
+fn save_live_branch_revision(
+    db: &Database,
+    session_id: &str,
+    root_user_id: &str,
+    revision_index: i64,
+    branch: &[UiMessage],
+) -> Result<MessageRevisionSummary> {
+    let conn = db.conn();
+    let existing: Option<(i64, bool)> = conn
+        .query_row(
+            "SELECT created_at, is_active FROM message_revisions
+             WHERE session_id = ?1 AND root_user_id = ?2 AND revision_index = ?3",
+            params![session_id, root_user_id, revision_index],
+            |row| Ok((row.get(0)?, row.get::<_, i64>(1)? != 0)),
+        )
+        .optional()?;
+    let created = existing.map_or_else(now_ms, |(created, _)| created);
+    let is_active = existing.is_none_or(|(_, is_active)| is_active);
+    transcripts::append_live_revision(
+        db.data_dir(),
+        session_id,
+        &transcripts::LiveRevisionRecord {
+            root_user_id: root_user_id.to_string(),
+            revision_index,
+            created_at: ms_to_ts(created),
+        },
+    )?;
+    let tx = conn.unchecked_transaction()?;
+    if existing.is_some() {
+        tx.prepare_cached(
+            "UPDATE message_revisions SET message_count = ?4
+             WHERE session_id = ?1 AND root_user_id = ?2 AND revision_index = ?3",
+        )?
+        .execute(params![
+            session_id,
+            root_user_id,
+            revision_index,
+            branch.len() as i64
+        ])?;
+    } else {
+        tx.prepare_cached(
+            "UPDATE message_revisions SET is_active = 0
+             WHERE session_id = ?1 AND root_user_id = ?2",
+        )?
+        .execute(params![session_id, root_user_id])?;
+        tx.prepare_cached(
+            "INSERT INTO message_revisions (
+                id, session_id, root_user_id, revision_index, is_active, message_count, created_at
+             ) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6)",
+        )?
+        .execute(params![
+            Uuid::new_v4().to_string(),
+            session_id,
+            root_user_id,
+            revision_index,
+            branch.len() as i64,
+            created
+        ])?;
+    }
+    tx.commit()?;
+    Ok(MessageRevisionSummary {
+        revision_index,
+        is_active,
+        created_at: ms_to_ts(created),
+        message_count: branch.len() as i64,
+    })
+}
+
+/// Where a revision family starts in the live transcript: the root itself, or
+/// (after a regenerate gave the live prompt a new id) the first user message
+/// stamped with that family key.
+fn live_branch_start(messages: &[UiMessage], root_user_id: &str) -> Option<usize> {
+    messages
+        .iter()
+        .position(|message| message.id == root_user_id)
+        .or_else(|| {
+            messages.iter().position(|message| {
+                message.role == "user" && message.revision_root_id.as_deref() == Some(root_user_id)
+            })
+        })
+}
+
+/// Write the live branch of `root_user_id` back over the revision it belongs to
+/// before a switch replaces it. Anything appended since the last archive
+/// (later prompts, error-ended turns that never hit agent_end) would otherwise
+/// vanish the moment the user pages away and back.
+///
+/// This is also what turns a live reference back into a stored payload: while
+/// the branch is live the revisions file holds no copy of it, and this call
+/// writes one before the switch below takes the branch away.
+///
+/// Returns the branch start in `live` when the family is present at all.
+fn archive_live_branch(
+    db: &Database,
+    session_id: &str,
+    root_user_id: &str,
+    live: &[UiMessage],
+) -> Result<Option<usize>> {
+    let Some(start) = live_branch_start(live, root_user_id) else {
+        return Ok(None);
+    };
+    let branch = &live[start..];
+    if branch.is_empty() {
+        return Ok(Some(start));
+    }
+    let existing = list_message_revisions(db, session_id, root_user_id)?;
+    // The stamp on the live root names the variant this branch is. It beats
+    // the DB active flag, which only moves on agent_end: after a regenerate
+    // whose turn failed, the DB still points at the previous variant, and
+    // refreshing that would bury the previous branch under this one.
+    let stamped = live[start].active_revision.unwrap_or(0);
+    let target = if stamped > 0 {
+        existing
+            .iter()
+            .find(|revision| revision.revision_index == stamped)
+    } else {
+        existing.iter().find(|revision| revision.is_active)
+    }
+    .map(|revision| revision.revision_index);
+    match target {
+        Some(index) => {
+            refresh_message_revision(db, session_id, root_user_id, index, branch)?;
+        }
+        None => {
+            // Stamped but never archived (or never stamped at all): the live
+            // tail is a variant of its own.
+            save_message_revision(db, session_id, root_user_id, branch, true)?;
+        }
+    }
+    Ok(Some(start))
+}
+
+pub fn list_message_revisions(
+    db: &Database,
+    session_id: &str,
+    root_user_id: &str,
+) -> Result<Vec<MessageRevisionSummary>> {
+    let mut stmt = db.conn().prepare_cached(
+        "SELECT revision_index, is_active, created_at, message_count
+         FROM message_revisions
+         WHERE session_id = ?1 AND root_user_id = ?2
+         ORDER BY revision_index ASC",
+    )?;
+    let rows = stmt.query_map(params![session_id, root_user_id], |row| {
+        Ok(MessageRevisionSummary {
+            revision_index: row.get(0)?,
+            is_active: row.get::<_, i64>(1)? != 0,
+            created_at: ms_to_ts(row.get(2)?),
+            message_count: row.get(3)?,
+        })
+    })?;
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row?);
+    }
+    Ok(out)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActiveRevisionSave {
+    pub root_user_id: String,
+    pub revision_count: i64,
+    pub active_revision: i64,
+    /// False when the branch was already archived and only the stamp was refreshed.
+    pub archived: bool,
+    /// The user root as it now stands on disk, for the renderer's pager.
+    pub root: UiMessage,
+}
+
+/// Archive the branch that just finished as the active revision of its user
+/// root, then stamp that root with the pager metadata.
+///
+/// This exists as one host call on purpose. Doing it from the app process meant
+/// `session.get` -> `session.replaceMessages`, and that round trip raced the
+/// same turn's final assistant message still draining the app's persistence
+/// outbox: the stale snapshot went back to disk and deleted the answer. Here the
+/// read, the archive and the stamp all happen under the RPC lock, and the stamp
+/// rewrites one line instead of the whole transcript.
+///
+/// Returns `None` when the latest user turn owns no regenerate history, which is
+/// every session that was never regenerated.
+pub fn save_active_branch_revision(
+    db: &Database,
+    session_id: &str,
+) -> Result<Option<ActiveRevisionSave>> {
+    let Some(detail) = get_session(db, session_id)? else {
+        return Ok(None);
+    };
+    let mut messages = detail.messages;
+    let Some(root_index) = messages
+        .iter()
+        .rposition(|message| message.role == "user" && message.revision_count.is_some())
+    else {
+        return Ok(None);
+    };
+    let root_user_id = messages[root_index]
+        .revision_root_id
+        .clone()
+        .unwrap_or_else(|| messages[root_index].id.clone());
+
+    let existing = list_message_revisions(db, session_id, &root_user_id)?;
+    let desired_active = messages[root_index].active_revision.unwrap_or(0);
+    let already_archived = existing
+        .iter()
+        .any(|revision| revision.revision_index == desired_active);
+    let branch = &messages[root_index..];
+    // The branch is still live, so the transcript already holds its payload and
+    // this records a reference to it. Refreshing a stored copy here is what made
+    // the file quadratic: the copy grew with the branch, so a session that ran N
+    // turns wrote O(N²) bytes to restate what the transcript already said. A
+    // branch leaves the transcript only through `archive_live_branch` or
+    // `archive_discarded_regenerate_branch`, and both write the full copy first.
+    let mut active = if already_archived {
+        save_live_branch_revision(db, session_id, &root_user_id, desired_active, branch)?;
+        desired_active
+    } else {
+        let next = existing
+            .iter()
+            .map(|revision| revision.revision_index)
+            .max()
+            .unwrap_or(0)
+            + 1;
+        save_live_branch_revision(db, session_id, &root_user_id, next, branch)?;
+        next
+    };
+    let archived = !already_archived;
+    let total = list_message_revisions(db, session_id, &root_user_id)?.len() as i64;
+    if active < 1 {
+        active = total;
+    }
+
+    let root = &mut messages[root_index];
+    root.revision_root_id = Some(root_user_id.clone());
+    root.revision_count = Some(total);
+    root.active_revision = Some(active);
+    let (record, _) = ui_to_record(root);
+    invalidate_transcript_layout(session_id);
+    transcripts::update_message(db.data_dir(), session_id, &record)?;
+    Ok(Some(ActiveRevisionSave {
+        root_user_id,
+        revision_count: total,
+        active_revision: active,
+        archived,
+        root: root.clone(),
+    }))
+}
+
+/// Activate a stored revision: replace the live transcript with prefix + branch.
+/// `prefix` is every message before the root user turn, as the renderer sees
+/// it; the durable transcript wins over it whenever the family is found there.
+pub fn activate_message_revision(
+    db: &Database,
+    session_id: &str,
+    root_user_id: &str,
+    revision_index: i64,
+    prefix: &[UiMessage],
+) -> Result<Vec<UiMessage>> {
+    let session_created = session_created_at(db, session_id)?;
+    {
+        let conn = db.conn();
+        let known: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM message_revisions
+             WHERE session_id = ?1 AND root_user_id = ?2 AND revision_index = ?3",
+            params![session_id, root_user_id, revision_index],
+            |row| row.get(0),
+        )?;
+        if known == 0 {
+            return Err(anyhow!("revision not found"));
+        }
+    }
+    // The switch below throws the live branch away. Archive it first, from the
+    // durable transcript rather than the renderer's copy, so every message that
+    // landed since the last archive survives the round trip.
+    let live = get_session(db, session_id)?
+        .map(|detail| detail.messages)
+        .unwrap_or_default();
+    let live_start = archive_live_branch(db, session_id, root_user_id, &live)?;
+    let prefix: &[UiMessage] = match live_start {
+        Some(start) => &live[..start],
+        None => prefix,
+    };
+
+    let payload =
+        transcripts::read_revision(db.data_dir(), session_id, root_user_id, revision_index)?
+            .ok_or_else(|| anyhow!("revision payload missing from revisions file"))?;
+    let archived_turns = payload.turns().clone();
+    let branch: Vec<UiMessage> = match payload {
+        transcripts::RevisionPayload::Stored(record) => {
+            record.messages.into_iter().map(record_to_ui).collect()
+        }
+        // The branch never left the transcript, so its messages are the live
+        // suffix rooted at its user turn — the same slice `archive_live_branch`
+        // measured one call ago, and the reason no copy of it is on disk.
+        transcripts::RevisionPayload::Live(record) => {
+            // The line names the family it belongs to; the slice below is only
+            // that family's if the two agree.
+            if record.root_user_id != root_user_id || record.revision_index != revision_index {
+                return Err(anyhow!(
+                    "revision payload names {}/{} not {root_user_id}/{revision_index}",
+                    record.root_user_id,
+                    record.revision_index
+                ));
+            }
+            let start = live_start.ok_or_else(|| {
+                anyhow!("revision payload missing from transcript for {root_user_id}")
+            })?;
+            live.get(start..).unwrap_or_default().to_vec()
+        }
+    };
+
+    let conn = db.conn();
+    let total: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM message_revisions
+         WHERE session_id = ?1 AND root_user_id = ?2",
+        params![session_id, root_user_id],
+        |row| row.get(0),
+    )?;
+    // rebuild live messages = prefix + branch
+    let mut combined = Vec::with_capacity(prefix.len() + branch.len());
+    combined.extend_from_slice(prefix);
+    combined.extend(branch);
+    // Stamp revision meta on the branch's user root. After regenerate the live
+    // prompt id may differ from the stable family key, so prefer an exact id
+    // match and fall back to the first user message in the restored branch.
+    let root_pos = combined
+        .iter()
+        .position(|m| m.id == root_user_id)
+        .or_else(|| {
+            combined
+                .iter()
+                .skip(prefix.len())
+                .position(|m| m.role == "user")
+                .map(|rel| prefix.len() + rel)
+        });
+    if let Some(pos) = root_pos {
+        if let Some(root) = combined.get_mut(pos) {
+            root.revision_root_id = Some(root_user_id.to_string());
+            root.revision_count = Some(total);
+            root.active_revision = Some(revision_index);
+        }
+    }
+
+    let (records, texts) = records_and_texts(&combined);
+    // A checkpoint whose anchors survive the switch stays valid; the rest is
+    // dropped with the branch it summarised, exactly as on truncation.
+    let compactions: Vec<CompactionRecord> =
+        transcripts::read_compactions(db.data_dir(), session_id)?
+            .into_iter()
+            .filter(|record| compaction_valid_for_records(record, &records))
+            .collect();
+    // The switch drops everything the restored variant does not contain. Any
+    // other family whose root is in that prefix was referenced rather than
+    // copied while it was live, so it has to be stored in full before the
+    // transcript stops holding it. The target family was archived above.
+    archive_dropped_live_branches(
+        db,
+        session_id,
+        &live,
+        &combined,
+        &[root_user_id.to_string()],
+    )?;
+    invalidate_transcript_layout(session_id);
+    transcripts::write_transcript_with_compactions(
+        db.data_dir(),
+        session_id,
+        &session_created,
+        &records,
+        &compactions,
+    )?;
+    // Reseating the index rows must carry each surviving message's owning turn
+    // across, or the whole session loses its turn/token attribution on switch.
+    let mut owning_turns: HashMap<String, String> = HashMap::new();
+    {
+        let mut stmt = conn.prepare_cached(
+            "SELECT id, turn_id FROM messages
+             WHERE session_id = ?1 AND turn_id IS NOT NULL",
+        )?;
+        let rows = stmt.query_map(params![session_id], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+        for row in rows {
+            let (id, turn_id) = row?;
+            owning_turns.insert(id, turn_id);
+        }
+    }
+    // Restored messages left the index with the branch; their turns come back
+    // from the archive. A live row's own turn is never overridden.
+    for (id, turn_id) in archived_turns {
+        owning_turns.entry(id).or_insert(turn_id);
+    }
+    let tx = conn.unchecked_transaction()?;
+    tx.prepare_cached(
+        "UPDATE message_revisions
+         SET is_active = CASE WHEN revision_index = ?3 THEN 1 ELSE 0 END
+         WHERE session_id = ?1 AND root_user_id = ?2",
+    )?
+    .execute(params![session_id, root_user_id, revision_index])?;
+    tx.prepare_cached("DELETE FROM messages WHERE session_id = ?1")?
+        .execute(params![session_id])?;
+    for (seq, record) in records.iter().enumerate() {
+        insert_index_row(
+            &tx,
+            session_id,
+            seq as i64,
+            owning_turns.get(&record.id).map(String::as_str),
+            record,
+            texts[seq].as_deref(),
+        )?;
+    }
+    tx.prepare_cached("UPDATE sessions SET last_seq = ?1, updated_at = ?2 WHERE id = ?3")?
+        .execute(params![records.len() as i64, now_ms(), session_id])?;
+    tx.commit()?;
+    Ok(combined)
+}
+
+/// Insert a session with caller-provided timestamps and messages in one
+/// transaction. Idempotent: if a session with the same id already exists the
+/// call is a no-op and returns false.
+pub fn import_session(
+    db: &Database,
+    summary: &SessionSummary,
+    messages: &[UiMessage],
+) -> Result<bool> {
+    validate_thinking_level(&summary.thinking_level)?;
+    let mode = normalize_mode(Some(&summary.mode));
+    let conn = db.conn();
+    let exists: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM sessions WHERE id = ?1",
+        params![summary.id],
+        |row| row.get(0),
+    )?;
+    if exists > 0 {
+        return Ok(false);
+    }
+    let (records, texts) = records_and_texts(messages);
+    invalidate_transcript_layout(&summary.id);
+    transcripts::write_transcript(db.data_dir(), &summary.id, &summary.created_at, &records)?;
+    let indexed = (|| -> Result<()> {
+        let tx = conn.unchecked_transaction()?;
+        let project_id = match summary
+            .project_path
+            .as_deref()
+            .filter(|path| !path.trim().is_empty())
+        {
+            Some(path) => Some(db.ensure_project(path, false)?),
+            None => None,
+        };
+        let source = summary.id.strip_prefix("import-").map(|rest| {
+            for known in ["claude-code", "opencode", "codex", "pi"] {
+                if rest.starts_with(&format!("{known}-")) {
+                    return known.to_string();
+                }
+            }
+            "external".to_string()
+        });
+        tx.prepare_cached(
+            "INSERT INTO sessions (
+                id, title, project_id, provider_id, model_id, mode, thinking_level, source,
+                last_seq, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        )?
+        .execute(params![
+            summary.id,
+            summary.title,
+            project_id,
+            summary.provider_id,
+            summary.model_id,
+            mode,
+            summary.thinking_level,
+            source,
+            records.len() as i64,
+            ts_to_ms(&summary.created_at),
+            ts_to_ms(&summary.updated_at),
+        ])?;
+        for (seq, record) in records.iter().enumerate() {
+            insert_index_row(
+                &tx,
+                &summary.id,
+                seq as i64,
+                None,
+                record,
+                texts[seq].as_deref(),
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    })();
+    if let Err(e) = indexed {
+        // Don't leave transcript files behind for a session row that never
+        // materialized.
+        invalidate_transcript_layout(&summary.id);
+        transcripts::remove_session_files(db.data_dir(), &summary.id);
+        return Err(e);
+    }
+    Ok(true)
+}
+
+pub fn session_count(db: &Database) -> Result<i64> {
+    Ok(db
+        .conn()
+        .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))?)
+}
+
+// ---- turns ------------------------------------------------------------------
+
+pub fn begin_turn(
+    db: &Database,
+    session_id: &str,
+    provider_id: Option<&str>,
+    model_id: Option<&str>,
+) -> Result<String> {
+    let id = Uuid::new_v4().to_string();
+    let inserted = db
+        .conn()
+        .prepare_cached(
+            "INSERT INTO turns (id, session_id, provider_id, model_id, started_at)
+             SELECT ?1, ?2, ?3, ?4, ?5
+             WHERE EXISTS (SELECT 1 FROM sessions WHERE id = ?2)
+               AND NOT EXISTS (
+                 SELECT 1 FROM turns WHERE session_id = ?2 AND status = 'running'
+               )",
+        )?
+        .execute(params![id, session_id, provider_id, model_id, now_ms()])
+        .map_err(|error| {
+            let message = error.to_string();
+            if message.contains("turns.session_id")
+                || message.contains("idx_turns_one_running_session")
+            {
+                anyhow!("AGENT_BUSY")
+            } else {
+                error.into()
+            }
+        })?;
+    if inserted == 0 {
+        let session_exists: bool = db.conn().query_row(
+            "SELECT EXISTS(SELECT 1 FROM sessions WHERE id = ?1)",
+            params![session_id],
+            |row| row.get(0),
+        )?;
+        if !session_exists {
+            return Err(anyhow!("session not found: {session_id}"));
+        }
+        return Err(anyhow!("AGENT_BUSY"));
+    }
+    Ok(id)
+}
+
+pub struct EndTurnResult {
+    pub updated: bool,
+    pub notification: Option<Notification>,
+    /// In-flight reply promoted into the transcript by this turn end (D299).
+    pub recovered: Option<UiMessage>,
+}
+
+/// Test-facing shorthand for `end_turn_settling` without checkpoint recovery.
+#[cfg(test)]
+pub fn end_turn(
+    db: &Database,
+    turn_id: &str,
+    status: &str,
+    error_code: Option<&str>,
+    usage: Option<&Value>,
+    create_notification: bool,
+) -> Result<EndTurnResult> {
+    end_turn_settling(
+        db,
+        turn_id,
+        status,
+        error_code,
+        usage,
+        create_notification,
+        false,
+    )
+}
+
+/// `end_turn` that also settles the session's in-flight reply checkpoint
+/// (D299). `recover_inflight` promotes a checkpoint whose final row can no
+/// longer arrive; it is what a caller passes when the sidecar is gone.
+pub fn end_turn_settling(
+    db: &Database,
+    turn_id: &str,
+    status: &str,
+    error_code: Option<&str>,
+    usage: Option<&Value>,
+    create_notification: bool,
+    recover_inflight: bool,
+) -> Result<EndTurnResult> {
+    let status = match status {
+        "completed" | "aborted" | "error" => status,
+        _ => "completed",
+    };
+    let input_tokens = usage
+        .and_then(|u| u.get("inputTokens"))
+        .and_then(|v| v.as_i64());
+    let output_tokens = usage
+        .and_then(|u| u.get("outputTokens"))
+        .and_then(|v| v.as_i64());
+    let session_id: Option<String> = db
+        .conn()
+        .prepare_cached("SELECT session_id FROM turns WHERE id = ?1")?
+        .query_row(params![turn_id], |r| r.get(0))
+        .optional()?;
+    let tx = db.conn().unchecked_transaction()?;
+    let n = tx
+        .prepare_cached(
+            "UPDATE turns SET status = ?1, error_code = ?2, ended_at = ?3,
+                input_tokens = COALESCE(?4, input_tokens),
+                output_tokens = COALESCE(?5, output_tokens),
+                usage_json = COALESCE(?6, usage_json)
+             WHERE id = ?7 AND status = 'running'",
+        )?
+        .execute(params![
+            status,
+            error_code,
+            now_ms(),
+            input_tokens,
+            output_tokens,
+            usage.map(|u| u.to_string()),
+            turn_id,
+        ])?;
+    let notification = if n > 0 && create_notification {
+        notifications::insert_for_terminal_turn(&tx, turn_id, status, error_code)?
+    } else {
+        None
+    };
+    tx.commit()?;
+    // Settle the in-flight checkpoint (D299, D327). A caller that knows the
+    // reply can never finish (sidecar gone) asks for recovery. A completed or
+    // error turn drops the checkpoint only once its final row is indexed —
+    // otherwise the outbox may still be draining, and a quit would lose the
+    // reply the user already saw. A user stop leaves the checkpoint alone:
+    // the aborted final row is still on its way and removes it on arrival,
+    // and the boot sweep settles a row that never came.
+    let recovered = match session_id.as_deref() {
+        Some(session_id) if recover_inflight => recover_inflight_message(db, session_id, true)?,
+        Some(session_id) if status != "aborted" => {
+            if let Some(inflight) = transcripts::read_inflight(db.data_dir(), session_id)? {
+                if message_indexed(db, session_id, &inflight.message.id)?
+                    && !streaming_assistant_indexed(db, session_id, &inflight.message.id)?
+                {
+                    transcripts::remove_inflight(db.data_dir(), session_id)?;
+                }
+            }
+            None
+        }
+        _ => None,
+    };
+    Ok(EndTurnResult {
+        updated: n > 0,
+        notification,
+        recovered,
+    })
+}
+
+// ---- search -----------------------------------------------------------------
+
+pub fn search_messages(db: &Database, query: &str, limit: i64) -> Result<Vec<SearchHit>> {
+    let query = query.trim();
+    if query.is_empty() {
+        return Ok(Vec::new());
+    }
+    let limit = limit.clamp(1, 100);
+    // trigram FTS needs >= 3 chars; shorter queries fall back to LIKE.
+    if query.chars().count() >= 3 {
+        let quoted = format!("\"{}\"", query.replace('"', "\"\""));
+        let mut stmt = db.conn().prepare_cached(
+            "SELECT m.id, m.session_id, s.title, m.role, m.created_at,
+                    snippet(messages_fts, 0, '', '', '…', 16)
+             FROM messages_fts
+             JOIN messages m ON m.mid = messages_fts.rowid
+             JOIN sessions s ON s.id = m.session_id
+             WHERE messages_fts MATCH ?1
+             ORDER BY m.created_at DESC LIMIT ?2",
+        )?;
+        let rows = stmt.query_map(params![quoted, limit], |row| {
+            Ok(SearchHit {
+                message_id: row.get(0)?,
+                session_id: row.get(1)?,
+                session_title: row.get(2)?,
+                role: row.get(3)?,
+                created_at: ms_to_ts(row.get(4)?),
+                snippet: row.get(5)?,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    } else {
+        let escaped = query
+            .replace('\\', "\\\\")
+            .replace('%', "\\%")
+            .replace('_', "\\_");
+        let mut stmt = db.conn().prepare_cached(
+            "SELECT m.id, m.session_id, s.title, m.role, m.created_at,
+                    substr(m.text, 1, 160)
+             FROM messages m
+             JOIN sessions s ON s.id = m.session_id
+             WHERE m.text LIKE '%' || ?1 || '%' ESCAPE '\\'
+             ORDER BY m.created_at DESC LIMIT ?2",
+        )?;
+        let rows = stmt.query_map(params![escaped, limit], |row| {
+            Ok(SearchHit {
+                message_id: row.get(0)?,
+                session_id: row.get(1)?,
+                session_title: row.get(2)?,
+                role: row.get(3)?,
+                created_at: ms_to_ts(row.get(4)?),
+                snippet: row.get(5)?,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+}
+
+fn normalize_usage_bucket(bucket: &str) -> &'static str {
+    match bucket {
+        "week" => "week",
+        "month" => "month",
+        _ => "day",
+    }
+}
+
+fn local_from_ms(ms: i64) -> Option<chrono::DateTime<chrono::Local>> {
+    chrono::DateTime::from_timestamp_millis(ms).map(|dt| dt.with_timezone(&chrono::Local))
+}
+
+fn usage_bucket_key(dt: &chrono::DateTime<chrono::Local>, bucket: &str) -> String {
+    match bucket {
+        "month" => dt.format("%Y-%m").to_string(),
+        "week" => dt.format("%G-W%V").to_string(),
+        _ => dt.format("%Y-%m-%d").to_string(),
+    }
+}
+
+fn default_history_start(
+    end: chrono::DateTime<chrono::Local>,
+    bucket: &str,
+) -> chrono::DateTime<chrono::Local> {
+    match bucket {
+        "month" => end - chrono::Duration::days(365 * 2),
+        "week" => end - chrono::Duration::weeks(52),
+        _ => end - chrono::Duration::weeks(53),
+    }
+}
+
+fn resolve_history_range(
+    start_date: Option<i64>,
+    end_date: Option<i64>,
+    bucket: &str,
+) -> (i64, i64) {
+    let now = chrono::Local::now();
+    let end = end_date
+        .filter(|v| *v > 0)
+        .and_then(local_from_ms)
+        .unwrap_or(now);
+    let start = start_date
+        .filter(|v| *v > 0)
+        .and_then(local_from_ms)
+        .unwrap_or_else(|| default_history_start(end, bucket));
+    if start <= end {
+        (start.timestamp_millis(), end.timestamp_millis())
+    } else {
+        (end.timestamp_millis(), start.timestamp_millis())
+    }
+}
+
+fn naive_local_midnight(date: chrono::NaiveDate) -> Option<chrono::DateTime<chrono::Local>> {
+    use chrono::TimeZone;
+    let naive = date.and_hms_opt(0, 0, 0)?;
+    match chrono::Local.from_local_datetime(&naive) {
+        chrono::LocalResult::Single(dt) => Some(dt),
+        chrono::LocalResult::Ambiguous(dt, _) => Some(dt),
+        chrono::LocalResult::None => None,
+    }
+}
+
+fn filled_history_keys(start_ms: i64, end_ms: i64, bucket: &str) -> Vec<(String, i64)> {
+    use chrono::{Datelike, TimeZone};
+    let start = local_from_ms(start_ms).unwrap_or_else(chrono::Local::now);
+    let end = local_from_ms(end_ms).unwrap_or_else(chrono::Local::now);
+    let mut keys = Vec::new();
+    match bucket {
+        "month" => {
+            let mut year = start.year();
+            let mut month = start.month();
+            let end_y = end.year();
+            let end_m = end.month();
+            loop {
+                if let chrono::LocalResult::Single(dt) | chrono::LocalResult::Ambiguous(dt, _) =
+                    chrono::Local.with_ymd_and_hms(year, month, 1, 0, 0, 0)
+                {
+                    keys.push((dt.format("%Y-%m").to_string(), dt.timestamp_millis()));
+                }
+                if year > end_y || (year == end_y && month >= end_m) {
+                    break;
+                }
+                month += 1;
+                if month == 13 {
+                    month = 1;
+                    year += 1;
+                }
+            }
+        }
+        "week" => {
+            let weekday = start.weekday().num_days_from_monday() as i64;
+            let mut cursor = start.date_naive() - chrono::Duration::days(weekday);
+            let end_date = end.date_naive();
+            while cursor <= end_date {
+                if let Some(dt) = naive_local_midnight(cursor) {
+                    keys.push((dt.format("%G-W%V").to_string(), dt.timestamp_millis()));
+                }
+                cursor += chrono::Duration::days(7);
+            }
+        }
+        _ => {
+            let mut cursor = start.date_naive();
+            let end_date = end.date_naive();
+            while cursor <= end_date {
+                if let Some(dt) = naive_local_midnight(cursor) {
+                    keys.push((dt.format("%Y-%m-%d").to_string(), dt.timestamp_millis()));
+                }
+                cursor += chrono::Duration::days(1);
+            }
+        }
+    }
+    keys
+}
+
+#[derive(Default, Clone, Copy)]
+struct UsageBucketAcc {
+    input: i64,
+    output: i64,
+    cache_read: i64,
+    cache_write: i64,
+    reasoning: i64,
+    turns: i64,
+    timestamp: i64,
+}
+
+impl UsageBucketAcc {
+    fn add(
+        &mut self,
+        input: i64,
+        output: i64,
+        cache_read: i64,
+        cache_write: i64,
+        reasoning: i64,
+        ts: i64,
+    ) {
+        if self.turns == 0 {
+            self.timestamp = ts;
+        }
+        self.input += input;
+        self.output += output;
+        self.cache_read += cache_read;
+        self.cache_write += cache_write;
+        self.reasoning += reasoning;
+        self.turns += 1;
+    }
+
+    fn total_tokens(&self) -> i64 {
+        self.input + self.output + self.cache_read + self.cache_write
+    }
+
+    fn to_json(self, date: &str) -> Value {
+        json!({
+            "date": date,
+            "timestamp": self.timestamp,
+            "inputTokens": self.input,
+            "outputTokens": self.output,
+            "totalTokens": self.total_tokens(),
+            "cacheReadTokens": self.cache_read,
+            "cacheWriteTokens": self.cache_write,
+            "reasoningTokens": self.reasoning,
+            "turnCount": self.turns,
+        })
+    }
+}
+
+pub fn get_token_usage_history(
+    db: &Database,
+    start_date: Option<i64>,
+    end_date: Option<i64>,
+    bucket: &str,
+) -> Result<Value> {
+    let bucket = normalize_usage_bucket(bucket);
+    let (range_start, range_end) = resolve_history_range(start_date, end_date, bucket);
+    let mut stmt = db.conn().prepare_cached(
+        "SELECT ended_at, input_tokens, output_tokens, usage_json
+         FROM turns
+         WHERE status = 'completed' AND ended_at IS NOT NULL AND ended_at >= ?1 AND ended_at <= ?2
+         ORDER BY ended_at ASC",
+    )?;
+
+    let rows = stmt.query_map(params![range_start, range_end], |row| {
+        Ok((
+            row.get::<_, i64>(0)?,
+            row.get::<_, i64>(1)?,
+            row.get::<_, i64>(2)?,
+            row.get::<_, Option<String>>(3)?,
+        ))
+    })?;
+
+    use std::collections::BTreeMap;
+    let mut bucket_map: BTreeMap<String, UsageBucketAcc> = BTreeMap::new();
+    let mut total_input = 0i64;
+    let mut total_output = 0i64;
+    let mut total_turns = 0i64;
+    let mut total_cache_read = 0i64;
+    let mut total_cache_write = 0i64;
+    let mut total_reasoning = 0i64;
+
+    for row in rows {
+        let (ended_at, input_tokens, output_tokens, usage_json) = row?;
+        let Some(dt) = local_from_ms(ended_at) else {
+            continue;
+        };
+        total_turns += 1;
+        total_input += input_tokens;
+        total_output += output_tokens;
+
+        let parsed_usage = usage_json
+            .as_deref()
+            .and_then(|s| serde_json::from_str::<Value>(s).ok());
+        let cache_read = parsed_usage
+            .as_ref()
+            .and_then(|u| u.get("cacheReadTokens"))
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        let cache_write = parsed_usage
+            .as_ref()
+            .and_then(|u| u.get("cacheWriteTokens"))
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        let reasoning = parsed_usage
+            .as_ref()
+            .and_then(|u| u.get("reasoningTokens"))
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        total_cache_read += cache_read;
+        total_cache_write += cache_write;
+        total_reasoning += reasoning;
+
+        let key = usage_bucket_key(&dt, bucket);
+        bucket_map.entry(key).or_default().add(
+            input_tokens,
+            output_tokens,
+            cache_read,
+            cache_write,
+            reasoning,
+            ended_at,
+        );
+    }
+
+    let items: Vec<Value> = filled_history_keys(range_start, range_end, bucket)
+        .into_iter()
+        .map(|(date, timestamp)| {
+            let mut acc = bucket_map.remove(&date).unwrap_or_default();
+            if acc.turns == 0 {
+                acc.timestamp = timestamp;
+            }
+            acc.to_json(&date)
+        })
+        .collect();
+
+    Ok(json!({
+        "bucket": bucket,
+        "rangeStart": range_start,
+        "rangeEnd": range_end,
+        "items": items,
+        "totals": {
+            "inputTokens": total_input,
+            "outputTokens": total_output,
+            "totalTokens": total_input + total_output + total_cache_read + total_cache_write,
+            "cacheReadTokens": total_cache_read,
+            "cacheWriteTokens": total_cache_write,
+            "reasoningTokens": total_reasoning,
+            "turnCount": total_turns,
+        }
+    }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::workspace::simple_canonicalize;
+
+    fn test_db() -> Database {
+        let dir = std::env::temp_dir().join(format!("pi-desktop-test-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        Database::open(&dir.join("test.sqlite")).unwrap()
+    }
+
+    fn user_msg(id: &str, content: &str, ts: &str) -> UiMessage {
+        UiMessage {
+            id: id.into(),
+            role: "user".into(),
+            content: content.into(),
+            attachments: None,
+            steering: None,
+            created_at: ts.into(),
+            thinking: None,
+            status: None,
+            model_id: None,
+            provider_id: None,
+            usage: None,
+            response_duration_ms: None,
+            response_output_tokens: None,
+            error: None,
+            revision_root_id: None,
+            revision_count: None,
+            active_revision: None,
+            tool_name: None,
+            tool_call_id: None,
+            tool_status: None,
+            tool_args: None,
+            tool_result: None,
+            tool_completed_at: None,
+            tool_duration_ms: None,
+            is_error: None,
+            parent_tool_call_id: None,
+            agent_name: None,
+            hosted_search: None,
+            session_message: None,
+        }
+    }
+
+    fn checkpoint(first: &str, through: &str) -> CompactionRecord {
+        CompactionRecord {
+            id: Uuid::new_v4().to_string(),
+            summary: "durable summary".into(),
+            first_kept_message_id: Some(first.into()),
+            through_message_id: through.into(),
+            tokens_before: 120_000,
+            usage: None,
+            retained_tail: Some(json!([{
+                "role": "user",
+                "content": "recent",
+                "timestamp": 1
+            }])),
+            details: None,
+            provider_id: Some("provider-1".into()),
+            model_id: Some("model-1".into()),
+            created_at: "2026-07-28T00:00:03Z".into(),
+        }
+    }
+
+    #[test]
+    fn compaction_survives_restart_and_late_truncation_but_not_early_truncation() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let messages = [
+            user_msg("u1", "old", "2026-07-28T00:00:00Z"),
+            user_msg("u2", "recent", "2026-07-28T00:00:01Z"),
+            user_msg("u3", "after", "2026-07-28T00:00:02Z"),
+        ];
+        for message in &messages {
+            append_message(&db, &session.id, message, None).unwrap();
+        }
+        append_compaction(&db, &session.id, &checkpoint("u2", "u2")).unwrap();
+
+        let restored = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(restored.messages.len(), 3);
+        assert_eq!(
+            restored.compaction.as_ref().unwrap().through_message_id,
+            "u2"
+        );
+
+        replace_messages(&db, &session.id, &messages[..2]).unwrap();
+        assert!(get_session(&db, &session.id)
+            .unwrap()
+            .unwrap()
+            .compaction
+            .is_some());
+
+        replace_messages(&db, &session.id, &messages[..1]).unwrap();
+        assert!(get_session(&db, &session.id)
+            .unwrap()
+            .unwrap()
+            .compaction
+            .is_none());
+    }
+
+    #[test]
+    fn the_whole_checkpoint_chain_survives_restart_and_partial_truncation() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let messages = [
+            user_msg("u1", "old", "2026-07-28T00:00:00Z"),
+            user_msg("u2", "recent", "2026-07-28T00:00:01Z"),
+            user_msg("u3", "after", "2026-07-28T00:00:02Z"),
+        ];
+        for message in &messages {
+            append_message(&db, &session.id, message, None).unwrap();
+        }
+        append_compaction(&db, &session.id, &checkpoint("u1", "u1")).unwrap();
+        append_compaction(&db, &session.id, &checkpoint("u2", "u3")).unwrap();
+
+        let restored = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(restored.compactions.len(), 2);
+        // `compaction` stays the newest one: it is what the runtime reinstalls.
+        assert_eq!(
+            restored.compaction.as_ref().unwrap().id,
+            restored.compactions[1].id
+        );
+
+        // Truncating past the second anchor invalidates that record alone.
+        replace_messages(&db, &session.id, &messages[..2]).unwrap();
+        let after = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(
+            after
+                .compactions
+                .iter()
+                .map(|record| record.through_message_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["u1"]
+        );
+    }
+
+    #[test]
+    fn fork_remaps_each_checkpoint_in_the_chain_on_its_own() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let messages = [
+            user_msg("u1", "old", "2026-07-28T00:00:00Z"),
+            user_msg("u2", "recent", "2026-07-28T00:00:01Z"),
+        ];
+        for message in &messages {
+            append_message(&db, &session.id, message, None).unwrap();
+        }
+        append_compaction(&db, &session.id, &checkpoint("u1", "u1")).unwrap();
+        append_compaction(&db, &session.id, &checkpoint("u2", "u2")).unwrap();
+
+        let ForkSessionResult::Created(full) =
+            fork_session_through(&db, &session.id, None, None).unwrap()
+        else {
+            panic!("expected fork");
+        };
+        assert_eq!(
+            full.compactions
+                .iter()
+                .map(|record| record.through_message_id.as_str())
+                .collect::<Vec<_>>(),
+            vec![full.messages[0].id.as_str(), full.messages[1].id.as_str()]
+        );
+
+        // A fork that cuts the later anchor keeps the earlier checkpoint.
+        let ForkSessionResult::Created(partial) =
+            fork_session_through(&db, &session.id, None, Some("u1")).unwrap()
+        else {
+            panic!("expected fork");
+        };
+        assert_eq!(partial.compactions.len(), 1);
+        assert_eq!(
+            partial.compactions[0].through_message_id,
+            partial.messages[0].id
+        );
+    }
+
+    #[test]
+    fn fork_copies_only_a_checkpoint_whose_boundary_is_included() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let messages = [
+            user_msg("u1", "old", "2026-07-28T00:00:00Z"),
+            user_msg("u2", "recent", "2026-07-28T00:00:01Z"),
+        ];
+        for message in &messages {
+            append_message(&db, &session.id, message, None).unwrap();
+        }
+        append_compaction(&db, &session.id, &checkpoint("u2", "u2")).unwrap();
+
+        let ForkSessionResult::Created(before) =
+            fork_session_through(&db, &session.id, None, Some("u1")).unwrap()
+        else {
+            panic!("expected fork");
+        };
+        assert!(before.compaction.is_none());
+
+        let ForkSessionResult::Created(including) =
+            fork_session_through(&db, &session.id, None, Some("u2")).unwrap()
+        else {
+            panic!("expected fork");
+        };
+        let copied = including.compaction.unwrap();
+        assert_eq!(
+            copied.first_kept_message_id.as_deref(),
+            Some(including.messages[1].id.as_str())
+        );
+        assert_eq!(copied.through_message_id, including.messages[1].id);
+        assert_ne!(
+            copied.id,
+            get_session(&db, &session.id)
+                .unwrap()
+                .unwrap()
+                .compaction
+                .unwrap()
+                .id
+        );
+    }
+
+    #[test]
+    fn configure_session_persists_pi_runtime_selection() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, Some("/tmp/x".into())).unwrap();
+        db.conn()
+            .execute(
+                "INSERT INTO providers (
+                    id, name, vendor_key, type, protocol, enabled, base_url,
+                    auth_kind, secret_ref, api_style, default_model_id,
+                    created_at, updated_at
+                 ) VALUES (
+                    'provider-1', 'Provider', 'custom', 'openai_compatible',
+                    'openai_compatible', 1, NULL, 'none', NULL,
+                    'chat_completions', 'model-1', 1, 1
+                 )",
+                [],
+            )
+            .unwrap();
+
+        let configured = configure_session_with_thinking(
+            &db,
+            &session.id,
+            "chat",
+            Some("provider-1"),
+            Some("model-1"),
+            Some("high"),
+            None,
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(configured.mode, "plan");
+        assert_eq!(configured.provider_id.as_deref(), Some("provider-1"));
+        assert_eq!(configured.model_id.as_deref(), Some("model-1"));
+        assert_eq!(configured.thinking_level, "high");
+        // Omitting the new field is backwards-compatible and preserves the
+        // configured value rather than resetting it to off.
+        let preserved = configure_session(&db, &session.id, "chat", None, None)
+            .unwrap()
+            .unwrap();
+        assert_eq!(preserved.thinking_level, "high");
+        assert!(configure_session(&db, &session.id, "invalid", None, None).is_err());
+        assert!(configure_session_with_thinking(
+            &db,
+            &session.id,
+            "chat",
+            None,
+            None,
+            Some("turbo"),
+            None,
+        )
+        .is_err());
+        let omitted = configure_session_with_thinking(
+            &db,
+            &session.id,
+            "chat",
+            None,
+            None,
+            Some("omit"),
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(omitted.thinking_level, "omit");
+    }
+
+    #[test]
+    fn create_session_permission_mode_is_optional_and_validated() {
+        let db = test_db();
+        let default_session = create_session(&db, None, None, None, None, None).unwrap();
+        assert_eq!(default_session.permission_mode, "inherit");
+
+        let worker = create_session_with_options(
+            &db,
+            SessionCreateOptions {
+                title: Some("Worker".into()),
+                mode: Some("agent".into()),
+                thinking_level: Some("high".into()),
+                permission_mode: Some("ask".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(worker.permission_mode, "ask");
+        assert_eq!(worker.thinking_level, "high");
+
+        assert!(create_session_with_options(
+            &db,
+            SessionCreateOptions {
+                permission_mode: Some("unrestricted".into()),
+                ..Default::default()
+            },
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn rename_session_normalizes_title_without_touching_activity() {
+        let db = test_db();
+        let session = create_session(&db, Some("Original".into()), None, None, None, None).unwrap();
+        let before: i64 = db
+            .conn()
+            .query_row(
+                "SELECT updated_at FROM sessions WHERE id = ?1",
+                params![session.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        assert!(rename_session(&db, &session.id, "  Renamed task  ").unwrap());
+        let renamed = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(renamed.summary.title, "Renamed task");
+        let after: i64 = db
+            .conn()
+            .query_row(
+                "SELECT updated_at FROM sessions WHERE id = ?1",
+                params![session.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(after, before);
+
+        assert!(rename_session(&db, &session.id, &"界".repeat(MAX_SESSION_TITLE_CHARS),).is_ok());
+        assert!(rename_session(&db, &session.id, "   ").is_err());
+        assert!(
+            rename_session(&db, &session.id, &"x".repeat(MAX_SESSION_TITLE_CHARS + 1),).is_err()
+        );
+        assert!(!rename_session(&db, "missing", "Valid").unwrap());
+    }
+
+    #[test]
+    fn create_session_returns_canonical_project_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("project");
+        std::fs::create_dir_all(&project).unwrap();
+        let db = Database::open(&dir.path().join("test.sqlite")).unwrap();
+        let spelling_with_trailing_slash = format!("{}/", project.display());
+
+        let session = create_session(
+            &db,
+            None,
+            None,
+            None,
+            None,
+            Some(spelling_with_trailing_slash),
+        )
+        .unwrap();
+
+        let canonical = simple_canonicalize(&project)
+            .unwrap()
+            .to_string_lossy()
+            .replace('\\', "/");
+        assert_eq!(session.project_path.as_deref(), Some(canonical.as_str()));
+        assert_eq!(
+            get_session(&db, &session.id)
+                .unwrap()
+                .unwrap()
+                .summary
+                .project_path
+                .as_deref(),
+            Some(canonical.as_str())
+        );
+    }
+
+    #[test]
+    fn import_session_is_idempotent_and_preserves_timestamps() {
+        let db = test_db();
+        let summary = SessionSummary {
+            id: "import-claude-code-abc".into(),
+            title: "Imported".into(),
+            message_count: 1,
+            project_path: Some("/tmp/proj".into()),
+            model_id: None,
+            provider_id: None,
+            mode: "agent".into(),
+            thinking_level: "off".into(),
+            permission_mode: "inherit".into(),
+            created_at: "2025-01-01T00:00:00Z".into(),
+            updated_at: "2025-01-02T00:00:00Z".into(),
+        };
+        let messages = vec![user_msg("m1", "hello", "2025-01-01T00:00:01Z")];
+
+        assert!(import_session(&db, &summary, &messages).unwrap());
+        // Re-import of the same id is skipped.
+        assert!(!import_session(&db, &summary, &messages).unwrap());
+
+        let detail = get_session(&db, &summary.id).unwrap().unwrap();
+        // Timestamps are stored as ms and re-emitted as RFC3339: compare instants.
+        assert_eq!(
+            ts_to_ms(&detail.summary.created_at),
+            ts_to_ms("2025-01-01T00:00:00Z")
+        );
+        assert_eq!(
+            ts_to_ms(&detail.summary.updated_at),
+            ts_to_ms("2025-01-02T00:00:00Z")
+        );
+        assert_eq!(detail.summary.project_path.as_deref(), Some("/tmp/proj"));
+        assert_eq!(detail.messages.len(), 1);
+        assert_eq!(detail.messages[0].content, "hello");
+        let projects = db.list_projects().unwrap();
+        assert_eq!(projects.len(), 1);
+        assert_eq!(projects[0].path, "/tmp/proj");
+
+        let source: Option<String> = db
+            .conn()
+            .query_row(
+                "SELECT source FROM sessions WHERE id = ?1",
+                params![summary.id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(source.as_deref(), Some("claude-code"));
+    }
+
+    #[test]
+    fn import_materializes_unique_projects_but_keeps_pathless_sessions_temporary() {
+        let db = test_db();
+        let base = SessionSummary {
+            id: "import-codex-one".into(),
+            title: "Imported".into(),
+            message_count: 0,
+            project_path: Some("/tmp/project/".into()),
+            model_id: None,
+            provider_id: None,
+            mode: "agent".into(),
+            thinking_level: "off".into(),
+            permission_mode: "inherit".into(),
+            created_at: "2025-01-01T00:00:00Z".into(),
+            updated_at: "2025-01-01T00:00:00Z".into(),
+        };
+        assert!(import_session(&db, &base, &[]).unwrap());
+
+        let mut same_project = base.clone();
+        same_project.id = "import-codex-two".into();
+        same_project.project_path = Some("/tmp/project".into());
+        assert!(import_session(&db, &same_project, &[]).unwrap());
+
+        let mut temporary = base.clone();
+        temporary.id = "import-codex-temporary".into();
+        temporary.project_path = Some("   ".into());
+        assert!(import_session(&db, &temporary, &[]).unwrap());
+
+        let projects = db.list_projects().unwrap();
+        assert_eq!(projects.len(), 1);
+        assert_eq!(projects[0].path, "/tmp/project");
+        assert_eq!(
+            get_session(&db, &temporary.id)
+                .unwrap()
+                .unwrap()
+                .summary
+                .project_path,
+            None
+        );
+    }
+
+    #[test]
+    fn subagent_attribution_roundtrips() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, Some("/tmp/x".into())).unwrap();
+        let mut assistant = user_msg("m1", "Found it.", "2025-05-01T00:00:00Z");
+        assistant.role = "assistant".into();
+        assistant.parent_tool_call_id = Some("task-1".into());
+        assistant.agent_name = Some("explorer".into());
+        append_message(&db, &session.id, &assistant, None).unwrap();
+
+        let mut tool = user_msg("m2", "ok", "2025-05-01T00:00:01Z");
+        tool.role = "tool".into();
+        tool.tool_name = Some("Read".into());
+        tool.tool_call_id = Some("child-read".into());
+        tool.tool_status = Some("success".into());
+        tool.parent_tool_call_id = Some("task-1".into());
+        tool.agent_name = Some("explorer".into());
+        append_message(&db, &session.id, &tool, None).unwrap();
+
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        for message in &detail.messages {
+            assert_eq!(message.parent_tool_call_id.as_deref(), Some("task-1"));
+            assert_eq!(message.agent_name.as_deref(), Some("explorer"));
+        }
+        // A row without attribution stays unattributed rather than inheriting one.
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("m3", "next", "2025-05-01T00:00:02Z"),
+            None,
+        )
+        .unwrap();
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(detail.messages[2].parent_tool_call_id, None);
+        assert_eq!(detail.messages[2].agent_name, None);
+    }
+
+    #[test]
+    fn append_and_roundtrip_tool_message() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, Some("/tmp/x".into())).unwrap();
+        assert_eq!(session.message_count, 0);
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("m1", "写一个文件", "2025-05-01T00:00:00Z"),
+            None,
+        )
+        .unwrap();
+        let tool = UiMessage {
+            id: "m2".into(),
+            role: "tool".into(),
+            content: "ok".into(),
+            attachments: None,
+            steering: None,
+            created_at: "2025-05-01T00:00:02Z".into(),
+            thinking: None,
+            status: Some("complete".into()),
+            model_id: None,
+            provider_id: None,
+            usage: None,
+            response_duration_ms: None,
+            response_output_tokens: None,
+            error: None,
+            revision_root_id: None,
+            revision_count: None,
+            active_revision: None,
+            tool_name: Some("Write".into()),
+            tool_call_id: Some("c1".into()),
+            tool_status: Some("success".into()),
+            tool_args: Some(json!({ "path": "a.txt" })),
+            tool_result: Some(json!({ "ok": true })),
+            tool_completed_at: Some("2025-05-01T00:00:03Z".into()),
+            tool_duration_ms: Some(1_000),
+            is_error: None,
+            parent_tool_call_id: None,
+            agent_name: None,
+            hosted_search: None,
+            session_message: None,
+        };
+        append_message(&db, &session.id, &tool, None).unwrap();
+        // Host recovery may replay the Electron persistence outbox; a message
+        // id must make that replay a no-op.
+        append_message(&db, &session.id, &tool, None).unwrap();
+
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(detail.messages.len(), 2);
+        assert_eq!(detail.summary.message_count, 2);
+        let m2 = &detail.messages[1];
+        assert_eq!(m2.role, "tool");
+        assert_eq!(m2.tool_name.as_deref(), Some("Write"));
+        assert_eq!(m2.tool_call_id.as_deref(), Some("c1"));
+        assert_eq!(m2.tool_status.as_deref(), Some("success"));
+        assert_eq!(m2.tool_args, Some(json!({ "path": "a.txt" })));
+        assert_eq!(m2.tool_result, Some(json!({ "ok": true })));
+        assert_eq!(
+            m2.tool_completed_at.as_deref(),
+            Some("2025-05-01T00:00:03Z")
+        );
+        assert_eq!(m2.tool_duration_ms, Some(1_000));
+        assert_eq!(m2.content, "ok");
+        assert_eq!(m2.status.as_deref(), Some("complete"));
+
+        let mut review_tool = tool.clone();
+        review_tool.tool_result = Some(json!({
+            "ok": true,
+            "details": {
+                "root": "workspace",
+                "review": {
+                    "snapshotId": "snapshot-1",
+                    "state": "active"
+                }
+            }
+        }));
+        replace_messages(
+            &db,
+            &session.id,
+            &[
+                user_msg("m1", "写一个文件", "2025-05-01T00:00:00Z"),
+                review_tool,
+            ],
+        )
+        .unwrap();
+        assert!(
+            update_tool_review_state(&db, &session.id, "m2", "snapshot-1", "rolledBack",).unwrap()
+        );
+        let updated = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(updated.summary.message_count, 2);
+        assert_eq!(
+            updated.messages[1].tool_result,
+            Some(json!({
+                "ok": true,
+                "details": {
+                    "root": "workspace",
+                    "review": {
+                        "snapshotId": "snapshot-1",
+                        "state": "rolledBack"
+                    }
+                }
+            }))
+        );
+
+        // seq allocation is monotonic per session.
+        let last_seq: i64 = db
+            .conn()
+            .query_row(
+                "SELECT last_seq FROM sessions WHERE id = ?1",
+                params![session.id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(last_seq, 2);
+    }
+
+    #[test]
+    fn append_message_remaps_ids_owned_by_another_session() {
+        let db = test_db();
+        let first = create_session(&db, None, None, None, None, None).unwrap();
+        let second = create_session(&db, None, None, None, None, None).unwrap();
+        let colliding = user_msg("call_421522", "first", "2026-09-16T15:42:41Z");
+        append_message(&db, &first.id, &colliding, None).unwrap();
+        append_message(&db, &second.id, &colliding, None).unwrap();
+
+        let first_detail = get_session(&db, &first.id).unwrap().unwrap();
+        let second_detail = get_session(&db, &second.id).unwrap().unwrap();
+        assert_eq!(first_detail.messages[0].id, "call_421522");
+        assert_eq!(
+            second_detail.messages[0].id,
+            format!("{}:call_421522", second.id)
+        );
+        assert_eq!(second_detail.messages[0].content, "first");
+
+        append_message(&db, &second.id, &colliding, None).unwrap();
+        assert_eq!(
+            get_session(&db, &second.id)
+                .unwrap()
+                .unwrap()
+                .messages
+                .len(),
+            1
+        );
+        assert_eq!(
+            transcripts::read_transcript(db.data_dir(), &second.id)
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn append_message_does_not_duplicate_a_unique_failed_jsonl_leftover() {
+        let db = test_db();
+        let first = create_session(&db, None, None, None, None, None).unwrap();
+        let second = create_session(&db, None, None, None, None, None).unwrap();
+        let colliding = user_msg("call_421522", "leftover", "2026-09-16T15:42:41Z");
+        append_message(&db, &first.id, &colliding, None).unwrap();
+        let (record, _) = ui_to_record(&colliding);
+        transcripts::append_message(db.data_dir(), &second.id, &second.created_at, &record)
+            .unwrap();
+        append_message(&db, &second.id, &colliding, None).unwrap();
+        assert_eq!(
+            transcripts::read_transcript(db.data_dir(), &second.id)
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            get_session(&db, &second.id)
+                .unwrap()
+                .unwrap()
+                .messages
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn restore_orphaned_session_remaps_ids_owned_by_another_session() {
+        let db = test_db();
+        let first = create_session(&db, None, None, None, None, None).unwrap();
+        let second = create_session(&db, None, None, None, None, None).unwrap();
+        let colliding = user_msg("call_421522", "orphan", "2026-09-16T15:42:41Z");
+        append_message(&db, &first.id, &colliding, None).unwrap();
+        let (record, _) = ui_to_record(&colliding);
+        transcripts::append_message(db.data_dir(), &second.id, &second.created_at, &record)
+            .unwrap();
+        db.conn()
+            .execute("DELETE FROM sessions WHERE id = ?1", params![second.id])
+            .unwrap();
+        assert!(restore_orphaned_session(&db, &second.id).unwrap());
+        let restored = get_session(&db, &second.id).unwrap().unwrap();
+        assert_eq!(restored.messages.len(), 1);
+        assert_eq!(
+            restored.messages[0].id,
+            format!("{}:call_421522", second.id)
+        );
+        assert_eq!(
+            get_session(&db, &first.id).unwrap().unwrap().messages[0].id,
+            "call_421522"
+        );
+    }
+
+    #[test]
+    fn user_attachments_roundtrip_as_canonical_blocks() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let mut user = user_msg("image-1", "这是什么", "2025-05-01T00:00:00Z");
+        user.attachments = Some(vec![MessageAttachment {
+            kind: "image".into(),
+            name: "image.png".into(),
+            reference: "attachments/abc123".into(),
+            mime_type: Some("image/png".into()),
+            size: Some(42),
+        }]);
+
+        append_message(&db, &session.id, &user, None).unwrap();
+
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(detail.messages[0].attachments, user.attachments);
+        assert_eq!(detail.messages[0].content, "这是什么");
+
+        let record = transcripts::read_transcript(db.data_dir(), &session.id)
+            .unwrap()
+            .into_iter()
+            .find(|record| record.id == user.id)
+            .expect("attachment message record");
+        let blocks = record.blocks;
+        assert_eq!(blocks[1]["type"], "attachment");
+        assert_eq!(blocks[1]["ref"], "attachments/abc123");
+        assert!(blocks[1].get("data").is_none());
+    }
+
+    #[test]
+    fn a_window_over_a_duplicated_id_stays_complete_and_reaches_the_head() {
+        // Physical lines can exceed distinct messages: a retried append leaves
+        // one id on two lines and reads dedupe keep-last. A window is therefore
+        // allowed to return fewer messages than its limit, and what matters is
+        // that paging still covers every message exactly once.
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        for index in 0..4 {
+            append_message(
+                &db,
+                &session.id,
+                &user_msg(
+                    &format!("m{index}"),
+                    &format!("body {index}"),
+                    "2025-05-01T00:00:00Z",
+                ),
+                None,
+            )
+            .unwrap();
+        }
+        // Duplicate an *older* line so the duplicate pair straddles a page edge.
+        let (record, _) = ui_to_record(&user_msg("m1", "body 1 retried", "2025-05-01T00:00:01Z"));
+        transcripts::append_message(db.data_dir(), &session.id, "2025-05-01T00:00:00Z", &record)
+            .unwrap();
+
+        let mut collected: Vec<String> = Vec::new();
+        let mut before: Option<i64> = None;
+        loop {
+            let page = get_session_with_options(
+                &db,
+                &session.id,
+                SessionReadOptions {
+                    message_around: None,
+                    message_before: before,
+                    message_limit: Some(2),
+                    content_limit: None,
+                },
+            )
+            .unwrap()
+            .unwrap();
+            let mut ids: Vec<String> = page.messages.iter().map(|m| m.id.clone()).collect();
+            ids.append(&mut collected);
+            collected = ids;
+            let start = page.message_start.unwrap();
+            if start == 0 || page.has_more_before != Some(true) {
+                break;
+            }
+            before = Some(start);
+        }
+        // Every message stays reachable by paging, which is the guarantee that
+        // matters: the pre-change clamp against `last_seq` dropped the newest
+        // ones entirely.
+        for id in ["m0", "m1", "m2", "m3"] {
+            assert!(
+                collected.iter().any(|seen| seen == id),
+                "missing {id} in {collected:?}"
+            );
+        }
+        // The retried line is physically last, so it is the newest line the tail
+        // window returns; the keep-last content wins and the renderer merges the
+        // two sightings of that id. A page is always internally deduplicated.
+        let newest = get_session_with_options(
+            &db,
+            &session.id,
+            SessionReadOptions {
+                message_around: None,
+                message_before: None,
+                message_limit: Some(2),
+                content_limit: None,
+            },
+        )
+        .unwrap()
+        .unwrap();
+        let newest_ids: Vec<&str> = newest.messages.iter().map(|m| m.id.as_str()).collect();
+        assert_eq!(newest_ids, ["m3", "m1"]);
+        assert_eq!(newest.messages[1].content, "body 1 retried");
+        // An uncapped read still collapses the pair to one message.
+        let whole = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(whole.messages.len(), 4);
+    }
+
+    #[test]
+    fn bounded_reads_use_physical_line_positions_not_the_dedup_counter() {
+        // A retried append leaves the same message id on two file lines. The
+        // index counter (`last_seq`) counts it once, so a window clamped
+        // against that counter cut one line short and hid the newest message.
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        for index in 0..4 {
+            append_message(
+                &db,
+                &session.id,
+                &user_msg(
+                    &format!("m{index}"),
+                    &format!("body {index}"),
+                    "2025-05-01T00:00:00Z",
+                ),
+                None,
+            )
+            .unwrap();
+        }
+        // Append one line straight to the file, as a crash between the durable
+        // file append and its index commit does. `last_seq` stays at 4 while the
+        // file holds 5 message lines, and it never catches up.
+        let (record, _) = ui_to_record(&user_msg("m4", "newest", "2025-05-01T00:00:04Z"));
+        transcripts::append_message(db.data_dir(), &session.id, "2025-05-01T00:00:00Z", &record)
+            .unwrap();
+        let last_seq: i64 = db
+            .conn()
+            .query_row(
+                "SELECT last_seq FROM sessions WHERE id = ?1",
+                params![session.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(last_seq, 4);
+
+        let page = get_session_with_options(
+            &db,
+            &session.id,
+            SessionReadOptions {
+                message_around: None,
+                message_before: None,
+                message_limit: Some(2),
+                content_limit: None,
+            },
+        )
+        .unwrap()
+        .unwrap();
+        // Clamping the window to `last_seq` used to cut the newest line off the
+        // tail, so the message existed on disk but never reached the renderer.
+        let ids: Vec<&str> = page.messages.iter().map(|m| m.id.as_str()).collect();
+        assert_eq!(ids, ["m3", "m4"]);
+        assert_eq!(page.has_more_before, Some(true));
+
+        // Paging backwards from the reported start reaches the true head
+        // without skipping a message.
+        let mut seen: Vec<String> = page.messages.iter().map(|m| m.id.clone()).collect();
+        let mut start = page.message_start.unwrap();
+        while start > 0 {
+            let older = get_session_with_options(
+                &db,
+                &session.id,
+                SessionReadOptions {
+                    message_around: None,
+                    message_before: Some(start),
+                    message_limit: Some(2),
+                    content_limit: None,
+                },
+            )
+            .unwrap()
+            .unwrap();
+            let mut ids: Vec<String> = older.messages.iter().map(|m| m.id.clone()).collect();
+            ids.append(&mut seen);
+            seen = ids;
+            start = older.message_start.unwrap();
+        }
+        assert_eq!(seen, ["m0", "m1", "m2", "m3", "m4"]);
+    }
+
+    #[test]
+    fn bounded_session_reads_page_history_and_cap_display_content() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("m1", "old", "2025-05-01T00:00:00Z"),
+            None,
+        )
+        .unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("m2", &"x".repeat(80_000), "2025-05-01T00:00:01Z"),
+            None,
+        )
+        .unwrap();
+
+        let page = get_session_with_options(
+            &db,
+            &session.id,
+            SessionReadOptions {
+                message_around: None,
+                message_before: None,
+                message_limit: Some(1),
+                content_limit: Some(128),
+            },
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(page.message_start, Some(1));
+        assert_eq!(page.has_more_before, Some(true));
+        assert_eq!(page.messages.len(), 1);
+        assert!(page.messages[0].content.len() < 256);
+        assert!(page.messages[0].content.contains("truncated for display"));
+
+        let full = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(full.messages[1].content.len(), 80_000);
+    }
+
+    #[test]
+    fn assistant_thinking_roundtrips_as_canonical_blocks() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let assistant = UiMessage {
+            id: "assistant-1".into(),
+            role: "assistant".into(),
+            content: "final answer".into(),
+            attachments: None,
+            steering: None,
+            created_at: "2025-05-01T00:00:01Z".into(),
+            thinking: Some("first plan\nsecond plan".into()),
+            status: Some("complete".into()),
+            model_id: Some("model-1".into()),
+            provider_id: Some("provider-1".into()),
+            usage: Some(MessageUsage {
+                input_tokens: 12,
+                output_tokens: 34,
+                cache_read_tokens: Some(2),
+                cache_write_tokens: None,
+                reasoning_tokens: Some(5),
+                total_tokens: 48,
+            }),
+            response_duration_ms: Some(2_000),
+            response_output_tokens: Some(34),
+            error: None,
+            revision_root_id: None,
+            revision_count: None,
+            active_revision: None,
+            tool_name: None,
+            tool_call_id: None,
+            tool_status: None,
+            tool_args: None,
+            tool_result: None,
+            tool_completed_at: None,
+            tool_duration_ms: None,
+            is_error: None,
+            parent_tool_call_id: None,
+            agent_name: None,
+            hosted_search: None,
+            session_message: None,
+        };
+        append_message(&db, &session.id, &assistant, None).unwrap();
+
+        let records = transcripts::read_transcript(db.data_dir(), &session.id).unwrap();
+        assert_eq!(records.len(), 1);
+        let blocks = &records[0].blocks;
+        assert_eq!(
+            blocks[0],
+            json!({
+                "type": "thinking",
+                "text": "first plan\nsecond plan"
+            })
+        );
+        assert_eq!(
+            blocks[1],
+            json!({
+                "type": "text",
+                "text": "final answer"
+            })
+        );
+
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(
+            detail.messages[0].thinking.as_deref(),
+            Some("first plan\nsecond plan")
+        );
+        assert_eq!(detail.messages[0].content, "final answer");
+        assert_eq!(detail.messages[0].model_id.as_deref(), Some("model-1"));
+        assert_eq!(
+            detail.messages[0].provider_id.as_deref(),
+            Some("provider-1")
+        );
+        let usage = detail.messages[0].usage.as_ref().expect("usage");
+        assert_eq!(usage.input_tokens, 12);
+        assert_eq!(usage.output_tokens, 34);
+        assert_eq!(usage.cache_read_tokens, Some(2));
+        assert_eq!(usage.reasoning_tokens, Some(5));
+        assert_eq!(usage.total_tokens, 48);
+        assert_eq!(detail.messages[0].response_duration_ms, Some(2_000));
+        assert_eq!(detail.messages[0].response_output_tokens, Some(34));
+    }
+
+    #[test]
+    fn assistant_hosted_search_roundtrips_as_canonical_blocks() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let assistant = UiMessage {
+            id: "assistant-search-1".into(),
+            role: "assistant".into(),
+            content: "answer with sources".into(),
+            attachments: None,
+            steering: None,
+            created_at: "2025-05-01T00:00:01Z".into(),
+            thinking: None,
+            status: Some("complete".into()),
+            model_id: Some("model-1".into()),
+            provider_id: Some("provider-1".into()),
+            usage: None,
+            response_duration_ms: None,
+            response_output_tokens: None,
+            error: None,
+            revision_root_id: None,
+            revision_count: None,
+            active_revision: None,
+            tool_name: None,
+            tool_call_id: None,
+            tool_status: None,
+            tool_args: None,
+            tool_result: None,
+            tool_completed_at: None,
+            tool_duration_ms: None,
+            is_error: None,
+            parent_tool_call_id: None,
+            agent_name: None,
+            hosted_search: Some(json!({
+                "status": "completed",
+                "rounds": [
+                    {
+                        "id": "srvtoolu_01",
+                        "status": "completed",
+                        "query": "pi-desktop release notes",
+                        "sources": [
+                            { "url": "https://example.com/a", "title": "A" }
+                        ]
+                    }
+                ],
+                "replay": [
+                    {
+                        "type": "hostedSearch",
+                        "phase": "server_tool_use",
+                        "blockId": "srvtoolu_01",
+                        "name": "web_search",
+                        "input": { "query": "pi-desktop release notes" }
+                    }
+                ]
+            })),
+            session_message: None,
+        };
+        append_message(&db, &session.id, &assistant, None).unwrap();
+
+        let records = transcripts::read_transcript(db.data_dir(), &session.id).unwrap();
+        assert_eq!(records.len(), 1);
+        let blocks = &records[0].blocks;
+        assert_eq!(
+            blocks[0],
+            json!({
+                "type": "hostedSearch",
+                "status": "completed",
+                "rounds": [
+                    {
+                        "id": "srvtoolu_01",
+                        "status": "completed",
+                        "query": "pi-desktop release notes",
+                        "sources": [
+                            { "url": "https://example.com/a", "title": "A" }
+                        ]
+                    }
+                ],
+                "replay": [
+                    {
+                        "type": "hostedSearch",
+                        "phase": "server_tool_use",
+                        "blockId": "srvtoolu_01",
+                        "name": "web_search",
+                        "input": { "query": "pi-desktop release notes" }
+                    }
+                ]
+            })
+        );
+
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(
+            detail.messages[0].hosted_search,
+            Some(json!({
+                "status": "completed",
+                "rounds": [
+                    {
+                        "id": "srvtoolu_01",
+                        "status": "completed",
+                        "query": "pi-desktop release notes",
+                        "sources": [
+                            { "url": "https://example.com/a", "title": "A" }
+                        ]
+                    }
+                ],
+                "replay": [
+                    {
+                        "type": "hostedSearch",
+                        "phase": "server_tool_use",
+                        "blockId": "srvtoolu_01",
+                        "name": "web_search",
+                        "input": { "query": "pi-desktop release notes" }
+                    }
+                ]
+            }))
+        );
+        // The additive block must not disturb text reconstruction.
+        assert_eq!(detail.messages[0].content, "answer with sources");
+    }
+
+    #[test]
+    fn assistant_error_roundtrips_in_message_metadata() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let mut assistant = user_msg("assistant-error", "", "2025-05-01T00:00:01Z");
+        assistant.role = "assistant".into();
+        assistant.status = Some("error".into());
+        assistant.is_error = Some(true);
+        assistant.error = Some(json!({
+            "code": "MODEL_NOT_CONFIGURED",
+            "message": "404: model not found",
+            "retriable": false
+        }));
+
+        append_message(&db, &session.id, &assistant, None).unwrap();
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        let restored = &detail.messages[0];
+
+        assert_eq!(restored.status.as_deref(), Some("error"));
+        assert_eq!(restored.is_error, Some(true));
+        assert_eq!(restored.error, assistant.error);
+    }
+
+    #[test]
+    fn import_and_replace_preserve_thinking() {
+        let db = test_db();
+        let summary = SessionSummary {
+            id: "thinking-import".into(),
+            title: "Thinking".into(),
+            message_count: 0,
+            project_path: None,
+            model_id: None,
+            provider_id: None,
+            mode: "agent".into(),
+            thinking_level: "medium".into(),
+            permission_mode: "inherit".into(),
+            created_at: "2025-01-01T00:00:00Z".into(),
+            updated_at: "2025-01-01T00:00:00Z".into(),
+        };
+        let mut message = user_msg("m1", "prompt", "2025-01-01T00:00:01Z");
+        message.role = "assistant".into();
+        message.thinking = Some("persist me".into());
+        assert!(import_session(&db, &summary, &[message.clone()]).unwrap());
+        let detail = get_session(&db, &summary.id).unwrap().unwrap();
+        assert_eq!(detail.summary.thinking_level, "medium");
+        assert_eq!(detail.messages[0].thinking.as_deref(), Some("persist me"));
+
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        message.id = "m2".into();
+        replace_messages(&db, &session.id, &[message]).unwrap();
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(detail.messages[0].thinking.as_deref(), Some("persist me"));
+    }
+
+    #[test]
+    fn transcript_survives_reopen_from_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        let db = Database::open(&path).unwrap();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("m1", "durable", "2025-05-01T00:00:00Z"),
+            None,
+        )
+        .unwrap();
+        let transcript = transcripts::transcript_path(db.data_dir(), &session.id).unwrap();
+        assert!(transcript.exists());
+
+        drop(db);
+        let db = Database::open(&path).unwrap();
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(detail.messages.len(), 1);
+        assert_eq!(detail.messages[0].content, "durable");
+    }
+
+    #[test]
+    fn delete_session_removes_transcript_files() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let root = user_msg("m1", "x", "2025-05-01T00:00:00Z");
+        append_message(&db, &session.id, &root, None).unwrap();
+        save_message_revision(&db, &session.id, "m1", &[root], true).unwrap();
+        let transcript = transcripts::transcript_path(db.data_dir(), &session.id).unwrap();
+        let revisions = transcripts::revisions_path(db.data_dir(), &session.id).unwrap();
+        assert!(transcript.exists());
+        assert!(revisions.exists());
+
+        assert!(delete_session(&db, &session.id).unwrap());
+        assert!(!transcript.exists());
+        assert!(!revisions.exists());
+    }
+
+    #[test]
+    fn missing_session_row_is_restored_from_transcript() {
+        let db = test_db();
+        let session = create_session(&db, Some("Keep me".into()), None, None, None, None).unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("u1", "hello world", "2025-05-01T00:00:00Z"),
+            None,
+        )
+        .unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("u2", "second", "2025-05-01T00:00:01Z"),
+            None,
+        )
+        .unwrap();
+        db.conn()
+            .execute("DELETE FROM sessions WHERE id = ?1", params![session.id])
+            .unwrap();
+        assert!(get_session(&db, &session.id).unwrap().is_none());
+
+        assert!(restore_orphaned_session(&db, &session.id).unwrap());
+        let restored = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(restored.messages.len(), 2);
+        assert_eq!(restored.messages[0].content, "hello world");
+        assert_eq!(restored.summary.title, "hello world");
+        assert_eq!(restored.summary.message_count, 2);
+        assert!(!restore_orphaned_session(&db, &session.id).unwrap());
+    }
+
+    #[test]
+    fn recover_orphaned_sessions_restores_transcript_files_without_rows() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("u1", "keep", "2025-05-01T00:00:00Z"),
+            None,
+        )
+        .unwrap();
+        db.conn()
+            .execute("DELETE FROM sessions WHERE id = ?1", params![session.id])
+            .unwrap();
+        assert_eq!(recover_orphaned_sessions(&db).unwrap(), 1);
+        assert!(get_session(&db, &session.id).unwrap().is_some());
+        assert_eq!(recover_orphaned_sessions(&db).unwrap(), 0);
+    }
+
+    #[test]
+    fn append_recreates_a_missing_session_row_so_the_outbox_can_drain() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("u1", "first", "2025-05-01T00:00:00Z"),
+            None,
+        )
+        .unwrap();
+        db.conn()
+            .execute("DELETE FROM sessions WHERE id = ?1", params![session.id])
+            .unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("u2", "queued", "2025-05-01T00:00:01Z"),
+            None,
+        )
+        .unwrap();
+        let restored = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(restored.messages.len(), 2);
+        assert_eq!(restored.messages[1].content, "queued");
+    }
+
+    #[test]
+    fn append_creates_a_stub_session_when_the_transcript_is_also_gone() {
+        let db = test_db();
+        let id = "11111111-2222-4333-8444-555555555555";
+        append_message(
+            &db,
+            id,
+            &user_msg("u1", "from outbox", "2025-05-01T00:00:00Z"),
+            None,
+        )
+        .unwrap();
+        let restored = get_session(&db, id).unwrap().unwrap();
+        assert_eq!(restored.summary.title, "Recovered session");
+        assert_eq!(restored.messages[0].content, "from outbox");
+    }
+
+    #[test]
+    fn get_session_dedupes_retried_file_lines_keep_last() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("m1", "old", "2025-05-01T00:00:00Z"),
+            None,
+        )
+        .unwrap();
+        // Simulate a retried append whose first file line lost its index
+        // transaction: the same id lands twice and the newest line wins.
+        let (record, _) = ui_to_record(&user_msg("m1", "new", "2025-05-01T00:00:01Z"));
+        transcripts::append_message(db.data_dir(), &session.id, "2025-05-01T00:00:00Z", &record)
+            .unwrap();
+
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(detail.messages.len(), 1);
+        assert_eq!(detail.messages[0].content, "new");
+    }
+
+    #[test]
+    fn replace_messages_resets_stream() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("a", "one", "2025-05-01T00:00:00Z"),
+            None,
+        )
+        .unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("b", "two", "2025-05-01T00:00:01Z"),
+            None,
+        )
+        .unwrap();
+        replace_messages(
+            &db,
+            &session.id,
+            &[user_msg("c", "compacted", "2025-05-01T00:00:02Z")],
+        )
+        .unwrap();
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(detail.messages.len(), 1);
+        assert_eq!(detail.messages[0].content, "compacted");
+        // Appending after replace continues from the new stream head.
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("d", "next", "2025-05-01T00:00:03Z"),
+            None,
+        )
+        .unwrap();
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(detail.messages.len(), 2);
+        assert_eq!(detail.messages[1].content, "next");
+    }
+
+    #[test]
+    fn fork_session_clones_active_transcript_and_configuration() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        let db = Database::open(&path).unwrap();
+        let source = create_session_with_thinking(
+            &db,
+            Some("Source".into()),
+            Some("chat".into()),
+            Some("provider-1".into()),
+            Some("model-1".into()),
+            Some("/tmp/project".into()),
+            Some("high".into()),
+        )
+        .unwrap();
+        configure_session_with_thinking(
+            &db,
+            &source.id,
+            "chat",
+            Some("provider-1"),
+            Some("model-1"),
+            Some("high"),
+            Some("auto"),
+        )
+        .unwrap();
+
+        let mut user = user_msg("user-1", "fork this", "2025-05-01T00:00:00Z");
+        user.revision_root_id = Some("user-1".into());
+        user.revision_count = Some(2);
+        user.active_revision = Some(2);
+        let mut tool = user_msg("tool-1", "ok", "2025-05-01T00:00:01Z");
+        tool.role = "tool".into();
+        tool.tool_name = Some("Read".into());
+        tool.tool_call_id = Some("call-1".into());
+        tool.tool_status = Some("success".into());
+        append_message(&db, &source.id, &user, None).unwrap();
+        append_message(&db, &source.id, &tool, None).unwrap();
+        save_message_revision(&db, &source.id, "user-1", &[user.clone()], true).unwrap();
+
+        let ForkSessionResult::Created(fork) =
+            fork_session_through(&db, &source.id, Some("Source (branch)"), None).unwrap()
+        else {
+            panic!("expected forked session");
+        };
+        let source_after = get_session(&db, &source.id).unwrap().unwrap();
+
+        assert_ne!(fork.summary.id, source.id);
+        assert_eq!(fork.summary.title, "Source (branch)");
+        assert_eq!(fork.summary.project_path, source.project_path);
+        assert_eq!(fork.summary.provider_id.as_deref(), Some("provider-1"));
+        assert_eq!(fork.summary.model_id.as_deref(), Some("model-1"));
+        assert_eq!(fork.summary.mode, "plan");
+        assert_eq!(fork.summary.thinking_level, "high");
+        assert_eq!(fork.summary.permission_mode, "auto");
+        assert_eq!(fork.messages.len(), 2);
+        assert_eq!(source_after.messages[0].id, "user-1");
+        assert_eq!(
+            source_after.messages[1].tool_call_id.as_deref(),
+            Some("call-1")
+        );
+        assert_ne!(fork.messages[0].id, source_after.messages[0].id);
+        assert_ne!(fork.messages[1].id, source_after.messages[1].id);
+        assert_ne!(
+            fork.messages[1].tool_call_id,
+            source_after.messages[1].tool_call_id
+        );
+        assert_eq!(fork.messages[0].content, "fork this");
+        assert_eq!(fork.messages[0].revision_root_id, None);
+        assert_eq!(fork.messages[0].revision_count, None);
+        assert_eq!(fork.messages[0].active_revision, None);
+        assert!(list_message_revisions(&db, &fork.summary.id, "user-1")
+            .unwrap()
+            .is_empty());
+        assert!(
+            !transcripts::revisions_path(db.data_dir(), &fork.summary.id)
+                .unwrap()
+                .exists()
+        );
+        assert!(search_messages(&db, "fork", 10)
+            .unwrap()
+            .iter()
+            .any(|hit| hit.session_id == fork.summary.id));
+
+        append_message(
+            &db,
+            &fork.summary.id,
+            &user_msg("child-only", "continue here", "2025-05-01T00:00:02Z"),
+            None,
+        )
+        .unwrap();
+        configure_session_with_thinking(
+            &db,
+            &fork.summary.id,
+            "agent",
+            Some("provider-2"),
+            Some("model-2"),
+            Some("off"),
+            Some("ask"),
+        )
+        .unwrap();
+        let source_final = get_session(&db, &source.id).unwrap().unwrap();
+        let fork_final = get_session(&db, &fork.summary.id).unwrap().unwrap();
+        assert_eq!(source_final.messages.len(), 2);
+        assert_eq!(source_final.summary.mode, "plan");
+        assert_eq!(source_final.summary.model_id.as_deref(), Some("model-1"));
+        assert_eq!(fork_final.messages.len(), 3);
+        assert_eq!(fork_final.summary.mode, "agent");
+        assert_eq!(fork_final.summary.model_id.as_deref(), Some("model-2"));
+        assert_eq!(fork_final.summary.thinking_level, "off");
+        assert_eq!(fork_final.summary.permission_mode, "ask");
+
+        drop(db);
+        let db = Database::open(&path).unwrap();
+        let source_reopened = get_session(&db, &source.id).unwrap().unwrap();
+        let fork_reopened = get_session(&db, &fork.summary.id).unwrap().unwrap();
+        assert_eq!(source_reopened.messages.len(), 2);
+        assert_eq!(fork_reopened.messages.len(), 3);
+        assert_eq!(fork_reopened.messages[2].content, "continue here");
+
+        assert!(matches!(
+            fork_session_through(&db, "missing", None, None).unwrap(),
+            ForkSessionResult::NotFound
+        ));
+        let turn = begin_turn(&db, &source.id, None, None).unwrap();
+        assert!(matches!(
+            fork_session_through(&db, &source.id, None, None).unwrap(),
+            ForkSessionResult::Busy
+        ));
+        end_turn(&db, &turn, "aborted", None, None, false).unwrap();
+        delete_session(&db, &source.id).unwrap();
+        assert!(get_session(&db, &source.id).unwrap().is_none());
+        assert_eq!(
+            get_session(&db, &fork.summary.id)
+                .unwrap()
+                .unwrap()
+                .messages
+                .len(),
+            3
+        );
+    }
+
+    #[test]
+    fn message_scoped_fork_stops_at_selected_assistant_response() {
+        let db = test_db();
+        let source = create_session(&db, Some("Source".into()), None, None, None, None).unwrap();
+        let mut assistant_a = user_msg("assistant-a", "first response", "2025-05-01T00:00:01Z");
+        assistant_a.role = "assistant".into();
+        let mut assistant_b = user_msg("assistant-b", "second response", "2025-05-01T00:00:03Z");
+        assistant_b.role = "assistant".into();
+        for message in [
+            user_msg("user-a", "first prompt", "2025-05-01T00:00:00Z"),
+            assistant_a,
+            user_msg("user-b", "second prompt", "2025-05-01T00:00:02Z"),
+            assistant_b,
+        ] {
+            append_message(&db, &source.id, &message, None).unwrap();
+        }
+
+        let ForkSessionResult::Created(fork) = fork_session_through(
+            &db,
+            &source.id,
+            Some("Response branch"),
+            Some("assistant-a"),
+        )
+        .unwrap() else {
+            panic!("expected message-scoped fork");
+        };
+
+        assert_eq!(fork.messages.len(), 2);
+        assert_eq!(fork.messages[0].content, "first prompt");
+        assert_eq!(fork.messages[1].content, "first response");
+        assert_ne!(fork.messages[1].id, "assistant-a");
+        assert_eq!(
+            get_session(&db, &source.id)
+                .unwrap()
+                .unwrap()
+                .messages
+                .len(),
+            4
+        );
+        assert!(matches!(
+            fork_session_through(&db, &source.id, None, Some("missing")).unwrap(),
+            ForkSessionResult::NotFound
+        ));
+    }
+
+    #[test]
+    fn turns_lifecycle() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, Some("p1"), Some("m1")).unwrap();
+        let ended = end_turn(
+            &db,
+            &turn,
+            "completed",
+            None,
+            Some(&json!({ "inputTokens": 10, "outputTokens": 20 })),
+            true,
+        )
+        .unwrap();
+        assert!(ended.updated);
+        assert_eq!(ended.notification.unwrap().kind, "task.completed");
+        // Ending twice is a no-op.
+        let duplicate = end_turn(&db, &turn, "completed", None, None, true).unwrap();
+        assert!(!duplicate.updated);
+        assert!(duplicate.notification.is_none());
+        let (status, input, output): (String, i64, i64) = db
+            .conn()
+            .query_row(
+                "SELECT status, input_tokens, output_tokens FROM turns WHERE id = ?1",
+                params![turn],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(status, "completed");
+        assert_eq!((input, output), (10, 20));
+    }
+
+    #[test]
+    fn begin_turn_rejects_a_second_running_turn_with_agent_busy() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let first = begin_turn(&db, &session.id, None, None).unwrap();
+
+        let error = begin_turn(&db, &session.id, None, None).unwrap_err();
+        assert_eq!(error.to_string(), "AGENT_BUSY");
+
+        end_turn(&db, &first, "aborted", None, None, false).unwrap();
+        assert!(begin_turn(&db, &session.id, None, None).is_ok());
+    }
+
+    #[test]
+    fn move_session_project_reassigns_only_the_project_and_rejects_running_turns() {
+        let db = test_db();
+        let source = std::env::temp_dir().join(format!("pi-move-source-{}", Uuid::new_v4()));
+        let target = std::env::temp_dir().join(format!("pi-move-target-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&source).unwrap();
+        std::fs::create_dir_all(&target).unwrap();
+        let session = create_session(
+            &db,
+            Some("Move me".into()),
+            Some("agent".into()),
+            Some("provider".into()),
+            Some("model".into()),
+            Some(source.to_string_lossy().to_string()),
+        )
+        .unwrap();
+
+        // The host stores the same canonical spelling it derives here: resolved,
+        // with forward slashes.
+        let target_path = crate::db::canonical_project_path(&target.to_string_lossy())
+            .expect("canonical project path");
+        let moved = move_session_project(&db, &session.id, &target.to_string_lossy()).unwrap();
+        let MoveSessionProjectResult::Moved(summary) = moved else {
+            panic!("an idle session must move to the requested project");
+        };
+        assert_eq!(summary.project_path.as_deref(), Some(target_path.as_str()));
+        // Title, provider, model, and message count stay with the session.
+        assert_eq!(summary.title, "Move me");
+        assert_eq!(summary.provider_id.as_deref(), Some("provider"));
+        assert_eq!(summary.model_id.as_deref(), Some("model"));
+        assert_eq!(summary.message_count, 0);
+
+        // A running turn blocks the move so the live agent cannot switch
+        // instruction roots mid-turn.
+        let turn = begin_turn(&db, &session.id, None, None).unwrap();
+        assert!(matches!(
+            move_session_project(&db, &session.id, &source.to_string_lossy()).unwrap(),
+            MoveSessionProjectResult::Busy
+        ));
+        end_turn(&db, &turn, "aborted", None, None, false).unwrap();
+        assert!(matches!(
+            move_session_project(&db, &session.id, &source.to_string_lossy()).unwrap(),
+            MoveSessionProjectResult::Moved(_)
+        ));
+
+        assert!(matches!(
+            move_session_project(&db, "missing-session", &source.to_string_lossy()).unwrap(),
+            MoveSessionProjectResult::NotFound
+        ));
+        assert!(move_session_project(&db, &session.id, "   ").is_err());
+    }
+
+    #[test]
+    fn aborted_turn_does_not_create_notification() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, None, None).unwrap();
+
+        let ended = end_turn(&db, &turn, "aborted", None, None, true).unwrap();
+
+        assert!(ended.updated);
+        assert!(ended.notification.is_none());
+        let notification_count: i64 = db
+            .conn()
+            .query_row("SELECT COUNT(*) FROM notifications", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(notification_count, 0);
+    }
+
+    #[test]
+    fn visible_turn_does_not_create_notification() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, None, None).unwrap();
+
+        let ended = end_turn(&db, &turn, "completed", None, None, false).unwrap();
+
+        assert!(ended.updated);
+        assert!(ended.notification.is_none());
+        let (status, notification_count): (String, i64) = db
+            .conn()
+            .query_row(
+                "SELECT t.status, COUNT(n.id)
+                 FROM turns t
+                 LEFT JOIN notifications n ON n.turn_id = t.id
+                 WHERE t.id = ?1
+                 GROUP BY t.status",
+                params![turn],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(status, "completed");
+        assert_eq!(notification_count, 0);
+    }
+
+    #[test]
+    fn search_finds_cjk_and_short_queries() {
+        let db = test_db();
+        let session = create_session(&db, Some("重构".into()), None, None, None, None).unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("m1", "帮我重构数据库结构", "2025-05-01T00:00:00Z"),
+            None,
+        )
+        .unwrap();
+        let hits = search_messages(&db, "数据库", 10).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].session_id, session.id);
+        // 2-char query falls back to LIKE.
+        let hits = search_messages(&db, "重构", 10).unwrap();
+        assert_eq!(hits.len(), 1);
+        // Deleting the session clears the index (cascade + FTS trigger).
+        delete_session(&db, &session.id).unwrap();
+        assert!(search_messages(&db, "数据库", 10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn save_and_activate_message_revision() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let user = user_msg("u1", "hello", "2025-05-01T00:00:00Z");
+        let mut a1 = user_msg("a1", "first", "2025-05-01T00:00:01Z");
+        a1.role = "assistant".into();
+        let mut a2 = user_msg("a2", "second", "2025-05-01T00:00:02Z");
+        a2.role = "assistant".into();
+        let branch1 = vec![user.clone(), a1.clone()];
+        let branch2 = vec![user.clone(), a2.clone()];
+        let r1 = save_message_revision(&db, &session.id, "u1", &branch1, true).unwrap();
+        assert_eq!(r1.revision_index, 1);
+        let r2 = save_message_revision(&db, &session.id, "u1", &branch2, true).unwrap();
+        assert_eq!(r2.revision_index, 2);
+        let listed = list_message_revisions(&db, &session.id, "u1").unwrap();
+        assert_eq!(listed.len(), 2);
+        assert!(listed.iter().any(|r| r.revision_index == 1 && !r.is_active));
+        assert!(listed.iter().any(|r| r.revision_index == 2 && r.is_active));
+        let activated = activate_message_revision(&db, &session.id, "u1", 1, &[]).unwrap();
+        assert_eq!(activated.len(), 2);
+        assert_eq!(activated[1].content, "first");
+        assert_eq!(activated[0].revision_root_id.as_deref(), Some("u1"));
+        assert_eq!(activated[0].active_revision, Some(1));
+        assert_eq!(activated[0].revision_count, Some(2));
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(detail.messages[1].content, "first");
+        assert_eq!(detail.messages[0].active_revision, Some(1));
+        assert_eq!(detail.messages[0].revision_count, Some(2));
+
+        // Switching forward restores the second branch and keeps the family key.
+        let activated2 = activate_message_revision(&db, &session.id, "u1", 2, &[]).unwrap();
+        assert_eq!(activated2[1].content, "second");
+        assert_eq!(activated2[0].active_revision, Some(2));
+        assert_eq!(activated2[0].revision_root_id.as_deref(), Some("u1"));
+    }
+
+    #[test]
+    fn save_active_branch_revision_keeps_a_message_appended_after_its_read() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, Some("p1"), Some("m1")).unwrap();
+        // Regenerate archived the discarded original branch as revision 1 and
+        // stamped the rewritten prompt as revision 2 of the same family.
+        let mut discarded = user_msg("u1", "do it", "2025-04-30T00:00:00Z");
+        let mut discarded_answer = user_msg("a1", "the discarded answer", "2025-04-30T00:00:01Z");
+        discarded_answer.role = "assistant".into();
+        discarded.revision_root_id = Some("u1".into());
+        save_message_revision(
+            &db,
+            &session.id,
+            "u1",
+            &[discarded, discarded_answer],
+            false,
+        )
+        .unwrap();
+        let mut root = user_msg("u2", "redo it", "2025-05-01T00:00:00Z");
+        root.revision_root_id = Some("u1".into());
+        root.revision_count = Some(2);
+        root.active_revision = Some(2);
+        append_message(&db, &session.id, &root, Some(&turn)).unwrap();
+        let mut tool = user_msg("t1", "ran a command", "2025-05-01T00:00:01Z");
+        tool.role = "assistant".into();
+        append_message(&db, &session.id, &tool, Some(&turn)).unwrap();
+
+        // The turn's final assistant message lands while the archive is already
+        // in flight — the case that used to lose it to a stale rewrite.
+        let mut answer = user_msg("a9", "the finished answer", "2025-05-01T00:00:02Z");
+        answer.role = "assistant".into();
+        append_message(&db, &session.id, &answer, Some(&turn)).unwrap();
+
+        let saved = save_active_branch_revision(&db, &session.id)
+            .unwrap()
+            .expect("a revision-bearing root is archived");
+        assert!(saved.archived);
+        assert_eq!(saved.root_user_id, "u1");
+        assert_eq!(saved.active_revision, 2);
+
+        // Nothing was dropped, and the pager stamp landed on the root.
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(
+            detail
+                .messages
+                .iter()
+                .map(|m| m.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["u2", "t1", "a9"],
+        );
+        assert_eq!(detail.messages[0].revision_count, Some(2));
+        assert_eq!(detail.messages[0].active_revision, Some(2));
+        assert_eq!(detail.messages[0].revision_root_id.as_deref(), Some("u1"));
+
+        // The branch carries the final answer, so switching back to it later
+        // restores a complete turn. It is still live, so what the file holds is
+        // a reference to the transcript suffix rather than a second copy of it.
+        let payload = transcripts::read_revision(db.data_dir(), &session.id, "u1", 2)
+            .unwrap()
+            .expect("branch payload");
+        assert!(matches!(payload, transcripts::RevisionPayload::Live(_)));
+        let branch = &detail.messages[live_branch_start(&detail.messages, "u1").unwrap()..];
+        assert_eq!(branch.last().unwrap().id, "a9");
+
+        // A one-line stamp must not reseat the index: seq order and the owning
+        // turn stay intact.
+        let rows: Vec<(String, i64, Option<String>)> = {
+            let conn = db.conn();
+            let mut stmt = conn
+                .prepare("SELECT id, seq, turn_id FROM messages WHERE session_id = ?1 ORDER BY seq")
+                .unwrap();
+            let mapped = stmt
+                .query_map(params![session.id], |row| {
+                    Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+                })
+                .unwrap();
+            mapped.map(|row| row.unwrap()).collect()
+        };
+        assert_eq!(
+            rows,
+            vec![
+                ("u2".to_string(), 0, Some(turn.clone())),
+                ("t1".to_string(), 1, Some(turn.clone())),
+                ("a9".to_string(), 2, Some(turn.clone())),
+            ],
+        );
+    }
+
+    #[test]
+    fn save_active_branch_revision_is_none_without_regenerate_history() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("u1", "hello", "2025-05-01T00:00:00Z"),
+            None,
+        )
+        .unwrap();
+        assert!(save_active_branch_revision(&db, &session.id)
+            .unwrap()
+            .is_none());
+        assert!(list_message_revisions(&db, &session.id, "u1")
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn save_active_branch_revision_restamps_an_already_archived_branch() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let mut root = user_msg("u1", "hello", "2025-05-01T00:00:00Z");
+        root.revision_count = Some(1);
+        root.active_revision = Some(1);
+        append_message(&db, &session.id, &root, None).unwrap();
+        save_message_revision(&db, &session.id, "u1", &[root.clone()], true).unwrap();
+
+        let saved = save_active_branch_revision(&db, &session.id)
+            .unwrap()
+            .unwrap();
+        assert!(!saved.archived, "revision 1 is already on disk");
+        assert_eq!(saved.revision_count, 1);
+        assert_eq!(
+            list_message_revisions(&db, &session.id, "u1")
+                .unwrap()
+                .len(),
+            1,
+        );
+    }
+
+    #[test]
+    fn save_active_branch_revision_refreshes_an_already_archived_branch() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let mut root = user_msg("u1", "hello", "2025-05-01T00:00:00Z");
+        root.revision_count = Some(1);
+        root.active_revision = Some(1);
+        append_message(&db, &session.id, &root, None).unwrap();
+        save_message_revision(&db, &session.id, "u1", &[root.clone()], true).unwrap();
+
+        // A later prompt on the same branch: the archived copy is now short.
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("u2", "and then", "2025-05-01T00:01:00Z"),
+            None,
+        )
+        .unwrap();
+        let mut answer = user_msg("a2", "done", "2025-05-01T00:01:01Z");
+        answer.role = "assistant".into();
+        append_message(&db, &session.id, &answer, None).unwrap();
+
+        let saved = save_active_branch_revision(&db, &session.id)
+            .unwrap()
+            .unwrap();
+        assert!(!saved.archived, "no new index is minted");
+        assert_eq!(saved.revision_count, 1);
+        // The branch is still live, so the refresh records a reference and the
+        // messages stay in the transcript instead of being copied into the
+        // revisions file again on every turn.
+        let payload = transcripts::read_revision(db.data_dir(), &session.id, "u1", 1)
+            .unwrap()
+            .unwrap();
+        assert!(matches!(payload, transcripts::RevisionPayload::Live(_)));
+        let live = get_session(&db, &session.id).unwrap().unwrap().messages;
+        let branch = &live[live_branch_start(&live, "u1").unwrap()..];
+        assert_eq!(
+            branch.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(),
+            vec!["u1", "u2", "a2"],
+        );
+        let listed = list_message_revisions(&db, &session.id, "u1").unwrap();
+        assert_eq!(listed[0].message_count, 3);
+        assert!(listed[0].is_active);
+    }
+
+    /// The reason a live branch is referenced and not copied: a branch that is
+    /// still in the transcript must cost the revisions file nothing, however
+    /// many turns run over it. Copying it per turn is what made a real session
+    /// reach 107 MB for 1152 messages — every turn rewrote a tail that had grown
+    /// since the turn before, which is O(N²) bytes for content the transcript
+    /// already held.
+    #[test]
+    fn a_live_branch_is_referenced_and_never_copied() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, Some("p1"), Some("m1")).unwrap();
+        let mut root = user_msg("u1", "start", "2025-05-01T00:00:00Z");
+        root.revision_count = Some(1);
+        root.active_revision = Some(1);
+        append_message(&db, &session.id, &root, Some(&turn)).unwrap();
+
+        // Ten finished turns, each appending a sizeable answer, each archived
+        // exactly the way a real turn ends.
+        for index in 0..10 {
+            let mut answer = user_msg(
+                &format!("a{index}"),
+                &"x".repeat(20_000),
+                "2025-05-01T00:01:00Z",
+            );
+            answer.role = "assistant".into();
+            append_message(&db, &session.id, &answer, Some(&turn)).unwrap();
+            assert!(
+                save_active_branch_revision(&db, &session.id)
+                    .unwrap()
+                    .is_some(),
+                "the stamped root archives on every turn"
+            );
+        }
+
+        let path = transcripts::revisions_path(db.data_dir(), &session.id).unwrap();
+        let written = std::fs::metadata(&path).unwrap().len();
+        assert!(
+            written < 8 * 1024,
+            "ten turns over a 200 KB branch wrote {written} bytes; \
+             a live branch must be referenced, not copied"
+        );
+
+        // The branch is still one revision, still counted, and still resolves
+        // to every message the transcript holds.
+        let listed = list_message_revisions(&db, &session.id, "u1").unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].message_count, 11);
+        assert!(matches!(
+            transcripts::read_revision(db.data_dir(), &session.id, "u1", 1)
+                .unwrap()
+                .unwrap(),
+            transcripts::RevisionPayload::Live(_)
+        ));
+        let live = get_session(&db, &session.id).unwrap().unwrap().messages;
+        let branch = &live[live_branch_start(&live, "u1").unwrap()..];
+        assert_eq!(branch.len(), 11);
+        assert_eq!(branch.last().unwrap().id, "a9");
+        // The reference carries no turn map: a live branch's rows are the
+        // session's own index rows, so a restore reads their turns from there.
+        // That is what keeps the reference constant-sized instead of one entry
+        // per branch message on every turn.
+        let payload = transcripts::read_revision(db.data_dir(), &session.id, "u1", 1)
+            .unwrap()
+            .unwrap();
+        assert!(payload.turns().is_empty());
+        let line_bytes = {
+            let raw = std::fs::read_to_string(
+                transcripts::revisions_path(db.data_dir(), &session.id).unwrap(),
+            )
+            .unwrap();
+            raw.lines().last().unwrap().len()
+        };
+        assert!(
+            line_bytes < 160,
+            "the newest reference is {line_bytes} bytes; it must not grow with the branch"
+        );
+
+        // And the restore still re-attaches every message to its turn.
+        let restored = activate_message_revision(&db, &session.id, "u1", 1, &[]).unwrap();
+        assert_eq!(restored.len(), 11);
+        let with_turn: i64 = db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*) FROM messages
+                 WHERE session_id = ?1 AND turn_id = ?2",
+                params![session.id, turn],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(with_turn, 11, "all eleven rows keep their owning turn");
+    }
+
+    /// Deleting the turn that owns a regenerate family takes its branch out of
+    /// the transcript, so the reference written while that branch was live has
+    /// to become a stored payload in the same breath. Otherwise the file names
+    /// a suffix that no longer exists and paging back to the variant fails.
+    #[test]
+    fn dropping_a_branch_root_stores_its_live_reference_first() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, Some("p1"), Some("m1")).unwrap();
+        let mut root = user_msg("u1", "start", "2025-05-01T00:00:00Z");
+        root.revision_count = Some(1);
+        root.active_revision = Some(1);
+        append_message(&db, &session.id, &root, Some(&turn)).unwrap();
+        let mut answer = user_msg("a1", "the answer", "2025-05-01T00:01:00Z");
+        answer.role = "assistant".into();
+        append_message(&db, &session.id, &answer, Some(&turn)).unwrap();
+        save_active_branch_revision(&db, &session.id)
+            .unwrap()
+            .unwrap();
+        assert!(matches!(
+            transcripts::read_revision(db.data_dir(), &session.id, "u1", 1)
+                .unwrap()
+                .unwrap(),
+            transcripts::RevisionPayload::Live(_)
+        ));
+
+        // The user deletes the turn. No revision call of its own runs for it.
+        let mut other = user_msg("u2", "another question", "2025-05-01T00:02:00Z");
+        other.role = "assistant".into();
+        replace_messages(&db, &session.id, &[other]).unwrap();
+
+        let stored = match transcripts::read_revision(db.data_dir(), &session.id, "u1", 1)
+            .unwrap()
+            .expect("the dropped branch was stored before the rewrite")
+        {
+            transcripts::RevisionPayload::Stored(record) => record,
+            transcripts::RevisionPayload::Live(_) => {
+                panic!("a branch that left the transcript must be stored")
+            }
+        };
+        assert_eq!(
+            stored
+                .messages
+                .iter()
+                .map(|m| m.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["u1", "a1"]
+        );
+    }
+
+    /// Two user turns each own a regenerate family and both are referenced, then
+    /// an edit cuts the earlier one away. The later family's root leaves the
+    /// transcript in that same rewrite, so its reference has to be stored in
+    /// full — it is not the branch the truncate archives itself.
+    #[test]
+    fn truncate_from_stores_a_later_familys_reference_first() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, Some("p1"), Some("m1")).unwrap();
+        let mut first = user_msg("u1", "one", "2025-05-01T00:00:00Z");
+        first.revision_count = Some(1);
+        first.active_revision = Some(1);
+        append_message(&db, &session.id, &first, Some(&turn)).unwrap();
+        let mut first_answer = user_msg("a1", "first answer", "2025-05-01T00:00:01Z");
+        first_answer.role = "assistant".into();
+        append_message(&db, &session.id, &first_answer, Some(&turn)).unwrap();
+        save_active_branch_revision(&db, &session.id)
+            .unwrap()
+            .unwrap();
+
+        let mut second = user_msg("u2", "two", "2025-05-01T00:01:00Z");
+        second.revision_count = Some(1);
+        second.active_revision = Some(1);
+        append_message(&db, &session.id, &second, Some(&turn)).unwrap();
+        let mut second_answer = user_msg("a2", "second answer", "2025-05-01T00:01:01Z");
+        second_answer.role = "assistant".into();
+        append_message(&db, &session.id, &second_answer, Some(&turn)).unwrap();
+        save_active_branch_revision(&db, &session.id)
+            .unwrap()
+            .unwrap();
+
+        let second_index =
+            list_message_revisions(&db, &session.id, "u2").unwrap()[0].revision_index;
+        assert!(matches!(
+            transcripts::read_revision(db.data_dir(), &session.id, "u2", second_index)
+                .unwrap()
+                .unwrap(),
+            transcripts::RevisionPayload::Live(_)
+        ));
+
+        // Editing the FIRST turn cuts the whole second turn away from the
+        // transcript, and only the first family is the regenerate root.
+        truncate_from(&db, &session.id, Some("u1"), None).unwrap();
+
+        let stored =
+            match transcripts::read_revision(db.data_dir(), &session.id, "u2", second_index)
+                .unwrap()
+                .expect("the later family was stored before its root left the transcript")
+            {
+                transcripts::RevisionPayload::Stored(record) => record,
+                transcripts::RevisionPayload::Live(_) => {
+                    panic!("a branch that left the transcript must be stored")
+                }
+            };
+        assert_eq!(
+            stored
+                .messages
+                .iter()
+                .map(|m| m.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["u2", "a2"]
+        );
+    }
+
+    /// The other half of the same hazard: a revision switch restores a prefix
+    /// from before a later family, and that later family leaves the transcript
+    /// without the switch ever naming it.
+    #[test]
+    fn activate_message_revision_stores_a_later_familys_reference_first() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, Some("p1"), Some("m1")).unwrap();
+        // Family u1 has two variants: the first does not contain u2 at all.
+        let mut first = user_msg("u1", "one", "2025-05-01T00:00:00Z");
+        first.revision_count = Some(2);
+        first.active_revision = Some(2);
+        append_message(&db, &session.id, &first, Some(&turn)).unwrap();
+        let mut first_answer = user_msg("a1", "v1 answer", "2025-05-01T00:00:01Z");
+        first_answer.role = "assistant".into();
+        save_message_revision(
+            &db,
+            &session.id,
+            "u1",
+            &[first.clone(), first_answer.clone()],
+            false,
+        )
+        .unwrap();
+        append_message(&db, &session.id, &first_answer, Some(&turn)).unwrap();
+
+        let mut second = user_msg("u2", "two", "2025-05-01T00:01:00Z");
+        second.revision_count = Some(1);
+        second.active_revision = Some(1);
+        append_message(&db, &session.id, &second, Some(&turn)).unwrap();
+        let mut second_answer = user_msg("a2", "second answer", "2025-05-01T00:01:01Z");
+        second_answer.role = "assistant".into();
+        append_message(&db, &session.id, &second_answer, Some(&turn)).unwrap();
+        save_active_branch_revision(&db, &session.id)
+            .unwrap()
+            .unwrap();
+
+        let second_index =
+            list_message_revisions(&db, &session.id, "u2").unwrap()[0].revision_index;
+        assert!(matches!(
+            transcripts::read_revision(db.data_dir(), &session.id, "u2", second_index)
+                .unwrap()
+                .unwrap(),
+            transcripts::RevisionPayload::Live(_)
+        ));
+
+        // Variant 1 of u1 predates u2, so restoring it drops u2 entirely.
+        let restored = activate_message_revision(&db, &session.id, "u1", 1, &[]).unwrap();
+        assert_eq!(
+            restored.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(),
+            vec!["u1", "a1"]
+        );
+
+        let stored =
+            match transcripts::read_revision(db.data_dir(), &session.id, "u2", second_index)
+                .unwrap()
+                .expect("the later family was stored before the switch dropped it")
+            {
+                transcripts::RevisionPayload::Stored(record) => record,
+                transcripts::RevisionPayload::Live(_) => {
+                    panic!("a branch that left the transcript must be stored")
+                }
+            };
+        assert_eq!(
+            stored
+                .messages
+                .iter()
+                .map(|m| m.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["u2", "a2"]
+        );
+    }
+
+    /// The incident shape: a branch archived on agent_end kept growing (later
+    /// prompts, an error-ended turn that never re-archived it). Paging away and
+    /// back must restore all of it, not the copy taken at the first archive.
+    #[test]
+    fn activate_message_revision_archives_the_grown_live_branch_first() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, Some("p1"), Some("m1")).unwrap();
+        let prefix_msg = user_msg("u0", "earlier", "2025-04-29T00:00:00Z");
+        append_message(&db, &session.id, &prefix_msg, Some(&turn)).unwrap();
+        // Regenerate archived the original tail as revision 1 ...
+        let mut discarded = user_msg("u1", "do it", "2025-04-30T00:00:00Z");
+        discarded.revision_root_id = Some("u1".into());
+        let mut discarded_answer = user_msg("a1", "old answer", "2025-04-30T00:00:01Z");
+        discarded_answer.role = "assistant".into();
+        save_message_revision(
+            &db,
+            &session.id,
+            "u1",
+            &[discarded, discarded_answer],
+            false,
+        )
+        .unwrap();
+        // ... and the rewritten prompt finished and was archived as revision 2.
+        let mut root = user_msg("u2", "redo it", "2025-05-01T00:00:00Z");
+        root.revision_root_id = Some("u1".into());
+        root.revision_count = Some(2);
+        root.active_revision = Some(2);
+        append_message(&db, &session.id, &root, Some(&turn)).unwrap();
+        let mut answer = user_msg("a2", "new answer", "2025-05-01T00:00:01Z");
+        answer.role = "assistant".into();
+        append_message(&db, &session.id, &answer, Some(&turn)).unwrap();
+        save_message_revision(&db, &session.id, "u1", &[root, answer], true).unwrap();
+        // The conversation went on; this turn ended in an error, so nothing
+        // re-archived the branch.
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("u3", "continue", "2025-05-01T00:05:00Z"),
+            Some(&turn),
+        )
+        .unwrap();
+        let mut failed = user_msg("a3", "", "2025-05-01T00:05:01Z");
+        failed.role = "assistant".into();
+        failed.status = Some("error".into());
+        append_message(&db, &session.id, &failed, Some(&turn)).unwrap();
+
+        // Page back to the original, with a deliberately wrong renderer prefix:
+        // the durable transcript decides what stays in front of the branch.
+        let back = activate_message_revision(&db, &session.id, "u1", 1, &[]).unwrap();
+        assert_eq!(
+            back.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(),
+            vec!["u0", "u1", "a1"],
+        );
+        let listed = list_message_revisions(&db, &session.id, "u1").unwrap();
+        assert_eq!(listed.len(), 2, "no extra variant was minted");
+        assert_eq!(
+            listed[1].message_count, 4,
+            "revision 2 now holds the grown branch"
+        );
+
+        // Page forward again: the whole grown branch is back, including the
+        // failed turn, and the prefix kept its owning turn.
+        let forward = activate_message_revision(&db, &session.id, "u1", 2, &[]).unwrap();
+        assert_eq!(
+            forward.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(),
+            vec!["u0", "u2", "a2", "u3", "a3"],
+        );
+        assert_eq!(forward[1].active_revision, Some(2));
+        assert_eq!(forward[1].revision_count, Some(2));
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(detail.messages.len(), 5);
+        let prefix_turn: Option<String> = db
+            .conn()
+            .query_row(
+                "SELECT turn_id FROM messages WHERE session_id = ?1 AND id = 'u0'",
+                params![session.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(prefix_turn.as_deref(), Some(turn.as_str()));
+        let restored_with_turn: i64 = db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*) FROM messages
+                 WHERE session_id = ?1 AND turn_id = ?2 AND id IN ('u2', 'a2', 'u3', 'a3')",
+                params![session.id, turn],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            restored_with_turn, 4,
+            "rows that left the index with the branch get their turn back"
+        );
+    }
+
+    /// A regenerate stamped the new prompt as variant 2, then its turn failed
+    /// before agent_end archived it. Paging away must store that tail as its
+    /// own variant instead of writing it over variant 1.
+    #[test]
+    fn activate_message_revision_keeps_a_stamped_unarchived_branch_as_its_own_variant() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let mut discarded = user_msg("u1", "do it", "2025-04-30T00:00:00Z");
+        discarded.revision_root_id = Some("u1".into());
+        let mut discarded_answer = user_msg("a1", "old answer", "2025-04-30T00:00:01Z");
+        discarded_answer.role = "assistant".into();
+        save_message_revision(
+            &db,
+            &session.id,
+            "u1",
+            &[discarded, discarded_answer],
+            false,
+        )
+        .unwrap();
+        let mut root = user_msg("u2", "redo it", "2025-05-01T00:00:00Z");
+        root.revision_root_id = Some("u1".into());
+        root.revision_count = Some(2);
+        root.active_revision = Some(2);
+        append_message(&db, &session.id, &root, None).unwrap();
+        let mut failed = user_msg("a2", "", "2025-05-01T00:00:01Z");
+        failed.role = "assistant".into();
+        failed.status = Some("error".into());
+        append_message(&db, &session.id, &failed, None).unwrap();
+
+        let back = activate_message_revision(&db, &session.id, "u1", 1, &[]).unwrap();
+        assert_eq!(
+            back.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(),
+            vec!["u1", "a1"],
+        );
+        let listed = list_message_revisions(&db, &session.id, "u1").unwrap();
+        assert_eq!(listed.len(), 2);
+        let original = transcripts::read_revision(db.data_dir(), &session.id, "u1", 1)
+            .unwrap()
+            .unwrap();
+        let stored = match original {
+            transcripts::RevisionPayload::Stored(record) => record,
+            transcripts::RevisionPayload::Live(_) => {
+                panic!("variant 1 was archived before the switch and stays stored")
+            }
+        };
+        assert_eq!(
+            stored.messages.last().unwrap().id,
+            "a1",
+            "variant 1 is intact"
+        );
+        let forward = activate_message_revision(&db, &session.id, "u1", 2, &[]).unwrap();
+        assert_eq!(
+            forward.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(),
+            vec!["u2", "a2"],
+        );
+    }
+
+    #[test]
+    fn refresh_message_revision_rejects_an_unknown_index() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let root = user_msg("u1", "hello", "2025-05-01T00:00:00Z");
+        assert!(refresh_message_revision(&db, &session.id, "u1", 1, &[root]).is_err());
+    }
+
+    #[test]
+    fn replace_messages_preserves_owning_turn_ids() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, Some("p1"), Some("m1")).unwrap();
+        let kept = user_msg("a", "one", "2025-05-01T00:00:00Z");
+        append_message(&db, &session.id, &kept, Some(&turn)).unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("b", "two", "2025-05-01T00:00:01Z"),
+            Some(&turn),
+        )
+        .unwrap();
+
+        replace_messages(&db, &session.id, &[kept]).unwrap();
+        let owning: Option<String> = db
+            .conn()
+            .query_row(
+                "SELECT turn_id FROM messages WHERE session_id = ?1 AND id = 'a'",
+                params![session.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(owning.as_deref(), Some(turn.as_str()));
+    }
+
+    #[test]
+    fn truncate_from_drops_the_tail_and_archives_the_discarded_branch() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, Some("p1"), Some("m1")).unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("u0", "earlier", "2025-05-01T00:00:00Z"),
+            Some(&turn),
+        )
+        .unwrap();
+        let mut root = user_msg("u1", "do it", "2025-05-01T00:00:01Z");
+        root.revision_root_id = Some("u1".into());
+        root.revision_count = Some(1);
+        root.active_revision = Some(1);
+        append_message(&db, &session.id, &root, Some(&turn)).unwrap();
+        let mut answer = user_msg("a1", "old answer", "2025-05-01T00:00:02Z");
+        answer.role = "assistant".into();
+        append_message(&db, &session.id, &answer, Some(&turn)).unwrap();
+
+        let result = truncate_from(&db, &session.id, Some("u1"), None).unwrap();
+        assert_eq!(result.kept_count, 1);
+        assert_eq!(result.discarded_count, 2);
+        assert_eq!(result.aborted_turn_id.as_deref(), Some(turn.as_str()));
+        let revision = result.revision.unwrap();
+        assert_eq!(revision.root_user_id, "u1");
+        assert_eq!(revision.revision_count, 2);
+        assert_eq!(revision.active_revision, 2);
+
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(
+            detail
+                .messages
+                .iter()
+                .map(|m| m.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["u0"]
+        );
+        let status: String = db
+            .conn()
+            .query_row(
+                "SELECT status FROM turns WHERE id = ?1",
+                params![turn],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(status, "aborted");
+        let listed = list_message_revisions(&db, &session.id, "u1").unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].message_count, 2);
+        assert!(!listed[0].is_active);
+        let owning: Option<String> = db
+            .conn()
+            .query_row(
+                "SELECT turn_id FROM messages WHERE session_id = ?1 AND id = 'u0'",
+                params![session.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(owning.as_deref(), Some(turn.as_str()));
+    }
+
+    #[test]
+    fn truncate_from_rejects_an_unknown_message() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("u1", "hello", "2025-05-01T00:00:00Z"),
+            None,
+        )
+        .unwrap();
+        let error = truncate_from(&db, &session.id, Some("gone"), None).unwrap_err();
+        assert!(error.to_string().contains("NOT_FOUND"));
+        assert_eq!(
+            get_session(&db, &session.id)
+                .unwrap()
+                .unwrap()
+                .messages
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn truncate_from_refreshes_the_stamped_revision() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let mut original = user_msg("u1", "do it", "2025-05-01T00:00:00Z");
+        original.revision_root_id = Some("u1".into());
+        original.active_revision = Some(1);
+        let mut original_answer = user_msg("a0", "stale", "2025-05-01T00:00:01Z");
+        original_answer.role = "assistant".into();
+        save_message_revision(
+            &db,
+            &session.id,
+            "u1",
+            &[original.clone(), original_answer],
+            true,
+        )
+        .unwrap();
+        append_message(&db, &session.id, &original, None).unwrap();
+        let mut grown = user_msg("a1", "grown answer", "2025-05-01T00:00:02Z");
+        grown.role = "assistant".into();
+        append_message(&db, &session.id, &grown, None).unwrap();
+
+        truncate_from(&db, &session.id, Some("u1"), None).unwrap();
+        let listed = list_message_revisions(&db, &session.id, "u1").unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].message_count, 2);
+        let payload = transcripts::read_revision(db.data_dir(), &session.id, "u1", 1)
+            .unwrap()
+            .unwrap();
+        let stored = match payload {
+            transcripts::RevisionPayload::Stored(record) => record,
+            transcripts::RevisionPayload::Live(_) => {
+                panic!("a branch that left the transcript must be stored in full")
+            }
+        };
+        assert_eq!(
+            stored
+                .messages
+                .iter()
+                .map(|m| m.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["u1", "a1"]
+        );
+    }
+
+    fn streaming_assistant(id: &str, content: &str) -> UiMessage {
+        let mut message = user_msg(id, content, "2025-05-01T00:00:01Z");
+        message.role = "assistant".into();
+        message.status = Some("streaming".into());
+        message.thinking = Some("still thinking".into());
+        message
+    }
+
+    #[test]
+    fn inflight_checkpoint_is_promoted_as_aborted_after_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        let db = Database::open(&path).unwrap();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, None, None).unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("u1", "hello", "2025-05-01T00:00:00Z"),
+            Some(&turn),
+        )
+        .unwrap();
+
+        // Two checkpoints of the same reply: the file is replaced, not appended.
+        assert!(save_inflight_message(
+            &db,
+            &session.id,
+            Some(&turn),
+            &streaming_assistant("a1", "par")
+        )
+        .unwrap());
+        assert!(save_inflight_message(
+            &db,
+            &session.id,
+            Some(&turn),
+            &streaming_assistant("a1", "partial")
+        )
+        .unwrap());
+        assert!(transcripts::inflight_path(db.data_dir(), &session.id)
+            .unwrap()
+            .exists());
+        assert_eq!(
+            get_session(&db, &session.id)
+                .unwrap()
+                .unwrap()
+                .messages
+                .len(),
+            1
+        );
+        drop(db);
+
+        // A new process: the boot sweep aborts the turn, then the checkpoint
+        // becomes the aborted tail of the transcript.
+        let db = Database::open(&path).unwrap();
+        let recovered = recover_inflight_messages(&db, false).unwrap();
+        assert_eq!(recovered.len(), 1);
+        assert_eq!(recovered[0].0, session.id);
+        assert_eq!(recovered[0].1.content, "partial");
+        assert_eq!(recovered[0].1.status.as_deref(), Some("aborted"));
+        assert!(!transcripts::inflight_path(db.data_dir(), &session.id)
+            .unwrap()
+            .exists());
+
+        let messages = get_session(&db, &session.id).unwrap().unwrap().messages;
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[1].id, "a1");
+        assert_eq!(messages[1].thinking.as_deref(), Some("still thinking"));
+        assert_eq!(messages[1].status.as_deref(), Some("aborted"));
+        let owning: Option<String> = db
+            .conn()
+            .query_row("SELECT turn_id FROM messages WHERE id = 'a1'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(owning.as_deref(), Some(turn.as_str()));
+        // Running it again finds nothing to do.
+        assert!(recover_inflight_messages(&db, false).unwrap().is_empty());
+    }
+
+    #[test]
+    fn final_row_supersedes_checkpoint_and_late_checkpoint_cannot_resurrect_it() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, None, None).unwrap();
+        assert!(save_inflight_message(
+            &db,
+            &session.id,
+            Some(&turn),
+            &streaming_assistant("a1", "partial")
+        )
+        .unwrap());
+
+        let mut final_row = streaming_assistant("a1", "partial and complete");
+        final_row.status = Some("complete".into());
+        append_message(&db, &session.id, &final_row, Some(&turn)).unwrap();
+        assert!(!transcripts::inflight_path(db.data_dir(), &session.id)
+            .unwrap()
+            .exists());
+
+        // A checkpoint call that was already in flight when the final row landed.
+        assert!(!save_inflight_message(
+            &db,
+            &session.id,
+            Some(&turn),
+            &streaming_assistant("a1", "partial")
+        )
+        .unwrap());
+        assert!(!transcripts::inflight_path(db.data_dir(), &session.id)
+            .unwrap()
+            .exists());
+        assert!(recover_inflight_message(&db, &session.id, true)
+            .unwrap()
+            .is_none());
+
+        let messages = get_session(&db, &session.id).unwrap().unwrap().messages;
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].content, "partial and complete");
+        assert_eq!(messages[0].status.as_deref(), Some("complete"));
+    }
+
+    #[test]
+    fn checkpoint_for_a_newer_fragment_survives_an_older_final_row() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, None, None).unwrap();
+        assert!(save_inflight_message(
+            &db,
+            &session.id,
+            Some(&turn),
+            &streaming_assistant("a2", "second")
+        )
+        .unwrap());
+
+        let mut earlier = streaming_assistant("a1", "first");
+        earlier.status = Some("complete".into());
+        append_message(&db, &session.id, &earlier, Some(&turn)).unwrap();
+        assert!(transcripts::inflight_path(db.data_dir(), &session.id)
+            .unwrap()
+            .exists());
+    }
+
+    #[test]
+    fn empty_streaming_message_is_not_checkpointed() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let mut empty = streaming_assistant("a1", "   ");
+        empty.thinking = None;
+        assert!(!save_inflight_message(&db, &session.id, None, &empty).unwrap());
+        assert!(!transcripts::inflight_path(db.data_dir(), &session.id)
+            .unwrap()
+            .exists());
+        assert!(save_inflight_message(
+            &db,
+            &session.id,
+            None,
+            &user_msg("u1", "x", "2025-05-01T00:00:00Z")
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn completed_turn_end_keeps_an_unindexed_checkpoint() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, None, None).unwrap();
+        assert!(save_inflight_message(
+            &db,
+            &session.id,
+            Some(&turn),
+            &streaming_assistant("a1", "partial")
+        )
+        .unwrap());
+
+        let ended = end_turn_settling(&db, &turn, "completed", None, None, false, false).unwrap();
+        assert!(ended.updated);
+        assert!(ended.recovered.is_none());
+        assert!(
+            transcripts::inflight_path(db.data_dir(), &session.id)
+                .unwrap()
+                .exists(),
+            "outbox may still be draining; do not drop the only copy (D327)"
+        );
+        assert!(get_session(&db, &session.id)
+            .unwrap()
+            .unwrap()
+            .messages
+            .is_empty());
+
+        assert!(
+            recover_inflight_messages(&db, false).unwrap().is_empty(),
+            "boot leaves a completed leftover for the outbox"
+        );
+        assert!(transcripts::inflight_path(db.data_dir(), &session.id)
+            .unwrap()
+            .exists());
+
+        let recovered = recover_inflight_messages(&db, true).unwrap();
+        assert_eq!(recovered.len(), 1);
+        assert_eq!(recovered[0].1.content, "partial");
+        assert_eq!(recovered[0].1.status.as_deref(), Some("complete"));
+        let messages = get_session(&db, &session.id).unwrap().unwrap().messages;
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].id, "a1");
+        assert_eq!(messages[0].status.as_deref(), Some("complete"));
+    }
+
+    #[test]
+    fn completed_turn_end_drops_checkpoint_once_the_final_row_landed() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, None, None).unwrap();
+        assert!(save_inflight_message(
+            &db,
+            &session.id,
+            Some(&turn),
+            &streaming_assistant("a1", "partial")
+        )
+        .unwrap());
+        let mut final_row = streaming_assistant("a1", "partial and complete");
+        final_row.status = Some("complete".into());
+        append_message(&db, &session.id, &final_row, Some(&turn)).unwrap();
+
+        let ended = end_turn_settling(&db, &turn, "completed", None, None, false, false).unwrap();
+        assert!(ended.updated);
+        assert!(ended.recovered.is_none());
+        assert!(!transcripts::inflight_path(db.data_dir(), &session.id)
+            .unwrap()
+            .exists());
+        let messages = get_session(&db, &session.id).unwrap().unwrap().messages;
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].content, "partial and complete");
+        assert_eq!(messages[0].status.as_deref(), Some("complete"));
+    }
+
+    #[test]
+    fn sidecar_loss_recovers_the_checkpoint_at_turn_end() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, None, None).unwrap();
+        assert!(save_inflight_message(
+            &db,
+            &session.id,
+            Some(&turn),
+            &streaming_assistant("a1", "partial")
+        )
+        .unwrap());
+
+        let ended = end_turn_settling(
+            &db,
+            &turn,
+            "aborted",
+            Some("TURN_ABORTED"),
+            None,
+            false,
+            true,
+        )
+        .unwrap();
+        assert!(ended.updated);
+        let recovered = ended.recovered.expect("checkpoint promoted");
+        assert_eq!(recovered.id, "a1");
+        assert_eq!(recovered.status.as_deref(), Some("aborted"));
+        assert!(!transcripts::inflight_path(db.data_dir(), &session.id)
+            .unwrap()
+            .exists());
+        let messages = get_session(&db, &session.id).unwrap().unwrap().messages;
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].content, "partial");
+
+        // The final row for the same id, should it still arrive, is a no-op.
+        let mut late = streaming_assistant("a1", "partial");
+        late.status = Some("aborted".into());
+        append_message(&db, &session.id, &late, Some(&turn)).unwrap();
+        assert_eq!(
+            get_session(&db, &session.id)
+                .unwrap()
+                .unwrap()
+                .messages
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn user_stop_keeps_the_checkpoint_until_the_final_row_lands() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, None, None).unwrap();
+        assert!(save_inflight_message(
+            &db,
+            &session.id,
+            Some(&turn),
+            &streaming_assistant("a1", "partial")
+        )
+        .unwrap());
+
+        let ended = end_turn_settling(
+            &db,
+            &turn,
+            "aborted",
+            Some("TURN_ABORTED"),
+            None,
+            false,
+            false,
+        )
+        .unwrap();
+        assert!(ended.updated);
+        assert!(ended.recovered.is_none());
+        assert!(transcripts::inflight_path(db.data_dir(), &session.id)
+            .unwrap()
+            .exists());
+
+        let mut final_row = streaming_assistant("a1", "partial");
+        final_row.status = Some("aborted".into());
+        append_message(&db, &session.id, &final_row, Some(&turn)).unwrap();
+        assert!(!transcripts::inflight_path(db.data_dir(), &session.id)
+            .unwrap()
+            .exists());
+        assert_eq!(
+            get_session(&db, &session.id)
+                .unwrap()
+                .unwrap()
+                .messages
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn delete_session_removes_the_checkpoint_file() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        assert!(save_inflight_message(
+            &db,
+            &session.id,
+            None,
+            &streaming_assistant("a1", "partial")
+        )
+        .unwrap());
+        let path = transcripts::inflight_path(db.data_dir(), &session.id).unwrap();
+        assert!(path.exists());
+        assert!(delete_session(&db, &session.id).unwrap());
+        assert!(!path.exists());
+        assert!(recover_inflight_messages(&db, true).unwrap().is_empty());
+    }
+
+    #[test]
+    fn token_usage_history_aggregation() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, None, None).unwrap();
+
+        let usage = json!({
+            "inputTokens": 120,
+            "outputTokens": 80,
+            "cacheReadTokens": 40,
+            "cacheWriteTokens": 10,
+            "reasoningTokens": 20
+        });
+
+        let ended =
+            end_turn_settling(&db, &turn, "completed", None, Some(&usage), false, false).unwrap();
+        assert!(ended.updated);
+        let ended_at: i64 = db
+            .conn()
+            .query_row(
+                "SELECT ended_at FROM turns WHERE id = ?1",
+                params![turn],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        let history =
+            get_token_usage_history(&db, Some(ended_at - 1_000), Some(ended_at + 1_000), "day")
+                .unwrap();
+        let totals = history.get("totals").unwrap();
+        assert_eq!(totals.get("inputTokens").unwrap().as_i64(), Some(120));
+        assert_eq!(totals.get("outputTokens").unwrap().as_i64(), Some(80));
+        assert_eq!(totals.get("totalTokens").unwrap().as_i64(), Some(250));
+        assert_eq!(totals.get("cacheReadTokens").unwrap().as_i64(), Some(40));
+        assert_eq!(totals.get("turnCount").unwrap().as_i64(), Some(1));
+
+        let items = history.get("items").unwrap().as_array().unwrap();
+        assert!(!items.is_empty());
+        let active = items
+            .iter()
+            .find(|item| item.get("turnCount").and_then(|v| v.as_i64()) == Some(1))
+            .expect("active day");
+        assert_eq!(active.get("totalTokens").unwrap().as_i64(), Some(250));
+    }
+
+    #[test]
+    fn token_usage_history_uses_iso_week_year() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, None, None).unwrap();
+        let usage = json!({ "inputTokens": 1, "outputTokens": 1 });
+        end_turn_settling(&db, &turn, "completed", None, Some(&usage), false, false).unwrap();
+        // Monday 2025-12-29 is ISO week 1 of 2026.
+        let ended_at = chrono::TimeZone::with_ymd_and_hms(&chrono::Utc, 2025, 12, 29, 12, 0, 0)
+            .unwrap()
+            .timestamp_millis();
+        db.conn()
+            .execute(
+                "UPDATE turns SET ended_at = ?1 WHERE id = ?2",
+                params![ended_at, turn],
+            )
+            .unwrap();
+
+        let history = get_token_usage_history(
+            &db,
+            Some(ended_at - 86_400_000),
+            Some(ended_at + 86_400_000),
+            "week",
+        )
+        .unwrap();
+        let items = history.get("items").unwrap().as_array().unwrap();
+        let active = items
+            .iter()
+            .find(|item| item.get("turnCount").and_then(|v| v.as_i64()) == Some(1))
+            .expect("iso week");
+        assert_eq!(
+            active.get("date").and_then(|v| v.as_str()),
+            Some("2026-W01")
+        );
+    }
+
+    #[test]
+    fn token_usage_history_defaults_to_a_bounded_window() {
+        let db = test_db();
+        let history = get_token_usage_history(&db, None, None, "day").unwrap();
+        let items = history.get("items").unwrap().as_array().unwrap();
+        assert!(items.len() >= 365);
+        assert!(items.len() <= 53 * 7 + 1);
+        assert_eq!(
+            history
+                .get("totals")
+                .unwrap()
+                .get("turnCount")
+                .unwrap()
+                .as_i64(),
+            Some(0)
+        );
+    }
+}

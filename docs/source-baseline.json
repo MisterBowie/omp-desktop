@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "recordedDate": "2026-09-21",
+  "timezone": "Asia/Shanghai",
+  "workspace": "/Users/vv/Documents/对话/omp-desktop",
+  "implementationStatus": "planning-only",
+  "repositories": [
+    {
+      "name": "PI-Desktop",
+      "url": "https://github.com/vastsa/PI-Desktop.git",
+      "remoteName": "upstream",
+      "checkoutPath": "upstream/pi-desktop",
+      "checkoutBranch": "main",
+      "developmentWorktreePath": "app",
+      "developmentBranch": "codex/omp-desktop",
+      "commit": "0111e306c120ad5820688d7608cb37bad8fbcc1f",
+      "commitDate": "2026-09-21T22:58:04+09:00",
+      "packageVersion": "0.15.2",
+      "shallow": true,
+      "trackedFiles": 2093,
+      "codegraphPresent": false,
+      "nodeRequirement": ">=22.19.0",
+      "packageManager": "pnpm@10.34.5",
+      "license": "LGPL-3.0"
+    },
+    {
+      "name": "oh-my-pi",
+      "url": "https://github.com/can1357/oh-my-pi.git",
+      "remoteName": "upstream",
+      "checkoutPath": "upstream/oh-my-pi",
+      "checkoutBranch": "main",
+      "commit": "d49918fab2dba3986927f2d46721629ed0f3a02c",
+      "commitDate": "2026-09-21T12:46:50+02:00",
+      "packageVersion": "18.2.7",
+      "versionSource": "packages/coding-agent/package.json",
+      "shallow": true,
+      "trackedFiles": 7518,
+      "codegraphPresent": false,
+      "packageManager": "bun@>=1.4",
+      "codingAgentBunEngine": ">=1.3.14",
+      "sourceRustToolchain": "nightly-2026-08-12",
+      "license": "MIT",
+      "thirdPartyNotice": "THIRD-PARTY-NOTICES.txt"
+    }
+  ],
+  "environment": {
+    "platform": "Darwin arm64",
+    "git": "2.45.1",
+    "defaultNodeObserved": "v20.10.0",
+    "selectedNodeMajor": 24,
+    "installedNode24Verified": "v24.14.0",
+    "nodeSelection": "nvm use 24",
+    "pnpmObserved": "10.33.0",
+    "bunFoundOnCurrentPath": false,
+    "rustcFoundOnCurrentPath": false
+  },
+  "dependenciesInstalled": false,
+  "applicationBuilt": false,
+  "runtimeIntegrationTested": false,
+  "paidModelCallsMade": false
+}

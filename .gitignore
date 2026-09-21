@@ -1,0 +1,10 @@
+.DS_Store
+upstream/*
+!upstream/pi-desktop/
+!upstream/oh-my-pi/
+.local-worktrees/
+.artifacts/
+.env
+.env.*
+!.env.example
+*.log

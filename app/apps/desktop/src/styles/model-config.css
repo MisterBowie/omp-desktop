@@ -1,0 +1,1775 @@
+/*
+  Model configuration surfaces.
+
+  Three surfaces share this file because they share one visual language:
+  the single-form provider setup dialog (`.provider-setup-*` plus the live
+  `.provider-models-*` list), the vendor account dialog, and the settings page
+  that hosts both (`.model-config-page`). Typography, radii and weights come
+  from styles/tokens.css only — scripts/check-style-tokens.mjs enforces that.
+*/
+
+/* ------------------------------------------------- catalog status footer */
+
+.model-config-page .model-default-panel {
+  gap: 12px;
+}
+
+/* models.dev is the enrichment source, so the page only reports its snapshot. */
+.model-catalog-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--ds-tile);
+}
+
+.model-catalog-status-text {
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-relaxed);
+}
+
+/* ----------------------------------------------------- setup dialog shell */
+
+.provider-setup-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /*
+    Wide enough for two model panes side by side, and a fixed height so the
+    dialog never grows with the number of models: the panes scroll, not the page.
+  */
+  width: min(1040px, calc(100vw - 48px));
+  max-width: 100%;
+  min-width: 0;
+  height: min(720px, calc(100vh - 64px));
+  padding: 16px;
+}
+
+.provider-setup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+}
+
+/*
+  The dialog's actions sit in the header rather than a footer bar. Cancel is
+  first so the corner-most control is Save's neighbour, not Save itself.
+*/
+.provider-setup-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.provider-setup-title {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-base-plus);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-tight);
+}
+
+/* Only the body scrolls, so the head and actions stay reachable. */
+.provider-setup-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  /*
+    Kept scrollable for very short windows, but in the normal case the two
+    panes below own the scrolling and this container does not move.
+    overflow-y: auto computes overflow-x to auto, which would clip the 2px
+    field focus ring and let a wide min-content row scroll sideways. The
+    2px padding keeps the ring inside the padding box.
+  */
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 2px;
+  overscroll-behavior: contain;
+}
+
+/* Credentials read as one compact band, not as three stacked rows. */
+.provider-setup-credentials {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: none;
+}
+
+/*
+  Named services are Service + key. Custom is Service, then Name beside URL,
+  then the key beside API format. An unchosen service is one searchable picker
+  so the first decision is which endpoint, not which of five fields.
+*/
+.provider-setup-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.provider-setup-field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  align-items: start;
+  min-width: 0;
+}
+
+.provider-setup-field-row > * {
+  min-width: 0;
+}
+
+.provider-setup-field-row.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Keep the endpoint readable without making the display name feel incidental. */
+.provider-setup-custom-identity-row {
+  grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1.2fr);
+}
+
+/* The key needs room for long tokens; the format remains a compact peer. */
+.provider-setup-custom-auth-row {
+  grid-template-columns: minmax(0, 1.25fr) minmax(180px, 0.75fr);
+}
+
+.provider-setup-base-url {
+  min-width: 0;
+}
+
+.provider-setup-base-url .field-input {
+  min-width: 0;
+}
+
+.provider-setup-base-url .field-input[aria-invalid="true"] {
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ds-warning) 30%, transparent);
+}
+
+.provider-setup-field-error {
+  color: var(--ds-warning);
+  font-size: var(--text-xs);
+  line-height: var(--leading-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.provider-setup-host {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-relaxed);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-service-anchor {
+  width: 100%;
+  min-width: 0;
+}
+
+.provider-service-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.provider-service-trigger-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-service-trigger.is-placeholder {
+  color: var(--ds-text-muted);
+}
+
+.provider-service-trigger-chevron {
+  flex: none;
+  color: var(--ds-text-muted);
+  transition: transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.provider-service-trigger[aria-expanded="true"] .provider-service-trigger-chevron {
+  transform: rotate(180deg);
+}
+
+/*
+  Portaled above the dialog overlay (z-index 40) so the list can overflow the
+  credential band. Measured before reveal, same as the default-model menu.
+*/
+.provider-service-menu {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: min(360px, calc(100vw - 32px));
+  max-height: min(400px, calc(100vh - 120px));
+  padding: 4px;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--ds-bg-elevated-opaque);
+  box-shadow: var(--ds-shadow-composer);
+  color: var(--ds-text-primary);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  overflow: hidden;
+}
+
+.provider-service-menu.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.provider-service-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  margin-bottom: 3px;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  background: var(--ds-tile);
+  color: var(--ds-text-faint);
+}
+
+.provider-service-search input {
+  min-width: 0;
+  height: 26px;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.provider-service-search input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.provider-service-results {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-top: 2px;
+}
+
+.provider-service-no-results {
+  padding: 24px 12px;
+  color: var(--ds-text-faint);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.provider-service-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.provider-service-group {
+  padding: 6px 7px 2px;
+  color: var(--ds-text-faint);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-normal);
+  letter-spacing: var(--tracking-wide);
+  line-height: var(--leading-tight);
+}
+
+.provider-service-group.has-divider {
+  margin-top: 10px;
+}
+
+.provider-service-option {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 6px;
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.provider-service-option:hover,
+.provider-service-option.is-active {
+  background: var(--ds-bg-hover);
+}
+
+.provider-service-option.is-current {
+  background: color-mix(in oklab, var(--ds-accent) 9%, transparent);
+}
+
+.provider-service-option:focus-visible {
+  outline: 2px solid var(--ds-accent-soft);
+  outline-offset: 1px;
+}
+
+.provider-service-option-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--ds-accent);
+}
+
+.provider-service-option-label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-setup-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.provider-advanced-overlay {
+  z-index: 70;
+}
+
+.provider-advanced-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(560px, calc(100vw - 48px));
+  max-width: 100%;
+  min-width: 0;
+  max-height: min(560px, calc(100vh - 64px));
+  padding: 16px;
+}
+
+.provider-advanced-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex: none;
+}
+
+.provider-advanced-title {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-base-plus);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-tight);
+}
+
+.provider-advanced-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px;
+}
+
+.provider-setup-headers {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.provider-setup-headers-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.provider-setup-headers-label {
+  min-width: 0;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+}
+
+.provider-setup-headers-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.provider-setup-header-preset .settings-menu-select-trigger {
+  width: auto;
+  max-width: 170px;
+  height: 26px;
+  padding: 0 8px 0 8px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-2xs);
+}
+
+.provider-setup-header-import,
+.provider-setup-header-copy {
+  flex: none;
+  max-width: 100%;
+  padding: 4px 8px;
+  overflow: hidden;
+  font-size: var(--text-2xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Copy feedback stays compact while making the successful state distinct. */
+.provider-setup-header-copy.is-copied {
+  background: color-mix(in oklab, var(--ds-accent) 12%, transparent);
+  color: var(--ds-accent);
+}
+
+.provider-setup-header-file {
+  display: none;
+}
+
+/* Keep five header rows visible; additional rows scroll without moving models. */
+.provider-setup-header-list {
+  min-height: 0;
+  max-height: min(220px, 30vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 2px;
+  margin: -2px;
+}
+
+.provider-setup-header-error {
+  margin: 0;
+  color: var(--ds-warning);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-relaxed);
+}
+
+/* Pick on the left, review on the right; both stretch to the same height. */
+.provider-setup-panes {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.provider-setup-error {
+  padding: 8px 10px;
+  border-radius: var(--radius-xs);
+  background: var(--ds-bg-inset);
+  color: var(--ds-warning);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-relaxed);
+}
+
+/* ----------------------------------------------------- credential fields */
+
+.provider-credential-test {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.provider-credential-test-result {
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-relaxed);
+}
+
+/* ------------------------------------------------- live model list */
+
+/* The service's own answer, so this is a short checkbox list, not a catalog. */
+/*
+  Both panes are self-contained inset trays (D297): the inset tone sets them
+  off from the dialog, and the head is separated from its list by spacing only.
+*/
+.provider-models {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: var(--radius-sm);
+  background: var(--ds-bg-inset);
+}
+
+.provider-models-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  flex-wrap: wrap;
+  padding: 7px 7px 3px;
+}
+
+.provider-models-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.provider-models-select-all {
+  flex: none;
+}
+
+.provider-models-title {
+  margin: 0;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  line-height: var(--leading-tight);
+  text-transform: uppercase;
+}
+
+.provider-models-reload {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  margin: 0;
+  padding: 0 7px;
+  min-height: 24px;
+  border: 0;
+  border-radius: var(--radius-2xs);
+  background: var(--ds-bg-chip);
+  color: var(--ds-text-secondary);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-normal);
+  cursor: pointer;
+}
+
+.provider-models-reload:hover:not(:disabled) {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.provider-models-reload:disabled {
+  cursor: default;
+  color: var(--ds-text-faint);
+}
+
+.provider-models-reload:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ds-accent) 24%, transparent);
+}
+
+.provider-models-reload.is-loading svg {
+  animation: provider-models-reload-spin 700ms linear infinite;
+}
+
+@keyframes provider-models-reload-spin {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .provider-models-reload.is-loading svg {
+    animation: none;
+  }
+}
+
+/*
+  One search field, two panes: the discovered list and the chosen list filter
+  with the same control, so the pair reads as one picker rather than as two
+  unrelated boxes. Both sit in their pane header, pushed to the trailing edge.
+*/
+.provider-models-search-wrap,
+.provider-chosen-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 0 7px;
+  min-height: 24px;
+  min-width: 150px;
+  border-radius: var(--radius-2xs);
+  background: var(--ds-bg-chip);
+  color: var(--ds-text-faint);
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+
+.provider-models-search-wrap:focus-within,
+.provider-chosen-search-wrap:focus-within {
+  background: var(--ds-raised);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ds-accent) 24%, transparent);
+}
+
+.provider-models-search,
+.provider-chosen-search {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+  color: var(--ds-text-primary);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-normal);
+}
+
+.provider-models-search::placeholder,
+.provider-chosen-search::placeholder {
+  color: var(--ds-text-faint);
+}
+
+.provider-models-note {
+  margin: 0 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-xs);
+  background: var(--ds-tile);
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-relaxed);
+}
+
+.provider-models-note.is-error {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--ds-warning);
+  overflow-wrap: anywhere;
+}
+
+.provider-models-placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 3px;
+  padding: 14px 10px;
+  border-radius: var(--radius-xs);
+  background: var(--ds-tile);
+  color: var(--ds-text-faint);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-relaxed);
+  text-align: center;
+}
+
+.provider-models-placeholder.is-error {
+  flex-direction: column;
+  gap: 6px;
+  color: var(--ds-warning);
+  overflow-wrap: anywhere;
+}
+
+.provider-models-error-summary {
+  font-weight: var(--font-weight-medium);
+}
+
+.provider-models-error-detail,
+.provider-models-error-hint {
+  color: var(--ds-text-muted);
+  max-width: 36ch;
+}
+
+.provider-models-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 3px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+
+/*
+  These rows live inside the inset tray, so they carry no box of their own;
+  the checkbox and the 2px gap are enough for them to read as a list (D297).
+*/
+.provider-models-row {
+  border-radius: var(--radius-3xs);
+}
+
+.provider-models-row:hover {
+  background: var(--ds-bg-hover);
+}
+
+.provider-models-row:has(.provider-models-check:checked) {
+  background: var(--ds-bg-active);
+}
+
+.provider-models-row-label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 7px;
+  cursor: pointer;
+}
+
+.provider-models-check {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  accent-color: var(--ds-accent);
+  cursor: pointer;
+}
+
+.provider-models-check:focus-visible {
+  outline: 2px solid var(--ds-accent-soft);
+  outline-offset: 1px;
+}
+
+.provider-models-row-copy {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.provider-models-row-id {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-models-row-name {
+  flex: none;
+  color: var(--ds-text-muted);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-normal);
+}
+
+.provider-models-row-limits {
+  flex: none;
+  color: var(--ds-text-faint);
+  font-size: var(--text-3xs);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading-normal);
+}
+
+/* --------------------------------------------------------- chosen models */
+
+.provider-chosen {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: var(--radius-sm);
+  background: var(--ds-bg-inset);
+}
+
+.provider-chosen-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  /* The trailing search field drops below the title on a narrow pane. */
+  flex-wrap: wrap;
+  padding: 9px 8px 4px;
+}
+
+.provider-chosen-title {
+  margin: 0;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  line-height: var(--leading-tight);
+  text-transform: uppercase;
+}
+
+.provider-chosen-count {
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--ds-bg-chip);
+  color: var(--ds-text-muted);
+  font-size: var(--text-3xs);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading-relaxed);
+}
+
+.provider-chosen-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 3px;
+  padding: 14px 10px;
+  border-radius: var(--radius-xs);
+  background: var(--ds-tile);
+  color: var(--ds-text-faint);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-relaxed);
+  text-align: center;
+}
+
+.provider-chosen-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 3px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+
+.provider-chosen-row {
+  position: relative;
+  border-radius: var(--radius-3xs);
+  background: var(--ds-tile);
+}
+
+.provider-chosen-row.is-dragging {
+  opacity: 0.5;
+}
+
+.provider-chosen-row[data-drop-placement]::after {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: var(--ds-accent);
+  pointer-events: none;
+  content: "";
+}
+
+.provider-chosen-row[data-drop-placement="before"]::after {
+  top: -2px;
+}
+
+.provider-chosen-row[data-drop-placement="after"]::after {
+  bottom: -2px;
+}
+
+.provider-chosen-reorder {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-2xs);
+  background: transparent;
+  color: var(--ds-text-muted);
+  cursor: grab;
+  user-select: none;
+}
+
+.provider-chosen-reorder:active {
+  cursor: grabbing;
+}
+
+.provider-chosen-reorder:hover:not(:disabled) {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.provider-chosen-reorder:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.provider-chosen-row-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+}
+
+.provider-chosen-row-id {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The configured alias, shown beside the id it names. */
+.provider-chosen-row-alias {
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--ds-tile-deep);
+  color: var(--ds-text-secondary);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-normal);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-chosen-row-limits {
+  flex: none;
+  color: var(--ds-text-faint);
+  font-size: var(--text-3xs);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading-normal);
+}
+
+.provider-chosen-advanced-toggle {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--ds-tile-deep);
+  color: var(--ds-text-muted);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-normal);
+  cursor: pointer;
+}
+
+.provider-chosen-advanced-toggle:hover,
+.provider-chosen-advanced-toggle[aria-expanded="true"] {
+  background: var(--ds-bg-active);
+  color: var(--ds-text-primary);
+}
+
+.provider-chosen-advanced-toggle:focus-visible,
+.provider-chosen-reorder:focus-visible,
+.model-provider-row:focus-visible,
+.provider-chosen-remove:focus-visible {
+  outline: 2px solid var(--ds-accent-soft);
+  outline-offset: 1px;
+}
+
+.provider-chosen-remove {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-2xs);
+  background: transparent;
+  color: var(--ds-text-faint);
+  cursor: pointer;
+}
+
+.provider-chosen-remove:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+/*
+  Compact property sheet in a half-pane: 2xs labels, dense fields, no helper
+  paragraphs. Native number spinners are hidden so the two limit fields match.
+  Author `display: flex` would otherwise override the HTML hidden attribute.
+*/
+.provider-chosen-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 8px 8px;
+  font-size: var(--text-sm);
+}
+
+.provider-chosen-row-body[hidden] {
+  display: none;
+}
+
+.provider-chosen-row-body .field-input,
+.provider-chosen-row-body .field-select {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.provider-chosen-row-body input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.provider-chosen-row-body input[type="number"]::-webkit-outer-spin-button,
+.provider-chosen-row-body input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+.provider-chosen-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.provider-chosen-field-label {
+  color: var(--ds-text-secondary);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-normal);
+}
+
+.provider-chosen-limits {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* Preset ladders above the two numeric limit inputs (#202): the same
+   segmented-track language as the thinking chips, five stops per ladder. */
+.provider-limit-presets {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 3px;
+  width: 100%;
+  max-width: 100%;
+  padding: 3px;
+  border-radius: var(--radius-md);
+  background: var(--ds-bg-chip);
+}
+
+.provider-chosen-thinking {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.provider-chosen-thinking-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.provider-chosen-thinking-label {
+  color: var(--ds-text-secondary);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-normal);
+}
+
+.provider-chosen-thinking-hint {
+  color: var(--ds-text-faint);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-normal);
+}
+
+/* The context-window field says when its number still follows models.dev. */
+.provider-chosen-limit-hint {
+  color: var(--ds-text-faint);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-normal);
+}
+
+.provider-chosen-thinking-default {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.provider-chosen-thinking-select .settings-menu-select-trigger {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-normal);
+}
+
+.provider-chosen-thinking-select .settings-menu-select-trigger:focus-visible {
+  outline: 2px solid var(--ds-accent-soft);
+  outline-offset: 1px;
+}
+
+.provider-chosen-capabilities {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.provider-chosen-capability-rows {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.provider-chosen-capability {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-normal);
+  cursor: pointer;
+}
+
+.provider-chosen-thinking-chips {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 3px;
+  width: 100%;
+  max-width: 100%;
+  padding: 3px;
+  border-radius: var(--radius-md);
+  background: var(--ds-bg-chip);
+}
+
+.provider-thinking-chip {
+  min-width: 0;
+  min-height: 26px;
+  padding: 3px 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.provider-thinking-chip:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+/* The chosen level is the raised segment of the track (D297). */
+.provider-thinking-chip.selected {
+  background: var(--ds-accent);
+  box-shadow: var(--ds-raised-shadow);
+  color: var(--ds-bg-primary);
+}
+
+.provider-thinking-chip:focus-visible {
+  outline: 2px solid var(--ds-accent-soft);
+  outline-offset: 1px;
+}
+
+.provider-chosen-delegation {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.provider-chosen-delegation-help {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  color: var(--ds-text-faint);
+  cursor: help;
+  transition: color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.provider-chosen-delegation-help:hover {
+  color: var(--ds-text-secondary);
+}
+
+
+.provider-custom-model {
+  flex: none;
+  margin-top: 2px;
+  padding: 8px;
+  font-size: var(--text-sm);
+}
+
+.provider-custom-model-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.provider-custom-model-row > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ------------------------------------------------ vendor account dialog */
+
+.vendor-account-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* Same box as the service dialog: it renders the same two model panes. */
+  width: min(1040px, calc(100vw - 48px));
+  max-width: 100%;
+  min-width: 0;
+  height: min(720px, calc(100vh - 64px));
+  padding: 16px;
+}
+
+.vendor-account-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.vendor-account-title {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-base-plus);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-tight);
+}
+
+.vendor-account-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 2px;
+  overscroll-behavior: contain;
+}
+
+.vendor-account-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+/* -------------------------------------------------- model config page */
+
+.model-config-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.model-config-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.model-config-btn-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The default control uses the same row geometry as the rest of Settings. */
+.model-default-row {
+  min-width: 0;
+}
+
+.model-default-copy {
+  min-width: 0;
+}
+
+.model-default-value {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.model-default-provider {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ds-text-primary);
+  font-size: var(--text-md-plus);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-default-sep {
+  color: var(--ds-text-faint);
+  font-size: var(--text-sm);
+}
+
+.model-default-model {
+  min-width: 0;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.model-default-empty {
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
+.model-default-trigger {
+  white-space: nowrap;
+}
+
+.model-default-trigger-chevron {
+  flex: 0 0 auto;
+  color: var(--ds-text-muted);
+  transition: transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.model-default-trigger[aria-expanded="true"] .model-default-trigger-chevron {
+  transform: rotate(180deg);
+}
+
+/*
+  Picking a default is a floating menu, not an in-place expansion: the card kept
+  growing with every configured service. The surface portals to document.body as
+  a fixed layer because `.settings-panel` clips its overflow, and it bounds its
+  own height so a long service list scrolls instead of running off-screen.
+*/
+.model-default-anchor {
+  position: relative;
+  flex: none;
+}
+
+.model-default-menu {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: min(340px, calc(100vw - 32px));
+  max-height: min(400px, calc(100vh - 120px));
+  padding: 4px;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--ds-bg-elevated-opaque);
+  box-shadow: var(--ds-shadow-composer);
+  color: var(--ds-text-primary);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  overflow: hidden;
+}
+
+.model-default-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  margin-bottom: 3px;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  background: var(--ds-tile);
+  color: var(--ds-text-faint);
+}
+
+.model-default-search input {
+  min-width: 0;
+  height: 26px;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.model-default-search input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.model-default-results {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-top: 2px;
+}
+
+.model-default-results-meta {
+  padding: 3px 8px 6px;
+  color: var(--ds-text-faint);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-wide);
+}
+
+.model-default-no-results {
+  padding: 24px 12px;
+  color: var(--ds-text-faint);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+/* Revealed only once measured: an unplaced menu would flash at the origin. */
+.model-default-menu.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.model-default-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.model-default-option {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 6px;
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.model-default-option:hover {
+  background: var(--ds-bg-hover);
+}
+
+.model-default-option.is-current {
+  background: color-mix(in oklab, var(--ds-accent) 9%, transparent);
+}
+
+.model-default-option:focus-visible {
+  outline: 2px solid var(--ds-accent-soft);
+  outline-offset: 1px;
+}
+
+.model-default-option-check {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 18px;
+  height: 18px;
+  color: var(--ds-accent);
+}
+
+.model-default-provider-group {
+  padding: 6px 7px 2px;
+  color: var(--ds-text-faint);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-normal);
+  letter-spacing: var(--tracking-wide);
+  line-height: var(--leading-tight);
+}
+
+.model-default-provider-group.has-divider {
+  margin-top: 10px;
+}
+
+.model-default-option-model {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-provider-panel {
+  padding: 0;
+}
+
+.model-provider-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 16px;
+}
+
+.model-provider-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 2px;
+  border-radius: var(--radius-full);
+  background: var(--ds-bg-chip);
+  color: var(--ds-text-muted);
+}
+
+.model-provider-empty-title {
+  color: var(--ds-text-primary);
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-tight);
+}
+
+.model-provider-empty-desc {
+  max-width: 340px;
+  margin-bottom: 6px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-relaxed);
+  text-align: center;
+}
+
+/* D297: service rows are tiles separated by a gap, not by hairlines. */
+.model-provider-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.model-provider-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  /* A plugin-declared row's key entry takes a full line of its own; every
+     other row keeps the single-line layout. */
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: var(--radius-md-plus);
+  background: var(--ds-tile);
+}
+
+.model-provider-row.is-disabled {
+  opacity: 0.55;
+}
+
+.model-provider-row-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.model-provider-row-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.model-provider-row-name {
+  color: var(--ds-text-primary);
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-tight);
+}
+
+.model-provider-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ds-text-faint);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-normal);
+}
+
+.model-provider-meta-dot {
+  color: var(--ds-text-faint);
+}
+
+.model-provider-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+/* A plugin-declared row lets the plugin provide its fields; a key entry belongs
+   to the plugin, so the user supplies only the key. */
+.model-provider-key-entry {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-basis: 100%;
+  padding-top: 10px;
+  border-top: 1px solid var(--ds-border-subtle);
+}
+
+.model-provider-key-entry > label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.model-provider-key-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.model-provider-icon-btn.is-testing {
+  color: var(--ds-text-primary);
+}
+
+.model-provider-icon-btn.is-danger:hover {
+  color: var(--ds-warning);
+}
+
+.model-provider-delete-confirm {
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-warning) 14%, transparent);
+  color: var(--ds-warning);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-normal);
+  cursor: pointer;
+}
+
+.model-provider-delete-confirm:focus-visible {
+  outline: 2px solid var(--ds-accent-soft);
+  outline-offset: 1px;
+}
+
+/* ------------------------------------------------------------ responsive */
+
+@media (max-width: 940px) {
+  /* Two panes stop being readable before the dialog itself gets narrow. */
+  .provider-setup-field-row,
+  .provider-setup-custom-identity-row,
+  .provider-setup-custom-auth-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .provider-setup-panes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .provider-setup-dialog,
+  .vendor-account-dialog {
+    height: auto;
+    max-height: min(760px, calc(100vh - 64px));
+  }
+
+  .provider-models-list,
+  .provider-chosen-list {
+    max-height: min(240px, 30vh);
+  }
+}
+
+@media (max-width: 720px) {
+  /* Both searches take their own row instead of squeezing their header. */
+  .provider-models-search-wrap,
+  .provider-chosen-search-wrap {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  /* Header actions wrap under the title rather than crowding it. */
+  .provider-setup-head {
+    flex-wrap: wrap;
+  }
+
+  .provider-setup-head-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .provider-setup-headers-toolbar {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .provider-setup-headers-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .provider-setup-header-preset {
+    flex: 1 1 120px;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .model-provider-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .model-provider-row-actions {
+    align-self: flex-end;
+  }
+
+  .provider-chosen-thinking-chips {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .model-default-option {
+    transition: none;
+  }
+}
+
+/* Provider cards move with the pointer; surrounding cards preview the open slot. */
+.model-provider-row {
+  cursor: grab;
+  touch-action: none;
+  transition: transform 160ms ease;
+}
+.model-provider-row.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+  opacity: 1;
+  box-shadow: var(--ds-shadow-dialog);
+  transition: none;
+}
+.model-provider-list[aria-busy="true"] .model-provider-row { cursor: default; transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .model-provider-row { transition: none; }
+}

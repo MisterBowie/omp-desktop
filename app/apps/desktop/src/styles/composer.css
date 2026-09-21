@@ -1,0 +1,798 @@
+/*
+  Composer — dock, shell, textarea, toolbar, and the send/stop/nav controls.
+  Light/dark surface overrides live in theme-overrides.css; the menus that open
+  from the toolbar live in composer-menus.css.
+*/
+
+.composer-dock {
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+/* Thread mode: floating bottom dock. The transcript reserves the composer's
+ * measured height for scrolling, while this solid workspace-coloured band
+ * clips transcript paint before it can remain visible below the shell. */
+.composer-dock-docked {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  padding: 0 24px 16px;
+  background: var(--ds-bg-primary);
+}
+
+/* Home mode: the shell is owned by the bottom-reserved home composer region. */
+.composer-dock-home {
+  position: relative;
+  padding: 0;
+  background: transparent;
+}
+
+.composer-dock-home .composer-stack {
+  /* Keep home and docked modes on the same state-aware content cap. */
+  width: min(100%, var(--chat-composer-max-width, 768px));
+  max-width: 100%;
+  gap: 0;
+  overflow: visible;
+}
+
+.composer-stack {
+  pointer-events: auto;
+  width: min(100%, var(--chat-composer-max-width, 768px));
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  container-type: inline-size;
+  container-name: composer-stack;
+  transition: width var(--chat-width-transition, var(--motion-duration-normal) var(--motion-ease-out));
+}
+
+/* Asktool uses the same decision surface as Plan and Goal approval: it is
+ * mounted in the transparent composer dock, so it paints the composer plate
+ * with its shadow rather than the in-flow `--ds-tile` wash (03-permission-ux
+ * §9). Its width is the composer stack's instead of an inset panel above the
+ * input. */
+.composer-stack > .asktool-card {
+  width: 100%;
+  margin: 0 0 8px;
+  background: var(--ds-bg-composer);
+  box-shadow: var(--ds-shadow-composer);
+}
+
+.composer-queued-prompts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin: 0 0 8px;
+}
+
+.composer-queued-prompt {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-lg);
+  padding: 7px 8px 7px 12px;
+  background: var(--ds-bg-composer);
+  box-shadow: var(--ds-shadow-composer);
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm-plus);
+}
+
+.composer-queued-prompt-text {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-queued-prompt-action,
+.composer-queued-prompt-send-now {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  color: var(--ds-text-muted);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.composer-queued-prompt-action {
+  width: 24px;
+  height: 24px;
+}
+
+.composer-queued-prompt-send-now {
+  min-height: 24px;
+  padding: 0 8px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.composer-queued-prompt-action:hover,
+.composer-queued-prompt-action:focus-visible,
+.composer-queued-prompt-send-now:hover:not(:disabled),
+.composer-queued-prompt-send-now:focus-visible {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.composer-queued-prompt-send-now:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+/* A promoted row ("Send now") starts next: it reads as the head of the queue
+   and locks its own actions until the Host delivers it. */
+.composer-queued-prompt[data-priority="true"] {
+  background: var(--ds-bg-elevated);
+  box-shadow:
+    var(--ds-shadow-composer),
+    inset 2px 0 0 0 var(--ds-accent);
+  color: var(--ds-text-primary);
+}
+
+.composer-queued-prompt[data-priority="true"] .composer-queued-prompt-send-now:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+/* A locked row action stays visible and explains the state instead of going
+   dim: the row is already queued as the next turn. */
+.composer-queued-prompt-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.composer-queued-prompt-action:disabled:hover {
+  background: transparent;
+  color: var(--ds-text-muted);
+}
+
+.composer-shell {
+  /* Positioning context for the autocomplete panel (D123–D125, ADR 0024). */
+  position: relative;
+  width: 100%;
+  border-radius: var(--ds-composer-radius, var(--radius-2xl));
+  background: var(--ds-bg-composer);
+  box-shadow: var(--ds-shadow-composer);
+  isolation: isolate;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-normal) var(--motion-ease-out),
+    transform var(--motion-duration-normal) var(--motion-ease-out);
+}
+
+/* Focus deepens the lift; the shell never gains a stroke (D297). */
+.composer-shell:focus-within {
+  box-shadow: 0 7px 24px color-mix(in oklab, var(--ds-text-primary) 9%, transparent);
+}
+
+/* Native file-system drops get a target cue without changing shell geometry. */
+.composer-shell.is-drop-target {
+  outline: 2px solid color-mix(in oklab, var(--ds-accent) 72%, transparent);
+  outline-offset: 3px;
+}
+
+.composer-input-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px 12px 0;
+  min-height: 44px;
+}
+
+.composer-input-stage {
+  position: relative;
+  width: 100%;
+}
+
+.composer-placeholder {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  padding-top: 2px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  opacity: 0.72;
+  pointer-events: none;
+  text-overflow: ellipsis;
+  user-select: none;
+  white-space: nowrap;
+  animation: composer-placeholder-fade-in var(--motion-duration-fast) var(--motion-ease-out) both;
+}
+
+@keyframes composer-placeholder-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 0.72;
+  }
+}
+
+.composer-mode-chip-face {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  animation: composer-mode-face-in var(--motion-duration-fast)
+    var(--motion-ease-out) both;
+}
+
+.composer-mode-chip[data-planning="true"] {
+  color: var(--ds-text-primary) !important;
+}
+
+.composer-mode-chip[data-planning="true"] svg {
+  color: var(--ds-purple) !important;
+  animation: composer-mode-planning-pulse 1.2s var(--motion-ease-standard)
+    infinite;
+}
+
+@keyframes composer-mode-face-in {
+  from {
+    opacity: 0;
+    transform: translateX(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes composer-mode-planning-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.composer-input {
+  width: 100%;
+  min-height: 3lh;
+  max-height: 7lh;
+  overflow-y: hidden;
+  resize: none;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ds-text-primary);
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  cursor: text;
+}
+
+/* Atomic inline attachment chip inside the editable draft. */
+.composer-chip {
+  display: inline-flex;
+  max-width: min(100%, 240px);
+  height: 20px;
+  align-items: center;
+  gap: 4px;
+  margin: 0 2px;
+  border-radius: var(--radius-md);
+  padding: 0 4px 0 6px;
+  background: var(--ds-tile-deep);
+  color: var(--ds-text-secondary);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-compact);
+  vertical-align: middle;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.composer-chip[data-action="expand-text-reference"] {
+  cursor: pointer;
+}
+
+.composer-chip[data-action="expand-text-reference"]:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--ds-accent) 72%, transparent);
+  outline-offset: 1px;
+}
+
+.composer-chip-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--ds-text-muted);
+}
+
+.composer-chip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-chip-remove {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  color: var(--ds-text-muted);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.composer-chip-remove:hover,
+.composer-chip-remove:focus-visible {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.composer-input::placeholder {
+  /* Keep the native value for assistive technology; the visible copy is the
+     keyed span above so text changes can fade instead of flashing. */
+  color: var(--ds-text-secondary);
+  -webkit-text-fill-color: var(--ds-text-secondary);
+  opacity: 0 !important;
+}
+
+.composer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
+  padding: 4px 8px 8px;
+}
+
+.composer-left,
+.composer-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.composer-right {
+  justify-content: flex-end;
+}
+
+.composer-right .context-inspector-trigger {
+  min-height: 28px;
+}
+
+.icon-btn {
+  display: inline-flex;
+  height: 28px;
+  min-width: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--radius-full);
+  padding: 0 8px;
+  color: var(--ds-text-secondary);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out),
+    transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.icon-btn:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.icon-btn.active {
+  background: var(--ds-bg-active);
+  color: var(--ds-text-primary);
+}
+
+.send-btn {
+  display: inline-flex;
+  height: 28px;
+  width: 28px; /* Codex spacing-token-button-composer = 28px */
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--gray-0);
+  color: var(--gray-1000);
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-out), transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.composer-enhance-btn {
+  min-width: 28px;
+}
+
+/* While enhancing, this control carries a label and leaves the square geometry
+   its idle state gets from `.icon-btn-square`. */
+.icon-btn.composer-enhance-btn.is-loading {
+  width: auto;
+  flex: 0 0 auto;
+  cursor: wait;
+  padding-inline: 8px;
+}
+
+.composer-enhance-btn .tool-spinner {
+  margin-left: 0;
+  border-color: color-mix(in oklab, var(--ds-text-secondary) 45%, transparent);
+  border-top-color: var(--ds-text-primary);
+}
+
+.composer-enhance-undo {
+  color: var(--ds-text-secondary);
+}
+
+.composer-enhancement-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 8px;
+  border-radius: var(--radius-lg);
+  padding: 8px 10px;
+  background: color-mix(in oklab, var(--ds-error) 8%, var(--ds-bg-composer));
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.composer-enhancement-error-message {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.composer-enhancement-error code {
+  color: var(--ds-error);
+  font-size: var(--text-xs);
+}
+
+.composer-enhancement-error-dismiss {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-md);
+  color: var(--ds-text-muted);
+}
+
+.composer-enhancement-error-dismiss:hover,
+.composer-enhancement-error-dismiss:focus-visible {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+:root[data-theme="light"] .send-btn {
+  background: var(--gray-1000);
+  color: var(--gray-0);
+}
+
+.send-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.send-btn:disabled {
+  opacity: 1;
+  background: var(--ds-send-disabled-bg);
+  color: var(--ds-send-disabled-fg);
+}
+
+/*
+  `.send-btn:disabled` scores (0,2,0), but light paints the *enabled* chip from
+  a `:root[data-theme="light"] .send-btn` rule at (0,3,0), which would strand the
+  disabled state on the near-black enabled fill. The disabled state therefore
+  keeps a light-qualified companion — it reads the same tokens, so a contributed
+  theme can still move the chip, and the built-in paint is unchanged.
+*/
+:root[data-theme="light"] .send-btn:disabled {
+  background: var(--ds-send-disabled-bg);
+  color: var(--ds-send-disabled-fg);
+}
+
+.stop-btn {
+  display: inline-flex;
+  height: 28px;
+  width: 28px;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 16%, transparent);
+  color: var(--ds-text-primary);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    opacity var(--motion-duration-fast) var(--motion-ease-out),
+    transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.stop-btn:hover {
+  background: color-mix(in oklab, var(--ds-text-primary) 22%, transparent);
+}
+
+.send-btn:active:not(:disabled),
+.stop-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.nav-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  min-height: 32px; /* Codex nav ~31-32px pitch */
+  color: var(--ds-text-secondary);
+  font-size: var(--text-base); /* readable primary sidebar nav */
+  text-align: left;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out),
+    transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.nav-item:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.nav-item.active {
+  background: var(--ds-bg-active);
+  color: var(--ds-text-primary);
+}
+
+/* Plan approval surface. Keep the gate in the composer layer so it remains
+   adjacent to the input and follows the same container width as the dock.
+   The dock itself is transparent, so this plate uses the composer elevated
+   fill and shadow rather than the in-flow `--ds-tile` wash. */
+.plan-approval-bar {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 10px 14px;
+  margin-bottom: 8px;
+  padding: 7px 9px;
+  border-radius: var(--radius-md);
+  background: var(--ds-bg-composer);
+  box-shadow: var(--ds-shadow-composer);
+}
+
+.plan-approval-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+
+.plan-approval-title {
+  min-width: 0;
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-md-plus);
+  font-weight: var(--font-weight-strong);
+  line-height: var(--leading-compact);
+  overflow-wrap: anywhere;
+}
+
+.plan-approval-details {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 2px;
+}
+
+.plan-approval-artifact {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-3xs);
+  padding: 2px 5px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-compact);
+  text-align: left;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.plan-approval-artifact:hover,
+.plan-approval-artifact:focus-visible {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.plan-approval-artifact > svg {
+  flex: 0 0 auto;
+}
+
+.plan-approval-artifact-label {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.plan-approval-artifact-path {
+  min-width: 0;
+  max-width: min(38vw, 320px);
+  overflow: hidden;
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-approval-actions {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-self: end;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.plan-approval-reject,
+.plan-approval-approve-main,
+.plan-approval-approve-menu {
+  min-height: 30px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-compact);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.plan-approval-reject {
+  flex: 0 0 auto;
+  padding: 0 9px;
+  color: var(--ds-text-secondary);
+  white-space: nowrap;
+}
+
+.plan-approval-reject:hover:not(:disabled) {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.plan-approval-split {
+  position: relative;
+  display: flex;
+  width: 220px;
+  min-width: 0;
+  flex: 0 1 220px;
+  align-items: stretch;
+  border-radius: var(--radius-sm);
+  background: var(--ds-tile-deep);
+}
+
+.plan-approval-approve-main {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 0 10px;
+  border-radius: var(--radius-3xs) 0 0 var(--radius-3xs);
+  color: var(--ds-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.plan-approval-approve-main:hover:not(:disabled),
+.plan-approval-approve-menu:hover:not(:disabled) {
+  background: var(--ds-bg-hover);
+}
+
+.plan-approval-approve-menu {
+  display: inline-flex;
+  width: 30px;
+  flex: 0 0 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 var(--radius-3xs) var(--radius-3xs) 0;
+  color: var(--ds-text-secondary);
+}
+
+@container composer-stack (max-width: 520px) {
+  .plan-approval-bar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .plan-approval-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .plan-approval-artifact-path {
+    max-width: min(48vw, 320px);
+  }
+}
+
+@container composer-stack (max-width: 360px) {
+  .plan-approval-actions {
+    justify-content: stretch;
+  }
+
+  .plan-approval-reject,
+  .plan-approval-split {
+    min-width: 0;
+    flex: 1 1 0;
+  }
+}
+
+@container composer-stack (max-width: 280px) {
+  .plan-approval-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .plan-approval-reject,
+  .plan-approval-split {
+    width: 100%;
+    flex: 0 0 auto;
+  }
+
+}
+
+/* A folder drop asks for an explicit choice instead of attaching contents. */
+.composer-directory-drop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  background: var(--ds-tile);
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm);
+}
+
+.composer-directory-drop-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-directory-drop-action {
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  background: var(--ds-tile-deep);
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.composer-directory-drop-action:nth-of-type(1) {
+  margin-left: auto;
+}
+
+.composer-directory-drop-action:hover {
+  background: var(--ds-tile-hover);
+}

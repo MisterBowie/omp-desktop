@@ -1,0 +1,18 @@
+/*
+  Theme contributed by the Hello example plugin.
+
+  Contributed CSS is sanitized by the host (no @import, no remote url(), 256KB
+  cap) and injected after the app's own stylesheets, so overriding a `--ds-*`
+  token is enough — match the base selector the shell uses for the declared
+  `base` ("dark" here) so specificity is equal and load order decides.
+*/
+:root[data-theme="dark"] {
+  --ds-bg-primary: #0d1424;
+  --ds-bg-secondary: #131c31;
+  --ds-bg-tertiary: #1a2440;
+  --ds-bg-under: #060a14;
+  --ds-accent: #8fb4ff;
+  --ds-accent-hover: #a9c6ff;
+  --ds-accent-soft: #6f93d8;
+  --ds-purple: #b39cff;
+}
