@@ -41,9 +41,9 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 - 建立专用分支 `codex/m0-baseline` 与 worktree，初始化参考子模块到固定 SHA（pi-desktop `0111e306`、oh-my-pi `d49918fab`）。
 - 准备并记录环境：Node 24、pnpm 10.34.5、Bun 1.4.2、rustc stable + nightly-2026-08-12、cmake/ninja。
 - 原 PI-Desktop 按锁文件安装依赖并完成 `build:js`、typecheck、lint、host-core 构建与测试（`cargo test -p host-core` 577 通过）。
-- 隔离开发数据/数据库/凭证/更新源并启动开发版，CDP 截取代表性界面基线。
-- OMP `bun setup` 构建成功；隔离配置下 `omp --mode rpc` 完成 `ready`/`negotiate_protocol`(v2)/`get_available_models` 协议启动，无付费模型调用。
-- 证据：`docs/validation/M0-baseline.md` 与 `docs/validation/M0-screenshots/`；任务看板 T01-T03 已标记完成。
+- 隔离开发数据/数据库/凭证/更新源（`PI_DESKTOP_DATA_DIR`）与全局 `.agents`（`PI_DESKTOP_AGENTS_DIR`），启动开发版，CDP 截取代表性界面基线。
+- OMP `bun setup` 构建成功；固定源码入口（`~/.bun/bin/omp`，版本 18.2.7）在全量隔离（`PI_CONFIG_DIR`/`PI_CODING_AGENT_DIR`/`OMP_DEV_LAUNCH_DIR`）下完成 `ready`/`negotiate_protocol`(v2)/`get_available_models` 协议启动，无付费模型调用；可复现脚本 `docs/validation/M0-rpc/verify-rpc.mjs` + fixture `models.yml`。
+- 证据：`docs/validation/M0-baseline.md`（含顶部“返修记录”）与 `docs/validation/M0-screenshots/`；任务看板 T01-T03 已标记完成。
 
 ## 3.1 仍然没有做的工作
 
@@ -57,9 +57,9 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 
 **从 M1（T04-T07）开始，不直接改 Agent 引擎。**
 
-M0 已完成：原桌面可复现构建、开发数据隔离、UI 基线、OMP 协议启动（`ready`/`negotiate_protocol` v2）均有记录（`docs/validation/M0-baseline.md`）。环境已就绪：Node 24、pnpm 10.34.5、Bun 1.4.2、桌面 Rust stable + OMP `nightly-2026-08-12`、cmake/ninja。
+M0 已完成并通过复审返修：原桌面可复现构建、开发数据与全局 `.agents` 隔离、UI 基线、OMP 协议启动（固定源码入口 18.2.7，`ready`/`negotiate_protocol` v2）均有记录（`docs/validation/M0-baseline.md`，顶部“返修记录”列 6 项修复）。环境已就绪：Node 24、pnpm 10.34.5、Bun 1.4.2、桌面 Rust stable + OMP `nightly-2026-08-12`、cmake/ninja。
 
-M1 优先验证 rpc-ui + OMP 原有审批/受信扩展，验证不足才增加 SDK bridge。审批、取消和恢复实验通过前，不开放完整工具执行。OMP 配置根 `~/.omp` 的完整隔离（`PI_CONFIG_DIR`/XDG）需在 M1/M2 收口。
+M1 优先验证 rpc-ui + OMP 原有审批/受信扩展，验证不足才增加 SDK bridge。审批、取消和恢复实验通过前，不开放完整工具执行。OMP 运行环境隔离已在本轮收口（`PI_CONFIG_DIR`/`PI_CODING_AGENT_DIR`/`OMP_DEV_LAUNCH_DIR` 三变量），M1 沿用 `docs/validation/M0-rpc/verify-rpc.mjs` 的隔离方式。
 
 ## 5. 可直接交给执行模型
 

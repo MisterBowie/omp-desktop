@@ -1,0 +1,17 @@
+# M0 reproducible RPC fixture: a single local mock model so the RPC server can
+# start without any paid provider or network call. The baseUrl is unreachable
+# by design (port 9); no prompt is ever sent in the M0 protocol verification.
+providers:
+  m0mock:
+    baseUrl: http://127.0.0.1:9
+    api: openai-completions
+    auth: none
+    models:
+      - id: local-model
+        api: openai-completions
+        contextWindow: 32000
+        cost:
+          input: 0
+          output: 0
+          cacheRead: 0
+          cacheWrite: 0

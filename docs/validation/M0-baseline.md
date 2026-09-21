@@ -6,6 +6,17 @@
 
 > 本记录所有命令均为实际执行；未运行或未通过的验证已明确标注，未标记为通过。
 
+## 返修记录（复审，2026-09-22）
+
+对提交 `44441d2` 的复审发现 6 项问题，本轮逐项修复并重验；旧验证的历史事实保留在正文，更正与新增证据如下：
+
+1. **OMP 版本**（5.2 更正）：原记录误用 `command -v omp` 命中的 `/home/vv/.local/bin/omp`（用户自行安装的已编译 18.2.6 二进制）。固定源码入口是 `~/.bun/bin/omp` → `upstream/oh-my-pi/packages/coding-agent/scripts/omp` → `bun src/cli.ts`，版本来自 `packages/utils/package.json` = **18.2.7**；`~/.bun/bin/omp --version` 实测 `omp/18.2.7`。
+2. **OMP 运行环境隔离**（5.4 完成）：原运行触碰 `~/.omp/agent/agent.db` 的 WAL/SHM。返修后同时设 `PI_CONFIG_DIR=.omp-m0-dev`、`PI_CODING_AGENT_DIR=<worktree>/.dev-data/omp-dev/agent`、`OMP_DEV_LAUNCH_DIR=<worktree>/.dev-data/omp-dev/dev-cwd`，三处全部离开 `~/.omp`；`~/.omp` 零写入，未迁移/删除用户数据。
+3. **桌面全局配置隔离**（4.2 完成）：`PI_DESKTOP_DATA_DIR` 不覆盖 `~/.agents`。设 `PI_DESKTOP_AGENTS_DIR=<worktree>/.dev-data/agents`（Rust `global_agents_dir()` 读取），MCP 页仅显示受控 fixture `m0-test`，真实用户 3 台 MCP 服务器未加载。
+4. **可复现材料**（新增）：`docs/validation/M0-rpc/verify-rpc.mjs`（环境/请求序列/断言/超时/清理）+ `docs/validation/M0-rpc/models.yml`（mock fixture），`node …/verify-rpc.mjs` 退出码 0。
+5. **模型设置页**（4.3 更新）：`02-settings-models.png` 已重拍为真实“模型配置”页（默认模型/生图模型/AI 服务/厂商账户，无 AI 服务）；`02-settings.png` 重拍为隔离后的 MCP 页（仅 fixture）。
+6. **测试表述**（3.1 修正）：单文件 14 项通过不再当作完整套件通过；完整 desktop 套件 `env -u SSH_ASKPASS node --test test/*.test.mjs` 实测 2523 项 / 2519 通过 / 0 失败 / 4 跳过（退出码 0）。
+
 ## 1. 环境与版本
 
 | 项目 | 版本/事实 | 说明 |
@@ -73,13 +84,13 @@ pip install cmake ninja                       # cmake 4.4.3 / ninja 1.13.2
 根因：本机 shell 环境预设 `SSH_ASKPASS=/usr/bin/false`，测试的 SSH 传输 fixture 从父环境继承了该变量。复现与证明：
 
 ```bash
-# 失败（默认环境）
+# 完整 desktop 包测试套件（默认环境，1 项失败）
 pnpm --filter @pi-desktop/desktop test   # 2523 tests, 2518 pass, 1 fail, 4 skipped
-# 通过（去掉环境变量后）
-env -u SSH_ASKPASS node --test test/remote-host-ssh-password.test.mjs  # 14 pass, 0 fail
+# 完整 desktop 包测试套件（去掉 SSH_ASKPASS 后重跑）
+env -u SSH_ASKPASS node --test test/*.test.mjs  # 2523 tests, 2519 pass, 0 fail, 4 skipped (exit 0)
 ```
 
-结论：该失败为上游既有、受本机环境变量触发的用例，未改动源码，不计为适配回归。上游其余测试未因本阶段改动而失败。
+结论：该失败为上游既有、受本机环境变量触发的用例，未改动源码，不计为适配回归。验证范围如实标注：完整 desktop 包测试套件（2523 项）在 `env -u SSH_ASKPASS` 下全通过（2519 通过 / 0 失败 / 4 跳过）；`pnpm -r --if-present test` 因 desktop 包失败而中断，其余 workspace 包的测试未在本轮重跑（仅 desktop 包重跑并记录）。
 
 ## 4. 开发数据/凭证/更新源隔离与 UI 基线（T03）
 
@@ -97,6 +108,7 @@ env -u SSH_ASKPASS node --test test/remote-host-ssh-password.test.mjs  # 14 pass
 | 凭证存储 | `.dev-data/pi-desktop/secrets/.machine-key`（加密 secret store） | 由开发版创建 |
 | 日志/插件/窗口态 | `.dev-data/pi-desktop/{logs,plugins,window-state.json,crash-dumps,cache,scratch}` | 由开发版创建 |
 | Electron userData | `~/.config/PI-Desktop Dev` | 进程参数 `--user-data-dir=...PI-Desktop Dev` |
+| 全局 `.agents`（MCP/技能/子代理） | `PI_DESKTOP_AGENTS_DIR=/…/.dev-data/agents` | 见返修记录第 3 项；MCP 页仅显示受控 fixture `m0-test`，真实用户的 3 台 MCP 服务器未加载 |
 | 用户既有数据 | `~/.pi-desktop`（2026-09-21 22:05 起存在） | `find ~/.pi-desktop -newermt "2026-09-22 00:00"` 为空 → 本次运行零写入 |
 | 更新源 | dev（unpackaged）构建 `resolveUpdateMode` 返回 `"disabled"` | 源码 `apps/desktop/electron/main/updater.ts`；dev 无 `app-update.yml`，不自动更新 |
 
@@ -109,6 +121,7 @@ env -u SSH_ASKPASS node --test test/remote-host-ssh-password.test.mjs  # 14 pass
 ```bash
 NO_SANDBOX=1 REMOTE_DEBUGGING_PORT=9222 \
 PI_DESKTOP_DATA_DIR=/home/vv/person/code/omp-desktop-m0/.dev-data/pi-desktop \
+PI_DESKTOP_AGENTS_DIR=/home/vv/person/code/omp-desktop-m0/.dev-data/agents \
 pnpm dev
 ```
 
@@ -119,8 +132,8 @@ pnpm dev
 | 文件 | 界面 | 核对要点 |
 | --- | --- | --- |
 | `01-project-list-onboarding.png` | 项目列表 + 引导 | 侧栏“会话/项目”，项目 `apps`，引导卡“添加 AI 模型服务/保存 API 密钥/打开项目文件夹/发送第一条消息” |
-| `02-settings.png` | 设置 → MCP | 侧栏“偏好/常规/AI/快捷键/智能体/指令/模型/技能/MCP/子智能体/工作区/导入/项目/系统/信息”；MCP 全局 3 项、项目 0 项 |
-| `02-settings-models.png` | 设置 → 模型 | 模型设置页 |
+| `02-settings.png` | 设置 → MCP | 侧栏“偏好/常规/AI/快捷键/智能体/指令/模型/技能/MCP/子智能体/工作区/导入/项目/系统/信息”；MCP 全局 1 项（受控 fixture `m0-test`）、项目 0 项，真实用户服务器未加载 |
+| `02-settings-models.png` | 设置 → 模型配置 | “模型配置”页：默认模型/生图模型/AI 服务/厂商账户，显示“还没有 AI 服务”、内置目录 7865 个模型 |
 | `03-extensions.png` | 扩展 | 已安装 2 个内置插件（`pi.file-manager` v0.5.2、`pi.browser` v1.0.0），1 个可更新 |
 | `04-main-after-settings.png` | 主界面 | 返回应用后的主视图 |
 
@@ -143,17 +156,22 @@ bun setup   # scripts/setup.ts: bun install → build:native → coding-agent li
 
 过程中发现并记录：首次 `build:native` 因 PATH 缺 `~/.cargo/bin` 报 `cargo metadata failed`；补 PATH 后因缺 `cmake` 报 `opusic-sys` 构建失败；`pip install cmake ninja` 后通过。OMP 原生模块构建对系统 `cmake`/`ninja` 的依赖未在上游文档显式列出。
 
-### 5.2 版本
+### 5.2 版本（返修更正）
 
-- `omp --version` → `omp/18.2.6`
-- `packages/coding-agent/package.json` `version` → `18.2.7`（与 `source-baseline.json` 一致）
-- 差异说明：CLI 报告版本 18.2.6（最近 CHANGELOG 发布 `[18.2.6] - 2026-09-18`），package.json 为 18.2.7（未发布增量）；固定 SHA 与 baseline 一致，版本字符串来源待后续对齐。
+- 固定源码 CLI 版本来自 `packages/utils/package.json`（`dirs.ts` 中 `import { version } from "../package.json"` → `VERSION`），为 **18.2.7**。
+- `command -v omp` → `/home/vv/.local/bin/omp`（用户自行安装的已编译 18.2.6 二进制，2026-09-20 23:09），不是固定源码入口。原记录误用了该二进制，把版本记成 18.2.6。
+- 固定源码入口：`~/.bun/bin/omp` → `upstream/oh-my-pi/packages/coding-agent/scripts/omp`（`bun setup` 的 `link omp` 建立）→ `bun src/cli.ts`。
+- 用源码入口重跑：`PATH="$HOME/.bun/bin:…" ~/.bun/bin/omp --version` → `omp/18.2.7`（与 pi-utils/package.json 一致）。
 
 ### 5.3 隔离配置下的协议启动（无付费模型调用）
 
-隔离方式：`PI_CODING_AGENT_DIR=/home/vv/person/code/omp-desktop-m0/.dev-data/omp-agent`，cwd 指向 `.dev-data/omp-cwd`；在该目录写 `models.yml` 声明一个 `auth: none`、`baseUrl: http://127.0.0.1:9`（不可达）的本地 mock 模型 `m0mock/local-model`，使启动时 `session.model` 成立而不触发任何付费/网络模型调用。
+隔离方式（返修后，全量隔离，见 5.4）：可复现脚本 `docs/validation/M0-rpc/verify-rpc.mjs` + fixture `docs/validation/M0-rpc/models.yml`。脚本 spawn 固定源码入口 `~/.bun/bin/omp --mode rpc --model m0mock/local-model`，设置 `PI_CONFIG_DIR=.omp-m0-dev`、`PI_CODING_AGENT_DIR=<worktree>/.dev-data/omp-dev/agent`、`OMP_DEV_LAUNCH_DIR=<worktree>/.dev-data/omp-dev/dev-cwd`，读 `ready`、写 `negotiate_protocol`、断言响应后 SIGTERM。fixture 声明 `auth: none`、`baseUrl: http://127.0.0.1:9`（不可达）的本地 mock 模型，使 `session.model` 成立而不触发任何付费/网络模型调用。
 
-命令与脚本（Node spawn `omp --mode rpc --model m0mock/local-model`，读 stdout、写 negotiate、读响应后 SIGTERM）：
+运行（退出码 0，`PASS: ready + negotiate_protocol(v2) + get_available_models`）：
+
+```bash
+node docs/validation/M0-rpc/verify-rpc.mjs
+```
 
 关键 stdout 帧（脱敏样本，无密钥/凭证）：
 
@@ -170,21 +188,29 @@ bun setup   # scripts/setup.ts: bun install → build:native → coding-agent li
 - `get_available_models` 返回隔离目录内的 mock 模型，未访问真实提供商。
 - 全程未设置任何 API key、未发送 `prompt`，未产生付费模型调用；模型 baseUrl 指向不可达 localhost，无外呼。
 
-### 5.4 OMP 数据隔离与残留
+### 5.4 OMP 运行环境隔离（返修完成）
 
-隔离目录 `.dev-data/omp-agent/` 由本次运行创建：`agent.db`、`models.db`、`sessions/-person-code-omp-desktop-m0-.dev-data-omp-cwd`、`models.yml`。
+原运行只设 `PI_CODING_AGENT_DIR`，触碰到用户真实 `~/.omp`（`~/.omp/agent/agent.db` 的 WAL/SHM、`~/.omp/natives`、`~/.omp/run/daemons`、`~/.omp/puppeteer`、`~/.omp/.dev-cwd`）。返修后同时设置三个环境变量，全部重定向离开 `~/.omp`：
 
-残留发现（需 M2 处理）：`PI_CODING_AGENT_DIR` 仅重定向 agent 数据目录；OMP 的配置根 `~/.omp`（默认，`PI_CONFIG_DIR` 控制）仍被本次运行写入运行时/构建缓存——`~/.omp/natives/18.2.6`（原生缓存）、`~/.omp/puppeteer`、`~/.omp/run/daemons`。这些是构建/运行时缓存，非用户数据、数据库或凭证；用户既有 `~/.omp/agent/` 下的 `config.yml`、`agent.db`、`models.db`、`history.db` 文件本体 mtime 未变（仅 SQLite `-wal`/`-shm` 被守护进程短暂打开时触碰）。完全隔离需同时设置 `PI_CONFIG_DIR`（或走 XDG 迁移），列为 M2 配置隔离项。
+| 目录 | 环境变量 | 返修后位置 |
+| --- | --- | --- |
+| 配置根（natives/run/daemons/puppeteer/logs） | `PI_CONFIG_DIR=.omp-m0-dev` | `~/.omp-m0-dev/` |
+| agent 数据（agent.db/models.db/sessions/config） | `PI_CODING_AGENT_DIR` | `<worktree>/.dev-data/omp-dev/agent/` |
+| 启动目录（源码启动器默认 `~/.omp/.dev-cwd`） | `OMP_DEV_LAUNCH_DIR` | `<worktree>/.dev-data/omp-dev/dev-cwd/` |
+
+验证：`verify-rpc.mjs` 运行后，`~/.omp-m0-dev` 与 `.dev-data/omp-dev/` 由本次创建（时间戳 01:01），`agent.db`/`models.db`/`sessions`/`models.yml` 均落在隔离 agent 目录；`~/.omp` 未被本次运行写入。未迁移、删除或清理用户真实 `~/.omp` 数据。
+
+注意：源码启动器 `scripts/omp` 即使只跑 `--version` 也会创建默认 `~/.omp/.dev-cwd`（除非设 `OMP_DEV_LAUNCH_DIR`）；因此所有源码入口调用都必须带上三个隔离变量。
 
 ## 6. 未完成项与剩余风险
 
-1. 原 PI-Desktop 1 个上游测试因本机 `SSH_ASKPASS` 环境变量失败（非回归，见 3.1）。
-2. OMP 配置根 `~/.omp` 的完整隔离（`PI_CONFIG_DIR`/XDG）未在 M0 收口，见 5.4。
-3. OMP 原生模块构建对 `cmake`/`ninja` 的依赖未在上游文档显式列出（已在本机补齐）。
-4. 未做 Rust `cargo clippy`（M0 基线以 build/test/fmt 为准，clippy 属宿主行为变更时才需，本阶段未改 host-core 源码）。
-5. 平台差异：本机为 Linux x64，与规划文档假设的 macOS arm64 不同；macOS 打包与安装产物（M6）未验证。
-6. 版本字符串 `omp/18.2.6` 与 package.json `18.2.7` 的不一致待对齐。
+1. 原 PI-Desktop 1 个上游测试因本机 `SSH_ASKPASS` 环境变量失败（非回归，`env -u SSH_ASKPASS` 后完整 desktop 套件全通过，见 3.1）。
+2. OMP 原生模块构建对 `cmake`/`ninja` 的依赖未在上游文档显式列出（已在本机补齐）。
+3. 未做 Rust `cargo clippy`（M0 基线以 build/test/fmt 为准，clippy 属宿主行为变更时才需，本阶段未改 host-core 源码）。
+4. 平台差异：本机为 Linux x64，与规划文档假设的 macOS arm64 不同；macOS 打包与安装产物（M6）未验证。
+
+（返修已收口：OMP 配置根隔离与版本字符串两项均已解决，见 5.2/5.4。）
 
 ## 7. 下一阶段入口
 
-M1（T04-T07）：以本基线记录的环境（Node 24 / pnpm 10.34.5 / Bun 1.4.2 / nightly-2026-08-12 / cmake+ninja）继续；M1 先复用本节已验证的 RPC 握手，验证 rpc-ui + OMP 原有审批 wrapper/受信扩展（E01-E09），并在 `PI_CONFIG_DIR` 完整隔离后重跑配置隔离实验。
+M1（T04-T07）：以本基线记录的环境（Node 24 / pnpm 10.34.5 / Bun 1.4.2 / nightly-2026-08-12 / cmake+ninja）继续；M1 复用 `docs/validation/M0-rpc/verify-rpc.mjs` 已验证的 RPC 握手（固定源码入口 + 全量隔离），验证 rpc-ui + OMP 原有审批 wrapper/受信扩展（E01-E09）。
