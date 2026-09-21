@@ -119,6 +119,9 @@ export function createEvidence(name) {
   const checks = [];
   const evidence = {
     experiment: name,
+    // The suite assigns a unique run id; a result without the current id is a
+    // leftover from an earlier run and must not count (see run-all.mjs).
+    runId: process.env.M1_RUN_ID ?? null,
     startedAt: new Date().toISOString(),
     checks,
     artifacts: {},

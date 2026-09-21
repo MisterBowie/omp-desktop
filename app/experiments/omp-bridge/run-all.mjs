@@ -14,15 +14,21 @@ import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomBytes } from "node:crypto";
+import { reapRunResources } from "./lib/runtime-registry.mjs";
+import { parseArgs, verdictFor } from "./lib/suite-policy.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+const EXPERIMENT_DATA_ROOT = join(HERE, "..", "..", "..", ".dev-data", "m1");
 const PER_EXPERIMENT_TIMEOUT_MS = Number(process.env.M1_EXPERIMENT_TIMEOUT_MS ?? 300_000);
+// Every experiment must stamp its result with this id; a file left over from an
+// earlier run cannot satisfy the check.
+const RUN_ID = `run-${Date.now().toString(36)}-${randomBytes(3).toString("hex")}`;
 
 const argv = process.argv.slice(2);
-const keep = argv.includes("--keep-artifacts");
-const dirFlag = argv.indexOf("--dir");
-const SCAN_DIR = dirFlag >= 0 && argv[dirFlag + 1] ? resolve(argv[dirFlag + 1]) : HERE;
-const selected = argv.filter((a, i) => !a.startsWith("--") && i !== dirFlag + 1);
+
+/** Parse flags and experiment selectors without positional drift. */
+const { selectors: selected, dir: SCAN_DIR, keep } = parseArgs(argv, HERE);
 
 const all = readdirSync(SCAN_DIR)
   .filter((f) => /^e\d+-.*\.mjs$/.test(f))
@@ -30,36 +36,18 @@ const all = readdirSync(SCAN_DIR)
 const targets = selected.length > 0 ? all.filter((f) => selected.some((s) => f.startsWith(s))) : all;
 
 /**
- * Decide whether one experiment really passed.
- *
- * A `PASS` line alone is not enough: the process must exit 0, must not have
- * been killed by a signal, and its recorded result file must exist, parse, name
- * the same experiment and itself report `ok: true`. This is what catches an
- * experiment that prints PASS and then dies (or whose assertions were never
- * written to disk).
+ * Read the result JSON an experiment writes for itself. The run id is part of
+ * the check: a file left over from an earlier suite run cannot satisfy it.
  */
-export function verdictFor({ exitCode, signal, headline, result }) {
-  if (signal) return { ok: false, reason: `killed by signal ${signal}` };
-  if (exitCode !== 0) return { ok: false, reason: `exit code ${exitCode}` };
-  if (!headline) return { ok: false, reason: "no PASS/FAIL line" };
-  if (!/^PASS /.test(headline)) return { ok: false, reason: "reported FAIL" };
-  if (!result.exists) return { ok: false, reason: "no result file" };
-  if (result.parseError) return { ok: false, reason: `result file unreadable: ${result.parseError}` };
-  if (result.experiment !== result.expected) return { ok: false, reason: `result file names "${result.experiment}"` };
-  if (result.ok !== true) return { ok: false, reason: "result file reports failure" };
-  return { ok: true, reason: "exit 0, no signal, PASS, matching valid result" };
-}
-
-/** Read the result JSON an experiment writes for itself. */
-function readResult(file) {
+function readResult(file, expectedRunId) {
   const expected = file.replace(/\.mjs$/, "");
   const path = join(SCAN_DIR, "results", `${expected}.json`);
-  if (!existsSync(path)) return { exists: false, expected };
+  if (!existsSync(path)) return { exists: false, expected, expectedRunId };
   try {
     const parsed = JSON.parse(readFileSync(path, "utf8"));
-    return { exists: true, expected, experiment: parsed.experiment, ok: parsed.ok };
+    return { exists: true, expected, expectedRunId, experiment: parsed.experiment, ok: parsed.ok, runId: parsed.runId ?? null };
   } catch (error) {
-    return { exists: true, expected, parseError: String(error.message).slice(0, 80) };
+    return { exists: true, expected, expectedRunId, parseError: String(error.message).slice(0, 80) };
   }
 }
 
@@ -70,7 +58,12 @@ function run(file) {
     const args = [file, ...(keep ? ["--keep-artifacts"] : [])];
     // Detached: the experiment starts its own OMP processes, so the timeout
     // path must kill the whole group rather than just this script.
-    const child = spawn(process.execPath, args, { cwd: SCAN_DIR, stdio: ["ignore", "pipe", "pipe"], detached: true });
+    const child = spawn(process.execPath, args, {
+      cwd: SCAN_DIR,
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
+      env: { ...process.env, M1_RUN_ID: RUN_ID },
+    });
     let out = "";
     let err = "";
     child.stdout.on("data", (d) => {
@@ -84,13 +77,20 @@ function run(file) {
       timedOut = true;
       try { process.kill(-child.pid, "SIGKILL"); } catch { try { child.kill("SIGKILL"); } catch { /* gone */ } }
     }, PER_EXPERIMENT_TIMEOUT_MS);
-    child.once("exit", (code, signal) => {
+    child.once("exit", async (code, signal) => {
       clearTimeout(timer);
       const headline = out.split("\n").find((l) => /^(PASS|FAIL) /.test(l)) ?? null;
-      const result = readResult(file);
+      const result = readResult(file, RUN_ID);
+      // Reclaim anything this experiment left behind, including detached
+      // runtimes it started (its own `finally` may never have run).
+      const reaped = await reapRunResources({
+        dataRoot: EXPERIMENT_DATA_ROOT,
+        runId: RUN_ID,
+        ownerPids: [child.pid],
+      }).catch((error) => ({ error: String(error?.message ?? error) }));
       const verdict = timedOut
         ? { ok: false, reason: `timed out after ${PER_EXPERIMENT_TIMEOUT_MS} ms` }
-        : verdictFor({ exitCode: code, signal, headline, result });
+        : verdictFor({ exitCode: code, signal, headline, result, expectedRunId: RUN_ID });
       resolve({
         file,
         exitCode: code,
@@ -100,6 +100,7 @@ function run(file) {
         headline,
         verdict,
         result,
+        reaped,
         cleanups: out.split("\n").filter((l) => l.startsWith("  limit: ")).map((l) => l.replace(/^  limit: /, "")),
         stderrTail: err ? err.trim().split("\n").slice(-3).join("\n") : null,
       });

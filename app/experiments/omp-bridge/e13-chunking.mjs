@@ -59,7 +59,13 @@ const evidence = await runExperiment("e13-chunking", async (ctx) => {
   mkdirSync(projectDir, { recursive: true });
 
   // ==========================================================================
-  // A. real outbound chunking: one oversized prompt echoes back as chunks
+  // A. real outbound chunking, end to end through rpc.request()
+  //
+  // Auto-compaction is disabled so the session keeps the oversized history, and
+  // the large response is then requested with an ordinary single-line command.
+  // The decode has to happen inside the client: a reassembler that only runs
+  // offline (as in the first version of this experiment) leaves `rpc.request()`
+  // waiting forever while the chunks sit in the frame list.
   // ==========================================================================
   {
     provider.script([{ text: "ok", finish: "stop" }, { text: "ok", finish: "stop" }]);
@@ -74,59 +80,41 @@ const evidence = await runExperiment("e13-chunking", async (ctx) => {
         cwd: projectDir,
       });
       await rpc.request({ type: "negotiate_protocol", protocolVersion: 2 });
+      const compaction = await rpc.request({ type: "set_auto_compaction", enabled: false });
+      ctx.check("A: auto-compaction is disabled for this run", compaction.success === true, compaction.error ?? "ok");
 
-      const from = rpc.frames.length;
       await rpc.request({ type: "prompt", message: bigPayload }, { timeoutMs: 60_000 });
       await rpc.waitFor((f) => f.type === "agent_end", 60_000);
-      await sleep(500);
-      const newFrames = rpc.frames.slice(from);
-      const chunkFrames = newFrames.filter((f) => f.type === "rpc_chunk");
+      const chunksBeforeRequest = rpc.chunkFramesSeen;
+      ctx.check("A: the oversized prompt produced real rpc_chunk frames", chunksBeforeRequest >= 2, chunksBeforeRequest);
 
-      ctx.check("A: the oversized prompt is accepted", true);
-      ctx.check("A: OMP splits the resulting logical frame into rpc_chunk frames", chunkFrames.length >= 2, `${chunkFrames.length} chunks`);
-      const first = chunkFrames[0];
-      if (first) {
-        const sequences = new Map();
-        for (const c of chunkFrames) sequences.set(c.chunkId, (sequences.get(c.chunkId) ?? 0) + 1);
-        ctx.check("A: every chunk sequence is complete (declared count == observed chunks)",
-          [...sequences.entries()].every(([, seen]) => seen >= 2),
-          Object.fromEntries(sequences));
-        ctx.check("A: chunk metadata is self-consistent",
-          chunkFrames.every((c) => c.count >= 2 && c.index < c.count && c.byteLength >= MAX_RPC_FRAME_BYTES),
-          { count: first.count, byteLength: first.byteLength, limit: MAX_RPC_FRAME_BYTES });
-        ctx.check("A: each physical chunk stays within the 1 MiB frame limit",
-          chunkFrames.every((c) => JSON.stringify(c).length <= MAX_RPC_FRAME_BYTES),
-          Math.max(...chunkFrames.map((c) => JSON.stringify(c).length)));
-        ctx.check("A: each chunk payload is within the 256 KiB payload limit",
-          chunkFrames.every((c) => Buffer.from(c.data, "base64").byteLength <= RPC_CHUNK_PAYLOAD_BYTES),
-          Math.max(...chunkFrames.map((c) => Buffer.from(c.data, "base64").byteLength)));
-        writeFixture("e13-real-chunk-sample.json", {
-          note: "REAL capture, sanitized: genuine rpc_chunk frames emitted by the pinned OMP for one oversized prompt's echoed frame",
-          sequences: Object.fromEntries(sequences),
-          chunks: chunkFrames.length,
-          sampleChunk: { type: first.type, chunkIdLength: String(first.chunkId).length, index: first.index, count: first.count, byteLength: first.byteLength, dataBytes: Buffer.from(first.data, "base64").byteLength },
-        });
-      }
-
-      // Reassemble the whole window and verify the chunked frame's content.
-      const reassembled = reassemble(newFrames);
-      ctx.check("A: reassembly reports no decoder errors", reassembled.errors.length === 0, reassembled.errors);
-      ctx.check("A: exactly the chunked frames are held back until complete",
-        reassembled.chunkCount >= 2 && reassembled.frames.length > 0,
-        { chunks: reassembled.chunkCount, frames: reassembled.frames.length });
-
-      const carried = reassembled.frames.find((f) => JSON.stringify(f).includes(marker));
-      ctx.check("A: a reassembled frame carries the oversized payload marker", Boolean(carried), carried ? carried.type : "not found");
-      if (carried) {
-        const bytes = Buffer.byteLength(JSON.stringify(carried), "utf8");
-        ctx.check("A: the reassembled frame exceeds the single-frame limit", bytes > MAX_RPC_FRAME_BYTES, bytes);
-        const text = JSON.stringify(carried);
-        ctx.check("A: the reassembled payload is byte-complete", text.includes(bigPayload), `${text.length} chars, expected payload ${bigPayload.length}`);
-        ctx.note("A-reassembledFrameType", carried.type);
-        ctx.note("A-reassembledBytes", bytes);
-      }
+      // The point of the experiment: this must complete through the client.
+      const messages = await rpc.request({ type: "get_messages" }, { timeoutMs: 60_000 });
+      ctx.check("A: a large response is delivered through rpc.request()", messages.success === true, messages.error ?? "ok");
+      ctx.check("A: the client reassembled chunked frames, not just collected them",
+        rpc.chunksAssembled >= 1, { assembled: rpc.chunksAssembled, physicalChunks: rpc.chunkFramesSeen });
       ctx.check("A: no chunk frame is ever surfaced as a logical frame",
-        reassembled.frames.every((f) => f.type !== "rpc_chunk"));
+        rpc.frames.every((f) => f.type !== "rpc_chunk"), rpc.frames.filter((f) => f.type === "rpc_chunk").length);
+      ctx.check("A: no chunk decoding error was recorded",
+        rpc.frames.every((f) => f.type !== "__chunk_error__"), rpc.frames.filter((f) => f.type === "__chunk_error__"));
+
+      const body = JSON.stringify(messages.data ?? {});
+      const bytes = Buffer.byteLength(body, "utf8");
+      ctx.check("A: the reassembled response is larger than one physical frame", bytes > MAX_RPC_FRAME_BYTES, bytes);
+      ctx.check("A: the oversized user message survived reassembly byte-complete",
+        body.includes(bigPayload), `${bytes} bytes, marker present: ${body.includes(marker)}`);
+      ctx.note("A-responseBytes", bytes);
+      ctx.note("A-chunkStats", { physical: rpc.chunkFramesSeen, assembled: rpc.chunksAssembled });
+
+      writeFixture("e13-real-chunk-sample.json", {
+        note: "REAL capture, sanitized: genuine rpc_chunk frames emitted by the pinned OMP, reassembled inside the RPC client before response matching",
+        physicalChunkFrames: rpc.chunkFramesSeen,
+        logicalFramesAssembled: rpc.chunksAssembled,
+        reassembledResponseBytes: bytes,
+        payloadByteComplete: body.includes(bigPayload),
+        autoCompactionDisabled: true,
+        limits: { frameBytes: MAX_RPC_FRAME_BYTES, reassembledBytes: MAX_RPC_REASSEMBLED_BYTES, chunkPayloadBytes: RPC_CHUNK_PAYLOAD_BYTES },
+      });
     } finally {
       if (rpc) ctx.check("A: process group reaped", (await rpc.stop()) === true);
     }

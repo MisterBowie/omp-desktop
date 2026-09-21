@@ -1,21 +1,20 @@
 {
-  "note": "real capture, sanitized; the subagent's dialog was deliberately left unanswered",
-  "dialog": {
-    "id": "1588a11dd91c6565",
-    "method": "select",
-    "title": "Approve write?"
-  },
-  "cancel": {
-    "type": "extension_ui_request",
-    "id": "1588a11dde1c6567",
-    "method": "cancel",
-    "targetId": "1588a11dd91c6565"
-  },
-  "decision": {
+  "note": "real capture, sanitized; the child's approval was deferred to an out-of-band channel that never answered, then the parent was stopped",
+  "markers": [
+    "tool-call-audit",
+    "tool-call-audit",
+    "gate",
+    "gate-pending",
+    "gate-decision"
+  ],
+  "pendingSeen": true,
+  "sideEffectCreated": false,
+  "abortMs": 25,
+  "deferResolution": {
     "event": "gate-decision",
     "decision": "deny",
-    "choice": null,
-    "at": 1790016694136
-  },
-  "sideEffectCreated": false
+    "route": "child-defer",
+    "outcome": "timeout",
+    "at": 1790019263989
+  }
 }

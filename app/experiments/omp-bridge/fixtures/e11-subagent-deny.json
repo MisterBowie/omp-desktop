@@ -1,28 +1,34 @@
 {
-  "note": "real capture, sanitized; the subagent's write is denied before execution",
+  "note": "real capture, sanitized; turns routed by session identity, decision injected by the experiment's policy",
+  "parentSessionId": "01a0c575-fb72-7079-b06a-94451ac8c61e",
+  "childSessionId": "01a0c575-fc4d-70a8-b934-7190cf2ca2d0",
+  "childHasUI": false,
+  "lifecycle": {
+    "id": "M1Child",
+    "agent": "task",
+    "parentToolCallId": "call_fake_1_0",
+    "detached": true,
+    "agentSource": "bundled",
+    "status": "started",
+    "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-UGTsB6/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e11-deny-UGTsB6-project--/2026-09-21T19-33-58-770Z_01a0c575-fb72-7079-b06a-94451ac8c61e/M1Child.jsonl",
+    "index": 0
+  },
+  "parentTaskToolCallId": "call_fake_1_0",
   "gate": {
     "event": "gate",
     "toolName": "write",
-    "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-FtCGub/project/subagent-deny.txt",
-    "hasUI": true,
-    "at": 1790016689092
+    "target": "<run>/project/child-deny.txt",
+    "hasUI": false,
+    "sessionId": "01a0c575-fc4d-70a8-b934-7190cf2ca2d0",
+    "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-UGTsB6/project",
+    "at": 1790019239036
   },
   "decision": {
     "event": "gate-decision",
     "decision": "deny",
-    "choice": "Deny",
-    "at": 1790016689131
+    "route": "child-policy",
+    "at": 1790019239036
   },
-  "dialogs": [
-    {
-      "id": "1588a118f103a87f",
-      "method": "select",
-      "title": "Approve write?"
-    }
-  ],
-  "toolExecutionStarts": [
-    "task",
-    "write"
-  ],
+  "dialogCount": 0,
   "sideEffectCreated": false
 }

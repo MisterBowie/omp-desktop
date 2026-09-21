@@ -1,5 +1,5 @@
 {
-  "ranAt": "2026-09-21T18:51:52.389Z",
+  "ranAt": "2026-09-21T19:35:42.398Z",
   "node": "v24.14.0",
   "platform": "linux-x64",
   "keepArtifacts": false,
@@ -17,7 +17,7 @@
         "experiment": "e01-protocol",
         "ok": true
       },
-      "seconds": 3.5,
+      "seconds": 3.7,
       "limitations": [
         "Only handshake-level frames are captured here; turn-level events are covered by E02."
       ]
@@ -35,7 +35,7 @@
         "experiment": "e02-turn",
         "ok": true
       },
-      "seconds": 1,
+      "seconds": 1.2,
       "limitations": [
         "The scripted model is local; no paid provider is contacted. Tool approval is bypassed here via --approval-mode yolo and is covered by E04."
       ]
@@ -53,7 +53,7 @@
         "experiment": "e03-interaction",
         "ok": true
       },
-      "seconds": 3.8,
+      "seconds": 3.9,
       "limitations": [
         "The timeout case relies on a dialog-level timeout supplied by the extension (800ms), not on client-side timing."
       ]
@@ -71,7 +71,7 @@
         "experiment": "e04-approval",
         "ok": true
       },
-      "seconds": 3.9,
+      "seconds": 4.1,
       "limitations": [
         "The gate is an experiment extension loaded with --extension; production wiring is M2. Model tool-call approval modes were not set to yolo for these runs."
       ]
@@ -89,7 +89,7 @@
         "experiment": "e05-cancel",
         "ok": true
       },
-      "seconds": 20.4,
+      "seconds": 20.7,
       "limitations": [
         "In-protocol stop (abort + abort_bash) reclaimed the running command process in this environment.",
         "The descendant of the running command was reclaimed together with it.",
@@ -110,7 +110,7 @@
         "experiment": "e06-session",
         "ok": true
       },
-      "seconds": 3.5,
+      "seconds": 3.8,
       "limitations": [
         "Session naming/restore are verified over RPC only; desktop-side metadata mapping is M2/M4 work."
       ]
@@ -128,7 +128,7 @@
         "experiment": "e07-isolation",
         "ok": true
       },
-      "seconds": 2.2,
+      "seconds": 2.1,
       "limitations": [
         "Rules are only injected when bucketed by frontmatter (`alwaysApply: true`, or a `description` for the rulebook); a bare markdown file in rules/ is read but never reaches the prompt. Relevant to T19.",
         "The MCP server from the isolated project config is discovered, spawned, and handshaken, but its tool is NOT in the model's tool list in this configuration (OMP advertises a curated 12-tool subset); MCP tool surfacing is T19/M5 work.",
@@ -149,7 +149,7 @@
         "experiment": "e08-host-tools",
         "ok": true
       },
-      "seconds": 44.4,
+      "seconds": 44.6,
       "limitations": [
         "The host tool also passed through the extension tool_call hook.",
         "The host-tool exchange is a real capture; the fake provider only supplies model turns."
@@ -168,7 +168,7 @@
         "experiment": "e09-transport",
         "ok": true
       },
-      "seconds": 5.6,
+      "seconds": 5.9,
       "limitations": [
         "Bridge-disconnect handling is asserted as 'OMP exits by itself and the group is reaped'; the desktop-side reconnect policy is M2/T09.",
         "Line-cap enforcement is specified by lib/ndjson.mjs; the production reader is M2/T09 and must adopt an explicit cap (Node's readline has no line limit).",
@@ -188,7 +188,7 @@
         "experiment": "e10-modes",
         "ok": true
       },
-      "seconds": 2,
+      "seconds": 2.3,
       "limitations": [
         "ACP and SDK paths were read in source only; M1 selects rpc-ui and does not need them, so no runtime comparison is claimed."
       ]
@@ -197,7 +197,7 @@
       "file": "e11-subagent-permissions.mjs",
       "passed": true,
       "verdict": "exit 0, no signal, PASS, matching valid result",
-      "headline": "PASS e11-subagent-permissions: 28/28 checks",
+      "headline": "PASS e11-subagent-permissions: 40/40 checks",
       "exitCode": 0,
       "signal": null,
       "timedOut": false,
@@ -206,18 +206,17 @@
         "experiment": "e11-subagent-permissions",
         "ok": true
       },
-      "seconds": 7.1,
+      "seconds": 52.9,
       "limitations": [
-        "The parent stop reclaimed the subagent's running command tree.",
-        "Subagent permission coverage is asserted for the `task` agent type driven by the local fake provider; other agent types and the M5 subagent UI are out of M1 scope.",
-        "Approval dialogs raised from a subagent are answered by this experiment; how the desktop routes them is M5 work."
+        "The child-session policy (`M1_CHILD_POLICY`) and the out-of-band decision file are the experiment's model of a desktop-side policy; OMP itself provides no UI for subagent sessions, so an interactive subagent approval cannot be verified here.",
+        "Only the `task` agent type is driven; other agent types and the M5 subagent UI are out of M1 scope."
       ]
     },
     {
       "file": "e12-harness-faults.mjs",
       "passed": true,
       "verdict": "exit 0, no signal, PASS, matching valid result",
-      "headline": "PASS e12-harness-faults: 16/16 checks",
+      "headline": "PASS e12-harness-faults: 40/40 checks",
       "exitCode": 0,
       "signal": null,
       "timedOut": false,
@@ -226,14 +225,14 @@
         "experiment": "e12-harness-faults",
         "ok": true
       },
-      "seconds": 10.7,
+      "seconds": 45.3,
       "limitations": []
     },
     {
       "file": "e13-chunking.mjs",
       "passed": true,
       "verdict": "exit 0, no signal, PASS, matching valid result",
-      "headline": "PASS e13-chunking: 34/34 checks",
+      "headline": "PASS e13-chunking: 30/30 checks",
       "exitCode": 0,
       "signal": null,
       "timedOut": false,
@@ -242,7 +241,7 @@
         "experiment": "e13-chunking",
         "ok": true
       },
-      "seconds": 6.4,
+      "seconds": 6.2,
       "limitations": [
         "The decoder is a faithful port of the pinned implementation (same constants and rejection rules); the capture in fixture A and the reactions in fixture B are real, the corrupted sequences in C are synthetic.",
         "Chunking is verified for one deterministic real trigger (an oversized prompt whose echoed message frame exceeds 1 MiB); other large-frame producers are not enumerated in M1."

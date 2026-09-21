@@ -34,7 +34,41 @@ export class FakeProvider {
 
   script(turns) {
     this.turns = turns;
+    this.routes = null;
     return this;
+  }
+
+  /**
+   * Route model turns by *session identity* instead of arrival order.
+   *
+   * A sequential queue cannot serve a parent session and its subagent: the
+   * subagent is started asynchronously, so whichever session asks next steals
+   * the turn that was meant for the other one. Routing on a marker that only
+   * exists in the child's session (its assignment text is the first user
+   * message) makes the assignment deterministic without adding delays.
+   *
+   * @param {{parent?: object[], subagents?: Array<{marker: string, turns: object[]}>}} config
+   */
+  routeBySession(config) {
+    this.routes = {
+      parent: config.parent ?? [{ text: "ok", finish: "stop" }],
+      subagents: config.subagents ?? [],
+    };
+    this.turns = null;
+    return this;
+  }
+
+  /** Which session a request belongs to, from its own content. */
+  classifyRequest(body) {
+    const messages = body?.messages ?? [];
+    const firstUser = messages.find((m) => m.role === "user");
+    const firstUserText = typeof firstUser?.content === "string"
+      ? firstUser.content
+      : JSON.stringify(firstUser?.content ?? "");
+    for (const [index, sub] of (this.routes?.subagents ?? []).entries()) {
+      if (sub.marker && firstUserText.includes(sub.marker)) return { kind: "subagent", index, marker: sub.marker };
+    }
+    return { kind: "parent" };
   }
 
   get lastRequest() {
@@ -75,13 +109,24 @@ export class FakeProvider {
     this.port = this.server.address().port;
   }
 
-  #nextTurn() {
+  #nextTurn(body) {
+    if (this.routes) {
+      const where = this.classifyRequest(body);
+      const queue = where.kind === "subagent"
+        ? this.routes.subagents[where.index].turns
+        : this.routes.parent;
+      if (!Array.isArray(queue) || queue.length === 0) return { text: "ok", finish: "stop" };
+      // Last turn repeats, so an unexpectedly long session never runs dry.
+      const turn = queue.length > 1 ? queue.shift() : queue[0];
+      this.lastClassifiedAs = where.kind === "subagent" ? `subagent:${where.marker}` : "parent";
+      return turn ?? { text: "ok", finish: "stop" };
+    }
     const turn = this.turns.length > 1 ? this.turns.shift() : this.turns[0];
     return turn ?? { text: "ok", finish: "stop" };
   }
 
-  async #streamCompletion(res, _body) {
-    const turn = this.#nextTurn();
+  async #streamCompletion(res, body) {
+    const turn = this.#nextTurn(body);
     const id = `chatcmpl-fake-${++this.toolCallSeq}`;
     res.writeHead(200, {
       "content-type": "text/event-stream",

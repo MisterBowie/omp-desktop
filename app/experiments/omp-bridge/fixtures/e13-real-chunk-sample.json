@@ -1,16 +1,13 @@
 {
-  "note": "REAL capture, sanitized: genuine rpc_chunk frames emitted by the pinned OMP for one oversized prompt's echoed frame",
-  "sequences": {
-    "rpc-1": 5,
-    "rpc-2": 5
-  },
-  "chunks": 10,
-  "sampleChunk": {
-    "type": "rpc_chunk",
-    "chunkIdLength": 5,
-    "index": 0,
-    "count": 5,
-    "byteLength": 1200150,
-    "dataBytes": 262144
+  "note": "REAL capture, sanitized: genuine rpc_chunk frames emitted by the pinned OMP, reassembled inside the RPC client before response matching",
+  "physicalChunkFrames": 12,
+  "logicalFramesAssembled": 3,
+  "reassembledResponseBytes": 1200659,
+  "payloadByteComplete": true,
+  "autoCompactionDisabled": true,
+  "limits": {
+    "frameBytes": 1048576,
+    "reassembledBytes": 67108864,
+    "chunkPayloadBytes": 262144
   }
 }

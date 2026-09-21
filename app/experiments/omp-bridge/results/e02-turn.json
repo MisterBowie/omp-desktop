@@ -1,12 +1,13 @@
 {
   "experiment": "e02-turn",
-  "startedAt": "2026-09-21T18:50:01.648Z",
+  "runId": "run-mubn6kc9-e85d14",
+  "startedAt": "2026-09-21T19:32:29.357Z",
   "checks": [
     {
       "description": "prompt command is acknowledged",
       "ok": true,
       "detail": {
-        "id": "req-c3ea41b4",
+        "id": "req-99a4b8c6",
         "type": "response",
         "command": "prompt",
         "success": true
@@ -85,6 +86,6 @@
   "limitations": [
     "The scripted model is local; no paid provider is contacted. Tool approval is bypassed here via --approval-mode yolo and is covered by E04."
   ],
-  "finishedAt": "2026-09-21T18:50:02.560Z",
+  "finishedAt": "2026-09-21T19:32:30.243Z",
   "ok": true
 }

@@ -1,6 +1,7 @@
 {
   "experiment": "e03-interaction",
-  "startedAt": "2026-09-21T18:50:02.594Z",
+  "runId": "run-mubn6kc9-e85d14",
+  "startedAt": "2026-09-21T19:32:30.577Z",
   "checks": [
     {
       "description": "all: expected dialogs requested",
@@ -139,6 +140,6 @@
   "limitations": [
     "The timeout case relies on a dialog-level timeout supplied by the extension (800ms), not on client-side timing."
   ],
-  "finishedAt": "2026-09-21T18:50:06.315Z",
+  "finishedAt": "2026-09-21T19:32:34.182Z",
   "ok": true
 }

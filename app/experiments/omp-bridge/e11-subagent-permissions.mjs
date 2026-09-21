@@ -2,23 +2,27 @@
 /**
  * E11 — subagent permission coverage and cancellation.
  *
- * The parent session's approval evidence does not by itself prove that a
- * subagent's tool calls are covered, so this experiment drives a real
- * subagent (`task` tool) with the trusted extension loaded and checks:
+ * The first version of this experiment was invalid: it scripted model turns in
+ * one shared queue, so the *parent* session (which keeps running while the
+ * subagent starts asynchronously) consumed the `write` turn that was meant for
+ * the subagent. Everything it "proved" about subagents was really the parent.
  *
- *   A. deny  — the subagent's `write` is blocked before execution;
- *   B. allow — the same call executes exactly once;
- *   C. cancel — the parent session is stopped while the subagent runs a real
- *      long command, and the subagent's process tree is reclaimed;
- *   D. pending — the parent is stopped while the subagent's approval dialog is
- *      still open: the dialog is cancelled by targetId and nothing is executed.
+ * This version routes turns by session identity: the child's assignment text is
+ * the first user message of its own session, so the fake provider can tell the
+ * two sessions apart without relying on timing. It then asserts correlation —
+ * the gate's own session id, `hasUI`, and the child's `parentToolCallId` — so a
+ * result can only be attributed to the real subagent.
  *
- * The subagent's own model turns come from the local fake provider, so no paid
- * model is contacted.
+ * Measured on the pinned OMP (rpc-ui):
+ *   - a subagent's `write`/`bash` DOES reach the extension `tool_call` hook;
+ *   - that hook runs with `hasUI: false`, so it cannot ask the user;
+ *   - a UI-dependent gate therefore blocks every subagent tool call, and the
+ *     desktop has to decide from its own policy (`M1_CHILD_POLICY` here) or
+ *     provide an out-of-band channel (`M1_CHILD_POLICY=defer`).
  *
  * Usage: node e11-subagent-permissions.mjs [--keep-artifacts]
  */
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { OmpRpc } from "./lib/rpc.mjs";
 import { FakeProvider } from "./lib/provider.mjs";
@@ -35,18 +39,6 @@ const isAlive = (pid) => {
   try { process.kill(pid, 0); return true; } catch { return false; }
 };
 const killQuietly = (pid, sig) => { if (pid) { try { process.kill(pid, sig); } catch { /* gone */ } } };
-
-/** Process group/session bookkeeping, used to explain reclamation results. */
-function procInfo(pid) {
-  if (!pid) return null;
-  try {
-    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
-    const rest = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
-    return { pid, ppid: Number(rest[1]), pgrp: Number(rest[2]), session: Number(rest[3]) };
-  } catch {
-    return null;
-  }
-}
 
 async function waitGone(pid, timeoutMs = 8_000) {
   const start = Date.now();
@@ -74,7 +66,7 @@ async function readIdentity(path, timeoutMs = 25_000) {
 const readLog = (path) =>
   existsSync(path) ? readFileSync(path, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : [];
 
-/** Answer request-style dialogs with `choice` until `until()` or the deadline. */
+/** Answer real dialogs (parent UI only) while a predicate becomes true. */
 async function driveUi(rpc, choice, until, timeoutMs = 60_000) {
   const answered = new Set();
   const dialogs = [];
@@ -94,13 +86,14 @@ async function driveUi(rpc, choice, until, timeoutMs = 60_000) {
   return dialogs;
 }
 
-const taskCall = (target, marker) => ({
-  name: "task",
-  args: {
-    i: "subagent work",
-    context: "M1 subagent permission/cancel evidence",
-    tasks: [{ task: `write the marker file ${target} (${marker})`, agent: "task", name: "M1Sub" }],
-  },
+/** Parent turn: delegate one task to a named subagent carrying `marker`. */
+const delegatingTurn = (marker, name, assignment) => ({
+  text: "parent delegates",
+  toolCalls: [{
+    name: "task",
+    args: { i: "spawn a child", context: "M1 subagent evidence", tasks: [{ task: `${marker} ${assignment}`, agent: "task", name }] },
+  }],
+  finish: "tool_calls",
 });
 
 const evidence = await runExperiment("e11-subagent-permissions", async (ctx) => {
@@ -109,21 +102,26 @@ const evidence = await runExperiment("e11-subagent-permissions", async (ctx) => 
   ctx.onCleanup(() => provider.close());
 
   // ==========================================================================
-  // A/B — deny and allow a subagent's own tool call
+  // A/B — the child's own tool call is denied / approved by policy
   // ==========================================================================
-  for (const [label, choice, expectWritten] of [["deny", "Deny", false], ["allow", "Allow", true]]) {
+  for (const [label, policy, expectWritten] of [["deny", "deny", false], ["allow", "allow", true]]) {
     const { root, runRoot, selector } = experimentRoot(ctx, `e11-${label}`, { baseUrl: provider.baseUrl });
     const projectDir = join(root, "project");
     mkdirSync(projectDir, { recursive: true });
     const uiLog = join(root, "ui.log");
-    const target = join(projectDir, `subagent-${label}.txt`);
+    const target = join(projectDir, `child-${label}.txt`);
+    const marker = `M1-CHILD-${label.toUpperCase()}-NONCE-a71c`;
 
-    provider.script([
-      { text: "delegating", toolCalls: [taskCall(target, label)], finish: "tool_calls" },
-      { text: "child writing", toolCalls: [{ name: "write", args: { path: target, content: `${label}-once\n` } }], finish: "tool_calls" },
-      { text: "child done", finish: "stop" },
-      { text: "parent done", finish: "stop" },
-    ]);
+    provider.routeBySession({
+      parent: [delegatingTurn(marker, "M1Child", `write the marker file ${target}`), { text: "parent wraps up", finish: "stop" }],
+      subagents: [{
+        marker,
+        turns: [
+          { text: "child writes", toolCalls: [{ name: "write", args: { path: target, content: `${label}-once\n` } }], finish: "tool_calls" },
+          { text: "child finished", finish: "stop" },
+        ],
+      }],
+    });
 
     let rpc;
     try {
@@ -131,65 +129,183 @@ const evidence = await runExperiment("e11-subagent-permissions", async (ctx) => 
         repoRoot, runRoot, mode: "rpc-ui",
         args: ["--model", selector, "--extension", GATE],
         cwd: projectDir,
-        extraEnv: { M1_UI_LOG: uiLog, M1_UI_LOG_ALL: "1" },
+        extraEnv: { M1_UI_LOG: uiLog, M1_UI_LOG_ALL: "1", M1_CHILD_POLICY: policy },
       });
       await rpc.request({ type: "negotiate_protocol", protocolVersion: 2 });
-      const promptPromise = rpc.request({ type: "prompt", message: "delegate a write" }, { timeoutMs: 90_000 });
-      const dialogs = await driveUi(rpc, choice, () => rpc.framesOfType("agent_end").length > 0);
-      await promptPromise.catch(() => {});
-      await sleep(1_000);
+      await rpc.request({ type: "set_subagent_subscription", level: "events" });
+      await rpc.request({ type: "prompt", message: "delegate a write to a child" }, { timeoutMs: 90_000 });
+      const dialogs = await driveUi(rpc, null, () => rpc.framesOfType("agent_end").length > 0, 60_000);
+      await sleep(1_500);
 
       const log = readLog(uiLog);
+      const childAudit = log.find((l) => l.event === "tool-call-audit" && l.toolName === "write");
+      const parentAudit = log.find((l) => l.event === "tool-call-audit" && l.toolName === "task");
       const gate = log.find((l) => l.event === "gate" && l.toolName === "write");
       const decision = log.find((l) => l.event === "gate-decision");
+      const lifecycle = rpc.frames.find((f) => f.type === "subagent_lifecycle")?.payload;
+      const taskEnd = rpc.frames.find((f) => f.type === "tool_execution_end" && f.toolName === "task");
+      const classifications = provider.requests.map((r) => provider.classifyRequest(r.body).kind);
 
-      ctx.check(`${label}: the subagent's write reaches the extension hook`, Boolean(gate), JSON.stringify(log.slice(0, 4)));
-      ctx.check(`${label}: the dialog is raised for the subagent call`, dialogs.length >= 1, dialogs);
-      ctx.check(`${label}: the gate records the human decision`, decision?.decision === (expectWritten ? "allow" : "deny"), decision);
-      ctx.check(`${label}: the gate saw the subagent's concrete target`, String(gate?.target ?? "").endsWith(`subagent-${label}.txt`), gate?.target);
-      ctx.check(`${label}: the subagent executed exactly ${expectWritten ? "once" : "nothing"}`,
+      // --- attribution: prove the write belongs to the child, not the parent --
+      ctx.check(`${label}: requests were routed to two distinct sessions`,
+        classifications.includes("parent") && classifications.includes("subagent"), classifications);
+      ctx.check(`${label}: the parent looked up the task tool under its own session`,
+        parentAudit?.hasUI === true, parentAudit);
+      ctx.check(`${label}: the child's write reached the hook from a UI-less session`,
+        childAudit?.hasUI === false, childAudit);
+      ctx.check(`${label}: the child's session is distinct from the parent's session`,
+        Boolean(childAudit?.sessionId) && childAudit.sessionId !== parentAudit?.sessionId,
+        { child: childAudit?.sessionId, parent: parentAudit?.sessionId });
+      ctx.check(`${label}: the gate saw the child's own target`,
+        typeof gate?.target === "string" && gate.target.endsWith(`child-${label}.txt`), gate?.target);
+      ctx.check(`${label}: the child is linked to the parent's task call`,
+        typeof lifecycle?.parentToolCallId === "string" &&
+        typeof taskEnd?.toolCallId === "string" &&
+        lifecycle.parentToolCallId === taskEnd.toolCallId,
+        { lifecycle: lifecycle?.parentToolCallId, parentTask: taskEnd?.toolCallId });
+      ctx.check(`${label}: the child ran in its own session file`,
+        typeof lifecycle?.sessionFile === "string" && lifecycle.sessionFile.includes("M1Child"),
+        lifecycle?.sessionFile);
+      ctx.check(`${label}: the parent never issued a write of its own`,
+        !rpc.frames.some((f) => f.type === "tool_execution_start" && f.toolName === "write"),
+        rpc.frames.filter((f) => f.type === "tool_execution_start").map((f) => f.toolName));
+
+      // --- outcome ----------------------------------------------------------
+      ctx.check(`${label}: the hook decided from the session's own policy`,
+        decision?.route === "child-policy" && decision?.decision === (expectWritten ? "allow" : "deny"), decision);
+      ctx.check(`${label}: no dialog was raised for the child (it has no UI)`, dialogs.length === 0, dialogs);
+      ctx.check(`${label}: the side effect matches the decision`,
         expectWritten
           ? (existsSync(target) && readFileSync(target, "utf8") === `${label}-once\n`)
-          : !existsSync(target));
-      ctx.check(`${label}: the task tool itself ran under the hook`, log.some((l) => l.event === "tool-call-audit" && l.toolName === "task"));
-      ctx.note(`${label}GateHasUI`, gate?.hasUI ?? null);
+          : !existsSync(target), existsSync(target));
+      ctx.note(`${label}Audit`, { parent: parentAudit ?? null, child: childAudit ?? null, gate: gate ?? null, decision: decision ?? null });
 
-      if (label === "allow") {
-        writeFixture("e11-subagent-allow.json", {
-          note: "real capture, sanitized; subagent driven by the local fake provider, gate answer synthetic",
-          gate, decision, dialogs,
-          subagentFrames: [...new Set(rpc.frames.filter((f) => String(f.type).startsWith("subagent_")).map((f) => f.type))],
-        });
-      } else {
-        writeFixture("e11-subagent-deny.json", {
-          note: "real capture, sanitized; the subagent's write is denied before execution",
-          gate, decision, dialogs,
-          toolExecutionStarts: rpc.frames.filter((f) => f.type === "tool_execution_start").map((f) => f.toolName),
-          sideEffectCreated: existsSync(target),
-        });
-      }
+      writeFixture(`e11-subagent-${label}.json`, {
+        note: "real capture, sanitized; turns routed by session identity, decision injected by the experiment's policy",
+        parentSessionId: parentAudit?.sessionId ?? null,
+        childSessionId: childAudit?.sessionId ?? null,
+        childHasUI: childAudit?.hasUI ?? null,
+        lifecycle: sanitizeFrame(lifecycle ?? null),
+        parentTaskToolCallId: taskEnd?.toolCallId ?? null,
+        gate: gate ? { ...sanitizeFrame(gate), target: `<run>/project/child-${label}.txt` } : null,
+        decision: decision ?? null,
+        dialogCount: dialogs.length,
+        sideEffectCreated: existsSync(target),
+      });
     } finally {
       if (rpc) ctx.check(`${label}: process group reaped`, (await rpc.stop()) === true);
     }
   }
 
   // ==========================================================================
-  // C — parent abort while the subagent runs a real long command
+  // C — the child waits for an out-of-band decision, then the parent is stopped
+  // ==========================================================================
+  {
+    const { root, runRoot, selector } = experimentRoot(ctx, "e11-pending", { baseUrl: provider.baseUrl });
+    const projectDir = join(root, "project");
+    mkdirSync(projectDir, { recursive: true });
+    const uiLog = join(root, "ui.log");
+    const decisionFile = join(root, "child-decision.txt");
+    const target = join(projectDir, "child-pending.txt");
+    const marker = "M1-CHILD-PENDING-NONCE-b93d";
+
+    provider.routeBySession({
+      parent: [delegatingTurn(marker, "M1Pending", `write the marker file ${target}`), { text: "parent wraps up", finish: "stop" }],
+      subagents: [{
+        marker,
+        turns: [
+          { text: "child writes", toolCalls: [{ name: "write", args: { path: target, content: "never\n" } }], finish: "tool_calls" },
+          { text: "child finished", finish: "stop" },
+        ],
+      }],
+    });
+
+    let rpc;
+    try {
+      rpc = await OmpRpc.start({
+        repoRoot, runRoot, mode: "rpc-ui",
+        args: ["--model", selector, "--extension", GATE],
+        cwd: projectDir,
+        extraEnv: {
+          M1_UI_LOG: uiLog, M1_UI_LOG_ALL: "1",
+          M1_CHILD_POLICY: "defer", M1_CHILD_DECISION: decisionFile, M1_CHILD_DEFER_MS: "20000",
+        },
+      });
+      await rpc.request({ type: "negotiate_protocol", protocolVersion: 2 });
+      await rpc.request({ type: "set_subagent_subscription", level: "events" });
+      await rpc.request({ type: "prompt", message: "delegate a write to a child" }, { timeoutMs: 90_000 });
+
+      // The gate logs a pending entry while it waits; that is the observable
+      // "child is waiting for approval" state (there is no dialog for it).
+      let pendingSeen = false;
+      const waitStart = Date.now();
+      while (Date.now() - waitStart < 30_000) {
+        if (readLog(uiLog).some((l) => l.event === "gate-pending")) { pendingSeen = true; break; }
+        await sleep(100);
+      }
+      ctx.check("C: the child's call reached the hook and is waiting for a decision", pendingSeen, readLog(uiLog).map((l) => l.event));
+      ctx.check("C: nothing was executed while the child waited", !existsSync(target));
+
+      // Stop the parent while the child is still waiting.
+      const started = Date.now();
+      await rpc.request({ type: "abort" }, { timeoutMs: 20_000 });
+      const abortMs = Date.now() - started;
+      ctx.check("C: the session stayed responsive through the stop", (await rpc.request({ type: "get_state" }, { timeoutMs: 10_000 })).type === "response");
+      await sleep(1_500);
+
+      const resolved = readLog(uiLog).find((l) => l.event === "gate-decision" && l.route === "child-defer");
+      ctx.check("C: no side effect from the abandoned child call", !existsSync(target));
+      ctx.check("C: the stop did not hang on the waiting call", abortMs < 20_000, `${abortMs} ms`);
+
+      // The deferred decision is bounded by M1_CHILD_DEFER_MS; wait for it so
+      // the final state is deterministic rather than merely "not yet resolved".
+      let settled = resolved ?? null;
+      const settleStart = Date.now();
+      while (!settled && Date.now() - settleStart < 30_000) {
+        settled = readLog(uiLog).find((l) => l.event === "gate-decision" && l.route === "child-defer") ?? null;
+        if (!settled) await sleep(200);
+      }
+      ctx.check("C: the abandoned child approval resolves to a denial after the stop",
+        settled?.decision === "deny", settled ?? "still pending after 30s");
+      ctx.check("C: still no side effect once the child approval settled", !existsSync(target));
+      ctx.note("C-deferResolution", settled ?? null);
+      ctx.check("C: process group reaped", (await rpc.stop()) === true);
+
+      writeFixture("e11-subagent-pending-cancel.json", {
+        note: "real capture, sanitized; the child's approval was deferred to an out-of-band channel that never answered, then the parent was stopped",
+        markers: readLog(uiLog).map((l) => l.event),
+        pendingSeen,
+        sideEffectCreated: existsSync(target),
+        abortMs,
+        deferResolution: settled ? sanitizeFrame(settled) : null,
+      });
+    } finally {
+      if (rpc?.pid) await rpc.stop();
+    }
+  }
+
+  // ==========================================================================
+  // D — the child executes a real long command, then the parent is stopped
   // ==========================================================================
   {
     const { root, runRoot, selector } = experimentRoot(ctx, "e11-cancel", { baseUrl: provider.baseUrl });
     const projectDir = join(root, "project");
     mkdirSync(projectDir, { recursive: true });
-    const identityFile = join(projectDir, "subagent-identity.json");
     const uiLog = join(root, "ui.log");
+    const identityFile = join(projectDir, "child-identity.json");
+    const marker = "M1-CHILD-CANCEL-NONCE-c05e";
     const command = `${process.execPath} ${LONG_TASK} ${identityFile}`;
 
-    provider.script([
-      { text: "delegating", toolCalls: [{ name: "task", args: { i: "long child work", context: "M1 subagent cancel", tasks: [{ task: "run the long command", agent: "task", name: "M1Long" }] } }], finish: "tool_calls" },
-      { text: "child running", toolCalls: [{ name: "bash", args: { command } }], finish: "tool_calls" },
-      { text: "child done", finish: "stop" },
-      { text: "parent done", finish: "stop" },
-    ]);
+    provider.routeBySession({
+      parent: [delegatingTurn(marker, "M1Long", "run the long command"), { text: "parent wraps up", finish: "stop" }],
+      subagents: [{
+        marker,
+        turns: [
+          { text: "child runs", toolCalls: [{ name: "bash", args: { command } }], finish: "tool_calls" },
+          { text: "child finished", finish: "stop" },
+        ],
+      }],
+    });
 
     let rpc;
     let identity = null;
@@ -198,77 +314,54 @@ const evidence = await runExperiment("e11-subagent-permissions", async (ctx) => 
         repoRoot, runRoot, mode: "rpc-ui",
         args: ["--model", selector, "--extension", GATE],
         cwd: projectDir,
-        extraEnv: { M1_UI_LOG: uiLog },
+        extraEnv: { M1_UI_LOG: uiLog, M1_UI_LOG_ALL: "1", M1_CHILD_POLICY: "allow" },
       });
       await rpc.request({ type: "negotiate_protocol", protocolVersion: 2 });
       await rpc.request({ type: "set_subagent_subscription", level: "events" });
-      const promptPromise = rpc.request({ type: "prompt", message: "delegate a long command" }, { timeoutMs: 90_000 });
+      await rpc.request({ type: "prompt", message: "delegate a long command" }, { timeoutMs: 90_000 });
 
-      // The subagent's bash call may need approval; allow it, and stop waiting
-      // as soon as the external program has recorded its identity.
-      const dialogs = await driveUi(rpc, "Allow", () => existsSync(identityFile), 60_000);
-      identity = await readIdentity(identityFile, 10_000);
-      ctx.check("C: the subagent started a real external program", identity !== null, identity);
-      ctx.check("C: the subagent's program is alive before abort", isAlive(identity?.pid), identity?.pid);
-      ctx.check("C: the subagent's descendant is alive before abort", isAlive(identity?.descendantPid), identity?.descendantPid);
-      ctx.note("C-dialogCount", dialogs.length);
-
-      const subagentFrames = rpc.frames.filter((f) => String(f.type).startsWith("subagent_"));
-      ctx.check("C: subagent lifecycle frames are emitted for the child", subagentFrames.some((f) => f.type === "subagent_lifecycle"), subagentFrames.map((f) => f.type).slice(0, 4));
-      const lifecycle = subagentFrames.find((f) => f.type === "subagent_lifecycle");
-      ctx.check("C: the child is correlated to the parent's task call", typeof lifecycle?.payload?.parentToolCallId === "string", lifecycle?.payload?.parentToolCallId);
+      identity = await readIdentity(identityFile, 40_000);
+      ctx.check("D: the child really started the external program", identity !== null, identity);
+      ctx.check("D: the child's program is alive before the parent stops", isAlive(identity?.pid), identity?.pid);
+      ctx.check("D: the child's descendant is alive before the parent stops", isAlive(identity?.descendantPid), identity?.descendantPid);
+      ctx.check("D: the command belongs to a child process, not OMP itself",
+        Boolean(identity) && identity.pid !== rpc.pid && identity.ppid !== process.pid,
+        { child: identity?.pid, ppid: identity?.ppid, omp: rpc.pid, harness: process.pid });
+      // The gate must not have raised a dialog: the child approves by policy.
+      ctx.check("D: the child's bash was approved by policy, not by a dialog",
+        readLog(uiLog).some((l) => l.event === "gate-decision" && l.toolName === undefined && l.route === "child-policy" && l.decision === "allow") ||
+        readLog(uiLog).some((l) => l.event === "gate-decision" && l.route === "child-policy"),
+        readLog(uiLog).filter((l) => l.event === "gate-decision"));
 
       await rpc.request({ type: "abort" }, { timeoutMs: 20_000 });
-      await promptPromise.catch(() => {});
-
-      // Measured, not assumed: does the parent's stop reclaim the subagent?
-      const parentGoneAfterAbort = await waitGone(identity?.pid, 8_000);
-      const descendantGoneAfterAbort = await waitGone(identity?.descendantPid, 8_000);
-      ctx.note("C-reclamationAfterParentAbort", { parentGoneAfterAbort, descendantGoneAfterAbort });
-      ctx.check("C: the parent stop is acknowledged and the session survives",
+      const parentGoneAfterAbort = await waitGone(identity?.pid, 10_000);
+      const descendantGoneAfterAbort = await waitGone(identity?.descendantPid, 10_000);
+      ctx.note("D-reclamationAfterParentAbort", { parentGoneAfterAbort, descendantGoneAfterAbort });
+      ctx.check("D: the stop leaves the session responsive",
         (await rpc.request({ type: "get_state" }, { timeoutMs: 10_000 })).type === "response");
+      const snapshot = await rpc.request({ type: "get_subagents" });
+      const running = (snapshot.data?.subagents ?? []).filter((s) => s.status === "running").length;
 
-      // Is the subagent still tracked as running after the parent stopped?
-      const snapshotAfterStop = await rpc.request({ type: "get_subagents" });
-      const stillRunning = (snapshotAfterStop.data?.subagents ?? []).filter((s) => s.status === "running");
-      ctx.note("C-subagentsStillRunningAfterParentStop", stillRunning.length);
+      ctx.check("D: process group reaped", (await rpc.stop()) === true);
+      const goneAfterTeardown = await waitGone(identity?.pid, 5_000);
+      ctx.note("D-reclamationAfterTeardown", { goneAfterTeardown });
 
-      // Bridge teardown is the other candidate mechanism.
-      const ompProc = procInfo(rpc.pid);
-      const commandProc = procInfo(identity?.pid);
-      ctx.note("C-proc", { ompProc, commandProc, childInOmpGroup: Boolean(ompProc && commandProc && commandProc.pgrp === ompProc.pgrp) });
-      ctx.check("C: process group reaped", (await rpc.stop()) === true);
-      const parentGoneAfterTeardown = await waitGone(identity?.pid, 5_000);
-      const descendantGoneAfterTeardown = await waitGone(identity?.descendantPid, 5_000);
-      ctx.note("C-reclamationAfterTeardown", { parentGoneAfterTeardown, descendantGoneAfterTeardown });
-
-      ctx.limit(
-        parentGoneAfterAbort
-          ? "The parent stop reclaimed the subagent's running command tree."
-          : "The parent stop did NOT reclaim the subagent's running command tree (the subagent runs detached), and bridge teardown does not either; the desktop must stop the subagent explicitly, and M2 must kill the subagent's process tree rather than relying on the parent turn ending.",
-      );
-
-      // Positive control: an explicit tree kill does reclaim it, so the
-      // requirement above is achievable. This runs only after every
-      // observation, and is a deliberate explicit kill, not a finally-fallback.
-      const treePid = identity?.pid;
-      if (treePid && isAlive(treePid)) {
-        // Kill the subagent's own process group (its session leader is the
-        // command itself when OMP detaches it).
-        try { process.kill(-treePid, "SIGKILL"); } catch { killQuietly(treePid, "SIGKILL"); killQuietly(identity.descendantPid, "SIGKILL"); }
+      // Positive control, run only after every observation.
+      let reclaimedByExplicitKill = !isAlive(identity?.pid);
+      if (isAlive(identity?.pid)) {
+        try { process.kill(-identity.pid, "SIGKILL"); } catch { killQuietly(identity.pid, "SIGKILL"); }
+        killQuietly(identity?.descendantPid, "SIGKILL");
+        reclaimedByExplicitKill = await waitGone(identity?.pid, 5_000) && await waitGone(identity?.descendantPid, 5_000);
       }
-      const reclaimedByExplicitKill = await waitGone(identity?.pid, 5_000) && await waitGone(identity?.descendantPid, 5_000);
-      ctx.check("C: an explicit process-tree kill reclaims the subagent's command tree", reclaimedByExplicitKill,
-        `parent ${identity?.pid} child ${identity?.descendantPid}`);
+      ctx.check("D: an explicit process-tree kill reclaims the child's command tree", reclaimedByExplicitKill,
+        `pid ${identity?.pid} descendant ${identity?.descendantPid}`);
 
       writeFixture("e11-subagent-cancel.json", {
-        note: "real capture, sanitized; subagent ran a real external program (tools/long-task.mjs) and the parent turn was stopped",
-        subagentFrameTypes: [...new Set(subagentFrames.map((f) => f.type))],
-        lifecycle: sanitizeFrame(lifecycle ?? null),
-        identity: identity ? { pidIsDistinctFromOmp: identity.pid !== rpc.pid, ppidEqualsOmp: identity.ppid === rpc.pid } : null,
+        note: "real capture, sanitized; the child session ran a real external program and the parent turn was stopped",
+        childIsDistinctProcess: Boolean(identity) && identity.pid !== rpc.pid,
         reclamationAfterParentAbort: { parentGoneAfterAbort, descendantGoneAfterAbort },
-        reclamationAfterTeardown: { parentGoneAfterTeardown, descendantGoneAfterTeardown },
-        subagentsStillRunningAfterParentStop: stillRunning.length,
+        reclamationAfterTeardown: { goneAfterTeardown },
+        subagentsRunningAfterParentStop: running,
         reclaimedByExplicitProcessTreeKill: reclaimedByExplicitKill,
       });
     } finally {
@@ -280,67 +373,8 @@ const evidence = await runExperiment("e11-subagent-permissions", async (ctx) => 
     }
   }
 
-  // ==========================================================================
-  // D — parent abort while the subagent's approval dialog is still pending
-  // ==========================================================================
-  {
-    const { root, runRoot, selector } = experimentRoot(ctx, "e11-pending", { baseUrl: provider.baseUrl });
-    const projectDir = join(root, "project");
-    mkdirSync(projectDir, { recursive: true });
-    const uiLog = join(root, "ui.log");
-    const target = join(projectDir, "pending-subagent.txt");
-
-    provider.script([
-      { text: "delegating", toolCalls: [taskCall(target, "pending")], finish: "tool_calls" },
-      { text: "child writing", toolCalls: [{ name: "write", args: { path: target, content: "never\n" } }], finish: "tool_calls" },
-      { text: "child done", finish: "stop" },
-      { text: "parent done", finish: "stop" },
-    ]);
-
-    let rpc;
-    try {
-      rpc = await OmpRpc.start({
-        repoRoot, runRoot, mode: "rpc-ui",
-        args: ["--model", selector, "--extension", GATE],
-        cwd: projectDir,
-        extraEnv: { M1_UI_LOG: uiLog },
-      });
-      await rpc.request({ type: "negotiate_protocol", protocolVersion: 2 });
-      const promptPromise = rpc.request({ type: "prompt", message: "delegate a write" }, { timeoutMs: 90_000 });
-
-      // Wait for the subagent's dialog, then never answer it.
-      const dialog = await rpc.waitFor((f) => f.type === "extension_ui_request" && DIALOG_METHODS.has(f.method), 60_000);
-      ctx.check("D: the subagent's approval dialog is pending before abort", Boolean(dialog), dialog?.title);
-
-      await rpc.request({ type: "abort" }, { timeoutMs: 20_000 });
-      const cancelFrame = await rpc.waitFor(
-        (f) => f.type === "extension_ui_request" && f.method === "cancel" && f.targetId === dialog?.id,
-        20_000,
-      );
-      ctx.check("D: the pending subagent dialog is cancelled by targetId", Boolean(cancelFrame), cancelFrame ?? "no cancel frame");
-      await promptPromise.catch(() => {});
-      await sleep(1_000);
-
-      const decision = readLog(uiLog).find((l) => l.event === "gate-decision");
-      ctx.check("D: the gate resolved without an approval", decision?.decision === "deny", decision);
-      ctx.check("D: no side effect from the cancelled subagent dialog", !existsSync(target));
-      ctx.check("D: session stays responsive", (await rpc.request({ type: "get_state" }, { timeoutMs: 10_000 })).type === "response");
-      ctx.check("D: process group reaped", (await rpc.stop()) === true);
-
-      writeFixture("e11-subagent-pending-cancel.json", {
-        note: "real capture, sanitized; the subagent's dialog was deliberately left unanswered",
-        dialog: dialog ? { id: dialog.id, method: dialog.method, title: dialog.title } : null,
-        cancel: cancelFrame ? sanitizeFrame(cancelFrame) : null,
-        decision: decision ?? null,
-        sideEffectCreated: existsSync(target),
-      });
-    } finally {
-      if (rpc?.pid) await rpc.stop();
-    }
-  }
-
-  ctx.limit("Subagent permission coverage is asserted for the `task` agent type driven by the local fake provider; other agent types and the M5 subagent UI are out of M1 scope.");
-  ctx.limit("Approval dialogs raised from a subagent are answered by this experiment; how the desktop routes them is M5 work.");
+  ctx.limit("The child-session policy (`M1_CHILD_POLICY`) and the out-of-band decision file are the experiment's model of a desktop-side policy; OMP itself provides no UI for subagent sessions, so an interactive subagent approval cannot be verified here.");
+  ctx.limit("Only the `task` agent type is driven; other agent types and the M5 subagent UI are out of M1 scope.");
 });
 
 process.exit(evidence.ok ? 0 : 1);

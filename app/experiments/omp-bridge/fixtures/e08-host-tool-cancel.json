@@ -2,7 +2,7 @@
   "note": "real capture, sanitized; the host deliberately never answered the call",
   "request": {
     "type": "host_tool_call",
-    "id": "1588a10ea161d99d",
+    "id": "1588aac7d40f971c",
     "toolCallId": "call_fake_3_0",
     "toolName": "m1_host_echo",
     "arguments": {
@@ -11,7 +11,7 @@
   },
   "cancel": {
     "type": "host_tool_cancel",
-    "id": "1588a10ea461d99e",
-    "targetId": "1588a10ea161d99d"
+    "id": "1588aac7d6cf971d",
+    "targetId": "1588aac7d40f971c"
   }
 }

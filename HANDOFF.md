@@ -27,9 +27,9 @@
 | `docs/07-environment-and-upstream.md` | 环境准备和上游维护 |
 | `docs/validation/M0-baseline.md` | M0 验证记录（命令、版本、退出码、SHA、截图） |
 | `docs/validation/M0-screenshots/` | M0 代表性界面基线截图（项目列表/设置/模型/扩展） |
-| `docs/validation/M1-compatibility.md` | M1 验证记录（E01-E13、326 项检查、传输能力矩阵、未执行项、R1-R6 复审返修） |
-| `docs/decisions/001-omp-transport.md` | 接入传输路径决策（含 M2 必须遵守的十条约束） |
-| `app/experiments/omp-bridge/` | M1 实验套件：`node run-all.mjs` 可复现，含 `tools/long-task.mjs`、fixtures/results |
+| `docs/validation/M1-compatibility.md` | M1 验证记录（E01-E13、358 项检查、传输能力矩阵、未执行项、两轮复审返修 R1-R6 / F1-F6） |
+| `docs/decisions/001-omp-transport.md` | 接入传输路径决策（含 M2 必须遵守的十二条约束） |
+| `app/experiments/omp-bridge/` | M1 实验套件：`node run-all.mjs` 可复现，含 `tools/long-task.mjs`、`lib/runtime-registry.mjs`（按运行标识回收资源）、fixtures/results |
 
 PI-Desktop SHA：`0111e306c120ad5820688d7608cb37bad8fbcc1f`
 
@@ -58,13 +58,13 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 
 ## 3.2 M1 已完成的工作
 
-- 在 `app/experiments/omp-bridge/` 建立可复现实验套件 E01-E13(本地假 provider、每实例合成 HOME 与隔离配置根、进程组回收)。`node run-all.mjs`:**13/13 实验、326/326 检查通过,退出码 0,约 114 秒**;汇总按「退出码 0 + 无信号 + PASS + 结果文件一致」判定。
+- 在 `app/experiments/omp-bridge/` 建立可复现实验套件 E01-E13(本地假 provider、每实例合成 HOME 与隔离配置根、进程组回收)。`node run-all.mjs`:**13/13 实验、358/358 检查通过,退出码 0,约 197 秒**;汇总按「退出码 0 + 无信号 + PASS + 结果文件命名/`ok` 一致 + 本轮运行标识」判定,并回收被强杀实验的 detached 运行时与隔离目录。
 - 权限链路实测:受信扩展的 `tool_call` 钩子在**执行前**拿到工具名与具体目标,拒绝时无文件/进程副作用,批准后只执行一次;宿主工具(`set_host_tools`)同样经过该钩子。审批问答通过 `extension_ui_request` 的 `select/confirm/input` 往返,并覆盖取消与超时。
 - 取消链路实测(复审 R1 后重做):顶层会话里 `abort` 就能回收**真实运行的命令进程及其子进程**(用自行写 PID 的外部程序验证);**不先停止就杀桥接进程组会留下孤儿**,因为命令运行在自己的 session/进程组;挂起对话被 `cancel` 且解析为 deny、会话保持可响应。停止顺序因此定为"先协议内停止,再拆桥接"。
-- 子代理(R3 新增 E11):`task` 子代理的 `write` 会进入同一条 `tool_call` 钩子(拒绝无副作用、批准只执行一次),挂起对话在父会话停止时按 `targetId` 取消;但父会话 `abort` **不会**回收 detached 子代理正在运行的命令树,需要显式的进程树终止。
+- 子代理(R3 新增 E11,复审 F1 后按会话身份路由重做):子代理的工具调用**会**进入同一条 `tool_call` 钩子,但钩子在子代理会话里 `hasUI=false`,不可能向用户弹窗——纯 UI 依赖的审批会被立即拒绝,审批必须由桌面策略或带外通道决定;策略批准时由子代理恰好执行一次。父会话 `abort` **不会**回收 detached 子代理正在运行的命令树(子代理仍被报为运行中),需要显式的进程树终止。
 - 配置隔离(R2 加固):子进程 `HOME` 指向运行目录内的合成家目录,并剥离额外重定向变量;正对照(合成 HOME 里的全局规则生效)与反对照(decoy HOME 的规则/技能不生效)都已验证,测试不再读取真实用户配置。
-- 协议分片(R4 新增 E13):1.2 MB 提示触发真实 `rpc_chunk`(5 片/组),用移植自固定实现的解码器重组并校验内容完整;把分片写回 stdin 会被拒绝(`Unknown command: rpc_chunk`),而 1.3 MB 单行命令可直接接受。
-- 工具链加固(R5/R6 新增 E12):帧结构校验(`null`/标量/数组/no-type → `__invalid__`)、启动失败一律有界清理;汇总脚本按"退出码 0 + 无信号 + PASS + 结果文件一致"判定,超时按进程组回收。
+- 协议分片(R4 新增 E13,复审 F3 后接入客户端):关闭自动压缩后 1.2 MB 提示产生真实 `rpc_chunk`,解码器现接在**响应匹配之前**,`rpc.request()` 能拿到 1,200,650 字节的完整重组响应;分片写回 stdin 会被拒绝(`Unknown command: rpc_chunk`),而单行超限命令可直接接受;分片故障不可恢复(固定实现亦视为致命),桌面应重启运行时。
+- 工具链加固(E12,R5/R6 与复审 F2-F5):帧结构校验、启动失败有界清理;汇总按「退出码 0 + 无信号 + PASS + 结果文件命名/`ok` 一致 + 本轮运行标识」判定;被超时杀死的实验,其 detached 运行时、后代与隔离目录按**环境归属**有界回收(不按进程名);参数选择集合正确。
 - 宿主工具与子代理:`host_tool_call`/`host_tool_result` 往返可用,放弃未应答调用会收到 `host_tool_cancel`(**按 `targetId` 关联**);真实 `task` 调用产生 `subagent_lifecycle`/`subagent_progress`/`subagent_event` 三类帧,存活期快照含 `parentToolCallId` 与 `sessionFile`。
 - 会话与隔离实测:原生会话按 `sessionFile` 恢复且不重放副作用、不重新审批;`branch` 生成新的原生会话文件;子进程实际环境无凭证与 steering 变量;模型/规则/MCP 都从隔离根加载。
 - 传输边界实测:跨块 UTF-8、半帧、CRLF、非法 JSON 恢复、超长行显式报错、180 KB 多字节消息往返;缺失可执行文件/立即崩溃/永不 ready 三类降级运行时均可分类回收;stdin EOF 与 stdout EPIPE 都会让 OMP 自行退出且进程组被回收。
@@ -73,7 +73,7 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 - 回归:M0 的 `verify-rpc.test.mjs` 18/18 通过,`verify-rpc.mjs` 真实无费用 RPC 通过。
 - 证据:`docs/validation/M1-compatibility.md`、`docs/decisions/001-omp-transport.md`、`app/experiments/omp-bridge/fixtures|results/`;任务看板 T04-T07 已标记完成。
 
-未通过/未执行:MCP 工具未进入模型工具表(归属 T19);子代理的停止/恢复边界(T17);macOS/Windows 进程终止未验证(T23);ACP/SDK 仅源码比对。
+未通过/未执行:MCP 工具未进入模型工具表(归属 T19);子代理的交互式审批**不支持**(无 UI,须由桌面策略替代)与单独停止(T17);macOS/Windows 进程终止未验证(T23);ACP/SDK 仅源码比对。
 
 ## 4. 下一执行模型从哪里开始
 
@@ -81,7 +81,7 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 
 M0 已完成并经四轮复审返修：原桌面可复现构建、开发数据与全局 `.agents` 隔离、UI 基线、OMP 协议启动（绑定 repo 内启动器、版本 18.2.7、`ready`/`negotiate_protocol` v2）均有记录（`docs/validation/M0-baseline.md`，顶部四段“返修记录”）。环境已就绪：Node 24、pnpm 10.34.5、Bun 1.4.2、桌面 Rust stable + OMP `nightly-2026-08-12`、cmake/ninja。复审结论以复审方为准。
 
-M1 已定案接入路径并留下约束，见 `docs/decisions/001-omp-transport.md`（§3 十条必须实现的约束）。M2 不得重新论证 rpc-ui 选择，除非出现新证据；停止路径必须包含进程组终止兜底，审批必须先于执行。实验套件可继续复用于回归：`cd app/experiments/omp-bridge && node run-all.mjs`（326 项检查）。
+M1 已定案接入路径并留下约束，见 `docs/decisions/001-omp-transport.md`（§3 十二条必须实现的约束）。M2 不得重新论证 rpc-ui 选择，除非出现新证据；停止必须先协议内停止再拆桥接（顶层 `abort` 即回收命令进程，子代理需显式终止其进程树），审批必须先于执行，子代理审批不能假设继承父会话 UI。实验套件可继续复用于回归：`cd app/experiments/omp-bridge && node run-all.mjs`（358 项检查）。
 
 ## 5. 可直接交给执行模型
 
@@ -97,8 +97,12 @@ M1 已定案接入路径并留下约束，见 `docs/decisions/001-omp-transport.
 桌面 Rust stable + OMP nightly-2026-08-12、cmake/ninja（pip 安装）。
 
 接入路径已定案，不要重新论证：OMP 以独立子进程 + --mode rpc-ui 运行，
-权限走受信扩展的 tool_call 执行前钩子，停止必须附带进程组终止兜底
-（协议内 abort/abort_bash 不会回收运行中的命令进程，E05 有实测证据）。
+权限走受信扩展的 tool_call 执行前钩子。停止按顺序处理：先协议内 abort
+（顶层会话即可回收命令进程及其后代），确认回收后再拆桥接；不先停止就杀
+桥接进程组会留下孤儿。
+子代理不同：其会话 hasUI=false，无法弹窗审批，必须由桌面策略或带外通道决定；
+父会话 abort 不会回收 detached 子代理正在运行的命令树，需要显式终止其进程树。
+详见 docs/decisions/001-omp-transport.md 的十二条约束。
 
 T08 最小运行时接口并保持原 Pi 行为；T09 进程监督与协议适配包
 （退出/超时/帧错误/资源回收，读取器需显式行长上限）；T10 会话引擎选择、

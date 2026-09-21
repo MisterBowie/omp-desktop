@@ -1,0 +1,15 @@
+{
+  "note": "SYNTHETIC fault sample: a corrupted chunk sequence, then a well-formed one, then a normal frame",
+  "chunkErrors": [
+    "rpc chunk sequence mismatch",
+    "rpc chunk sequence mismatch",
+    "rpc chunk sequence mismatch",
+    "rpc chunk sequence interrupted"
+  ],
+  "streamRecovered": false,
+  "requestAfterFault": {
+    "success": false,
+    "error": "chunk decode failed: rpc chunk sequence mismatch"
+  },
+  "finding": "The pinned decoder has no resynchronisation: after one chunk fault every later frame is rejected, and OMP's own client treats a decoder throw as fatal (rpc-client.ts has no try/catch around frameDecoder.push). A desktop must restart the runtime on a chunk fault."
+}

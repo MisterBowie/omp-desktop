@@ -1,0 +1,108 @@
+{
+  "note": "SYNTHETIC regression: stub experiments plus argument-arrangement cases",
+  "cases": [
+    {
+      "args": [],
+      "got": {
+        "selectors": [],
+        "dir": "/default",
+        "keep": false
+      },
+      "ok": true
+    },
+    {
+      "args": [
+        "e04",
+        "e05"
+      ],
+      "got": {
+        "selectors": [
+          "e04",
+          "e05"
+        ],
+        "dir": "/default",
+        "keep": false
+      },
+      "ok": true
+    },
+    {
+      "args": [
+        "e04"
+      ],
+      "got": {
+        "selectors": [
+          "e04"
+        ],
+        "dir": "/default",
+        "keep": false
+      },
+      "ok": true
+    },
+    {
+      "args": [
+        "--dir",
+        "/tmp/one",
+        "e04",
+        "e05"
+      ],
+      "got": {
+        "selectors": [
+          "e04",
+          "e05"
+        ],
+        "dir": "/tmp/one",
+        "keep": false
+      },
+      "ok": true
+    },
+    {
+      "args": [
+        "e04",
+        "--dir",
+        "/tmp/two",
+        "e05"
+      ],
+      "got": {
+        "selectors": [
+          "e04",
+          "e05"
+        ],
+        "dir": "/tmp/two",
+        "keep": false
+      },
+      "ok": true
+    },
+    {
+      "args": [
+        "--keep-artifacts",
+        "e04"
+      ],
+      "got": {
+        "selectors": [
+          "e04"
+        ],
+        "dir": "/default",
+        "keep": true
+      },
+      "ok": true
+    },
+    {
+      "args": [
+        "e04",
+        "--keep-artifacts"
+      ],
+      "got": {
+        "selectors": [
+          "e04"
+        ],
+        "dir": "/default",
+        "keep": true
+      },
+      "ok": true
+    }
+  ],
+  "endToEndRan": [
+    "e04-alpha.mjs",
+    "e05-beta.mjs"
+  ]
+}

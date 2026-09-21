@@ -1,6 +1,7 @@
 {
   "experiment": "e12-harness-faults",
-  "startedAt": "2026-09-21T18:51:35.281Z",
+  "runId": "run-mubn6kc9-e85d14",
+  "startedAt": "2026-09-21T19:34:50.923Z",
   "checks": [
     {
       "description": "R5: start against invalid frames fails instead of crashing",
@@ -23,7 +24,7 @@
     {
       "description": "R5: the failed start left no isolated home behind",
       "ok": true,
-      "detail": "/tmp/m1-r5-SFKWmk/fail-run/home"
+      "detail": "/tmp/m1-r5-le5Ifg/fail-run/home"
     },
     {
       "description": "R5: a runtime with invalid frames then ready is usable",
@@ -46,6 +47,122 @@
     {
       "description": "R5: synthetic roots removed after the probes",
       "ok": true
+    },
+    {
+      "description": "F2: the leaking experiment is rejected on timeout",
+      "ok": true,
+      "detail": "running e96-leaky.mjs ... REJECTED (timed out after 30000 ms) — reported: PASS e96-leaky: 1/1 checks"
+    },
+    {
+      "description": "F2: the suite reclaimed the killed experiment's detached runtime",
+      "ok": true,
+      "detail": "runtime 208154"
+    },
+    {
+      "description": "F2: the suite reclaimed the tool process the runtime detached",
+      "ok": true,
+      "detail": "descendant 208212"
+    },
+    {
+      "description": "F2: the synthetic home was removed",
+      "ok": true,
+      "detail": "/tmp/m1-f2-3SRt9s/run/home"
+    },
+    {
+      "description": "F2: the isolated config root was removed",
+      "ok": true,
+      "detail": "/tmp/m1-f2-3SRt9s/run/home/.omp-m0-7514ac32"
+    },
+    {
+      "description": "F2: the reaper did not touch this test process",
+      "ok": true
+    },
+    {
+      "description": "F2: the reaper did not touch a decoy outside this run",
+      "ok": true,
+      "detail": "decoy 208133"
+    },
+    {
+      "description": "F3: the client starts even when the stream later contains bad chunks",
+      "ok": true
+    },
+    {
+      "description": "F3: a corrupted chunk sequence is reported as a chunk error",
+      "ok": true,
+      "detail": [
+        "rpc chunk sequence mismatch",
+        "rpc chunk sequence mismatch",
+        "rpc chunk sequence mismatch",
+        "rpc chunk sequence interrupted"
+      ]
+    },
+    {
+      "description": "F3: the corrupted sequence yields no logical frame",
+      "ok": true
+    },
+    {
+      "description": "F3: a chunk fault is fatal to the stream, not silently recoverable",
+      "ok": true,
+      "detail": {
+        "assembled": 0,
+        "physical": 1
+      }
+    },
+    {
+      "description": "F3: requests fail fast after a chunk fault instead of timing out",
+      "ok": true,
+      "detail": "chunk decode failed: rpc chunk sequence mismatch"
+    },
+    {
+      "description": "F3: the stream error is queryable by the caller",
+      "ok": true,
+      "detail": "chunk decode failed: rpc chunk sequence mismatch"
+    },
+    {
+      "description": "F3: stop() still reaps the runtime after a chunk error",
+      "ok": true
+    },
+    {
+      "description": "F3: the failed client left no isolated home behind",
+      "ok": true
+    },
+    {
+      "description": "F5: selectors survive every --dir / flag arrangement",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "description": "F5: a single selector is not dropped",
+      "ok": true
+    },
+    {
+      "description": "F5: multiple selectors are all kept",
+      "ok": true
+    },
+    {
+      "description": "F5: --dir without a value is rejected",
+      "ok": true
+    },
+    {
+      "description": "F5: exactly the requested experiments ran",
+      "ok": true,
+      "detail": [
+        "e04-alpha.mjs",
+        "e05-beta.mjs"
+      ]
+    },
+    {
+      "description": "F5: the unselected experiment did not run",
+      "ok": true,
+      "detail": [
+        "e04-alpha.mjs",
+        "e05-beta.mjs"
+      ]
+    },
+    {
+      "description": "F5: the selected run exits zero",
+      "ok": true,
+      "detail": 0
     },
     {
       "description": "R6: the suite exits non-zero when any experiment is dishonest",
@@ -83,6 +200,16 @@
       "detail": "running e90-honest-pass.mjs ... PASS e90-honest-pass: 1/1 checks"
     },
     {
+      "description": "F4: a stale result file from an earlier run is rejected",
+      "ok": true,
+      "detail": "running e97-stale-result.mjs ... REJECTED (result file belongs to run run-from-an-earlier-suite) — reported: PASS e97-stale-result: 1/1 checks"
+    },
+    {
+      "description": "F4: a result file without a run id is rejected",
+      "ok": true,
+      "detail": "running e98-unstamped-result.mjs ... REJECTED (result file has no run id (stale file?)) — reported: PASS e98-unstamped-result: 1/1 checks"
+    },
+    {
       "description": "R6: a stalled experiment is rejected as timed out",
       "ok": true,
       "detail": "running e96-stalled.mjs ... REJECTED (timed out after 8000 ms) — reported: PASS e96-stalled: 1/1 checks"
@@ -90,11 +217,11 @@
     {
       "description": "R6: the timeout path reclaims the experiment's own child processes",
       "ok": true,
-      "detail": "grandchild 182072"
+      "detail": "grandchild 208634"
     }
   ],
   "artifacts": {},
   "limitations": [],
-  "finishedAt": "2026-09-21T18:51:45.958Z",
+  "finishedAt": "2026-09-21T19:35:35.911Z",
   "ok": true
 }

@@ -3,15 +3,18 @@
   "gate": {
     "event": "gate",
     "toolName": "write",
-    "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-allow-write-wWHra7/project/guarded.txt",
+    "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-allow-write-63NXzF/project/guarded.txt",
     "hasUI": true,
-    "at": 1790016608153
+    "sessionId": "01a0c574-b898-751f-ae2a-08ec9d72b424",
+    "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-allow-write-63NXzF/project",
+    "at": 1790019156270
   },
   "decision": {
     "event": "gate-decision",
     "decision": "allow",
+    "route": "ui",
     "choice": "Allow",
-    "at": 1790016608174
+    "at": 1790019156289
   },
   "dialogs": [
     {
@@ -32,7 +35,7 @@
           }
         ],
         "details": {
-          "resolvedPath": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-allow-write-wWHra7/project/guarded.txt"
+          "resolvedPath": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-allow-write-63NXzF/project/guarded.txt"
         }
       },
       "isError": false

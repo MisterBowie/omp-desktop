@@ -1,74 +1,50 @@
 {
   "experiment": "e13-chunking",
-  "startedAt": "2026-09-21T18:51:45.991Z",
+  "runId": "run-mubn6kc9-e85d14",
+  "startedAt": "2026-09-21T19:35:36.244Z",
   "checks": [
     {
-      "description": "A: the oversized prompt is accepted",
-      "ok": true
-    },
-    {
-      "description": "A: OMP splits the resulting logical frame into rpc_chunk frames",
+      "description": "A: auto-compaction is disabled for this run",
       "ok": true,
-      "detail": "10 chunks"
+      "detail": "ok"
     },
     {
-      "description": "A: every chunk sequence is complete (declared count == observed chunks)",
+      "description": "A: the oversized prompt produced real rpc_chunk frames",
+      "ok": true,
+      "detail": 8
+    },
+    {
+      "description": "A: a large response is delivered through rpc.request()",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "description": "A: the client reassembled chunked frames, not just collected them",
       "ok": true,
       "detail": {
-        "rpc-1": 5,
-        "rpc-2": 5
+        "assembled": 3,
+        "physicalChunks": 12
       }
     },
     {
-      "description": "A: chunk metadata is self-consistent",
+      "description": "A: no chunk frame is ever surfaced as a logical frame",
       "ok": true,
-      "detail": {
-        "count": 5,
-        "byteLength": 1200150,
-        "limit": 1048576
-      }
+      "detail": 0
     },
     {
-      "description": "A: each physical chunk stays within the 1 MiB frame limit",
-      "ok": true,
-      "detail": 349617
-    },
-    {
-      "description": "A: each chunk payload is within the 256 KiB payload limit",
-      "ok": true,
-      "detail": 262144
-    },
-    {
-      "description": "A: reassembly reports no decoder errors",
+      "description": "A: no chunk decoding error was recorded",
       "ok": true,
       "detail": []
     },
     {
-      "description": "A: exactly the chunked frames are held back until complete",
+      "description": "A: the reassembled response is larger than one physical frame",
       "ok": true,
-      "detail": {
-        "chunks": 10,
-        "frames": 18
-      }
+      "detail": 1200659
     },
     {
-      "description": "A: a reassembled frame carries the oversized payload marker",
+      "description": "A: the oversized user message survived reassembly byte-complete",
       "ok": true,
-      "detail": "message_start"
-    },
-    {
-      "description": "A: the reassembled frame exceeds the single-frame limit",
-      "ok": true,
-      "detail": 1200150
-    },
-    {
-      "description": "A: the reassembled payload is byte-complete",
-      "ok": true,
-      "detail": "1200150 chars, expected payload 1200015"
-    },
-    {
-      "description": "A: no chunk frame is ever surfaced as a logical frame",
-      "ok": true
+      "detail": "1200659 bytes, marker present: true"
     },
     {
       "description": "A: process group reaped",
@@ -334,8 +310,11 @@
     }
   ],
   "artifacts": {
-    "A-reassembledFrameType": "message_start",
-    "A-reassembledBytes": 1200150,
+    "A-responseBytes": 1200659,
+    "A-chunkStats": {
+      "physical": 12,
+      "assembled": 3
+    },
     "C-caseVerdicts": [
       "missing middle chunk: sequence-mismatch,sequence-mismatch,sequence-mismatch",
       "duplicated chunk: sequence-mismatch",
@@ -354,6 +333,6 @@
     "The decoder is a faithful port of the pinned implementation (same constants and rejection rules); the capture in fixture A and the reactions in fixture B are real, the corrupted sequences in C are synthetic.",
     "Chunking is verified for one deterministic real trigger (an oversized prompt whose echoed message frame exceeds 1 MiB); other large-frame producers are not enumerated in M1."
   ],
-  "finishedAt": "2026-09-21T18:51:52.383Z",
+  "finishedAt": "2026-09-21T19:35:42.093Z",
   "ok": true
 }

@@ -2,7 +2,7 @@
 
 记录时间:2026-09-22
 工作目录:`/home/vv/person/code/omp-desktop-m1`(M1 专用分支 `codex/m1-compatibility` 的 worktree)
-结论:**13/13 实验通过,326/326 检查通过**;接入路径已定案,见 `docs/decisions/001-omp-transport.md`。
+结论:**13/13 实验通过,358/358 检查通过**;接入路径已定案,见 `docs/decisions/001-omp-transport.md`。
 
 > 本文件已被一次独立复审返修(R1-R6)。返修前版本的 E05 取消结论**无效并已撤回**,隔离、子代理权限、协议分片、工具链健壮性均有新证据;逐项处理见 §8。
 
@@ -10,7 +10,7 @@
 
 | 项目 | 值 |
 | --- | --- |
-| 系统 | Linux x86_64,内核 7.0.0-31-generic(kernel #31~24.04.1-Ubuntu) |
+| 系统 | Linux x86_64,内核 7.0.0-31-generic(kernel #31~24.04.1-Ubuntu)。依赖 `/proc` 的验证(E05/E11 的进程组记账、E07 读取子进程 `/proc/<pid>/environ`、E12 的环境归属回收)只在 Linux 上执行并通过;这些路径在其他平台需要各自的等价实现,不能把本机结论直接外推(macOS/Windows 见未执行项) |
 | Node | v24.14.0(`nvm use 24`) |
 | Bun | 未在 PATH;由锁定源码的 `scripts/omp` 启动脚本内部 `exec bun` |
 | Rust | 1.95.0(本次实验未使用) |
@@ -33,7 +33,7 @@ node e04-approval.mjs                # 单个实验;加 --keep-artifacts 保留�
 
 每个实验自建隔离目录(配置根 `~/.omp-m0-<hex>`、agent dir、cwd),结束后回收进程组并删除临时根。结果写入 `results/<name>.json`,脱敏 fixture 写入 `fixtures/<name>.json`。
 
-总结果:`experiments: 13/13 passed | checks: 326/326`,退出码 0,耗时 114.3 秒;汇总写入 `results/summary.json`,逐实验明细写入 `results/<name>.json`。汇总现在按「退出码 0 + 无信号 + PASS + 结果文件一致」判定,不再只看 PASS 文本。
+总结果:`experiments: 13/13 passed | checks: 358/358`,退出码 0,耗时 196.8 秒;汇总写入 `results/summary.json`,逐实验明细写入 `results/<name>.json`。汇总现在按「退出码 0 + 无信号 + PASS + 结果文件存在/命名/`ok` 一致 + 本轮运行标识」判定,不再只看 PASS 文本。
 
 清理验证:正常结束时 `.dev-data/m1/` 运行目录与 `~/.omp-m0-*` 配置根均为 0 个残留,无遗留 OMP 进程(被 `SIGKILL`/管道中断的临时调试运行会留下残留,已清理并确认与正式路径无关)。
 
@@ -51,9 +51,9 @@ node e04-approval.mjs                # 单个实验;加 --keep-artifacts 保留�
 | E08 子代理与工具桥 | `node e08-host-tools.mjs` | 0 | 23/23 | 宿主工具往返与取消(`targetId` 关联);子代理三类事件帧与存活期快照;宿主工具同样过 `tool_call` 钩子 | `e08-host-tool-exchange.json`、`e08-host-tool-cancel.json`、`e08-subagent-events.json` |
 | E09 传输边界 | `node e09-transport.mjs` | 0 | 30/30 | 跨块 UTF-8、半帧、CRLF、非法 JSON 恢复、超长行、180 KB 多字节往返;stdin EOF / stdout EPIPE 自退出并回收 | `e09-degraded-runtimes.json` |
 | E10 模式差异 | `node e10-modes.mjs` | 0 | 18/18 | 两种模式都有扩展对话通道;只有 rpc-ui 广告 `ask` 工具 | `e10-mode-capabilities.json` |
-| E11 子代理权限与取消 | `node e11-subagent-permissions.mjs` | 0 | 28/28 | 子代理的 `write` 走同一条 `tool_call` 钩子(拒绝无副作用/批准执行一次);父停止不回收 detached 子代理的命令树,显式进程树终止可以 | `e11-subagent-allow.json`、`e11-subagent-deny.json`、`e11-subagent-cancel.json`、`e11-subagent-pending-cancel.json` |
-| E12 工具链故障回归 | `node e12-harness-faults.mjs` | 0 | 16/16 | 非法帧不崩溃且有界清理;汇总按退出码/信号/结果文件判定,超时按进程组回收 | `e12-invalid-frames.json`、`e12-aggregator-verdicts.json` |
-| E13 协议 v2 分片 | `node e13-chunking.mjs` | 0 | 34/34 | 1.2 MB 提示触发真实 5 片/组 `rpc_chunk` 并完整重组;入站分片被拒绝;缺片/重复/乱序/非法元数据/超限全部报错 | `e13-real-chunk-sample.json`、`e13-inbound-chunks.json`、`e13-chunk-faults.json` |
+| E11 子代理权限与取消 | `node e11-subagent-permissions.mjs` | 0 | 40/40 | 按**会话身份**路由后:子代理工具调用进入同一 `tool_call` 钩子但 `hasUI=false`,不能弹窗;审批须由桌面策略决定(拒绝无副作用/批准执行一次);父停止不回收 detached 子代理命令树 | `e11-subagent-allow.json`、`e11-subagent-deny.json`、`e11-subagent-cancel.json`、`e11-subagent-pending-cancel.json` |
+| E12 工具链故障回归 | `node e12-harness-faults.mjs` | 0 | 40/40 | 非法帧不崩溃且有界清理;汇总按「退出码+信号+PASS+结果文件+运行标识」判定;被杀实验的 detached 运行时/后代/隔离目录被有界回收;参数选择集合正确 | `e12-invalid-frames.json`、`e12-aggregator-verdicts.json`、`e12-runtime-reaping.json`、`e12-chunk-error-handling.json`、`e12-arg-parsing.json` |
+| E13 协议 v2 分片 | `node e13-chunking.mjs` | 0 | 30/30 | 关闭自动压缩后,1.2 MB 提示产生真实分片,`rpc.request()` 经客户端解码后拿到 1,200,650 字节完整响应;入站分片被拒绝;缺片/重复/乱序/非法元数据/超限均有判定 | `e13-real-chunk-sample.json`、`e13-inbound-chunks.json`、`e13-chunk-faults.json` |
 
 ## 3.1 M0 回归复跑
 
@@ -101,6 +101,9 @@ models       : local-model
 | `e11-subagent-pending-cancel.json` | 真实采集 | 子代理挂起对话被父停止取消 |
 | `e12-invalid-frames.json` | **合成故障样本** | 桩运行时输出非法帧,只有客户端分类是被观察行为 |
 | `e12-aggregator-verdicts.json` | **合成故障样本** | 桩实验的退出码/信号/结果文件组合 |
+| `e12-runtime-reaping.json` | **合成故障样本** | 桩实验启动真实运行时后被超时杀死,验证回收 |
+| `e12-chunk-error-handling.json` | **合成故障样本** | 桩运行时发出损坏的分片序列 |
+| `e12-arg-parsing.json` | **合成故障样本** | 参数组合与桩实验执行集合 |
 | `e13-real-chunk-sample.json` | 真实采集 | 固定 OMP 真实发出的 `rpc_chunk` 结构 |
 | `e13-inbound-chunks.json` | 真实采集 | 向 stdin 发送合法分片后的真实反应 |
 | `e13-chunk-faults.json` | **合成故障样本** | 用移植编码器生成再破坏的分片序列 |
@@ -152,7 +155,20 @@ models       : local-model
 
 机制来自 `/proc` 记账:命令进程的 `ppid` 等于 OMP PID,但它的 `pgrp`/`session` 是**它自己的**,所以杀掉 OMP 的进程组根本触达不到它。挂起对话仍会收到带 `targetId` 的 `cancel`,gate 解析为 `deny` 且无副作用。
 
-**子代理的权限覆盖与取消(E11)** — `task` 子代理的 `write` 会进入**同一条**扩展 `tool_call` 钩子:拒绝时文件不存在,批准时恰好写入一次;钩子看到的仍是子代理的具体目标路径。父会话停止时,子代理挂起的审批对话会收到带 `targetId` 的 `cancel` 并解析为 deny,无副作用。但父会话 `abort` **不会**回收 detached 子代理正在运行的命令树(真实外部程序 PID 仍存活),`get_subagents` 也不再报告其为运行中;显式的进程树终止可以回收。因此桌面停止会话时必须显式处理子代理的后台进程。
+**子代理的权限覆盖与取消(E11,复审 F1 后重做)** — 旧版本**无效**:它用一条共享的顺序响应队列驱动父会话与子代理,而子代理是异步启动的,于是父会话抢先消费了本该给子代理的 `write` 轮次;"子代理审批"的结论实际上全部来自父会话。现在按**会话身份**路由(子代理的派发文本是它自己会话的第一条 user 消息),并断言归属:父会话 `task` 钩子 `hasUI=true` 而子代理 `write` 钩子 `hasUI=false`、两者 `sessionId` 不同、子代理 `parentToolCallId` 等于父会话 `task` 的 `toolCallId`、父会话从未自己发起 `write`。
+
+重做后的实测:
+
+| 场景 | 结果 |
+| --- | --- |
+| 子代理工具调用是否经过同一条钩子 | **经过**,且带子代理自己的目标路径 |
+| 子代理能否向用户弹窗 | **不能**,`hasUI=false`,OMP 不提供子代理 UI |
+| 纯 UI 依赖的审批结果 | 立即拒绝(`denied: no UI available for approval`),无对话、无副作用 |
+| 桌面策略拒绝/批准 | 策略拒绝无副作用;策略批准时由**子代理**恰好写入一次 |
+| 带外审批等待中停止父会话 | 停止 25 ms 返回、会话可响应、无副作用;挂起的子代理审批随后解析为拒绝 |
+| 子代理执行真实长任务时停止父会话 | 父 `abort` **不回收** detached 子代理的命令进程与后代(`get_subagents` 仍报 1 个运行中);显式进程树终止可回收 |
+
+架构影响:子代理的工具调用在**执行前**可达且可阻断,但无法向用户提问,所以桌面的审批方案必须是"父会话交互决定 + 子代理按策略/带外通道决定"的两段式(或直接把子代理的能力限制在策略允许的范围内),不能假设子代理继承父会话的 UI。
 
 **宿主工具、取消与子代理(E08)** — `set_host_tools` 注册的工具能被模型调用,`host_tool_result` 会回灌给模型;扩展的 `tool_call` 钩子同时观察到宿主工具与原生工具(`["m1_host_echo","write"]`),因此"注册宿主工具"不等于绕过审批。放弃未应答的宿主工具调用(改发 `abort`)会收到 `host_tool_cancel`,**关联字段是 `targetId` 而不是它自己的 `id`**,桌面必须按 `targetId` 匹配。真实 `task` 调用产生了 `subagent_lifecycle`/`subagent_progress`/`subagent_event` 三类帧,`get_subagents` 在子代理存活期间返回带 `parentToolCallId`、`sessionFile`、`status` 的条目(子代理结束后会从注册表移除)。
 
@@ -165,7 +181,8 @@ models       : local-model
 | 项 | 状态 | 原因 / 后续 |
 | --- | --- | --- |
 | MCP 工具进入模型工具表 | 未通过 | 隔离配置的 MCP 服务器被发现、启动并完成 `initialize`/`tools/list`,但其工具未出现在模型工具表中(OMP 只广告 12 项核心工具);归属 T19/M5 |
-| 子代理审批对话的桌面路由 | 未实现 | E11 由实验代答;真实桌面如何呈现子代理提问属 M5 |
+| 子代理的交互式审批 | **不支持** | E11 实测:子代理会话 `hasUI=false`,OMP 不提供子代理 UI,因此无法向用户弹窗;桌面必须用策略或带外通道决定(E11 用 `M1_CHILD_POLICY`/决策文件模拟),真正的桌面策略属 M2/T10-M11 |
+| 分片损坏后的恢复 | **不支持** | E12 实测:固定解码器无重新同步路径,一次分片错误后后续帧全部被拒;OMP 自己的客户端也把它当作致命错误(读取循环外无 try/catch),桌面应重启运行时 |
 | 真实付费模型烟测 | 未执行 | 按仓库规则需用户明确指定提供方与预算 |
 | ACP / SDK 运行时对比 | 未执行 | 仅源码比对;M1 选定 rpc-ui 后不再需要,不作为已对比结论 |
 | macOS / Windows 进程终止 | 未覆盖 | 本机为 Linux;终止语义按自写 PID 校验,跨平台留待 M6/T23 |
@@ -193,5 +210,27 @@ M2 可以开始,前置条件已满足:RPC(rpc-ui)覆盖消息、会话恢复与�
 | R4 [P2] | E09 的 180 KB 远低于 1 MiB 帧阈值,没有任何真实 `rpc_chunk` 证据 | 新增 E13:确定触发条件(1.2 MB 提示 → 5 片/组真实分片),移植固定实现的解码器(常量与拒绝规则一致)做重组校验;实测入站分片被拒绝、单行超限命令可接受;补齐缺片/重复/乱序/非法元数据/超限等用例 | E13 34/34;`e13-real-chunk-sample.json` 为真实采集,`e13-chunk-faults.json` 标注为合成 |
 | R5 [P2] | 启动阶段收到 `null` 等非法帧时 `f.type` 抛异常并绕过 `stop()`,子进程残留 | `lib/rpc.mjs` 增加帧结构校验(非对象/无字符串 `type` → `__invalid__`),`#start` 的所有失败路径统一走有界 `stop()`;新增 `launcher` 测试接缝以便对着桩运行时验证 | E12 16/16;`R5` 用例:启动失败被报成就绪失败而非 TypeError、无残留进程、无残留合成 HOME |
 | R6 [P2] | `run-all.mjs` 只看 PASS 文本,子实验打印 PASS 后退出 9 仍算通过并返回 0 | 通过条件改为「退出码 0 + 未被信号终止 + PASS + 结果文件存在且 `experiment` 匹配且 `ok: true`」;超时按**进程组**回收实验自身启动的 OMP;新增 `--dir` 与 `M1_EXPERIMENT_TIMEOUT_MS` 以便端到端回归 | E12 16/16;六种不诚实桩实验全部被拒且汇总退出 1,唯一诚实桩被接受;超时桩的孙进程被回收 |
+
+## 8.1 第二轮独立复审返修(F1-F6)
+
+复审对象:`1156d0e`。同样先复现、再修复、再回归。
+
+| 编号 | 复现到的缺口 | 处理 | 回归证据 |
+| --- | --- | --- | --- |
+| F1 [P1] | E11 用共享顺序队列驱动父/子两个会话,父会话抢先消费了本应属于子代理的 `write` 轮次;独立复现显示真实子代理 `toolCount=0` 而实验仍"通过" | 假 provider 增加**按会话身份路由**(以子代理派发文本作为其首条 user 消息的判据,不靠延迟);E11 重写并断言父/子 `sessionId`、`hasUI`、`parentToolCallId` 与 `task` 的 `toolCallId` 一致、父会话未自行 `write` | E11 40/40;`e11-subagent-{allow,deny}.json` 记录父子两个 sessionId;真实子代理路径为 `hasUI=false` |
+| F2 [P1] | 汇总器超时只杀实验进程组,而运行时是 `detached`,实验的 `finally` 不执行 → 运行时进程、其后代与隔离目录残留 | 新增 `lib/runtime-registry.mjs`:启动时登记(pid/进程组/隔离根/运行标识/宿主 pid),正常停止时注销;汇总器在**每个**实验结束后按本轮运行标识做有界回收(组终止 → 环境归属清扫 → 删除隔离根)。归属判据是进程环境里本轮的 `PI_CONFIG_DIR`/`PI_CODING_AGENT_DIR` | E12 40/40;`e12-runtime-reaping.json`:被超时杀死的桩实验,其运行时、被其派生的后代、合成 HOME 与配置根全部被回收,且**同形 decoy 进程存活**(证明不是按名字滥杀) |
+| F3 [P2] | 分片解码只在实验结束后离线做,`OmpRpc` 的响应匹配看不到重组后的帧 → 大响应让 `rpc.request()` 超时 | 解码器接入 `lib/rpc.mjs` 的行处理,**在响应匹配与事件分派之前**;解码错误记录为 `__chunk_error__` 并把流标记为失败,使挂起/后续请求快速失败而不是超时 | E13 30/30:关闭自动压缩后 `get_messages` 经 `rpc.request()` 返回 1,200,650 字节且内容逐字节完整(12 个物理分片 → 3 个逻辑帧);E12 的 `e12-chunk-error-handling.json` 覆盖损坏序列 |
+| F4 [P2] | 预先放置的旧成功结果文件可以冒充本轮结果 | 汇总器生成本轮唯一运行标识并注入每个实验(`M1_RUN_ID`);证据对象记录该标识,汇总器要求结果文件存在、命名匹配、`ok: true` **且运行标识等于本轮** | E12:`e97`(旧运行标识)与 `e98`(无运行标识)都被拒绝;成功桩改为**自己在本轮写结果**,父脚本不再预写 |
+| F5 [P2] | `--dir` 缺失时 `i !== dirFlag + 1` 会丢掉第一个选择参数(`e04 e05` 只跑 e05,只给 `e04` 则跑全部) | 参数解析抽出为 `lib/suite-policy.mjs` 的 `parseArgs`,按标志逐个消费 | E12 覆盖 7 种排列(单选/多选/`--dir` 在前在后/`--keep-artifacts`),并端到端断言实际执行的实验集合恰为所选 |
+| F6 [P2] | 交接提示词仍写"abort 不回收运行中命令";ADR 的子代理结论与已提交 fixture 记录相反 | 先完成 F1,再按有效证据重写 HANDOFF 提示词、ADR(区分四种终止情形)、本报告与任务板 | E05 与 E11 的 fixture 现与文档一致;`e11-subagent-cancel.json` 由身份路由后的运行重新生成 |
+
+**四种终止情形必须区分**(此前混为一谈):
+
+| 情形 | 实测结果 | 来源 |
+| --- | --- | --- |
+| 顶层会话取消 | `abort` 回收命令进程及其后代 | E05 |
+| 真实子代理取消 | 父 `abort` 不回收 detached 子代理的运行中命令树,子代理仍被报为运行中;显式进程树终止可回收 | E11-D |
+| 异常退出 | 不先停止就杀桥接进程组会留下孤儿命令树;被强杀**的实验**其运行时靠 stdin EOF 自退出,但隔离目录会残留 | E05-3、E12-F2 |
+| 兜底清理 | 汇总器按运行标识与环境归属回收本轮运行时/后代/隔离目录;桌面侧等价实现属 M2/T09 | E12-F2 |
 
 复审后**被撤回**的旧结论:`abort`/`abort_bash` 无法回收运行中命令、必须依赖桥接层进程组终止。替换为:顶层会话 `abort` 即可回收命令进程及其子进程;杀桥接进程组**不能**替代停止(`abort`),否则留下孤儿;子代理的后台命令树需要显式终止。

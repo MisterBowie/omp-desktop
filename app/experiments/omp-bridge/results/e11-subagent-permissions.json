@@ -1,133 +1,246 @@
 {
   "experiment": "e11-subagent-permissions",
-  "startedAt": "2026-09-21T18:51:28.225Z",
+  "runId": "run-mubn6kc9-e85d14",
+  "startedAt": "2026-09-21T19:33:58.082Z",
   "checks": [
     {
-      "description": "deny: the subagent's write reaches the extension hook",
-      "ok": true,
-      "detail": "[{\"event\":\"tool-call-audit\",\"toolName\":\"task\",\"hasUI\":true,\"gated\":false},{\"event\":\"tool-call-audit\",\"toolName\":\"write\",\"hasUI\":true,\"gated\":true},{\"event\":\"gate\",\"toolName\":\"write\",\"target\":\"/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-FtCGub/project/subagent-deny.txt\",\"hasUI\":true,\"at\":1790016689092},{\"event\":\"gate-decision\",\"decision\":\"deny\",\"choice\":\"Deny\",\"at\":1790016689131}]"
-    },
-    {
-      "description": "deny: the dialog is raised for the subagent call",
+      "description": "deny: requests were routed to two distinct sessions",
       "ok": true,
       "detail": [
-        {
-          "id": "1588a118f103a87f",
-          "method": "select",
-          "title": "Approve write?"
-        }
+        "parent",
+        "parent",
+        "subagent",
+        "subagent",
+        "subagent",
+        "subagent",
+        "subagent",
+        "parent"
       ]
     },
     {
-      "description": "deny: the gate records the human decision",
+      "description": "deny: the parent looked up the task tool under its own session",
+      "ok": true,
+      "detail": {
+        "event": "tool-call-audit",
+        "toolName": "task",
+        "hasUI": true,
+        "gated": false,
+        "sessionId": "01a0c575-fb72-7079-b06a-94451ac8c61e",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-UGTsB6/project"
+      }
+    },
+    {
+      "description": "deny: the child's write reached the hook from a UI-less session",
+      "ok": true,
+      "detail": {
+        "event": "tool-call-audit",
+        "toolName": "write",
+        "hasUI": false,
+        "gated": true,
+        "sessionId": "01a0c575-fc4d-70a8-b934-7190cf2ca2d0",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-UGTsB6/project"
+      }
+    },
+    {
+      "description": "deny: the child's session is distinct from the parent's session",
+      "ok": true,
+      "detail": {
+        "child": "01a0c575-fc4d-70a8-b934-7190cf2ca2d0",
+        "parent": "01a0c575-fb72-7079-b06a-94451ac8c61e"
+      }
+    },
+    {
+      "description": "deny: the gate saw the child's own target",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-UGTsB6/project/child-deny.txt"
+    },
+    {
+      "description": "deny: the child is linked to the parent's task call",
+      "ok": true,
+      "detail": {
+        "lifecycle": "call_fake_1_0",
+        "parentTask": "call_fake_1_0"
+      }
+    },
+    {
+      "description": "deny: the child ran in its own session file",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-UGTsB6/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e11-deny-UGTsB6-project--/2026-09-21T19-33-58-770Z_01a0c575-fb72-7079-b06a-94451ac8c61e/M1Child.jsonl"
+    },
+    {
+      "description": "deny: the parent never issued a write of its own",
+      "ok": true,
+      "detail": [
+        "task"
+      ]
+    },
+    {
+      "description": "deny: the hook decided from the session's own policy",
       "ok": true,
       "detail": {
         "event": "gate-decision",
         "decision": "deny",
-        "choice": "Deny",
-        "at": 1790016689131
+        "route": "child-policy",
+        "at": 1790019239036
       }
     },
     {
-      "description": "deny: the gate saw the subagent's concrete target",
+      "description": "deny: no dialog was raised for the child (it has no UI)",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-FtCGub/project/subagent-deny.txt"
+      "detail": []
     },
     {
-      "description": "deny: the subagent executed exactly nothing",
-      "ok": true
-    },
-    {
-      "description": "deny: the task tool itself ran under the hook",
-      "ok": true
+      "description": "deny: the side effect matches the decision",
+      "ok": true,
+      "detail": false
     },
     {
       "description": "deny: process group reaped",
       "ok": true
     },
     {
-      "description": "allow: the subagent's write reaches the extension hook",
-      "ok": true,
-      "detail": "[{\"event\":\"tool-call-audit\",\"toolName\":\"task\",\"hasUI\":true,\"gated\":false},{\"event\":\"tool-call-audit\",\"toolName\":\"write\",\"hasUI\":true,\"gated\":true},{\"event\":\"gate\",\"toolName\":\"write\",\"target\":\"/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-QhYgpD/project/subagent-allow.txt\",\"hasUI\":true,\"at\":1790016691062},{\"event\":\"gate-decision\",\"decision\":\"allow\",\"choice\":\"Allow\",\"at\":1790016691069}]"
-    },
-    {
-      "description": "allow: the dialog is raised for the subagent call",
+      "description": "allow: requests were routed to two distinct sessions",
       "ok": true,
       "detail": [
-        {
-          "id": "1588a11add8b4127",
-          "method": "select",
-          "title": "Approve write?"
-        }
+        "parent",
+        "parent",
+        "parent",
+        "parent",
+        "parent",
+        "parent",
+        "parent",
+        "parent",
+        "parent",
+        "parent",
+        "subagent",
+        "subagent",
+        "subagent",
+        "subagent",
+        "subagent",
+        "parent"
       ]
     },
     {
-      "description": "allow: the gate records the human decision",
+      "description": "allow: the parent looked up the task tool under its own session",
+      "ok": true,
+      "detail": {
+        "event": "tool-call-audit",
+        "toolName": "task",
+        "hasUI": true,
+        "gated": false,
+        "sessionId": "01a0c576-050b-7640-a3d2-add12b61bd4c",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-12SBki/project"
+      }
+    },
+    {
+      "description": "allow: the child's write reached the hook from a UI-less session",
+      "ok": true,
+      "detail": {
+        "event": "tool-call-audit",
+        "toolName": "write",
+        "hasUI": false,
+        "gated": true,
+        "sessionId": "01a0c576-05da-719b-93fa-95d3b15ce69b",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-12SBki/project"
+      }
+    },
+    {
+      "description": "allow: the child's session is distinct from the parent's session",
+      "ok": true,
+      "detail": {
+        "child": "01a0c576-05da-719b-93fa-95d3b15ce69b",
+        "parent": "01a0c576-050b-7640-a3d2-add12b61bd4c"
+      }
+    },
+    {
+      "description": "allow: the gate saw the child's own target",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-12SBki/project/child-allow.txt"
+    },
+    {
+      "description": "allow: the child is linked to the parent's task call",
+      "ok": true,
+      "detail": {
+        "lifecycle": "call_fake_9_0",
+        "parentTask": "call_fake_9_0"
+      }
+    },
+    {
+      "description": "allow: the child ran in its own session file",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-12SBki/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e11-allow-12SBki-project--/2026-09-21T19-34-01-227Z_01a0c576-050b-7640-a3d2-add12b61bd4c/M1Child.jsonl"
+    },
+    {
+      "description": "allow: the parent never issued a write of its own",
+      "ok": true,
+      "detail": [
+        "task"
+      ]
+    },
+    {
+      "description": "allow: the hook decided from the session's own policy",
       "ok": true,
       "detail": {
         "event": "gate-decision",
         "decision": "allow",
-        "choice": "Allow",
-        "at": 1790016691069
+        "route": "child-policy",
+        "at": 1790019241480
       }
     },
     {
-      "description": "allow: the gate saw the subagent's concrete target",
+      "description": "allow: no dialog was raised for the child (it has no UI)",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-QhYgpD/project/subagent-allow.txt"
+      "detail": []
     },
     {
-      "description": "allow: the subagent executed exactly once",
-      "ok": true
-    },
-    {
-      "description": "allow: the task tool itself ran under the hook",
-      "ok": true
+      "description": "allow: the side effect matches the decision",
+      "ok": true,
+      "detail": true
     },
     {
       "description": "allow: process group reaped",
       "ok": true
     },
     {
-      "description": "C: the subagent started a real external program",
-      "ok": true,
-      "detail": {
-        "pid": 181840,
-        "ppid": 181723,
-        "descendantPid": 181847,
-        "argv": [
-          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-cancel-wWWVTl/project/subagent-identity.json"
-        ],
-        "startedAt": 1790016693128
-      }
-    },
-    {
-      "description": "C: the subagent's program is alive before abort",
-      "ok": true,
-      "detail": 181840
-    },
-    {
-      "description": "C: the subagent's descendant is alive before abort",
-      "ok": true,
-      "detail": 181847
-    },
-    {
-      "description": "C: subagent lifecycle frames are emitted for the child",
+      "description": "C: the child's call reached the hook and is waiting for a decision",
       "ok": true,
       "detail": [
-        "subagent_lifecycle",
-        "subagent_event",
-        "subagent_event",
-        "subagent_progress"
+        "tool-call-audit",
+        "tool-call-audit",
+        "gate",
+        "gate-pending"
       ]
     },
     {
-      "description": "C: the child is correlated to the parent's task call",
-      "ok": true,
-      "detail": "call_fake_17_0"
+      "description": "C: nothing was executed while the child waited",
+      "ok": true
     },
     {
-      "description": "C: the parent stop is acknowledged and the session survives",
+      "description": "C: the session stayed responsive through the stop",
+      "ok": true
+    },
+    {
+      "description": "C: no side effect from the abandoned child call",
+      "ok": true
+    },
+    {
+      "description": "C: the stop did not hang on the waiting call",
+      "ok": true,
+      "detail": "25 ms"
+    },
+    {
+      "description": "C: the abandoned child approval resolves to a denial after the stop",
+      "ok": true,
+      "detail": {
+        "event": "gate-decision",
+        "decision": "deny",
+        "route": "child-defer",
+        "outcome": "timeout",
+        "at": 1790019263989
+      }
+    },
+    {
+      "description": "C: still no side effect once the child approval settled",
       "ok": true
     },
     {
@@ -135,77 +248,150 @@
       "ok": true
     },
     {
-      "description": "C: an explicit process-tree kill reclaims the subagent's command tree",
-      "ok": true,
-      "detail": "parent 181840 child 181847"
-    },
-    {
-      "description": "D: the subagent's approval dialog is pending before abort",
-      "ok": true,
-      "detail": "Approve write?"
-    },
-    {
-      "description": "D: the pending subagent dialog is cancelled by targetId",
+      "description": "D: the child really started the external program",
       "ok": true,
       "detail": {
-        "type": "extension_ui_request",
-        "id": "1588a11dde1c6567",
-        "method": "cancel",
-        "targetId": "1588a11dd91c6565"
+        "pid": 207815,
+        "ppid": 207704,
+        "descendantPid": 207822,
+        "argv": [
+          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-cancel-9Cf3LB/project/child-identity.json"
+        ],
+        "startedAt": 1790019265060
       }
     },
     {
-      "description": "D: the gate resolved without an approval",
+      "description": "D: the child's program is alive before the parent stops",
+      "ok": true,
+      "detail": 207815
+    },
+    {
+      "description": "D: the child's descendant is alive before the parent stops",
+      "ok": true,
+      "detail": 207822
+    },
+    {
+      "description": "D: the command belongs to a child process, not OMP itself",
       "ok": true,
       "detail": {
-        "event": "gate-decision",
-        "decision": "deny",
-        "choice": null,
-        "at": 1790016694136
+        "child": 207815,
+        "ppid": 207704,
+        "omp": 207704,
+        "harness": 207121
       }
     },
     {
-      "description": "D: no side effect from the cancelled subagent dialog",
-      "ok": true
+      "description": "D: the child's bash was approved by policy, not by a dialog",
+      "ok": true,
+      "detail": [
+        {
+          "event": "gate-decision",
+          "decision": "allow",
+          "route": "child-policy",
+          "at": 1790019265006
+        }
+      ]
     },
     {
-      "description": "D: session stays responsive",
+      "description": "D: the stop leaves the session responsive",
       "ok": true
     },
     {
       "description": "D: process group reaped",
       "ok": true
+    },
+    {
+      "description": "D: an explicit process-tree kill reclaims the child's command tree",
+      "ok": true,
+      "detail": "pid 207815 descendant 207822"
     }
   ],
   "artifacts": {
-    "denyGateHasUI": true,
-    "allowGateHasUI": true,
-    "C-dialogCount": 1,
-    "C-reclamationAfterParentAbort": {
-      "parentGoneAfterAbort": true,
-      "descendantGoneAfterAbort": true
-    },
-    "C-subagentsStillRunningAfterParentStop": 0,
-    "C-proc": {
-      "ompProc": {
-        "pid": 181723,
-        "ppid": 181507,
-        "pgrp": 181723,
-        "session": 181723
+    "denyAudit": {
+      "parent": {
+        "event": "tool-call-audit",
+        "toolName": "task",
+        "hasUI": true,
+        "gated": false,
+        "sessionId": "01a0c575-fb72-7079-b06a-94451ac8c61e",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-UGTsB6/project"
       },
-      "commandProc": null,
-      "childInOmpGroup": false
+      "child": {
+        "event": "tool-call-audit",
+        "toolName": "write",
+        "hasUI": false,
+        "gated": true,
+        "sessionId": "01a0c575-fc4d-70a8-b934-7190cf2ca2d0",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-UGTsB6/project"
+      },
+      "gate": {
+        "event": "gate",
+        "toolName": "write",
+        "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-UGTsB6/project/child-deny.txt",
+        "hasUI": false,
+        "sessionId": "01a0c575-fc4d-70a8-b934-7190cf2ca2d0",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-UGTsB6/project",
+        "at": 1790019239036
+      },
+      "decision": {
+        "event": "gate-decision",
+        "decision": "deny",
+        "route": "child-policy",
+        "at": 1790019239036
+      }
     },
-    "C-reclamationAfterTeardown": {
-      "parentGoneAfterTeardown": true,
-      "descendantGoneAfterTeardown": true
+    "allowAudit": {
+      "parent": {
+        "event": "tool-call-audit",
+        "toolName": "task",
+        "hasUI": true,
+        "gated": false,
+        "sessionId": "01a0c576-050b-7640-a3d2-add12b61bd4c",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-12SBki/project"
+      },
+      "child": {
+        "event": "tool-call-audit",
+        "toolName": "write",
+        "hasUI": false,
+        "gated": true,
+        "sessionId": "01a0c576-05da-719b-93fa-95d3b15ce69b",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-12SBki/project"
+      },
+      "gate": {
+        "event": "gate",
+        "toolName": "write",
+        "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-12SBki/project/child-allow.txt",
+        "hasUI": false,
+        "sessionId": "01a0c576-05da-719b-93fa-95d3b15ce69b",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-12SBki/project",
+        "at": 1790019241480
+      },
+      "decision": {
+        "event": "gate-decision",
+        "decision": "allow",
+        "route": "child-policy",
+        "at": 1790019241480
+      }
+    },
+    "C-deferResolution": {
+      "event": "gate-decision",
+      "decision": "deny",
+      "route": "child-defer",
+      "outcome": "timeout",
+      "at": 1790019263989
+    },
+    "D-reclamationAfterParentAbort": {
+      "parentGoneAfterAbort": false,
+      "descendantGoneAfterAbort": false
+    },
+    "D-reclamationAfterTeardown": {
+      "goneAfterTeardown": false
     }
   },
   "limitations": [
-    "The parent stop reclaimed the subagent's running command tree.",
-    "Subagent permission coverage is asserted for the `task` agent type driven by the local fake provider; other agent types and the M5 subagent UI are out of M1 scope.",
-    "Approval dialogs raised from a subagent are answered by this experiment; how the desktop routes them is M5 work."
+    "The child-session policy (`M1_CHILD_POLICY`) and the out-of-band decision file are the experiment's model of a desktop-side policy; OMP itself provides no UI for subagent sessions, so an interactive subagent approval cannot be verified here.",
+    "Only the `task` agent type is driven; other agent types and the M5 subagent UI are out of M1 scope."
   ],
-  "finishedAt": "2026-09-21T18:51:35.248Z",
+  "finishedAt": "2026-09-21T19:34:50.586Z",
   "ok": true
 }

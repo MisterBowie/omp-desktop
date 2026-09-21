@@ -7,7 +7,7 @@
  */
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
 
 import {
@@ -18,10 +18,19 @@ import {
   terminateTree,
   safeRmConfigRoot,
   safeRmSyntheticHome,
+  experimentDataRoot,
 } from "./base.mjs";
+import { registerRuntime, unregisterRuntime } from "./runtime-registry.mjs";
+import { RpcChunkDecoder } from "./ndjson.mjs";
 
 export class OmpRpc {
   #child = null;
+  #chunkDecoder = new RpcChunkDecoder();
+  /** Physical `rpc_chunk` lines seen (protocol v2 framing). */
+  chunkFramesSeen = 0;
+  /** Logical frames that only became available after reassembly. */
+  chunksAssembled = 0;
+  dataRoot = null;
   #rl = null;
   #streamError = null;
   #exit = null;
@@ -76,19 +85,44 @@ export class OmpRpc {
     this.#rl.on("line", (line) => {
       const t = line.trim();
       if (!t) return;
+      let parsed;
       try {
-        const parsed = JSON.parse(t);
-        // Structural validation: a JSON `null`/scalar has no `.type`, and any
-        // predicate touching `f.type` would throw inside this handler, which
-        // would escape the await in #start and skip process cleanup.
-        if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed) || typeof parsed.type !== "string") {
-          this.frames.push({ type: "__invalid__", raw: t.slice(0, 400) });
-          return;
-        }
-        this.frames.push(parsed);
+        parsed = JSON.parse(t);
       } catch {
         this.frames.push({ type: "__unparsed__", raw: t.slice(0, 400) });
+        return;
       }
+      // Structural validation: a JSON `null`/scalar has no `.type`, and any
+      // predicate touching `f.type` would throw inside this handler, which
+      // would escape the await in #start and skip process cleanup.
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed) || typeof parsed.type !== "string") {
+        this.frames.push({ type: "__invalid__", raw: t.slice(0, 400) });
+        return;
+      }
+      // Protocol v2 chunking: a logical frame larger than the 1 MiB line limit
+      // arrives as a strictly ordered `rpc_chunk` sequence. Decoding has to
+      // happen HERE, before response matching and event dispatch, or a large
+      // response never reaches the caller that is waiting for it.
+      let frame;
+      try {
+        frame = this.#chunkDecoder.push(parsed);
+      } catch (error) {
+        const message = String(error?.message ?? error).slice(0, 200);
+        this.frames.push({ type: "__chunk_error__", error: message });
+        // The pinned decoder has no resynchronisation path: once a sequence is
+        // corrupted, every later frame is rejected against the stuck pending
+        // state, and OMP's own client treats a decoder throw as fatal (it is
+        // not caught around the read loop). Record the stream as failed so
+        // pending and future requests fail fast instead of timing out.
+        if (!this.#streamError) this.#streamError = `chunk decode failed: ${message}`;
+        return;
+      }
+      if (frame === undefined) {
+        this.chunkFramesSeen++;
+        return;
+      }
+      if (parsed.type === "rpc_chunk") this.chunksAssembled++;
+      this.frames.push(frame);
     });
     this.#rl.on("error", onErr("readline"));
     this.#child.stdout.on("error", onErr("stdout"));
@@ -100,6 +134,24 @@ export class OmpRpc {
     });
     this.#exit = new Promise((res) => this.#child.once("exit", (code, signal) => res({ code, signal })));
     this.#child.on("error", onErr("child"));
+
+    // Register with the suite's reaper: the runtime is detached, so a killed
+    // experiment cannot clean it up from a `finally`.
+    this.configDirName = configDirName;
+    this.runId = process.env.M1_RUN_ID ?? null;
+    this.dataRoot = experimentDataRoot(repoRoot);
+    registerRuntime(this.dataRoot, {
+      pid: this.pid,
+      pgrp: this.pid,
+      agentDir: this.agentDir,
+      configDirName,
+      configRoot: this.configRoot,
+      home: this.home,
+      runRoot,
+      runId: this.runId,
+      ownerPid: process.pid,
+      owner: process.argv[1] ? basename(process.argv[1]) : null,
+    });
 
     // Every failure path below (spawn error, stream error, malformed frames,
     // timeout, predicate throw) must end in bounded teardown: the child runs
@@ -182,6 +234,8 @@ export class OmpRpc {
       safeRmConfigRoot(this.configRoot);
       safeRmSyntheticHome(this.home, this.runRoot);
     }
+    // Clean stop: forget the runtime so the reaper does not chase a dead pid.
+    if (this.dataRoot) unregisterRuntime(this.dataRoot, this.pid);
     return reaped;
   }
 

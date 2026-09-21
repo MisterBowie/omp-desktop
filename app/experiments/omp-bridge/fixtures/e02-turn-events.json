@@ -11,7 +11,7 @@
     "maxReassembledFrameBytes": 67108864
   },
   "promptResponse": {
-    "id": "req-c3ea41b4",
+    "id": "req-99a4b8c6",
     "type": "response",
     "command": "prompt",
     "success": true
@@ -39,7 +39,7 @@
       "toolCallId": "call_fake_1_0",
       "toolName": "write",
       "args": {
-        "path": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-fLOL1B/project/hello.txt",
+        "path": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-moj6e8/project/hello.txt",
         "content": "hello from e02\n"
       }
     }
@@ -57,7 +57,7 @@
           }
         ],
         "details": {
-          "resolvedPath": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-fLOL1B/project/hello.txt"
+          "resolvedPath": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-moj6e8/project/hello.txt"
         }
       },
       "isError": false
@@ -83,10 +83,10 @@
             "id": "call_fake_1_0",
             "name": "write",
             "arguments": {
-              "path": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-fLOL1B/project/hello.txt",
+              "path": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-moj6e8/project/hello.txt",
               "content": "hello from e02\n"
             },
-            "partialArgs": "{\"path\":\"/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-fLOL1B/project/hello.txt\",\"content\":\"hello from e02\\n\"}",
+            "partialArgs": "{\"path\":\"/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-moj6e8/project/hello.txt\",\"content\":\"hello from e02\\n\"}",
             "streamIndex": 0
           }
         ],
@@ -108,10 +108,10 @@
           }
         },
         "stopReason": "toolUse",
-        "timestamp": 1790016602484,
+        "timestamp": 1790019150162,
         "responseId": "chatcmpl-fake-1",
-        "duration": 12.458893999999987,
-        "ttft": 10.42926
+        "duration": 11.050216000000091,
+        "ttft": 9.14617700000008
       },
       "toolResults": [
         {
@@ -125,10 +125,10 @@
             }
           ],
           "details": {
-            "resolvedPath": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-fLOL1B/project/hello.txt"
+            "resolvedPath": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-moj6e8/project/hello.txt"
           },
           "isError": false,
-          "timestamp": 1790016602508
+          "timestamp": 1790019150184
         }
       ]
     }
@@ -145,7 +145,7 @@
           }
         ],
         "attribution": "user",
-        "timestamp": 1790016602436
+        "timestamp": 1790019150118
       },
       {
         "role": "assistant",
@@ -164,10 +164,10 @@
             "id": "call_fake_1_0",
             "name": "write",
             "arguments": {
-              "path": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-fLOL1B/project/hello.txt",
+              "path": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-moj6e8/project/hello.txt",
               "content": "hello from e02\n"
             },
-            "partialArgs": "{\"path\":\"/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-fLOL1B/project/hello.txt\",\"content\":\"hello from e02\\n\"}",
+            "partialArgs": "{\"path\":\"/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-moj6e8/project/hello.txt\",\"content\":\"hello from e02\\n\"}",
             "streamIndex": 0
           }
         ],
@@ -189,10 +189,10 @@
           }
         },
         "stopReason": "toolUse",
-        "timestamp": 1790016602484,
+        "timestamp": 1790019150162,
         "responseId": "chatcmpl-fake-1",
-        "duration": 12.458893999999987,
-        "ttft": 10.42926
+        "duration": 11.050216000000091,
+        "ttft": 9.14617700000008
       },
       {
         "role": "toolResult",
@@ -205,10 +205,10 @@
           }
         ],
         "details": {
-          "resolvedPath": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-fLOL1B/project/hello.txt"
+          "resolvedPath": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-moj6e8/project/hello.txt"
         },
         "isError": false,
-        "timestamp": 1790016602508
+        "timestamp": 1790019150184
       },
       {
         "role": "assistant",
@@ -241,10 +241,10 @@
           }
         },
         "stopReason": "stop",
-        "timestamp": 1790016602512,
+        "timestamp": 1790019150193,
         "responseId": "chatcmpl-fake-2",
-        "duration": 2.5017520000000104,
-        "ttft": 2.2787759999999935
+        "duration": 2.3367470000000594,
+        "ttft": 2.083692000000042
       }
     ],
     "isTerminal": true

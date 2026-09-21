@@ -1,6 +1,7 @@
 {
   "experiment": "e04-approval",
-  "startedAt": "2026-09-21T18:50:06.349Z",
+  "runId": "run-mubn6kc9-e85d14",
+  "startedAt": "2026-09-21T19:32:34.515Z",
   "checks": [
     {
       "description": "deny-write: gate asked exactly once",
@@ -15,7 +16,7 @@
     {
       "description": "deny-write: gate saw the concrete target before execution",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-deny-write-qp7SGP/project/guarded.txt"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-deny-write-7rau1g/project/guarded.txt"
     },
     {
       "description": "deny-write: gate recorded the human decision",
@@ -53,7 +54,7 @@
     {
       "description": "allow-write: gate saw the concrete target before execution",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-allow-write-wWHra7/project/guarded.txt"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-allow-write-63NXzF/project/guarded.txt"
     },
     {
       "description": "allow-write: gate recorded the human decision",
@@ -85,7 +86,7 @@
     {
       "description": "deny-bash: gate saw the concrete target before execution",
       "ok": true,
-      "detail": "printf 'ran\\n' >> /home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-deny-bash-ISaBM2/project/bash-ran.txt"
+      "detail": "printf 'ran\\n' >> /home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-deny-bash-hq8FoD/project/bash-ran.txt"
     },
     {
       "description": "deny-bash: gate recorded the human decision",
@@ -123,7 +124,7 @@
     {
       "description": "allow-bash: gate saw the concrete target before execution",
       "ok": true,
-      "detail": "printf 'ran\\n' >> /home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-allow-bash-BLvTew/project/bash-ran.txt"
+      "detail": "printf 'ran\\n' >> /home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-allow-bash-U8oF7R/project/bash-ran.txt"
     },
     {
       "description": "allow-bash: gate recorded the human decision",
@@ -144,6 +145,6 @@
   "limitations": [
     "The gate is an experiment extension loaded with --extension; production wiring is M2. Model tool-call approval modes were not set to yolo for these runs."
   ],
-  "finishedAt": "2026-09-21T18:50:10.178Z",
+  "finishedAt": "2026-09-21T19:32:38.320Z",
   "ok": true
 }

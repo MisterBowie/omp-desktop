@@ -1,0 +1,8 @@
+{
+  "note": "SYNTHETIC fault sample: a stub experiment starts a real OmpRpc runtime plus a detached tool-like process, then is killed by the suite timeout",
+  "runtimeGone": true,
+  "descendantGone": true,
+  "homeRemoved": true,
+  "configRootRemoved": true,
+  "suiteExitCode": 1
+}

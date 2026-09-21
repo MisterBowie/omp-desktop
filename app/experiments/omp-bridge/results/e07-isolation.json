@@ -1,11 +1,12 @@
 {
   "experiment": "e07-isolation",
-  "startedAt": "2026-09-21T18:50:34.129Z",
+  "runId": "run-mubn6kc9-e85d14",
+  "startedAt": "2026-09-21T19:33:03.177Z",
   "checks": [
     {
       "description": "child environment is readable for verification",
       "ok": true,
-      "detail": 179985
+      "detail": 205830
     },
     {
       "description": "injected API key is not present in the child env",
@@ -35,17 +36,17 @@
     {
       "description": "child config root points at this run's isolated root",
       "ok": true,
-      "detail": ".omp-m0-c77fedd0"
+      "detail": ".omp-m0-827f0730"
     },
     {
       "description": "child agent dir points at this run's isolated agent dir",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-AF7NEH/agent"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-cLYQfz/agent"
     },
     {
       "description": "child launch dir points at this run's isolated launch dir",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-AF7NEH/dev-cwd"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-cLYQfz/dev-cwd"
     },
     {
       "description": "synthetic credential value never appears in the child env",
@@ -54,17 +55,17 @@
     {
       "description": "child HOME is redirected into the run root",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-AF7NEH/home"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-cLYQfz/home"
     },
     {
       "description": "child HOME is not the ambient user home",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-AF7NEH/home vs /home/vv"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-cLYQfz/home vs /home/vv"
     },
     {
       "description": "resolved config root lives under the synthetic home",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-AF7NEH/home/.omp-m0-c77fedd0"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-cLYQfz/home/.omp-m0-827f0730"
     },
     {
       "description": "CLAUDE_CONFIG_DIR is stripped from the child env",
@@ -165,7 +166,7 @@
     {
       "description": "agent database was created inside the isolated agent dir",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-AF7NEH/agent/agent.db"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-cLYQfz/agent/agent.db"
     },
     {
       "description": "sessions directory exists inside the isolated agent dir",
@@ -174,17 +175,17 @@
     {
       "description": "config root is this run's isolated root, not ~/.omp",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-AF7NEH/home/.omp-m0-c77fedd0"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-cLYQfz/home/.omp-m0-827f0730"
     },
     {
       "description": "run logs land in the isolated config root or agent dir",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-AF7NEH/home/.omp-m0-c77fedd0"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-cLYQfz/home/.omp-m0-827f0730"
     },
     {
       "description": "launch dir is isolated",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-AF7NEH/dev-cwd"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-cLYQfz/dev-cwd"
     },
     {
       "description": "process group reaped",
@@ -219,6 +220,6 @@
     "Credential isolation is proven for environment variables; OS keychain/system-store naming is deferred to M4 packaging.",
     "The real user's config is never read by these runs: the child's HOME is a synthetic directory inside the run root, and isolation is asserted against a decoy home instead of the user's."
   ],
-  "finishedAt": "2026-09-21T18:50:36.252Z",
+  "finishedAt": "2026-09-21T19:33:04.898Z",
   "ok": true
 }
