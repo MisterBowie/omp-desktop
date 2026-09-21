@@ -1,0 +1,115 @@
+{
+  "experiment": "e05-cancel",
+  "startedAt": "2026-09-21T18:19:06.172Z",
+  "checks": [
+    {
+      "description": "bash tool started before abort",
+      "ok": true,
+      "detail": "bash"
+    },
+    {
+      "description": "the command wrote its own PID while running",
+      "ok": true,
+      "detail": 156008
+    },
+    {
+      "description": "the command process is alive before abort",
+      "ok": true,
+      "detail": 156008
+    },
+    {
+      "description": "abort is acknowledged",
+      "ok": true,
+      "detail": {
+        "id": "req-02e987f3",
+        "type": "response",
+        "command": "abort",
+        "success": true
+      }
+    },
+    {
+      "description": "abort_bash is acknowledged",
+      "ok": true,
+      "detail": {
+        "id": "req-e69738d2",
+        "type": "response",
+        "command": "abort_bash",
+        "success": true
+      }
+    },
+    {
+      "description": "the turn reports tool completion after stopping",
+      "ok": true
+    },
+    {
+      "description": "session stayed responsive after abort",
+      "ok": true
+    },
+    {
+      "description": "abort scenario: process group reaped",
+      "ok": true
+    },
+    {
+      "description": "approval dialog is pending before abort",
+      "ok": true,
+      "detail": "Approve write?"
+    },
+    {
+      "description": "pending dialog is cancelled with a matching targetId",
+      "ok": true,
+      "detail": {
+        "type": "extension_ui_request",
+        "id": "158899bb59f78379",
+        "method": "cancel",
+        "targetId": "158899bb54378378"
+      }
+    },
+    {
+      "description": "gate resolved without an approval after abort",
+      "ok": true,
+      "detail": {
+        "event": "gate-decision",
+        "decision": "deny",
+        "choice": null,
+        "at": 1790014758247
+      }
+    },
+    {
+      "description": "no side effect from the aborted dialog",
+      "ok": true
+    },
+    {
+      "description": "dialog scenario: process group reaped",
+      "ok": true
+    },
+    {
+      "description": "command PID observable before bridge kill",
+      "ok": true,
+      "detail": 156315
+    },
+    {
+      "description": "command alive before bridge kill",
+      "ok": true,
+      "detail": 156315
+    },
+    {
+      "description": "bridge process group reaped on kill",
+      "ok": true
+    },
+    {
+      "description": "no orphan command process survives the bridge kill",
+      "ok": true,
+      "detail": "pid 156315"
+    }
+  ],
+  "artifacts": {
+    "terminatedByPlainAbort": false,
+    "terminatedByAbortBash": false
+  },
+  "limitations": [
+    "In-protocol stop (abort + abort_bash) did NOT reclaim the OS process of the running command in rpc-ui mode; the desktop stop path needs a process-tree termination fallback, which the bridge-level kill provides (scenario 3).",
+    "Process termination is asserted on Linux via a self-written PID; macOS/Windows semantics are not covered here."
+  ],
+  "finishedAt": "2026-09-21T18:19:19.239Z",
+  "ok": true
+}

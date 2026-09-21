@@ -1,0 +1,58 @@
+{
+  "note": "real capture, sanitized; subagent driven by the local fake provider",
+  "frameTypes": [
+    "subagent_lifecycle",
+    "subagent_event",
+    "subagent_progress"
+  ],
+  "sample": {
+    "type": "subagent_lifecycle",
+    "payload": {
+      "id": "M1Scout",
+      "agent": "scout",
+      "parentToolCallId": "call_fake_4_0",
+      "detached": true,
+      "agentSource": "bundled",
+      "status": "started",
+      "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e08-subagent-mCHRKA/agent/sessions/-person-code-omp-desktop-m1-.dev-data-m1-e08-subagent-mCHRKA-project/2026-09-21T18-20-12-845Z_01a0c532-72ad-72cf-b754-b88672302cce/M1Scout.jsonl",
+      "index": 0
+    }
+  },
+  "snapshot": [
+    {
+      "id": "M1Scout",
+      "index": 0,
+      "agent": "scout",
+      "agentSource": "bundled",
+      "status": "running",
+      "task": "Complete assignment thoroughly:\n\nreport the word ALPHA",
+      "assignment": "report the word ALPHA",
+      "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e08-subagent-mCHRKA/agent/sessions/-person-code-omp-desktop-m1-.dev-data-m1-e08-subagent-mCHRKA-project/2026-09-21T18-20-12-845Z_01a0c532-72ad-72cf-b754-b88672302cce/M1Scout.jsonl",
+      "lastUpdate": 1790014813100,
+      "parentToolCallId": "call_fake_4_0",
+      "progress": {
+        "index": 0,
+        "id": "M1Scout",
+        "agent": "scout",
+        "agentSource": "bundled",
+        "status": "running",
+        "task": "Complete assignment thoroughly:\n\nreport the word ALPHA",
+        "assignment": "report the word ALPHA",
+        "recentTools": [],
+        "recentOutput": [],
+        "toolCount": 0,
+        "requests": 0,
+        "tokens": "<redacted>",
+        "cost": 0,
+        "durationMs": 25,
+        "modelOverride": [
+          "m1fake/local-model"
+        ],
+        "modelRole": "smol",
+        "contextWindow": 200000,
+        "resolvedModelIdentity": "m1fake/local-model",
+        "resolvedModel": "m1fake/local-model"
+      }
+    }
+  ]
+}

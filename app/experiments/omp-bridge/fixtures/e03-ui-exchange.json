@@ -1,0 +1,33 @@
+{
+  "note": "real capture, sanitized; answers are the experiment's own synthetic values",
+  "requests": [
+    {
+      "id": "158899a924dc2dfd",
+      "method": "setWidget"
+    },
+    {
+      "id": "158899a93cdc2dfe",
+      "method": "select",
+      "title": "E03 select probe"
+    },
+    {
+      "id": "158899a9411c2dff",
+      "method": "confirm",
+      "title": "E03 confirm probe"
+    },
+    {
+      "id": "158899a94adc2e00",
+      "method": "input",
+      "title": "E03 input probe"
+    },
+    {
+      "id": "158899a95d9c2e02",
+      "method": "setWidget"
+    }
+  ],
+  "extensionObserved": {
+    "select": "A",
+    "confirm": true,
+    "input": "typed-value"
+  }
+}

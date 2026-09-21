@@ -1,0 +1,73 @@
+{
+  "note": "real capture, sanitized; local fake model provider, no credentials",
+  "captureMode": "rpc-ui",
+  "pinnedVersion": "18.2.7",
+  "submoduleSha": "d49918fab2dba3986927f2d46721629ed0f3a02c",
+  "ready": {
+    "type": "ready",
+    "protocolVersion": 1,
+    "supportedProtocolVersions": [
+      1,
+      2
+    ],
+    "maxFrameBytes": 1048576,
+    "maxReassembledFrameBytes": 67108864
+  },
+  "negotiateResponse": {
+    "id": "req-fa20933f",
+    "type": "response",
+    "command": "negotiate_protocol",
+    "success": true,
+    "data": {
+      "protocolVersion": 2
+    }
+  },
+  "commandNames": [
+    "security",
+    "model",
+    "switch",
+    "fast",
+    "skillful",
+    "extended-context",
+    "computer",
+    "prewalk",
+    "advisor",
+    "export",
+    "trace",
+    "dump",
+    "share",
+    "browser",
+    "todo",
+    "session",
+    "jobs",
+    "usage",
+    "stats",
+    "changelog",
+    "tools",
+    "context",
+    "mcp",
+    "ssh",
+    "fresh",
+    "compact",
+    "shake",
+    "handoff",
+    "pin",
+    "retry",
+    "memory",
+    "rename",
+    "move",
+    "wt",
+    "add-dir",
+    "remove-dir",
+    "dirs",
+    "marketplace",
+    "plugins",
+    "reload-plugins",
+    "force",
+    "skill:archify",
+    "autoresearch",
+    "green",
+    "review",
+    "init"
+  ]
+}

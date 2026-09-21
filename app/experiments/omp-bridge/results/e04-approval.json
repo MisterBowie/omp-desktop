@@ -1,0 +1,149 @@
+{
+  "experiment": "e04-approval",
+  "startedAt": "2026-09-21T18:19:02.496Z",
+  "checks": [
+    {
+      "description": "deny-write: gate asked exactly once",
+      "ok": true,
+      "detail": "1 dialogs"
+    },
+    {
+      "description": "deny-write: gate saw the real tool name",
+      "ok": true,
+      "detail": "write"
+    },
+    {
+      "description": "deny-write: gate saw the concrete target before execution",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-deny-write-uFklsj/project/guarded.txt"
+    },
+    {
+      "description": "deny-write: gate recorded the human decision",
+      "ok": true,
+      "detail": "deny"
+    },
+    {
+      "description": "deny-write: no write side effect",
+      "ok": true
+    },
+    {
+      "description": "deny-write: no bash side effect",
+      "ok": true,
+      "detail": "0 marker lines"
+    },
+    {
+      "description": "deny-write: denial is reported back to the session",
+      "ok": true,
+      "detail": "denied result observed"
+    },
+    {
+      "description": "deny-write: process group reaped",
+      "ok": true
+    },
+    {
+      "description": "allow-write: gate asked exactly once",
+      "ok": true,
+      "detail": "1 dialogs"
+    },
+    {
+      "description": "allow-write: gate saw the real tool name",
+      "ok": true,
+      "detail": "write"
+    },
+    {
+      "description": "allow-write: gate saw the concrete target before execution",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-allow-write-AmhXpi/project/guarded.txt"
+    },
+    {
+      "description": "allow-write: gate recorded the human decision",
+      "ok": true,
+      "detail": "allow"
+    },
+    {
+      "description": "allow-write: file created after approval",
+      "ok": true
+    },
+    {
+      "description": "allow-write: content written exactly once",
+      "ok": true
+    },
+    {
+      "description": "allow-write: process group reaped",
+      "ok": true
+    },
+    {
+      "description": "deny-bash: gate asked exactly once",
+      "ok": true,
+      "detail": "1 dialogs"
+    },
+    {
+      "description": "deny-bash: gate saw the real tool name",
+      "ok": true,
+      "detail": "bash"
+    },
+    {
+      "description": "deny-bash: gate saw the concrete target before execution",
+      "ok": true,
+      "detail": "printf 'ran\\n' >> /home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-deny-bash-1KII7h/project/bash-ran.txt"
+    },
+    {
+      "description": "deny-bash: gate recorded the human decision",
+      "ok": true,
+      "detail": "deny"
+    },
+    {
+      "description": "deny-bash: no write side effect",
+      "ok": true
+    },
+    {
+      "description": "deny-bash: no bash side effect",
+      "ok": true,
+      "detail": "0 marker lines"
+    },
+    {
+      "description": "deny-bash: denial is reported back to the session",
+      "ok": true,
+      "detail": "denied result observed"
+    },
+    {
+      "description": "deny-bash: process group reaped",
+      "ok": true
+    },
+    {
+      "description": "allow-bash: gate asked exactly once",
+      "ok": true,
+      "detail": "1 dialogs"
+    },
+    {
+      "description": "allow-bash: gate saw the real tool name",
+      "ok": true,
+      "detail": "bash"
+    },
+    {
+      "description": "allow-bash: gate saw the concrete target before execution",
+      "ok": true,
+      "detail": "printf 'ran\\n' >> /home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-allow-bash-54Ag6S/project/bash-ran.txt"
+    },
+    {
+      "description": "allow-bash: gate recorded the human decision",
+      "ok": true,
+      "detail": "allow"
+    },
+    {
+      "description": "allow-bash: command ran after approval",
+      "ok": true,
+      "detail": "1 marker lines"
+    },
+    {
+      "description": "allow-bash: process group reaped",
+      "ok": true
+    }
+  ],
+  "artifacts": {},
+  "limitations": [
+    "The gate is an experiment extension loaded with --extension; production wiring is M2. Model tool-call approval modes were not set to yolo for these runs."
+  ],
+  "finishedAt": "2026-09-21T18:19:06.138Z",
+  "ok": true
+}

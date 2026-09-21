@@ -1,0 +1,47 @@
+{
+  "note": "real capture, sanitized; identical scenario in both modes with a local fake provider",
+  "modes": {
+    "rpc": {
+      "mode": "rpc",
+      "toolCallHookSawNativeTool": true,
+      "contextHasUI": true,
+      "dialogsRequested": 1,
+      "dialogMethods": [
+        "select"
+      ],
+      "notifications": [
+        "setWidget",
+        "setWidget"
+      ],
+      "decision": "allow",
+      "wroteFile": true,
+      "advertisesAskTool": false,
+      "advertisedToolCount": 11,
+      "reportedAgentEnd": true
+    },
+    "rpc-ui": {
+      "mode": "rpc-ui",
+      "toolCallHookSawNativeTool": true,
+      "contextHasUI": true,
+      "dialogsRequested": 1,
+      "dialogMethods": [
+        "select"
+      ],
+      "notifications": [
+        "setWidget",
+        "setWidget"
+      ],
+      "decision": "allow",
+      "wroteFile": true,
+      "advertisesAskTool": true,
+      "advertisedToolCount": 12,
+      "reportedAgentEnd": true
+    }
+  },
+  "source": {
+    "hasUI": "packages/coding-agent/src/main.ts:2085 sessionOptions.hasUI = isInteractive || mode === \"rpc-ui\"",
+    "toolUiContext": "packages/coding-agent/src/main.ts:2311 runRpcMode(session, mode === \"rpc-ui\" ? setToolUIContext : undefined, ...) -> sdk.ts:3597 toolContextStore.setUIContext",
+    "askToolGate": "packages/coding-agent/src/tools/ask.ts:807 AskTool.createIf returns null unless session.canPromptUser ?? session.hasUI",
+    "extensionUiBridge": "packages/coding-agent/src/modes/rpc/rpc-mode.ts:772 emits extension_ui_request regardless of mode"
+  }
+}

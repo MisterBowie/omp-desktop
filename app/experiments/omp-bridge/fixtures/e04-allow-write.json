@@ -1,0 +1,41 @@
+{
+  "note": "real capture, sanitized; local fake provider, gate answers are synthetic",
+  "gate": {
+    "event": "gate",
+    "toolName": "write",
+    "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-allow-write-AmhXpi/project/guarded.txt",
+    "hasUI": true,
+    "at": 1790014744215
+  },
+  "decision": {
+    "event": "gate-decision",
+    "decision": "allow",
+    "choice": "Allow",
+    "at": 1790014744231
+  },
+  "dialogs": [
+    {
+      "method": "select",
+      "title": "Approve write?"
+    }
+  ],
+  "toolExecutionEnd": [
+    {
+      "type": "tool_execution_end",
+      "toolCallId": "call_fake_3_0",
+      "toolName": "write",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "[guarded.txt#3177]\nSuccessfully wrote 14 bytes to guarded.txt"
+          }
+        ],
+        "details": {
+          "resolvedPath": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-allow-write-AmhXpi/project/guarded.txt"
+        }
+      },
+      "isError": false
+    }
+  ]
+}

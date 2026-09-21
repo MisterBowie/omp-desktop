@@ -1,6 +1,6 @@
 # OMP Desktop 开发交接
 
-更新时间：2026-09-22。当前状态：**M0 开发基线（T01-T03）完成，原桌面可复现构建、开发数据已隔离、开发版 UI 基线已记录、OMP 隔离配置下无付费模型调用的协议启动已验证。下一阶段 M1（T04-T07）。**
+更新时间：2026-09-22。当前状态：**M1 兼容性实验与路径定案（T04-T07）完成，接入路径已定案为「rpc-ui 子进程 + 受信扩展 tool_call 前置审批 + 桥接层进程组终止兜底」。下一阶段 M2（T08-T10）。**
 
 ## 1. 用户已确定的方向
 
@@ -27,6 +27,9 @@
 | `docs/07-environment-and-upstream.md` | 环境准备和上游维护 |
 | `docs/validation/M0-baseline.md` | M0 验证记录（命令、版本、退出码、SHA、截图） |
 | `docs/validation/M0-screenshots/` | M0 代表性界面基线截图（项目列表/设置/模型/扩展） |
+| `docs/validation/M1-compatibility.md` | M1 验证记录（E01-E10、224 项检查、传输能力矩阵、未执行项） |
+| `docs/decisions/001-omp-transport.md` | 接入传输路径决策（含 M2 必须遵守的八条约束） |
+| `app/experiments/omp-bridge/` | M1 实验套件：`node run-all.mjs` 可复现，含 fixtures/results |
 
 PI-Desktop SHA：`0111e306c120ad5820688d7608cb37bad8fbcc1f`
 
@@ -50,39 +53,58 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 - 没有修改应用源码或 OMP 源码（M0 全部通过已有配置完成，未改产品代码；仅根 `.gitignore` 增加 `.dev-data/`）。
 - 没有调用真实模型或付费 API（OMP 协议启动用 `auth: none` 的本地 mock 模型）。
 - 没有创建 PR、发布安装包或部署产品，没有自动提交或推送。
-- 没有证明两套运行时完整兼容；RPC 握手已实测，但 rpc-ui、审批、取消、恢复等实验属 M1。
 - 没有做 macOS arm64 打包（本机为 Linux x64，与规划假设不同）。
+- M1 未覆盖：真实子代理事件（需真实 `task` 调用，T17）、MCP 工具进入模型工具表（T19）、macOS/Windows 进程终止语义（T23）、真实付费模型烟测（需用户指定）。
+
+## 3.2 M1 已完成的工作
+
+- 在 `app/experiments/omp-bridge/` 建立可复现实验套件 E01-E10(本地假 provider、每实例隔离配置根与 agent dir、进程组回收)。`node run-all.mjs`:**10/10 实验、224/224 检查通过,退出码 0,约 88 秒**。
+- 权限链路实测:受信扩展的 `tool_call` 钩子在**执行前**拿到工具名与具体目标,拒绝时无文件/进程副作用,批准后只执行一次;宿主工具(`set_host_tools`)同样经过该钩子。审批问答通过 `extension_ui_request` 的 `select/confirm/input` 往返,并覆盖取消与超时。
+- 取消链路实测:`abort`/`abort_bash` 被确认、挂起对话被 `cancel` 且解析为 deny、会话保持可响应;**但运行中的命令进程未被协议内停止回收**,只有桥接层进程组终止才回收 —— 该结论直接约束 M2 的 T09/T11 停止实现。
+- 宿主工具与子代理:`host_tool_call`/`host_tool_result` 往返可用,放弃未应答调用会收到 `host_tool_cancel`(**按 `targetId` 关联**);真实 `task` 调用产生 `subagent_lifecycle`/`subagent_progress`/`subagent_event` 三类帧,存活期快照含 `parentToolCallId` 与 `sessionFile`。
+- 会话与隔离实测:原生会话按 `sessionFile` 恢复且不重放副作用、不重新审批;`branch` 生成新的原生会话文件;子进程实际环境无凭证与 steering 变量;模型/规则/MCP 都从隔离根加载。
+- 传输边界实测:跨块 UTF-8、半帧、CRLF、非法 JSON 恢复、超长行显式报错、180 KB 多字节消息往返;缺失可执行文件/立即崩溃/永不 ready 三类降级运行时均可分类回收;stdin EOF 与 stdout EPIPE 都会让 OMP 自行退出且进程组被回收。
+- 模式差异实测(纠正了仅凭源码的初判):两种模式都能投递扩展对话,但只有 `rpc-ui` 装配 `setToolUIContext` 并广告 OMP 自身的 `ask` 工具(12 项 vs 11 项)。
+- 版本协商实测:ready 广告 `supportedProtocolVersions: [1,2]`,但 `negotiate_protocol: 1` 被明确拒绝,只能协商 v2。
+- 回归:M0 的 `verify-rpc.test.mjs` 18/18 通过,`verify-rpc.mjs` 真实无费用 RPC 通过。
+- 证据:`docs/validation/M1-compatibility.md`、`docs/decisions/001-omp-transport.md`、`app/experiments/omp-bridge/fixtures|results/`;任务看板 T04-T07 已标记完成。
+
+未通过/未执行:MCP 工具未进入模型工具表(归属 T19);子代理的停止/恢复边界(T17);macOS/Windows 进程终止未验证(T23);ACP/SDK 仅源码比对。
 
 ## 4. 下一执行模型从哪里开始
 
-**从 M1（T04-T07）开始，不直接改 Agent 引擎。**
+**从 M2（T08-T10）开始，不直接改 Agent 引擎。**
 
 M0 已完成并经四轮复审返修：原桌面可复现构建、开发数据与全局 `.agents` 隔离、UI 基线、OMP 协议启动（绑定 repo 内启动器、版本 18.2.7、`ready`/`negotiate_protocol` v2）均有记录（`docs/validation/M0-baseline.md`，顶部四段“返修记录”）。环境已就绪：Node 24、pnpm 10.34.5、Bun 1.4.2、桌面 Rust stable + OMP `nightly-2026-08-12`、cmake/ninja。复审结论以复审方为准。
 
-M1 优先验证 rpc-ui + OMP 原有审批/受信扩展，验证不足才增加 SDK bridge。审批、取消和恢复实验通过前，不开放完整工具执行。OMP 运行环境隔离与协议验证已收口，M1 沿用 `docs/validation/M0-rpc/verify-rpc.mjs`（固定入口 + 全量隔离 + 分帧 + 进程组回收 + 隔离路径验收 + 流错误处理）与 `verify-rpc.test.mjs`（18 项假进程测试）。
+M1 已定案接入路径并留下约束，见 `docs/decisions/001-omp-transport.md`（§3 八条必须实现的约束）。M2 不得重新论证 rpc-ui 选择，除非出现新证据；停止路径必须包含进程组终止兜底，审批必须先于执行。实验套件可继续复用于回归：`cd app/experiments/omp-bridge && node run-all.mjs`（224 项检查）。
 
 ## 5. 可直接交给执行模型
 
 ```text
-打开 /home/vv/person/code/omp-desktop 作为整个工作区（M0 已完成）。
+打开 /home/vv/person/code/omp-desktop 作为整个工作区（M0、M1 已完成）。
 
 阅读 AGENTS.md、HANDOFF.md 和 docs 中的规划文档，以及 app/ 的适用规则。
-本轮执行 M1（T04-T07），前置 M0 已完成（docs/validation/M0-baseline.md）。
+本轮执行 M2（T08-T10），前置 M1 已完成：
+- docs/validation/M1-compatibility.md
+- docs/decisions/001-omp-transport.md（§3 六条约束必须落实）
 
 环境已就绪：Node 24、pnpm 10.34.5、Bun 1.4.2（~/.bun/bin）、
 桌面 Rust stable + OMP nightly-2026-08-12、cmake/ninja（pip 安装）。
 
-依据 docs/01-source-audit.md 定位真实 RPC、SDK、扩展事件、host_tool_*、
-子代理、会话恢复和配置发现入口，完成 E01-E09 实验。
-使用隔离目录、本地 fake provider 和真实 OMP 内部工具链路验证；
-优先验证 rpc-ui 加 OMP 原有审批 wrapper/受信扩展，证明拒绝发生在副作用之前。
-普通 RPC 的交互提问不等于权限审批，set_host_tools 也不等于所有原生工具均受宿主控制。
+接入路径已定案，不要重新论证：OMP 以独立子进程 + --mode rpc-ui 运行，
+权限走受信扩展的 tool_call 执行前钩子，停止必须附带进程组终止兜底
+（协议内 abort/abort_bash 不会回收运行中的命令进程，E05 有实测证据）。
 
-根仓库管理 app/；upstream/ 是参考子模块。新任务按仓库规则创建专用分支和 worktree，
-不修改参考子模块。不重写界面、不调用付费模型。
+T08 最小运行时接口并保持原 Pi 行为；T09 进程监督与协议适配包
+（退出/超时/帧错误/资源回收，读取器需显式行长上限）；T10 会话引擎选择、
+能力判断与应用身份（含独立 appId、数据目录、凭证存储命名与更新源）。
 
-输出 docs/validation/M1-compatibility.md、docs/decisions/001-omp-transport.md，
-更新任务看板和 HANDOFF.md。不要自动提交、推送或发布。
+优先复用 app/experiments/omp-bridge/ 的结论与 fixtures 作为回归基线
+（cd app/experiments/omp-bridge && node run-all.mjs 应保持通过）。
+不修改参考子模块，不重写界面，不调用付费模型，不自动提交或推送。
+
+输出 docs/validation/M2-*.md，更新任务看板和 HANDOFF.md。
 ```
 
 ## 6. 下一轮必须保持的取舍

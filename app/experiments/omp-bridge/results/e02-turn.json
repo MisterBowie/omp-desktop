@@ -1,0 +1,90 @@
+{
+  "experiment": "e02-turn",
+  "startedAt": "2026-09-21T18:18:58.004Z",
+  "checks": [
+    {
+      "description": "prompt command is acknowledged",
+      "ok": true,
+      "detail": {
+        "id": "req-3402b9f0",
+        "type": "response",
+        "command": "prompt",
+        "success": true
+      }
+    },
+    {
+      "description": "prompt acknowledgement arrives before the turn ends",
+      "ok": true,
+      "detail": "at 25ms"
+    },
+    {
+      "description": "agent_end terminates the turn",
+      "ok": true
+    },
+    {
+      "description": "prompt acknowledgement is not the turn-end signal",
+      "ok": true
+    },
+    {
+      "description": "tool_execution_start observed",
+      "ok": true,
+      "detail": [
+        "write"
+      ]
+    },
+    {
+      "description": "tool_execution_end observed",
+      "ok": true
+    },
+    {
+      "description": "the real write tool ran and produced the file",
+      "ok": true
+    },
+    {
+      "description": "file content matches the scripted tool call",
+      "ok": true,
+      "detail": "hello from e02\n"
+    },
+    {
+      "description": "assistant text/thinking reached the client",
+      "ok": true,
+      "detail": "15 frames"
+    },
+    {
+      "description": "turn_end observed",
+      "ok": true,
+      "detail": "2"
+    },
+    {
+      "description": "fake provider was called with tools advertised",
+      "ok": true,
+      "detail": "12 tools"
+    },
+    {
+      "description": "process group reaped",
+      "ok": true
+    }
+  ],
+  "artifacts": {
+    "advertisedTools": [
+      "read",
+      "bash",
+      "edit",
+      "ask",
+      "eval",
+      "glob",
+      "grep",
+      "task",
+      "hub",
+      "todo",
+      "web_search",
+      "write"
+    ],
+    "toolCallCount": 2
+  },
+  "limitations": [
+    "The scripted model is local; no paid provider is contacted. Tool approval is bypassed here via --approval-mode yolo and is covered by E04."
+  ],
+  "finishedAt": "2026-09-21T18:18:58.863Z",
+  "ok": true
+}

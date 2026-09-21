@@ -1,0 +1,239 @@
+{
+  "experiment": "e09-transport",
+  "startedAt": "2026-09-21T18:20:42.079Z",
+  "checks": [
+    {
+      "description": "split UTF-8 decodes to the original text",
+      "ok": true,
+      "detail": "汉字😀 é"
+    },
+    {
+      "description": "split UTF-8 produces no protocol error",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "description": "batched frames are emitted in order",
+      "ok": true,
+      "detail": [
+        "ready",
+        "x",
+        "y",
+        "z"
+      ]
+    },
+    {
+      "description": "a frame split across three chunks yields exactly one frame",
+      "ok": true,
+      "detail": [
+        {
+          "type": "split",
+          "n": 7
+        }
+      ]
+    },
+    {
+      "description": "CRLF-terminated frame is parsed",
+      "ok": true,
+      "detail": {
+        "type": "ready",
+        "protocolVersion": 2,
+        "crlf": true
+      }
+    },
+    {
+      "description": "blank line yields no frame and no error",
+      "ok": true
+    },
+    {
+      "description": "invalid JSON is reported as a protocol error",
+      "ok": true,
+      "detail": [
+        {
+          "kind": "invalid-json",
+          "sample": "not json at all"
+        }
+      ]
+    },
+    {
+      "description": "reader continues after invalid JSON",
+      "ok": true,
+      "detail": [
+        "ready",
+        "after_error"
+      ]
+    },
+    {
+      "description": "unterminated tail is not emitted early",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "description": "unterminated tail is emitted at end of stream",
+      "ok": true,
+      "detail": [
+        {
+          "type": "tail"
+        }
+      ]
+    },
+    {
+      "description": "oversized line is reported explicitly",
+      "ok": true,
+      "detail": [
+        {
+          "kind": "line-too-large",
+          "bytes": 8192
+        }
+      ]
+    },
+    {
+      "description": "reader resynchronises after an oversized line",
+      "ok": true,
+      "detail": [
+        "recovered"
+      ]
+    },
+    {
+      "description": "oversized line does not emit a partial frame",
+      "ok": true
+    },
+    {
+      "description": "a ~180 KB multi-byte prompt is accepted",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "description": "the full multi-byte payload reached the model byte-exact",
+      "ok": true,
+      "detail": "1 provider requests"
+    },
+    {
+      "description": "stdout framing reported no unparsed frame",
+      "ok": true,
+      "detail": 0
+    },
+    {
+      "description": "real OMP process group reaped",
+      "ok": true
+    },
+    {
+      "description": "banner on stdout is reported as a protocol error, not a crash",
+      "ok": true,
+      "detail": {
+        "execPath": "<run>/fake-runtimes/banner.mjs",
+        "pid": 158567,
+        "ready": true,
+        "frames": [
+          "ready"
+        ],
+        "errors": [
+          "invalid-json"
+        ],
+        "exited": null,
+        "stderr": "",
+        "classification": "usable"
+      }
+    },
+    {
+      "description": "a runtime with stdout noise is still classified usable",
+      "ok": true,
+      "detail": "usable"
+    },
+    {
+      "description": "immediate exit is classified as a crash",
+      "ok": true,
+      "detail": {
+        "execPath": "<run>/fake-runtimes/crash.mjs",
+        "pid": 158581,
+        "ready": false,
+        "frames": [],
+        "errors": [],
+        "exited": {
+          "code": 3,
+          "signal": null
+        },
+        "stderr": "fatal: native module missing\n",
+        "classification": "crashed"
+      }
+    },
+    {
+      "description": "crash diagnostics keep stderr for the caller",
+      "ok": true,
+      "detail": "fatal: native module missing\n"
+    },
+    {
+      "description": "a never-ready runtime is classified as a start timeout",
+      "ok": true,
+      "detail": {
+        "execPath": "<run>/fake-runtimes/hang.mjs",
+        "pid": 158595,
+        "ready": false,
+        "frames": [],
+        "errors": [],
+        "exited": null,
+        "stderr": "",
+        "classification": "start-timeout"
+      }
+    },
+    {
+      "description": "a never-ready runtime is reclaimed rather than left running",
+      "ok": true,
+      "detail": "pid 158595"
+    },
+    {
+      "description": "a missing executable fails fast as a spawn error, not a timeout",
+      "ok": true,
+      "detail": {
+        "threw": true,
+        "code": "ENOENT",
+        "message": "spawn /home/vv/person/code/omp-desktop-m1/.dev-data/m1/e09-cXHt4B/fake-runtimes/definitely-not-installed-omp ENOENT"
+      }
+    },
+    {
+      "description": "stdin EOF is injected into a live session",
+      "ok": true,
+      "detail": 158627
+    },
+    {
+      "description": "OMP exits by itself after stdin EOF (no orphan idle process)",
+      "ok": true,
+      "detail": "self-exit observed"
+    },
+    {
+      "description": "stdin-EOF process group is fully reaped",
+      "ok": true
+    },
+    {
+      "description": "stdout consumer is removed from a live session",
+      "ok": true,
+      "detail": 158697
+    },
+    {
+      "description": "OMP shuts down instead of spinning after the reader disappears",
+      "ok": true,
+      "detail": "self-exit observed"
+    },
+    {
+      "description": "stdout-EPIPE process group is fully reaped",
+      "ok": true
+    }
+  ],
+  "artifacts": {
+    "missingExecutableProbe": {
+      "threw": true,
+      "code": "ENOENT",
+      "message": "spawn /home/vv/person/code/omp-desktop-m1/.dev-data/m1/e09-cXHt4B/fake-runtimes/definitely-not-installed-omp ENOENT"
+    },
+    "stdinEofStderr": "",
+    "promptWrittenAfterStdoutDrop": true,
+    "epipeStderr": ""
+  },
+  "limitations": [
+    "Bridge-disconnect handling is asserted as 'OMP exits by itself and the group is reaped'; the desktop-side reconnect policy is M2/T09.",
+    "Line-cap enforcement is specified by lib/ndjson.mjs; the production reader is M2/T09 and must adopt an explicit cap (Node's readline has no line limit).",
+    "Windows/macOS process reclamation is not covered here."
+  ],
+  "finishedAt": "2026-09-21T18:20:47.544Z",
+  "ok": true
+}

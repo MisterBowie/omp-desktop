@@ -1,0 +1,39 @@
+{
+  "note": "real capture, sanitized; local fake provider, gate answers are synthetic",
+  "gate": {
+    "event": "gate",
+    "toolName": "write",
+    "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-deny-write-uFklsj/project/guarded.txt",
+    "hasUI": true,
+    "at": 1790014743320
+  },
+  "decision": {
+    "event": "gate-decision",
+    "decision": "deny",
+    "choice": "Deny",
+    "at": 1790014743337
+  },
+  "dialogs": [
+    {
+      "method": "select",
+      "title": "Approve write?"
+    }
+  ],
+  "toolExecutionEnd": [
+    {
+      "type": "tool_execution_end",
+      "toolCallId": "call_fake_1_0",
+      "toolName": "write",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "denied by user (Deny)"
+          }
+        ],
+        "details": {}
+      },
+      "isError": true
+    }
+  ]
+}

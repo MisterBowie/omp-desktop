@@ -1,0 +1,12 @@
+{
+  "note": "real capture, sanitized; paths are inside this run's isolated agent dir",
+  "sessionFileRelativeToAgentDir": "sessions/-person-code-omp-desktop-m1-.dev-data-m1-e06-szFkCE-project/2026-09-21T18-19-20-006Z_01a0c531-a446-762e-abbe-d6036744926e.jsonl",
+  "sessionId": "01a0c531-a446-762e-abbe-d6036744926e",
+  "sessionName": "m1-e06-session",
+  "messageRoles": [
+    "user",
+    "assistant",
+    "toolResult",
+    "assistant"
+  ]
+}

@@ -1,0 +1,164 @@
+{
+  "experiment": "e07-isolation",
+  "startedAt": "2026-09-21T18:19:22.681Z",
+  "checks": [
+    {
+      "description": "child environment is readable for verification",
+      "ok": true,
+      "detail": 156641
+    },
+    {
+      "description": "injected API key is not present in the child env",
+      "ok": true,
+      "detail": "absent"
+    },
+    {
+      "description": "OMP_PROFILE is stripped from the child env",
+      "ok": true,
+      "detail": "absent"
+    },
+    {
+      "description": "PI_PROFILE is stripped from the child env",
+      "ok": true,
+      "detail": "absent"
+    },
+    {
+      "description": "XDG_DATA_HOME is stripped from the child env",
+      "ok": true,
+      "detail": "absent"
+    },
+    {
+      "description": "XDG_CACHE_HOME is stripped from the child env",
+      "ok": true,
+      "detail": "absent"
+    },
+    {
+      "description": "child config root points at this run's isolated root",
+      "ok": true,
+      "detail": ".omp-m0-63bbd4b8"
+    },
+    {
+      "description": "child agent dir points at this run's isolated agent dir",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-O3zsGV/agent"
+    },
+    {
+      "description": "child launch dir points at this run's isolated launch dir",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-O3zsGV/dev-cwd"
+    },
+    {
+      "description": "synthetic credential value never appears in the child env",
+      "ok": true
+    },
+    {
+      "description": "only this run's models are visible",
+      "ok": true,
+      "detail": [
+        "control-model",
+        "local-model"
+      ]
+    },
+    {
+      "description": "no user-owned model is visible",
+      "ok": true,
+      "detail": [
+        "control-model",
+        "local-model"
+      ]
+    },
+    {
+      "description": "user-level rule from the isolated agent dir reaches the model",
+      "ok": true
+    },
+    {
+      "description": "project-level rule from the isolated cwd reaches the model",
+      "ok": true
+    },
+    {
+      "description": "MCP server from the isolated project config was started",
+      "ok": true,
+      "detail": "started"
+    },
+    {
+      "description": "MCP client completed the handshake",
+      "ok": true,
+      "detail": [
+        "started",
+        "initialize",
+        "notifications/initialized",
+        "tools/list"
+      ]
+    },
+    {
+      "description": "MCP server was queried for tools",
+      "ok": true,
+      "detail": [
+        "started",
+        "initialize",
+        "notifications/initialized",
+        "tools/list"
+      ]
+    },
+    {
+      "description": "agent database was created inside the isolated agent dir",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-O3zsGV/agent/agent.db"
+    },
+    {
+      "description": "sessions directory exists inside the isolated agent dir",
+      "ok": true
+    },
+    {
+      "description": "config root is this run's isolated root, not ~/.omp",
+      "ok": true,
+      "detail": "/home/vv/.omp-m0-63bbd4b8"
+    },
+    {
+      "description": "run logs land in the isolated config root or agent dir",
+      "ok": true,
+      "detail": "/home/vv/.omp-m0-63bbd4b8"
+    },
+    {
+      "description": "launch dir is isolated",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e07-O3zsGV/dev-cwd"
+    },
+    {
+      "description": "process group reaped",
+      "ok": true
+    }
+  ],
+  "artifacts": {
+    "userOmpExists": true,
+    "userOwnModelsYmlExists": false,
+    "userOwnModelIdsCount": 0,
+    "visibleModelIds": [
+      "control-model",
+      "local-model"
+    ],
+    "advertisedTools": [
+      "read",
+      "bash",
+      "edit",
+      "ask",
+      "eval",
+      "glob",
+      "grep",
+      "task",
+      "hub",
+      "todo",
+      "web_search",
+      "write"
+    ],
+    "mcpToolAdvertised": false
+  },
+  "limitations": [
+    "Rules are only injected when bucketed by frontmatter (`alwaysApply: true`, or a `description` for the rulebook); a bare markdown file in rules/ is read but never reaches the prompt. Relevant to T19.",
+    "The MCP server from the isolated project config is discovered, spawned, and handshaken, but its tool is NOT in the model's tool list in this configuration (OMP advertises a curated 12-tool subset); MCP tool surfacing is T19/M5 work.",
+    "Credential isolation is proven for environment variables; OS keychain/system-store naming is deferred to M4 packaging.",
+    "The user's ~/.omp is read only to compare model ids; it is never written by these experiments."
+  ],
+  "finishedAt": "2026-09-21T18:19:29.913Z",
+  "ok": true
+}

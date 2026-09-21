@@ -1,0 +1,28 @@
+{
+  "note": "real capture, sanitized",
+  "registration": {
+    "id": "req-531495c4",
+    "type": "response",
+    "command": "set_host_tools",
+    "success": true,
+    "data": {
+      "toolNames": [
+        "m1_host_echo"
+      ]
+    }
+  },
+  "hostToolCalls": [
+    {
+      "id": "158899c7a0ecf2ff",
+      "toolName": "m1_host_echo",
+      "args": {
+        "text": "from-model"
+      }
+    }
+  ],
+  "toolCallsSeenByExtension": [
+    "m1_host_echo",
+    "write"
+  ],
+  "subagentSubscription": "events"
+}

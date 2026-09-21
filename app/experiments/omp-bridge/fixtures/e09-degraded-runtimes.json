@@ -1,0 +1,39 @@
+{
+  "note": "SYNTHETIC fault sample, not a real OMP capture: the runtimes are local stub scripts written by this experiment; only the reader's classification of them is observed behaviour.",
+  "banner": {
+    "execPath": "<run>/fake-runtimes/banner.mjs",
+    "pid": 158567,
+    "ready": true,
+    "frames": [
+      "ready"
+    ],
+    "errors": [
+      "invalid-json"
+    ],
+    "exited": null,
+    "stderr": "",
+    "classification": "usable"
+  },
+  "crash": {
+    "execPath": "<run>/fake-runtimes/crash.mjs",
+    "pid": 158581,
+    "ready": false,
+    "frames": [],
+    "errors": [],
+    "exited": {
+      "code": 3,
+      "signal": null
+    },
+    "stderr": "fatal: native module missing\n",
+    "classification": "crashed"
+  },
+  "hang": {
+    "execPath": "<run>/fake-runtimes/hang.mjs",
+    "ready": false,
+    "frames": [],
+    "errors": [],
+    "exited": null,
+    "stderr": "",
+    "classification": "start-timeout"
+  }
+}

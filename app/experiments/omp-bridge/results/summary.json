@@ -1,0 +1,115 @@
+{
+  "ranAt": "2026-09-21T18:20:21.614Z",
+  "node": "v24.14.0",
+  "platform": "linux-x64",
+  "keepArtifacts": false,
+  "experiments": [
+    {
+      "file": "e01-protocol.mjs",
+      "passed": true,
+      "headline": "PASS e01-protocol: 26/26 checks",
+      "exitCode": 0,
+      "seconds": 3.8,
+      "limitations": [
+        "Only handshake-level frames are captured here; turn-level events are covered by E02."
+      ]
+    },
+    {
+      "file": "e02-turn.mjs",
+      "passed": true,
+      "headline": "PASS e02-turn: 12/12 checks",
+      "exitCode": 0,
+      "seconds": 0.9,
+      "limitations": [
+        "The scripted model is local; no paid provider is contacted. Tool approval is bypassed here via --approval-mode yolo and is covered by E04."
+      ]
+    },
+    {
+      "file": "e03-interaction.mjs",
+      "passed": true,
+      "headline": "PASS e03-interaction: 23/23 checks",
+      "exitCode": 0,
+      "seconds": 3.6,
+      "limitations": [
+        "The timeout case relies on a dialog-level timeout supplied by the extension (800ms), not on client-side timing."
+      ]
+    },
+    {
+      "file": "e04-approval.mjs",
+      "passed": true,
+      "headline": "PASS e04-approval: 29/29 checks",
+      "exitCode": 0,
+      "seconds": 3.7,
+      "limitations": [
+        "The gate is an experiment extension loaded with --extension; production wiring is M2. Model tool-call approval modes were not set to yolo for these runs."
+      ]
+    },
+    {
+      "file": "e05-cancel.mjs",
+      "passed": true,
+      "headline": "PASS e05-cancel: 17/17 checks",
+      "exitCode": 0,
+      "seconds": 13.1,
+      "limitations": [
+        "In-protocol stop (abort + abort_bash) did NOT reclaim the OS process of the running command in rpc-ui mode; the desktop stop path needs a process-tree termination fallback, which the bridge-level kill provides (scenario 3).",
+        "Process termination is asserted on Linux via a self-written PID; macOS/Windows semantics are not covered here."
+      ]
+    },
+    {
+      "file": "e06-session.mjs",
+      "passed": true,
+      "headline": "PASS e06-session: 23/23 checks",
+      "exitCode": 0,
+      "seconds": 3.4,
+      "limitations": [
+        "Session naming/restore are verified over RPC only; desktop-side metadata mapping is M2/M4 work."
+      ]
+    },
+    {
+      "file": "e07-isolation.mjs",
+      "passed": true,
+      "headline": "PASS e07-isolation: 23/23 checks",
+      "exitCode": 0,
+      "seconds": 7.3,
+      "limitations": [
+        "Rules are only injected when bucketed by frontmatter (`alwaysApply: true`, or a `description` for the rulebook); a bare markdown file in rules/ is read but never reaches the prompt. Relevant to T19.",
+        "The MCP server from the isolated project config is discovered, spawned, and handshaken, but its tool is NOT in the model's tool list in this configuration (OMP advertises a curated 12-tool subset); MCP tool surfacing is T19/M5 work.",
+        "Credential isolation is proven for environment variables; OS keychain/system-store naming is deferred to M4 packaging.",
+        "The user's ~/.omp is read only to compare model ids; it is never written by these experiments."
+      ]
+    },
+    {
+      "file": "e08-host-tools.mjs",
+      "passed": true,
+      "headline": "PASS e08-host-tools: 23/23 checks",
+      "exitCode": 0,
+      "seconds": 44.2,
+      "limitations": [
+        "The host tool also passed through the extension tool_call hook.",
+        "The host-tool exchange is a real capture; the fake provider only supplies model turns."
+      ]
+    },
+    {
+      "file": "e09-transport.mjs",
+      "passed": true,
+      "headline": "PASS e09-transport: 30/30 checks",
+      "exitCode": 0,
+      "seconds": 5.5,
+      "limitations": [
+        "Bridge-disconnect handling is asserted as 'OMP exits by itself and the group is reaped'; the desktop-side reconnect policy is M2/T09.",
+        "Line-cap enforcement is specified by lib/ndjson.mjs; the production reader is M2/T09 and must adopt an explicit cap (Node's readline has no line limit).",
+        "Windows/macOS process reclamation is not covered here."
+      ]
+    },
+    {
+      "file": "e10-modes.mjs",
+      "passed": true,
+      "headline": "PASS e10-modes: 18/18 checks",
+      "exitCode": 0,
+      "seconds": 1.9,
+      "limitations": [
+        "ACP and SDK paths were read in source only; M1 selects rpc-ui and does not need them, so no runtime comparison is claimed."
+      ]
+    }
+  ]
+}

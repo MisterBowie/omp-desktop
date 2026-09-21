@@ -1,0 +1,168 @@
+{
+  "experiment": "e06-session",
+  "startedAt": "2026-09-21T18:19:19.269Z",
+  "checks": [
+    {
+      "description": "new_session is accepted (not cancelled)",
+      "ok": true,
+      "detail": {
+        "id": "req-92de3f0a",
+        "type": "response",
+        "command": "new_session",
+        "success": true,
+        "data": {
+          "cancelled": false
+        }
+      }
+    },
+    {
+      "description": "set_session_name is accepted",
+      "ok": true,
+      "detail": {
+        "id": "req-c3f3608f",
+        "type": "response",
+        "command": "set_session_name",
+        "success": true
+      }
+    },
+    {
+      "description": "get_state exposes a native session file",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e06-szFkCE/agent/sessions/-person-code-omp-desktop-m1-.dev-data-m1-e06-szFkCE-project/2026-09-21T18-19-20-006Z_01a0c531-a446-762e-abbe-d6036744926e.jsonl"
+    },
+    {
+      "description": "get_state exposes a native session id",
+      "ok": true,
+      "detail": "01a0c531-a446-762e-abbe-d6036744926e"
+    },
+    {
+      "description": "session name is reflected in state",
+      "ok": true,
+      "detail": "m1-e06-session"
+    },
+    {
+      "description": "side effect happened once in run A",
+      "ok": true
+    },
+    {
+      "description": "get_messages returns the conversation",
+      "ok": true,
+      "detail": "4 messages"
+    },
+    {
+      "description": "run A: process group reaped",
+      "ok": true
+    },
+    {
+      "description": "native session files live under the isolated agent dir",
+      "ok": true,
+      "detail": "1 files"
+    },
+    {
+      "description": "no session file leaked outside the isolated agent dir",
+      "ok": true
+    },
+    {
+      "description": "the reported session file exists on disk",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e06-szFkCE/agent/sessions/-person-code-omp-desktop-m1-.dev-data-m1-e06-szFkCE-project/2026-09-21T18-19-20-006Z_01a0c531-a446-762e-abbe-d6036744926e.jsonl"
+    },
+    {
+      "description": "switch_session by native path is accepted",
+      "ok": true,
+      "detail": {
+        "id": "req-0d412f10",
+        "type": "response",
+        "command": "switch_session",
+        "success": true,
+        "data": {
+          "cancelled": false
+        }
+      }
+    },
+    {
+      "description": "reopened session reports the same native id",
+      "ok": true,
+      "detail": "01a0c531-a446-762e-abbe-d6036744926e"
+    },
+    {
+      "description": "reopened session keeps its name",
+      "ok": true,
+      "detail": "m1-e06-session"
+    },
+    {
+      "description": "history is restored on reopen",
+      "ok": true,
+      "detail": "4 messages"
+    },
+    {
+      "description": "reopen replays no tool execution",
+      "ok": true,
+      "detail": "0 tool starts"
+    },
+    {
+      "description": "reopen asks for no new approval",
+      "ok": true,
+      "detail": "no gate log"
+    },
+    {
+      "description": "reopen does not rewrite the file",
+      "ok": true
+    },
+    {
+      "description": "get_branch_messages exposes branchable entry ids",
+      "ok": true,
+      "detail": "1 entries"
+    },
+    {
+      "description": "branch is accepted",
+      "ok": true,
+      "detail": {
+        "id": "req-ad8e9f77",
+        "type": "response",
+        "command": "branch",
+        "success": true,
+        "data": {
+          "text": "write the marker file",
+          "cancelled": false
+        }
+      }
+    },
+    {
+      "description": "branch keeps the session usable",
+      "ok": true
+    },
+    {
+      "description": "branch produces a distinct native location",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e06-szFkCE/agent/sessions/-person-code-omp-desktop-m1-.dev-data-m1-e06-szFkCE-project/2026-09-21T18-19-22-582Z_01a0c531-ae56-72fd-8cc8-626ade5a1b1e.jsonl"
+    },
+    {
+      "description": "run B: process group reaped",
+      "ok": true
+    }
+  ],
+  "artifacts": {
+    "messageRoles": [
+      "user",
+      "assistant",
+      "toolResult",
+      "assistant"
+    ],
+    "sessionState": {
+      "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e06-szFkCE/agent/sessions/-person-code-omp-desktop-m1-.dev-data-m1-e06-szFkCE-project/2026-09-21T18-19-20-006Z_01a0c531-a446-762e-abbe-d6036744926e.jsonl",
+      "sessionId": "01a0c531-a446-762e-abbe-d6036744926e",
+      "sessionName": "m1-e06-session"
+    },
+    "branchResult": {
+      "text": "write the marker file",
+      "cancelled": false
+    },
+    "branchSessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e06-szFkCE/agent/sessions/-person-code-omp-desktop-m1-.dev-data-m1-e06-szFkCE-project/2026-09-21T18-19-22-582Z_01a0c531-ae56-72fd-8cc8-626ade5a1b1e.jsonl"
+  },
+  "limitations": [
+    "Session naming/restore are verified over RPC only; desktop-side metadata mapping is M2/M4 work."
+  ],
+  "finishedAt": "2026-09-21T18:19:22.650Z",
+  "ok": true
+}

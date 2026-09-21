@@ -1,0 +1,113 @@
+{
+  "experiment": "e10-modes",
+  "startedAt": "2026-09-21T18:20:19.737Z",
+  "checks": [
+    {
+      "description": "rpc: ready arrives and protocol v2 negotiates",
+      "ok": true
+    },
+    {
+      "description": "rpc: the tool_call hook observes the native tool",
+      "ok": true
+    },
+    {
+      "description": "rpc: exactly one approval dialog is requested",
+      "ok": true,
+      "detail": [
+        {
+          "id": "158899f833e0aab6",
+          "method": "select",
+          "title": "Approve write?"
+        }
+      ]
+    },
+    {
+      "description": "rpc: the approved decision is honored exactly once",
+      "ok": true
+    },
+    {
+      "description": "rpc: process group reaped",
+      "ok": true
+    },
+    {
+      "description": "rpc-ui: ready arrives and protocol v2 negotiates",
+      "ok": true
+    },
+    {
+      "description": "rpc-ui: the tool_call hook observes the native tool",
+      "ok": true
+    },
+    {
+      "description": "rpc-ui: exactly one approval dialog is requested",
+      "ok": true,
+      "detail": [
+        {
+          "id": "158899f91dec37dc",
+          "method": "select",
+          "title": "Approve write?"
+        }
+      ]
+    },
+    {
+      "description": "rpc-ui: the approved decision is honored exactly once",
+      "ok": true
+    },
+    {
+      "description": "rpc-ui: process group reaped",
+      "ok": true
+    },
+    {
+      "description": "rpc: extensions reach the tool_call hook",
+      "ok": true
+    },
+    {
+      "description": "rpc: extension dialogs are delivered over the protocol",
+      "ok": true,
+      "detail": 1
+    },
+    {
+      "description": "rpc: the extension sees a UI context",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "description": "rpc-ui: extensions reach the tool_call hook",
+      "ok": true
+    },
+    {
+      "description": "rpc-ui: extension dialogs are delivered over the protocol",
+      "ok": true,
+      "detail": 1
+    },
+    {
+      "description": "rpc-ui: the extension sees a UI context",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "description": "rpc-ui advertises OMP's ask tool to the model",
+      "ok": true,
+      "detail": 12
+    },
+    {
+      "description": "plain rpc does not advertise OMP's ask tool",
+      "ok": true,
+      "detail": 11
+    }
+  ],
+  "artifacts": {
+    "rpcNotifications": [
+      "setWidget",
+      "setWidget"
+    ],
+    "rpc-uiNotifications": [
+      "setWidget",
+      "setWidget"
+    ]
+  },
+  "limitations": [
+    "ACP and SDK paths were read in source only; M1 selects rpc-ui and does not need them, so no runtime comparison is claimed."
+  ],
+  "finishedAt": "2026-09-21T18:20:21.611Z",
+  "ok": true
+}

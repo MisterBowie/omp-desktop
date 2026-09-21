@@ -1,0 +1,265 @@
+{
+  "experiment": "e08-host-tools",
+  "startedAt": "2026-09-21T18:19:29.947Z",
+  "checks": [
+    {
+      "description": "set_host_tools is accepted",
+      "ok": true,
+      "detail": {
+        "id": "req-531495c4",
+        "type": "response",
+        "command": "set_host_tools",
+        "success": true,
+        "data": {
+          "toolNames": [
+            "m1_host_echo"
+          ]
+        }
+      }
+    },
+    {
+      "description": "registered host tool name is echoed back",
+      "ok": true,
+      "detail": [
+        "m1_host_echo"
+      ]
+    },
+    {
+      "description": "set_subagent_subscription(events) is accepted",
+      "ok": true,
+      "detail": {
+        "id": "req-b5dc0449",
+        "type": "response",
+        "command": "set_subagent_subscription",
+        "success": true,
+        "data": {
+          "level": "events"
+        }
+      }
+    },
+    {
+      "description": "get_subagents returns a snapshot",
+      "ok": true,
+      "detail": "0 subagents"
+    },
+    {
+      "description": "the host tool was actually called by the model",
+      "ok": true,
+      "detail": [
+        "m1_host_echo"
+      ]
+    },
+    {
+      "description": "the host tool call carried the model's arguments",
+      "ok": true,
+      "detail": {
+        "text": "from-model"
+      }
+    },
+    {
+      "description": "host tool result is fed back to the model",
+      "ok": true
+    },
+    {
+      "description": "the extension observed the native tool call",
+      "ok": true,
+      "detail": [
+        "m1_host_echo",
+        "write"
+      ]
+    },
+    {
+      "description": "host tool registration does not imply native tools bypass the extension path",
+      "ok": true,
+      "detail": "native `write` still reached the tool_call hook"
+    },
+    {
+      "description": "native tool was intercepted before execution",
+      "ok": true,
+      "detail": "0 executions"
+    },
+    {
+      "description": "denied native tool produced no side effect",
+      "ok": true
+    },
+    {
+      "description": "process group reaped",
+      "ok": true
+    },
+    {
+      "description": "scenario 2: host tool call arrives and is left unanswered",
+      "ok": true,
+      "detail": "host_tool_call"
+    },
+    {
+      "description": "abandoning a pending host tool call produces host_tool_cancel",
+      "ok": true,
+      "detail": {
+        "type": "host_tool_cancel",
+        "id": "158899effbc26fab",
+        "targetId": "158899eff8426faa"
+      }
+    },
+    {
+      "description": "host_tool_cancel carries its own distinct frame id",
+      "ok": true
+    },
+    {
+      "description": "scenario 2: session stays responsive after the abandoned call",
+      "ok": true
+    },
+    {
+      "description": "scenario 2: process group reaped",
+      "ok": true
+    },
+    {
+      "description": "scenario 3: subagent subscription accepted for the run",
+      "ok": true,
+      "detail": "events"
+    },
+    {
+      "description": "scenario 3: get_subagents reports the live subagent",
+      "ok": true,
+      "detail": "1 subagents"
+    },
+    {
+      "description": "scenario 3: real subagent frames reach the desktop",
+      "ok": true,
+      "detail": [
+        "subagent_lifecycle",
+        "subagent_event",
+        "subagent_event",
+        "subagent_progress",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_progress",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_progress",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_progress",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_event",
+        "subagent_progress",
+        "subagent_progress",
+        "subagent_lifecycle"
+      ]
+    },
+    {
+      "description": "scenario 3: lifecycle, progress and event frames are all covered",
+      "ok": true,
+      "detail": [
+        "subagent_lifecycle",
+        "subagent_event",
+        "subagent_progress"
+      ]
+    },
+    {
+      "description": "scenario 3: the task tool actually executed",
+      "ok": true
+    },
+    {
+      "description": "scenario 3: process group reaped",
+      "ok": true
+    }
+  ],
+  "artifacts": {
+    "registeredHostTools": [
+      "m1_host_echo"
+    ],
+    "toolCallsSeenByExtension": [
+      "m1_host_echo",
+      "write"
+    ],
+    "hostToolSeenByExtension": true,
+    "hostToolCancelFrame": {
+      "type": "host_tool_cancel",
+      "id": "158899effbc26fab",
+      "targetId": "158899eff8426faa"
+    },
+    "subagentSnapshot": [
+      {
+        "id": "M1Scout",
+        "index": 0,
+        "agent": "scout",
+        "agentSource": "bundled",
+        "status": "running",
+        "task": "Complete assignment thoroughly:\n\nreport the word ALPHA",
+        "assignment": "report the word ALPHA",
+        "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e08-subagent-mCHRKA/agent/sessions/-person-code-omp-desktop-m1-.dev-data-m1-e08-subagent-mCHRKA-project/2026-09-21T18-20-12-845Z_01a0c532-72ad-72cf-b754-b88672302cce/M1Scout.jsonl",
+        "lastUpdate": 1790014813100,
+        "parentToolCallId": "call_fake_4_0",
+        "progress": {
+          "index": 0,
+          "id": "M1Scout",
+          "agent": "scout",
+          "agentSource": "bundled",
+          "status": "running",
+          "task": "Complete assignment thoroughly:\n\nreport the word ALPHA",
+          "assignment": "report the word ALPHA",
+          "recentTools": [],
+          "recentOutput": [],
+          "toolCount": 0,
+          "requests": 0,
+          "tokens": "<redacted>",
+          "cost": 0,
+          "durationMs": 25,
+          "modelOverride": [
+            "m1fake/local-model"
+          ],
+          "modelRole": "smol",
+          "contextWindow": 200000,
+          "resolvedModelIdentity": "m1fake/local-model",
+          "resolvedModel": "m1fake/local-model"
+        }
+      }
+    ],
+    "subagentFrameTypes": [
+      "subagent_lifecycle",
+      "subagent_event",
+      "subagent_progress"
+    ]
+  },
+  "limitations": [
+    "The host tool also passed through the extension tool_call hook.",
+    "The host-tool exchange is a real capture; the fake provider only supplies model turns."
+  ],
+  "finishedAt": "2026-09-21T18:20:14.158Z",
+  "ok": true
+}

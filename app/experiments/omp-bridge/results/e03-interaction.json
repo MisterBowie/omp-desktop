@@ -1,0 +1,144 @@
+{
+  "experiment": "e03-interaction",
+  "startedAt": "2026-09-21T18:18:58.899Z",
+  "checks": [
+    {
+      "description": "all: expected dialogs requested",
+      "ok": true,
+      "detail": [
+        "setWidget",
+        "select",
+        "confirm",
+        "input",
+        "setWidget"
+      ]
+    },
+    {
+      "description": "all: every request carries a correlation id",
+      "ok": true
+    },
+    {
+      "description": "all: ids are unique per request",
+      "ok": true,
+      "detail": "5 requests"
+    },
+    {
+      "description": "extension observed the select answer",
+      "ok": true,
+      "detail": "A"
+    },
+    {
+      "description": "extension observed the confirm answer",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "description": "extension observed the input answer",
+      "ok": true,
+      "detail": "typed-value"
+    },
+    {
+      "description": "all: blocked tool produced no file",
+      "ok": true
+    },
+    {
+      "description": "all: no pending dialog left behind",
+      "ok": true,
+      "detail": "5 requests / 5 handled"
+    },
+    {
+      "description": "all: process group reaped",
+      "ok": true
+    },
+    {
+      "description": "cancel: expected dialogs requested",
+      "ok": true,
+      "detail": [
+        "setWidget",
+        "select",
+        "setWidget"
+      ]
+    },
+    {
+      "description": "cancel: every request carries a correlation id",
+      "ok": true
+    },
+    {
+      "description": "cancel: ids are unique per request",
+      "ok": true,
+      "detail": "3 requests"
+    },
+    {
+      "description": "cancel: extension resolved with no answer (select)",
+      "ok": true,
+      "detail": "null"
+    },
+    {
+      "description": "cancel: blocked tool produced no file",
+      "ok": true
+    },
+    {
+      "description": "cancel: no pending dialog left behind",
+      "ok": true,
+      "detail": "3 requests / 3 handled"
+    },
+    {
+      "description": "cancel: process group reaped",
+      "ok": true
+    },
+    {
+      "description": "timeout: expected dialogs requested",
+      "ok": true,
+      "detail": [
+        "setWidget",
+        "select",
+        "setWidget"
+      ]
+    },
+    {
+      "description": "timeout: every request carries a correlation id",
+      "ok": true
+    },
+    {
+      "description": "timeout: ids are unique per request",
+      "ok": true,
+      "detail": "3 requests"
+    },
+    {
+      "description": "timeout: extension resolved with no answer (select-timeout)",
+      "ok": true,
+      "detail": "null"
+    },
+    {
+      "description": "timeout: blocked tool produced no file",
+      "ok": true
+    },
+    {
+      "description": "timeout: no pending dialog left behind",
+      "ok": true,
+      "detail": "3 requests / 3 handled"
+    },
+    {
+      "description": "timeout: process group reaped",
+      "ok": true
+    }
+  ],
+  "artifacts": {
+    "extensionSaw.all": {
+      "select": "A",
+      "confirm": true,
+      "input": "typed-value"
+    },
+    "extensionSaw.cancel": {
+      "select": null
+    },
+    "extensionSaw.timeout": {
+      "select-timeout": null
+    }
+  },
+  "limitations": [
+    "The timeout case relies on a dialog-level timeout supplied by the extension (800ms), not on client-side timing."
+  ],
+  "finishedAt": "2026-09-21T18:19:02.465Z",
+  "ok": true
+}

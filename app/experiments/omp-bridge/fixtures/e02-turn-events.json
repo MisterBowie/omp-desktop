@@ -1,0 +1,252 @@
+{
+  "note": "real capture, sanitized; local fake provider, approval-mode=yolo for this experiment only",
+  "ready": {
+    "type": "ready",
+    "protocolVersion": 1,
+    "supportedProtocolVersions": [
+      1,
+      2
+    ],
+    "maxFrameBytes": 1048576,
+    "maxReassembledFrameBytes": 67108864
+  },
+  "promptResponse": {
+    "id": "req-3402b9f0",
+    "type": "response",
+    "command": "prompt",
+    "success": true
+  },
+  "eventTypes": [
+    "ready",
+    "extension_ui_request",
+    "advisor_cost_changed",
+    "available_commands_update",
+    "response",
+    "agent_start",
+    "turn_start",
+    "message_start",
+    "message_end",
+    "message_update",
+    "tool_execution_start",
+    "tool_execution_update",
+    "tool_execution_end",
+    "turn_end",
+    "agent_end"
+  ],
+  "toolStart": [
+    {
+      "type": "tool_execution_start",
+      "toolCallId": "call_fake_1_0",
+      "toolName": "write",
+      "args": {
+        "path": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-kITCue/project/hello.txt",
+        "content": "hello from e02\n"
+      }
+    }
+  ],
+  "toolEnd": [
+    {
+      "type": "tool_execution_end",
+      "toolCallId": "call_fake_1_0",
+      "toolName": "write",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "[hello.txt#1373]\nSuccessfully wrote 15 bytes to hello.txt"
+          }
+        ],
+        "details": {
+          "resolvedPath": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-kITCue/project/hello.txt"
+        }
+      },
+      "isError": false
+    }
+  ],
+  "turnEnd": [
+    {
+      "type": "turn_end",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "planning a small write",
+            "thinkingSignature": "reasoning_content"
+          },
+          {
+            "type": "text",
+            "text": "Writing the file now."
+          },
+          {
+            "type": "toolCall",
+            "id": "call_fake_1_0",
+            "name": "write",
+            "arguments": {
+              "path": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-kITCue/project/hello.txt",
+              "content": "hello from e02\n"
+            },
+            "partialArgs": "{\"path\":\"/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-kITCue/project/hello.txt\",\"content\":\"hello from e02\\n\"}",
+            "streamIndex": 0
+          }
+        ],
+        "api": "openai-completions",
+        "provider": "m1fake",
+        "model": "local-model",
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "totalTokens": "<redacted>",
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "toolUse",
+        "timestamp": 1790014738783,
+        "responseId": "chatcmpl-fake-1",
+        "duration": 12.797172000000046,
+        "ttft": 10.801868000000013
+      },
+      "toolResults": [
+        {
+          "role": "toolResult",
+          "toolCallId": "call_fake_1_0",
+          "toolName": "write",
+          "content": [
+            {
+              "type": "text",
+              "text": "[hello.txt#1373]\nSuccessfully wrote 15 bytes to hello.txt"
+            }
+          ],
+          "details": {
+            "resolvedPath": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-kITCue/project/hello.txt"
+          },
+          "isError": false,
+          "timestamp": 1790014738811
+        }
+      ]
+    }
+  ],
+  "agentEnd": {
+    "type": "agent_end",
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Create hello.txt"
+          }
+        ],
+        "attribution": "user",
+        "timestamp": 1790014738739
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "planning a small write",
+            "thinkingSignature": "reasoning_content"
+          },
+          {
+            "type": "text",
+            "text": "Writing the file now."
+          },
+          {
+            "type": "toolCall",
+            "id": "call_fake_1_0",
+            "name": "write",
+            "arguments": {
+              "path": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-kITCue/project/hello.txt",
+              "content": "hello from e02\n"
+            },
+            "partialArgs": "{\"path\":\"/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-kITCue/project/hello.txt\",\"content\":\"hello from e02\\n\"}",
+            "streamIndex": 0
+          }
+        ],
+        "api": "openai-completions",
+        "provider": "m1fake",
+        "model": "local-model",
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "totalTokens": "<redacted>",
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "toolUse",
+        "timestamp": 1790014738783,
+        "responseId": "chatcmpl-fake-1",
+        "duration": 12.797172000000046,
+        "ttft": 10.801868000000013
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_fake_1_0",
+        "toolName": "write",
+        "content": [
+          {
+            "type": "text",
+            "text": "[hello.txt#1373]\nSuccessfully wrote 15 bytes to hello.txt"
+          }
+        ],
+        "details": {
+          "resolvedPath": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e02-kITCue/project/hello.txt"
+        },
+        "isError": false,
+        "timestamp": 1790014738811
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "finishing",
+            "thinkingSignature": "reasoning_content"
+          },
+          {
+            "type": "text",
+            "text": "Done."
+          }
+        ],
+        "api": "openai-completions",
+        "provider": "m1fake",
+        "model": "local-model",
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "totalTokens": "<redacted>",
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "stop",
+        "timestamp": 1790014738816,
+        "responseId": "chatcmpl-fake-2",
+        "duration": 2.791349999999966,
+        "ttft": 2.4757829999999785
+      }
+    ],
+    "isTerminal": true
+  }
+}

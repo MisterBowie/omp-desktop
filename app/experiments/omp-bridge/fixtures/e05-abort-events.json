@@ -1,0 +1,48 @@
+{
+  "note": "real capture, sanitized; event type names and abort response only",
+  "eventTypes": [
+    "ready",
+    "extension_ui_request",
+    "advisor_cost_changed",
+    "available_commands_update",
+    "response",
+    "agent_start",
+    "turn_start",
+    "message_start",
+    "message_end",
+    "message_update",
+    "tool_execution_start",
+    "tool_execution_update",
+    "tool_execution_end",
+    "turn_end",
+    "agent_end"
+  ],
+  "abortResponse": {
+    "id": "req-02e987f3",
+    "type": "response",
+    "command": "abort",
+    "success": true
+  },
+  "toolExecutionEnd": [
+    {
+      "type": "tool_execution_end",
+      "toolCallId": "call_fake_1_0",
+      "toolName": "bash",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "error: command not found: exec\n\n\nWall time: 0.03 seconds\n\nCommand exited with code 127"
+          }
+        ],
+        "details": {
+          "timeoutSeconds": 300,
+          "wallTimeMs": 28.277049000000034,
+          "exitCode": 127
+        },
+        "isError": true
+      },
+      "isError": true
+    }
+  ]
+}
