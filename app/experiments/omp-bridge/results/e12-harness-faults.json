@@ -1,0 +1,100 @@
+{
+  "experiment": "e12-harness-faults",
+  "startedAt": "2026-09-21T18:51:35.281Z",
+  "checks": [
+    {
+      "description": "R5: start against invalid frames fails instead of crashing",
+      "ok": true,
+      "detail": {
+        "threw": true,
+        "message": "OMP did not become ready: no ready frame"
+      }
+    },
+    {
+      "description": "R5: the failure is reported as a readiness failure, not a TypeError",
+      "ok": true,
+      "detail": "OMP did not become ready: no ready frame"
+    },
+    {
+      "description": "R5: no client survived the failed start",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "description": "R5: the failed start left no isolated home behind",
+      "ok": true,
+      "detail": "/tmp/m1-r5-SFKWmk/fail-run/home"
+    },
+    {
+      "description": "R5: a runtime with invalid frames then ready is usable",
+      "ok": true,
+      "detail": [
+        "__invalid__",
+        "__invalid__",
+        "ready"
+      ]
+    },
+    {
+      "description": "R5: invalid frames are recorded as __invalid__",
+      "ok": true,
+      "detail": [
+        "__invalid__",
+        "__invalid__",
+        "ready"
+      ]
+    },
+    {
+      "description": "R5: synthetic roots removed after the probes",
+      "ok": true
+    },
+    {
+      "description": "R6: the suite exits non-zero when any experiment is dishonest",
+      "ok": true,
+      "detail": 1
+    },
+    {
+      "description": "R6: PASS followed by a non-zero exit is rejected",
+      "ok": true,
+      "detail": "running e91-pass-then-exit9.mjs ... REJECTED (exit code 9) — reported: PASS e91-pass-then-exit9: 1/1 checks"
+    },
+    {
+      "description": "R6: a signalled experiment is rejected",
+      "ok": true,
+      "detail": "running e92-signalled.mjs ... REJECTED (killed by signal SIGKILL) — reported: PASS e92-signalled: 1/1 checks"
+    },
+    {
+      "description": "R6: a missing result file is rejected",
+      "ok": true,
+      "detail": "running e93-no-result.mjs ... REJECTED (no result file) — reported: PASS e93-no-result: 1/1 checks"
+    },
+    {
+      "description": "R6: a result file that reports failure is rejected",
+      "ok": true,
+      "detail": "running e94-result-says-fail.mjs ... REJECTED (result file reports failure) — reported: PASS e94-result-says-fail: 1/1 checks"
+    },
+    {
+      "description": "R6: a mismatched result file is rejected",
+      "ok": true,
+      "detail": "running e95-mismatched-result.mjs ... REJECTED (result file names \"e95-something-else\") — reported: PASS e95-mismatched-result: 1/1 checks"
+    },
+    {
+      "description": "R6: the one honest experiment is accepted",
+      "ok": true,
+      "detail": "running e90-honest-pass.mjs ... PASS e90-honest-pass: 1/1 checks"
+    },
+    {
+      "description": "R6: a stalled experiment is rejected as timed out",
+      "ok": true,
+      "detail": "running e96-stalled.mjs ... REJECTED (timed out after 8000 ms) — reported: PASS e96-stalled: 1/1 checks"
+    },
+    {
+      "description": "R6: the timeout path reclaims the experiment's own child processes",
+      "ok": true,
+      "detail": "grandchild 182072"
+    }
+  ],
+  "artifacts": {},
+  "limitations": [],
+  "finishedAt": "2026-09-21T18:51:45.958Z",
+  "ok": true
+}

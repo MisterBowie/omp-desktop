@@ -1,12 +1,12 @@
 {
   "experiment": "e06-session",
-  "startedAt": "2026-09-21T18:19:19.269Z",
+  "startedAt": "2026-09-21T18:50:30.643Z",
   "checks": [
     {
       "description": "new_session is accepted (not cancelled)",
       "ok": true,
       "detail": {
-        "id": "req-92de3f0a",
+        "id": "req-4885a587",
         "type": "response",
         "command": "new_session",
         "success": true,
@@ -19,7 +19,7 @@
       "description": "set_session_name is accepted",
       "ok": true,
       "detail": {
-        "id": "req-c3f3608f",
+        "id": "req-6f27cd0a",
         "type": "response",
         "command": "set_session_name",
         "success": true
@@ -28,12 +28,12 @@
     {
       "description": "get_state exposes a native session file",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e06-szFkCE/agent/sessions/-person-code-omp-desktop-m1-.dev-data-m1-e06-szFkCE-project/2026-09-21T18-19-20-006Z_01a0c531-a446-762e-abbe-d6036744926e.jsonl"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e06-V5tJAI/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e06-V5tJAI-project--/2026-09-21T18-50-31-406Z_01a0c54e-326e-74ae-953a-6ea830a953ed.jsonl"
     },
     {
       "description": "get_state exposes a native session id",
       "ok": true,
-      "detail": "01a0c531-a446-762e-abbe-d6036744926e"
+      "detail": "01a0c54e-326e-74ae-953a-6ea830a953ed"
     },
     {
       "description": "session name is reflected in state",
@@ -65,13 +65,13 @@
     {
       "description": "the reported session file exists on disk",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e06-szFkCE/agent/sessions/-person-code-omp-desktop-m1-.dev-data-m1-e06-szFkCE-project/2026-09-21T18-19-20-006Z_01a0c531-a446-762e-abbe-d6036744926e.jsonl"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e06-V5tJAI/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e06-V5tJAI-project--/2026-09-21T18-50-31-406Z_01a0c54e-326e-74ae-953a-6ea830a953ed.jsonl"
     },
     {
       "description": "switch_session by native path is accepted",
       "ok": true,
       "detail": {
-        "id": "req-0d412f10",
+        "id": "req-a2196ec1",
         "type": "response",
         "command": "switch_session",
         "success": true,
@@ -83,7 +83,7 @@
     {
       "description": "reopened session reports the same native id",
       "ok": true,
-      "detail": "01a0c531-a446-762e-abbe-d6036744926e"
+      "detail": "01a0c54e-326e-74ae-953a-6ea830a953ed"
     },
     {
       "description": "reopened session keeps its name",
@@ -118,7 +118,7 @@
       "description": "branch is accepted",
       "ok": true,
       "detail": {
-        "id": "req-ad8e9f77",
+        "id": "req-243fa987",
         "type": "response",
         "command": "branch",
         "success": true,
@@ -135,7 +135,7 @@
     {
       "description": "branch produces a distinct native location",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e06-szFkCE/agent/sessions/-person-code-omp-desktop-m1-.dev-data-m1-e06-szFkCE-project/2026-09-21T18-19-22-582Z_01a0c531-ae56-72fd-8cc8-626ade5a1b1e.jsonl"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e06-V5tJAI/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e06-V5tJAI-project--/2026-09-21T18-50-34-021Z_01a0c54e-3ca5-70c4-aef8-734a612884e6.jsonl"
     },
     {
       "description": "run B: process group reaped",
@@ -150,19 +150,19 @@
       "assistant"
     ],
     "sessionState": {
-      "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e06-szFkCE/agent/sessions/-person-code-omp-desktop-m1-.dev-data-m1-e06-szFkCE-project/2026-09-21T18-19-20-006Z_01a0c531-a446-762e-abbe-d6036744926e.jsonl",
-      "sessionId": "01a0c531-a446-762e-abbe-d6036744926e",
+      "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e06-V5tJAI/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e06-V5tJAI-project--/2026-09-21T18-50-31-406Z_01a0c54e-326e-74ae-953a-6ea830a953ed.jsonl",
+      "sessionId": "01a0c54e-326e-74ae-953a-6ea830a953ed",
       "sessionName": "m1-e06-session"
     },
     "branchResult": {
       "text": "write the marker file",
       "cancelled": false
     },
-    "branchSessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e06-szFkCE/agent/sessions/-person-code-omp-desktop-m1-.dev-data-m1-e06-szFkCE-project/2026-09-21T18-19-22-582Z_01a0c531-ae56-72fd-8cc8-626ade5a1b1e.jsonl"
+    "branchSessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e06-V5tJAI/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e06-V5tJAI-project--/2026-09-21T18-50-34-021Z_01a0c54e-3ca5-70c4-aef8-734a612884e6.jsonl"
   },
   "limitations": [
     "Session naming/restore are verified over RPC only; desktop-side metadata mapping is M2/M4 work."
   ],
-  "finishedAt": "2026-09-21T18:19:22.650Z",
+  "finishedAt": "2026-09-21T18:50:34.099Z",
   "ok": true
 }

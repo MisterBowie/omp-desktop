@@ -1,0 +1,35 @@
+{
+  "note": "real capture, sanitized; subagent ran a real external program (tools/long-task.mjs) and the parent turn was stopped",
+  "subagentFrameTypes": [
+    "subagent_lifecycle",
+    "subagent_event",
+    "subagent_progress"
+  ],
+  "lifecycle": {
+    "type": "subagent_lifecycle",
+    "payload": {
+      "id": "M1Long",
+      "agent": "task",
+      "parentToolCallId": "call_fake_17_0",
+      "detached": true,
+      "agentSource": "bundled",
+      "status": "started",
+      "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-cancel-wWWVTl/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e11-cancel-wWWVTl-project--/2026-09-21T18-51-32-860Z_01a0c54f-227c-77c7-a3f8-37aca85ecfca/M1Long.jsonl",
+      "index": 0
+    }
+  },
+  "identity": {
+    "pidIsDistinctFromOmp": true,
+    "ppidEqualsOmp": true
+  },
+  "reclamationAfterParentAbort": {
+    "parentGoneAfterAbort": true,
+    "descendantGoneAfterAbort": true
+  },
+  "reclamationAfterTeardown": {
+    "parentGoneAfterTeardown": true,
+    "descendantGoneAfterTeardown": true
+  },
+  "subagentsStillRunningAfterParentStop": 0,
+  "reclaimedByExplicitProcessTreeKill": true
+}

@@ -1,0 +1,211 @@
+{
+  "experiment": "e11-subagent-permissions",
+  "startedAt": "2026-09-21T18:51:28.225Z",
+  "checks": [
+    {
+      "description": "deny: the subagent's write reaches the extension hook",
+      "ok": true,
+      "detail": "[{\"event\":\"tool-call-audit\",\"toolName\":\"task\",\"hasUI\":true,\"gated\":false},{\"event\":\"tool-call-audit\",\"toolName\":\"write\",\"hasUI\":true,\"gated\":true},{\"event\":\"gate\",\"toolName\":\"write\",\"target\":\"/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-FtCGub/project/subagent-deny.txt\",\"hasUI\":true,\"at\":1790016689092},{\"event\":\"gate-decision\",\"decision\":\"deny\",\"choice\":\"Deny\",\"at\":1790016689131}]"
+    },
+    {
+      "description": "deny: the dialog is raised for the subagent call",
+      "ok": true,
+      "detail": [
+        {
+          "id": "1588a118f103a87f",
+          "method": "select",
+          "title": "Approve write?"
+        }
+      ]
+    },
+    {
+      "description": "deny: the gate records the human decision",
+      "ok": true,
+      "detail": {
+        "event": "gate-decision",
+        "decision": "deny",
+        "choice": "Deny",
+        "at": 1790016689131
+      }
+    },
+    {
+      "description": "deny: the gate saw the subagent's concrete target",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-FtCGub/project/subagent-deny.txt"
+    },
+    {
+      "description": "deny: the subagent executed exactly nothing",
+      "ok": true
+    },
+    {
+      "description": "deny: the task tool itself ran under the hook",
+      "ok": true
+    },
+    {
+      "description": "deny: process group reaped",
+      "ok": true
+    },
+    {
+      "description": "allow: the subagent's write reaches the extension hook",
+      "ok": true,
+      "detail": "[{\"event\":\"tool-call-audit\",\"toolName\":\"task\",\"hasUI\":true,\"gated\":false},{\"event\":\"tool-call-audit\",\"toolName\":\"write\",\"hasUI\":true,\"gated\":true},{\"event\":\"gate\",\"toolName\":\"write\",\"target\":\"/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-QhYgpD/project/subagent-allow.txt\",\"hasUI\":true,\"at\":1790016691062},{\"event\":\"gate-decision\",\"decision\":\"allow\",\"choice\":\"Allow\",\"at\":1790016691069}]"
+    },
+    {
+      "description": "allow: the dialog is raised for the subagent call",
+      "ok": true,
+      "detail": [
+        {
+          "id": "1588a11add8b4127",
+          "method": "select",
+          "title": "Approve write?"
+        }
+      ]
+    },
+    {
+      "description": "allow: the gate records the human decision",
+      "ok": true,
+      "detail": {
+        "event": "gate-decision",
+        "decision": "allow",
+        "choice": "Allow",
+        "at": 1790016691069
+      }
+    },
+    {
+      "description": "allow: the gate saw the subagent's concrete target",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-QhYgpD/project/subagent-allow.txt"
+    },
+    {
+      "description": "allow: the subagent executed exactly once",
+      "ok": true
+    },
+    {
+      "description": "allow: the task tool itself ran under the hook",
+      "ok": true
+    },
+    {
+      "description": "allow: process group reaped",
+      "ok": true
+    },
+    {
+      "description": "C: the subagent started a real external program",
+      "ok": true,
+      "detail": {
+        "pid": 181840,
+        "ppid": 181723,
+        "descendantPid": 181847,
+        "argv": [
+          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-cancel-wWWVTl/project/subagent-identity.json"
+        ],
+        "startedAt": 1790016693128
+      }
+    },
+    {
+      "description": "C: the subagent's program is alive before abort",
+      "ok": true,
+      "detail": 181840
+    },
+    {
+      "description": "C: the subagent's descendant is alive before abort",
+      "ok": true,
+      "detail": 181847
+    },
+    {
+      "description": "C: subagent lifecycle frames are emitted for the child",
+      "ok": true,
+      "detail": [
+        "subagent_lifecycle",
+        "subagent_event",
+        "subagent_event",
+        "subagent_progress"
+      ]
+    },
+    {
+      "description": "C: the child is correlated to the parent's task call",
+      "ok": true,
+      "detail": "call_fake_17_0"
+    },
+    {
+      "description": "C: the parent stop is acknowledged and the session survives",
+      "ok": true
+    },
+    {
+      "description": "C: process group reaped",
+      "ok": true
+    },
+    {
+      "description": "C: an explicit process-tree kill reclaims the subagent's command tree",
+      "ok": true,
+      "detail": "parent 181840 child 181847"
+    },
+    {
+      "description": "D: the subagent's approval dialog is pending before abort",
+      "ok": true,
+      "detail": "Approve write?"
+    },
+    {
+      "description": "D: the pending subagent dialog is cancelled by targetId",
+      "ok": true,
+      "detail": {
+        "type": "extension_ui_request",
+        "id": "1588a11dde1c6567",
+        "method": "cancel",
+        "targetId": "1588a11dd91c6565"
+      }
+    },
+    {
+      "description": "D: the gate resolved without an approval",
+      "ok": true,
+      "detail": {
+        "event": "gate-decision",
+        "decision": "deny",
+        "choice": null,
+        "at": 1790016694136
+      }
+    },
+    {
+      "description": "D: no side effect from the cancelled subagent dialog",
+      "ok": true
+    },
+    {
+      "description": "D: session stays responsive",
+      "ok": true
+    },
+    {
+      "description": "D: process group reaped",
+      "ok": true
+    }
+  ],
+  "artifacts": {
+    "denyGateHasUI": true,
+    "allowGateHasUI": true,
+    "C-dialogCount": 1,
+    "C-reclamationAfterParentAbort": {
+      "parentGoneAfterAbort": true,
+      "descendantGoneAfterAbort": true
+    },
+    "C-subagentsStillRunningAfterParentStop": 0,
+    "C-proc": {
+      "ompProc": {
+        "pid": 181723,
+        "ppid": 181507,
+        "pgrp": 181723,
+        "session": 181723
+      },
+      "commandProc": null,
+      "childInOmpGroup": false
+    },
+    "C-reclamationAfterTeardown": {
+      "parentGoneAfterTeardown": true,
+      "descendantGoneAfterTeardown": true
+    }
+  },
+  "limitations": [
+    "The parent stop reclaimed the subagent's running command tree.",
+    "Subagent permission coverage is asserted for the `task` agent type driven by the local fake provider; other agent types and the M5 subagent UI are out of M1 scope.",
+    "Approval dialogs raised from a subagent are answered by this experiment; how the desktop routes them is M5 work."
+  ],
+  "finishedAt": "2026-09-21T18:51:35.248Z",
+  "ok": true
+}

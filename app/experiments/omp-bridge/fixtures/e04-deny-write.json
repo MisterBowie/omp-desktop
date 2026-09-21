@@ -3,15 +3,15 @@
   "gate": {
     "event": "gate",
     "toolName": "write",
-    "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-deny-write-uFklsj/project/guarded.txt",
+    "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-deny-write-qp7SGP/project/guarded.txt",
     "hasUI": true,
-    "at": 1790014743320
+    "at": 1790016607202
   },
   "decision": {
     "event": "gate-decision",
     "decision": "deny",
     "choice": "Deny",
-    "at": 1790014743337
+    "at": 1790016607216
   },
   "dialogs": [
     {

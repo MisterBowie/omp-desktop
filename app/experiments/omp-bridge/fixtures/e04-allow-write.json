@@ -3,15 +3,15 @@
   "gate": {
     "event": "gate",
     "toolName": "write",
-    "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-allow-write-AmhXpi/project/guarded.txt",
+    "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-allow-write-wWHra7/project/guarded.txt",
     "hasUI": true,
-    "at": 1790014744215
+    "at": 1790016608153
   },
   "decision": {
     "event": "gate-decision",
     "decision": "allow",
     "choice": "Allow",
-    "at": 1790014744231
+    "at": 1790016608174
   },
   "dialogs": [
     {
@@ -32,7 +32,7 @@
           }
         ],
         "details": {
-          "resolvedPath": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-allow-write-AmhXpi/project/guarded.txt"
+          "resolvedPath": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-allow-write-wWHra7/project/guarded.txt"
         }
       },
       "isError": false

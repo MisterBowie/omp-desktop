@@ -1,12 +1,12 @@
 {
   "experiment": "e08-host-tools",
-  "startedAt": "2026-09-21T18:19:29.947Z",
+  "startedAt": "2026-09-21T18:50:36.281Z",
   "checks": [
     {
       "description": "set_host_tools is accepted",
       "ok": true,
       "detail": {
-        "id": "req-531495c4",
+        "id": "req-b11c97e1",
         "type": "response",
         "command": "set_host_tools",
         "success": true,
@@ -28,7 +28,7 @@
       "description": "set_subagent_subscription(events) is accepted",
       "ok": true,
       "detail": {
-        "id": "req-b5dc0449",
+        "id": "req-1b8ca64b",
         "type": "response",
         "command": "set_subagent_subscription",
         "success": true,
@@ -96,8 +96,8 @@
       "ok": true,
       "detail": {
         "type": "host_tool_cancel",
-        "id": "158899effbc26fab",
-        "targetId": "158899eff8426faa"
+        "id": "1588a10ea461d99e",
+        "targetId": "1588a10ea161d99d"
       }
     },
     {
@@ -210,8 +210,8 @@
     "hostToolSeenByExtension": true,
     "hostToolCancelFrame": {
       "type": "host_tool_cancel",
-      "id": "158899effbc26fab",
-      "targetId": "158899eff8426faa"
+      "id": "1588a10ea461d99e",
+      "targetId": "1588a10ea161d99d"
     },
     "subagentSnapshot": [
       {
@@ -222,8 +222,8 @@
         "status": "running",
         "task": "Complete assignment thoroughly:\n\nreport the word ALPHA",
         "assignment": "report the word ALPHA",
-        "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e08-subagent-mCHRKA/agent/sessions/-person-code-omp-desktop-m1-.dev-data-m1-e08-subagent-mCHRKA-project/2026-09-21T18-20-12-845Z_01a0c532-72ad-72cf-b754-b88672302cce/M1Scout.jsonl",
-        "lastUpdate": 1790014813100,
+        "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e08-subagent-ZF4QV6/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e08-subagent-ZF4QV6-project--/2026-09-21T18-51-19-277Z_01a0c54e-ed6d-765e-b7f2-1a03ca8fa2da/M1Scout.jsonl",
+        "lastUpdate": 1790016679538,
         "parentToolCallId": "call_fake_4_0",
         "progress": {
           "index": 0,
@@ -260,6 +260,6 @@
     "The host tool also passed through the extension tool_call hook.",
     "The host-tool exchange is a real capture; the fake provider only supplies model turns."
   ],
-  "finishedAt": "2026-09-21T18:20:14.158Z",
+  "finishedAt": "2026-09-21T18:51:20.606Z",
   "ok": true
 }

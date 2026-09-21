@@ -1,0 +1,12 @@
+{
+  "note": "SYNTHETIC fault sample: stub experiments with dishonest exits, signals and result files",
+  "suiteExitCode": 1,
+  "rejectedLines": [
+    "running e91-pass-then-exit9.mjs ... REJECTED (exit code 9) — reported: PASS e91-pass-then-exit9: 1/1 checks",
+    "running e92-signalled.mjs ... REJECTED (killed by signal SIGKILL) — reported: PASS e92-signalled: 1/1 checks",
+    "running e93-no-result.mjs ... REJECTED (no result file) — reported: PASS e93-no-result: 1/1 checks",
+    "running e94-result-says-fail.mjs ... REJECTED (result file reports failure) — reported: PASS e94-result-says-fail: 1/1 checks",
+    "running e95-mismatched-result.mjs ... REJECTED (result file names \"e95-something-else\") — reported: PASS e95-mismatched-result: 1/1 checks",
+    "running e96-stalled.mjs ... REJECTED (timed out after 8000 ms) — reported: PASS e96-stalled: 1/1 checks"
+  ]
+}

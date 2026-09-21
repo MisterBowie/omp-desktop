@@ -1,0 +1,15 @@
+{
+  "note": "REAL capture, sanitized: a well-formed v2 chunk sequence sent to OMP's stdin, plus its reaction",
+  "chunkSequence": {
+    "frames": 1
+  },
+  "reactions": [
+    {
+      "type": "response",
+      "command": "rpc_chunk",
+      "success": false,
+      "error": "Unknown command: rpc_chunk"
+    }
+  ],
+  "oversizedSingleLineAccepted": true
+}

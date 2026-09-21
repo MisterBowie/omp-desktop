@@ -1,8 +1,8 @@
 # 001 OMP 接入传输路径
 
-状态:**已决定**(2026-09-22,M1 实验完成后,分支 `codex/m1-compatibility`)
+状态:**已决定**(2026-09-22,M1 实验完成后经独立复审返修 R1-R6,分支 `codex/m1-compatibility`)
 决定范围:M1;影响 T08-T11 及后续所有 OMP 会话实现
-证据:`docs/validation/M1-compatibility.md`、`app/experiments/omp-bridge/`(E01-E10 与 fixtures/results)
+证据:`docs/validation/M1-compatibility.md`、`app/experiments/omp-bridge/`(E01-E13 与 fixtures/results)
 
 ## 1. 决定
 
@@ -20,7 +20,9 @@ OMP 接入采用**独立子进程 + `--mode rpc-ui` 的 NDJSON JSON-RPC**,权限
 | 子代理 | `set_subagent_subscription(events)` + `get_subagents`,三类 `subagent_*` 帧 | E08:真实 `task` 调用产生 `subagent_lifecycle`/`subagent_progress`/`subagent_event`,快照含 `parentToolCallId` 与 `sessionFile` |
 | 会话 | 使用 OMP 原生会话,按 `sessionFile` 路径恢复 | E06:恢复不重放副作用、不重新审批;`branch` 生成新的原生会话文件 |
 | 配置隔离 | 每实例独立 config root + agent dir,剥离凭证与 steering 环境变量 | E07:子进程环境中合成 Key 与 `OMP_PROFILE`/`XDG_*` 均不存在 |
-| 取消 | `abort` + `abort_bash`,并必须附加进程组终止 | E05:`abort` 后运行中的命令进程仍存活,只有进程组终止才回收 |
+| 取消 | 先协议内 `abort`(`abort_bash` 备用),再拆桥接;不能只杀进程组 | E05(重做):`abort` 回收了真实运行的命令进程及其子进程;不先停止就杀桥接进程组会留下孤儿,因为命令运行在自己的 session/进程组 |
+| 子代理 | `task` 子代理的工具调用走同一条扩展审批链;其后台进程树必须在停止时显式终止 | E11:子代理的 `write` 触发同一个 `tool_call` 钩子(拒绝无副作用、批准只执行一次);父会话 `abort` 不回收 detached 子代理的运行中命令树,显式进程树终止可回收 |
+| 分片 | 只做**出站**重组;**不向 OMP 发送** `rpc_chunk` 分片 | E13:1.2 MB 提示触发了 5 片一组的真实 `rpc_chunk`;把分片写回 stdin 得到 `Unknown command: rpc_chunk`,而单行超限命令可直接接受 |
 | 桥接断开 | 不自行重连;断开即回收并由桌面重建 | E09:stdin EOF 与 stdout EPIPE 都会让 OMP 自行退出,进程组被回收 |
 | 版本协商 | 只协商 v2,并把 ready 的 `supportedProtocolVersions` 当参考信息 | E01:广告 `[1,2]`,但 `negotiate_protocol: 1` 被明确拒绝(`rpc-mode.ts:1176`) |
 | 进程监督 | 独立进程组,启动超时/崩溃/协议错误分类处理 | E09:ENOENT、退出码 3、永不 ready 分别归类,均被回收 |
@@ -37,14 +39,16 @@ OMP 接入采用**独立子进程 + `--mode rpc-ui` 的 NDJSON JSON-RPC**,权限
 
 ## 3. 必须随之实现的约束
 
-1. **停止路径不能只发协议命令**。E05 记录:在 rpc-ui(强制 `PI_NO_PTY=1`)下,`abort`+`abort_bash` 被确认,但运行中 bash 命令的操作系统进程仍存活;桥接层进程组终止可以回收。T09/T11 的停止实现必须包含此兜底,并据此判定"已终止"。
-2. **审批发生在执行前**,依赖扩展钩子的同步返回;任何"先执行后弹窗"的实现都违反已验证语义。
-3. **宿主工具与原生工具共用同一条钩子路径**(E08),因此宿主工具的执行也必须在桌面侧等待审批结果,不能因为"是自己注册的"就跳过。
-4. **取消会连带取消挂起问答**。E05 显示挂起对话会收到带 `targetId` 的 `cancel`,gate 解析为 deny;E08 显示未应答的宿主工具调用同样收到 `host_tool_cancel`。两者都必须按 `targetId`(不是帧自身的 `id`)匹配并清理 pending UI/宿主任务,而不是重复弹窗或继续执行。
-5. **渲染读取器必须有显式行长上限**。E09 显示非法 JSON 可恢复,但 Node `readline` 无行长限制;超长行必须以显式 `line-too-large` 错误并重新同步。
-6. **配置根与凭证始终显式注入**,不依赖用户全局 profile(E07)。
-7. **只协商 v2**。ready 广告 `supportedProtocolVersions: [1,2]`,但 v1 协商会被明确拒绝(E01,`rpc-mode.ts:1176`);桌面应要求该列表包含 2、协商 2,把 v1 请求当错误路径处理,而不是把它当作可回退选项。
-8. **桥接断开后按"重建"处理**。E09 证明 stdin EOF 与 stdout EPIPE 都会让 OMP 自行退出且进程组被回收,因此桌面不需要"重连同一进程",而应把断开视为会话结束并按需重建。
+1. **停止顺序:先协议内停止,再拆桥接**。E05 重做后记录:在顶层会话里 `abort` 就能回收真实运行的命令进程及其子进程;**不先停止就杀桥接进程组会留下孤儿**,因为命令进程有自己的 session/进程组(`/proc` 记账:命令的 `ppid` 是 OMP,但 `pgrp`/`session` 是它自己)。T09/T11 必须先 `abort`(必要时 `abort_bash`),确认回收后才允许结束进程组。
+2. **子代理的后台进程树必须显式终止**。E11 记录:父会话 `abort` 不会回收 detached 子代理正在运行的命令树,而显式的进程树终止可以回收;因此桌面停止会话时要一并处理子代理的进程树,不能假设父回合结束等于子任务结束。
+3. **审批发生在执行前**,依赖扩展钩子的同步返回;任何"先执行后弹窗"的实现都违反已验证语义。子代理的工具调用同样经过这条钩子(E11),因此审批路由不能只挂在父会话上。
+4. **宿主工具与原生工具共用同一条钩子路径**(E08),因此宿主工具的执行也必须在桌面侧等待审批结果,不能因为"是自己注册的"就跳过。
+5. **取消会连带取消挂起问答**。E05 显示挂起对话会收到带 `targetId` 的 `cancel`,gate 解析为 deny;E08 显示未应答的宿主工具调用同样收到 `host_tool_cancel`;E11 显示子代理的挂起对话也会被父会话的停止取消。这些都必须按 `targetId`(不是帧自身的 `id`)匹配并清理 pending UI/宿主任务,而不是重复弹窗或继续执行。
+6. **渲染读取器必须有显式行长上限**。E09 显示非法 JSON 可恢复,但 Node `readline` 无行长限制;超长行必须以显式 `line-too-large` 错误并重新同步。
+7. **配置与凭证按 HOME 边界隔离**。仅改 `PI_CONFIG_DIR` 不够,因为 OMP 还会在 home 下发现 `~/.agent`、`~/.agents`、`~/.omp` 等目录;E07 现在把子进程 `HOME` 指向运行目录内的合成家目录,并额外剥离 `CLAUDE_CONFIG_DIR`/`COPILOT_HOME`/`GH_CONFIG_DIR`/`MISE_DATA_DIR`/`OMP_WORKTREE_DIR`/`PI_CONFIG_FILES` 等重定向变量。
+8. **只协商 v2**。ready 广告 `supportedProtocolVersions: [1,2]`,但 v1 协商会被明确拒绝(E01,`rpc-mode.ts:1176`);桌面应要求该列表包含 2、协商 2,把 v1 请求当错误路径处理,而不是把它当作可回退选项。
+9. **不要向 OMP 发送分片帧**。E13 记录:`rpc_chunk` 只有出站方向被支持,把分片写回 stdin 会得到 `Unknown command: rpc_chunk`;超大命令应作为**单行**发送(实测 1.3 MB 单行被接受并完整送达模型),而 OMP 自身超过 1 MiB 的帧必须由桌面按 5 片/组那样的序列重组。
+10. **桥接断开后按"重建"处理**。E09 证明 stdin EOF 与 stdout EPIPE 都会让 OMP 自行退出且进程组被回收,因此桌面不需要"重连同一进程",而应把断开视为会话结束并按需重建。
 
 ## 4. 结论对应的 D 项
 

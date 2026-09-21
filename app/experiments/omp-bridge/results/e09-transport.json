@@ -1,6 +1,6 @@
 {
   "experiment": "e09-transport",
-  "startedAt": "2026-09-21T18:20:42.079Z",
+  "startedAt": "2026-09-21T18:51:20.642Z",
   "checks": [
     {
       "description": "split UTF-8 decodes to the original text",
@@ -122,7 +122,7 @@
       "ok": true,
       "detail": {
         "execPath": "<run>/fake-runtimes/banner.mjs",
-        "pid": 158567,
+        "pid": 181115,
         "ready": true,
         "frames": [
           "ready"
@@ -145,7 +145,7 @@
       "ok": true,
       "detail": {
         "execPath": "<run>/fake-runtimes/crash.mjs",
-        "pid": 158581,
+        "pid": 181122,
         "ready": false,
         "frames": [],
         "errors": [],
@@ -167,7 +167,7 @@
       "ok": true,
       "detail": {
         "execPath": "<run>/fake-runtimes/hang.mjs",
-        "pid": 158595,
+        "pid": 181129,
         "ready": false,
         "frames": [],
         "errors": [],
@@ -179,7 +179,7 @@
     {
       "description": "a never-ready runtime is reclaimed rather than left running",
       "ok": true,
-      "detail": "pid 158595"
+      "detail": "pid 181129"
     },
     {
       "description": "a missing executable fails fast as a spawn error, not a timeout",
@@ -187,13 +187,13 @@
       "detail": {
         "threw": true,
         "code": "ENOENT",
-        "message": "spawn /home/vv/person/code/omp-desktop-m1/.dev-data/m1/e09-cXHt4B/fake-runtimes/definitely-not-installed-omp ENOENT"
+        "message": "spawn /home/vv/person/code/omp-desktop-m1/.dev-data/m1/e09-ckNdk3/fake-runtimes/definitely-not-installed-omp ENOENT"
       }
     },
     {
       "description": "stdin EOF is injected into a live session",
       "ok": true,
-      "detail": 158627
+      "detail": 181172
     },
     {
       "description": "OMP exits by itself after stdin EOF (no orphan idle process)",
@@ -207,7 +207,7 @@
     {
       "description": "stdout consumer is removed from a live session",
       "ok": true,
-      "detail": 158697
+      "detail": 181237
     },
     {
       "description": "OMP shuts down instead of spinning after the reader disappears",
@@ -223,7 +223,7 @@
     "missingExecutableProbe": {
       "threw": true,
       "code": "ENOENT",
-      "message": "spawn /home/vv/person/code/omp-desktop-m1/.dev-data/m1/e09-cXHt4B/fake-runtimes/definitely-not-installed-omp ENOENT"
+      "message": "spawn /home/vv/person/code/omp-desktop-m1/.dev-data/m1/e09-ckNdk3/fake-runtimes/definitely-not-installed-omp ENOENT"
     },
     "stdinEofStderr": "",
     "promptWrittenAfterStdoutDrop": true,
@@ -234,6 +234,6 @@
     "Line-cap enforcement is specified by lib/ndjson.mjs; the production reader is M2/T09 and must adopt an explicit cap (Node's readline has no line limit).",
     "Windows/macOS process reclamation is not covered here."
   ],
-  "finishedAt": "2026-09-21T18:20:47.544Z",
+  "finishedAt": "2026-09-21T18:51:26.196Z",
   "ok": true
 }

@@ -1,0 +1,28 @@
+{
+  "note": "real capture, sanitized; the subagent's write is denied before execution",
+  "gate": {
+    "event": "gate",
+    "toolName": "write",
+    "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-FtCGub/project/subagent-deny.txt",
+    "hasUI": true,
+    "at": 1790016689092
+  },
+  "decision": {
+    "event": "gate-decision",
+    "decision": "deny",
+    "choice": "Deny",
+    "at": 1790016689131
+  },
+  "dialogs": [
+    {
+      "id": "1588a118f103a87f",
+      "method": "select",
+      "title": "Approve write?"
+    }
+  ],
+  "toolExecutionStarts": [
+    "task",
+    "write"
+  ],
+  "sideEffectCreated": false
+}

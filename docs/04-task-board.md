@@ -2,7 +2,7 @@
 
 状态：`待开始`、`进行中`、`已完成`、`阻塞`。只有附验证证据才能将实现任务标为已完成。
 
-当前交付阶段：M1 兼容性实验与路径定案完成（T04-T07），证据见 `docs/validation/M1-compatibility.md`，决策见 `docs/decisions/001-omp-transport.md`。下一阶段 M2（T08-T10）。
+当前交付阶段：M1 兼容性实验与路径定案完成（T04-T07），并已按独立复审 R1-R6 返修（见 `docs/validation/M1-compatibility.md` §8）。证据见 `docs/validation/M1-compatibility.md`，决策见 `docs/decisions/001-omp-transport.md`。下一阶段 M2（T08-T10）。
 
 ## 准备工作
 
@@ -113,11 +113,11 @@ T23 不阻塞仅面向 macOS arm64 的首次交付，但未通过前不能宣称
 基线 SHA / 本次测试代码状态：同上
 目标与可观察行为：取消运行中的工具与挂起对话，验证宿主工具往返/取消与子代理事件
 实际修改文件：app/experiments/omp-bridge/（e05、e08、fixtures/e05、e08-host-tool-cancel.json、e08-subagent-events.json）
-验证命令及结果：node run-all.mjs → e05 17/17、e08 23/23 通过
+验证命令及结果：node run-all.mjs → e05 28/28、e08 23/23、e11 28/28 通过（复审后重跑：全套 13/13、326/326、退出码 0）
 代表性用户路径：执行中停止；审批弹窗中停止；宿主工具回灌结果；委派子代理并观察进度
-已确认的接口 / 数据归属：挂起对话与宿主工具调用都会被取消（均按 targetId 关联）；abort/abort_bash 不回收命令进程，需进程组终止兜底；子代理三类帧与存活期快照可用
-未完成项及原因：子代理在父回合停止后的存活语义未测（T17）
-风险或需要用户决定的事项：停止路径必须包含进程组终止，否则会留下孤儿进程
+已确认的接口 / 数据归属：挂起对话与宿主工具调用都会被取消（均按 targetId 关联）；子代理三类帧与存活期快照可用。**复审 R1 修正**：旧结论"abort/abort_bash 不回收命令进程"已撤回——旧测试的命令（`echo $$; exec sleep 300`）从未运行（`command not found: exec`，退出码 127）。用真实外部程序重做后：顶层会话 `abort` 即可回收命令进程及其子进程；不先停止就杀桥接进程组会留下孤儿（命令有自己的 session/进程组）；子代理（detached）的运行中命令树需显式终止（E11）
+未完成项及原因：子代理在父回合停止后的存活语义已测到"不回收"，其恢复/重启边界留待 T17
+风险或需要用户决定的事项：停止顺序必须为"先协议内停止，再拆桥接"；子代理后台进程树必须显式终止，否则会留下孤儿进程
 下一任务：T07
 证据文档：docs/validation/M1-compatibility.md
 ```
@@ -127,12 +127,12 @@ T23 不阻塞仅面向 macOS arm64 的首次交付，但未通过前不能宣称
 状态：已完成
 基线 SHA / 本次测试代码状态：同上
 目标与可观察行为：原生会话的新建/命名/恢复/分支，配置与凭证隔离，选定主接入路径
-实际修改文件：app/experiments/omp-bridge/（e06、e07、e09）、docs/decisions/001-omp-transport.md、docs/00-scope-and-decisions.md
-验证命令及结果：node run-all.mjs → e06 23/23、e07 23/23、e09 30/30 通过；总计 10/10 实验、224/224 检查、退出码 0
+实际修改文件：app/experiments/omp-bridge/（e06、e07、e09、e12、e13、lib/base.mjs、lib/ndjson.mjs）、docs/decisions/001-omp-transport.md、docs/00-scope-and-decisions.md
+验证命令及结果：node run-all.mjs → e06 23/23、e07 36/36、e09 30/30、e13 34/34 通过；总计 13/13 实验、326/326 检查、退出码 0
 代表性用户路径：重启后恢复会话；切换项目不串数据；发送含中文与 emoji 的长消息；桌面崩溃后不留孤儿进程
 已确认的接口 / 数据归属：原生会话归 OMP；桌面只存索引与投影；rpc-ui 为唯一提供 ask 工具的模式；桥接断开时 OMP 自退出并被回收
 未完成项及原因：MCP 工具未进入模型工具表（T19）；macOS 进程终止未验证（T23）
-风险或需要用户决定的事项：接入路径已定案，M2 必须按决策文档 §3 的八条约束实现
+风险或需要用户决定的事项：接入路径已定案，M2 必须按决策文档 §3 的十条约束实现
 下一任务：T08
 证据文档：docs/validation/M1-compatibility.md、docs/decisions/001-omp-transport.md
 ```

@@ -1,0 +1,21 @@
+{
+  "note": "real capture, sanitized; the subagent's dialog was deliberately left unanswered",
+  "dialog": {
+    "id": "1588a11dd91c6565",
+    "method": "select",
+    "title": "Approve write?"
+  },
+  "cancel": {
+    "type": "extension_ui_request",
+    "id": "1588a11dde1c6567",
+    "method": "cancel",
+    "targetId": "1588a11dd91c6565"
+  },
+  "decision": {
+    "event": "gate-decision",
+    "decision": "deny",
+    "choice": null,
+    "at": 1790016694136
+  },
+  "sideEffectCreated": false
+}

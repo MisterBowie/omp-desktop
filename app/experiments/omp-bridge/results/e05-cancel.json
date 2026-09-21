@@ -1,6 +1,6 @@
 {
   "experiment": "e05-cancel",
-  "startedAt": "2026-09-21T18:19:06.172Z",
+  "startedAt": "2026-09-21T18:50:10.218Z",
   "checks": [
     {
       "description": "bash tool started before abort",
@@ -8,32 +8,55 @@
       "detail": "bash"
     },
     {
-      "description": "the command wrote its own PID while running",
+      "description": "the external program recorded its own identity",
       "ok": true,
-      "detail": 156008
+      "detail": {
+        "pid": 179277,
+        "ppid": 179167,
+        "descendantPid": 179284,
+        "argv": [
+          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e05-abort-tool-Qtz5z1/project/identity.json"
+        ],
+        "startedAt": 1790016611095
+      }
     },
     {
-      "description": "the command process is alive before abort",
+      "description": "tracked pid differs from the OMP process pid",
       "ok": true,
-      "detail": 156008
+      "detail": "179277 vs omp 179167"
+    },
+    {
+      "description": "tracked pid differs from the harness pid",
+      "ok": true,
+      "detail": "179277 vs harness 179159"
+    },
+    {
+      "description": "the program spawned a distinct descendant",
+      "ok": true,
+      "detail": 179284
+    },
+    {
+      "description": "the command actually started running (no shell error)",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "description": "the program is alive before abort",
+      "ok": true,
+      "detail": 179277
+    },
+    {
+      "description": "the descendant is alive before abort",
+      "ok": true,
+      "detail": 179284
     },
     {
       "description": "abort is acknowledged",
       "ok": true,
       "detail": {
-        "id": "req-02e987f3",
+        "id": "req-68cf6b85",
         "type": "response",
         "command": "abort",
-        "success": true
-      }
-    },
-    {
-      "description": "abort_bash is acknowledged",
-      "ok": true,
-      "detail": {
-        "id": "req-e69738d2",
-        "type": "response",
-        "command": "abort_bash",
         "success": true
       }
     },
@@ -44,6 +67,16 @@
     {
       "description": "session stayed responsive after abort",
       "ok": true
+    },
+    {
+      "description": "abort_bash is acknowledged",
+      "ok": true,
+      "detail": {
+        "id": "req-efb4ad5f",
+        "type": "response",
+        "command": "abort_bash",
+        "success": true
+      }
     },
     {
       "description": "abort scenario: process group reaped",
@@ -59,9 +92,9 @@
       "ok": true,
       "detail": {
         "type": "extension_ui_request",
-        "id": "158899bb59f78379",
+        "id": "1588a0cdd130b355",
         "method": "cancel",
-        "targetId": "158899bb54378378"
+        "targetId": "1588a0cdcd30b354"
       }
     },
     {
@@ -71,7 +104,7 @@
         "event": "gate-decision",
         "decision": "deny",
         "choice": null,
-        "at": 1790014758247
+        "at": 1790016612164
       }
     },
     {
@@ -83,33 +116,129 @@
       "ok": true
     },
     {
-      "description": "command PID observable before bridge kill",
+      "description": "the external program recorded its identity before the bridge kill",
       "ok": true,
-      "detail": 156315
+      "detail": {
+        "pid": 179494,
+        "ppid": 179384,
+        "descendantPid": 179501,
+        "argv": [
+          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e05-bridge-kill-NFWq3U/project/identity.json"
+        ],
+        "startedAt": 1790016613139
+      }
     },
     {
-      "description": "command alive before bridge kill",
+      "description": "the command process is alive before the bridge kill",
       "ok": true,
-      "detail": 156315
+      "detail": 179494
+    },
+    {
+      "description": "the descendant is alive before the bridge kill",
+      "ok": true,
+      "detail": 179501
     },
     {
       "description": "bridge process group reaped on kill",
       "ok": true
     },
     {
-      "description": "no orphan command process survives the bridge kill",
+      "description": "the bridge kill was observed before any harness-side cleanup",
+      "ok": true
+    },
+    {
+      "description": "scenario 4: the command is running before the orderly stop",
       "ok": true,
-      "detail": "pid 156315"
+      "detail": {
+        "pid": 179790,
+        "ppid": 179680,
+        "descendantPid": 179797,
+        "argv": [
+          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e05-orderly-5l4ny1/project/identity.json"
+        ],
+        "startedAt": 1790016630476
+      }
+    },
+    {
+      "description": "scenario 4: the in-protocol stop reclaims the command before teardown",
+      "ok": true,
+      "detail": "pid 179790"
+    },
+    {
+      "description": "scenario 4: the descendant is reclaimed by the in-protocol stop",
+      "ok": true,
+      "detail": "descendant 179797"
+    },
+    {
+      "description": "scenario 4: bridge teardown then finds nothing to orphan",
+      "ok": true
+    },
+    {
+      "description": "scenario 4: nothing survived the orderly stop",
+      "ok": true
     }
   ],
   "artifacts": {
-    "terminatedByPlainAbort": false,
-    "terminatedByAbortBash": false
+    "identity": {
+      "pid": 179277,
+      "ppid": 179167,
+      "descendantPid": 179284,
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e05-abort-tool-Qtz5z1/project/identity.json"
+      ],
+      "startedAt": 1790016611095
+    },
+    "ompPid": 179167,
+    "ompProc": {
+      "pid": 179384,
+      "ppid": 179159,
+      "pgrp": 179384,
+      "session": 179384,
+      "tty": 0,
+      "tpgid": -1
+    },
+    "commandProc": {
+      "pid": 179494,
+      "ppid": 179384,
+      "pgrp": 179494,
+      "session": 179494,
+      "tty": 0,
+      "tpgid": -1
+    },
+    "descendantProc": {
+      "pid": 179284,
+      "ppid": 179277,
+      "pgrp": 179277,
+      "session": 179277,
+      "tty": 0,
+      "tpgid": -1
+    },
+    "aliveBeforeStop": {
+      "parent": true,
+      "descendant": true
+    },
+    "parentGoneAfterAbort": true,
+    "descendantGoneAfterAbort": true,
+    "parentGoneAfterAbortBash": true,
+    "descendantGoneAfterAbortBash": true,
+    "harnessHadToCleanUpAfterAbort": false,
+    "commandRunsInOmpProcessGroup": false,
+    "bridgeKillProcessReclamation": {
+      "parentGone": false,
+      "descendantGone": false
+    },
+    "harnessCleanedUpAfterBridgeKill": true,
+    "orderlyStopReclamation": {
+      "parentGone": true,
+      "descendantGone": true
+    }
   },
   "limitations": [
-    "In-protocol stop (abort + abort_bash) did NOT reclaim the OS process of the running command in rpc-ui mode; the desktop stop path needs a process-tree termination fallback, which the bridge-level kill provides (scenario 3).",
+    "In-protocol stop (abort + abort_bash) reclaimed the running command process in this environment.",
+    "The descendant of the running command was reclaimed together with it.",
+    "Killing the bridge process group did NOT reclaim the running command tree: with rpc-ui the command runs in its own process group, so a bridge-level kill alone leaves orphans. The desktop must stop the session (abort/abort_bash) before tearing the bridge down; see scenario 4 for the working order.",
     "Process termination is asserted on Linux via a self-written PID; macOS/Windows semantics are not covered here."
   ],
-  "finishedAt": "2026-09-21T18:19:19.239Z",
+  "finishedAt": "2026-09-21T18:50:30.613Z",
   "ok": true
 }

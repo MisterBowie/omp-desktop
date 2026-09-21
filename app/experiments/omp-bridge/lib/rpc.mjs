@@ -17,6 +17,7 @@ import {
   makeConfigDirName,
   terminateTree,
   safeRmConfigRoot,
+  safeRmSyntheticHome,
 } from "./base.mjs";
 
 export class OmpRpc {
@@ -42,17 +43,21 @@ export class OmpRpc {
     cwd,
     extraEnv = {},
     readyTimeoutMs = 30_000,
+    /** Test seam: launch this executable instead of the pinned source launcher. */
+    launcher: launcherOverride = null,
   }) {
     const rpc = new OmpRpc();
-    await rpc.#start({ repoRoot, runRoot, mode, args, cwd, extraEnv, readyTimeoutMs });
+    await rpc.#start({ repoRoot, runRoot, mode, args, cwd, extraEnv, readyTimeoutMs, launcherOverride });
     return rpc;
   }
 
-  async #start({ repoRoot, runRoot, mode, args, cwd, extraEnv, readyTimeoutMs }) {
-    const launcher = findPinnedLauncher(repoRoot);
+  async #start({ repoRoot, runRoot, mode, args, cwd, extraEnv, readyTimeoutMs, launcherOverride }) {
+    const launcher = launcherOverride ?? findPinnedLauncher(repoRoot);
     const configDirName = makeConfigDirName();
-    const { env, configRoot } = buildIsolatedEnv({ repoRoot, runRoot, configDirName });
+    const { env, configRoot, home } = buildIsolatedEnv({ repoRoot, runRoot, configDirName });
     this.configRoot = configRoot;
+    this.home = home;
+    this.runRoot = runRoot;
     this.agentDir = join(runRoot, "agent");
     this.launchDir = join(runRoot, "dev-cwd");
 
@@ -72,7 +77,15 @@ export class OmpRpc {
       const t = line.trim();
       if (!t) return;
       try {
-        this.frames.push(JSON.parse(t));
+        const parsed = JSON.parse(t);
+        // Structural validation: a JSON `null`/scalar has no `.type`, and any
+        // predicate touching `f.type` would throw inside this handler, which
+        // would escape the await in #start and skip process cleanup.
+        if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed) || typeof parsed.type !== "string") {
+          this.frames.push({ type: "__invalid__", raw: t.slice(0, 400) });
+          return;
+        }
+        this.frames.push(parsed);
       } catch {
         this.frames.push({ type: "__unparsed__", raw: t.slice(0, 400) });
       }
@@ -88,14 +101,21 @@ export class OmpRpc {
     this.#exit = new Promise((res) => this.#child.once("exit", (code, signal) => res({ code, signal })));
     this.#child.on("error", onErr("child"));
 
-    const ready = await this.waitFor((f) => f.type === "ready", readyTimeoutMs);
-    if (!ready) {
-      const reason = this.#streamError ?? (this.stderr ? this.stderr.slice(-300) : "no ready frame");
+    // Every failure path below (spawn error, stream error, malformed frames,
+    // timeout, predicate throw) must end in bounded teardown: the child runs
+    // detached, so an escaping exception would leave it alive.
+    try {
+      const ready = await this.waitFor((f) => f.type === "ready", readyTimeoutMs);
+      if (!ready) {
+        const reason = this.#streamError ?? (this.stderr ? this.stderr.slice(-300) : "no ready frame");
+        throw new Error(`OMP did not become ready: ${reason}`);
+      }
+      this.readyFrame = ready;
+      return ready;
+    } catch (error) {
       await this.stop();
-      throw new Error(`OMP did not become ready: ${reason}`);
+      throw error;
     }
-    this.readyFrame = ready;
-    return ready;
   }
 
   get streamError() {
@@ -157,8 +177,11 @@ export class OmpRpc {
     const reaped = await terminateTree(this.#child, timeoutMs);
     this.reaped = reaped;
     this.#child = null;
-    // Remove the isolated config root this client created (never the user's ~/.omp).
-    if (!this.keepIsolation) safeRmConfigRoot(this.configRoot);
+    // Remove what this client created (never the user's ~/.omp or real home).
+    if (!this.keepIsolation) {
+      safeRmConfigRoot(this.configRoot);
+      safeRmSyntheticHome(this.home, this.runRoot);
+    }
     return reaped;
   }
 

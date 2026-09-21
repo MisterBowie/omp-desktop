@@ -1,0 +1,359 @@
+{
+  "experiment": "e13-chunking",
+  "startedAt": "2026-09-21T18:51:45.991Z",
+  "checks": [
+    {
+      "description": "A: the oversized prompt is accepted",
+      "ok": true
+    },
+    {
+      "description": "A: OMP splits the resulting logical frame into rpc_chunk frames",
+      "ok": true,
+      "detail": "10 chunks"
+    },
+    {
+      "description": "A: every chunk sequence is complete (declared count == observed chunks)",
+      "ok": true,
+      "detail": {
+        "rpc-1": 5,
+        "rpc-2": 5
+      }
+    },
+    {
+      "description": "A: chunk metadata is self-consistent",
+      "ok": true,
+      "detail": {
+        "count": 5,
+        "byteLength": 1200150,
+        "limit": 1048576
+      }
+    },
+    {
+      "description": "A: each physical chunk stays within the 1 MiB frame limit",
+      "ok": true,
+      "detail": 349617
+    },
+    {
+      "description": "A: each chunk payload is within the 256 KiB payload limit",
+      "ok": true,
+      "detail": 262144
+    },
+    {
+      "description": "A: reassembly reports no decoder errors",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "description": "A: exactly the chunked frames are held back until complete",
+      "ok": true,
+      "detail": {
+        "chunks": 10,
+        "frames": 18
+      }
+    },
+    {
+      "description": "A: a reassembled frame carries the oversized payload marker",
+      "ok": true,
+      "detail": "message_start"
+    },
+    {
+      "description": "A: the reassembled frame exceeds the single-frame limit",
+      "ok": true,
+      "detail": 1200150
+    },
+    {
+      "description": "A: the reassembled payload is byte-complete",
+      "ok": true,
+      "detail": "1200150 chars, expected payload 1200015"
+    },
+    {
+      "description": "A: no chunk frame is ever surfaced as a logical frame",
+      "ok": true
+    },
+    {
+      "description": "A: process group reaped",
+      "ok": true
+    },
+    {
+      "description": "B: a chunked inbound command is rejected, not silently accepted",
+      "ok": true,
+      "detail": [
+        "Unknown command: rpc_chunk"
+      ]
+    },
+    {
+      "description": "B: no reassembled response is produced for the chunked command",
+      "ok": true
+    },
+    {
+      "description": "B: the session stays usable after the rejected chunk sequence",
+      "ok": true
+    },
+    {
+      "description": "B: an oversized single-line command is accepted",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "description": "B: the oversized command reaches the model intact",
+      "ok": true
+    },
+    {
+      "description": "B: process group reaped",
+      "ok": true
+    },
+    {
+      "description": "C: encoder produces a multi-chunk sequence for a >1 MiB frame",
+      "ok": true,
+      "detail": 5
+    },
+    {
+      "description": "C: a well-formed sequence reassembles exactly once",
+      "ok": true
+    },
+    {
+      "description": "C: reassembled payload matches the source frame",
+      "ok": true
+    },
+    {
+      "description": "C: every corrupted sequence reports at least one decoder error",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "description": "C: no corrupted sequence yields a frame with wrong content",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "description": "C: a missing chunk cannot complete a frame",
+      "ok": true,
+      "detail": {
+        "name": "missing middle chunk",
+        "frames": [],
+        "frameCount": 0,
+        "errors": [
+          {
+            "kind": "sequence-mismatch",
+            "message": "rpc chunk sequence mismatch"
+          },
+          {
+            "kind": "sequence-mismatch",
+            "message": "rpc chunk sequence mismatch"
+          },
+          {
+            "kind": "sequence-mismatch",
+            "message": "rpc chunk sequence mismatch"
+          }
+        ]
+      }
+    },
+    {
+      "description": "C: metadata and limit violations yield no frame at all",
+      "ok": true,
+      "detail": [
+        "duplicated chunk:1",
+        "sequence interrupted by a normal frame:1"
+      ]
+    },
+    {
+      "description": "C: a sequence interrupted by a normal frame reports the interruption",
+      "ok": true,
+      "detail": [
+        {
+          "kind": "interrupted",
+          "message": "rpc chunk sequence interrupted"
+        }
+      ]
+    },
+    {
+      "description": "C: a missing chunk surfaces as a sequence mismatch on the next chunk",
+      "ok": true,
+      "detail": [
+        {
+          "kind": "sequence-mismatch",
+          "message": "rpc chunk sequence mismatch"
+        },
+        {
+          "kind": "sequence-mismatch",
+          "message": "rpc chunk sequence mismatch"
+        },
+        {
+          "kind": "sequence-mismatch",
+          "message": "rpc chunk sequence mismatch"
+        }
+      ]
+    },
+    {
+      "description": "C: a duplicated chunk is reported as a sequence mismatch",
+      "ok": true,
+      "detail": [
+        {
+          "kind": "sequence-mismatch",
+          "message": "rpc chunk sequence mismatch"
+        }
+      ]
+    },
+    {
+      "description": "C: out-of-order chunks are reported as a sequence mismatch",
+      "ok": true,
+      "detail": [
+        {
+          "kind": "sequence-mismatch",
+          "message": "rpc chunk sequence mismatch"
+        },
+        {
+          "kind": "sequence-mismatch",
+          "message": "rpc chunk sequence mismatch"
+        },
+        {
+          "kind": "sequence-mismatch",
+          "message": "rpc chunk sequence mismatch"
+        }
+      ]
+    },
+    {
+      "description": "C: invalid metadata is reported as such",
+      "ok": true,
+      "detail": [
+        {
+          "kind": "invalid-metadata",
+          "message": "invalid rpc chunk metadata"
+        },
+        {
+          "kind": "invalid-metadata",
+          "message": "invalid rpc chunk metadata"
+        },
+        {
+          "kind": "invalid-metadata",
+          "message": "invalid rpc chunk metadata"
+        },
+        {
+          "kind": "invalid-metadata",
+          "message": "invalid rpc chunk metadata"
+        },
+        {
+          "kind": "invalid-metadata",
+          "message": "invalid rpc chunk metadata"
+        }
+      ]
+    },
+    {
+      "description": "C: the size limits are enforced on both ends",
+      "ok": true,
+      "detail": [
+        [
+          {
+            "kind": "invalid-metadata",
+            "message": "invalid rpc chunk metadata"
+          },
+          {
+            "kind": "invalid-metadata",
+            "message": "invalid rpc chunk metadata"
+          },
+          {
+            "kind": "invalid-metadata",
+            "message": "invalid rpc chunk metadata"
+          },
+          {
+            "kind": "invalid-metadata",
+            "message": "invalid rpc chunk metadata"
+          },
+          {
+            "kind": "invalid-metadata",
+            "message": "invalid rpc chunk metadata"
+          }
+        ],
+        [
+          {
+            "kind": "invalid-metadata",
+            "message": "invalid rpc chunk metadata"
+          },
+          {
+            "kind": "invalid-metadata",
+            "message": "invalid rpc chunk metadata"
+          },
+          {
+            "kind": "invalid-metadata",
+            "message": "invalid rpc chunk metadata"
+          },
+          {
+            "kind": "invalid-metadata",
+            "message": "invalid rpc chunk metadata"
+          },
+          {
+            "kind": "invalid-metadata",
+            "message": "invalid rpc chunk metadata"
+          }
+        ]
+      ]
+    },
+    {
+      "description": "C: non-base64 payloads are rejected",
+      "ok": true,
+      "detail": [
+        {
+          "kind": "invalid-data",
+          "message": "invalid rpc chunk data"
+        },
+        {
+          "kind": "sequence-mismatch",
+          "message": "rpc chunk sequence mismatch"
+        },
+        {
+          "kind": "sequence-mismatch",
+          "message": "rpc chunk sequence mismatch"
+        },
+        {
+          "kind": "sequence-mismatch",
+          "message": "rpc chunk sequence mismatch"
+        }
+      ]
+    },
+    {
+      "description": "C: an oversized chunk payload is rejected",
+      "ok": true,
+      "detail": [
+        {
+          "kind": "payload-too-large",
+          "message": "rpc chunk payload exceeds the transport limit"
+        },
+        {
+          "kind": "sequence-mismatch",
+          "message": "rpc chunk sequence mismatch"
+        },
+        {
+          "kind": "sequence-mismatch",
+          "message": "rpc chunk sequence mismatch"
+        },
+        {
+          "kind": "sequence-mismatch",
+          "message": "rpc chunk sequence mismatch"
+        }
+      ]
+    }
+  ],
+  "artifacts": {
+    "A-reassembledFrameType": "message_start",
+    "A-reassembledBytes": 1200150,
+    "C-caseVerdicts": [
+      "missing middle chunk: sequence-mismatch,sequence-mismatch,sequence-mismatch",
+      "duplicated chunk: sequence-mismatch",
+      "out-of-order chunks: sequence-mismatch,sequence-mismatch,sequence-mismatch",
+      "sequence interrupted by a normal frame: interrupted",
+      "count below 2: invalid-metadata,invalid-metadata,invalid-metadata,invalid-metadata,invalid-metadata",
+      "byteLength below the frame limit: invalid-metadata,invalid-metadata,invalid-metadata,invalid-metadata,invalid-metadata",
+      "byteLength beyond the reassembly ceiling: invalid-metadata,invalid-metadata,invalid-metadata,invalid-metadata,invalid-metadata",
+      "chunkId mismatch: sequence-mismatch,sequence-mismatch,sequence-mismatch,sequence-mismatch",
+      "non-base64 payload: invalid-data,sequence-mismatch,sequence-mismatch,sequence-mismatch",
+      "oversized chunk payload: payload-too-large,sequence-mismatch,sequence-mismatch,sequence-mismatch",
+      "declared length longer than the payload: length-mismatch"
+    ]
+  },
+  "limitations": [
+    "The decoder is a faithful port of the pinned implementation (same constants and rejection rules); the capture in fixture A and the reactions in fixture B are real, the corrupted sequences in C are synthetic.",
+    "Chunking is verified for one deterministic real trigger (an oversized prompt whose echoed message frame exceeds 1 MiB); other large-frame producers are not enumerated in M1."
+  ],
+  "finishedAt": "2026-09-21T18:51:52.383Z",
+  "ok": true
+}

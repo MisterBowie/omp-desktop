@@ -1,0 +1,24 @@
+{
+  "note": "real capture, sanitized; subagent driven by the local fake provider, gate answer synthetic",
+  "gate": {
+    "event": "gate",
+    "toolName": "write",
+    "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-QhYgpD/project/subagent-allow.txt",
+    "hasUI": true,
+    "at": 1790016691062
+  },
+  "decision": {
+    "event": "gate-decision",
+    "decision": "allow",
+    "choice": "Allow",
+    "at": 1790016691069
+  },
+  "dialogs": [
+    {
+      "id": "1588a11add8b4127",
+      "method": "select",
+      "title": "Approve write?"
+    }
+  ],
+  "subagentFrames": []
+}

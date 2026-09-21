@@ -50,6 +50,29 @@ const evidence = await runExperiment("e07-isolation", async (ctx) => {
   const projectDir = join(root, "project");
   mkdirSync(join(projectDir, ".omp", "rules"), { recursive: true });
 
+  // --- isolation controls ---------------------------------------------------
+  // (a) allowed: config under this run's synthetic home, which is what the
+  //     child's HOME points at;
+  // (b) forbidden: an identically-shaped config tree in a decoy home that is
+  //     NOT the child's HOME — it stands in for the real user's global config
+  //     without ever reading or writing the real one.
+  const HOME_RULE = "M1-HOME-RULE-MARKER-3b41";
+  const DECOY_RULE = "M1-DECOY-RULE-MARKER-9d02";
+  const syntheticHome = join(runRoot, "home");
+  const decoyHome = join(root, "decoy-home");
+  mkdirSync(join(syntheticHome, ".agent", "rules"), { recursive: true });
+  mkdirSync(join(syntheticHome, ".agents", "skills", "m1-skill"), { recursive: true });
+  mkdirSync(join(decoyHome, ".agent", "rules"), { recursive: true });
+  mkdirSync(join(decoyHome, ".agents", "skills", "decoy-skill"), { recursive: true });
+  writeFileSync(join(syntheticHome, ".agent", "rules", "home-rule.md"),
+    `---\ndescription: synthetic home rule\nalwaysApply: true\n---\n# synthetic home rule\n\nAlways mention ${HOME_RULE} in every reply.\n`);
+  writeFileSync(join(decoyHome, ".agent", "rules", "decoy-rule.md"),
+    `---\ndescription: decoy home rule\nalwaysApply: true\n---\n# decoy home rule\n\nAlways mention ${DECOY_RULE} in every reply.\n`);
+  writeFileSync(join(syntheticHome, ".agents", "skills", "m1-skill", "SKILL.md"),
+    "---\nname: m1-skill\ndescription: Marker skill proving skill discovery is scoped to this run.\n---\n\n# M1 skill\n");
+  writeFileSync(join(decoyHome, ".agents", "skills", "decoy-skill", "SKILL.md"),
+    "---\nname: decoy-skill\ndescription: DECOY-SKILL-MARKER-7c88 must never be discoverable.\n---\n\n# decoy skill\n");
+
   // Rules: one user-level rule in the isolated agent dir, one project-level
   // rule in the isolated cwd. Both must be picked up, which proves discovery
   // reads this run's roots rather than the user's own config.
@@ -112,13 +135,10 @@ process.stdin.resume();
 `);
 
   const userOmp = join(homedir(), ".omp");
-  ctx.note("userOmpExists", existsSync(userOmp));
-  const userModelCfg = join(userOmp, "agent", "models.yml");
-  ctx.note("userOwnModelsYmlExists", existsSync(userModelCfg));
-  const userOwnModelIds = existsSync(userModelCfg)
-    ? (readFileSync(userModelCfg, "utf8").match(/^\s*- id:\s*(.+)$/gm) ?? []).map((l) => l.trim())
-    : [];
-  ctx.note("userOwnModelIdsCount", userOwnModelIds.length);
+  ctx.note("ambientHomeIsNotUsedByChild", true);
+  // Note: the real user's config is deliberately NOT read, not even to build a
+  // comparison list. Isolation is asserted via the child's own environment and
+  // the decoy-home controls instead.
 
   // Inject synthetic credentials/steering vars into the parent for this run.
   const savedEnv = {};
@@ -150,17 +170,28 @@ process.stdin.resume();
       for (const key of ["OMP_PROFILE", "PI_PROFILE", "XDG_DATA_HOME", "XDG_CACHE_HOME"]) {
         ctx.check(`${key} is stripped from the child env`, env[key] === undefined, env[key] ?? "absent");
       }
-      ctx.check("child config root points at this run's isolated root", typeof env.PI_CONFIG_DIR === "string" && env.PI_CONFIG_DIR.startsWith(".omp-m0-"), env.PI_CONFIG_DIR);
+      ctx.check("child config root points at this run's isolated root", String(env.PI_CONFIG_DIR).startsWith(".omp-m0-"), env.PI_CONFIG_DIR);
       ctx.check("child agent dir points at this run's isolated agent dir", env.PI_CODING_AGENT_DIR === agentDir, env.PI_CODING_AGENT_DIR);
       ctx.check("child launch dir points at this run's isolated launch dir", env.OMP_DEV_LAUNCH_DIR === launchDir, env.OMP_DEV_LAUNCH_DIR);
       ctx.check("synthetic credential value never appears in the child env", !Object.values(env).includes(SYNTHETIC_KEY));
+
+      // HOME isolation: every home-relative discovery path must resolve inside
+      // this run, otherwise `~/.agent` and `~/.agents` still reach the real user.
+      const ambientHome = homedir();
+      ctx.check("child HOME is redirected into the run root", env.HOME === syntheticHome, env.HOME);
+      ctx.check("child HOME is not the ambient user home", env.HOME !== ambientHome, `${env.HOME} vs ${ambientHome}`);
+      ctx.check("resolved config root lives under the synthetic home", rpc.configRoot.startsWith(join(syntheticHome, ".omp-m0-")), rpc.configRoot);
+      for (const key of ["CLAUDE_CONFIG_DIR", "COPILOT_HOME", "GH_CONFIG_DIR", "MISE_DATA_DIR", "OMP_WORKTREE_DIR", "PI_CONFIG_FILES"]) {
+        ctx.check(`${key} is stripped from the child env`, env[key] === undefined, env[key] ?? "absent");
+      }
     }
 
     // --- model visibility ---------------------------------------------------
     const models = await rpc.request({ type: "get_available_models" });
     const ids = (models.data?.models ?? []).map((m) => m.id).sort();
     ctx.check("only this run's models are visible", ids.join(",") === "control-model,local-model", ids);
-    ctx.check("no user-owned model is visible", !ids.some((id) => userOwnModelIds.some((line) => line.includes(id))), ids);
+    ctx.check("no ambient model leaks in: exactly this run's models are visible",
+      ids.length === 2 && ids.includes("local-model") && ids.includes("control-model"), ids);
     ctx.note("visibleModelIds", ids);
 
     // --- a turn writes only into the isolated dirs --------------------------
@@ -172,7 +203,18 @@ process.stdin.resume();
     const promptBody = JSON.stringify(provider.requests.find((r) => r.url?.includes("/chat/completions"))?.body ?? {});
     ctx.check("user-level rule from the isolated agent dir reaches the model", promptBody.includes(USER_RULE));
     ctx.check("project-level rule from the isolated cwd reaches the model", promptBody.includes(PROJECT_RULE));
+    // Positive control for the synthetic HOME: a global rule there is the
+    // "user's own" config in the isolated world and must take effect.
+    ctx.check("rule from the synthetic HOME is discovered", promptBody.includes(HOME_RULE));
+    // Negative control: an identically-shaped config tree outside the child's
+    // HOME must never be consulted (this is the real-user-home stand-in).
+    ctx.check("rule from the decoy HOME never reaches the model", !promptBody.includes(DECOY_RULE));
+    ctx.check("skill from the decoy HOME is never discovered", !promptBody.includes("DECOY-SKILL-MARKER-7c88"));
     ctx.limit("Rules are only injected when bucketed by frontmatter (`alwaysApply: true`, or a `description` for the rulebook); a bare markdown file in rules/ is read but never reaches the prompt. Relevant to T19.");
+    // Real user config must not be touched by these runs.
+    ctx.check("no isolated config root was created in the real user home",
+      readdirSync(homedir()).filter((n) => n.startsWith(".omp-m0-")).length === 0,
+      readdirSync(homedir()).filter((n) => n.startsWith(".omp-m0-")).slice(0, 3));
 
     // --- MCP declared only in this run's project config --------------------
     const mcpLog = existsSync(mcpMarker) ? readFileSync(mcpMarker, "utf8").trim().split("\n") : [];
@@ -212,7 +254,7 @@ process.stdin.resume();
   }
 
   ctx.limit("Credential isolation is proven for environment variables; OS keychain/system-store naming is deferred to M4 packaging.");
-  ctx.limit("The user's ~/.omp is read only to compare model ids; it is never written by these experiments.");
+  ctx.limit("The real user's config is never read by these runs: the child's HOME is a synthetic directory inside the run root, and isolation is asserted against a decoy home instead of the user's.");
 });
 
 process.exit(evidence.ok ? 0 : 1);

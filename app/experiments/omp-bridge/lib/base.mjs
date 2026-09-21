@@ -23,7 +23,7 @@ import {
   resolveRepoRoot,
   findPinnedLauncher,
   verifyPinnedSource,
-  buildIsolatedEnv,
+  buildIsolatedEnv as buildM0IsolatedEnv,
   makeConfigDirName,
   prepareRunRoot,
   terminateTree,
@@ -33,11 +33,62 @@ export {
   resolveRepoRoot,
   findPinnedLauncher,
   verifyPinnedSource,
-  buildIsolatedEnv,
   makeConfigDirName,
   prepareRunRoot,
   terminateTree,
 };
+
+/**
+ * Extra variables OMP reads that would otherwise point discovery back at the
+ * real user's directories. M0 already strips profiles, XDG redirects, the
+ * session-dir override and credentials; these were found by grepping the
+ * pinned source for `process.env`/`Bun.env` directory hints and are stripped
+ * here so the M1 suite isolates the *discovery entry points*, not just the
+ * config root name.
+ */
+export const EXTRA_DIRECTED_VARS = [
+  "CLAUDE_CONFIG_DIR",
+  "COPILOT_HOME",
+  "COPILOT_CUSTOM_INSTRUCTIONS_DIRS",
+  "GH_CONFIG_DIR",
+  "MISE_DATA_DIR",
+  "OMP_AUTORESEARCH_DB_DIR",
+  "OMP_WORKTREE_DIR",
+  "PI_CONFIG_FILES",
+  "PI_PACKAGE_DIR",
+];
+
+/** Global home-relative directories OMP discovers; pre-created empty. */
+const HOME_DISCOVERY_DIRS = [".agent", ".agents", ".omp", ".claude", ".config"];
+
+/**
+ * Strict M1 isolation: anchor `HOME` at a synthetic directory inside the run
+ * root, so every home-relative discovery path (`~/.agent`, `~/.agents`,
+ * `~/.omp`, `~/.claude`) resolves inside this run instead of the real user's
+ * home. `PI_CONFIG_DIR` alone is not sufficient because OMP's discovery also
+ * walks those agent directories relative to the home directory.
+ */
+export function buildIsolatedEnv({ repoRoot, runRoot, configDirName = makeConfigDirName() }) {
+  const base = buildM0IsolatedEnv({ repoRoot, runRoot, configDirName });
+  const home = join(runRoot, "home");
+  mkdirSync(home, { recursive: true });
+  for (const dir of HOME_DISCOVERY_DIRS) mkdirSync(join(home, dir), { recursive: true });
+
+  const env = { ...base.env, HOME: home };
+  for (const key of EXTRA_DIRECTED_VARS) delete env[key];
+
+  return { env, configDirName, configRoot: join(home, configDirName), home };
+}
+
+/** Remove the synthetic home, but only when it really is inside the run root. */
+export function safeRmSyntheticHome(home, runRoot) {
+  if (!home || !runRoot) return false;
+  const absHome = resolve(home);
+  const absRun = resolve(runRoot);
+  if (absHome !== join(absRun, "home")) return false;
+  rmSync(absHome, { recursive: true, force: true });
+  return true;
+}
 
 export const EXPERIMENT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 

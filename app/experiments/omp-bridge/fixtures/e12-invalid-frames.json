@@ -1,0 +1,17 @@
+{
+  "note": "SYNTHETIC fault sample: stub runtimes written by this experiment emit structurally invalid frames",
+  "invalidLines": [
+    "null",
+    "123",
+    "\"a string\"",
+    "[1,2,3]",
+    "{\"no\":\"type\"}",
+    "not json"
+  ],
+  "startFailure": {
+    "threw": true,
+    "message": "OMP did not become ready: no ready frame"
+  },
+  "noisyRuntimeUsable": true,
+  "invalidFrameCount": 2
+}

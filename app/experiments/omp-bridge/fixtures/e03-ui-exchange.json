@@ -2,26 +2,26 @@
   "note": "real capture, sanitized; answers are the experiment's own synthetic values",
   "requests": [
     {
-      "id": "158899a924dc2dfd",
+      "id": "1588a0c532029613",
       "method": "setWidget"
     },
     {
-      "id": "158899a93cdc2dfe",
+      "id": "1588a0c54d029614",
       "method": "select",
       "title": "E03 select probe"
     },
     {
-      "id": "158899a9411c2dff",
+      "id": "1588a0c551429615",
       "method": "confirm",
       "title": "E03 confirm probe"
     },
     {
-      "id": "158899a94adc2e00",
+      "id": "1588a0c55b029616",
       "method": "input",
       "title": "E03 input probe"
     },
     {
-      "id": "158899a95d9c2e02",
+      "id": "1588a0c56e829618",
       "method": "setWidget"
     }
   ],
