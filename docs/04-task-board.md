@@ -2,7 +2,7 @@
 
 状态：`待开始`、`进行中`、`已完成`、`阻塞`。只有附验证证据才能将实现任务标为已完成。
 
-当前交付阶段：规划与源码准备。所有产品实现任务均未开始。
+当前交付阶段：M0 开发基线完成（T01-T03），证据见 `docs/validation/M0-baseline.md`。下一阶段 M1（T04-T07）。
 
 ## 准备工作
 
@@ -17,9 +17,9 @@
 
 | 编号 | 阶段 | 任务与交付 | 依赖 | 验收重点 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| T01 | M0 | Node 24、pnpm、Rust、Bun 环境与版本记录 | P03 | 可复现命令，不改全局 Node 默认 | 待开始 |
-| T02 | M0 | 原桌面构建与测试基线 | T01 | 上游失败独立记录，尚不启动真实用户实例 | 待开始 |
-| T03 | M0 | 开发数据/凭证/更新源隔离及代表性 UI 基线 | T02 | 先隔离再启动，不读写原产品数据、不自动更新 | 待开始 |
+| T01 | M0 | Node 24、pnpm、Rust、Bun 环境与版本记录 | P03 | 可复现命令，不改全局 Node 默认 | 已完成 |
+| T02 | M0 | 原桌面构建与测试基线 | T01 | 上游失败独立记录，尚不启动真实用户实例 | 已完成 |
+| T03 | M0 | 开发数据/凭证/更新源隔离及代表性 UI 基线 | T02 | 先隔离再启动，不读写原产品数据、不自动更新 | 已完成 |
 | T04 | M1 | OMP RPC 启动、版本协商、命令/事件 fixtures | T01 | ready、分片、应答与回合结束区分 | 待开始 |
 | T05 | M1 | 工具执行前审批与拒绝实验 | T03,T04 | 拒绝无副作用；覆盖原生工具入口 | 待开始 |
 | T06 | M1 | 取消、子代理及宿主工具实验 | T04,T05 | 后台实际终止，挂起请求清理 | 待开始 |
@@ -43,6 +43,15 @@
 | T24 | M7 | 日常任务验收、升级回退及维护交接 | T22 | 真实工作流、限制说明、升级演练 | 待开始 |
 
 T23 不阻塞仅面向 macOS arm64 的首次交付，但未通过前不能宣称跨平台可用。T17-T20 按用户实际功能优先级逐项开放，不要求在基本开发版之前全部完成。
+
+## M0 完成记录（T01-T03）
+
+证据详见 `docs/validation/M0-baseline.md`（命令、退出码、版本、SHA、界面截图均已记录）。
+
+- **T01 环境**：Node v24.14.0（nvm）、pnpm 10.34.5（corepack）、Bun 1.4.2、rustc stable 1.95.0 + nightly-2026-08-12（1.99.0-nightly）、cmake 4.4.3 + ninja 1.13.2（pip）；参考子模块浅取到固定 SHA（pi-desktop `0111e306`、oh-my-pi `d49918fab`）。
+- **T02 构建/测试**：`pnpm install --frozen-lockfile`、`build:js`、`typecheck`、`lint`、`cargo build -p host-core --locked`、`cargo test -p host-core --locked`（577 通过）、`cargo fmt --check` 均通过；`pnpm -r --if-present test` 1 项失败（`remote-host-ssh-password.test.mjs`，本机 `SSH_ASKPASS` 环境变量触发，非回归，`env -u SSH_ASKPASS` 后全通过）。
+- **T03 隔离/UI**：开发版以 `PI_DESKTOP_DATA_DIR` 隔离，`pi.sqlite`/`secrets/.machine-key`/日志/插件写入 `.dev-data/pi-desktop`，`~/.pi-desktop` 零写入，更新源 dev 构建 `disabled`；Electron 43.6.0 启动，CDP 截取项目列表/设置-MCP/模型/扩展 5 张基线截图。
+- **OMP 协议启动（M0 步骤 7，T04 前置）**：`bun setup` 成功；`omp --mode rpc` 在 `PI_CODING_AGENT_DIR` 隔离目录内输出 `ready`、`negotiate_protocol`(v2)、`get_available_models`（mock 模型，无付费模型调用）。残留：OMP 配置根 `~/.omp` 完整隔离需 `PI_CONFIG_DIR`，列入 M2。
 
 ## 单任务记录模板
 

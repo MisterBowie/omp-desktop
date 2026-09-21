@@ -1,6 +1,6 @@
 # OMP Desktop 开发交接
 
-更新时间：2026-09-21。当前状态：**规划及本地源码准备完成，产品实现尚未开始。**
+更新时间：2026-09-22。当前状态：**M0 开发基线（T01-T03）完成，原桌面可复现构建、开发数据已隔离、开发版 UI 基线已记录、OMP 隔离配置下无付费模型调用的协议启动已验证。下一阶段 M1（T04-T07）。**
 
 ## 1. 用户已确定的方向
 
@@ -25,6 +25,8 @@
 | `docs/05-validation-and-release.md` | 测试矩阵、用户路径和发布验收 |
 | `docs/06-executor-prompts.md` | 分阶段执行提示词 |
 | `docs/07-environment-and-upstream.md` | 环境准备和上游维护 |
+| `docs/validation/M0-baseline.md` | M0 验证记录（命令、版本、退出码、SHA、截图） |
+| `docs/validation/M0-screenshots/` | M0 代表性界面基线截图（项目列表/设置/模型/扩展） |
 
 PI-Desktop SHA：`0111e306c120ad5820688d7608cb37bad8fbcc1f`
 
@@ -34,40 +36,53 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 
 首次规划的 `app/` worktree 结构已为 GitHub 交付调整；原始 worktree 仅在本机 `.local-worktrees/pi-desktop-baseline/` 保留，不是后续开发入口。`source-baseline.json` 中的初始化记录保持历史原样，当前布局以上述说明为准。
 
-## 3. 没有做的工作
+## 3. M0 已完成的工作
 
-- 没有修改应用源码或 OMP 源码。
-- 没有安装项目依赖、Bun 或 Rust，没有构建、启动应用或运行产品测试。
-- 没有调用真实模型或付费 API。
-- 用户已授权将源码与计划提交并推送到指定 GitHub；没有创建 PR、发布安装包或部署产品。
-- 没有证明两套运行时已经兼容；静态源码结论与待实验事项已分开记录。
+- 建立专用分支 `codex/m0-baseline` 与 worktree，初始化参考子模块到固定 SHA（pi-desktop `0111e306`、oh-my-pi `d49918fab`）。
+- 准备并记录环境：Node 24、pnpm 10.34.5、Bun 1.4.2、rustc stable + nightly-2026-08-12、cmake/ninja。
+- 原 PI-Desktop 按锁文件安装依赖并完成 `build:js`、typecheck、lint、host-core 构建与测试（`cargo test -p host-core` 577 通过）。
+- 隔离开发数据/数据库/凭证/更新源并启动开发版，CDP 截取代表性界面基线。
+- OMP `bun setup` 构建成功；隔离配置下 `omp --mode rpc` 完成 `ready`/`negotiate_protocol`(v2)/`get_available_models` 协议启动，无付费模型调用。
+- 证据：`docs/validation/M0-baseline.md` 与 `docs/validation/M0-screenshots/`；任务看板 T01-T03 已标记完成。
+
+## 3.1 仍然没有做的工作
+
+- 没有修改应用源码或 OMP 源码（M0 全部通过已有配置完成，未改产品代码；仅根 `.gitignore` 增加 `.dev-data/`）。
+- 没有调用真实模型或付费 API（OMP 协议启动用 `auth: none` 的本地 mock 模型）。
+- 没有创建 PR、发布安装包或部署产品，没有自动提交或推送。
+- 没有证明两套运行时完整兼容；RPC 握手已实测，但 rpc-ui、审批、取消、恢复等实验属 M1。
+- 没有做 macOS arm64 打包（本机为 Linux x64，与规划假设不同）。
 
 ## 4. 下一执行模型从哪里开始
 
-**从 M0（T01-T03）开始，不直接改 Agent 引擎。**
+**从 M1（T04-T07）开始，不直接改 Agent 引擎。**
 
-先加载根 AGENTS 和 `app/AGENTS.md`。确认 Git 状态后切换 Node 24；pnpm 按 10.34.5；桌面 Rust 稳定工具链与 OMP 固定 `nightly-2026-08-12` 分开管理。OMP 根要求 Bun >=1.4，不能只看 coding-agent 包级的 >=1.3.14。
+M0 已完成：原桌面可复现构建、开发数据隔离、UI 基线、OMP 协议启动（`ready`/`negotiate_protocol` v2）均有记录（`docs/validation/M0-baseline.md`）。环境已就绪：Node 24、pnpm 10.34.5、Bun 1.4.2、桌面 Rust stable + OMP `nightly-2026-08-12`、cmake/ninja。
 
-M0 先证明原桌面和 OMP 基线可运行，并隔离数据与凭证。M1 优先验证 rpc-ui + OMP 原有审批/受信扩展，验证不足才增加 SDK bridge。审批、取消和恢复实验通过前，不开放完整工具执行。
+M1 优先验证 rpc-ui + OMP 原有审批/受信扩展，验证不足才增加 SDK bridge。审批、取消和恢复实验通过前，不开放完整工具执行。OMP 配置根 `~/.omp` 的完整隔离（`PI_CONFIG_DIR`/XDG）需在 M1/M2 收口。
 
 ## 5. 可直接交给执行模型
 
 ```text
-打开 /Users/vv/Documents/对话/omp-desktop 作为整个工作区。
+打开 /home/vv/person/code/omp-desktop 作为整个工作区（M0 已完成）。
 
 阅读 AGENTS.md、HANDOFF.md 和 docs 中的规划文档，以及 app/ 的适用规则。
-本轮执行 M0（T01-T03），不要一次做完整项目。
+本轮执行 M1（T04-T07），前置 M0 已完成（docs/validation/M0-baseline.md）。
 
-我已有 NVM 和 Node 24，使用 nvm use 24。按锁定基线准备 pnpm、Bun、Rust，
-证明原 PI-Desktop 能构建，并隔离开发数据、凭证存储和更新源。
-OMP 只做隔离配置下的无费用协议启动，不调用真实付费模型。
+环境已就绪：Node 24、pnpm 10.34.5、Bun 1.4.2（~/.bun/bin）、
+桌面 Rust stable + OMP nightly-2026-08-12、cmake/ninja（pip 安装）。
 
-根仓库管理 app/；upstream/ 是参考子模块。新任务按仓库规则在项目根
-创建专用分支和 worktree，再进入其中的 app/ 开发，不修改参考子模块。
+依据 docs/01-source-audit.md 定位真实 RPC、SDK、扩展事件、host_tool_*、
+子代理、会话恢复和配置发现入口，完成 E01-E09 实验。
+使用隔离目录、本地 fake provider 和真实 OMP 内部工具链路验证；
+优先验证 rpc-ui 加 OMP 原有审批 wrapper/受信扩展，证明拒绝发生在副作用之前。
+普通 RPC 的交互提问不等于权限审批，set_host_tools 也不等于所有原生工具均受宿主控制。
 
-遵循 docs/03-implementation-plan.md 和 docs/05-validation-and-release.md，
-将命令、结果及未完成项写入 docs/validation/M0-baseline.md，
-更新 docs/04-task-board.md 与 HANDOFF.md。不要自动提交或发布。
+根仓库管理 app/；upstream/ 是参考子模块。新任务按仓库规则创建专用分支和 worktree，
+不修改参考子模块。不重写界面、不调用付费模型。
+
+输出 docs/validation/M1-compatibility.md、docs/decisions/001-omp-transport.md，
+更新任务看板和 HANDOFF.md。不要自动提交、推送或发布。
 ```
 
 ## 6. 下一轮必须保持的取舍
