@@ -60,6 +60,28 @@ node docs/validation/M0-rpc/verify-rpc.mjs                      # exit 0
 rm -rf .dev-data && node docs/validation/M0-rpc/verify-rpc.mjs  # clean tree, exit 0
 ```
 
+## 返修记录（第四轮复审，2026-09-22）
+
+对提交 `1385b85` 的复审提出 2 项问题，本轮集中修复测试与流错误处理（先复现、后修复）：
+
+1. **环境恢复测试与凭据日志泄漏**（一）：旧断言 `assert.equal(process.env.OMP_PROFILE/OPENAI_API_KEY, undefined)` 假定恢复后必为 undefined——用户原本设置这些变量时既误报失败，又把真实值打印进失败日志。复现：`env -u OMP_PROFILE OPENAI_API_KEY=m0-review-not-secret node --test --test-name-pattern='env isolation' <旧测试文件>` → `actual: 'm0-review-not-secret'`。修复：`withEnv` 按“原本存在/不存在”保存与恢复；断言改为 `hasOwnProperty` 的布尔比较，失败信息不含值；新增 `env restore probe` 与两个子进程包装测试（原变量不存在 / 原变量已有值，均用合成值）。测试不做 `process.env` 序列化，不读取或打印真实凭据。
+2. **管道错误绕过统一清理**（二）：旧实现只监听 `ChildProcess` 的 `error`，未处理 stdin/stdout/stderr/readline 的异步 `error`；子进程关闭 stdin 后写入 `negotiate_protocol` 触发未处理 EPIPE（复现：`Error: write EPIPE`），外层 try/catch 无法捕获。修复：在使用流之前安装各流 error 处理；新增守卫写入 `writeCommand`，写入失败记为流错误；`waitFor` 遇到流错误立即返回；失败原因携带流错误；仍经统一 `finally` 有界回收进程组，不用全局 `uncaughtException`，也不吞错报成功。
+
+本轮实际执行（`docs/validation/M0-rpc/`，运行目录 `app` 之外）：
+
+```bash
+# 复现（旧实现）
+env -u OMP_PROFILE OPENAI_API_KEY=m0-review-not-secret \
+  node --test --test-name-pattern='env isolation' <旧测试>   # fail，并打印该假值
+node --test --test-name-pattern='stream error' verify-rpc.test.mjs  # fail: Error: write EPIPE
+# 修复后
+env -u OMP_PROFILE OMP_PROFILE=m0-review-profile OPENAI_API_KEY=m0-review-not-secret \
+  node --test verify-rpc.test.mjs        # 18 tests, 18 pass, 0 fail (exit 0)
+node docs/validation/M0-rpc/verify-rpc.mjs  # exit 0
+```
+
+修复后套件输出中出现 `m0-review-not-secret` / `m0-review-profile` 次数为 **0**（无凭据泄漏）；默认运行无临时目录与进程残留。
+
 ## 1. 环境与版本
 
 | 项目 | 版本/事实 | 说明 |

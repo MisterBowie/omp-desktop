@@ -9,6 +9,7 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, existsSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir, homedir } from "node:os";
 import { join, dirname } from "node:path";
@@ -16,8 +17,30 @@ import { fileURLToPath } from "node:url";
 import * as harness from "./verify-rpc.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const __filename = fileURLToPath(import.meta.url);
 const FAKE = join(__dirname, "fake-omp.mjs");
 const NODE = process.execPath;
+
+/** Environment variables this test file sets; compared by presence, never by value. */
+const ENV_KEYS = [
+  "OMP_PROFILE", "PI_PROFILE",
+  "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "XDG_CONFIG_HOME",
+  "PI_CODING_AGENT_SESSION_DIR", "OPENAI_API_KEY",
+];
+
+/** Synthetic-only values; never derived from the ambient environment. */
+const SYNTHETIC_ENV = {
+  OMP_PROFILE: "m0-synthetic-profile",
+  PI_PROFILE: "m0-synthetic-profile-2",
+  XDG_DATA_HOME: "/tmp/m0-xdg-data",
+  XDG_STATE_HOME: "/tmp/m0-xdg-state",
+  XDG_CACHE_HOME: "/tmp/m0-xdg-cache",
+  XDG_CONFIG_HOME: "/tmp/m0-xdg-config",
+  PI_CODING_AGENT_SESSION_DIR: "/tmp/m0-session-dir",
+  OPENAI_API_KEY: "m0-synthetic-not-a-real-key",
+};
+
+const has = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
 
 function fakeEnv(scenario) {
   return { ...process.env, FAKE_SCENARIO: scenario };
@@ -180,33 +203,63 @@ test("verifyPinnedSource leaves no omp-ver-* temp directory behind", () => {
 
 // --- environment isolation -------------------------------------------------
 
-test("env isolation: profile / XDG / credential vars are stripped", () => {
-  const overrides = {
-    OMP_PROFILE: "work",
-    PI_PROFILE: "work2",
-    XDG_DATA_HOME: "/tmp/xdg-data",
-    XDG_STATE_HOME: "/tmp/xdg-state",
-    XDG_CACHE_HOME: "/tmp/xdg-cache",
-    XDG_CONFIG_HOME: "/tmp/xdg-config",
-    PI_CODING_AGENT_SESSION_DIR: "/tmp/session-dir",
-    OPENAI_API_KEY: "sk-not-real",
-  };
-  const savedPiProfile = process.env.PI_PROFILE;
-  const runRoot = mkdtempSync(join(tmpdir(), "env-"));
+test("env restore probe: presence is restored after an isolation cycle", () => {
+  const before = Object.fromEntries(ENV_KEYS.map((k) => [k, has(process.env, k)]));
+  const runRoot = mkdtempSync(join(tmpdir(), "env-probe-"));
   try {
-    withEnv(overrides, () => {
+    withEnv(SYNTHETIC_ENV, () => {
       const { env } = harness.buildIsolatedEnv({ repoRoot: harness.resolveRepoRoot(), runRoot });
-      for (const k of Object.keys(overrides)) assert.equal(env[k], undefined, `${k} must be stripped`);
+      for (const k of ENV_KEYS) assert.ok(!has(env, k), `${k} must be stripped from the child env`);
       assert.ok(env.PI_CONFIG_DIR && env.PI_CONFIG_DIR.startsWith(".omp-m0-"));
       assert.ok(env.PI_CODING_AGENT_DIR.endsWith("agent"));
       assert.ok(env.OMP_DEV_LAUNCH_DIR);
     });
-    // Every touched variable (including PI_PROFILE) is restored afterwards.
-    assert.equal(process.env.PI_PROFILE, savedPiProfile);
-    assert.equal(process.env.OMP_PROFILE, undefined);
-    assert.equal(process.env.OPENAI_API_KEY, undefined);
+    for (const k of ENV_KEYS) {
+      // Boolean-only assertion: a failure message must never echo a credential value.
+      assert.equal(has(process.env, k), before[k], `${k} presence must be restored`);
+    }
   } finally {
     rmSync(runRoot, { recursive: true, force: true });
+  }
+});
+
+/** Run only the probe above in a subprocess with a controlled environment. */
+function runEnvProbeProbe(env) {
+  return spawnSync(NODE, ["--test", "--test-name-pattern=env restore probe", __filename], {
+    env, encoding: "utf8", timeout: 60_000,
+  });
+}
+
+test("env restore: variables that started absent come back absent", () => {
+  const env = { ...process.env };
+  for (const k of ENV_KEYS) delete env[k];
+  const r = runEnvProbeProbe(env);
+  assert.equal(r.status, 0, `probe must pass with the variables absent (status ${r.status})`);
+});
+
+test("env restore: variables that started set come back set", () => {
+  const env = { ...process.env, ...SYNTHETIC_ENV };
+  const r = runEnvProbeProbe(env);
+  assert.equal(r.status, 0, `probe must pass with the variables set (status ${r.status})`);
+});
+
+test("stream error: closed stdin fails explicitly, without an unhandled EPIPE", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "epipe-"));
+  const pidFile = join(cwd, "self.pid");
+  let pid = null;
+  try {
+    const r = await fake("closed-stdin", { cwd, stepTimeoutMs: 1500, termTimeoutMs: 500 });
+    assert.equal(r.ok, false, "a stream error must not be reported as success");
+    assert.match(String(r.reason), /stream|EPIPE|write|stdin/i, `unexpected reason: ${r.reason}`);
+    assert.equal(r.reaped, true, "the process group must be reaped");
+    assert.ok(existsSync(pidFile), "fake must record its pid");
+    pid = Number(readFileSync(pidFile, "utf8").trim());
+    assert.ok(Number.isFinite(pid) && pid > 0);
+    await new Promise((res) => setTimeout(res, 200));
+    assert.equal(isAlive(pid), false, `fake ${pid} must be dead after cleanup`);
+  } finally {
+    if (pid && isAlive(pid)) { try { process.kill(pid, "SIGKILL"); } catch {} }
+    rmSync(cwd, { recursive: true, force: true });
   }
 });
 

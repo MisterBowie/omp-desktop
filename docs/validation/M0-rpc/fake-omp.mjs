@@ -15,7 +15,7 @@
  */
 import { createInterface } from "node:readline";
 import { spawn } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { writeFileSync, closeSync } from "node:fs";
 import { join } from "node:path";
 
 const scenario = process.env.FAKE_SCENARIO || "normal";
@@ -91,6 +91,13 @@ if (scenario === "crash") {
     try { msg = JSON.parse(line); } catch { return; }
     answer(msg);
   });
+} else if (scenario === "closed-stdin") {
+  // Close our stdin, announce ready, then stay alive: the harness's next write
+  // to child.stdin must surface as a stream error, not an unhandled EPIPE.
+  try { closeSync(0); } catch {}
+  try { writeFileSync(join(process.cwd(), "self.pid"), String(process.pid)); } catch {}
+  write(READY);
+  setInterval(() => {}, 1000);
 } else {
   if (scenario === "split") writeSplit(READY);
   else write(READY);

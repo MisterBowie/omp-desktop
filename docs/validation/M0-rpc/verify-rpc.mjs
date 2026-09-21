@@ -232,6 +232,7 @@ export async function runProtocolCheck({
   const messages = [];
   let stderr = "";
   let spawnError = null;
+  let streamError = null;
 
   const result = {
     ok: false, stage: "start", reason: "", pid: null,
@@ -240,6 +241,9 @@ export async function runProtocolCheck({
   };
 
   const fail = (stage, reason) => { result.ok = false; result.stage = stage; result.reason = reason; };
+  const noteStreamError = (where) => (e) => {
+    if (!streamError) streamError = `${where}: ${e?.message ?? e}`;
+  };
 
   try {
     child = spawn(command, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"], detached: true });
@@ -251,15 +255,34 @@ export async function runProtocolCheck({
       if (!t) return;
       try { messages.push(JSON.parse(t)); } catch { /* non-JSON line, ignore */ }
     });
+    // Install stream error handlers before any read/write: an async 'error' event
+    // (e.g. EPIPE from a child that closed stdin) is not caught by try/catch.
+    child.stdin.on("error", noteStreamError("stdin"));
+    child.stdout.on("error", noteStreamError("stdout"));
+    child.stderr.on("error", noteStreamError("stderr"));
+    rl.on("error", noteStreamError("readline"));
     child.stderr.on("data", (d) => { stderr += d.toString(); });
     child.on("exit", (code, sig) => { result.exitCode = code; result.signalCode = sig; });
     child.on("error", (e) => { spawnError = e; });
+
+    /** Write one command; a stream failure is recorded and reported, never thrown. */
+    const writeCommand = (obj) => {
+      if (streamError) return false;
+      try {
+        child.stdin.write(JSON.stringify(obj) + "\n");
+        return true;
+      } catch (e) {
+        noteStreamError("stdin")(e);
+        return false;
+      }
+    };
 
     const waitFor = async (pred, timeoutMs) => {
       const start = Date.now();
       for (;;) {
         const hit = messages.find(pred);
         if (hit) return hit;
+        if (streamError) return null; // stop waiting immediately on a stream failure
         if (result.exitCode !== null || result.signalCode !== null) return null;
         if (Date.now() - start > timeoutMs) return null;
         await new Promise((r) => setTimeout(r, 100));
@@ -271,7 +294,9 @@ export async function runProtocolCheck({
     if (!result.ready) {
       const reason = spawnError
         ? `spawn error: ${spawnError.message}`
-        : `no ready frame within ${readyTimeoutMs}ms${stderr ? ` (stderr: ${stderr.slice(-200)})` : ""}${result.exitCode !== null ? ` (exit ${result.exitCode})` : ""}`;
+        : streamError
+          ? `stream error before ready: ${streamError}`
+          : `no ready frame within ${readyTimeoutMs}ms${stderr ? ` (stderr: ${stderr.slice(-200)})` : ""}${result.exitCode !== null ? ` (exit ${result.exitCode})` : ""}`;
       fail("ready", reason);
       return result;
     }
@@ -281,24 +306,36 @@ export async function runProtocolCheck({
     }
 
     // 2. negotiate_protocol
-    child.stdin.write(JSON.stringify({ id: "m0", type: "negotiate_protocol", protocolVersion: 2 }) + "\n");
+    if (!writeCommand({ id: "m0", type: "negotiate_protocol", protocolVersion: 2 })) {
+      fail("negotiate_protocol", `could not send negotiate_protocol: ${streamError}`);
+      return result;
+    }
     result.negotiate = await waitFor(
       (m) => m && m.type === "response" && m.command === "negotiate_protocol" && m.id === "m0",
       stepTimeoutMs,
     );
     if (!result.negotiate || result.negotiate.success !== true || result.negotiate.data?.protocolVersion !== 2) {
-      fail("negotiate_protocol", `negotiate_protocol failed: ${result.negotiate ? JSON.stringify(result.negotiate) : "no response"}`);
+      const reason = streamError
+        ? `stream error: ${streamError}`
+        : `negotiate_protocol failed: ${result.negotiate ? JSON.stringify(result.negotiate) : "no response"}`;
+      fail("negotiate_protocol", reason);
       return result;
     }
 
     // 3. get_available_models
-    child.stdin.write(JSON.stringify({ id: "m1", type: "get_available_models" }) + "\n");
+    if (!writeCommand({ id: "m1", type: "get_available_models" })) {
+      fail("get_available_models", `could not send get_available_models: ${streamError}`);
+      return result;
+    }
     result.models = await waitFor(
       (m) => m && m.type === "response" && m.command === "get_available_models" && m.id === "m1",
       stepTimeoutMs,
     );
     if (!result.models || result.models.success !== true) {
-      fail("get_available_models", `get_available_models failed: ${result.models ? JSON.stringify(result.models) : "no response"}`);
+      const reason = streamError
+        ? `stream error: ${streamError}`
+        : `get_available_models failed: ${result.models ? JSON.stringify(result.models) : "no response"}`;
+      fail("get_available_models", reason);
       return result;
     }
     const models = result.models.data?.models;

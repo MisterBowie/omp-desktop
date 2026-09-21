@@ -42,7 +42,7 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 - 准备并记录环境：Node 24、pnpm 10.34.5、Bun 1.4.2、rustc stable + nightly-2026-08-12、cmake/ninja。
 - 原 PI-Desktop 按锁文件安装依赖并完成 `build:js`、typecheck、lint、host-core 构建与测试（`cargo test -p host-core` 577 通过）。
 - 隔离开发数据/数据库/凭证/更新源（`PI_DESKTOP_DATA_DIR`）与全局 `.agents`（`PI_DESKTOP_AGENTS_DIR`），启动开发版，CDP 截取代表性界面基线。
-- OMP `bun setup` 构建成功；`docs/validation/M0-rpc/verify-rpc.mjs` 绑定 `upstream/oh-my-pi` 内的启动器（repo 路径，非全局链接），核对 gitlink=submodule SHA 与版本 18.2.7，全量隔离（每次运行唯一的 `PI_CONFIG_DIR`/`PI_CODING_AGENT_DIR`/`OMP_DEV_LAUNCH_DIR`）下完成 `ready`/`negotiate_protocol`(v2)/`get_available_models` 协议启动，无付费模型调用；隔离路径为验收条件，默认无临时目录/进程残留。配套 `verify-rpc.test.mjs`（15 项假进程测试）+ fixture `models.yml` + `fake-omp.mjs`。
+- OMP `bun setup` 构建成功；`docs/validation/M0-rpc/verify-rpc.mjs` 绑定 `upstream/oh-my-pi` 内的启动器（repo 路径，非全局链接），核对 gitlink=submodule SHA 与版本 18.2.7，全量隔离（每次运行唯一的 `PI_CONFIG_DIR`/`PI_CODING_AGENT_DIR`/`OMP_DEV_LAUNCH_DIR`）下完成 `ready`/`negotiate_protocol`(v2)/`get_available_models` 协议启动，无付费模型调用；隔离路径为验收条件，流错误统一清理，默认无临时目录/进程残留。配套 `verify-rpc.test.mjs`（18 项假进程测试）+ fixture `models.yml` + `fake-omp.mjs`。
 - 证据：`docs/validation/M0-baseline.md`（含顶部“返修记录”）与 `docs/validation/M0-screenshots/`；任务看板 T01-T03 已标记完成。
 
 ## 3.1 仍然没有做的工作
@@ -57,9 +57,9 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 
 **从 M1（T04-T07）开始，不直接改 Agent 引擎。**
 
-M0 已完成并经三轮复审返修：原桌面可复现构建、开发数据与全局 `.agents` 隔离、UI 基线、OMP 协议启动（绑定 repo 内启动器、版本 18.2.7、`ready`/`negotiate_protocol` v2）均有记录（`docs/validation/M0-baseline.md`，顶部三段“返修记录”）。环境已就绪：Node 24、pnpm 10.34.5、Bun 1.4.2、桌面 Rust stable + OMP `nightly-2026-08-12`、cmake/ninja。复审结论以复审方为准。
+M0 已完成并经四轮复审返修：原桌面可复现构建、开发数据与全局 `.agents` 隔离、UI 基线、OMP 协议启动（绑定 repo 内启动器、版本 18.2.7、`ready`/`negotiate_protocol` v2）均有记录（`docs/validation/M0-baseline.md`，顶部四段“返修记录”）。环境已就绪：Node 24、pnpm 10.34.5、Bun 1.4.2、桌面 Rust stable + OMP `nightly-2026-08-12`、cmake/ninja。复审结论以复审方为准。
 
-M1 优先验证 rpc-ui + OMP 原有审批/受信扩展，验证不足才增加 SDK bridge。审批、取消和恢复实验通过前，不开放完整工具执行。OMP 运行环境隔离与协议验证已收口，M1 沿用 `docs/validation/M0-rpc/verify-rpc.mjs`（固定入口 + 全量隔离 + 分帧 + 进程组回收 + 隔离路径验收）与 `verify-rpc.test.mjs`（15 项假进程测试）。
+M1 优先验证 rpc-ui + OMP 原有审批/受信扩展，验证不足才增加 SDK bridge。审批、取消和恢复实验通过前，不开放完整工具执行。OMP 运行环境隔离与协议验证已收口，M1 沿用 `docs/validation/M0-rpc/verify-rpc.mjs`（固定入口 + 全量隔离 + 分帧 + 进程组回收 + 隔离路径验收 + 流错误处理）与 `verify-rpc.test.mjs`（18 项假进程测试）。
 
 ## 5. 可直接交给执行模型
 
