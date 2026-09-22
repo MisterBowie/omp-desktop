@@ -433,7 +433,48 @@ supervisor 采纳该所有权(记录 pid/pgid、保留 runRoot、`status` 报 `f
 | 固定 OMP 无费用烟测 | M0 `verify-rpc.mjs` PASS;运行时包 `pinned-runtime.test.ts` 通过,未发送 prompt |
 | 残留 | mock/OMP/Electron 进程 0、临时运行根 0、无 `~/.omp-desktop*`、子模块 SHA 未变、`git status --porcelain` 为空 |
 
-## 11. 下一阶段条件
+## 11. 第四轮独立复审返修记录（S8）
+
+复审对象:`a921117331a8ac668122531a4722a5650f482a55`。
+
+### S8 同一次 stop 为同一 runRoot 留下两条互相矛盾的记录
+
+**原状**:`performStop` 只在 `cleaned = true` 时调用 `dropRecord(runRoot)`;`cleaned = false` 时**直接 push**
+cleanup-only 记录,没有先删除扫描为同一运行保留的 live 记录。于是同一次 stop 之后同一 runRoot 存在两条记录:
+旧 `{reaped:false, pid/pgid:4242}` + 新 `{reaped:true, pid:0, pgid:0}`。下一次 `reclaimAll` 仍会对旧记录调用
+`terminateTree`,可能向已回收并被复用的 PGID 发信号。
+
+复现(旧实现):
+1. Fake `runtime.stop` 首次 `reaped:false`、注入 `terminateTree` 也返回 `reaped:false` → `reclaimAll()` 留下 1 条 live 记录;
+2. `chmod` runtime state dir 为不可删除;`supervisor.stop()` 第二次 `runtime.stop` 返回 `reaped:true`、`removeRunRoot=false`;
+3. 断言 `pendingCleanup` 恰有 1 条 cleanup-only 记录 → **失败**:`expected [ …(2) ] to have a length of 1 but got 2`。
+
+**修正**:进程组确认回收后**无论目录删除成败都先 `dropRecord(runRoot)`**,再按需 push cleanup-only 记录。
+结果:目录删除成功 → 同 runRoot 记录 0 条;删除失败 → 同 runRoot 恰 1 条 `{reaped:true, pid:0, pgid:0}`。
+`status` 仍为 `failed`/`unreclaimed`、`start()` 仍拒绝(cleanup failure 不变量与精确 runRoot 释放语义均未放宽)。
+
+**证据**:`packages/omp-runtime/src/supervisor-lifecycle.test.ts` 新增确定性用例
+“replaces the retained live record when the retried stop reaps the group”,串联覆盖:
+`reclaimAll`(1 条 live 记录)→ 重试 `stop` 回收进程组但目录不可删 → `pendingCleanup` 恰 1 条
+`{reaped:true,pid:0,pgid:0}`、`status` 仍 `failed`/`unreclaimed`、`start()` 被拒 →
+目录仍不可删时再次 `reclaimAll` **不调用** `terminateTree`(调用计数不变)→ 恢复权限后目录被清除、
+记录清空、`status` = `stopped`、`terminateTree` 总调用次数仍为 1。
+**先失败后通过**:在 `a921117` 上失败(同 runRoot 两条记录),修复后通过。
+
+### 本轮验证结果
+
+| 命令 | 结果 |
+| --- | --- |
+| `pnpm build:js` / `pnpm typecheck` | 12 包构建通过 / 0 错误 |
+| `pnpm --filter @pi-desktop/omp-runtime test` | **7 文件 / 80 项通过**(本轮新增 1 项) |
+| `pnpm --filter @pi-desktop/shared test` | 84 文件 / 968 项通过 |
+| `cd apps/desktop && env -u SSH_ASKPASS node --test test/*.test.mjs` | 2568 通过 / 0 失败 |
+| `cd crates && cargo test -p host-core --locked` | 579 通过 / 0 失败 |
+| `cd app/experiments/omp-bridge && node run-all.mjs` | 13/13 实验、413/413 检查、退出码 0 |
+| `node docs/validation/M0-rpc/verify-rpc.mjs`(固定 OMP,无费用) | PASS:ready + negotiate v2 + models,**未发送 prompt** |
+| 残留 | mock/OMP/Electron 进程 0、临时运行根 0、无 `~/.omp-desktop*`、子模块 SHA 未变、`git status --porcelain` 为空 |
+
+## 12. 下一阶段条件
 
 - T08-T10 的接口、路由、监督、身份与测试均已落地并通过上述命令;M3(端到端对话与工具执行)可在
   `packages/omp-runtime` 的传输与监督之上实现回合事件、工具卡片与审批问答。

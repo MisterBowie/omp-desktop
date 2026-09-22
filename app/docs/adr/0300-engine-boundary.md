@@ -5,6 +5,7 @@
 - Amended: 2026-09-23 (review R1-R3: production lookup wiring, fail-closed lookup, IPC audit)
 - Amended: 2026-09-23 (review S1-S5: reorder gate, gate before durable change, router-first ordering, startup ownership, retained-record semantics)
 - Amended: 2026-09-23 (review S7: a sweep that reclaims a retained run releases that run's ownership)
+- Amended: 2026-09-23 (review S8: a reaped run keeps exactly one record)
 - Issues: —
 - Relates to: D002 (agent loop placement), [ADR 0094](0094-single-instance-per-data-directory.md),
   `docs/spec/03-runtime/02-agent-runtime.md`, `docs/spec/03-runtime/07-process-model.md`,
@@ -175,7 +176,10 @@ Four rules it enforces, each from a measured failure:
   that is still running. A successful `stop` drops the record an earlier sweep
   retained for the same run, and a sweep that empties the group but not the
   directory downgrades that record to directory-only (`reaped: true`, ids
-  cleared) so the retry never signals a reused process id. A cleanup failure
+  cleared) so the retry never signals a reused process id. A run has at most
+  one record: once its group is reaped, the record an earlier sweep retained is
+  replaced by what the stop learned — dropped when the directory went with it,
+  downgraded otherwise. A cleanup failure
   stays a failure: while any record remains, `status` is `failed`/`unreclaimed`
   and a new runtime is refused.
 

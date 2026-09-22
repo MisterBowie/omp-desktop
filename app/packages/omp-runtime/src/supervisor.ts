@@ -467,13 +467,13 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
     // leaving it would report a live obligation that no longer exists.
     this.lastFailure = null;
     const cleaned = this.removeRunRoot(ownership.runRoot);
-    if (cleaned) {
-      // An earlier sweep may have retained the same run as a live record; this
-      // stop is what that record was waiting for, so it goes with it. Leaving
-      // it would report a reaped obligation and invite a later sweep to signal
-      // process ids this run no longer owns.
-      this.dropRecord(ownership.runRoot);
-    } else {
+    // An earlier sweep may have retained the same run as a live record; this
+    // stop is what that record was waiting for, so it is replaced by what this
+    // stop learned. Keeping it as well would leave two records for one run — a
+    // live-looking one whose group is already empty — and the next sweep would
+    // signal process ids this run no longer owns.
+    this.dropRecord(ownership.runRoot);
+    if (!cleaned) {
       // The group is empty, so what remains is a directory obligation: keeping
       // the pids here would invite a later reclaim to signal a reused number.
       this.uncleanedRuns.push({ ...ownership, reaped: true, pid: 0, pgid: 0 });

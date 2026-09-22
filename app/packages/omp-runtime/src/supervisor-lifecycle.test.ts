@@ -544,6 +544,71 @@ describe("ghost ownership after a sweep (S7)", () => {
   });
 });
 
+describe("retained record bookkeeping (S8)", () => {
+  it("replaces the retained live record when the retried stop reaps the group", async () => {
+    const dataRoot = makeRoot("record-replace");
+    created.push(dataRoot);
+    // The group survives the sweep, then empties on the retried stop, whose
+    // directory removal fails.
+    const runtime = new FakeRuntime([stopResult({ reaped: false }), stopResult()]);
+    const terminations: number[] = [];
+    const supervisor = new OmpRuntimeSupervisor({
+      dataRoot,
+      launcherPath: MOCK_LAUNCHER,
+      expectedRuntimeVersion: MOCK_VERSION,
+      runtimeFactory: async (options: OmpRuntimeProcessOptions) => {
+        mkdirSync(options.cwd, { recursive: true });
+        return runtime;
+      },
+      terminateTree: async (_child, pgid) => {
+        terminations.push(pgid);
+        return { reaped: false, escalated: "kill" as const, steps: ["injected: survived"] };
+      },
+    });
+    supervisors.push(supervisor);
+    await supervisor.start();
+    const runRoot = runRoots(dataRoot)[0]!;
+
+    const swept = await supervisor.reclaimAll();
+    expect(swept.every((entry) => !entry.cleaned)).toBe(true);
+    expect(supervisor.pendingCleanup).toHaveLength(1);
+    expect(supervisor.pendingCleanup[0]).toMatchObject({ runRoot: join(dataRoot, "omp-runtime", runRoot) });
+    expect(supervisor.pendingCleanup[0]).toMatchObject({ reaped: false, pid: 4242 });
+
+    const stateDir = join(dataRoot, "omp-runtime");
+    chmodSync(stateDir, 0o500);
+    try {
+      // The retried stop reaps the group; the directory is the part that fails.
+      const stopped = await supervisor.stop();
+      expect(stopped).toMatchObject({ reaped: true, cleaned: false });
+      // One run, one record: a live-looking copy of a run whose group is
+      // already empty must not survive next to the directory-only record.
+      expect(supervisor.pendingCleanup).toHaveLength(1);
+      expect(supervisor.pendingCleanup[0]).toMatchObject({ reaped: true, pid: 0, pgid: 0 });
+      expect(supervisor.status().phase).toBe("failed");
+      expect(supervisor.status().reason).toBe("unreclaimed");
+      await expect(supervisor.start()).rejects.toMatchObject({ code: "not-started" });
+
+      // While only the directory is owed, no sweep may signal the old group.
+      const signalsBefore = terminations.length;
+      await supervisor.reclaimAll();
+      expect(terminations.length).toBe(signalsBefore);
+      expect(supervisor.pendingCleanup).toHaveLength(1);
+    } finally {
+      chmodSync(stateDir, 0o700);
+    }
+
+    // Once the directory can be removed, the debt clears for good.
+    const final = await supervisor.reclaimAll();
+    expect(final.some((entry) => entry.cleaned)).toBe(true);
+    expect(supervisor.pendingCleanup).toEqual([]);
+    expect(supervisor.status().phase).toBe("stopped");
+    expect(runRoots(dataRoot)).toEqual([]);
+    expect(terminations.length).toBe(1);
+  });
+
+});
+
 describe("concurrent lifecycle", () => {
   it("shares one stop attempt between concurrent callers", async () => {
     const { supervisor, runtime } = supervisorWithRuntime([stopResult()]);
