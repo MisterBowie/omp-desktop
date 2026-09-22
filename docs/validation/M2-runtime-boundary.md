@@ -296,7 +296,87 @@ supervisor 文件头声明 “caller must never read stopped out of a run it cou
 | `cd app/experiments/omp-bridge && node run-all.mjs` | 13/13 实验、413/413 检查、退出码 0 |
 | 固定 OMP 无费用烟测(运行时包内) | 版本 18.2.7 → ready → negotiate v2 → stop 后进程组与运行根均已回收,未发送 prompt |
 
-## 9. 下一阶段条件
+## 9. 第二轮独立复审返修记录（S1-S6）
+
+复审对象:`9c0aa358a7ca346b854378e266e77e36942947ef`。同样先对照固定源码,再改本项目,
+新增测试均验证“修复前失败、修复后通过”。
+
+### S1 `agentQueueReorder` 绕过唯一 gate
+
+**原状(源码事实)**:`agent-ipc.ts` 的 reorder 直接调用 `queue.reorder`,而 `remove`/`prioritize` 已经
+`sessionOf` + `requireForSession(owner,"followUp")`。对照固定 PI-Desktop:`AgentHost.reorderTurn` 与
+`prioritizeTurn` 同级,移动队列顺序会改变下一个被执行的 turn,属控制路径。
+**修正**:reorder 与 prioritize/remove 使用同一 owner 查询与同一 `followUp` gate;`sessionOf` 缺失即视为无主(由队列自身报错)。
+**证据**:`engine-ipc-gates.test.mjs` 的 “queue reorder refuses an OMP turn and still orders Pi turns”
+(OMP 拒绝且 bridge 未收到 reorder;Pi 正常移动)。先失败后通过:移除该 gate 时该用例失败
+(`agentHostBridge.queue.reorder is not a function`/bridge 收到 reorder)。
+
+### S2 gate 之前修改持久状态
+
+**A. 计划批准**:原状为 `plans.resolve` → `settleApproval` → 才 gate;固定 PI-Desktop ADR 0052 的
+`plans.resolve` 是原子事务(pending→approved、会话转 agent、写权限模式、创建后续执行)。
+**修正**:`action === "approve"` 时在读事务之前 gate;`reject` 不启动运行时,保留固定拒绝语义。
+**证据**:`engine-ipc-gates.test.mjs` 的 “an approval for an OMP session mutates nothing”
+(断言 `plans.resolve` 调用数 0、settlement 0、dispatch 0)、“a rejection still follows the host's own semantics”、
+“an approval for a Pi session still runs the transaction and dispatches”。
+
+**B. 恢复/排空**:原状为先 `plans.claimExecution`(queued→running),之后才 gate,失败还把执行改成 interrupted。
+**修正**:先读持久 session 并 gate,再要求 sidecar;被拒的执行**带着警告跳过**,行保持 queued、不产生 turn、
+drain 继续处理其余条目。
+**证据**:`plan-drain-engine-gate.test.mjs`(真实 `createPlanRuntime` + 真实 `createSessionCoordination`):
+OMP 队列执行时宿主只收到 `plans.queuedExecutions` 与 `session.get`,**没有** `claimExecution`/`beginTurn`/
+sidecar/`finishExecution`;Pi 执行仍完整派发;缺 gate 时一条也不 claim。先失败后通过:临时恢复旧顺序后 3 项全失败。
+
+### S3 在 engine 之前依赖 Pi sidecar/AgentHost
+
+**修正**:本轮改过的 handler 统一为“参数/身份校验 → 读引擎并 gate → 才要求 Pi 运行时”
+(`agentPrompt`、`agentSteer`、`agentStop`、`agentAbort`、`agentCompact`、`agentQueuePush/List/Remove/Prioritize/Reorder`、
+`askToolResolve`;原生 `native-pi:` 分支保持先要 sidecar)。同时把 gate 语义明确为**按声明**判定:
+运行时未启动是状态问题(`EngineRuntimeStatus`/`liveCapabilities`),不是“引擎不支持”,否则一次重启就会被当成永久拒绝,
+队列也无法在重启期间暂存消息;需要活运行时的路径仍旧给出各自的 “sidecar unavailable”。
+**证据**:`engine-ipc-gates.test.mjs` 的 “an OMP session is refused even when the Pi runtime is absent”
+(8 条执行路径全部 `ENGINE_CAPABILITY_UNAVAILABLE`;`agentGetStatus`/`agentQueueList` 在 sidecar=null、bridge=null 时
+仍返回稳定结果)与 “a Pi session still reports its own runtime's absence”。
+
+### S4 启动失败后丢弃 reaped:false 的所有权
+
+**原状(源码事实)**:`OmpRuntimeProcess.start` 的 catch 忽略 `stop()` 的 `reaped:false`;supervisor 拿不到 handle,
+只按普通启动失败删目录。
+**修正**:新增 `OmpStartupFailure`(携带 runtime 与 stop verdict,`ownsLiveProcess`)与 `startupFailureOwnership()`;
+supervisor 采纳该所有权(记录 pid/pgid、保留 runRoot、`status` 报 `failed`/`unreclaimed`、拒绝第二次 start),
+`stop()`/`reclaimAll()` 可重试并最终清理;未 reaped 时绝不删除活进程目录。
+**证据**:`supervisor-lifecycle.test.ts` 的 S4 两条 —— 注入首次 termination 返回 `reaped:false` 且子进程真的存活
+(`deaf-unready` mock:`deaf-unready` 既不 ready 又忽略 EOF/SIGTERM),断言失败对象携带所有权、目录保留、
+二次 start 被拒、重试终止后进程与目录都清理干净;另一条断言成功回收时**不**携带所有权(fail-closed 的反面)。
+先失败后通过:临时恢复“忽略 verdict”后该用例失败。
+
+### S5 cleanup-only 记录用旧 PGID 再发信号
+
+**原状(源码事实)**:进程已 reaped 但目录删除失败时,记录仍带原 pid/pgid;`reclaimAll` 对所有 `pgid>0` 都发 TERM/KILL。
+**修正**:记录新增 `reaped` 事实;目录型记录把 pid/pgid 归零,`reclaimAll` 只重试删除,绝不发信号;
+只有明确仍拥有活组的记录才重试终止(且先终止、确认 reaped 后才删目录)。
+**证据**:`supervisor-lifecycle.test.ts` 的 “a directory-only retry never signals the old group”
+(注入的终止实现调用次数必须为 0)与 “a live retry does terminate the retained group”
+(注入实现被以该 pgid 调用,记录保留、目录不删)。先失败后通过:恢复旧语义后两条均失败。
+
+### S6 交付物包含未跟踪的提示词文件
+
+**修正**:删除任务临时文件 `.m2-executor-prompt.md`,最终以 `git status --porcelain` 为空(含未跟踪)为准。
+
+### 返修后的验证结果
+
+| 命令 | 结果 |
+| --- | --- |
+| `pnpm build:js` / `pnpm typecheck` | 0 错误 |
+| `pnpm --filter @pi-desktop/omp-runtime test` | **7 文件 / 75 项通过**(本轮新增 4 项) |
+| `pnpm --filter @pi-desktop/shared test` | 84 文件 / 968 项通过 |
+| `cd apps/desktop && env -u SSH_ASKPASS node --test test/*.test.mjs` | **2568 通过 / 0 失败**(本轮新增 `plan-drain-engine-gate` 3 项与 gates 6 项) |
+| `cd crates && cargo test -p host-core --locked` | 579 通过 / 0 失败 |
+| `cd app/experiments/omp-bridge && node run-all.mjs` | 13/13 实验、413/413 检查、退出码 0 |
+| 固定 OMP 无费用烟测 | M0 `verify-rpc.mjs` PASS;运行时包 `pinned-runtime.test.ts` 通过(18.2.7 → ready → v2 → 回收),未发送 prompt |
+| 残留 | mock/OMP/Electron 进程 0、临时运行根 0、无 `~/.omp-desktop*`、子模块 SHA 未变、`git status --porcelain` 为空 |
+
+## 10. 下一阶段条件
 
 - T08-T10 的接口、路由、监督、身份与测试均已落地并通过上述命令;M3(端到端对话与工具执行)可在
   `packages/omp-runtime` 的传输与监督之上实现回合事件、工具卡片与审批问答。

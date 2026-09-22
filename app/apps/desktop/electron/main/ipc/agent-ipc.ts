@@ -255,7 +255,6 @@ export function registerAgentIpc({
   });
 
   handle(IPC.invoke.agentSteer, async (req: AgentSteerRequest) => {
-    if (!host || !sidecar) throw new Error("backend unavailable");
     if (
       !req?.sessionId || typeof req.content !== "string" || !req.expectedTurnId ||
       (!req.content.trim() && !req.attachments?.length)
@@ -265,8 +264,11 @@ export function registerAgentIpc({
       });
     }
     // Steering reaches into a running turn, so it is gated the same way as the
-    // prompt that started it.
+    // prompt that started it — and gated *before* the Pi runtime is required, so
+    // another engine's session is refused with an accurate reason whether or not
+    // the Pi sidecar happens to be running.
     await engineRouter.requireForSession(req.sessionId, "steer");
+    if (!host || !sidecar) throw new Error("backend unavailable");
     // A steering input belongs to the turn it names: it is refused once that
     // turn was cancelled, has started finalizing, or no longer owns the session.
     if (!isTurnDispatchable(req.sessionId, req.expectedTurnId)) {
@@ -305,8 +307,10 @@ export function registerAgentIpc({
   });
 
   handle(IPC.invoke.agentPrompt, async (req: AgentPromptRequest) => {
-    if (!sidecar) throw new Error("sidecar unavailable");
     if (req.sessionId.startsWith("native-pi:")) {
+      // A native Pi session is Pi by construction; it has no engine choice to
+      // read, so the Pi runtime is required first.
+      if (!sidecar) throw new Error("sidecar unavailable");
       if (req.sessionMessageId || req.truncateFromMessageId || req.truncateBefore !== undefined || req.attachments?.length) {
         throw Object.assign(new Error("Native Pi continuation currently supports text prompts only"), {
           errorCode: ErrorCodes.INVALID_ARGUMENT,
@@ -347,8 +351,11 @@ export function registerAgentIpc({
     }
     // Engine gate before anything is launched for this session: a session whose
     // engine cannot prompt in this build is refused here, and no later branch
-    // may fall back to the Pi runtime for it.
+    // may fall back to the Pi runtime for it. The engine is decided from the
+    // durable record, so the refusal does not depend on the Pi sidecar being
+    // absent or present.
     engineRouter.require(session, "prompt");
+    if (!sidecar) throw new Error("sidecar unavailable");
     const truncateFromMessageId =
       typeof req.truncateFromMessageId === "string"
         ? req.truncateFromMessageId.trim()
@@ -632,9 +639,10 @@ export function registerAgentIpc({
 
   handle(IPC.invoke.agentCompact, async (req: { sessionId: string }) => {
     rejectNativeAgentOperation(req.sessionId);
-    if (!host || !sidecar) throw new Error("backend unavailable");
-    // Compaction rewrites the session's context inside its own runtime.
+    // Compaction rewrites the session's context inside its own runtime; the
+    // engine is decided before the Pi runtime is required.
     await engineRouter.requireForSession(req.sessionId, "prompt");
+    if (!host || !sidecar) throw new Error("backend unavailable");
     if (activeTurns.has(req.sessionId)) {
       throw Object.assign(new Error("Session already has an active turn"), {
         errorCode: ErrorCodes.AGENT_BUSY,
@@ -664,8 +672,8 @@ export function registerAgentIpc({
   });
 
   handle(IPC.invoke.agentAbort, async (req: { sessionId: string; turnId?: string }) => {
-    if (!sidecar) throw new Error("sidecar unavailable");
     await engineRouter.requireForSession(req.sessionId, "stop");
+    if (!sidecar) throw new Error("sidecar unavailable");
     const releaseSessionOperation = req.turnId ? await acquireSessionOperation(req.sessionId) : undefined;
     try {
     const abortedTurnId = activeTurns.get(req.sessionId);
@@ -710,8 +718,8 @@ export function registerAgentIpc({
   });
 
   handle(IPC.invoke.agentStop, async (req: AgentStopRequest) => {
-    if (!sidecar) throw new Error("sidecar unavailable");
     await engineRouter.requireForSession(req.sessionId, "stop");
+    if (!sidecar) throw new Error("sidecar unavailable");
     logger.app("session", "info", "prompt graceful stop requested", {
       sessionId: req.sessionId,
     });
@@ -722,14 +730,15 @@ export function registerAgentIpc({
   });
 
   handle(IPC.invoke.agentGetStatus, async (sessionId: string) => {
-    if (!sidecar) throw new Error("sidecar unavailable");
     // A read, answered truthfully by the owning engine: a session executed
     // elsewhere holds no Pi turn, and asking the Pi runtime about it would
-    // report a state that belongs to a different runtime.
+    // report a state that belongs to a different runtime. The answer must not
+    // depend on whether the Pi sidecar happens to be running.
     const engine = await engineRouter.engineForSession(sessionId);
     if (engine !== "pi") {
       return { status: { sessionId, isRunning: false, pendingToolConfirmations: 0 } };
     }
+    if (!sidecar) throw new Error("sidecar unavailable");
     return sidecar.call("agent.getStatus", { sessionId });
   });
 
@@ -737,34 +746,35 @@ export function registerAgentIpc({
   // headless module admits, orders, and drains it.
   handle(IPC.invoke.agentQueuePush, async (req: AgentQueuePushRequest) => {
     rejectNativeAgentOperation(req.sessionId);
-    if (!agentHostBridge) throw new Error("agent host unavailable");
     // A queued entry becomes a turn, so it needs the same gate as a prompt.
     await engineRouter.requireForSession(req.sessionId, "prompt");
+    if (!agentHostBridge) throw new Error("agent host unavailable");
     return agentHostBridge.queue.push(req);
   });
   handle(IPC.invoke.agentQueueList, async (req: { sessionId: string }) => {
     rejectNativeAgentOperation(req.sessionId);
-    if (!agentHostBridge) throw new Error("agent host unavailable");
     // A read: the queue drains into the session's engine, so a session this
     // build cannot drive has no entries here — and none can be added (push is
-    // gated). Answering without the engine's queue is the truthful read.
+    // gated). Answering without the engine's queue is the truthful read, and it
+    // must not depend on the agent host being up.
     const engine = await engineRouter.engineForSession(req.sessionId);
     if (engine !== "pi") return { entries: [] };
+    if (!agentHostBridge) throw new Error("agent host unavailable");
     return { entries: agentHostBridge.queue.list(req.sessionId) };
   });
   handle(IPC.invoke.agentQueueRemove, async (req: { turnId: string }) => {
-    if (!agentHostBridge) throw new Error("agent host unavailable");
     // Cancels queued work, so it is gated by the engine of the owning session.
     // An unknown turn has no owner; the queue call reports that on its own.
-    const owner = agentHostBridge.queue.sessionOf(req.turnId);
+    const owner = agentHostBridge?.queue.sessionOf(req.turnId) ?? null;
     if (owner) await engineRouter.requireForSession(owner, "followUp");
+    if (!agentHostBridge) throw new Error("agent host unavailable");
     await agentHostBridge.queue.remove(req.turnId);
     return { ok: true };
   });
   handle(IPC.invoke.agentQueuePrioritize, async (req: { turnId: string }) => {
-    if (!agentHostBridge) throw new Error("agent host unavailable");
-    const owner = agentHostBridge.queue.sessionOf(req.turnId);
+    const owner = agentHostBridge?.queue.sessionOf(req.turnId) ?? null;
     if (owner) await engineRouter.requireForSession(owner, "followUp");
+    if (!agentHostBridge) throw new Error("agent host unavailable");
     await agentHostBridge.queue.prioritize(req.turnId);
     return { ok: true };
   });
@@ -772,10 +782,14 @@ export function registerAgentIpc({
   handle(
     IPC.invoke.agentQueueReorder,
     async (req: { turnId: string; direction: "up" | "down" }) => {
-      if (!agentHostBridge) throw new Error("agent host unavailable");
       if (req.direction !== "up" && req.direction !== "down") {
         throw new Error(`unknown queue reorder direction: ${String(req.direction)}`);
       }
+      // Reordering decides which queued turn the engine runs next: it is a
+      // control path like prioritize and remove, not a read.
+      const owner = agentHostBridge?.queue.sessionOf(req.turnId) ?? null;
+      if (owner) await engineRouter.requireForSession(owner, "followUp");
+      if (!agentHostBridge) throw new Error("agent host unavailable");
       return agentHostBridge.queue.reorder(req.turnId, req.direction);
     },
   );
@@ -800,13 +814,14 @@ export function registerAgentIpc({
   });
 
   handle(IPC.invoke.askToolResolve, async (resolution: AskToolResolution) => {
-    if (!sidecar) throw new Error("sidecar unavailable");
     const sessionId = String(resolution?.sessionId ?? "").trim();
     const requestId = String(resolution?.requestId ?? "").trim();
     if (!sessionId || !requestId) throw new Error("asktool resolution identity required");
     // Answers a question a *running Pi turn* asked; another engine's session
-    // has no such question pending here.
+    // has no such question pending here. The engine decides before the Pi
+    // runtime is required.
     await engineRouter.requireForSession(sessionId, "structuredQuestions");
+    if (!sidecar) throw new Error("sidecar unavailable");
     return sidecar.call("asktool.resolve", {
       ...resolution,
       sessionId,
@@ -852,6 +867,15 @@ export function registerAgentIpc({
       resolution.version > 0
         ? resolution.version
         : undefined;
+    if (action === "approve") {
+      // Approval is a transaction that flips the proposal to approved, moves the
+      // session to agent mode and queues the follow-up execution (ADR 0052), and
+      // it starts a turn in the session's own runtime. The engine is therefore
+      // decided *before* the transaction runs: refusing afterwards would leave a
+      // session approved and unable to run. Rejection starts nothing and keeps
+      // the host's own reject semantics.
+      await engineRouter.requireForSession(sessionId, "prompt");
+    }
     const result = await host.call<PlanResolutionResult>("plans.resolve", {
       proposalId,
       sessionId,
@@ -866,9 +890,6 @@ export function registerAgentIpc({
       ...(targetPermissionMode ? { permissionMode: targetPermissionMode } : {}),
     });
     if (action === "approve") {
-      // Approval starts a turn in the session's own runtime, so it passes the
-      // same gate as a prompt before anything is dispatched.
-      await engineRouter.requireForSession(sessionId, "prompt");
       const execution = executionFromResponse(result);
       if (execution) {
         void dispatchApprovedPlan(execution);

@@ -42,6 +42,7 @@ import {
 import { resolveOmpLauncher } from "./launcher.js";
 import {
   OmpRuntimeProcess,
+  startupFailureOwnership,
   type OmpRuntimePhase,
   type OmpRuntimeProcessOptions,
   type OmpStopOptions,
@@ -89,6 +90,8 @@ export type OmpRuntimeSupervisorOptions = {
   /** Test seams. */
   /** How a runtime is started; defaults to the real process implementation. */
   runtimeFactory?: OmpRuntimeFactory;
+  /** How a retained group is terminated; defaults to the real implementation. */
+  terminateTree?: typeof terminateProcessTree;
   spawnImpl?: OmpRuntimeProcessOptions["spawnImpl"];
   probeVersion?: OmpRuntimeProcessOptions["probeVersion"];
   abortSettleMs?: number;
@@ -130,6 +133,13 @@ export type OmpRuntimeFactory = (
 ) => Promise<ManagedOmpRuntime>;
 
 export type OwnedOmpRuntime = {
+  /**
+   * True once the run's process group is confirmed empty. A record with
+   * `reaped: true` is a *directory-only* obligation: its pid/pgid are kept for
+   * diagnostics but must never be signalled again, because the operating system
+   * may have reused them.
+   */
+  reaped: boolean;
   /** Process id and group id of the runtime (the runtime is its own leader). */
   pid: number;
   pgid: number;
@@ -154,11 +164,20 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
   readonly engine = "omp";
 
   private readonly options: OmpRuntimeSupervisorOptions;
+  /** Termination used for retained ownership (seam for deterministic tests). */
+  private readonly terminateTree: typeof terminateProcessTree;
   /** The runtime this supervisor owns, live or not yet reclaimed. */
   private runtime: ManagedOmpRuntime | null = null;
   /** Record of `this.runtime`: the group and directory a reclaim must dispose of. */
   private ownership: OwnedOmpRuntime | null = null;
-  /** Runs with no live handle whose directory could not be removed yet. */
+  /**
+   * Runs whose disposal is still owed.
+   *
+   * Two kinds live here, and the `reaped` flag is what tells them apart: a
+   * directory-only record (its group is confirmed empty, so its ids must never
+   * be signalled again — the operating system may have reused them) and a live
+   * record (a group that survived its termination, which the sweep retries).
+   */
   private uncleanedRuns: OwnedOmpRuntime[] = [];
   private starting: Promise<EngineRuntimeStatus> | null = null;
   /** Single-flight reclaim: concurrent callers share one attempt. */
@@ -167,6 +186,7 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
 
   constructor(options: OmpRuntimeSupervisorOptions) {
     this.options = options;
+    this.terminateTree = options.terminateTree ?? terminateProcessTree;
   }
 
   /** The pinned runtime version this supervisor accepts. */
@@ -207,6 +227,7 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
           : "the runtime is shutting down",
       );
     }
+
     if (this.uncleanedRuns.length > 0) {
       return this.failedStatus(
         "unreclaimed",
@@ -331,6 +352,7 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
       this.lastFailure = null;
       const pid = runtime.pid ?? 0;
       this.ownership = {
+        reaped: false,
         pid,
         pgid: runtime.pgid ?? pid,
         runRoot,
@@ -343,14 +365,38 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
       return this.status();
     } catch (error) {
       const code = (error as OmpRuntimeError)?.code;
+      // A failed handshake can still leave a live process. When it does, this
+      // supervisor adopts it: the record keeps the group it must dispose of, the
+      // directory stays, and a later stop/reclaim retries the termination.
+      const orphaned = startupFailureOwnership(error);
+      if (orphaned) {
+        this.runtime = orphaned.runtime;
+        this.ownership = {
+          reaped: false,
+          pid: orphaned.runtime.pid ?? 0,
+          pgid: orphaned.runtime.pgid ?? 0,
+          runRoot,
+          configRoot,
+          home,
+          launcher,
+          runtimeVersion: orphaned.runtime.runtimeVersion,
+          startedAt: (this.options.now ?? Date.now)(),
+        };
+        this.lastFailure = {
+          reason: "unreclaimed",
+          detail: `the runtime never became usable and could not be stopped: ${(error as Error).message}`,
+        };
+        throw error;
+      }
+
       this.lastFailure = {
         reason: code === "version-mismatch" ? "version-mismatch" : "start-failed",
         detail: (error as Error).message,
       };
-      // The runtime never became usable: remove what this attempt created, and
-      // keep the record when even that fails.
+      // Nothing of this attempt is alive, so only the directory can be owed.
       if (!this.removeRunRoot(runRoot)) {
         this.uncleanedRuns.push({
+          reaped: true,
           pid: 0,
           pgid: 0,
           runRoot,
@@ -402,6 +448,10 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
       // record needed to terminate it, and does not delete the directory of a
       // running process. Retrying calls `stop` again — the process-level stop
       // does not cache a failed verdict.
+      this.lastFailure = {
+        reason: "unreclaimed",
+        detail: stop.errors.join("; ") || "the runtime process group is still populated",
+      };
       return {
         stopped: false,
         reaped: false,
@@ -413,8 +463,13 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
 
     this.runtime = null;
     this.ownership = null;
+    // The runtime is gone, so any failure recorded about owning it is spent:
+    // leaving it would report a live obligation that no longer exists.
+    this.lastFailure = null;
     const cleaned = this.removeRunRoot(ownership.runRoot);
-    if (!cleaned) this.uncleanedRuns.push(ownership);
+    // The group is empty, so what remains is a directory obligation: keeping
+    // the pids here would invite a later reclaim to signal a reused number.
+    if (!cleaned) this.uncleanedRuns.push({ ...ownership, reaped: true, pid: 0, pgid: 0 });
     const errors = [...stop.errors];
     if (!cleaned) errors.push(`could not remove ${ownership.runRoot}`);
     return {
@@ -451,18 +506,36 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
    */
   async reclaimAll(): Promise<OmpReclaimResult[]> {
     const results: OmpReclaimResult[] = [];
-    if (this.runtime || this.starting) results.push(await this.stop());
+    if (this.runtime || this.starting) {
+      const stopped = await this.stop();
+      results.push(stopped);
+      // The runtime is still owned by `this.runtime`, but a sweep must be able
+      // to finish the job from its records alone — on the next call, or from
+      // another owner — so a group that survived is recorded as live.
+      if (!stopped.reaped && this.ownership) {
+        const ownership = this.ownership;
+        if (!this.uncleanedRuns.some((entry) => entry.runRoot === ownership.runRoot)) {
+          this.uncleanedRuns.push({ ...ownership });
+        }
+      }
+    }
 
     for (const run of [...this.uncleanedRuns]) {
       const steps: string[] = [];
       const errors: string[] = [];
+      // A record whose process is already gone owes only its directory; its ids
+      // may long since belong to something else.
       let reaped = true;
 
-      if (run.pgid > 0) {
-        const termination = await terminateProcessTree(null, run.pgid, { graceMs: 1_000 });
+      if (!run.reaped && run.pgid > 0) {
+        // Still owns a live group: this is the only sweep that signals a
+        // retained record, and it does so before the directory is touched.
+        const termination = await this.terminateTree(null, run.pgid, { graceMs: 1_000 });
         steps.push(...termination.steps);
         reaped = termination.reaped;
         if (!reaped) errors.push(`process group ${run.pgid} is still populated`);
+      } else if (run.reaped) {
+        steps.push("process already reaped; directory only");
       }
 
       // Deleting a directory a live process still uses would hide the ownership

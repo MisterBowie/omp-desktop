@@ -47,6 +47,47 @@ export const DEFAULT_SELF_EXIT_MS = 3_000;
 
 export type OmpRuntimePhase = "starting" | "idle" | "stopping" | "stopped" | "failed";
 
+/**
+ * A failed handshake that may still own a running process.
+ *
+ * `OmpRuntimeProcess.start` reaps what it spawned before it throws, but a stop
+ * can come back `reaped: false` — a process group that survived its SIGKILL, or
+ * a termination that could not run at all. Dropping that fact would leave a live
+ * process whose pid and group nothing recorded, so the failure carries the
+ * handle and the verdict: the caller either takes ownership or has nothing to
+ * take.
+ */
+export class OmpStartupFailure extends OmpRuntimeError {
+  /** The runtime the caller now owns, when one exists. */
+  readonly runtime: OmpRuntimeProcess | null;
+  /** The stop attempt's verdict, or null when the stop itself did not finish. */
+  readonly stopResult: OmpStopResult | null;
+
+  constructor(
+    cause: OmpRuntimeError,
+    ownership: { runtime: OmpRuntimeProcess; stopResult: OmpStopResult | null },
+  ) {
+    super(cause.code, cause.message, cause.detail);
+    this.name = "OmpStartupFailure";
+    this.runtime = ownership.runtime;
+    this.stopResult = ownership.stopResult;
+  }
+
+  /** True when the failure left a process this caller has to dispose of. */
+  get ownsLiveProcess(): boolean {
+    return this.stopResult?.reaped !== true;
+  }
+}
+
+/** The ownership a startup failure carries, when it carries one. */
+export function startupFailureOwnership(
+  error: unknown,
+): { runtime: OmpRuntimeProcess; stopResult: OmpStopResult | null } | null {
+  if (!(error instanceof OmpStartupFailure)) return null;
+  if (!error.ownsLiveProcess || !error.runtime) return null;
+  return { runtime: error.runtime, stopResult: error.stopResult };
+}
+
 export type OmpSpawnOptions = {
   command: string;
   args: string[];
@@ -202,9 +243,15 @@ export class OmpRuntimeProcess {
       return runtime;
     } catch (error) {
       // Every failure path reaps what was spawned: the runtime is detached, so
-      // an escaping error would leave it running with no owner.
-      await runtime.stop({ skipAbort: true }).catch(() => undefined);
-      throw error;
+      // an escaping error would leave it running with no owner. When that reap
+      // does not complete, the failure carries the handle instead of dropping it.
+      const stopResult = await runtime.stop({ skipAbort: true }).catch(() => null);
+      const cause =
+        error instanceof OmpRuntimeError
+          ? error
+          : new OmpRuntimeError("spawn-failed", String((error as Error)?.message ?? error));
+      if (stopResult?.reaped === true) throw cause;
+      throw new OmpStartupFailure(cause, { runtime, stopResult });
     }
   }
 

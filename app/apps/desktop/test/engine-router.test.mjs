@@ -71,20 +71,22 @@ test("Pi keeps every capability open while its runtime is up", async () => {
   }
 });
 
-test("a stopped runtime closes a statically supported capability", async () => {
+test("a stopped runtime is reported as such without reclassifying the engine", async () => {
   const router = routerWith({ pi: "stopped" });
-  assert.throws(
-    () => router.require({}, "prompt"),
-    (error) => {
-      assert.equal(error.errorCode, ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE);
-      assert.equal(error.engine, "pi");
-      assert.equal(error.capability, "prompt");
-      assert.match(error.message, /does not support "prompt"/);
-      return true;
-    },
-  );
+  // The status surface and the affordances it feeds report the outage.
   assert.equal(router.status("pi").phase, "stopped");
   assert.deepEqual(router.liveCapabilities("pi"), closedEngineCapabilities());
+  // The gate itself answers a different question — whether Pi can serve a
+  // prompt at all — so a runtime that is merely down is not read as an engine
+  // that cannot serve the capability. Each path checks its own runtime and
+  // reports "sidecar unavailable"; a queued message stays queueable while the
+  // runtime restarts.
+  assert.equal(router.require({}, "prompt"), "pi");
+  // An engine whose *declaration* closes the capability is still refused.
+  assert.throws(
+    () => router.require({ engine: "omp" }, "prompt"),
+    (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+  );
 });
 
 test("an OMP session is refused every capability this release has not shipped", async () => {
@@ -189,9 +191,14 @@ test("a status provider that throws cannot open a capability", async () => {
       throw new Error("no supervisor");
     },
   });
+  // The status reports the failure instead of inventing availability.
   assert.equal(router.status("omp").phase, "failed");
   assert.deepEqual(router.liveCapabilities("pi"), closedEngineCapabilities());
-  assert.throws(() => router.require({}, "prompt"));
+  // OMP's declaration is closed in this release, so the gate still refuses it.
+  assert.throws(
+    () => router.require({ engine: "omp" }, "prompt"),
+    (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+  );
 });
 
 test("engine capability declarations stay complete for both engines", async () => {

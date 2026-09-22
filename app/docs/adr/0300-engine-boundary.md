@@ -3,6 +3,7 @@
 - Status: Accepted
 - Date: 2026-09-23
 - Amended: 2026-09-23 (review R1-R3: production lookup wiring, fail-closed lookup, IPC audit)
+- Amended: 2026-09-23 (review S1-S5: reorder gate, gate before durable change, router-first ordering, startup ownership, retained-record semantics)
 - Issues: —
 - Relates to: D002 (agent loop placement), [ADR 0094](0094-single-instance-per-data-directory.md),
   `docs/spec/03-runtime/02-agent-runtime.md`, `docs/spec/03-runtime/07-process-model.md`,
@@ -59,6 +60,13 @@ for a capability the session's engine does not have is refused with
 no fallback branch, because falling back would execute a session on a runtime
 that does not own it.
 
+The gate judges the *declaration*; the status surface reports the phase. A
+runtime that is merely down is not an engine that cannot serve the capability,
+and each path that needs a live runtime says so itself after the engine is
+known ("sidecar unavailable"). Folding the two together would turn a temporary
+outage into a permanent refusal — and would break the turn queue, which exists
+to hold work while a runtime restarts.
+
 The M2 release declares every OMP capability closed. The runtime process can be
 started, supervised and inspected, but this release drives no conversation
 through it: turn streaming, tool cards and approval are the next slice, and
@@ -96,11 +104,27 @@ The IPC audit that follows from those rules:
 | `agentSteer` | execute | refuse (`steer`) |
 | `agentStop`, `agentAbort` | control | refuse (`stop`) |
 | `agentCompact` | control | refuse (`prompt`) — it rewrites the session's context inside its own runtime |
-| `agentQueuePrioritize`, `agentQueueRemove` | control | refuse (`followUp`); the owner session comes from the queue facade |
+| `agentQueuePrioritize`, `agentQueueRemove`, `agentQueueReorder` | control | refuse (`followUp`); the owner session comes from the queue facade |
 | `askToolResolve` | control | refuse (`structuredQuestions`) |
 | `agentGetStatus` | read | neutral `isRunning: false`, without asking the Pi runtime |
 | `agentQueueList` | read | neutral `entries: []` |
 | plan dispatch from the restore/drain path | execute | refuse (`prompt`) inside the plan runtime, because a restored execution never passed the interactive gate |
+
+Two ordering rules make the gate effective rather than decorative:
+
+- **Nothing durable changes before the engine is known.** `plans.resolve` is one
+  transaction — pending to approved, session to agent mode, permission mode
+  written, follow-up execution queued (ADR 0052) — so approval is gated before
+  it runs; refusing afterwards would leave a session approved and unable to run.
+  The restore/drain path reads the session and gates before
+  `plans.claimExecution`, which is the call that moves a row from queued to
+  running; refusing after it would rewrite the row as interrupted for a runtime
+  that never ran it. An execution the gate refuses is skipped with a warning and
+  left queued.
+- **The engine is decided before the Pi runtime is required.** Every gated
+  handler validates its arguments, reads the engine, and only then asks for the
+  sidecar, the agent bridge or the host queue. Otherwise the reason a session is
+  refused would depend on whether an unrelated process happened to be running.
 
 Three paths deliberately do not gate, each for a stated reason:
 
@@ -127,7 +151,7 @@ package rather than a folder inside Electron main is what lets the protocol and
 lifecycle rules be tested against a mock child and against the pinned runtime
 directly, without a display or an Electron process.
 
-Three rules it enforces, each from a measured failure:
+Four rules it enforces, each from a measured failure:
 
 - **Stop in protocol, then break the bridge.** A command runs in its own process
   group; killing the bridge group first leaves it orphaned. The runtime's own
@@ -137,6 +161,13 @@ Three rules it enforces, each from a measured failure:
   instead of success.
 - **Chunk decode failure is fatal.** The protocol decoder cannot resynchronise,
   so a corrupt sequence ends the stream and the runtime must be rebuilt.
+- **Ownership survives a failed stop.** A handshake that fails after spawning
+  hands the process back: the failure carries the handle and the stop verdict,
+  the supervisor adopts it, keeps its run directory, reports `unreclaimed`, and
+  refuses to start a second runtime until it is disposed of. A retained record
+  says whether its group is confirmed empty — a *directory-only* record whose
+  ids may already belong to another process is never signalled again, while a
+  record that still owns a live group is terminated by the next sweep.
 
 The launcher is never resolved from `PATH`: a global `omp` points at whatever
 checkout installed it last. A packaged build uses a bundled runtime; a

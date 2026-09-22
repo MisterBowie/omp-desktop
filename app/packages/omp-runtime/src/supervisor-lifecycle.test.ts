@@ -18,8 +18,23 @@ import {
   type ManagedOmpRuntime,
   type OmpRuntimeSupervisorOptions,
 } from "./supervisor.js";
-import type { OmpRuntimeProcessOptions, OmpStopOptions, OmpStopResult } from "./process.js";
-import { MOCK_LAUNCHER, MOCK_VERSION, makeRoot, mockPathEntries } from "./test-harness.js";
+import {
+  OmpRuntimeProcess,
+  startupFailureOwnership,
+  type OmpRuntimeProcessOptions,
+  type OmpStopOptions,
+  type OmpStopResult,
+} from "./process.js";
+import { terminateProcessTree } from "./process-group.js";
+import {
+  MOCK_LAUNCHER,
+  MOCK_VERSION,
+  fakeVersionProbe,
+  makeRoot,
+  mockPathEntries,
+  processAlive,
+  waitFor,
+} from "./test-harness.js";
 import { OMP_RUNTIME_VERSION } from "@pi-desktop/shared";
 
 const created: string[] = [];
@@ -144,20 +159,28 @@ describe("ownership after a failed reclaim", () => {
   });
 
   it("reclaims a retained run through reclaimAll by re-terminating its group", async () => {
-    const { supervisor, dataRoot } = supervisorWithRuntime([stopResult({ reaped: false })]);
+    const { supervisor, dataRoot } = supervisorWithRuntime([stopResult({ reaped: false })], {
+      // The group never confirms as empty, so the obligation must survive the
+      // sweep rather than being cleaned on an optimistic verdict.
+      terminateTree: async () => ({
+        reaped: false,
+        escalated: "kill" as const,
+        steps: ["injected: survived"],
+      }),
+    });
     await supervisor.start();
     await supervisor.stop();
     expect(runRoots(dataRoot)).toHaveLength(1);
 
     const results = await supervisor.reclaimAll();
-    expect(results).toHaveLength(1);
     // The retained run is retried: this fake still refuses to reap, so the
     // directory must stay and the record must remain for the next attempt.
-    expect(results[0]).toMatchObject({ reaped: false, cleaned: false });
+    expect(results.some((entry) => entry.reaped === false && entry.cleaned === false)).toBe(true);
     expect(runRoots(dataRoot)).toHaveLength(1);
 
     const again = await supervisor.reclaimAll();
-    expect(again[0]!.cleaned).toBe(false);
+    expect(again.every((entry) => entry.cleaned === false)).toBe(true);
+    expect(runRoots(dataRoot)).toHaveLength(1);
   });
 
   it("reports a directory that could not be removed and keeps retrying it", async () => {
@@ -192,6 +215,169 @@ describe("ownership after a failed reclaim", () => {
     expect(reclaimed.some((entry) => entry.cleaned)).toBe(true);
     expect(supervisor.status().phase).toBe("stopped");
     expect(runRoot.length).toBeGreaterThan(0);
+  });
+});
+
+describe("startup failure ownership (S4)", () => {
+  it("adopts a process the failed handshake could not stop", async () => {
+    const dataRoot = makeRoot("startup-orphan");
+    created.push(dataRoot);
+    let terminationAttempts = 0;
+    const supervisor = new OmpRuntimeSupervisor({
+      dataRoot,
+      launcherPath: MOCK_LAUNCHER,
+      expectedRuntimeVersion: MOCK_VERSION,
+      probeVersion: fakeVersionProbe(MOCK_VERSION),
+      pathEntries: mockPathEntries(),
+      readyTimeoutMs: 300,
+      selfExitMs: 50,
+      // `deaf` never becomes ready *and* ignores EOF and SIGTERM, so the failed
+      // handshake really does leave a process behind; a real SIGKILL always
+      // wins, so the first termination's verdict is injected.
+      runtimeFactory: async (options: OmpRuntimeProcessOptions) =>
+        OmpRuntimeProcess.start({
+          ...options,
+          terminateTree: async (child, pgid, terminateOptions) => {
+            terminationAttempts += 1;
+            if (terminationAttempts === 1) {
+              return { reaped: false, escalated: "kill" as const, steps: ["injected: survived"] };
+            }
+            return terminateProcessTree(child, pgid, terminateOptions);
+          },
+        }),
+      extraEnv: { MOCK_OMP_MODE: "deaf-unready" },
+    });
+    supervisors.push(supervisor);
+
+    let failure: unknown;
+    try {
+      await supervisor.start();
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toBeInstanceOf(OmpRuntimeError);
+    const ownership = startupFailureOwnership(failure);
+    expect(ownership, "the failure must carry the process it could not stop").not.toBeNull();
+
+    // The supervisor owns the group: the directory stays, the status says so,
+    // and a second runtime is refused while this one is unreclaimed.
+    expect(runRoots(dataRoot)).toHaveLength(1);
+    expect(supervisor.status().phase).toBe("failed");
+    expect(supervisor.status().reason).toBe("unreclaimed");
+    await expect(supervisor.start()).rejects.toMatchObject({ code: "not-started" });
+
+    const pid = ownership!.runtime.pid;
+    expect(pid).toBeGreaterThan(0);
+    expect(processAlive(pid!)).toBe(true);
+
+    // The retry really terminates it, then removes the directory.
+    const retried = await supervisor.stop();
+    expect(retried).toMatchObject({ stopped: true, reaped: true, cleaned: true });
+    expect(terminationAttempts).toBeGreaterThanOrEqual(2);
+    expect(await waitFor(() => !processAlive(pid!))).toBe(true);
+    expect(runRoots(dataRoot)).toEqual([]);
+    expect(supervisor.status().phase).toBe("stopped");
+  }, 30_000);
+
+  it("reports the plain failure when the handshake's process was reaped", async () => {
+    const dataRoot = makeRoot("startup-clean");
+    created.push(dataRoot);
+    const supervisor = new OmpRuntimeSupervisor({
+      dataRoot,
+      launcherPath: MOCK_LAUNCHER,
+      expectedRuntimeVersion: MOCK_VERSION,
+      probeVersion: fakeVersionProbe(MOCK_VERSION),
+      pathEntries: mockPathEntries(),
+      readyTimeoutMs: 300,
+      extraEnv: { MOCK_OMP_MODE: "never-ready" },
+    });
+    supervisors.push(supervisor);
+    let failure: unknown;
+    try {
+      await supervisor.start();
+    } catch (error) {
+      failure = error;
+    }
+    // Nothing survived, so there is no ownership to hand over and no directory
+    // left to owe.
+    expect(startupFailureOwnership(failure)).toBeNull();
+    expect(runRoots(dataRoot)).toEqual([]);
+  }, 20_000);
+});
+
+describe("retained records and reused pids (S5)", () => {
+  it("a directory-only retry never signals the old group", async () => {
+    const dataRoot = makeRoot("sweep-directory-only");
+    created.push(dataRoot);
+    const runtime = new FakeRuntime([stopResult()]);
+    const terminations: number[] = [];
+    const supervisor = new OmpRuntimeSupervisor({
+      dataRoot,
+      launcherPath: MOCK_LAUNCHER,
+      expectedRuntimeVersion: MOCK_VERSION,
+      runtimeFactory: async (options: OmpRuntimeProcessOptions) => {
+        mkdirSync(options.cwd, { recursive: true });
+        return runtime;
+      },
+      terminateTree: async (_child, pgid) => {
+        terminations.push(pgid);
+        return { reaped: true, escalated: "term" as const, steps: ["injected"] };
+      },
+    });
+    supervisors.push(supervisor);
+    await supervisor.start();
+
+    // The process is reaped but its directory cannot be removed yet.
+    const stateDir = join(dataRoot, "omp-runtime");
+    chmodSync(stateDir, 0o500);
+    try {
+      const result = await supervisor.stop();
+      expect(result).toMatchObject({ reaped: true, cleaned: false });
+    } finally {
+      chmodSync(stateDir, 0o700);
+    }
+    expect(supervisor.pendingCleanup).toHaveLength(1);
+    expect(supervisor.pendingCleanup[0]!.reaped).toBe(true);
+    expect(supervisor.pendingCleanup[0]!.pgid).toBe(0);
+
+    const swept = await supervisor.reclaimAll();
+    expect(swept.some((entry) => entry.cleaned)).toBe(true);
+    // The group was already empty: signalling those numbers again could reach
+    // an unrelated process that inherited them.
+    expect(terminations).toEqual([]);
+    expect(runRoots(dataRoot)).toEqual([]);
+  });
+
+  it("a live retry does terminate the retained group", async () => {
+    const dataRoot = makeRoot("sweep-live");
+    created.push(dataRoot);
+    const runtime = new FakeRuntime([stopResult({ reaped: false }), stopResult({ reaped: false })]);
+    const terminations: number[] = [];
+    const supervisor = new OmpRuntimeSupervisor({
+      dataRoot,
+      launcherPath: MOCK_LAUNCHER,
+      expectedRuntimeVersion: MOCK_VERSION,
+      runtimeFactory: async (options: OmpRuntimeProcessOptions) => {
+        mkdirSync(options.cwd, { recursive: true });
+        return runtime;
+      },
+      terminateTree: async (_child, pgid) => {
+        terminations.push(pgid);
+        // Still unable to empty the group: the obligation must survive.
+        return { reaped: false, escalated: "kill" as const, steps: ["injected: survived"] };
+      },
+    });
+    supervisors.push(supervisor);
+    await supervisor.start();
+
+    const swept = await supervisor.reclaimAll();
+    expect(swept[0]).toMatchObject({ reaped: false });
+    // The sweep terminated the group it still owned, and did not delete the
+    // directory of a process that is still there.
+    expect(terminations).toEqual([runtime.pgid]);
+    expect(runRoots(dataRoot)).toHaveLength(1);
+    expect(supervisor.pendingCleanup.length).toBeGreaterThan(0);
+    expect(supervisor.pendingCleanup.every((entry) => entry.reaped === false)).toBe(true);
   });
 });
 

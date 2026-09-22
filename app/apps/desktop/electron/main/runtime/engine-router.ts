@@ -20,6 +20,14 @@
  * value this build does not understand, refuses the operation instead — the
  * alternative is routing a session nobody could identify into a runtime that
  * does not own it.
+ *
+ * The gate judges the *declaration*: can this engine serve this capability at
+ * all? Whether its runtime is up right now is a different question with its own
+ * answer on each path (the Pi paths check their sidecar and say so), and folding
+ * the two together would turn a temporary outage into a permanent refusal — the
+ * turn queue exists precisely to hold work while a runtime restarts. Liveness
+ * still shapes `liveCapabilities()` and `EngineRuntimeStatus`, which is what a
+ * status surface or an affordance reads.
  */
 import {
   ErrorCodes,
@@ -84,8 +92,10 @@ export type EngineRouter = {
   /**
    * Throwing check, for every path that is about to *do* something.
    *
-   * Returns the engine that was checked, so the caller can assert it is the
-   * engine it is about to call into.
+   * Judges the engine's declaration, not its runtime's current phase: a path
+   * that needs a running runtime says so itself, after the engine is known (see
+   * the module header). Returns the engine that was checked, so the caller can
+   * assert it is the engine it is about to call into.
    */
   require(session: EngineSessionRecord, capability: EngineCapability): EngineId;
 };
@@ -169,7 +179,9 @@ export function createEngineRouter(options: {
     },
     require(session, capability) {
       const engine = engineOf(session);
-      const capabilities = liveCapabilities(engine);
+      // Declaration, not phase: a stopped runtime must not read as an engine
+      // that cannot serve the capability at all.
+      const capabilities = engineCapabilities(engine);
       if (capabilities[capability]) return engine;
       const refusal = engineCapabilityRefusal(engine, capability);
       const detail = statusOf(engine).detail;

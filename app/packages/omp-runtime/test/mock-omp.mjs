@@ -104,7 +104,9 @@ if (mode === "exit-immediately") {
   process.exit(3);
 }
 
-if (mode !== "never-ready") {
+// `deaf-unready` never becomes ready *and* ignores both EOF and SIGTERM: the
+// case where a failed handshake leaves a process that only SIGKILL reclaims.
+if (mode !== "never-ready" && mode !== "deaf-unready") {
   send({
     type: "ready",
     protocolVersion: 1,
@@ -148,7 +150,7 @@ if (mode === "oversized-line") {
   log("oversized-line");
 }
 
-if (mode === "unresponsive" || mode === "deaf") {
+if (mode === "unresponsive" || mode === "deaf" || mode === "deaf-unready") {
   // Ignores SIGTERM on purpose: the supervisor must escalate to SIGKILL.
   process.on("SIGTERM", () => log("sigterm-ignored"));
 } else {
@@ -174,7 +176,7 @@ process.stdin.on("end", () => {
   log("eof");
   // `deaf` ignores EOF as well, so only a signal can end it: that is the case
   // where the desktop must escalate past a graceful stop.
-  if (mode === "ignore-eof" || mode === "deaf") {
+  if (mode === "ignore-eof" || mode === "deaf" || mode === "deaf-unready") {
     // A Node process with nothing pending exits on its own once stdin ends, so
     // keeping the peer alive has to be explicit.
     setInterval(() => {}, 1000);

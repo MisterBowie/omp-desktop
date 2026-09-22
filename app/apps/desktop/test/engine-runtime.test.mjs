@@ -76,12 +76,14 @@ test("Pi reports idle only while both of its processes are up", () => {
   const down = runtime({ piLive: false });
   assert.equal(down.status("pi").phase, "stopped");
   assert.equal(down.status("pi").reason, "not-started");
-  // A runtime that is down closes its capabilities even though Pi supports them.
+  // The status surface reports the outage: a stopped runtime offers nothing.
   assert.deepEqual(down.status("pi").capabilities, closedEngineCapabilities());
-  assert.throws(
-    () => down.engineRouter.require({}, "prompt"),
-    (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
-  );
+  assert.deepEqual(down.engineRouter.liveCapabilities("pi"), closedEngineCapabilities());
+  // The gate answers a different question — whether Pi can serve a prompt at
+  // all — so a runtime that is merely down stays outside its judgement; each
+  // path checks its own runtime and reports "sidecar unavailable"
+  // (see engine-ipc-gates: "a Pi session still reports its own runtime's absence").
+  assert.equal(down.engineRouter.require({}, "prompt"), "pi");
 });
 
 test("OMP status comes from its runtime, and its capabilities stay closed", () => {

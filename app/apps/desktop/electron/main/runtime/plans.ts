@@ -400,7 +400,7 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
   ) {
     return;
   }
-  if (!runtimeState.host || !runtimeState.sidecar) return;
+  if (!runtimeState.host) return;
   dispatchingApprovedExecutions.add(initial.id);
   let claimed = false;
   let turnId: string | undefined;
@@ -421,6 +421,43 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
       retry.unref();
       return;
     }
+    // Decide the engine before anything durable changes. `plans.claimExecution`
+    // moves the row from queued to running, so gating afterwards would leave an
+    // execution marked running for a session this build cannot drive — and the
+    // failure path would rewrite it as interrupted.
+    const sessionResult = await runtimeState.host.call<{ session?: any }>("session.get", {
+      id: initial.sessionId,
+      messageLimit: 1,
+    });
+    const session = sessionResult?.session;
+    if (!session) {
+      throw Object.assign(new Error("Session not found"), {
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+    const engineRouter = getEngineRouter();
+    if (!engineRouter) {
+      throw Object.assign(new Error("the engine gate is not available"), {
+        errorCode: ErrorCodes.ENGINE_UNAVAILABLE,
+      });
+    }
+    try {
+      engineRouter.require(session, "prompt");
+    } catch (refusal) {
+      // An approved execution for a session this build cannot drive is skipped
+      // with nothing changed: the row stays queued, no turn exists, and the rest
+      // of the drain continues. The alternative — refusing after claiming —
+      // would rewrite the row as interrupted for a runtime that never ran it.
+      logger.app("runtime", "warn", "approved plan execution skipped", {
+        sessionId: initial.sessionId,
+        code: (refusal as { errorCode?: string })?.errorCode,
+        data: { executionId: initial.id, reason: String((refusal as Error)?.message ?? refusal) },
+      });
+      return;
+    }
+    // Only now is the Pi runtime required: the engine is known to be Pi.
+    if (!runtimeState.sidecar) return;
+
     const claimResponse = await runtimeState.host.call("plans.claimExecution", {
       executionId: initial.id,
     });
@@ -441,27 +478,10 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
     claimed = true;
     claimedExecutionSessions.set(execution.id, execution.sessionId);
 
-    const [settings, sessionResult] = await Promise.all([
-      runtimeState.host.call("settings.get"),
-      runtimeState.host.call<{ session?: any }>("session.get", { id: execution.sessionId }),
-    ]);
-    if (!sessionResult.session) {
-      throw Object.assign(new Error("Session not found"), {
-        errorCode: ErrorCodes.NOT_FOUND,
-      });
-    }
-    // Execute only on the engine that owns this session: an approved execution
-    // restored from persistence never passed an interactive gate.
-    const engineRouter = getEngineRouter();
-    if (!engineRouter) {
-      throw Object.assign(new Error("the engine gate is not available"), {
-        errorCode: ErrorCodes.ENGINE_UNAVAILABLE,
-      });
-    }
-    engineRouter.require(sessionResult.session, "prompt");
+    const settings = await runtimeState.host.call("settings.get");
     const launch = await resolveAgentRuntimeLaunch(
       execution.sessionId,
-      sessionResult.session,
+      session,
       settings,
       { mode: "agent" },
     );
