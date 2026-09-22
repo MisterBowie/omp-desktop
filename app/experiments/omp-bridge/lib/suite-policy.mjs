@@ -34,7 +34,7 @@ export function parseArgs(args, defaultDir) {
  * experiment that prints PASS and then dies (or whose assertions were never
  * written to disk).
  */
-export function verdictFor({ exitCode, signal, headline, result }) {
+export function verdictFor({ exitCode, signal, headline, result, cleanup }) {
   if (signal) return { ok: false, reason: `killed by signal ${signal}` };
   if (exitCode !== 0) return { ok: false, reason: `exit code ${exitCode}` };
   if (!headline) return { ok: false, reason: "no PASS/FAIL line" };
@@ -45,5 +45,18 @@ export function verdictFor({ exitCode, signal, headline, result }) {
   if (!result.runId) return { ok: false, reason: "result file has no run id (stale file?)" };
   if (result.runId !== result.expectedRunId) return { ok: false, reason: `result file belongs to run ${result.runId}` };
   if (result.ok !== true) return { ok: false, reason: "result file reports failure" };
+  // Reclaiming what the experiment started is part of the verdict: a run that
+  // leaves live processes or undeletable roots behind has not passed, even if
+  // every assertion inside it held.
+  if (cleanup) {
+    if (cleanup.error) return { ok: false, reason: `cleanup failed: ${cleanup.error}` };
+    if (cleanup.clean === false) {
+      const parts = [];
+      if (cleanup.stillAlive?.length) parts.push(`${cleanup.stillAlive.length} live process(es)`);
+      if (cleanup.unattributed?.length) parts.push(`${cleanup.unattributed.length} unattributable`);
+      for (const error of cleanup.errors ?? []) parts.push(`${error.phase} ${error.path ?? error.pid}: ${error.message}`);
+      return { ok: false, reason: `cleanup incomplete: ${parts.join("; ") || "unknown"}` };
+    }
+  }
   return { ok: true, reason: "exit 0, no signal, PASS, matching valid result" };
 }

@@ -1,7 +1,7 @@
 {
   "experiment": "e13-chunking",
-  "runId": "run-muczvppa-2ad6ee",
-  "startedAt": "2026-09-22T18:19:03.811Z",
+  "runId": "run-mud22nhi-2a4e99",
+  "startedAt": "2026-09-22T19:20:22.926Z",
   "checks": [
     {
       "description": "A: auto-compaction is disabled for this run",
@@ -39,12 +39,12 @@
     {
       "description": "A: the reassembled response is larger than one physical frame",
       "ok": true,
-      "detail": 1200660
+      "detail": 1200659
     },
     {
       "description": "A: the oversized user message survived reassembly byte-complete",
       "ok": true,
-      "detail": "1200660 bytes, marker present: true"
+      "detail": "1200659 bytes, marker present: true"
     },
     {
       "description": "A: process group reaped",
@@ -310,7 +310,7 @@
     }
   ],
   "artifacts": {
-    "A-responseBytes": 1200660,
+    "A-responseBytes": 1200659,
     "A-chunkStats": {
       "physical": 12,
       "assembled": 3
@@ -333,6 +333,6 @@
     "The decoder is a faithful port of the pinned implementation (same constants and rejection rules); the capture in fixture A and the reactions in fixture B are real, the corrupted sequences in C are synthetic.",
     "Chunking is verified for one deterministic real trigger (an oversized prompt whose echoed message frame exceeds 1 MiB); other large-frame producers are not enumerated in M1."
   ],
-  "finishedAt": "2026-09-22T18:19:09.825Z",
+  "finishedAt": "2026-09-22T19:20:28.935Z",
   "ok": true
 }

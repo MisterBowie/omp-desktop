@@ -125,6 +125,28 @@ export function makeConfigDirName() {
   return `.omp-m0-${randomBytes(4).toString("hex")}`;
 }
 
+/**
+ * Point the child's HTTP clients at a closed local port so any *outbound*
+ * discovery attempt fails immediately instead of hanging until its own budget.
+ *
+ * Measured cause (C1): `get_available_models` awaits `awaitBackgroundRefresh()`
+ * (rpc-mode.ts:1423) and that background pass performs online discovery against
+ * remote catalog/provider hosts (observed CONNECT targets:
+ * catalog.stencil.so, hyper.charm.land, api.kilo.ai, api.venice.ai, zenmux.ai,
+ * api.commandcode.ai, coding-intl.dashscope.aliyuncs.com). On a machine where
+ * those connections blackhole rather than refuse, the call waits out
+ * REMOTE_DISCOVERY_TIMEOUT_MS = 10_000 (model-discovery.ts:67), which exceeds
+ * this harness's 8 s step bound. With the same discovery pointed at a refused
+ * port the call returns in ~24 ms.
+ *
+ * So the smoke test is made explicitly offline: the fixture provider is on
+ * loopback (exempted via NO_PROXY), nothing about it needs the network, and the
+ * result no longer depends on the host's reachability. This bounds the
+ * environment's influence on the test; it is not a claim about why any given
+ * provider's discovery is slow.
+ */
+const OFFLINE_PROXY_URL = "http://127.0.0.1:9";
+
 export function buildIsolatedEnv({ repoRoot, runRoot, configDirName = makeConfigDirName() }) {
   const env = {};
   // Copy only what OMP legitimately needs; never inherit credentials, profiles,
@@ -135,6 +157,11 @@ export function buildIsolatedEnv({ repoRoot, runRoot, configDirName = makeConfig
     env[k] = process.env[k];
   }
   env.HOME = process.env.HOME ?? homedir();
+  // See OFFLINE_PROXY_URL: any outbound attempt fails fast, loopback stays direct.
+  env.HTTP_PROXY = OFFLINE_PROXY_URL;
+  env.HTTPS_PROXY = OFFLINE_PROXY_URL;
+  env.ALL_PROXY = OFFLINE_PROXY_URL;
+  env.NO_PROXY = "127.0.0.1,localhost,::1";
   env.PI_CONFIG_DIR = configDirName; // homedir-relative config root
   env.PI_CODING_AGENT_DIR = join(runRoot, "agent");
   env.OMP_DEV_LAUNCH_DIR = join(runRoot, "dev-cwd");

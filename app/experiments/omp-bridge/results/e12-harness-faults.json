@@ -1,7 +1,7 @@
 {
   "experiment": "e12-harness-faults",
-  "runId": "run-muczvppa-2ad6ee",
-  "startedAt": "2026-09-22T18:17:49.007Z",
+  "runId": "run-mud22nhi-2a4e99",
+  "startedAt": "2026-09-22T19:19:06.883Z",
   "checks": [
     {
       "description": "R5: start against invalid frames fails instead of crashing",
@@ -24,7 +24,7 @@
     {
       "description": "R5: the failed start left no isolated home behind",
       "ok": true,
-      "detail": "/tmp/m1-r5-e4nSm7/fail-run/home"
+      "detail": "/tmp/m1-r5-BSHQwe/fail-run/home"
     },
     {
       "description": "R5: a runtime with invalid frames then ready is usable",
@@ -56,22 +56,22 @@
     {
       "description": "F2: the suite reclaimed the killed experiment's detached runtime",
       "ok": true,
-      "detail": "runtime 25443"
+      "detail": "runtime 54363"
     },
     {
       "description": "F2: the suite reclaimed the tool process the runtime detached",
       "ok": true,
-      "detail": "descendant 25508"
+      "detail": "descendant 54422"
     },
     {
       "description": "F2: the synthetic home was removed",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-9wc3Lt/home"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-VSwzFa/home"
     },
     {
       "description": "F2: the isolated config root was removed",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-9wc3Lt/home/.omp-m0-e0cc8115"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-VSwzFa/home/.omp-m0-b3f563d6"
     },
     {
       "description": "F2: the reaper did not touch this test process",
@@ -80,17 +80,17 @@
     {
       "description": "F2: the reaper did not touch a decoy outside this run",
       "ok": true,
-      "detail": "decoy 25422"
+      "detail": "decoy 54342"
     },
     {
       "description": "R3: the killed experiment's scratch run root is reclaimed",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-9wc3Lt"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-VSwzFa"
     },
     {
       "description": "R3: the killed experiment's agent data is reclaimed",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-9wc3Lt/agent"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-VSwzFa/agent"
     },
     {
       "description": "R3: the suite reports the cleanup as clean",
@@ -102,7 +102,7 @@
       "ok": true,
       "detail": {
         "keepExit": 1,
-        "keptRunRoot": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-9EKgfC",
+        "keptRunRoot": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-1EieX5",
         "exists": true
       }
     },
@@ -110,8 +110,8 @@
       "description": "R3: the reclaimed and kept runs used different roots",
       "ok": true,
       "detail": {
-        "reclaimed": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-9wc3Lt",
-        "kept": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-9EKgfC"
+        "reclaimed": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-VSwzFa",
+        "kept": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-1EieX5"
       }
     },
     {
@@ -159,12 +159,263 @@
       "ok": true
     },
     {
+      "description": "R2: the run fails when cleanup cannot reclaim what the experiment left",
+      "ok": true,
+      "detail": 1
+    },
+    {
+      "description": "R2: the failure is reported as a cleanup failure, not hidden behind PASS",
+      "ok": true,
+      "detail": "running e97-cleanup-fails.mjs ... REJECTED (cleanup incomplete: remove /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w: EACCES, Permission denied: /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w '/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w') — reported: PASS e97-cleanup-fails: 1/1 checks"
+    },
+    {
+      "description": "R2: summary keeps the reason and structured diagnostics",
+      "ok": true,
+      "detail": {
+        "passed": false,
+        "verdict": "cleanup incomplete: remove /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w: EACCES, Permission denied: /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w '/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w'",
+        "errors": [
+          {
+            "phase": "remove",
+            "path": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w",
+            "pid": 999999,
+            "message": "EACCES, Permission denied: /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w '/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w'"
+          }
+        ]
+      }
+    },
+    {
+      "description": "R2: the undeletable root is still reported as leftover",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w"
+    },
+    {
+      "description": "R2: the failed cleanup keeps its retryable registration",
+      "ok": true,
+      "detail": 1
+    },
+    {
+      "description": "R2: a retry reclaims the leftover root once the obstruction is gone",
+      "ok": true,
+      "detail": {
+        "errors": [],
+        "exists": false
+      }
+    },
+    {
+      "description": "R2: --keep-artifacts is not reported as a cleanup failure",
+      "ok": true,
+      "detail": {
+        "exit": 0,
+        "out": [
+          "running e97-cleanup-fails.mjs ... PASS e97-cleanup-fails: 1/1 checks",
+          ""
+        ]
+      }
+    },
+    {
+      "description": "R2: --keep-artifacts really keeps the run root",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-1g5X8j"
+    },
+    {
+      "description": "R1: the gate exposes a tool_call handler",
+      "ok": true
+    },
+    {
+      "description": "R1: an earlier allow cannot outrank an already-published cancellation",
+      "ok": true,
+      "detail": {
+        "name": "earlier-allow-then-cancel",
+        "blocked": true,
+        "reason": "aborted: the session was stopped while this approval was pending",
+        "elapsed": 0,
+        "decision": {
+          "event": "gate-decision",
+          "decision": "deny",
+          "route": "child-cancelled",
+          "cancelled": true,
+          "toolCallId": "call-earlier-allow-then-cancel",
+          "at": 1790104810953
+        },
+        "ignored": [],
+        "decisionFileContent": "allow"
+      }
+    },
+    {
+      "description": "R1: that cancellation is classified as cancelled, not as a timeout or a defer timeout",
+      "ok": true,
+      "detail": {
+        "decision": {
+          "event": "gate-decision",
+          "decision": "deny",
+          "route": "child-cancelled",
+          "cancelled": true,
+          "toolCallId": "call-earlier-allow-then-cancel",
+          "at": 1790104810953
+        },
+        "elapsed": 0
+      }
+    },
+    {
+      "description": "R1: a cancel published before any decision blocks the call",
+      "ok": true,
+      "detail": {
+        "name": "cancel-first",
+        "blocked": true,
+        "reason": "aborted: the session was stopped while this approval was pending",
+        "elapsed": 0,
+        "decision": {
+          "event": "gate-decision",
+          "decision": "deny",
+          "route": "child-cancelled",
+          "cancelled": true,
+          "toolCallId": "call-cancel-first",
+          "at": 1790104810958
+        },
+        "ignored": [],
+        "decisionFileContent": null
+      }
+    },
+    {
+      "description": "R1: without cancellation an allow still admits the call",
+      "ok": true,
+      "detail": {
+        "name": "allow",
+        "blocked": false,
+        "reason": null,
+        "elapsed": 0,
+        "decision": {
+          "event": "gate-decision",
+          "decision": "allow",
+          "route": "child-defer",
+          "at": 1790104810964
+        },
+        "ignored": [],
+        "decisionFileContent": "consumed call-allow"
+      }
+    },
+    {
+      "description": "R1: an applied decision is consumed so it cannot authorise another call",
+      "ok": true,
+      "detail": "consumed call-allow"
+    },
+    {
+      "description": "R1: an explicit deny blocks the call",
+      "ok": true,
+      "detail": {
+        "name": "deny",
+        "blocked": true,
+        "reason": "denied: no out-of-band decision (deny)",
+        "elapsed": 0,
+        "decision": {
+          "event": "gate-decision",
+          "decision": "deny",
+          "route": "child-defer",
+          "outcome": "deny",
+          "at": 1790104810969
+        },
+        "ignored": [],
+        "decisionFileContent": "consumed call-deny"
+      }
+    },
+    {
+      "description": "R1: a real timeout stays a distinct outcome",
+      "ok": true,
+      "detail": {
+        "decision": {
+          "event": "gate-decision",
+          "decision": "deny",
+          "route": "child-defer",
+          "outcome": "timeout",
+          "at": 1790104811371
+        },
+        "elapsed": 402
+      }
+    },
+    {
+      "description": "R1: a decision addressed to another call is not reused",
+      "ok": true,
+      "detail": {
+        "blocked": true,
+        "ignored": [
+          {
+            "event": "gate-decision-ignored",
+            "reason": "scope-mismatch",
+            "toolCallId": "call-mine",
+            "decisionFor": "someone-else",
+            "at": 1790104811376
+          },
+          {
+            "event": "gate-decision-ignored",
+            "reason": "scope-mismatch",
+            "toolCallId": "call-mine",
+            "decisionFor": "someone-else",
+            "at": 1790104811426
+          },
+          {
+            "event": "gate-decision-ignored",
+            "reason": "scope-mismatch",
+            "toolCallId": "call-mine",
+            "decisionFor": "someone-else",
+            "at": 1790104811476
+          },
+          {
+            "event": "gate-decision-ignored",
+            "reason": "scope-mismatch",
+            "toolCallId": "call-mine",
+            "decisionFor": "someone-else",
+            "at": 1790104811526
+          },
+          {
+            "event": "gate-decision-ignored",
+            "reason": "scope-mismatch",
+            "toolCallId": "call-mine",
+            "decisionFor": "someone-else",
+            "at": 1790104811577
+          },
+          {
+            "event": "gate-decision-ignored",
+            "reason": "scope-mismatch",
+            "toolCallId": "call-mine",
+            "decisionFor": "someone-else",
+            "at": 1790104811627
+          },
+          {
+            "event": "gate-decision-ignored",
+            "reason": "scope-mismatch",
+            "toolCallId": "call-mine",
+            "decisionFor": "someone-else",
+            "at": 1790104811677
+          },
+          {
+            "event": "gate-decision-ignored",
+            "reason": "scope-mismatch",
+            "toolCallId": "call-mine",
+            "decisionFor": "someone-else",
+            "at": 1790104811727
+          }
+        ]
+      }
+    },
+    {
+      "description": "R1: one approval admits exactly one call",
+      "ok": true,
+      "detail": {
+        "first": null,
+        "second": {
+          "block": true,
+          "reason": "denied: no out-of-band decision (timeout)"
+        }
+      }
+    },
+    {
       "description": "R2: the leader exited while its same-group descendant stayed alive",
       "ok": true,
       "detail": {
-        "leader": 26180,
+        "leader": 54748,
         "leaderAlive": false,
-        "survivor": 26187,
+        "survivor": 54755,
         "survivorAlive": true
       }
     },
@@ -172,13 +423,13 @@
       "description": "R2: the survivor carries no PI attribution env (group handling alone must reclaim it)",
       "ok": true,
       "detail": {
-        "survivor": 26187
+        "survivor": 54755
       }
     },
     {
       "description": "R2: the survivor is reclaimed even though its leader had already exited",
       "ok": true,
-      "detail": "survivor 26187"
+      "detail": "survivor 54755"
     },
     {
       "description": "R2: the group is gone after reaping",
@@ -190,17 +441,19 @@
       "detail": {
         "runtimes": 1,
         "killedProcesses": [
-          26187
+          54755
         ],
         "removedRoots": [
-          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-opILQV/home/.omp-m0-081708f2",
-          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-opILQV/home"
+          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-k6GG0R/home/.omp-m0-98bb520b",
+          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-k6GG0R/home"
         ],
         "removedRunRoots": [
-          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-opILQV"
+          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-k6GG0R"
         ],
         "stillAlive": [],
         "unattributed": [],
+        "errors": [],
+        "artifactsKept": false,
         "clean": true
       }
     },
@@ -211,13 +464,13 @@
     {
       "description": "R2: the reclaimed run root is removed",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-opILQV"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-k6GG0R"
     },
     {
       "description": "R2: a tool that left the group and dropped attribution is NOT claimed as reclaimed",
       "ok": true,
       "detail": {
-        "orphan": 26214,
+        "orphan": 54777,
         "note": "documented limitation: only its own group or its own isolation env can attribute a process"
       }
     },
@@ -227,13 +480,13 @@
       "detail": {
         "errorKind": "transport",
         "error": "chunk decode failed: rpc chunk sequence must start at index 0",
-        "elapsed": 26
+        "elapsed": 24
       }
     },
     {
       "description": "R4: the failure is reported promptly, not after the timeout elapsed",
       "ok": true,
-      "detail": "26 ms (timeout was 2000 ms)"
+      "detail": "24 ms (timeout was 2000 ms)"
     },
     {
       "description": "R4: a genuine timeout keeps its own classification",
@@ -339,17 +592,17 @@
     {
       "description": "R6: the timeout path reclaims the experiment's own child processes",
       "ok": true,
-      "detail": "grandchild 26321"
+      "detail": "grandchild 54878"
     }
   ],
   "artifacts": {
     "R2-detachedOrphan": {
-      "pid": 26214,
+      "pid": 54777,
       "stillAlive": true,
       "reapClean": true
     }
   },
   "limitations": [],
-  "finishedAt": "2026-09-22T18:19:03.775Z",
+  "finishedAt": "2026-09-22T19:20:22.886Z",
   "ok": true
 }

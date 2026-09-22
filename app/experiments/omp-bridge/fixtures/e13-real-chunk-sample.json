@@ -2,7 +2,7 @@
   "note": "REAL capture, sanitized: genuine rpc_chunk frames emitted by the pinned OMP, reassembled inside the RPC client before response matching",
   "physicalChunkFrames": 12,
   "logicalFramesAssembled": 3,
-  "reassembledResponseBytes": 1200660,
+  "reassembledResponseBytes": 1200659,
   "payloadByteComplete": true,
   "autoCompactionDisabled": true,
   "limits": {

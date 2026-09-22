@@ -21,7 +21,7 @@
  * Decisions are appended to `M1_UI_LOG` so experiments can assert what the gate
  * saw, which session it belonged to, and how it answered.
  */
-import { appendFileSync, existsSync, readFileSync, statSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 
 interface DialogOptions {
   timeout?: number;
@@ -68,44 +68,98 @@ function log(entry: Record<string, unknown>): void {
 }
 
 /**
- * Outcome of waiting for a child decision.
+ * Child-approval channel: a request-scoped, single-use decision plus an
+ * authoritative cancellation marker.
  *
- * `cancelled` is deliberately distinct from `timeout`: PI-Desktop's
- * `permissions.cancel` removes the pending request and answers Deny so a waiter
- * that raced the cancellation wakes up, while a *late* resolve returns
- * NOT_FOUND and can never execute. OMP provides no equivalent for a subagent's
- * pending tool call — the `tool_call` hook simply keeps awaiting this promise —
- * so the cancel marker below is the bridge's own implementation of that
- * contract, not an OMP capability.
+ * PI-Desktop reference (source facts): `permissions.cancel()` removes the
+ * pending request and answers Deny so a waiter racing the cancellation wakes
+ * up, and `rpc/mod.rs` re-checks cancellation after the approval wait; a late
+ * `permissions.resolve` returns NOT_FOUND. The property that matters here is
+ * that an approval which has not executed yet cannot be admitted once its
+ * cancellation is known — the *order in which files were written* is not a
+ * signal about whether the call may run.
+ *
+ * OMP provides none of this for a subagent tool call (measured: after a parent
+ * `abort` the child keeps running, no cancel frame is emitted, and an `allow`
+ * that arrives later executes the call). This channel is therefore the bridge's
+ * own implementation of that contract, not an OMP capability.
+ *
+ * Rules:
+ *   - The cancel marker is checked first on every poll. If it is present, the
+ *     call is `cancelled`, regardless of any decision already on disk: an older
+ *     `allow` cannot outrank a cancellation that is already visible.
+ *   - A decision is applied at most once and only to the call it names. An
+ *     unscoped `allow`/`deny` is consumed by the first call that reads it (the
+ *     file is rewritten as `consumed <toolCallId>`), so one approval can never
+ *     authorise two calls.
+ *   - `timeout` is its own outcome: no decision, no cancellation.
  */
-async function awaitChildDecision(toolCallId: string): Promise<"allow" | "deny" | "timeout" | "cancelled"> {
+type ChildOutcome = "allow" | "deny" | "timeout" | "cancelled";
+
+interface ScopedDecision {
+  decision: "allow" | "deny";
+  toolCallId: string | null;
+}
+
+/** Parse a decision line: `allow`, `deny`, `allow <id>` or `{"decision":…,"toolCallId":…}`. */
+function parseDecision(text: string): ScopedDecision | "consumed" | null {
+  const raw = text.trim();
+  if (!raw) return null;
+  if (raw.startsWith("consumed")) return "consumed";
+  if (raw.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(raw) as { decision?: unknown; toolCallId?: unknown };
+      if (parsed.decision === "allow" || parsed.decision === "deny") {
+        return { decision: parsed.decision, toolCallId: typeof parsed.toolCallId === "string" ? parsed.toolCallId : null };
+      }
+    } catch { /* fall through to the plain form */ }
+    return null;
+  }
+  const [verdict, id] = raw.split(/\s+/, 2);
+  const lowered = verdict?.toLowerCase();
+  if (lowered === "allow" || lowered === "deny") return { decision: lowered, toolCallId: id ?? null };
+  if (lowered === "consumed") return "consumed";
+  return null;
+}
+
+/** Mark a decision as used so no later call can reuse it. */
+function consumeDecision(path: string, toolCallId: string): void {
+  try {
+    writeFileSync(path, `consumed ${toolCallId}\n`);
+  } catch { /* best effort: the caller already holds the decision */ }
+}
+
+async function awaitChildDecision(toolCallId: string): Promise<ChildOutcome> {
   const decisionPath = process.env.M1_CHILD_DECISION;
   const cancelPath = process.env.M1_CHILD_CANCEL;
   const budgetMs = Number(process.env.M1_CHILD_DEFER_MS ?? 15_000);
   const started = Date.now();
-  let cancelObservedAt: number | null = null;
+
+  const sleep = (ms: number) => {
+    const { promise, resolve } = Promise.withResolvers<void>();
+    setTimeout(resolve, ms);
+    return promise;
+  };
 
   while (Date.now() - started < budgetMs) {
-    const cancelStat = cancelPath && existsSync(cancelPath) ? statSync(cancelPath) : null;
-    if (cancelStat) {
-      cancelObservedAt ??= cancelStat.mtimeMs;
-      // A decision that only appeared after the cancellation is late: it must
-      // not admit the call (the pending request is gone, as in NOT_FOUND).
-      const decisionStat = decisionPath && existsSync(decisionPath) ? statSync(decisionPath) : null;
-      if (!decisionStat || decisionStat.mtimeMs >= cancelStat.mtimeMs) {
-        return "cancelled";
+    // Cancellation first: it is authoritative for a call that has not run yet.
+    if (cancelPath && existsSync(cancelPath)) return "cancelled";
+
+    if (decisionPath && existsSync(decisionPath)) {
+      const parsed = parseDecision(readFileSync(decisionPath, "utf8"));
+      if (parsed === "consumed") {
+        // Already applied to some call; never reuse it.
+      } else if (parsed) {
+        if (parsed.toolCallId === null || parsed.toolCallId === toolCallId) {
+          consumeDecision(decisionPath, toolCallId);
+          return parsed.decision;
+        }
+        // A decision addressed to another call is not this call's to use.
+        log({ event: "gate-decision-ignored", reason: "scope-mismatch", toolCallId, decisionFor: parsed.toolCallId, at: Date.now() });
       }
     }
-    if (decisionPath && existsSync(decisionPath)) {
-      const text = readFileSync(decisionPath, "utf8").trim().toLowerCase();
-      if (text === "allow" || text === "deny") return text;
-    }
-    const { promise, resolve } = Promise.withResolvers<void>();
-    setTimeout(resolve, 50);
-    await promise;
+    await sleep(50);
   }
-  void toolCallId;
-  void cancelObservedAt;
   return "timeout";
 }
 

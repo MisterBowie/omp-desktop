@@ -27,7 +27,7 @@
 | `docs/07-environment-and-upstream.md` | 环境准备和上游维护 |
 | `docs/validation/M0-baseline.md` | M0 验证记录（命令、版本、退出码、SHA、截图） |
 | `docs/validation/M0-screenshots/` | M0 代表性界面基线截图（项目列表/设置/模型/扩展） |
-| `docs/validation/M1-compatibility.md` | M1 验证记录（E01-E13、378 项检查、传输能力矩阵、未执行项、三轮复审返修 R1-R6 / F1-F6 / R1-R4） |
+| `docs/validation/M1-compatibility.md` | M1 验证记录（E01-E13、396 项检查、传输能力矩阵、未执行项、三轮复审返修 R1-R6 / F1-F6 / R1-R4） |
 | `docs/decisions/001-omp-transport.md` | 接入传输路径决策（含 M2 必须遵守的十二条约束） |
 | `app/experiments/omp-bridge/` | M1 实验套件：`node run-all.mjs` 可复现，含 `tools/long-task.mjs`、`lib/runtime-registry.mjs`（按运行标识回收资源）、fixtures/results |
 
@@ -58,13 +58,16 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 
 ## 3.2 M1 已完成的工作
 
-- 在 `app/experiments/omp-bridge/` 建立可复现实验套件 E01-E13(本地假 provider、每实例合成 HOME 与隔离配置根、进程组回收)。`node run-all.mjs`:**13/13 实验、378/378 检查通过,退出码 0,约 209 秒**;汇总按「退出码 0 + 无信号 + PASS + 结果文件命名/`ok` 一致 + 本轮运行标识」判定,并回收被强杀实验的 detached 运行时与隔离目录。
+- 在 `app/experiments/omp-bridge/` 建立可复现实验套件 E01-E13(本地假 provider、每实例合成 HOME 与隔离配置根、进程组回收)。`node run-all.mjs`:**13/13 实验、396/396 检查通过,退出码 0,约 206 秒**;汇总按「退出码 0 + 无信号 + PASS + 结果文件命名/`ok` 一致 + 本轮运行标识」判定,并回收被强杀实验的 detached 运行时与隔离目录。
 - 权限链路实测:受信扩展的 `tool_call` 钩子在**执行前**拿到工具名与具体目标,拒绝时无文件/进程副作用,批准后只执行一次;宿主工具(`set_host_tools`)同样经过该钩子。审批问答通过 `extension_ui_request` 的 `select/confirm/input` 往返,并覆盖取消与超时。
 - 取消链路实测(复审 R1 后重做):顶层会话里 `abort` 就能回收**真实运行的命令进程及其子进程**(用自行写 PID 的外部程序验证);**不先停止就杀桥接进程组会留下孤儿**,因为命令运行在自己的 session/进程组;挂起对话被 `cancel` 且解析为 deny、会话保持可响应。停止顺序因此定为"先协议内停止,再拆桥接"。
 - 子代理挂起审批的取消(第三轮 R1):**OMP 不提供**——父 `abort` 成功后子代理仍 `running`、无取消帧、延迟 300 ms 的 allow 会真的执行;E11 改为由**桥接侧取消标记**实现"停止后旧审批不能再放行",并区分取消/拒绝/超时。桌面须在 M2/T09 自建该机制。
 - 子代理(R3 新增 E11,复审 F1 后按会话身份路由重做):子代理的工具调用**会**进入同一条 `tool_call` 钩子,但钩子在子代理会话里 `hasUI=false`,不可能向用户弹窗——纯 UI 依赖的审批会被立即拒绝,审批必须由桌面策略或带外通道决定;策略批准时由子代理恰好执行一次。父会话 `abort` **不会**回收 detached 子代理正在运行的命令树(子代理仍被报为运行中),需要显式的进程树终止。
 - 配置隔离(R2 加固):子进程 `HOME` 指向运行目录内的合成家目录,并剥离额外重定向变量;正对照(合成 HOME 里的全局规则生效)与反对照(decoy HOME 的规则/技能不生效)都已验证,测试不再读取真实用户配置。
 - 协议分片(R4 新增 E13,复审 F3 后接入客户端):关闭自动压缩后 1.2 MB 提示产生真实 `rpc_chunk`,解码器现接在**响应匹配之前**,`rpc.request()` 能拿到 1,200,650 字节的完整重组响应;分片写回 stdin 会被拒绝(`Unknown command: rpc_chunk`),而单行超限命令可直接接受;分片故障不可恢复(固定实现亦视为致命),桌面应重启运行时。
+- 取消语义(第四轮 R1):取消对尚未执行的调用具有决定权——每轮先查取消标记,决定按 `toolCallId` 归属且单次消费,不再用文件 mtime 判断(真实 OMP 探针证伪了旧规则);E12 覆盖取消先到、allow 先落盘后被取消、正常允许、显式拒绝、真实超时与作用域不匹配。
+- 回收验收(第四轮 R2):回收异常/`clean=false`/存活资源进入验收判定,失败时非零退出且 summary 保留结构化诊断;清理失败的登记保留可重试;`--keep-artifacts` 不算失败。
+- 离线烟测(第四轮 C1):M0 隔离环境显式离线(出站指向关闭端口、loopback 直连),默认命令恢复通过且**未放宽超时**;原因见验证报告 §8.3。
 - 回收语义(第三轮 R2/R3):按**进程组存活**决定 SIGKILL 升级(组长退出不豁免,对照 `npm-executable.ts` 的 `settle()`),存活成员按 `/proc` 的 `pgrp` 精确枚举,清理未完成保留登记且不谎报;按所有权删除本轮 `.dev-data/m1/<run>-*` 临时根并遵循 `--keep-artifacts`。
 - 传输错误分类(第三轮 R4):等待中的协议/流错误按真实错误返回(`errorKind="transport"`),只有真正超时才归类 timeout。
 - 工具链加固(E12,R5/R6 与复审 F2-F5):帧结构校验、启动失败有界清理;汇总按「退出码 0 + 无信号 + PASS + 结果文件命名/`ok` 一致 + 本轮运行标识」判定;被超时杀死的实验,其 detached 运行时、后代与隔离目录按**环境归属**有界回收(不按进程名);参数选择集合正确。
@@ -84,7 +87,7 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 
 M0 已完成并经四轮复审返修：原桌面可复现构建、开发数据与全局 `.agents` 隔离、UI 基线、OMP 协议启动（绑定 repo 内启动器、版本 18.2.7、`ready`/`negotiate_protocol` v2）均有记录（`docs/validation/M0-baseline.md`，顶部四段“返修记录”）。环境已就绪：Node 24、pnpm 10.34.5、Bun 1.4.2、桌面 Rust stable + OMP `nightly-2026-08-12`、cmake/ninja。复审结论以复审方为准。
 
-M1 已定案接入路径并留下约束，见 `docs/decisions/001-omp-transport.md`（§3 十二条必须实现的约束）。M2 不得重新论证 rpc-ui 选择，除非出现新证据；停止必须先协议内停止再拆桥接（顶层 `abort` 即回收命令进程，子代理需显式终止其进程树），审批必须先于执行，子代理审批不能假设继承父会话 UI。实验套件可继续复用于回归：`cd app/experiments/omp-bridge && node run-all.mjs`（378 项检查）。
+M1 已定案接入路径并留下约束，见 `docs/decisions/001-omp-transport.md`（§3 十二条必须实现的约束）。M2 不得重新论证 rpc-ui 选择，除非出现新证据；停止必须先协议内停止再拆桥接（顶层 `abort` 即回收命令进程，子代理需显式终止其进程树），审批必须先于执行，子代理审批不能假设继承父会话 UI。实验套件可继续复用于回归：`cd app/experiments/omp-bridge && node run-all.mjs`（396 项检查）。
 
 ## 5. 可直接交给执行模型
 

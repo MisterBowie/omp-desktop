@@ -15,7 +15,7 @@
  *
  * Usage: node e12-harness-faults.mjs [--keep-artifacts]
  */
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
@@ -84,6 +84,7 @@ function runSuiteIn(dir, { timeoutMs = 8000, extraArgs = [], env = {} } = {}) {
 }
 
 import { parseArgs } from "./lib/suite-policy.mjs";
+import { reapRunResources } from "./lib/runtime-registry.mjs";
 
 const evidence = await runExperiment("e12-harness-faults", async (ctx) => {
   const repoRoot = resolveRepoRoot();
@@ -331,6 +332,217 @@ setInterval(() => {}, 1000);
       note: "SYNTHETIC fault sample: a corrupted chunk sequence, then a well-formed one, then a normal frame",
     });
     rmSync(runRoot, { recursive: true, force: true });
+  }
+
+  // ==========================================================================
+  // R2 — a cleanup failure must fail the run, not be reported as success
+  //
+  // PI-Desktop reference: it has no equivalent aggregator, so the requirement
+  // here is M1's own acceptance rule — its descendant test asserts the process
+  // is actually gone, and a product-side `warn` on scratch deletion is product
+  // cleanup behaviour, not evidence that "no residue" was verified.
+  // ==========================================================================
+  {
+    const suiteDir = mkdtempSync(join(tmpdir(), "m1-r2-cleanup-"));
+    mkdirSync(join(suiteDir, "results"), { recursive: true });
+    const report = join(suiteDir, "stub-report.json");
+
+    // A stub that looks fully successful (valid result, PASS, exit 0) but leaves
+    // its own scratch root behind with an undeletable inner directory.
+    const stubSource = (targetDir, reportPath) => `#!/usr/bin/env node
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+const BASE = ${JSON.stringify(HERE)};
+const { makeScratch } = await import(join(BASE, "lib/base.mjs"));
+const { registerRuntime } = await import(join(BASE, "lib/runtime-registry.mjs"));
+const runRoot = makeScratch("review-cleanup-fail");
+const protectedDir = join(runRoot, "agent", "protected");
+mkdirSync(protectedDir, { recursive: true });
+writeFileSync(join(protectedDir, "x"), "x");
+// Register a runtime that has already exited: the process side is clean, only
+// the directory removal will fail.
+registerRuntime(join(BASE, "..", "..", "..", ".dev-data", "m1"), {
+  pid: 999999, pgrp: 999999, agentDir: join(runRoot, "agent"), configDirName: ".omp-m0-review",
+  configRoot: join(runRoot, "home", ".omp-m0-review"), home: join(runRoot, "home"),
+  runRoot, runId: process.env.M1_RUN_ID, ownerPid: process.pid, owner: "e97",
+});
+chmodSync(protectedDir, 0o500);
+const dir = join(${JSON.stringify("__TARGET_DIR__")}, "results");
+mkdirSync(dir, { recursive: true });
+writeFileSync(join(dir, "e97-cleanup-fails.json"), JSON.stringify({ experiment: "e97-cleanup-fails", ok: true, runId: process.env.M1_RUN_ID, checks: [] }) + "\\n");
+writeFileSync(${JSON.stringify("__REPORT__")}, JSON.stringify({ runRoot, protectedDir, runId: process.env.M1_RUN_ID }));
+console.log("PASS e97-cleanup-fails: 1/1 checks");
+process.exit(0);
+`.replace("__TARGET_DIR__", targetDir).replace("__REPORT__", reportPath);
+
+    writeFileSync(join(suiteDir, "e97-cleanup-fails.mjs"), stubSource(suiteDir, report), { mode: 0o755 });
+
+    const suite = await runSuiteIn(suiteDir, { timeoutMs: 20_000 });
+    ctx.check("R2: the run fails when cleanup cannot reclaim what the experiment left", suite.code !== 0, suite.code);
+    ctx.check("R2: the failure is reported as a cleanup failure, not hidden behind PASS",
+      /REJECTED.*cleanup/.test(suite.out), suite.out.split("\n").find((l) => l.includes("e97")));
+    const summary = existsSync(join(suiteDir, "results", "summary.json"))
+      ? JSON.parse(readFileSync(join(suiteDir, "results", "summary.json"), "utf8"))
+      : null;
+    const row = summary?.experiments?.find((e) => e.file === "e97-cleanup-fails.mjs");
+    ctx.check("R2: summary keeps the reason and structured diagnostics",
+      row?.passed === false && /cleanup/.test(row?.verdict ?? "") && (row?.cleanup?.errors?.length ?? 0) > 0,
+      { passed: row?.passed, verdict: row?.verdict, errors: row?.cleanup?.errors });
+    const info = existsSync(report) ? JSON.parse(readFileSync(report, "utf8")) : null;
+    ctx.check("R2: the undeletable root is still reported as leftover", Boolean(info) && existsSync(info.runRoot), info?.runRoot);
+
+    // Ownership evidence must survive a failed cleanup so a retry is possible.
+    const dataRoot = join(HERE, "..", "..", "..", ".dev-data", "m1");
+    const registrations = existsSync(join(dataRoot, ".runtimes")) ? readdirSync(join(dataRoot, ".runtimes")).length : 0;
+    ctx.check("R2: the failed cleanup keeps its retryable registration", registrations >= 1, registrations);
+
+    // Retry after the obstruction is gone: it must now succeed and clean up.
+    if (info) {
+      chmodSync(info.protectedDir, 0o700);
+      const retry = await reapRunResources({ dataRoot, runId: info.runId, keepArtifacts: false, sweep: false });
+      ctx.check("R2: a retry reclaims the leftover root once the obstruction is gone",
+        !existsSync(info.runRoot) && retry.errors.length === 0, { errors: retry.errors, exists: existsSync(info.runRoot) });
+    }
+
+    // --keep-artifacts intentionally preserves the scratch root: not a failure.
+    const keepDir = mkdtempSync(join(tmpdir(), "m1-r2-keep-"));
+    mkdirSync(join(keepDir, "results"), { recursive: true });
+    const keepReport = join(keepDir, "stub-report.json");
+    writeFileSync(join(keepDir, "e97-cleanup-fails.mjs"), stubSource(keepDir, keepReport), { mode: 0o755 });
+    const keepSuite = await runSuiteIn(keepDir, { timeoutMs: 20_000, extraArgs: ["--keep-artifacts"] });
+    const keepInfo = existsSync(keepReport) ? JSON.parse(readFileSync(keepReport, "utf8")) : null;
+    ctx.check("R2: --keep-artifacts is not reported as a cleanup failure",
+      keepSuite.code === 0 && /PASS e97/.test(keepSuite.out), { exit: keepSuite.code, out: keepSuite.out.split("\n").slice(0, 2) });
+    ctx.check("R2: --keep-artifacts really keeps the run root", Boolean(keepInfo) && existsSync(keepInfo.runRoot), keepInfo?.runRoot);
+    if (keepInfo?.protectedDir) chmodSync(keepInfo.protectedDir, 0o700);
+    if (keepInfo?.runRoot) rmSync(keepInfo.runRoot, { recursive: true, force: true });
+    // The kept run leaves its own registration (pid 999999): drop it explicitly.
+    for (const file of readdirSync(join(dataRoot, ".runtimes"))) {
+      if (file === "999999.json") rmSync(join(dataRoot, ".runtimes", file), { force: true });
+    }
+
+    writeFixture("e12-cleanup-verdict.json", {
+      note: "SYNTHETIC fault sample: an experiment that passes but leaves an undeletable scratch root",
+      failingRun: { exitCode: suite.code, verdict: row?.verdict ?? null, cleanupErrors: row?.cleanup?.errors ?? [] },
+      registrationsAfterFailure: registrations,
+      keepArtifactsRun: { exitCode: keepSuite.code, rootKept: Boolean(keepInfo) && existsSync(keepInfo.runRoot) },
+    });
+    rmSync(suiteDir, { recursive: true, force: true });
+    rmSync(keepDir, { recursive: true, force: true });
+  }
+
+  // ==========================================================================
+  // R1 — cancellation is authoritative for a call that has not executed, and a
+  // decision is request-scoped and single-use
+  //
+  // PI-Desktop reference (source facts): `permissions.cancel()` removes the
+  // pending request and answers Deny to wake a racing waiter, and a late
+  // `permissions.resolve` returns NOT_FOUND. The governing property is that a
+  // not-yet-executed call cannot be admitted once its cancellation is known —
+  // the write order of the decision and cancel files says nothing about that.
+  // ==========================================================================
+  {
+    const gateSource = join(HERE, "extensions", "approval-gate.ts");
+    const { default: approvalGate } = await import(gateSource);
+    const gateRoot = mkdtempSync(join(tmpdir(), "m1-gate-"));
+
+    let handler = null;
+    approvalGate({ on: (_event, h) => { handler = h; } });
+    ctx.check("R1: the gate exposes a tool_call handler", typeof handler === "function");
+
+    const childCtx = { hasUI: false, sessionManager: { getSessionId: () => "review-child" } };
+    const callWrite = (dir, toolCallId) =>
+      handler({ toolName: "write", toolCallId, input: { path: join(dir, "side-effect.txt") } }, childCtx);
+
+    /** Run one case in its own directory with fresh decision/cancel files. */
+    const runCase = async (name, { decision, cancel, order = [], toolCallId = `call-${name}`, deferMs = 800 }) => {
+      const dir = join(gateRoot, name);
+      mkdirSync(dir, { recursive: true });
+      const decisionPath = join(dir, "decision");
+      const cancelPath = join(dir, "cancel");
+      const audit = join(dir, "audit.jsonl");
+      writeFileSync(audit, "");
+      process.env.M1_CHILD_POLICY = "defer";
+      process.env.M1_CHILD_DEFER_MS = String(deferMs);
+      process.env.M1_CHILD_DECISION = decisionPath;
+      process.env.M1_CHILD_CANCEL = cancelPath;
+      process.env.M1_UI_LOG = audit;
+      process.env.M1_UI_LOG_ALL = "1";
+
+      // `order` lets a case stage files before the waiter starts, which is the
+      // deterministic form of "the waiter was frozen while both were written".
+      for (const step of order) {
+        if (step === "decision") writeFileSync(decisionPath, decision);
+        if (step === "cancel") writeFileSync(cancelPath, cancel);
+        await sleep(5);
+      }
+      const started = Date.now();
+      const result = await callWrite(dir, toolCallId);
+      const entries = readFileSync(audit, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
+      return {
+        name,
+        blocked: result?.block === true,
+        reason: result?.reason ?? null,
+        elapsed: Date.now() - started,
+        decision: entries.find((e) => e.event === "gate-decision") ?? null,
+        ignored: entries.filter((e) => e.event === "gate-decision-ignored"),
+        decisionFileContent: existsSync(decisionPath) ? readFileSync(decisionPath, "utf8").trim() : null,
+      };
+    };
+
+    // The reviewer's case: an allow that was written BEFORE the cancel must not
+    // outrank a cancellation that is already visible when the waiter resumes.
+    const earlierAllow = await runCase("earlier-allow-then-cancel", { decision: "allow", cancel: "cancel", order: ["decision", "cancel"] });
+    ctx.check("R1: an earlier allow cannot outrank an already-published cancellation",
+      earlierAllow.blocked && earlierAllow.decision?.route === "child-cancelled",
+      earlierAllow);
+    ctx.check("R1: that cancellation is classified as cancelled, not as a timeout or a defer timeout",
+      earlierAllow.decision?.cancelled === true && earlierAllow.elapsed < 800,
+      { decision: earlierAllow.decision, elapsed: earlierAllow.elapsed });
+
+    const cancelFirst = await runCase("cancel-first", { decision: "allow", cancel: "cancel", order: ["cancel"] });
+    ctx.check("R1: a cancel published before any decision blocks the call", cancelFirst.blocked && cancelFirst.decision?.route === "child-cancelled", cancelFirst);
+
+    const plainAllow = await runCase("allow", { decision: "allow", cancel: null, order: ["decision"] });
+    ctx.check("R1: without cancellation an allow still admits the call", plainAllow.blocked === false, plainAllow);
+    ctx.check("R1: an applied decision is consumed so it cannot authorise another call",
+      plainAllow.decisionFileContent?.startsWith("consumed"), plainAllow.decisionFileContent);
+
+    const plainDeny = await runCase("deny", { decision: "deny", cancel: null, order: ["decision"] });
+    ctx.check("R1: an explicit deny blocks the call", plainDeny.blocked && plainDeny.decision?.decision === "deny", plainDeny);
+
+    const noDecision = await runCase("no-decision", { decision: null, cancel: null, order: [], deferMs: 400 });
+    ctx.check("R1: a real timeout stays a distinct outcome",
+      noDecision.blocked && noDecision.decision?.outcome === "timeout" && noDecision.elapsed >= 400,
+      { decision: noDecision.decision, elapsed: noDecision.elapsed });
+
+    // A decision addressed to another call is neither applied nor consumed.
+    const scopedAway = await runCase("scoped-away", { decision: "allow someone-else", cancel: null, order: ["decision"], toolCallId: "call-mine", deferMs: 400 });
+    ctx.check("R1: a decision addressed to another call is not reused",
+      scopedAway.blocked && scopedAway.ignored.some((e) => e.reason === "scope-mismatch"),
+      { blocked: scopedAway.blocked, ignored: scopedAway.ignored });
+
+    // One approval must not authorise two calls.
+    const sharedDir = join(gateRoot, "shared-decision");
+    mkdirSync(sharedDir, { recursive: true });
+    process.env.M1_CHILD_POLICY = "defer";
+    process.env.M1_CHILD_DEFER_MS = "300";
+    process.env.M1_CHILD_DECISION = join(sharedDir, "decision");
+    process.env.M1_CHILD_CANCEL = join(sharedDir, "cancel");
+    process.env.M1_UI_LOG = join(sharedDir, "audit.jsonl");
+    writeFileSync(process.env.M1_UI_LOG, "");
+    writeFileSync(process.env.M1_CHILD_DECISION, "allow");
+    const first = await handler({ toolName: "write", toolCallId: "call-one", input: { path: join(sharedDir, "one.txt") } }, childCtx);
+    const second = await handler({ toolName: "write", toolCallId: "call-two", input: { path: join(sharedDir, "two.txt") } }, childCtx);
+    ctx.check("R1: one approval admits exactly one call",
+      first === undefined && second?.block === true, { first: first ?? null, second: second ?? null });
+
+    writeFixture("e12-cancel-decision-semantics.json", {
+      note: "SYNTHETIC fault sample: the real gate module driven directly for cancellation/decision ordering",
+      earlierAllow, cancelFirst, plainAllow, plainDeny, noDecision, scopedAway,
+      oneApprovalOneCall: { first: first ?? null, second: second?.block === true },
+    });
+    rmSync(gateRoot, { recursive: true, force: true });
   }
 
   // ==========================================================================

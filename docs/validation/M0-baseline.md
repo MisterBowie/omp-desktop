@@ -267,6 +267,16 @@ node docs/validation/M0-rpc/verify-rpc.mjs
 
 注意：源码启动器 `scripts/omp` 即使只跑 `--version` 也会创建默认 `~/.omp/.dev-cwd`（除非设 `OMP_DEV_LAUNCH_DIR`）；因此所有源码入口调用都必须带上三个隔离变量。
 
+## 5.1 M1 期间的修订（2026-09-23，C1）
+
+M1 复审指出：本文件第 5 节的"默认真实无费用 RPC 通过"在当前网络环境下不可复现——`node docs/validation/M0-rpc/verify-rpc.mjs` 退出 1，`get_available_models failed: no response`（8.88 s，步上限 8 s）。
+
+定位到的机制（实测，非推断）：`get_available_models` 会等待 `awaitBackgroundRefresh()`（`upstream/oh-my-pi/packages/coding-agent/src/modes/rpc/rpc-mode.ts:1423`），该后台发现会向远端目录/服务发起出站 HTTPS（抓到的 CONNECT 目标包括 `catalog.stencil.so`、`hyper.charm.land`、`api.kilo.ai`、`api.venice.ai`、`zenmux.ai`、`api.commandcode.ai`、`coding-intl.dashscope.aliyuncs.com`）。本机这些连接是黑洞而非拒绝，因此耗到 `REMOTE_DISCOVERY_TIMEOUT_MS = 10_000`（`config/model-discovery.ts:67`）。同一次调用实测：首次 10,036 ms、第二次 25 ms；把出站指向拒绝连接的本地端口后 24 ms；`get_state` 全程 24 ms。
+
+修订：`docs/validation/M0-rpc/verify-rpc.mjs` 的 `buildIsolatedEnv` 现在把子进程 `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` 指向关闭的本地端口，并用 `NO_PROXY` 放行 loopback。夹具 provider 在 loopback,因此仍直连;烟测不再依赖本机外网可达性。**未放宽任何超时**（步上限仍为 8 s）。
+
+修订后的默认命令结果（2026-09-23 实跑）：`PASS`，退出码 0，1.28 s，`models : local-model`；M0 假进程单测仍 18/18。第 5 节的历史记录保留为当时事实。
+
 ## 6. 未完成项与剩余风险
 
 1. 原 PI-Desktop 1 个上游测试因本机 `SSH_ASKPASS` 环境变量失败（非回归，`env -u SSH_ASKPASS` 后完整 desktop 套件全通过，见 3.1）。

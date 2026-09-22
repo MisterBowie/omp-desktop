@@ -177,6 +177,11 @@ export async function reapRunResources({
     removedRunRoots: [],
     stillAlive: [],
     unattributed: [],
+    // Structured, readable failures. `clean` is false whenever anything here is
+    // non-empty, so the suite's verdict can depend on the real outcome instead
+    // of on a swallowed exception.
+    errors: [],
+    artifactsKept: keepArtifacts,
     clean: true,
   };
 
@@ -223,8 +228,28 @@ export async function reapRunResources({
     for (const pid of owned) if (alive(pid)) result.stillAlive.push(pid);
   }
 
-  // 3. Cleanup only what this run owns. A registration is dropped only when its
-  //    group is really gone, so a failed cleanup stays retryable.
+  // 3. Cleanup only what this run owns. A registration is dropped only when the
+  //    group is gone AND every removal succeeded, so a failed cleanup stays
+  //    retryable instead of losing the only ownership evidence we have.
+  const removeOwned = (entry, dir, bucket) => {
+    if (!dir) return;
+    const abs = resolve(dir);
+    try {
+      rmSync(abs, { recursive: true, force: true });
+      bucket.push(abs);
+    } catch (error) {
+      result.errors.push({ phase: "remove", path: abs, pid: entry.pid, message: String(error?.message ?? error) });
+    }
+  };
+
+  /** True when `dir` lives inside `parent` (the run roots are never the parent). */
+  const insideOf = (dir, parent) => {
+    if (!dir || !parent) return false;
+    const abs = resolve(dir);
+    const base = resolve(parent);
+    return abs !== base && abs.startsWith(`${base}/`);
+  };
+
   for (const entry of entries) {
     const pgid = entry.pgrp ?? entry.pid;
     if (groupAlive(pgid)) {
@@ -232,23 +257,16 @@ export async function reapRunResources({
       result.clean = false;
       continue;
     }
+    const errorsBefore = result.errors.length;
     for (const dir of [entry.configRoot, entry.home]) {
-      if (!dir) continue;
-      const abs = resolve(dir);
-      if (!abs.includes(`${resolve(entry.runRoot ?? "")}/`)) continue;
-      rmSync(abs, { recursive: true, force: true });
-      result.removedRoots.push(abs);
+      if (insideOf(dir, entry.runRoot)) removeOwned(entry, dir, result.removedRoots);
     }
-    if (!keepArtifacts && entry.runRoot) {
-      const absRun = resolve(entry.runRoot);
-      const owned = `${resolve(dataRoot)}/`;
-      if (absRun.startsWith(owned) && absRun !== resolve(dataRoot)) {
-        rmSync(absRun, { recursive: true, force: true });
-        result.removedRunRoots.push(absRun);
-      }
-    }
-    unregisterRuntime(dataRoot, entry.pid);
+    // The run root itself is guarded by the experiment data root, not by itself.
+    if (!keepArtifacts && insideOf(entry.runRoot, dataRoot)) removeOwned(entry, entry.runRoot, result.removedRunRoots);
+    // Keep the registration when this entry's cleanup failed.
+    if (result.errors.length === errorsBefore) unregisterRuntime(dataRoot, entry.pid);
   }
   if (result.stillAlive.length > 0) result.clean = false;
+  if (result.errors.length > 0) result.clean = false;
   return result;
 }

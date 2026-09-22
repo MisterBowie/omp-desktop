@@ -1,0 +1,155 @@
+{
+  "note": "SYNTHETIC fault sample: the real gate module driven directly for cancellation/decision ordering",
+  "earlierAllow": {
+    "name": "earlier-allow-then-cancel",
+    "blocked": true,
+    "reason": "aborted: the session was stopped while this approval was pending",
+    "elapsed": 0,
+    "decision": {
+      "event": "gate-decision",
+      "decision": "deny",
+      "route": "child-cancelled",
+      "cancelled": true,
+      "toolCallId": "call-earlier-allow-then-cancel",
+      "at": 1790104810953
+    },
+    "ignored": [],
+    "decisionFileContent": "allow"
+  },
+  "cancelFirst": {
+    "name": "cancel-first",
+    "blocked": true,
+    "reason": "aborted: the session was stopped while this approval was pending",
+    "elapsed": 0,
+    "decision": {
+      "event": "gate-decision",
+      "decision": "deny",
+      "route": "child-cancelled",
+      "cancelled": true,
+      "toolCallId": "call-cancel-first",
+      "at": 1790104810958
+    },
+    "ignored": [],
+    "decisionFileContent": null
+  },
+  "plainAllow": {
+    "name": "allow",
+    "blocked": false,
+    "reason": null,
+    "elapsed": 0,
+    "decision": {
+      "event": "gate-decision",
+      "decision": "allow",
+      "route": "child-defer",
+      "at": 1790104810964
+    },
+    "ignored": [],
+    "decisionFileContent": "consumed call-allow"
+  },
+  "plainDeny": {
+    "name": "deny",
+    "blocked": true,
+    "reason": "denied: no out-of-band decision (deny)",
+    "elapsed": 0,
+    "decision": {
+      "event": "gate-decision",
+      "decision": "deny",
+      "route": "child-defer",
+      "outcome": "deny",
+      "at": 1790104810969
+    },
+    "ignored": [],
+    "decisionFileContent": "consumed call-deny"
+  },
+  "noDecision": {
+    "name": "no-decision",
+    "blocked": true,
+    "reason": "denied: no out-of-band decision (timeout)",
+    "elapsed": 402,
+    "decision": {
+      "event": "gate-decision",
+      "decision": "deny",
+      "route": "child-defer",
+      "outcome": "timeout",
+      "at": 1790104811371
+    },
+    "ignored": [],
+    "decisionFileContent": null
+  },
+  "scopedAway": {
+    "name": "scoped-away",
+    "blocked": true,
+    "reason": "denied: no out-of-band decision (timeout)",
+    "elapsed": 402,
+    "decision": {
+      "event": "gate-decision",
+      "decision": "deny",
+      "route": "child-defer",
+      "outcome": "timeout",
+      "at": 1790104811778
+    },
+    "ignored": [
+      {
+        "event": "gate-decision-ignored",
+        "reason": "scope-mismatch",
+        "toolCallId": "call-mine",
+        "decisionFor": "someone-else",
+        "at": 1790104811376
+      },
+      {
+        "event": "gate-decision-ignored",
+        "reason": "scope-mismatch",
+        "toolCallId": "call-mine",
+        "decisionFor": "someone-else",
+        "at": 1790104811426
+      },
+      {
+        "event": "gate-decision-ignored",
+        "reason": "scope-mismatch",
+        "toolCallId": "call-mine",
+        "decisionFor": "someone-else",
+        "at": 1790104811476
+      },
+      {
+        "event": "gate-decision-ignored",
+        "reason": "scope-mismatch",
+        "toolCallId": "call-mine",
+        "decisionFor": "someone-else",
+        "at": 1790104811526
+      },
+      {
+        "event": "gate-decision-ignored",
+        "reason": "scope-mismatch",
+        "toolCallId": "call-mine",
+        "decisionFor": "someone-else",
+        "at": 1790104811577
+      },
+      {
+        "event": "gate-decision-ignored",
+        "reason": "scope-mismatch",
+        "toolCallId": "call-mine",
+        "decisionFor": "someone-else",
+        "at": 1790104811627
+      },
+      {
+        "event": "gate-decision-ignored",
+        "reason": "scope-mismatch",
+        "toolCallId": "call-mine",
+        "decisionFor": "someone-else",
+        "at": 1790104811677
+      },
+      {
+        "event": "gate-decision-ignored",
+        "reason": "scope-mismatch",
+        "toolCallId": "call-mine",
+        "decisionFor": "someone-else",
+        "at": 1790104811727
+      }
+    ],
+    "decisionFileContent": "allow someone-else"
+  },
+  "oneApprovalOneCall": {
+    "first": null,
+    "second": true
+  }
+}

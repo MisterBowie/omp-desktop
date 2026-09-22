@@ -1,7 +1,7 @@
 {
   "experiment": "e11-subagent-permissions",
-  "runId": "run-muczvppa-2ad6ee",
-  "startedAt": "2026-09-22T18:17:15.002Z",
+  "runId": "run-mud22nhi-2a4e99",
+  "startedAt": "2026-09-22T19:18:32.818Z",
   "checks": [
     {
       "description": "deny: requests were routed to two distinct sessions",
@@ -25,8 +25,8 @@
         "toolName": "task",
         "hasUI": true,
         "gated": false,
-        "sessionId": "01a0ca56-1ad4-7494-a3f5-518eeda3961c",
-        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-0JYf8t/project"
+        "sessionId": "01a0ca8e-3918-72dc-9782-fb15bea56350",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-as3kgp/project"
       }
     },
     {
@@ -37,22 +37,22 @@
         "toolName": "write",
         "hasUI": false,
         "gated": true,
-        "sessionId": "01a0ca56-1bb7-707b-ace8-fc0fd7769968",
-        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-0JYf8t/project"
+        "sessionId": "01a0ca8e-3a43-772b-9c12-963e76b01661",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-as3kgp/project"
       }
     },
     {
       "description": "deny: the child's session is distinct from the parent's session",
       "ok": true,
       "detail": {
-        "child": "01a0ca56-1bb7-707b-ace8-fc0fd7769968",
-        "parent": "01a0ca56-1ad4-7494-a3f5-518eeda3961c"
+        "child": "01a0ca8e-3a43-772b-9c12-963e76b01661",
+        "parent": "01a0ca8e-3918-72dc-9782-fb15bea56350"
       }
     },
     {
       "description": "deny: the gate saw the child's own target",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-0JYf8t/project/child-deny.txt"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-as3kgp/project/child-deny.txt"
     },
     {
       "description": "deny: the child is linked to the parent's task call",
@@ -65,7 +65,7 @@
     {
       "description": "deny: the child ran in its own session file",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-0JYf8t/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e11-deny-0JYf8t-project--/2026-09-22T18-17-15-732Z_01a0ca56-1ad4-7494-a3f5-518eeda3961c/M1Child.jsonl"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-as3kgp/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e11-deny-as3kgp-project--/2026-09-22T19-18-33-496Z_01a0ca8e-3918-72dc-9782-fb15bea56350/M1Child.jsonl"
     },
     {
       "description": "deny: the parent never issued a write of its own",
@@ -81,7 +81,7 @@
         "event": "gate-decision",
         "decision": "deny",
         "route": "child-policy",
-        "at": 1790101036010
+        "at": 1790104713848
       }
     },
     {
@@ -128,8 +128,8 @@
         "toolName": "task",
         "hasUI": true,
         "gated": false,
-        "sessionId": "01a0ca56-24ad-74f7-b9a3-087bdd99a837",
-        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-heM1Fd/project"
+        "sessionId": "01a0ca8e-42fe-73c3-b6f8-dcc2dcfb9660",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-bOBJ3R/project"
       }
     },
     {
@@ -140,22 +140,22 @@
         "toolName": "write",
         "hasUI": false,
         "gated": true,
-        "sessionId": "01a0ca56-2584-768d-87c3-e9ce2195644b",
-        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-heM1Fd/project"
+        "sessionId": "01a0ca8e-4435-7218-afde-38e938d9006d",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-bOBJ3R/project"
       }
     },
     {
       "description": "allow: the child's session is distinct from the parent's session",
       "ok": true,
       "detail": {
-        "child": "01a0ca56-2584-768d-87c3-e9ce2195644b",
-        "parent": "01a0ca56-24ad-74f7-b9a3-087bdd99a837"
+        "child": "01a0ca8e-4435-7218-afde-38e938d9006d",
+        "parent": "01a0ca8e-42fe-73c3-b6f8-dcc2dcfb9660"
       }
     },
     {
       "description": "allow: the gate saw the child's own target",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-heM1Fd/project/child-allow.txt"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-bOBJ3R/project/child-allow.txt"
     },
     {
       "description": "allow: the child is linked to the parent's task call",
@@ -168,7 +168,7 @@
     {
       "description": "allow: the child ran in its own session file",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-heM1Fd/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e11-allow-heM1Fd-project--/2026-09-22T18-17-18-253Z_01a0ca56-24ad-74f7-b9a3-087bdd99a837/M1Child.jsonl"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-bOBJ3R/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e11-allow-bOBJ3R-project--/2026-09-22T19-18-36-030Z_01a0ca8e-42fe-73c3-b6f8-dcc2dcfb9660/M1Child.jsonl"
     },
     {
       "description": "allow: the parent never issued a write of its own",
@@ -184,7 +184,7 @@
         "event": "gate-decision",
         "decision": "allow",
         "route": "child-policy",
-        "at": 1790101038518
+        "at": 1790104716391
       }
     },
     {
@@ -219,7 +219,7 @@
       "description": "C: the parent stop is acknowledged",
       "ok": true,
       "detail": {
-        "id": "req-9a0fc2d6",
+        "id": "req-0bb709b8",
         "type": "response",
         "command": "abort",
         "success": true
@@ -249,7 +249,7 @@
         "route": "child-cancelled",
         "cancelled": true,
         "toolCallId": "call_fake_19_0",
-        "at": 1790101041673
+        "at": 1790104719391
       }
     },
     {
@@ -277,33 +277,33 @@
       "description": "D: the child really started the external program",
       "ok": true,
       "detail": {
-        "pid": 25116,
-        "ppid": 24999,
-        "descendantPid": 25123,
+        "pid": 54206,
+        "ppid": 54096,
+        "descendantPid": 54213,
         "argv": [
-          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-cancel-LwXOTy/project/child-identity.json"
+          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-cancel-WS19tq/project/child-identity.json"
         ],
-        "startedAt": 1790101043433
+        "startedAt": 1790104721324
       }
     },
     {
       "description": "D: the child's program is alive before the parent stops",
       "ok": true,
-      "detail": 25116
+      "detail": 54206
     },
     {
       "description": "D: the child's descendant is alive before the parent stops",
       "ok": true,
-      "detail": 25123
+      "detail": 54213
     },
     {
       "description": "D: the command belongs to a child process, not OMP itself",
       "ok": true,
       "detail": {
-        "child": 25116,
-        "ppid": 24999,
-        "omp": 24999,
-        "harness": 24604
+        "child": 54206,
+        "ppid": 54096,
+        "omp": 54096,
+        "harness": 53806
       }
     },
     {
@@ -314,7 +314,7 @@
           "event": "gate-decision",
           "decision": "allow",
           "route": "child-policy",
-          "at": 1790101043384
+          "at": 1790104721270
         }
       ]
     },
@@ -329,7 +329,7 @@
     {
       "description": "D: an explicit process-tree kill reclaims the child's command tree",
       "ok": true,
-      "detail": "pid 25116 descendant 25123"
+      "detail": "pid 54206 descendant 54213"
     }
   ],
   "artifacts": {
@@ -339,32 +339,32 @@
         "toolName": "task",
         "hasUI": true,
         "gated": false,
-        "sessionId": "01a0ca56-1ad4-7494-a3f5-518eeda3961c",
-        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-0JYf8t/project"
+        "sessionId": "01a0ca8e-3918-72dc-9782-fb15bea56350",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-as3kgp/project"
       },
       "child": {
         "event": "tool-call-audit",
         "toolName": "write",
         "hasUI": false,
         "gated": true,
-        "sessionId": "01a0ca56-1bb7-707b-ace8-fc0fd7769968",
-        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-0JYf8t/project"
+        "sessionId": "01a0ca8e-3a43-772b-9c12-963e76b01661",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-as3kgp/project"
       },
       "gate": {
         "event": "gate",
         "toolName": "write",
         "toolCallId": "call_fake_3_0",
-        "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-0JYf8t/project/child-deny.txt",
+        "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-as3kgp/project/child-deny.txt",
         "hasUI": false,
-        "sessionId": "01a0ca56-1bb7-707b-ace8-fc0fd7769968",
-        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-0JYf8t/project",
-        "at": 1790101036010
+        "sessionId": "01a0ca8e-3a43-772b-9c12-963e76b01661",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-deny-as3kgp/project",
+        "at": 1790104713848
       },
       "decision": {
         "event": "gate-decision",
         "decision": "deny",
         "route": "child-policy",
-        "at": 1790101036010
+        "at": 1790104713848
       }
     },
     "allowAudit": {
@@ -373,32 +373,32 @@
         "toolName": "task",
         "hasUI": true,
         "gated": false,
-        "sessionId": "01a0ca56-24ad-74f7-b9a3-087bdd99a837",
-        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-heM1Fd/project"
+        "sessionId": "01a0ca8e-42fe-73c3-b6f8-dcc2dcfb9660",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-bOBJ3R/project"
       },
       "child": {
         "event": "tool-call-audit",
         "toolName": "write",
         "hasUI": false,
         "gated": true,
-        "sessionId": "01a0ca56-2584-768d-87c3-e9ce2195644b",
-        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-heM1Fd/project"
+        "sessionId": "01a0ca8e-4435-7218-afde-38e938d9006d",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-bOBJ3R/project"
       },
       "gate": {
         "event": "gate",
         "toolName": "write",
         "toolCallId": "call_fake_11_0",
-        "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-heM1Fd/project/child-allow.txt",
+        "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-bOBJ3R/project/child-allow.txt",
         "hasUI": false,
-        "sessionId": "01a0ca56-2584-768d-87c3-e9ce2195644b",
-        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-heM1Fd/project",
-        "at": 1790101038518
+        "sessionId": "01a0ca8e-4435-7218-afde-38e938d9006d",
+        "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-bOBJ3R/project",
+        "at": 1790104716391
       },
       "decision": {
         "event": "gate-decision",
         "decision": "allow",
         "route": "child-policy",
-        "at": 1790101038518
+        "at": 1790104716391
       }
     },
     "C-subagentsStillRunningAfterParentStop": 1,
@@ -414,6 +414,6 @@
     "The child-session policy (`M1_CHILD_POLICY`) and the out-of-band decision file are the experiment's model of a desktop-side policy; OMP itself provides no UI for subagent sessions, so an interactive subagent approval cannot be verified here.",
     "Only the `task` agent type is driven; other agent types and the M5 subagent UI are out of M1 scope."
   ],
-  "finishedAt": "2026-09-22T18:17:48.971Z",
+  "finishedAt": "2026-09-22T19:19:06.848Z",
   "ok": true
 }

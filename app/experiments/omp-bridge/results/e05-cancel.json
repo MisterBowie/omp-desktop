@@ -1,7 +1,7 @@
 {
   "experiment": "e05-cancel",
-  "runId": "run-muczvppa-2ad6ee",
-  "startedAt": "2026-09-22T18:15:53.537Z",
+  "runId": "run-mud22nhi-2a4e99",
+  "startedAt": "2026-09-22T19:17:14.681Z",
   "checks": [
     {
       "description": "bash tool started before abort",
@@ -12,29 +12,29 @@
       "description": "the external program recorded its own identity",
       "ok": true,
       "detail": {
-        "pid": 21936,
-        "ppid": 21826,
-        "descendantPid": 21943,
+        "pid": 52303,
+        "ppid": 52186,
+        "descendantPid": 52310,
         "argv": [
-          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e05-abort-tool-8qBljs/project/identity.json"
+          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e05-abort-tool-QlB3yU/project/identity.json"
         ],
-        "startedAt": 1790100954466
+        "startedAt": 1790104635682
       }
     },
     {
       "description": "tracked pid differs from the OMP process pid",
       "ok": true,
-      "detail": "21936 vs omp 21826"
+      "detail": "52303 vs omp 52186"
     },
     {
       "description": "tracked pid differs from the harness pid",
       "ok": true,
-      "detail": "21936 vs harness 21818"
+      "detail": "52303 vs harness 52178"
     },
     {
       "description": "the program spawned a distinct descendant",
       "ok": true,
-      "detail": 21943
+      "detail": 52310
     },
     {
       "description": "the command actually started running (no shell error)",
@@ -44,18 +44,18 @@
     {
       "description": "the program is alive before abort",
       "ok": true,
-      "detail": 21936
+      "detail": 52303
     },
     {
       "description": "the descendant is alive before abort",
       "ok": true,
-      "detail": 21943
+      "detail": 52310
     },
     {
       "description": "abort is acknowledged",
       "ok": true,
       "detail": {
-        "id": "req-20504af6",
+        "id": "req-0f364820",
         "type": "response",
         "command": "abort",
         "success": true
@@ -73,7 +73,7 @@
       "description": "abort_bash is acknowledged",
       "ok": true,
       "detail": {
-        "id": "req-c306bf5a",
+        "id": "req-6a978a95",
         "type": "response",
         "command": "abort_bash",
         "success": true
@@ -93,9 +93,9 @@
       "ok": true,
       "detail": {
         "type": "extension_ui_request",
-        "id": "1589e28c6ebec0aa",
+        "id": "1589f09768d90e23",
         "method": "cancel",
-        "targetId": "1589e28c6b7ec0a9"
+        "targetId": "1589f09763d90e22"
       }
     },
     {
@@ -106,7 +106,7 @@
         "decision": "deny",
         "route": "ui",
         "choice": null,
-        "at": 1790100955578
+        "at": 1790104636835
       }
     },
     {
@@ -121,24 +121,24 @@
       "description": "the external program recorded its identity before the bridge kill",
       "ok": true,
       "detail": {
-        "pid": 22153,
-        "ppid": 22037,
-        "descendantPid": 22160,
+        "pid": 52500,
+        "ppid": 52397,
+        "descendantPid": 52507,
         "argv": [
-          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e05-bridge-kill-QAEFOb/project/identity.json"
+          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e05-bridge-kill-mRAarG/project/identity.json"
         ],
-        "startedAt": 1790100956571
+        "startedAt": 1790104637864
       }
     },
     {
       "description": "the command process is alive before the bridge kill",
       "ok": true,
-      "detail": 22153
+      "detail": 52500
     },
     {
       "description": "the descendant is alive before the bridge kill",
       "ok": true,
-      "detail": 22160
+      "detail": 52507
     },
     {
       "description": "bridge process group reaped on kill",
@@ -152,24 +152,24 @@
       "description": "scenario 4: the command is running before the orderly stop",
       "ok": true,
       "detail": {
-        "pid": 22439,
-        "ppid": 22323,
-        "descendantPid": 22446,
+        "pid": 52672,
+        "ppid": 52569,
+        "descendantPid": 52679,
         "argv": [
-          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e05-orderly-yU6rVQ/project/identity.json"
+          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e05-orderly-HEKWZ6/project/identity.json"
         ],
-        "startedAt": 1790100973973
+        "startedAt": 1790104655296
       }
     },
     {
       "description": "scenario 4: the in-protocol stop reclaims the command before teardown",
       "ok": true,
-      "detail": "pid 22439"
+      "detail": "pid 52672"
     },
     {
       "description": "scenario 4: the descendant is reclaimed by the in-protocol stop",
       "ok": true,
-      "detail": "descendant 22446"
+      "detail": "descendant 52679"
     },
     {
       "description": "scenario 4: bridge teardown then finds nothing to orphan",
@@ -182,36 +182,36 @@
   ],
   "artifacts": {
     "identity": {
-      "pid": 21936,
-      "ppid": 21826,
-      "descendantPid": 21943,
+      "pid": 52303,
+      "ppid": 52186,
+      "descendantPid": 52310,
       "argv": [
-        "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e05-abort-tool-8qBljs/project/identity.json"
+        "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e05-abort-tool-QlB3yU/project/identity.json"
       ],
-      "startedAt": 1790100954466
+      "startedAt": 1790104635682
     },
-    "ompPid": 21826,
+    "ompPid": 52186,
     "ompProc": {
-      "pid": 22037,
-      "ppid": 21818,
-      "pgrp": 22037,
-      "session": 22037,
+      "pid": 52397,
+      "ppid": 52178,
+      "pgrp": 52397,
+      "session": 52397,
       "tty": 0,
       "tpgid": -1
     },
     "commandProc": {
-      "pid": 22153,
-      "ppid": 22037,
-      "pgrp": 22153,
-      "session": 22153,
+      "pid": 52500,
+      "ppid": 52397,
+      "pgrp": 52500,
+      "session": 52500,
       "tty": 0,
       "tpgid": -1
     },
     "descendantProc": {
-      "pid": 21943,
-      "ppid": 21936,
-      "pgrp": 21936,
-      "session": 21936,
+      "pid": 52310,
+      "ppid": 52303,
+      "pgrp": 52303,
+      "session": 52303,
       "tty": 0,
       "tpgid": -1
     },
@@ -241,6 +241,6 @@
     "Killing the bridge process group did NOT reclaim the running command tree: with rpc-ui the command runs in its own process group, so a bridge-level kill alone leaves orphans. The desktop must stop the session (abort/abort_bash) before tearing the bridge down; see scenario 4 for the working order.",
     "Process termination is asserted on Linux via a self-written PID; macOS/Windows semantics are not covered here."
   ],
-  "finishedAt": "2026-09-22T18:16:14.117Z",
+  "finishedAt": "2026-09-22T19:17:35.442Z",
   "ok": true
 }

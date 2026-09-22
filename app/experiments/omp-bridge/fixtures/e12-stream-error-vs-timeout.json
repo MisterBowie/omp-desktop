@@ -3,7 +3,7 @@
   "waitingRequestError": {
     "errorKind": "transport",
     "error": "chunk decode failed: rpc chunk sequence must start at index 0",
-    "elapsedMs": 26
+    "elapsedMs": 24
   },
   "timeoutMs": 2000
 }

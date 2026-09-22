@@ -4,18 +4,18 @@
     "event": "gate",
     "toolName": "write",
     "toolCallId": "call_fake_1_0",
-    "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-deny-write-PKXhw3/project/guarded.txt",
+    "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-deny-write-OiDxK4/project/guarded.txt",
     "hasUI": true,
-    "sessionId": "01a0ca54-cca2-74b1-b239-1ec4f4f8e29f",
-    "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-deny-write-PKXhw3/project",
-    "at": 1790100950330
+    "sessionId": "01a0ca8c-f77d-7134-ab96-30150612fdad",
+    "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-deny-write-OiDxK4/project",
+    "at": 1790104631415
   },
   "decision": {
     "event": "gate-decision",
     "decision": "deny",
     "route": "ui",
     "choice": "Deny",
-    "at": 1790100950346
+    "at": 1790104631436
   },
   "dialogs": [
     {

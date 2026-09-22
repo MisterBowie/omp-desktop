@@ -90,9 +90,12 @@ function run(file) {
         // Keep the scratch roots only when the caller asked for artifacts.
         keepArtifacts: keep,
       }).catch((error) => ({ error: String(error?.message ?? error) }));
+      const cleanup = reaped?.error
+        ? { clean: false, error: String(reaped.error), stillAlive: [], unattributed: [], errors: [] }
+        : reaped ?? null;
       const verdict = timedOut
         ? { ok: false, reason: `timed out after ${PER_EXPERIMENT_TIMEOUT_MS} ms` }
-        : verdictFor({ exitCode: code, signal, headline, result, expectedRunId: RUN_ID });
+        : verdictFor({ exitCode: code, signal, headline, result, expectedRunId: RUN_ID, cleanup });
       resolve({
         file,
         exitCode: code,
@@ -103,6 +106,7 @@ function run(file) {
         verdict,
         result,
         reaped,
+        cleanup,
         cleanups: out.split("\n").filter((l) => l.startsWith("  limit: ")).map((l) => l.replace(/^  limit: /, "")),
         stderrTail: err ? err.trim().split("\n").slice(-3).join("\n") : null,
       });
@@ -116,8 +120,8 @@ for (const file of targets) {
   const row = await run(file);
   rows.push(row);
   console.log(row.verdict.ok ? (row.headline ?? "PASS") : `REJECTED (${row.verdict.reason})${row.headline ? ` — reported: ${row.headline}` : ""}`);
-  if (row.reaped && (row.reaped.stillAlive?.length || row.reaped.unattributed?.length || row.reaped.error)) {
-    console.log(`    cleanup: ${JSON.stringify(row.reaped)}`);
+  if (row.cleanup && (row.cleanup.clean === false || row.cleanup.error)) {
+    console.log(`    cleanup: ${JSON.stringify({ error: row.cleanup.error ?? null, errors: row.cleanup.errors ?? [], stillAlive: row.cleanup.stillAlive ?? [], unattributed: row.cleanup.unattributed ?? [] })}`);
   }
   if (!row.verdict.ok && row.stderrTail) console.log(`    ${row.stderrTail.replace(/\n/g, "\n    ")}`);
 }
@@ -133,7 +137,19 @@ const summary = {
     // agree, not just the printed headline.
     passed: r.verdict.ok,
     verdict: r.verdict.reason,
-    cleanup: r.reaped ? { clean: r.reaped.clean ?? null, stillAlive: r.reaped.stillAlive ?? [], unattributed: r.reaped.unattributed ?? [] } : null,
+    // Structured diagnostics: a failure here must stay readable in summary.json.
+    cleanup: r.cleanup
+      ? {
+        clean: r.cleanup.clean ?? null,
+        error: r.cleanup.error ?? null,
+        artifactsKept: r.cleanup.artifactsKept ?? false,
+        stillAlive: r.cleanup.stillAlive ?? [],
+        unattributed: r.cleanup.unattributed ?? [],
+        errors: r.cleanup.errors ?? [],
+        removedRoots: r.cleanup.removedRoots ?? [],
+        removedRunRoots: r.cleanup.removedRunRoots ?? [],
+      }
+      : null,
     headline: r.headline,
     exitCode: r.exitCode,
     signal: r.signal ?? null,

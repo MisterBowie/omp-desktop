@@ -2,11 +2,11 @@
   "note": "real capture, sanitized; a real external program (tools/long-task.mjs) records its own pid, ppid and descendant pid",
   "commandKind": "node tools/long-task.mjs <identity-file>",
   "identity": {
-    "pid": 21936,
-    "ppid": 21826,
-    "descendantPid": 21943,
+    "pid": 52303,
+    "ppid": 52186,
+    "descendantPid": 52310,
     "argv": 1,
-    "startedAt": 1790100954466
+    "startedAt": 1790104635682
   },
   "ompPidIsDistinct": true,
   "aliveBeforeStop": {
@@ -36,7 +36,7 @@
     "agent_end"
   ],
   "abortResponse": {
-    "id": "req-20504af6",
+    "id": "req-0f364820",
     "type": "response",
     "command": "abort",
     "success": true

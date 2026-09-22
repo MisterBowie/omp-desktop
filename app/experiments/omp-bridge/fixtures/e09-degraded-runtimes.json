@@ -2,7 +2,7 @@
   "note": "SYNTHETIC fault sample, not a real OMP capture: the runtimes are local stub scripts written by this experiment; only the reader's classification of them is observed behaviour.",
   "banner": {
     "execPath": "<run>/fake-runtimes/banner.mjs",
-    "pid": 23616,
+    "pid": 53443,
     "ready": true,
     "frames": [
       "ready"
@@ -16,7 +16,7 @@
   },
   "crash": {
     "execPath": "<run>/fake-runtimes/crash.mjs",
-    "pid": 23623,
+    "pid": 53451,
     "ready": false,
     "frames": [],
     "errors": [],
