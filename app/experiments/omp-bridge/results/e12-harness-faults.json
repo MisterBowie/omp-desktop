@@ -1,7 +1,7 @@
 {
   "experiment": "e12-harness-faults",
-  "runId": "run-mud22nhi-2a4e99",
-  "startedAt": "2026-09-22T19:19:06.883Z",
+  "runId": "run-mud335b2-812d80",
+  "startedAt": "2026-09-22T19:47:29.571Z",
   "checks": [
     {
       "description": "R5: start against invalid frames fails instead of crashing",
@@ -24,7 +24,7 @@
     {
       "description": "R5: the failed start left no isolated home behind",
       "ok": true,
-      "detail": "/tmp/m1-r5-BSHQwe/fail-run/home"
+      "detail": "/tmp/m1-r5-qmvlll/fail-run/home"
     },
     {
       "description": "R5: a runtime with invalid frames then ready is usable",
@@ -56,22 +56,22 @@
     {
       "description": "F2: the suite reclaimed the killed experiment's detached runtime",
       "ok": true,
-      "detail": "runtime 54363"
+      "detail": "runtime 68288"
     },
     {
       "description": "F2: the suite reclaimed the tool process the runtime detached",
       "ok": true,
-      "detail": "descendant 54422"
+      "detail": "descendant 68346"
     },
     {
       "description": "F2: the synthetic home was removed",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-VSwzFa/home"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-NFXffv/home"
     },
     {
       "description": "F2: the isolated config root was removed",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-VSwzFa/home/.omp-m0-b3f563d6"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-NFXffv/home/.omp-m0-087a45df"
     },
     {
       "description": "F2: the reaper did not touch this test process",
@@ -80,17 +80,17 @@
     {
       "description": "F2: the reaper did not touch a decoy outside this run",
       "ok": true,
-      "detail": "decoy 54342"
+      "detail": "decoy 68267"
     },
     {
       "description": "R3: the killed experiment's scratch run root is reclaimed",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-VSwzFa"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-NFXffv"
     },
     {
       "description": "R3: the killed experiment's agent data is reclaimed",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-VSwzFa/agent"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-NFXffv/agent"
     },
     {
       "description": "R3: the suite reports the cleanup as clean",
@@ -102,7 +102,7 @@
       "ok": true,
       "detail": {
         "keepExit": 1,
-        "keptRunRoot": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-1EieX5",
+        "keptRunRoot": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-NYRoLq",
         "exists": true
       }
     },
@@ -110,8 +110,8 @@
       "description": "R3: the reclaimed and kept runs used different roots",
       "ok": true,
       "detail": {
-        "reclaimed": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-VSwzFa",
-        "kept": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-1EieX5"
+        "reclaimed": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-NFXffv",
+        "kept": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-NYRoLq"
       }
     },
     {
@@ -159,6 +159,173 @@
       "ok": true
     },
     {
+      "description": "F2: no inherited lowercase proxy survives into the child env",
+      "ok": true,
+      "detail": {
+        "http_proxy": "http://127.0.0.1:9",
+        "https_proxy": "http://127.0.0.1:9",
+        "all_proxy": "http://127.0.0.1:9"
+      }
+    },
+    {
+      "description": "F2: a wildcard inherited no_proxy is replaced by the loopback-only bypass",
+      "ok": true,
+      "detail": "127.0.0.1,localhost,::1"
+    },
+    {
+      "description": "F2: NODE_USE_ENV_PROXY is not inherited",
+      "ok": true
+    },
+    {
+      "description": "F2: the harness policy is expressed in both cases",
+      "ok": true,
+      "detail": {
+        "upper": "http://127.0.0.1:9",
+        "lower": "http://127.0.0.1:9"
+      }
+    },
+    {
+      "description": "F2: a real child runtime could run under the isolated env",
+      "ok": true,
+      "detail": {
+        "code": 0,
+        "stdout": "{\"http\":\"TypeError\",\"https\":\"TypeError\",\"loopback\":\"ok\"}"
+      }
+    },
+    {
+      "description": "F2: the fake proxy receives no outbound request from the child",
+      "ok": true,
+      "detail": {
+        "httpRequests": 0,
+        "connectRequests": 0
+      }
+    },
+    {
+      "description": "F2: the child does not report a completed outbound fetch",
+      "ok": true,
+      "detail": {
+        "http": "TypeError",
+        "https": "TypeError",
+        "loopback": "ok"
+      }
+    },
+    {
+      "description": "F2: the loopback fixture path is still reachable",
+      "ok": true,
+      "detail": {
+        "http": "TypeError",
+        "https": "TypeError",
+        "loopback": "ok"
+      }
+    },
+    {
+      "description": "F1: an unconsumable decision denies the call instead of admitting it",
+      "ok": true,
+      "detail": {
+        "firstBlocked": true,
+        "secondBlocked": true,
+        "routes": [
+          "child-consume-failed"
+        ],
+        "reasons": [
+          "denied: approval decision could not be applied (consume-failed)",
+          "denied: approval decision could not be applied (consume-failed)"
+        ]
+      }
+    },
+    {
+      "description": "F1: the same unconsumable decision cannot admit a second call either",
+      "ok": true,
+      "detail": {
+        "firstBlocked": true,
+        "secondBlocked": true,
+        "routes": [
+          "child-consume-failed"
+        ],
+        "reasons": [
+          "denied: approval decision could not be applied (consume-failed)",
+          "denied: approval decision could not be applied (consume-failed)"
+        ]
+      }
+    },
+    {
+      "description": "F1: the refusal reason is explicit, not a silent allow",
+      "ok": true,
+      "detail": [
+        "denied: approval decision could not be applied (consume-failed)",
+        "denied: approval decision could not be applied (consume-failed)"
+      ]
+    },
+    {
+      "description": "F1: an unreadable decision denies rather than allowing",
+      "ok": true,
+      "detail": {
+        "firstBlocked": true,
+        "secondBlocked": true,
+        "routes": [
+          "child-decision-unreadable"
+        ],
+        "reasons": [
+          "denied: approval decision could not be applied (decision-unreadable)",
+          "denied: approval decision could not be applied (decision-unreadable)"
+        ]
+      }
+    },
+    {
+      "description": "F1: an unreadable decision cannot admit a later call either",
+      "ok": true,
+      "detail": {
+        "firstBlocked": true,
+        "secondBlocked": true,
+        "routes": [
+          "child-decision-unreadable"
+        ],
+        "reasons": [
+          "denied: approval decision could not be applied (decision-unreadable)",
+          "denied: approval decision could not be applied (decision-unreadable)"
+        ]
+      }
+    },
+    {
+      "description": "F1: an ordinary writable decision still admits exactly one call",
+      "ok": true,
+      "detail": {
+        "firstBlocked": false,
+        "secondBlocked": true,
+        "routes": [
+          "child-defer"
+        ],
+        "reasons": [
+          null,
+          "denied: no out-of-band decision (timeout)"
+        ]
+      }
+    },
+    {
+      "description": "F1: the real subagent issued two distinct tool calls",
+      "ok": true,
+      "detail": [
+        "call_fake_3_0",
+        "call_fake_4_0"
+      ]
+    },
+    {
+      "description": "F1: neither call produced a file side effect",
+      "ok": true,
+      "detail": {
+        "targetA": false,
+        "targetB": false
+      }
+    },
+    {
+      "description": "F1: both refusals are classified as consume failures",
+      "ok": true,
+      "detail": [
+        "call_fake_3_0",
+        "call_fake_4_0"
+      ]
+    },
+    {
       "description": "R2: the run fails when cleanup cannot reclaim what the experiment left",
       "ok": true,
       "detail": 1
@@ -166,20 +333,20 @@
     {
       "description": "R2: the failure is reported as a cleanup failure, not hidden behind PASS",
       "ok": true,
-      "detail": "running e97-cleanup-fails.mjs ... REJECTED (cleanup incomplete: remove /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w: EACCES, Permission denied: /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w '/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w') — reported: PASS e97-cleanup-fails: 1/1 checks"
+      "detail": "running e97-cleanup-fails.mjs ... REJECTED (cleanup incomplete: remove /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-xy3k9C: EACCES, Permission denied: /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-xy3k9C '/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-xy3k9C') — reported: PASS e97-cleanup-fails: 1/1 checks"
     },
     {
       "description": "R2: summary keeps the reason and structured diagnostics",
       "ok": true,
       "detail": {
         "passed": false,
-        "verdict": "cleanup incomplete: remove /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w: EACCES, Permission denied: /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w '/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w'",
+        "verdict": "cleanup incomplete: remove /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-xy3k9C: EACCES, Permission denied: /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-xy3k9C '/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-xy3k9C'",
         "errors": [
           {
             "phase": "remove",
-            "path": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w",
+            "path": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-xy3k9C",
             "pid": 999999,
-            "message": "EACCES, Permission denied: /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w '/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w'"
+            "message": "EACCES, Permission denied: /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-xy3k9C '/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-xy3k9C'"
           }
         ]
       }
@@ -187,7 +354,7 @@
     {
       "description": "R2: the undeletable root is still reported as leftover",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-xy3k9C"
     },
     {
       "description": "R2: the failed cleanup keeps its retryable registration",
@@ -216,7 +383,7 @@
     {
       "description": "R2: --keep-artifacts really keeps the run root",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-1g5X8j"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-9td01j"
     },
     {
       "description": "R1: the gate exposes a tool_call handler",
@@ -236,7 +403,7 @@
           "route": "child-cancelled",
           "cancelled": true,
           "toolCallId": "call-earlier-allow-then-cancel",
-          "at": 1790104810953
+          "at": 1790106517972
         },
         "ignored": [],
         "decisionFileContent": "allow"
@@ -252,7 +419,7 @@
           "route": "child-cancelled",
           "cancelled": true,
           "toolCallId": "call-earlier-allow-then-cancel",
-          "at": 1790104810953
+          "at": 1790106517972
         },
         "elapsed": 0
       }
@@ -264,14 +431,14 @@
         "name": "cancel-first",
         "blocked": true,
         "reason": "aborted: the session was stopped while this approval was pending",
-        "elapsed": 0,
+        "elapsed": 1,
         "decision": {
           "event": "gate-decision",
           "decision": "deny",
           "route": "child-cancelled",
           "cancelled": true,
           "toolCallId": "call-cancel-first",
-          "at": 1790104810958
+          "at": 1790106517978
         },
         "ignored": [],
         "decisionFileContent": null
@@ -289,7 +456,7 @@
           "event": "gate-decision",
           "decision": "allow",
           "route": "child-defer",
-          "at": 1790104810964
+          "at": 1790106517983
         },
         "ignored": [],
         "decisionFileContent": "consumed call-allow"
@@ -313,7 +480,7 @@
           "decision": "deny",
           "route": "child-defer",
           "outcome": "deny",
-          "at": 1790104810969
+          "at": 1790106517988
         },
         "ignored": [],
         "decisionFileContent": "consumed call-deny"
@@ -328,9 +495,9 @@
           "decision": "deny",
           "route": "child-defer",
           "outcome": "timeout",
-          "at": 1790104811371
+          "at": 1790106518389
         },
-        "elapsed": 402
+        "elapsed": 401
       }
     },
     {
@@ -344,56 +511,56 @@
             "reason": "scope-mismatch",
             "toolCallId": "call-mine",
             "decisionFor": "someone-else",
-            "at": 1790104811376
+            "at": 1790106518394
           },
           {
             "event": "gate-decision-ignored",
             "reason": "scope-mismatch",
             "toolCallId": "call-mine",
             "decisionFor": "someone-else",
-            "at": 1790104811426
+            "at": 1790106518445
           },
           {
             "event": "gate-decision-ignored",
             "reason": "scope-mismatch",
             "toolCallId": "call-mine",
             "decisionFor": "someone-else",
-            "at": 1790104811476
+            "at": 1790106518495
           },
           {
             "event": "gate-decision-ignored",
             "reason": "scope-mismatch",
             "toolCallId": "call-mine",
             "decisionFor": "someone-else",
-            "at": 1790104811526
+            "at": 1790106518545
           },
           {
             "event": "gate-decision-ignored",
             "reason": "scope-mismatch",
             "toolCallId": "call-mine",
             "decisionFor": "someone-else",
-            "at": 1790104811577
+            "at": 1790106518595
           },
           {
             "event": "gate-decision-ignored",
             "reason": "scope-mismatch",
             "toolCallId": "call-mine",
             "decisionFor": "someone-else",
-            "at": 1790104811627
+            "at": 1790106518645
           },
           {
             "event": "gate-decision-ignored",
             "reason": "scope-mismatch",
             "toolCallId": "call-mine",
             "decisionFor": "someone-else",
-            "at": 1790104811677
+            "at": 1790106518695
           },
           {
             "event": "gate-decision-ignored",
             "reason": "scope-mismatch",
             "toolCallId": "call-mine",
             "decisionFor": "someone-else",
-            "at": 1790104811727
+            "at": 1790106518746
           }
         ]
       }
@@ -413,9 +580,9 @@
       "description": "R2: the leader exited while its same-group descendant stayed alive",
       "ok": true,
       "detail": {
-        "leader": 54748,
+        "leader": 68804,
         "leaderAlive": false,
-        "survivor": 54755,
+        "survivor": 68811,
         "survivorAlive": true
       }
     },
@@ -423,13 +590,13 @@
       "description": "R2: the survivor carries no PI attribution env (group handling alone must reclaim it)",
       "ok": true,
       "detail": {
-        "survivor": 54755
+        "survivor": 68811
       }
     },
     {
       "description": "R2: the survivor is reclaimed even though its leader had already exited",
       "ok": true,
-      "detail": "survivor 54755"
+      "detail": "survivor 68811"
     },
     {
       "description": "R2: the group is gone after reaping",
@@ -441,14 +608,14 @@
       "detail": {
         "runtimes": 1,
         "killedProcesses": [
-          54755
+          68811
         ],
         "removedRoots": [
-          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-k6GG0R/home/.omp-m0-98bb520b",
-          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-k6GG0R/home"
+          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-CMM3WD/home/.omp-m0-12742e24",
+          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-CMM3WD/home"
         ],
         "removedRunRoots": [
-          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-k6GG0R"
+          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-CMM3WD"
         ],
         "stillAlive": [],
         "unattributed": [],
@@ -464,13 +631,13 @@
     {
       "description": "R2: the reclaimed run root is removed",
       "ok": true,
-      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-k6GG0R"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-CMM3WD"
     },
     {
       "description": "R2: a tool that left the group and dropped attribution is NOT claimed as reclaimed",
       "ok": true,
       "detail": {
-        "orphan": 54777,
+        "orphan": 68831,
         "note": "documented limitation: only its own group or its own isolation env can attribute a process"
       }
     },
@@ -480,13 +647,13 @@
       "detail": {
         "errorKind": "transport",
         "error": "chunk decode failed: rpc chunk sequence must start at index 0",
-        "elapsed": 24
+        "elapsed": 26
       }
     },
     {
       "description": "R4: the failure is reported promptly, not after the timeout elapsed",
       "ok": true,
-      "detail": "24 ms (timeout was 2000 ms)"
+      "detail": "26 ms (timeout was 2000 ms)"
     },
     {
       "description": "R4: a genuine timeout keeps its own classification",
@@ -592,17 +759,17 @@
     {
       "description": "R6: the timeout path reclaims the experiment's own child processes",
       "ok": true,
-      "detail": "grandchild 54878"
+      "detail": "grandchild 68932"
     }
   ],
   "artifacts": {
     "R2-detachedOrphan": {
-      "pid": 54777,
+      "pid": 68831,
       "stillAlive": true,
       "reapClean": true
     }
   },
   "limitations": [],
-  "finishedAt": "2026-09-22T19:20:22.886Z",
+  "finishedAt": "2026-09-22T19:48:49.919Z",
   "ok": true
 }

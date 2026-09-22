@@ -147,6 +147,29 @@ export function makeConfigDirName() {
  */
 const OFFLINE_PROXY_URL = "http://127.0.0.1:9";
 
+/**
+ * Every proxy-related variable a child could read, in both cases, plus the Node
+ * switch that enables env-proxy handling.
+ *
+ * Copied from the pinned PI-Desktop implementation
+ * (`packages/shared/src/network-proxy.ts` PROXY_ENV_KEYS) rather than invented:
+ * that list is what the original application strips before it launches a child
+ * with its own proxy configuration (`packages/host-runtime/src/host-process.ts`
+ * spreads `stripProxyEnv(process.env)` first, then overlays explicit values).
+ * Overriding only the uppercase names is not enough: a client that reads the
+ * lowercase ones still uses the inherited proxy (measured: Bun's fetch sent
+ * both an HTTP and a CONNECT request through an inherited lowercase proxy even
+ * though HTTP_PROXY/HTTPS_PROXY pointed at a closed port).
+ */
+const PROXY_ENV_KEYS = [
+  "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
+  "http_proxy", "https_proxy", "all_proxy", "no_proxy",
+  "NODE_USE_ENV_PROXY",
+];
+
+/** Loopback must stay direct so the fixture provider is reachable. */
+const OFFLINE_NO_PROXY = "127.0.0.1,localhost,::1";
+
 export function buildIsolatedEnv({ repoRoot, runRoot, configDirName = makeConfigDirName() }) {
   const env = {};
   // Copy only what OMP legitimately needs; never inherit credentials, profiles,
@@ -157,11 +180,15 @@ export function buildIsolatedEnv({ repoRoot, runRoot, configDirName = makeConfig
     env[k] = process.env[k];
   }
   env.HOME = process.env.HOME ?? homedir();
+  // Strip *all* inherited proxy configuration first (both cases plus the Node
+  // switch), then apply this harness's own policy — otherwise an inherited
+  // lowercase proxy or a wildcard `no_proxy` survives the uppercase override.
+  for (const key of PROXY_ENV_KEYS) delete env[key];
   // See OFFLINE_PROXY_URL: any outbound attempt fails fast, loopback stays direct.
-  env.HTTP_PROXY = OFFLINE_PROXY_URL;
-  env.HTTPS_PROXY = OFFLINE_PROXY_URL;
-  env.ALL_PROXY = OFFLINE_PROXY_URL;
-  env.NO_PROXY = "127.0.0.1,localhost,::1";
+  for (const key of ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]) {
+    env[key] = OFFLINE_PROXY_URL;
+  }
+  for (const key of ["NO_PROXY", "no_proxy"]) env[key] = OFFLINE_NO_PROXY;
   env.PI_CONFIG_DIR = configDirName; // homedir-relative config root
   env.PI_CODING_AGENT_DIR = join(runRoot, "agent");
   env.OMP_DEV_LAUNCH_DIR = join(runRoot, "dev-cwd");

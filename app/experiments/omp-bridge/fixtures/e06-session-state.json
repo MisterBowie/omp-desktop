@@ -1,7 +1,7 @@
 {
   "note": "real capture, sanitized; paths are inside this run's isolated agent dir",
-  "sessionFileRelativeToAgentDir": "sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e06-piPBht-project--/2026-09-22T19-17-36-314Z_01a0ca8d-59ba-771f-a3ef-ee5840f26321.jsonl",
-  "sessionId": "01a0ca8d-59ba-771f-a3ef-ee5840f26321",
+  "sessionFileRelativeToAgentDir": "sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e06-q4OYYw-project--/2026-09-22T19-45-58-868Z_01a0caa7-5454-753c-9d00-e828bb2bb314.jsonl",
+  "sessionId": "01a0caa7-5454-753c-9d00-e828bb2bb314",
   "sessionName": "m1-e06-session",
   "messageRoles": [
     "user",

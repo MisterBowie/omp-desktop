@@ -14,7 +14,7 @@
       "detached": true,
       "agentSource": "bundled",
       "status": "started",
-      "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e08-subagent-n46MEk/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e08-subagent-n46MEk-project--/2026-09-22T19-18-23-346Z_01a0ca8e-1172-730f-8979-abad6b8e1797/M1Scout.jsonl",
+      "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e08-subagent-09Nfbk/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e08-subagent-09Nfbk-project--/2026-09-22T19-46-45-912Z_01a0caa8-0c18-7407-bed3-8e8e229bc712/M1Scout.jsonl",
       "index": 0
     }
   },
@@ -27,8 +27,8 @@
       "status": "running",
       "task": "Complete assignment thoroughly:\n\nreport the word ALPHA",
       "assignment": "report the word ALPHA",
-      "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e08-subagent-n46MEk/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e08-subagent-n46MEk-project--/2026-09-22T19-18-23-346Z_01a0ca8e-1172-730f-8979-abad6b8e1797/M1Scout.jsonl",
-      "lastUpdate": 1790104703693,
+      "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e08-subagent-09Nfbk/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e08-subagent-09Nfbk-project--/2026-09-22T19-46-45-912Z_01a0caa8-0c18-7407-bed3-8e8e229bc712/M1Scout.jsonl",
+      "lastUpdate": 1790106406267,
       "parentToolCallId": "call_fake_4_0",
       "progress": {
         "index": 0,
@@ -44,7 +44,7 @@
         "requests": 0,
         "tokens": "<redacted>",
         "cost": 0,
-        "durationMs": 32,
+        "durationMs": 30,
         "modelOverride": [
           "m1fake/local-model"
         ],

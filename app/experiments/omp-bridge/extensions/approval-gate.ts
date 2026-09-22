@@ -94,7 +94,7 @@ function log(entry: Record<string, unknown>): void {
  *     authorise two calls.
  *   - `timeout` is its own outcome: no decision, no cancellation.
  */
-type ChildOutcome = "allow" | "deny" | "timeout" | "cancelled";
+type ChildOutcome = "allow" | "deny" | "timeout" | "cancelled" | "consume-failed" | "decision-unreadable";
 
 interface ScopedDecision {
   decision: "allow" | "deny";
@@ -122,11 +122,32 @@ function parseDecision(text: string): ScopedDecision | "consumed" | null {
   return null;
 }
 
-/** Mark a decision as used so no later call can reuse it. */
-function consumeDecision(path: string, toolCallId: string): void {
+/**
+ * Mark a decision as used so no later call can reuse it.
+ *
+ * A failure here must NOT be treated as an approval: if the decision cannot be
+ * consumed, the same `allow` would authorise every later call. PI-Desktop's
+ * `permissions.resolve` removes the pending request before it answers, so a
+ * duplicate or late request finds nothing (NOT_FOUND); OMP's `emitToolCall`
+ * is likewise fail-closed on hook errors. We follow that: consumption failure
+ * denies.
+ */
+function consumeDecision(path: string, toolCallId: string): boolean {
   try {
     writeFileSync(path, `consumed ${toolCallId}\n`);
-  } catch { /* best effort: the caller already holds the decision */ }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Read the decision file; an unreadable file is a failure, not an approval. */
+function readDecision(path: string): { ok: true; parsed: ScopedDecision | "consumed" | null } | { ok: false } {
+  try {
+    return { ok: true, parsed: parseDecision(readFileSync(path, "utf8")) };
+  } catch {
+    return { ok: false };
+  }
 }
 
 async function awaitChildDecision(toolCallId: string): Promise<ChildOutcome> {
@@ -146,12 +167,23 @@ async function awaitChildDecision(toolCallId: string): Promise<ChildOutcome> {
     if (cancelPath && existsSync(cancelPath)) return "cancelled";
 
     if (decisionPath && existsSync(decisionPath)) {
-      const parsed = parseDecision(readFileSync(decisionPath, "utf8"));
+      const read = readDecision(decisionPath);
+      if (!read.ok) {
+        // Cannot know what the decision says, so this call is not admitted.
+        log({ event: "gate-decision", decision: "deny", route: "child-decision-unreadable", toolCallId, at: Date.now() });
+        return "decision-unreadable";
+      }
+      const parsed = read.parsed;
       if (parsed === "consumed") {
         // Already applied to some call; never reuse it.
       } else if (parsed) {
         if (parsed.toolCallId === null || parsed.toolCallId === toolCallId) {
-          consumeDecision(decisionPath, toolCallId);
+          if (!consumeDecision(decisionPath, toolCallId)) {
+            // The decision could not be marked as used: admitting it here would
+            // let one approval authorise every subsequent call.
+            log({ event: "gate-decision", decision: "deny", route: "child-consume-failed", toolCallId, at: Date.now() });
+            return "consume-failed";
+          }
           return parsed.decision;
         }
         // A decision addressed to another call is not this call's to use.
@@ -194,6 +226,11 @@ export default function approvalGate(pi: ExtensionAPI): void {
       if (decided === "allow") {
         log({ event: "gate-decision", decision: "allow", route: "child-defer", at: Date.now() });
         return undefined;
+      }
+      if (decided === "consume-failed" || decided === "decision-unreadable") {
+        // Fail closed: the decision could not be applied exactly once, so the
+        // call is blocked rather than admitted on an unverifiable approval.
+        return { block: true, reason: `denied: approval decision could not be applied (${decided})` };
       }
       if (decided === "cancelled") {
         // Bridge-provided cancellation: the pending request is gone and a late

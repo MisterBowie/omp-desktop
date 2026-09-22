@@ -1,0 +1,13 @@
+{
+  "note": "SYNTHETIC fault sample (read-only decision file) driven through the real OMP subagent path",
+  "childCallIds": [
+    "call_fake_3_0",
+    "call_fake_4_0"
+  ],
+  "targetAWritten": false,
+  "targetBWritten": false,
+  "consumeFailures": [
+    "call_fake_3_0",
+    "call_fake_4_0"
+  ]
+}

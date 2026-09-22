@@ -1,0 +1,16 @@
+{
+  "note": "SYNTHETIC environment probe with a loopback fake proxy; no external service is contacted",
+  "childRuntime": "bun",
+  "inheritedLowercaseProxy": false,
+  "wildcardNoProxyInherited": false,
+  "nodeUseEnvProxyInherited": false,
+  "fakeProxyRequests": {
+    "httpRequests": 0,
+    "connectRequests": 0
+  },
+  "child": {
+    "http": "TypeError",
+    "https": "TypeError",
+    "loopback": "ok"
+  }
+}

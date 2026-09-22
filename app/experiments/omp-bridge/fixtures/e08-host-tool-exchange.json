@@ -1,7 +1,7 @@
 {
   "note": "real capture, sanitized",
   "registration": {
-    "id": "req-42bd0a5a",
+    "id": "req-e7793874",
     "type": "response",
     "command": "set_host_tools",
     "success": true,
@@ -13,7 +13,7 @@
   },
   "hostToolCalls": [
     {
-      "id": "1589f0af2ae6ee49",
+      "id": "1589f72dd078639b",
       "toolName": "m1_host_echo",
       "args": {
         "text": "from-model"

@@ -2,7 +2,7 @@
 
 记录时间:2026-09-22
 工作目录:`/home/vv/person/code/omp-desktop-m1`(M1 专用分支 `codex/m1-compatibility` 的 worktree)
-结论:**13/13 实验通过,396/396 检查通过**;接入路径已定案,见 `docs/decisions/001-omp-transport.md`。
+结论:**13/13 实验通过,413/413 检查通过**;接入路径已定案,见 `docs/decisions/001-omp-transport.md`。
 
 > 本文件已被一次独立复审返修(R1-R6)。返修前版本的 E05 取消结论**无效并已撤回**,隔离、子代理权限、协议分片、工具链健壮性均有新证据;逐项处理见 §8。
 
@@ -33,7 +33,7 @@ node e04-approval.mjs                # 单个实验;加 --keep-artifacts 保留�
 
 每个实验自建隔离目录(配置根 `~/.omp-m0-<hex>`、agent dir、cwd),结束后回收进程组并删除临时根。结果写入 `results/<name>.json`,脱敏 fixture 写入 `fixtures/<name>.json`。
 
-总结果:`experiments: 13/13 passed | checks: 396/396`,退出码 0,耗时 205.5 秒;汇总写入 `results/summary.json`,逐实验明细写入 `results/<name>.json`。汇总现在按「退出码 0 + 无信号 + PASS + 结果文件存在/命名/`ok` 一致 + 本轮运行标识」判定,不再只看 PASS 文本。
+总结果:`experiments: 13/13 passed | checks: 413/413`,退出码 0,耗时 209.8 秒;汇总写入 `results/summary.json`,逐实验明细写入 `results/<name>.json`。汇总现在按「退出码 0 + 无信号 + PASS + 结果文件存在/命名/`ok` 一致 + 本轮运行标识」判定,不再只看 PASS 文本。
 
 清理验证:正常结束时 `.dev-data/m1/` 运行目录与 `~/.omp-m0-*` 配置根均为 0 个残留,无遗留 OMP 进程(被 `SIGKILL`/管道中断的临时调试运行会留下残留,已清理并确认与正式路径无关)。
 
@@ -52,7 +52,7 @@ node e04-approval.mjs                # 单个实验;加 --keep-artifacts 保留�
 | E09 传输边界 | `node e09-transport.mjs` | 0 | 30/30 | 跨块 UTF-8、半帧、CRLF、非法 JSON 恢复、超长行、180 KB 多字节往返;stdin EOF / stdout EPIPE 自退出并回收 | `e09-degraded-runtimes.json` |
 | E10 模式差异 | `node e10-modes.mjs` | 0 | 18/18 | 两种模式都有扩展对话通道;只有 rpc-ui 广告 `ask` 工具 | `e10-mode-capabilities.json` |
 | E11 子代理权限与取消 | `node e11-subagent-permissions.mjs` | 0 | 42/42 | 按**会话身份**路由后:子代理工具调用进入同一 `tool_call` 钩子但 `hasUI=false`,不能弹窗;审批须由桌面策略决定(拒绝无副作用/批准执行一次);父停止不取消其挂起审批(R1)也不回收其命令树 | `e11-subagent-allow.json`、`e11-subagent-deny.json`、`e11-subagent-cancel.json`、`e11-subagent-pending-cancel.json` |
-| E12 工具链故障回归 | `node e12-harness-faults.mjs` | 0 | 76/76 | 非法帧不崩溃且有界清理;汇总按「退出码+信号+PASS+结果文件+运行标识」判定;被杀实验的运行时/同组抗 TERM 后代/整棵临时运行根被有界回收(组长退出不豁免);**取消对未执行调用具有决定权且决定单次消费**;**回收失败进入验收并非零退出**;流错误与超时分类正确;参数选择集合正确 | `e12-invalid-frames.json`、`e12-aggregator-verdicts.json`、`e12-runtime-reaping.json`、`e12-chunk-error-handling.json`、`e12-arg-parsing.json` |
+| E12 工具链故障回归 | `node e12-harness-faults.mjs` | 0 | 93/93 | 非法帧不崩溃且有界清理;汇总按「退出码+信号+PASS+结果文件+运行标识」判定;被杀实验的运行时/同组抗 TERM 后代/整棵临时运行根被有界回收(组长退出不豁免);**取消对未执行调用具有决定权且决定单次消费**;**回收失败进入验收并非零退出**;**审批消费/读取失败 fail-closed**;**代理环境按大小写全量归一化**;流错误与超时分类正确;参数选择集合正确 | `e12-invalid-frames.json`、`e12-aggregator-verdicts.json`、`e12-runtime-reaping.json`、`e12-chunk-error-handling.json`、`e12-arg-parsing.json` |
 | E13 协议 v2 分片 | `node e13-chunking.mjs` | 0 | 30/30 | 关闭自动压缩后,1.2 MB 提示产生真实分片,`rpc.request()` 经客户端解码后拿到 1,200,650 字节完整响应;入站分片被拒绝;缺片/重复/乱序/非法元数据/超限均有判定 | `e13-real-chunk-sample.json`、`e13-inbound-chunks.json`、`e13-chunk-faults.json` |
 
 ## 3.1 M0 回归复跑
@@ -107,6 +107,8 @@ models       : local-model
 | `e12-stream-error-vs-timeout.json` | **合成故障样本** | 请求在途时流被破坏,R4 的分类回归 |
 | `e12-cancel-decision-semantics.json` | **合成故障样本** | 直接驱动真实 gate 模块:取消/决定顺序、作用域与单次消费(第四轮 R1) |
 | `e12-cleanup-verdict.json` | **合成故障样本** | 桩实验通过但 scratch 不可删除,汇总必须失败(第四轮 R2) |
+| `e12-consume-failure.json` | **合成故障样本** | 只读 decision 驱动的真实子代理两连调用,必须零副作用(第五轮 F1) |
+| `e12-proxy-normalization.json` | **合成故障样本** | 继承大小写代理 + 通配 no_proxy 的环境探针,含 loopback 假代理(第五轮 F2) |
 | `e13-real-chunk-sample.json` | 真实采集 | 固定 OMP 真实发出的 `rpc_chunk` 结构 |
 | `e13-inbound-chunks.json` | 真实采集 | 向 stdin 发送合法分片后的真实反应 |
 | `e13-chunk-faults.json` | **合成故障样本** | 用移植编码器生成再破坏的分片序列 |
@@ -258,6 +260,15 @@ M2 可以开始,前置条件已满足:RPC(rpc-ui)覆盖消息、会话恢复与�
 | R1 [P1] 取消已发布,较早落盘的 allow 仍放行 | `permissions.cancel()` 删除 pending 并唤醒等待者;`rpc/mod.rs` 在审批等待后再检查 cancellation;迟到 `resolve` 返回 NOT_FOUND。**范围限制**:该接线在固定 PI 中明确覆盖 Bash/GenerateImages,不能外推为所有 Write | 用复审方的两个探针在本仓库复现:①直接驱动扩展 handler:`cancelPresentAtResolution=true` 但 `gateBlocked=false`;②真实 OMP + 真子代理:父 `abort` 成功后 SIGSTOP 本探针持有的 OMP → 写 allow → 20 ms 后写 cancel → SIGCONT,子代理**实际写出目标文件**。根因:gate 用两个文件的 mtime 决定取消是否有效,较早的 allow 因此豁免了已可见的取消 | 取消改为**对未执行调用具有决定权**:每轮先查取消标记,存在即终态 `cancelled`,不再比较 mtime;决定改为**按 toolCallId 归属、单次消费**(应用后把文件改写为 `consumed <id>`),跨调用不重用;作用域不匹配时记录 `gate-decision-ignored` | E12 新增 8 项:`earlier-allow-then-cancel` 被阻断且分类为 `child-cancelled`、`cancel-first`、正常 allow、显式 deny、真实 timeout、作用域不匹配不重用、一次批准只放行一个调用。复审方两个探针在修复后:handler `gateBlocked=true`;真实 OMP `sideEffectAfterCancel=false`,`route=child-cancelled` |
 | R2 [P2] 回收失败仍被汇总为成功 | 原项目没有这份 OMP M1 汇总器;其 `npm-executable` 测试直接断言进程消失,产品 `scratch.rs` 删除失败只 warn —— 都不能当作"无残留验收通过"的证据 | 复现:桩实验 PASS/exit 0/结果有效,但专属 scratch 内部目录不可写 → 回收 EACCES → 汇总仍 `passed=true`、exit 0,且 summary 把 `error` 丢掉只剩 `clean:null` | 回收失败进入验收:结构化 `errors`(phase/path/message)、`clean=false` 一律判失败并非零退出;summary 保留原因与诊断;清理失败**保留登记**以便重试;`--keep-artifacts` 的主动保留不算失败。顺带修掉重构时引入的所有权判定错误(运行根本身被自身包含判断挡掉) | E12 新增 8 项:真实汇总入口下 exit≠0、输出为 `REJECTED (cleanup incomplete: remove … EACCES)`、summary 含 verdict 与 errors、残留根被记录、登记保留(可重试)、解除障碍后重试成功回收、`--keep-artifacts` exit 0 且保留根 |
 | C1 默认 M0 烟测不可复现 | 无对应实现(这是本项目自己的烟测) | 复现:`node docs/validation/M0-rpc/verify-rpc.mjs` 退出 1,`get_available_models failed: no response`(8.88 s,步上限 8 s)。定位到机制:`get_available_models` 等待 `awaitBackgroundRefresh()`(`rpc-mode.ts:1423`),该后台发现会向远端目录/服务发起**出站 HTTPS**(抓到的 CONNECT 目标:`catalog.stencil.so`、`hyper.charm.land`、`api.kilo.ai`、`api.venice.ai`、`zenmux.ai`、`api.commandcode.ai`、`coding-intl.dashscope.aliyuncs.com`);本机这些连接不是拒绝而是黑洞,于是耗到 `REMOTE_DISCOVERY_TIMEOUT_MS = 10_000`(`model-discovery.ts:67`)。实测:同一次调用首次 10,036 ms、第二次 25 ms;把出站指向一个拒绝连接的本地端口后降为 24 ms;`get_state` 全程 24 ms | 隔离环境改为**显式离线**:`HTTP(S)_PROXY`/`ALL_PROXY` 指向关闭的本地端口,`NO_PROXY` 放行 loopback(夹具 provider 仍走直连)。**不放宽任何超时**,保留 8 s 步上限。这是把环境可达性的影响从烟测里移除,**不声称**已定位某个 provider 发现实现为何慢、也不声称修改了 OMP | M0 默认命令:`PASS`,退出码 0,1.28 s(修复前 8.88 s 失败);M0 假进程单测 18/18 通过;`models : local-model` 仍正确列出 |
+
+## 8.4 第五轮独立复审返修(F1/F2)
+
+复审对象:`941ed26`。上一轮的取消竞态与清理误报已由复审方独立探针确认关闭,本轮不回退。
+
+| 编号 | 原桌面依据(源码事实) | OMP/本机实测差异 | 实际处理 | 回归证据 |
+| --- | --- | --- | --- | --- |
+| F1 [P1] 审批消费写入失败被吞掉,同一份 allow 可授权多次真实写入 | `permissions.rs` 的 `resolve` **先 remove pending 再发决定**,重复/迟到请求得到 NOT_FOUND | 本仓库复现:handler 探针把 decision 设为 0444 → `{"firstAllowed":true,"secondAllowed":true,"decisionUnchanged":true}`;真实子代理探针两个不同 `toolCallId`(`call_fake_3_0`/`call_fake_4_0`)→ `targetAWritten=true,targetBWritten=true`。根因:`consumeDecision` 的空 catch 把写失败当成功 | 消费失败**改为不放行**:新增 `child-consume-failed` 判定与显式 block(`denied: approval decision could not be applied`);读取失败同样 fail-closed(`child-decision-unreadable`)。不依赖 OMP 的异常关闭机制,而是显式返回 block(OMP `emitToolCall` 的 fail-closed 仅作对照,未冒充运行时证据) | E12 新增 9 项:只读 decision → 两次调用都被拒且 `route=child-consume-failed`;不可读 decision → `child-decision-unreadable`;可写 decision → 仍恰好放行一次;真实子代理两个 `toolCallId` **均无文件副作用**,fixture 记录 `targetAWritten/targetBWritten=false` |
+| F2 [P2] 显式离线环境仍继承小写代理 | `network-proxy.ts` 的 `PROXY_ENV_KEYS`(大小写各四组 + `NODE_USE_ENV_PROXY`)与 `stripProxyEnv`;`host-process.ts` 先 `stripProxyEnv(process.env)` 再叠加显式值 | 本仓库复现:`{"inheritedLowercaseProxy":true,"httpRequests":1,"connectRequests":1}` —— 大写到关闭端口没有阻止继承的小写代理,子进程仍经父代理发出 HTTP 与 CONNECT(目标为 `outside.invalid`,无真实外部服务) | `buildIsolatedEnv` 按 PI 的键表**先全量剥离** 9 个变量,再一致施加本测试策略(大小写都指向关闭端口,`NO_PROXY`/`no_proxy` 仅放行 loopback);不设置 `NODE_USE_ENV_PROXY`。只改测试子进程环境,不触碰用户/全局代理设置;这是进程环境策略,不是操作系统级网络隔离 | E12 新增 8 项:继承小写代理消失、通配 `no_proxy` 被替换、`NODE_USE_ENV_PROXY` 未继承、策略在两种大小写中一致;真实 **bun** 子进程:假代理收到 `0` HTTP / `0` CONNECT,外发 fetch 未完成(`TypeError`),而 **loopback 仍可达**(`loopback:"ok"`)。复审方探针修复后:`inheritedLowercaseProxy:false,httpRequests:0,connectRequests:0` |
 
 **本轮明确的能力边界**:子代理挂起审批的取消仍**不是 OMP 自带能力**,只是桥接实现,桌面必须自建;回收失败现在会阻断验收,但"跨进程组且丢弃归属标记的逃逸后代"依旧无法归属(见 §6)。
 

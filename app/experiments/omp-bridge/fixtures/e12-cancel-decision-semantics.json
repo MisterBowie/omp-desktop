@@ -11,7 +11,7 @@
       "route": "child-cancelled",
       "cancelled": true,
       "toolCallId": "call-earlier-allow-then-cancel",
-      "at": 1790104810953
+      "at": 1790106517972
     },
     "ignored": [],
     "decisionFileContent": "allow"
@@ -20,14 +20,14 @@
     "name": "cancel-first",
     "blocked": true,
     "reason": "aborted: the session was stopped while this approval was pending",
-    "elapsed": 0,
+    "elapsed": 1,
     "decision": {
       "event": "gate-decision",
       "decision": "deny",
       "route": "child-cancelled",
       "cancelled": true,
       "toolCallId": "call-cancel-first",
-      "at": 1790104810958
+      "at": 1790106517978
     },
     "ignored": [],
     "decisionFileContent": null
@@ -41,7 +41,7 @@
       "event": "gate-decision",
       "decision": "allow",
       "route": "child-defer",
-      "at": 1790104810964
+      "at": 1790106517983
     },
     "ignored": [],
     "decisionFileContent": "consumed call-allow"
@@ -56,7 +56,7 @@
       "decision": "deny",
       "route": "child-defer",
       "outcome": "deny",
-      "at": 1790104810969
+      "at": 1790106517988
     },
     "ignored": [],
     "decisionFileContent": "consumed call-deny"
@@ -65,13 +65,13 @@
     "name": "no-decision",
     "blocked": true,
     "reason": "denied: no out-of-band decision (timeout)",
-    "elapsed": 402,
+    "elapsed": 401,
     "decision": {
       "event": "gate-decision",
       "decision": "deny",
       "route": "child-defer",
       "outcome": "timeout",
-      "at": 1790104811371
+      "at": 1790106518389
     },
     "ignored": [],
     "decisionFileContent": null
@@ -86,7 +86,7 @@
       "decision": "deny",
       "route": "child-defer",
       "outcome": "timeout",
-      "at": 1790104811778
+      "at": 1790106518796
     },
     "ignored": [
       {
@@ -94,56 +94,56 @@
         "reason": "scope-mismatch",
         "toolCallId": "call-mine",
         "decisionFor": "someone-else",
-        "at": 1790104811376
+        "at": 1790106518394
       },
       {
         "event": "gate-decision-ignored",
         "reason": "scope-mismatch",
         "toolCallId": "call-mine",
         "decisionFor": "someone-else",
-        "at": 1790104811426
+        "at": 1790106518445
       },
       {
         "event": "gate-decision-ignored",
         "reason": "scope-mismatch",
         "toolCallId": "call-mine",
         "decisionFor": "someone-else",
-        "at": 1790104811476
+        "at": 1790106518495
       },
       {
         "event": "gate-decision-ignored",
         "reason": "scope-mismatch",
         "toolCallId": "call-mine",
         "decisionFor": "someone-else",
-        "at": 1790104811526
+        "at": 1790106518545
       },
       {
         "event": "gate-decision-ignored",
         "reason": "scope-mismatch",
         "toolCallId": "call-mine",
         "decisionFor": "someone-else",
-        "at": 1790104811577
+        "at": 1790106518595
       },
       {
         "event": "gate-decision-ignored",
         "reason": "scope-mismatch",
         "toolCallId": "call-mine",
         "decisionFor": "someone-else",
-        "at": 1790104811627
+        "at": 1790106518645
       },
       {
         "event": "gate-decision-ignored",
         "reason": "scope-mismatch",
         "toolCallId": "call-mine",
         "decisionFor": "someone-else",
-        "at": 1790104811677
+        "at": 1790106518695
       },
       {
         "event": "gate-decision-ignored",
         "reason": "scope-mismatch",
         "toolCallId": "call-mine",
         "decisionFor": "someone-else",
-        "at": 1790104811727
+        "at": 1790106518746
       }
     ],
     "decisionFileContent": "allow someone-else"

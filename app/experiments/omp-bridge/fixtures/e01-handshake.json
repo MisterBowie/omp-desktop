@@ -14,7 +14,7 @@
     "maxReassembledFrameBytes": 67108864
   },
   "negotiateResponse": {
-    "id": "req-e4b3f05f",
+    "id": "req-5c439423",
     "type": "response",
     "command": "negotiate_protocol",
     "success": true,

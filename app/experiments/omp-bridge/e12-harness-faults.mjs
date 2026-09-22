@@ -17,13 +17,13 @@
  */
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 import { OmpRpc } from "./lib/rpc.mjs";
 import { FakeProvider } from "./lib/provider.mjs";
-import { resolveRepoRoot, buildIsolatedEnv, makeConfigDirName, terminateTree, safeRmConfigRoot, safeRmSyntheticHome } from "./lib/base.mjs";
+import { resolveRepoRoot, buildIsolatedEnv, makeConfigDirName, terminateTree, safeRmConfigRoot, safeRmSyntheticHome, makeScratch } from "./lib/base.mjs";
 import { runExperiment, experimentRoot, writeFixture } from "./lib/run.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -332,6 +332,256 @@ setInterval(() => {}, 1000);
       note: "SYNTHETIC fault sample: a corrupted chunk sequence, then a well-formed one, then a normal frame",
     });
     rmSync(runRoot, { recursive: true, force: true });
+  }
+
+  // ==========================================================================
+  // F2 — inherited proxy configuration (either case, plus wildcard bypass) must
+  // not survive into the isolated child
+  //
+  // PI-Desktop reference (source facts): `network-proxy.ts` lists the proxy
+  // variables it manages — HTTP_PROXY/HTTPS_PROXY/ALL_PROXY/NO_PROXY in both
+  // cases plus NODE_USE_ENV_PROXY — and `stripProxyEnv` deletes all of them;
+  // `host-process.ts` builds a child env as `stripProxyEnv(process.env)` first
+  // and only then overlays explicit values. Overriding the uppercase names alone
+  // leaves an inherited lowercase proxy in place (measured: Bun's fetch issued
+  // both an HTTP request and a CONNECT through an inherited lowercase proxy).
+  // ==========================================================================
+  {
+    const { createServer } = await import("node:http");
+    const { buildIsolatedEnv: buildEnv } = await import(join(HERE, "..", "..", "..", "docs", "validation", "M0-rpc", "verify-rpc.mjs"));
+
+    const runRoot = makeScratch("review-proxy");
+    mkdirSync(join(runRoot, "agent"), { recursive: true });
+    const loopback = createServer((req, res) => res.end("ok"));
+    await new Promise((r) => loopback.listen(0, "127.0.0.1", r));
+    const loopbackPort = loopback.address().port;
+
+    // A loopback fake proxy: it must receive nothing for outbound hosts.
+    let httpRequests = 0;
+    let connectRequests = 0;
+    const fakeProxy = createServer((req, res) => { httpRequests++; res.end("synthetic-proxy"); });
+    fakeProxy.on("connect", (req, socket) => { connectRequests++; socket.end("HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"); });
+    await new Promise((r) => fakeProxy.listen(0, "127.0.0.1", r));
+    const sentinel = `http://127.0.0.1:${fakeProxy.address().port}`;
+
+    const keys = ["http_proxy", "https_proxy", "all_proxy", "no_proxy", "NODE_USE_ENV_PROXY"];
+    const previous = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+    try {
+      // Parent-side inheritance the child must NOT keep: lowercase proxies plus a
+      // wildcard bypass, exactly the shape the review measured.
+      process.env.http_proxy = sentinel;
+      process.env.https_proxy = sentinel;
+      process.env.all_proxy = sentinel;
+      process.env.no_proxy = "*";
+      process.env.NODE_USE_ENV_PROXY = "1";
+
+      const { env } = buildEnv({ repoRoot, runRoot });
+      ctx.check("F2: no inherited lowercase proxy survives into the child env",
+        env.http_proxy !== sentinel && env.https_proxy !== sentinel && env.all_proxy !== sentinel,
+        { http_proxy: env.http_proxy, https_proxy: env.https_proxy, all_proxy: env.all_proxy });
+      ctx.check("F2: a wildcard inherited no_proxy is replaced by the loopback-only bypass",
+        env.no_proxy !== "*" && /127\.0\.0\.1/.test(env.no_proxy ?? ""), env.no_proxy);
+      ctx.check("F2: NODE_USE_ENV_PROXY is not inherited",
+        env.NODE_USE_ENV_PROXY === undefined, env.NODE_USE_ENV_PROXY);
+      ctx.check("F2: the harness policy is expressed in both cases",
+        env.HTTP_PROXY && env.http_proxy === env.HTTP_PROXY && env.HTTPS_PROXY === env.https_proxy,
+        { upper: env.HTTP_PROXY, lower: env.http_proxy });
+
+      // Run a real runtime against this env: outbound must not reach the proxy,
+      // loopback must still be direct.
+      const bunPath = join(homedir(), ".bun", "bin", "bun");
+      const childRuntime = existsSync(bunPath) ? bunPath : process.execPath;
+      const childScript = `
+const out = { http: null, https: null, loopback: null };
+try { await fetch("http://outside.invalid/probe", { signal: AbortSignal.timeout(1500) }); out.http = "completed"; } catch (e) { out.http = e?.name ?? "error"; }
+try { await fetch("https://outside.invalid/probe", { signal: AbortSignal.timeout(1500) }); out.https = "completed"; } catch (e) { out.https = e?.name ?? "error"; }
+try { const r = await fetch("http://127.0.0.1:${loopbackPort}/ok"); out.loopback = r.ok ? "ok" : String(r.status); } catch (e) { out.loopback = "error"; }
+console.log(JSON.stringify(out));
+`;
+      const child = await new Promise((resolve) => {
+        const c = spawn(childRuntime, ["-e", childScript], { env, stdio: ["ignore", "pipe", "pipe"] });
+        let stdout = "";
+        c.stdout.on("data", (d) => { stdout += d.toString(); });
+        c.once("close", (code) => resolve({ code, stdout: stdout.trim() }));
+      });
+      const childResult = (() => { try { return JSON.parse(child.stdout); } catch { return null; } })();
+      ctx.check("F2: a real child runtime could run under the isolated env", child.code === 0 && childResult !== null, { code: child.code, stdout: child.stdout.slice(0, 120) });
+      ctx.check("F2: the fake proxy receives no outbound request from the child",
+        httpRequests === 0 && connectRequests === 0, { httpRequests, connectRequests });
+      ctx.check("F2: the child does not report a completed outbound fetch",
+        childResult?.http !== "completed" && childResult?.https !== "completed", childResult);
+      ctx.check("F2: the loopback fixture path is still reachable",
+        childResult?.loopback === "ok", childResult);
+
+      writeFixture("e12-proxy-normalization.json", {
+        note: "SYNTHETIC environment probe with a loopback fake proxy; no external service is contacted",
+        childRuntime: childRuntime === process.execPath ? "node" : "bun",
+        inheritedLowercaseProxy: env.http_proxy === sentinel,
+        wildcardNoProxyInherited: env.no_proxy === "*",
+        nodeUseEnvProxyInherited: env.NODE_USE_ENV_PROXY !== undefined,
+        fakeProxyRequests: { httpRequests, connectRequests },
+        child: childResult,
+      });
+    } finally {
+      for (const key of keys) {
+        if (previous[key] === undefined) delete process.env[key];
+        else process.env[key] = previous[key];
+      }
+      await new Promise((r) => fakeProxy.close(r));
+      await new Promise((r) => loopback.close(r));
+      rmSync(runRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ==========================================================================
+  // F1 — a decision that cannot be consumed (or read) must not admit the call
+  //
+  // PI-Desktop reference (source fact): `permissions.resolve` removes the pending
+  // request *before* it answers, so a duplicate/late request finds nothing
+  // (NOT_FOUND). OMP's own `emitToolCall` is fail-closed on hook errors and
+  // timeouts. Swallowing a consumption failure would let one `allow` authorise
+  // every later call, which is exactly what was reproduced here.
+  // ==========================================================================
+  {
+    const gateSource = join(HERE, "extensions", "approval-gate.ts");
+    const { default: approvalGate } = await import(gateSource);
+    const gateRoot = mkdtempSync(join(tmpdir(), "m1-consume-"));
+
+    let handler = null;
+    approvalGate({ on: (_event, h) => { handler = h; } });
+
+    const childCtx = { hasUI: false, sessionManager: { getSessionId: () => "consume-child" } };
+
+    /** Drive two calls against one decision file with the given mode. */
+    const runPair = async (name, { mode }) => {
+      const dir = join(gateRoot, name);
+      mkdirSync(dir, { recursive: true });
+      const decisionPath = join(dir, "decision");
+      const audit = join(dir, "audit.jsonl");
+      writeFileSync(decisionPath, "allow");
+      writeFileSync(audit, "");
+      if (mode === "readonly") chmodSync(decisionPath, 0o444);
+      if (mode === "unreadable") chmodSync(decisionPath, 0o000);
+      process.env.M1_CHILD_POLICY = "defer";
+      process.env.M1_CHILD_DEFER_MS = "600";
+      process.env.M1_CHILD_DECISION = decisionPath;
+      process.env.M1_CHILD_CANCEL = join(dir, "cancel");
+      process.env.M1_UI_LOG = audit;
+      process.env.M1_UI_LOG_ALL = "1";
+
+      const call = (toolCallId, target) => handler({ toolName: "write", toolCallId, input: { path: join(dir, target) } }, childCtx);
+      const first = await call("call-one", "one.txt");
+      const second = await call("call-two", "two.txt");
+      const entries = readFileSync(audit, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
+      const decisions = entries.filter((e) => e.event === "gate-decision");
+      // Restore permissions before anything tries to clean the directory up.
+      if (mode === "readonly") chmodSync(decisionPath, 0o600);
+      if (mode === "unreadable") chmodSync(decisionPath, 0o600);
+      return {
+        firstBlocked: first?.block === true,
+        secondBlocked: second?.block === true,
+        routes: [...new Set(decisions.map((d) => d.route))],
+        reasons: [first?.reason ?? null, second?.reason ?? null],
+      };
+    };
+
+    const readOnly = await runPair("readonly", { mode: "readonly" });
+    ctx.check("F1: an unconsumable decision denies the call instead of admitting it",
+      readOnly.firstBlocked && readOnly.routes.includes("child-consume-failed"), readOnly);
+    ctx.check("F1: the same unconsumable decision cannot admit a second call either",
+      readOnly.secondBlocked, readOnly);
+    ctx.check("F1: the refusal reason is explicit, not a silent allow",
+      (readOnly.reasons[0] ?? "").includes("could not be applied"), readOnly.reasons);
+
+    const unreadable = await runPair("unreadable", { mode: "unreadable" });
+    ctx.check("F1: an unreadable decision denies rather than allowing",
+      unreadable.firstBlocked && unreadable.routes.includes("child-decision-unreadable"), unreadable);
+    ctx.check("F1: an unreadable decision cannot admit a later call either", unreadable.secondBlocked, unreadable);
+
+    const writable = await runPair("writable", { mode: "ok" });
+    ctx.check("F1: an ordinary writable decision still admits exactly one call",
+      !writable.firstBlocked && writable.secondBlocked, writable);
+
+    rmSync(gateRoot, { recursive: true, force: true });
+  }
+
+  // ==========================================================================
+  // F1 (real OMP) — one read-only allow must not produce any subagent file
+  // ==========================================================================
+  {
+    const { writeModelsConfig } = await import("./lib/models-config.mjs");
+    const runRoot = makeScratch("review-consume");
+    mkdirSync(join(runRoot, "agent"), { recursive: true });
+    mkdirSync(join(runRoot, "dev-cwd"), { recursive: true });
+    const projectDir = join(runRoot, "project");
+    mkdirSync(projectDir, { recursive: true });
+    const uiLog = join(runRoot, "audit.jsonl");
+    const decisionPath = join(runRoot, "decision");
+    const targetA = join(projectDir, "target-a.txt");
+    const targetB = join(projectDir, "target-b.txt");
+    const marker = "REVIEW-CONSUME-FAIL";
+
+    let provider;
+    let rpc;
+    try {
+      provider = await FakeProvider.start({ model: "local-model" });
+      const selector = writeModelsConfig(join(runRoot, "agent"), { baseUrl: provider.baseUrl });
+      provider.routeBySession({
+        parent: [
+          { toolCalls: [{ name: "task", args: { i: "delegate", context: "consume", tasks: [{ task: `${marker} write both targets`, agent: "task", name: "ConsumeChild" }] } }], finish: "tool_calls" },
+          { text: "parent done", finish: "stop" },
+        ],
+        subagents: [{
+          marker,
+          turns: [
+            { toolCalls: [{ name: "write", args: { path: targetA, content: "A\n" } }], finish: "tool_calls" },
+            { toolCalls: [{ name: "write", args: { path: targetB, content: "B\n" } }], finish: "tool_calls" },
+            { text: "child done", finish: "stop" },
+          ],
+        }],
+      });
+
+      // One decision that cannot be consumed: read-only for the child process.
+      writeFileSync(decisionPath, "allow");
+      chmodSync(decisionPath, 0o444);
+
+      rpc = await OmpRpc.start({
+        repoRoot, runRoot, mode: "rpc-ui",
+        args: ["--model", selector, "--extension", join(HERE, "extensions", "approval-gate.ts")],
+        cwd: projectDir,
+        extraEnv: {
+          M1_UI_LOG: uiLog, M1_UI_LOG_ALL: "1",
+          M1_CHILD_POLICY: "defer", M1_CHILD_DECISION: decisionPath, M1_CHILD_DEFER_MS: "1500",
+        },
+      });
+      await rpc.request({ type: "negotiate_protocol", protocolVersion: 2 });
+      await rpc.request({ type: "prompt", message: "delegate two writes to the child" }, { timeoutMs: 60_000 });
+      await sleep(2_500);
+
+      const entries = existsSync(uiLog) ? readFileSync(uiLog, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : [];
+      const childGates = entries.filter((e) => e.event === "gate" && e.hasUI === false);
+      const childCallIds = [...new Set(childGates.map((e) => e.toolCallId))];
+      ctx.check("F1: the real subagent issued two distinct tool calls", childCallIds.length >= 2, childCallIds);
+      ctx.check("F1: neither call produced a file side effect",
+        !existsSync(targetA) && !existsSync(targetB), { targetA: existsSync(targetA), targetB: existsSync(targetB) });
+      ctx.check("F1: both refusals are classified as consume failures",
+        entries.filter((e) => e.route === "child-consume-failed").length >= 2,
+        entries.filter((e) => e.route === "child-consume-failed").map((e) => e.toolCallId));
+
+      chmodSync(decisionPath, 0o600);
+      writeFixture("e12-consume-failure.json", {
+        note: "SYNTHETIC fault sample (read-only decision file) driven through the real OMP subagent path",
+        childCallIds,
+        targetAWritten: existsSync(targetA),
+        targetBWritten: existsSync(targetB),
+        consumeFailures: entries.filter((e) => e.route === "child-consume-failed").map((e) => e.toolCallId),
+      });
+    } finally {
+      if (existsSync(decisionPath)) chmodSync(decisionPath, 0o600);
+      if (rpc?.pid) await rpc.stop();
+      if (provider) await provider.close();
+      rmSync(runRoot, { recursive: true, force: true });
+    }
   }
 
   // ==========================================================================

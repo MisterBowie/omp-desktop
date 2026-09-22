@@ -2,13 +2,13 @@
   "note": "SYNTHETIC fault sample: an experiment that passes but leaves an undeletable scratch root",
   "failingRun": {
     "exitCode": 1,
-    "verdict": "cleanup incomplete: remove /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w: EACCES, Permission denied: /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w '/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w'",
+    "verdict": "cleanup incomplete: remove /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-xy3k9C: EACCES, Permission denied: /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-xy3k9C '/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-xy3k9C'",
     "cleanupErrors": [
       {
         "phase": "remove",
-        "path": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w",
+        "path": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-xy3k9C",
         "pid": 999999,
-        "message": "EACCES, Permission denied: /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w '/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-zDxF5w'"
+        "message": "EACCES, Permission denied: /home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-xy3k9C '/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-cleanup-fail-xy3k9C'"
       }
     ]
   },

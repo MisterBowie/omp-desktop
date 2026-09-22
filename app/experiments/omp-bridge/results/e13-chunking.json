@@ -1,7 +1,7 @@
 {
   "experiment": "e13-chunking",
-  "runId": "run-mud22nhi-2a4e99",
-  "startedAt": "2026-09-22T19:20:22.926Z",
+  "runId": "run-mud335b2-812d80",
+  "startedAt": "2026-09-22T19:48:49.955Z",
   "checks": [
     {
       "description": "A: auto-compaction is disabled for this run",
@@ -333,6 +333,6 @@
     "The decoder is a faithful port of the pinned implementation (same constants and rejection rules); the capture in fixture A and the reactions in fixture B are real, the corrupted sequences in C are synthetic.",
     "Chunking is verified for one deterministic real trigger (an oversized prompt whose echoed message frame exceeds 1 MiB); other large-frame producers are not enumerated in M1."
   ],
-  "finishedAt": "2026-09-22T19:20:28.935Z",
+  "finishedAt": "2026-09-22T19:48:55.970Z",
   "ok": true
 }

@@ -1,5 +1,5 @@
 {
-  "ranAt": "2026-09-22T19:20:28.941Z",
+  "ranAt": "2026-09-22T19:48:55.977Z",
   "node": "v24.14.0",
   "platform": "linux-x64",
   "keepArtifacts": false,
@@ -83,7 +83,7 @@
         "experiment": "e03-interaction",
         "ok": true
       },
-      "seconds": 4,
+      "seconds": 3.9,
       "limitations": [
         "The timeout case relies on a dialog-level timeout supplied by the extension (800ms), not on client-side timing."
       ]
@@ -139,7 +139,7 @@
         "experiment": "e05-cancel",
         "ok": true
       },
-      "seconds": 20.8,
+      "seconds": 20.7,
       "limitations": [
         "In-protocol stop (abort + abort_bash) reclaimed the running command process in this environment.",
         "The descendant of the running command was reclaimed together with it.",
@@ -170,7 +170,7 @@
         "experiment": "e06-session",
         "ok": true
       },
-      "seconds": 3.7,
+      "seconds": 3.6,
       "limitations": [
         "Session naming/restore are verified over RPC only; desktop-side metadata mapping is M2/M4 work."
       ]
@@ -229,7 +229,7 @@
         "experiment": "e08-host-tools",
         "ok": true
       },
-      "seconds": 44.6,
+      "seconds": 44.7,
       "limitations": [
         "The host tool also passed through the extension tool_call hook.",
         "The host-tool exchange is a real capture; the fake provider only supplies model turns."
@@ -288,7 +288,7 @@
         "experiment": "e10-modes",
         "ok": true
       },
-      "seconds": 2.1,
+      "seconds": 2.2,
       "limitations": [
         "ACP and SDK paths were read in source only; M1 selects rpc-ui and does not need them, so no runtime comparison is claimed."
       ]
@@ -336,7 +336,7 @@
         "removedRoots": [],
         "removedRunRoots": []
       },
-      "headline": "PASS e12-harness-faults: 76/76 checks",
+      "headline": "PASS e12-harness-faults: 93/93 checks",
       "exitCode": 0,
       "signal": null,
       "timedOut": false,
@@ -345,7 +345,7 @@
         "experiment": "e12-harness-faults",
         "ok": true
       },
-      "seconds": 76,
+      "seconds": 80.4,
       "limitations": []
     },
     {
