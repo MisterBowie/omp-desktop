@@ -15,8 +15,10 @@ import { OmpRuntimeError } from "./errors.js";
 import {
   OmpRuntimeSupervisor,
   RUN_ROOT_PREFIX,
+  ownsRun,
   type ManagedOmpRuntime,
   type OmpRuntimeSupervisorOptions,
+  type OwnedOmpRuntime,
 } from "./supervisor.js";
 import {
   OmpRuntimeProcess,
@@ -206,8 +208,11 @@ describe("ownership after a failed reclaim", () => {
     try {
       const result = await supervisor.stop();
       expect(result).toMatchObject({ reaped: true, cleaned: false, stopped: false });
-      expect(supervisor.status().reason).toBe("unreclaimed");
+      // A cleanup failure is a failure: the caller must never read `stopped`
+      // out of a run it could not reclaim.
       expect(supervisor.status().phase).toBe("failed");
+      expect(supervisor.status().reason).toBe("unreclaimed");
+      expect(supervisor.pendingCleanup).toHaveLength(1);
     } finally {
       chmodSync(stateDir, 0o700);
     }
@@ -378,6 +383,164 @@ describe("retained records and reused pids (S5)", () => {
     expect(runRoots(dataRoot)).toHaveLength(1);
     expect(supervisor.pendingCleanup.length).toBeGreaterThan(0);
     expect(supervisor.pendingCleanup.every((entry) => entry.reaped === false)).toBe(true);
+  });
+});
+
+describe("ghost ownership after a sweep (S7)", () => {
+  /** A supervisor whose runtime never reaps, but whose sweep can. */
+  function ghostFixture() {
+    const dataRoot = makeRoot("sweep-ghost");
+    created.push(dataRoot);
+    const runtimes: FakeRuntime[] = [];
+    const terminations: number[] = [];
+    const supervisor = new OmpRuntimeSupervisor({
+      dataRoot,
+      launcherPath: MOCK_LAUNCHER,
+      expectedRuntimeVersion: MOCK_VERSION,
+      runtimeFactory: async (options: OmpRuntimeProcessOptions) => {
+        mkdirSync(options.cwd, { recursive: true });
+        const runtime = new FakeRuntime([stopResult({ reaped: false })]);
+        runtimes.push(runtime);
+        return runtime;
+      },
+      // The sweep's own terminator *can* empty the group, which is the case the
+      // runtime-level stop could not reach.
+      terminateTree: async (_child, pgid) => {
+        terminations.push(pgid);
+        return { reaped: true, escalated: "kill" as const, steps: ["injected: reaped"] };
+      },
+    });
+    supervisors.push(supervisor);
+    return { supervisor, dataRoot, runtimes, terminations };
+  }
+
+  it("releases ownership when the sweep reclaims the retained run", async () => {
+    const { supervisor, dataRoot, runtimes } = ghostFixture();
+    await supervisor.start();
+    const runRoot = runRoots(dataRoot)[0];
+    expect(runRoot).toBeDefined();
+
+    // The first stop cannot reap, so the run is retained and the sweep is the
+    // one that finishes it.
+    const swept = await supervisor.reclaimAll();
+    expect(swept.some((entry) => entry.reaped && entry.cleaned)).toBe(true);
+    expect(supervisor.pendingCleanup).toEqual([]);
+    expect(runRoots(dataRoot)).toEqual([]);
+
+    // Nothing is owned any more: reporting `failed`/`unreclaimed` here would
+    // describe a group and a directory that no longer exist.
+    expect(supervisor.status().phase).toBe("stopped");
+    expect(supervisor.status().reason).toBe("not-started");
+
+    // And the engine can be started again, which is the behaviour the ghost
+    // ownership made impossible.
+    const restarted = await supervisor.start();
+    expect(restarted.phase).toBe("idle");
+    expect(runtimes).toHaveLength(2);
+  });
+
+  it("a retried stop clears the record the sweep retained for it", async () => {
+    const dataRoot = makeRoot("sweep-then-stop");
+    created.push(dataRoot);
+    // The group survives the first stop and the sweep, then empties on the
+    // retried stop: the retained record must go with it.
+    const runtime = new FakeRuntime([stopResult({ reaped: false }), stopResult()]);
+    const terminations: number[] = [];
+    const supervisor = new OmpRuntimeSupervisor({
+      dataRoot,
+      launcherPath: MOCK_LAUNCHER,
+      expectedRuntimeVersion: MOCK_VERSION,
+      runtimeFactory: async (options: OmpRuntimeProcessOptions) => {
+        mkdirSync(options.cwd, { recursive: true });
+        return runtime;
+      },
+      terminateTree: async () => {
+        terminations.push(1);
+        return { reaped: false, escalated: "kill" as const, steps: ["injected: survived"] };
+      },
+    });
+    supervisors.push(supervisor);
+    await supervisor.start();
+
+    const swept = await supervisor.reclaimAll();
+    expect(swept.every((entry) => !entry.cleaned)).toBe(true);
+    expect(supervisor.pendingCleanup).toHaveLength(1);
+    expect(supervisor.status().phase).toBe("failed");
+
+    // The ordinary stop is the retry that finishes the run.
+    const stopped = await supervisor.stop();
+    expect(stopped).toMatchObject({ stopped: true, reaped: true, cleaned: true });
+    expect(supervisor.pendingCleanup).toEqual([]);
+    expect(supervisor.status().phase).toBe("stopped");
+    expect(runRoots(dataRoot)).toEqual([]);
+
+    // Nothing is left to retry, and no stale record can signal the old group.
+    const signalsBefore = terminations.length;
+    const again = await supervisor.reclaimAll();
+    expect(again).toEqual([]);
+    expect(terminations.length).toBe(signalsBefore);
+  });
+
+  it("keeps the directory debt without signalling the emptied group again", async () => {
+    const dataRoot = makeRoot("sweep-dir-only");
+    created.push(dataRoot);
+    const runtime = new FakeRuntime([stopResult({ reaped: false })]);
+    const terminations: number[] = [];
+    const supervisor = new OmpRuntimeSupervisor({
+      dataRoot,
+      launcherPath: MOCK_LAUNCHER,
+      expectedRuntimeVersion: MOCK_VERSION,
+      runtimeFactory: async (options: OmpRuntimeProcessOptions) => {
+        mkdirSync(options.cwd, { recursive: true });
+        return runtime;
+      },
+      // The sweep empties the group; the directory is what cannot be removed.
+      terminateTree: async (_child, pgid) => {
+        terminations.push(pgid);
+        return { reaped: true, escalated: "kill" as const, steps: ["injected: reaped"] };
+      },
+    });
+    supervisors.push(supervisor);
+    await supervisor.start();
+    const runRoot = runRoots(dataRoot)[0]!;
+    const stateDir = join(dataRoot, "omp-runtime");
+    chmodSync(stateDir, 0o500);
+    try {
+      const swept = await supervisor.reclaimAll();
+      // The first entry is the runtime stop; the last one is the retained record.
+      expect(swept.at(-1)).toMatchObject({ reaped: true, cleaned: false });
+      // The process is gone, so nothing may signal its old group again; the
+      // directory is still owed, so the engine stays failed and unstartable.
+      expect(supervisor.pendingCleanup).toEqual([
+        expect.objectContaining({ reaped: true, pid: 0, pgid: 0 }),
+      ]);
+      expect(runRoots(dataRoot)).toEqual([runRoot]);
+      expect(supervisor.status().phase).toBe("failed");
+      expect(supervisor.status().reason).toBe("unreclaimed");
+      await expect(supervisor.start()).rejects.toMatchObject({ code: "not-started" });
+
+      const signalsAfterFirstSweep = terminations.length;
+      await supervisor.reclaimAll();
+      expect(terminations.length).toBe(signalsAfterFirstSweep);
+    } finally {
+      chmodSync(stateDir, 0o700);
+    }
+
+    // Once the directory can be removed, the debt clears.
+    const final = await supervisor.reclaimAll();
+    expect(final.some((entry) => entry.cleaned)).toBe(true);
+    expect(supervisor.pendingCleanup).toEqual([]);
+    expect(supervisor.status().phase).toBe("stopped");
+    expect(terminations.length).toBe(1);
+  });
+
+  it("releases ownership only for the run that was reclaimed", async () => {
+    const owned = (runRoot: string): OwnedOmpRuntime =>
+      ({ runRoot }) as unknown as OwnedOmpRuntime;
+    // A sweep of any other run must not release this one.
+    expect(ownsRun(owned("/tmp/run-a"), "/tmp/run-a")).toBe(true);
+    expect(ownsRun(owned("/tmp/run-a"), "/tmp/run-b")).toBe(false);
+    expect(ownsRun(null, "/tmp/run-a")).toBe(false);
   });
 });
 

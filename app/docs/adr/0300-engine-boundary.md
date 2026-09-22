@@ -4,6 +4,7 @@
 - Date: 2026-09-23
 - Amended: 2026-09-23 (review R1-R3: production lookup wiring, fail-closed lookup, IPC audit)
 - Amended: 2026-09-23 (review S1-S5: reorder gate, gate before durable change, router-first ordering, startup ownership, retained-record semantics)
+- Amended: 2026-09-23 (review S7: a sweep that reclaims a retained run releases that run's ownership)
 - Issues: —
 - Relates to: D002 (agent loop placement), [ADR 0094](0094-single-instance-per-data-directory.md),
   `docs/spec/03-runtime/02-agent-runtime.md`, `docs/spec/03-runtime/07-process-model.md`,
@@ -167,7 +168,16 @@ Four rules it enforces, each from a measured failure:
   refuses to start a second runtime until it is disposed of. A retained record
   says whether its group is confirmed empty — a *directory-only* record whose
   ids may already belong to another process is never signalled again, while a
-  record that still owns a live group is terminated by the next sweep.
+  record that still owns a live group is terminated by the next sweep. A sweep
+  that reclaims a run releases *that* run's ownership — and only that one: the
+  record and the live ownership describe the same run root, so whichever path
+  finishes it clears both, and sweeping an older record never forgets a runtime
+  that is still running. A successful `stop` drops the record an earlier sweep
+  retained for the same run, and a sweep that empties the group but not the
+  directory downgrades that record to directory-only (`reaped: true`, ids
+  cleared) so the retry never signals a reused process id. A cleanup failure
+  stays a failure: while any record remains, `status` is `failed`/`unreclaimed`
+  and a new runtime is refused.
 
 The launcher is never resolved from `PATH`: a global `omp` points at whatever
 checkout installed it last. A packaged build uses a bundled runtime; a

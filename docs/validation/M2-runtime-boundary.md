@@ -376,7 +376,64 @@ supervisor 采纳该所有权(记录 pid/pgid、保留 runRoot、`status` 报 `f
 | 固定 OMP 无费用烟测 | M0 `verify-rpc.mjs` PASS;运行时包 `pinned-runtime.test.ts` 通过(18.2.7 → ready → v2 → 回收),未发送 prompt |
 | 残留 | mock/OMP/Electron 进程 0、临时运行根 0、无 `~/.omp-desktop*`、子模块 SHA 未变、`git status --porcelain` 为空 |
 
-## 10. 下一阶段条件
+## 10. 第三轮独立复审返修记录（S7）
+
+复审对象:`aa88fdfc0a502794b04fa4e8b511b0536384603a`。
+
+### S7 扫描回收成功后残留“幽灵所有权”
+
+**原状(源码事实)**:`reclaimAll` 先把未能回收的 ownership 复制进 `uncleanedRuns`,随后同一次遍历中
+`terminateTree` 若成功且目录删除成功,只从 `uncleanedRuns` 删除记录,却未清空 `this.runtime`/`this.ownership`——
+进程组与目录都已消失,supervisor 仍报 `failed`/`unreclaimed`,并继续拒绝 `start()`。
+
+**修正**(不改变 cleanup failure 语义:`uncleanedRuns` 非空时 `status` 仍为 `failed`/`unreclaimed`,
+`start()` 仍拒绝,直到清理完成):
+
+1. 新增 `releaseOwnership(runRoot)`:仅当该 runRoot 与当前 `this.ownership.runRoot` **精确相同**时才清除
+   `runtime`/`ownership` 与已消耗的 failure 记录;判定规则抽成导出的纯函数 `ownsRun(ownership, runRoot)`。
+2. `performStop` 成功回收(进程组为空且目录已删除)时调用 `dropRecord(runRoot)`,把同一次运行在
+   `uncleanedRuns` 中的副本一并删除:否则会留下 `reaped:false` 的陈旧记录,`status` 继续失败,
+   下一次扫描还会向可能已被复用的 PGID 发信号。
+3. 扫描中若 `terminateTree` 确认进程组已空、但目录仍无法删除:记录**原地降级**为 cleanup-only
+   (`reaped:true`、`pid:0`、`pgid:0`),此时可清除已确认回收的 matching ownership;
+   状态仍为 `failed`/`unreclaimed`、`start()` 仍拒绝,下一次扫描只重试删目录,绝不再向旧 PGID 发信号。
+
+**证据**(`packages/omp-runtime/src/supervisor-lifecycle.test.ts`,本轮新增 4 项):
+
+- **A** “releases ownership when the sweep reclaims the retained run”:`stop()` 返回 `reaped:false` →
+  注入的 `terminateTree` 成功 → 目录移除 → `pendingCleanup` 为空 → `status` = `stopped` → **可再次 `start()`**。
+  **先失败后通过**:移除修复后失败(`expected 'failed' to be 'stopped'`)。
+- **B** “a retried stop clears the record the sweep retained for it”:首次 `reclaimAll` 留下 matching live record 后,
+  常规 `stop()` 重试回收成功 → `pendingCleanup` 1 → 0、`status` = `stopped`、
+  后续 `reclaimAll` 不再调用 `terminateTree`(调用计数不变)。
+  **先失败后通过**:回退 `dropRecord` 后失败(残留 `{reaped:false,pid:4242}`)。
+- **C** “keeps the directory debt without signalling the emptied group again”:扫描确认进程组已空但目录删不掉 →
+  记录降级为 `{reaped:true,pid:0,pgid:0}`、`status` 仍 `failed`/`unreclaimed`、`start()` 仍拒绝、
+  下一次扫描 `terminateTree` 调用次数不增加;恢复权限后目录被清除、`terminateTree` 总调用次数仍为 1。
+  **先失败后通过**:回退 `updateRecord`/`releaseOwnership` 后失败(记录仍为 `{reaped:false,pid:4242}`)。
+- “releases ownership only for the run that was reclaimed”:`ownsRun` 对 matching / 非 matching / 空 ownership
+  三种取值的精确匹配断言。说明:`status`/`start` 不变量不变的前提下,当前公开路径不可能同时存在
+  “活体 ownership + 非 matching 记录”(启动会被未清理记录拒绝),故该精度规则以纯函数行为验证,
+  而不是放宽产品不变量来构造场景。
+
+**关于语义偏移的更正**:本轮中途曾把 cleanup-only 目录债务改为 `stopped` 并允许其存在时启动新 runtime,
+与文件头不变式“cleanup failure is a failure … caller must never read stopped out of a run it could not reclaim”
+及既有测试冲突,已按复审意见全部撤回;相关测试预期同时恢复为 `failed`/`unreclaimed`。
+
+### 本轮验证结果
+
+| 命令 | 结果 |
+| --- | --- |
+| `pnpm build:js` / `pnpm typecheck` | 12 包构建通过 / 0 错误 |
+| `pnpm --filter @pi-desktop/omp-runtime test` | **7 文件 / 79 项通过**(本轮新增 4 项) |
+| `pnpm --filter @pi-desktop/shared test` | 84 文件 / 968 项通过 |
+| `cd apps/desktop && env -u SSH_ASKPASS node --test test/*.test.mjs` | 2568 通过 / 0 失败 |
+| `cd crates && cargo test -p host-core --locked` | 579 通过 / 0 失败 |
+| `cd app/experiments/omp-bridge && node run-all.mjs` | 13/13 实验、413/413 检查、退出码 0 |
+| 固定 OMP 无费用烟测 | M0 `verify-rpc.mjs` PASS;运行时包 `pinned-runtime.test.ts` 通过,未发送 prompt |
+| 残留 | mock/OMP/Electron 进程 0、临时运行根 0、无 `~/.omp-desktop*`、子模块 SHA 未变、`git status --porcelain` 为空 |
+
+## 11. 下一阶段条件
 
 - T08-T10 的接口、路由、监督、身份与测试均已落地并通过上述命令;M3(端到端对话与工具执行)可在
   `packages/omp-runtime` 的传输与监督之上实现回合事件、工具卡片与审批问答。

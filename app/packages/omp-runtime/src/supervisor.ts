@@ -467,9 +467,17 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
     // leaving it would report a live obligation that no longer exists.
     this.lastFailure = null;
     const cleaned = this.removeRunRoot(ownership.runRoot);
-    // The group is empty, so what remains is a directory obligation: keeping
-    // the pids here would invite a later reclaim to signal a reused number.
-    if (!cleaned) this.uncleanedRuns.push({ ...ownership, reaped: true, pid: 0, pgid: 0 });
+    if (cleaned) {
+      // An earlier sweep may have retained the same run as a live record; this
+      // stop is what that record was waiting for, so it goes with it. Leaving
+      // it would report a reaped obligation and invite a later sweep to signal
+      // process ids this run no longer owns.
+      this.dropRecord(ownership.runRoot);
+    } else {
+      // The group is empty, so what remains is a directory obligation: keeping
+      // the pids here would invite a later reclaim to signal a reused number.
+      this.uncleanedRuns.push({ ...ownership, reaped: true, pid: 0, pgid: 0 });
+    }
     const errors = [...stop.errors];
     if (!cleaned) errors.push(`could not remove ${ownership.runRoot}`);
     return {
@@ -515,6 +523,10 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
       if (!stopped.reaped && this.ownership) {
         const ownership = this.ownership;
         if (!this.uncleanedRuns.some((entry) => entry.runRoot === ownership.runRoot)) {
+          // The same run is now described twice on purpose: `this.runtime` is
+          // the handle a retry uses, and this record is what lets *this sweep*
+          // finish the job. Whichever path reclaims it clears both — see
+          // `releaseOwnership`.
           this.uncleanedRuns.push({ ...ownership });
         }
       }
@@ -543,13 +555,58 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
       const cleaned = reaped ? this.removeRunRoot(run.runRoot) : false;
       if (!cleaned) errors.push(`could not remove ${run.runRoot}`);
       if (!reaped || !cleaned) {
+        // The record keeps the work that is left. Once the group is empty its
+        // ids are dropped: the directory retry must never signal a number that
+        // may now belong to another process.
+        this.updateRecord(run, reaped);
+        // The process is confirmed gone, so this supervisor no longer owes it
+        // one; the directory debt is reported by the record and by `status`.
+        if (reaped) this.releaseOwnership(run.runRoot);
         results.push({ stopped: false, reaped, cleaned, steps, errors });
         continue;
       }
-      this.uncleanedRuns = this.uncleanedRuns.filter((entry) => entry !== run);
+      this.dropRecord(run.runRoot);
+      // A run this supervisor still owns may have just been reclaimed by the
+      // sweep (the record and the live ownership describe the same runRoot).
+      // Leaving `this.runtime` in place would keep reporting an obligation that
+      // no longer exists — a group and a directory that are both gone.
+      this.releaseOwnership(run.runRoot);
       results.push({ stopped: true, reaped, cleaned, steps, errors });
     }
     return results;
+  }
+
+  /**
+   * Forget the run this supervisor owns, once its group and directory are gone.
+   *
+   * Only the current ownership is cleared, and only when it is the run that was
+   * just reclaimed: a sweep that finishes some older record must not forget a
+   * runtime that is still running.
+   */
+  private releaseOwnership(runRoot: string): void {
+    if (!ownsRun(this.ownership, runRoot)) return;
+    this.runtime = null;
+    this.ownership = null;
+    // The failure that described this run is spent with it.
+    this.lastFailure = null;
+  }
+
+  /** Drop the retained record of a run, if one is still kept. */
+  private dropRecord(runRoot: string): void {
+    this.uncleanedRuns = this.uncleanedRuns.filter((entry) => entry.runRoot !== runRoot);
+  }
+
+  /**
+   * Write back what one sweep attempt learned about a retained run.
+   *
+   * A group that is now empty loses its ids: the directory retry may happen much
+   * later, and the numbers could belong to another process by then.
+   */
+  private updateRecord(run: OwnedOmpRuntime, reaped: boolean): void {
+    const next: OwnedOmpRuntime = reaped
+      ? { ...run, reaped: true, pid: 0, pgid: 0 }
+      : { ...run, reaped: false };
+    this.uncleanedRuns = this.uncleanedRuns.map((entry) => (entry === run ? next : entry));
   }
 
   private createRunRoot(): string {
@@ -577,6 +634,16 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
       return false;
     }
   }
+}
+
+/**
+ * True when a reclaimed run root is the one this ownership describes.
+ *
+ * Ownership is released per run root rather than per reclaimed record: a sweep
+ * of older runs must never forget a runtime that is still running.
+ */
+export function ownsRun(ownership: OwnedOmpRuntime | null, runRoot: string): boolean {
+  return ownership !== null && ownership.runRoot === runRoot;
 }
 
 /** Resolve the launcher the supervisor will use, without starting anything. */

@@ -1,6 +1,6 @@
 # OMP Desktop 开发交接
 
-更新时间：2026-09-23。当前状态：**M2 运行时边界与应用身份（T08-T10）实现完成，已按独立复审 R1-R7、S1-S6 两轮返修（见 `docs/validation/M2-runtime-boundary.md` §8、§9），等待复审确认。**接入路径沿用 M1 定案：「rpc-ui 子进程 + 受信扩展 tool_call 前置审批 + 桥接层进程组终止兜底」，M2 已把它落成产品包 `app/packages/omp-runtime` 与唯一路由点 `engine-router`。下一阶段 M3（T11-T16）。
+更新时间：2026-09-23。当前状态：**M2 运行时边界与应用身份（T08-T10）实现完成，已按独立复审 R1-R7、S1-S6、S7 三轮返修（见 `docs/validation/M2-runtime-boundary.md` §8-§10），等待复审确认。**接入路径沿用 M1 定案：「rpc-ui 子进程 + 受信扩展 tool_call 前置审批 + 桥接层进程组终止兜底」，M2 已把它落成产品包 `app/packages/omp-runtime` 与唯一路由点 `engine-router`。下一阶段 M3（T11-T16）。
 
 ## 1. 用户已确定的方向
 
@@ -91,7 +91,7 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 - **T10 路由与身份**：host-core schema 升级到 v20（`sessions.engine TEXT NOT NULL DEFAULT 'pi'` + 迁移与备份，既有会话读出 `pi`；fork 与协同 spawn 继承来源引擎）；`session.create` 校验引擎；桌面侧 `runtime/engine-router.ts` 是唯一判定点（`prompt`/`steer`/`stop` 三个执行入口统一过 gate），OMP 会话在能力关闭时被**拒绝而非回退到 Pi**；`runtime/engine-runtime.ts` 汇总两引擎状态并持有 OMP 运行时；退出时 reclaim 未完成会写 error 日志。
 - **应用身份**：`packages/shared/src/app-identity.ts` 定义产品身份并与上游 PI-Desktop 及 OMP 自身目录做冲突断言（`assertIndependentIdentity`）；数据根改为 `~/.omp-desktop` / `~/.omp-desktop-dev`，appId `net.misterbowie.omp-desktop`，productName `OMP Desktop`，更新源指向本项目仓库，开发构建禁用自动更新，开发 bundle 的名称/bundle id 由 package.json 派生。
 - **复审返修（R1-R7，见验证记录 §8）**：① 生产组合此前**没有**接入会话→引擎查询，steer/stop 等按 id 的 gate 实际永远读作 Pi——现已由 host 的 `session.get` 提供唯一持久化来源并在组合测试中断言（OMP 会话抛能力拒绝且不触碰 sidecar）；② 查询失败不再 fail-open 到 Pi，只有“读取成功且无 engine 字段”才算旧会话，其余一律 `ENGINE_UNAVAILABLE`；③ 逐条审计并 gate 了 abort/compact/status/队列/ask 解析/计划批准与恢复排空，ADR 0300 增补审计表与三条不 gate 的依据；④⑤ supervisor 在 `reaped:false` 后保留可重试所有权并禁止二次启动，stop/reclaim 单飞以消除并发竞态（含 start 与 reclaim 的竞态）；⑥ shutdown 对 reclaim rejection 写 error 日志并有行为测试；⑦ 测试夹具 PATH 追加解释器目录，修复 macOS/`~/.nvm` 下的 127 失败（生产 PATH 仍封闭）。
-- **第二轮复审返修（S1-S6，见验证记录 §9）**：① 队列 reorder 补上唯一 gate；② 计划批准与恢复排空改为“先 gate 再改动持久状态”（被拒的执行跳过且保持 queued）；③ 所有执行/控制 handler 改为“参数校验 → 读引擎并 gate → 才要求 Pi 运行时”，并把 gate 语义定为**按声明**判定（运行时是否在跑由状态面回答，避免一次重启被读成永久拒绝，队列也才能在重启期间暂存）；④ 启动失败若进程未能回收，错误携带所有权、supervisor 采纳并保留目录与 pid/pgid，拒绝第二次启动，重试可清理；⑤ 记录区分“进程已回收（只欠目录）”与“仍拥有活组”，前者绝不再发信号；⑥ 删除任务临时文件，交付以 `git status --porcelain` 为空为准。
+- **第二轮复审返修（S1-S6，见验证记录 §9）**：① 队列 reorder 补上唯一 gate；② 计划批准与恢复排空改为“先 gate 再改动持久状态”（被拒的执行跳过且保持 queued）；③ 所有执行/控制 handler 改为“参数校验 → 读引擎并 gate → 才要求 Pi 运行时”，并把 gate 语义定为**按声明**判定（运行时是否在跑由状态面回答，避免一次重启被读成永久拒绝，队列也才能在重启期间暂存）；④ 启动失败若进程未能回收，错误携带所有权、supervisor 采纳并保留目录与 pid/pgid，拒绝第二次启动，重试可清理；⑤ 记录区分“进程已回收（只欠目录）”与“仍拥有活组”，前者绝不再发信号；⑥ 删除任务临时文件，交付以 `git status --porcelain` 为空为准。第三轮（S7）：扫描回收成功后按同一 runRoot 精确释放所有权（`ownsRun`），使 `status` 回到 `stopped`、`start()` 可再次成功；成功回收的 `stop` 同时删除扫描为同一运行保留的记录，扫描确认进程已回收但目录仍在时把记录降级为 cleanup-only 并停止发信号。cleanup failure 语义不变：只要仍有未清理记录，`status` 为 `failed`/`unreclaimed`、`start()` 继续拒绝。
 - **环境事实（重要）**：子模块依赖必须**按 worktree 单独安装**（`bun install` + `bun run build:native`，不执行 `link omp`）。未安装时固定启动器会把 `@oh-my-pi/pi-utils` 解析到 bun 缓存里的已发布包，`--version` 报出与固定检出不同的版本——这正是运行时包坚持启动前校验版本的理由。
 - 证据：`docs/validation/M2-runtime-boundary.md`、`docs/decisions/001-omp-transport.md`（沿用）、`app/docs/adr/0300-engine-boundary.md`（英文 ADR）、`app/docs/spec/03-runtime/02-agent-runtime.md` §13。任务看板 T08-T10 已标记完成。
 
