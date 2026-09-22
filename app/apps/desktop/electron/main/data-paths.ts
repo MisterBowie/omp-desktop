@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { APP_NAME } from "@pi-desktop/shared";
+import { PRODUCT_IDENTITY } from "@pi-desktop/shared";
 
 /**
  * The two directories that define an installation, and the development split
@@ -23,13 +23,20 @@ import { APP_NAME } from "@pi-desktop/shared";
  */
 
 /** `userData` directory of a development installation, beside the shipped one. */
-export const DEVELOPMENT_INSTALLATION_NAME = `${APP_NAME} Dev`;
+export const DEVELOPMENT_INSTALLATION_NAME = PRODUCT_IDENTITY.developmentUserDataName;
 
-/** Data directory of a shipped installation, below the user's home. */
-export const INSTALLATION_DATA_DIR_NAME = ".pi-desktop";
+/**
+ * Data directory of a shipped installation, below the user's home.
+ *
+ * The name belongs to this product, not to the PI-Desktop fork it came from
+ * (`app-identity.ts` pins both and tests the two apart): an installation that
+ * reused `~/.pi-desktop` would open a second host-core over a running user's
+ * SQLite file and secrets.
+ */
+export const INSTALLATION_DATA_DIR_NAME = PRODUCT_IDENTITY.dataDirName;
 
 /** Data directory of a development installation, below the user's home. */
-export const DEVELOPMENT_DATA_DIR_NAME = ".pi-desktop-dev";
+export const DEVELOPMENT_DATA_DIR_NAME = PRODUCT_IDENTITY.developmentDataDirName;
 
 export type DataDirInput = {
   /** `PI_DESKTOP_DATA_DIR`; an explicit directory wins over either profile. */

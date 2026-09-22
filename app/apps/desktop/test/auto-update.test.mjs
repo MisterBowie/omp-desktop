@@ -127,8 +127,13 @@ test("updater gates delivery mode by platform and delivery policy", () => {
   assert.match(updaterSource, /autoUpdater\.on\("error"/);
   assert.match(
     updaterSource,
-    /github\.com\/vastsa\/PI-Desktop\/releases/,
-    "releases fallback URL",
+    /PRODUCT_IDENTITY\.updateSource/,
+    "the release page comes from the product identity, not a literal URL",
+  );
+  assert.doesNotMatch(
+    updaterSource,
+    /vastsa\/PI-Desktop/,
+    "the updater must never link the fork's release feed",
   );
   assert.match(
     updaterSource,
@@ -225,8 +230,8 @@ test("packaging publishes an electron-updater feed for GitHub Releases", () => {
   const pkg = JSON.parse(pkgSource);
   assert.ok(pkg.dependencies["electron-updater"], "electron-updater dependency");
   assert.equal(pkg.build.publish[0].provider, "github");
-  assert.equal(pkg.build.publish[0].owner, "vastsa");
-  assert.equal(pkg.build.publish[0].repo, "PI-Desktop");
+  assert.equal(pkg.build.publish[0].owner, "MisterBowie");
+  assert.equal(pkg.build.publish[0].repo, "omp-desktop");
   const macTargets = pkg.build.mac.target.map((entry) => entry.target);
   assert.ok(macTargets.includes("zip"), "mac zip target (Squirrel.Mac feed)");
   // electron-builder must never self-publish (implicit tag publishing would

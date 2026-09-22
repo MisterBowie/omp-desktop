@@ -1,6 +1,6 @@
 # OMP Desktop 开发交接
 
-更新时间：2026-09-22。当前状态：**M1 兼容性实验与路径定案（T04-T07）完成，接入路径已定案为「rpc-ui 子进程 + 受信扩展 tool_call 前置审批 + 桥接层进程组终止兜底」。下一阶段 M2（T08-T10）。**
+更新时间：2026-09-23。当前状态：**M2 运行时边界与应用身份（T08-T10）实现完成，等待独立复审。**接入路径沿用 M1 定案：「rpc-ui 子进程 + 受信扩展 tool_call 前置审批 + 桥接层进程组终止兜底」，M2 已把它落成产品包 `app/packages/omp-runtime` 与唯一路由点 `engine-router`。下一阶段 M3（T11-T16）。
 
 ## 1. 用户已确定的方向
 
@@ -83,9 +83,23 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 
 未通过/未执行:MCP 工具未进入模型工具表(归属 T19);子代理的交互式审批**不支持**(无 UI,须由桌面策略替代)与单独停止(T17);macOS/Windows 进程终止未验证(T23);ACP/SDK 仅源码比对。
 
+## 3.3 M2 已完成的工作（T08-T10）
+
+- **T08 引擎边界**：`packages/shared/src/engine.ts` 定义 `EngineId`（`pi` | `omp`，与 `SessionSource` 不同维度）、全键必需的 `EngineCapabilities`、`SessionEngineRef`（含 `ENGINE_ADAPTER_VERSION`）、`EngineRuntimeStatus` 与协议/版本常量。`normalizeEngineId` 对缺省与未知值一律回 `pi`：旧会话永远属于 Pi，不会被新默认值接管。
+- **T09 运行时包**：新增 `app/packages/omp-runtime`（已入 pnpm workspace 与锁文件）。模块职责：`protocol`（typebox 帧校验、ready 判定、v2 分片重组）、`ndjson`（显式行长上限 + `line-too-large` 重同步）、`transport`（ID 匹配、流错误按真实原因返回、挂起请求全量 settle、拒绝写回 `rpc_chunk`）、`launcher`（显式/打包内/固定子模块，**绝不从 PATH 解析**，`--version` 校验）、`isolation`（合成 HOME、剥离重定向/代理/凭证变量）、`process`（停止顺序 abort → abort_bash → EOF → TERM 组 → KILL 组，按**进程组存活**判定）、`supervisor`（运行根所有权、单飞启动、`stopped`/`reaped`/`cleaned` 三独立判定、`terminateOwnedTree`、`prepareRun` 配置投影）。
+- **实际运行证据**：该包 62 项测试全部通过，其中含**真实固定 OMP 运行时**的无费用烟测（版本 18.2.7 校验 → ready → negotiate v2 → 停止后进程组与运行根均已回收）；mock 子进程覆盖永不 ready、拒绝 v2、帧上限不符、分片损坏、忽略 TERM/EOF、组长退出但后代存活等情形。
+- **T10 路由与身份**：host-core schema 升级到 v20（`sessions.engine TEXT NOT NULL DEFAULT 'pi'` + 迁移与备份，既有会话读出 `pi`；fork 与协同 spawn 继承来源引擎）；`session.create` 校验引擎；桌面侧 `runtime/engine-router.ts` 是唯一判定点（`prompt`/`steer`/`stop` 三个执行入口统一过 gate），OMP 会话在能力关闭时被**拒绝而非回退到 Pi**；`runtime/engine-runtime.ts` 汇总两引擎状态并持有 OMP 运行时；退出时 reclaim 未完成会写 error 日志。
+- **应用身份**：`packages/shared/src/app-identity.ts` 定义产品身份并与上游 PI-Desktop 及 OMP 自身目录做冲突断言（`assertIndependentIdentity`）；数据根改为 `~/.omp-desktop` / `~/.omp-desktop-dev`，appId `net.misterbowie.omp-desktop`，productName `OMP Desktop`，更新源指向本项目仓库，开发构建禁用自动更新，开发 bundle 的名称/bundle id 由 package.json 派生。
+- **环境事实（重要）**：子模块依赖必须**按 worktree 单独安装**（`bun install` + `bun run build:native`，不执行 `link omp`）。未安装时固定启动器会把 `@oh-my-pi/pi-utils` 解析到 bun 缓存里的已发布包，`--version` 报出与固定检出不同的版本——这正是运行时包坚持启动前校验版本的理由。
+- 证据：`docs/validation/M2-runtime-boundary.md`、`docs/decisions/001-omp-transport.md`（沿用）、`app/docs/adr/0300-engine-boundary.md`（英文 ADR）、`app/docs/spec/03-runtime/02-agent-runtime.md` §13。任务看板 T08-T10 已标记完成。
+
 ## 4. 下一执行模型从哪里开始
 
-**从 M2（T08-T10）开始，不直接改 Agent 引擎。**
+**从 M3（T11-T16）开始：端到端对话与工具执行。**
+
+M2 已完成并等待复审：引擎边界、`packages/omp-runtime` 监督与传输、路由与能力门、应用身份（见 §3.3）。
+M3 的起点是运行时包已有的传输/监督接口——回合事件、工具卡片、审批问答都在其上实现，
+不要再自己造一套进程或协议处理。
 
 M0 已完成并经四轮复审返修：原桌面可复现构建、开发数据与全局 `.agents` 隔离、UI 基线、OMP 协议启动（绑定 repo 内启动器、版本 18.2.7、`ready`/`negotiate_protocol` v2）均有记录（`docs/validation/M0-baseline.md`，顶部四段“返修记录”）。环境已就绪：Node 24、pnpm 10.34.5、Bun 1.4.2、桌面 Rust stable + OMP `nightly-2026-08-12`、cmake/ninja。复审结论以复审方为准。
 

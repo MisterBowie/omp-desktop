@@ -1,0 +1,213 @@
+# M2 运行时边界与应用身份验证记录
+
+本记录对应任务 T08-T10(阶段 M2)。每条结论都标注来源:**源码事实**、**实际运行证据**或**推断**。
+未运行的验证一律标注为未运行。
+
+## 1. 环境与基线
+
+| 项目 | 值 |
+| --- | --- |
+| 工作区 | `/home/vv/person/code/omp-desktop-m2`(分支 `codex/m2-runtime`) |
+| 基线提交 | `e3071904e892ea91c2515917eafc42c715ed94f5`(M1 第五轮返修) |
+| 系统 | Linux 7.0.0-31-generic,x86_64(NVIDIA GTX 1080 Ti) |
+| Node / pnpm | v24.14.0 / 10.34.5(worktree 内执行,未改全局默认) |
+| Bun | 1.4.2(`~/.bun/bin`) |
+| Rust | stable(桌面 `host-core`);OMP 原生插件按 `nightly-2026-08-12` 构建 |
+| cmake / ninja | 4.4.3 / 1.13.2(经 `~/.pyenv/shims`) |
+| PI-Desktop | `0111e306c120ad5820688d7608cb37bad8fbcc1f`(未升级) |
+| OMP | `d49918fab2dba3986927f2d46721629ed0f3a02c`(未升级) |
+
+准备步骤(每个 worktree 独立,均为已记录命令):
+
+```bash
+cd app && pnpm install --frozen-lockfile          # 首次;新增 workspace 包后用 pnpm install 更新锁文件
+cd upstream/oh-my-pi && bun install               # 该 worktree 的子模块依赖(见 §6 发现 1)
+cd upstream/oh-my-pi && bun run build:native      # pi_natives 原生插件(需要 cmake/ninja;PATH 需含 ~/.pyenv/shims)
+node apps/desktop/node_modules/electron/install.js # electron 二进制(本 worktree 未随 pnpm install 下载)
+cargo build --release -p host-core                # E2E boot 探针需要的宿主二进制
+```
+
+GUI 烟测的运行环境(本机非 root 且 `kernel.apparmor_restrict_unprivileged_userns=1`,与 M0 §4 记录一致):
+
+```bash
+DISPLAY=:1 XAUTHORITY=/run/user/1000/.mutter-Xwaylandauth.AII2V3 ELECTRON_DISABLE_SANDBOX=1 \
+  node scripts/e2e-electron-boot.mjs
+```
+
+## 2. 可重复命令与结果
+
+| # | 命令 | 运行目录 | 退出码 | 关键结果 |
+| --- | --- | --- | --- | --- |
+| 1 | `pnpm -r --if-present build`(`pnpm build:js`) | `app/` | 0 | 全部 workspace 包构建通过(含新增 `@pi-desktop/omp-runtime`) |
+| 2 | `pnpm --filter @pi-desktop/omp-runtime test` | `app/` | 0 | **6 文件 / 60 检查通过**(含真实固定运行时无费用烟测) |
+| 3 | `pnpm --filter @pi-desktop/shared test` | `app/` | 0 | 84 文件 / 968 检查通过(含新增 `engine.test.ts` 与 `app-identity.test.ts`,单独运行合计 20 项) |
+| 4 | `node --test test/*.test.mjs`(env 见 §5) | `app/apps/desktop` | 0 | **2545 通过 / 0 失败**(含新增 4 个引擎相关测试文件:router 10 项、runtime 4 项、session-ipc 4 项、launcher 8 项) |
+| 5 | `cargo test -p host-core` | `app/crates` | 0 | **579 通过 / 0 失败**(新增 2 项:引擎持久化、v19→v20 迁移) |
+| 6 | `cargo fmt --check` | `app/crates` | 0 | 无差异 |
+| 7 | `cargo clippy -p host-core --all-targets` | `app/crates` | 0 | 无告警 |
+| 8 | `node scripts/check-architecture.mjs` | `app/` | 0 | 通过(`main/index.ts` 1500 行,上限 1500) |
+| 9 | `node ../../scripts/check-style-tokens.mjs` | `app/apps/desktop` | 0 | style tokens OK |
+| 10 | `npx biome lint` | `app/` | 0 | 75 文件,无问题 |
+| 11 | `node docs/validation/M0-rpc/verify-rpc.test.mjs` | 根仓库 | 0 | pass 18 / fail 0 |
+| 12 | `node docs/validation/M0-rpc/verify-rpc.mjs` | 根仓库 | 0 | PASS:ready + negotiate_protocol(v2) + get_available_models(无付费调用) |
+| 13 | `node run-all.mjs` | `app/experiments/omp-bridge` | 0 | **13/13 实验、413/413 检查通过**,210.0 s(M1 回归,详见 §4) |
+| 14 | `node scripts/e2e-electron-boot.mjs`(env 见 §1) | `app/` | 0 | **PASS boot-probe**:应用 v0.15.2、host protocol 11、800 会话列表刷新 8 轮全部 <1 s、主线程最大间隔 32 ms、项目删除往返成功 |
+| 15 | `pnpm test`(根) | `app/` | 1(仅环境性失败) | 全部包测试通过;唯一失败为 §5 记录的 `SSH_ASKPASS` 环境用例 |
+| 16 | `node --test`(docs) | `app/docs` | 0 | 11/11:locales、ADR 索引、引用、结构检查全部通过 |
+
+## 3. 逐任务实现与证据
+
+### 3.1 T08 最小运行时接口与原 Pi 行为保持
+
+**源码事实**:`SessionSource`(`desktop` | `pi-native` | `remote`)表示 transcript 权威来源;
+新增 `EngineId`(`pi` | `omp`)表示执行引擎,两者是不同维度,不共用取值。
+
+| 位置 | 内容 |
+| --- | --- |
+| `app/packages/shared/src/engine.ts` | `EngineId`、`ENGINE_IDS`、`normalizeEngineId`(未知/缺省→`pi`)、`EngineCapability`(11 项)、`EngineCapabilities`(全键必需)、`PI_ENGINE_CAPABILITIES`、`OMP_ENGINE_CAPABILITIES`(本阶段全 false)、`engineSupports`、`engineCapabilityRefusal`、`SessionEngineRef` + `ENGINE_ADAPTER_VERSION`、`EngineRuntimeStatus`、`liveEngineCapabilities`、`EngineRuntimeHandle`/`EngineStopOutcome`、协议与版本常量 |
+| `app/packages/shared/src/engine.test.ts` | 20 项:旧记录→Pi、轴分离、能力完整性与开关、引用校验、版本常量 |
+| `app/apps/desktop/electron/main/runtime/engine-router.ts` | 唯一路由/能力判定点(纯模块,不依赖 Electron) |
+| `app/apps/desktop/test/engine-router.test.mjs` | 10 项:旧会话→Pi、`source` 不被当成引擎、停机闭锁、OMP 全拒、无静默回退 |
+
+**Pi 默认路径保持**:`normalizeEngineId` 对 `undefined`/`null`/`""`/未知值一律返回 `pi`;
+`session.create` 不带 `engine` 时桌面**不发送**该字段(Rust 侧默认 `pi`);
+`session.list`/`get` 原样保留 `engine`(含 `pi-native` 记录仍无该字段)。
+证据:`app/apps/desktop/test/engine-session-ipc.test.mjs`(4 项)与宿主 `crates/host-core/src/sessions.rs::tests::engine_is_persisted_defaulted_and_inherited`。
+
+### 3.2 T09 OMP 进程监督与协议适配包
+
+新增 `app/packages/omp-runtime`(纳入 pnpm workspace,已写入锁文件),原有四个关注点各自成模块:
+
+| 模块 | 责任 |
+| --- | --- |
+| `protocol.ts` | typebox 帧 schema(`ready`/`response`/`rpc_chunk`/通用帧)、`checkReadyFrame`(v2 必需、帧上限必须与本地常量完全一致)、协议 v2 分片重组(顺序、元数据、base64 规范形式、1 MiB/64 MiB 上限) |
+| `ndjson.ts` | 显式行长上限(默认 4 MiB)+ `line-too-large` 重同步、跨块 UTF-8、CRLF、非法 JSON 继续 |
+| `transport.ts` | 请求 ID 匹配、分片解码先于应答匹配、**等待中的流错误按真实错误返回**(只有真正到期才叫 timeout)、写失败/退出/取消全部 settle 挂起请求、**拒绝对外发送 `rpc_chunk`**、分片故障视为致命 |
+| `launcher.ts` | 启动器解析(显式/打包内/固定子模块,**绝不从 PATH 解析**)、`--version` 探针、版本比对 |
+| `isolation.ts` | 合成 `HOME`、发现目录预建、剥离 `PI_CONFIG_DIR`/重定向变量/代理(大小写各四组 + `NODE_USE_ENV_PROXY`)/凭证型变量、所有权安全的目录删除 |
+| `process.ts` | 启动→ready→协商 v2→版本校验;停止顺序 `abort`→(必要时 `abort_bash`)→关 stdin(EOF)→TERM 组→KILL 组;按**进程组存活**判定回收 |
+| `supervisor.ts` | 运行根所有权、单飞启动、状态上报、清理判定(`stopped`/`reaped`/`cleaned` 三独立事实)、`terminateOwnedTree` 显式终止入口、`prepareRun` 运行前配置投影 |
+
+**实际运行证据**(`app/packages/omp-runtime/src/*.test.ts`,6 文件 / 60 项):
+
+- 启动/握手:正常 v2 会话;版本不符(`18.2.9` vs 校验值)在**进程创建前**失败;不广告 v2 的运行时被拒;
+  帧上限不符被拒;永不 ready 超时后进程与进程组被回收;崩溃按 `not-started` 上报而非超时。
+- 请求生命周期:ID 匹配与事件转发;1,200,000 字节响应经分片重组;分片损坏→`transport-failed` 并使后续请求快速失败;
+  真实超时(`request-timeout`)与流错误区分;写回 `rpc_chunk` 被拒;运行中退出时两个挂起请求都 settle。
+- 停止顺序(证据为 mock 写入的 `MOCK_OMP_LOG`):`abort` 在 `eof` 之前;`abort_bash` 在 `abort` 之后、`eof` 之前;
+  忽略 TERM 与 EOF 的运行时升级到 SIGKILL(`escalated: "kill"`);**组长退出但后代存活**时仍按进程组回收;
+  重复停止返回同一判定。
+- 隔离:子进程 `HOME` 在运行根内、配置根在合成 HOME 内、无凭证型变量、无 `PI_DESKTOP_*`;代理按大小写全量归一化;
+  运行根删除仅限自有前缀与目录内。
+
+**真实固定运行时无费用烟测**(`src/pinned-runtime.test.ts`,无 prompt、无付费模型):
+固定启动器(仓库内 `upstream/oh-my-pi/.../scripts/omp`)→ 版本 `18.2.7` 校验通过 →
+`ready` → `negotiate_protocol(2)` → 状态 `idle`/`reason: not-implemented` → `stop()` 返回
+`reaped: true`、`cleaned: true`,状态目录内无遗留运行根。模型目录由 `prepareRun` 写入本地
+`proxies: smoke`(指向关闭端口,从不请求)。
+
+### 3.3 T10 会话引擎选择、能力门与应用身份
+
+| 位置 | 内容 |
+| --- | --- |
+| `crates/host-core` | `sessions.engine TEXT NOT NULL DEFAULT 'pi'`(schema v20,迁移 `v19→v20` + 备份);`session.create` 接受并校验 `engine`;`fork`/协同 `spawn` 继承来源会话引擎;摘要/详情/SELECT 同步 |
+| `apps/desktop/electron/main/runtime/engine-runtime.ts` | Pi/OMP 状态映射、gate 构造、运行时所有权 |
+| `apps/desktop/electron/main/ipc/agent-ipc.ts` | `agentPrompt`(在读出的会话记录上)、`agentSteer`、`agentStop` 三处执行入口统一过 gate |
+| `apps/desktop/electron/main/bootstrap/shutdown.ts` | 退出时 `ompRuntime.reclaim()`;回收未完成会写入 error 级日志 |
+| `packages/shared/src/app-identity.ts` | `PRODUCT_IDENTITY`、`LEGACY_PI_DESKTOP_IDENTITY`、`assertIndependentIdentity`、保留目录检查 |
+| `apps/desktop/package.json` | `appId` = `net.misterbowie.omp-desktop`,`productName` = `OMP Desktop`,publish = `MisterBowie/omp-desktop` |
+| `apps/desktop/electron/main/data-paths.ts` | 目录名取自身份:`.omp-desktop` / `.omp-desktop-dev` |
+| `apps/desktop/electron/main/updater.ts` | 发布页来自身份;无发布渠道时 `openReleases` 抛 `NO_RELEASE_CHANNEL`;开发构建 `disabled` |
+| `scripts/dev-electron.mjs` | 开发 bundle 的名称/bundle id 由 `apps/desktop/package.json` 的 `productName`/`appId` 派生 |
+
+**实际运行证据**:
+`engine-session-ipc.test.mjs`(显式引擎原样送达宿主、缺省不发字段、列表保留各自引擎、未知引擎由宿主拒绝)、
+`omp-runtime-launcher.test.mjs`(显式优先且失败不回退搜索、打包构建只用自带运行时、开发构建按目录向上找到固定启动器、
+本 worktree 解析到 `upstream/oh-my-pi/.../scripts/omp`、身份无冲突、开发构建禁用更新)、
+`engine-runtime.test.mjs`(Pi 仅在双进程就绪时报 `idle`;停机闭锁能力;OMP 运行中仍全闭)、
+`cargo test v19_database_migrates_to_session_engine`(旧库升级后既有会话读出 `pi`)。
+
+**E2E 实际运行证据**:`scripts/e2e-electron-boot.mjs`(真实 Electron、临时数据根、sandboxed preload)
+在本次改动后仍通过 —— 说明启动期构造引擎运行时、能力门接线、退出回收与身份改名没有破坏真实应用;
+该脚本自身的产品名断言(`probe.appName`)已按新身份改为 `OMP Desktop`。
+
+**未运行的推断**:macOS 开发 bundle 的 plist 断言(`development-branding.test.mjs` 在非 darwin 上 skip)与
+`PI-Desktop-macOS-open.command` 的 bundle id 已在本次改到新身份,但本机是 Linux,**未运行**这两条路径。
+
+## 4. M1 回归与对照
+
+| 项目 | 结果 |
+| --- | --- |
+| `app/experiments/omp-bridge/run-all.mjs` | 13/13 实验、413/413 检查、退出码 0(见 §2 #13) |
+| M0 `verify-rpc.test.mjs` / `verify-rpc.mjs` | 18/18 通过 / 真实无费用 RPC PASS |
+| 原 Pi 对照 | 桌面 2545 项测试全通过;`session-message-input.test.mjs` 证明 prompt 仍走原路径(prompt IPC 持久化、slash 展开跳过、宿主账本优先) |
+
+**对照源码位置(仅阅读,未运行)**:
+
+- PI-Desktop:`packages/shared/src/network-proxy.ts`(`PROXY_ENV_KEYS`)、
+  `packages/host-runtime/src/host-process.ts`(先 `stripProxyEnv` 再叠加)、
+  `crates/host-core/src/permissions.rs`(`resolve` 先移除 pending)、
+  `apps/desktop/electron/main/data-paths.ts`(开发/发行数据根分离)。
+- OMP:`packages/coding-agent/src/modes/rpc/rpc-frame.ts`(帧与分片常量)、
+  `rpc-client.ts:172`(客户端就绪判定)、`rpc-mode.ts:843`(ready 广告)与 `:1176`(v1 协商被拒)、
+  `packages/utils/src/dirs.ts`(`VERSION` 来自包版本)。
+
+## 4.1 残留审计(改动后)
+
+| 检查项 | 结果 |
+| --- | --- |
+| mock/固定运行时进程 | 运行 `packages/omp-runtime` 全套与桌面全套后均为 **0** |
+| `/tmp/omp-runtime-*`、`/tmp/omp-launcher-*` 临时运行根 | **0**(测试与监督层各自删除自己创建的运行根) |
+| 用户数据目录 | 无 `~/.omp-desktop` / `~/.omp-desktop-dev` 残留(人工探针创建的已删除);用户的 `~/.pi-desktop`、`~/.config/PI-Desktop`、`~/.omp`、`~/.agents` 时间戳未变 |
+| 子模块工作树 | `git -C upstream/oh-my-pi status --short` 为空(安装与原生构建产物均被忽略);两个子模块提交未变 |
+| 全局 `~/.bun/bin/omp` | 未改动(只执行 `bun install` 与 `bun run build:native`,未执行 `link omp`) |
+
+**一次已修正的泄漏与结论**:早期版本的一条 `deaf` 模式用例在 vitest 默认 5 s 超时下被放弃,
+当时 `stop()` 仍处于升级链中(`abort` 1 s + EOF 3 s + TERM 宽限 3 s ≈ 7 s),三个 mock 进程因此留在系统里。
+已改为显式缩短各阶段预算并给出 20 s 用例超时;修正后连续多次运行均无残留。
+结论对包本身同样成立:**停止一旦被调用方放弃,运行时不会被回收**——调用方必须为停止留出预算。
+
+## 5. 环境相关的测试注记
+
+- 本机 shell 环境存在 `SSH_ASKPASS=/usr/bin/false`,会让 `remote-host-ssh-password.test.mjs` 中
+  "a key-authenticated transport is handed no askpass material" 失败——该测试断言子进程环境里
+  `SSH_ASKPASS` 未设置。**与本次改动无关**(未触碰 ssh 相关代码),用
+  `env -u SSH_ASKPASS node --test test/*.test.mjs` 运行即为 2537 通过 / 0 失败;
+  单独运行该文件在清除该变量后为 14/14 通过。
+- `pnpm install` 首次在本 worktree 需要联网;新增 workspace 包后必须用 `pnpm install`(非 `--frozen-lockfile`)
+  更新锁文件——锁文件差异仅新增 `packages/omp-runtime` 一条 importer。
+
+## 6. 与计划不同的事实与原因
+
+1. **子模块依赖必须按 worktree 单独安装**。M0 的 `bun setup` 已在 M0 worktree 完成,但 M2 worktree 的
+   `upstream/oh-my-pi` 没有自己的 `node_modules`;此时固定启动器把 `@oh-my-pi/pi-utils` 解析到
+   **bun 缓存中的已发布包**,`--version` 报出 `18.2.9`,而固定检出是 `18.2.7`。
+   处理:在本 worktree 执行 `bun install` 与 `bun run build:native`(不执行 `link omp`,避免改写用户全局 `~/.bun/bin/omp`)。
+   这正是运行时包坚持**启动前校验版本**的现实依据——若信任启动器输出,将运行一个未经该基线验证的运行时。
+2. **真实运行时需要模型目录才能就绪**。空配置下它直接以 "No models available" 退出;
+   因此监督层提供 `prepareRun(paths)` 投影入口,烟测写入指向关闭端口的本地 `models.yml`(M4 将在此投影桌面模型配置)。
+3. **`main/index.ts` 有行数上限**(`check-architecture.mjs`,`≤1500`)。引擎装配因此放在
+   `runtime/engine-runtime.ts`,index.ts 只保留一行构造调用。
+4. **上游 dev bundle 脚本硬编码身份**。`scripts/dev-electron.mjs` 原先自己写死 `PI-Desktop` 与
+   `net.aiuo.pi-desktop.dev`;现改为从 `apps/desktop/package.json` 的 `productName`/`appId` 派生。
+
+## 7. 未执行项与剩余风险
+
+| 项目 | 状态 | 说明 |
+| --- | --- | --- |
+| macOS 开发 bundle / 打开脚本的 bundle id | 未运行 | 本机 Linux;`development-branding.test.mjs` 相关用例被平台跳过 |
+| Windows/Linux 打包身份与安装产物 | 未运行 | M6 范围(M2 只做运行期身份边界) |
+| 图标、Windows 可执行文件/快捷方式命名 | 未改动 | 属 M6 品牌与打包;`productName` 已是新产品名,图标与 win 命名仍沿用上游值 |
+| 打包内自带运行时 | 未实现 | `resources/omp-runtime/omp` 只是约定位置;未产出安装包,故引擎在打包构建中会报不可用 |
+| OMP 对话/工具/审批 | 未实现 | M3;本阶段所有 OMP 能力显式关闭,拒绝而不回退 |
+| 真实付费模型烟测 | 未执行 | 需用户指定提供方、模型与预算 |
+| 子代理进程树自动回收 | 未实现 | 已提供 `terminateOwnedTree`,由 M3/T17 从子代理事件取 pid 调用 |
+| 打包后安装/离线启动 | 未运行 | M6 |
+| `PI_DESKTOP_*` 环境变量名 | 未改名 | 38 个文件引用;属开发/测试覆盖机制,改名与 M6 品牌一并处理 |
+| 临时目录/工件命名 | 未改名 | E2E 探针的临时 profile 前缀 `pi-desktop-boot-` 是它与 `session-list-probe.ts` 的夹具契约;宿主二进制名 `pi-desktop-host-core` 同样属 M6 打包命名 |
+
+## 8. 下一阶段条件
+
+- T08-T10 的接口、路由、监督、身份与测试均已落地并通过上述命令;M3(端到端对话与工具执行)可在
+  `packages/omp-runtime` 的传输与监督之上实现回合事件、工具卡片与审批问答。
+- M3 必须先解决的两点:MCP 工具进入模型工具表(T19 归属)、子代理审批的桌面策略与进程树终止(T17/M5)。

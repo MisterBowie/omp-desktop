@@ -39,6 +39,7 @@
     "@pi-desktop/agent-runtime": "workspace:*",
     "@pi-desktop/host-runtime": "workspace:*",
     "@pi-desktop/i18n": "workspace:*",
+    "@pi-desktop/omp-runtime": "workspace:*",
     "@pi-desktop/plugin-devkit": "workspace:*",
     "@pi-desktop/plugin-sdk": "workspace:*",
     "@pi-desktop/racp": "workspace:*",
@@ -75,16 +76,16 @@
     "zustand": "^5.0.15"
   },
   "build": {
-    "appId": "net.aiuo.pi-desktop",
-    "productName": "PI-Desktop",
+    "appId": "net.misterbowie.omp-desktop",
+    "productName": "OMP Desktop",
     "directories": {
       "output": "release"
     },
     "publish": [
       {
         "provider": "github",
-        "owner": "vastsa",
-        "repo": "PI-Desktop"
+        "owner": "MisterBowie",
+        "repo": "omp-desktop"
       }
     ],
     "files": [

@@ -1,7 +1,15 @@
 export const PROTOCOL_VERSION = 11 as const;
 export const SCHEMA_VERSION = 16 as const;
-export const APP_ID = "net.aiuo.pi-desktop";
-export const APP_NAME = "PI-Desktop";
+/**
+ * Product name and reverse-DNS application id.
+ *
+ * They live here because this module must stay import-free: dozens of tests
+ * load it as a TypeScript source, and a single import would force every one of
+ * them through a resolver hook. They are the source of truth — `app-identity.ts`
+ * composes the full identity around them rather than restating them.
+ */
+export const APP_ID = "net.misterbowie.omp-desktop";
+export const APP_NAME = "OMP Desktop";
 export const APP_VERSION = "0.15.2";
 
 export const APP_MENU_COMMANDS = [

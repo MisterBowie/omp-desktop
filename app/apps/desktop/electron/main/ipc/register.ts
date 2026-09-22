@@ -8,6 +8,7 @@ import { ROUTE_LOCAL, type BackendRouter } from "../remote/backend-router";
 import { registerAgentExtensionIpc } from "../agent-extensions-ipc";
 import { readNpmPath, writeNpmPath } from "../npm-preferences";
 import { registerAgentIpc } from "./agent-ipc";
+import type { EngineRouter } from "../runtime/engine-router";
 import { registerAppIpc } from "./app-ipc";
 import { registerDiagnosticsIpc } from "./diagnostics-ipc";
 import { registerMarketIpc } from "./market-ipc";
@@ -48,6 +49,8 @@ export type RegisterIpcDependencies = {
    * unchanged. Null until the router is wired (and in tests).
    */
   getBackendRouter?: () => BackendRouter | null;
+  /** Engine gate shared by every IPC path that can execute work (M2/T10). */
+  engineRouter: EngineRouter;
   getNotificationViewingSessionId: () => string | null;
   setNotificationViewingSessionId: (sessionId: string | null) => void;
   activeUserSubagentDocuments: (...args: any[]) => Promise<any>;
@@ -75,6 +78,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     getHost,
     getSidecar,
     getAgentHostBridge,
+    engineRouter,
     getBackendRouter,
     getNotificationViewingSessionId,
     setNotificationViewingSessionId,
@@ -352,6 +356,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     getHost,
     getSidecar,
     getAgentHostBridge,
+    engineRouter,
     cancelSessionTools: (sessionId: string, reason?: string) => plugins.cancelSessionTools(sessionId, reason),
     logger,
     vendorOAuth,

@@ -122,6 +122,40 @@ fn v18_database_migrates_session_thinking_omit() {
     assert!(sql.contains("'omit'"), "{sql}");
 }
 
+/// M2/T08: a v19 database gains the engine column, and every session it
+/// already held reads back as Pi — the engine that created it.
+#[test]
+fn v19_database_migrates_to_session_engine() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    let session_id;
+    {
+        let db = Database::open(&path).unwrap();
+        let session =
+            crate::sessions::create_session(&db, Some("existing".into()), None, None, None, None)
+                .unwrap();
+        session_id = session.id;
+        // Recreate the pre-v20 shape: the column did not exist, so neither does
+        // any value that could be read out of it.
+        db.conn()
+            .execute_batch("ALTER TABLE sessions DROP COLUMN engine;")
+            .unwrap();
+        db.conn().pragma_update(None, "user_version", 19).unwrap();
+    }
+    let db = Database::open(&path).unwrap();
+    assert_eq!(schema_version(db.conn()), SCHEMA_VERSION);
+    assert!(migration_backup_path(&path, 19).exists());
+    let engine: String = db
+        .conn()
+        .query_row(
+            "SELECT engine FROM sessions WHERE id = ?1",
+            params![session_id],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(engine, "pi");
+}
+
 fn schema_version(conn: &Connection) -> i64 {
     conn.query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap()

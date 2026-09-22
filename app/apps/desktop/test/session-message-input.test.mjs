@@ -6,6 +6,20 @@ import { IPC } from "@pi-desktop/shared";
 register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
 const { resolveSessionMessageInput } = await import("../../../packages/host-runtime/src/session-message-input.ts");
 const { registerAgentIpc } = await import("../electron/main/ipc/agent-ipc.ts");
+const { createEngineRouter } = await import("../electron/main/runtime/engine-router.ts");
+const { PI_ENGINE_CAPABILITIES } = await import("@pi-desktop/shared");
+
+/** The gate every executing IPC path asks before it runs anything. */
+const engineRouter = createEngineRouter({
+  status: (engine) => ({
+    engine,
+    phase: "idle",
+    runtimeVersion: null,
+    protocolVersion: null,
+    reason: null,
+    capabilities: PI_ENGINE_CAPABILITIES,
+  }),
+});
 
 const message = {
   id: "delivery-1", pluginId: "demo.sessions", sourceSessionId: "sender",
@@ -69,7 +83,7 @@ test("prompt IPC persists original session text, skips slash expansion and binds
       calls.push({ method, params });
       if (method === "session.collaboration.message") return { message };
       if (method === "settings.get") return {};
-      if (method === "session.get") return { session: { id: "target", messages: [] } };
+      if (method === "session.get") return { session: { id: "target", engine: "pi", messages: [] } };
       if (method === "session.beginTurn") return { turnId: "turn-1" };
       if (method === "session.appendMessage") return {};
       assert.fail(`unexpected RPC ${method}`);
@@ -84,6 +98,7 @@ test("prompt IPC persists original session text, skips slash expansion and binds
       async call(method, params) { sidecarCalls.push({ method, params }); return { accepted: true, turnId: "turn-1" }; },
     }),
     getAgentHostBridge: () => null,
+    engineRouter,
     logger: { app() {} }, vendorOAuth: {}, agentExtensions: {}, cancelSessionTools() {},
     persistenceOutbox: {}, dataDir: "/unused-for-no-attachments",
     activeTurns: new Map(), activeTurnUsages: new Map(), approvedExecutionIdsBySession: new Map(), claimedExecutionSessions: new Map(),

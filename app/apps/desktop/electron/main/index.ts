@@ -100,6 +100,7 @@ import type { AgentHostBridge } from "./agent-host-bridge";
 import { registerAppIpc } from "./ipc/app-ipc";
 import { registerNotificationIpc } from "./ipc/notification-ipc";
 import { registerSessionIpc } from "./ipc/session-ipc";
+import { createDesktopEngineRuntimeForApp } from "./runtime/engine-runtime";
 import { registerSettingsIpc } from "./ipc/settings-ipc";
 import { registerProviderIpc } from "./ipc/provider-ipc";
 import {
@@ -1242,6 +1243,7 @@ runtimeLifecycle = createRuntimeLifecycle({
 });
 const { bootHostStatus, runtimeArch, bootBackends } = runtimeLifecycle;
 
+const engineRuntime = createDesktopEngineRuntimeForApp({ dataRoot: dataDir, app, piRuntimeLive: () => host !== null && sidecar !== null }); // engine gate + owned runtime (ADR 0300)
 function registerIpc() {
   return registerIpcHandlers({
     traySessions: applicationLifecycle!.traySessions,
@@ -1250,6 +1252,7 @@ function registerIpc() {
     getHost: () => host,
     getSidecar: () => sidecar,
     getAgentHostBridge: () => agentHostBridge,
+    engineRouter: engineRuntime.engineRouter,
     getBackendRouter: () => startupState.backendRouter,
     getNotificationViewingSessionId: () => notificationViewingSessionId,
     setNotificationViewingSessionId: (sessionId: string | null) => {
@@ -1484,6 +1487,7 @@ registerShutdownHandlers({
   browserPane,
   pluginViews,
   updater,
+  ompRuntime: engineRuntime.ompRuntime,
   logger,
   confirmQuitDialog,
 });

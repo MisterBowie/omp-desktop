@@ -1,4 +1,5 @@
 /** Shared public types grouped by the owning application domain. */
+import type { EngineId } from "../engine.js";
 import type { Mode } from "./common.js";
 import type { SessionThinkingLevel, ThinkingLevel } from "./models.js";
 import type { PermissionMode } from "./permissions.js";
@@ -27,6 +28,11 @@ export type SessionSummary = {
   id: string;
   /** Transcript authority. Omitted by older hosts and normalized to `desktop`. */
   source?: SessionSource;
+  /**
+   * Engine that executes this session (M2). Omitted by older hosts and by
+   * records created before the field existed; both mean Pi, never OMP.
+   */
+  engine?: EngineId;
   /** Native sessions expose only safe actions in the first continuation slice. */
   capabilities?: SessionCapabilities;
   /** Stable machine-readable reason why a native session cannot be continued. */

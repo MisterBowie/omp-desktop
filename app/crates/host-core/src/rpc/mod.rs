@@ -2066,6 +2066,13 @@ async fn handle_request(
                         .map(str::to_string),
                     thinking_level,
                     permission_mode,
+                    // Engine choice (M2/T08): absent means Pi, and the value is
+                    // validated inside the sessions module, so an unknown engine
+                    // is an argument error rather than a stored surprise.
+                    engine: params
+                        .get("engine")
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string),
                 },
             )
             .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;

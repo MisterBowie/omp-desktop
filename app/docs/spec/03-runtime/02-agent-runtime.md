@@ -1512,3 +1512,61 @@ cause survives adapter message flattening, remains on the final error row,
 and never triggers a provider transport rebuild. Protocol errors such as
 `EPROTO` keep their existing retry behavior. See
 [certificate trust ADR](../../adr/provider-system-certificates.md).
+
+## 13. Engine boundary (M2, ADR 0300)
+
+A session is executed by exactly one engine. `EngineId` (`pi` | `omp`) is a
+separate axis from `SessionSource`, which still records transcript authority
+(`desktop` | `pi-native` | `remote`); a native or remote session is still
+executed by an engine, and neither source value names one.
+
+### 13.1 Persistence
+
+`sessions.engine` (schema v20) is `TEXT NOT NULL DEFAULT 'pi'`. Every record
+written before the column existed was created by the Pi engine, so `pi` is the
+stored fact and not a placeholder. `session.create` accepts `engine`, validates
+it against `pi` | `omp`, rejects anything else with `INVALID_ARGUMENT`, and
+returns the stored value with every session summary and detail. `session.fork`
+and `session.collaboration.spawn` inherit the source session's engine: a branch
+continues the same conversation, and a spawned worker runs where its parent
+runs.
+
+### 13.2 Capabilities
+
+`EngineCapabilities` declares every capability for every engine, all keys
+required. `liveEngineCapabilities` folds the runtime phase in: a statically
+supported capability is still closed while the runtime is down. A caller asking
+for a capability the session's engine does not have is refused with
+`ENGINE_CAPABILITY_UNAVAILABLE` carrying `engine` and `capability`. No path
+falls back to another engine.
+
+In this release the OMP engine declares every capability closed: its runtime can
+be started, supervised, inspected and stopped, and no conversation is driven
+through it yet. `EngineRuntimeStatus.reason` therefore reports
+`not-implemented` while the process is running.
+
+### 13.3 Routing
+
+`apps/desktop/electron/main/runtime/engine-router.ts` is the single decision
+point. It reads the engine from a session record the caller already has (or from
+a host lookup by id) and answers `require(session, capability)`. Every IPC path
+that would execute work — prompt, steer, stop — asks it before launching
+anything. The renderer never starts a process and never sends engine-specific
+commands to another engine's transport.
+
+### 13.4 OMP runtime placement
+
+`packages/omp-runtime` owns executable resolution, child-environment isolation,
+the rpc-ui framing contract (line cap, protocol-v2 chunk reassembly, request
+lifecycle, typed failures), process-group termination and cleanup verdicts. It
+starts with `--mode rpc-ui`, requires protocol v2, verifies the executable's
+version against the build's pin, and never resolves a launcher from `PATH`.
+Electron main constructs it, starts it on request, and reclaims it on quit; the
+runtime is not started at boot while no conversation surface exists.
+
+Lifecycle rules from the compatibility experiments are part of the contract: stop
+in-protocol (`abort`, then `abort_bash` when a command is running) before
+breaking the bridge; decide termination by process-group liveness, so a leader's
+exit does not exempt surviving descendants; treat a chunk-decode failure as
+fatal and rebuild the runtime; and report a stop that left processes or
+directories behind as a failure.

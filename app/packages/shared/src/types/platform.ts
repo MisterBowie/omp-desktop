@@ -70,7 +70,8 @@ export type UpdateState = {
   error?: string;
   /** True when the transition came from a user-initiated check. */
   manual?: boolean;
-  releasesUrl: string;
+  /** Release page to link from the update surface; absent without a channel. */
+  releasesUrl?: string;
 };
 
 export type OnboardingState = {

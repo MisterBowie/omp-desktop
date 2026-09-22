@@ -44,6 +44,8 @@ for (const preloadPath of [
   }
 }
 
+// The prefix is a fixture contract with `session-list-probe.ts`, which refuses
+// to run against anything but its own temporary profile.
 const dataDir = createTempDataDir("pi-desktop-boot-");
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
@@ -122,7 +124,7 @@ child.on("close", (code) => {
   if (
     code === 0 &&
     probe?.ok &&
-    probe.appName === "PI-Desktop" &&
+    probe.appName === "OMP Desktop" &&
     probe.platform === process.platform &&
     (process.platform === "darwin" || probe.maximized === true) &&
     menuContractOk &&

@@ -66,6 +66,7 @@ CREATE TABLE sessions (
   permission_mode TEXT NOT NULL DEFAULT 'inherit'
                 CHECK (permission_mode IN ('inherit', 'ask', 'accept-edits', 'auto')),
   source      TEXT,
+  engine      TEXT NOT NULL DEFAULT 'pi',
   deleted_at  INTEGER,
   pinned      INTEGER NOT NULL DEFAULT 0,
   last_seq    INTEGER NOT NULL DEFAULT 0,

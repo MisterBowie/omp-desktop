@@ -839,3 +839,32 @@ pub(crate) fn migrate_v18_to_v19(conn: &Connection, path: &Path) -> Result<()> {
     let _ = conn.pragma_update(None, "foreign_keys", true);
     result
 }
+
+/// v20 records which engine executes a session (M2/T08).
+///
+/// The column is added with a constant default rather than rebuilt into the
+/// table: every existing row predates the engine boundary and was created by
+/// the Pi engine, so `pi` is the fact, not a placeholder. Nothing ELSE reads
+/// the value — a record without it is treated the same way in the API.
+pub(crate) fn migrate_v19_to_v20_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+    tx.execute_batch("ALTER TABLE sessions ADD COLUMN engine TEXT NOT NULL DEFAULT 'pi';")?;
+    tx.pragma_update(None, "user_version", 20i64)?;
+    Ok(())
+}
+
+pub(crate) fn migrate_v19_to_v20(conn: &Connection, path: &Path) -> Result<()> {
+    let backup = create_migration_backup(conn, path, 19)?;
+    conn.pragma_update(None, "foreign_keys", false)?;
+    let result = (|| {
+        let tx = conn.unchecked_transaction()?;
+        migrate_v19_to_v20_tx(&tx)?;
+        tx.commit().with_context(|| {
+            format!(
+                "commit schema v19 to v20 migration; backup {} remains",
+                backup.display()
+            )
+        })
+    })();
+    let _ = conn.pragma_update(None, "foreign_keys", true);
+    result
+}

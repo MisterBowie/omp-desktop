@@ -1,4 +1,6 @@
 export * from "./activation.js";
+export * from "./app-identity.js";
+export * from "./engine.js";
 export * from "./protocol.js";
 export * from "./errors.js";
 export * from "./rpc-error.js";

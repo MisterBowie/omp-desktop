@@ -188,8 +188,8 @@ test(
         await readFile(join(brandedContents, "Resources", "icon.icns"), "utf8"),
         "canonical-icon",
       );
-      assert.match(plist, /<string>PI-Desktop<\/string>/);
-      assert.match(plist, /<string>net\.aiuo\.pi-desktop\.dev<\/string>/);
+      assert.match(plist, /<string>OMP Desktop<\/string>/);
+      assert.match(plist, /<string>net\.misterbowie\.omp-desktop\.dev<\/string>/);
       assert.equal(prepareMacDevelopmentBundle(options), brandedExecutable);
     } finally {
       await rm(root, { recursive: true, force: true });

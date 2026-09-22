@@ -18,6 +18,7 @@ import type { UpdateInfo, ProgressInfo } from "electron-updater";
 import {
   formatChangelogNotes,
   IPC,
+  PRODUCT_IDENTITY,
   type UpdateMode,
   type UpdateState,
 } from "@pi-desktop/shared";
@@ -30,7 +31,15 @@ import {
 
 const { autoUpdater } = electronUpdaterPkg;
 
-export const RELEASES_URL = "https://github.com/vastsa/PI-Desktop/releases/latest";
+/**
+ * The release page this product's update surface links to.
+ *
+ * It follows the product identity, never the fork's feed: a build that linked
+ * to the upstream product's releases would offer users an installer for a
+ * different application. `null` means this product has no release channel yet,
+ * and the updater reports "disabled" instead of checking one.
+ */
+export const RELEASES_URL = PRODUCT_IDENTITY.updateSource?.releasesUrl ?? null;
 
 const AUTO_CHECK_INITIAL_DELAY_MS = 15_000;
 const AUTO_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -59,6 +68,9 @@ export function resolveUpdateMode(
   env: NodeJS.ProcessEnv = process.env,
 ): UpdateMode {
   if (!isPackaged) return "disabled";
+  // No release channel for this product yet: a packaged build must not check
+  // anyone else's feed, and electron-updater has no app-update.yml to read.
+  if (PRODUCT_IDENTITY.updateSource === null) return "disabled";
   if (platform === "win32") {
     return env.PORTABLE_EXECUTABLE_FILE ? "manual" : "in-app";
   }
@@ -98,7 +110,7 @@ export class AppUpdaterController {
       mode,
       status: "idle",
       currentVersion: options.currentVersion,
-      releasesUrl: RELEASES_URL,
+      releasesUrl: RELEASES_URL ?? undefined,
     };
     if (mode !== "disabled") this.attachListeners();
   }
@@ -293,6 +305,9 @@ export class AppUpdaterController {
   }
 
   async openReleases(): Promise<void> {
+    // No release channel yet is a different condition from a rejected URL:
+    // the first has nothing to open, the second must never be opened.
+    if (!RELEASES_URL) throw new Error("NO_RELEASE_CHANNEL");
     const url = parseAllowedExternalUrl(RELEASES_URL);
     if (!url) throw new Error("DISALLOWED_EXTERNAL_URL");
     await shell.openExternal(url);

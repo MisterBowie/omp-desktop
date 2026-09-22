@@ -80,6 +80,18 @@ process resources returns `PROCESS_RESOURCE_EXHAUSTED`. Host-core's control
 stdio is isolated from Tokio's dynamic blocking pool so the latter condition
 does not turn temporary thread pressure into a host process exit.
 
+### 3.2a Engine boundary
+
+Which agent runtime executes a session is a boundary the desktop decides before
+any work starts (spec 02 §4, M2/T08). A session whose engine cannot serve a
+capability is refused with these codes; it is never served by another engine's
+path.
+
+| code | retriable | meaning |
+|---|---|---|
+| `ENGINE_CAPABILITY_UNAVAILABLE` | no | the session's engine does not support the requested capability in this build (its declaration is closed, or its runtime is not up). Carries `engine` and `capability`; the message names the engine, never a fallback |
+| `ENGINE_UNAVAILABLE` | yes | the engine's runtime is not running or failed to start; the caller may retry once the runtime is available (protocol, version, or process failure) |
+
 ### 3.2 Agent / session
 
 | code | retriable | meaning |

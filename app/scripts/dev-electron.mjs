@@ -16,11 +16,22 @@ import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const APP_NAME = "PI-Desktop";
-const DEV_BUNDLE_ID = "net.aiuo.pi-desktop.dev";
 const BRANDING_SCHEMA = "v3";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DESKTOP_ROOT = join(ROOT, "apps", "desktop");
+
+// The development bundle carries this product's name and app id, read from the
+// same place the packaged build does rather than restated here: a development
+// app whose bundle id does not match the shipped one is a different
+// application to macOS (launch services, signing, saved state), and the
+// close/quit helpers that validate the bundle id would refuse to open it.
+const DESKTOP_PACKAGE = JSON.parse(
+  readFileSync(join(DESKTOP_ROOT, "package.json"), "utf8"),
+);
+const APP_NAME = DESKTOP_PACKAGE.build.productName;
+const APP_ID = DESKTOP_PACKAGE.build.appId;
+/** A development bundle is its own application next to a shipped install. */
+const DEV_BUNDLE_ID = `${APP_ID}.dev`;
 
 function resolvePackagePath(packageName) {
   const require = createRequire(join(DESKTOP_ROOT, "package.json"));

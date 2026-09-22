@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
+    "rootDir": "src",
+    "composite": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*"],
+  // Test-only modules: vitest loads them through source, they must not ship.
+  "exclude": ["src/**/*.test.ts", "src/test-harness.ts"],
+  "references": [{ "path": "../shared" }]
+}

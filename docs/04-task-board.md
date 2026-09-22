@@ -2,7 +2,7 @@
 
 状态：`待开始`、`进行中`、`已完成`、`阻塞`。只有附验证证据才能将实现任务标为已完成。
 
-当前交付阶段：M1 兼容性实验与路径定案完成（T04-T07），并已按独立复审 R1-R6 返修（见 `docs/validation/M1-compatibility.md` §8）。证据见 `docs/validation/M1-compatibility.md`，决策见 `docs/decisions/001-omp-transport.md`。下一阶段 M2（T08-T10）。
+当前交付阶段：M2 运行时边界与应用身份（T08-T10）实现完成，等待独立复审。证据见 `docs/validation/M2-runtime-boundary.md`；传输决策见 `docs/decisions/001-omp-transport.md`，引擎边界决策见 `app/docs/adr/0300-engine-boundary.md`（英文）。上一阶段证据见 `docs/validation/M1-compatibility.md`。下一阶段 M3（T11-T16）。
 
 ## 准备工作
 
@@ -24,9 +24,9 @@
 | T05 | M1 | 工具执行前审批与拒绝实验 | T03,T04 | 拒绝无副作用；覆盖原生工具入口 | 已完成 |
 | T06 | M1 | 取消、子代理及宿主工具实验 | T04,T05 | 后台实际终止，挂起请求清理 | 已完成 |
 | T07 | M1 | 会话恢复、配置隔离及接入 ADR | T04-T06 | 原生会话映射；选定主路径 | 已完成 |
-| T08 | M2 | 最小运行时接口和原 Pi 行为保持 | T07 | 旧流程对照测试 | 待开始 |
-| T09 | M2 | OMP 进程监督与协议适配包 | T08 | 退出/超时/帧错误，资源回收 | 待开始 |
-| T10 | M2 | 会话引擎选择、能力判断和应用身份 | T03,T08,T09 | 新旧会话路由准确 | 待开始 |
+| T08 | M2 | 最小运行时接口和原 Pi 行为保持 | T07 | 旧流程对照测试 | 已完成（`docs/validation/M2-runtime-boundary.md` §3.1；`packages/shared/src/engine.ts` + `engine.test.ts` 20 项、`runtime/engine-router.ts` + 10 项、`engine-session-ipc` 4 项） |
+| T09 | M2 | OMP 进程监督与协议适配包 | T08 | 退出/超时/帧错误，资源回收 | 已完成（`docs/validation/M2-runtime-boundary.md` §3.2；`packages/omp-runtime` 62 项含 mock 子进程与真实固定运行时无费用烟测；M1 413/413 未回归） |
+| T10 | M2 | 会话引擎选择、能力判断和应用身份 | T03,T08,T09 | 新旧会话路由准确 | 已完成（`docs/validation/M2-runtime-boundary.md` §3.3；host-core schema v20 + 579 项、桌面 2537 项、身份隔离与开发构建禁用更新） |
 | T11 | M3 | 文本、思考、工具、错误与用量事件 | T09,T10 | 顺序、隔离与未知工具退化 | 待开始 |
 | T12 | M3 | 审批与提问 UI、权限桥接 | T05,T11 | 请求关联、拒绝/超时/取消 | 待开始 |
 | T13 | M3 | 停止与端到端编码流程 | T06,T11,T12 | 文件/命令副作用与 UI 一致 | 待开始 |

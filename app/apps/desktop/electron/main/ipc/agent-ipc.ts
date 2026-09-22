@@ -6,6 +6,7 @@ import { appendPromptFallbackPaths, durableUserMessageId, preparePromptAttachmen
 import { executionFromResponse, resolveSessionMessageInput } from "@pi-desktop/host-runtime";
 import type { AgentExtensionBridge } from "../agent-extensions";
 import type { AgentHostBridge } from "../agent-host-bridge";
+import type { EngineRouter } from "../runtime/engine-router";
 import type { AgentSidecar } from "../agent-sidecar";
 import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
@@ -32,6 +33,12 @@ export type AgentIpcDependencies = {
   approvedExecutionIdsBySession: Map<string, string>;
   claimedExecutionSessions: Map<string, string>;
   resolveAgentRuntimeLaunch: (...args: any[]) => Promise<any>;
+  /**
+   * Engine gate (M2/T10). Every path that would execute work for a session
+   * asks here first, so a session belonging to an engine this build cannot
+   * drive is refused instead of being served by the Pi path.
+   */
+  engineRouter: EngineRouter;
   acquireSessionOperation: (sessionId: string) => Promise<() => void>;
   finishTurn: FinishTurn;
   /**
@@ -74,6 +81,7 @@ export function registerAgentIpc({
   approvedExecutionIdsBySession,
   claimedExecutionSessions,
   resolveAgentRuntimeLaunch,
+  engineRouter,
   acquireSessionOperation,
   finishTurn,
   lockAbortReason,
@@ -256,6 +264,9 @@ export function registerAgentIpc({
         errorCode: ErrorCodes.INVALID_ARGUMENT,
       });
     }
+    // Steering reaches into a running turn, so it is gated the same way as the
+    // prompt that started it.
+    await engineRouter.requireForSession(req.sessionId, "steer");
     // A steering input belongs to the turn it names: it is refused once that
     // turn was cancelled, has started finalizing, or no longer owns the session.
     if (!isTurnDispatchable(req.sessionId, req.expectedTurnId)) {
@@ -334,6 +345,10 @@ export function registerAgentIpc({
         errorCode: ErrorCodes.NOT_FOUND,
       });
     }
+    // Engine gate before anything is launched for this session: a session whose
+    // engine cannot prompt in this build is refused here, and no later branch
+    // may fall back to the Pi runtime for it.
+    engineRouter.require(session, "prompt");
     const truncateFromMessageId =
       typeof req.truncateFromMessageId === "string"
         ? req.truncateFromMessageId.trim()
@@ -693,6 +708,7 @@ export function registerAgentIpc({
 
   handle(IPC.invoke.agentStop, async (req: AgentStopRequest) => {
     if (!sidecar) throw new Error("sidecar unavailable");
+    await engineRouter.requireForSession(req.sessionId, "stop");
     logger.app("session", "info", "prompt graceful stop requested", {
       sessionId: req.sessionId,
     });

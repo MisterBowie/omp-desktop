@@ -13,6 +13,32 @@ use crate::transcripts::{self, CompactionRecord, MessageRecord, RevisionRecord};
 
 pub const MODES: [&str; 3] = ["plan", "goal", "agent"];
 
+/// Engines a session may be created on (M2/T08). The set lives here so an
+/// unknown engine is rejected at the boundary instead of being stored and
+/// silently served by the Pi path later.
+pub const ENGINES: [&str; 2] = ["pi", "omp"];
+
+/// Engine of every session created without an explicit choice, and of every
+/// session that predates the field.
+pub const DEFAULT_ENGINE: &str = "pi";
+
+pub fn is_valid_engine(engine: &str) -> bool {
+    ENGINES.contains(&engine)
+}
+
+/// The engine to persist for a create request: absent means Pi, and a value
+/// that is present must be one this build knows.
+pub fn normalize_engine(engine: Option<&str>) -> Result<String> {
+    match engine.map(str::trim).filter(|value| !value.is_empty()) {
+        None => Ok(DEFAULT_ENGINE.to_string()),
+        Some(value) if is_valid_engine(value) => Ok(value.to_string()),
+        Some(value) => Err(anyhow!(
+            "engine must be one of {}, got {value}",
+            ENGINES.join(", ")
+        )),
+    }
+}
+
 /// Maximum number of Unicode scalar values accepted for a user-defined title.
 pub const MAX_SESSION_TITLE_CHARS: usize = 80;
 
@@ -65,6 +91,10 @@ fn default_permission_mode() -> String {
     "inherit".to_string()
 }
 
+fn default_engine() -> String {
+    DEFAULT_ENGINE.to_string()
+}
+
 fn validate_permission_mode(mode: &str) -> Result<()> {
     if is_valid_permission_mode(mode) {
         Ok(())
@@ -109,6 +139,10 @@ pub struct SessionSummary {
     pub thinking_level: String,
     #[serde(default = "default_permission_mode")]
     pub permission_mode: String,
+    /// Engine that executes this session. Older hosts omit it; `pi` is then
+    /// the correct reading, and a client must never treat absence as `omp`.
+    #[serde(default = "default_engine")]
+    pub engine: String,
     pub updated_at: String,
     pub created_at: String,
 }
@@ -1110,7 +1144,7 @@ fn session_created_at(db: &Database, session_id: &str) -> Result<String> {
 
 const SUMMARY_SELECT: &str =
     "SELECT s.id, s.title, s.last_seq, p.path, s.model_id, s.provider_id, s.mode,
-            s.thinking_level, s.permission_mode, s.updated_at, s.created_at
+            s.thinking_level, s.permission_mode, s.engine, s.updated_at, s.created_at
      FROM sessions s LEFT JOIN projects p ON p.id = s.project_id
      WHERE s.deleted_at IS NULL";
 
@@ -1125,8 +1159,9 @@ pub(crate) fn summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Sess
         mode: row.get(6)?,
         thinking_level: row.get(7)?,
         permission_mode: row.get(8)?,
-        updated_at: ms_to_ts(row.get(9)?),
-        created_at: ms_to_ts(row.get(10)?),
+        engine: row.get(9)?,
+        updated_at: ms_to_ts(row.get(10)?),
+        created_at: ms_to_ts(row.get(11)?),
     })
 }
 
@@ -1200,6 +1235,9 @@ pub struct SessionCreateOptions {
     pub project_path: Option<String>,
     pub thinking_level: Option<String>,
     pub permission_mode: Option<String>,
+    /// Engine choice; `None` means [`DEFAULT_ENGINE`]. An unknown value is a
+    /// validation error, not a fallback.
+    pub engine: Option<String>,
 }
 
 pub fn create_session_with_thinking(
@@ -1221,6 +1259,7 @@ pub fn create_session_with_thinking(
             project_path,
             thinking_level,
             permission_mode: None,
+            engine: None,
         },
     )
 }
@@ -1242,6 +1281,7 @@ pub fn create_session_with_options(
         project_path,
         thinking_level,
         permission_mode,
+        engine,
     } = options;
     let now = now_ms();
     let id = Uuid::new_v4().to_string();
@@ -1251,6 +1291,7 @@ pub fn create_session_with_options(
     validate_thinking_level(&thinking_level)?;
     let permission_mode = permission_mode.unwrap_or_else(default_permission_mode);
     validate_permission_mode(&permission_mode)?;
+    let engine = normalize_engine(engine.as_deref())?;
     let project_id = match project_path
         .as_deref()
         .filter(|path| !path.trim().is_empty())
@@ -1266,8 +1307,8 @@ pub fn create_session_with_options(
         .prepare_cached(
             "INSERT INTO sessions (
                 id, title, project_id, provider_id, model_id, mode, thinking_level,
-                permission_mode, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)",
+                permission_mode, engine, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)",
         )?
         .execute(params![
             id,
@@ -1278,6 +1319,7 @@ pub fn create_session_with_options(
             mode,
             thinking_level,
             permission_mode,
+            engine,
             now
         ])?;
     Ok(SessionSummary {
@@ -1290,6 +1332,7 @@ pub fn create_session_with_options(
         mode,
         thinking_level,
         permission_mode,
+        engine,
         updated_at: ms_to_ts(now),
         created_at: ms_to_ts(now),
     })
@@ -1598,6 +1641,9 @@ pub fn fork_session_through(
         mode: source.summary.mode,
         thinking_level: source.summary.thinking_level,
         permission_mode: source.summary.permission_mode,
+        // A branch continues the same conversation on the same engine; the new
+        // native identity is the branch, not a different runtime.
+        engine: source.summary.engine,
         updated_at: created_at.clone(),
         created_at,
     };
@@ -3647,6 +3693,67 @@ mod tests {
         Database::open(&dir.join("test.sqlite")).unwrap()
     }
 
+    /// M2/T08: the engine is persisted, defaulted and validated, and a branch
+    /// keeps the engine of the session it came from.
+    #[test]
+    fn engine_is_persisted_defaulted_and_inherited() {
+        let db = test_db();
+
+        // No engine asked for: the historical default, never the newest engine.
+        let plain = create_session_with_options(&db, SessionCreateOptions::default()).unwrap();
+        assert_eq!(plain.engine, "pi");
+        let reloaded = get_session(&db, &plain.id).unwrap().unwrap();
+        assert_eq!(reloaded.summary.engine, "pi");
+
+        let explicit = create_session_with_options(
+            &db,
+            SessionCreateOptions {
+                engine: Some("omp".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(explicit.engine, "omp");
+        let listed = list_sessions(&db)
+            .unwrap()
+            .into_iter()
+            .find(|session| session.id == explicit.id)
+            .unwrap();
+        assert_eq!(listed.engine, "omp");
+
+        // An unknown engine is a boundary error, not a value that gets stored
+        // and then served by the Pi path.
+        let rejected = create_session_with_options(
+            &db,
+            SessionCreateOptions {
+                engine: Some("claude".into()),
+                ..Default::default()
+            },
+        );
+        assert!(rejected.is_err());
+        assert!(rejected
+            .unwrap_err()
+            .to_string()
+            .contains("engine must be one of"));
+
+        // Blank is the same as absent.
+        let blank = create_session_with_options(
+            &db,
+            SessionCreateOptions {
+                engine: Some("  ".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(blank.engine, "pi");
+
+        let fork = fork_session_through(&db, &explicit.id, None, None).unwrap();
+        let ForkSessionResult::Created(branch) = fork else {
+            panic!("expected a forked session, got a different result");
+        };
+        assert_eq!(branch.summary.engine, "omp");
+    }
+
     fn user_msg(id: &str, content: &str, ts: &str) -> UiMessage {
         UiMessage {
             id: id.into(),
@@ -4032,6 +4139,7 @@ mod tests {
             mode: "agent".into(),
             thinking_level: "off".into(),
             permission_mode: "inherit".into(),
+            engine: "pi".into(),
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-02T00:00:00Z".into(),
         };
@@ -4082,6 +4190,7 @@ mod tests {
             mode: "agent".into(),
             thinking_level: "off".into(),
             permission_mode: "inherit".into(),
+            engine: "pi".into(),
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-01T00:00:00Z".into(),
         };
@@ -4821,6 +4930,7 @@ mod tests {
             mode: "agent".into(),
             thinking_level: "medium".into(),
             permission_mode: "inherit".into(),
+            engine: "pi".into(),
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-01T00:00:00Z".into(),
         };

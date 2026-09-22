@@ -225,9 +225,22 @@ test("app quit waits for one idempotent teardown before allowing the follow-up q
     "host disposal must start before other application teardown",
   );
   assert.match(shutdownSource, /await hostShutdown/);
+  // Every teardown this process owns must be awaited together: a resource left
+  // out of the list is a resource the quit path forgets it started. The OMP
+  // runtime takes part through its own ownership rules (M2/T09).
   assert.match(
     shutdownSource,
-    /await Promise\.allSettled\(\[\s*pluginPanelShutdown,\s*pluginShutdown,\s*sidecarShutdown,\s*mcpShutdown,\s*remoteHostsShutdown,\s*\]\)/,
+    /await Promise\.allSettled\(\[\s*pluginPanelShutdown,\s*pluginShutdown,\s*sidecarShutdown,\s*mcpShutdown,\s*remoteHostsShutdown,\s*ompShutdown,\s*\]\)/,
+  );
+  assert.match(
+    shutdownSource,
+    /ompRuntime\.reclaim\(\)/,
+    "the OMP runtime this process started is reclaimed on quit",
+  );
+  assert.match(
+    shutdownSource,
+    /OMP runtime cleanup incomplete/,
+    "a reclaim that did not finish is reported, not swallowed",
   );
   const releaseQuit = shutdownSource.match(
     /const releaseQuit = \(\) => \{[\s\S]*?shutdownComplete = true;[\s\S]*?app\.quit\(\);[\s\S]*?\};/,

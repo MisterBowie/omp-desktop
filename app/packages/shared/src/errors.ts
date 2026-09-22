@@ -242,4 +242,8 @@ export const ErrorCodes = {
   PLAN_WORKSPACE_REQUIRED: "PLAN_WORKSPACE_REQUIRED",
   PLAN_ALREADY_ACTIVE: "PLAN_ALREADY_ACTIVE",
   PLAN_INTERNAL: "PLAN_INTERNAL",
+  // Engine boundary (M2/T08). A session action the owning engine cannot serve
+  // is refused with these codes; it is never served by another engine.
+  ENGINE_CAPABILITY_UNAVAILABLE: "ENGINE_CAPABILITY_UNAVAILABLE",
+  ENGINE_UNAVAILABLE: "ENGINE_UNAVAILABLE",
 } as const;
