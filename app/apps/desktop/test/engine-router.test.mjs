@@ -84,7 +84,7 @@ test("a stopped runtime is reported as such without reclassifying the engine", a
   assert.equal(router.require({}, "prompt"), "pi");
   // An engine whose *declaration* closes the capability is still refused.
   assert.throws(
-    () => router.require({ engine: "omp" }, "prompt"),
+    () => router.require({ engine: "omp" }, "resume"),
     (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
   );
 });
@@ -92,7 +92,13 @@ test("a stopped runtime is reported as such without reclassifying the engine", a
 test("an OMP session is refused every capability this release has not shipped", async () => {
   const router = routerWith();
   assert.deepEqual(router.liveCapabilities("omp"), OMP_ENGINE_CAPABILITIES);
+  // M3 ships prompt/stop/structuredQuestions/toolApproval; those pass the gate.
+  const shipped = new Set(["prompt", "stop", "structuredQuestions", "toolApproval"]);
   for (const capability of ENGINE_CAPABILITY_KEYS) {
+    if (shipped.has(capability)) {
+      assert.equal(router.require({ engine: "omp" }, capability), "omp", capability);
+      continue;
+    }
     assert.throws(
       () => router.require({ engine: "omp" }, capability),
       (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
@@ -102,16 +108,17 @@ test("an OMP session is refused every capability this release has not shipped", 
   // The refusal names the engine it refused, so a caller can never mistake it
   // for a Pi failure it should retry on another path.
   assert.throws(
-    () => router.require({ engine: "omp" }, "prompt"),
-    (error) => error.message.includes("omp") && error.capability === "prompt",
+    () => router.require({ engine: "omp" }, "resume"),
+    (error) => error.message.includes("omp") && error.capability === "resume",
   );
 });
 
 test("supports() answers without throwing, for UI affordances", async () => {
   const router = routerWith();
   assert.equal(router.supports({}, "prompt"), true);
-  assert.equal(router.supports({ engine: "omp" }, "prompt"), false);
+  assert.equal(router.supports({ engine: "omp" }, "prompt"), true);
   assert.equal(router.supports({ engine: "omp" }, "branch"), false);
+  assert.equal(router.supports({ engine: "omp" }, "resume"), false);
 });
 
 test("a persisted Pi session is still Pi, and an OMP one is OMP", async () => {
@@ -121,8 +128,11 @@ test("a persisted Pi session is still Pi, and an OMP one is OMP", async () => {
   });
   assert.equal(await router.engineForSession("omp-session"), "omp");
   assert.equal(await router.engineForSession("legacy-session"), "pi");
+  // An OMP session is served by the OMP engine — never by Pi — and a capability
+  // this release has not shipped is still refused.
+  assert.equal(await router.requireForSession("omp-session", "prompt"), "omp");
   await assert.rejects(
-    () => router.requireForSession("omp-session", "prompt"),
+    () => router.requireForSession("omp-session", "resume"),
     (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
   );
   assert.equal(await router.requireForSession("legacy-session", "prompt"), "pi");
@@ -194,9 +204,13 @@ test("a status provider that throws cannot open a capability", async () => {
   // The status reports the failure instead of inventing availability.
   assert.equal(router.status("omp").phase, "failed");
   assert.deepEqual(router.liveCapabilities("pi"), closedEngineCapabilities());
-  // OMP's declaration is closed in this release, so the gate still refuses it.
+  // A runtime that cannot report its status has no live capabilities, for
+  // either engine: the shipped OMP capabilities are declarations, and a
+  // declaration does not make a dead runtime able to serve a prompt.
+  assert.deepEqual(router.liveCapabilities("omp"), closedEngineCapabilities());
+  // A capability no release has shipped is refused whatever the status says.
   assert.throws(
-    () => router.require({ engine: "omp" }, "prompt"),
+    () => router.require({ engine: "omp" }, "resume"),
     (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
   );
 });

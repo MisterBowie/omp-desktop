@@ -52,6 +52,13 @@ export type ShutdownDependencies = {
    * reclaim — and a reclaim that did not finish is reported, not swallowed.
    */
   ompRuntime: Pick<OmpRuntimeAdapter, "reclaim">;
+  /**
+   * The OMP conversation bridge (M3). Disposed before the runtime is reclaimed
+   * so every dialog the runtime is blocked on is answered "cancelled" first: a
+   * tool waiting on a user whose window is gone must resolve as denied, not
+   * hang until the process is killed underneath it.
+   */
+  ompSessions?: { dispose(reason?: string): Promise<void> } | null;
   logger: Pick<Logger, "app">;
   confirmQuitDialog: () => Promise<boolean>;
 };
@@ -74,6 +81,7 @@ export function registerShutdownHandlers({
   pluginViews,
   updater,
   ompRuntime,
+  ompSessions,
   logger,
   confirmQuitDialog,
 }: ShutdownDependencies): void {
@@ -180,6 +188,19 @@ export function registerShutdownHandlers({
         await hostShutdown;
       } catch (error) {
         logger.app("lifecycle", "warn", "host shutdown failed", { data: String(error) });
+      }
+
+      // The OMP conversation's dialogs are cancelled before the reclaim batch
+      // starts: a tool waiting on a user whose window is gone must resolve as
+      // denied, not be torn down while the runtime still waits for an answer.
+      if (ompSessions) {
+        try {
+          await ompSessions.dispose("application shutdown");
+        } catch (error) {
+          logger.app("runtime", "error", "OMP session bridge failed to dispose", {
+            data: { error: String(error) },
+          });
+        }
       }
       await Promise.allSettled([
         pluginPanelShutdown,

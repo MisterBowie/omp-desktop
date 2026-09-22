@@ -86,7 +86,7 @@ test("Pi reports idle only while both of its processes are up", () => {
   assert.equal(down.engineRouter.require({}, "prompt"), "pi");
 });
 
-test("OMP status comes from its runtime, and its capabilities stay closed", () => {
+test("OMP status comes from its runtime, and unshipped capabilities stay closed", () => {
   const idleOmp = runtime({
     ompStatus: {
       engine: "omp",
@@ -102,9 +102,11 @@ test("OMP status comes from its runtime, and its capabilities stay closed", () =
   assert.equal(status.runtimeVersion, "18.2.7");
   assert.equal(status.protocolVersion, 2);
   assert.equal(status.reason, "not-implemented");
-  // Running is not the same as shipped: no capability opens in this release.
+  // Running is not the same as shipped: only the capabilities M3 implements
+  // are open, and the rest are refused even with the runtime up.
+  assert.equal(idleOmp.engineRouter.require({ engine: "omp" }, "prompt"), "omp");
   assert.throws(
-    () => idleOmp.engineRouter.require({ engine: "omp" }, "prompt"),
+    () => idleOmp.engineRouter.require({ engine: "omp" }, "resume"),
     (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
   );
 
@@ -156,8 +158,8 @@ test("boot wiring reads the engine from the host and gates id-only callers", asy
   // A legacy record (no engine field) still prompts on Pi.
   assert.equal(await runtime.engineRouter.engineForSession("legacy-session"), "pi");
 
-  // An OMP session is refused, with the engine and capability named, before any
-  // runtime call could happen.
+  // An OMP session is refused for a capability this release has not shipped,
+  // with the engine and capability named, before any runtime call could happen.
   await assert.rejects(
     () => runtime.engineRouter.requireForSession("omp-session", "steer"),
     (error) => {
@@ -167,7 +169,9 @@ test("boot wiring reads the engine from the host and gates id-only callers", asy
       return true;
     },
   );
-  await assert.rejects(() => runtime.engineRouter.requireForSession("omp-session", "stop"));
+  await assert.rejects(() => runtime.engineRouter.requireForSession("omp-session", "followUp"));
+  // The capabilities M3 does ship pass the gate for the same session.
+  assert.equal(await runtime.engineRouter.requireForSession("omp-session", "stop"), "omp");
   // The lookup itself is the only RPC made: the gate never reached a runtime,
   // and every read was the durable session record.
   assert.ok(calls.length >= 3, `expected one lookup per gate call, got ${calls.length}`);

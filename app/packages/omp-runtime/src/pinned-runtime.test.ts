@@ -80,9 +80,10 @@ describe.skipIf(!LAUNCHER)("pinned runtime smoke", () => {
       expect(status.phase).toBe("idle");
       expect(status.runtimeVersion).toBe(OMP_RUNTIME_VERSION);
       expect(status.protocolVersion).toBe(2);
-      // M2 truth: the process runs, the conversation surface is not shipped.
-      expect(status.reason).toBe("not-implemented");
-      expect(Object.values(status.capabilities).every((value) => !value)).toBe(true);
+      expect(status.reason).toBeNull();
+      expect(status.capabilities.prompt).toBe(true);
+      expect(status.capabilities.toolApproval).toBe(true);
+      expect(status.capabilities.resume).toBe(false);
 
       const result = await supervisor.stop();
       expect(result.reaped).toBe(true);

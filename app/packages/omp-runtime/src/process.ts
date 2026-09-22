@@ -289,6 +289,29 @@ export class OmpRuntimeProcess {
     return this.transport.onFrame(handler);
   }
 
+  /**
+   * The failure that made this runtime unusable, if any.
+   *
+   * A caller holding this handle (the desktop's session runner) reports the
+   * real cause instead of waiting for a request that can never be answered.
+   */
+  onFailure(handler: (error: OmpRuntimeError) => void): () => void {
+    return this.transport.onFailure(handler);
+  }
+
+  /** Whether frames can still be written and answered. */
+  get usable(): boolean {
+    return (
+      this.phase !== "stopping" && this.phase !== "stopped" && this.transport.usable
+    );
+  }
+
+  /** Write one frame (an extension UI response, a prompt, an abort). */
+  write(frame: OmpFrame): boolean {
+    if (this.phase === "stopping" || this.phase === "stopped") return false;
+    return this.transport.write(frame);
+  }
+
   /** Send a command and await its response frame. */
   request(
     command: OmpFrame,

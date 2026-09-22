@@ -1,6 +1,6 @@
 import { ErrorCodes, IPC, type AgentEventEnvelope, type AppNotification, type PlanExecution, type PlanExecutionFinishStatus, type UiMessage } from "@pi-desktop/shared";
 import { executionFromResponse, executionListFromResponse, planExecutionFromUnknown } from "@pi-desktop/host-runtime";
-import type { EngineRouter } from "./engine-router";
+import { refuseOutsidePiRuntime, type EngineRouter } from "./engine-router";
 import type { RuntimeState } from "./context";
 import type {
   SessionCoordination,
@@ -442,7 +442,9 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
       });
     }
     try {
-      engineRouter.require(session, "prompt");
+      // Draining a plan execution is Pi-runtime machinery; see
+      // `refuseOutsidePiRuntime` for why this is not a shared capability.
+      refuseOutsidePiRuntime(engineRouter.require(session, "prompt"), "plan execution");
     } catch (refusal) {
       // An approved execution for a session this build cannot drive is skipped
       // with nothing changed: the row stays queued, no turn exists, and the rest

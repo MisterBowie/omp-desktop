@@ -8,6 +8,7 @@ import { ROUTE_LOCAL, type BackendRouter } from "../remote/backend-router";
 import { registerAgentExtensionIpc } from "../agent-extensions-ipc";
 import { readNpmPath, writeNpmPath } from "../npm-preferences";
 import { registerAgentIpc } from "./agent-ipc";
+import type { OmpSessionBridge } from "../runtime/omp-session";
 import type { EngineRouter } from "../runtime/engine-router";
 import { registerAppIpc } from "./app-ipc";
 import { registerDiagnosticsIpc } from "./diagnostics-ipc";
@@ -51,6 +52,8 @@ export type RegisterIpcDependencies = {
   getBackendRouter?: () => BackendRouter | null;
   /** Engine gate shared by every IPC path that can execute work (M2/T10). */
   engineRouter: EngineRouter;
+  /** OMP conversation bridge (M3/T11-T13); absent in builds without a runtime. */
+  ompSessions?: OmpSessionBridge | null;
   getNotificationViewingSessionId: () => string | null;
   setNotificationViewingSessionId: (sessionId: string | null) => void;
   activeUserSubagentDocuments: (...args: any[]) => Promise<any>;
@@ -79,6 +82,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     getSidecar,
     getAgentHostBridge,
     engineRouter,
+    ompSessions,
     getBackendRouter,
     getNotificationViewingSessionId,
     setNotificationViewingSessionId,
@@ -357,6 +361,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     getSidecar,
     getAgentHostBridge,
     engineRouter,
+    ompSessions,
     cancelSessionTools: (sessionId: string, reason?: string) => plugins.cancelSessionTools(sessionId, reason),
     logger,
     vendorOAuth,

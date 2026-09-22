@@ -109,24 +109,27 @@ export const PI_ENGINE_CAPABILITIES: EngineCapabilities = {
 };
 
 /**
- * M2 truth for the OMP engine: its process can be started, supervised and
- * inspected, but this release does not drive a conversation through it. Turn
- * streaming, tool cards and approval are M3, so every capability stays closed.
+ * M3 truth for the OMP engine: a session can be prompted, streamed, stopped and
+ * asked about — turn streaming, tool rows, the pre-execution approval gate and
+ * user questions are implemented and verified.
  *
- * Closed means closed: a caller that asks for one of these on an OMP session
- * must be refused with `EngineCapabilityRefusal`, never served by the Pi path.
- * Capabilities are only widened by shipping the behavior and its evidence.
+ * Still closed, and closed means closed: resume, branching, steering, follow-up,
+ * model switching and subagent events belong to M4/M5. A caller that asks for
+ * one of those on an OMP session is refused with `EngineCapabilityRefusal`,
+ * never served by the Pi path — an unshipped capability has no implementation
+ * behind it, and routing it to the other engine would run the user's session on
+ * a runtime that does not own its transcript.
  */
 export const OMP_ENGINE_CAPABILITIES: EngineCapabilities = {
-  prompt: false,
-  stop: false,
+  prompt: true,
+  stop: true,
   resume: false,
   branch: false,
   steer: false,
   followUp: false,
   modelSwitch: false,
-  structuredQuestions: false,
-  toolApproval: false,
+  structuredQuestions: true,
+  toolApproval: true,
   subagentEvents: false,
 };
 

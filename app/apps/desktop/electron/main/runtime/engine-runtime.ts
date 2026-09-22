@@ -21,9 +21,17 @@ import {
   type EngineRuntimeStatus,
 } from "@pi-desktop/shared";
 import { ErrorCodes } from "@pi-desktop/shared";
+import { findGateExtension } from "@pi-desktop/omp-runtime";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
 import type { EngineRouter, EngineSessionLookup } from "./engine-router";
 import { createEngineRouter } from "./engine-router";
-import { createOmpRuntimeAdapter, type OmpRuntimeAdapter } from "./omp-runtime";
+import {
+  BUNDLED_GATE_PATH,
+  createOmpRuntimeAdapter,
+  type OmpRuntimeAdapter,
+} from "./omp-runtime";
 
 export type EngineRuntimeDependencies = {
   /** Product data root; the OMP supervisor owns everything below it. */
@@ -49,6 +57,8 @@ export type EngineRuntimeDependencies = {
 
 export type DesktopEngineRuntime = {
   ompRuntime: OmpRuntimeAdapter;
+  /** Absolute path of the gate extension this build loads, or null. */
+  gateExtension: string | null;
   engineRouter: EngineRouter;
   /** Status of one engine as of *now*; the router reads the same function. */
   status: (engine: EngineId) => EngineRuntimeStatus;
@@ -155,9 +165,29 @@ export async function reclaimOwnedRuntime(
   }
 }
 
+/**
+ * Where the tool gate this build loads into the runtime lives.
+ *
+ * Packaged builds use the copy inside Resources; a development checkout uses
+ * the one in the runtime package. Null means "this build has none", which the
+ * session bridge turns into a refusal rather than an unguarded runtime.
+ */
+export function resolveGateExtension(dependencies: {
+  isPackaged: boolean;
+  appPath: string;
+  resourcesPath?: string | null;
+}): string | null {
+  if (dependencies.isPackaged && dependencies.resourcesPath) {
+    const bundled = join(dependencies.resourcesPath, BUNDLED_GATE_PATH);
+    return existsSync(bundled) ? bundled : null;
+  }
+  return findGateExtension(dependencies.appPath);
+}
+
 export function createDesktopEngineRuntime(
   dependencies: EngineRuntimeDependencies,
 ): DesktopEngineRuntime {
+  const gateExtension = resolveGateExtension(dependencies);
   const ompRuntime = (dependencies.ompAdapterFactory ?? createOmpRuntimeAdapter)({
     dataRoot: dependencies.dataRoot,
     isPackaged: dependencies.isPackaged,
@@ -165,6 +195,10 @@ export function createDesktopEngineRuntime(
     resourcesPath: dependencies.resourcesPath,
     env: dependencies.env ?? process.env,
     expectedRuntimeVersion: dependencies.expectedRuntimeVersion,
+    // Without the gate the runtime would execute native tools with no
+    // pre-execution approval; the bridge refuses to prompt in that case, so an
+    // empty argument list here can never become an unguarded conversation.
+    ...(gateExtension ? { args: ["--extension", gateExtension] } : {}),
   });
 
   /**
@@ -191,5 +225,5 @@ export function createDesktopEngineRuntime(
     ...(dependencies.sessionEngine ? { sessionEngine: dependencies.sessionEngine } : {}),
   });
 
-  return { ompRuntime, engineRouter, status };
+  return { ompRuntime, gateExtension, engineRouter, status };
 }

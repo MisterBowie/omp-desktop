@@ -43,6 +43,9 @@ export { findPinnedLauncher };
 /** Bundled runtime inside a packaged app's resources (M6). */
 export const BUNDLED_LAUNCHER_PATH = join("omp-runtime", "omp");
 
+/** Bundled tool gate inside a packaged app's resources (the runtime loads it). */
+export const BUNDLED_GATE_PATH = join("omp-runtime", "extensions", "omp-desktop-gate.ts");
+
 export type LauncherResolutionInput = {
   env?: NodeJS.ProcessEnv;
   isPackaged: boolean;
@@ -91,6 +94,13 @@ export function resolveRuntimeLauncher(input: LauncherResolutionInput): Resolved
 }
 
 export type OmpRuntimeAdapterOptions = LauncherResolutionInput & {
+  /**
+   * Extra runtime arguments, after `--mode rpc-ui`. The desktop passes the
+   * gate extension here; the supervisor refuses nothing on its own, so a
+   * caller that cannot resolve the gate must not start a runtime at all
+   * (see `createOmpSessionBridge`).
+   */
+  args?: readonly string[];
   /** Product data root; the supervisor owns everything below it. */
   dataRoot: string;
   /** Version this build expects; defaults to the shared pin. */
@@ -125,6 +135,7 @@ export function createOmpRuntimeAdapter(
     dataRoot: options.dataRoot,
     launcherPath: resolved.path,
     expectedRuntimeVersion: options.expectedRuntimeVersion,
+    ...(options.args && options.args.length > 0 ? { args: options.args } : {}),
   });
 
   return {

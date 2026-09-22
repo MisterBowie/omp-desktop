@@ -25,7 +25,6 @@ import { basename, join, resolve } from "node:path";
 import {
   closedEngineCapabilities,
   liveEngineCapabilities,
-  OMP_ENGINE_CAPABILITIES,
   OMP_RUNTIME_VERSION,
   type EngineRuntimeHandle,
   type EngineRuntimeStatus,
@@ -71,6 +70,11 @@ export type OmpRuntimeSupervisorOptions = {
   pathEntries?: readonly string[];
   /** Working directory of the runtime process; defaults to the run root. */
   cwd?: string;
+  /**
+   * Extra arguments after `--mode rpc-ui`; the desktop passes `--extension`
+   * for the tool gate it ships. Empty arguments are refused at spawn time.
+   */
+  args?: readonly string[];
   /**
    * Extra environment for the runtime process. Isolation keys, proxy variables
    * and credential-shaped names are still decided by `buildOmpRuntimeEnv`.
@@ -164,10 +168,21 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
   readonly engine = "omp";
 
   private readonly options: OmpRuntimeSupervisorOptions;
+  private readonly args: readonly string[];
+  /** Per-start working directory; null means "the run root". */
+  private workingDirectory: string | null = null;
   /** Termination used for retained ownership (seam for deterministic tests). */
   private readonly terminateTree: typeof terminateProcessTree;
   /** The runtime this supervisor owns, live or not yet reclaimed. */
   private runtime: ManagedOmpRuntime | null = null;
+  /**
+   * The same runtime, when it is the real process and can be spoken to.
+   *
+   * Kept beside `runtime` rather than derived from it: the lifecycle seam
+   * accepts fakes that implement only `stop()`, and a caller that writes frames
+   * must never be handed one of those.
+   */
+  private liveRuntime: OmpRuntimeProcess | null = null;
   /** Record of `this.runtime`: the group and directory a reclaim must dispose of. */
   private ownership: OwnedOmpRuntime | null = null;
   /**
@@ -187,6 +202,41 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
   constructor(options: OmpRuntimeSupervisorOptions) {
     this.options = options;
     this.terminateTree = options.terminateTree ?? terminateProcessTree;
+    this.args = (options.args ?? []).filter((arg) => typeof arg === "string" && arg.length > 0);
+  }
+
+  /**
+   * Working directory for the next start.
+   *
+   * The desktop runs a session in its project; the run root holds the isolated
+   * home and config, not the user's files. Refused while a runtime is owned,
+   * because the directory is a property of the process that is already running.
+   */
+  setWorkingDirectory(path: string | null): void {
+    if (this.runtime || this.starting) {
+      throw new OmpRuntimeError(
+        "stopping",
+        "the runtime is running; stop it before changing its working directory",
+      );
+    }
+    this.workingDirectory = path;
+  }
+
+  workingDir(): string | null {
+    return this.workingDirectory;
+  }
+
+  /**
+   * The running runtime, for driving a conversation over it.
+   *
+   * Null unless a healthy runtime is owned right now: a handle received while
+   * the supervisor is starting, stopping or reclaiming would let its holder
+   * write into a process that is being disposed of.
+   */
+  currentRuntime(): OmpRuntimeProcess | null {
+    const runtime = this.liveRuntime;
+    if (!runtime || runtime !== this.runtime) return null;
+    return runtime.usable ? runtime : null;
   }
 
   /** The pinned runtime version this supervisor accepts. */
@@ -208,11 +258,11 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
         phase: "idle",
         runtimeVersion: this.runtime.runtimeVersion,
         protocolVersion: this.runtime.protocolVersion,
-        // The process is up, but this release still drives no conversation
-        // through it: M2 capabilities stay closed by declaration.
-        reason: "not-implemented",
-        detail: "the OMP runtime is running; conversation, tools and approval arrive in M3",
-        capabilities: OMP_ENGINE_CAPABILITIES,
+        reason: null,
+        // Live capabilities, not the declaration: a running runtime can serve
+        // exactly what this release has shipped (M3: prompt, stop, questions
+        // and tool approval), and nothing else.
+        capabilities: liveEngineCapabilities("omp", "idle"),
       };
     }
     if (this.runtime) {
@@ -338,7 +388,8 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
         ((options: OmpRuntimeProcessOptions) => OmpRuntimeProcess.start(options));
       const runtime = await runtimeFactory({
         launcher,
-        cwd: this.options.cwd ?? launchDir,
+        ...(this.args.length > 0 ? { args: this.args } : {}),
+        cwd: this.workingDirectory ?? this.options.cwd ?? launchDir,
         env,
         expectedRuntimeVersion: this.pinnedRuntimeVersion,
         ...(this.options.requestTimeoutMs ? { requestTimeoutMs: this.options.requestTimeoutMs } : {}),
@@ -349,6 +400,7 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
         ...(this.options.selfExitMs ? { selfExitMs: this.options.selfExitMs } : {}),
       });
       this.runtime = runtime;
+      this.liveRuntime = isDrivableRuntime(runtime) ? runtime : null;
       this.lastFailure = null;
       const pid = runtime.pid ?? 0;
       this.ownership = {
@@ -462,6 +514,7 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
     }
 
     this.runtime = null;
+    this.liveRuntime = null;
     this.ownership = null;
     // The runtime is gone, so any failure recorded about owning it is spent:
     // leaving it would report a live obligation that no longer exists.
@@ -586,6 +639,7 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
   private releaseOwnership(runRoot: string): void {
     if (!ownsRun(this.ownership, runRoot)) return;
     this.runtime = null;
+    this.liveRuntime = null;
     this.ownership = null;
     // The failure that described this run is spent with it.
     this.lastFailure = null;
@@ -644,6 +698,21 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
  */
 export function ownsRun(ownership: OwnedOmpRuntime | null, runRoot: string): boolean {
   return ownership !== null && ownership.runRoot === runRoot;
+}
+
+/**
+ * True when a runtime handle can be driven over the protocol, not merely
+ * stopped. The lifecycle seam allows test runtimes that implement only
+ * `stop()`; those are never handed to a caller that writes frames.
+ */
+function isDrivableRuntime(runtime: ManagedOmpRuntime): runtime is OmpRuntimeProcess {
+  const candidate = runtime as Partial<OmpRuntimeProcess>;
+  return (
+    typeof candidate.write === "function" &&
+    typeof candidate.request === "function" &&
+    typeof candidate.onFrame === "function" &&
+    typeof candidate.onFailure === "function"
+  );
 }
 
 /** Resolve the launcher the supervisor will use, without starting anything. */

@@ -2,7 +2,7 @@
 
 状态：`待开始`、`进行中`、`已完成`、`阻塞`。只有附验证证据才能将实现任务标为已完成。
 
-当前交付阶段：M2 运行时边界与应用身份（T08-T10）实现完成，并已按独立复审两轮返修（R1-R7：生产查询接线、查询失败 fail-closed、IPC 审计、supervisor 所有权与并发、shutdown 回收日志、测试夹具可移植；S1-S6：reorder gate、先 gate 后改动持久状态、router-first 顺序、启动失败所有权交接、保留记录语义、交付物无未跟踪文件；S7：扫描回收后按 runRoot 精确释放幽灵所有权、成功 stop 清理同运行保留记录、目录债务降级不再发信号；S8：进程组回收后替换而非追加同 runRoot 记录，一次运行最多一条记录），等待复审确认。证据见 `docs/validation/M2-runtime-boundary.md`；传输决策见 `docs/decisions/001-omp-transport.md`，引擎边界决策见 `app/docs/adr/0300-engine-boundary.md`（英文）。上一阶段证据见 `docs/validation/M1-compatibility.md`。下一阶段 M3（T11-T16）。
+当前交付阶段：M3 端到端对话与工具执行（T11-T13）实现完成并已提交，含真实固定 OMP 的端到端验收夹具；等待独立复审，M4 未开始。上一阶段 当前交付阶段：M2 运行时边界与应用身份（T08-T10）实现完成，并已按独立复审两轮返修（R1-R7：生产查询接线、查询失败 fail-closed、IPC 审计、supervisor 所有权与并发、shutdown 回收日志、测试夹具可移植；S1-S6：reorder gate、先 gate 后改动持久状态、router-first 顺序、启动失败所有权交接、保留记录语义、交付物无未跟踪文件；S7：扫描回收后按 runRoot 精确释放幽灵所有权、成功 stop 清理同运行保留记录、目录债务降级不再发信号；S8：进程组回收后替换而非追加同 runRoot 记录，一次运行最多一条记录），等待复审确认。证据见 `docs/validation/M2-runtime-boundary.md`；传输决策见 `docs/decisions/001-omp-transport.md`，引擎边界决策见 `app/docs/adr/0300-engine-boundary.md`（英文）。上一阶段证据见 `docs/validation/M1-compatibility.md`。下一阶段 M3（T11-T16）。
 
 ## 准备工作
 
@@ -27,9 +27,9 @@
 | T08 | M2 | 最小运行时接口和原 Pi 行为保持 | T07 | 旧流程对照测试 | 已完成（`docs/validation/M2-runtime-boundary.md` §3.1；`packages/shared/src/engine.ts` + `engine.test.ts` 20 项、`runtime/engine-router.ts` + 10 项、`engine-session-ipc` 4 项） |
 | T09 | M2 | OMP 进程监督与协议适配包 | T08 | 退出/超时/帧错误，资源回收 | 已完成（`docs/validation/M2-runtime-boundary.md` §3.2；`packages/omp-runtime` 62 项含 mock 子进程与真实固定运行时无费用烟测；M1 413/413 未回归） |
 | T10 | M2 | 会话引擎选择、能力判断和应用身份 | T03,T08,T09 | 新旧会话路由准确 | 已完成（`docs/validation/M2-runtime-boundary.md` §3.3；host-core schema v20 + 579 项、桌面 2537 项、身份隔离与开发构建禁用更新） |
-| T11 | M3 | 文本、思考、工具、错误与用量事件 | T09,T10 | 顺序、隔离与未知工具退化 | 待开始 |
-| T12 | M3 | 审批与提问 UI、权限桥接 | T05,T11 | 请求关联、拒绝/超时/取消 | 待开始 |
-| T13 | M3 | 停止与端到端编码流程 | T06,T11,T12 | 文件/命令副作用与 UI 一致 | 待开始 |
+| T11 | M3 | 文本、思考、工具、错误与用量事件 | T09,T10 | 顺序、隔离与未知工具退化 | 已完成（`docs/validation/M3-workflow.md` §1） |
+| T12 | M3 | 审批与提问 UI、权限桥接 | T05,T11 | 请求关联、拒绝/超时/取消 | 已完成（同上 §2） |
+| T13 | M3 | 停止与端到端编码流程 | T06,T11,T12 | 文件/命令副作用与 UI 一致 | 已完成（同上 §3） |
 | T14 | M4 | 会话字段、迁移、恢复、归档与分支 | T07,T13 | 旧库/新库，缺文件与中断恢复 | 待开始 |
 | T15 | M4 | 模型配置、认证投影和凭证脱敏 | T07,T13 | 配置不串用，凭证不泄漏 | 待开始 |
 | T16 | M4 | 并发项目、队列、压缩与故障恢复 | T14,T15 | cwd 不漂移、无重复执行 | 待开始 |

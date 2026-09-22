@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { OMP_ENGINE_CAPABILITIES } from "@pi-desktop/shared";
+import { closedEngineCapabilities } from "@pi-desktop/shared";
 
 import { OmpRuntimeError } from "./errors.js";
 import { OmpRuntimeSupervisor } from "./supervisor.js";
@@ -62,16 +62,23 @@ describe("runtime supervisor", () => {
     const before = supervisor.status();
     expect(before.phase).toBe("stopped");
     expect(before.reason).toBe("not-started");
-    expect(before.capabilities).toEqual(OMP_ENGINE_CAPABILITIES);
+    // Nothing is live before a runtime exists: the declaration is a promise,
+    // the status reports what can be served right now.
+    expect(before.capabilities).toEqual(closedEngineCapabilities());
 
     const started = await supervisor.start();
     expect(started.phase).toBe("idle");
     expect(started.runtimeVersion).toBe(MOCK_VERSION);
     expect(started.protocolVersion).toBe(2);
-    // M2 truth: the process is up, the conversation surface is not shipped.
-    expect(started.reason).toBe("not-implemented");
-    expect(Object.values(started.capabilities).every((value) => value === false)).toBe(true);
-    expect(supervisor.liveCapabilities().prompt).toBe(false);
+    // M3 truth: the process is up and serves the surface this release ships.
+    expect(started.reason).toBeNull();
+    // A running runtime serves exactly the capabilities M3 shipped; the ones
+    // still closed (steer, resume, branching…) stay false.
+    expect(started.capabilities.prompt).toBe(true);
+    expect(started.capabilities.stop).toBe(true);
+    expect(started.capabilities.resume).toBe(false);
+    expect(started.capabilities.steer).toBe(false);
+    expect(supervisor.liveCapabilities().prompt).toBe(true);
   });
 
   it("coalesces concurrent starts into one runtime", async () => {
@@ -130,7 +137,7 @@ describe("runtime supervisor", () => {
     const status = supervisor.status();
     expect(status.phase).toBe("failed");
     expect(status.reason).toBe("start-failed");
-    expect(status.capabilities.prompt).toBe(false);
+    expect(status.capabilities.prompt).toBe(false);  // a failed runtime serves nothing
     expect(runDirs(dataRoot)).toEqual([]);
   });
 

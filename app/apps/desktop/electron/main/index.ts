@@ -101,6 +101,7 @@ import { registerAppIpc } from "./ipc/app-ipc";
 import { registerNotificationIpc } from "./ipc/notification-ipc";
 import { registerSessionIpc } from "./ipc/session-ipc";
 import { createDesktopEngineRuntimeForApp } from "./runtime/engine-runtime";
+import { createOmpSessionBridge } from "./runtime/omp-session";
 import { registerSettingsIpc } from "./ipc/settings-ipc";
 import { registerProviderIpc } from "./ipc/provider-ipc";
 import {
@@ -1244,6 +1245,18 @@ runtimeLifecycle = createRuntimeLifecycle({
 const { bootHostStatus, runtimeArch, bootBackends } = runtimeLifecycle;
 
 const engineRuntime = createDesktopEngineRuntimeForApp({ dataRoot: dataDir, app, getHost: () => host, piRuntimeLive: () => host !== null && sidecar !== null }); // engine gate + owned runtime (ADR 0300)
+// The OMP conversation bridge (M3): one runtime drives one session, streams its
+// events into the desktop's own vocabulary and answers its approval dialogs.
+const ompSessions = createOmpSessionBridge({
+  supervisor: engineRuntime.ompRuntime.supervisor(),
+  launcher: engineRuntime.ompRuntime.launcher,
+  isPackaged: app.isPackaged,
+  resourcesPath: process.resourcesPath ?? null,
+  appPath: app.getAppPath(),
+  emitAgentEvent: (envelope) => emitAgentEvent(envelope),
+  logger,
+  gateResolver: () => engineRuntime.gateExtension,
+});
 function registerIpc() {
   return registerIpcHandlers({
     traySessions: applicationLifecycle!.traySessions,
@@ -1253,6 +1266,7 @@ function registerIpc() {
     getSidecar: () => sidecar,
     getAgentHostBridge: () => agentHostBridge,
     engineRouter: engineRuntime.engineRouter,
+    ompSessions,
     getBackendRouter: () => startupState.backendRouter,
     getNotificationViewingSessionId: () => notificationViewingSessionId,
     setNotificationViewingSessionId: (sessionId: string | null) => {
@@ -1488,6 +1502,7 @@ registerShutdownHandlers({
   pluginViews,
   updater,
   ompRuntime: engineRuntime.ompRuntime,
+  ompSessions,
   logger,
   confirmQuitDialog,
 });

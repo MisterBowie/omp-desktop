@@ -47,6 +47,31 @@ import {
 export type EngineStatusProvider = (engine: EngineId) => EngineRuntimeStatus;
 
 /**
+ * Refuse an operation that only the Pi runtime can serve in this release.
+ *
+ * A few desktop subsystems are not engine features at all: the host-owned turn
+ * queue and the plan pipeline drain into the Pi sidecar, and compaction is a
+ * Pi-runtime command. They used to be covered by the capability gate because
+ * every OMP capability was closed; once `prompt` opened for OMP, sharing that
+ * capability would have let an OMP session be queued, compacted or
+ * plan-approved through machinery that belongs to the other runtime. Naming the
+ * restriction keeps it explicit, and the refusal is the same typed error
+ * callers already handle.
+ */
+export function refuseOutsidePiRuntime(engine: EngineId, area: string): void {
+  if (engine === "pi") return;
+  throw Object.assign(
+    new Error(`${area} is served by the Pi runtime in this release; ${engine} sessions do not use it`),
+    {
+      errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+      engine,
+      capability: "prompt" satisfies EngineCapability,
+      area,
+    },
+  );
+}
+
+/**
  * Persisted engine of a session, read from the product's single durable source.
  *
  * `null`/`undefined` means a record that predates the engine field (Pi); an

@@ -83,6 +83,38 @@ export const PINNED_LAUNCHER_RELATIVE_PATH = join(
 const PINNED_SEARCH_DEPTH = 6;
 
 /**
+ * The tool gate this product loads into the runtime, relative to a repo root.
+ *
+ * It ships with the runtime package because it is part of this boundary: the
+ * gate is what makes a native tool call wait for the desktop, and the desktop
+ * is what understands the dialogs it raises.
+ */
+export const PINNED_GATE_RELATIVE_PATH = join(
+  "packages",
+  "omp-runtime",
+  "extensions",
+  "omp-desktop-gate.ts",
+);
+
+/** Find the shipped gate extension by walking up from `startDir`. */
+export function findGateExtension(
+  startDir: string,
+  depth = PINNED_SEARCH_DEPTH,
+): string | null {
+  let current = resolve(startDir);
+  for (let level = 0; level <= depth; level += 1) {
+    const candidate = join(current, "app", PINNED_GATE_RELATIVE_PATH);
+    if (existsSync(candidate)) return candidate;
+    const direct = join(current, PINNED_GATE_RELATIVE_PATH);
+    if (existsSync(direct)) return direct;
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return null;
+}
+
+/**
  * Find the pinned launcher by walking up from `startDir`.
  *
  * This is the development answer to "where is the runtime": a source checkout

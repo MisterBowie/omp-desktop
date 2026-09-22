@@ -28,6 +28,8 @@ export {
 export { OmpRuntimeError, isFatalTransportError, type OmpRuntimeErrorCode } from "./errors.js";
 export {
   PINNED_LAUNCHER_RELATIVE_PATH,
+  PINNED_GATE_RELATIVE_PATH,
+  findGateExtension,
   findPinnedLauncher,
   isExecutableAt,
   probeRuntimeVersion,
@@ -98,3 +100,40 @@ export {
   type OmpRuntimeSupervisorOptions,
   type OwnedOmpRuntime,
 } from "./supervisor.js";
+
+export {
+  OmpEventConverter,
+  appError,
+  type OmpConversionDiagnostics,
+  type OmpEventConverterOptions,
+} from "./session/events.js";
+export {
+  OmpUiRequests,
+  classifyUiRequest,
+  descriptorRisk,
+  responseFor,
+  type OmpUiDecision,
+  type OmpUiRecord,
+  type OmpUiRequest,
+  type OmpUiResponseFrame,
+} from "./session/ui-requests.js";
+export {
+  OmpSessionRunner,
+  type OmpRunState,
+  type OmpSessionRunnerOptions,
+  type OmpSessionRuntime,
+  type OmpStopOutcome,
+} from "./session/runner.js";
+export {
+  OMP_APPROVAL_ALLOW_LABEL,
+  OMP_APPROVAL_DENY_LABEL,
+  OMP_APPROVAL_KIND,
+  OMP_APPROVAL_OPTIONS,
+  OMP_APPROVAL_VERSION,
+  OMP_NATIVE_APPROVAL_OPTIONS,
+  encodeApprovalDescriptor,
+  isNativeApprovalOptions,
+  parseApprovalDescriptor,
+  type OmpApprovalDescriptor,
+  type OmpApprovalRisk,
+} from "./session/approval-protocol.js";

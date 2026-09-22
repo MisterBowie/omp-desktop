@@ -240,14 +240,26 @@ export type AgentEvent =
     }
   | { type: "message_end"; message: UiMessage; precedingAssistant?: UiMessage; replacesMessageId?: string }
   | { type: "user_message_persisted"; optimisticMessageId: string; message: UiMessage }
-  | { type: "tool_start"; toolCallId: string; toolName: string; args: unknown }
-  | { type: "tool_update"; toolCallId: string; partialResult?: unknown }
+  | {
+      type: "tool_start";
+      toolCallId: string;
+      toolName: string;
+      args: unknown;
+      ompToolMeta?: OmpToolMeta;
+    }
+  | {
+      type: "tool_update";
+      toolCallId: string;
+      partialResult?: unknown;
+      ompToolMeta?: OmpToolMeta;
+    }
   | {
       type: "tool_end";
       toolCallId: string;
       result: unknown;
       isError?: boolean;
       toolUsage?: ToolTokenUsage;
+      ompToolMeta?: OmpToolMeta;
     }
   | ({ type: "planning_state" } & Omit<PlanningStateEvent, "sessionId">)
   | { type: "tool_permission_request"; request: ToolPermissionRequest }
@@ -271,6 +283,23 @@ export type AgentEvent =
     }
   | { type: "error"; error: AppError }
   | { type: "status"; status: AgentStatus };
+
+/**
+ * Tool metadata that only the OMP runtime produces, preserved verbatim.
+ *
+ * These fields exist in the pinned runtime's own tool events and have no Pi
+ * equivalent; dropping them would make the desktop's transcript lossier than
+ * the runtime's own frames, so they ride along on the shared tool events
+ * instead of being folded into `args`.
+ */
+export type OmpToolMeta = {
+  /** Harness-level intent the runtime extracted from the traced arguments. */
+  intent?: string;
+  /** Wire-level name when the runtime invoked a custom-format tool. */
+  customWireName?: string;
+  /** `tool_stream_update` payload (argument-stream projections, diff previews). */
+  streamUpdate?: unknown;
+};
 
 export type AgentEventEnvelope = {
   sessionId: string;

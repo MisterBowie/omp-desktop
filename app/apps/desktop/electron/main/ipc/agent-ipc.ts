@@ -14,6 +14,8 @@ import type { PersistenceOutbox } from "../persistence-outbox";
 import type { ComposerCommandService } from "./composer-ipc";
 import type { IpcRegistrar } from "./types";
 import { withPromptEnhancementTimeout } from "../prompt-enhancement-timeout";
+import { refuseOutsidePiRuntime } from "../runtime/engine-router";
+import type { OmpSessionBridge } from "../runtime/omp-session";
 
 export type AgentIpcDependencies = {
   registrar: IpcRegistrar;
@@ -39,6 +41,13 @@ export type AgentIpcDependencies = {
    * drive is refused instead of being served by the Pi path.
    */
   engineRouter: EngineRouter;
+  /**
+   * The OMP conversation bridge (M3/T11-T13): the runtime a session runs on,
+   * the events it streams and the dialogs it asks. Absent in builds and tests
+   * that have no OMP runtime; an OMP session notified without one is refused
+   * rather than served by the Pi path.
+   */
+  ompSessions?: OmpSessionBridge | null;
   acquireSessionOperation: (sessionId: string) => Promise<() => void>;
   finishTurn: FinishTurn;
   /**
@@ -82,6 +91,7 @@ export function registerAgentIpc({
   claimedExecutionSessions,
   resolveAgentRuntimeLaunch,
   engineRouter,
+  ompSessions,
   acquireSessionOperation,
   finishTurn,
   lockAbortReason,
@@ -354,7 +364,58 @@ export function registerAgentIpc({
     // may fall back to the Pi runtime for it. The engine is decided from the
     // durable record, so the refusal does not depend on the Pi sidecar being
     // absent or present.
-    engineRouter.require(session, "prompt");
+    const promptEngine = engineRouter.require(session, "prompt");
+    if (promptEngine === "omp") {
+      // The OMP runtime owns this session's transcript, its tools and its
+      // approvals; the Pi sidecar and the host turn queue are not part of this
+      // path at all. The user's row is echoed so the optimistic bubble settles,
+      // but nothing is written to the desktop's own transcript (M2 decision:
+      // one writer per session).
+      if (!ompSessions) {
+        throw Object.assign(new Error("this build has no OMP runtime"), {
+          errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+          engine: "omp",
+          capability: "prompt",
+        });
+      }
+      if (req.attachments?.length) {
+        // Attachments need a projection into the runtime's message format that
+        // this release does not implement; silently dropping them would prompt
+        // with less than the user attached.
+        throw Object.assign(new Error("OMP sessions do not accept attachments yet"), {
+          errorCode: ErrorCodes.INVALID_ARGUMENT,
+        });
+      }
+      const projectPath =
+        typeof session.projectPath === "string" && session.projectPath.trim()
+          ? session.projectPath.trim()
+          : null;
+      const ompUserMessage: UiMessage = {
+        id: req.messageId ?? `omp-user:${req.sessionId}`,
+        role: "user",
+        content: req.content,
+        createdAt: new Date().toISOString(),
+        status: "complete",
+      };
+      emitAgentEvent({
+        sessionId: req.sessionId,
+        ts: Date.now(),
+        event: { type: "message_start", message: ompUserMessage },
+      } satisfies AgentEventEnvelope);
+      emitAgentEvent({
+        sessionId: req.sessionId,
+        ts: Date.now(),
+        event: { type: "message_end", message: ompUserMessage },
+      } satisfies AgentEventEnvelope);
+      logger.app("session", "info", "omp prompt accepted", {
+        data: { sessionId: req.sessionId, projectPath },
+      });
+      return ompSessions.prompt({
+        sessionId: req.sessionId,
+        content: req.content,
+        projectPath,
+      });
+    }
     if (!sidecar) throw new Error("sidecar unavailable");
     const truncateFromMessageId =
       typeof req.truncateFromMessageId === "string"
@@ -641,7 +702,11 @@ export function registerAgentIpc({
     rejectNativeAgentOperation(req.sessionId);
     // Compaction rewrites the session's context inside its own runtime; the
     // engine is decided before the Pi runtime is required.
-    await engineRouter.requireForSession(req.sessionId, "prompt");
+    const compactEngine = await engineRouter.requireForSession(req.sessionId, "prompt");
+    // Compaction is a Pi-runtime command in this release: an OMP session owns
+    // its own context management, and forwarding this to the Pi runtime would
+    // compact a transcript that runtime has never seen.
+    refuseOutsidePiRuntime(compactEngine, "compaction");
     if (!host || !sidecar) throw new Error("backend unavailable");
     if (activeTurns.has(req.sessionId)) {
       throw Object.assign(new Error("Session already has an active turn"), {
@@ -672,7 +737,29 @@ export function registerAgentIpc({
   });
 
   handle(IPC.invoke.agentAbort, async (req: { sessionId: string; turnId?: string }) => {
-    await engineRouter.requireForSession(req.sessionId, "stop");
+    const abortEngine = await engineRouter.requireForSession(req.sessionId, "stop");
+    if (abortEngine === "omp") {
+      if (!ompSessions) {
+        throw Object.assign(new Error("this build has no OMP runtime"), {
+          errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+          engine: "omp",
+          capability: "stop",
+        });
+      }
+      // The runtime's own stop order lives in the bridge: protocol abort first,
+      // `abort_bash` only while a command is still running, then M2's process
+      // teardown as the fallback. No desktop turn bookkeeping is touched: an
+      // OMP turn is not the host's to finish.
+      const outcome = await ompSessions.stop(req.sessionId);
+      logger.app("session", "info", "omp abort finished", {
+        data: {
+          sessionId: req.sessionId,
+          converged: outcome.converged,
+          toreDown: outcome.toreDown,
+        },
+      });
+      return { ok: true, aborted: outcome.converged || outcome.toreDown, steps: outcome.steps };
+    }
     if (!sidecar) throw new Error("sidecar unavailable");
     const releaseSessionOperation = req.turnId ? await acquireSessionOperation(req.sessionId) : undefined;
     try {
@@ -718,7 +805,21 @@ export function registerAgentIpc({
   });
 
   handle(IPC.invoke.agentStop, async (req: AgentStopRequest) => {
-    await engineRouter.requireForSession(req.sessionId, "stop");
+    const stopEngine = await engineRouter.requireForSession(req.sessionId, "stop");
+    if (stopEngine === "omp") {
+      if (!ompSessions) {
+        throw Object.assign(new Error("this build has no OMP runtime"), {
+          errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+          engine: "omp",
+          capability: "stop",
+        });
+      }
+      // A graceful stop for OMP is the same sequence as an abort: the runtime
+      // decides when the turn ends, and the desktop's `agent_end` envelope is
+      // what finishes the row.
+      const outcome = await ompSessions.stop(req.sessionId);
+      return { accepted: true, status: ompSessions.status(req.sessionId), steps: outcome.steps };
+    }
     if (!sidecar) throw new Error("sidecar unavailable");
     logger.app("session", "info", "prompt graceful stop requested", {
       sessionId: req.sessionId,
@@ -735,6 +836,19 @@ export function registerAgentIpc({
     // report a state that belongs to a different runtime. The answer must not
     // depend on whether the Pi sidecar happens to be running.
     const engine = await engineRouter.engineForSession(sessionId);
+    if (engine === "omp") {
+      // Answered by the runtime that owns the session, so a running OMP turn
+      // is reported as running instead of as an idle engine.
+      const status = ompSessions?.status(sessionId);
+      return {
+        status: {
+          sessionId,
+          isRunning: status?.isRunning === true,
+          ...(status?.currentTurnId ? { currentTurnId: status.currentTurnId } : {}),
+          pendingToolConfirmations: status?.pendingToolConfirmations ?? 0,
+        },
+      };
+    }
     if (engine !== "pi") {
       return { status: { sessionId, isRunning: false, pendingToolConfirmations: 0 } };
     }
@@ -746,8 +860,10 @@ export function registerAgentIpc({
   // headless module admits, orders, and drains it.
   handle(IPC.invoke.agentQueuePush, async (req: AgentQueuePushRequest) => {
     rejectNativeAgentOperation(req.sessionId);
-    // A queued entry becomes a turn, so it needs the same gate as a prompt.
-    await engineRouter.requireForSession(req.sessionId, "prompt");
+    // A queued entry becomes a turn, so it needs the same gate as a prompt —
+    // and the queue itself is host-owned machinery that drains into the Pi
+    // runtime, so an OMP session must not be admitted to it.
+    refuseOutsidePiRuntime(await engineRouter.requireForSession(req.sessionId, "prompt"), "the turn queue");
     if (!agentHostBridge) throw new Error("agent host unavailable");
     return agentHostBridge.queue.push(req);
   });
@@ -766,14 +882,14 @@ export function registerAgentIpc({
     // Cancels queued work, so it is gated by the engine of the owning session.
     // An unknown turn has no owner; the queue call reports that on its own.
     const owner = agentHostBridge?.queue.sessionOf(req.turnId) ?? null;
-    if (owner) await engineRouter.requireForSession(owner, "followUp");
+    if (owner) refuseOutsidePiRuntime(await engineRouter.requireForSession(owner, "followUp"), "the turn queue");
     if (!agentHostBridge) throw new Error("agent host unavailable");
     await agentHostBridge.queue.remove(req.turnId);
     return { ok: true };
   });
   handle(IPC.invoke.agentQueuePrioritize, async (req: { turnId: string }) => {
     const owner = agentHostBridge?.queue.sessionOf(req.turnId) ?? null;
-    if (owner) await engineRouter.requireForSession(owner, "followUp");
+    if (owner) refuseOutsidePiRuntime(await engineRouter.requireForSession(owner, "followUp"), "the turn queue");
     if (!agentHostBridge) throw new Error("agent host unavailable");
     await agentHostBridge.queue.prioritize(req.turnId);
     return { ok: true };
@@ -798,6 +914,28 @@ export function registerAgentIpc({
     requestId: string;
     decision: string;
   }) => {
+    // An OMP approval is answered by the runtime that is blocked on it. The
+    // request id is the runtime's own frame id, so the bridge can refuse a
+    // decision it never raised, a duplicate, or one from a stopped run.
+    if (
+      ompSessions &&
+      typeof resolution?.requestId === "string" &&
+      (resolution.decision === "allow-once" ||
+        resolution.decision === "allow-session" ||
+        resolution.decision === "deny") &&
+      ompSessions.hasPendingRequest(resolution.requestId)
+    ) {
+      const result = ompSessions.resolveUi(undefined, resolution.requestId, resolution.decision);
+      if (!result.ok) {
+        throw Object.assign(new Error(result.detail ?? "the approval is no longer pending"), {
+          errorCode: ErrorCodes.NOT_FOUND,
+        });
+      }
+      logger.app("permission", "info", "omp permission resolved", {
+        data: { requestId: resolution.requestId, decision: resolution.decision },
+      });
+      return { resolved: true };
+    }
     if (!host) throw new Error("host unavailable");
     logger.app("permission", "info", "permission resolved", {
       data: { requestId: resolution.requestId, decision: resolution.decision },
@@ -820,7 +958,23 @@ export function registerAgentIpc({
     // Answers a question a *running Pi turn* asked; another engine's session
     // has no such question pending here. The engine decides before the Pi
     // runtime is required.
-    await engineRouter.requireForSession(sessionId, "structuredQuestions");
+    const askEngine = await engineRouter.requireForSession(sessionId, "structuredQuestions");
+    if (askEngine === "omp") {
+      if (!ompSessions) {
+        throw Object.assign(new Error("this build has no OMP runtime"), {
+          errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+          engine: "omp",
+          capability: "structuredQuestions",
+        });
+      }
+      const result = ompSessions.resolveAsk({ ...resolution, sessionId, requestId });
+      if (!result.ok) {
+        throw Object.assign(new Error(result.detail ?? "the question is no longer pending"), {
+          errorCode: ErrorCodes.NOT_FOUND,
+        });
+      }
+      return { resolved: true };
+    }
     if (!sidecar) throw new Error("sidecar unavailable");
     return sidecar.call("asktool.resolve", {
       ...resolution,
@@ -874,7 +1028,12 @@ export function registerAgentIpc({
       // decided *before* the transaction runs: refusing afterwards would leave a
       // session approved and unable to run. Rejection starts nothing and keeps
       // the host's own reject semantics.
-      await engineRouter.requireForSession(sessionId, "prompt");
+      // The plan pipeline is the desktop's own approval machinery for the Pi
+      // runtime's plan tool; it has no OMP counterpart until M5 decides one.
+      refuseOutsidePiRuntime(
+        await engineRouter.requireForSession(sessionId, "prompt"),
+        "plan approval",
+      );
     }
     const result = await host.call<PlanResolutionResult>("plans.resolve", {
       proposalId,

@@ -1,6 +1,15 @@
 # OMP Desktop 开发交接
 
-更新时间：2026-09-23。当前状态：**M2 运行时边界与应用身份（T08-T10）实现完成，已按独立复审 R1-R7、S1-S6、S7、S8 四轮返修（见 `docs/validation/M2-runtime-boundary.md` §8-§11），等待复审确认。**接入路径沿用 M1 定案：「rpc-ui 子进程 + 受信扩展 tool_call 前置审批 + 桥接层进程组终止兜底」，M2 已把它落成产品包 `app/packages/omp-runtime` 与唯一路由点 `engine-router`。下一阶段 M3（T11-T16）。
+更新时间：2026-09-23。当前状态：**M3 端到端对话与工具执行（T11-T13）实现完成（见下方摘要与 `docs/validation/M3-workflow.md`），等待独立复审。**接入路径沿用 M1 定案：「rpc-ui 子进程 + 受信扩展 tool_call 前置审批 + 桥接层进程组终止兜底」，M2 已把它落成产品包 `app/packages/omp-runtime` 与唯一路由点 `engine-router`。M2 已完成并按要求复审（`docs/validation/M2-runtime-boundary.md` §8-§11）。下一阶段 M4（T14-T16）。M3 的范围是 T11-T13，不含 T14-T16。
+
+## 0. M3 交付摘要（本轮）
+
+- 状态：**T11-T13 已完成并提交**（分支 `codex/m3-workflow`），等待独立复审；M4 未开始。
+- 证据：`docs/validation/M3-workflow.md`（三方证据位置、权限竞争矩阵、停止顺序、端到端夹具时间线与残留检查）；设计决策：`app/docs/adr/0301-omp-session-surface.md`。
+- 新增/改动核心：`app/packages/omp-runtime/src/session/`（events 转换器、ui-requests 决策注册表、runner 生命周期）、`app/packages/omp-runtime/extensions/omp-desktop-gate.ts`（随产品发布的执行前网关）、`app/apps/desktop/electron/main/runtime/omp-session.ts`（桌面桥接）、`agent-ipc.ts` 的 OMP 分支、`packages/shared/src/engine.ts` 的能力开放（prompt/stop/structuredQuestions/toolApproval）。
+- 新增测试：`events.test.ts`(16)、`ui-requests.test.ts`(19)、`gate.test.ts`(13)、`runner.test.ts`(14)、`omp-session-bridge.test.mjs`(13)、`omp-session-e2e.test.mjs`(真实固定 OMP 端到端 1 项：读→拒绝→批准一次→跑测试→长任务停止→无残留)。
+- 本轮环境补充（新工作树必需）：`bun install --frozen-lockfile` 与 `bun --cwd=packages/natives run build`（未安装时 Bun 会解析到全局缓存 18.2.9，pinned 校验失败）。
+- 下一轮入口：M4/T14-T16（会话字段与恢复、模型与凭证投影、并发项目）；M3 未开放的入口（附件、steer/follow-up、压缩、分支、子代理交互审批、会话切换）保持显式拒绝。
 
 ## 1. 用户已确定的方向
 
