@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-23
+- Amended: 2026-09-23 (review R1-R3: production lookup wiring, fail-closed lookup, IPC audit)
 - Issues: —
 - Relates to: D002 (agent loop placement), [ADR 0094](0094-single-instance-per-data-directory.md),
   `docs/spec/03-runtime/02-agent-runtime.md`, `docs/spec/03-runtime/07-process-model.md`,
@@ -70,9 +71,52 @@ missing.
 answers "which engine serves this session, and may it do this?". It is pure: it
 takes a status provider and reads the engine out of a session record the caller
 already has, so it is testable without Electron and cannot be bypassed by a
-convenience import elsewhere. Every IPC path that would execute work asks it
-first. Renderer code never starts a process and never sends an engine-specific
-command to another engine's transport.
+convenience import elsewhere. Renderer code never starts a process and never
+sends an engine-specific command to another engine's transport.
+
+Two rules make the gate trustworthy rather than decorative:
+
+- **The production composition supplies the lookup.** `main/index.ts` builds the
+  engine runtime with a host-backed session lookup (`session.get`), so a caller
+  that has only a session id — steer, stop, abort, compact, status, the queue,
+  ask resolution, plan approval — reads the durable record instead of assuming
+  Pi. A router without a lookup refuses id-only gates; it does not default.
+- **A lookup failure refuses, it does not fall back.** Only a *successful* read
+  of a record with no engine field is a legacy Pi session. A read that failed,
+  or a value this build does not know, is refused with `ENGINE_UNAVAILABLE`
+  before any runtime is entered: an unidentified session must never be served
+  by the Pi runtime, which does not own its transcript, permissions or working
+  directory.
+
+The IPC audit that follows from those rules:
+
+| path | kind | non-Pi session |
+| --- | --- | --- |
+| `agentPrompt`, `plansResolve` (approve), `agentQueuePush` | execute | refuse (`prompt`) |
+| `agentSteer` | execute | refuse (`steer`) |
+| `agentStop`, `agentAbort` | control | refuse (`stop`) |
+| `agentCompact` | control | refuse (`prompt`) — it rewrites the session's context inside its own runtime |
+| `agentQueuePrioritize`, `agentQueueRemove` | control | refuse (`followUp`); the owner session comes from the queue facade |
+| `askToolResolve` | control | refuse (`structuredQuestions`) |
+| `agentGetStatus` | read | neutral `isRunning: false`, without asking the Pi runtime |
+| `agentQueueList` | read | neutral `entries: []` |
+| plan dispatch from the restore/drain path | execute | refuse (`prompt`) inside the plan runtime, because a restored execution never passed the interactive gate |
+
+Three paths deliberately do not gate, each for a stated reason:
+
+- **`native.session.*`** is keyed by a `native-pi:` id, which is Pi-native by
+  construction (`SessionSource`), not by an engine choice.
+- **`promptEnhance` and `sessionSummarizeTitle`** are cross-engine product
+  services: they read the session through host-core and use the sidecar as a
+  *model transport* under a synthetic session id (`prompt-enhancement:<uuid>`,
+  `title-summary:<id>`), never the target session's turn channels.
+- **`toolResolvePermission`** resolves an approval in host-core's permission
+  store, which is the product's permission authority for both engines rather
+  than a Pi runtime path.
+- **The plan UI probe** (`PI_DESKTOP_PLAN_UI_PROBE=1`) drives a fixture session
+  it creates itself; it is an E2E harness that only exists when the probe
+  environment variable is set, and it never addresses a user session.
+
 
 ### 4. The OMP runtime is its own package
 

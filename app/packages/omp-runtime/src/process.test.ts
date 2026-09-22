@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { OmpRuntimeError } from "./errors.js";
 import { OmpRuntimeProcess } from "./process.js";
-import { processGroupLiveness } from "./process-group.js";
+import { processGroupLiveness, terminateProcessTree } from "./process-group.js";
 import {
   MOCK_LAUNCHER,
   MOCK_VERSION,
@@ -297,6 +297,76 @@ describe("stop ordering", () => {
       expect(await waitFor(() => !processAlive(descendant))).toBe(true);
     });
   });
+
+  it("runs one stop sequence when several callers stop at once", async () => {
+    const started = await startMock("stop-concurrent");
+    await withRuntime(started, async () => {
+      const results = await Promise.all([
+        started.process.stop(),
+        started.process.stop(),
+        started.process.stop(),
+      ]);
+      // One abort and one EOF: three concurrent stops must not each drive the
+      // child through the same sequence.
+      const log = readLog(started.layout.logPath);
+      expect(log.filter((entry) => entry === "abort")).toHaveLength(1);
+      expect(log.filter((entry) => entry === "eof")).toHaveLength(1);
+      expect(results[1]).toEqual(results[0]);
+      expect(results[2]).toEqual(results[0]);
+      expect(results[0]!.reaped).toBe(true);
+    });
+  });
+
+  it("does not cache a stop whose process group survived", async () => {
+    const started = await startMock("stop-retry", {
+      mode: "deaf",
+      processOptions: {
+        abortSettleMs: 50,
+        selfExitMs: 100,
+        terminationGraceMs: 100,
+        terminationKillGraceMs: 500,
+      },
+    });
+    await withRuntime(started, async () => {
+      // The mock ignores EOF and SIGTERM. The first escalation is reported as
+      // unreaped on purpose: a group that survived must stay retryable, or the
+      // ownership could never be disposed of.
+      let attempts = 0;
+      const injected = async (child: any, pgid: number, options: any) => {
+        attempts += 1;
+        if (attempts === 1) return { reaped: false, escalated: "kill" as const, steps: ["injected: survived"] };
+        return terminateProcessTree(child, pgid, options);
+      };
+      const process_ = await OmpRuntimeProcess.start({
+        launcher: MOCK_LAUNCHER,
+        cwd: started.layout.cwd,
+        env: started.layout.env,
+        expectedRuntimeVersion: MOCK_VERSION,
+        probeVersion: fakeVersionProbe(MOCK_VERSION),
+        readyTimeoutMs: 5_000,
+        abortSettleMs: 50,
+        selfExitMs: 100,
+        terminationGraceMs: 100,
+        terminationKillGraceMs: 500,
+        terminateTree: injected,
+      });
+      try {
+        const first = await process_.stop();
+        expect(first.reaped).toBe(false);
+        expect(first.escalated).toBe("kill");
+        expect(process_.currentPhase).toBe("failed");
+        // The retry runs the escalation again rather than returning the cached
+        // failure, and this time the group is really gone.
+        const second = await process_.stop();
+        expect(second.reaped).toBe(true);
+        expect(attempts).toBe(2);
+        expect(process_.currentPhase).toBe("stopped");
+      } finally {
+        await process_.stop().catch(() => undefined);
+        await started.process.stop().catch(() => undefined);
+      }
+    });
+  }, 30_000);
 
   it("is idempotent and reports the same verdict twice", async () => {
     const started = await startMock("stop-twice");

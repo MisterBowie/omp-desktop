@@ -2,7 +2,7 @@
 
 状态：`待开始`、`进行中`、`已完成`、`阻塞`。只有附验证证据才能将实现任务标为已完成。
 
-当前交付阶段：M2 运行时边界与应用身份（T08-T10）实现完成，等待独立复审。证据见 `docs/validation/M2-runtime-boundary.md`；传输决策见 `docs/decisions/001-omp-transport.md`，引擎边界决策见 `app/docs/adr/0300-engine-boundary.md`（英文）。上一阶段证据见 `docs/validation/M1-compatibility.md`。下一阶段 M3（T11-T16）。
+当前交付阶段：M2 运行时边界与应用身份（T08-T10）实现完成，并已按独立复审 R1-R7 返修（生产查询接线、查询失败 fail-closed、IPC 审计、supervisor 所有权与并发、shutdown 回收日志、测试夹具可移植），等待复审确认。证据见 `docs/validation/M2-runtime-boundary.md`；传输决策见 `docs/decisions/001-omp-transport.md`，引擎边界决策见 `app/docs/adr/0300-engine-boundary.md`（英文）。上一阶段证据见 `docs/validation/M1-compatibility.md`。下一阶段 M3（T11-T16）。
 
 ## 准备工作
 

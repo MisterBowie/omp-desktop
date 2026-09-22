@@ -1115,7 +1115,7 @@ const sessionCollaboration = createSessionCollaborationService({
 });
 
 const planRuntime = createPlanRuntime({
-  runtimeState,
+  runtimeState, getEngineRouter: () => engineRuntime.engineRouter,
   planState: planRuntimeState,
   logger,
   sendToRenderer,
@@ -1243,7 +1243,7 @@ runtimeLifecycle = createRuntimeLifecycle({
 });
 const { bootHostStatus, runtimeArch, bootBackends } = runtimeLifecycle;
 
-const engineRuntime = createDesktopEngineRuntimeForApp({ dataRoot: dataDir, app, piRuntimeLive: () => host !== null && sidecar !== null }); // engine gate + owned runtime (ADR 0300)
+const engineRuntime = createDesktopEngineRuntimeForApp({ dataRoot: dataDir, app, getHost: () => host, piRuntimeLive: () => host !== null && sidecar !== null }); // engine gate + owned runtime (ADR 0300)
 function registerIpc() {
   return registerIpcHandlers({
     traySessions: applicationLifecycle!.traySessions,

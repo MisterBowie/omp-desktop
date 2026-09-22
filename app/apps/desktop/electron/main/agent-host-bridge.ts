@@ -281,6 +281,20 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
     list(sessionId: string): QueuedTurnSummary[] {
       return agentHost.queueEntries(sessionId).map(toQueueSummary);
     },
+    /**
+     * Session that owns a queued turn, for the engine gate.
+     *
+     * The queue operations below take a turn id, not a session id, so a caller
+     * that decides whether the session's engine may be driven needs this
+     * mapping. An unknown turn has no owner and answers `null`.
+     */
+    sessionOf(turnId: string): string | null {
+      try {
+        return agentHost.getTurn(turnId).sessionId ?? null;
+      } catch {
+        return null;
+      }
+    },
     async remove(turnId: string): Promise<void> {
       const turn = agentHost.getTurn(turnId);
       const entry = agentHost.queueEntries(turn.sessionId).find((candidate) => candidate.turn.id === turnId);

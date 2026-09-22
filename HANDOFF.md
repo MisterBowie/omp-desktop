@@ -1,6 +1,6 @@
 # OMP Desktop 开发交接
 
-更新时间：2026-09-23。当前状态：**M2 运行时边界与应用身份（T08-T10）实现完成，等待独立复审。**接入路径沿用 M1 定案：「rpc-ui 子进程 + 受信扩展 tool_call 前置审批 + 桥接层进程组终止兜底」，M2 已把它落成产品包 `app/packages/omp-runtime` 与唯一路由点 `engine-router`。下一阶段 M3（T11-T16）。
+更新时间：2026-09-23。当前状态：**M2 运行时边界与应用身份（T08-T10）实现完成，已按独立复审 R1-R7 返修（见 `docs/validation/M2-runtime-boundary.md` §8），等待复审确认。**接入路径沿用 M1 定案：「rpc-ui 子进程 + 受信扩展 tool_call 前置审批 + 桥接层进程组终止兜底」，M2 已把它落成产品包 `app/packages/omp-runtime` 与唯一路由点 `engine-router`。下一阶段 M3（T11-T16）。
 
 ## 1. 用户已确定的方向
 
@@ -90,6 +90,7 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 - **实际运行证据**：该包 62 项测试全部通过，其中含**真实固定 OMP 运行时**的无费用烟测（版本 18.2.7 校验 → ready → negotiate v2 → 停止后进程组与运行根均已回收）；mock 子进程覆盖永不 ready、拒绝 v2、帧上限不符、分片损坏、忽略 TERM/EOF、组长退出但后代存活等情形。
 - **T10 路由与身份**：host-core schema 升级到 v20（`sessions.engine TEXT NOT NULL DEFAULT 'pi'` + 迁移与备份，既有会话读出 `pi`；fork 与协同 spawn 继承来源引擎）；`session.create` 校验引擎；桌面侧 `runtime/engine-router.ts` 是唯一判定点（`prompt`/`steer`/`stop` 三个执行入口统一过 gate），OMP 会话在能力关闭时被**拒绝而非回退到 Pi**；`runtime/engine-runtime.ts` 汇总两引擎状态并持有 OMP 运行时；退出时 reclaim 未完成会写 error 日志。
 - **应用身份**：`packages/shared/src/app-identity.ts` 定义产品身份并与上游 PI-Desktop 及 OMP 自身目录做冲突断言（`assertIndependentIdentity`）；数据根改为 `~/.omp-desktop` / `~/.omp-desktop-dev`，appId `net.misterbowie.omp-desktop`，productName `OMP Desktop`，更新源指向本项目仓库，开发构建禁用自动更新，开发 bundle 的名称/bundle id 由 package.json 派生。
+- **复审返修（R1-R7，见验证记录 §8）**：① 生产组合此前**没有**接入会话→引擎查询，steer/stop 等按 id 的 gate 实际永远读作 Pi——现已由 host 的 `session.get` 提供唯一持久化来源并在组合测试中断言（OMP 会话抛能力拒绝且不触碰 sidecar）；② 查询失败不再 fail-open 到 Pi，只有“读取成功且无 engine 字段”才算旧会话，其余一律 `ENGINE_UNAVAILABLE`；③ 逐条审计并 gate 了 abort/compact/status/队列/ask 解析/计划批准与恢复排空，ADR 0300 增补审计表与三条不 gate 的依据；④⑤ supervisor 在 `reaped:false` 后保留可重试所有权并禁止二次启动，stop/reclaim 单飞以消除并发竞态（含 start 与 reclaim 的竞态）；⑥ shutdown 对 reclaim rejection 写 error 日志并有行为测试；⑦ 测试夹具 PATH 追加解释器目录，修复 macOS/`~/.nvm` 下的 127 失败（生产 PATH 仍封闭）。
 - **环境事实（重要）**：子模块依赖必须**按 worktree 单独安装**（`bun install` + `bun run build:native`，不执行 `link omp`）。未安装时固定启动器会把 `@oh-my-pi/pi-utils` 解析到 bun 缓存里的已发布包，`--version` 报出与固定检出不同的版本——这正是运行时包坚持启动前校验版本的理由。
 - 证据：`docs/validation/M2-runtime-boundary.md`、`docs/decisions/001-omp-transport.md`（沿用）、`app/docs/adr/0300-engine-boundary.md`（英文 ADR）、`app/docs/spec/03-runtime/02-agent-runtime.md` §13。任务看板 T08-T10 已标记完成。
 

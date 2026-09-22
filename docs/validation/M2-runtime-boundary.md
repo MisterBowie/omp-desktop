@@ -39,9 +39,9 @@ DISPLAY=:1 XAUTHORITY=/run/user/1000/.mutter-Xwaylandauth.AII2V3 ELECTRON_DISABL
 | # | 命令 | 运行目录 | 退出码 | 关键结果 |
 | --- | --- | --- | --- | --- |
 | 1 | `pnpm -r --if-present build`(`pnpm build:js`) | `app/` | 0 | 全部 workspace 包构建通过(含新增 `@pi-desktop/omp-runtime`) |
-| 2 | `pnpm --filter @pi-desktop/omp-runtime test` | `app/` | 0 | **6 文件 / 60 检查通过**(含真实固定运行时无费用烟测) |
+| 2 | `pnpm --filter @pi-desktop/omp-runtime test` | `app/` | 0 | **6 文件 / 60 检查通过**(首次交付;返修后 7 文件 / 71 项) |
 | 3 | `pnpm --filter @pi-desktop/shared test` | `app/` | 0 | 84 文件 / 968 检查通过(含新增 `engine.test.ts` 与 `app-identity.test.ts`,单独运行合计 20 项) |
-| 4 | `node --test test/*.test.mjs`(env 见 §5) | `app/apps/desktop` | 0 | **2545 通过 / 0 失败**(含新增 4 个引擎相关测试文件:router 10 项、runtime 4 项、session-ipc 4 项、launcher 8 项) |
+| 4 | `node --test test/*.test.mjs`(env 见 §5) | `app/apps/desktop` | 0 | **2545 通过 / 0 失败**(首次交付时;含新增 4 个引擎相关测试文件:router 10 项、runtime 4 项、session-ipc 4 项、launcher 8 项)。复审返修后的数字见 §8 |
 | 5 | `cargo test -p host-core` | `app/crates` | 0 | **579 通过 / 0 失败**(新增 2 项:引擎持久化、v19→v20 迁移) |
 | 6 | `cargo fmt --check` | `app/crates` | 0 | 无差异 |
 | 7 | `cargo clippy -p host-core --all-targets` | `app/crates` | 0 | 无告警 |
@@ -88,7 +88,7 @@ DISPLAY=:1 XAUTHORITY=/run/user/1000/.mutter-Xwaylandauth.AII2V3 ELECTRON_DISABL
 | `process.ts` | 启动→ready→协商 v2→版本校验;停止顺序 `abort`→(必要时 `abort_bash`)→关 stdin(EOF)→TERM 组→KILL 组;按**进程组存活**判定回收 |
 | `supervisor.ts` | 运行根所有权、单飞启动、状态上报、清理判定(`stopped`/`reaped`/`cleaned` 三独立事实)、`terminateOwnedTree` 显式终止入口、`prepareRun` 运行前配置投影 |
 
-**实际运行证据**(`app/packages/omp-runtime/src/*.test.ts`,6 文件 / 60 项):
+**实际运行证据**(首次交付:`app/packages/omp-runtime/src/*.test.ts`,6 文件 / 60 项;返修后 7 文件 / 71 项,见 §8):
 
 - 启动/握手:正常 v2 会话;版本不符(`18.2.9` vs 校验值)在**进程创建前**失败;不广告 v2 的运行时被拒;
   帧上限不符被拒;永不 ready 超时后进程与进程组被回收;崩溃按 `not-started` 上报而非超时。
@@ -111,8 +111,8 @@ DISPLAY=:1 XAUTHORITY=/run/user/1000/.mutter-Xwaylandauth.AII2V3 ELECTRON_DISABL
 | 位置 | 内容 |
 | --- | --- |
 | `crates/host-core` | `sessions.engine TEXT NOT NULL DEFAULT 'pi'`(schema v20,迁移 `v19→v20` + 备份);`session.create` 接受并校验 `engine`;`fork`/协同 `spawn` 继承来源会话引擎;摘要/详情/SELECT 同步 |
-| `apps/desktop/electron/main/runtime/engine-runtime.ts` | Pi/OMP 状态映射、gate 构造、运行时所有权 |
-| `apps/desktop/electron/main/ipc/agent-ipc.ts` | `agentPrompt`(在读出的会话记录上)、`agentSteer`、`agentStop` 三处执行入口统一过 gate |
+| `apps/desktop/electron/main/runtime/engine-runtime.ts` | Pi/OMP 状态映射、gate 构造(含 host 会话查询)、运行时所有权、退出 reclaim 记录 |
+| `apps/desktop/electron/main/ipc/agent-ipc.ts` | 执行/控制类入口统一过 gate:`agentPrompt`、`agentSteer`、`agentStop`、`agentAbort`、`agentCompact`、队列 push/prioritize/remove、`askToolResolve`、`plansResolve`(批准);读类(`agentGetStatus`、`agentQueueList`)按所属引擎作答且不进入 Pi 运行时 |
 | `apps/desktop/electron/main/bootstrap/shutdown.ts` | 退出时 `ompRuntime.reclaim()`;回收未完成会写入 error 级日志 |
 | `packages/shared/src/app-identity.ts` | `PRODUCT_IDENTITY`、`LEGACY_PI_DESKTOP_IDENTITY`、`assertIndependentIdentity`、保留目录检查 |
 | `apps/desktop/package.json` | `appId` = `net.misterbowie.omp-desktop`,`productName` = `OMP Desktop`,publish = `MisterBowie/omp-desktop` |
@@ -140,7 +140,7 @@ DISPLAY=:1 XAUTHORITY=/run/user/1000/.mutter-Xwaylandauth.AII2V3 ELECTRON_DISABL
 | --- | --- |
 | `app/experiments/omp-bridge/run-all.mjs` | 13/13 实验、413/413 检查、退出码 0(见 §2 #13) |
 | M0 `verify-rpc.test.mjs` / `verify-rpc.mjs` | 18/18 通过 / 真实无费用 RPC PASS |
-| 原 Pi 对照 | 桌面 2545 项测试全通过;`session-message-input.test.mjs` 证明 prompt 仍走原路径(prompt IPC 持久化、slash 展开跳过、宿主账本优先) |
+| 原 Pi 对照 | 桌面 2545 项测试全通过(返修后 2559 项,见 §8);`session-message-input.test.mjs` 证明 prompt 仍走原路径(prompt IPC 持久化、slash 展开跳过、宿主账本优先) |
 
 **对照源码位置(仅阅读,未运行)**:
 
@@ -172,7 +172,7 @@ DISPLAY=:1 XAUTHORITY=/run/user/1000/.mutter-Xwaylandauth.AII2V3 ELECTRON_DISABL
 - 本机 shell 环境存在 `SSH_ASKPASS=/usr/bin/false`,会让 `remote-host-ssh-password.test.mjs` 中
   "a key-authenticated transport is handed no askpass material" 失败——该测试断言子进程环境里
   `SSH_ASKPASS` 未设置。**与本次改动无关**(未触碰 ssh 相关代码),用
-  `env -u SSH_ASKPASS node --test test/*.test.mjs` 运行即为 2537 通过 / 0 失败;
+  `env -u SSH_ASKPASS node --test test/*.test.mjs` 运行即为通过(首次交付 2537,返修后 2559);
   单独运行该文件在清除该变量后为 14/14 通过。
 - `pnpm install` 首次在本 worktree 需要联网;新增 workspace 包后必须用 `pnpm install`(非 `--frozen-lockfile`)
   更新锁文件——锁文件差异仅新增 `packages/omp-runtime` 一条 importer。
@@ -206,7 +206,97 @@ DISPLAY=:1 XAUTHORITY=/run/user/1000/.mutter-Xwaylandauth.AII2V3 ELECTRON_DISABL
 | `PI_DESKTOP_*` 环境变量名 | 未改名 | 38 个文件引用;属开发/测试覆盖机制,改名与 M6 品牌一并处理 |
 | 临时目录/工件命名 | 未改名 | E2E 探针的临时 profile 前缀 `pi-desktop-boot-` 是它与 `session-list-probe.ts` 的夹具契约;宿主二进制名 `pi-desktop-host-core` 同样属 M6 打包命名 |
 
-## 8. 下一阶段条件
+## 8. 独立复审返修记录（R1-R7）
+
+复审对象:`35570e3a595f759eabc0631ad9bc2023caa50d1a`。以下每条都先对照固定 PI-Desktop 与固定 OMP 源码,
+再改本项目;新增测试均先验证“修复前失败、修复后通过”。
+
+### R1 生产 session→engine 查询未接线
+
+**原状(源码事实)**:`engine-runtime.ts` 只调用 `createEngineRouter({ status })`,`index.ts` 的生产构造也没有查询回调,
+因此 `agentSteer`/`agentStop` 的 `requireForSession` 永远得到 `pi`。
+**修正**:`createDesktopEngineRuntimeForApp` 现在接收 `getHost` 并构造 `createHostSessionLookup`(读 `session.get`,
+`messageLimit: 1`,缺失会话返回 NOT_FOUND 而不是“旧会话”);`index.ts` 在同一次构造里传入。
+**证据**:`engine-runtime.test.mjs` 的组合测试(存储 `engine: "omp"` 的会话在 `steer`/`stop` 上抛
+`ENGINE_CAPABILITY_UNAVAILABLE`,且全程只有 `session.get` 一种 RPC,没有任何 sidecar 调用);
+`engine-ipc-gates.test.mjs` 断言 OMP 会话下 sidecar 与队列桥调用数均为 0。
+
+### R2 查询失败时 fail-open 到 Pi
+
+**原状(源码事实)**:`engineForSession` 捕获任意异常后 `normalizeEngineId(undefined)` → `pi`。
+**修正**:只有**成功读取且记录无 engine 字段**才归 `pi`;查询异常或本构建不认识的值一律以
+`ENGINE_UNAVAILABLE` 拒绝(新增 `lookupFailure`),未配置查询的 router 同样拒绝。原先断言 fail-open 的测试已改写为
+断言拒绝。
+**证据**:`engine-router.test.mjs` 中 “a failed engine lookup refuses instead of assuming Pi”、
+“an engine value this build does not know refuses”、“a router without a lookup refuses id-only gates”,
+以及 `engine-runtime.test.mjs` 的 host 失败/缺失主机两条。
+
+### R3 逐条审计按 sessionId 进入 Pi 执行路径的 IPC
+
+**修正**:见 ADR 0300 的审计表——执行/控制类全部过 gate(拒绝时抛 `ENGINE_CAPABILITY_UNAVAILABLE`),
+读类按所属引擎作答且不触碰 Pi 运行时,三条路径(原生 `native.session.*`、`promptEnhance`/`sessionSummarizeTitle`、
+`toolResolvePermission`)在 ADR 中写明依据。计划批准在执行入口与**恢复/排空路径**两处都过 gate
+(`plans.ts` 内新增 `getEngineRouter` 依赖,因排空的执行从未经过交互式批准)。
+**证据**:`engine-ipc-gates.test.mjs`(7 项行为测试)。**先失败后通过**:临时移除 gate 后 5 项失败
+(abort 一项因临时移除脚本只匹配带注释的行而仍保留 gate)。
+
+### R4 supervisor 在 reaped:false 后丢失所有权
+
+**原状(源码事实)**:`stop()` 无条件清空 `runtime`/`ownership` 并尝试删除 runRoot;`reclaimAll()` 对保留项只删目录,
+从不按保存的 pgid 再次终止;status 会在 pendingCleanup 非空时报 stopped。
+**修正**:未 reaped 时保留完整诊断与可重试所有权(不删活进程的 runRoot、status 报 `failed`/`unreclaimed`、
+存在未回收所有权时拒绝再次 `start`);`reclaimAll()` 先按保存的 pgid 重新验证并终止,确认 reaped 后才删目录,
+失败项保留以便重试。`EngineUnavailableReason` 新增 `"unreclaimed"` 并写明语义。
+**证据**:`supervisor-lifecycle.test.ts`(8 项,注入受控 runtime)。**先失败后通过**:临时恢复旧语义后该文件 6 项失败。
+
+### R5 stop/reclaim 并发竞态
+
+**原状(源码事实)**:`OmpRuntimeProcess.stop()` 无 in-flight promise,并发 stop 会重复 abort/EOF/TERM/KILL;
+supervisor `start()` 与 `stop()`/`reclaimAll()` 无协调,shutdown 可能在 start 装好 runtime 前返回 “nothing owned”。
+**修正**:进程级 stop 单飞(并发调用共享同一 Promise 与同一结果,仅**成功**结果被记住,失败保持可重试);
+监督层 `stopping` 单飞,并在 `performStop` 开始时等待 in-flight start。
+**证据**:`process.test.ts` 的 “one stop sequence when several callers stop at once”(mock 日志中 `abort`/`eof` 各恰好 1 次)
+与 “does not cache a stop whose process group survived”(注入终止实现:首次 unreaped、重试真正回收);
+`supervisor-lifecycle.test.ts` 的并发 stop / start 竞态两条。**先失败后通过**:临时去掉进程级单飞后
+并发用例得到 `['abort','abort','abort']`。
+
+### R6 shutdown 吞掉 reclaim rejection
+
+**原状(源码事实)**:shutdown 只在 resolved results 中检查 `stopped=false`,`reclaim()` 抛错会被
+`Promise.allSettled` 吞掉且无日志。
+**修正**:抽出 `reclaimOwnedRuntime(runtime, log)`,对 rejection 写 `OMP_RUNTIME_RECLAIM_FAILED`、对部分失败写
+`OMP_RUNTIME_CLEANUP_FAILED`(字段仅含步骤与错误文本,不含凭证);shutdown 调用该函数。
+**证据**:`engine-runtime.test.mjs` 的行为测试(注入 reject / 部分失败 / 干净三种 reclaim,断言日志条数与 code)。
+`rpc-lifecycle-contract.test.mjs` 同步更新为断言 `reclaimOwnedRuntime(ompRuntime, …)` 且 `ompShutdown` 在
+`Promise.allSettled` 列表中。
+
+### R7 macOS/NVM 测试夹具不可移植
+
+**原状(源码事实)**:mock 子进程脚本以 `#!/usr/bin/env node` 启动,而测试夹具沿用生产封闭 PATH
+(`~/.bun/bin`、`/usr/local/bin`、`/usr/bin`、`/bin`),macOS 上 Node 位于 `~/.nvm`, `/usr/bin/node` 不存在 → exit 127。
+**修正**:仅测试夹具新增 `mockPathEntries()`(在默认条目后追加 `dirname(process.execPath)`),
+`test-harness.makeMockLayout` 与 supervisor 测试均使用它;生产 `buildOmpRuntimeEnv` 的 PATH 保持封闭。
+**证据**:`isolation.test.ts` 新增用例断言夹具 PATH 含解释器目录、而生产 `defaultPathEntries()` 不含。
+**限制**:本机为 Linux,**未运行** macOS 实测;该用例锁定的是成因与修法,不是跨平台结论。
+
+### 另外修正的状态契约
+
+supervisor 文件头声明 “caller must never read stopped out of a run it could not reclaim”,此前与实现不符:
+未清理时 `status()` 仍返回 `stopped`。现改为:仍有存活所有权 → `failed`/`unreclaimed`;仅目录未删 → 同样 `failed`/`unreclaimed`。
+
+### 返修后的验证结果
+
+| 命令 | 结果 |
+| --- | --- |
+| `pnpm build:js` / `pnpm typecheck` | 0 错误 |
+| `pnpm --filter @pi-desktop/omp-runtime test` | **7 文件 / 71 项通过**(新增 11 项) |
+| `pnpm --filter @pi-desktop/shared test` | 84 文件 / 968 项通过 |
+| `cd apps/desktop && env -u SSH_ASKPASS node --test test/*.test.mjs` | **2559 通过 / 0 失败**(新增 3 个引擎测试文件共 20 项:router 13、gates 7、runtime 8) |
+| `cd crates && cargo test -p host-core --locked` | 579 通过 / 0 失败 |
+| `cd app/experiments/omp-bridge && node run-all.mjs` | 13/13 实验、413/413 检查、退出码 0 |
+| 固定 OMP 无费用烟测(运行时包内) | 版本 18.2.7 → ready → negotiate v2 → stop 后进程组与运行根均已回收,未发送 prompt |
+
+## 9. 下一阶段条件
 
 - T08-T10 的接口、路由、监督、身份与测试均已落地并通过上述命令;M3(端到端对话与工具执行)可在
   `packages/omp-runtime` 的传输与监督之上实现回合事件、工具卡片与审批问答。

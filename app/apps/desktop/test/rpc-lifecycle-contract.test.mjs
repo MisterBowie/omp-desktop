@@ -234,13 +234,13 @@ test("app quit waits for one idempotent teardown before allowing the follow-up q
   );
   assert.match(
     shutdownSource,
-    /ompRuntime\.reclaim\(\)/,
+    /reclaimOwnedRuntime\(ompRuntime,/,
     "the OMP runtime this process started is reclaimed on quit",
   );
   assert.match(
     shutdownSource,
-    /OMP runtime cleanup incomplete/,
-    "a reclaim that did not finish is reported, not swallowed",
+    /ompShutdown,/,
+    "the reclaim is awaited with the rest of the teardown",
   );
   const releaseQuit = shutdownSource.match(
     /const releaseQuit = \(\) => \{[\s\S]*?shutdownComplete = true;[\s\S]*?app\.quit\(\);[\s\S]*?\};/,

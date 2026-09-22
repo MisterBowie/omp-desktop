@@ -68,6 +68,13 @@ export type OmpRuntimeProcessOptions = {
   maxLineBytes?: number;
   /** Test seams. */
   spawnImpl?: (options: OmpSpawnOptions) => ChildProcessWithoutNullStreams;
+  /**
+   * How the process group is verified and terminated.
+   *
+   * A real child cannot survive SIGKILL, so the "did not reap" branch of the
+   * lifecycle is only reachable with an injected verdict.
+   */
+  terminateTree?: typeof terminateProcessTree;
   probeVersion?: (launcher: string, env: NodeJS.ProcessEnv) => Promise<OmpVersionProbe>;
   abortSettleMs?: number;
   selfExitMs?: number;
@@ -99,7 +106,10 @@ export class OmpRuntimeProcess {
   private readonly options: OmpRuntimeProcessOptions;
   private readyFrame: OmpReadyFrame | null = null;
   private phase: OmpRuntimePhase = "starting";
+  /** The one successful stop, remembered so repeated calls agree. */
   private stopResult: OmpStopResult | null = null;
+  /** The stop attempt in flight; shared by concurrent callers. */
+  private stopPromise: Promise<OmpStopResult> | null = null;
 
   private constructor(
     options: OmpRuntimeProcessOptions,
@@ -261,17 +271,24 @@ export class OmpRuntimeProcess {
    * the group survived, and the caller must not treat that as a clean stop.
    */
   async stop(options: OmpStopOptions = {}): Promise<OmpStopResult> {
+    // One stop per process: concurrent callers share the attempt instead of
+    // each running the abort/EOF/TERM/KILL sequence against the same child.
+    // Only a *successful* stop is remembered — a run whose group survived must
+    // stay retryable, or the ownership could never be disposed of.
     if (this.stopResult) return this.stopResult;
-    if (this.phase === "stopped") {
-      this.stopResult = {
-        reaped: true,
-        escalated: "none",
-        steps: ["already stopped"],
-        abortAcknowledged: null,
-        errors: [],
-      };
-      return this.stopResult;
+    if (this.stopPromise) return this.stopPromise;
+    const attempt = this.performStop(options);
+    this.stopPromise = attempt;
+    try {
+      const result = await attempt;
+      if (result.reaped) this.stopResult = result;
+      return result;
+    } finally {
+      if (this.stopPromise === attempt) this.stopPromise = null;
     }
+  }
+
+  private async performStop(options: OmpStopOptions): Promise<OmpStopResult> {
     this.phase = "stopping";
     const steps: string[] = [];
     const errors: string[] = [];
@@ -282,8 +299,7 @@ export class OmpRuntimeProcess {
       steps.push("no process to stop");
       this.transport.dispose();
       this.phase = "stopped";
-      this.stopResult = { reaped: true, escalated: "none", steps, abortAcknowledged, errors };
-      return this.stopResult;
+      return { reaped: true, escalated: "none", steps, abortAcknowledged, errors };
     }
 
     // 1. In-protocol stop while the bridge is still usable: this is what
@@ -324,10 +340,11 @@ export class OmpRuntimeProcess {
     if (selfExited) steps.push("exited after stdin closed");
 
     // 3. Escalate on the process group, verifying emptiness rather than exit.
+    const terminateTree = this.options.terminateTree ?? terminateProcessTree;
     let reaped = selfExited;
     let escalated: "none" | "term" | "kill" = "none";
     if (!reaped) {
-      const termination = await terminateProcessTree(this.child, pgid, {
+      const termination = await terminateTree(this.child, pgid, {
         graceMs: this.options.terminationGraceMs,
         killGraceMs: this.options.terminationKillGraceMs,
       });
@@ -341,7 +358,7 @@ export class OmpRuntimeProcess {
       if (liveness === "empty") {
         steps.push("group empty");
       } else {
-        const termination = await terminateProcessTree(null, pgid, {
+        const termination = await terminateTree(null, pgid, {
           graceMs: this.options.terminationGraceMs,
           killGraceMs: this.options.terminationKillGraceMs,
         });
@@ -353,8 +370,7 @@ export class OmpRuntimeProcess {
     if (!reaped) errors.push("runtime process group is still populated after SIGKILL");
 
     this.phase = reaped ? "stopped" : "failed";
-    this.stopResult = { reaped, escalated, steps, abortAcknowledged, errors };
-    return this.stopResult;
+    return { reaped, escalated, steps, abortAcknowledged, errors };
   }
 
   // -------------------------------------------------------------------------

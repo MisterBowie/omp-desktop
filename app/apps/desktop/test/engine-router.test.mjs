@@ -17,6 +17,18 @@ const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
 const { createEngineRouter } = await import("../electron/main/runtime/engine-router.ts");
 
+/** Status provider reporting both engines as available. */
+function idleStatus(engine) {
+  return {
+    engine,
+    phase: "idle",
+    runtimeVersion: null,
+    protocolVersion: null,
+    reason: null,
+    capabilities: engineCapabilities(engine),
+  };
+}
+
 /** A status provider whose phase the test controls per engine. */
 function routerWith(phases = {}) {
   return createEngineRouter({
@@ -100,17 +112,10 @@ test("supports() answers without throwing, for UI affordances", async () => {
   assert.equal(router.supports({ engine: "omp" }, "branch"), false);
 });
 
-test("an unknown session keeps the historical Pi engine", async () => {
+test("a persisted Pi session is still Pi, and an OMP one is OMP", async () => {
   const router = createEngineRouter({
-    status: (engine) => ({
-      engine,
-      phase: "idle",
-      runtimeVersion: null,
-      protocolVersion: null,
-      reason: null,
-      capabilities: engineCapabilities(engine),
-    }),
-    sessionEngine: async (sessionId) => (sessionId === "omp-session" ? "omp" : null),
+    status: idleStatus,
+    sessionEngine: async (sessionId) => (sessionId === "omp-session" ? "omp" : "pi"),
   });
   assert.equal(await router.engineForSession("omp-session"), "omp");
   assert.equal(await router.engineForSession("legacy-session"), "pi");
@@ -121,21 +126,61 @@ test("an unknown session keeps the historical Pi engine", async () => {
   assert.equal(await router.requireForSession("legacy-session", "prompt"), "pi");
 });
 
-test("a lookup failure does not move a session to another engine", async () => {
+test("a record without an engine field is a legacy Pi session", async () => {
+  // The only case that may read as Pi: the read succeeded and the record
+  // predates the engine field.
   const router = createEngineRouter({
-    status: (engine) => ({
-      engine,
-      phase: "idle",
-      runtimeVersion: null,
-      protocolVersion: null,
-      reason: null,
-      capabilities: engineCapabilities(engine),
-    }),
+    status: idleStatus,
+    sessionEngine: async () => null,
+  });
+  assert.equal(await router.engineForSession("legacy"), "pi");
+  assert.equal(await router.requireForSession("legacy", "prompt"), "pi");
+});
+
+test("a failed engine lookup refuses instead of assuming Pi", async () => {
+  const router = createEngineRouter({
+    status: idleStatus,
     sessionEngine: async () => {
       throw new Error("host unavailable");
     },
   });
-  assert.equal(await router.engineForSession("anything"), "pi");
+  await assert.rejects(
+    () => router.engineForSession("unknown"),
+    (error) => {
+      assert.equal(error.errorCode, ErrorCodes.ENGINE_UNAVAILABLE);
+      assert.match(error.message, /host unavailable/);
+      return true;
+    },
+  );
+  // The refusal must stop the operation before any runtime is entered: an
+  // unknown session is not a legacy session.
+  await assert.rejects(
+    () => router.requireForSession("unknown", "prompt"),
+    (error) => error.errorCode === ErrorCodes.ENGINE_UNAVAILABLE,
+  );
+});
+
+test("an engine value this build does not know refuses", async () => {
+  const router = createEngineRouter({
+    status: idleStatus,
+    sessionEngine: async () => "claude",
+  });
+  await assert.rejects(
+    () => router.requireForSession("future-session", "prompt"),
+    (error) => {
+      assert.equal(error.errorCode, ErrorCodes.ENGINE_UNAVAILABLE);
+      assert.match(error.message, /does not know: claude/);
+      return true;
+    },
+  );
+});
+
+test("a router without a lookup refuses id-only gates", async () => {
+  const router = createEngineRouter({ status: idleStatus });
+  await assert.rejects(
+    () => router.requireForSession("some-session", "prompt"),
+    (error) => error.errorCode === ErrorCodes.ENGINE_UNAVAILABLE,
+  );
 });
 
 test("a status provider that throws cannot open a capability", async () => {

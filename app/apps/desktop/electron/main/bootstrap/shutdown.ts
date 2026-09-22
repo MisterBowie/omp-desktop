@@ -10,6 +10,7 @@ import type { PluginPanelHost } from "../plugin-panel-host";
 import type { PluginRuntime } from "../plugin-runtime";
 import type { PluginViewHost } from "../plugin-view-host";
 import type { AppUpdaterController } from "../updater";
+import { reclaimOwnedRuntime } from "../runtime/engine-runtime";
 import type { OmpRuntimeAdapter } from "../runtime/omp-runtime";
 import type { UserMcpRuntime } from "../user-mcp";
 import type { McpControlServer } from "../mcp-control";
@@ -155,17 +156,10 @@ export function registerShutdownHandlers({
       const hostShutdown = getHost()?.dispose();
       // The OMP runtime is stopped through its own ownership rules: process
       // group first (verified empty, not merely signalled), then its run
-      // directory. A run that could not be reclaimed leaves a line in the log
-      // naming what survived.
-      const ompShutdown = ompRuntime.reclaim().then((results) => {
-        for (const result of results) {
-          if (result.stopped) continue;
-          logger.app("runtime", "error", "OMP runtime cleanup incomplete", {
-            code: "OMP_RUNTIME_CLEANUP_FAILED",
-            event: result.steps.join("; "),
-            data: result.errors.join("; "),
-          });
-        }
+      // directory. Both a partial reclaim and a rejected one are reported — a
+      // swallow here would leave a process nobody looks for again.
+      const ompShutdown = reclaimOwnedRuntime(ompRuntime, (message, fields) => {
+        logger.app("runtime", "error", message, fields);
       });
       const mcpShutdown = getMcpControl()?.stop();
       const pluginPanelShutdown = pluginPanels.closeAll();

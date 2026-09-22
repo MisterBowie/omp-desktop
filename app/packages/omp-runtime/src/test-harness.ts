@@ -10,7 +10,12 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildOmpRuntimeEnv, OmpRuntimeProcess, type OmpRuntimeProcessOptions } from "./index.js";
+import {
+  buildOmpRuntimeEnv,
+  defaultPathEntries,
+  OmpRuntimeProcess,
+  type OmpRuntimeProcessOptions,
+} from "./index.js";
 
 /** The mock runtime shipped beside the tests. */
 export const MOCK_LAUNCHER = join(
@@ -19,6 +24,20 @@ export const MOCK_LAUNCHER = join(
   "test",
   "mock-omp.mjs",
 );
+
+/**
+ * PATH the mock children are launched with.
+ *
+ * The mock is an executable script with an `env node` shebang, and the
+ * production PATH deliberately excludes toolchain directories. On macOS the
+ * interpreter lives under `~/.nvm/.../bin` and `/usr/bin/node` does not exist,
+ * so the fixture adds the directory of *the interpreter running this test*.
+ * This is a test-fixture concern only: `buildOmpRuntimeEnv` keeps its closed
+ * PATH for real runtimes.
+ */
+export function mockPathEntries(): string[] {
+  return [...defaultPathEntries(), dirname(process.execPath)];
+}
 
 /** The pinned version the tests claim the mock reports. */
 export const MOCK_VERSION = "18.2.7";
@@ -63,6 +82,7 @@ export function makeMockLayout(
     codingAgentDir: agentDir,
     launchDir: cwd,
     baseEnv: {},
+    pathEntries: mockPathEntries(),
   });
   env.MOCK_OMP_MODE = options.mode ?? "normal";
   env.MOCK_OMP_VERSION = options.version ?? `omp/${MOCK_VERSION}`;

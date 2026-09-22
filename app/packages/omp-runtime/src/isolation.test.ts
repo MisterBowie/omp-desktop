@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -8,12 +8,14 @@ import {
   CREDENTIAL_VAR_PATTERN,
   HOME_DISCOVERY_DIRS,
   PROXY_ENV_KEYS,
+  defaultPathEntries,
   STEER_VARS,
   isPathInside,
   makeRuntimeConfigDirName,
   prepareOmpRuntimeHome,
   removeOwnedRunRoot,
 } from "./isolation.js";
+import { mockPathEntries } from "./test-harness.js";
 
 const created: string[] = [];
 
@@ -124,6 +126,16 @@ describe("runtime environment isolation", () => {
     }
     expect(withPolicy.no_proxy).toBe("127.0.0.1,localhost,::1");
     expect(withPolicy.NODE_USE_ENV_PROXY).toBeUndefined();
+  });
+
+  it("fixtures reach the interpreter running the test, not just the system PATH", async () => {
+    // The mock runtimes are scripts with an `env node` shebang. macOS installs
+    // Node under ~/.nvm, which the closed production PATH does not include, so
+    // the fixture adds this interpreter's own directory. Removing that entry
+    // breaks the suite on any machine without /usr/bin/node.
+    expect(mockPathEntries()).toContain(dirname(process.execPath));
+    // The production PATH stays closed: the fixture widens its own PATH only.
+    expect(defaultPathEntries()).not.toContain(dirname(process.execPath));
   });
 
   it("names a unique config root and pre-creates the discovery directories", () => {

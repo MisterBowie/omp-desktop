@@ -1,5 +1,6 @@
 import { ErrorCodes, IPC, type AgentEventEnvelope, type AppNotification, type PlanExecution, type PlanExecutionFinishStatus, type UiMessage } from "@pi-desktop/shared";
 import { executionFromResponse, executionListFromResponse, planExecutionFromUnknown } from "@pi-desktop/host-runtime";
+import type { EngineRouter } from "./engine-router";
 import type { RuntimeState } from "./context";
 import type {
   SessionCoordination,
@@ -64,12 +65,22 @@ export type PlanRuntimeDependencies = {
   emitAgentEvent: (envelope: AgentEventEnvelope) => void;
   acquireSessionOperation: (sessionId: string) => Promise<() => void>;
   resolveAgentRuntimeLaunch: (...args: any[]) => Promise<any>;
+  /**
+   * The engine gate (ADR 0300). Resolved lazily because the plan runtime is
+   * constructed before the engine runtime exists in the boot sequence.
+   *
+   * A plan execution starts a turn in the session's own runtime, so every entry
+   * into it — the interactive approval and the restore/drain path — passes the
+   * same gate as a prompt.
+   */
+  getEngineRouter: () => EngineRouter | null;
   isQuitting: () => boolean;
   onTurnSettled?: (sessionId: string, turnId: string) => Promise<void>;
 };
 
 export function createPlanRuntime({
   runtimeState,
+  getEngineRouter,
   planState,
   logger,
   sendToRenderer,
@@ -439,6 +450,15 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
         errorCode: ErrorCodes.NOT_FOUND,
       });
     }
+    // Execute only on the engine that owns this session: an approved execution
+    // restored from persistence never passed an interactive gate.
+    const engineRouter = getEngineRouter();
+    if (!engineRouter) {
+      throw Object.assign(new Error("the engine gate is not available"), {
+        errorCode: ErrorCodes.ENGINE_UNAVAILABLE,
+      });
+    }
+    engineRouter.require(sessionResult.session, "prompt");
     const launch = await resolveAgentRuntimeLaunch(
       execution.sessionId,
       sessionResult.session,

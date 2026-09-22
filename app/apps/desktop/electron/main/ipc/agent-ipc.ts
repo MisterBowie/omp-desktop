@@ -633,6 +633,8 @@ export function registerAgentIpc({
   handle(IPC.invoke.agentCompact, async (req: { sessionId: string }) => {
     rejectNativeAgentOperation(req.sessionId);
     if (!host || !sidecar) throw new Error("backend unavailable");
+    // Compaction rewrites the session's context inside its own runtime.
+    await engineRouter.requireForSession(req.sessionId, "prompt");
     if (activeTurns.has(req.sessionId)) {
       throw Object.assign(new Error("Session already has an active turn"), {
         errorCode: ErrorCodes.AGENT_BUSY,
@@ -663,6 +665,7 @@ export function registerAgentIpc({
 
   handle(IPC.invoke.agentAbort, async (req: { sessionId: string; turnId?: string }) => {
     if (!sidecar) throw new Error("sidecar unavailable");
+    await engineRouter.requireForSession(req.sessionId, "stop");
     const releaseSessionOperation = req.turnId ? await acquireSessionOperation(req.sessionId) : undefined;
     try {
     const abortedTurnId = activeTurns.get(req.sessionId);
@@ -720,6 +723,13 @@ export function registerAgentIpc({
 
   handle(IPC.invoke.agentGetStatus, async (sessionId: string) => {
     if (!sidecar) throw new Error("sidecar unavailable");
+    // A read, answered truthfully by the owning engine: a session executed
+    // elsewhere holds no Pi turn, and asking the Pi runtime about it would
+    // report a state that belongs to a different runtime.
+    const engine = await engineRouter.engineForSession(sessionId);
+    if (engine !== "pi") {
+      return { status: { sessionId, isRunning: false, pendingToolConfirmations: 0 } };
+    }
     return sidecar.call("agent.getStatus", { sessionId });
   });
 
@@ -728,20 +738,33 @@ export function registerAgentIpc({
   handle(IPC.invoke.agentQueuePush, async (req: AgentQueuePushRequest) => {
     rejectNativeAgentOperation(req.sessionId);
     if (!agentHostBridge) throw new Error("agent host unavailable");
+    // A queued entry becomes a turn, so it needs the same gate as a prompt.
+    await engineRouter.requireForSession(req.sessionId, "prompt");
     return agentHostBridge.queue.push(req);
   });
   handle(IPC.invoke.agentQueueList, async (req: { sessionId: string }) => {
     rejectNativeAgentOperation(req.sessionId);
     if (!agentHostBridge) throw new Error("agent host unavailable");
+    // A read: the queue drains into the session's engine, so a session this
+    // build cannot drive has no entries here — and none can be added (push is
+    // gated). Answering without the engine's queue is the truthful read.
+    const engine = await engineRouter.engineForSession(req.sessionId);
+    if (engine !== "pi") return { entries: [] };
     return { entries: agentHostBridge.queue.list(req.sessionId) };
   });
   handle(IPC.invoke.agentQueueRemove, async (req: { turnId: string }) => {
     if (!agentHostBridge) throw new Error("agent host unavailable");
+    // Cancels queued work, so it is gated by the engine of the owning session.
+    // An unknown turn has no owner; the queue call reports that on its own.
+    const owner = agentHostBridge.queue.sessionOf(req.turnId);
+    if (owner) await engineRouter.requireForSession(owner, "followUp");
     await agentHostBridge.queue.remove(req.turnId);
     return { ok: true };
   });
   handle(IPC.invoke.agentQueuePrioritize, async (req: { turnId: string }) => {
     if (!agentHostBridge) throw new Error("agent host unavailable");
+    const owner = agentHostBridge.queue.sessionOf(req.turnId);
+    if (owner) await engineRouter.requireForSession(owner, "followUp");
     await agentHostBridge.queue.prioritize(req.turnId);
     return { ok: true };
   });
@@ -781,6 +804,9 @@ export function registerAgentIpc({
     const sessionId = String(resolution?.sessionId ?? "").trim();
     const requestId = String(resolution?.requestId ?? "").trim();
     if (!sessionId || !requestId) throw new Error("asktool resolution identity required");
+    // Answers a question a *running Pi turn* asked; another engine's session
+    // has no such question pending here.
+    await engineRouter.requireForSession(sessionId, "structuredQuestions");
     return sidecar.call("asktool.resolve", {
       ...resolution,
       sessionId,
@@ -840,6 +866,9 @@ export function registerAgentIpc({
       ...(targetPermissionMode ? { permissionMode: targetPermissionMode } : {}),
     });
     if (action === "approve") {
+      // Approval starts a turn in the session's own runtime, so it passes the
+      // same gate as a prompt before anything is dispatched.
+      await engineRouter.requireForSession(sessionId, "prompt");
       const execution = executionFromResponse(result);
       if (execution) {
         void dispatchApprovedPlan(execution);

@@ -12,10 +12,19 @@
  * engine out of a session record the caller already has. That keeps it
  * importable (and testable) without Electron, and keeps the gate out of the
  * places that merely *use* it.
+ *
+ * A caller that has only a session id needs the persisted record, so it hands
+ * the router a lookup. That lookup is the one place where a *failure* could be
+ * mistaken for "a legacy session": it must not be. Only a successful read of a
+ * record without an engine field is Pi; a read that failed, or that returned a
+ * value this build does not understand, refuses the operation instead — the
+ * alternative is routing a session nobody could identify into a runtime that
+ * does not own it.
  */
 import {
   ErrorCodes,
   closedEngineCapabilities,
+  isEngineId,
   engineCapabilities,
   engineCapabilityRefusal,
   liveEngineCapabilities,
@@ -28,6 +37,16 @@ import {
 
 /** Live status of one engine, as the process that owns it reports it. */
 export type EngineStatusProvider = (engine: EngineId) => EngineRuntimeStatus;
+
+/**
+ * Persisted engine of a session, read from the product's single durable source.
+ *
+ * `null`/`undefined` means a record that predates the engine field (Pi); an
+ * unknown string is a value this build cannot route, and a rejection is a
+ * lookup failure. The router tells the two apart, so an unreadable record never
+ * degrades into a guess.
+ */
+export type EngineSessionLookup = (sessionId: string) => Promise<unknown>;
 
 export type EngineSessionRecord = { engine?: unknown } | null | undefined;
 
@@ -55,8 +74,9 @@ export type EngineRouter = {
   /**
    * Engine of a session the caller has only an id for.
    *
-   * An unknown session reads as Pi, which is what every session created before
-   * the engine field is; the call that follows reports `NOT_FOUND` on its own.
+   * Reads the persisted record: a record without an engine field is Pi, a value
+   * this build does not know or a record it cannot read is `ENGINE_UNAVAILABLE`.
+   * There is no "unknown therefore Pi" path.
    */
   engineForSession(sessionId: string): Promise<EngineId>;
   /** `require` for a caller that has an id rather than a record. */
@@ -70,10 +90,29 @@ export type EngineRouter = {
   require(session: EngineSessionRecord, capability: EngineCapability): EngineId;
 };
 
+/**
+ * The failure a caller sees when the engine of a session cannot be established.
+ *
+ * It is `ENGINE_UNAVAILABLE` rather than `ENGINE_CAPABILITY_UNAVAILABLE`,
+ * because no capability was judged: the operation was refused before any engine
+ * was chosen, and retrying after the host answers again is meaningful.
+ */
+function lookupFailure(sessionId: string, detail: string): Error {
+  return Object.assign(
+    new Error(`Could not determine the engine of session ${sessionId}: ${detail}`),
+    { errorCode: ErrorCodes.ENGINE_UNAVAILABLE, sessionId },
+  );
+}
+
 export function createEngineRouter(options: {
   status: EngineStatusProvider;
-  /** Persisted engine of a session, when the caller has only its id. */
-  sessionEngine?: (sessionId: string) => Promise<unknown>;
+  /**
+   * Persisted engine of a session, when the caller has only its id.
+   *
+   * Required for {@link EngineRouter.requireForSession}: a router that cannot
+   * read the record must refuse rather than assume Pi.
+   */
+  sessionEngine?: EngineSessionLookup;
 }): EngineRouter {
   const engineOf = (session: EngineSessionRecord): EngineId =>
     normalizeEngineId(session?.engine);
@@ -106,14 +145,23 @@ export function createEngineRouter(options: {
     status: statusOf,
     supports: (session, capability) => liveCapabilities(engineOf(session))[capability],
     async engineForSession(sessionId) {
-      if (!options.sessionEngine) return normalizeEngineId(undefined);
+      if (!options.sessionEngine) throw lookupFailure(sessionId, "no session lookup is configured");
+      let persisted: unknown;
       try {
-        return normalizeEngineId(await options.sessionEngine(sessionId));
-      } catch {
-        // A lookup that cannot answer keeps the session on the path it has
-        // always used; the operation itself will report the real failure.
+        persisted = await options.sessionEngine(sessionId);
+      } catch (error) {
+        // Not a legacy record: the engine is unknown, and an unknown engine
+        // must never be served by the Pi runtime.
+        throw lookupFailure(sessionId, `the session record could not be read: ${String((error as Error)?.message ?? error)}`);
+      }
+      if (persisted === undefined || persisted === null || persisted === "") {
+        // A record that predates the engine field was created by Pi.
         return normalizeEngineId(undefined);
       }
+      if (!isEngineId(persisted)) {
+        throw lookupFailure(sessionId, `the session record names an engine this build does not know: ${String(persisted)}`);
+      }
+      return persisted;
     },
     async requireForSession(sessionId, capability) {
       const engine = await this.engineForSession(sessionId);

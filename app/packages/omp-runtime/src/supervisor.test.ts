@@ -12,6 +12,7 @@ import {
   MOCK_VERSION,
   fakeVersionProbe,
   makeRoot,
+  mockPathEntries,
   processAlive,
   waitFor,
 } from "./test-harness.js";
@@ -33,6 +34,9 @@ function supervisorFor(
     launcherPath: MOCK_LAUNCHER,
     expectedRuntimeVersion: MOCK_VERSION,
     probeVersion: fakeVersionProbe(MOCK_VERSION),
+    // The mock is a script with an `env node` shebang; its interpreter lives
+    // outside the closed production PATH.
+    pathEntries: mockPathEntries(),
     ...options,
     dataRoot,
   });
@@ -225,6 +229,7 @@ describe("runtime supervisor", () => {
       launcherPath: MOCK_LAUNCHER,
       expectedRuntimeVersion: MOCK_VERSION,
       probeVersion: fakeVersionProbe(MOCK_VERSION),
+      pathEntries: mockPathEntries(),
     });
     supervisors.push(supervisor);
     await supervisor.start();

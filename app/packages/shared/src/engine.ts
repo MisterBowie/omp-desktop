@@ -258,7 +258,14 @@ export type EngineUnavailableReason =
   /** The runtime refused the protocol version this build requires. */
   | "protocol-unsupported"
   /** The stream the runtime was using is unusable; the runtime must be rebuilt. */
-  | "transport-failed";
+  | "transport-failed"
+  /**
+   * A previous runtime of this engine could not be reclaimed: its process group
+   * is still populated, or its run directory survived. The engine must not be
+   * started again until that ownership is disposed of, so this is a blocking
+   * state rather than a transient one.
+   */
+  | "unreclaimed";
 
 /**
  * What the desktop tells its own UI and its gates about one engine.

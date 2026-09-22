@@ -42,7 +42,9 @@ import {
 import { resolveOmpLauncher } from "./launcher.js";
 import {
   OmpRuntimeProcess,
+  type OmpRuntimePhase,
   type OmpRuntimeProcessOptions,
+  type OmpStopOptions,
   type OmpStopResult,
 } from "./process.js";
 import { terminateProcessTree, type TerminateTreeResult } from "./process-group.js";
@@ -85,6 +87,8 @@ export type OmpRuntimeSupervisorOptions = {
    */
   prepareRun?: (paths: OmpRunPaths) => void | Promise<void>;
   /** Test seams. */
+  /** How a runtime is started; defaults to the real process implementation. */
+  runtimeFactory?: OmpRuntimeFactory;
   spawnImpl?: OmpRuntimeProcessOptions["spawnImpl"];
   probeVersion?: OmpRuntimeProcessOptions["probeVersion"];
   abortSettleMs?: number;
@@ -102,6 +106,28 @@ export type OmpRunPaths = {
   configRoot: string;
   launchDir: string;
 };
+
+/**
+ * What the supervisor needs from a running runtime.
+ *
+ * `OmpRuntimeProcess` satisfies this structurally; the seam exists so the
+ * lifecycle state machine (surviving process groups, retained ownership,
+ * concurrent start/stop) can be driven deterministically, without depending on
+ * a child that survives SIGKILL — which no real process does.
+ */
+export type ManagedOmpRuntime = {
+  readonly pid: number | null;
+  readonly pgid: number | null;
+  readonly currentPhase: OmpRuntimePhase;
+  readonly runtimeVersion: string | null;
+  /** Protocol version the handshake settled on, reported in the status. */
+  readonly protocolVersion: number;
+  stop(options?: OmpStopOptions): Promise<OmpStopResult>;
+};
+
+export type OmpRuntimeFactory = (
+  options: OmpRuntimeProcessOptions,
+) => Promise<ManagedOmpRuntime>;
 
 export type OwnedOmpRuntime = {
   /** Process id and group id of the runtime (the runtime is its own leader). */
@@ -128,11 +154,16 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
   readonly engine = "omp";
 
   private readonly options: OmpRuntimeSupervisorOptions;
-  private runtime: OmpRuntimeProcess | null = null;
+  /** The runtime this supervisor owns, live or not yet reclaimed. */
+  private runtime: ManagedOmpRuntime | null = null;
+  /** Record of `this.runtime`: the group and directory a reclaim must dispose of. */
   private ownership: OwnedOmpRuntime | null = null;
-  private starting: Promise<EngineRuntimeStatus> | null = null;
-  private lastFailure: { reason: EngineUnavailableReason; detail: string } | null = null;
+  /** Runs with no live handle whose directory could not be removed yet. */
   private uncleanedRuns: OwnedOmpRuntime[] = [];
+  private starting: Promise<EngineRuntimeStatus> | null = null;
+  /** Single-flight reclaim: concurrent callers share one attempt. */
+  private stopping: Promise<OmpReclaimResult> | null = null;
+  private lastFailure: { reason: EngineUnavailableReason; detail: string } | null = null;
 
   constructor(options: OmpRuntimeSupervisorOptions) {
     this.options = options;
@@ -164,8 +195,23 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
         capabilities: OMP_ENGINE_CAPABILITIES,
       };
     }
-    if (this.runtime && this.runtime.currentPhase === "failed") {
-      return this.failedStatus("transport-failed", "the runtime did not stop cleanly; it must be rebuilt");
+    if (this.runtime) {
+      // A runtime this supervisor still owns is never "stopped": it is either
+      // stopping (not usable, and not reclaimable yet) or failed with its
+      // process group still populated. Reporting `stopped` here would let a
+      // caller forget an ownership it still has.
+      return this.failedStatus(
+        "unreclaimed",
+        this.runtime.currentPhase === "failed"
+          ? "the runtime could not be stopped; its process group is still populated"
+          : "the runtime is shutting down",
+      );
+    }
+    if (this.uncleanedRuns.length > 0) {
+      return this.failedStatus(
+        "unreclaimed",
+        `${this.uncleanedRuns.length} run director${this.uncleanedRuns.length === 1 ? "y" : "ies"} could not be removed`,
+      );
     }
     if (this.lastFailure) {
       return this.failedStatus(this.lastFailure.reason, this.lastFailure.detail);
@@ -206,7 +252,23 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
    * runtime state directory.
    */
   async start(): Promise<EngineRuntimeStatus> {
-    if (this.runtime && this.runtime.currentPhase === "idle") return this.status();
+    if (this.uncleanedRuns.length > 0) {
+      throw new OmpRuntimeError(
+        "not-started",
+        "a previous runtime directory could not be reclaimed; reclaim it before starting another",
+        this.uncleanedRuns[0]?.runRoot,
+      );
+    }
+    if (this.runtime) {
+      if (this.runtime.currentPhase === "idle") return this.status();
+      // A runtime that is stopping or failed is still owned. Starting a second
+      // one would leave two processes sharing one product runtime directory.
+      throw new OmpRuntimeError(
+        "not-started",
+        "the previous runtime has not been reclaimed",
+        `phase=${this.runtime.currentPhase}`,
+      );
+    }
     if (this.starting) return this.starting;
     this.starting = this.startRuntime();
     try {
@@ -250,7 +312,10 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
 
     try {
       if (this.options.prepareRun) await this.options.prepareRun(paths);
-      const runtime = await OmpRuntimeProcess.start({
+      const runtimeFactory =
+        this.options.runtimeFactory ??
+        ((options: OmpRuntimeProcessOptions) => OmpRuntimeProcess.start(options));
+      const runtime = await runtimeFactory({
         launcher,
         cwd: this.options.cwd ?? launchDir,
         env,
@@ -307,31 +372,58 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
    * group is empty, whether the run directory is gone, and what was escalated.
    */
   async stop(options: { abortBash?: boolean } = {}): Promise<OmpReclaimResult> {
+    if (this.stopping) return this.stopping;
+    const attempt = this.performStop(options);
+    this.stopping = attempt;
+    try {
+      return await attempt;
+    } finally {
+      if (this.stopping === attempt) this.stopping = null;
+    }
+  }
+
+  private async performStop(options: { abortBash?: boolean }): Promise<OmpReclaimResult> {
+    // A start in flight will install a runtime after this call began; waiting
+    // for it is what keeps that runtime from becoming unowned.
+    if (this.starting) await this.starting.catch(() => undefined);
+
     const runtime = this.runtime;
     const ownership = this.ownership;
     if (!runtime || !ownership) {
       return { stopped: true, reaped: true, cleaned: true, steps: ["nothing owned"], errors: [] };
     }
+
     const stop: OmpStopResult = await runtime.stop(
       options.abortBash ? { abortBash: true } : {},
     );
+
+    if (!stop.reaped) {
+      // The process group is populated: this supervisor still owns it, keeps the
+      // record needed to terminate it, and does not delete the directory of a
+      // running process. Retrying calls `stop` again — the process-level stop
+      // does not cache a failed verdict.
+      return {
+        stopped: false,
+        reaped: false,
+        cleaned: false,
+        steps: [...stop.steps, "ownership retained for retry"],
+        errors: stop.errors.length > 0 ? [...stop.errors] : ["the runtime process group is still populated"],
+      };
+    }
+
     this.runtime = null;
     this.ownership = null;
-
     const cleaned = this.removeRunRoot(ownership.runRoot);
-    if (!cleaned) {
-      this.uncleanedRuns.push(ownership);
-    }
+    if (!cleaned) this.uncleanedRuns.push(ownership);
     const errors = [...stop.errors];
     if (!cleaned) errors.push(`could not remove ${ownership.runRoot}`);
-    const result: OmpReclaimResult = {
-      stopped: stop.reaped && cleaned,
-      reaped: stop.reaped,
+    return {
+      stopped: cleaned,
+      reaped: true,
       cleaned,
       steps: [...stop.steps, cleaned ? "run root removed" : "run root kept"],
       errors,
     };
-    return result;
   }
 
   /**
@@ -348,24 +440,41 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
     return terminateProcessTree(null, pid, options.graceMs ? { graceMs: options.graceMs } : {});
   }
 
-  /** Stop every run this supervisor owns; used on application shutdown. */
+  /**
+   * Reclaim every run this supervisor owns; used on application shutdown.
+   *
+   * Each retained directory is handled the same way whether its process is
+   * alive or not: verify the saved group, terminate it if it is populated,
+   * and only delete the directory once nothing from that run survives. A run
+   * that still cannot be reclaimed keeps its record, so a later attempt — in
+   * this process or the next — still has something to retry.
+   */
   async reclaimAll(): Promise<OmpReclaimResult[]> {
     const results: OmpReclaimResult[] = [];
-    if (this.runtime) results.push(await this.stop());
+    if (this.runtime || this.starting) results.push(await this.stop());
+
     for (const run of [...this.uncleanedRuns]) {
-      const cleaned = this.removeRunRoot(run.runRoot);
-      if (cleaned) {
-        this.uncleanedRuns = this.uncleanedRuns.filter((entry) => entry !== run);
-        results.push({ stopped: true, reaped: true, cleaned: true, steps: ["late cleanup"], errors: [] });
-      } else {
-        results.push({
-          stopped: false,
-          reaped: false,
-          cleaned: false,
-          steps: [],
-          errors: [`could not remove ${run.runRoot}`],
-        });
+      const steps: string[] = [];
+      const errors: string[] = [];
+      let reaped = true;
+
+      if (run.pgid > 0) {
+        const termination = await terminateProcessTree(null, run.pgid, { graceMs: 1_000 });
+        steps.push(...termination.steps);
+        reaped = termination.reaped;
+        if (!reaped) errors.push(`process group ${run.pgid} is still populated`);
       }
+
+      // Deleting a directory a live process still uses would hide the ownership
+      // that makes the retry possible.
+      const cleaned = reaped ? this.removeRunRoot(run.runRoot) : false;
+      if (!cleaned) errors.push(`could not remove ${run.runRoot}`);
+      if (!reaped || !cleaned) {
+        results.push({ stopped: false, reaped, cleaned, steps, errors });
+        continue;
+      }
+      this.uncleanedRuns = this.uncleanedRuns.filter((entry) => entry !== run);
+      results.push({ stopped: true, reaped, cleaned, steps, errors });
     }
     return results;
   }

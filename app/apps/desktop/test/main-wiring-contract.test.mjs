@@ -92,8 +92,12 @@ function assertPassesRequiredKeys(interfaceSource, interfaceName, callSource, ca
   const keys = requiredKeys(interfaceBody(interfaceSource, interfaceName));
   assert.ok(keys.length > 3, `${interfaceName} should declare several members`);
   const argument = callArgument(callSource, callee);
+  // A key is wired when it appears as a property of this call's argument,
+  // wherever it sits: matching only at the start of a line missed a key that
+  // shares a line with another one, which is a false negative in a check whose
+  // whole job is to notice a missing dependency.
   const missing = keys.filter(
-    (key) => !new RegExp(`(^|\\n)\\s*${key}\\s*[,:]`, "m").test(argument),
+    (key) => !new RegExp(`(^|[\\s,{])${key}\\s*[,:]`, "m").test(argument),
   );
   assert.deepEqual(
     missing,

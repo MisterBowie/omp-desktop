@@ -131,6 +131,9 @@ test("queue remove/prioritize preserve the Desktop opaque host turnId contract",
     getAgentHostBridge: () => ({ queue: {
       remove: async (turnId) => calls.push(["remove", turnId]),
       prioritize: async (turnId) => calls.push(["prioritize", turnId]),
+      // The gate asks the facade which session owns a queued turn. These opaque
+      // ids predate that mapping, so there is no owner to gate on.
+      sessionOf: () => null,
     } }),
   });
   await handlers.get(IPC.invoke.agentQueueRemove)({ turnId: "host-turn" });

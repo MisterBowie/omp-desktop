@@ -20,7 +20,8 @@ import {
   type EngineId,
   type EngineRuntimeStatus,
 } from "@pi-desktop/shared";
-import type { EngineRouter } from "./engine-router";
+import { ErrorCodes } from "@pi-desktop/shared";
+import type { EngineRouter, EngineSessionLookup } from "./engine-router";
 import { createEngineRouter } from "./engine-router";
 import { createOmpRuntimeAdapter, type OmpRuntimeAdapter } from "./omp-runtime";
 
@@ -36,6 +37,11 @@ export type EngineRuntimeDependencies = {
   expectedRuntimeVersion?: string | null;
   /** Whether the Pi runtime's two processes are up. */
   piRuntimeLive: () => boolean;
+  /**
+   * Persisted engine of a session. Production supplies the host-backed lookup;
+   * without one the router refuses id-only gates instead of assuming Pi.
+   */
+  sessionEngine?: EngineSessionLookup;
   /** Test seam. */
   ompAdapterFactory?: typeof createOmpRuntimeAdapter;
   routerFactory?: typeof createEngineRouter;
@@ -65,6 +71,8 @@ export function createDesktopEngineRuntimeForApp(dependencies: {
   dataRoot: string;
   app: ElectronAppSurface;
   piRuntimeLive: () => boolean;
+  /** The host process; the session record is the only authority on an engine. */
+  getHost: () => HostLookup | null;
   resourcesPath?: string | null;
   env?: NodeJS.ProcessEnv;
 }): DesktopEngineRuntime {
@@ -76,7 +84,75 @@ export function createDesktopEngineRuntimeForApp(dependencies: {
     env: dependencies.env ?? process.env,
     expectedRuntimeVersion: OMP_RUNTIME_VERSION,
     piRuntimeLive: dependencies.piRuntimeLive,
+    sessionEngine: createHostSessionLookup(dependencies.getHost),
   });
+}
+
+/** The host surface this lookup needs; structural so tests need no HostProcess. */
+export type HostLookup = {
+  call<T>(method: string, params?: unknown): Promise<T>;
+};
+
+/**
+ * Read a session's engine from host-core — the only durable record of it.
+ *
+ * `messageLimit: 1` keeps the read to a bounded transcript window; the engine
+ * field comes from the summary. A missing session answers `null`, which the
+ * router treats as "not a record I can route" rather than as a legacy session.
+ */
+export function createHostSessionLookup(
+  getHost: () => HostLookup | null,
+): EngineSessionLookup {
+  return async (sessionId: string) => {
+    const host = getHost();
+    if (!host) {
+      throw Object.assign(new Error("host unavailable while reading a session engine"), {
+        errorCode: ErrorCodes.HOST_UNAVAILABLE,
+      });
+    }
+    const result = await host.call<{ session?: { engine?: unknown } | null }>("session.get", {
+      id: sessionId,
+      messageLimit: 1,
+    });
+    const session = result?.session;
+    if (!session) {
+      throw Object.assign(new Error(`session not found: ${sessionId}`), {
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+    return session.engine ?? null;
+  };
+}
+
+/**
+ * Reclaim the runtime this process owns, reporting what could not be reclaimed.
+ *
+ * A rejected reclaim is a lifecycle failure too, and it must reach the log: a
+ * shutdown that swallows it leaves a process nobody will look for again. The
+ * caller supplies its own logger so this stays testable without Electron.
+ */
+export async function reclaimOwnedRuntime(
+  runtime: Pick<OmpRuntimeAdapter, "reclaim">,
+  log: (message: string, fields: { code: string; event?: string; data: string }) => void,
+): Promise<void> {
+  let results: Awaited<ReturnType<OmpRuntimeAdapter["reclaim"]>>;
+  try {
+    results = await runtime.reclaim();
+  } catch (error) {
+    log("OMP runtime reclaim failed", {
+      code: "OMP_RUNTIME_RECLAIM_FAILED",
+      data: String((error as Error)?.message ?? error),
+    });
+    return;
+  }
+  for (const result of results) {
+    if (result.stopped) continue;
+    log("OMP runtime cleanup incomplete", {
+      code: "OMP_RUNTIME_CLEANUP_FAILED",
+      event: result.steps.join("; "),
+      data: result.errors.join("; "),
+    });
+  }
 }
 
 export function createDesktopEngineRuntime(
@@ -110,7 +186,10 @@ export function createDesktopEngineRuntime(
     };
   };
 
-  const engineRouter = (dependencies.routerFactory ?? createEngineRouter)({ status });
+  const engineRouter = (dependencies.routerFactory ?? createEngineRouter)({
+    status,
+    ...(dependencies.sessionEngine ? { sessionEngine: dependencies.sessionEngine } : {}),
+  });
 
   return { ompRuntime, engineRouter, status };
 }
