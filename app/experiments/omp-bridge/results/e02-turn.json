@@ -1,13 +1,13 @@
 {
   "experiment": "e02-turn",
-  "runId": "run-mubn6kc9-e85d14",
-  "startedAt": "2026-09-21T19:32:29.357Z",
+  "runId": "run-muczvppa-2ad6ee",
+  "startedAt": "2026-09-22T18:15:44.532Z",
   "checks": [
     {
       "description": "prompt command is acknowledged",
       "ok": true,
       "detail": {
-        "id": "req-99a4b8c6",
+        "id": "req-6b82fe26",
         "type": "response",
         "command": "prompt",
         "success": true
@@ -16,7 +16,7 @@
     {
       "description": "prompt acknowledgement arrives before the turn ends",
       "ok": true,
-      "detail": "at 25ms"
+      "detail": "at 26ms"
     },
     {
       "description": "agent_end terminates the turn",
@@ -86,6 +86,6 @@
   "limitations": [
     "The scripted model is local; no paid provider is contacted. Tool approval is bypassed here via --approval-mode yolo and is covered by E04."
   ],
-  "finishedAt": "2026-09-21T19:32:30.243Z",
+  "finishedAt": "2026-09-22T18:15:45.481Z",
   "ok": true
 }

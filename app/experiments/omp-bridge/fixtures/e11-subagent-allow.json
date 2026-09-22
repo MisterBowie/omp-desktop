@@ -1,7 +1,7 @@
 {
   "note": "real capture, sanitized; turns routed by session identity, decision injected by the experiment's policy",
-  "parentSessionId": "01a0c576-050b-7640-a3d2-add12b61bd4c",
-  "childSessionId": "01a0c576-05da-719b-93fa-95d3b15ce69b",
+  "parentSessionId": "01a0ca56-24ad-74f7-b9a3-087bdd99a837",
+  "childSessionId": "01a0ca56-2584-768d-87c3-e9ce2195644b",
   "childHasUI": false,
   "lifecycle": {
     "id": "M1Child",
@@ -10,24 +10,25 @@
     "detached": true,
     "agentSource": "bundled",
     "status": "started",
-    "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-12SBki/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e11-allow-12SBki-project--/2026-09-21T19-34-01-227Z_01a0c576-050b-7640-a3d2-add12b61bd4c/M1Child.jsonl",
+    "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-heM1Fd/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e11-allow-heM1Fd-project--/2026-09-22T18-17-18-253Z_01a0ca56-24ad-74f7-b9a3-087bdd99a837/M1Child.jsonl",
     "index": 0
   },
   "parentTaskToolCallId": "call_fake_9_0",
   "gate": {
     "event": "gate",
     "toolName": "write",
+    "toolCallId": "call_fake_11_0",
     "target": "<run>/project/child-allow.txt",
     "hasUI": false,
-    "sessionId": "01a0c576-05da-719b-93fa-95d3b15ce69b",
-    "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-12SBki/project",
-    "at": 1790019241480
+    "sessionId": "01a0ca56-2584-768d-87c3-e9ce2195644b",
+    "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e11-allow-heM1Fd/project",
+    "at": 1790101038518
   },
   "decision": {
     "event": "gate-decision",
     "decision": "allow",
     "route": "child-policy",
-    "at": 1790019241480
+    "at": 1790101038518
   },
   "dialogCount": 0,
   "sideEffectCreated": true

@@ -1,7 +1,7 @@
 {
   "experiment": "e12-harness-faults",
-  "runId": "run-mubn6kc9-e85d14",
-  "startedAt": "2026-09-21T19:34:50.923Z",
+  "runId": "run-muczvppa-2ad6ee",
+  "startedAt": "2026-09-22T18:17:49.007Z",
   "checks": [
     {
       "description": "R5: start against invalid frames fails instead of crashing",
@@ -24,7 +24,7 @@
     {
       "description": "R5: the failed start left no isolated home behind",
       "ok": true,
-      "detail": "/tmp/m1-r5-le5Ifg/fail-run/home"
+      "detail": "/tmp/m1-r5-e4nSm7/fail-run/home"
     },
     {
       "description": "R5: a runtime with invalid frames then ready is usable",
@@ -56,22 +56,22 @@
     {
       "description": "F2: the suite reclaimed the killed experiment's detached runtime",
       "ok": true,
-      "detail": "runtime 208154"
+      "detail": "runtime 25443"
     },
     {
       "description": "F2: the suite reclaimed the tool process the runtime detached",
       "ok": true,
-      "detail": "descendant 208212"
+      "detail": "descendant 25508"
     },
     {
       "description": "F2: the synthetic home was removed",
       "ok": true,
-      "detail": "/tmp/m1-f2-3SRt9s/run/home"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-9wc3Lt/home"
     },
     {
       "description": "F2: the isolated config root was removed",
       "ok": true,
-      "detail": "/tmp/m1-f2-3SRt9s/run/home/.omp-m0-7514ac32"
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-9wc3Lt/home/.omp-m0-e0cc8115"
     },
     {
       "description": "F2: the reaper did not touch this test process",
@@ -80,7 +80,39 @@
     {
       "description": "F2: the reaper did not touch a decoy outside this run",
       "ok": true,
-      "detail": "decoy 208133"
+      "detail": "decoy 25422"
+    },
+    {
+      "description": "R3: the killed experiment's scratch run root is reclaimed",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-9wc3Lt"
+    },
+    {
+      "description": "R3: the killed experiment's agent data is reclaimed",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-9wc3Lt/agent"
+    },
+    {
+      "description": "R3: the suite reports the cleanup as clean",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "description": "R3: --keep-artifacts preserves that run's scratch root",
+      "ok": true,
+      "detail": {
+        "keepExit": 1,
+        "keptRunRoot": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-9EKgfC",
+        "exists": true
+      }
+    },
+    {
+      "description": "R3: the reclaimed and kept runs used different roots",
+      "ok": true,
+      "detail": {
+        "reclaimed": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-9wc3Lt",
+        "kept": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-timeout-9EKgfC"
+      }
     },
     {
       "description": "F3: the client starts even when the stream later contains bad chunks",
@@ -124,6 +156,96 @@
     },
     {
       "description": "F3: the failed client left no isolated home behind",
+      "ok": true
+    },
+    {
+      "description": "R2: the leader exited while its same-group descendant stayed alive",
+      "ok": true,
+      "detail": {
+        "leader": 26180,
+        "leaderAlive": false,
+        "survivor": 26187,
+        "survivorAlive": true
+      }
+    },
+    {
+      "description": "R2: the survivor carries no PI attribution env (group handling alone must reclaim it)",
+      "ok": true,
+      "detail": {
+        "survivor": 26187
+      }
+    },
+    {
+      "description": "R2: the survivor is reclaimed even though its leader had already exited",
+      "ok": true,
+      "detail": "survivor 26187"
+    },
+    {
+      "description": "R2: the group is gone after reaping",
+      "ok": true
+    },
+    {
+      "description": "R2: the reaper reports no survivors",
+      "ok": true,
+      "detail": {
+        "runtimes": 1,
+        "killedProcesses": [
+          26187
+        ],
+        "removedRoots": [
+          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-opILQV/home/.omp-m0-081708f2",
+          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-opILQV/home"
+        ],
+        "removedRunRoots": [
+          "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-opILQV"
+        ],
+        "stillAlive": [],
+        "unattributed": [],
+        "clean": true
+      }
+    },
+    {
+      "description": "R2: the registration is dropped only after the group is gone",
+      "ok": true
+    },
+    {
+      "description": "R2: the reclaimed run root is removed",
+      "ok": true,
+      "detail": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/review-r2-opILQV"
+    },
+    {
+      "description": "R2: a tool that left the group and dropped attribution is NOT claimed as reclaimed",
+      "ok": true,
+      "detail": {
+        "orphan": 26214,
+        "note": "documented limitation: only its own group or its own isolation env can attribute a process"
+      }
+    },
+    {
+      "description": "R4: a request waiting when the stream faults does not report a timeout",
+      "ok": true,
+      "detail": {
+        "errorKind": "transport",
+        "error": "chunk decode failed: rpc chunk sequence must start at index 0",
+        "elapsed": 26
+      }
+    },
+    {
+      "description": "R4: the failure is reported promptly, not after the timeout elapsed",
+      "ok": true,
+      "detail": "26 ms (timeout was 2000 ms)"
+    },
+    {
+      "description": "R4: a genuine timeout keeps its own classification",
+      "ok": true,
+      "detail": "expected errorKind=timeout for an unanswered request"
+    },
+    {
+      "description": "R4: the faulted client still stops cleanly",
+      "ok": true
+    },
+    {
+      "description": "R4: the faulted client left no isolated home behind",
       "ok": true
     },
     {
@@ -217,11 +339,17 @@
     {
       "description": "R6: the timeout path reclaims the experiment's own child processes",
       "ok": true,
-      "detail": "grandchild 208634"
+      "detail": "grandchild 26321"
     }
   ],
-  "artifacts": {},
+  "artifacts": {
+    "R2-detachedOrphan": {
+      "pid": 26214,
+      "stillAlive": true,
+      "reapClean": true
+    }
+  },
   "limitations": [],
-  "finishedAt": "2026-09-21T19:35:35.911Z",
+  "finishedAt": "2026-09-22T18:19:03.775Z",
   "ok": true
 }

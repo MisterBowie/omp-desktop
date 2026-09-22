@@ -1,7 +1,7 @@
 {
   "experiment": "e01-protocol",
-  "runId": "run-mubn6kc9-e85d14",
-  "startedAt": "2026-09-21T19:32:25.618Z",
+  "runId": "run-muczvppa-2ad6ee",
+  "startedAt": "2026-09-22T18:15:40.534Z",
   "checks": [
     {
       "description": "pinned submodule SHA matches the repo gitlink",
@@ -39,7 +39,7 @@
       "description": "rpc: negotiate_protocol succeeds",
       "ok": true,
       "detail": {
-        "id": "req-7f80dbf7",
+        "id": "req-f8efa65c",
         "type": "response",
         "command": "negotiate_protocol",
         "success": true,
@@ -111,7 +111,7 @@
       "description": "rpc-ui: negotiate_protocol succeeds",
       "ok": true,
       "detail": {
-        "id": "req-7ec3bf12",
+        "id": "req-c34e7ad2",
         "type": "response",
         "command": "negotiate_protocol",
         "success": true,
@@ -260,8 +260,8 @@
       "steeringMode": "one-at-a-time",
       "followUpMode": "one-at-a-time",
       "interruptMode": "immediate",
-      "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e01-rpc-5Z1LZQ/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e01-rpc-5Z1LZQ-dev-cwd--/2026-09-21T19-32-26-305Z_01a0c574-9241-728f-8bcc-3f2fb53b0a89.jsonl",
-      "sessionId": "01a0c574-9241-728f-8bcc-3f2fb53b0a89",
+      "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e01-rpc-EDsGJY/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e01-rpc-EDsGJY-dev-cwd--/2026-09-22T18-15-41-258Z_01a0ca54-a9ca-7152-821c-3407021de994.jsonl",
+      "sessionId": "01a0ca54-a9ca-7152-821c-3407021de994",
       "autoCompactionEnabled": true,
       "queuedMessageCount": 0,
       "todoPhases": [],
@@ -1259,8 +1259,8 @@
       "steeringMode": "one-at-a-time",
       "followUpMode": "one-at-a-time",
       "interruptMode": "immediate",
-      "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e01-rpc-ui-XhBzpT/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e01-rpc-ui-XhBzpT-dev-cwd--/2026-09-21T19-32-27-992Z_01a0c574-98d8-7520-aa17-63ab3d4f15f4.jsonl",
-      "sessionId": "01a0c574-98d8-7520-aa17-63ab3d4f15f4",
+      "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e01-rpc-ui-tmewYY/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e01-rpc-ui-tmewYY-dev-cwd--/2026-09-22T18-15-43-144Z_01a0ca54-b128-7498-863f-b4896c03cf28.jsonl",
+      "sessionId": "01a0ca54-b128-7498-863f-b4896c03cf28",
       "autoCompactionEnabled": true,
       "queuedMessageCount": 0,
       "todoPhases": [],
@@ -2296,6 +2296,6 @@
   "limitations": [
     "Only handshake-level frames are captured here; turn-level events are covered by E02."
   ],
-  "finishedAt": "2026-09-21T19:32:29.023Z",
+  "finishedAt": "2026-09-22T18:15:44.494Z",
   "ok": true
 }

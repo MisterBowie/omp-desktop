@@ -2,7 +2,7 @@
 
 记录时间:2026-09-22
 工作目录:`/home/vv/person/code/omp-desktop-m1`(M1 专用分支 `codex/m1-compatibility` 的 worktree)
-结论:**13/13 实验通过,358/358 检查通过**;接入路径已定案,见 `docs/decisions/001-omp-transport.md`。
+结论:**13/13 实验通过,378/378 检查通过**;接入路径已定案,见 `docs/decisions/001-omp-transport.md`。
 
 > 本文件已被一次独立复审返修(R1-R6)。返修前版本的 E05 取消结论**无效并已撤回**,隔离、子代理权限、协议分片、工具链健壮性均有新证据;逐项处理见 §8。
 
@@ -33,7 +33,7 @@ node e04-approval.mjs                # 单个实验;加 --keep-artifacts 保留�
 
 每个实验自建隔离目录(配置根 `~/.omp-m0-<hex>`、agent dir、cwd),结束后回收进程组并删除临时根。结果写入 `results/<name>.json`,脱敏 fixture 写入 `fixtures/<name>.json`。
 
-总结果:`experiments: 13/13 passed | checks: 358/358`,退出码 0,耗时 196.8 秒;汇总写入 `results/summary.json`,逐实验明细写入 `results/<name>.json`。汇总现在按「退出码 0 + 无信号 + PASS + 结果文件存在/命名/`ok` 一致 + 本轮运行标识」判定,不再只看 PASS 文本。
+总结果:`experiments: 13/13 passed | checks: 378/378`,退出码 0,耗时 209.3 秒;汇总写入 `results/summary.json`,逐实验明细写入 `results/<name>.json`。汇总现在按「退出码 0 + 无信号 + PASS + 结果文件存在/命名/`ok` 一致 + 本轮运行标识」判定,不再只看 PASS 文本。
 
 清理验证:正常结束时 `.dev-data/m1/` 运行目录与 `~/.omp-m0-*` 配置根均为 0 个残留,无遗留 OMP 进程(被 `SIGKILL`/管道中断的临时调试运行会留下残留,已清理并确认与正式路径无关)。
 
@@ -51,8 +51,8 @@ node e04-approval.mjs                # 单个实验;加 --keep-artifacts 保留�
 | E08 子代理与工具桥 | `node e08-host-tools.mjs` | 0 | 23/23 | 宿主工具往返与取消(`targetId` 关联);子代理三类事件帧与存活期快照;宿主工具同样过 `tool_call` 钩子 | `e08-host-tool-exchange.json`、`e08-host-tool-cancel.json`、`e08-subagent-events.json` |
 | E09 传输边界 | `node e09-transport.mjs` | 0 | 30/30 | 跨块 UTF-8、半帧、CRLF、非法 JSON 恢复、超长行、180 KB 多字节往返;stdin EOF / stdout EPIPE 自退出并回收 | `e09-degraded-runtimes.json` |
 | E10 模式差异 | `node e10-modes.mjs` | 0 | 18/18 | 两种模式都有扩展对话通道;只有 rpc-ui 广告 `ask` 工具 | `e10-mode-capabilities.json` |
-| E11 子代理权限与取消 | `node e11-subagent-permissions.mjs` | 0 | 40/40 | 按**会话身份**路由后:子代理工具调用进入同一 `tool_call` 钩子但 `hasUI=false`,不能弹窗;审批须由桌面策略决定(拒绝无副作用/批准执行一次);父停止不回收 detached 子代理命令树 | `e11-subagent-allow.json`、`e11-subagent-deny.json`、`e11-subagent-cancel.json`、`e11-subagent-pending-cancel.json` |
-| E12 工具链故障回归 | `node e12-harness-faults.mjs` | 0 | 40/40 | 非法帧不崩溃且有界清理;汇总按「退出码+信号+PASS+结果文件+运行标识」判定;被杀实验的 detached 运行时/后代/隔离目录被有界回收;参数选择集合正确 | `e12-invalid-frames.json`、`e12-aggregator-verdicts.json`、`e12-runtime-reaping.json`、`e12-chunk-error-handling.json`、`e12-arg-parsing.json` |
+| E11 子代理权限与取消 | `node e11-subagent-permissions.mjs` | 0 | 42/42 | 按**会话身份**路由后:子代理工具调用进入同一 `tool_call` 钩子但 `hasUI=false`,不能弹窗;审批须由桌面策略决定(拒绝无副作用/批准执行一次);父停止不取消其挂起审批(R1)也不回收其命令树 | `e11-subagent-allow.json`、`e11-subagent-deny.json`、`e11-subagent-cancel.json`、`e11-subagent-pending-cancel.json` |
+| E12 工具链故障回归 | `node e12-harness-faults.mjs` | 0 | 58/58 | 非法帧不崩溃且有界清理;汇总按「退出码+信号+PASS+结果文件+运行标识」判定;被杀实验的运行时/同组抗 TERM 后代/整棵临时运行根被有界回收(组长退出不豁免);流错误与超时分类正确;参数选择集合正确 | `e12-invalid-frames.json`、`e12-aggregator-verdicts.json`、`e12-runtime-reaping.json`、`e12-chunk-error-handling.json`、`e12-arg-parsing.json` |
 | E13 协议 v2 分片 | `node e13-chunking.mjs` | 0 | 30/30 | 关闭自动压缩后,1.2 MB 提示产生真实分片,`rpc.request()` 经客户端解码后拿到 1,200,650 字节完整响应;入站分片被拒绝;缺片/重复/乱序/非法元数据/超限均有判定 | `e13-real-chunk-sample.json`、`e13-inbound-chunks.json`、`e13-chunk-faults.json` |
 
 ## 3.1 M0 回归复跑
@@ -104,6 +104,7 @@ models       : local-model
 | `e12-runtime-reaping.json` | **合成故障样本** | 桩实验启动真实运行时后被超时杀死,验证回收 |
 | `e12-chunk-error-handling.json` | **合成故障样本** | 桩运行时发出损坏的分片序列 |
 | `e12-arg-parsing.json` | **合成故障样本** | 参数组合与桩实验执行集合 |
+| `e12-stream-error-vs-timeout.json` | **合成故障样本** | 请求在途时流被破坏,R4 的分类回归 |
 | `e13-real-chunk-sample.json` | 真实采集 | 固定 OMP 真实发出的 `rpc_chunk` 结构 |
 | `e13-inbound-chunks.json` | 真实采集 | 向 stdin 发送合法分片后的真实反应 |
 | `e13-chunk-faults.json` | **合成故障样本** | 用移植编码器生成再破坏的分片序列 |
@@ -182,6 +183,8 @@ models       : local-model
 | --- | --- | --- |
 | MCP 工具进入模型工具表 | 未通过 | 隔离配置的 MCP 服务器被发现、启动并完成 `initialize`/`tools/list`,但其工具未出现在模型工具表中(OMP 只广告 12 项核心工具);归属 T19/M5 |
 | 子代理的交互式审批 | **不支持** | E11 实测:子代理会话 `hasUI=false`,OMP 不提供子代理 UI,因此无法向用户弹窗;桌面必须用策略或带外通道决定(E11 用 `M1_CHILD_POLICY`/决策文件模拟),真正的桌面策略属 M2/T10-M11 |
+| 子代理挂起审批的取消 | **OMP 不支持** | R1 实测:父 `abort` 成功后子代理仍 `running`、无取消帧、迟到 allow 会真的执行;E11 现由**桥接侧取消标记**实现"停止后不能放行",桌面需在 M2/T09 自建同等机制 |
+| 离开进程组且不带归属环境的进程 | **不能归属** | R2 边界用例:该进程既不在本轮进程组、环境也不引用本轮隔离根,回收器**不声称覆盖**;产品侧需在启动工具时自行记录归属(`tools/mod.rs` 的 ProcessOwnership/Job Object 是参考) |
 | 分片损坏后的恢复 | **不支持** | E12 实测:固定解码器无重新同步路径,一次分片错误后后续帧全部被拒;OMP 自己的客户端也把它当作致命错误(读取循环外无 try/catch),桌面应重启运行时 |
 | 真实付费模型烟测 | 未执行 | 按仓库规则需用户明确指定提供方与预算 |
 | ACP / SDK 运行时对比 | 未执行 | 仅源码比对;M1 选定 rpc-ui 后不再需要,不作为已对比结论 |
@@ -232,5 +235,18 @@ M2 可以开始,前置条件已满足:RPC(rpc-ui)覆盖消息、会话恢复与�
 | 真实子代理取消 | 父 `abort` 不回收 detached 子代理的运行中命令树,子代理仍被报为运行中;显式进程树终止可回收 | E11-D |
 | 异常退出 | 不先停止就杀桥接进程组会留下孤儿命令树;被强杀**的实验**其运行时靠 stdin EOF 自退出,但隔离目录会残留 | E05-3、E12-F2 |
 | 兜底清理 | 汇总器按运行标识与环境归属回收本轮运行时/后代/隔离目录;桌面侧等价实现属 M2/T09 | E12-F2 |
+
+## 8.2 第三轮独立复审返修(R1-R4)
+
+复审对象:`165163c`。每项都先复现、再对照原桌面实现、再修复、再回归。
+
+| 编号 | 原桌面依据(源码事实) | OMP 实际差异(本机实测) | 实际处理 | 回归证据 |
+| --- | --- | --- | --- | --- |
+| R1 [P1] 子代理等待审批未被父停止取消,而实验把超时当取消 | `runtime.abort()`→`abortRunningDelegations()` 取消各 running delegation;`permissions.cancel()` 删除 pending 并发送 Deny,迟到 `resolve` 返回 `NOT_FOUND`(rpc/mod.rs 的 `tools_abort_during_permission_removes_the_pending_request` 断言"迟到批准"被拒、结果为 `TOOL_ABORTED`)。注意原桌面这套转发明确覆盖 Bash/GenerateImages,不能外推为"所有 Write 都已验证可取消" | 复现:子代理 `write` 进入 `gate-pending` → 父 `abort` 返回 `success=true` → `get_subagents` 仍报子代理 `running` → **abort 后 300 ms 写入 allow,子代理真的创建了目标文件**;全程没有任何取消帧。原 E11-C 的 deny 只是实验自己的 20 s 等待超时 | 撤回"父停止会取消子代理挂起对话"的结论;ADR 第 5 条改为"父会话取消与子代理取消覆盖范围不同";gate 增加**桥接侧取消**(取消标记 + 迟到决定拒绝),E11-C 改为"停止→发布取消→迟到 allow"并断言**取消(vs 超时/拒绝)分类**、`toolCallId` 归属与零副作用;fixture 标注该能力来自桥接而非 OMP | E11 42/42:`route="child-cancelled"`、`lateAllowExecuted=false`、`subagentsStillRunningAfterParentStop=1`、`ompNativeCancelObserved=false` |
+| R2 [P1] 回收器在组长退出后漏杀同组后代 | `npm-executable.ts` 的 `settle()` 在超时后**无论组长是否已退出**都对剩余进程组发 SIGKILL(注释即写明"leader may exit on SIGTERM while a descendant survives");测试 `timeout kills resistant descendants after their group leader exits with ignored stdio`(本机运行 1/1 通过) | 复现:组长先退出后,旧实现用"组长 PID 是否存活"决定是否升级 SIGKILL,`alive(pgrp)` 又退化成检查正 PID → 同组抗 TERM 后代存活,但 `stillAlive=[]` 被报告为"无残留",登记还被删除 | 回收改为按**进程组存活**(`kill(-pgid,0)`)决定升级:先 SIGTERM,再有界 SIGKILL,组长退出不豁免;存活成员按 `/proc/<pid>/stat` 的 `pgrp` 精确枚举;清理未完成时**保留登记并置 `clean=false`**,不再谎报 | E12:`R2: the survivor is reclaimed even though its leader had already exited`、`reaper reports no survivors`、`registration dropped only after group gone`;后代**不带 PI 归属环境变量**,证明是进程组处理而非环境扫描在起作用 |
+| R3 [P2] 超时只清理 HOME/config,未清理本轮实验根 | `scratch.rs` 按会话生命周期管理 scratch(跨回合保留、删除会话时清理、启动时清扫孤儿),`main.rs` 只在拿到真实会话列表时清扫 | 复现:汇总器超时后 `homeRemains=false` 但 `runRootRemains=true`、`agent` 数据仍在;旧 E12 随后自删整个临时套件目录,掩盖了残留 | 回收器增加**按所有权**删除本轮运行根(`.dev-data/m1/<run>-*`),并遵循 `--keep-artifacts`;`run-all` 把该选项传入并汇总 `cleanup` 状态;明确不把实验清理规则扩展成"abort 就删 OMP agent dir/会话/凭据" | E12:`R3: scratch run root is reclaimed`、`agent data is reclaimed`、`--keep-artifacts preserves that run's scratch root`、两轮运行根不同 |
+| R4 [P2] 等待响应期间的分片错误被误报为 timeout | `host-process.ts`:`closeTransport(error)` 清除 pending 定时器并用**真实错误**拒绝所有待完成请求;只有定时器触发才返回 timeout;写失败传播传输错误 | 复现:请求发出后流中出现错序分片,`request({timeoutMs:2000})` 约 27 ms 返回 `error="timeout"`,而内部 `streamError` 是 `chunk decode failed: rpc chunk sequence mismatch` | `request()` 分离分类:`errorKind="transport"` 返回真实流错误并立即结束等待,`errorKind="timeout"` 仅在超时真的到达时给出 | E12:`R4: a request waiting when the stream faults does not report a timeout`(26 ms,`errorKind=transport`)、`a genuine timeout keeps its own classification`、大响应与故障后新请求回归保留 |
+
+**能力边界(本轮新增的明确结论)**:子代理挂起审批的取消在固定 OMP 中**不存在**;M1 只用实验侧桥接实现并证明"停止后不能放行",桌面必须在 M2/T09 自建同等机制(删除 pending + Deny 唤醒 + 迟到决定拒绝),不能依赖 OMP。另:`tools.mod.rs` 的正式 Bash 生命周期(unix 进程组 / Windows Job Object)是产品级参考,本轮只对齐了实验套件的回收语义。
 
 复审后**被撤回**的旧结论:`abort`/`abort_bash` 无法回收运行中命令、必须依赖桥接层进程组终止。替换为:顶层会话 `abort` 即可回收命令进程及其子进程;杀桥接进程组**不能**替代停止(`abort`),否则留下孤儿;子代理的后台命令树需要显式终止。

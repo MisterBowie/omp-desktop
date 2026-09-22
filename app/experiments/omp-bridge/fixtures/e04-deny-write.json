@@ -3,18 +3,19 @@
   "gate": {
     "event": "gate",
     "toolName": "write",
-    "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-deny-write-7rau1g/project/guarded.txt",
+    "toolCallId": "call_fake_1_0",
+    "target": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-deny-write-PKXhw3/project/guarded.txt",
     "hasUI": true,
-    "sessionId": "01a0c574-b4f8-7623-b36a-31843cfbfff8",
-    "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-deny-write-7rau1g/project",
-    "at": 1790019155362
+    "sessionId": "01a0ca54-cca2-74b1-b239-1ec4f4f8e29f",
+    "cwd": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e04-deny-write-PKXhw3/project",
+    "at": 1790100950330
   },
   "decision": {
     "event": "gate-decision",
     "decision": "deny",
     "route": "ui",
     "choice": "Deny",
-    "at": 1790019155384
+    "at": 1790100950346
   },
   "dialogs": [
     {

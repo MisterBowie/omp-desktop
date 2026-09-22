@@ -65,6 +65,64 @@ function alive(pid) {
   try { process.kill(pid, 0); return true; } catch { return false; }
 }
 
+/**
+ * Liveness of a whole process group.
+ *
+ * `process.kill(-pgid, 0)` fails only when the group has no members left, so
+ * this stays true after the group leader exits — the case where gating
+ * escalation on the leader's liveness leaks surviving descendants (PI-Desktop's
+ * npm-executable.ts sends SIGKILL to the remaining group on settle for exactly
+ * this reason).
+ */
+function groupAlive(pgid) {
+  if (!pgid) return false;
+  try {
+    process.kill(-pgid, 0);
+    return true;
+  } catch (error) {
+    return error?.code === "EPERM";
+  }
+}
+
+/** Pids whose process group is `pgid`, from /proc (exact, not name-based). */
+function groupMembers(pgid) {
+  if (!pgid) return [];
+  const members = [];
+  let names;
+  try { names = readdirSync("/proc"); } catch { return members; }
+  for (const name of names) {
+    if (!/^\d+$/.test(name)) continue;
+    const pid = Number(name);
+    if (pid === process.pid) continue;
+    try {
+      const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+      const rest = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+      if (Number(rest[2]) === pgid) members.push(pid);
+    } catch { /* raced with exit */ }
+  }
+  return members;
+}
+
+/**
+ * Terminate a whole group: SIGTERM, bounded wait, then SIGKILL **regardless of
+ * whether the leader is still alive**, then bounded wait. Returns the survivors.
+ */
+async function terminateGroup(pgid, { graceMs = 400, killWaitMs = 3_000 } = {}) {
+  const sleep = (ms) => {
+    const { promise, resolve } = Promise.withResolvers();
+    setTimeout(resolve, ms);
+    return promise;
+  };
+  if (!groupAlive(pgid)) return [];
+  signalQuietly(-pgid, "SIGTERM");
+  const graceEnd = Date.now() + graceMs;
+  while (Date.now() < graceEnd && groupAlive(pgid)) await sleep(50);
+  signalQuietly(-pgid, "SIGKILL");
+  const killEnd = Date.now() + killWaitMs;
+  while (Date.now() < killEnd && groupAlive(pgid)) await sleep(50);
+  return groupMembers(pgid);
+}
+
 function signalQuietly(pid, signal) {
   try { process.kill(pid, signal); } catch { /* gone */ }
 }
@@ -104,6 +162,7 @@ export async function reapRunResources({
   ownerPids = [],
   timeoutMs = 2_000,
   sweep = true,
+  keepArtifacts = false,
 } = {}) {
   const sleep = (ms) => {
     const { promise, resolve: done } = Promise.withResolvers();
@@ -111,53 +170,68 @@ export async function reapRunResources({
     return promise;
   };
   const entries = listRuntimes(dataRoot, { runId });
-  const result = { runtimes: entries.length, killedProcesses: [], removedRoots: [], stillAlive: [] };
+  const result = {
+    runtimes: entries.length,
+    killedProcesses: [],
+    removedRoots: [],
+    removedRunRoots: [],
+    stillAlive: [],
+    unattributed: [],
+    clean: true,
+  };
 
-  // 1. Bounded termination of every registered runtime group (and the pid).
+  // 1. Group termination per registered runtime. Escalation is decided by
+  //    *group* liveness, so a leader that exited first cannot spare its
+  //    remaining descendants.
   for (const entry of entries) {
-    if (!entry.pid) continue;
-    if (alive(entry.pid) || alive(entry.pgrp)) {
-      if (entry.pgrp) signalQuietly(-entry.pgrp, "SIGTERM");
-      signalQuietly(entry.pid, "SIGTERM");
-    }
-  }
-  await sleep(150);
-  for (const entry of entries) {
-    if (alive(entry.pid)) {
-      if (entry.pgrp) signalQuietly(-entry.pgrp, "SIGKILL");
-      signalQuietly(entry.pid, "SIGKILL");
-    }
+    const pgid = entry.pgrp ?? entry.pid;
+    if (!groupAlive(pgid)) continue;
+    const before = groupMembers(pgid);
+    const survivors = await terminateGroup(pgid, { graceMs: 400, killWaitMs: timeoutMs });
+    // Report every member that was present before the kill: the survivors (if
+    // any) are the ones the caller must still worry about.
+    result.killedProcesses.push(...before.filter((pid) => !survivors.includes(pid)));
+    if (survivors.length > 0) result.stillAlive.push(...survivors);
   }
 
-  // 2. Environment-attributed sweep for this run's leftover processes,
-  //    including tools the runtime detached into their own sessions.
+  // 2. Secondary safety net for processes that left the group (OMP tools may
+  //    setsid themselves): attribute them by this run's isolation roots.
   const owned = sweep
     ? sweepOwnedPids({
       agentDirs: entries.map((e) => e.agentDir).filter(Boolean),
       configDirNames: entries.map((e) => e.configDirName).filter(Boolean),
-      exclude: [process.pid, ...ownerPids],
+      exclude: [process.pid, ...ownerPids, ...result.stillAlive],
     })
     : [];
-  for (const pid of owned) {
-    signalQuietly(pid, "SIGTERM");
-  }
-  await sleep(150);
-  for (const pid of owned) {
-    if (alive(pid)) signalQuietly(pid, "SIGKILL");
-    result.killedProcesses.push(pid);
-  }
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    const stragglers = [...entries.map((e) => e.pid), ...owned].filter(alive);
-    if (stragglers.length === 0 || Date.now() > deadline) {
-      result.stillAlive = stragglers;
-      break;
+  for (const pid of owned) signalQuietly(pid, "SIGTERM");
+  if (owned.length > 0) {
+    const sleep = (ms) => {
+      const { promise, resolve } = Promise.withResolvers();
+      setTimeout(resolve, ms);
+      return promise;
+    };
+    await sleep(150);
+    for (const pid of owned) {
+      if (alive(pid)) {
+        // The process leads its own group when it called setsid; kill both.
+        signalQuietly(-pid, "SIGKILL");
+        signalQuietly(pid, "SIGKILL");
+      }
+      result.killedProcesses.push(pid);
     }
-    await sleep(100);
+    await sleep(150);
+    for (const pid of owned) if (alive(pid)) result.stillAlive.push(pid);
   }
 
-  // 3. Isolated directories: only paths inside the run root are removed.
+  // 3. Cleanup only what this run owns. A registration is dropped only when its
+  //    group is really gone, so a failed cleanup stays retryable.
   for (const entry of entries) {
+    const pgid = entry.pgrp ?? entry.pid;
+    if (groupAlive(pgid)) {
+      result.unattributed.push({ pid: entry.pid, pgid, reason: "group still alive after SIGKILL" });
+      result.clean = false;
+      continue;
+    }
     for (const dir of [entry.configRoot, entry.home]) {
       if (!dir) continue;
       const abs = resolve(dir);
@@ -165,7 +239,16 @@ export async function reapRunResources({
       rmSync(abs, { recursive: true, force: true });
       result.removedRoots.push(abs);
     }
+    if (!keepArtifacts && entry.runRoot) {
+      const absRun = resolve(entry.runRoot);
+      const owned = `${resolve(dataRoot)}/`;
+      if (absRun.startsWith(owned) && absRun !== resolve(dataRoot)) {
+        rmSync(absRun, { recursive: true, force: true });
+        result.removedRunRoots.push(absRun);
+      }
+    }
     unregisterRuntime(dataRoot, entry.pid);
   }
+  if (result.stillAlive.length > 0) result.clean = false;
   return result;
 }

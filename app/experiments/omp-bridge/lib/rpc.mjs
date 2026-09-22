@@ -199,18 +199,34 @@ export class OmpRpc {
     }
   }
 
-  /** Send a command and wait for its `response` frame. */
+  /**
+   * Send a command and wait for its `response` frame.
+   *
+   * Failure classification mirrors PI-Desktop's host RPC (`host-process.ts`):
+   * a transport/stream failure rejects the waiting request with that actual
+   * error and clears its timer, while "timeout" is reported only when the
+   * timeout itself elapsed. Callers can therefore tell a broken stream from a
+   * slow runtime instead of seeing every failure as a timeout.
+   */
   async request(command, { timeoutMs = 15_000, id } = {}) {
     const cmdId = id ?? `req-${randomBytes(4).toString("hex")}`;
     const payload = { id: cmdId, ...command };
     const from = this.frames.length;
-    if (!this.write(payload)) return { id: cmdId, type: "response", success: false, error: this.#streamError };
-    const res = await this.waitFor(
-      (f) => f.type === "response" && f.id === cmdId,
-      timeoutMs,
-      from,
-    );
-    return res ?? { id: cmdId, type: "response", success: false, error: "timeout", command: command.type };
+    if (!this.write(payload)) {
+      return { id: cmdId, type: "response", success: false, error: this.#streamError, errorKind: "transport", command: command.type };
+    }
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const res = await this.waitFor((f) => f.type === "response" && f.id === cmdId, Math.max(1, deadline - Date.now()), from);
+      if (res) return res;
+      // waitFor returns null for both causes; report which one it was.
+      if (this.#streamError) {
+        return { id: cmdId, type: "response", success: false, error: this.#streamError, errorKind: "transport", command: command.type };
+      }
+      if (Date.now() >= deadline) {
+        return { id: cmdId, type: "response", success: false, error: `timeout after ${timeoutMs} ms`, errorKind: "timeout", command: command.type };
+      }
+    }
   }
 
   /** Answer an `extension_ui_request`. */

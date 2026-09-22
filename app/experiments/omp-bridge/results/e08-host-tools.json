@@ -1,13 +1,13 @@
 {
   "experiment": "e08-host-tools",
-  "runId": "run-mubn6kc9-e85d14",
-  "startedAt": "2026-09-21T19:33:05.233Z",
+  "runId": "run-muczvppa-2ad6ee",
+  "startedAt": "2026-09-22T18:16:22.490Z",
   "checks": [
     {
       "description": "set_host_tools is accepted",
       "ok": true,
       "detail": {
-        "id": "req-f96ebae6",
+        "id": "req-21958bd3",
         "type": "response",
         "command": "set_host_tools",
         "success": true,
@@ -29,7 +29,7 @@
       "description": "set_subagent_subscription(events) is accepted",
       "ok": true,
       "detail": {
-        "id": "req-e9f1de17",
+        "id": "req-940d7209",
         "type": "response",
         "command": "set_subagent_subscription",
         "success": true,
@@ -97,8 +97,8 @@
       "ok": true,
       "detail": {
         "type": "host_tool_cancel",
-        "id": "1588aac7d6cf971d",
-        "targetId": "1588aac7d40f971c"
+        "id": "1589e2d0282ad10b",
+        "targetId": "1589e2d025aad10a"
       }
     },
     {
@@ -211,8 +211,8 @@
     "hostToolSeenByExtension": true,
     "hostToolCancelFrame": {
       "type": "host_tool_cancel",
-      "id": "1588aac7d6cf971d",
-      "targetId": "1588aac7d40f971c"
+      "id": "1589e2d0282ad10b",
+      "targetId": "1589e2d025aad10a"
     },
     "subagentSnapshot": [
       {
@@ -223,8 +223,8 @@
         "status": "running",
         "task": "Complete assignment thoroughly:\n\nreport the word ALPHA",
         "assignment": "report the word ALPHA",
-        "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e08-subagent-3nFb8F/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e08-subagent-3nFb8F-project--/2026-09-21T19-33-48-221Z_01a0c575-d23d-7075-a80e-bbc97b0d50c9/M1Scout.jsonl",
-        "lastUpdate": 1790019228474,
+        "sessionFile": "/home/vv/person/code/omp-desktop-m1/.dev-data/m1/e08-subagent-91MFhE/agent/sessions/--home-vv-person-code-omp-desktop-m1-.dev-data-m1-e08-subagent-91MFhE-project--/2026-09-22T18-17-05-709Z_01a0ca55-f3ad-7374-bbde-8bcdf548d77a/M1Scout.jsonl",
+        "lastUpdate": 1790101025980,
         "parentToolCallId": "call_fake_4_0",
         "progress": {
           "index": 0,
@@ -261,6 +261,6 @@
     "The host tool also passed through the extension tool_call hook.",
     "The host-tool exchange is a real capture; the fake provider only supplies model turns."
   ],
-  "finishedAt": "2026-09-21T19:33:49.542Z",
+  "finishedAt": "2026-09-22T18:17:07.067Z",
   "ok": true
 }

@@ -198,7 +198,17 @@ const evidence = await runExperiment("e11-subagent-permissions", async (ctx) => 
   }
 
   // ==========================================================================
-  // C — the child waits for an out-of-band decision, then the parent is stopped
+  // C — the child waits for approval; the parent stops; a LATE allow arrives
+  //
+  // PI-Desktop reference (source facts): `runtime.abort()` calls
+  // `abortRunningDelegations()`, and host-core's `permissions.cancel()` removes
+  // the pending request, answers Deny so a racing waiter wakes, and makes a late
+  // resolve fail with NOT_FOUND — the tool result is reported as TOOL_ABORTED.
+  // OMP difference (measured here): a subagent's `tool_call` hook is simply
+  // awaiting this extension's promise; stopping the parent session produces no
+  // cancel frame, the subagent stays `running`, and a late allow WOULD execute
+  // the call. The cancel marker below is therefore the bridge's own
+  // implementation of that contract, not an OMP capability.
   // ==========================================================================
   {
     const { root, runRoot, selector } = experimentRoot(ctx, "e11-pending", { baseUrl: provider.baseUrl });
@@ -206,6 +216,7 @@ const evidence = await runExperiment("e11-subagent-permissions", async (ctx) => 
     mkdirSync(projectDir, { recursive: true });
     const uiLog = join(root, "ui.log");
     const decisionFile = join(root, "child-decision.txt");
+    const cancelFile = join(root, "child-cancel.txt");
     const target = join(projectDir, "child-pending.txt");
     const marker = "M1-CHILD-PENDING-NONCE-b93d";
 
@@ -228,56 +239,70 @@ const evidence = await runExperiment("e11-subagent-permissions", async (ctx) => 
         cwd: projectDir,
         extraEnv: {
           M1_UI_LOG: uiLog, M1_UI_LOG_ALL: "1",
-          M1_CHILD_POLICY: "defer", M1_CHILD_DECISION: decisionFile, M1_CHILD_DEFER_MS: "20000",
+          M1_CHILD_POLICY: "defer", M1_CHILD_DECISION: decisionFile,
+          M1_CHILD_CANCEL: cancelFile, M1_CHILD_DEFER_MS: "30000",
         },
       });
       await rpc.request({ type: "negotiate_protocol", protocolVersion: 2 });
       await rpc.request({ type: "set_subagent_subscription", level: "events" });
       await rpc.request({ type: "prompt", message: "delegate a write to a child" }, { timeoutMs: 90_000 });
 
-      // The gate logs a pending entry while it waits; that is the observable
-      // "child is waiting for approval" state (there is no dialog for it).
       let pendingSeen = false;
       const waitStart = Date.now();
       while (Date.now() - waitStart < 30_000) {
         if (readLog(uiLog).some((l) => l.event === "gate-pending")) { pendingSeen = true; break; }
         await sleep(100);
       }
+      const pendingEntry = readLog(uiLog).find((l) => l.event === "gate-pending");
       ctx.check("C: the child's call reached the hook and is waiting for a decision", pendingSeen, readLog(uiLog).map((l) => l.event));
       ctx.check("C: nothing was executed while the child waited", !existsSync(target));
 
-      // Stop the parent while the child is still waiting.
+      // Stop the parent, then publish the bridge's cancellation (the desktop's
+      // stop path), then let a late allow arrive — the reviewer's exact order.
       const started = Date.now();
-      await rpc.request({ type: "abort" }, { timeoutMs: 20_000 });
+      const abortRes = await rpc.request({ type: "abort" }, { timeoutMs: 20_000 });
       const abortMs = Date.now() - started;
-      ctx.check("C: the session stayed responsive through the stop", (await rpc.request({ type: "get_state" }, { timeoutMs: 10_000 })).type === "response");
-      await sleep(1_500);
+      ctx.check("C: the parent stop is acknowledged", abortRes.success === true, abortRes);
+      const subsAfterAbort = await rpc.request({ type: "get_subagents" });
+      const stillRunning = (subsAfterAbort.data?.subagents ?? []).filter((s) => s.status === "running").length;
+      ctx.note("C-subagentsStillRunningAfterParentStop", stillRunning);
+      ctx.check("C: OMP does not stop the subagent when the parent is stopped (no native cancel)",
+        stillRunning >= 1, { stillRunning, note: "measured; the child keeps running" });
 
-      const resolved = readLog(uiLog).find((l) => l.event === "gate-decision" && l.route === "child-defer");
-      ctx.check("C: no side effect from the abandoned child call", !existsSync(target));
-      ctx.check("C: the stop did not hang on the waiting call", abortMs < 20_000, `${abortMs} ms`);
+      await sleep(300);
+      writeFileSync(cancelFile, "cancel\n");
+      await sleep(300);
+      writeFileSync(decisionFile, "allow\n");
 
-      // The deferred decision is bounded by M1_CHILD_DEFER_MS; wait for it so
-      // the final state is deterministic rather than merely "not yet resolved".
-      let settled = resolved ?? null;
+      let settled = null;
       const settleStart = Date.now();
       while (!settled && Date.now() - settleStart < 30_000) {
-        settled = readLog(uiLog).find((l) => l.event === "gate-decision" && l.route === "child-defer") ?? null;
-        if (!settled) await sleep(200);
+        settled = readLog(uiLog).find((l) => l.event === "gate-decision") ?? null;
+        if (!settled) await sleep(100);
       }
-      ctx.check("C: the abandoned child approval resolves to a denial after the stop",
-        settled?.decision === "deny", settled ?? "still pending after 30s");
-      ctx.check("C: still no side effect once the child approval settled", !existsSync(target));
-      ctx.note("C-deferResolution", settled ?? null);
+      await sleep(500);
+
+      ctx.check("C: the abandoned child approval no longer executes even when a late allow arrives",
+        !existsSync(target), { sideEffectCreated: existsSync(target) });
+      ctx.check("C: the outcome is classified as cancelled, not as a timeout",
+        settled?.route === "child-cancelled" && settled?.cancelled === true, settled);
+      ctx.check("C: the stop did not hang on the waiting call", abortMs < 20_000, `${abortMs} ms`);
+      ctx.check("C: the cancellation decision belongs to the child's tool call",
+        Boolean(pendingEntry?.toolCallId) && settled?.toolCallId === pendingEntry?.toolCallId,
+        { pending: pendingEntry?.toolCallId ?? null, settled: settled?.toolCallId ?? null });
+      ctx.check("C: session stays responsive after the stop",
+        (await rpc.request({ type: "get_state" }, { timeoutMs: 10_000 })).type === "response");
       ctx.check("C: process group reaped", (await rpc.stop()) === true);
 
       writeFixture("e11-subagent-pending-cancel.json", {
-        note: "real capture, sanitized; the child's approval was deferred to an out-of-band channel that never answered, then the parent was stopped",
-        markers: readLog(uiLog).map((l) => l.event),
-        pendingSeen,
-        sideEffectCreated: existsSync(target),
+        note: "real capture, sanitized; the child's approval was pending when the parent was stopped, and a late allow was published afterwards",
+        capability: "bridge-provided cancellation (the cancel marker is the experiment's), not an OMP feature",
+        ompNativeCancelObserved: false,
+        subagentsStillRunningAfterParentStop: stillRunning,
+        pendingToolCallId: pendingEntry?.toolCallId ?? null,
+        decision: settled ? sanitizeFrame(settled) : null,
+        lateAllowExecuted: existsSync(target),
         abortMs,
-        deferResolution: settled ? sanitizeFrame(settled) : null,
       });
     } finally {
       if (rpc?.pid) await rpc.stop();

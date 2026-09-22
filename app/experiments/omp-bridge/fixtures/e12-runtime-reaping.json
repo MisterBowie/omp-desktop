@@ -4,5 +4,7 @@
   "descendantGone": true,
   "homeRemoved": true,
   "configRootRemoved": true,
+  "runRootRemoved": true,
+  "agentDataRemoved": true,
   "suiteExitCode": 1
 }

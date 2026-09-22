@@ -1,7 +1,7 @@
 {
   "experiment": "e10-modes",
-  "runId": "run-mubn6kc9-e85d14",
-  "startedAt": "2026-09-21T19:33:55.795Z",
+  "runId": "run-muczvppa-2ad6ee",
+  "startedAt": "2026-09-22T18:17:12.873Z",
   "checks": [
     {
       "description": "rpc: ready arrives and protocol v2 negotiates",
@@ -16,7 +16,7 @@
       "ok": true,
       "detail": [
         {
-          "id": "1588aad0c9ffe714",
+          "id": "1589e2d8d2251e21",
           "method": "select",
           "title": "Approve write?"
         }
@@ -43,7 +43,7 @@
       "ok": true,
       "detail": [
         {
-          "id": "1588aad1bb405dd0",
+          "id": "1589e2d9d418c965",
           "method": "select",
           "title": "Approve write?"
         }
@@ -109,6 +109,6 @@
   "limitations": [
     "ACP and SDK paths were read in source only; M1 selects rpc-ui and does not need them, so no runtime comparison is claimed."
   ],
-  "finishedAt": "2026-09-21T19:33:57.738Z",
+  "finishedAt": "2026-09-22T18:17:14.970Z",
   "ok": true
 }

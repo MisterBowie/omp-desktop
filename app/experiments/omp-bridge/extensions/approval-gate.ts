@@ -21,7 +21,7 @@
  * Decisions are appended to `M1_UI_LOG` so experiments can assert what the gate
  * saw, which session it belonged to, and how it answered.
  */
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, statSync } from "node:fs";
 
 interface DialogOptions {
   timeout?: number;
@@ -41,6 +41,7 @@ interface ToolCallCtx {
 }
 interface ToolCallEvent {
   toolName: string;
+  toolCallId?: string;
   input: Record<string, unknown>;
 }
 interface ExtensionAPI {
@@ -66,21 +67,45 @@ function log(entry: Record<string, unknown>): void {
   if (path) appendFileSync(path, `${JSON.stringify(entry)}\n`);
 }
 
-/** Wait for an out-of-band decision file, bounded by M1_CHILD_DEFER_MS. */
-async function awaitOutOfBandDecision(): Promise<"allow" | "deny" | "timeout"> {
-  const path = process.env.M1_CHILD_DECISION;
+/**
+ * Outcome of waiting for a child decision.
+ *
+ * `cancelled` is deliberately distinct from `timeout`: PI-Desktop's
+ * `permissions.cancel` removes the pending request and answers Deny so a waiter
+ * that raced the cancellation wakes up, while a *late* resolve returns
+ * NOT_FOUND and can never execute. OMP provides no equivalent for a subagent's
+ * pending tool call — the `tool_call` hook simply keeps awaiting this promise —
+ * so the cancel marker below is the bridge's own implementation of that
+ * contract, not an OMP capability.
+ */
+async function awaitChildDecision(toolCallId: string): Promise<"allow" | "deny" | "timeout" | "cancelled"> {
+  const decisionPath = process.env.M1_CHILD_DECISION;
+  const cancelPath = process.env.M1_CHILD_CANCEL;
   const budgetMs = Number(process.env.M1_CHILD_DEFER_MS ?? 15_000);
-  if (!path) return "timeout";
   const started = Date.now();
+  let cancelObservedAt: number | null = null;
+
   while (Date.now() - started < budgetMs) {
-    if (existsSync(path)) {
-      const text = readFileSync(path, "utf8").trim().toLowerCase();
+    const cancelStat = cancelPath && existsSync(cancelPath) ? statSync(cancelPath) : null;
+    if (cancelStat) {
+      cancelObservedAt ??= cancelStat.mtimeMs;
+      // A decision that only appeared after the cancellation is late: it must
+      // not admit the call (the pending request is gone, as in NOT_FOUND).
+      const decisionStat = decisionPath && existsSync(decisionPath) ? statSync(decisionPath) : null;
+      if (!decisionStat || decisionStat.mtimeMs >= cancelStat.mtimeMs) {
+        return "cancelled";
+      }
+    }
+    if (decisionPath && existsSync(decisionPath)) {
+      const text = readFileSync(decisionPath, "utf8").trim().toLowerCase();
       if (text === "allow" || text === "deny") return text;
     }
     const { promise, resolve } = Promise.withResolvers<void>();
-    setTimeout(resolve, 100);
+    setTimeout(resolve, 50);
     await promise;
   }
+  void toolCallId;
+  void cancelObservedAt;
   return "timeout";
 }
 
@@ -93,7 +118,7 @@ export default function approvalGate(pi: ExtensionAPI): void {
     }
     if (!GATED_TOOLS[event.toolName]) return undefined;
     const target = String(event.input.path ?? event.input.command ?? "");
-    log({ event: "gate", toolName: event.toolName, target, hasUI: ctx.hasUI, ...session, at: Date.now() });
+    log({ event: "gate", toolName: event.toolName, toolCallId: event.toolCallId ?? null, target, hasUI: ctx.hasUI, ...session, at: Date.now() });
 
     if (ctx.hasUI) {
       const choice = await ctx.ui.select(`Approve ${event.toolName}?`, ["Allow", "Deny"]);
@@ -110,11 +135,17 @@ export default function approvalGate(pi: ExtensionAPI): void {
       return undefined;
     }
     if (policy === "defer") {
-      log({ event: "gate-pending", route: "child-defer", target, at: Date.now() });
-      const decided = await awaitOutOfBandDecision();
+      log({ event: "gate-pending", route: "child-defer", toolCallId: event.toolCallId ?? null, target, at: Date.now() });
+      const decided = await awaitChildDecision(event.toolCallId ?? "");
       if (decided === "allow") {
         log({ event: "gate-decision", decision: "allow", route: "child-defer", at: Date.now() });
         return undefined;
+      }
+      if (decided === "cancelled") {
+        // Bridge-provided cancellation: the pending request is gone and a late
+        // decision can no longer admit the call. Distinct from `timeout`.
+        log({ event: "gate-decision", decision: "deny", route: "child-cancelled", cancelled: true, toolCallId: event.toolCallId ?? null, at: Date.now() });
+        return { block: true, reason: "aborted: the session was stopped while this approval was pending" };
       }
       log({ event: "gate-decision", decision: "deny", route: "child-defer", outcome: decided, at: Date.now() });
       return { block: true, reason: `denied: no out-of-band decision (${decided})` };

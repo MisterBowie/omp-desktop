@@ -1,5 +1,5 @@
 {
-  "ranAt": "2026-09-21T19:35:42.398Z",
+  "ranAt": "2026-09-22T18:19:09.832Z",
   "node": "v24.14.0",
   "platform": "linux-x64",
   "keepArtifacts": false,
@@ -8,6 +8,11 @@
       "file": "e01-protocol.mjs",
       "passed": true,
       "verdict": "exit 0, no signal, PASS, matching valid result",
+      "cleanup": {
+        "clean": true,
+        "stillAlive": [],
+        "unattributed": []
+      },
       "headline": "PASS e01-protocol: 26/26 checks",
       "exitCode": 0,
       "signal": null,
@@ -17,7 +22,7 @@
         "experiment": "e01-protocol",
         "ok": true
       },
-      "seconds": 3.7,
+      "seconds": 4,
       "limitations": [
         "Only handshake-level frames are captured here; turn-level events are covered by E02."
       ]
@@ -26,6 +31,11 @@
       "file": "e02-turn.mjs",
       "passed": true,
       "verdict": "exit 0, no signal, PASS, matching valid result",
+      "cleanup": {
+        "clean": true,
+        "stillAlive": [],
+        "unattributed": []
+      },
       "headline": "PASS e02-turn: 12/12 checks",
       "exitCode": 0,
       "signal": null,
@@ -35,7 +45,7 @@
         "experiment": "e02-turn",
         "ok": true
       },
-      "seconds": 1.2,
+      "seconds": 1,
       "limitations": [
         "The scripted model is local; no paid provider is contacted. Tool approval is bypassed here via --approval-mode yolo and is covered by E04."
       ]
@@ -44,6 +54,11 @@
       "file": "e03-interaction.mjs",
       "passed": true,
       "verdict": "exit 0, no signal, PASS, matching valid result",
+      "cleanup": {
+        "clean": true,
+        "stillAlive": [],
+        "unattributed": []
+      },
       "headline": "PASS e03-interaction: 23/23 checks",
       "exitCode": 0,
       "signal": null,
@@ -62,6 +77,11 @@
       "file": "e04-approval.mjs",
       "passed": true,
       "verdict": "exit 0, no signal, PASS, matching valid result",
+      "cleanup": {
+        "clean": true,
+        "stillAlive": [],
+        "unattributed": []
+      },
       "headline": "PASS e04-approval: 29/29 checks",
       "exitCode": 0,
       "signal": null,
@@ -80,6 +100,11 @@
       "file": "e05-cancel.mjs",
       "passed": true,
       "verdict": "exit 0, no signal, PASS, matching valid result",
+      "cleanup": {
+        "clean": true,
+        "stillAlive": [],
+        "unattributed": []
+      },
       "headline": "PASS e05-cancel: 28/28 checks",
       "exitCode": 0,
       "signal": null,
@@ -89,7 +114,7 @@
         "experiment": "e05-cancel",
         "ok": true
       },
-      "seconds": 20.7,
+      "seconds": 20.6,
       "limitations": [
         "In-protocol stop (abort + abort_bash) reclaimed the running command process in this environment.",
         "The descendant of the running command was reclaimed together with it.",
@@ -101,6 +126,11 @@
       "file": "e06-session.mjs",
       "passed": true,
       "verdict": "exit 0, no signal, PASS, matching valid result",
+      "cleanup": {
+        "clean": true,
+        "stillAlive": [],
+        "unattributed": []
+      },
       "headline": "PASS e06-session: 23/23 checks",
       "exitCode": 0,
       "signal": null,
@@ -110,7 +140,7 @@
         "experiment": "e06-session",
         "ok": true
       },
-      "seconds": 3.8,
+      "seconds": 3.6,
       "limitations": [
         "Session naming/restore are verified over RPC only; desktop-side metadata mapping is M2/M4 work."
       ]
@@ -119,6 +149,11 @@
       "file": "e07-isolation.mjs",
       "passed": true,
       "verdict": "exit 0, no signal, PASS, matching valid result",
+      "cleanup": {
+        "clean": true,
+        "stillAlive": [],
+        "unattributed": []
+      },
       "headline": "PASS e07-isolation: 36/36 checks",
       "exitCode": 0,
       "signal": null,
@@ -128,7 +163,7 @@
         "experiment": "e07-isolation",
         "ok": true
       },
-      "seconds": 2.1,
+      "seconds": 4.7,
       "limitations": [
         "Rules are only injected when bucketed by frontmatter (`alwaysApply: true`, or a `description` for the rulebook); a bare markdown file in rules/ is read but never reaches the prompt. Relevant to T19.",
         "The MCP server from the isolated project config is discovered, spawned, and handshaken, but its tool is NOT in the model's tool list in this configuration (OMP advertises a curated 12-tool subset); MCP tool surfacing is T19/M5 work.",
@@ -140,6 +175,11 @@
       "file": "e08-host-tools.mjs",
       "passed": true,
       "verdict": "exit 0, no signal, PASS, matching valid result",
+      "cleanup": {
+        "clean": true,
+        "stillAlive": [],
+        "unattributed": []
+      },
       "headline": "PASS e08-host-tools: 23/23 checks",
       "exitCode": 0,
       "signal": null,
@@ -159,6 +199,11 @@
       "file": "e09-transport.mjs",
       "passed": true,
       "verdict": "exit 0, no signal, PASS, matching valid result",
+      "cleanup": {
+        "clean": true,
+        "stillAlive": [],
+        "unattributed": []
+      },
       "headline": "PASS e09-transport: 30/30 checks",
       "exitCode": 0,
       "signal": null,
@@ -168,7 +213,7 @@
         "experiment": "e09-transport",
         "ok": true
       },
-      "seconds": 5.9,
+      "seconds": 5.8,
       "limitations": [
         "Bridge-disconnect handling is asserted as 'OMP exits by itself and the group is reaped'; the desktop-side reconnect policy is M2/T09.",
         "Line-cap enforcement is specified by lib/ndjson.mjs; the production reader is M2/T09 and must adopt an explicit cap (Node's readline has no line limit).",
@@ -179,6 +224,11 @@
       "file": "e10-modes.mjs",
       "passed": true,
       "verdict": "exit 0, no signal, PASS, matching valid result",
+      "cleanup": {
+        "clean": true,
+        "stillAlive": [],
+        "unattributed": []
+      },
       "headline": "PASS e10-modes: 18/18 checks",
       "exitCode": 0,
       "signal": null,
@@ -188,7 +238,7 @@
         "experiment": "e10-modes",
         "ok": true
       },
-      "seconds": 2.3,
+      "seconds": 2.1,
       "limitations": [
         "ACP and SDK paths were read in source only; M1 selects rpc-ui and does not need them, so no runtime comparison is claimed."
       ]
@@ -197,7 +247,12 @@
       "file": "e11-subagent-permissions.mjs",
       "passed": true,
       "verdict": "exit 0, no signal, PASS, matching valid result",
-      "headline": "PASS e11-subagent-permissions: 40/40 checks",
+      "cleanup": {
+        "clean": true,
+        "stillAlive": [],
+        "unattributed": []
+      },
+      "headline": "PASS e11-subagent-permissions: 42/42 checks",
       "exitCode": 0,
       "signal": null,
       "timedOut": false,
@@ -206,7 +261,7 @@
         "experiment": "e11-subagent-permissions",
         "ok": true
       },
-      "seconds": 52.9,
+      "seconds": 34,
       "limitations": [
         "The child-session policy (`M1_CHILD_POLICY`) and the out-of-band decision file are the experiment's model of a desktop-side policy; OMP itself provides no UI for subagent sessions, so an interactive subagent approval cannot be verified here.",
         "Only the `task` agent type is driven; other agent types and the M5 subagent UI are out of M1 scope."
@@ -216,7 +271,12 @@
       "file": "e12-harness-faults.mjs",
       "passed": true,
       "verdict": "exit 0, no signal, PASS, matching valid result",
-      "headline": "PASS e12-harness-faults: 40/40 checks",
+      "cleanup": {
+        "clean": true,
+        "stillAlive": [],
+        "unattributed": []
+      },
+      "headline": "PASS e12-harness-faults: 58/58 checks",
       "exitCode": 0,
       "signal": null,
       "timedOut": false,
@@ -225,13 +285,18 @@
         "experiment": "e12-harness-faults",
         "ok": true
       },
-      "seconds": 45.3,
+      "seconds": 74.8,
       "limitations": []
     },
     {
       "file": "e13-chunking.mjs",
       "passed": true,
       "verdict": "exit 0, no signal, PASS, matching valid result",
+      "cleanup": {
+        "clean": true,
+        "stillAlive": [],
+        "unattributed": []
+      },
       "headline": "PASS e13-chunking: 30/30 checks",
       "exitCode": 0,
       "signal": null,
@@ -241,7 +306,7 @@
         "experiment": "e13-chunking",
         "ok": true
       },
-      "seconds": 6.2,
+      "seconds": 6.1,
       "limitations": [
         "The decoder is a faithful port of the pinned implementation (same constants and rejection rules); the capture in fixture A and the reactions in fixture B are real, the corrupted sequences in C are synthetic.",
         "Chunking is verified for one deterministic real trigger (an oversized prompt whose echoed message frame exceeds 1 MiB); other large-frame producers are not enumerated in M1."

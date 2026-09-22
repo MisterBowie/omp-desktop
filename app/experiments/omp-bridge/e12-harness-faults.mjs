@@ -15,7 +15,7 @@
  *
  * Usage: node e12-harness-faults.mjs [--keep-artifacts]
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
@@ -69,12 +69,12 @@ async function startAgainst(execPath, args, { runRoot, readyTimeoutMs = 4_000 } 
 }
 
 /** Run the suite aggregator against a temp directory of stub experiments. */
-function runSuiteIn(dir, { timeoutMs = 8000 } = {}) {
+function runSuiteIn(dir, { timeoutMs = 8000, extraArgs = [], env = {} } = {}) {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [join(HERE, "run-all.mjs"), "--dir", dir], {
+    const child = spawn(process.execPath, [join(HERE, "run-all.mjs"), "--dir", dir, ...extraArgs], {
       cwd: HERE, stdio: ["ignore", "pipe", "pipe"],
       // The stalled stub must hit the timeout quickly in this regression.
-      env: { ...process.env, M1_EXPERIMENT_TIMEOUT_MS: String(timeoutMs) },
+      env: { ...process.env, M1_EXPERIMENT_TIMEOUT_MS: String(timeoutMs), ...env },
     });
     let out = "";
     child.stdout.on("data", (d) => { out += d.toString(); });
@@ -179,7 +179,8 @@ setInterval(() => {}, 1000);
   {
     const suiteDir = mkdtempSync(join(tmpdir(), "m1-f2-"));
     mkdirSync(join(suiteDir, "results"), { recursive: true });
-    const report = join(suiteDir, "runtime-report.json");
+    const report = join(suiteDir, "runtime-report-reclaimed.json");
+    const keptReport = join(suiteDir, "runtime-report-kept.json");
 
     // A stub that really uses OmpRpc.start, spawns a detached process with the
     // runtime's own environment (what an OMP tool does), then hangs until the
@@ -191,7 +192,8 @@ import { join } from "node:path";
 const BASE = ${JSON.stringify(HERE)};
 const { OmpRpc } = await import(join(BASE, "lib/rpc.mjs"));
 const { writeModelsConfig } = await import(join(BASE, "lib/models-config.mjs"));
-const runRoot = ${JSON.stringify(join(suiteDir, "run"))};
+const { makeScratch } = await import(join(BASE, "lib/base.mjs"));
+const runRoot = process.env.F2_RUN_ROOT_OVERRIDE || makeScratch("review-timeout");
 mkdirSync(join(runRoot, "agent"), { recursive: true });
 mkdirSync(join(runRoot, "dev-cwd"), { recursive: true });
 const selector = writeModelsConfig(join(runRoot, "agent"), { baseUrl: "http://127.0.0.1:9" });
@@ -200,7 +202,7 @@ const rpc = await OmpRpc.start({ runRoot, mode: "rpc-ui", args: ["--model", sele
 const envText = readFileSync("/proc/" + rpc.pid + "/environ", "utf8");
 const env = Object.fromEntries(envText.split("\\0").filter(Boolean).map((kv) => { const i = kv.indexOf("="); return [kv.slice(0, i), kv.slice(i + 1)]; }));
 const descendant = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000);"], { stdio: "ignore", detached: true, env });
-writeFileSync(${JSON.stringify(report)}, JSON.stringify({ runtimePid: rpc.pid, descendantPid: descendant.pid, home: rpc.home, configRoot: rpc.configRoot, runRoot }));
+writeFileSync(process.env.F2_REPORT || ${JSON.stringify(report)}, JSON.stringify({ runtimePid: rpc.pid, descendantPid: descendant.pid, home: rpc.home, configRoot: rpc.configRoot, runRoot }));
 console.log("PASS e96-leaky: 1/1 checks");
 setInterval(() => {}, 1000);
 `, { mode: 0o755 });
@@ -214,7 +216,9 @@ setInterval(() => {}, 1000);
       env: { ...process.env, PI_CONFIG_DIR: ".omp-decoy-not-ours", PI_CODING_AGENT_DIR: join(suiteDir, "decoy-agent") },
     });
 
-    const suite = await runSuiteIn(suiteDir, { timeoutMs: 30_000 });
+    const suite = await runSuiteIn(suiteDir, { timeoutMs: 30_000, env: { F2_REPORT: report } });
+    // R3: with --keep-artifacts the scratch root must be preserved.
+    const keepSuite = await runSuiteIn(suiteDir, { timeoutMs: 30_000, extraArgs: ["--keep-artifacts"], env: { F2_REPORT: keptReport } });
     ctx.check("F2: the leaking experiment is rejected on timeout", /e96-leaky.*REJECTED.*timed out/.test(suite.out), suite.out.split("\n").find((l) => l.includes("e96")));
 
     if (!existsSync(report)) {
@@ -238,11 +242,31 @@ setInterval(() => {}, 1000);
       ctx.check("F2: the reaper did not touch this test process", isAlive(process.pid));
       ctx.check("F2: the reaper did not touch a decoy outside this run", isAlive(decoy.pid), `decoy ${decoy.pid}`);
       killQuietly(decoy.pid, "SIGKILL");
+      // R3: the killed experiment's whole scratch root must be reclaimed, not
+      // just HOME/config. The stub allocates its root under .dev-data/m1, like a
+      // real experiment, so this exercises the ownership-scoped removal.
+      ctx.check("R3: the killed experiment's scratch run root is reclaimed",
+        !existsSync(info.runRoot), info.runRoot);
+      ctx.check("R3: the killed experiment's agent data is reclaimed",
+        !existsSync(join(info.runRoot, "agent")), join(info.runRoot, "agent"));
+      ctx.check("R3: the suite reports the cleanup as clean",
+        suite.out.includes("experiments: 0/1 passed") && !/cleanup:.*stillAlive":\[[^\]]/.test(suite.out),
+        suite.out.split("\n").filter((l) => l.includes("cleanup")).slice(0, 2));
+      // The kept run must survive, the reclaimed run must not.
+      const keptInfo = existsSync(keptReport) ? JSON.parse(readFileSync(keptReport, "utf8")) : null;
+      ctx.check("R3: --keep-artifacts preserves that run's scratch root",
+        keepSuite.code !== 0 && Boolean(keptInfo) && existsSync(keptInfo.runRoot),
+        { keepExit: keepSuite.code, keptRunRoot: keptInfo?.runRoot ?? null, exists: keptInfo ? existsSync(keptInfo.runRoot) : null });
+      ctx.check("R3: the reclaimed and kept runs used different roots",
+        Boolean(keptInfo) && keptInfo.runRoot !== info.runRoot, { reclaimed: info.runRoot, kept: keptInfo?.runRoot ?? null });
+      if (keptInfo?.runRoot) rmSync(keptInfo.runRoot, { recursive: true, force: true });
       writeFixture("e12-runtime-reaping.json", {
         note: "SYNTHETIC fault sample: a stub experiment starts a real OmpRpc runtime plus a detached tool-like process, then is killed by the suite timeout",
         runtimeGone, descendantGone,
         homeRemoved: !existsSync(info.home),
         configRootRemoved: !existsSync(info.configRoot),
+        runRootRemoved: !existsSync(info.runRoot),
+        agentDataRemoved: !existsSync(join(info.runRoot, "agent")),
         suiteExitCode: suite.code,
       });
     }
@@ -305,6 +329,166 @@ setInterval(() => {}, 1000);
       requestAfterFault: { success: afterFault.success, error: afterFault.error ?? null },
       finding: "The pinned decoder has no resynchronisation: after one chunk fault every later frame is rejected, and OMP's own client treats a decoder throw as fatal (rpc-client.ts has no try/catch around frameDecoder.push). A desktop must restart the runtime on a chunk fault.",
       note: "SYNTHETIC fault sample: a corrupted chunk sequence, then a well-formed one, then a normal frame",
+    });
+    rmSync(runRoot, { recursive: true, force: true });
+  }
+
+  // ==========================================================================
+  // R2 — a same-group descendant that survives SIGTERM and carries no
+  // attribution env must still be reclaimed after its group leader exits
+  //
+  // PI-Desktop reference (source fact): apps/desktop/electron/main/npm-executable.ts
+  // sends SIGKILL to the remaining process group on settle, precisely because
+  // "the leader may exit on SIGTERM while a descendant with ignored stdio
+  // survives"; its test `timeout kills resistant descendants after their group
+  // leader exits with ignored stdio` covers the same shape.
+  // ==========================================================================
+  {
+    const { makeScratch } = await import("./lib/base.mjs");
+    const { reapRunResources: reap, listRuntimes: list } = await import("./lib/runtime-registry.mjs");
+    const dataRoot = join(HERE, "..", "..", "..", ".dev-data", "m1");
+    const runId = `r2-${Date.now().toString(36)}`;
+    const runRoot = makeScratch("review-r2");
+    mkdirSync(join(runRoot, "agent"), { recursive: true });
+    mkdirSync(join(runRoot, "dev-cwd"), { recursive: true });
+    const { writeModelsConfig } = await import("./lib/models-config.mjs");
+    writeModelsConfig(join(runRoot, "agent"), { baseUrl: "http://127.0.0.1:9" });
+
+    const report = join(runRoot, "r2-report.json");
+    const leader = join(runRoot, "leader.mjs");
+    // The survivor ignores SIGTERM, stays in the leader's group, and drops the
+    // PI_* attribution env so the environment sweep cannot mask a group bug.
+    writeFileSync(leader, `#!/usr/bin/env node
+import { spawn } from "node:child_process";
+import { writeFileSync } from "node:fs";
+const survivor = "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);";
+const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("PI_") && k !== "M1_RUN_ID" && k !== "OMP_DEV_LAUNCH_DIR"));
+const child = spawn(process.execPath, ["-e", survivor], { stdio: "ignore", env });
+writeFileSync(${JSON.stringify(report)}, JSON.stringify({ leaderPid: process.pid, survivorPid: child.pid, runRoot: process.env.R2_RUN_ROOT }));
+process.stdout.write(JSON.stringify({ type: "ready", protocolVersion: 2, supportedProtocolVersions: [1, 2], maxFrameBytes: 1048576, maxReassembledFrameBytes: 67108864 }) + "\\n");
+setTimeout(() => process.exit(0), 300);
+`, { mode: 0o755 });
+
+    process.env.M1_RUN_ID = runId;
+    process.env.R2_RUN_ROOT = runRoot;
+    const client = await OmpRpc.start({ repoRoot, runRoot, mode: "rpc-ui", args: [], cwd: runRoot, readyTimeoutMs: 8_000, launcher: leader });
+    const leaderPid = client.pid;
+    await sleep(700);
+    const info = existsSync(report) ? JSON.parse(readFileSync(report, "utf8")) : null;
+
+    ctx.check("R2: the leader exited while its same-group descendant stayed alive",
+      Boolean(info) && !isAlive(leaderPid) && isAlive(info.survivorPid),
+      { leader: leaderPid, leaderAlive: isAlive(leaderPid), survivor: info?.survivorPid, survivorAlive: info ? isAlive(info.survivorPid) : null });
+    ctx.check("R2: the survivor carries no PI attribution env (group handling alone must reclaim it)",
+      Boolean(info) && !existsSync(`/proc/${info.survivorPid}/environ`) === false &&
+      !readFileSync(`/proc/${info.survivorPid}/environ`, "utf8").split("\0").some((kv) => kv.startsWith("PI_CODING_AGENT_DIR=") || kv.startsWith("PI_CONFIG_DIR=")),
+      { survivor: info?.survivorPid });
+
+    const reaped = await reap({ dataRoot, runId, ownerPids: [process.pid] });
+    let survivorGone = false;
+    for (let i = 0; i < 40 && !survivorGone; i++) { survivorGone = !isAlive(info?.survivorPid); await sleep(100); }
+    ctx.check("R2: the survivor is reclaimed even though its leader had already exited", survivorGone, `survivor ${info?.survivorPid}`);
+    ctx.check("R2: the group is gone after reaping", !(() => { try { process.kill(-leaderPid, 0); return true; } catch { return false; } })());
+    ctx.check("R2: the reaper reports no survivors", reaped.stillAlive.length === 0 && reaped.clean === true, reaped);
+    ctx.check("R2: the registration is dropped only after the group is gone", list(dataRoot, { runId }).length === 0);
+    ctx.check("R2: the reclaimed run root is removed", !existsSync(runRoot), runRoot);
+
+    // Boundary: a tool that left the group AND dropped attribution cannot be
+    // attributed at all. Recorded as a limitation rather than claimed as covered.
+    const detachedRunRoot = makeScratch("review-r2-detached");
+    const orphanReport = join(detachedRunRoot, "orphan.json");
+    const orphanMaker = join(detachedRunRoot, "maker.mjs");
+    writeFileSync(orphanMaker, `#!/usr/bin/env node
+import { spawn } from "node:child_process";
+import { writeFileSync } from "node:fs";
+const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("PI_") && k !== "M1_RUN_ID"));
+const child = spawn(process.execPath, ["-e", "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);"], { stdio: "ignore", detached: true, env });
+writeFileSync(${JSON.stringify(orphanReport)}, JSON.stringify({ orphanPid: child.pid, runRoot: ${JSON.stringify(detachedRunRoot)} }));
+process.stdout.write(JSON.stringify({ type: "ready", protocolVersion: 2, supportedProtocolVersions: [1, 2], maxFrameBytes: 1048576, maxReassembledFrameBytes: 67108864 }) + "\\n");
+setTimeout(() => process.exit(0), 300);
+`, { mode: 0o755 });
+    process.env.R2_RUN_ROOT = detachedRunRoot;
+    const orphanClient = await OmpRpc.start({ repoRoot, runRoot: detachedRunRoot, mode: "rpc-ui", args: [], cwd: detachedRunRoot, readyTimeoutMs: 8_000, launcher: orphanMaker });
+    await sleep(800);
+    const orphanInfo = existsSync(orphanReport) ? JSON.parse(readFileSync(orphanReport, "utf8")) : null;
+    const orphanReap = await reap({ dataRoot, runId, ownerPids: [process.pid] });
+    ctx.check("R2: a tool that left the group and dropped attribution is NOT claimed as reclaimed",
+      Boolean(orphanInfo) && isAlive(orphanInfo.orphanPid),
+      { orphan: orphanInfo?.orphanPid, note: "documented limitation: only its own group or its own isolation env can attribute a process" });
+    ctx.note("R2-detachedOrphan", { pid: orphanInfo?.orphanPid ?? null, stillAlive: orphanInfo ? isAlive(orphanInfo.orphanPid) : null, reapClean: orphanReap.clean });
+    if (orphanInfo?.orphanPid) {
+      try { process.kill(-orphanInfo.orphanPid, "SIGKILL"); } catch { killQuietly(orphanInfo.orphanPid, "SIGKILL"); }
+    }
+    await orphanClient.stop();
+    rmSync(detachedRunRoot, { recursive: true, force: true });
+    rmSync(runRoot, { recursive: true, force: true });
+  }
+
+  // ==========================================================================
+  // R4 — a stream fault while a request is in flight must be reported as the
+  // real error, not as a timeout
+  // ==========================================================================
+  {
+    const runRoot = mkdtempSync(join(tmpdir(), "m1-r4-"));
+    const stubDir = join(runRoot, "stubs");
+    mkdirSync(stubDir, { recursive: true });
+    const stub = join(stubDir, "faulty.mjs");
+    // Ready first; the corruption is sent only after the client asks for
+    // something, so the request is waiting when the stream breaks.
+    writeFileSync(stub, `#!/usr/bin/env node
+const payload = Buffer.from(JSON.stringify({ type: "notice", text: "x" }), "utf8");
+const chunk = (index, count, byteLength, data, chunkId) => JSON.stringify({ type: "rpc_chunk", chunkId, index, count, byteLength, data });
+process.stdout.write(JSON.stringify({ type: "ready", protocolVersion: 2, supportedProtocolVersions: [1, 2], maxFrameBytes: 1048576, maxReassembledFrameBytes: 67108864 }) + "\\n");
+let buf = "";
+process.stdin.on("data", (d) => {
+  buf += d.toString();
+  let i;
+  while ((i = buf.indexOf("\\n")) !== -1) {
+    const line = buf.slice(0, i).trim();
+    buf = buf.slice(i + 1);
+    if (!line) continue;
+    // Out-of-order chunks: index 1 before index 0.
+    process.stdout.write(chunk(1, 2, 1100000, payload.subarray(3).toString("base64"), "seq-x") + "\\n");
+    process.stdout.write(chunk(0, 2, 1100000, payload.subarray(0, 3).toString("base64"), "seq-x") + "\\n");
+  }
+});
+setInterval(() => {}, 1000);
+`, { mode: 0o755 });
+
+    const client = await OmpRpc.start({
+      repoRoot, runRoot, mode: "rpc-ui", args: [], cwd: runRoot,
+      readyTimeoutMs: 8_000, launcher: stub,
+    });
+    const started = Date.now();
+    const res = await client.request({ type: "get_state" }, { timeoutMs: 2_000 });
+    const elapsed = Date.now() - started;
+    ctx.check("R4: a request waiting when the stream faults does not report a timeout",
+      res.errorKind === "transport" && /chunk decode failed/.test(res.error ?? ""),
+      { errorKind: res.errorKind, error: res.error, elapsed });
+    ctx.check("R4: the failure is reported promptly, not after the timeout elapsed",
+      elapsed < 2_000, `${elapsed} ms (timeout was 2000 ms)`);
+    ctx.check("R4: a genuine timeout keeps its own classification", await (async () => {
+      // A stub that never answers keeps the request unanswered → must be "timeout".
+      const silent = join(stubDir, "silent.mjs");
+      writeFileSync(silent, `#!/usr/bin/env node
+process.stdout.write(JSON.stringify({ type: "ready", protocolVersion: 2, supportedProtocolVersions: [1, 2], maxFrameBytes: 1048576, maxReassembledFrameBytes: 67108864 }) + "\\n");
+process.stdin.resume();
+setInterval(() => {}, 1000);
+`, { mode: 0o755 });
+      const quietRoot = join(runRoot, "quiet");
+      mkdirSync(quietRoot, { recursive: true });
+      const quiet = await OmpRpc.start({ repoRoot, runRoot: quietRoot, mode: "rpc-ui", args: [], cwd: quietRoot, readyTimeoutMs: 8_000, launcher: silent });
+      const timed = await quiet.request({ type: "get_state" }, { timeoutMs: 400 });
+      const ok = timed.errorKind === "timeout" && /timeout after 400 ms/.test(timed.error ?? "");
+      await quiet.stop();
+      return ok;
+    })(), "expected errorKind=timeout for an unanswered request");
+    ctx.check("R4: the faulted client still stops cleanly", (await client.stop()) === true);
+    ctx.check("R4: the faulted client left no isolated home behind", !existsSync(join(runRoot, "home")));
+    writeFixture("e12-stream-error-vs-timeout.json", {
+      note: "SYNTHETIC fault sample: a stub corrupts the chunk stream only after a request is in flight",
+      waitingRequestError: { errorKind: res.errorKind, error: res.error, elapsedMs: elapsed },
+      timeoutMs: 2000,
     });
     rmSync(runRoot, { recursive: true, force: true });
   }

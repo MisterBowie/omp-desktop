@@ -87,6 +87,8 @@ function run(file) {
         dataRoot: EXPERIMENT_DATA_ROOT,
         runId: RUN_ID,
         ownerPids: [child.pid],
+        // Keep the scratch roots only when the caller asked for artifacts.
+        keepArtifacts: keep,
       }).catch((error) => ({ error: String(error?.message ?? error) }));
       const verdict = timedOut
         ? { ok: false, reason: `timed out after ${PER_EXPERIMENT_TIMEOUT_MS} ms` }
@@ -114,6 +116,9 @@ for (const file of targets) {
   const row = await run(file);
   rows.push(row);
   console.log(row.verdict.ok ? (row.headline ?? "PASS") : `REJECTED (${row.verdict.reason})${row.headline ? ` — reported: ${row.headline}` : ""}`);
+  if (row.reaped && (row.reaped.stillAlive?.length || row.reaped.unattributed?.length || row.reaped.error)) {
+    console.log(`    cleanup: ${JSON.stringify(row.reaped)}`);
+  }
   if (!row.verdict.ok && row.stderrTail) console.log(`    ${row.stderrTail.replace(/\n/g, "\n    ")}`);
 }
 
@@ -128,6 +133,7 @@ const summary = {
     // agree, not just the printed headline.
     passed: r.verdict.ok,
     verdict: r.verdict.reason,
+    cleanup: r.reaped ? { clean: r.reaped.clean ?? null, stillAlive: r.reaped.stillAlive ?? [], unattributed: r.reaped.unattributed ?? [] } : null,
     headline: r.headline,
     exitCode: r.exitCode,
     signal: r.signal ?? null,

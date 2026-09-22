@@ -1,20 +1,17 @@
 {
-  "note": "real capture, sanitized; the child's approval was deferred to an out-of-band channel that never answered, then the parent was stopped",
-  "markers": [
-    "tool-call-audit",
-    "tool-call-audit",
-    "gate",
-    "gate-pending",
-    "gate-decision"
-  ],
-  "pendingSeen": true,
-  "sideEffectCreated": false,
-  "abortMs": 25,
-  "deferResolution": {
+  "note": "real capture, sanitized; the child's approval was pending when the parent was stopped, and a late allow was published afterwards",
+  "capability": "bridge-provided cancellation (the cancel marker is the experiment's), not an OMP feature",
+  "ompNativeCancelObserved": false,
+  "subagentsStillRunningAfterParentStop": 1,
+  "pendingToolCallId": "call_fake_19_0",
+  "decision": {
     "event": "gate-decision",
     "decision": "deny",
-    "route": "child-defer",
-    "outcome": "timeout",
-    "at": 1790019263989
-  }
+    "route": "child-cancelled",
+    "cancelled": true,
+    "toolCallId": "call_fake_19_0",
+    "at": 1790101041673
+  },
+  "lateAllowExecuted": false,
+  "abortMs": 25
 }
