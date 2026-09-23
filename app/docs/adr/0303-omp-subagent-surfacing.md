@@ -1,7 +1,7 @@
 # ADR 0303: OMP subagent surfacing, attribution and the stop boundary
 
-- Status: Proposed (pending M5/T17 independent acceptance — B1 revised, C1 implemented, B2/B3 open; T17 unaccepted)
-- Date: 2026-09-23 (revised 2026-09-24 for the B1/C1 stop-boundary and runtime-replacement fixes)
+- Status: Proposed (pending M5/T17 independent acceptance — B1 revised, C1 implemented, B2/B3 implemented; T17 unaccepted)
+- Date: 2026-09-23 (revised 2026-09-24 for the B1/C1 stop-boundary and runtime-replacement fixes, and again for the B3 whole-row UTF-8 budget)
 - Scope: M5/T17. Amends 0301 (conversation surface) by wiring the subagent
   frame families into the existing Pi delegation renderer, and 0302 (per-session
   registry) by adding a per-child registry inside each session's runner.
@@ -202,10 +202,20 @@ prompt still proceeds (only this child-surface feature is unavailable), but
   projection and never persists into the main transcript.
 - Malformed or ownership-ambiguous frames are counted, never attributed to the
   parent or a newer generation.
-- The durable transcript read projects each tool result through a bounded,
-  structured envelope (`{ content, details }`, each part capped at the 4 MiB
-  content limit, images and provider-only parts dropped); a raw unbounded
-  `content` never crosses the bridge into the renderer.
+- The durable transcript read projects every row through a single shared
+  serialized-UTF-8 budget (4 MiB) that covers all payload-bearing fields of one
+  durable `UiMessage` — `content`, `thinking` and the `toolResult` envelope
+  (`{ content, details }`). The fixed envelope (id, role, timestamps, tool
+  identity, status) is measured first and subtracted, so the whole serialized
+  row is bounded to 4 MiB with no separate allowance. Byte accounting follows
+  `JSON.stringify`: string keys and content are charged in their escaped UTF-8
+  form (quotes, backslashes, C0 controls, multibyte code points), and scalars,
+  separators and container syntax are all charged. Truncation walks code points
+  and appends `…`, so a surrogate pair is never split. Text-only results keep
+  their text in the row's `content` (with `toolResult` empty), structured
+  results keep it in the envelope's text blocks for the Pi delegation-report
+  and lifecycle-summary paths, so the same text is never serialized twice; a
+  raw unbounded `content` never crosses the bridge into the renderer.
 - Child detail requires `--model` (the explicit projected binding); a build that
   omits it would show topology/progress but no child transcript, which is exactly
   the gap the projection now closes.

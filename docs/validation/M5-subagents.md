@@ -1,6 +1,6 @@
 # M5 验证记录：OMP 子代理面板与编排归属（T17）
 
-状态：**未验收**（T17）。第三轮独立复审拆出 B1-B3 三项返修；B1 于 `9d0acde` 首实现后独立复审仍复现两项缺陷（F1 目录债二次 stop 丢失、F2 停期间短暂放行 prompt），本提交修复并追加行为回归，**B1 改定待独立验收**；第四轮独立复审拆出 C1（回收成功后的运行时替换/原生会话恢复，见 §0.5），C1 基本续聊已修复，但独立复审进一步复现三项残余缺陷（R1 替换后回复覆盖、R2 停止未完成即替换且跳过恢复、R3 启动/恢复中停止被忽略），由跟进提交 `0092572` 修复并追加行为回归（见 §0.6），第五轮独立复审已在 `0092572` 上独立确认 R1/R2/R3 修复（88 runtime + 63 desktop 定向用例通过）；**第五轮进一步复现两项生命周期门残留（D1 dispose 期间可启动孤儿替换、D2 启动/恢复停止期间新 prompt 逃逸 epoch，见 §0.7），由本提交修复并追加行为回归，`24d7270` D1/D2 定向探针已独立通过；第六轮复现两项残留（E1 既有会话绕过整桥关闭、E2 模型切换复用 live 消息/turn id，见 §0.8），本提交修复并追加行为回归，E1/E2 待独立验收**；**B2（renderer 单飞/错误可见，见 §0.9）已实现并追加行为回归，独立复审确认其夹具与初始行为通过，但仍复现运行恢复续读缺陷，由本提交修复并追加回归（见 §0.10），B2 follow-up 待独立验收**；**B3（总 UTF-8 预算）仍未解决，T17 不验收**。M5 后续任务 T18-T20 未开始。
+状态：**未验收**（T17）。第三轮独立复审拆出 B1-B3 三项返修；B1 于 `9d0acde` 首实现后独立复审仍复现两项缺陷（F1 目录债二次 stop 丢失、F2 停期间短暂放行 prompt），本提交修复并追加行为回归，**B1 改定待独立验收**；第四轮独立复审拆出 C1（回收成功后的运行时替换/原生会话恢复，见 §0.5），C1 基本续聊已修复，但独立复审进一步复现三项残余缺陷（R1 替换后回复覆盖、R2 停止未完成即替换且跳过恢复、R3 启动/恢复中停止被忽略），由跟进提交 `0092572` 修复并追加行为回归（见 §0.6），第五轮独立复审已在 `0092572` 上独立确认 R1/R2/R3 修复（88 runtime + 63 desktop 定向用例通过）；**第五轮进一步复现两项生命周期门残留（D1 dispose 期间可启动孤儿替换、D2 启动/恢复停止期间新 prompt 逃逸 epoch，见 §0.7），由本提交修复并追加行为回归，`24d7270` D1/D2 定向探针已独立通过；第六轮复现两项残留（E1 既有会话绕过整桥关闭、E2 模型切换复用 live 消息/turn id，见 §0.8），本提交修复并追加行为回归，E1/E2 待独立验收**；**B2（renderer 单飞/错误可见，见 §0.9）已实现并追加行为回归，独立复审确认其夹具与初始行为通过，但仍复现运行恢复续读缺陷，由本提交修复并追加回归（见 §0.10），B2 follow-up 待独立验收**；**B3（总 UTF-8 预算）已实现并追加回归（§0.11），待独立验收；T17 不验收**。M5 后续任务 T18-T20 未开始。
 基线提交：`d26444407fc963c2e7efd51bda7d1bd4a70e8bbd`；第二轮独立复审返修（S1-S4）以追加普通提交落在该基线上（见 `git log` 最新提交）。
 固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未修改）。
 工作树：`/home/vv/person/code/omp-desktop-m5-t17`，分支 `codex/m5-subagents`。
@@ -155,6 +155,27 @@
 
 状态：**B2 follow-up 已实现、待独立验收**；B3（总 UTF-8 预算）、平台、最终 T17 验收仍待。
 
+## 0.11 第三轮复审返修（B3，2026-09-24）：总 UTF-8 预算
+
+独立复审在 B1/F1/F2、C1、D1/D2、E1/E2、B2 已修复的基线上复现「工具行序列化尺寸」缺陷：`events.ts` 给 `content`、复制的 envelope 文本与 `details` 各 4 MiB 上限，且按 UTF-16 `.length` 计数、`boundValue` 不计 key/数字/布尔/null/容器语法与 JSON 转义。整行序列化尺寸独立实测（pre-B1 基线）：5 MiB ASCII 字符串 4,194,514 字节；5 MiB 文本块 + 5 MiB details 12,583,183 字节；Emoji 输入 8,388,818 字节。扩大后的复审探针 `/tmp/m5-row-budget-review.mjs`（`OMP_REVIEW_APP` 指定 app 路径）进一步复现：转义控制符 7,000,210、对象键 5,338,051、标量数组 5,100,271、assistant 文本+thinking 8,388,744，且「前导 ASCII + emoji」在代理对中间被切断（`wellFormed=false`）；探针断言全部结果、基线退出 1。
+
+参考顺序（先 PI 后 OMP，借规则而非照搬全局架构）：
+- 固定 PI `apps/desktop/src/lib/tool-presentation.ts:152/171/180` `toolResultPayload`/`delegateReport`/`envelopeTextOf`：空 toolResult 读 `row.content`、结构化结果读 `details`、delegation 报告与 lifecycle 摘要读 envelope 文本块——envelope 文本不能整块丢弃。
+- 固定 PI `packages/agent-runtime/src/custom-system-prompt.ts` `limitUtf8` + `custom-system-prompt.test.ts`（multibyte 边界）：按码点累计 UTF-8 字节、在码点边界切（`end += char.length`），提供 Unicode 安全字节截断语义，**不是**完整序列化 JSON 预算算法。
+- 固定 OMP `packages/coding-agent/src/modes/rpc/rpc-subagents.ts` `readRpcSubagentTranscript`：durable entries（`{id,parentId,timestamp,message}`）、物理字节游标 `nextByte = startByte + byteLength(completeText,"utf8")`、未完成末行回退、`startByte > size` 时 reset。
+- 固定 OMP `packages/ai/src/types.ts` `ToolResultMessage`（`{role,toolCallId,toolName,content:blocks[],details?,isError,timestamp}`）+ `packages/agent/src/agent-loop.ts` durable tool-result 构造。
+- 上游 `subagent-output-limit` 测试关乎**模型 token 上限**，不作为桥字节预算证据。
+
+修复（`app/packages/omp-runtime/src/session/events.ts`，未改固定上游）：单一共享序列化 UTF-8 预算 `ROW_BUDGET_BYTES = 4 MiB` 覆盖一行 durable UiMessage 的所有载荷字段（`content`/`thinking`/`toolResult`）。先以「空占位骨架」量出固定 envelope（id/role/时间戳/工具身份/状态 + 各载荷键与结构语法）并扣除，剩余全部分给载荷；字符串按 `JSON.stringify` 的**转义后** UTF-8 字节计费（`"`/`\`→2、五种具名控制→2、其余 C0→`\u00XX` 6、孤立代理对→6、其余按码点 UTF-8 宽度），`boundValue` 递归计费 key/引号/冒号/逗号/括号/数字/布尔/null；截断按码点行走（绝不切代理对）并追加 `…`。text-only 结果只投影 `content`（`toolResult=""`，渲染器读 `content` 字段）；结构化结果 `content=""`、文本与 `details` 共享同一预算放进 envelope——去掉重复镜像，delegation report/lifecycle summary 所需 envelope 文本块保留。工具行与 assistant 行（含字符串/数组 content、thinking）经同一 `toToolRow`/`toUiMessage` 走同一预算。整行 `Buffer.byteLength(JSON.stringify(row),"utf8")` 恒 ≤ 4 MiB（固定 envelope 已先扣除，无需额外 allowance）。
+
+新增回归（先红后绿）：
+- `packages/omp-runtime/src/session/events.test.ts` durable entry 段重写 + 8 新例：大 ASCII、多文本块、大 content+大 details 共享、CJK/emoji、前导 ASCII 不切代理对、转义引号/反斜杠/控制符、对象键、标量数组、字符串 form assistant、content+thinking 共享、小载荷结构不变、跨重读与 reset 稳定 entry id；全部断言整行序列化 UTF-8 字节 ≤ 4 MiB。
+- `apps/desktop/test/omp-subagent-presentation.test.mjs`（新，6 例）：真实 `OmpEventConverter.convertEntry` 投影正常 read/bash/unknown/Task/TaskWait 结果，跑真实 PI `toolResultPayload`/`buildToolPresentation`/`hasToolDetails`/`runOutcome`，断言结构化 details 解开、text-only 走 content、delegation report 保留在 envelope 文本块、lifecycle roster 读 `details.delegations`、unknown 退化为字段。
+
+验证（`app/`，Node v24.14.0，pnpm 10.34.5）：`pnpm --filter @pi-desktop/omp-runtime test` **239 passed / 0 failed**（+12 B3 回归，含真实固定 runtime 烟测）；`node --test test/omp-subagent-presentation.test.mjs` **6 passed**；复审探针退出 0，实测尺寸（字节，均 ≤ 4,194,304）：contentAndDetails 4,194,304、emoji 4,194,301、surrogateBoundary 4,194,302（`wellFormed=true`）、escapedControls 4,194,303、objectKeys 4,194,221、scalarArray 4,194,301、assistantString 4,194,304、assistantTextAndThinking 4,194,304；定向 desktop 回归 `omp-subagent-read` 5、`omp-subagent-bridge` 8、`subagent-reload-projection`、`omp-subagent-panel-mounted` 12、`omp-subagent-panel-render` 2、`tool-presentation` 30 全绿；`pnpm --filter @pi-desktop/omp-runtime typecheck` 与 `pnpm --filter @pi-desktop/desktop typecheck` 退出 0；`git diff --check` 无输出。
+
+状态：**B3 已实现、待独立验收**；平台、最终 T17 验收仍待。
+
 ## 0. 环境准备（固定子模块流程，与本轮代码无关）
 
 | 步骤 | 命令 | 结果 |
@@ -246,7 +267,7 @@
 ## 7. 关键限制与边界
 
 - **`subagent_event` 需要 `--model`**：固定 OMP 仅在显式 `--model provider/model` 时转发子代理事件流；仅靠 `models.yml` 发现则子代理有 lifecycle/progress 但无 event（详情/转录不流）。M4 投影已钉住单一 provider/model，故 `omp-session-wiring.ts` 现同时传 `--model` 与投影。这是本轮发现的真实上游行为，已用 E2E 前后对照复现。
-- **转录读取的上游 EOF 行为 vs 桌面输出上界**：固定 OMP `readRpcSubagentTranscript` 是 `file.slice(fromByte).text()` 读到 EOF（子运行时内无法阻止）；桌面桥因此对返回结果加显式上界——`SUBAGENT_MAX_ENTRIES`/`SUBAGENT_MAX_MESSAGES`（各 10000）超限即 typed 拒绝、`nextByte < fromByte` 拒绝、内容按 4 MiB 截断——任何无界结果都不会越过桥到渲染器或被保留。截断不静默跳过消息（超限整体拒绝，游标不推进）。`toolResult` 同样经结构化有界投影（`{ content, details }` 各 4 MiB，图片/仅 provider 部件丢弃，text-only 结果投影为空串），不复制镜像。
+- **转录读取的上游 EOF 行为 vs 桌面输出上界**：固定 OMP `readRpcSubagentTranscript` 是 `file.slice(fromByte).text()` 读到 EOF（子运行时内无法阻止）；桌面桥因此对返回结果加显式上界——`SUBAGENT_MAX_ENTRIES`/`SUBAGENT_MAX_MESSAGES`（各 10000）超限即 typed 拒绝、`nextByte < fromByte` 拒绝——任何无界结果都不会越过桥到渲染器或被保留。截断不静默跳过消息（超限整体拒绝，游标不推进）。单行/单工具结果的尺寸由 B3 的**单一共享序列化 UTF-8 预算**约束（§0.11）：一行 durable UiMessage 的所有载荷字段（`content`/`thinking`/`toolResult`）合计 ≤ 4 MiB，固定 envelope 先扣除，字符串按 JSON 转义后 UTF-8 字节计费、按码点截断并加 `…`，图片/仅 provider 部件丢弃，text-only 结果投影为空串（渲染器读 `content`），结构化结果的文本与 `details` 共享预算且不复制镜像。
 - **详情读取的增量累积与 reset**：`get_subagent_messages` 按 `fromByte` 返回增量。渲染器按稳定 entry id 合并去重并保留旧行、reset 响应替换集合、空增量不清屏、所有成功响应把游标前进到 `nextByte`（含 reset）；poll 完成后再调度（单飞）。上游每次读仍到 EOF，桌面靠游标增量读取。
 - **父 stop 的漏 lifecycle 情形**：父 stop 收敛后**始终**查 `get_subagents`（不依赖本地 registry 是否已有 running child），以覆盖订阅不可用/帧丢失/UI 从未打开 list 的场景；RPC 拒绝/畸形时保守 teardown 且记录原因，不谎报已确认无 child。teardown 未确认 `reaped` 时保留 registry/task-call 所有权（可重试），确认后才清。
 - **missing parent 的 tracker 策略**：lifecycle/progress/snapshot 每一族都必须带非空 parent、与 existing child 的 owner 一致、且命中已观察 `task` call；wire schema 保持真实 optional，tracker fail-closed——missing/unknown/conflicting 均自增 `unknownParentCalls`，不改变 child、不 settlement、不重归属。

@@ -132,7 +132,17 @@ type StreamingMessage = {
   toolCallId?: string;
 };
 
-const ASSISTANT_TEXT_LIMIT = 4 * 1024 * 1024;
+/**
+ * One durable UiMessage's serialized payload fits within this UTF-8 byte
+ * budget. `content`, `thinking` and `toolResult` share a single budget; the
+ * fixed envelope (id, role, timestamps, tool identity, status) is measured
+ * separately and subtracted first, so the whole serialized row stays at or
+ * below this bound (see `newRowBudget`).
+ */
+const ROW_BUDGET_BYTES = 4 * 1024 * 1024;
+/** Truncation marker appended to visibly truncated text (the codebase's `…` convention). */
+const TRUNCATION_SUFFIX = "\u2026";
+const TRUNCATION_SUFFIX_BYTES = 3;
 
 export class OmpEventConverter {
   private readonly sessionId: string;
@@ -210,35 +220,50 @@ export class OmpEventConverter {
 
   /** Map a `toolResult` message into a tool row the renderer already presents. */
   private toToolRow(id: string, message: OmpMessage): UiMessage {
-    const content = this.contentText(message.content);
-    return {
+    const createdAt = new Date(
+      typeof message.timestamp === "number" ? message.timestamp : this.now(),
+    ).toISOString();
+    const fixed = {
       id,
-      role: "tool",
-      content,
-      createdAt: new Date(
-        typeof message.timestamp === "number" ? message.timestamp : this.now(),
-      ).toISOString(),
+      role: "tool" as const,
+      createdAt,
       ...(message.toolCallId ? { toolCallId: message.toolCallId } : {}),
       toolName: message.toolName ?? "unknown",
-      toolStatus: message.isError === true ? "error" : "success",
-      toolResult: boundedToolResult(message),
+      toolStatus: (message.isError === true ? "error" : "success") as "error" | "success",
       ...(this.parentToolCallId ? { parentToolCallId: this.parentToolCallId } : {}),
       ...(this.agentName ? { agentName: this.agentName } : {}),
       isError: message.isError === true,
-      status: "complete",
+      status: "complete" as const,
     };
+    // Both payload keys are always present, so the envelope is measured with
+    // empty placeholders and each payload charges only its bytes above them.
+    const budget = newRowBudget({ ...fixed, content: "", toolResult: "" });
+    if (message.details === undefined) {
+      // A text-only result: the renderer reads the row's `content` field when
+      // `toolResult` is empty, so the text is represented once, not twice.
+      return {
+        ...fixed,
+        content: boundFieldText(this.contentText(message.content), budget),
+        toolResult: "",
+      };
+    }
+    // A structured result: `details` is the payload the renderer unwraps, and
+    // the envelope's text blocks are kept only for the delegation-report and
+    // lifecycle-summary paths. The row's `content` stays empty so the same text
+    // is not serialized twice.
+    return { ...fixed, content: "", toolResult: boundedToolResult(message, budget) };
   }
 
-  /** The flattened text of a message body, bounded for the read projection. */
+  /** The flattened text of a message body; bounded later by the shared budget. */
   private contentText(content: unknown): string {
-    if (typeof content === "string") return content.slice(0, ASSISTANT_TEXT_LIMIT);
+    if (typeof content === "string") return content;
     if (!Array.isArray(content)) return "";
     const parts: string[] = [];
     for (const part of content) {
       if (!isRecord(part)) continue;
       if (part.type === "text" && typeof part.text === "string") parts.push(part.text);
     }
-    return parts.join("\n").slice(0, ASSISTANT_TEXT_LIMIT);
+    return parts.join("\n");
   }
 
   /**
@@ -494,11 +519,9 @@ export class OmpEventConverter {
     const usage = usageOf(message);
     const modelId = stringOr(message.model, undefined);
     const providerId = stringOr(message.provider, undefined);
-    return {
+    const fixed = {
       id,
       role,
-      content,
-      ...(thinking ? { thinking } : {}),
       createdAt: new Date(
         typeof message.timestamp === "number" ? message.timestamp : this.now(),
       ).toISOString(),
@@ -508,6 +531,18 @@ export class OmpEventConverter {
       ...(this.parentToolCallId ? { parentToolCallId: this.parentToolCallId } : {}),
       ...(this.agentName ? { agentName: this.agentName } : {}),
       ...(usage ? { usage } : {}),
+    };
+    const skeleton = {
+      ...fixed,
+      content: "",
+      ...(thinking ? { thinking: "" } : {}),
+    };
+    const budget = newRowBudget(skeleton);
+    const boundedThinking = thinking ? boundFieldText(thinking, budget) : "";
+    return {
+      ...fixed,
+      content: boundFieldText(content, budget),
+      ...(boundedThinking ? { thinking: boundedThinking } : {}),
     };
   }
 
@@ -541,91 +576,220 @@ function splitContent(content: unknown): { content: string; thinking?: string } 
     // toolCall parts belong to their tool row; image and provider-specific
     // parts have no desktop row in M3 and are counted by the caller.
   }
-  const joined = text.join("\n").slice(0, ASSISTANT_TEXT_LIMIT);
-  const reasoning = thinking.join("\n").slice(0, ASSISTANT_TEXT_LIMIT);
+  const joined = text.join("\n");
+  const reasoning = thinking.join("\n");
   return { content: joined, ...(reasoning ? { thinking: reasoning } : {}) };
 }
 
+// ---------------------------------------------------------------------------
+// Shared serialized-UTF-8 budget.
+//
+// The pinned runtime persists each tool result as `{ content: blocks, details }`
+// and each assistant message as `{ content: blocks (text + thinking) }`. Every
+// one of those payload fields, plus the JSON syntax that carries them (keys,
+// quotes, separators, escaping, multibyte code points), must fit in one
+// 4 MiB serialized UTF-8 budget per durable row. `.length` counts UTF-16 code
+// units, so byte accounting here measures the JSON-escaped UTF-8 form instead.
+// ---------------------------------------------------------------------------
+
+type ByteBudget = { remaining: number };
+
+/** Sentinel: the value cannot fit at all (not even its empty form). */
+const NO_SPACE: unique symbol = Symbol("no-space");
+
 /**
- * A bounded, structured projection of a durable tool result.
- *
- * The pinned runtime persists tool results as `{ content: blocks, details }`;
- * the renderer reads `details` for tool-specific presentation and the display
- * text from the row's `content`. A raw `message.content` alias would carry the
- * full bytes across the bridge. Text-only results therefore project to an
- * empty result (the renderer reads the already-bounded `content` field), while
- * results with structured details keep the bounded `{ content, details }`
- * envelope the renderer already unwraps. Images and provider-only parts have no
- * desktop row and are dropped.
+ * JSON-serialized byte length of one code point, *excluding* the surrounding
+ * string quotes. Matches `JSON.stringify`: `"` and `\` escape to two bytes, the
+ * five named controls to two bytes, other C0 controls to `\u00XX` (six bytes),
+ * lone surrogates to `\uXXXX` (six bytes), and everything else keeps its raw
+ * UTF-8 width.
  */
-function boundedToolResult(message: OmpMessage): unknown {
-  const details =
-    message.details === undefined
-      ? undefined
-      : boundValue(message.details, ASSISTANT_TEXT_LIMIT, { remaining: ASSISTANT_TEXT_LIMIT });
-  if (details === undefined) {
-    return "";
+function escapedCharBytes(codePoint: number): number {
+  if (codePoint === 0x22 || codePoint === 0x5c) return 2; // " -> \" , \ -> \\
+  if (
+    codePoint === 0x08 || codePoint === 0x09 || codePoint === 0x0a ||
+    codePoint === 0x0c || codePoint === 0x0d
+  ) {
+    return 2; // \b \t \n \f \r
   }
-  const blocks = boundedTextBlocks(message.content, ASSISTANT_TEXT_LIMIT);
-  return blocks.length > 0 ? { content: blocks, details } : { details };
+  if (codePoint < 0x20) return 6; // other C0 controls -> \u00XX
+  if (codePoint >= 0xd800 && codePoint <= 0xdfff) return 6; // lone surrogate -> \uXXXX
+  if (codePoint < 0x80) return 1;
+  if (codePoint < 0x800) return 2;
+  if (codePoint < 0x10000) return 3;
+  return 4;
 }
 
-/** Text-only blocks of the runtime content, bounded to `limit` bytes total. */
-function boundedTextBlocks(
-  content: unknown,
-  limit: number,
-): Array<{ type: "text"; text: string }> {
+/** Content bytes of `text` once JSON-serialized (escapes counted, quotes excluded). */
+function escapedStringBytes(text: string): number {
+  let bytes = 0;
+  for (const char of text) bytes += escapedCharBytes(char.codePointAt(0)!);
+  return bytes;
+}
+
+/** Serialized bytes of a JSON scalar: number (or its `null` form), boolean, null. */
+function scalarBytes(value: number | boolean | null): number {
+  if (value === null) return 4;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? String(value).length : 4;
+  }
+  return value ? 4 : 5;
+}
+
+/**
+ * A row budget for one durable message: the shared 4 MiB minus the measured
+ * fixed envelope. `skeleton` holds every non-payload field plus an empty
+ * placeholder for each payload field, so all keys and structural syntax are
+ * charged once and each payload then charges only its bytes above the
+ * placeholder (the two quote bytes for `""`, nothing more).
+ */
+function newRowBudget(skeleton: Record<string, unknown>): ByteBudget {
+  return {
+    remaining: ROW_BUDGET_BYTES - Buffer.byteLength(JSON.stringify(skeleton), "utf8"),
+  };
+}
+
+/**
+ * Bound one string to the shared budget. `quoteOverhead` is the two bytes a
+ * JSON string's quotes cost: 0 for a top-level field whose placeholder quotes
+ * the skeleton already charged, 2 for a string nested inside another value.
+ * Returns `NO_SPACE` when not even the empty string plus its overhead fits.
+ * Truncation walks code points, so a surrogate pair is never split, and appends
+ * the truncation marker.
+ */
+function boundString(
+  text: string,
+  budget: ByteBudget,
+  quoteOverhead: number,
+): string | typeof NO_SPACE {
+  const contentBytes = escapedStringBytes(text);
+  if (quoteOverhead + contentBytes <= budget.remaining) {
+    budget.remaining -= quoteOverhead + contentBytes;
+    return text;
+  }
+  const limit = budget.remaining - quoteOverhead - TRUNCATION_SUFFIX_BYTES;
+  if (limit <= 0) return NO_SPACE;
+  let used = 0;
+  let end = 0;
+  for (const char of text) {
+    const bytes = escapedCharBytes(char.codePointAt(0)!);
+    if (used + bytes > limit) break;
+    used += bytes;
+    end += char.length;
+  }
+  budget.remaining -= quoteOverhead + used + TRUNCATION_SUFFIX_BYTES;
+  return text.slice(0, end) + TRUNCATION_SUFFIX;
+}
+
+/** Bound a top-level string field; an unrepresentable value becomes "". */
+function boundFieldText(text: string, budget: ByteBudget): string {
+  const bounded = boundString(text, budget, 0);
+  return bounded === NO_SPACE ? "" : bounded;
+}
+
+/**
+ * Recursively bound a structured value to the shared budget, charging exactly
+ * the bytes its serialized form will occupy — string content with escapes and
+ * quotes, keys, array brackets, object braces, commas, colons, and every scalar.
+ * Shape is preserved for whatever fits; a value that cannot fit at all yields
+ * `NO_SPACE` so the enclosing container drops it rather than serializing junk.
+ */
+function boundValue(value: unknown, budget: ByteBudget): unknown {
+  if (budget.remaining <= 0) return NO_SPACE;
+  if (typeof value === "string") return boundString(value, budget, 2);
+  if (typeof value === "number" || typeof value === "boolean") {
+    const bytes = scalarBytes(value);
+    if (bytes > budget.remaining) return NO_SPACE;
+    budget.remaining -= bytes;
+    return value;
+  }
+  if (value === null) {
+    if (budget.remaining < 4) return NO_SPACE;
+    budget.remaining -= 4;
+    return null;
+  }
+  if (Array.isArray(value)) {
+    if (budget.remaining < 2) return NO_SPACE;
+    budget.remaining -= 2; // [ ]
+    const out: unknown[] = [];
+    for (let index = 0; index < value.length; index++) {
+      if (index > 0) {
+        if (budget.remaining < 1) break;
+        budget.remaining -= 1; // ,
+      }
+      const item = boundValue(value[index], budget);
+      if (item === NO_SPACE) {
+        if (index > 0) budget.remaining += 1; // refund the comma
+        break;
+      }
+      out.push(item);
+    }
+    return out;
+  }
+  if (isRecord(value)) {
+    if (budget.remaining < 2) return NO_SPACE;
+    budget.remaining -= 2; // { }
+    const out: Record<string, unknown> = {};
+    let first = true;
+    for (const [key, item] of Object.entries(value)) {
+      const keyBytes = 2 + escapedStringBytes(key) + 1; // "key":
+      const separatorBytes = first ? 0 : 1;
+      if (budget.remaining < separatorBytes + keyBytes) break;
+      budget.remaining -= separatorBytes + keyBytes;
+      const bounded = boundValue(item, budget);
+      if (bounded === NO_SPACE) {
+        budget.remaining += separatorBytes + keyBytes; // refund
+        break;
+      }
+      out[key] = bounded;
+      first = false;
+    }
+    return out;
+  }
+  // undefined / functions / symbols are not JSON data and never occur in the
+  // pinned runtime's parsed payloads; serialize to nothing.
+  return undefined;
+}
+
+/** Text-only blocks of the runtime content, unbounded (bounded via `boundValue`). */
+function textBlocksOf(content: unknown): Array<{ type: "text"; text: string }> {
   if (typeof content === "string") {
-    return content.length === 0 ? [] : [{ type: "text", text: content.slice(0, limit) }];
+    return content.length === 0 ? [] : [{ type: "text", text: content }];
   }
   if (!Array.isArray(content)) return [];
   const blocks: Array<{ type: "text"; text: string }> = [];
-  let total = 0;
   for (const part of content) {
     if (!isRecord(part)) continue;
-    if (part.type !== "text" || typeof part.text !== "string") continue;
-    const remaining = limit - total;
-    if (remaining <= 0) break;
-    const text = part.text.slice(0, remaining);
-    blocks.push({ type: "text", text });
-    total += text.length;
+    if (part.type === "text" && typeof part.text === "string") {
+      blocks.push({ type: "text", text: part.text });
+    }
   }
   return blocks;
 }
 
 /**
- * Recursively bound a structured `details` value: strings are truncated and the
- * total string bytes are capped, preserving object/array shape for the renderer
- * while keeping the serialized size within the product bound.
+ * A bounded, structured projection of a durable tool result, charged against
+ * the same budget as the row's other payload fields.
+ *
+ * The renderer reads `details` for tool-specific presentation and the envelope
+ * text blocks for the delegation report and lifecycle summary; images and
+ * provider-only parts have no desktop row and are dropped. The row's `content`
+ * is left empty by the caller for structured results, so the text is carried
+ * once, not twice. The two quote bytes of the `""` placeholder are handed back
+ * so the assembled envelope's full serialized form can be charged, and the net
+ * delta is what the shared budget pays.
  */
-function boundValue(
-  value: unknown,
-  limit: number,
-  budget: { remaining: number },
-): unknown {
-  if (budget.remaining <= 0) return undefined;
-  if (typeof value === "string") {
-    const slice = value.slice(0, Math.min(limit, budget.remaining));
-    budget.remaining -= slice.length;
-    return slice;
-  }
-  if (Array.isArray(value)) {
-    const out: unknown[] = [];
-    for (const item of value) {
-      if (budget.remaining <= 0) break;
-      out.push(boundValue(item, limit, budget));
-    }
-    return out;
-  }
-  if (isRecord(value)) {
-    const out: Record<string, unknown> = {};
-    for (const [key, item] of Object.entries(value)) {
-      if (budget.remaining <= 0) break;
-      out[key] = boundValue(item, limit, budget);
-    }
-    return out;
-  }
-  return value;
+function boundedToolResult(message: OmpMessage, budget: ByteBudget): unknown {
+  const blocks = textBlocksOf(message.content);
+  const envelope =
+    blocks.length > 0
+      ? { content: blocks, details: message.details }
+      : { details: message.details };
+  const subBudget: ByteBudget = { remaining: budget.remaining + 2 };
+  const bounded = boundValue(envelope, subBudget);
+  if (bounded === NO_SPACE) return "";
+  budget.remaining = subBudget.remaining;
+  return bounded;
 }
 
 /** Only the usage fields the pinned runtime actually reports. */

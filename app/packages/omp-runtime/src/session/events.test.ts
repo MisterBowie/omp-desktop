@@ -263,79 +263,200 @@ describe("unknown frames", () => {
   });
 });
 
-describe("durable entry conversion (bounded tool results)", () => {
-  const entry = (message: Record<string, unknown>, id = "entry-1") => ({
+describe("durable entry conversion (shared serialized budget)", () => {
+  const ROW_BUDGET_BYTES = 4 * 1024 * 1024;
+  const serializedBytes = (value: unknown): number =>
+    Buffer.byteLength(JSON.stringify(value), "utf8");
+  type DurableEntry = {
+    id: string;
+    parentId: null;
+    timestamp: string;
+    message: Record<string, unknown>;
+  };
+  const entry = (message: Record<string, unknown>, id = "entry-1"): DurableEntry => ({
     id,
     parentId: null,
     timestamp: "2026-01-01T00:00:00.000Z",
     message,
   });
+  const toolEntry = (
+    content: unknown,
+    details?: unknown,
+    id = "entry-1",
+  ): DurableEntry =>
+    entry(
+      {
+        role: "toolResult",
+        toolName: "read",
+        toolCallId: "call-1",
+        content,
+        ...(details === undefined ? {} : { details }),
+        timestamp: 1,
+      },
+      id,
+    );
 
-  it("bounds an oversized string tool result without leaking the raw bytes", () => {
-    const c = converter();
-    const big = "x".repeat(5 * 1024 * 1024);
-    const row = c.convertEntry(
-      entry({ role: "toolResult", toolName: "read", toolCallId: "call-1", content: big, timestamp: 1 }),
+  it("bounds a large ASCII string result to the whole-row budget", () => {
+    const row = converter().convertEntry(toolEntry("x".repeat(5 * 1024 * 1024)));
+    expect(row).not.toBeNull();
+    if (!row) return;
+    // Text-only result: the renderer reads `content`, so `toolResult` is empty.
+    expect(row.toolResult).toBe("");
+    expect(row.content.endsWith("\u2026")).toBe(true);
+    expect(row.content.length).toBeLessThan(ROW_BUDGET_BYTES);
+    expect(serializedBytes(row)).toBeLessThanOrEqual(ROW_BUDGET_BYTES);
+  });
+
+  it("bounds multiple text parts and drops non-text blocks", () => {
+    const row = converter().convertEntry(
+      toolEntry([
+        { type: "text", text: "a".repeat(3 * 1024 * 1024) },
+        { type: "image", data: "z".repeat(1024 * 1024), mimeType: "image/png" },
+        { type: "text", text: "b".repeat(3 * 1024 * 1024) },
+      ]),
     );
     expect(row).not.toBeNull();
     if (!row) return;
-    expect(row.content.length).toBe(4 * 1024 * 1024);
-    // The toolResult is a bounded projection, not the raw 5 MiB string.
-    expect(JSON.stringify(row.toolResult).length).toBeLessThan(4 * 1024 * 1024 + 256);
-    expect(JSON.stringify(row).length).toBeLessThan(4 * 1024 * 1024 + 256);
+    expect(row.toolResult).toBe("");
+    expect(JSON.stringify(row)).not.toContain("image/png");
+    expect(serializedBytes(row)).toBeLessThanOrEqual(ROW_BUDGET_BYTES);
   });
 
-  it("bounds text parts and drops non-text blocks", () => {
-    const c = converter();
-    const bigText = "y".repeat(5 * 1024 * 1024);
-    const row = c.convertEntry(
+  it("shares one budget across content and details", () => {
+    const row = converter().convertEntry(
+      toolEntry(
+        [{ type: "text", text: "c".repeat(5 * 1024 * 1024) }],
+        { output: "d".repeat(5 * 1024 * 1024) },
+      ),
+    );
+    expect(row).not.toBeNull();
+    if (!row) return;
+    // Structured result: the text lives in the envelope, never duplicated in
+    // the row's `content`.
+    expect(row.content).toBe("");
+    const result = row.toolResult as { content: Array<{ text: string }>; details: { output: string } };
+    expect(Array.isArray(result.content)).toBe(true);
+    expect(serializedBytes(row)).toBeLessThanOrEqual(ROW_BUDGET_BYTES);
+  });
+
+  it("preserves valid Unicode while bounding CJK and emoji text", () => {
+    const emoji = converter().convertEntry(toolEntry("\u{1F600}".repeat(3 * 1024 * 1024)));
+    const cjk = converter().convertEntry(toolEntry("\u{6F22}".repeat(3 * 1024 * 1024)));
+    for (const row of [emoji, cjk]) {
+      expect(row).not.toBeNull();
+      if (!row) return;
+      expect(row.content.isWellFormed()).toBe(true);
+      expect(row.content.endsWith("\u2026")).toBe(true);
+      expect(serializedBytes(row)).toBeLessThanOrEqual(ROW_BUDGET_BYTES);
+    }
+  });
+
+  it("never splits a surrogate pair when a leading ASCII char pushes the cut inside one", () => {
+    const row = converter().convertEntry(
+      toolEntry(`x${"\u{1F600}".repeat(3 * 1024 * 1024)}`),
+    );
+    expect(row).not.toBeNull();
+    if (!row) return;
+    expect(row.content.isWellFormed()).toBe(true);
+    expect(serializedBytes(row)).toBeLessThanOrEqual(ROW_BUDGET_BYTES);
+  });
+
+  it("charges JSON escaping, not raw code units", () => {
+    const row = converter().convertEntry(toolEntry("\u0000\"\\".repeat(700_000)));
+    expect(row).not.toBeNull();
+    if (!row) return;
+    expect(row.content.includes("\u2026")).toBe(true);
+    expect(serializedBytes(row)).toBeLessThanOrEqual(ROW_BUDGET_BYTES);
+  });
+
+  it("charges object keys and stops adding them past the budget", () => {
+    const row = converter().convertEntry(
+      toolEntry(
+        "result",
+        Object.fromEntries(
+          Array.from({ length: 40_000 }, (_, index) => [`${"k".repeat(120)}${index}`, index]),
+        ),
+      ),
+    );
+    expect(row).not.toBeNull();
+    if (!row) return;
+    const details = (row.toolResult as { details: Record<string, unknown> }).details;
+    expect(details).toBeTypeOf("object");
+    expect(Object.keys(details).length).toBeLessThan(40_000);
+    expect(serializedBytes(row)).toBeLessThanOrEqual(ROW_BUDGET_BYTES);
+  });
+
+  it("charges array values and non-string scalars", () => {
+    const row = converter().convertEntry(
+      toolEntry(
+        "result",
+        Array.from({ length: 300_000 }, () => Number.MAX_SAFE_INTEGER),
+      ),
+    );
+    expect(row).not.toBeNull();
+    if (!row) return;
+    const details = (row.toolResult as { details: unknown[] }).details;
+    expect(Array.isArray(details)).toBe(true);
+    expect(details.length).toBeLessThan(300_000);
+    expect(serializedBytes(row)).toBeLessThanOrEqual(ROW_BUDGET_BYTES);
+  });
+
+  it("bounds a string-form assistant message instead of bypassing truncation", () => {
+    const row = converter().convertEntry(
+      entry({ role: "assistant", content: "a".repeat(5 * 1024 * 1024), timestamp: 1 }),
+    );
+    expect(row).not.toBeNull();
+    if (!row) return;
+    expect(row.role).toBe("assistant");
+    expect(row.content.endsWith("\u2026")).toBe(true);
+    expect(serializedBytes(row)).toBeLessThanOrEqual(ROW_BUDGET_BYTES);
+  });
+
+  it("shares the budget across assistant content and thinking", () => {
+    const row = converter().convertEntry(
       entry({
-        role: "toolResult",
-        toolName: "bash",
-        toolCallId: "call-1",
+        role: "assistant",
         content: [
-          { type: "text", text: bigText },
-          { type: "image", data: "z".repeat(1024 * 1024), mimeType: "image/png" },
+          { type: "text", text: "a".repeat(4 * 1024 * 1024) },
+          { type: "thinking", thinking: "t".repeat(4 * 1024 * 1024) },
         ],
         timestamp: 1,
       }),
     );
     expect(row).not.toBeNull();
     if (!row) return;
-    // The display text is bounded; the image block has no desktop row.
-    expect(row.content.length).toBe(4 * 1024 * 1024);
-    expect(row.toolResult).toBe("");
-    expect(JSON.stringify(row)).not.toContain("image/png");
+    expect(row.role).toBe("assistant");
+    expect(serializedBytes(row)).toBeLessThanOrEqual(ROW_BUDGET_BYTES);
   });
 
-  it("preserves bounded structured details readably", () => {
-    const c = converter();
-    const row = c.convertEntry(
-      entry({
-        role: "toolResult",
-        toolName: "read",
-        toolCallId: "call-1",
-        content: [{ type: "text", text: "file contents" }],
-        details: { path: "/tmp/a.txt", exitCode: 0, huge: "q".repeat(5 * 1024 * 1024) },
-        timestamp: 1,
-      }),
+  it("preserves small supported payloads exactly", () => {
+    const row = converter().convertEntry(
+      toolEntry(
+        [{ type: "text", text: "file contents" }],
+        { path: "/tmp/a.txt", exitCode: 0, lines: [1, 2, 3], ok: true, nil: null },
+      ),
     );
     expect(row).not.toBeNull();
     if (!row) return;
-    const result = row.toolResult as { details: { path: string; exitCode: number; huge: string } };
-    expect(result.details.path).toBe("/tmp/a.txt");
-    expect(result.details.exitCode).toBe(0);
-    expect(result.details.huge.length).toBeGreaterThan(4 * 1024 * 1024 - 1024);
-    expect(result.details.huge.length).toBeLessThan(4 * 1024 * 1024 + 1);
-    expect(JSON.stringify(row).length).toBeLessThan(4 * 1024 * 1024 + 4096);
+    expect(row.toolResult).toEqual({
+      content: [{ type: "text", text: "file contents" }],
+      details: { path: "/tmp/a.txt", exitCode: 0, lines: [1, 2, 3], ok: true, nil: null },
+    });
   });
 
-  it("keeps the entry id stable across reads", () => {
-    const c = converter();
-    const message = { role: "toolResult", toolName: "read", toolCallId: "call-1", content: [{ type: "text", text: "x" }], timestamp: 1 };
-    const first = c.convertEntry(entry(message, "entry-9"));
-    const second = c.convertEntry(entry(message, "entry-9"));
+  it("keeps the entry id stable across reads and a fresh converter (reset)", () => {
+    const message = {
+      role: "toolResult",
+      toolName: "read",
+      toolCallId: "call-1",
+      content: [{ type: "text", text: "x" }],
+      timestamp: 1,
+    };
+    const first = converter().convertEntry(entry(message, "entry-9"));
+    const reread = converter().convertEntry(entry(message, "entry-9"));
+    const afterReset = converter().convertEntry(entry(message, "entry-9"));
     expect(first?.id).toBe("omp:s1:entry:entry-9");
-    expect(first?.id).toBe(second?.id);
+    expect(reread?.id).toBe(first?.id);
+    expect(afterReset?.id).toBe(first?.id);
   });
 });
