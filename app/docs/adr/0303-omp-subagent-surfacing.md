@@ -1,7 +1,7 @@
 # ADR 0303: OMP subagent surfacing, attribution and the stop boundary
 
-- Status: Proposed (pending M5/T17 independent acceptance — B1 revised, C1 implemented, B2/B3 implemented; T17 unaccepted)
-- Date: 2026-09-23 (revised 2026-09-24 for the B1/C1 stop-boundary and runtime-replacement fixes, and again for the B3 whole-row UTF-8 budget)
+- Status: Proposed (pending M5/T17 independent acceptance — B1 revised, C1 implemented, B2/B3 implemented; B3 follow-up answer preservation + structured truncation indication implemented; T17 unaccepted)
+- Date: 2026-09-23 (revised 2026-09-24 for the B1/C1 stop-boundary and runtime-replacement fixes, the B3 whole-row UTF-8 budget, and again for the B3 follow-up allocation priority and truncation indication)
 - Scope: M5/T17. Amends 0301 (conversation surface) by wiring the subagent
   frame families into the existing Pi delegation renderer, and 0302 (per-session
   registry) by adding a per-child registry inside each session's runner.
@@ -216,6 +216,16 @@ prompt still proceeds (only this child-surface feature is unavailable), but
   results keep it in the envelope's text blocks for the Pi delegation-report
   and lifecycle-summary paths, so the same text is never serialized twice; a
   raw unbounded `content` never crosses the bridge into the renderer.
+  Allocation is answer-first: `content` is charged before `thinking`, so
+  oversized reasoning can never erase a short final answer — this priority is
+  shared by the durable `convertEntry` and the live `message_start`/`message_end`
+  paths, which therefore retain the final answer too. When the bound drops
+  anything (a long string, an array item, an object key, or a whole field), the
+  row still says so: the presenter's existing `details.truncated` flag is set
+  (a record `details` gains the key directly; a non-record `details` is wrapped
+  as `{ truncated: true, value }`), reserved from the same budget so the
+  indication renders without exceeding the bound and without inventing original
+  counts.
 - Child detail requires `--model` (the explicit projected binding); a build that
   omits it would show topology/progress but no child transcript, which is exactly
   the gap the projection now closes.

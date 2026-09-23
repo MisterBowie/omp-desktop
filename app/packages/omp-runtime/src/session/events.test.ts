@@ -383,6 +383,8 @@ describe("durable entry conversion (shared serialized budget)", () => {
     const details = (row.toolResult as { details: Record<string, unknown> }).details;
     expect(details).toBeTypeOf("object");
     expect(Object.keys(details).length).toBeLessThan(40_000);
+    // Dropped keys are signalled, not silent.
+    expect(details.truncated).toBe(true);
     expect(serializedBytes(row)).toBeLessThanOrEqual(ROW_BUDGET_BYTES);
   });
 
@@ -395,9 +397,15 @@ describe("durable entry conversion (shared serialized budget)", () => {
     );
     expect(row).not.toBeNull();
     if (!row) return;
-    const details = (row.toolResult as { details: unknown[] }).details;
-    expect(Array.isArray(details)).toBe(true);
-    expect(details.length).toBeLessThan(300_000);
+    // A dropped array item cannot carry a flag on the array itself, so the
+    // bounded details is wrapped: `truncated` marks it and `value` holds the
+    // surviving prefix.
+    const details = (row.toolResult as { details: Record<string, unknown> }).details;
+    expect(details.truncated).toBe(true);
+    const value = details.value;
+    expect(Array.isArray(value)).toBe(true);
+    if (!Array.isArray(value)) return;
+    expect(value.length).toBeLessThan(300_000);
     expect(serializedBytes(row)).toBeLessThanOrEqual(ROW_BUDGET_BYTES);
   });
 
@@ -458,5 +466,79 @@ describe("durable entry conversion (shared serialized budget)", () => {
     expect(first?.id).toBe("omp:s1:entry:entry-9");
     expect(reread?.id).toBe(first?.id);
     expect(afterReset?.id).toBe(first?.id);
+  });
+
+  it("preserves a short final answer when oversized thinking spends the budget", () => {
+    const row = converter().convertEntry(
+      entry({
+        role: "assistant",
+        content: [
+          { type: "thinking", thinking: "t".repeat(4 * 1024 * 1024 + 1024) },
+          { type: "text", text: "FINAL-ANSWER" },
+        ],
+        timestamp: 1,
+      }),
+    );
+    expect(row).not.toBeNull();
+    if (!row) return;
+    expect(row.role).toBe("assistant");
+    // Allocation priority: the answer is charged before the reasoning, so a
+    // huge thinking block can never erase it.
+    expect(row.content).toBe("FINAL-ANSWER");
+    expect(typeof row.thinking).toBe("string");
+    expect(row.thinking?.endsWith("\u2026")).toBe(true);
+    expect(serializedBytes(row)).toBeLessThanOrEqual(ROW_BUDGET_BYTES);
+  });
+
+  it("keeps a short final answer with escapes when the budget is tight", () => {
+    // Multi-byte code points and JSON escapes both charge more bytes than code
+    // units; the answer must still survive intact, not get truncated to fit.
+    const answer = 'FINAL "quoted" \\ \u{1F600} answer';
+    const row = converter().convertEntry(
+      entry({
+        role: "assistant",
+        content: [
+          { type: "thinking", thinking: "t".repeat(4 * 1024 * 1024 + 1024) },
+          { type: "text", text: answer },
+        ],
+        timestamp: 1,
+      }),
+    );
+    expect(row).not.toBeNull();
+    if (!row) return;
+    expect(row.content).toBe(answer);
+    expect(serializedBytes(row)).toBeLessThanOrEqual(ROW_BUDGET_BYTES);
+  });
+
+  it("keeps a short final answer through the live message_end path", () => {
+    const c = converter();
+    const message = {
+      role: "assistant",
+      content: [
+        { type: "thinking", thinking: "t".repeat(4 * 1024 * 1024 + 1024) },
+        { type: "text", text: "FINAL-ANSWER" },
+      ],
+    };
+    c.convert({ type: "message_start", message });
+    const events = c.convert({ type: "message_end", message });
+    const end = events.find((event) => event.type === "message_end");
+    expect(end).toBeDefined();
+    if (!end || end.type !== "message_end") return;
+    expect(end.message.content).toBe("FINAL-ANSWER");
+  });
+
+  it("marks a large string that precedes later fields as truncated", () => {
+    const row = converter().convertEntry(
+      toolEntry("result", { summary: "x".repeat(5 * 1024 * 1024), count: 42 }),
+    );
+    expect(row).not.toBeNull();
+    if (!row) return;
+    const details = (row.toolResult as { details: Record<string, unknown> }).details;
+    expect(details.truncated).toBe(true);
+    expect((details.summary as string).endsWith("\u2026")).toBe(true);
+    // The field after the large string could not fit and was dropped, not
+    // silently omitted.
+    expect("count" in details).toBe(false);
+    expect(serializedBytes(row)).toBeLessThanOrEqual(ROW_BUDGET_BYTES);
   });
 });

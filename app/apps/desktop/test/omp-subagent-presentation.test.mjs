@@ -10,7 +10,7 @@ register(pathToFileURL(join(here, "helpers/ts-import-hooks.mjs")));
 const { OmpEventConverter } = await import(
   pathToFileURL(join(here, "../../../packages/omp-runtime/src/session/events.ts"))
 );
-const { buildToolPresentation, hasToolDetails, runOutcome, toolResultPayload } =
+const { buildToolPresentation, hasToolDetails, runOutcome, toolResultChips, toolResultPayload } =
   await import("../src/lib/tool-presentation.ts");
 
 const converter = new OmpEventConverter({ sessionId: "s1", now: () => 1 });
@@ -141,4 +141,72 @@ test("an unknown tool's structured result degrades to fields, not a JSON blob", 
   assert.ok(row, "the unknown tool row projects");
   const payload = toolResultPayload(row);
   assert.deepEqual(payload, { count: 42, label: "items" });
+});
+
+const ROW_BUDGET_BYTES = 4 * 1024 * 1024;
+const serializedBytes = (value) => Buffer.byteLength(JSON.stringify(value), "utf8");
+/** The presenter's own truncation signal, across both collapsed and expanded bodies. */
+const marksTruncation = (row) => {
+  const chips = toolResultChips(row);
+  if (chips.some((chip) => chip.role === "truncated")) return true;
+  return /truncat|omitt|\u2026/i.test(
+    JSON.stringify(buildToolPresentation(row, { hideSummaryArg: true })),
+  );
+};
+
+test("an overflowed scalar array renders a truncation indication", () => {
+  const row = converter.convertEntry(
+    entry({
+      role: "toolResult",
+      toolName: "PluginTool",
+      toolCallId: "call-1",
+      content: [{ type: "text", text: "result" }],
+      details: Array.from({ length: 300_000 }, () => Number.MAX_SAFE_INTEGER),
+    }),
+  );
+  assert.ok(row, "the tool row projects");
+  assert.ok(serializedBytes(row) <= ROW_BUDGET_BYTES, "the row stays within the whole-row bound");
+  // The presenter must say the result is incomplete, not show a silent prefix.
+  assert.ok(marksTruncation(row), "the presenter indicates the result was truncated");
+  assert.deepEqual(toolResultChips(row), [{ role: "truncated" }]);
+});
+
+test("an overflowed object result renders a truncation indication", () => {
+  const row = converter.convertEntry(
+    entry({
+      role: "toolResult",
+      toolName: "PluginTool",
+      toolCallId: "call-1",
+      content: [{ type: "text", text: "result" }],
+      details: Object.fromEntries(
+        Array.from({ length: 40_000 }, (_, index) => [`${"k".repeat(120)}${index}`, index]),
+      ),
+    }),
+  );
+  assert.ok(row, "the tool row projects");
+  assert.ok(serializedBytes(row) <= ROW_BUDGET_BYTES, "the row stays within the whole-row bound");
+  assert.ok(marksTruncation(row), "the presenter indicates the result was truncated");
+  assert.deepEqual(toolResultChips(row), [{ role: "truncated" }]);
+});
+
+test("a large string that precedes later fields is marked truncated", () => {
+  const row = converter.convertEntry(
+    entry({
+      role: "toolResult",
+      toolName: "PluginTool",
+      toolCallId: "call-1",
+      content: [{ type: "text", text: "result" }],
+      details: { summary: "x".repeat(5 * 1024 * 1024), count: 42 },
+    }),
+  );
+  assert.ok(row, "the tool row projects");
+  assert.ok(serializedBytes(row) <= ROW_BUDGET_BYTES, "the row stays within the whole-row bound");
+  assert.ok(marksTruncation(row), "the presenter indicates the result was truncated");
+  // The surviving large string keeps its `…` suffix, and the field after it
+  // was dropped rather than silently omitted.
+  const details = toolResultPayload(row);
+  assert.ok(details && typeof details === "object" && !Array.isArray(details), "details stays a record");
+  assert.equal(details.truncated, true);
+  assert.ok(details.summary.endsWith("\u2026"), "the large string is visibly truncated");
+  assert.equal("count" in details, false, "the later field was dropped, not invented");
 });

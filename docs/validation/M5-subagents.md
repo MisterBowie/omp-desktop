@@ -174,7 +174,26 @@
 
 验证（`app/`，Node v24.14.0，pnpm 10.34.5）：`pnpm --filter @pi-desktop/omp-runtime test` **239 passed / 0 failed**（+12 B3 回归，含真实固定 runtime 烟测）；`node --test test/omp-subagent-presentation.test.mjs` **6 passed**；复审探针退出 0，实测尺寸（字节，均 ≤ 4,194,304）：contentAndDetails 4,194,304、emoji 4,194,301、surrogateBoundary 4,194,302（`wellFormed=true`）、escapedControls 4,194,303、objectKeys 4,194,221、scalarArray 4,194,301、assistantString 4,194,304、assistantTextAndThinking 4,194,304；定向 desktop 回归 `omp-subagent-read` 5、`omp-subagent-bridge` 8、`subagent-reload-projection`、`omp-subagent-panel-mounted` 12、`omp-subagent-panel-render` 2、`tool-presentation` 30 全绿；`pnpm --filter @pi-desktop/omp-runtime typecheck` 与 `pnpm --filter @pi-desktop/desktop typecheck` 退出 0；`git diff --check` 无输出。
 
-状态：**B3 已实现、待独立验收**；平台、最终 T17 验收仍待。
+状态：**B3 字节/Unicode 证据已独立通过，两处行为缺陷由 §0.12 跟进提交修复、待独立验收**；平台（macOS 夹具可移植性）、最终 T17 验收仍待。
+
+## 0.12 B3 follow-up：短答案保留 + 结构化截断指示（2026-09-24）
+
+独立复审在 B3 基线上复现两项行为缺陷（探针 `/tmp/m5-row-meaning-review.mjs`，基线退出 1）：
+
+- **大思考块擦除短答案**：`toUiMessage` 先扣 `thinking` 再扣 `content`，4 MiB+1024 字节思考 + 文本 `FINAL-ANSWER` 时整行恰 4,194,304 字节但 `content` 为空，`buildSubagentRun` 只出 `["thinking"]`；共享 helper 同样被 live `message_start`/`message_end` 调用，live 完成路径同样丢失答案。
+- **结构化截断静默**：`boundValue` 对数组/对象超出预算时静默 break，300,000 个 `Number.MAX_SAFE_INTEGER` 变成 246,707 项（53,293 静默省略），行内与真实 `buildToolPresentation`/`toolResultChips` 输出均无截断指示。
+
+修复（`app/packages/omp-runtime/src/session/events.ts`，未改固定上游、未改原生 transcript 内容/游标）：
+- **分配优先级**：`toUiMessage` 先扣 `content`（最终答案）再扣 `thinking`；超大思考块不再擦除短答案，普通 reasoning+answer 在合计未超界时完整保留，整行仍 ≤ 4 MiB。该 helper 同时服务 durable `convertEntry` 与 live `message_start`/`message_end`，故 live 完成路径（含最终 `message_end`）一并修复——这是预期共享行为，非引入新执行/持久化语义。
+- **结构化截断指示**：`ByteBudget` 增 `truncated` 标志（`boundString` 追加 `…`、`boundValue` 数组/对象提前 break 时置位）；`boundedToolResult` 预留 ≤32 字节、仅在确实丢弃时写入既有 PI 契约 `details.truncated:true`——record `details` 直接增补该键，非 record `details`（数组/标量）包裹为 `{truncated:true,value}`，整字段被丢弃时置 envelope 级 `truncated:true`；渲染走既有 `toolResultChips`（`details.truncated` → `truncated` chip）与 `recordBlocks`/`safeJson` 兜底，不虚构原始计数。
+
+新增回归（先红后绿）：
+- `packages/omp-runtime/src/session/events.test.ts` +4：超大思考不擦短答案、紧预算下含转义/emoji 的短答案完好、live `message_end` 保留短答案、大字符串先于后续字段（`count` 被丢弃且 `truncated:true`）；对象键/标量数组两例改为断言 `truncated:true` 与包裹后的 `value` 数组。
+- `apps/desktop/test/omp-subagent-presentation.test.mjs` +3：标量数组/对象键/大字符串先于后续字段，经真实 `toolResultChips`（断言 `[{role:"truncated"}]`）与 `buildToolPresentation` 呈现截断，且整行字节 ≤ 4 MiB。
+
+验证（`app/`，Node v24.14.0，pnpm 10.34.5）：`pnpm --filter @pi-desktop/omp-runtime test` **243 passed / 0 failed**；定向 desktop `omp-subagent-read`/`omp-subagent-presentation`/`omp-subagent-panel-render`/`omp-subagent-panel-mounted`/`tool-presentation`/`assistant-turns` **75 passed / 0 failed**；复审探针 `/tmp/m5-row-budget-review.mjs` 8/8 与 `/tmp/m5-row-meaning-review.mjs` 全断言均退出 0（`answerPreserved` 两路径 true、`presentationMarksTruncation` true、两行字节均 ≤ 4,194,304）；`pnpm --filter @pi-desktop/omp-runtime typecheck`、`pnpm --filter @pi-desktop/desktop typecheck`、`git diff --check` 退出 0。
+
+状态：**B3 follow-up 已实现、待独立验收**；平台（macOS 夹具可移植性）、最终 T17 验收仍待。
 
 ## 0. 环境准备（固定子模块流程，与本轮代码无关）
 

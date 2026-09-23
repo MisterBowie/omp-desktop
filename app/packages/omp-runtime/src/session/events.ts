@@ -143,6 +143,13 @@ const ROW_BUDGET_BYTES = 4 * 1024 * 1024;
 /** Truncation marker appended to visibly truncated text (the codebase's `…` convention). */
 const TRUNCATION_SUFFIX = "\u2026";
 const TRUNCATION_SUFFIX_BYTES = 3;
+/**
+ * Bytes reserved up front for the structured-truncation marker so a result
+ * that had to drop data can still say so within the same row bound. The marker
+ * is `"truncated":true`; its worst structural overhead is wrapping a non-record
+ * `details` as `{"truncated":true,"value":…}` (27 bytes), so 32 leaves headroom.
+ */
+const TRUNCATION_MARKER_RESERVE_BYTES = 32;
 
 export class OmpEventConverter {
   private readonly sessionId: string;
@@ -538,10 +545,16 @@ export class OmpEventConverter {
       ...(thinking ? { thinking: "" } : {}),
     };
     const budget = newRowBudget(skeleton);
+    // Allocation priority: the final answer (`content`) is the only part a
+    // reader must never lose, so it is charged first; reasoning (`thinking`)
+    // takes whatever remains. A huge reasoning block can therefore never erase
+    // a short answer, while an ordinary reasoning+answer pair still fits in
+    // full when their combined size is under the bound.
+    const boundedContent = boundFieldText(content, budget);
     const boundedThinking = thinking ? boundFieldText(thinking, budget) : "";
     return {
       ...fixed,
-      content: boundFieldText(content, budget),
+      content: boundedContent,
       ...(boundedThinking ? { thinking: boundedThinking } : {}),
     };
   }
@@ -592,7 +605,14 @@ function splitContent(content: unknown): { content: string; thinking?: string } 
 // units, so byte accounting here measures the JSON-escaped UTF-8 form instead.
 // ---------------------------------------------------------------------------
 
-type ByteBudget = { remaining: number };
+/**
+ * One row's remaining serialized bytes plus whether anything was dropped while
+ * spending them. `truncated` is set by `boundString` (a `…` suffix), by the
+ * array/object loops in `boundValue` (items or keys that could not fit), and by
+ * `boundedToolResult` (a whole field that could not fit), so a caller can tell
+ * the presenter the result is incomplete without inventing original counts.
+ */
+type ByteBudget = { remaining: number; truncated: boolean };
 
 /** Sentinel: the value cannot fit at all (not even its empty form). */
 const NO_SPACE: unique symbol = Symbol("no-space");
@@ -646,6 +666,7 @@ function scalarBytes(value: number | boolean | null): number {
 function newRowBudget(skeleton: Record<string, unknown>): ByteBudget {
   return {
     remaining: ROW_BUDGET_BYTES - Buffer.byteLength(JSON.stringify(skeleton), "utf8"),
+    truncated: false,
   };
 }
 
@@ -678,6 +699,7 @@ function boundString(
     end += char.length;
   }
   budget.remaining -= quoteOverhead + used + TRUNCATION_SUFFIX_BYTES;
+  budget.truncated = true;
   return text.slice(0, end) + TRUNCATION_SUFFIX;
 }
 
@@ -714,12 +736,16 @@ function boundValue(value: unknown, budget: ByteBudget): unknown {
     const out: unknown[] = [];
     for (let index = 0; index < value.length; index++) {
       if (index > 0) {
-        if (budget.remaining < 1) break;
+        if (budget.remaining < 1) {
+          budget.truncated = true;
+          break;
+        }
         budget.remaining -= 1; // ,
       }
       const item = boundValue(value[index], budget);
       if (item === NO_SPACE) {
         if (index > 0) budget.remaining += 1; // refund the comma
+        budget.truncated = true;
         break;
       }
       out.push(item);
@@ -734,11 +760,15 @@ function boundValue(value: unknown, budget: ByteBudget): unknown {
     for (const [key, item] of Object.entries(value)) {
       const keyBytes = 2 + escapedStringBytes(key) + 1; // "key":
       const separatorBytes = first ? 0 : 1;
-      if (budget.remaining < separatorBytes + keyBytes) break;
+      if (budget.remaining < separatorBytes + keyBytes) {
+        budget.truncated = true;
+        break;
+      }
       budget.remaining -= separatorBytes + keyBytes;
       const bounded = boundValue(item, budget);
       if (bounded === NO_SPACE) {
         budget.remaining += separatorBytes + keyBytes; // refund
+        budget.truncated = true;
         break;
       }
       out[key] = bounded;
@@ -768,6 +798,25 @@ function textBlocksOf(content: unknown): Array<{ type: "text"; text: string }> {
 }
 
 /**
+ * Attach the presenter's truncation flag to a bounded tool-result envelope.
+ * `details` is the field `toolResultPayload` prefers, so a record details gets
+ * the `truncated` key directly; a non-record details (array/scalar) has nowhere
+ * to carry a key and is wrapped as `{ truncated: true, value }`; a details that
+ * could not fit at all was dropped, so the envelope itself carries the flag.
+ */
+function withTruncationMarker(bounded: unknown): unknown {
+  if (!isRecord(bounded)) return bounded;
+  const details = bounded.details;
+  if (isRecord(details) && !Array.isArray(details)) {
+    return { ...bounded, details: { ...details, truncated: true } };
+  }
+  if (details !== undefined) {
+    return { ...bounded, details: { truncated: true, value: details } };
+  }
+  return { ...bounded, truncated: true };
+}
+
+/**
  * A bounded, structured projection of a durable tool result, charged against
  * the same budget as the row's other payload fields.
  *
@@ -778,6 +827,11 @@ function textBlocksOf(content: unknown): Array<{ type: "text"; text: string }> {
  * once, not twice. The two quote bytes of the `""` placeholder are handed back
  * so the assembled envelope's full serialized form can be charged, and the net
  * delta is what the shared budget pays.
+ *
+ * When the bound drops anything (a long string, an array item, an object key,
+ * or a whole field), the result also carries the presenter's `truncated` flag,
+ * reserved from the same budget first so a truncated row still renders its own
+ * indication without exceeding the bound.
  */
 function boundedToolResult(message: OmpMessage, budget: ByteBudget): unknown {
   const blocks = textBlocksOf(message.content);
@@ -785,11 +839,27 @@ function boundedToolResult(message: OmpMessage, budget: ByteBudget): unknown {
     blocks.length > 0
       ? { content: blocks, details: message.details }
       : { details: message.details };
-  const subBudget: ByteBudget = { remaining: budget.remaining + 2 };
+  const subBudget: ByteBudget = { remaining: budget.remaining + 2, truncated: false };
+  // Reserve the marker up front; spend it only when something was dropped.
+  const reserved = Math.min(TRUNCATION_MARKER_RESERVE_BYTES, subBudget.remaining);
+  subBudget.remaining -= reserved;
   const bounded = boundValue(envelope, subBudget);
-  if (bounded === NO_SPACE) return "";
-  budget.remaining = subBudget.remaining;
-  return bounded;
+  if (bounded === NO_SPACE) {
+    budget.remaining = subBudget.remaining + reserved;
+    return "";
+  }
+  if (!subBudget.truncated) {
+    budget.remaining = subBudget.remaining + reserved;
+    return bounded;
+  }
+  const marked = withTruncationMarker(bounded);
+  // The marker costs at most the reserved bytes; refund the unused remainder
+  // so the whole row's serialized form stays within the bound.
+  const delta =
+    Buffer.byteLength(JSON.stringify(marked), "utf8") -
+    Buffer.byteLength(JSON.stringify(bounded), "utf8");
+  budget.remaining = subBudget.remaining + reserved - delta;
+  return marked;
 }
 
 /** Only the usage fields the pinned runtime actually reports. */
