@@ -87,14 +87,6 @@ export type NativeSessionBoundInfo = {
   runtimeVersion: string | null;
 };
 
-/** What a branch produced, for the desktop to create a new session row. */
-export type BranchSessionInfo = {
-  parentSessionId: string;
-  nativeSessionId: string;
-  nativeSessionPath: string;
-  runtimeVersion: string | null;
-};
-
 export type OmpSessionBridgeOptions = {
   /**
    * Create a fresh supervisor per session (M4: one runtime per session). The
@@ -133,10 +125,6 @@ export type OmpSessionBridgeOptions = {
     thinkingLevel?: string | null;
     permissionMode?: string | null;
   }) => void | Promise<void>;
-  /** Create a branch session row and resolve with its new desktop session id. */
-  createBranchSession?: (info: BranchSessionInfo) => Promise<string>;
-  /** Remove a native session the bridge created for a branch that failed to bind. */
-  persistBranchCleanup?: (info: { sessionId: string; nativeSessionPath: string }) => void | Promise<void>;
   /** The app-owned persistent native-session directory (containment root). */
   sessionDir: string;
   /** Test seams. */
@@ -165,13 +153,11 @@ export type OmpPromptInput = {
   nativeSessionPath?: string | null;
   adapterVersion?: number | null;
   runtimeVersion?: string | null;
-  /** The renderer's durable id for the user message, for branch correlation. */
-  userMessageId?: string | null;
 };
 
 export type OmpRenameResult = { ok: boolean; reason?: string; inconsistent?: boolean };
 
-export type OmpModelSwitchResult = { ok: boolean; reason?: string };
+export type OmpModelSwitchResult = { ok: boolean; reason?: string; inconsistent?: boolean };
 
 /**
  * The outcome of answering a dialog.
@@ -505,8 +491,6 @@ class SessionEntry {
   private readonly sessionDir: string;
   /** The model binding this session's runtime was projected with. */
   binding: { providerId: string | null; modelId: string | null; thinkingLevel: string | null };
-  /** User prompts in leaf order, for branch-point correlation. */
-  readonly userMessages: Array<{ id: string; content: string }> = [];
 
   readonly approvalRequests = new Map<string, PendingDialog>();
   readonly askRequests = new Map<string, PendingDialog>();
@@ -901,12 +885,6 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     const entry = entryFor(spec);
     await entry.ensureNativeSession(gate, spec);
     const runner = await entry.ensureRunner(gate);
-    // Record the user prompt for branch-point correlation, before the turn
-    // consumes it (a branch later in this process must map the renderer's
-    // selected message to the native entry, never default to the first).
-    if (input.userMessageId) {
-      entry.userMessages.push({ id: input.userMessageId, content: input.content });
-    }
     const started = await runner.prompt(input.content);
     return { accepted: started.accepted, turnId: started.turnId };
   }
@@ -1043,91 +1021,21 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     }
   }
 
-  /** Map the renderer's selected message to the OMP entry to branch from. */
-  function branchEntryId(entry: SessionEntry, entriesList: Array<{ entryId: string; text: string }>, throughMessageId: string | null | undefined): string {
-    if (entriesList.length === 0) {
-      throw Object.assign(new Error("the runtime reported no branchable entry"), { errorCode: "OMP_BRANCH_FAILED" });
-    }
-    if (throughMessageId) {
-      // Prefer a direct user-message id match, then an assistant id of the
-      // form omp:<session>:<turn> whose turn index names the user prompt that
-      // started it. Never default to the first entry.
-      const userIndex = entry.userMessages.findIndex((user) => user.id === throughMessageId);
-      if (userIndex >= 0 && userIndex < entriesList.length) {
-        return entriesList[userIndex].entryId;
-      }
-      const assistantMatch = /^omp:[^:]+:(\d+)$/.exec(throughMessageId);
-      if (assistantMatch) {
-        const turnIndex = Number.parseInt(assistantMatch[1], 10) - 1;
-        if (turnIndex >= 0 && turnIndex < entriesList.length) {
-          return entriesList[turnIndex].entryId;
-        }
-      }
-      throw Object.assign(
-        new Error("the selected message does not correspond to a known native branch point"),
-        { errorCode: "OMP_BRANCH_FAILED" },
-      );
-    }
-    // Sidebar fork: branch at the latest user message (the head).
-    return entriesList[entriesList.length - 1].entryId;
-  }
-
-  async function branch(sessionId: string, throughMessageId?: string | null): Promise<{ sessionId: string }> {
-    const entry = entryOf(sessionId);
-    if (!entry) {
-      throw Object.assign(new Error("no OMP runtime is running for this session"), { errorCode: "NOT_FOUND" });
-    }
-    const runtime = runtimeOf(entry);
-    const branchable = await runtime.request({ type: "get_branch_messages" }, { timeoutMs: 20_000 });
-    const branchData = branchable.data as { messages?: Array<{ entryId?: string; text?: string }> } | undefined;
-    const entriesList = (branchData?.messages ?? [])
-      .filter((message): message is { entryId: string; text: string } => typeof message.entryId === "string" && message.entryId.length > 0)
-      .map((message) => ({ entryId: message.entryId, text: typeof message.text === "string" ? message.text : "" }));
-    const entryId = branchEntryId(entry, entriesList, throughMessageId);
-
-    const branched = await runtime.request({ type: "branch", entryId }, { timeoutMs: 30_000 });
-    const branchResult = branched.data as { cancelled?: boolean } | undefined;
-    if (branched.success === false || branchResult?.cancelled === true) {
-      throw Object.assign(
-        new Error(`the runtime refused to branch: ${branched.error ?? "cancelled"}`),
-        { errorCode: "OMP_BRANCH_FAILED" },
-      );
-    }
-    const state = await runtime.request({ type: "get_state" }, { timeoutMs: 20_000 });
-    const stateData = state.data as { sessionId?: string; sessionFile?: string } | undefined;
-    const nativeSessionId = typeof stateData?.sessionId === "string" ? stateData.sessionId : "";
-    const nativeSessionPath = typeof stateData?.sessionFile === "string" ? stateData.sessionFile : "";
-    if (!nativeSessionId || !nativeSessionPath || nativeSessionPath === entry.nativeSessionPath) {
-      throw Object.assign(
-        new Error("the runtime did not produce a distinct native session for the branch"),
-        { errorCode: "OMP_BRANCH_FAILED" },
-      );
-    }
-    // The branch output must pass the same containment/file-type checks as any
-    // other persisted native reference.
-    const canonicalPath = validateNativeSessionPath(options.sessionDir, nativeSessionId, nativeSessionPath);
-    if (!options.createBranchSession) {
-      throw Object.assign(new Error("branching is not wired in this build"), { errorCode: REFUSAL });
-    }
-    try {
-      const newSessionId = await options.createBranchSession({
-        parentSessionId: sessionId,
-        nativeSessionId,
-        nativeSessionPath: canonicalPath,
-        runtimeVersion: entry.runtimeVersion,
-      });
-      return { sessionId: newSessionId };
-    } catch (error) {
-      // Compensation: a child that failed to bind must not be left behind. The
-      // native file lives in the app-owned session directory and was created by
-      // this branch, so removing it is safe and restores the pre-branch state.
-      try {
-        await options.persistBranchCleanup?.({ sessionId, nativeSessionPath: canonicalPath });
-      } catch {
-        // Best effort; the orphan is reported by the caller's error.
-      }
-      throw error;
-    }
+  /**
+   * Branching is closed (see `OMP_ENGINE_CAPABILITIES`): the pinned runtime's
+   * `branch(userEntryId)` is a redo-from-user fork that switches the running
+   * runtime to the new child, and the rpc-ui event stream carries no OMP entry
+   * ids, so a faithful fork cannot be mapped without an adapter extension. The
+   * method exists only to keep the surface typed; it always refuses.
+   */
+  function branch(_sessionId: string, _throughMessageId?: string | null): Promise<{ sessionId: string }> {
+    return Promise.reject(
+      Object.assign(new Error("branching is not available for OMP sessions in this build"), {
+        errorCode: REFUSAL,
+        engine: "omp",
+        capability: "branch",
+      }),
+    );
   }
 
   async function configure(
@@ -1140,6 +1048,9 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       permissionMode?: string | null;
     },
   ): Promise<OmpModelSwitchResult> {
+    if (!options.persistConfig) {
+      return { ok: false, reason: "configuration persistence is not wired in this build" };
+    }
     const entry = entryOf(sessionId);
     const providerId = config.providerId ?? null;
     const modelId = config.modelId ?? null;
@@ -1174,24 +1085,33 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
 
     try {
       if (modelChanged) {
-        // A model change means the projection is stale. The host DB is written
-        // first (one atomic call), then the runtime is stopped so the next
-        // prompt re-projects with the new binding. A failed reclaim must not be
-        // reported as success: the old runtime could still serve the old model.
-        await persistAll();
+        // Offline switch: the projection is minimal (one model), so the running
+        // OMP catalog cannot `set_model` to a different model. The transaction
+        // is "reclaim first, persist second": if the old runtime cannot be
+        // reclaimed, the host DB is left untouched (no fork), and the next
+        // prompt re-projects the still-persisted old binding.
         const disposed = await disposeSession(sessionId, "model reconfigured");
         if (!disposed.ok) {
           return {
             ok: false,
-            reason: `the model binding was persisted but the old runtime could not be reclaimed: ${disposed.failures.map((failure) => failure.detail).join("; ")}`,
+            reason: `the old runtime could not be reclaimed, so the model binding was not changed: ${disposed.failures.map((failure) => failure.detail).join("; ")}`,
           };
+        }
+        try {
+          await persistAll();
+        } catch (error) {
+          // The runtime is already reclaimed; the host DB still holds the old
+          // binding, so the next prompt re-projects it. The failure is reported
+          // and no partial state is left.
+          return { ok: false, reason: String((error as Error)?.message ?? error) };
         }
         return { ok: true };
       }
       if (thinkingChanged) {
-        // Thinking is a runtime state that does not need re-projection; apply it
-        // to a running runtime and persist, reverting on a failed persist.
-        const oldLevel = entry.binding.thinkingLevel;
+        // Thinking is a runtime state that does not need re-projection: apply it
+        // to a running runtime, persist, and revert on a failed persist. The
+        // prior level is always a valid string (the session default is "off").
+        const oldLevel = entry.binding.thinkingLevel ?? "off";
         if (entry.activeRunner()) {
           const result = await runtimeOf(entry).request({ type: "set_thinking_level", level: thinkingLevel }, { timeoutMs: 20_000 });
           if (result.success === false) {
@@ -1201,8 +1121,25 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
         try {
           await persistAll();
         } catch (error) {
-          if (entry.activeRunner() && oldLevel) {
-            await runtimeOf(entry).request({ type: "set_thinking_level", level: oldLevel }, { timeoutMs: 20_000 }).catch(() => undefined);
+          // Revert the runtime thinking so the transcript and the DB never fork.
+          let rolledBack = true;
+          let rollbackError: string | null = null;
+          if (entry.activeRunner()) {
+            try {
+              const revert = await runtimeOf(entry).request({ type: "set_thinking_level", level: oldLevel }, { timeoutMs: 20_000 });
+              rolledBack = revert.success !== false;
+              if (revert.success === false) rollbackError = revert.error ?? "the runtime refused the revert";
+            } catch (revertError) {
+              rolledBack = false;
+              rollbackError = String((revertError as Error)?.message ?? revertError);
+            }
+          }
+          if (!rolledBack) {
+            return {
+              ok: false,
+              reason: `${String((error as Error)?.message ?? error)}; the thinking level could not be reverted (${rollbackError ?? "unknown"})`,
+              inconsistent: true,
+            };
           }
           return { ok: false, reason: String((error as Error)?.message ?? error) };
         }

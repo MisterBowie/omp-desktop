@@ -470,28 +470,27 @@ export function createProjectSlice({
       persistCurrentSidebar(get);
     },
 
-    toggleSessionArchived: (id) => {
+    toggleSessionArchived: async (id) => {
       if (!id) return;
-      const archived = !sessionIsArchived(id, get().sessionMeta);
-      set((state) => {
-        const sessionMeta = {
-          ...state.sessionMeta,
-          [id]: { ...(state.sessionMeta[id] || {}), archived },
-        };
-        const sessions = state.sessions.map((session) =>
-          session.id === id ? { ...session, archived } : session,
-        );
-        return { sessionMeta, sessions };
-      });
-      persistCurrentSidebar(get);
-      // Archiving an OMP session reclaims its runtime; the notification is
-      // fire-and-forget (the local metadata is already committed). Unarchiving
-      // never starts a runtime.
-      if (archived) void api.archiveSession(id);
-    },
-
-    archiveSession: (id) => {
-      if (!id) return;
+      const wasArchived = sessionIsArchived(id, get().sessionMeta);
+      if (wasArchived) {
+        // Unarchiving only changes metadata; it never starts a runtime.
+        set((state) => ({
+          sessionMeta: {
+            ...state.sessionMeta,
+            [id]: { ...(state.sessionMeta[id] || {}), archived: false },
+          },
+          sessions: state.sessions.map((session) =>
+            session.id === id ? { ...session, archived: false } : session,
+          ),
+        }));
+        persistCurrentSidebar(get);
+        return;
+      }
+      // Archiving reclaims the runtime first (main), then commits the archived
+      // metadata. A failed reclaim throws, leaving the session unarchived and
+      // surfacing the error to the caller.
+      await api.archiveSession(id);
       set((state) => ({
         sessionMeta: {
           ...state.sessionMeta,
@@ -502,7 +501,23 @@ export function createProjectSlice({
         ),
       }));
       persistCurrentSidebar(get);
-      void api.archiveSession(id);
+    },
+
+    archiveSession: async (id) => {
+      if (!id) return;
+      // Reclaim the runtime first; only then commit the archived metadata. A
+      // failed reclaim throws and leaves the session unarchived.
+      await api.archiveSession(id);
+      set((state) => ({
+        sessionMeta: {
+          ...state.sessionMeta,
+          [id]: { ...(state.sessionMeta[id] || {}), archived: true },
+        },
+        sessions: state.sessions.map((session) =>
+          session.id === id ? { ...session, archived: true } : session,
+        ),
+      }));
+      persistCurrentSidebar(get);
     },
 
     restoreSession: (id) => {

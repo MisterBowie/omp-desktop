@@ -107,10 +107,13 @@ test("F2: delete resolves the engine and reclaims the OMP runtime before deletin
   assert.equal(disposed[0].reason, "session deleted");
 });
 
-test("F2: delete reports a failed reclaim instead of a clean delete", async () => {
-  const { handlers } = harness({ disposeResult: { ok: false, failures: [{ sessionId: "omp-session-1", detail: "process group survived" }] } });
-  const result = await handlers.get(IPC.invoke.sessionDelete)("omp-session-1");
-  assert.equal(result.cleanupFailed, "process group survived");
+test("F2: delete refuses a failed reclaim and never writes the host row", async () => {
+  const { handlers, calls } = harness({ disposeResult: { ok: false, failures: [{ sessionId: "omp-session-1", detail: "process group survived" }] } });
+  await assert.rejects(
+    () => handlers.get(IPC.invoke.sessionDelete)("omp-session-1"),
+    (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE && /not deleted/.test(error.message),
+  );
+  assert.equal(calls.some((call) => call.method === "session.delete"), false, "the host row must survive a failed reclaim");
 });
 
 test("F2: archive reclaims only the target OMP runtime and unarchive is a no-op", async () => {
@@ -122,11 +125,12 @@ test("F2: archive reclaims only the target OMP runtime and unarchive is a no-op"
   assert.equal(disposed[0].reason, "session archived");
 });
 
-test("F2: archive does not start a runtime and reports a failed reclaim", async () => {
+test("F2: archive throws on a failed reclaim instead of reporting ok:true", async () => {
   const { handlers, disposed } = harness({ disposeResult: { ok: false, failures: [{ sessionId: "omp-session-A", detail: "run dir survived" }] } });
-  const result = await handlers.get(IPC.invoke.sessionArchive)("omp-session-A");
-  assert.equal(result.ok, true, "archive metadata still lands");
-  assert.equal(result.cleanupFailed, "run dir survived", "but the reclaim failure is observable");
+  await assert.rejects(
+    () => handlers.get(IPC.invoke.sessionArchive)("omp-session-A"),
+    (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE && /not archived/.test(error.message),
+  );
   assert.equal(disposed.length, 1);
 });
 

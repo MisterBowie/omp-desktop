@@ -34,6 +34,14 @@
 | F7 真实并发审批 | E2E 顺序执行；无两 runtime 重叠审批 | 新增真实 runtime + 本地 fake provider：A/B 同时 prompt、同时卡审批、回答 A 不释放 B、各自 side effect、停止 A 不影响 B | `omp-session-concurrent-approval-e2e.test.mjs` |
 | F8 文档诚实 | 声明超出实际证明 | 本表 + ADR 0302 §6 更正 branch 关闭；HANDOFF 更正 | — |
 
+## 0.3 第三轮独立复审返修（G1-G3）
+
+| 编号 | 问题 | 修复 | 测试 |
+| --- | --- | --- | --- |
+| G1 modelSwitch 原子 | modelChanged 先 persist 后 dispose，reclaim 失败 DB 已改；thinking 回滚 null/空被跳过、回滚失败被吞；persistConfig optional | 改为「先成功回收旧 runtime，再原子 persist」离线切换事务：reclaim 失败 DB 完全不变；persist 失败 DB 原值不变、下次 prompt 按旧 binding 重启；thinking-only 应用→persist→回滚，null/空旧值用 "off"，回滚失败 `inconsistent`；persistConfig 缺失 fail-closed | `omp-session-configure.test.mjs`（5 项：model 顺序/回收失败不写 host/thinking 回滚/回滚失败 inconsistent/mode+permissionMode） |
+| G2 delete/archive 回收失败可观察 | delete 回收失败仍删 row；archive 返回 `{ok:true,cleanupFailed}`；renderer fire-and-forget；engine 解析失败被当非 OMP | delete 先解析 engine（失败 fail closed），OMP 回收失败则抛 typed error 不删 row/outbox；archive 回收失败抛 typed error；renderer archive 改 async：先 `api.archiveSession` 成功才提交 archived metadata，失败保持未归档并抛错 | `omp-session-delete-archive.test.mjs`（回收失败不写 host row / archive 抛错） |
+| G3 清理过期 branch | 关闭 capability 但保留序号猜测 branch 实现 + wiring | 删除 `branchEntryId`/`createBranchSession`/`persistBranchCleanup`/`userMessages` 追踪，`branch` 改为 typed refusal；文档不再把 modelSwitch 称为「原子」（改为「离线切换事务」） | — |
+
 ## 0. 结论摘要
 
 - T14（会话字段/迁移/恢复/归档）、T15（模型投影/凭证脱敏）、T16（并发注册表/故障恢复）实现完成并验证。**分支（branch）经两轮复审确认与固定 OMP `branch` 语义不兼容（redo-from-user fork vs PI copy-through fork）且 rpc-ui 事件流不带 entry id，本版关闭该 capability 并明确拒绝，不宣称兼容**（见 §0.2 F3、ADR 0302 §6）。

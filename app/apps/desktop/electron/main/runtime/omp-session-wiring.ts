@@ -15,7 +15,7 @@
  *      branches go through the host so a restart restores the same identity.
  */
 import { join } from "node:path";
-import { lstatSync, unlinkSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 
 import { ENGINE_ADAPTER_VERSION, type AgentEventEnvelope } from "@pi-desktop/shared";
 import type { HostProcess } from "../host-process";
@@ -27,7 +27,6 @@ import {
 } from "@pi-desktop/omp-runtime";
 import {
   createOmpSessionBridge,
-  isPathWithin,
   type OmpSessionBridge,
   type OmpSessionRuntimeSpec,
 } from "./omp-session";
@@ -184,51 +183,6 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
         ...(info.thinkingLevel !== null && info.thinkingLevel !== undefined ? { thinkingLevel: info.thinkingLevel } : {}),
         ...(info.permissionMode !== null && info.permissionMode !== undefined ? { permissionMode: info.permissionMode } : {}),
       });
-    },
-    createBranchSession: async (info) => {
-      const client = hostOrThrow(deps.host);
-      const parent = await client.call<{ session?: { projectPath?: string | null; providerId?: string | null; modelId?: string | null } | null }>(
-        "session.get",
-        { id: info.parentSessionId, messageLimit: 1 },
-      );
-      const created = await client.call<{ session?: { id: string } | null }>("session.create", {
-        engine: "omp",
-        title: "Branched session",
-        mode: "agent",
-        projectPath: parent?.session?.projectPath ?? null,
-        providerId: parent?.session?.providerId ?? null,
-        modelId: parent?.session?.modelId ?? null,
-      });
-      const sessionId = created?.session?.id;
-      if (!sessionId) throw Object.assign(new Error("branch session creation failed"), { errorCode: "OMP_BRANCH_FAILED" });
-      try {
-        await client.call("session.bindEngine", {
-          id: sessionId,
-          adapterVersion: ENGINE_ADAPTER_VERSION,
-          runtimeVersion: info.runtimeVersion,
-          nativeSessionId: info.nativeSessionId,
-          nativeSessionPath: info.nativeSessionPath,
-        });
-      } catch (error) {
-        // Compensation: the child row exists but has no engine reference; delete
-        // it so a half-created child is never visible. The native file is
-        // removed by the caller's `persistBranchCleanup`.
-        await client.call("session.delete", { id: sessionId }).catch(() => undefined);
-        throw error;
-      }
-      return sessionId;
-    },
-    persistBranchCleanup: async (info) => {
-      // The native file this branch created lives in the app-owned session
-      // directory and is unreferenced; removing it restores the pre-branch state
-      // after a failed bind. Containment and file type are re-checked first.
-      try {
-        if (isPathWithin(info.nativeSessionPath, sessionDir) && lstatSync(info.nativeSessionPath).isFile()) {
-          unlinkSync(info.nativeSessionPath);
-        }
-      } catch {
-        // Best effort: a file we cannot remove is left for manual recovery.
-      }
     },
   });
 

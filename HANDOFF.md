@@ -4,7 +4,8 @@
 
 ## 0. M4 交付摘要（本轮）
 
-- 状态：**T14-T16 已完成并提交**（分支 `codex/m4-persistence`），含两轮独立复审（R1-R9、F1-F8）返修，等待复审确认。
+- 状态：**T14-T16 已完成并提交**（分支 `codex/m4-persistence`），含三轮独立复审（R1-R9、F1-F8、G1-G3）返修，等待复审确认。
+- 第三轮复审返修（G1-G3）：modelSwitch 改为「先成功回收旧 runtime，再原子 persist」离线切换事务（reclaim 失败 DB 完全不变、persist 失败按旧 binding 重启、thinking 应用→persist→回滚且回滚失败 `inconsistent`、persistConfig 缺失 fail-closed）；delete/archive 回收失败抛 typed error 不删 row/不谎报完成，renderer archive 改 async 且失败保持未归档；删除过期 branch 序号猜测实现（`branch` 改 typed refusal）。详见 `docs/validation/M4-persistence.md` §0.3。
 - 第二轮复审返修（F1-F8）：恢复路径用 `realpath` canonicalize（拒直接/中间目录 symlink 逃逸）、有界读 header、switch 后 `get_state` 必须同时返回 id+canonical path；delete 先取 engine 再回收 OMP runtime 且 `cleanupFailed` 可观察、新增 `sessionArchive` IPC（archive 回收目标、unarchive 不启动）；**branch capability 关闭**（固定 OMP `branch` 是 redo-from-user fork 而非 PI copy-through fork，rpc-ui 事件流不带 entry id，无法可靠映射）；modelSwitch 用单一 `persistConfig` 原子持久化全字段（含 mode/permissionMode）并处理 dispose 失败；投影 authKind 明确 allowlist、空 key fail-closed、provider id 结构化引号；rename 空标题回滚 + cleanup 失败可观察；新增真实 runtime 并发审批 E2E（A/B 同时卡审批、回答 A 不释放 B）。详见 `docs/validation/M4-persistence.md` §0.1/§0.2。
 - 证据：`docs/validation/M4-persistence.md`（功能→PI/OMP/本项目 证据表、验证命令与结果、先红后绿证据）；设计决策：`app/docs/adr/0302-omp-session-persistence-and-runtime-registry.md`（英文 ADR）。
 - 核心变更：

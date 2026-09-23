@@ -436,7 +436,6 @@ export function registerAgentIpc({
         nativeSessionPath: engineRef?.nativeSessionPath ?? null,
         adapterVersion: engineRef?.adapterVersion ?? null,
         runtimeVersion: engineRef?.runtimeVersion ?? null,
-        userMessageId: req.messageId ?? null,
       });
     }
     if (!sidecar) throw new Error("sidecar unavailable");
