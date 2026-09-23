@@ -170,10 +170,9 @@ test("edit renders a single-file change as a diff, not a JSON blob", () => {
   );
   assert.ok(row, "the edit row projects");
   const blocks = buildToolPresentation(row, { hideSummaryArg: true });
-  assert.deepEqual(
-    fieldValues(blocks).filter((v) => v.startsWith("path")),
-    ["path: src/App.tsx"],
-  );
+  const files = blocks.find((block) => block.kind === "files");
+  assert.ok(files, "the edited path is an openable file list");
+  assert.deepEqual(files.paths, ["src/App.tsx"]);
   const diff = blocks.find((block) => block.kind === "diff");
   assert.ok(diff, "the source snapshots render a colored diff");
   assert.ok(diff.lines.some((line) => line.type === "del" && line.text === "old"));
@@ -193,8 +192,11 @@ test("edit renders multi-file results one file at a time", () => {
   );
   assert.ok(row, "the multi-file edit row projects");
   const blocks = buildToolPresentation(row, { hideSummaryArg: true });
-  const paths = fieldValues(blocks).filter((v) => v.startsWith("path"));
-  assert.deepEqual(paths, ["path: a.ts", "path: b.ts"]);
+  const filesBlocks = blocks.filter((block) => block.kind === "files");
+  assert.deepEqual(
+    filesBlocks.map((block) => block.paths),
+    [["a.ts"], ["b.ts"]],
+  );
   const diffs = blocks.filter((block) => block.kind === "diff");
   assert.equal(diffs.length, 2, "each file renders its own diff");
 });
@@ -211,7 +213,9 @@ test("edit rename shows source → destination with no diff body", () => {
   );
   assert.ok(row, "the move row projects");
   const blocks = buildToolPresentation(row, { hideSummaryArg: true });
-  assert.deepEqual(fieldValues(blocks), ["move: a.ts → b.ts"]);
+  const files = blocks.find((block) => block.kind === "files");
+  assert.ok(files, "a move exposes both paths as an openable file list");
+  assert.deepEqual(files.paths, ["a.ts", "b.ts"]);
   assert.equal(blocks.some((block) => block.kind === "diff"), false, "a move has no diff body");
   assert.doesNotMatch(allText(blocks), /no changes/, "a move is not reported as a no-op");
 });
@@ -367,4 +371,166 @@ test("a large Unicode LSP result stays within the durable row bound and readable
   const blocks = buildToolPresentation(row, { hideSummaryArg: true });
   const output = byRole(blocks, "output")[0];
   assert.ok(output.text.endsWith("\u2026"), "the retained text is visibly truncated");
+});
+
+// ---------------------------------------------------------------------------
+// Independent-review regressions: the presenter must not drop text that lives
+// outside `details`, diagnostics it does not map, or unknown producer fields.
+// ---------------------------------------------------------------------------
+
+test("a text-only LSP ToolError (read-only/timeout) keeps its message and error tone", () => {
+  // The producer throws ToolError: `{ content, isError: true }` with no
+  // `details`. The durable projection puts the text on `content` and empties
+  // `toolResult`, so the LSP mapping must read the row content, not only the
+  // envelope.
+  const row = converter.convertEntry(
+    entry({
+      role: "toolResult",
+      toolName: "lsp",
+      toolCallId: "call-lsp-timeout",
+      content: [{ type: "text", text: "LSP definition timed out after 30s on typescript." }],
+      isError: true,
+    }),
+  );
+  assert.ok(row, "the LSP failure row projects");
+  assert.equal(row.toolResult, "", "a text-only result carries no envelope");
+  const blocks = buildToolPresentation(row, { hideSummaryArg: true });
+  const error = byRole(blocks, "error")[0];
+  assert.match(error.text, /timed out after 30s/);
+  assert.equal(error.tone, "error");
+  assert.equal(runOutcome(row), "failed");
+});
+
+test("debug no-session terminate and empty output keep their producer text", () => {
+  const terminate = converter.convertEntry(
+    tool("debug", [{ type: "text", text: "No debug session to terminate." }], {
+      action: "terminate",
+      success: true,
+    }),
+  );
+  const terminateBlocks = buildToolPresentation(terminate, { hideSummaryArg: true });
+  assert.ok(
+    byRole(terminateBlocks, "output").some((b) => b.text.includes("No debug session to terminate.")),
+    "a metadata-only terminate still shows its message",
+  );
+
+  const emptyOutput = converter.convertEntry(
+    tool("debug", [{ type: "text", text: "(no output captured)" }], {
+      action: "output",
+      success: true,
+      output: "",
+    }),
+  );
+  const emptyBlocks = buildToolPresentation(emptyOutput, { hideSummaryArg: true });
+  assert.ok(
+    byRole(emptyBlocks, "output").some((b) => b.text.includes("no output captured")),
+    "an empty console read still shows its producer text",
+  );
+});
+
+test("LSP request and unknown metadata stay readable", () => {
+  const row = converter.convertEntry(
+    tool("lsp", [{ type: "text", text: "Status OK" }], {
+      action: "status",
+      success: true,
+      request: { action: "status", file: "REQUEST_TARGET.ts" },
+    }),
+  );
+  const blocks = buildToolPresentation(row, { hideSummaryArg: true });
+  assert.ok(
+    fieldValues(blocks).includes("file: REQUEST_TARGET.ts"),
+    "the request target the model asked for is visible",
+  );
+  assert.ok(
+    fieldValues(blocks).includes("action: status"),
+    "the action field is still shown",
+  );
+});
+
+test("debug snapshot id, instruction pointer, breakpoint message and unknown fields stay readable", () => {
+  const row = converter.convertEntry(
+    tool("debug", [{ type: "text", text: "Paused" }], {
+      action: "pause",
+      success: true,
+      snapshot: {
+        id: "session-9",
+        adapter: "fake",
+        status: "stopped",
+        cwd: "/tmp",
+        needsConfigurationDone: false,
+        instructionPointerReference: "0xFF44",
+        futureMeta: "FUTURE_SNAPSHOT_DATA",
+      },
+      breakpoints: [
+        { id: 4, line: 8, verified: false, message: "No executable code at the breakpoint location." },
+      ],
+    }),
+  );
+  const blocks = buildToolPresentation(row, { hideSummaryArg: true });
+  const values = fieldValues(blocks);
+  assert.ok(values.includes("id: session-9"), "the session id renders");
+  assert.ok(values.includes("instructionPointerReference: 0xFF44"), "the instruction pointer renders");
+  assert.ok(
+    values.some((v) => v.startsWith("breakpoint:") && v.includes("No executable code at the breakpoint location.")),
+    "the breakpoint pending reason renders",
+  );
+  assert.ok(
+    allText(blocks).includes("FUTURE_SNAPSHOT_DATA"),
+    "an unknown snapshot field is not silently dropped",
+  );
+});
+
+test("edit keeps diagnostics, firstChangedLine and unknown fields", () => {
+  const row = converter.convertEntry(
+    tool("edit", [{ type: "text", text: "Updated warning.ts" }], {
+      diff: "-1|old\n+1|new",
+      path: "warning.ts",
+      firstChangedLine: 42,
+      diagnostics: {
+        server: "patch",
+        summary: "Patch warnings: 1",
+        errored: false,
+        messages: ["patch: Inexact match in warning.ts near line 1: PATTERN_WARNING"],
+      },
+      futureMeta: { reason: "FUTURE_EDIT_DATA" },
+    }),
+  );
+  const blocks = buildToolPresentation(row, { hideSummaryArg: true });
+  assert.ok(
+    byRole(blocks, "notice").some((b) => b.text.includes("PATTERN_WARNING")),
+    "the patch warning renders as a notice",
+  );
+  assert.ok(
+    fieldValues(blocks).some((v) => v.startsWith("firstChangedLine: 42")),
+    "the first changed line renders",
+  );
+  assert.ok(
+    fieldValues(blocks).includes("summary: Patch warnings: 1"),
+    "the diagnostics summary renders",
+  );
+  assert.ok(
+    allText(blocks).includes("FUTURE_EDIT_DATA"),
+    "an unknown edit field is not silently dropped",
+  );
+});
+
+test("a plugin name ending in edit keeps its own diff/revision metadata", () => {
+  const row = {
+    toolName: "plugin_publisher_edit",
+    toolArgs: { path: "src/plugin.ts" },
+    toolResult: {
+      details: {
+        diff: "OPAQUE_PLUGIN_DIFF",
+        action: "evaluate",
+        success: true,
+        revision: "PLUGIN_REVISION_42",
+        nested: { future: "UNKNOWN_PLUGIN_DATA" },
+      },
+      content: [{ type: "text", text: "Duplicate metadata echo" }],
+    },
+  };
+  const rendered = JSON.stringify(buildToolPresentation(row));
+  assert.ok(rendered.includes("PLUGIN_REVISION_42"), "the plugin revision stays visible");
+  assert.ok(rendered.includes("UNKNOWN_PLUGIN_DATA"), "nested plugin data stays visible");
+  assert.ok(rendered.includes("OPAQUE_PLUGIN_DIFF"), "the plugin's own diff stays visible");
 });

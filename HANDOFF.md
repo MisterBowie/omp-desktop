@@ -1,18 +1,19 @@
 # OMP Desktop 开发交接
 
-更新时间：2026-09-24。当前状态：**M5/T18（OMP 原生 Edit/LSP/Debug 结果的可读展示）已完成，待最终独立复审**（基线 `ca6a25570122c1f74007697b885eb2dbb681b5f4`，分支 `codex/m5-tool-results`；T17 已验收基线 `ab07a888d6afb916561b80e5661ed27aa6be612a` 保持不动）。下一阶段入口：M5/T19-T20。T18 证据见 `docs/validation/M5-tool-results.md`；T17 历轮独立复审返修见 `docs/validation/M5-subagents.md` §0.1-§0.15。
+更新时间：2026-09-24。当前状态：**M5/T18（OMP 原生 Edit/LSP/Debug 结果的可读展示）进行中，独立复审返修 R1-R4 已完成，待复审确认（未验收）**（本轮基线 `5ca321262bee88ca6a4a81e949291965e22d86c5`，分支 `codex/m5-tool-results`；T17 已验收基线 `ab07a888d6afb916561b80e5661ed27aa6be612a` 保持不动）。下一阶段入口：M5/T19-T20。T18 证据见 `docs/validation/M5-tool-results.md`；T17 历轮独立复审返修见 `docs/validation/M5-subagents.md` §0.1-§0.15。
 
 ## 0. M5/T18 交付摘要（本轮）
 
-- 状态：**T18 已完成**（待最终独立复审）。只适配结果展示，不改执行/权限/生命周期/持久化语义；固定 OMP 拥有工具执行与权限。
-- 证据：`docs/validation/M5-tool-results.md`（PI 源码/测试 → OMP 生产者形状 → 本项目适配证据、命令/计数/退出、先红后绿、限制）；本轮未新增 ADR（既有 `tool-presentation.ts` 边界内的纯展示适配，不改变接口/契约/权限/架构，沿用 ADR 0300/0303 的「差异集中在适配层」原则）。
+- 状态：**T18 进行中**（独立复审返修 R1-R4 已完成，待复审确认）。只适配结果展示，不改执行/权限/生命周期/持久化语义；固定 OMP 拥有工具执行与权限。
+- 证据：`docs/validation/M5-tool-results.md`（PI 源码/测试 → OMP 生产者形状 → 本项目适配证据、命令/计数/退出、先红后绿、限制、R1-R4 返修与环境修正）；本轮未新增 ADR（既有 `tool-presentation.ts` 边界内的纯展示适配，不改变接口/契约/权限/架构，沿用 ADR 0300/0303 的「差异集中在适配层」原则）。
 - 核心变更（`app/apps/desktop/src/lib/tool-presentation.ts`）：
-  - **LSP**（`ompToolKind` + `ompLspBlocks`）：诊断文本与 all-servers-failed 失败文本从 envelope 文本块读取渲染为 output/error 块（`success:false` 用 error tone）；`success` 只表示「语言服务器是否应答」，含 error 严重度的诊断仍是 `success:true`，不把源码错误当成工具失败。
-  - **Debug**（`ompDebugBlocks`）：`details.snapshot`/`evaluation` 扁平为字段行（adapter/status/cwd/program/location/stopReason/frameName/exitCode/configuration），console output 成 output 块、断点成行，未知字段走通用 record 回退。
-  - **Edit**（`ompEditBlocks`/`ompEditFileBlocks`）：以 `oldText`/`newText` 生成只读 `diffBlock`，快照裁剪时回退 hashline 格式 `diff` 字符串；单/多文件、rename(`sourcePath → move`)、create/delete、no-op、per-file 错误与 `snapshotsPruned` 通知可读；不伪造 review 快照、不声称 revert/accept。`resultBlocks` 在 Pi switch 前对 `lsp`/`debug` 分流，`case "edit"` 以 `details.diff`/`perFileResults` 存在与否区分 OMP/Pi（shape 即边界，无引擎判断）。
+  - **LSP**（`ompToolKind` + `ompResultText` + `ompLspBlocks`）：诊断文本与 all-servers-failed 失败文本从 envelope 文本块**或行 `content`** 读取渲染为 output/error 块（`success:false` 或 `toolStatus:error` 用 error tone）；`request`/未知字段走通用回退；`success` 只表示「语言服务器是否应答」，含 error 严重度的诊断仍是 `success:true`，不把源码错误当成工具失败；text-only ToolError（read-only/timeout）不再丢文本。
+  - **Debug**（`ompDebugBlocks`）：`details.snapshot`/`evaluation` 扁平为字段行（id/adapter/status/cwd/program/location/stopReason/frameName/instructionPointerReference/exitCode/configuration），console output 成 output 块、断点成行（含 `message` pending 原因），未知字段走通用 record 回退；no-session terminate/空 output 的 producer 文本保留。
+  - **Edit**（`ompEditBlocks`/`ompEditFileBlocks`/`ompEditDiagnosticBlocks`）：以 `oldText`/`newText` 生成只读 `diffBlock`，快照裁剪时回退 hashline 格式 `diff` 字符串；单/多文件、rename(`sourcePath`/`move` 双路径)、create/delete、no-op、per-file 错误、`snapshotsPruned`、`diagnostics`/`meta`/`firstChangedLine` 与未知字段可读；路径是点开的 `files` 块（走宿主 `fsResolveRef`）；不伪造 review 快照、不声称 revert/accept。
+  - **识别收窄**：原生 edit 识别为 `ompToolBareName === "edit"` AND `details.diff`/`perFileResults`，`plugin_publisher_edit` 等插件保留自身元数据走通用回退（R3）。
   - 未全局替换 Pi 的 details 优先语义、未改 converter/预算/游标/权限；4 MiB 整行预算与 Unicode/稳定 ID 保持（大 Unicode LSP 结果 ≤ 4 MiB 且带 `truncated` chip + `…`）。
-- 新增测试：`omp-tool-results.test.mjs`（14 例，真实 `convertEntry`/`convert` → 真实 `buildToolPresentation`/`runOutcome`/`toolResultChips`，覆盖 live/durable/子代理转录、Pi 兼容、大 Unicode 截断）、`omp-tool-results-render.test.mjs`（1 例，SSR 渲染真实 `ToolDetailBlocks`）。
-- 验证：`pnpm --filter @pi-desktop/desktop typecheck` 0、desktop style-token lint 0、`pnpm lint:biome`（75 files）0；presentation/file-ref/display 六套件 72 passed / 0 failed；T17 两探针与 tool-text 探针退出 0；全量 desktop 排除 4 份真实 OMP E2E 后 2744/2740 passed/0 failed/4 skipped（6 项 E2E 失败为本新工作树未构建 OMP 原生模块的 `version-mismatch`，与 presenter 无关）。
+- 新增测试：`omp-tool-results.test.mjs`（21 例，真实 `convertEntry`/`convert` → 真实 `buildToolPresentation`/`runOutcome`/`toolResultChips`，覆盖 live/durable/子代理转录、Pi 兼容、插件兼容、大 Unicode 截断、R1-R4 回归）、`omp-tool-results-render.test.mjs`（1 例，SSR 渲染真实 `ToolDetailBlocks`）。
+- 验证：`pnpm --filter @pi-desktop/desktop typecheck` 0、desktop style-token lint 0、`pnpm lint:biome`（75 files）0、desktop renderer build 0；presentation/file-ref/display 六套件 **79 passed / 0 failed**；三份独立复审探针（paths 33/33、preservation 8/8、mounted 组件交互）与 T17 两探针 + tool-text 探针均退出 0；**全量 desktop `node --test test/*.test.mjs` 2757 总数 / 2753 passed / 0 failed / 4 skipped**（固定 runtime 已备：`upstream/oh-my-pi` 内 `bun install --frozen-lockfile` + `bun run build:native`，launcher 报 `omp/18.2.7`；6 项真实固定 OMP E2E 现已通过）。
 - 下一轮入口：M5/T19-T20（MCP/规则/技能/记忆及插件分类适配；Plan/Goal 与高权限工具能力门）。仍关闭：`branch`/`steer`/`followUp`/`compact`、子代理单独停止、子代理 `hasUI=false` 工具 gating。
 
 ## 0. M5/T17 交付摘要（上一轮，已验收）
@@ -157,7 +158,7 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 
 ## 4. 下一执行模型从哪里开始
 
-T17 已通过最终独立复审并验收（验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`；含真实固定 OMP 端到端验收与 macOS arm64 独立复审，证据见 `docs/validation/M5-subagents.md` §0.15 与 §0.14）。T18（OMP 原生 Edit/LSP/Debug 结果的可读展示）已完成、待最终独立复审（分支 `codex/m5-tool-results`，证据见 `docs/validation/M5-tool-results.md`）。
+T17 已通过最终独立复审并验收（验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`；含真实固定 OMP 端到端验收与 macOS arm64 独立复审，证据见 `docs/validation/M5-subagents.md` §0.15 与 §0.14）。T18（OMP 原生 Edit/LSP/Debug 结果的可读展示）进行中、独立复审返修 R1-R4 已完成、待复审确认（分支 `codex/m5-tool-results`，本轮基线 `5ca321262bee88ca6a4a81e949291965e22d86c5`，证据见 `docs/validation/M5-tool-results.md`）。
 
 下一阶段入口：M5/T19-T20（MCP/规则/技能/记忆及插件分类适配；Plan/Goal 与高权限工具能力门）。仍在关闭的能力：`branch`/`steer`/`followUp`/`compact`、子代理单独停止（固定 OMP 无 per-child stop RPC）、子代理 `hasUI=false` 工具 gating（产品策略），留待对应阶段逐项开放。
 
