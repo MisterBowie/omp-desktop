@@ -1,8 +1,21 @@
 # OMP Desktop 开发交接
 
-更新时间：2026-09-24。当前状态：**M5/T17（OMP 子代理生命周期、父子归属、进度/详情查看、取消边界与恢复语义）已通过最终独立复审并验收**（验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`；本轮文档记录为单独的 docs-only 提交，见 §0 与 `docs/validation/M5-subagents.md`）。下一阶段入口：M5/T18-T20。历轮独立复审返修（R1-R8、S1-S4、B1-B3、C1、D1/D2、E1/E2、F1/F2）的事实与证据见 `docs/validation/M5-subagents.md` §0.1-§0.14，此处不再逐条复述。
+更新时间：2026-09-24。当前状态：**M5/T18（OMP 原生 Edit/LSP/Debug 结果的可读展示）已完成，待最终独立复审**（基线 `ca6a25570122c1f74007697b885eb2dbb681b5f4`，分支 `codex/m5-tool-results`；T17 已验收基线 `ab07a888d6afb916561b80e5661ed27aa6be612a` 保持不动）。下一阶段入口：M5/T19-T20。T18 证据见 `docs/validation/M5-tool-results.md`；T17 历轮独立复审返修见 `docs/validation/M5-subagents.md` §0.1-§0.15。
 
-## 0. M5/T17 交付摘要（本轮）
+## 0. M5/T18 交付摘要（本轮）
+
+- 状态：**T18 已完成**（待最终独立复审）。只适配结果展示，不改执行/权限/生命周期/持久化语义；固定 OMP 拥有工具执行与权限。
+- 证据：`docs/validation/M5-tool-results.md`（PI 源码/测试 → OMP 生产者形状 → 本项目适配证据、命令/计数/退出、先红后绿、限制）；本轮未新增 ADR（既有 `tool-presentation.ts` 边界内的纯展示适配，不改变接口/契约/权限/架构，沿用 ADR 0300/0303 的「差异集中在适配层」原则）。
+- 核心变更（`app/apps/desktop/src/lib/tool-presentation.ts`）：
+  - **LSP**（`ompToolKind` + `ompLspBlocks`）：诊断文本与 all-servers-failed 失败文本从 envelope 文本块读取渲染为 output/error 块（`success:false` 用 error tone）；`success` 只表示「语言服务器是否应答」，含 error 严重度的诊断仍是 `success:true`，不把源码错误当成工具失败。
+  - **Debug**（`ompDebugBlocks`）：`details.snapshot`/`evaluation` 扁平为字段行（adapter/status/cwd/program/location/stopReason/frameName/exitCode/configuration），console output 成 output 块、断点成行，未知字段走通用 record 回退。
+  - **Edit**（`ompEditBlocks`/`ompEditFileBlocks`）：以 `oldText`/`newText` 生成只读 `diffBlock`，快照裁剪时回退 hashline 格式 `diff` 字符串；单/多文件、rename(`sourcePath → move`)、create/delete、no-op、per-file 错误与 `snapshotsPruned` 通知可读；不伪造 review 快照、不声称 revert/accept。`resultBlocks` 在 Pi switch 前对 `lsp`/`debug` 分流，`case "edit"` 以 `details.diff`/`perFileResults` 存在与否区分 OMP/Pi（shape 即边界，无引擎判断）。
+  - 未全局替换 Pi 的 details 优先语义、未改 converter/预算/游标/权限；4 MiB 整行预算与 Unicode/稳定 ID 保持（大 Unicode LSP 结果 ≤ 4 MiB 且带 `truncated` chip + `…`）。
+- 新增测试：`omp-tool-results.test.mjs`（14 例，真实 `convertEntry`/`convert` → 真实 `buildToolPresentation`/`runOutcome`/`toolResultChips`，覆盖 live/durable/子代理转录、Pi 兼容、大 Unicode 截断）、`omp-tool-results-render.test.mjs`（1 例，SSR 渲染真实 `ToolDetailBlocks`）。
+- 验证：`pnpm --filter @pi-desktop/desktop typecheck` 0、desktop style-token lint 0、`pnpm lint:biome`（75 files）0；presentation/file-ref/display 六套件 72 passed / 0 failed；T17 两探针与 tool-text 探针退出 0；全量 desktop 排除 4 份真实 OMP E2E 后 2744/2740 passed/0 failed/4 skipped（6 项 E2E 失败为本新工作树未构建 OMP 原生模块的 `version-mismatch`，与 presenter 无关）。
+- 下一轮入口：M5/T19-T20（MCP/规则/技能/记忆及插件分类适配；Plan/Goal 与高权限工具能力门）。仍关闭：`branch`/`steer`/`followUp`/`compact`、子代理单独停止、子代理 `hasUI=false` 工具 gating。
+
+## 0. M5/T17 交付摘要（上一轮，已验收）
 
 - 状态：**T17 已验收**（已实现能力边界；验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`，含真实固定 OMP 子代理端到端验收与 macOS arm64 独立复审）。历轮独立复审返修（R1-R8、S1-S4、B1-B3、C1、D1/D2、E1/E2、F1/F2）的历史记录见 §0.1-§0.14。验收范围仅为 T17 已实现能力边界，不代表 M5/M6/M7 全量、打包构建、付费 provider 或 Windows 已验收；仍关闭的能力（`branch`/`steer`/`followUp`/`compact`、子代理单独停止无 per-child stop RPC、子代理 `hasUI=false` 工具 gating）见 ADR 0303。
 - 证据：`docs/validation/M5-subagents.md`（PI 实现/测试 → 固定 OMP 能力 → 本项目决策证据表、归属矩阵、用户路径、失败/取消矩阵、命令与计数、限制；顶部 §0.1-§0.5 为返修记录）；设计决策：`app/docs/adr/0303-omp-subagent-surfacing.md`（英文 ADR）。
@@ -144,9 +157,9 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 
 ## 4. 下一执行模型从哪里开始
 
-T17 已通过最终独立复审并验收（验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`；含真实固定 OMP 端到端验收与 macOS arm64 独立复审，证据见 `docs/validation/M5-subagents.md` §0.15 与 §0.14）。
+T17 已通过最终独立复审并验收（验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`；含真实固定 OMP 端到端验收与 macOS arm64 独立复审，证据见 `docs/validation/M5-subagents.md` §0.15 与 §0.14）。T18（OMP 原生 Edit/LSP/Debug 结果的可读展示）已完成、待最终独立复审（分支 `codex/m5-tool-results`，证据见 `docs/validation/M5-tool-results.md`）。
 
-下一阶段入口：M5/T18-T20（edit/LSP/DAP 结果展示、MCP/规则/技能/记忆及插件分类适配、Plan/Goal 与高权限工具能力门）。仍在关闭的能力：`branch`/`steer`/`followUp`/`compact`、子代理单独停止（固定 OMP 无 per-child stop RPC）、子代理 `hasUI=false` 工具 gating（产品策略），留待对应阶段逐项开放。
+下一阶段入口：M5/T19-T20（MCP/规则/技能/记忆及插件分类适配；Plan/Goal 与高权限工具能力门）。仍在关闭的能力：`branch`/`steer`/`followUp`/`compact`、子代理单独停止（固定 OMP 无 per-child stop RPC）、子代理 `hasUI=false` 工具 gating（产品策略），留待对应阶段逐项开放。
 
 ## 6. 下一轮必须保持的取舍
 

@@ -541,6 +541,242 @@ export function hasToolDetails(message: ToolPresentationMessage): boolean {
   return message.toolArgs !== undefined;
 }
 
+/**
+ * OMP native tools whose result shapes have no PI mapping. `lsp` and `debug`
+ * resolve to the generic `use` action, and their meaning lives in
+ * producer-specific shapes plus the envelope text, so they are recognised by
+ * name at this adapter boundary. `edit` shares its action with PI's Edit tool
+ * and is told apart by its result shape (see `resultBlocks`).
+ */
+function ompToolKind(toolName?: string): "lsp" | "debug" | null {
+  const bare = (toolName || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  if (bare === "lsp") return "lsp";
+  if (bare === "debug") return "debug";
+  return null;
+}
+
+/**
+ * An LSP tool result. The producer carries the diagnostics (or the
+ * all-servers-failed text) in the envelope's text blocks and only
+ * `action`/`serverName`/`success` in `details`, so the generic
+ * details-preferred unwrap would drop the diagnostics. `success` reports
+ * whether a language server answered: a diagnostics result full of
+ * error-severity findings still has `success: true`, so the row is never
+ * marked failed from the findings themselves.
+ */
+function ompLspBlocks(
+  message: ToolPresentationMessage,
+  details: Record<string, unknown> | null,
+): ToolBlock[] {
+  const blocks: ToolBlock[] = [];
+  const text = envelopeTextOf(message);
+  if (text) {
+    const failed = details?.success === false;
+    blocks.push(
+      codeBlock(failed ? "error" : "output", text, "", failed ? { tone: "error" } : {}),
+    );
+  }
+  const rows: ToolFieldRow[] = [];
+  for (const key of ["serverName", "action"] as const) {
+    const value = stringAt(details, key);
+    if (value) rows.push({ label: key, value });
+  }
+  if (rows.length > 0) blocks.push({ kind: "fields", role: "details", rows });
+  return blocks;
+}
+
+/** The debugger's stop location, `source.path[:line[:column]]`. */
+function ompDebugLocation(snapshot: Record<string, unknown>): string | null {
+  const source = asRecord(snapshot.source);
+  const path = stringAt(source, "path");
+  if (!path) return null;
+  const line = numberAt(snapshot, "line");
+  if (line === null) return path;
+  const column = numberAt(snapshot, "column");
+  return column === null ? `${path}:${line}` : `${path}:${line}:${column}`;
+}
+
+/** The session summary (`details.snapshot`) as field rows, not a JSON blob. */
+function ompDebugSnapshotRows(snapshot: Record<string, unknown>): ToolFieldRow[] {
+  const rows: ToolFieldRow[] = [];
+  const push = (label: string, value: unknown) => {
+    if (typeof value === "string" && value !== "") {
+      rows.push({ label, value });
+    } else if (typeof value === "number" && Number.isFinite(value)) {
+      rows.push({ label, value: String(value) });
+    }
+  };
+  push("adapter", snapshot.adapter);
+  push("status", snapshot.status);
+  push("cwd", snapshot.cwd);
+  push("program", snapshot.program);
+  push("stopReason", snapshot.stopReason);
+  push("frameName", snapshot.frameName);
+  const location = ompDebugLocation(snapshot);
+  if (location) rows.push({ label: "location", value: location });
+  push("exitCode", snapshot.exitCode);
+  if (snapshot.needsConfigurationDone === true) {
+    rows.push({ label: "configuration", value: "pending configurationDone" });
+  }
+  return rows;
+}
+
+/** Breakpoint listings read better as rows than as a JSON blob of records. */
+function ompDebugBreakpointRows(value: unknown): ToolFieldRow[] {
+  if (!Array.isArray(value)) return [];
+  const rows: ToolFieldRow[] = [];
+  for (const entry of value) {
+    const record = asRecord(entry);
+    if (!record) continue;
+    const line = numberAt(record, "line");
+    const target =
+      stringAt(record, "name") ?? (line !== null ? `line ${line}` : null);
+    if (!target) continue;
+    const verified =
+      record.verified === true ? "verified" : record.verified === false ? "pending" : "";
+    const condition = stringAt(record, "condition");
+    const parts = [target, verified, condition ? `if ${condition}` : null].filter(
+      (part): part is string => Boolean(part),
+    );
+    rows.push({ label: "breakpoint", value: parts.join(" · ") });
+  }
+  return rows;
+}
+
+/**
+ * A debugger tool result. The producer stores a session summary in
+ * `details.snapshot` and the action's payload (`evaluation`, `output`,
+ * breakpoint/stack/thread/scope listings…) beside it; the generic
+ * details-preferred unwrap would dump `snapshot` and `evaluation` as JSON
+ * blobs. Flatten the summary and the common payloads into readable rows, and
+ * keep every other field through the generic record renderer.
+ */
+function ompDebugBlocks(
+  details: Record<string, unknown> | null,
+): ToolBlock[] | null {
+  if (!details) return null;
+  const blocks: ToolBlock[] = [];
+
+  const snapshot = asRecord(details.snapshot);
+  if (snapshot) {
+    const rows = ompDebugSnapshotRows(snapshot);
+    if (rows.length > 0) blocks.push({ kind: "fields", role: "details", rows });
+  }
+
+  const output = stringAt(details, "output");
+  if (output) blocks.push(codeBlock("output", output));
+
+  const evaluation = asRecord(details.evaluation);
+  if (evaluation) blocks.push(...recordBlocks(evaluation, "details"));
+
+  for (const key of ["breakpoints", "functionBreakpoints"] as const) {
+    const rows = ompDebugBreakpointRows(details[key]);
+    if (rows.length > 0) blocks.push({ kind: "fields", role: "details", rows });
+  }
+
+  // Everything else — action, success, state, timedOut, adapter, and any
+  // future producer fields — stays readable through the generic renderer.
+  const consumed: Record<string, true> = {
+    snapshot: true,
+    output: true,
+    evaluation: true,
+    breakpoints: true,
+    functionBreakpoints: true,
+  };
+  const remainder = Object.fromEntries(
+    Object.entries(details).filter(([key]) => !consumed[key]),
+  );
+  if (Object.keys(remainder).length > 0) {
+    blocks.push(...recordBlocks(remainder, "details"));
+  }
+  return blocks;
+}
+
+/** One edited file: identity rows, a read-only diff, errors and pruned notice. */
+function ompEditFileBlocks(file: Record<string, unknown>): ToolBlock[] {
+  const blocks: ToolBlock[] = [];
+  const path = stringAt(file, "path");
+  const op = stringAt(file, "op");
+  const move = stringAt(file, "move");
+  const sourcePath = stringAt(file, "sourcePath");
+  const isError = file.isError === true;
+  const errorText = stringAt(file, "displayErrorText") ?? stringAt(file, "errorText");
+  const snapshotsPruned = file.snapshotsPruned === true;
+  const oldText = typeof file.oldText === "string" ? file.oldText : null;
+  const newText = typeof file.newText === "string" ? file.newText : null;
+  const diffText = typeof file.diff === "string" && file.diff !== "" ? file.diff : null;
+
+  // Identity: the path plus the rename/operation it represents.
+  const rows: ToolFieldRow[] = [];
+  if (sourcePath && move) {
+    rows.push({ label: "move", value: `${sourcePath} → ${move}` });
+  } else if (path) {
+    rows.push({ label: "path", value: path });
+  }
+  if (op === "create") rows.push({ label: "operation", value: "create" });
+  else if (op === "delete") rows.push({ label: "operation", value: "delete" });
+  if (rows.length > 0) blocks.push({ kind: "fields", role: "details", rows });
+
+  if (op === "create") {
+    if (newText !== null) blocks.push(codeBlock("written", newText, langForPath(path)));
+    else if (diffText) blocks.push(codeBlock("written", diffText, ""));
+  } else if (op === "delete") {
+    if (oldText !== null) {
+      blocks.push(codeBlock("content", oldText, langForPath(path), { label: "deleted" }));
+    } else if (diffText) {
+      blocks.push(codeBlock("content", diffText, "", { label: "deleted" }));
+    }
+  } else if (oldText !== null && newText !== null) {
+    // Source-of-truth snapshots render a clean colored diff; the hashline-format
+    // `diff` string repeats them, so it is shown only when the snapshots were
+    // pruned away.
+    const diff = diffBlock(oldText, newText);
+    if (diff) {
+      blocks.push(diff);
+    } else if (!sourcePath && !move) {
+      blocks.push({
+        kind: "note",
+        role: "notice",
+        text: path ? `no changes were made to ${path}` : "no changes were made",
+      });
+    }
+  } else if (diffText) {
+    blocks.push(codeBlock("diff", diffText, ""));
+  } else if (!sourcePath && !move) {
+    blocks.push({
+      kind: "note",
+      role: "notice",
+      text: path ? `no changes were made to ${path}` : "no changes were made",
+    });
+  }
+
+  if (isError) {
+    blocks.push({ kind: "note", role: "error", text: errorText || "the edit failed" });
+  }
+  if (snapshotsPruned) {
+    blocks.push({
+      kind: "note",
+      role: "notice",
+      text: "file snapshots were pruned from the result",
+    });
+  }
+  return blocks;
+}
+
+/** An OMP edit result: per-file diffs, or the single-file aggregate shape. */
+function ompEditBlocks(details: Record<string, unknown>): ToolBlock[] {
+  const perFile = Array.isArray(details.perFileResults) ? details.perFileResults : null;
+  if (perFile && perFile.length > 0) {
+    const blocks: ToolBlock[] = [];
+    for (const entry of perFile) {
+      const file = asRecord(entry);
+      if (file) blocks.push(...ompEditFileBlocks(file));
+    }
+    return blocks;
+  }
+  return ompEditFileBlocks(details);
+}
+
 function resultBlocks(
   action: ToolAction,
   message: ToolPresentationMessage,
@@ -567,6 +803,20 @@ function resultBlocks(
     });
   }
 
+  // OMP native LSP/debug results are resolved here, before the PI switch: their
+  // meaning is producer-specific and lives partly outside `details`, so the
+  // generic details-preferred fallback would drop it.
+  const ompKind = ompToolKind(message.toolName);
+  if (ompKind === "lsp") {
+    return ompLspBlocks(message, details);
+  }
+  if (ompKind === "debug") {
+    const debug = ompDebugBlocks(details);
+    // A debug failure is text-only (no `details`), so fall through to the
+    // generic string fallback rather than returning an empty body.
+    if (debug) return debug;
+  }
+
   switch (action) {
     case "read": {
       const content = stringAt(details, "content");
@@ -585,6 +835,14 @@ function resultBlocks(
       break;
     }
     case "edit": {
+      // OMP's Edit tool carries a `diff` string (single-file) or `perFileResults`
+      // (multi-file); PI's Edit tool never has either, so the shape itself
+      // selects the OMP presentation without an engine check.
+      if (typeof details?.diff === "string" || Array.isArray(details?.perFileResults)) {
+        blocks.push(...ompEditBlocks(details));
+        mapped = true;
+        break;
+      }
       const ops = stringAt(args, "ops");
       // Workspace edits already own a ReviewChangeCard with the real diff;
       // only scratch edits and imported sessions need the model's stated ops.
