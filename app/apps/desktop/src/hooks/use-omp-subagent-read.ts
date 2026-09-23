@@ -29,6 +29,12 @@ const POLL_INTERVAL_MS = 2_000;
  * after a manually triggered read. A request slower than the interval can
  * therefore never be overlapped by the next poll.
  *
+ * Polling follows `running`: it arms from each read completion while running
+ * is true, cancels the moment running becomes false, and *resumes* (on the
+ * same selection) when running turns true again — that transition triggers one
+ * read through the shared coordinator, preserving the accumulated rows and
+ * cursor instead of resetting them.
+ *
  * Incremental semantics: the bridge returns only the bytes since `fromByte`, so
  * each read's rows are *merged* into the accumulated set by stable message id.
  * A `reset` response (the cursor was ahead of the file) replaces the set. A
@@ -65,6 +71,8 @@ export function useOmpSubagentRead(
   /** Latest `omp`/`running`, readable from the stable read-completion closure. */
   const ompRef = useRef(omp);
   const runningRef = useRef(opts.running);
+  /** Previous `opts.running`, to detect the idle/stopped -> running transition. */
+  const prevRunningRef = useRef(opts.running);
 
   const performRead = useCallback(async (sid: string, did: string): Promise<void> => {
     const seq = ++requestSeq.current;
@@ -162,13 +170,23 @@ export function useOmpSubagentRead(
   // Polling stops the moment the child is no longer running (or OMP is off):
   // an armed poll is cancelled outright rather than left to fire once and
   // no-op. An in-flight read is deliberately left to settle its own rows.
+  //
+  // Polling also resumes on the idle/stopped -> running transition for the
+  // *same* selection: `requestRead` coalesces with any pending read (or starts
+  // one), and that read's completion re-arms the next poll. The accumulated
+  // rows and cursor are preserved; only a selection/disable/unmount change
+  // resets them (in the initial-read and invalidation effects above).
   useEffect(() => {
-    if (omp && opts.running) return;
-    if (pollTimerRef.current !== null) {
-      window.clearTimeout(pollTimerRef.current);
-      pollTimerRef.current = null;
+    const resumed = omp && opts.running && !prevRunningRef.current;
+    prevRunningRef.current = opts.running;
+    if (resumed) void requestRead();
+    if (!omp || !opts.running) {
+      if (pollTimerRef.current !== null) {
+        window.clearTimeout(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
     }
-  }, [omp, opts.running]);
+  }, [omp, opts.running, requestRead]);
 
   return { omp, phase, run, errorDetail, reload: () => void requestRead() };
 }

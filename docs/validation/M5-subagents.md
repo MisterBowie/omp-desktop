@@ -1,6 +1,6 @@
 # M5 验证记录：OMP 子代理面板与编排归属（T17）
 
-状态：**未验收**（T17）。第三轮独立复审拆出 B1-B3 三项返修；B1 于 `9d0acde` 首实现后独立复审仍复现两项缺陷（F1 目录债二次 stop 丢失、F2 停期间短暂放行 prompt），本提交修复并追加行为回归，**B1 改定待独立验收**；第四轮独立复审拆出 C1（回收成功后的运行时替换/原生会话恢复，见 §0.5），C1 基本续聊已修复，但独立复审进一步复现三项残余缺陷（R1 替换后回复覆盖、R2 停止未完成即替换且跳过恢复、R3 启动/恢复中停止被忽略），由跟进提交 `0092572` 修复并追加行为回归（见 §0.6），第五轮独立复审已在 `0092572` 上独立确认 R1/R2/R3 修复（88 runtime + 63 desktop 定向用例通过）；**第五轮进一步复现两项生命周期门残留（D1 dispose 期间可启动孤儿替换、D2 启动/恢复停止期间新 prompt 逃逸 epoch，见 §0.7），由本提交修复并追加行为回归，`24d7270` D1/D2 定向探针已独立通过；第六轮复现两项残留（E1 既有会话绕过整桥关闭、E2 模型切换复用 live 消息/turn id，见 §0.8），本提交修复并追加行为回归，E1/E2 待独立验收**；**B2（renderer 单飞/错误可见，见 §0.9）已实现并追加行为回归、待独立验收**；**B3（总 UTF-8 预算）仍未解决，T17 不验收**。M5 后续任务 T18-T20 未开始。
+状态：**未验收**（T17）。第三轮独立复审拆出 B1-B3 三项返修；B1 于 `9d0acde` 首实现后独立复审仍复现两项缺陷（F1 目录债二次 stop 丢失、F2 停期间短暂放行 prompt），本提交修复并追加行为回归，**B1 改定待独立验收**；第四轮独立复审拆出 C1（回收成功后的运行时替换/原生会话恢复，见 §0.5），C1 基本续聊已修复，但独立复审进一步复现三项残余缺陷（R1 替换后回复覆盖、R2 停止未完成即替换且跳过恢复、R3 启动/恢复中停止被忽略），由跟进提交 `0092572` 修复并追加行为回归（见 §0.6），第五轮独立复审已在 `0092572` 上独立确认 R1/R2/R3 修复（88 runtime + 63 desktop 定向用例通过）；**第五轮进一步复现两项生命周期门残留（D1 dispose 期间可启动孤儿替换、D2 启动/恢复停止期间新 prompt 逃逸 epoch，见 §0.7），由本提交修复并追加行为回归，`24d7270` D1/D2 定向探针已独立通过；第六轮复现两项残留（E1 既有会话绕过整桥关闭、E2 模型切换复用 live 消息/turn id，见 §0.8），本提交修复并追加行为回归，E1/E2 待独立验收**；**B2（renderer 单飞/错误可见，见 §0.9）已实现并追加行为回归，独立复审确认其夹具与初始行为通过，但仍复现运行恢复续读缺陷，由本提交修复并追加回归（见 §0.10），B2 follow-up 待独立验收**；**B3（总 UTF-8 预算）仍未解决，T17 不验收**。M5 后续任务 T18-T20 未开始。
 基线提交：`d26444407fc963c2e7efd51bda7d1bd4a70e8bbd`；第二轮独立复审返修（S1-S4）以追加普通提交落在该基线上（见 `git log` 最新提交）。
 固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未修改）。
 工作树：`/home/vv/person/code/omp-desktop-m5-t17`，分支 `codex/m5-subagents`。
@@ -127,7 +127,8 @@
 | --- | --- |
 | pending-read 守卫 + 完成时以对象身份判陈旧 + `reportError` 保留既有行 | `apps/desktop/src/stores/runtime/transcript-reading-runtime.ts` `loadTranscriptPage`/`reportError` |
 | 测试夹具根用 `realpathSync(mkdtempSync(...))` 对齐生产 restore 边界的 canonical 化 | `apps/desktop/test/npm-executable.test.mjs:35` `fixture()` |
-| 完成后再调度下一 poll（单飞）、慢请求不被 interval 永久覆盖 | `apps/desktop/test/transcript-reading.test.mjs`（controlled deferred promises、physical cursors、stale errors、pane eviction） |
+
+**PI 不提供本适配器的 2 秒轮询算法**：固定 PI `transcript-reading-runtime.ts` 及其 `transcript-reading.test.mjs` 跟随 live/persisted transcript 变更（deferred reads、coalescing、canceled ownership、new-turn transitions），不存在"完成后调度下一 poll"的定时续读端点。本适配器的 `POLL_INTERVAL_MS = 2_000` 轮询与"完成后 2s 再调度下一 poll（单飞）"是 **OMP 适配器自身的协调器行为**（`use-omp-subagent-read.ts`），仅借用 PI 的**请求归属/陈旧判据**语义（pending-read 守卫、完成时以对象身份判陈旧、错误保留既有行），而非其轮询实现；受控 deferred promise 的测试写法沿用 PI 测试约定。慢请求不被 interval 永久覆盖由 `inFlightRef` 单飞 + 完成后才调度保证。
 
 前置（独立测试夹具提交，非产品改动）：`shutdownAdmissionHarness`/`modelSwitchHarness` 根从 `mkdtempSync(tmpdir())` 改为 `realpathSync(mkdtempSync(...))`，否则 macOS `/var` 别名与生产 restore 边界的 `/private/var` canonical 化不一致，5 项新 E1/E2 回归在 `switch_session` 抛 `incorrect session binding`。Linux 以 `TMPDIR` 指向隔离 symlink 复现（先 5 失败后通过），随后清理夹具。
 
@@ -137,6 +138,22 @@
 - 既有 reset 用例补 `fromByte=7` 断言（reset 后下一条请求显式续读）。
 
 验证（`app/`，`nvm use v24.14.0`，Node v24.14.0，pnpm 10.34.5，`env -u SSH_ASKPASS`，`--test-force-exit`）：`omp-subagent-read` **5 passed**、`omp-subagent-panel-render` **2 passed**、`omp-subagent-panel-mounted` **6 passed**（3 旧 + 3 B2）、`omp-subagent-panel-real` **1 passed**；共享面板 PI 回归 `subagent-panel` 7、`subagent-transcript` 17、`transcript-search-rendering` 1、`work-panel` 24、`tool-presentation` 30、`transcript-reading` 14 全绿；`pnpm --filter @pi-desktop/desktop typecheck` 退出码 0；`git diff --check` 无输出。未重跑全量 runtime/E2E（renderer-only 变更，最终 T17 回归随 B3）。
+
+## 0.10 B2 follow-up：运行恢复时续读与完整归属覆盖（2026-09-24）
+
+独立复审在 B2 交付 `250fe6e` 上确认：test-only 夹具 canonical 化提交 `182f88a1939909f856ce9a0984d3e9a5ee988b1c` 被接受；真实 `SubagentPanel` 挂载探针默认模式全部通过（挂载 1 读、增量错误后 rows 保留、错误/重试可见、每次重试 1 读、恢复输出并清错误），macOS 上 132 项定向 desktop 测试全通过、退出 0。
+
+独立复审仍复现一项残留缺陷：`use-omp-subagent-read.ts` 只在 `running` 变 false 时清 timer；`running` 随后变 true 时直接 return、不调度也不读取。无在途请求时没有任何东西能调度下一次 poll；挂载时 idle、首次读结束后会话才开始 running 的面板同样无法恢复轮询。独立复现（`/tmp/m5-real-panel-review.mjs`，真实 `SubagentPanel` + 真实 `useAppStore.runningSessions` + 真实 `api.ts`，仅 IPC/定时器受控）：`resumedPolling=false`、`readsAfterResume=3`、退出 1。
+
+修复（本提交）：轮询跟随 `running` 的 false→true 转变恢复——新增 `prevRunningRef` 检测转变，在 `omp && running` 且先前非 running 时经同一 `requestRead` 协调器续读（有在途读则合并、否则新起一条链），该读完成后重新 armed 下一 poll；累计 rows 与游标保留（`sessionId`/`delegationId`/`omp` 变化才重置）。重复 true 渲染不重启 timer、不产生并行读；停止/禁用/卸载的取消与陈旧完成隔离保持不变。修正 §0.9 借用表——PI `transcript-reading` 不提供 2 秒轮询，该轮询是本适配器自身行为。
+
+新增回归（先红后绿，受控 promise/定时器）：
+- `omp-subagent-panel-mounted.test.mjs` +6：① idle→running 恢复（续读自保游标、恰好 1 读 + 1 poll、rows 累积）；② running→stopped→running 恢复；③ running 挂载 + deferred 初始读恰好 1 条链；④ timer armed 时 manual reload 恰好 1 次读、完成后恰好 1 poll（相对完成调度）；⑤ 同实例选择更新时旧/新读都 pending，旧成功不替换 rows、不 clear 新归属、不 re-arm 旧 poll；⑥ 旧错误不 surface 到新选择、不 re-arm。
+- `omp-subagent-panel-real.test.mjs` +1：生产 `SubagentPanel` keyed 选择 remount（`TranscriptDisclosureProvider key`），旧 pending 读完成后不替换新选择 rows、不启动额外读。
+
+验证（`app/apps/desktop`，Node v24.14.0，`node --test`）：`omp-subagent-panel-mounted` **12 passed**（6 旧 + 6 本提交）、`omp-subagent-panel-real` **2 passed**；独立探针默认与 resume 两模式退出 0（`resumedPolling=true`、`readsAfterResume=4`）。先红后绿：在 `250fe6e` 基线（`git stash` 掉本提交 hook）上 `idle→running`/`running→stopped→running` 两例复现缺陷（断言 `1 !== 2`），恢复后通过。
+
+状态：**B2 follow-up 已实现、待独立验收**；B3（总 UTF-8 预算）、平台、最终 T17 验收仍待。
 
 ## 0. 环境准备（固定子模块流程，与本轮代码无关）
 

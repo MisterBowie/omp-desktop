@@ -436,3 +436,285 @@ test("mounted read: disabling OMP invalidates an in-flight read and drops its re
     restoreGlobals(previous);
   }
 });
+
+test("mounted read: an idle mount resumes polling when the child starts running", async () => {
+  const previous = installMinimalDom();
+  const { polls } = installFakeTimers();
+  const { calls, behaviour, invoke } = makeInvokeMock();
+  globalThis.window.piDesktop = { invoke, on: () => () => {}, platform: "linux" };
+  const readCalls = () => calls.filter((c) => c.channel === IPC.invoke.ompSubagentRead).length;
+
+  const container = globalThis.document.createElement("div");
+  const root = createRoot(container);
+  try {
+    useAppStore.setState({ sessions: [{ id: "s1", title: "OMP", mode: "agent", messageCount: 0, engine: "omp" }] });
+    behaviour.read = () => ({
+      ok: true,
+      data: { cursor: { fromByte: 0, nextByte: 10, reset: false }, messages: [message("a", "first")] },
+    });
+    await act(async () => {
+      root.render(createElement(HookProbe, { sessionId: "s1", delegationId: "child-1", running: false }));
+    });
+    assert.equal(readCalls(), 1, "the idle mount performs exactly one read");
+    assert.equal(polls().length, 0, "no poll is armed while stopped");
+
+    // Running again on the same mounted panel: one read resumes the chain, and
+    // its completion arms the next poll. The cursor is preserved, not reset.
+    let resumedFromByte = null;
+    behaviour.read = (args) => {
+      resumedFromByte = args.fromByte;
+      return {
+        ok: true,
+        data: { cursor: { fromByte: args.fromByte, nextByte: 15, reset: false }, messages: [message("b", "second")] },
+      };
+    };
+    await act(async () => {
+      root.render(createElement(HookProbe, { sessionId: "s1", delegationId: "child-1", running: true }));
+    });
+    assert.equal(readCalls(), 2, "running again starts exactly one read");
+    assert.equal(resumedFromByte, 10, "the resumed read continues from the preserved cursor");
+    assert.equal(polls().length, 1, "running again arms exactly one poll");
+    assert.deepEqual(
+      latest.run.items.map((i) => i.message.content),
+      ["first", "second"],
+      "rows accumulate across the resume, not reset",
+    );
+
+    await act(async () => { root.unmount(); });
+  } finally {
+    restoreGlobals(previous);
+  }
+});
+
+test("mounted read: a stopped child resumes polling on the same mounted panel", async () => {
+  const previous = installMinimalDom();
+  const { polls } = installFakeTimers();
+  const { calls, behaviour, invoke } = makeInvokeMock();
+  globalThis.window.piDesktop = { invoke, on: () => () => {}, platform: "linux" };
+  const readCalls = () => calls.filter((c) => c.channel === IPC.invoke.ompSubagentRead).length;
+
+  const container = globalThis.document.createElement("div");
+  const root = createRoot(container);
+  try {
+    useAppStore.setState({ sessions: [{ id: "s1", title: "OMP", mode: "agent", messageCount: 0, engine: "omp" }] });
+    behaviour.read = () => ({
+      ok: true,
+      data: { cursor: { fromByte: 0, nextByte: 10, reset: false }, messages: [message("a", "first")] },
+    });
+    await act(async () => {
+      root.render(createElement(HookProbe, { sessionId: "s1", delegationId: "child-1", running: true }));
+    });
+    assert.equal(readCalls(), 1);
+    assert.equal(polls().length, 1);
+
+    // Stop: the armed poll is cancelled, no extra read.
+    await act(async () => {
+      root.render(createElement(HookProbe, { sessionId: "s1", delegationId: "child-1", running: false }));
+    });
+    assert.equal(polls().length, 0, "stopping cancels the armed poll");
+    assert.equal(readCalls(), 1, "stopping performs no extra read");
+
+    // Resume on the same panel: exactly one read and one re-armed poll.
+    behaviour.read = () => ({
+      ok: true,
+      data: { cursor: { fromByte: 10, nextByte: 20, reset: false }, messages: [message("b", "second")] },
+    });
+    await act(async () => {
+      root.render(createElement(HookProbe, { sessionId: "s1", delegationId: "child-1", running: true }));
+    });
+    assert.equal(readCalls(), 2, "resuming performs exactly one read");
+    assert.equal(polls().length, 1, "resuming re-arms exactly one poll");
+    assert.deepEqual(
+      latest.run.items.map((i) => i.message.content),
+      ["first", "second"],
+      "rows are retained across stop and resume",
+    );
+
+    await act(async () => { root.unmount(); });
+  } finally {
+    restoreGlobals(previous);
+  }
+});
+
+test("mounted read: a running mount with a pending read starts exactly one chain", async () => {
+  const previous = installMinimalDom();
+  const { polls } = installFakeTimers();
+  const { calls, behaviour, invoke } = makeInvokeMock();
+  globalThis.window.piDesktop = { invoke, on: () => () => {}, platform: "linux" };
+  const readCalls = () => calls.filter((c) => c.channel === IPC.invoke.ompSubagentRead).length;
+
+  const container = globalThis.document.createElement("div");
+  const root = createRoot(container);
+  try {
+    useAppStore.setState({ sessions: [{ id: "s1", title: "OMP", mode: "agent", messageCount: 0, engine: "omp" }] });
+
+    // A deferred initial read: the running mount must still start exactly one
+    // list/read chain while it is pending, not a second one from the resume path.
+    let resolveInit;
+    behaviour.read = () => new Promise((resolve) => { resolveInit = resolve; });
+    await act(async () => {
+      root.render(createElement(HookProbe, { sessionId: "s1", delegationId: "child-1", running: true }));
+    });
+    assert.equal(readCalls(), 1, "exactly one read while the initial read is pending");
+    assert.equal(polls().length, 0, "no poll is armed before the pending read completes");
+
+    resolveInit({
+      ok: true,
+      data: { cursor: { fromByte: 0, nextByte: 10, reset: false }, messages: [message("a", "first")] },
+    });
+    await flush();
+    assert.equal(readCalls(), 1, "no second chain starts when the pending read completes");
+    assert.equal(polls().length, 1, "one poll is armed on completion");
+
+    await act(async () => { root.unmount(); });
+  } finally {
+    restoreGlobals(previous);
+  }
+});
+
+test("mounted read: a manual reload while a poll is armed yields one poll on completion", async () => {
+  const previous = installMinimalDom();
+  const { timers, polls } = installFakeTimers();
+  const { calls, behaviour, invoke } = makeInvokeMock();
+  globalThis.window.piDesktop = { invoke, on: () => () => {}, platform: "linux" };
+  const readCalls = () => calls.filter((c) => c.channel === IPC.invoke.ompSubagentRead).length;
+
+  const container = globalThis.document.createElement("div");
+  const root = createRoot(container);
+  try {
+    useAppStore.setState({ sessions: [{ id: "s1", title: "OMP", mode: "agent", messageCount: 0, engine: "omp" }] });
+    behaviour.read = () => ({
+      ok: true,
+      data: { cursor: { fromByte: 0, nextByte: 10, reset: false }, messages: [message("a", "first")] },
+    });
+    await act(async () => {
+      root.render(createElement(HookProbe, { sessionId: "s1", delegationId: "child-1", running: true }));
+    });
+    assert.equal(readCalls(), 1);
+    assert.equal(polls().length, 1, "the initial read arms one poll");
+
+    // A manual reload while that poll is armed (no read in flight) replaces the
+    // armed poll with one relative to this read's completion, never two.
+    behaviour.read = () => ({
+      ok: true,
+      data: { cursor: { fromByte: 10, nextByte: 20, reset: false }, messages: [message("b", "second")] },
+    });
+    await act(async () => { latest.reload(); });
+    assert.equal(readCalls(), 2, "the reload performs exactly one read");
+    assert.equal(polls().length, 1, "the armed poll is replaced, not duplicated");
+
+    // The single re-armed poll fires exactly one more read.
+    const [poll] = polls();
+    timers.delete(poll.id);
+    await act(async () => { await poll.cb(); });
+    assert.equal(readCalls(), 3, "the re-armed poll is the third read");
+    assert.equal(polls().length, 1);
+
+    await act(async () => { root.unmount(); });
+  } finally {
+    restoreGlobals(previous);
+  }
+});
+
+test("mounted read: a same-instance selection update isolates stale old reads", async () => {
+  const previous = installMinimalDom();
+  const { polls } = installFakeTimers();
+  const { calls, behaviour, invoke } = makeInvokeMock();
+  globalThis.window.piDesktop = { invoke, on: () => () => {}, platform: "linux" };
+  const readCalls = () => calls.filter((c) => c.channel === IPC.invoke.ompSubagentRead).length;
+
+  const container = globalThis.document.createElement("div");
+  const root = createRoot(container);
+  try {
+    useAppStore.setState({ sessions: [{ id: "s1", title: "OMP", mode: "agent", messageCount: 0, engine: "omp" }] });
+
+    // Old selection's read is still pending.
+    let resolveOld;
+    behaviour.read = () => new Promise((resolve) => { resolveOld = resolve; });
+    await act(async () => {
+      root.render(createElement(HookProbe, { sessionId: "s1", delegationId: "child-1", running: true }));
+    });
+    assert.equal(readCalls(), 1);
+
+    // Update the delegation on the same instance: the old read is invalidated
+    // and the new selection starts its own pending read.
+    let resolveNew;
+    behaviour.read = () => new Promise((resolve) => { resolveNew = resolve; });
+    await act(async () => {
+      root.render(createElement(HookProbe, { sessionId: "s1", delegationId: "child-2", running: true }));
+    });
+    assert.equal(readCalls(), 2, "the new selection starts its own read");
+    assert.equal(latest.phase, "loading", "no rows yet while the new read is pending");
+
+    // Old success must neither populate the new selection nor arm a poll.
+    resolveOld({
+      ok: true,
+      data: { cursor: { fromByte: 0, nextByte: 99, reset: false }, messages: [message("old", "old-row")] },
+    });
+    await flush();
+    assert.equal(latest.phase, "loading", "a stale success must not populate the new selection");
+    assert.equal(latest.run, null, "a stale success must not install rows");
+    assert.equal(polls().length, 0, "a stale completion must not arm a poll");
+
+    // The new read lands on its own selection and arms the poll.
+    resolveNew({
+      ok: true,
+      data: { cursor: { fromByte: 0, nextByte: 5, reset: false }, messages: [message("new", "new-row")] },
+    });
+    await flush();
+    assert.deepEqual(latest.run.items.map((i) => i.message.content), ["new-row"]);
+    assert.equal(polls().length, 1, "the new read's completion arms the poll");
+
+    await act(async () => { root.unmount(); });
+  } finally {
+    restoreGlobals(previous);
+  }
+});
+
+test("mounted read: a stale old error must not clear the new selection's ownership", async () => {
+  const previous = installMinimalDom();
+  const { polls } = installFakeTimers();
+  const { calls, behaviour, invoke } = makeInvokeMock();
+  globalThis.window.piDesktop = { invoke, on: () => () => {}, platform: "linux" };
+  const readCalls = () => calls.filter((c) => c.channel === IPC.invoke.ompSubagentRead).length;
+
+  const container = globalThis.document.createElement("div");
+  const root = createRoot(container);
+  try {
+    useAppStore.setState({ sessions: [{ id: "s1", title: "OMP", mode: "agent", messageCount: 0, engine: "omp" }] });
+
+    let resolveOld;
+    behaviour.read = () => new Promise((resolve) => { resolveOld = resolve; });
+    await act(async () => {
+      root.render(createElement(HookProbe, { sessionId: "s1", delegationId: "child-1", running: true }));
+    });
+
+    let resolveNew;
+    behaviour.read = () => new Promise((resolve) => { resolveNew = resolve; });
+    await act(async () => {
+      root.render(createElement(HookProbe, { sessionId: "s1", delegationId: "child-2", running: true }));
+    });
+    assert.equal(readCalls(), 2);
+
+    // Old error must not surface on the new selection nor re-arm old polling.
+    resolveOld({ ok: false, error: { code: "ENGINE_CAPABILITY_UNAVAILABLE", message: "stale-failure" } });
+    await flush();
+    assert.equal(latest.phase, "loading", "a stale error must not surface on the new selection");
+    assert.equal(latest.errorDetail, undefined, "a stale error must not clear the new selection");
+    assert.equal(polls().length, 0, "a stale error must not arm a poll");
+
+    // The new read resolves cleanly: ready rows, no error.
+    resolveNew({
+      ok: true,
+      data: { cursor: { fromByte: 0, nextByte: 5, reset: false }, messages: [message("new", "new-row")] },
+    });
+    await flush();
+    assert.equal(latest.phase, "ready");
+    assert.deepEqual(latest.run.items.map((i) => i.message.content), ["new-row"]);
+    assert.equal(latest.errorDetail, undefined);
+
+    await act(async () => { root.unmount(); });
+  } finally {
+    restoreGlobals(previous);
+  }
+});
