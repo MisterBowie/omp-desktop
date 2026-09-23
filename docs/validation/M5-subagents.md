@@ -1,6 +1,6 @@
 # M5 验证记录：OMP 子代理面板与编排归属（T17）
 
-状态：**未验收**（T17）。第三轮独立复审拆出 B1-B3 三项返修；B1 于 `9d0acde` 首实现后独立复审仍复现两项缺陷（F1 目录债二次 stop 丢失、F2 停期间短暂放行 prompt），本提交修复并追加行为回归，**B1 改定待独立验收**；第四轮独立复审拆出 C1（回收成功后的运行时替换/原生会话恢复，见 §0.5），C1 基本续聊已修复，但独立复审进一步复现三项残余缺陷（R1 替换后回复覆盖、R2 停止未完成即替换且跳过恢复、R3 启动/恢复中停止被忽略），由本提交修复并追加行为回归（见 §0.6），**C1 及本跟进提交待独立验收**；**B2（renderer 单飞/错误可见）与 B3（总 UTF-8 预算）仍未解决**。M5 后续任务 T18-T20 未开始。
+状态：**未验收**（T17）。第三轮独立复审拆出 B1-B3 三项返修；B1 于 `9d0acde` 首实现后独立复审仍复现两项缺陷（F1 目录债二次 stop 丢失、F2 停期间短暂放行 prompt），本提交修复并追加行为回归，**B1 改定待独立验收**；第四轮独立复审拆出 C1（回收成功后的运行时替换/原生会话恢复，见 §0.5），C1 基本续聊已修复，但独立复审进一步复现三项残余缺陷（R1 替换后回复覆盖、R2 停止未完成即替换且跳过恢复、R3 启动/恢复中停止被忽略），由跟进提交 `0092572` 修复并追加行为回归（见 §0.6），第五轮独立复审已在 `0092572` 上独立确认 R1/R2/R3 修复（88 runtime + 63 desktop 定向用例通过）；**第五轮进一步复现两项生命周期门残留（D1 dispose 期间可启动孤儿替换、D2 启动/恢复停止期间新 prompt 逃逸 epoch，见 §0.7），由本提交修复并追加行为回归，D1/D2 待独立验收**；**B2（renderer 单飞/错误可见）与 B3（总 UTF-8 预算）仍未解决，T17 不验收**。M5 后续任务 T18-T20 未开始。
 基线提交：`d26444407fc963c2e7efd51bda7d1bd4a70e8bbd`；第二轮独立复审返修（S1-S4）以追加普通提交落在该基线上（见 `git log` 最新提交）。
 固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未修改）。
 工作树：`/home/vv/person/code/omp-desktop-m5-t17`，分支 `codex/m5-subagents`。
@@ -81,6 +81,16 @@
 新增回归（`apps/desktop/test/omp-session-bridge.test.mjs` 5 例，真实 `SessionEntry` + 真实 `OmpRuntimeSupervisor` + 外部边界可控 promise/假 runtime，先红后绿）：① R1 两次重建后三条回复保留各自 id 与原内容（经真实 `projectMessageEnd` 投影）；② R2 stop 进行中 racing prompt 以 typed `stopping` 拒绝、`startsDuringStop=0`、替换 prompt 先 `switch_session`/`get_state` 再 `prompt`；③ R3 stop 在 start/restore（含 replacement）四组合下取消 pending prompt、stop 不提前 settle、会话 idle；④ R3 dispose 在 start/restore 下取消 pending prompt 并干净回收；⑤ 两个并发 prompt 共享一个 runtime、仅其一启动 run。扩展真实固定 OMP E2E（`omp-session-e2e.test.mjs`，本地假 provider）：同会话停后续聊断言真实助手回复 `status:"complete"` 且无 `error`（不再只凭 `agent_end`）。
 
 验证（`app/`，`nvm use v24.14.0`，Node v24.14.0，pnpm 10.34.5，Bun 1.4.2）：`pnpm --filter @pi-desktop/omp-runtime test` **231 passed / 0 failed**；`node --test test/omp-session-bridge.test.mjs` **40 passed / 0 failed**（35 + 5 C1 跟进回归）；`session-transcript`/`omp-session-ownership`/`failclosed`/`configure`/`configure-ipc`/`delete-archive`/`ipc-result`/`host-mutation-gates`/`archive-renderer`/`subagent-bridge`/`subagent-read`/`subagent-reload-projection` **76 passed / 0 failed**；`omp-session-e2e`/`concurrent-approval-e2e`/`persistence-e2e` **3 passed / 0 failed**（真实固定 OMP + 假 provider）；`omp-subagent-e2e` **3 passed / 0 failed**；`pnpm --filter @pi-desktop/omp-runtime typecheck` 与 desktop `pnpm typecheck` 退出码 0；`git diff --check` 无输出。
+
+## 0.7 C1 生命周期门收尾（D1/D2，2026-09-24）
+
+第五轮独立复审在 `0092572` 上独立确认 R1/R2/R3 已修复（88 runtime + 63 desktop 定向用例通过），并进一步复现两项生命周期门残留缺陷（repro：`/tmp/m5-session-restart-review.mjs`、`/tmp/m5-restore-stop-review.mjs`，真实 `SessionEntry` + 真实 `OmpRuntimeSupervisor`，仅外部进程边界用假 runtime、无付费调用）。本提交修复并追加行为回归，**D1/D2 待独立验收**；**B2/B3 与最终 T17 验收仍待**。
+
+- **D1 dispose 期间可启动孤儿替换**：`SessionEntry.dispose()` 只自增 `stopEpoch`、清 runner 后 `await reclaimAll`，从不同步把 entry 标记为对**新**操作关闭；epoch 只取消旧工作、不拒绝新工作。dispose 后到达的 prompt 捕获新 epoch、通过终值相等检查，在 supervisor 已释放所有权后重建 runtime；随后 `disposeSession` 报告清理成功并 `entries.delete(sessionId)`，把这个复活 entry 遗忘——替换 runtime 存活但桥已删其会话条目，`status`/`stop` 不可达（`disposeSession` 与 application dispose 皆可复现）。**关闭所有权的事实**：supervisor 自身 `setWorkingDirectory` 的门只覆盖其**自己的** stop（`runtime`/`starting`），先于外层 SessionEntry/桥接 dispose 结束，不能作为外层操作的唯一门。
+- **修复（D1）**：`SessionEntry` 增 `closed`（`dispose` 首个 await 前**同步**置位，永久）；`prompt`/`ensureNativeSession` 入口 `assertOpen` 拒绝 closed entry 的新 prompt/运行时准备（`not-started`），复用/恢复的迟到完成不得重开同一 entry；桥接级增 `shuttingDown`，`dispose`（应用关闭）在取 `entries` 快照前同步置位、`entryFor` 拒绝关闭期间新建会话（`ENGINE_UNAVAILABLE`），区分"单会话 dispose 成功删除后允许新建 fresh entry"与"应用关闭一扇门关闭"；回收失败的 entry/supervisor 保留供 dispose 重试，但绝不用于再启动 runtime。
+- **D2 启动/恢复停止期间的新 prompt 逃逸 stopEpoch**：stop 已自增 epoch，第二个 prompt 捕获新 epoch、在 stop 返回 `nothing running` 后照常提交（repro：`duringCancel.accepted=true`、`status.isRunning=true`）。`SessionEntry` 增 `stopping`（单飞，从同步入口贯穿 startup/restore 等待与 runner teardown/retirement）；`assertOpen` 在 stop 未决时拒绝新 prompt/运行时准备（`stopping`），先前已准入的工作仍由 epoch 复检失效；并发 stop 加入同一操作、不提前重开；stop/dispose 重叠无缝隙（dispose 先 join `stopping`），runner 显示的 idle 状态不重开准入。
+- 新增回归（`apps/desktop/test/omp-session-bridge.test.mjs` 5 例，真实 supervisor + 假 runtime + 外部边界，先红后绿）：disposeSession 与 application dispose 的一微任务完成窗口各一例（dispose 期间无替换工厂调用/内容提交、成功后无孤儿、handler 全 detach）；整桥关闭期间新会话一例（`ENGINE_UNAVAILABLE`、不建 runtime）；启动/恢复 stop 四受控 case（第二个 prompt `stopping` 拒绝）；并发 stop/dispose 重叠一例（准入全程关闭、无第二 runtime）。
+- **修正回复断言所属 E2E 路径**：`0092572` 的回复/无 error 断言加在 `omp-session-e2e.test.mjs`（普通续聊）。C1 的 detached-child 续聊用户路径在 `omp-subagent-e2e.test.mjs` 第三项，此前只断言 `agent_end` 与原生 id；本提交在该处补 `continued.turnId` 的非空 assistant 回复、无 `error`、同一原生 `sessionFile`（脚本化假 provider 回复"subagent finished"），保留不先 list 的 detached-child 场景与进程清理。
 
 ## 0. 环境准备（固定子模块流程，与本轮代码无关）
 

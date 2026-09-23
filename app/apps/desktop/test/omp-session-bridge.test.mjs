@@ -1771,3 +1771,223 @@ test("two concurrent prompts share one runtime and only one starts a run", async
   assert.equal(refused[0].reason.code ?? refused[0].reason.errorCode, "not-started");
   assert.equal(supervisor.started, 1, "concurrent prompts must not start a second runtime");
 });
+
+/** A real supervisor whose factory mints one message-emitting runtime per start, tracking starts during disposal. */
+function d1Harness() {
+  const root = mkdtempSync(join(tmpdir(), "omp-bridge-d1-"));
+  scratch.push(root);
+  const project = join(root, "project");
+  const sessionDir = join(root, "sessions");
+  mkdirSync(project);
+  mkdirSync(sessionDir);
+  const nativeId = "native-d1";
+  const nativePath = join(sessionDir, "native.jsonl");
+  writeFileSync(nativePath, `${JSON.stringify({ type: "session", id: nativeId, cwd: project, timestamp: "2026-09-24T00:00:00Z" })}\n`);
+  const runtimes = [];
+  const state = { disposeInFlight: false, startsDuringDispose: 0 };
+  const mockLauncher = join(here, "..", "..", "..", "packages", "omp-runtime", "test", "mock-omp.mjs");
+  const supervisor = new OmpRuntimeSupervisor({
+    dataRoot: join(root, "data"),
+    sessionDir,
+    launcherPath: mockLauncher,
+    expectedRuntimeVersion: "18.2.7",
+    runtimeFactory: async () => {
+      if (state.disposeInFlight) state.startsDuringDispose += 1;
+      const runtime = messageRuntime(nativeId, nativePath, runtimes.length + 1);
+      runtime.pid = 9000 + runtimes.length;
+      runtime.pgid = runtime.pid;
+      runtimes.push(runtime);
+      return runtime;
+    },
+  });
+  const bridge = createOmpSessionBridge({
+    createSupervisor: () => supervisor,
+    launcher: mockLauncher,
+    isPackaged: false,
+    appPath: here,
+    sessionDir,
+    gateResolver: () => join(here, "..", "..", "..", "packages", "omp-runtime", "extensions", "omp-desktop-gate.ts"),
+    emitAgentEvent: () => {},
+  });
+  return { root, project, nativeId, nativePath, supervisor, bridge, runtimes, state };
+}
+
+test("a prompt racing disposeSession's completion window is refused and leaves no orphan", async () => {
+  const { project, nativeId, nativePath, supervisor, bridge, runtimes, state } = d1Harness();
+  try {
+    await bridge.prompt({ sessionId: "d1-dispose", content: "first", projectPath: project });
+
+    state.disposeInFlight = true;
+    const disposePromise = bridge.disposeSession("d1-dispose", "d1 disposal").finally(() => { state.disposeInFlight = false; });
+    // Fire while dispose owns the lifecycle but the supervisor's stop gate has
+    // already released ownership (the one-microtask completion window).
+    for (let turn = 0; turn < 100 && state.disposeInFlight && supervisor.currentRuntime() !== null; turn += 1) await Promise.resolve();
+    assert.equal(state.disposeInFlight, true, "the racing prompt must fire while dispose is still in flight");
+
+    const raced = await bridge.prompt({
+      sessionId: "d1-dispose",
+      content: "racing dispose",
+      projectPath: project,
+      nativeSessionId: nativeId,
+      nativeSessionPath: nativePath,
+    }).then((result) => result, (error) => ({ refused: true, code: error.code ?? error.errorCode, message: error.message }));
+    await disposePromise;
+
+    assert.equal(raced.refused, true, "the racing prompt must be refused, not answered into a replaced runtime");
+    assert.equal(raced.code, "not-started");
+    assert.equal(state.startsDuringDispose, 0, "no replacement runtime may start during disposal");
+    assert.equal(runtimes.length, 1, "dispose must not start a second runtime");
+    assert.equal(supervisor.currentRuntime(), null, "the disposed runtime must be fully reclaimed");
+    assert.equal(runtimes[0].handlers.size, 0, "the disposed runtime's handlers must be detached");
+    assert.equal(bridge.status("d1-dispose").isRunning, false, "the disposed session must report not running");
+  } finally {
+    await bridge.dispose("d1 cleanup").catch(() => undefined);
+    await supervisor.reclaimAll().catch(() => undefined);
+  }
+});
+
+test("a prompt racing application shutdown's completion window is refused and leaves no orphan", async () => {
+  const { project, nativeId, nativePath, supervisor, bridge, runtimes, state } = d1Harness();
+  try {
+    await bridge.prompt({ sessionId: "d1-shutdown", content: "first", projectPath: project });
+
+    state.disposeInFlight = true;
+    const disposePromise = bridge.dispose("review shutdown").finally(() => { state.disposeInFlight = false; });
+    for (let turn = 0; turn < 100 && state.disposeInFlight && supervisor.currentRuntime() !== null; turn += 1) await Promise.resolve();
+    assert.equal(state.disposeInFlight, true, "the racing prompt must fire while shutdown is still in flight");
+
+    const raced = await bridge.prompt({
+      sessionId: "d1-shutdown",
+      content: "racing shutdown",
+      projectPath: project,
+      nativeSessionId: nativeId,
+      nativeSessionPath: nativePath,
+    }).then((result) => result, (error) => ({ refused: true, code: error.code ?? error.errorCode, message: error.message }));
+    await disposePromise;
+
+    assert.equal(raced.refused, true, "the racing prompt must be refused during shutdown");
+    assert.equal(state.startsDuringDispose, 0, "no replacement runtime may start during shutdown");
+    assert.equal(runtimes.length, 1, "shutdown must not start a second runtime");
+    assert.equal(supervisor.currentRuntime(), null, "the runtime must be fully reclaimed");
+    assert.equal(bridge.status("d1-shutdown").isRunning, false, "the session must report not running");
+  } finally {
+    await bridge.dispose("d1 cleanup").catch(() => undefined);
+    await supervisor.reclaimAll().catch(() => undefined);
+  }
+});
+
+test("a new session racing whole-bridge shutdown is refused before it starts a runtime", async () => {
+  const { project, supervisor, bridge, runtimes } = d1Harness();
+  try {
+    await bridge.prompt({ sessionId: "d1-existing", content: "first", projectPath: project });
+    // Shutdown closes admission synchronously before its first await: the new
+    // session must be refused even before the sweep's snapshot is iterated.
+    const disposePromise = bridge.dispose("review shutdown");
+    const raced = await bridge.prompt({
+      sessionId: "d1-new",
+      content: "new session during shutdown",
+      projectPath: project,
+    }).then((result) => result, (error) => ({ refused: true, code: error.errorCode ?? error.code, message: error.message }));
+    await disposePromise;
+
+    assert.equal(raced.refused, true, "a new session must be refused during whole-bridge shutdown");
+    assert.equal(raced.code, "ENGINE_UNAVAILABLE");
+    assert.equal(runtimes.length, 1, "no runtime may start for the new session");
+  } finally {
+    await bridge.dispose("d1 cleanup").catch(() => undefined);
+    await supervisor.reclaimAll().catch(() => undefined);
+  }
+});
+
+test("a prompt racing a startup or restore stop is refused, not submitted after the stop reports nothing running", async () => {
+  for (const afterReclaim of [false, true]) {
+    for (const boundary of ["start", "restore"]) {
+      const { project, nativeId, nativePath, supervisor, bridge, runtimes, entered, release } = r3Harness(boundary, afterReclaim);
+      try {
+        if (afterReclaim) {
+          await bridge.prompt({ sessionId: "r3", content: "first", projectPath: project, nativeSessionId: nativeId, nativeSessionPath: nativePath });
+          for (const fn of runtimes[0].handlers) fn({ type: "tool_execution_start", toolName: "task", toolCallId: "task-1", args: {} });
+          await bridge.stop("r3");
+        }
+        const pendingPrompt = bridge.prompt({
+          sessionId: "r3",
+          content: "must be cancelled by stop",
+          projectPath: project,
+          nativeSessionId: nativeId,
+          nativeSessionPath: nativePath,
+        }).then((result) => result, (error) => ({ refused: true, code: error.code ?? error.errorCode, message: error.message }));
+
+        await entered.promise;
+        const pendingStop = bridge.stop("r3");
+        let stopSettledBeforeRelease = false;
+        pendingStop.then(() => { stopSettledBeforeRelease = true; });
+        for (let turn = 0; turn < 20; turn += 1) await Promise.resolve();
+        assert.equal(stopSettledBeforeRelease, false, `stop must own the pending ${boundary}`);
+
+        // The second prompt arrives while the stop still owns startup/restore: it
+        // must be refused, not submitted after the stop returns "nothing running".
+        const concurrentPrompt = bridge.prompt({
+          sessionId: "r3",
+          content: "must not start during active cancellation",
+          projectPath: project,
+          nativeSessionId: nativeId,
+          nativeSessionPath: nativePath,
+        }).then((result) => result, (error) => ({ refused: true, code: error.code ?? error.errorCode, message: error.message }));
+
+        release.resolve();
+        const [prompt, stop, duringCancel] = await Promise.all([pendingPrompt, pendingStop, concurrentPrompt]);
+
+        assert.equal(prompt.refused, true, `the pending prompt must be cancelled on ${boundary}`);
+        assert.equal(prompt.code, "stopping");
+        assert.equal(duringCancel.refused, true, `the second prompt must be refused while the stop owns ${boundary}`);
+        assert.equal(duringCancel.code, "stopping");
+        assert.equal(stop.toreDown, false);
+        assert.equal(bridge.status("r3").isRunning, false);
+        assert.equal(bridge.status("r3").state, "idle");
+      } finally {
+        release.resolve();
+        await bridge.dispose("r3 cleanup").catch(() => undefined);
+        await supervisor.reclaimAll().catch(() => undefined);
+      }
+    }
+  }
+});
+
+test("concurrent stop and dispose overlap without reopening admission", async () => {
+  const { project, nativeId, nativePath, supervisor, bridge, runtimes, entered, release } = r3Harness("start", false);
+  try {
+    const pendingPrompt = bridge.prompt({
+      sessionId: "r3",
+      content: "held",
+      projectPath: project,
+      nativeSessionId: nativeId,
+      nativeSessionPath: nativePath,
+    }).then((result) => result, (error) => ({ refused: true, code: error.code ?? error.errorCode, message: error.message }));
+
+    await entered.promise;
+    // Stop and dispose are issued together: dispose must join the in-flight stop
+    // and admission must stay closed for the whole overlap.
+    const stopPromise = bridge.stop("r3");
+    const disposePromise = bridge.dispose("shutdown");
+    const raced = await bridge.prompt({
+      sessionId: "r3",
+      content: "racing the overlap",
+      projectPath: project,
+      nativeSessionId: nativeId,
+      nativeSessionPath: nativePath,
+    }).then((result) => result, (error) => ({ refused: true, code: error.code ?? error.errorCode, message: error.message }));
+
+    release.resolve();
+    const [prompt, , disposed] = await Promise.all([pendingPrompt, stopPromise, disposePromise]);
+
+    assert.equal(prompt.refused, true);
+    assert.equal(raced.refused, true, "a prompt racing the stop/dispose overlap must be refused");
+    assert.deepEqual(disposed, { ok: true, failures: [] });
+    assert.equal(bridge.status("r3").isRunning, false);
+    assert.equal(runtimes.length, 1, "no second runtime may start across the overlap");
+  } finally {
+    release.resolve();
+    await bridge.dispose("r3 cleanup").catch(() => undefined);
+    await supervisor.reclaimAll().catch(() => undefined);
+  }
+});

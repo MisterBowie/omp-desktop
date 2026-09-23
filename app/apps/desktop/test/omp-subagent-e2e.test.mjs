@@ -473,9 +473,36 @@ test(
       const resumed = await waitFor(() => envelopes.some((e) => e.turnId === continued.turnId && e.event.type === "agent_end"));
       assert.equal(resumed, true, "the continued prompt must produce a response under its own turn id");
 
-      // The restored runtime reports the same native session identity.
+      // The continued turn must carry a real, nonempty assistant reply from the
+      // scripted fake provider (the parent's second routed turn), and no error.
+      const replyEnd = await waitFor(() =>
+        envelopes.some(
+          (e) =>
+            e.turnId === continued.turnId &&
+            e.event.type === "message_end" &&
+            e.event.message?.role === "assistant" &&
+            typeof e.event.message.content === "string" &&
+            e.event.message.content.trim().length > 0,
+        ),
+      );
+      assert.equal(replyEnd, true, "the continued turn must produce a nonempty assistant reply");
+      const continuedReplies = envelopes.filter(
+        (e) => e.turnId === continued.turnId && e.event.type === "message_end" && e.event.message?.role === "assistant",
+      );
+      assert.ok(
+        continuedReplies.some((e) => (e.event.message.content ?? "").includes("subagent finished")),
+        "the continued turn must stream the scripted fake-provider reply",
+      );
+      assert.equal(
+        envelopes.some((e) => e.turnId === continued.turnId && e.event.type === "error"),
+        false,
+        "the continued turn must not emit an error",
+      );
+
+      // The restored runtime reports the same native session identity and path.
       const nativeAfter = await supervisor.currentRuntime().request({ type: "get_state" });
       assert.equal(nativeAfter.data.sessionId, nativeId, "the same native session must be restored");
+      assert.equal(nativeAfter.data.sessionFile, nativePath, "the same native session path must be restored");
 
       await bridge.dispose("e2e finished");
       const reclaimed = await supervisor.reclaimAll();

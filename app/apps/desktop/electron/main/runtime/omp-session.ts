@@ -530,6 +530,21 @@ class SessionEntry {
    * prompt's startup/restore cannot let the prompt submit content afterwards.
    */
   private stopEpoch = 0;
+  /**
+   * The single-flight stop operation, owned from synchronous entry through the
+   * startup/restore waits and the runner teardown/retirement. A new prompt or
+   * runtime preparation is refused while this is unresolved, because the stop
+   * has already bumped the epoch and a prompt arriving afterwards would pass
+   * the epoch equality check.
+   */
+  private stopping: Promise<OmpStopOutcome> | null = null;
+  /**
+   * True once `dispose` begins, set synchronously before its first await: the
+   * entry can never run a runtime again. A prompt (or a rename/configure that
+   * would prepare a runtime) is refused while this is set, so a disposal that
+   * is still awaiting its reclaim cannot be resurrected by a new operation.
+   */
+  private closed = false;
   runtimeVersion: string | null = null;
   /** The app-owned persistent native-session directory (containment root). */
   private readonly sessionDir: string;
@@ -579,6 +594,32 @@ class SessionEntry {
 
   generationOf(frameId: string): number {
     return this.generations.get(frameId) ?? 0;
+  }
+
+  /**
+   * Refuse admission to a disposed entry, or one whose stop is unresolved.
+   *
+   * `closed` is permanent (set synchronously by `dispose` before its first
+   * await), while the in-flight stop operation is transient. Both must refuse a
+   * NEW prompt or runtime preparation: a disposed entry has no runtime to run,
+   * and a stop that already bumped the epoch would otherwise be bypassed by a
+   * prompt that captured the new epoch. Work admitted earlier is not re-checked
+   * here — it is invalidated by the epoch re-check immediately before
+   * submission, so it stays distinguishable from new admission.
+   */
+  private assertOpen(): void {
+    if (this.closed) {
+      throw new OmpRuntimeError(
+        "not-started",
+        "this OMP session has been disposed and cannot start another runtime",
+      );
+    }
+    if (this.stopping) {
+      throw new OmpRuntimeError(
+        "stopping",
+        "a stop is in progress; wait for it to finish before prompting",
+      );
+    }
   }
 
   /**
@@ -699,6 +740,9 @@ class SessionEntry {
 
   /** Establish the native session: restore by path, or create and persist. */
   async ensureNativeSession(gate: string, spec: OmpSessionRuntimeSpec): Promise<void> {
+    // A rename/configure can prepare a runtime directly, outside the prompt's
+    // epoch re-check, so the same admission gate applies here.
+    this.assertOpen();
     // The current runtime process is already on this exact session: re-switching
     // would reopen the transcript, which OMP's `switch_session` treats as a
     // session transition. The check names the *runner* the session is bound to
@@ -885,6 +929,7 @@ class SessionEntry {
    * stop that raced a startup/restore cannot let the prompt land afterwards.
    */
   async prompt(gate: string, spec: OmpSessionRuntimeSpec, content: string): Promise<OmpPromptResult> {
+    this.assertOpen();
     const epoch = this.stopEpoch;
     await this.ensureNativeSession(gate, spec);
     const runner = await this.ensureRunner(gate);
@@ -906,6 +951,19 @@ class SessionEntry {
   }
 
   async stop(): Promise<OmpStopOutcome> {
+    // Concurrent stops join one operation: the gate must not reopen early, and
+    // a second caller must observe the same outcome as the first.
+    if (this.stopping) return this.stopping;
+    const attempt = this.performStop();
+    this.stopping = attempt;
+    try {
+      return await attempt;
+    } finally {
+      if (this.stopping === attempt) this.stopping = null;
+    }
+  }
+
+  private async performStop(): Promise<OmpStopOutcome> {
     // A stop owns the lifecycle for its whole span, including work that has not
     // produced a runner yet. Bump the epoch first (synchronously) so a prompt
     // that is mid-startup/mid-restore sees it and refuses to submit; then await
@@ -930,12 +988,21 @@ class SessionEntry {
   }
 
   async dispose(reason: string): Promise<Array<{ sessionId: string; detail: string }>> {
+    // Mark the entry closed synchronously, before any await: a prompt (or a
+    // rename/configure runtime preparation) that races this disposal must be
+    // refused, not allowed to build a fresh runtime that the bridge then
+    // forgets when it deletes the entry after a "successful" reclaim.
+    this.closed = true;
     // Invalidate any prompt that is still preparing, and own a runtime that is
     // still starting or restoring, before the runner is detached and reclaimed.
     this.stopEpoch += 1;
     this.approvalRequests.clear();
     this.askRequests.clear();
     this.generations.clear();
+    // Join any in-flight stop so its teardown/retirement and this disposal do
+    // not overlap on the same runner/supervisor; admission stays closed via
+    // `closed` for the whole span.
+    if (this.stopping) await this.stopping.catch(() => undefined);
     if (this.runnerBuild) await this.runnerBuild.catch(() => undefined);
     if (this.nativeSessionBuild) await this.nativeSessionBuild.catch(() => undefined);
     if (this.runner) this.runner.dispose(reason);
@@ -967,6 +1034,13 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
   const runnerFactory = options.runnerFactory ?? ((runnerOptions) => new OmpSessionRunner(runnerOptions));
 
   const entries = new Map<string, SessionEntry>();
+  /**
+   * True once application shutdown begins. A new session must not be created
+   * after the shutdown sweep has taken its snapshot, or its runtime would
+   * outlive the shutdown that was supposed to reclaim it. Per-session disposal
+   * does not set this: a later operation may still create a fresh entry.
+   */
+  let shuttingDown = false;
 
   function gatePath(): string | null {
     if (options.isPackaged && options.resourcesPath) {
@@ -1028,6 +1102,12 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
         );
       }
       return existing;
+    }
+    if (shuttingDown) {
+      throw Object.assign(
+        new Error("the OMP runtime is shutting down; no new session can start"),
+        { errorCode: ErrorCodes.ENGINE_UNAVAILABLE },
+      );
     }
     const supervisor = options.createSupervisor(spec);
     const entry = new SessionEntry({
@@ -1563,6 +1643,10 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
   }
 
   async function dispose(reason = "application shutdown"): Promise<OmpDisposeResult> {
+    // Close admission before the snapshot: a new session arriving after the
+    // sweep passed its position must not start a runtime that outlives the
+    // shutdown.
+    shuttingDown = true;
     // Reclaim every session, but only forget the ones that were fully reclaimed:
     // a session whose runtime could not be reclaimed keeps its entry so a later
     // dispose (or status) can retry the same supervisor instead of losing it.
