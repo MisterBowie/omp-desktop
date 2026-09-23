@@ -1,10 +1,32 @@
 # M5 验证记录：OMP 子代理面板与编排归属（T17）
 
-状态：**最终独立复审待验收**（T17，基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`）。C1 已独立通过 `01ce56aab1f1df5a61be390cf750ab55e44d03ed`、B2 已独立通过 `6b96bcdfc6a87f3f3c302ff90712c4851e863253`、B3 已独立通过 `3a6df0df22f2078e96f5ea2dede432b909b19411`，T17 夹具可移植性在本基线已由复审方于 macOS arm64 独立确认（五份真实固定 OMP E2E 5 passed / 0 failed、58 bridge tests、diff check、进程助手 10 轮 shell-quoting 往返与 owned-child PID/marker 存活断言均通过）。本基线本地完整回归通过。历史返修记录见 §0.1-§0.14；T17 保持「最终独立复审待验收」，未自证完成、未启动 T18。
+状态：**T17 已验收**（已实现能力边界；验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`）。真实固定 OMP 子代理端到端验收与 macOS arm64 独立复审通过（见 §0.15 最终验收表）。验收范围仅为 T17 已实现能力边界，不代表 M5/M6/M7 全量、打包构建、付费 provider 或 Windows 已验收。历轮独立复审返修（R1-R8、S1-S4、B1-B3、C1、D1/D2、E1/E2、F1/F2）见 §0.1-§0.14。
 基线提交：`d26444407fc963c2e7efd51bda7d1bd4a70e8bbd`；第二轮独立复审返修（S1-S4）以追加普通提交落在该基线上（见 `git log` 最新提交）。
 固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未修改）。
 工作树：`/home/vv/person/code/omp-desktop-m5-t17`，分支 `codex/m5-subagents`。
 传输/权限决策沿用 `docs/decisions/001-omp-transport.md`；本轮新增产品侧 ADR `app/docs/adr/0303-omp-subagent-surfacing.md`。
+
+## 0.15 最终独立复审验收（2026-09-24）
+
+T17 已按已实现能力边界验收。验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`（分支 `codex/m5-subagents`）；本轮记录为单独的 docs-only 提交，验收代码 SHA 与记录提交分开，不伪造未来提交哈希。
+
+| 平台 | 命令 / 范围 | 计数 | 退出 |
+| --- | --- | --- | --- |
+| macOS arm64（复审方，Node v24.14.0） | 根 `pnpm typecheck` / `build` | 全 JS 构建 + 全 workspace typecheck 通过 | 0 |
+| macOS arm64 | `@pi-desktop/omp-runtime` test | 243 passed / 0 failed | 0 |
+| macOS arm64 | `@pi-desktop/shared` test | 968 passed / 0 failed | 0 |
+| macOS arm64 | `pnpm lint` | 75 files、style tokens OK | 0 |
+| macOS arm64 | 五份真实固定 OMP E2E（本地假 provider） | 5 passed / 0 skipped | 0 |
+| macOS arm64 | bridge 套件 | 58 passed | 0 |
+| macOS arm64 | 全量 desktop `node --test test/*.test.mjs` | 2735 总数 / 2726 passed / 9 failed / 0 skipped | 1（9 项失败均为固定 PI 基线的 release 夹具中文路径缺陷；六份真实 OMP E2E（含并发审批）均在该全量内通过） |
+| Linux x64（远程，Node v24.14.0） | 根 typecheck / build | 通过 | 0 |
+| Linux x64 | `@pi-desktop/omp-runtime` test | 243 passed | 0 |
+| Linux x64 | `@pi-desktop/shared` test | 968 passed | 0 |
+| Linux x64 | desktop `node --test test/*.test.mjs`（`app/apps/desktop`，`SSH_ASKPASS` unset） | 2735 总数 / 2731 passed / 0 failed / 4 skipped | 0（4 项为非 darwin 显式跳过：dev-branding:141、macos-release-lane:86、macos-signing-watchdog:254/308） |
+| Linux x64 | desktop style-token lint | 通过 | 0 |
+| Linux x64 | 五份真实 E2E；lifecycle assertion wrapper；row 探针与 real-panel resume-poll 探针；symlink-TMPDIR bridge | 5 passed；25 passed；探针 0；50 passed | 0 |
+
+macOS 全量 desktop 未宣称为绿：9 项失败已确认是固定 PI `0111e306c120ad5820688d7608cb37bad8fbcc1f` 基线的 release 夹具 URL.pathname/中文路径缺陷（相同测试 + 两个脚本在中文检出路径复现 0/9，未改动的 `git archive` 副本在 ASCII 路径 9/9）。该既有夹具修正登记到 M6/T22，此处不实现、不削弱其 release 检查。Linux 结果单独归属远程执行；部分旧命令管道接了 `tail` 而无 `pipefail`，不臆造独立退出码，仅记录底层测试/构建完成与计数。
 
 ## 0.1 独立复审返修（R1-R8，2026-09-23）
 

@@ -1,10 +1,10 @@
 # OMP Desktop 开发交接
 
-更新时间：2026-09-24。当前状态：**M5/T17（OMP 子代理生命周期、父子归属、进度/详情查看、取消边界与恢复语义）最终独立复审待验收**（基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`，见 §0 摘要与 `docs/validation/M5-subagents.md`）。C1 已独立通过 `01ce56aab1f1df5a61be390cf750ab55e44d03ed`、B2 已独立通过 `6b96bcdfc6a87f3f3c302ff90712c4851e863253`、B3 已独立通过 `3a6df0df22f2078e96f5ea2dede432b909b19411`，T17 夹具可移植性在本基线已独立确认；本基线本地完整回归通过。T17 保持「最终独立复审待验收」，未自证完成、未启动 T18。前两轮独立复审返修（R1-R8 与 S1-S4）已提交；第三轮独立复审拆出 B1-B3，B1（回收未完成时的重试，§0.3）与 B1 残余缺陷 F1/F2（§0.4）已实现；**第四轮独立复审拆出 C1（回收成功后的运行时替换/原生会话恢复，§0.5），C1 基本续聊已修复，其三项残余缺陷（R1 替换后回复覆盖、R2 停止未完成即替换且跳过恢复、R3 启动/恢复中停止被忽略）由跟进提交 `0092572` 修复（§0.6），第五轮复审已在 `0092572` 上独立确认 R1/R2/R3 修复；第五轮进一步复现两项生命周期门残留（D1 dispose 期间可启动孤儿替换、D2 启动/恢复停止期间新 prompt 逃逸 epoch，§0.7）由 `24d7270` 修复且 D1/D2 定向探针已独立通过；第六轮进一步复现两项残留（E1 既有会话绕过整桥关闭、E2 模型切换复用 live 消息/turn id，§0.8）由本提交修复并追加行为回归，已独立通过；B2（renderer 单飞/错误可见，§0.9）已实现并追加行为回归，独立复审确认其夹具与初始行为通过，但仍复现运行恢复续读缺陷，由本提交修复并追加回归（§0.10），B2 follow-up 已独立通过；B3（总 UTF-8 预算，§0.11）字节/Unicode 证据已独立通过；B3 follow-up 修复两处行为缺陷（大思考块擦除短答案、结构化截断静默，§0.12）并追加回归，短答案与普通结构化标记两路径已独立通过，整字段 details 丢弃的截断指示（§0.13）已实现并独立通过。**接入路径沿用 M1 定案；M5 把子代理三类帧接入既有 Pi 拓扑/详情/工作面板 UI，单独立停止保持关闭（固定 OMP 无 per-child stop RPC）。下一阶段 M5/T18-T20（edit/LSP/DAP 展示、MCP/规则/技能/记忆、Plan/Goal 能力门）。
+更新时间：2026-09-24。当前状态：**M5/T17（OMP 子代理生命周期、父子归属、进度/详情查看、取消边界与恢复语义）已通过最终独立复审并验收**（验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`；本轮文档记录为单独的 docs-only 提交，见 §0 与 `docs/validation/M5-subagents.md`）。下一阶段入口：M5/T18-T20。历轮独立复审返修（R1-R8、S1-S4、B1-B3、C1、D1/D2、E1/E2、F1/F2）的事实与证据见 `docs/validation/M5-subagents.md` §0.1-§0.14，此处不再逐条复述。
 
 ## 0. M5/T17 交付摘要（本轮）
 
-- 状态：**T17 最终独立复审待验收**（基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`），含真实固定 OMP 子代理端到端验收；C1/B2/B3 与 T17 夹具可移植性已获独立通过（SHAs 见顶部状态行与 §0.14），本基线本地完整回归通过；已按独立复审多轮返修并追加提交：R1-R8（父 stop 泄漏、渲染器接线、结算破坏 Task 行、所有权 fail-closed、读取上界、快照补漏、订阅失败、文档）与 S1-S4（父 stop 漏 lifecycle 仍查快照并保留未回收所有权、渲染器增量累积/reset 与单飞、existing child 缺父拒绝、toolResult 有界投影）。第三轮复审返修：B1（回收未完成时的重试）与 B1 残余缺陷 F1/F2 已实现；**第四轮复审返修：C1（回收成功后的运行时替换/原生会话恢复）基本续聊已修复，其三项残余缺陷（替换后回复覆盖、停止未完成即替换且跳过恢复、启动/恢复中停止被忽略）由 `0092572` 修复（§0.6）并获第五轮复审独立确认；第五轮复审进一步拆出两项生命周期门残留 D1/D2（dispose 期间可启动孤儿替换、启动/恢复停止期间新 prompt 逃逸 epoch，§0.7）由 `24d7270` 修复且 D1/D2 定向探针已独立通过；第六轮复审拆出两项残留 E1/E2（既有会话绕过整桥关闭、模型切换复用 live 消息/turn id，§0.8）由本提交修复并追加行为回归，已独立通过**；第七轮 B2（renderer 单飞/错误可见，§0.9）已实现并追加行为回归，独立复审确认其夹具与初始行为通过，但仍复现运行恢复续读缺陷，由本提交修复并追加回归（§0.10），B2 follow-up 已独立通过；B3（总 UTF-8 预算，§0.11）字节/Unicode 证据已独立通过，本跟进提交修复两处行为缺陷（大思考块擦除短答案、结构化截断静默，§0.12）并追加回归、短答案与普通结构化标记两路径已独立通过，整字段 details 丢弃的截断指示（§0.13）已实现并独立通过。
+- 状态：**T17 已验收**（已实现能力边界；验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`，含真实固定 OMP 子代理端到端验收与 macOS arm64 独立复审）。历轮独立复审返修（R1-R8、S1-S4、B1-B3、C1、D1/D2、E1/E2、F1/F2）的历史记录见 §0.1-§0.14。验收范围仅为 T17 已实现能力边界，不代表 M5/M6/M7 全量、打包构建、付费 provider 或 Windows 已验收；仍关闭的能力（`branch`/`steer`/`followUp`/`compact`、子代理单独停止无 per-child stop RPC、子代理 `hasUI=false` 工具 gating）见 ADR 0303。
 - 证据：`docs/validation/M5-subagents.md`（PI 实现/测试 → 固定 OMP 能力 → 本项目决策证据表、归属矩阵、用户路径、失败/取消矩阵、命令与计数、限制；顶部 §0.1-§0.5 为返修记录）；设计决策：`app/docs/adr/0303-omp-subagent-surfacing.md`（英文 ADR）。
 - 核心变更：
   - **严格帧校验 + 所有权 fail-closed**（`subagent-frames.ts`/`subagents.ts`）：typebox 校验三族帧与 `get_subagents`/`get_subagent_messages` 响应；缺子身份/状态/`agentSource` 拒绝并计数。所有权单独 fail-closed：子代理只有在其父 id 命中本 runner 观测到的 `task` 调用后才 surface；missing/unknown/conflicting 父 id 计 `unknownParentCalls` 拒绝；`emitSynthesis` 找不到属主即丢弃，不回退当前 run。
@@ -144,7 +144,7 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 
 ## 4. 下一执行模型从哪里开始
 
-T17 已实现并提交（分支 `codex/m5-subagents`，基线 `ab07a888`）。C1/B2/B3 与 T17 夹具可移植性已获独立通过；本基线本地完整回归通过（详见 §0 与 `docs/validation/M5-subagents.md`）。T17 保持「最终独立复审待验收」：待复审方拉取本最终交付并独立验收后才推进下一阶段，不自行标定完成、不启动 T18。
+T17 已通过最终独立复审并验收（验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`；含真实固定 OMP 端到端验收与 macOS arm64 独立复审，证据见 `docs/validation/M5-subagents.md` §0.15 与 §0.14）。
 
 下一阶段入口：M5/T18-T20（edit/LSP/DAP 结果展示、MCP/规则/技能/记忆及插件分类适配、Plan/Goal 与高权限工具能力门）。仍在关闭的能力：`branch`/`steer`/`followUp`/`compact`、子代理单独停止（固定 OMP 无 per-child stop RPC）、子代理 `hasUI=false` 工具 gating（产品策略），留待对应阶段逐项开放。
 
