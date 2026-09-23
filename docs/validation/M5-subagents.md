@@ -1,6 +1,6 @@
 # M5 验证记录：OMP 子代理面板与编排归属（T17）
 
-状态：**未验收**（T17）。第三轮独立复审拆出 B1-B3 三项返修；B1 于 `9d0acde` 首实现后独立复审仍复现两项缺陷（F1 目录债二次 stop 丢失、F2 停期间短暂放行 prompt），本提交修复并追加行为回归，**B1 改定待独立验收**；第四轮独立复审拆出 C1（回收成功后的运行时替换/原生会话恢复，见 §0.5），C1 基本续聊已修复，但独立复审进一步复现三项残余缺陷（R1 替换后回复覆盖、R2 停止未完成即替换且跳过恢复、R3 启动/恢复中停止被忽略），由跟进提交 `0092572` 修复并追加行为回归（见 §0.6），第五轮独立复审已在 `0092572` 上独立确认 R1/R2/R3 修复（88 runtime + 63 desktop 定向用例通过）；**第五轮进一步复现两项生命周期门残留（D1 dispose 期间可启动孤儿替换、D2 启动/恢复停止期间新 prompt 逃逸 epoch，见 §0.7），由本提交修复并追加行为回归，`24d7270` D1/D2 定向探针已独立通过；第六轮复现两项残留（E1 既有会话绕过整桥关闭、E2 模型切换复用 live 消息/turn id，见 §0.8），本提交修复并追加行为回归，E1/E2 待独立验收**；**B2（renderer 单飞/错误可见，见 §0.9）已实现并追加行为回归，独立复审确认其夹具与初始行为通过，但仍复现运行恢复续读缺陷，由本提交修复并追加回归（见 §0.10），B2 follow-up 待独立验收**；**B3（总 UTF-8 预算）已实现并追加回归（§0.11），待独立验收；T17 不验收**。M5 后续任务 T18-T20 未开始。
+状态：**未验收**（T17）。第三轮独立复审拆出 B1-B3 三项返修；B1 于 `9d0acde` 首实现后独立复审仍复现两项缺陷（F1 目录债二次 stop 丢失、F2 停期间短暂放行 prompt），本提交修复并追加行为回归，**B1 改定待独立验收**；第四轮独立复审拆出 C1（回收成功后的运行时替换/原生会话恢复，见 §0.5），C1 基本续聊已修复，但独立复审进一步复现三项残余缺陷（R1 替换后回复覆盖、R2 停止未完成即替换且跳过恢复、R3 启动/恢复中停止被忽略），由跟进提交 `0092572` 修复并追加行为回归（见 §0.6），第五轮独立复审已在 `0092572` 上独立确认 R1/R2/R3 修复（88 runtime + 63 desktop 定向用例通过）；**第五轮进一步复现两项生命周期门残留（D1 dispose 期间可启动孤儿替换、D2 启动/恢复停止期间新 prompt 逃逸 epoch，见 §0.7），由本提交修复并追加行为回归，`24d7270` D1/D2 定向探针已独立通过；第六轮复现两项残留（E1 既有会话绕过整桥关闭、E2 模型切换复用 live 消息/turn id，见 §0.8），本提交修复并追加行为回归，E1/E2 待独立验收**；**B2（renderer 单飞/错误可见，见 §0.9）已实现并追加行为回归，独立复审确认其夹具与初始行为通过，但仍复现运行恢复续读缺陷，由本提交修复并追加回归（见 §0.10），B2 follow-up 待独立验收**；**B3（总 UTF-8 预算，§0.11）已实现并追加回归，字节/Unicode 证据已独立通过；B3 follow-up（短答案保留 + 结构化截断指示，§0.12）已实现，短答案与普通结构化标记两路径已独立通过，整字段 details 丢弃的截断指示（§0.13）已实现、待独立验收；T17 不验收**。M5 后续任务 T18-T20 未开始。
 基线提交：`d26444407fc963c2e7efd51bda7d1bd4a70e8bbd`；第二轮独立复审返修（S1-S4）以追加普通提交落在该基线上（见 `git log` 最新提交）。
 固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未修改）。
 工作树：`/home/vv/person/code/omp-desktop-m5-t17`，分支 `codex/m5-subagents`。
@@ -193,7 +193,21 @@
 
 验证（`app/`，Node v24.14.0，pnpm 10.34.5）：`pnpm --filter @pi-desktop/omp-runtime test` **243 passed / 0 failed**；定向 desktop `omp-subagent-read`/`omp-subagent-presentation`/`omp-subagent-panel-render`/`omp-subagent-panel-mounted`/`tool-presentation`/`assistant-turns` **75 passed / 0 failed**；复审探针 `/tmp/m5-row-budget-review.mjs` 8/8 与 `/tmp/m5-row-meaning-review.mjs` 全断言均退出 0（`answerPreserved` 两路径 true、`presentationMarksTruncation` true、两行字节均 ≤ 4,194,304）；`pnpm --filter @pi-desktop/omp-runtime typecheck`、`pnpm --filter @pi-desktop/desktop typecheck`、`git diff --check` 退出 0。
 
-状态：**B3 follow-up 已实现、待独立验收**；平台（macOS 夹具可移植性）、最终 T17 验收仍待。
+状态：**B3 follow-up 的短答案保留与普通结构化标记已实现，两路径独立通过；整字段 details 丢弃的截断指示（§0.13）已实现、待独立验收**；平台（macOS 夹具可移植性）、最终 T17 验收仍待。
+
+## 0.13 B3 follow-up 残余：整字段 details 丢弃时的截断指示（2026-09-24）
+
+独立复审在 B3 follow-up 基线上复现一条残余指示路径（探针 `/tmp/m5-row-meaning-review.mjs` 新增两例，基线退出 1）：`boundedToolResult` 在 `details` 整字段装不下时把它丢弃、并把截断标志打在 envelope 顶层（`{content, truncated:true}`，§0.12 的第三分支）。但 PI 的 `toolResultPayload` 在 `details` 缺席时返回 `envelopeText`（保留的文本正文），`toolResultChips` 只读结果里的 `details` record——于是 envelope 顶层的原始标志被忽略，而保留文本又没有 `…`，整字段被丢弃时没有任何可见指示。基线实测两例 `bytes=4194283`、`envelopeKeys=["content","truncated"]`、`lateDetailsRetained=false`、`presentationMarksTruncation=false`、退出 1。
+
+修复（`app/apps/desktop/src/lib/tool-presentation.ts`，仅演示器边界，未改 converter/预算逻辑、未改固定上游、未改原生 transcript 内容/游标）：`toolResultChips` 在 `details` 非 record 且 envelope 顶层 `truncated===true` 时仍推进 `truncated` chip，再照旧早退。保留的 content 正文仍经 `toolResultPayload` → output block 可见，不被 marker-only 对象替换；普通未截断文本/小结构化载荷不变（无 envelope 级 `truncated`，不产生假 chip）。
+
+新增回归（先红后绿，`apps/desktop/test/omp-subagent-presentation.test.mjs` +2）：
+- 近边界（content 恰好装下、`details` 装不下）与超边界（`details` 再多 1024 字节）两例，断言整行字节 ≤ 4 MiB、`toolResultChips` 为 `[{role:"truncated"}]`、`toolResultPayload` 返回保留正文且 `buildToolPresentation` 出 output block 文本一致。
+- 普通未截断文本（小结构化 + text-only）不获得 chip。
+
+验证（`app/`，Node v24.14.0，pnpm 10.34.5）：`node --test test/tool-presentation.test.mjs test/omp-subagent-presentation.test.mjs test/assistant-turns.test.mjs test/subagent-transcript.test.mjs test/session-message-presentation.test.mjs test/work-panel-presentation.test.mjs` **82 passed / 0 failed**；复审探针 `/tmp/m5-row-budget-review.mjs` 8/8 与 `/tmp/m5-row-meaning-review.mjs` 全断言退出 0（近/超边界 `presentationMarksTruncation=true`）；`pnpm --filter @pi-desktop/desktop typecheck` 退出 0；`git diff --check` 无输出。仅演示器改动、未改 converter 预算逻辑，故未重跑 243 runtime 全量与 E2E。
+
+状态：**B3 follow-up 的短答案/普通结构化标记两路径已独立通过，整字段 details 丢弃指示已实现、待独立验收**；平台（macOS 夹具可移植性）、最终 T17 验收仍待。
 
 ## 0. 环境准备（固定子模块流程，与本轮代码无关）
 

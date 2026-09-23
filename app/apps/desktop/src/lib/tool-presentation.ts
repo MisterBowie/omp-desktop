@@ -482,9 +482,17 @@ export function runOutcome(
 /** Cheap outcome badges for the collapsed row: no stringify, property reads. */
 export function toolResultChips(message: ToolPresentationMessage): ToolChip[] {
   const details = asRecord(toolResultPayload(message));
-  if (!details) return [];
-  const action = getToolAction(message.toolName);
   const chips: ToolChip[] = [];
+  // A whole omitted `details` field leaves the adapter's truncation flag on the
+  // envelope itself; `toolResultPayload` then unwraps to the envelope's text
+  // blocks, so the record read above misses the flag. Honor it before bailing
+  // on a non-record payload — the retained content body stays visible.
+  const envelope = asRecord(message.toolResult);
+  if (details === null && envelope?.truncated === true) {
+    chips.push({ role: "truncated" });
+  }
+  if (!details) return chips;
+  const action = getToolAction(message.toolName);
   const exitCode = numberAt(details, "exitCode");
   // A successful exit is already implied by the row status; only failures earn
   // a badge.

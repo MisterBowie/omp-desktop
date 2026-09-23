@@ -210,3 +210,50 @@ test("a large string that precedes later fields is marked truncated", () => {
   assert.ok(details.summary.endsWith("\u2026"), "the large string is visibly truncated");
   assert.equal("count" in details, false, "the later field was dropped, not invented");
 });
+
+/** A result whose content text is huge while `details` is tiny. */
+const lateDetailsEntry = (text, extraDetails = {}) =>
+  entry(
+    {
+      role: "toolResult",
+      toolName: "PluginTool",
+      toolCallId: "late-call",
+      content: [{ type: "text", text }],
+      details: { kept: 1, ...extraDetails },
+      isError: false,
+    },
+    "late-details",
+  );
+
+test("an omitted details field keeps the content visible and chips the drop", () => {
+  // Size the content so it fits while the tiny `details` object does not: the
+  // whole `details` field is dropped and the flag rides on the envelope.
+  const baseSize = serializedBytes(converter.convertEntry(lateDetailsEntry("")));
+  const nearText = "c".repeat(ROW_BUDGET_BYTES - baseSize - 17);
+  const near = converter.convertEntry(lateDetailsEntry(nearText));
+  assert.ok(near, "the near-boundary row projects");
+  assert.ok(serializedBytes(near) <= ROW_BUDGET_BYTES, "the row stays within the whole-row bound");
+  assert.deepEqual(toolResultChips(near), [{ role: "truncated" }]);
+  // The retained content body stays visible, not replaced by a marker object.
+  assert.equal(toolResultPayload(near), nearText);
+  const output = buildToolPresentation(near, { hideSummaryArg: true }).find(
+    (block) => block.role === "output",
+  );
+  assert.equal(output?.text, nearText);
+
+  // 1024 more bytes of `details` still cannot fit, and must still indicate.
+  const over = converter.convertEntry(lateDetailsEntry(nearText, { padding: "d".repeat(1024) }));
+  assert.ok(serializedBytes(over) <= ROW_BUDGET_BYTES, "the oversized row stays within the bound");
+  assert.deepEqual(toolResultChips(over), [{ role: "truncated" }]);
+  assert.equal(toolResultPayload(over), nearText);
+});
+
+test("an untruncated result does not acquire a truncation chip", () => {
+  // A small structured result that fits fully: no truncation, no chip.
+  assert.deepEqual(
+    toolResultChips(converter.convertEntry(tool([{ type: "text", text: "done" }], { count: 42 }))),
+    [],
+  );
+  // A text-only result carries no envelope, so no chip either.
+  assert.deepEqual(toolResultChips(converter.convertEntry(tool("plain output"))), []);
+});
