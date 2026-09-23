@@ -4,17 +4,18 @@
 
 ## 0. M4 交付摘要（本轮）
 
-- 状态：**T14-T16 已完成并提交**（分支 `codex/m4-persistence`），含三轮独立复审（R1-R9、F1-F8、G1-G3）返修，等待复审确认。
+- 状态：**T14-T16 已完成并提交**（分支 `codex/m4-persistence`），含四轮独立复审（R1-R9、F1-F8、G1-G3、H1-H4）返修，等待复审确认。
+- 第四轮复审返修（H1-H4）：reclaim 失败后 registry 保留 entry/supervisor（第二次 dispose 命中同一 supervisor 可重试，失败后 prompt 不创建第二个 runtime）；renderer archive 改为 await 事务（失败保持未归档且进入 reportError，不创建 fallback session）；sessionConfigure 错误携带 `inconsistent`，delete/archive 在 engine=omp 但 runtime 未接线时 fail closed；修正 validation/task-board/HANDOFF 中 branch/model/计数等过期表述。
 - 第三轮复审返修（G1-G3）：modelSwitch 改为「先成功回收旧 runtime，再原子 persist」离线切换事务（reclaim 失败 DB 完全不变、persist 失败按旧 binding 重启、thinking 应用→persist→回滚且回滚失败 `inconsistent`、persistConfig 缺失 fail-closed）；delete/archive 回收失败抛 typed error 不删 row/不谎报完成，renderer archive 改 async 且失败保持未归档；删除过期 branch 序号猜测实现（`branch` 改 typed refusal）。详见 `docs/validation/M4-persistence.md` §0.3。
 - 第二轮复审返修（F1-F8）：恢复路径用 `realpath` canonicalize（拒直接/中间目录 symlink 逃逸）、有界读 header、switch 后 `get_state` 必须同时返回 id+canonical path；delete 先取 engine 再回收 OMP runtime 且 `cleanupFailed` 可观察、新增 `sessionArchive` IPC（archive 回收目标、unarchive 不启动）；**branch capability 关闭**（固定 OMP `branch` 是 redo-from-user fork 而非 PI copy-through fork，rpc-ui 事件流不带 entry id，无法可靠映射）；modelSwitch 用单一 `persistConfig` 原子持久化全字段（含 mode/permissionMode）并处理 dispose 失败；投影 authKind 明确 allowlist、空 key fail-closed、provider id 结构化引号；rename 空标题回滚 + cleanup 失败可观察；新增真实 runtime 并发审批 E2E（A/B 同时卡审批、回答 A 不释放 B）。详见 `docs/validation/M4-persistence.md` §0.1/§0.2。
 - 证据：`docs/validation/M4-persistence.md`（功能→PI/OMP/本项目 证据表、验证命令与结果、先红后绿证据）；设计决策：`app/docs/adr/0302-omp-session-persistence-and-runtime-registry.md`（英文 ADR）。
 - 核心变更：
   - **schema v21**（`crates/host-core`）：`sessions` 加 4 个可空列（`engine_adapter_version`/`engine_runtime_version`/`native_session_id`/`native_session_path`），`session.bindEngine`/`session.getEngineRef` 两个主机边界 RPC；旧 Pi 记录读回 `engine=pi`、引用全 `None`。
   - **持久原生目录**：supervisor 加 `sessionDir`，以 `--session-dir <dataRoot>/omp-sessions` 启动 runtime（原生 transcript 与临时 runRoot 分离），stop/reclaim 不删。
-  - **per-session registry**（`omp-session.ts` 重写）：每 session 独立 supervisor/runtime/cwd/模型投影/审批注册表；`new_session`→`get_state`→`bindEngine` 或 `switch_session` 恢复；`set_session_name`/`set_model`/`set_thinking_level` 成功并持久化后才生效。
+  - **per-session registry**（`omp-session.ts` 重写）：每 session 独立 supervisor/runtime/cwd/模型投影/审批注册表；`new_session`→`get_state`→`bindEngine` 或 `switch_session` 恢复；`set_session_name` 成功并持久化后才生效；model change 为离线 reclaim-first/persist-second restart（不调用 OMP `set_model`），thinking-only 在线 `set_thinking_level` 并回滚。
   - **模型投影**（`omp-model-projection.ts` + `omp-session-wiring.ts`）：只投影目标 provider/model 到临时 `models.yml`，secret 只在 main/host 边界读取、只落进临时文件，canary 扫描覆盖日志/帧/持久引用/文档。
-  - **能力**：`resume`/`modelSwitch` 开放；`branch`（语义不兼容，见 F3）/`steer`/`followUp`/`compact` 保持 typed refusal。
-- 新增测试：`omp-session-persistence-e2e.test.mjs`（真实 runtime 持久化/恢复 1 项）、`omp-session-concurrent-approval-e2e.test.mjs`（F7 真实并发审批 1 项）、`omp-session-failclosed.test.mjs`（17 项 R1/F1/R5/F6/R7）、`omp-session-delete-archive.test.mjs`（5 项 F2）、`omp-model-projection.test.mjs`（17 项 R4/F5）、`omp-secret-redaction.test.mjs`（canary 2）、`omp-session-bridge.test.mjs`（28）、host-core `db/tests.rs`（迁移 v21 + bindEngine）。
+  - **能力**：`resume`/`modelSwitch` 开放；`branch`（语义不兼容，见 F3/G3）/`steer`/`followUp`/`compact` 保持 typed refusal。
+- 新增测试：`omp-session-persistence-e2e.test.mjs`（真实 runtime 持久化/恢复 1 项）、`omp-session-concurrent-approval-e2e.test.mjs`（F7 真实并发审批 1 项）、`omp-session-failclosed.test.mjs`（17 项 R1/F1/R5/F6/R7）、`omp-session-delete-archive.test.mjs`（5 项 F2）、`omp-session-configure.test.mjs`（5 项 G1）、`omp-session-configure-ipc.test.mjs`（3 项 H3）、`omp-session-ownership.test.mjs`（2 项 H1）、`omp-session-archive-renderer.test.mjs`（5 项 H2）、`omp-model-projection.test.mjs`（17 项 R4/F5）、`omp-secret-redaction.test.mjs`（canary 2）、`omp-session-bridge.test.mjs`（28）、host-core `db/tests.rs`（迁移 v21 + bindEngine）。
 - 下一轮入口：M5/T17-T20（子代理面板、edit/LSP/DAP 展示、MCP/规则/技能/记忆）；`steer`/`followUp`/`compact` 与 `subagentEvents` 在 M5 逐项开放。
 
 ## 0. M3 交付摘要（上一轮）

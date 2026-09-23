@@ -59,8 +59,8 @@
 | 命名 | `session.rename`、`apps/desktop/test/session-rename.test.mjs` | `set_session_name`（`rpc-types.ts:80`、`rpc-mode.ts`） | OMP 名称经 `set_session_name` 协调，成功后才 `session.rename` 持久化（`session-ipc.ts`）；失败不留两套名称 |
 | 归档/侧栏 | `packages/shared/src/session-presentation.ts`（`sessionIsArchived` 展示态）、`apps/desktop/test/app-store-sidebar.test.mjs` | 无对应 | 复用 PI 展示态归档/侧栏刷新，归档只改产品可见状态，不删原生文件 |
 | 恢复 | 原生 Pi 会话 `native-pi-session.ts` 恢复（`SessionManager.open`） | `switch_session(sessionPath)`（`rpc-types.ts:76`、`session-manager.ts:1835` 采纳 header cwd） | 新进程用同一 session 引用 `switch_session(sessionPath)` 后恢复历史，不重放 prompt/工具/审批（`omp-session-persistence-e2e.test.mjs`） |
-| 分支 | `session-fork.test.mjs`、`fork_session_through` | `get_branch_messages`→`branch(entryId)`（`rpc-types.ts:77-78`、`e06-session.mjs`） | 用原生 entry identity 调 `branch`，新桌面 session + 新原生映射，父子不共用原生 sessionFile |
-| 模型/思维 | `packages/shared/src/types/providers.ts`（`ProviderPublic`/`ModelBinding`）、`runtime/provider-catalog.ts`、`session-thinking.test.mjs`、`session-configuration-staging.test.mjs` | `get_available_models`/`set_model`/`set_thinking_level`（`rpc-types.ts:48-53`）、`models.yml`（`config/models-config-schema-bundle.ts`、`config/model-registry.ts:429`） | 最小投影：只投影目标 provider/model，`models.yml` 写进临时 agent 目录；`set_model`/`set_thinking_level` 成功并持久化后才生效，失败保持旧绑定 |
+| 分支 | `session-fork.test.mjs`、`fork_session_through` | `get_branch_messages`→`branch(entryId)`（`rpc-types.ts:77-78`、`e06-session.mjs`） | **branch capability 关闭**：固定 OMP `branch` 是 redo-from-user fork（fork 到选中 user 的 parent）而非 PI copy-through fork，rpc-ui 事件流不带 entry id，无法可靠映射；`branch()` 抛 typed refusal（见 §0.2 F3、§0.3 G3） |
+| 模型/思维 | `packages/shared/src/types/providers.ts`（`ProviderPublic`/`ModelBinding`）、`runtime/provider-catalog.ts`、`session-thinking.test.mjs`、`session-configuration-staging.test.mjs` | `get_available_models`/`set_model`/`set_thinking_level`（`rpc-types.ts:48-53`）、`models.yml`（`config/models-config-schema-bundle.ts`、`config/model-registry.ts:429`） | 最小投影（单模型）：model change 是最小投影约束下的**离线 reclaim-first/persist-second restart**（不调用固定 OMP `set_model`）；thinking-only 才在线 `set_thinking_level` 并回滚；mode/permissionMode 一次 host configure 持久化 |
 | 凭证/脱敏 | `crates/host-core/src/secrets.rs`、`ipc/provider-ipc.ts:444`（`providers.getSecret`） | `isolation.ts`（ambient 剥离、合成 HOME）、`e07-isolation.mjs` | secret 只在 main/host 边界读取，只落进临时 `models.yml`；canary 扫描覆盖日志/帧/持久引用/文档/快照 |
 | 并发/隔离 | 无（Pi 单 sidecar） | 无（M3 单 runtime） | 每 session 独立 supervisor/runtime（`omp-session.ts` registry），并发实测（`omp-session-persistence-e2e.test.mjs`） |
 
@@ -74,7 +74,7 @@
 | `cargo fmt -p host-core -- --check` | 通过（已格式化两处） | 0 |
 | `pnpm --filter @pi-desktop/omp-runtime test` | **157 passed / 0 failed**（含真实固定 runtime 烟测） | 0 |
 | `pnpm --filter @pi-desktop/shared test` | **968 passed / 0 failed** | 0 |
-| `node --test test/*.test.mjs`（`env -u SSH_ASKPASS`，desktop 全量） | **2635 passed / 0 failed / 4 skipped**（2639 项） | 0 |
+| `node --test test/*.test.mjs`（`env -u SSH_ASKPASS`，desktop 全量） | **2650 passed / 0 failed / 4 skipped**（2654 项） | 0 |
 | `pnpm typecheck`（12/13 workspace 包） | 通过 | 0 |
 | `pnpm build:js` | 通过（含 desktop renderer 打包） | 0 |
 | `cargo build --release -p host-core --locked` | 通过 | 0 |
@@ -88,13 +88,13 @@
 2. **持久化真实 native id/path 且关闭 runtime 后文件仍在**：`omp-session-persistence-e2e.test.mjs` 断言 `get_state` 的 `sessionFile` 落在 `sessionDir`（非 runRoot），`disposeSession` 后 `existsSync(sessionPath)` 仍为真。
 3. **新进程恢复相同会话**：同一测试用 `nativeSessionPath` 重开，断言历史恢复、0 个旧工具执行、目标文件 mtime/content 不变（restore 不重放）。
 4. **缺失/损坏/越界引用**：`omp-session.ts` 的 `ensureNativeSession` 对 `switch_session` 返回 `cancelled`/`success:false` 抛 `OMP_RESTORE_FAILED`，不新建替代会话（bridge 测试 + registry 语义覆盖）。
-5. **rename/archive/delete 主路径与失败**：`session-ipc.ts` 重命名失败抛 `ENGINE_CAPABILITY_UNAVAILABLE`；`sessionDelete` 先取 engine 再回收 OMP runtime、回收失败 `cleanupFailed` 可观察；`sessionArchive` IPC 回收目标 runtime（`omp-session-delete-archive.test.mjs`）。branch 关闭（见 §0.2 F3）。
+5. **rename/archive/delete 主路径与失败**：`session-ipc.ts` 重命名失败抛 `ENGINE_CAPABILITY_UNAVAILABLE`；`sessionDelete` 先取 engine 再回收 OMP runtime、回收失败抛 typed error 不删 host row；`sessionArchive` IPC 回收目标 runtime、回收失败抛 typed error（`omp-session-delete-archive.test.mjs`）。branch 关闭（见 §0.2 F3）。
 6. **模型投影只出现目标模型 + 默认变化不改旧 session**：`omp-model-projection.test.mjs` 断言只一个 `- id:`；投影固定于 session 绑定的 provider/model；`set_model`/`set_thinking_level` 失败返回 `{ok:false}` 且不改绑定。
 7. **canary secret 不泄漏**：`omp-secret-redaction.test.mjs` 断言合成 key 只落在临时 `models.yml`，不在日志、事件 envelope、持久引用、文档/快照。
 8. **并发隔离（真实 runtime）**：`omp-session-concurrent-approval-e2e.test.mjs` 让 A/B 两个真实 OMP runtime 同时存活、同时卡各自 gate 审批，回答 A 不释放 B、各自 side effect、停止 A 不影响 B；`omp-session-persistence-e2e.test.mjs` 断言双项目 cwd/文件隔离。
 9. **崩溃/重启不重放、旧审批不跨进程放行**：runner 的 generation 单次消费 + `resolveUiRequest` 绑定 session/generation（M3 已证），M4 恢复路径复用同一语义（`omp-session-bridge.test.mjs` 28 项全绿）。
 10. **未开放能力拒绝不改持久状态**：`branch`/`steer`/`followUp`/`compact` 保持关闭，`engine-router` 拒绝（`engine.test.ts` 断言 `branch===false`/`steer===false` 与 typed refusal）；`resume`/`modelSwitch` 开放（`engine.test.ts` 更新后 968 项全绿）。
-11. **Pi 对照**：desktop 全量 2635 项通过，Pi session 路径未回归；host-core 582 项通过。
+11. **Pi 对照**：desktop 全量 2650 项通过，Pi session 路径未回归；host-core 582 项通过。
 
 ## 4. 环境限制与未完成项
 

@@ -274,8 +274,8 @@ export type AppState = {
    */
   deleteProject: (path: string) => Promise<void>;
   toggleSessionPinned: (id: string) => void;
-  toggleSessionArchived: (id: string) => void;
-  archiveSession: (id: string) => void;
+  toggleSessionArchived: (id: string) => Promise<void>;
+  archiveSession: (id: string) => Promise<void>;
   restoreSession: (id: string) => void;
   renameSession: (id: string, title: string) => Promise<void>;
   /** Move an idle session into an already-known project, preserving history. */

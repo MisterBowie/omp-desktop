@@ -1304,21 +1304,30 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
   async function disposeSession(sessionId: string, reason = "session disposed"): Promise<OmpDisposeResult> {
     const entry = entries.get(sessionId);
     if (!entry) return { ok: true, failures: [] };
-    entries.delete(sessionId);
+    // The entry is removed only after a fully successful reclaim. A failed
+    // reclaim leaves the supervisor owning a live process group / uncleaned run;
+    // dropping the entry here would orphan that ownership (the next prompt could
+    // start a second runtime, and no later retry could reach the supervisor).
     const failures = await entry.dispose(reason);
     for (const failure of failures) {
       logger?.app("omp", "error", "omp session runtime reclaim incomplete", { data: failure });
+    }
+    if (failures.length === 0) {
+      entries.delete(sessionId);
     }
     return { ok: failures.length === 0, failures };
   }
 
   async function dispose(reason = "application shutdown"): Promise<OmpDisposeResult> {
-    const retained = [...entries.entries()];
-    entries.clear();
+    // Reclaim every session, but only forget the ones that were fully reclaimed:
+    // a session whose runtime could not be reclaimed keeps its entry so a later
+    // dispose (or status) can retry the same supervisor instead of losing it.
     const failures: Array<{ sessionId: string; detail: string }> = [];
-    for (const [sessionId, entry] of retained) {
+    for (const [sessionId, entry] of [...entries.entries()]) {
       try {
-        failures.push(...(await entry.dispose(reason)));
+        const entryFailures = await entry.dispose(reason);
+        if (entryFailures.length === 0) entries.delete(sessionId);
+        failures.push(...entryFailures);
       } catch (error) {
         failures.push({ sessionId, detail: String((error as Error)?.message ?? error) });
       }

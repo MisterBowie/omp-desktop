@@ -361,11 +361,16 @@ export function registerSessionIpc({
     if (engineRouter) {
       isOmp = (await engineRouter.requireForSession(id, "stop")) === "omp";
     }
-    // An OMP session's runtime must be reclaimed before the delete commits. A
-    // failed reclaim aborts the delete entirely: the host row is kept, the
-    // outbox is untouched, and the caller sees an actionable error rather than a
-    // row whose runtime is still alive.
-    if (isOmp && ompSessions) {
+    // An OMP session must be reclaimed through the wired bridge before the
+    // delete commits. A session that is OMP but has no bridge wired must fail
+    // closed: deleting its host row without reclaiming its runtime would leave
+    // a live process with no durable record to reach it.
+    if (isOmp) {
+      if (!ompSessions) {
+        throw Object.assign(new Error("this build has no OMP runtime to reclaim this session"), {
+          errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+        });
+      }
       const outcome = await ompSessions.disposeSession(id, "session deleted");
       if (!outcome.ok) {
         throw Object.assign(
@@ -396,9 +401,14 @@ export function registerSessionIpc({
     // is a separate no-op path that never starts a runtime.
     if (id.startsWith("native-pi:")) return { ok: true };
     if (!host) throw new Error("host unavailable");
-    if (engineRouter && ompSessions) {
+    if (engineRouter) {
       const engine = await engineRouter.requireForSession(id, "stop");
       if (engine === "omp") {
+        if (!ompSessions) {
+          throw Object.assign(new Error("this build has no OMP runtime to reclaim this session"), {
+            errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+          });
+        }
         const outcome = await ompSessions.disposeSession(id, "session archived");
         if (!outcome.ok) {
           throw Object.assign(
@@ -652,8 +662,12 @@ export function registerSessionIpc({
           permissionMode: config.permissionMode ?? null,
         });
         if (!outcome.ok) {
+          // An inconsistent outcome means the runtime and the host DB have
+          // forked (a revert failed); that fact must reach the caller, not be
+          // flattened into a generic capability error.
           throw Object.assign(new Error(outcome.reason ?? "the OMP runtime refused the configuration"), {
             errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+            ...(outcome.inconsistent ? { inconsistent: true } : {}),
           });
         }
         result = await host.call<{ session?: RuntimeSession | null }>("session.get", {

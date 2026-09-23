@@ -1142,13 +1142,17 @@ export function Sidebar({
       }
       if (wasActive && next) {
         if (!(await selectProjectSession(next))) return;
-        archiveSessionAction(session.id);
+        // Reclaim the runtime first; a failed archive must not proceed to the
+        // fallback. The action throws, which the caller surfaces.
+        await archiveSessionAction(session.id);
         return;
       }
       if (wasActive) {
-        // Archive first so an empty active slot is not reused as its own
-        // replacement. Restore it if creating the fallback slot fails.
-        archiveSessionAction(session.id);
+        // Archive first (awaited) so an empty active slot is not reused as its
+        // own replacement, and the fallback session is only created once the
+        // archive actually committed. On archive failure the session stays
+        // unarchived and no fallback is created.
+        await archiveSessionAction(session.id);
         try {
           await newSession({ projectPath: session.projectPath ?? null });
         } catch (error) {
@@ -1157,7 +1161,7 @@ export function Sidebar({
         }
         return;
       }
-      archiveSessionAction(session.id);
+      await archiveSessionAction(session.id);
     } catch (error) {
       reportError(error);
     }

@@ -30,9 +30,9 @@
 | T11 | M3 | 文本、思考、工具、错误与用量事件 | T09,T10 | 顺序、隔离与未知工具退化 | 已完成（`docs/validation/M3-workflow.md` §1） |
 | T12 | M3 | 审批与提问 UI、权限桥接 | T05,T11 | 请求关联、拒绝/超时/取消 | 已完成（同上 §2） |
 | T13 | M3 | 停止与端到端编码流程 | T06,T11,T12 | 文件/命令副作用与 UI 一致 | 已完成（同上 §3） |
-| T14 | M4 | 会话字段、迁移、恢复、归档与分支 | T07,T13 | 旧库/新库，缺文件与中断恢复 | 已完成（`docs/validation/M4-persistence.md` §1-§3；host-core schema v21 + 582 项、`session.bindEngine`/`getEngineRef`、持久 `--session-dir`、registry 恢复/命名/分支） |
-| T15 | M4 | 模型配置、认证投影和凭证脱敏 | T07,T13 | 配置不串用，凭证不泄漏 | 已完成（同上；`omp-model-projection.ts` + canary 扫描 + `set_model`/`set_thinking_level` 原子持久化） |
-| T16 | M4 | 并发项目、队列、压缩与故障恢复 | T14,T15 | cwd 不漂移、无重复执行 | 已完成（同上；per-session registry、并发/恢复 E2E、`resume`/`branch`/`modelSwitch` 开放、`steer`/`followUp`/`compact` 保持拒绝） |
+| T14 | M4 | 会话字段、迁移、恢复、归档 | T07,T13 | 旧库/新库，缺文件与中断恢复 | 已完成（`docs/validation/M4-persistence.md` §1-§3；host-core schema v21 + 582 项、`session.bindEngine`/`getEngineRef`、持久 `--session-dir`、registry 恢复/命名/归档；**分支 branch 关闭**——固定 OMP `branch` 语义与 PI fork 不兼容） |
+| T15 | M4 | 模型配置、认证投影和凭证脱敏 | T07,T13 | 配置不串用，凭证不泄漏 | 已完成（同上；`omp-model-projection.ts` + canary 扫描；model change 为最小投影约束下的**离线 reclaim-first/persist-second restart**，thinking-only 在线 `set_thinking_level` 并回滚，mode/permissionMode 一次持久化） |
+| T16 | M4 | 并发项目、队列、压缩与故障恢复 | T14,T15 | cwd 不漂移、无重复执行 | 已完成（同上；per-session registry、并发/恢复 E2E、`resume`/`modelSwitch` 开放、`branch`/`steer`/`followUp`/`compact` 保持拒绝） |
 | T17 | M5 | OMP 子代理面板与编排归属 | T16 | 父子事件、查看、停止、恢复边界 | 待开始 |
 | T18 | M5 | edit/LSP/DAP 结果与必要的专用展示 | T16 | 结构正确、未知结果可读 | 待开始 |
 | T19 | M5 | MCP、规则、技能、记忆及插件分类适配 | T16 | 单一加载责任、不重复工具注册 | 待开始 |
