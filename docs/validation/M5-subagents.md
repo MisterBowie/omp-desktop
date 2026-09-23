@@ -1,6 +1,6 @@
 # M5 验证记录：OMP 子代理面板与编排归属（T17）
 
-状态：**未验收**（T17）。第三轮独立复审拆出 B1-B3 三项返修；B1 于 `9d0acde` 首实现后独立复审仍复现两项缺陷（F1 目录债二次 stop 丢失、F2 停期间短暂放行 prompt），本提交修复并追加行为回归，**B1 改定待独立验收**；**B2（renderer 单飞/错误可见）与 B3（总 UTF-8 预算）仍未解决**。M5 后续任务 T18-T20 未开始。
+状态：**未验收**（T17）。第三轮独立复审拆出 B1-B3 三项返修；B1 于 `9d0acde` 首实现后独立复审仍复现两项缺陷（F1 目录债二次 stop 丢失、F2 停期间短暂放行 prompt），本提交修复并追加行为回归，**B1 改定待独立验收**；第四轮独立复审拆出 C1（回收成功后的运行时替换/原生会话恢复，见 §0.5），**C1 已实现待独立验收**；**B2（renderer 单飞/错误可见）与 B3（总 UTF-8 预算）仍未解决**。M5 后续任务 T18-T20 未开始。
 基线提交：`d26444407fc963c2e7efd51bda7d1bd4a70e8bbd`；第二轮独立复审返修（S1-S4）以追加普通提交落在该基线上（见 `git log` 最新提交）。
 固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未修改）。
 工作树：`/home/vv/person/code/omp-desktop-m5-t17`，分支 `codex/m5-subagents`。
@@ -44,6 +44,24 @@
 - **F2 停期间短暂放行新 prompt**：`agent_end` 在 stop 等待 `get_subagents`/teardown 前已 `closeRun()`（state=idle/run=null），`prompt()` 只查 `pendingReclaim` 与 state、未查活动 stop，导致窗口内接受新代并随后被旧 stop 关闭。修复（`runner.ts`）：`prompt()` 增加 `this.stopping` 所有权检查（typed `stopping` 拒绝），覆盖 abort/收敛/快照/teardown/重试全窗口；`closeRun()` 增加代守卫（旧代完成/失败不得关闭已取代的新 run）。回归（`runner.test.ts` 可控 promise，先红后绿）：独立 hold 快照与 teardown 各拒 prompt、并发 pending-retry 拒 prompt、stop 期间 `agent_end` 不得关闭 stop 之后的新 run。
 
 验证（`app/`，`nvm use v24.14.0`，Node v24.14.0，pnpm 10.34.5）：`pnpm --filter @pi-desktop/omp-runtime test` **231 passed / 0 failed**（227 + 4 F2 回归）；`pnpm --filter @pi-desktop/omp-runtime build` 0；`env -u SSH_ASKPASS node --test test/omp-session-bridge.test.mjs` **29 passed / 0 failed**（28 + 1 F1 真实 supervisor 集成）；`omp-subagent-bridge` 8、`omp-subagent-e2e` 3（含不先 list 的 detached-child 场景）、`omp-session-ownership`/`failclosed`/`configure`/`configure-ipc`/`delete-archive`/`host-mutation-gates`/`ipc-result` 42、`omp-session-e2e`/`concurrent-approval-e2e`/`persistence-e2e` 3 全绿；`pnpm --filter @pi-desktop/omp-runtime typecheck` 与 `pnpm --filter @pi-desktop/desktop typecheck` 0；`git diff --check` 无输出。两个独立 repro（`/tmp/m5-stop-prompt-race.mjs`、`/tmp/m5-bridge-cleanup-retry.mjs`）在修复后均按预期输出。
+
+## 0.5 第四轮独立复审返修（C1，2026-09-24）
+
+第四轮独立复审在 B1/F1/F2 已修复的基线上复现「回收成功后同一桌面会话续聊」仍断裂：`prompt → task 子代理 → stop → 目录清理失败 → 重试直到 reaped && cleaned → 同会话发下一条消息`。独立复现输出 `nextPrompt={refused:true,errorCode:"NOT_STARTED"}` 且 `runtimeStarts=1`（见 `/tmp/m5-bridge-cleanup-retry.mjs`）。本提交修复并追加行为回归，C1 待独立验收。
+
+- **C1 根因**：`SessionEntry.ensureRunner` 只要 `this.runner` 非空就直接返回，即使其 runtime 已被成功 reap；supervisor 在成功 teardown 后正确清空 `currentRuntime`，但 entry 仍保留绑定死句柄的 runner；下一条 prompt 经 `ensureNativeSession` → `runtimeHandle()` 抛 `NOT_STARTED`。桌面 `agentAbort`/`agentStop` 只调 bridge.stop、不 dispose 会话，用户无法靠再发消息恢复（先 `dispose` 再建会话的测试不是该用户路径）。
+- **修复（`apps/desktop/electron/main/runtime/omp-session.ts` + `packages/omp-runtime/src/session/runner.ts` + `ui-requests.ts`）**：
+  1. **成功回收后退役死 runner、下次显式 prompt 重建 runtime/runner**：`ensureRunner` 在 `shouldRetireRunner()` 成立时 `retireRunner()`（detach 帧/失败 handler、`dispose`、置 null），随后单飞 `buildRunner` 重建。协议收敛停止（runtime 仍活，`currentRuntime()` 非空）或失败 teardown（`hasPendingReclaim()`）不退役；stop 进行中（`runState()==="stopping"`）不退役、不启动第二 runtime。
+  2. **换进程后必须重发 switch_session**：新增 per-runtime `nativeSessionBound` 标志；退役时清它，但保留持久 `nativeSessionId`/`nativeSessionPath`。恢复路径在换进程后重发 `switch_session` + `get_state` 身份校验，绝不新建原生会话、绝不重放旧消息/工具。
+  3. **turn 身份跨替换保持不同**：runner 增加 `generationSeed`（`OmpUiRequests` 起点）；退役时取 `currentGeneration()` 作下个 runner 的种子，使新进程的 turnId 续号而非重置为 1。
+  4. **并发协调**：`runnerBuild`/`nativeSessionBuild` 两个受控 promise 单飞，杜绝重复 runner 与重复内容提交；`dispose` 复位 `nativeSessionBound` 且绝不意外重启 runtime。
+
+- **参考实现/测试（借用规则，非照搬全局架构）**：固定 PI `apps/desktop/electron/main/runtime/sidecar.ts` `onExit`（清 `runtimeState.sidecar`、崩溃清理绑定其 crash turn、`superviseRestart` 请求替换）→ 借「清陈旧句柄 + 清理绑定旧 turn + 请求替换」；固定 PI `packages/host-runtime/src/runtime-supervisor.ts` + `runtime-supervisor.test.ts`（单飞重启、shutdown 后不重启）与 `runtime-service.ts` `attachSidecar` + `runtime-service.test.ts`（旧 sidecar/turn 事件不得作用于替换者）→ 借「单飞 + 旧事件不得落到新 turn + shutdown 不重启」；固定 OMP `packages/coding-agent/src/modes/rpc/rpc-mode.ts` `handleRpcSessionChange`（`switch_session` 非 cancelled 即 `subagentRegistry.clear()`）与 `get_state` 返回 `sessionId`/`sessionFile` → 借「换会话清 per-runtime 初始化态、恢复只经 switch_session/get_state、不重放」。OMP 是 per-session runtime，不照搬 PI 全局重启系统。详见 `app/docs/adr/0303` §6。
+
+- 新增回归（`apps/desktop/test/omp-session-bridge.test.mjs` 6 例，真实 `SessionEntry` + 真实 `OmpRuntimeSupervisor` + 外部边界 chmod，先红后绿）：① 失败→重试→成功后同会话 prompt（无 dispose），断言 `runtimes.length===2`、新 runtime 命令序列 `["switch_session","get_state","set_subagent_subscription","prompt"]`（恰好一次 prompt）、turnId `...:2` 不复用；② 立即成功 teardown 后同会话 prompt 仍重建；③ 协议收敛停止复用活 runtime（`runtimes.length===1`、turnId `...:2` 续号）；④ pending cleanup 拒 prompt 且工厂不二次调用（`runtimes.length===1`）；⑤ 退役 runtime 的 handler 已 detach、旧帧不达新 turn、新 runtime 收到新 turnId 帧；⑥ dispose 未 reclaim 时保留会话所有权（不二次启动 runtime、重试 dispose 清债）。
+- 扩展真实固定 OMP E2E（`apps/desktop/test/omp-subagent-e2e.test.mjs` 第三项，保留不先 list 的 detached-child 场景与本地假 provider）：停掉仍运行的 detached 子代理后，**同会话**显式新消息续聊，断言 `accepted`、turnId 与首轮不同、新 turn 收到 `agent_end`、`get_state` 报同一 `sessionId`；finally 全量 reclaim。
+
+验证（`app/`，`nvm use v24.14.0`，Node v24.14.0，pnpm 10.34.5，Bun 1.4.2）：独立 repro `OMP_REVIEW_APP=/home/vv/person/code/omp-desktop-m5-t17/app OMP_REVIEW_NEXT_PROMPT=true node /tmp/m5-bridge-cleanup-retry.mjs` 现输出 `nextPrompt={accepted:true,turnId:"omp-turn:review-cleanup:2"}`、`runtimeStarts=2`、`replacementCommands=["switch_session","get_state","set_subagent_subscription","prompt"]`；`pnpm --filter @pi-desktop/omp-runtime test` **231 passed / 0 failed**（含真实固定 runtime 烟测）；`env -u SSH_ASKPASS node --test test/omp-session-bridge.test.mjs` **35 passed / 0 failed**（29 + 6 C1 回归）；`omp-subagent-e2e` 3（含同会话续聊）、`omp-session-ownership`/`failclosed`/`configure`/`configure-ipc`/`delete-archive`/`host-mutation-gates`/`ipc-result`/`subagent-bridge`/`subagent-read`/`subagent-panel-render`/`subagent-panel-mounted` 共 60、`omp-session-e2e`/`concurrent-approval-e2e`/`persistence-e2e` 3 全绿；`pnpm --filter @pi-desktop/omp-runtime exec tsc -p tsconfig.json --noEmit` 与 `pnpm --filter @pi-desktop/desktop typecheck` 0；`git diff --check` 无输出。
 
 ## 0. 环境准备（固定子模块流程，与本轮代码无关）
 

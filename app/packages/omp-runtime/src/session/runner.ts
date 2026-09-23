@@ -108,6 +108,12 @@ export type OmpSessionRunnerOptions = {
     cleaned: boolean;
   }>;
   now?: () => number;
+  /**
+   * Generation the run counter starts at. The bridge passes the retired
+   * runner's last generation when it rebuilds a runtime, so a turn that runs
+   * after a reclaim never reuses the turn id of a turn that already ended.
+   */
+  generationSeed?: number;
   /** How long to wait for one convergence step before escalating. */
   convergeTimeoutMs?: number;
   /** How long to wait for `abort` itself to be answered. */
@@ -200,6 +206,7 @@ export class OmpSessionRunner {
       sessionId: this.sessionId,
       write: (frame) => this.runtime.write(frame as OmpFrame),
       now: this.now,
+      ...(options.generationSeed !== undefined ? { generationSeed: options.generationSeed } : {}),
     });
     this.detachFrame = this.runtime.onFrame((frame) => this.onFrame(frame));
     this.detachFailure = this.runtime.onFailure((error) => this.onTransportFailure(error));
@@ -220,6 +227,26 @@ export class OmpSessionRunner {
 
   runState(): OmpRunState {
     return this.state;
+  }
+
+  /**
+   * True while a teardown obligation from a previous stop is still owed.
+   *
+   * The owning bridge reads this to decide whether a runner that lost its
+   * runtime handle is merely mid-cleanup (keep it, so the retry stays
+   * reachable) or fully reclaimed (retire it and rebuild on the next prompt).
+   */
+  hasPendingReclaim(): boolean {
+    return this.pendingReclaim;
+  }
+
+  /**
+   * The run generation this runner last assigned. The bridge reads it when it
+   * retires a runner so the replacement's turn counter continues where the old
+   * one left off, keeping turn identities distinct across a runtime swap.
+   */
+  currentGeneration(): number {
+    return this.ui.currentGeneration();
   }
 
   /** Open dialog requests, for the desktop's status surface. */

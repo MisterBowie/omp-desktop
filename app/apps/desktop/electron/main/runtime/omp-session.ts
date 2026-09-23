@@ -504,8 +504,16 @@ class SessionEntry {
   private readonly persistNativeSession: OmpSessionBridgeOptions["persistNativeSession"];
 
   private runner: OmpSessionRunner | null = null;
+  /** Single-flight build: concurrent prompts share one runtime + runner. */
+  private runnerBuild: Promise<OmpSessionRunner> | null = null;
+  /** Single-flight native-session establishment (switch/new + identity check). */
+  private nativeSessionBuild: Promise<void> | null = null;
   nativeSessionId: string | null = null;
   nativeSessionPath: string | null = null;
+  /** True once the CURRENT runtime process is on this session (switch/new). */
+  private nativeSessionBound = false;
+  /** Turn counter seed for the next runner, carried across runtime replacement. */
+  private generationSeed = 0;
   runtimeVersion: string | null = null;
   /** The app-owned persistent native-session directory (containment root). */
   private readonly sessionDir: string;
@@ -557,9 +565,57 @@ class SessionEntry {
     return this.generations.get(frameId) ?? 0;
   }
 
-  /** Start the runtime (once) and construct the runner over it. */
+  /**
+   * Return the runner for this session, building runtime + runner once.
+   *
+   * A runner whose runtime was fully reclaimed is stale: it is retired here so
+   * the next prompt rebuilds a fresh process and runner. A converged protocol
+   * stop keeps the live process, and a failed teardown keeps its retryable
+   * obligation, so neither is retired — and an in-flight stop owns the
+   * lifecycle, so a concurrent prompt must not start a second runtime.
+   */
   async ensureRunner(gate: string): Promise<OmpSessionRunner> {
+    if (this.runner && this.shouldRetireRunner()) {
+      this.retireRunner();
+    }
     if (this.runner) return this.runner;
+    if (this.runnerBuild) return this.runnerBuild;
+    this.runnerBuild = this.buildRunner(gate);
+    try {
+      return await this.runnerBuild;
+    } finally {
+      this.runnerBuild = null;
+    }
+  }
+
+  /**
+   * True when the current runner wraps a runtime the supervisor no longer owns.
+   *
+   * Only a fully reclaimed runtime retires the runner: a stop still in flight,
+   * or a teardown that left a retryable obligation, keeps it (the supervisor's
+   * ownership must not be dropped merely because `currentRuntime` is null
+   * mid-cleanup, and no second runtime may start while that stop is unresolved).
+   */
+  private shouldRetireRunner(): boolean {
+    if (!this.runner) return false;
+    if (this.runner.runState() === "stopping") return false;
+    if (this.runner.hasPendingReclaim()) return false;
+    return this.supervisor.currentRuntime() === null;
+  }
+
+  /** Detach the retired runner's handlers and forget it. */
+  private retireRunner(): void {
+    const retired = this.runner;
+    this.runner = null;
+    this.nativeSessionBound = false;
+    if (retired) {
+      this.generationSeed = retired.currentGeneration();
+      retired.dispose("the runtime was reclaimed");
+    }
+  }
+
+  /** Start the runtime (once) and construct the runner over it. */
+  private async buildRunner(gate: string): Promise<OmpSessionRunner> {
     this.supervisor.setWorkingDirectory(this.projectDirectory);
     if (this.supervisor.status().phase !== "idle") {
       await this.supervisor.start();
@@ -568,6 +624,7 @@ class SessionEntry {
     this.runner = this.runnerFactory({
       sessionId: this.sessionId,
       runtime,
+      generationSeed: this.generationSeed,
       emit: (envelope) => this.emitAgentEvent(envelope),
       onUiRequest: (request, info) => this.surfaceUiRequest(request, info.sessionId, info.generation),
       onUiClosed: (requestId, reason) => {
@@ -620,17 +677,29 @@ class SessionEntry {
 
   /** Establish the native session: restore by path, or create and persist. */
   async ensureNativeSession(gate: string, spec: OmpSessionRuntimeSpec): Promise<void> {
-    const runner = await this.ensureRunner(gate);
-    void runner;
+    // The current runtime process is already on this exact session: re-switching
+    // would reopen the transcript, which OMP's `switch_session` treats as a
+    // session transition. `nativeSessionBound` is what makes a replacement
+    // process re-issue `switch_session` (a retired runner resets it) while the
+    // persisted identity (`nativeSessionId`/`nativeSessionPath`) is kept.
+    if (this.nativeSessionBound && this.nativeSessionId === spec.nativeSessionId && this.nativeSessionPath) {
+      return;
+    }
+    if (this.nativeSessionBuild) return this.nativeSessionBuild;
+    this.nativeSessionBuild = this.establishNativeSession(gate, spec);
+    try {
+      await this.nativeSessionBuild;
+    } finally {
+      this.nativeSessionBuild = null;
+    }
+  }
+
+  /** Switch to (or create) the native session on the live runtime. */
+  private async establishNativeSession(gate: string, spec: OmpSessionRuntimeSpec): Promise<void> {
+    await this.ensureRunner(gate);
     const runtime = this.runtimeHandle();
 
     if (spec.nativeSessionPath || spec.nativeSessionId) {
-      // The runtime is already on this native session (an earlier prompt in the
-      // same process bound it): re-switching would reopen the transcript, which
-      // OMP's `switch_session` treats as a session transition. Skip it.
-      if (this.nativeSessionId === spec.nativeSessionId && this.nativeSessionPath) {
-        return;
-      }
       // Restore: validate the persisted reference before handing its path to
       // the runtime, then verify the runtime actually opened that identity.
       validateEngineVersions(spec.adapterVersion, spec.runtimeVersion, this.supervisor.status().runtimeVersion);
@@ -672,6 +741,7 @@ class SessionEntry {
       this.nativeSessionId = spec.nativeSessionId ?? null;
       this.nativeSessionPath = canonicalPath;
       this.runtimeVersion = this.supervisor.status().runtimeVersion;
+      this.nativeSessionBound = true;
       return;
     }
 
@@ -701,6 +771,7 @@ class SessionEntry {
     this.nativeSessionId = sessionId;
     this.nativeSessionPath = canonicalPath;
     this.runtimeVersion = this.supervisor.status().runtimeVersion;
+    this.nativeSessionBound = true;
     await this.persistNativeSession?.({
       sessionId: this.sessionId,
       nativeSessionId: sessionId,
@@ -780,7 +851,16 @@ class SessionEntry {
     if (!this.runner) {
       return { aborted: false, abortBashSent: false, converged: true, toreDown: false, steps: ["nothing running"], errors: [] };
     }
-    return this.runner.stop();
+    const outcome = await this.runner.stop();
+    // A teardown that fully reclaimed the process retires the runner: its
+    // runtime handle is dead, and the next prompt must rebuild runtime + runner
+    // over a fresh process. A converged stop keeps the live process, and a
+    // failed teardown keeps the runner so its retryable obligation stays
+    // reachable — `shouldRetireRunner` distinguishes the three.
+    if (this.shouldRetireRunner()) {
+      this.retireRunner();
+    }
+    return outcome;
   }
 
   async dispose(reason: string): Promise<Array<{ sessionId: string; detail: string }>> {
@@ -789,6 +869,7 @@ class SessionEntry {
     this.generations.clear();
     if (this.runner) this.runner.dispose(reason);
     this.runner = null;
+    this.nativeSessionBound = false;
     const failures: Array<{ sessionId: string; detail: string }> = [];
     try {
       const results = await this.supervisor.reclaimAll();

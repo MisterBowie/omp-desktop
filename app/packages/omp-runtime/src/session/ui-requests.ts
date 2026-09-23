@@ -92,6 +92,12 @@ export type OmpUiRequestsOptions = {
   now?: () => number;
   /** Bounded diagnostic trail. */
   maxRecords?: number;
+  /**
+   * Generation the counter starts at. A session that replaces its runtime (a
+   * stop that reclaimed the process) passes the retired runner's last
+   * generation so turn identities stay distinct across the replacement.
+   */
+  generationSeed?: number;
 };
 
 type Pending = {
@@ -116,6 +122,7 @@ export class OmpUiRequests {
     this.write = options.write;
     this.now = options.now ?? Date.now;
     this.maxRecords = options.maxRecords ?? 200;
+    this.generation = options.generationSeed ?? 0;
   }
 
   /** The run generation decisions are currently accepted for. */

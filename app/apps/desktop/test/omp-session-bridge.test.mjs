@@ -501,6 +501,289 @@ test("retains a directory-only debt across stop retries until it is removable", 
   }
 });
 
+/** A fake runtime that records every command written to it. */
+function c1Runtime(nativeId, nativePath, childRunning) {
+  const handlers = new Set();
+  const commands = [];
+  return {
+    pid: 4242,
+    pgid: 4242,
+    currentPhase: "idle",
+    usable: true,
+    runtimeVersion: "18.2.7",
+    protocolVersion: 2,
+    commands,
+    handlers,
+    write: () => true,
+    onFrame(fn) { handlers.add(fn); return () => handlers.delete(fn); },
+    onFailure() { return () => {}; },
+    async stop() {
+      this.usable = false;
+      return { reaped: true, escalated: "none", steps: [], errors: [], abortAcknowledged: true };
+    },
+    async request(command) {
+      commands.push(command.type);
+      if (command.type === "get_state") return { success: true, data: { sessionId: nativeId, sessionFile: nativePath } };
+      if (command.type === "get_subagents") {
+        return childRunning
+          ? { success: true, data: { subagents: [{ id: "child", index: 0, agent: "task", agentSource: "bundled", status: "running", lastUpdate: 1, parentToolCallId: "task-1" }] } }
+          : { success: true, data: { subagents: [] } };
+      }
+      if (command.type === "abort") for (const fn of handlers) fn({ type: "agent_end", isTerminal: true });
+      return { success: true, data: { cancelled: false } };
+    },
+  };
+}
+
+/**
+ * A real supervisor + real SessionEntry whose factory mints one fake runtime per
+ * start, so `runtimes.length` is the runtime-start count and each runtime's
+ * `commands` is the ordered command log the C1 contract checks against.
+ */
+function c1Harness({ childRunning = true } = {}) {
+  const root = mkdtempSync(join(tmpdir(), "omp-bridge-c1-"));
+  scratch.push(root);
+  const project = join(root, "project");
+  const sessionDir = join(root, "sessions");
+  mkdirSync(project);
+  mkdirSync(sessionDir);
+  const nativeId = "native-c1";
+  const nativePath = join(sessionDir, "native.jsonl");
+  writeFileSync(nativePath, `${JSON.stringify({ type: "session", id: nativeId, cwd: project, timestamp: "2026-09-24T00:00:00Z" })}\n`);
+
+  const runtimes = [];
+  const envelopes = [];
+  let runRoot;
+  const mockLauncher = join(here, "..", "..", "..", "packages", "omp-runtime", "test", "mock-omp.mjs");
+  const supervisor = new OmpRuntimeSupervisor({
+    dataRoot: join(root, "data"),
+    sessionDir,
+    launcherPath: mockLauncher,
+    expectedRuntimeVersion: "18.2.7",
+    prepareRun(paths) { runRoot = paths.runRoot; },
+    runtimeFactory: async () => {
+      const runtime = c1Runtime(nativeId, nativePath, childRunning);
+      runtime.pid = 4242 + runtimes.length;
+      runtime.pgid = runtime.pid;
+      runtimes.push(runtime);
+      return runtime;
+    },
+  });
+  const bridge = createOmpSessionBridge({
+    createSupervisor: () => supervisor,
+    launcher: mockLauncher,
+    isPackaged: false,
+    appPath: here,
+    sessionDir,
+    gateResolver: () => join(here, "..", "..", "..", "packages", "omp-runtime", "extensions", "omp-desktop-gate.ts"),
+    emitAgentEvent: (envelope) => envelopes.push(envelope),
+  });
+  return { root, project, nativeId, nativePath, supervisor, bridge, runtimes, envelopes, runRoot: () => runRoot };
+}
+
+test("reclaims a dead runtime and rebuilds it for the next prompt in the same session", async () => {
+  // C1's actual user path: prompt -> task child -> stop -> failed cleanup ->
+  // retry until reaped && cleaned -> send the next message in the SAME session
+  // (no dispose). The fully reclaimed runtime must be retired and rebuilt, and
+  // the replacement must restore the SAME native session before exactly one
+  // prompt.
+  const { root, project, nativeId, nativePath, supervisor, bridge, runtimes, runRoot } = c1Harness({ childRunning: true });
+
+  try {
+    await bridge.prompt({ sessionId: "c1-retry", content: "delegate", projectPath: project });
+    for (const fn of runtimes[0].handlers) fn({ type: "tool_execution_start", toolName: "task", toolCallId: "task-1", args: {} });
+
+    chmodSync(runRoot(), 0o500);
+    assert.equal((await bridge.stop("c1-retry")).toreDown, true);
+    assert.equal(supervisor.pendingCleanup.length, 1);
+    assert.equal((await bridge.stop("c1-retry")).toreDown, true);
+    assert.equal(supervisor.pendingCleanup.length, 1);
+    chmodSync(runRoot(), 0o700);
+    const third = await bridge.stop("c1-retry");
+    assert.equal(third.toreDown, true);
+    assert.equal(supervisor.pendingCleanup.length, 0);
+    assert.equal(existsSync(runRoot()), false);
+
+    // The same session, without dispose, starts a second runtime and restores
+    // the same native identity before exactly one prompt.
+    const next = await bridge.prompt({
+      sessionId: "c1-retry",
+      content: "continue",
+      projectPath: project,
+      nativeSessionId: nativeId,
+      nativeSessionPath: nativePath,
+    });
+    assert.equal(next.accepted, true);
+    assert.match(next.turnId, /^omp-turn:c1-retry:2$/, "the turn identity must not reuse the first turn's");
+    assert.equal(runtimes.length, 2, "a second runtime must start for the replacement");
+    assert.deepEqual(runtimes[1].commands, ["switch_session", "get_state", "set_subagent_subscription", "prompt"]);
+    assert.equal(runtimes[1].commands.filter((command) => command === "prompt").length, 1, "exactly one prompt is submitted");
+  } finally {
+    if (runRoot() && existsSync(runRoot())) chmodSync(runRoot(), 0o700);
+    await bridge.dispose("c1 cleanup").catch(() => undefined);
+    await supervisor.reclaimAll().catch(() => undefined);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an immediate successful teardown still lets the next prompt rebuild", async () => {
+  // No filesystem failure: the first stop tears the process down and cleans the
+  // run root. The next prompt in the same session must still rebuild.
+  const { root, project, nativeId, nativePath, supervisor, bridge, runtimes } = c1Harness({ childRunning: true });
+
+  try {
+    await bridge.prompt({ sessionId: "c1-immediate", content: "delegate", projectPath: project });
+    for (const fn of runtimes[0].handlers) fn({ type: "tool_execution_start", toolName: "task", toolCallId: "task-1", args: {} });
+    const stop = await bridge.stop("c1-immediate");
+    assert.equal(stop.toreDown, true);
+    assert.equal(supervisor.pendingCleanup.length, 0);
+
+    const next = await bridge.prompt({
+      sessionId: "c1-immediate",
+      content: "again",
+      projectPath: project,
+      nativeSessionId: nativeId,
+      nativeSessionPath: nativePath,
+    });
+    assert.equal(next.accepted, true);
+    assert.equal(runtimes.length, 2);
+    assert.match(next.turnId, /^omp-turn:c1-immediate:2$/);
+  } finally {
+    await bridge.dispose("c1 cleanup").catch(() => undefined);
+    await supervisor.reclaimAll().catch(() => undefined);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a converged protocol stop reuses the live runtime", async () => {
+  // A normal stop with no detached child converges in-protocol and leaves the
+  // process alive: the runner is not retired and the next prompt reuses it.
+  const { root, project, nativeId, nativePath, supervisor, bridge, runtimes } = c1Harness({ childRunning: false });
+
+  try {
+    await bridge.prompt({ sessionId: "c1-converged", content: "hello", projectPath: project });
+    const stop = await bridge.stop("c1-converged");
+    assert.equal(stop.converged, true);
+    assert.equal(stop.toreDown, false);
+
+    const next = await bridge.prompt({
+      sessionId: "c1-converged",
+      content: "again",
+      projectPath: project,
+      nativeSessionId: nativeId,
+      nativeSessionPath: nativePath,
+    });
+    assert.equal(next.accepted, true);
+    assert.equal(runtimes.length, 1, "a converged stop must not start a second runtime");
+    assert.match(next.turnId, /^omp-turn:c1-converged:2$/, "the same runner continues the turn sequence");
+  } finally {
+    await bridge.dispose("c1 cleanup").catch(() => undefined);
+    await supervisor.reclaimAll().catch(() => undefined);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("pending cleanup refuses the next prompt without starting a second runtime", async () => {
+  // A failed teardown keeps the runner (its retry obligation is still owed) and
+  // must not trigger a rebuild: the prompt is refused and the factory is not
+  // called a second time.
+  const { root, project, supervisor, bridge, runtimes, runRoot } = c1Harness({ childRunning: true });
+
+  try {
+    await bridge.prompt({ sessionId: "c1-pending", content: "delegate", projectPath: project });
+    for (const fn of runtimes[0].handlers) fn({ type: "tool_execution_start", toolName: "task", toolCallId: "task-1", args: {} });
+    chmodSync(runRoot(), 0o500);
+    const stop = await bridge.stop("c1-pending");
+    assert.equal(stop.toreDown, true);
+    assert.equal(supervisor.pendingCleanup.length, 1);
+
+    await assert.rejects(
+      () => bridge.prompt({ sessionId: "c1-pending", content: "again", projectPath: project }),
+      (error) => error.errorCode === "NOT_STARTED",
+    );
+    assert.equal(runtimes.length, 1, "a pending reclaim must not start a second runtime");
+  } finally {
+    if (runRoot() && existsSync(runRoot())) chmodSync(runRoot(), 0o700);
+    await bridge.dispose("c1 cleanup").catch(() => undefined);
+    await supervisor.reclaimAll().catch(() => undefined);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the retired runtime's handlers are detached and old frames do not reach the replacement", async () => {
+  // After a full reclaim the retired runner must detach its frame handlers: a
+  // late frame from the dead process cannot settle or mutate the new turn, and
+  // the replacement runner is wired to the new runtime instead.
+  const { root, project, nativeId, nativePath, supervisor, bridge, runtimes, envelopes } = c1Harness({ childRunning: true });
+
+  try {
+    await bridge.prompt({ sessionId: "c1-detach", content: "delegate", projectPath: project });
+    for (const fn of runtimes[0].handlers) fn({ type: "tool_execution_start", toolName: "task", toolCallId: "task-1", args: {} });
+    const stop = await bridge.stop("c1-detach");
+    assert.equal(stop.toreDown, true);
+    assert.equal(supervisor.pendingCleanup.length, 0);
+
+    // The retired runtime has no listeners left; a late frame reaches nothing.
+    assert.equal(runtimes[0].handlers.size, 0, "the retired runtime's handlers must be detached");
+    for (const fn of runtimes[0].handlers) fn({ type: "agent_start" });
+    assert.equal(envelopes.filter((envelope) => envelope.event.type === "agent_start").length, 0);
+
+    const next = await bridge.prompt({
+      sessionId: "c1-detach",
+      content: "continue",
+      projectPath: project,
+      nativeSessionId: nativeId,
+      nativeSessionPath: nativePath,
+    });
+    assert.equal(next.accepted, true);
+    assert.equal(runtimes.length, 2);
+    assert.equal(runtimes[1].handlers.size, 1, "the replacement runner is wired to the new runtime");
+    for (const fn of runtimes[1].handlers) fn({ type: "agent_start" });
+    const start = envelopes.find((envelope) => envelope.event.type === "agent_start");
+    assert.equal(start.turnId, next.turnId, "a frame on the new runtime belongs to the new turn");
+  } finally {
+    await bridge.dispose("c1 cleanup").catch(() => undefined);
+    await supervisor.reclaimAll().catch(() => undefined);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a dispose that cannot reclaim keeps the session's ownership, not a second runtime", async () => {
+  // Stop leaves a directory debt, then dispose runs (the stop/dispose overlap
+  // the shutdown path must survive): the failed reclaim keeps the entry and the
+  // supervisor's obligation, a prompt cannot start a second runtime, and a
+  // retry dispose clears the debt once the directory is removable.
+  const { root, project, supervisor, bridge, runtimes, runRoot } = c1Harness({ childRunning: true });
+
+  try {
+    await bridge.prompt({ sessionId: "c1-dispose-debt", content: "delegate", projectPath: project });
+    for (const fn of runtimes[0].handlers) fn({ type: "tool_execution_start", toolName: "task", toolCallId: "task-1", args: {} });
+    chmodSync(runRoot(), 0o500);
+    await bridge.stop("c1-dispose-debt");
+    assert.equal(supervisor.pendingCleanup.length, 1);
+
+    const disposed = await bridge.dispose("shutdown");
+    assert.equal(disposed.ok, false, "a dispose that cannot reclaim must report failure");
+    assert.equal(supervisor.pendingCleanup.length, 1, "the supervisor still owns the debt after dispose");
+
+    await assert.rejects(
+      () => bridge.prompt({ sessionId: "c1-dispose-debt", content: "again", projectPath: project }),
+      (error) => error.code === "not-started" || error.errorCode === "NOT_STARTED",
+    );
+    assert.equal(runtimes.length, 1, "dispose must not start a second runtime");
+
+    chmodSync(runRoot(), 0o700);
+    const retried = await bridge.dispose("shutdown");
+    assert.equal(retried.ok, true);
+    assert.equal(supervisor.pendingCleanup.length, 0);
+  } finally {
+    if (runRoot() && existsSync(runRoot())) chmodSync(runRoot(), 0o700);
+    await bridge.dispose("c1 cleanup").catch(() => undefined);
+    await supervisor.reclaimAll().catch(() => undefined);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("reports a transport failure as one typed error, not a hung turn", async () => {
   const { bridge, runtime, envelopes } = bridgeHarness();
   const project = makeProject();

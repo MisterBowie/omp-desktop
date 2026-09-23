@@ -419,7 +419,8 @@ test(
     let childPid = null;
     let childDescendantPid = null;
     try {
-      await bridge.prompt({ sessionId: "e2e-omp-subagent-stop", content: "delegate a long command", projectPath: project });
+      const first = await bridge.prompt({ sessionId: "e2e-omp-subagent-stop", content: "delegate a long command", projectPath: project });
+      assert.equal(first.accepted, true);
 
       // The child's long-lived command starts and records its own identity.
       const started = await waitFor(() => existsSync(identityPath));
@@ -428,6 +429,15 @@ test(
       childPid = identity.pid;
       childDescendantPid = identity.descendantPid;
       assert.ok(pidAlive(childPid), "the child's command must be alive before the stop");
+
+      // Capture the native identity while the runtime is still live, so the
+      // continuation below can prove the SAME session (not a fresh one) is
+      // restored after the rebuild.
+      const nativeBefore = await supervisor.currentRuntime().request({ type: "get_state" });
+      const nativeId = nativeBefore.data.sessionId;
+      const nativePath = nativeBefore.data.sessionFile;
+      assert.equal(typeof nativeId, "string");
+      assert.equal(typeof nativePath, "string");
 
       // The child is still running (its bash command has not finished). The
       // parent turn is still in-flight because the `task` tool waits on it.
@@ -445,6 +455,27 @@ test(
       // The teardown reclaims the child's command tree: no owned process remains.
       const childReaped = await waitFor(() => !pidAlive(childPid) && !pidAlive(childDescendantPid), 15_000);
       assert.equal(childReaped, true, "the detached child's command tree must be reclaimed");
+
+      // --- C1: continue the SAME native session without a dispose ------------
+      // The stop tore the process down and reclaimed the detached child. The
+      // next explicit message must rebuild a runtime, restore the same native
+      // session, and produce a response under a distinct turn id.
+      const continued = await bridge.prompt({
+        sessionId: "e2e-omp-subagent-stop",
+        content: "continue the conversation after the reclaim",
+        projectPath: project,
+        nativeSessionId: nativeId,
+        nativeSessionPath: nativePath,
+      });
+      assert.equal(continued.accepted, true);
+      assert.notEqual(continued.turnId, first.turnId, "the rebuilt runtime must issue a distinct turn id");
+
+      const resumed = await waitFor(() => envelopes.some((e) => e.turnId === continued.turnId && e.event.type === "agent_end"));
+      assert.equal(resumed, true, "the continued prompt must produce a response under its own turn id");
+
+      // The restored runtime reports the same native session identity.
+      const nativeAfter = await supervisor.currentRuntime().request({ type: "get_state" });
+      assert.equal(nativeAfter.data.sessionId, nativeId, "the same native session must be restored");
 
       await bridge.dispose("e2e finished");
       const reclaimed = await supervisor.reclaimAll();

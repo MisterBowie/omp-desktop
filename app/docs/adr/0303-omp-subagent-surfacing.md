@@ -1,7 +1,7 @@
 # ADR 0303: OMP subagent surfacing, attribution and the stop boundary
 
-- Status: Proposed (pending M5/T17 independent acceptance — B1 revised, B2/B3 open; T17 unaccepted)
-- Date: 2026-09-23 (revised 2026-09-24 for the B1 stop-boundary fixes)
+- Status: Proposed (pending M5/T17 independent acceptance — B1 revised, C1 implemented, B2/B3 open; T17 unaccepted)
+- Date: 2026-09-23 (revised 2026-09-24 for the B1/C1 stop-boundary and runtime-replacement fixes)
 - Scope: M5/T17. Amends 0301 (conversation surface) by wiring the subagent
   frame families into the existing Pi delegation renderer, and 0302 (per-session
   registry) by adding a per-child registry inside each session's runner.
@@ -159,6 +159,19 @@ already superseded. A run whose group was reaped but whose directory survived
 is a directory-only debt: the bridge's teardown re-runs the supervisor sweep on
 every subsequent stop until no retained run directory remains, and never
 signals the ids of an already-reaped record.
+
+When a teardown fully reaps the process group *and* removes the run root, the
+runner is retired: its frame/failure handlers are detached and its runtime
+handle is dropped. The next explicit prompt in the same desktop session rebuilds
+a fresh runtime and runner, re-issues `switch_session` (restoring the same
+validated native session — never a fresh session, never a replay of prior
+tools) before exactly one prompt, and continues the turn counter from the
+retired runner, so the new turn id is distinct from every turn the session has
+already run. A converged protocol stop (no teardown) keeps the live runtime and
+its runner; a failed or in-flight stop keeps the runner and its retryable
+obligation, so a prompt is refused rather than starting a second runtime. The
+rebuild and the native restore are single-flight, so concurrent prompts share
+one runtime and cannot double-submit content or create duplicate runners.
 
 Fixed OMP exposes no per-child stop command, and a child session has no
 trustworthy child-owned process handle to terminate without risking the parent
