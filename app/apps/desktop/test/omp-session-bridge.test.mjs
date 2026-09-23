@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { register } from "node:module";
 import { tmpdir } from "node:os";
 import test, { after } from "node:test";
@@ -2006,7 +2006,10 @@ test("concurrent stop and dispose overlap without reopening admission", async ()
 
 /** A bridge over real per-session supervisors whose session A stop is held. */
 function shutdownAdmissionHarness() {
-  const root = mkdtempSync(join(tmpdir(), "omp-bridge-shutdown-"));
+  // Canonicalize like the production restore boundary: `mkdtempSync(tmpdir())`
+  // keeps a macOS `/var` alias while the bridge realpaths to `/private/var`,
+  // which would otherwise mismatch the session path and fail closed.
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "omp-bridge-shutdown-")));
   scratch.push(root);
   const project = join(root, "project");
   const sessionDir = join(root, "sessions");
@@ -2165,7 +2168,8 @@ test("whole-bridge shutdown invalidates a prompt still preparing before it submi
 
 /** A bridge whose per-session supervisor mints one reply-emitting runtime. */
 function modelSwitchHarness() {
-  const root = mkdtempSync(join(tmpdir(), "omp-bridge-model-"));
+  // Canonicalize like the production restore boundary (see shutdownAdmissionHarness).
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "omp-bridge-model-")));
   scratch.push(root);
   const project = join(root, "project");
   const sessionDir = join(root, "sessions");
