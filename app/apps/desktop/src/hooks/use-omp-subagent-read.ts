@@ -11,6 +11,9 @@ import { useAppStore } from "../stores/app-store";
 
 export type OmpSubagentReadPhase = "idle" | "loading" | "ready" | "empty" | "error";
 
+/** Milliseconds from the end of one read to the start of the next poll. */
+const POLL_INTERVAL_MS = 2_000;
+
 /**
  * The OMP-only detail read for one child, mapped into the existing
  * `SubagentRun` structure. Pi sessions never enter this path (`omp` is false),
@@ -18,6 +21,13 @@ export type OmpSubagentReadPhase = "idle" | "loading" | "ready" | "empty" | "err
  *
  * The read is a local projection: rows land only in component state, never in
  * the main transcript persistence or any tool side effect.
+ *
+ * One read in flight: the initial load, the live poll, and a manual
+ * reload/retry all share one coordinator. Concurrent triggers coalesce onto
+ * the in-flight read instead of starting parallel list/read chains, and the
+ * next poll is scheduled only after a read completes (2s later), including
+ * after a manually triggered read. A request slower than the interval can
+ * therefore never be overlapped by the next poll.
  *
  * Incremental semantics: the bridge returns only the bytes since `fromByte`, so
  * each read's rows are *merged* into the accumulated set by stable message id.
@@ -46,10 +56,17 @@ export function useOmpSubagentRead(
   const [errorDetail, setErrorDetail] = useState<string | undefined>(undefined);
   const messagesRef = useRef<UiMessage[]>([]);
   const cursorRef = useRef<number | null>(null);
-  /** Monotonic request id: a stale response (selection change / unmount) is dropped. */
+  /** Monotonic request id: a stale response (selection change / disable / unmount) is dropped. */
   const requestSeq = useRef(0);
+  /** The single in-flight read; concurrent triggers join it instead of starting another. */
+  const inFlightRef = useRef<Promise<void> | null>(null);
+  /** The armed continuation poll, cleared whenever polling must stop. */
+  const pollTimerRef = useRef<number | null>(null);
+  /** Latest `omp`/`running`, readable from the stable read-completion closure. */
+  const ompRef = useRef(omp);
+  const runningRef = useRef(opts.running);
 
-  const load = useCallback(async (): Promise<void> => {
+  const performRead = useCallback(async (sid: string, did: string): Promise<void> => {
     const seq = ++requestSeq.current;
     // Keep existing rows visible while a continuation is in flight; only a
     // first read (nothing accumulated yet) shows the loading state.
@@ -57,8 +74,8 @@ export function useOmpSubagentRead(
     try {
       const result = await fetchOmpSubagentDetail(
         { list: api.listOmpSubagents, read: api.readOmpSubagent },
-        sessionId,
-        delegationId,
+        sid,
+        did,
         cursorRef.current ?? undefined,
       );
       if (requestSeq.current !== seq) return;
@@ -82,10 +99,42 @@ export function useOmpSubagentRead(
       setErrorDetail(error instanceof Error ? error.message : String(error));
       setPhase("error");
     }
-  }, [sessionId, delegationId]);
+  }, []);
+
+  // The latest `requestRead` for the armed poll to re-enter without holding a
+  // stale closure or a useCallback cycle.
+  const requestReadRef = useRef<() => Promise<void>>(() => Promise.resolve());
+
+  const requestRead = useCallback((): Promise<void> => {
+    if (inFlightRef.current) return inFlightRef.current;
+    const promise = performRead(sessionId, delegationId).finally(() => {
+      // Only the read that still owns the slot may clear it and arm the next
+      // poll; a stale completion (selection change / disable / unmount) sees a
+      // different (or null) in-flight and does nothing.
+      if (inFlightRef.current !== promise) return;
+      inFlightRef.current = null;
+      if (ompRef.current && runningRef.current) {
+        if (pollTimerRef.current !== null) window.clearTimeout(pollTimerRef.current);
+        pollTimerRef.current = window.setTimeout(() => {
+          pollTimerRef.current = null;
+          if (ompRef.current && runningRef.current) void requestReadRef.current();
+        }, POLL_INTERVAL_MS);
+      }
+    });
+    inFlightRef.current = promise;
+    return promise;
+  }, [sessionId, delegationId, performRead]);
+
+  // Keep the latest props readable from the stable completion closure.
+  useEffect(() => {
+    ompRef.current = omp;
+    runningRef.current = opts.running;
+    requestReadRef.current = requestRead;
+  });
 
   // Initial read and reopen: reset the accumulated set and cursor, then read
-  // from the start.
+  // from the start. The poll self-arms from each read's completion, so the
+  // live continuation and the initial load share this one entry point.
   useEffect(() => {
     if (!omp) return;
     messagesRef.current = [];
@@ -93,35 +142,33 @@ export function useOmpSubagentRead(
     setRun(null);
     setErrorDetail(undefined);
     setPhase("idle");
-    void load();
-  }, [omp, sessionId, delegationId, load]);
+    void requestRead();
+  }, [omp, sessionId, delegationId, requestRead]);
 
-  // Live continuation while the child is running: schedule the next poll only
-  // after the previous read completes (single-flight by construction), so a
-  // slow request is never perpetually superseded by an overlapping poll.
-  useEffect(() => {
-    if (!omp || !opts.running) return;
-    let cancelled = false;
-    let timer: number | null = null;
-    const poll = async () => {
-      await load();
-      if (cancelled) return;
-      timer = window.setTimeout(poll, 2_000);
-    };
-    void poll();
-    return () => {
-      cancelled = true;
-      if (timer !== null) window.clearTimeout(timer);
-    };
-  }, [omp, opts.running, load]);
-
-  // Unmount or selection change invalidates every in-flight request so an older
-  // response cannot populate a newer selection.
+  // Selection change, disabling OMP, and unmount invalidate every in-flight
+  // request and cancel any armed poll, so an older response cannot populate a
+  // newer selection or schedule a poll for a dead one.
   useEffect(() => {
     return () => {
       requestSeq.current += 1;
+      inFlightRef.current = null;
+      if (pollTimerRef.current !== null) {
+        window.clearTimeout(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
     };
-  }, [sessionId, delegationId]);
+  }, [sessionId, delegationId, omp]);
 
-  return { omp, phase, run, errorDetail, reload: () => void load() };
+  // Polling stops the moment the child is no longer running (or OMP is off):
+  // an armed poll is cancelled outright rather than left to fire once and
+  // no-op. An in-flight read is deliberately left to settle its own rows.
+  useEffect(() => {
+    if (omp && opts.running) return;
+    if (pollTimerRef.current !== null) {
+      window.clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, [omp, opts.running]);
+
+  return { omp, phase, run, errorDetail, reload: () => void requestRead() };
 }

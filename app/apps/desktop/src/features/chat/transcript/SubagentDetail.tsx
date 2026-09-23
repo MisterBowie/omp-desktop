@@ -350,12 +350,17 @@ export function SubagentDetail({
         </div>
       </section>
       {delegate ? (
-        <SubagentRunRows
-          run={delegate}
-          agentName={agentName}
-          scrollable={false}
-          variant="dock"
-        />
+        <>
+          <SubagentRunRows
+            run={delegate}
+            agentName={agentName}
+            scrollable={false}
+            variant="dock"
+          />
+          {readStatus?.phase === "error" ? (
+            <SubagentReadState status={readStatus} />
+          ) : null}
+        </>
       ) : readStatus ? (
         <SubagentReadState status={readStatus} />
       ) : null}

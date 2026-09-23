@@ -84,17 +84,19 @@ function SubagentPanelSurface({ selection }: { selection: SubagentPanelSelection
   const delegate = ompRead.omp
     ? (ompRead.run ?? undefined)
     : selected?.item.delegate;
-  // The OMP child detail shows its own read state (loading/empty/error with a
-  // retry) when there are no rows yet; Pi keeps the transcript delegate and
-  // never passes a read state.
+  // The OMP child detail shows its own read state. An error must stay visible
+  // alongside retained rows (with its retry), while loading/empty only apply
+  // while there are no rows yet. Pi sessions never pass a read state.
   const readStatus: SubagentReadStatus | undefined =
-    ompRead.omp && delegate === undefined
-      ? ompRead.phase === "error"
+    !ompRead.omp
+      ? undefined
+      : ompRead.phase === "error"
         ? { phase: "error", detail: ompRead.errorDetail, onRetry: ompRead.reload }
-        : ompRead.phase === "empty"
-          ? { phase: "empty" }
-          : { phase: "loading" }
-      : undefined;
+        : delegate === undefined
+          ? ompRead.phase === "empty"
+            ? { phase: "empty" }
+            : { phase: "loading" }
+          : undefined;
   const delegationStatuses = useMemo<ReadonlyMap<string, SubagentOutcome>>(
     () =>
       selected

@@ -1,6 +1,6 @@
 # M5 验证记录：OMP 子代理面板与编排归属（T17）
 
-状态：**未验收**（T17）。第三轮独立复审拆出 B1-B3 三项返修；B1 于 `9d0acde` 首实现后独立复审仍复现两项缺陷（F1 目录债二次 stop 丢失、F2 停期间短暂放行 prompt），本提交修复并追加行为回归，**B1 改定待独立验收**；第四轮独立复审拆出 C1（回收成功后的运行时替换/原生会话恢复，见 §0.5），C1 基本续聊已修复，但独立复审进一步复现三项残余缺陷（R1 替换后回复覆盖、R2 停止未完成即替换且跳过恢复、R3 启动/恢复中停止被忽略），由跟进提交 `0092572` 修复并追加行为回归（见 §0.6），第五轮独立复审已在 `0092572` 上独立确认 R1/R2/R3 修复（88 runtime + 63 desktop 定向用例通过）；**第五轮进一步复现两项生命周期门残留（D1 dispose 期间可启动孤儿替换、D2 启动/恢复停止期间新 prompt 逃逸 epoch，见 §0.7），由本提交修复并追加行为回归，`24d7270` D1/D2 定向探针已独立通过；第六轮复现两项残留（E1 既有会话绕过整桥关闭、E2 模型切换复用 live 消息/turn id，见 §0.8），本提交修复并追加行为回归，E1/E2 待独立验收**；**B2（renderer 单飞/错误可见）与 B3（总 UTF-8 预算）仍未解决，T17 不验收**。M5 后续任务 T18-T20 未开始。
+状态：**未验收**（T17）。第三轮独立复审拆出 B1-B3 三项返修；B1 于 `9d0acde` 首实现后独立复审仍复现两项缺陷（F1 目录债二次 stop 丢失、F2 停期间短暂放行 prompt），本提交修复并追加行为回归，**B1 改定待独立验收**；第四轮独立复审拆出 C1（回收成功后的运行时替换/原生会话恢复，见 §0.5），C1 基本续聊已修复，但独立复审进一步复现三项残余缺陷（R1 替换后回复覆盖、R2 停止未完成即替换且跳过恢复、R3 启动/恢复中停止被忽略），由跟进提交 `0092572` 修复并追加行为回归（见 §0.6），第五轮独立复审已在 `0092572` 上独立确认 R1/R2/R3 修复（88 runtime + 63 desktop 定向用例通过）；**第五轮进一步复现两项生命周期门残留（D1 dispose 期间可启动孤儿替换、D2 启动/恢复停止期间新 prompt 逃逸 epoch，见 §0.7），由本提交修复并追加行为回归，`24d7270` D1/D2 定向探针已独立通过；第六轮复现两项残留（E1 既有会话绕过整桥关闭、E2 模型切换复用 live 消息/turn id，见 §0.8），本提交修复并追加行为回归，E1/E2 待独立验收**；**B2（renderer 单飞/错误可见，见 §0.9）已实现并追加行为回归、待独立验收**；**B3（总 UTF-8 预算）仍未解决，T17 不验收**。M5 后续任务 T18-T20 未开始。
 基线提交：`d26444407fc963c2e7efd51bda7d1bd4a70e8bbd`；第二轮独立复审返修（S1-S4）以追加普通提交落在该基线上（见 `git log` 最新提交）。
 固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未修改）。
 工作树：`/home/vv/person/code/omp-desktop-m5-t17`，分支 `codex/m5-subagents`。
@@ -109,6 +109,34 @@
 新增回归（`apps/desktop/test/omp-session-bridge.test.mjs` 5 例，真实 `SessionEntry` + 真实 `OmpRuntimeSupervisor` + 外部边界可控 promise/假 runtime，先红后绿）：① 整桥关闭既有会话拒绝（`ENGINE_UNAVAILABLE`、无第二 prompt 命令、无 C 建 runtime、无残留 owner）；② 整桥关闭在途准备失效（`stopping`、不提交）；③ model 切换 `configure` → 下一条 prompt（distinct turn、两条回复保留、同一原生路径、restore-before-prompt）；④ `disposeSession` → 重开（同前）；⑤ 桥重建不与保留回复 live id 冲突。
 
 验证（`app/`，`nvm use v24.14.0`，Node v24.14.0，pnpm 10.34.5，Bun 1.4.2）：三探针先复现后通过——`/tmp/m5-shutdown-admission-review.mjs` 两模式现 `existingSession.refused=true`、`bPrompts=1`、`runtimeStarts=2`、`runtimeOwnersAfterShutdown=[]`；`/tmp/m5-disposal-replacement-review.mjs` 现 `distinctTurns=true`、两条 `projectedAssistantRows`、`oldHandlers=0`；`pnpm --filter @pi-desktop/omp-runtime test` **231 passed / 0 failed**；`node --test test/omp-session-bridge.test.mjs` **50 passed / 0 failed**（45 + 5 回归）；`omp-session-ownership`/`configure`/`configure-ipc`/`failclosed`/`delete-archive`/`session-transcript`/`omp-subagent-bridge` **52 passed / 0 failed**；`omp-session-e2e`/`omp-session-persistence-e2e` **2 passed / 0 failed**、`omp-subagent-e2e` **3 passed / 0 failed**（真实固定 OMP + 假 provider，无付费）；`pnpm --filter @pi-desktop/omp-runtime typecheck` 与 desktop `pnpm typecheck` 退出码 0；`git diff --check` 无输出。
+
+## 0.9 B2 renderer 单飞与增量错误可见（2026-09-24）
+
+第三轮复审拆出的 B2 指 `use-omp-subagent-read` 的单飞缺失与增量错误在真实面板中的可见性。独立复审在 `424efe8` 上用真实 `SubagentPanel`（非 HookProbe）+ 真实 `api.ts` + 受控 poll 定时器 + 外部 IPC 打桩复现：挂载 `running:true` 子代理产生两条 list/read 链（`readsAfterMount=2`），且失败续读后 `retainedRows=true` 但 `visibleError=false`/`retryVisible=false`（rows 一旦存在，增量错误与重试就从真实面板消失）。基线行为（本提交修改前，先红后绿）：
+
+| 缺陷 | 根因 | 修复 |
+| --- | --- | --- |
+| 挂载即两条链（`listCalls=2`/`readCalls=2`） | `load()` 无单飞：初始 effect 与 poll effect 各自 `load()`；manual reload 亦可重叠 | hook 重写为单一协调器：`inFlightRef` 单飞 promise，初始/轮询/reload 三触发共享 `requestRead`，并发触发合并到在途读取，`requestSeq` 仅用于真正的陈旧失效（选择变更/禁用/卸载） |
+| 增量错误/重试在 rows 存在时消失 | `SubagentPanel` 仅在 `delegate === undefined` 时传 `readStatus`；`SubagentDetail` 底部 `delegate ? rows : readStatus ? state : null` 互斥 | 面板对 `phase==="error"` 无论有无 rows 都传 `{phase:"error",detail,onRetry}`；详情把 `SubagentRunRows` 与 `SubagentReadState(error)` 并列渲染 |
+| reset 游标未验证 | reset 响应 `{reset:true,nextByte:7}` 后未再读，未证明下一 `fromByte=7` | 测试补显式断言：reset 后下一次读 `fromByte=7` |
+| 禁用 OMP 不失效在途读取 | 旧 invalidation effect 依赖 `[sessionId,delegationId]`，不含 `omp`，禁用后迟到完成仍写 state | invalidation 依赖加入 `omp`；停止轮询单独 effect（`!omp||!running` 即清已 armed poll），在途读取允许自行结算 rows |
+
+借用语义（PI history 与 OMP 字节游标不同，非同一 API）：
+
+| 借用规则 | 固定 PI 来源 |
+| --- | --- |
+| pending-read 守卫 + 完成时以对象身份判陈旧 + `reportError` 保留既有行 | `apps/desktop/src/stores/runtime/transcript-reading-runtime.ts` `loadTranscriptPage`/`reportError` |
+| 测试夹具根用 `realpathSync(mkdtempSync(...))` 对齐生产 restore 边界的 canonical 化 | `apps/desktop/test/npm-executable.test.mjs:35` `fixture()` |
+| 完成后再调度下一 poll（单飞）、慢请求不被 interval 永久覆盖 | `apps/desktop/test/transcript-reading.test.mjs`（controlled deferred promises、physical cursors、stale errors、pane eviction） |
+
+前置（独立测试夹具提交，非产品改动）：`shutdownAdmissionHarness`/`modelSwitchHarness` 根从 `mkdtempSync(tmpdir())` 改为 `realpathSync(mkdtempSync(...))`，否则 macOS `/var` 别名与生产 restore 边界的 `/private/var` canonical 化不一致，5 项新 E1/E2 回归在 `switch_session` 抛 `incorrect session binding`。Linux 以 `TMPDIR` 指向隔离 symlink 复现（先 5 失败后通过），随后清理夹具。
+
+新增回归（先红后绿，真实 `api.ts`/`window.piDesktop.invoke`，受控 promise/定时器，非 wall-clock）：
+- `apps/desktop/test/omp-subagent-panel-mounted.test.mjs` 3 例：① running 子代理单飞——挂载恰好一次读、完成后 2s 再 poll、停止即清 armed poll；② manual reload 与在途慢读合并（不新增第三条链）；③ 禁用 OMP 失效在途读并丢弃迟到结果。
+- `apps/desktop/test/omp-subagent-panel-real.test.mjs` 1 例（真实 `SubagentPanel`，非 HookProbe，仿复审脚本）：挂载 1 读 → 失败续读后 rows 保留 + 错误可见 + "Try again" 按钮 → 点击真实渲染重试恰好一次额外读、错误清除、rows 保留。
+- 既有 reset 用例补 `fromByte=7` 断言（reset 后下一条请求显式续读）。
+
+验证（`app/`，`nvm use v24.14.0`，Node v24.14.0，pnpm 10.34.5，`env -u SSH_ASKPASS`，`--test-force-exit`）：`omp-subagent-read` **5 passed**、`omp-subagent-panel-render` **2 passed**、`omp-subagent-panel-mounted` **6 passed**（3 旧 + 3 B2）、`omp-subagent-panel-real` **1 passed**；共享面板 PI 回归 `subagent-panel` 7、`subagent-transcript` 17、`transcript-search-rendering` 1、`work-panel` 24、`tool-presentation` 30、`transcript-reading` 14 全绿；`pnpm --filter @pi-desktop/desktop typecheck` 退出码 0；`git diff --check` 无输出。未重跑全量 runtime/E2E（renderer-only 变更，最终 T17 回归随 B3）。
 
 ## 0. 环境准备（固定子模块流程，与本轮代码无关）
 
