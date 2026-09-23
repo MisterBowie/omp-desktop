@@ -81,16 +81,14 @@
 
 ## 6. 全量回归
 
-（提交前运行，命令与计数在最终交付报告补齐）
-
-| 命令 | 结果 |
-| --- | --- |
-| `pnpm --filter @pi-desktop/omp-runtime test` | 197 passed |
-| `pnpm --filter @pi-desktop/shared test` | 见交付报告 |
-| `node --test test/*.test.mjs`（`env -u SSH_ASKPASS`，desktop 全量） | 见交付报告 |
-| `pnpm typecheck`（12/13 workspace 包） | 通过 |
-| `pnpm build:js` | 通过 |
-| `git diff --check` | 无输出 |
+| 命令 | 结果 | 退出码 |
+| --- | --- | --- |
+| `pnpm --filter @pi-desktop/omp-runtime test` | **197 passed / 0 failed**（含真实固定 runtime 烟测） | 0 |
+| `pnpm --filter @pi-desktop/shared test` | **968 passed / 0 failed** | 0 |
+| `node --test test/*.test.mjs`（`env -u SSH_ASKPASS`，desktop 全量） | **2673 passed / 0 failed / 4 skipped**（2677 项） | 0 |
+| `pnpm typecheck`（12/13 workspace 包） | 通过 | 0 |
+| `pnpm build:js` | 通过（含 desktop renderer 打包） | 0 |
+| `git diff --check` | 无输出 | 0 |
 
 ## 7. 关键限制与边界
 
@@ -98,4 +96,4 @@
 - **单独停止关闭**：固定 OMP 无 per-child stop RPC，子代理 `hasUI=false` 无可信子进程句柄；`stopSubagent` 恒拒并如实说明（停止子代理 = 停止父回合）。未臆造父 abort 伪成功。
 - **batch `task` 的拓扑卡**：Pi 模型是「一个 Task 行 = 一个 delegation」。OMP batch（`tasks[]`）会在一行下多个子代理；拓扑卡以首个 child 为主 `delegationId`，各子代理行仍按 `parentToolCallId` 归入该卡。单子代理（最常见、E2E 覆盖）完整。
 - **重启边界**：固定 OMP 进程退出后无法重开 live 子代理 registry；桌面不谎报旧 detached 子代理仍在运行、不重放。持久父 transcript 已记录的 completed/failed 如实呈现，其余 `running` 按 `turnLive:false` 呈现为 `aborted`。
-- **子模块生成文件**：`bun install` 重生成 `upstream/oh-my-pi/packages/coding-agent/src/export/html/tool-views.generated.js`（未提交，见 `git status`）。
+- **子模块状态**：`upstream/oh-my-pi` 与 `upstream/pi-desktop` 均保持干净（HEAD 与固定 SHA 一致）；`bun install` 的 `tool-views.generated.js` 重生成结果与提交一致，未产生未提交改动。
