@@ -224,6 +224,54 @@
 
 强制回归覆盖:select 的 `answers:[null]` 写 `cancelled:true` 并清两层 pending;confirm 的 Yes/No 与跳过语义;自定义答案 fail closed 不悬挂;run 1 的审批与提问在 `agent_end` 后不能在 run 2 被回答(且只写取消帧);stop/传输失败/dispose 后的迟到回复不写第二帧;`stop(other-session)` 抛错且 pending/状态/wire 完全不变;OMP `method:cancel` 后桥接不再报告 pending;原 projectPath 与 approval/ask kind 隔离测试继续通过。
 
+## 5.3 第三轮独立复审返修 F1-F3(基线 `ce2bf012f0b24b39cc3890a57f979a17a7c8ae96`)
+
+每项均先加失败测试复现,再查固定 PI-Desktop 与固定 OMP 的对应实现与测试。
+
+### 参考的固定源码与测试(检索证据)
+
+| 主题 | PI-Desktop 实现 | PI-Desktop 测试 | OMP 实现 | OMP 测试 |
+| --- | --- | --- | --- | --- |
+| 请求生命周期与迟到决定 | `packages/agent-host/src/approvals.ts`(`ApprovalBroker`:lifetime 过期、`APPROVAL_STALE`、`alreadyResolved`、`cancelForSession`) | `packages/agent-host/src/approvals.test.ts`(`fails closed on expiry, stale revision, and unoffered decisions`、`settles externally and cancels a session's open requests`) | `modes/rpc/rpc-mode.ts:601`(`parseValueDialogResponse`:`cancelled` → `undefined`)、`:358`(`dispatchRpcControlFrame`:未知 id 的响应被忽略) | `packages/coding-agent/test/rpc-extension-ui.test.ts`、`test/rpc-input-frame.test.ts` |
+| 被拒绝/失败的 prompt 必须回到一致状态 | `packages/agent-runtime/src/native-pi-session.ts:342-360`(`prompt()`:进入 running → 拒绝时结束 provisional 行、清空 `turnId`/`userMessageId`、重新抛出原异常) | `packages/agent-runtime/src/native-pi-session.test.ts:275`(`AGENT_BUSY` 拒绝后会话保持可用)、`:249/:362/:1044`(provider/绑定/启动失败同样拒绝并保持状态) | `modes/rpc/rpc-mode.ts:1176`(只接受 v2,其余返回错误响应) | `packages/coding-agent/test/rpc-input-frame.test.ts` |
+
+说明:PI-Desktop **没有**"agent_end 之后到达的 extension 对话框"这一形态(它的审批生命周期由 `ApprovalBroker` 的 TTL + `cancelForSession` 覆盖,不存在"回合结束后仍可放行"的窗口),因此 F1 复用其"过期即 fail closed、迟到决定只返回 alreadyResolved/抛错且无副作用"的断言结构,而不是照搬用例。
+
+### F1 回合结束后到达的 UI 请求可被重新放行(已修)
+
+**基线失败测试**:prompt → `agent_end` → 迟到 approval/question → 断言"不呈现、pending=0、只写取消帧"失败(`requests` 收到 2 条,pending=1)。
+**修正**:`runner.onFrame` 先用 `classifyUiRequest` 分流;approval/question **仅当 `state === "running"`** 才进入可回答 registry 并呈现;idle/stopping 期间的交互帧立即 fail closed(`OmpUiRequests.decline()` 写 `{cancelled:true}` 并记录,不注册、不呈现)。`method:"cancel"` 仍按其真实语义处理(撤回 + 通知桥接),notice 等非交互帧不写响应。
+**修后**:迟到帧不呈现、pending=0、各写一次取消帧、随后 `resolveUiRequest` 失败且不再写帧。
+
+### F2 prompt 被拒绝时同期 dialog 未取消(已修)
+
+**基线失败测试**:`runtime.request(prompt)` 内先发 `ui-refused` 再返回 `{success:false}` → 断言 pending=0 与"写一次取消帧"失败(实际 pending=1、无取消帧)。
+**修正**:`prompt()` 的请求阶段包在 try/catch 中;任何失败路径调用新的 `closeGeneration(generation, reason)`——取消该代所有 dialog、通知 `onUiClosed`、清空 run 并回到 idle,然后原样抛出。
+
+### F3 prompt 请求抛错时 runner 留在 running(已修)
+
+**基线失败测试**:同一路径改为抛 `OmpRuntimeError("request-timeout")` → 断言 `runState()==="idle"` 失败(实际仍为 `running`,pending 仍在)。
+**修正**:同 `closeGeneration`;该函数**幂等**——先取消仍打开的 dialog,再在需要时关闭 run,因此与 `onTransportFailure()` 并发时不会重复写取消帧或重复关闭(有专门竞态测试:并发场景下 `ui-race` 只写一帧、`onUiClosed` 只回调一次)。
+
+### 关于"重复注释行"
+
+复审提到 `runner.stop()` 中有相邻重复注释行(`The protocol could not stop it...` 出现两次)。本 HEAD 复核:该句在 `app/packages/omp-runtime/src/session/runner.ts` 中**仅出现 1 次**(`git show HEAD:...runner.ts | grep -c` = 1),且全文件无相邻重复注释行(脚本检查 0 处);未做无依据改动。
+
+### 本轮返修验证
+
+| 命令 | 结果 |
+| --- | --- |
+| `pnpm --filter @pi-desktop/omp-runtime test` | 11 文件 / **153 项通过**(新增 F1-F3 与竞态 5 项) |
+| `pnpm --filter @pi-desktop/shared test` | 84 文件 / 968 项通过 |
+| `cd apps/desktop && env -u SSH_ASKPASS node --test test/*.test.mjs` | 2600 项:2596 通过 / 0 失败(桥接 27 项;连续 5 次运行均 0 失败) |
+| `node --test apps/desktop/test/omp-session-e2e.test.mjs` | 1 项通过(真实固定 OMP,不预设 cwd) |
+| `pnpm build` / `pnpm typecheck` | 12 包 + host-core release 构建 / 0 错误 |
+| `cd crates && cargo test -p host-core --locked` | 579 通过 / 0 失败 |
+| `node docs/validation/M0-rpc/verify-rpc.mjs` | PASS(未发送 prompt,无付费 provider) |
+| `git diff --check` | 无输出 |
+
+回归保留:迟到 approval/question 不呈现、stopping 窗口不呈现、prompt 拒绝/抛错后 idle 且取消一次、竞态下只取消一次、以及 ce2bf01 已有的 R1-R3 全部继续通过。本轮唯一未复现项:一次 desktop 全量运行出现 1 个未记录到名字的失败,随后连续 5 次运行均 0 失败(2596/2600),无法复现,如实记录。
+
 ## 6. 已知限制(真实存在,且不属于本轮范围)
 
 1. **模型与凭证投影属于 M4/T15**:本产品尚未把用户模型设置投影进 OMP;产品内 OMP 会话需要一个可达模型配置,验收夹具用本地假 provider 提供。

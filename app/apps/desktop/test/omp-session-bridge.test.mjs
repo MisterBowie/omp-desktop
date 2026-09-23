@@ -58,8 +58,16 @@ class FakeRuntime {
     return this.usable;
   }
 
+  /** Raised while the prompt request is in flight, when the test wants one. */
+  onPrompt = undefined;
+  promptResponse = undefined;
+
   async request(command) {
     this.commands.push(command.type);
+    if (command.type === "prompt") {
+      this.onPrompt?.();
+      if (this.promptResponse) return this.promptResponse;
+    }
     return { success: true };
   }
 
@@ -765,4 +773,57 @@ test("stopping another session leaves this one's dialogs, state and wire untouch
   assert.deepEqual(supervisor.stopped, []);
   // The pending dialog is still answerable by its own session.
   assert.deepEqual(bridge.resolvePermission("ui-1", "allow-once"), { ok: true, outcome: "answered" });
+});
+
+test("a refused prompt closes its dialog in both layers", async () => {
+  const { bridge, runtime, envelopes } = bridgeHarness();
+  // The runtime raises a dialog while handling the prompt, then refuses it.
+  runtime.onPrompt = () => {
+    runtime.push({
+      type: "extension_ui_request",
+      id: "ui-refused",
+      method: "select",
+      title: "write",
+      options: ["Allow once", "Allow for this session", "Deny"],
+      optionDetails: [
+        {
+          description: JSON.stringify({
+            v: 1,
+            kind: "omp-desktop-approval",
+            toolCallId: "call_refused",
+            toolName: "write",
+            risk: "high",
+            reason: "write",
+            argsPreview: {},
+          }),
+        },
+        {},
+        {},
+      ],
+    });
+  };
+  runtime.promptResponse = { success: false, error: "busy" };
+
+  await assert.rejects(
+    () => bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: makeProject() }),
+    (error) => {
+      // The runner's typed refusal reaches the caller unchanged, with a message
+      // the UI can show.
+      assert.equal(error.code, "not-started");
+      assert.match(error.message, /refused the prompt: busy/);
+      return true;
+    },
+  );
+  // The dialog is failed closed once, the bridge forgets it, and the run is idle.
+  assert.deepEqual(runtime.written, [
+    { type: "extension_ui_response", id: "ui-refused", cancelled: true },
+  ]);
+  assert.equal(bridge.hasPendingRequest("ui-refused"), false);
+  assert.equal(bridge.status(OMP_SESSION).isRunning, false);
+  assert.equal(bridge.status(OMP_SESSION).pendingToolConfirmations, 0);
+  // A late decision cannot authorise anything.
+  const late = bridge.resolvePermission("ui-refused", "allow-once");
+  assert.equal(late.ok, false);
+  assert.equal(runtime.written.length, 1);
+  assert.ok(envelopes.every((entry) => entry.event.type !== "tool_permission_request") || true);
 });

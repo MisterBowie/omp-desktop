@@ -176,6 +176,27 @@ export class OmpUiRequests {
     return request;
   }
 
+  /**
+   * Refuse a dialog that will never be presented.
+   *
+   * Used for a request that arrives when no run is active (the runtime raised it
+   * after its turn ended, or while the desktop is stopping one): the caller is
+   * blocked inside the runtime waiting for an answer, so the fail-closed answer
+   * is written immediately and nothing is registered — a card that nobody can
+   * answer must never become answerable later.
+   */
+  decline(request: OmpUiRequest, reason: string): void {
+    this.write({ type: "extension_ui_response", id: request.frameId, cancelled: true });
+    this.record({
+      frameId: request.frameId,
+      kind: request.kind,
+      generation: this.generation,
+      outcome: "cancelled",
+      decision: "cancel",
+      detail: reason,
+    });
+  }
+
   /** Requests still waiting for an answer, oldest first. */
   open(): Array<{ requestId: string; request: OmpUiRequest; generation: number }> {
     return [...this.pending.values()].map((entry) => ({

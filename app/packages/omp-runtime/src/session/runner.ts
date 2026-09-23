@@ -26,6 +26,7 @@ import type { AgentEvent, AgentEventEnvelope } from "@pi-desktop/shared";
 import { OmpRuntimeError } from "../errors.js";
 import type { OmpFrame } from "../protocol.js";
 import { appError, OmpEventConverter } from "./events.js";
+import { classifyUiRequest } from "./ui-requests.js";
 import {
   OmpUiRequests,
   type OmpUiDecision,
@@ -226,16 +227,22 @@ export class OmpSessionRunner {
       settled: false,
     };
     this.state = "running";
-    const response = await this.runtime.request({ type: "prompt", message }, { timeoutMs: 30_000 });
-    if (response.success === false) {
-      this.state = "idle";
-      this.run = null;
-      throw new OmpRuntimeError(
-        "not-started",
-        `the runtime refused the prompt: ${response.error ?? "unknown error"}`,
-      );
+    try {
+      const response = await this.runtime.request({ type: "prompt", message }, { timeoutMs: 30_000 });
+      if (response.success === false) {
+        throw new OmpRuntimeError(
+          "not-started",
+          `the runtime refused the prompt: ${response.error ?? "unknown error"}`,
+        );
+      }
+      return { accepted: true, turnId, generation };
+    } catch (error) {
+      // The run never started, so anything it raised on the way is unanswerable:
+      // close the generation (cancelling its dialogs exactly once) and leave the
+      // runner idle before the original failure reaches the caller.
+      this.closeGeneration(generation, "the prompt was refused by the runtime");
+      throw error;
     }
-    return { accepted: true, turnId, generation };
   }
 
   /**
@@ -374,13 +381,32 @@ export class OmpSessionRunner {
 
   private onFrame(frame: OmpFrame): void {
     if (frame.type === "extension_ui_request") {
-      const request = this.ui.observe(frame);
-      if (request && (request.kind === "approval" || request.kind === "question")) {
-        this.onUiRequest?.(request, {
+      const classified = classifyUiRequest(frame);
+      if (!classified) return;
+      if (classified.kind === "approval" || classified.kind === "question") {
+        // A dialog belongs to the run that raised it. With no run in flight —
+        // not started, already ended, or stopping — it can never be answered
+        // into anything, so it is refused immediately: presenting it would
+        // create a card whose decision the runtime has no turn to apply to.
+        if (this.state !== "running") {
+          this.ui.decline(
+            classified,
+            this.state === "stopping"
+              ? "the run was stopping when the dialog arrived"
+              : "no run is active for this dialog",
+          );
+          for (const record of this.ui.records().slice(-1)) this.onUiRecord?.(record);
+          return;
+        }
+        this.ui.observe(frame);
+        this.onUiRequest?.(classified, {
           sessionId: this.sessionId,
           generation: this.ui.currentGeneration(),
         });
+        for (const record of this.ui.records().slice(-1)) this.onUiRecord?.(record);
+        return;
       }
+      const request = this.ui.observe(frame);
       if (request?.kind === "cancel") {
         // The runtime withdrew its own request; the dialog disappears from the
         // runtime's side, so the desktop must forget it too.
@@ -445,9 +471,12 @@ export class OmpSessionRunner {
   private onTransportFailure(error: OmpRuntimeError): void {
     // A dead transport ends the run *and* everything waiting on a dialog: the
     // desktop must see one definite failure rather than a turn that hangs.
-    const cancelled = this.cancelOpenDialogs(`the runtime transport failed: ${error.code}`).length;
+    const cancelled = this.ui.open().length;
     const run = this.run;
-    this.closeRun(run?.generation ?? 0);
+    this.closeGeneration(
+      run?.generation ?? this.ui.currentGeneration(),
+      `the runtime transport failed: ${error.code}`,
+    );
     this.emitEnvelope({
       sessionId: this.sessionId,
       ...(run ? { turnId: run.turnId } : {}),
@@ -460,6 +489,24 @@ export class OmpSessionRunner {
         }),
       },
     });
+  }
+
+  /**
+   * Close one generation: cancel its dialogs, forget the run, go idle.
+   *
+   * Idempotent on purpose — a prompt failure and a transport failure can race,
+   * and the second caller must not write a second cancellation or re-close a
+   * run that is already gone.
+   */
+  private closeGeneration(generation: number, reason: string): void {
+    const open = this.ui.open();
+    if (open.length > 0) this.cancelOpenDialogs(reason);
+    if (this.run?.generation === generation || this.state !== "idle") {
+      this.closeRun(generation);
+      return;
+    }
+    // Already closed by a concurrent path; the dialogs (if any survived it) were
+    // cancelled above, so there is nothing left to do.
   }
 
   private closeRun(generation: number): void {

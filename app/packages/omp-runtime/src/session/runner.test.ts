@@ -11,6 +11,7 @@ import type { AgentEventEnvelope } from "@pi-desktop/shared";
 import { OmpRuntimeError } from "../errors.js";
 import type { OmpFrame } from "../protocol.js";
 import { OmpSessionRunner, type OmpSessionRuntime } from "./runner.js";
+import type { OmpUiRecord } from "./ui-requests.js";
 import { encodeApprovalDescriptor, OMP_APPROVAL_OPTIONS } from "./approval-protocol.js";
 
 class FakeRuntime implements OmpSessionRuntime {
@@ -28,8 +29,19 @@ class FakeRuntime implements OmpSessionRuntime {
     return this.usable;
   }
 
+  /** Raised while the prompt request is in flight, when the test wants one. */
+  onPrompt: (() => void) | undefined;
+  /** Verdict for the next prompt request; a throw is modelled by `promptFailure`. */
+  promptResponse: { success?: boolean; error?: string } | undefined;
+  promptFailure: Error | undefined;
+
   async request(command: OmpFrame): Promise<{ success?: boolean; error?: string }> {
     this.commands.push(String(command.type));
+    if (command.type === "prompt") {
+      this.onPrompt?.();
+      if (this.promptFailure) throw this.promptFailure;
+      if (this.promptResponse) return this.promptResponse;
+    }
     if (command.type === "abort") {
       if (this.abortBehaviour === "throw") throw new OmpRuntimeError("request-timeout", "abort timed out");
       if (this.abortBehaviour === "fail") return { success: false, error: "nothing to abort" };
@@ -57,7 +69,14 @@ class FakeRuntime implements OmpSessionRuntime {
   }
 }
 
-function harness(options: { teardown?: () => Promise<{ reaped: boolean; cleaned: boolean }> } = {}) {
+function harness(
+  options: {
+    teardown?: () => Promise<{ reaped: boolean; cleaned: boolean }>;
+    /** Extra observers; one runtime is driven by exactly one runner. */
+    onUiClosed?: (requestId: string, reason: string) => void;
+    onUiRecord?: (record: OmpUiRecord) => void;
+  } = {},
+) {
   const runtime = new FakeRuntime();
   const envelopes: AgentEventEnvelope[] = [];
   const requests: Array<{ requestId: string; kind: string }> = [];
@@ -66,6 +85,8 @@ function harness(options: { teardown?: () => Promise<{ reaped: boolean; cleaned:
     runtime,
     emit: (envelope) => envelopes.push(envelope),
     onUiRequest: (request, info) => requests.push({ requestId: request.frameId, kind: request.kind }),
+    onUiClosed: options.onUiClosed,
+    onUiRecord: options.onUiRecord,
     convergeTimeoutMs: 200,
     abortTimeoutMs: 100,
     teardown: options.teardown,
@@ -297,30 +318,21 @@ describe("dispose", () => {
 
 describe("dialog lifecycle (R1/R2)", () => {
   it("cancels the dialogs a run raised when the run ends", async () => {
-    const { runtime, runner } = harness();
     const closed: Array<{ id: string; reason: string }> = [];
-    // A fresh runner with an observer, so the notification path is covered.
-    const observed = new OmpSessionRunner({
-      sessionId: "omp-1",
-      runtime,
-      emit: () => undefined,
+    const { runtime, runner } = harness({
       onUiClosed: (requestId, reason) => closed.push({ id: requestId, reason }),
-      convergeTimeoutMs: 50,
-      abortTimeoutMs: 50,
     });
-    void runner;
-    await observed.prompt("hello");
+    await runner.prompt("hello");
     runtime.push(approvalFrame("ui-old"));
     runtime.push({ type: "agent_end", messages: [] });
-    expect(observed.status().pendingToolConfirmations).toBe(0);
+    expect(runner.status().pendingToolConfirmations).toBe(0);
     expect(runtime.written).toEqual([
       { type: "extension_ui_response", id: "ui-old", cancelled: true },
     ]);
     expect(closed.map((entry) => entry.id)).toEqual(["ui-old"]);
     // A decision for that dialog can no longer be delivered.
-    expect(observed.resolveUiRequest("ui-old", "allow-once")).toMatchObject({ ok: false });
+    expect(runner.resolveUiRequest("ui-old", "allow-once")).toMatchObject({ ok: false });
     expect(runtime.written).toHaveLength(1);
-    observed.dispose();
   });
 
   it("cancels leftovers before starting the next run", async () => {
@@ -336,44 +348,175 @@ describe("dialog lifecycle (R1/R2)", () => {
   });
 
   it("fails one dialog closed on request, through the registry", async () => {
-    const { runtime, runner } = harness();
     const closed: string[] = [];
-    const observed = new OmpSessionRunner({
+    const { runtime, runner } = harness({ onUiClosed: (requestId) => closed.push(requestId) });
+    await runner.prompt("hello");
+    runtime.push(approvalFrame("ui-1"));
+    expect(runner.cancelUiRequest("ui-1", "the user skipped it")).toBe(true);
+    expect(runtime.written).toEqual([
+      { type: "extension_ui_response", id: "ui-1", cancelled: true },
+    ]);
+    expect(runner.status().pendingToolConfirmations).toBe(0);
+    expect(closed).toEqual(["ui-1"]);
+    expect(runner.cancelUiRequest("ui-1", "again")).toBe(false);
+    expect(runtime.written).toHaveLength(1);
+  });
+
+  it("forgets a dialog the runtime retracted, and says so", async () => {
+    const closed: string[] = [];
+    const { runtime, runner } = harness({
+      onUiClosed: (requestId, reason) => closed.push(`${requestId}:${reason}`),
+    });
+    await runner.prompt("hello");
+    runtime.push(approvalFrame("ui-1"));
+    runtime.push({ type: "extension_ui_request", id: "ui-2", method: "cancel", targetId: "ui-1" });
+    expect(runner.status().pendingToolConfirmations).toBe(0);
+    expect(closed).toEqual(["ui-1:the runtime retracted its request"]);
+    expect(runtime.written).toEqual([]);
+  });
+});
+
+describe("late and failed dialog lifecycles (F1-F3)", () => {
+  it("refuses a dialog that arrives after the run ended, without presenting it", async () => {
+    const { runtime, requests, runner } = harness();
+    await runner.prompt("hello");
+    runtime.push({ type: "agent_end", messages: [] });
+    expect(runner.runState()).toBe("idle");
+
+    runtime.push(approvalFrame("ui-late"));
+    runtime.push({
+      type: "extension_ui_request",
+      id: "q-late",
+      method: "select",
+      title: "Which file?",
+      options: ["a.ts"],
+    });
+
+    // Nothing is presented and nothing stays answerable.
+    expect(requests).toEqual([]);
+    expect(runner.status().pendingToolConfirmations).toBe(0);
+    // Each unanswerable dialog is refused once, immediately.
+    expect(runtime.written).toEqual([
+      { type: "extension_ui_response", id: "ui-late", cancelled: true },
+      { type: "extension_ui_response", id: "q-late", cancelled: true },
+    ]);
+    // A decision arriving later cannot authorise anything.
+    expect(runner.resolveUiRequest("ui-late", "allow-once")).toMatchObject({ ok: false });
+    expect(runner.resolveUiRequest("q-late", "allow-once")).toMatchObject({ ok: false });
+    expect(runtime.written).toHaveLength(2);
+  });
+
+  it("refuses a dialog that arrives while the run is stopping", async () => {
+    const { runtime, requests, runner } = harness();
+    await runner.prompt("hello");
+    runtime.abortBehaviour = "ok";
+    const stop = runner.stop();
+    runtime.push(approvalFrame("ui-stopping"));
+    runtime.push({
+      type: "extension_ui_request",
+      id: "q-stopping",
+      method: "select",
+      title: "Which file?",
+      options: ["a.ts"],
+    });
+    setTimeout(() => runtime.push({ type: "agent_end", messages: [] }), 10);
+    await stop;
+
+    expect(requests).toEqual([]);
+    expect(runner.status().pendingToolConfirmations).toBe(0);
+    expect(runtime.written.filter((frame) => frame.id === "ui-stopping")).toEqual([
+      { type: "extension_ui_response", id: "ui-stopping", cancelled: true },
+    ]);
+    expect(runtime.written.filter((frame) => frame.id === "q-stopping")).toEqual([
+      { type: "extension_ui_response", id: "q-stopping", cancelled: true },
+    ]);
+    expect(runner.resolveUiRequest("ui-stopping", "allow-once")).toMatchObject({ ok: false });
+  });
+
+  it("closes the generation when the runtime refuses the prompt", async () => {
+    const runtime = new FakeRuntime();
+    const requests: string[] = [];
+    const closed: string[] = [];
+    const runner = new OmpSessionRunner({
+      sessionId: "omp-1",
+      runtime,
+      emit: () => undefined,
+      onUiRequest: (request) => requests.push(request.frameId),
+      onUiClosed: (requestId) => closed.push(requestId),
+      convergeTimeoutMs: 50,
+      abortTimeoutMs: 50,
+    });
+    // The runtime raises a dialog while handling the prompt, then refuses it.
+    runtime.onPrompt = () => runtime.push(approvalFrame("ui-refused"));
+    runtime.promptResponse = { success: false, error: "busy" };
+
+    await expect(runner.prompt("hello")).rejects.toMatchObject({ code: "not-started" });
+    expect(runner.runState()).toBe("idle");
+    expect(runner.status().isRunning).toBe(false);
+    expect(runner.status().pendingToolConfirmations).toBe(0);
+    expect(runtime.written).toEqual([
+      { type: "extension_ui_response", id: "ui-refused", cancelled: true },
+    ]);
+    expect(closed).toEqual(["ui-refused"]);
+    // A decision arriving after the refusal cannot authorise anything.
+    expect(runner.resolveUiRequest("ui-refused", "allow-once")).toMatchObject({ ok: false });
+    expect(runtime.written).toHaveLength(1);
+    runner.dispose();
+  });
+
+  it("closes the generation when the prompt request itself throws", async () => {
+    const runtime = new FakeRuntime();
+    const requests: string[] = [];
+    const closed: string[] = [];
+    const runner = new OmpSessionRunner({
+      sessionId: "omp-1",
+      runtime,
+      emit: () => undefined,
+      onUiRequest: (request) => requests.push(request.frameId),
+      onUiClosed: (requestId) => closed.push(requestId),
+      convergeTimeoutMs: 50,
+      abortTimeoutMs: 50,
+    });
+    runtime.onPrompt = () => runtime.push(approvalFrame("ui-error"));
+    runtime.promptFailure = new OmpRuntimeError("request-timeout", "no response within 30000 ms");
+
+    await expect(runner.prompt("hello")).rejects.toMatchObject({ code: "request-timeout" });
+    expect(runner.runState()).toBe("idle");
+    expect(runner.status().pendingToolConfirmations).toBe(0);
+    expect(runtime.written).toEqual([
+      { type: "extension_ui_response", id: "ui-error", cancelled: true },
+    ]);
+    expect(closed).toEqual(["ui-error"]);
+    // The failure did not leave the runner unusable.
+    expect(runner.resolveUiRequest("ui-error", "allow-once")).toMatchObject({ ok: false });
+    runner.dispose();
+  });
+
+  it("cancels a failed prompt's dialog exactly once when a transport failure races it", async () => {
+    const runtime = new FakeRuntime();
+    const closed: string[] = [];
+    const runner = new OmpSessionRunner({
       sessionId: "omp-1",
       runtime,
       emit: () => undefined,
       onUiClosed: (requestId) => closed.push(requestId),
+      convergeTimeoutMs: 50,
+      abortTimeoutMs: 50,
     });
-    await observed.prompt("hello");
-    runtime.push(approvalFrame("ui-1"));
-    expect(observed.cancelUiRequest("ui-1", "the user skipped it")).toBe(true);
-    expect(runtime.written).toEqual([
-      { type: "extension_ui_response", id: "ui-1", cancelled: true },
-    ]);
-    expect(observed.status().pendingToolConfirmations).toBe(0);
-    expect(closed).toEqual(["ui-1"]);
-    expect(observed.cancelUiRequest("ui-1", "again")).toBe(false);
-    expect(runtime.written).toHaveLength(1);
-    observed.dispose();
-    void runner;
-  });
+    runtime.onPrompt = () => {
+      runtime.push(approvalFrame("ui-race"));
+      // The transport dies while the prompt is still unanswered.
+      runtime.fail(new OmpRuntimeError("transport-failed", "stdout closed"));
+    };
+    runtime.promptFailure = new OmpRuntimeError("transport-failed", "stdout closed");
 
-  it("forgets a dialog the runtime retracted, and says so", async () => {
-    const { runtime, runner } = harness();
-    const closed: string[] = [];
-    const observed = new OmpSessionRunner({
-      sessionId: "omp-1",
-      runtime,
-      emit: () => undefined,
-      onUiClosed: (requestId, reason) => closed.push(`${requestId}:${reason}`),
-    });
-    await observed.prompt("hello");
-    runtime.push(approvalFrame("ui-1"));
-    runtime.push({ type: "extension_ui_request", id: "ui-2", method: "cancel", targetId: "ui-1" });
-    expect(observed.status().pendingToolConfirmations).toBe(0);
-    expect(closed).toEqual(["ui-1:the runtime retracted its request"]);
-    expect(runtime.written).toEqual([]);
-    observed.dispose();
-    void runner;
+    await expect(runner.prompt("hello")).rejects.toBeInstanceOf(OmpRuntimeError);
+    expect(runtime.written.filter((frame) => frame.id === "ui-race")).toEqual([
+      { type: "extension_ui_response", id: "ui-race", cancelled: true },
+    ]);
+    expect(closed).toEqual(["ui-race"]);
+    expect(runner.runState()).toBe("idle");
+    expect(runner.status().pendingToolConfirmations).toBe(0);
+    runner.dispose();
   });
 });
