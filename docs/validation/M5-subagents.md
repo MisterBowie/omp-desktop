@@ -1,6 +1,6 @@
 # M5 验证记录：OMP 子代理面板与编排归属（T17）
 
-状态：**完成**（T17）。M5 后续任务 T18-T20 未开始。
+状态：**未验收**（T17）。第三轮独立复审判定 T17 尚待 B1-B3 三项返修；本提交仅实现 **B1（回收未完成时的重试）** 并待复审，**B2（renderer 单飞/错误可见）与 B3（总 UTF-8 预算）仍未解决**。M5 后续任务 T18-T20 未开始。
 基线提交：`d26444407fc963c2e7efd51bda7d1bd4a70e8bbd`；第二轮独立复审返修（S1-S4）以追加普通提交落在该基线上（见 `git log` 最新提交）。
 固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未修改）。
 工作树：`/home/vv/person/code/omp-desktop-m5-t17`，分支 `codex/m5-subagents`。
@@ -27,6 +27,14 @@
 - **S2 renderer 增量读取覆盖/清空详情、reset 游标错误、错误态未呈现**：`useOmpSubagentRead` 此前每次 poll `setRun(result.run)`（第二批覆盖第一批），空增量被 helper 转成 `empty` 后 `setRun(null)`（稳定 child 2 秒后空 poll 从面板消失），`cursor.reset===true` 时把游标设 0（应继续 `nextByte`）。现初次读取建立完整行集、非 reset 增量按稳定 message id 合并去重并保留旧行、reset 响应替换集合、无新行保留现有详情、所有成功响应把游标前进到 `nextByte`（含 reset）。2 秒 poll 改为完成后再调度（单飞），杜绝慢请求永远因 sequence 失效；selection change/unmount 的 stale-response 序号守卫保留。`SubagentPanel`/`SubagentDetail` 现消费 hook 的 phase/errorDetail/reload，在既有 Pi 风格内呈现 loading/empty/typed error/retry（新增 i18n `panel.subagentLoading/Error/Retry` 8 语言）；Pi 会话保持原路径、不触发 OMP IPC。新增真实 mounted renderer 测试（`react-dom/client` + 最小 DOM shim + 可控 promise，非 wall-clock sleep）：挂载 `useOmpSubagentRead`，打桩 `window.piDesktop.invoke`，断言真实 `api.ts` channel 调用，覆盖初次完整行/空增量不清屏/第二批追加/reset 替换并从 `nextByte` 续读/loading·error·retry/慢请求与 selection change 不污染/Pi 不调用 `ompSubagentList/Read`。
 - **S3 已存在 child 的 missing parent 仍被放行**：`ownedParent()` 此前只在 existing child 同时带不同 parent 时拒绝，`existing` 存在且新帧 `parentToolCallId===undefined` 时直接返回 true（会产生 1 个 settlement、状态改 completed、`unknownParentCalls=0`，与 ADR/验证文档"lifecycle/progress/snapshot missing parent 全部拒绝并计数"矛盾）。现每个 lifecycle/progress/snapshot 都必须携带非空 parent、与 existing child 的 owner 一致、且有该 runner 已观察 task call 的所有权证据；missing/unknown/conflicting 均自增 `unknownParentCalls`，不改变 child、不 settlement、不重归属。wire schema 保持真实 optional，tracker fail-closed。新增 existing child 的 terminal lifecycle missing parent、progress missing parent、snapshot missing/conflicting parent 行为测试。
 - **S4 toolResult 绕过 4 MiB 内容上限**：`toToolRow` 此前把显示用 `content` 截到 4 MiB，却把原始 `message.content` 原样放入 `toolResult`（5 MiB string → `content.length=4194304` 而 `toolResult.length=5242880`，整个 UiMessage 跨 IPC 到 renderer，"任何无界结果都不越过桥"不成立）。现按固定 OMP durable `ToolResultMessage`（`{ content: blocks, details }`）做结构化有界投影：文本块与 `details` 各自 4 MiB 上限（`details` 递归截断字符串），图片/仅 provider 部件丢弃，text-only 结果投影为空串（渲染器读已截断的 `content` 字段，不复制镜像）；`content`/`toolResult` 及任何由 transcript entry 带入 UiMessage 的大字段均不越过总内容边界。新增超大 string、text parts、结构化/异常 tool result 的序列化大小与可读性测试，并保持稳定 entry id。
+
+## 0.3 第三轮独立复审返修（B1，2026-09-24）
+
+第三轮独立复审否定了"T17 已完成"，拆出 B1-B3 三项返修；**本提交只实现 B1**，B2、B3 仍未解决，T17 不验收。
+
+- **B1 回收未完成时的重试（已实现，待复审）**：独立复现显示 `session/runner.ts` 的 teardown 未成功时仍 `closeRun()`，第二次 stop 命中 487-490 的 `nothing running` 早退、不再调用 supervisor——实际仍有存活进程组。现改为：teardown 未确认 `reaped && cleaned` 时记录可重试义务 `pendingReclaim`；第二次 stop 直接重跑同一 `teardown`（跳过协议 abort，绝不把旧父回合的 abort 重发到新回合）；pending 时 `prompt` 以 typed `stopping` 拒绝；只有确认 `reaped && cleaned` 才清义务并清 registry/task-call 所有权（保留迟到子帧归因）。`stop()` 加单飞（并发 stop 共享一次尝试，杜绝重叠 teardown、不短暂放行 prompt）。桥接 teardown 包装改为：组已回收但目录残留（`reaped:true/cleaned:false`）时补一次 `reclaimAll()` 扫目录，因为 `supervisor.stop()` 对 directory-only 债务回报 `nothing owned`。参考顺序：固定 PI 的 `TaskStop`（`agent-runtime/src/runtime.ts` 委托停止）是模型自调工具、无桌面侧进程组重试语义，PI 的 `provider-retry.ts` 是 provider HTTP 重试、与进程回收无关；OMP 无 per-child stop RPC；可复用语义来自本仓库 M2 supervisor 的 `reaped`/`cleaned` 独立判定与 ownership-retained-for-retry（`supervisor.ts` `performStop`/`reclaimAll`），B1 直接适配该契约，未臆造新语义。
+- 新增回归（`packages/omp-runtime/src/session/subagent-runner.test.ts` 的 `pending reclaim retry` 5 例，先红后绿）：首败二成后第三停 `nothing running`、连续失败仍拒 prompt、teardown 抛错仍可重试、`reaped:true/cleaned:false` 目录债保留义务、并发 stop 单飞（可控 promise，无 wall-clock sleep）。
+- 验证（`app/`，`nvm use 24`）：`@pi-desktop/omp-runtime` vitest **227 passed / 0 failed**（222 + 5 B1 回归，含真实固定 runtime 烟测）；desktop `node --test` 定向 OMP 用例全绿（`omp-subagent-bridge` 8、`omp-subagent-e2e` 3、`omp-session-ownership` 2、`omp-session-bridge`/`failclosed`/`configure`/`configure-ipc`/`delete-archive`/`host-mutation-gates`/`ipc-result` 共 68、`omp-session-e2e`/`concurrent-approval-e2e`/`persistence-e2e` 3，均为假 provider / 无付费模型）；`pnpm --filter @pi-desktop/omp-runtime exec tsc --noEmit` 与 desktop `pnpm typecheck` 通过；`git diff --check` 无输出。
 
 ## 0. 环境准备（固定子模块流程，与本轮代码无关）
 

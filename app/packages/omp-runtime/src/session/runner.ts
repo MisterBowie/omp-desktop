@@ -170,6 +170,18 @@ export class OmpSessionRunner {
   private lateFrames = 0;
   private readonly waiters = new Set<() => void>();
   private disposed: { code: string; message: string } | null = null;
+  /** Single-flight stop: concurrent callers share one attempt, so a racing stop
+   * and retry can never overlap two teardowns against the same supervisor. */
+  private stopping: Promise<OmpStopOutcome> | null = null;
+  /**
+   * A teardown that could not fully reclaim the process group or run root.
+   *
+   * While set, `prompt` is refused and the next `stop` re-runs the same
+   * teardown instead of reporting "nothing running". It is cleared only when
+   * the teardown confirms both `reaped` and `cleaned`, matching the
+   * supervisor's ownership-retained-for-retry semantics.
+   */
+  private pendingReclaim: boolean = false;
 
   constructor(options: OmpSessionRunnerOptions) {
     this.sessionId = options.sessionId;
@@ -381,6 +393,12 @@ export class OmpSessionRunner {
    */
   async prompt(message: string): Promise<{ accepted: boolean; turnId: string; generation: number }> {
     this.throwIfDisposed();
+    if (this.pendingReclaim) {
+      throw new OmpRuntimeError(
+        "stopping",
+        "the previous run's process group was not fully reclaimed; stop the session again to finish reclaiming before prompting",
+      );
+    }
     if (this.state !== "idle") {
       throw new OmpRuntimeError(
         "not-started",
@@ -482,9 +500,29 @@ export class OmpSessionRunner {
    * Stop the current run: the protocol first, the process only as a last resort.
    */
   async stop(): Promise<OmpStopOutcome> {
+    if (this.stopping) return this.stopping;
+    const attempt = this.performStop();
+    this.stopping = attempt;
+    try {
+      return await attempt;
+    } finally {
+      if (this.stopping === attempt) this.stopping = null;
+    }
+  }
+
+  private async performStop(): Promise<OmpStopOutcome> {
     const steps: string[] = [];
     const errors: string[] = [];
     const run = this.run;
+
+    // A previous teardown failed and left a retryable obligation: there is no
+    // live turn to abort, but the supervisor still owns a process group or run
+    // root. Re-run the same teardown rather than reporting "nothing running",
+    // and never re-send the old turn's abort into whatever runs next.
+    if (!run && this.pendingReclaim) {
+      return this.retryPendingReclaim(steps, errors);
+    }
+
     if (!run || this.state === "idle") {
       return { aborted: false, abortBashSent: false, converged: true, toreDown: false, steps: ["nothing running"], errors };
     }
@@ -538,15 +576,15 @@ export class OmpSessionRunner {
     // the parent and every child it spawned. The run is closed either way,
     // because the desktop must not keep reporting a turn the user cancelled.
     let toreDown = false;
-    let reaped = false;
+    let reclaimed = false;
     if (this.teardown) {
       try {
         const result = await this.teardown({ abortBash: run.bashOpen });
-        reaped = result.reaped;
         toreDown = result.reaped;
+        reclaimed = result.reaped && result.cleaned;
         steps.push(`process teardown: reaped=${String(result.reaped)} cleaned=${String(result.cleaned)}`);
-        if (!result.reaped || !result.cleaned) {
-          errors.push("the runtime process group could not be fully reclaimed");
+        if (!reclaimed) {
+          errors.push("the runtime process group or run root could not be fully reclaimed");
         }
       } catch (error) {
         errors.push(`process teardown failed: ${describe(error)}`);
@@ -555,16 +593,57 @@ export class OmpSessionRunner {
       errors.push("no process teardown is available");
     }
     this.closeRun(run.generation);
-    // Only once the process group is confirmed gone can a detached child not
-    // come back. A failed teardown retains the child registry and task-call
-    // ownership — the only retryable evidence of a surviving child — matching
-    // the supervisor's ownership-retained-for-retry semantics: a late frame can
-    // still be attributed, and a later stop/dispose can re-run the teardown.
-    if (reaped) {
+    // Only once the process group is confirmed gone AND the run root removed can
+    // a detached child not come back and nothing remain owed. A failed teardown
+    // retains the child registry, the task-call ownership and a retryable
+    // obligation — matching the supervisor's ownership-retained-for-retry
+    // semantics: a late frame can still be attributed, and a later stop re-runs
+    // this teardown.
+    if (reclaimed) {
+      this.pendingReclaim = false;
+      this.subagents.reset();
+      this.taskCallTurn.clear();
+    } else if (this.teardown) {
+      this.pendingReclaim = true;
+    }
+    return { aborted, abortBashSent, converged: false, toreDown, steps, errors };
+  }
+
+  /**
+   * Re-run the teardown for an obligation a previous stop left behind.
+   *
+   * There is no live turn, so the protocol phase does not apply: this is the
+   * second stop the defect described, and it must reach the same supervisor
+   * teardown — never re-send the old parent turn's abort. The obligation is
+   * cleared only when the teardown reports both `reaped` and `cleaned`.
+   */
+  private async retryPendingReclaim(steps: string[], errors: string[]): Promise<OmpStopOutcome> {
+    this.state = "stopping";
+    let toreDown = false;
+    let reclaimed = false;
+    if (this.teardown) {
+      try {
+        const result = await this.teardown({ abortBash: false });
+        toreDown = result.reaped;
+        reclaimed = result.reaped && result.cleaned;
+        steps.push(`process teardown retry: reaped=${String(result.reaped)} cleaned=${String(result.cleaned)}`);
+        if (!reclaimed) {
+          errors.push("the runtime process group or run root could not be fully reclaimed");
+        }
+      } catch (error) {
+        errors.push(`process teardown failed: ${describe(error)}`);
+      }
+    } else {
+      errors.push("no process teardown is available");
+    }
+    if (reclaimed) {
+      this.pendingReclaim = false;
       this.subagents.reset();
       this.taskCallTurn.clear();
     }
-    return { aborted, abortBashSent, converged: false, toreDown, steps, errors };
+    this.state = "idle";
+    this.wakeWaiters();
+    return { aborted: false, abortBashSent: false, converged: false, toreDown, steps, errors };
   }
 
   /**
@@ -615,6 +694,10 @@ export class OmpSessionRunner {
     this.detachFailure();
     this.subagents.reset();
     this.taskCallTurn.clear();
+    // The runner is detaching; the actual reclaim is delegated to the
+    // supervisor (via the bridge's dispose → reclaimAll), so the retryable
+    // obligation this runner carried is no longer this runner's to hold.
+    this.pendingReclaim = false;
     this.state = "idle";
     this.run = null;
     this.wakeWaiters();

@@ -392,3 +392,176 @@ describe("stop refusal", () => {
     expect(result.reason).toBe("capability-unavailable");
   });
 });
+
+describe("pending reclaim retry", () => {
+  /** Drive a parent turn with one observed task call and a surviving child. */
+  async function startChildTurn(runtime: FakeRuntime, runner: OmpSessionRunner) {
+    await runner.enableSubagentSubscription("events");
+    await runner.prompt("delegate");
+    runtime.push(taskStart());
+    runtime.push({
+      type: "subagent_lifecycle",
+      payload: { id: "child-1", agent: "task", agentSource: "bundled", status: "started", index: 0, parentToolCallId: "call-task-1" },
+    });
+    runtime.dataByCommand.set("get_subagents", {
+      subagents: [{ id: "child-1", index: 0, agent: "task", agentSource: "bundled", status: "running", lastUpdate: 1, parentToolCallId: "call-task-1" }],
+    });
+  }
+
+  it("retries the same teardown on the second stop after a first failure, then reports nothing running", async () => {
+    const verdicts = [
+      { reaped: false, cleaned: false },
+      { reaped: true, cleaned: true },
+    ];
+    let teardownCalls = 0;
+    const { runtime, runner } = harness({
+      teardown: async () => {
+        const verdict = verdicts[Math.min(teardownCalls, verdicts.length - 1)]!;
+        teardownCalls += 1;
+        return verdict;
+      },
+    });
+    await startChildTurn(runtime, runner);
+
+    const first = runner.stop();
+    runtime.push({ type: "agent_end", isTerminal: true });
+    const firstOutcome = await first;
+    expect(firstOutcome.toreDown).toBe(false);
+    expect(firstOutcome.converged).toBe(false);
+    expect(firstOutcome.errors.join(" ")).toMatch(/could not be fully reclaimed/);
+    expect(teardownCalls).toBe(1);
+
+    // The failed teardown blocks a new prompt: the obligation is still owed.
+    await expect(runner.prompt("next")).rejects.toMatchObject({ code: "stopping" });
+
+    // The second stop re-runs the teardown instead of reporting "nothing running".
+    const second = await runner.stop();
+    expect(second.toreDown).toBe(true);
+    expect(teardownCalls).toBe(2);
+
+    // Once reclaimed, a third stop has nothing to do.
+    const third = await runner.stop();
+    expect(third.steps).toEqual(["nothing running"]);
+    expect(teardownCalls).toBe(2);
+  });
+
+  it("keeps the obligation after consecutive teardown failures and keeps refusing prompts", async () => {
+    let teardownCalls = 0;
+    const { runtime, runner } = harness({
+      teardown: async () => {
+        teardownCalls += 1;
+        return { reaped: false, cleaned: false };
+      },
+    });
+    await startChildTurn(runtime, runner);
+
+    const first = runner.stop();
+    runtime.push({ type: "agent_end", isTerminal: true });
+    await first;
+    expect(teardownCalls).toBe(1);
+
+    const second = await runner.stop();
+    expect(second.toreDown).toBe(false);
+    expect(teardownCalls).toBe(2);
+
+    // Still owed: prompt is refused, and a third stop retries again.
+    await expect(runner.prompt("next")).rejects.toMatchObject({ code: "stopping" });
+    const third = await runner.stop();
+    expect(teardownCalls).toBe(3);
+  });
+
+  it("retains the obligation when the teardown throws and retries it on the next stop", async () => {
+    let teardownCalls = 0;
+    const { runtime, runner } = harness({
+      teardown: async () => {
+        teardownCalls += 1;
+        if (teardownCalls === 1) throw new Error("teardown exploded");
+        return { reaped: true, cleaned: true };
+      },
+    });
+    await startChildTurn(runtime, runner);
+
+    const first = runner.stop();
+    runtime.push({ type: "agent_end", isTerminal: true });
+    const firstOutcome = await first;
+    expect(firstOutcome.toreDown).toBe(false);
+    expect(firstOutcome.errors.join(" ")).toMatch(/teardown failed/);
+    expect(teardownCalls).toBe(1);
+
+    await expect(runner.prompt("next")).rejects.toMatchObject({ code: "stopping" });
+
+    const second = await runner.stop();
+    expect(second.toreDown).toBe(true);
+    expect(teardownCalls).toBe(2);
+  });
+
+  it("retains the obligation when the group is reaped but the run root is not cleaned", async () => {
+    const verdicts = [
+      { reaped: true, cleaned: false },
+      { reaped: true, cleaned: true },
+    ];
+    let teardownCalls = 0;
+    const { runtime, runner } = harness({
+      teardown: async () => {
+        const verdict = verdicts[Math.min(teardownCalls, verdicts.length - 1)]!;
+        teardownCalls += 1;
+        return verdict;
+      },
+    });
+    await startChildTurn(runtime, runner);
+
+    const first = runner.stop();
+    runtime.push({ type: "agent_end", isTerminal: true });
+    const firstOutcome = await first;
+    // The group is gone but the directory is not: not a clean teardown.
+    expect(firstOutcome.toreDown).toBe(true);
+    expect(firstOutcome.errors.join(" ")).toMatch(/could not be fully reclaimed/);
+    expect(teardownCalls).toBe(1);
+
+    await expect(runner.prompt("next")).rejects.toMatchObject({ code: "stopping" });
+
+    const second = await runner.stop();
+    expect(second.toreDown).toBe(true);
+    expect(teardownCalls).toBe(2);
+    const third = await runner.stop();
+    expect(third.steps).toEqual(["nothing running"]);
+  });
+
+  it("single-flights concurrent stops so the teardown never overlaps", async () => {
+    let teardownCalls = 0;
+    let releaseTeardown!: () => void;
+    let markEntered!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseTeardown = resolve;
+    });
+    // Resolved the moment the (blocked) teardown is invoked, so the assertion
+    // below awaits the real event instead of a wall-clock tick.
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve;
+    });
+    const { runtime, runner } = harness({
+      teardown: async () => {
+        teardownCalls += 1;
+        markEntered();
+        await gate;
+        return { reaped: true, cleaned: true };
+      },
+    });
+    await startChildTurn(runtime, runner);
+
+    const first = runner.stop();
+    runtime.push({ type: "agent_end", isTerminal: true });
+    // While the first teardown is blocked on the gate, a second stop must share
+    // the same attempt rather than start a second overlapping teardown.
+    const second = runner.stop();
+    await entered;
+    expect(teardownCalls).toBe(1);
+    releaseTeardown();
+    const [a, b] = await Promise.all([first, second]);
+    expect(a).toBe(b);
+    expect(teardownCalls).toBe(1);
+
+    // Fully reclaimed: a prompt is allowed again and a further stop is idle.
+    await expect(runner.prompt("next")).resolves.toBeTruthy();
+  });
+});
