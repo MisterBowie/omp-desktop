@@ -15,9 +15,9 @@
  *      branches go through the host so a restart restores the same identity.
  */
 import { join } from "node:path";
-import { writeFileSync } from "node:fs";
+import { lstatSync, unlinkSync, writeFileSync } from "node:fs";
 
-import type { AgentEventEnvelope } from "@pi-desktop/shared";
+import { ENGINE_ADAPTER_VERSION, type AgentEventEnvelope } from "@pi-desktop/shared";
 import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
 import type { DesktopEngineRuntime } from "./engine-runtime";
@@ -27,23 +27,29 @@ import {
 } from "@pi-desktop/omp-runtime";
 import {
   createOmpSessionBridge,
+  isPathWithin,
   type OmpSessionBridge,
   type OmpSessionRuntimeSpec,
 } from "./omp-session";
 import {
-  ompApiForStyle,
   projectionError,
   projectModelsYaml,
-  type OmpModelProjection,
+  resolveProviderProjection,
 } from "./omp-model-projection";
 
-/** A provider row with just the fields the projection needs. */
+/** A provider row with the fields the projection resolver needs. */
 type ProjectionProvider = {
   id: string;
+  enabled?: boolean | null;
+  type?: string | null;
   baseUrl?: string | null;
   apiStyle?: string | null;
-  type?: string;
-  models?: Array<{ id: string; contextWindow?: number; maxTokens?: number }>;
+  authKind?: string | null;
+  hasSecret?: boolean | null;
+  hasOauth?: boolean | null;
+  headers?: Record<string, string> | null;
+  models?: Array<{ id: string; contextWindow?: number | null; maxTokens?: number | null; thinkingLevels?: string[] }>;
+  defaultModelId?: string | null;
 };
 
 /** Host surface for model projection and durable session coordination. */
@@ -65,12 +71,14 @@ function hostOrThrow(host: () => HostProcess | null): HostProcess {
 }
 
 /**
- * Read one provider and its model binding, project them, and write the minimal
- * `models.yml` into the runtime's transient agent directory.
+ * Read one provider and its model binding, project them fail-closed, and write
+ * the minimal `models.yml` into the runtime's transient agent directory.
  *
  * The provider id and model id come from the session's durable binding, never
  * from the renderer; the secret is read at this boundary and written only into
- * `paths.agentDir/models.yml`, which the stop path deletes.
+ * `paths.agentDir/models.yml`, which the stop path deletes. A disabled provider,
+ * an unknown model, a missing key, an unsupported auth kind, or an incompatible
+ * thinking level is refused here, before any prompt is sent.
  */
 export async function projectSessionModels(
   host: () => HostProcess | null,
@@ -89,25 +97,20 @@ export async function projectSessionModels(
   });
   const row = provider?.provider;
   if (!row) {
-    throw Object.assign(new Error(`provider ${spec.providerId} does not exist or is disabled`), {
+    throw Object.assign(new Error(`provider ${spec.providerId} does not exist`), {
       errorCode: "OMP_PROJECTION_FAILED",
     });
   }
-  const api = ompApiForStyle(row.apiStyle);
-  const baseUrl = typeof row.baseUrl === "string" ? row.baseUrl.trim() : "";
+  const resolved = resolveProviderProjection(row, spec.modelId, spec.thinkingLevel);
+  if (!resolved.ok) {
+    throw Object.assign(new Error(resolved.error.message), { errorCode: resolved.error.errorCode });
+  }
+  // The credential is read only after the source is validated, and only lands
+  // in the transient models.yml.
   const secret = await client.call<{ value?: string | null }>("providers.getSecret", {
     id: spec.providerId,
   });
-  const model = row.models?.find((entry) => entry.id === spec.modelId);
-  const projection: OmpModelProjection = {
-    providerId: row.id,
-    modelId: spec.modelId,
-    api: api ?? "",
-    baseUrl,
-    apiKey: secret?.value ?? null,
-    ...(model?.contextWindow ? { contextWindow: model.contextWindow } : {}),
-    ...(model?.maxTokens ? { maxTokens: model.maxTokens } : {}),
-  };
+  const projection = { ...resolved.projection, apiKey: secret?.value ?? null };
   const error = projectionError(projection);
   if (error) {
     throw Object.assign(new Error(error.message), { errorCode: error.errorCode });
@@ -133,6 +136,7 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
     isPackaged: deps.isPackaged,
     resourcesPath: deps.resourcesPath ?? null,
     appPath: deps.appPath,
+    sessionDir,
     createSupervisor: (spec: OmpSessionRuntimeSpec) =>
       engineRuntime.ompRuntime.createSupervisor({
         sessionDir,
@@ -146,7 +150,7 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
       const client = hostOrThrow(deps.host);
       await client.call("session.bindEngine", {
         id: info.sessionId,
-        adapterVersion: 1,
+        adapterVersion: ENGINE_ADAPTER_VERSION,
         runtimeVersion: info.runtimeVersion,
         nativeSessionId: info.nativeSessionId,
         nativeSessionPath: info.nativeSessionPath,
@@ -189,14 +193,34 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
       });
       const sessionId = created?.session?.id;
       if (!sessionId) throw Object.assign(new Error("branch session creation failed"), { errorCode: "OMP_BRANCH_FAILED" });
-      await client.call("session.bindEngine", {
-        id: sessionId,
-        adapterVersion: 1,
-        runtimeVersion: info.runtimeVersion,
-        nativeSessionId: info.nativeSessionId,
-        nativeSessionPath: info.nativeSessionPath,
-      });
+      try {
+        await client.call("session.bindEngine", {
+          id: sessionId,
+          adapterVersion: ENGINE_ADAPTER_VERSION,
+          runtimeVersion: info.runtimeVersion,
+          nativeSessionId: info.nativeSessionId,
+          nativeSessionPath: info.nativeSessionPath,
+        });
+      } catch (error) {
+        // Compensation: the child row exists but has no engine reference; delete
+        // it so a half-created child is never visible. The native file is
+        // removed by the caller's `persistBranchCleanup`.
+        await client.call("session.delete", { id: sessionId }).catch(() => undefined);
+        throw error;
+      }
       return sessionId;
+    },
+    persistBranchCleanup: async (info) => {
+      // The native file this branch created lives in the app-owned session
+      // directory and is unreferenced; removing it restores the pre-branch state
+      // after a failed bind. Containment and file type are re-checked first.
+      try {
+        if (isPathWithin(info.nativeSessionPath, sessionDir) && lstatSync(info.nativeSessionPath).isFile()) {
+          unlinkSync(info.nativeSessionPath);
+        }
+      } catch {
+        // Best effort: a file we cannot remove is left for manual recovery.
+      }
     },
   });
 

@@ -28,7 +28,7 @@ register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
 
 const { FakeProvider } = await import("../../../experiments/omp-bridge/lib/provider.mjs");
 const { writeModelsConfig } = await import("../../../experiments/omp-bridge/lib/models-config.mjs");
-const { OmpRuntimeSupervisor, findPinnedLauncher, findGateExtension } = await import(
+const { OmpRuntimeSupervisor, ensureSessionStateDir, findPinnedLauncher, findGateExtension } = await import(
   "../../../packages/omp-runtime/src/index.ts"
 );
 const { createOmpSessionBridge } = await import("../electron/main/runtime/omp-session.ts");
@@ -156,10 +156,12 @@ test(
     ]);
 
     const envelopes = [];
+    const sessionDir = ensureSessionStateDir(dataRoot);
     const supervisor = new OmpRuntimeSupervisor({
       dataRoot,
       launcherPath: LAUNCHER,
       expectedRuntimeVersion: "18.2.7",
+      sessionDir,
       args: ["--extension", GATE],
       extraEnv: {
         OMP_DESKTOP_GATE_TOOLS: "write,bash",
@@ -181,6 +183,7 @@ test(
       launcher: LAUNCHER,
       isPackaged: false,
       appPath: here,
+      sessionDir,
       gateResolver: () => GATE,
       emitAgentEvent: (envelope) => envelopes.push(envelope),
       logger: { app: () => undefined },

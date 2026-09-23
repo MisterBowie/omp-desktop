@@ -16,6 +16,7 @@ const {
   ompApiForStyle,
   projectionError,
   projectModelsYaml,
+  resolveProviderProjection,
 } = await import("../electron/main/runtime/omp-model-projection.ts");
 
 const CANARY = "omp-m4-canary-not-a-real-key";
@@ -80,4 +81,62 @@ test("fails closed on an empty or incompatible projection", () => {
     () => projectModelsYaml({ providerId: "p", modelId: "m", api: "", baseUrl: "http://x", apiKey: null }),
     (error) => error.errorCode === "OMP_PROJECTION_UNSUPPORTED",
   );
+});
+
+const source = (overrides = {}) => ({
+  id: "acme",
+  enabled: true,
+  type: "openai_compatible",
+  apiStyle: "chat_completions",
+  authKind: "api_key",
+  hasSecret: true,
+  baseUrl: "https://api.example.com/v1",
+  models: [{ id: "acme-x", contextWindow: 128000, maxTokens: 16384, thinkingLevels: ["off", "high"] }],
+  ...overrides,
+});
+
+test("R4: resolves a valid provider/model binding", () => {
+  const result = resolveProviderProjection(source(), "acme-x", "high");
+  assert.equal(result.ok, true);
+  assert.equal(result.projection.providerId, "acme");
+  assert.equal(result.projection.api, "openai-completions");
+});
+
+test("R4: refuses a disabled provider", () => {
+  const result = resolveProviderProjection(source({ enabled: false }), "acme-x", null);
+  assert.equal(result.ok, false);
+  assert.equal(result.error.errorCode, "OMP_PROJECTION_INVALID");
+});
+
+test("R4: refuses a model not in the provider's configured models", () => {
+  const result = resolveProviderProjection(source(), "acme-y", null);
+  assert.equal(result.ok, false);
+  assert.match(result.error.message, /not one of/);
+});
+
+test("R4: refuses a key-auth provider without a stored secret", () => {
+  const result = resolveProviderProjection(source({ hasSecret: false }), "acme-x", null);
+  assert.equal(result.ok, false);
+  assert.match(result.error.message, /requires an API key/);
+});
+
+test("R4: refuses OAuth and basic auth instead of downgrading to auth:none", () => {
+  for (const authKind of ["oauth", "basic"]) {
+    const result = resolveProviderProjection(source({ authKind }), "acme-x", null);
+    assert.equal(result.ok, false);
+    assert.equal(result.error.errorCode, "OMP_PROJECTION_UNSUPPORTED");
+  }
+});
+
+test("R4: refuses an incompatible thinking level", () => {
+  const result = resolveProviderProjection(source(), "acme-x", "max");
+  assert.equal(result.ok, false);
+  assert.match(result.error.message, /not supported/);
+});
+
+test("R4: projects provider headers into the yaml", () => {
+  const result = resolveProviderProjection(source({ headers: { "X-Custom": "v1" } }), "acme-x", null);
+  assert.equal(result.ok, true);
+  const yaml = projectModelsYaml({ ...result.projection, apiKey: "k" });
+  assert.match(yaml, /X-Custom/);
 });

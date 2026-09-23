@@ -72,11 +72,11 @@ describe("runtime supervisor", () => {
     expect(started.protocolVersion).toBe(2);
     // M3 truth: the process is up and serves the surface this release ships.
     expect(started.reason).toBeNull();
-    // A running runtime serves exactly the capabilities M3 shipped; the ones
-    // still closed (steer, resume, branching…) stay false.
+    // A running runtime serves exactly the capabilities M4 shipped; the ones
+    // still closed (steer, followUp, compact…) stay false.
     expect(started.capabilities.prompt).toBe(true);
     expect(started.capabilities.stop).toBe(true);
-    expect(started.capabilities.resume).toBe(false);
+    expect(started.capabilities.resume).toBe(true);
     expect(started.capabilities.steer).toBe(false);
     expect(supervisor.liveCapabilities().prompt).toBe(true);
   });

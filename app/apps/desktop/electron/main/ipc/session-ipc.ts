@@ -105,8 +105,16 @@ export type SessionIpcDependencies = {
   enrichSession: (session: any, providers: any, defaults: any) => any;
   acquireSessionOperation: (sessionId: string) => Promise<() => void>;
   stripWinLongPrefix: (path: string) => string;
-  engineRouter?: { requireForSession(sessionId: string, capability: "prompt" | "stop"): Promise<string> };
-  ompSessions?: { rename(sessionId: string, title: string): Promise<{ ok: boolean }> } | null;
+  engineRouter?: { requireForSession(sessionId: string, capability: "prompt" | "stop" | "branch" | "modelSwitch"): Promise<string> };
+  ompSessions?: {
+    rename(sessionId: string, title: string, context?: unknown): Promise<{ ok: boolean; reason?: string }>;
+    branch(sessionId: string, throughMessageId?: string | null): Promise<{ sessionId: string }>;
+    configure(
+      sessionId: string,
+      config: { providerId?: string | null; modelId?: string | null; thinkingLevel?: string | null },
+    ): Promise<{ ok: boolean; reason?: string }>;
+    disposeSession(sessionId: string, reason?: string): Promise<unknown>;
+  } | null;
 };
 
 export function registerSessionIpc({
@@ -213,6 +221,26 @@ export function registerSessionIpc({
         throw Object.assign(new Error("sessionId required"), {
           errorCode: ErrorCodes.INVALID_ARGUMENT,
         });
+      }
+      // An OMP session's fork is a native branch: the renderer's selected point
+      // maps to an OMP entry, a new native transcript is created, and the child
+      // binds its own engine reference. The host transcript is never copied.
+      const forkEngine = engineRouter ? await engineRouter.requireForSession(sessionId, "branch") : "pi";
+      if (forkEngine === "omp") {
+        if (!ompSessions) {
+          throw Object.assign(new Error("this build has no OMP runtime"), {
+            errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+          });
+        }
+        const throughMessageId =
+          typeof input.throughMessageId === "string" ? input.throughMessageId.trim() : "";
+        const child = await ompSessions.branch(sessionId, throughMessageId || null);
+        const childSession = await host.call<{ session?: RuntimeSession | null }>("session.get", {
+          id: child.sessionId,
+          messageLimit: 1,
+        });
+        const { providers, defaults } = await sessionCapabilityContext();
+        return { session: enrichSession(childSession.session, providers, defaults) };
       }
       if (activeTurns.has(sessionId)) {
         throw Object.assign(new Error("Cannot fork a running session"), {
@@ -344,6 +372,21 @@ export function registerSessionIpc({
         .call("agent.disposeSession", { sessionId: id })
         .catch(() => undefined);
     }
+    // An OMP session owns a runtime/process group; deleting it reclaims that
+    // runtime and nothing else. A failed reclaim is logged, never swallowed as
+    // a clean delete.
+    if (engineRouter && ompSessions) {
+      try {
+        const engine = await engineRouter.requireForSession(id, "stop");
+        if (engine === "omp") {
+          await ompSessions.disposeSession(id, "session deleted");
+        }
+      } catch (error) {
+        logger.app("session", "warn", "OMP session runtime cleanup after delete failed", {
+          data: { sessionId: id, error: String((error as Error)?.message ?? error) },
+        });
+      }
+    }
     sessionProjects.delete(id);
     logger.app("session", "info", "session deleted", { sessionId: id });
     return res;
@@ -357,12 +400,31 @@ export function registerSessionIpc({
     if (!host) throw new Error("host unavailable");
     // An OMP session's name lives in its native transcript; the desktop row
     // must not fork from it. The runtime's `set_session_name` is the authority,
-    // and only on its success is the desktop title persisted.
+    // and only on its success is the desktop title persisted. Rename works in
+    // every state (active, idle, restart): the bridge briefly restores the
+    // native session when needed and disposes it again afterwards.
     const engine = engineRouter ? await engineRouter.requireForSession(id, "prompt") : "pi";
     if (engine === "omp" && ompSessions) {
-      const result = await ompSessions.rename(id, title);
+      const session = await host.call<{ session?: { projectPath?: string | null; providerId?: string | null; modelId?: string | null; thinkingLevel?: string | null } | null }>(
+        "session.get",
+        { id, messageLimit: 1 },
+      );
+      const ref = await host.call<{ engineRef?: { nativeSessionId?: string | null; nativeSessionPath?: string | null; adapterVersion?: number | null; runtimeVersion?: string | null } | null }>(
+        "session.getEngineRef",
+        { id },
+      );
+      const result = await ompSessions.rename(id, title, {
+        projectPath: session?.session?.projectPath ?? null,
+        providerId: session?.session?.providerId ?? null,
+        modelId: session?.session?.modelId ?? null,
+        thinkingLevel: session?.session?.thinkingLevel ?? null,
+        nativeSessionId: ref?.engineRef?.nativeSessionId ?? null,
+        nativeSessionPath: ref?.engineRef?.nativeSessionPath ?? null,
+        adapterVersion: ref?.engineRef?.adapterVersion ?? null,
+        runtimeVersion: ref?.engineRef?.runtimeVersion ?? null,
+      });
       if (!result.ok) {
-        throw Object.assign(new Error("the OMP runtime refused the rename"), {
+        throw Object.assign(new Error(result.reason ?? "the OMP runtime refused the rename"), {
           errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
         });
       }
@@ -555,10 +617,34 @@ export function registerSessionIpc({
     ) => {
       rejectNativeMutation(id, "configuration");
       if (!host) throw new Error("host unavailable");
-      const result = await host.call<{ session?: RuntimeSession | null }>(
-        "session.configure",
-        { id, ...config },
-      );
+      // An OMP session's model/thinking binding must stay consistent across the
+      // runtime projection and the host DB. The bridge applies the change to the
+      // runtime (re-projects for model, applies for thinking) and persists it
+      // through its own callbacks; a failed persist is reverted rather than left
+      // forked. The Pi path below is the plain host write.
+      const engine = engineRouter ? await engineRouter.requireForSession(id, "modelSwitch") : "pi";
+      let result: { session?: RuntimeSession | null };
+      if (engine === "omp" && ompSessions) {
+        const outcome = await ompSessions.configure(id, {
+          providerId: config.providerId ?? null,
+          modelId: config.modelId ?? null,
+          thinkingLevel: config.thinkingLevel ?? null,
+        });
+        if (!outcome.ok) {
+          throw Object.assign(new Error(outcome.reason ?? "the OMP runtime refused the configuration"), {
+            errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+          });
+        }
+        result = await host.call<{ session?: RuntimeSession | null }>("session.get", {
+          id,
+          messageLimit: 1,
+        });
+      } else {
+        result = await host.call<{ session?: RuntimeSession | null }>(
+          "session.configure",
+          { id, ...config },
+        );
+      }
       if (!result.session) return result;
       const { providers, defaults } = await sessionCapabilityContext();
       const session = enrichSession(result.session, providers, defaults);

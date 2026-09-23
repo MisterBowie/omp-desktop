@@ -58,7 +58,9 @@ export type ShutdownDependencies = {
    * tool waiting on a user whose window is gone must resolve as denied, not
    * hang until the process is killed underneath it.
    */
-  ompSessions?: { dispose(reason?: string): Promise<void> } | null;
+  ompSessions?: {
+    dispose(reason?: string): Promise<{ ok: boolean; failures: Array<{ sessionId: string; detail: string }> }>;
+  } | null;
   logger: Pick<Logger, "app">;
   confirmQuitDialog: () => Promise<boolean>;
 };
@@ -195,7 +197,12 @@ export function registerShutdownHandlers({
       // denied, not be torn down while the runtime still waits for an answer.
       if (ompSessions) {
         try {
-          await ompSessions.dispose("application shutdown");
+          const outcome = await ompSessions.dispose("application shutdown");
+          for (const failure of outcome.failures) {
+            logger.app("runtime", "error", "OMP session runtime reclaim incomplete", {
+              data: failure,
+            });
+          }
         } catch (error) {
           logger.app("runtime", "error", "OMP session bridge failed to dispose", {
             data: { error: String(error) },

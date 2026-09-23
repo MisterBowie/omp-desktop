@@ -26,10 +26,11 @@
  *      pre-execution approval. If the gate cannot be found, the prompt is
  *      refused and the reason is reported.
  */
-import { existsSync, statSync } from "node:fs";
-import { isAbsolute, join, normalize } from "node:path";
+import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
+import { isAbsolute, join, normalize, relative, resolve } from "node:path";
 
 import {
+  ENGINE_ADAPTER_VERSION,
   ErrorCodes,
   type AgentEventEnvelope,
   type AskToolRequest,
@@ -72,6 +73,10 @@ export type OmpSessionRuntimeSpec = {
   /** Restore target: present when the session already has a native reference. */
   nativeSessionId?: string | null;
   nativeSessionPath?: string | null;
+  /** The reference's adapter version; validated against this build's support. */
+  adapterVersion?: number | null;
+  /** The runtime version the reference was written with; used for downgrade checks. */
+  runtimeVersion?: string | null;
 };
 
 /** A native session whose `get_state` handles were validated, ready to persist. */
@@ -120,6 +125,10 @@ export type OmpSessionBridgeOptions = {
   persistThinkingLevel?: (info: { sessionId: string; level: string }) => void | Promise<void>;
   /** Create a branch session row and resolve with its new desktop session id. */
   createBranchSession?: (info: BranchSessionInfo) => Promise<string>;
+  /** Remove a native session the bridge created for a branch that failed to bind. */
+  persistBranchCleanup?: (info: { sessionId: string; nativeSessionPath: string }) => void | Promise<void>;
+  /** The app-owned persistent native-session directory (containment root). */
+  sessionDir: string;
   /** Test seams. */
   runnerFactory?: (options: ConstructorParameters<typeof OmpSessionRunner>[0]) => OmpSessionRunner;
   gateResolver?: (startDir: string) => string | null;
@@ -144,6 +153,10 @@ export type OmpPromptInput = {
   thinkingLevel?: string | null;
   nativeSessionId?: string | null;
   nativeSessionPath?: string | null;
+  adapterVersion?: number | null;
+  runtimeVersion?: string | null;
+  /** The renderer's durable id for the user message, for branch correlation. */
+  userMessageId?: string | null;
 };
 
 export type OmpRenameResult = { ok: boolean; reason?: string };
@@ -203,12 +216,179 @@ export function resolveProjectDirectory(projectPath: string | null | undefined):
   return absolute;
 }
 
+/**
+ * True when `candidate` is `root` or a descendant of it, after resolving both.
+ *
+ * The check is lexically on resolved absolute paths (no `..` traversal can
+ * escape), and the caller has already canonicalised `candidate` so a symlink in
+ * the middle cannot smuggle the path outside the root.
+ */
+export function isPathWithin(candidate: string, root: string): boolean {
+  const child = resolve(candidate);
+  const parent = resolve(root);
+  if (child === parent) return true;
+  const rel = relative(parent, child);
+  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+}
+
+/**
+ * Validate a persisted native-session path before it is handed to the runtime.
+ *
+ * The runtime's `switch_session` takes an arbitrary path, so the desktop must
+ * refuse anything that is not an ordinary transcript file inside the app-owned
+ * session directory. The rules, each fail-closed:
+ *
+ *   - canonicalise (resolve symlinks) and reject if the result is outside the
+ *     session directory;
+ *   - reject a symlink itself, a directory, or a missing file (lstat, not stat,
+ *     so a symlink to a regular file is still refused);
+ *   - read the first line and confirm it is a `session` header whose `id`
+ *     matches the persisted native session id (the fixed OMP `SessionHeader`
+ *     JSONL format: `type: "session"`, `id`, `cwd`, `timestamp`).
+ */
+export function validateNativeSessionPath(
+  sessionDir: string,
+  nativeSessionId: string | null | undefined,
+  nativeSessionPath: string | null | undefined,
+): string {
+  if (!nativeSessionId || !nativeSessionPath) {
+    throw Object.assign(new Error("the persisted native session reference is incomplete"), {
+      errorCode: "OMP_RESTORE_FAILED",
+    });
+  }
+  const raw = String(nativeSessionPath).trim();
+  if (!raw || !isAbsolute(raw)) {
+    throw Object.assign(new Error("the persisted native session path is not absolute"), {
+      errorCode: "OMP_RESTORE_FAILED",
+    });
+  }
+  // Resolve the path as it exists on disk (symlinks resolved), then confirm the
+  // result stays inside the session directory.
+  let canonical: string;
+  try {
+    canonical = resolve(raw);
+  } catch {
+    throw Object.assign(new Error("the persisted native session path cannot be resolved"), {
+      errorCode: "OMP_RESTORE_FAILED",
+    });
+  }
+  if (!isPathWithin(canonical, sessionDir)) {
+    throw Object.assign(new Error("the persisted native session path is outside the session directory"), {
+      errorCode: "OMP_RESTORE_FAILED",
+    });
+  }
+  // Reject a symlink, a directory, a missing file, or any non-regular file.
+  let fileStats: ReturnType<typeof lstatSync>;
+  try {
+    fileStats = lstatSync(canonical);
+  } catch {
+    throw Object.assign(new Error("the persisted native session file does not exist"), {
+      errorCode: "OMP_RESTORE_FAILED",
+    });
+  }
+  if (fileStats.isSymbolicLink()) {
+    throw Object.assign(new Error("the persisted native session path is a symbolic link"), {
+      errorCode: "OMP_RESTORE_FAILED",
+    });
+  }
+  if (!fileStats.isFile()) {
+    throw Object.assign(new Error("the persisted native session path is not a regular file"), {
+      errorCode: "OMP_RESTORE_FAILED",
+    });
+  }
+  // The file's own header records its identity: a session whose header id does
+  // not match the persisted id is the wrong file, not this session. The pinned
+  // OMP format writes a 256-byte title slot as the first line and the
+  // `type: "session"` header next, so the header is searched over the leading
+  // lines rather than assumed to be the first.
+  let headerId: string | null = null;
+  try {
+    const head = readFileSync(canonical, "utf8").split("\n", 4);
+    for (const line of head) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed && typeof parsed.type === "string" && parsed.type === "session" && typeof parsed.id === "string") {
+          headerId = parsed.id;
+          break;
+        }
+      } catch {
+        // The title slot and other leading lines may not be JSON the first time;
+        // keep scanning.
+      }
+    }
+  } catch {
+    headerId = null;
+  }
+  if (headerId !== nativeSessionId) {
+    throw Object.assign(
+      new Error(headerId === null
+        ? "the persisted native session file has no readable session header"
+        : "the persisted native session file belongs to a different native session"),
+      { errorCode: "OMP_RESTORE_FAILED" },
+    );
+  }
+  return canonical;
+}
+
+/** Compare two dotted versions; returns 0 (equal), +1 (a newer), -1 (a older). */
+function compareVersions(a: string, b: string): number {
+  const pa = a.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const pb = b.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const length = Math.max(pa.length, pb.length);
+  for (let i = 0; i < length; i += 1) {
+    const left = pa[i] ?? 0;
+    const right = pb[i] ?? 0;
+    if (left !== right) return left > right ? 1 : -1;
+  }
+  return 0;
+}
+
+/**
+ * The adapter/runtime version contract, fail-closed.
+ *
+ * `adapterVersion` must be a positive integer this build understands (the
+ * shared `ENGINE_ADAPTER_VERSION`); a larger value describes a reference shape
+ * this build cannot read. `runtimeVersion` is the runtime the reference was
+ * written with: a reference written by a *newer* runtime than the one running
+ * now is a downgrade and is refused, so an incompatible session is never opened
+ * on a runtime too old to read it.
+ */
+export function validateEngineVersions(
+  adapterVersion: number | null | undefined,
+  persistedRuntimeVersion: string | null | undefined,
+  runningRuntimeVersion: string | null | undefined,
+): void {
+  if (adapterVersion !== null && adapterVersion !== undefined) {
+    if (!Number.isInteger(adapterVersion) || adapterVersion < 1 || adapterVersion > ENGINE_ADAPTER_VERSION) {
+      throw Object.assign(
+        new Error(`unsupported session-engine adapter version ${adapterVersion}; this build supports 1..=${ENGINE_ADAPTER_VERSION}`),
+        { errorCode: "OMP_RESTORE_FAILED" },
+      );
+    }
+  }
+  if (persistedRuntimeVersion && runningRuntimeVersion) {
+    if (compareVersions(persistedRuntimeVersion, runningRuntimeVersion) > 0) {
+      throw Object.assign(
+        new Error(`the session was written by runtime ${persistedRuntimeVersion}, newer than the running ${runningRuntimeVersion}`),
+        { errorCode: "OMP_RESTORE_FAILED" },
+      );
+    }
+  }
+}
+
 export type OmpSessionBridge = {
   gatePath(): string | null;
   prompt(input: OmpPromptInput): Promise<OmpPromptResult>;
   rename(sessionId: string, title: string): Promise<OmpRenameResult>;
-  /** Branch the session at its native head; resolves with the new session id. */
-  branch(sessionId: string): Promise<{ sessionId: string }>;
+  /** Branch the session at the renderer's selected point (or the head). */
+  branch(sessionId: string, throughMessageId?: string | null): Promise<{ sessionId: string }>;
+  /** Apply a provider/model/thinking change consistently (runtime + host DB). */
+  configure(
+    sessionId: string,
+    config: { providerId?: string | null; modelId?: string | null; thinkingLevel?: string | null },
+  ): Promise<OmpModelSwitchResult>;
   setModel(sessionId: string, providerId: string, modelId: string): Promise<OmpModelSwitchResult>;
   setThinkingLevel(sessionId: string, level: string): Promise<OmpModelSwitchResult>;
   stop(sessionId: string): Promise<OmpStopOutcome>;
@@ -218,9 +398,9 @@ export type OmpSessionBridge = {
   hasPendingRequest(requestId: string): boolean;
   hasKnownRequest(requestId: string): boolean;
   workingDirectory(sessionId: string): string | null;
-  disposeSession(sessionId: string, reason?: string): Promise<void>;
+  disposeSession(sessionId: string, reason?: string): Promise<OmpDisposeResult>;
   /** Reclaim every session's runtime; used by application shutdown. */
-  dispose(reason?: string): Promise<void>;
+  dispose(reason?: string): Promise<OmpDisposeResult>;
   diagnostics(): {
     sessionId: string | null;
     lateFrames: number;
@@ -229,6 +409,12 @@ export type OmpSessionBridge = {
     state: OmpRunState;
     sessions: Array<{ sessionId: string; state: OmpRunState; lateFrames: number }>;
   };
+};
+
+/** The observable outcome of reclaiming every session on shutdown. */
+export type OmpDisposeResult = {
+  ok: boolean;
+  failures: Array<{ sessionId: string; detail: string }>;
 };
 
 const REFUSAL = ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE;
@@ -256,6 +442,12 @@ class SessionEntry {
   nativeSessionId: string | null = null;
   nativeSessionPath: string | null = null;
   runtimeVersion: string | null = null;
+  /** The app-owned persistent native-session directory (containment root). */
+  private readonly sessionDir: string;
+  /** The model binding this session's runtime was projected with. */
+  binding: { providerId: string | null; modelId: string | null; thinkingLevel: string | null };
+  /** User prompts in leaf order, for branch-point correlation. */
+  readonly userMessages: Array<{ id: string; content: string }> = [];
 
   readonly approvalRequests = new Map<string, PendingDialog>();
   readonly askRequests = new Map<string, PendingDialog>();
@@ -271,6 +463,8 @@ class SessionEntry {
     now: () => number;
     runnerFactory: NonNullable<OmpSessionBridgeOptions["runnerFactory"]>;
     persistNativeSession: OmpSessionBridgeOptions["persistNativeSession"];
+    sessionDir: string;
+    binding: { providerId: string | null; modelId: string | null; thinkingLevel: string | null };
   }) {
     this.sessionId = deps.sessionId;
     this.projectDirectory = deps.projectDirectory;
@@ -280,6 +474,8 @@ class SessionEntry {
     this.now = deps.now;
     this.runnerFactory = deps.runnerFactory;
     this.persistNativeSession = deps.persistNativeSession;
+    this.sessionDir = deps.sessionDir;
+    this.binding = deps.binding;
   }
 
   supervisorHandle(): OmpRuntimeSupervisor {
@@ -352,13 +548,25 @@ class SessionEntry {
   /** Establish the native session: restore by path, or create and persist. */
   async ensureNativeSession(gate: string, spec: OmpSessionRuntimeSpec): Promise<void> {
     const runner = await this.ensureRunner(gate);
+    void runner;
     const runtime = this.runtimeHandle();
 
-    if (spec.nativeSessionPath) {
-      // Restore: reopen the persisted native transcript before any prompt. A
-      // cancelled switch (the runtime refused the path) is a restore failure,
-      // not a reason to fabricate a new session.
-      const switched = await runtime.request({ type: "switch_session", sessionPath: spec.nativeSessionPath }, { timeoutMs: 20_000 });
+    if (spec.nativeSessionPath || spec.nativeSessionId) {
+      // The runtime is already on this native session (an earlier prompt in the
+      // same process bound it): re-switching would reopen the transcript, which
+      // OMP's `switch_session` treats as a session transition. Skip it.
+      if (this.nativeSessionId === spec.nativeSessionId && this.nativeSessionPath) {
+        return;
+      }
+      // Restore: validate the persisted reference before handing its path to
+      // the runtime, then verify the runtime actually opened that identity.
+      validateEngineVersions(spec.adapterVersion, spec.runtimeVersion, this.supervisor.status().runtimeVersion);
+      const canonicalPath = validateNativeSessionPath(
+        this.sessionDir,
+        spec.nativeSessionId,
+        spec.nativeSessionPath,
+      );
+      const switched = await runtime.request({ type: "switch_session", sessionPath: canonicalPath }, { timeoutMs: 20_000 });
       const switchData = switched.data as { cancelled?: boolean } | undefined;
       if (switched.success === false || switchData?.cancelled === true) {
         throw Object.assign(
@@ -366,8 +574,22 @@ class SessionEntry {
           { errorCode: "OMP_RESTORE_FAILED" },
         );
       }
+      // The runtime may report a different state than the one we asked it to
+      // open (a path collision, a stale file). Verify the identity it reports,
+      // and stop the runtime rather than persist a mismatched reference.
+      const state = await runtime.request({ type: "get_state" }, { timeoutMs: 20_000 });
+      const stateData = state.data as { sessionId?: string; sessionFile?: string } | undefined;
+      const openedId = typeof stateData?.sessionId === "string" ? stateData.sessionId : "";
+      const openedPath = typeof stateData?.sessionFile === "string" ? stateData.sessionFile : "";
+      if (openedId !== spec.nativeSessionId || (openedPath && resolve(openedPath) !== canonicalPath)) {
+        await this.supervisor.stop().catch(() => undefined);
+        throw Object.assign(
+          new Error(`the runtime opened a different native session (${openedId || "none"}) than the persisted reference`),
+          { errorCode: "OMP_RESTORE_FAILED" },
+        );
+      }
       this.nativeSessionId = spec.nativeSessionId ?? null;
-      this.nativeSessionPath = spec.nativeSessionPath;
+      this.nativeSessionPath = canonicalPath;
       this.runtimeVersion = this.supervisor.status().runtimeVersion;
       return;
     }
@@ -391,13 +613,17 @@ class SessionEntry {
         { errorCode: "OMP_SESSION_CREATE_FAILED" },
       );
     }
+    // The created path must pass the same containment/file-type/identity checks
+    // before anything is persisted: a path outside the session directory, a
+    // symlink, or a file whose header disagrees is refused.
+    const canonicalPath = validateNativeSessionPath(this.sessionDir, sessionId, sessionFile);
     this.nativeSessionId = sessionId;
-    this.nativeSessionPath = sessionFile;
+    this.nativeSessionPath = canonicalPath;
     this.runtimeVersion = this.supervisor.status().runtimeVersion;
     await this.persistNativeSession?.({
       sessionId: this.sessionId,
       nativeSessionId: sessionId,
-      nativeSessionPath: sessionFile,
+      nativeSessionPath: canonicalPath,
       runtimeVersion: this.runtimeVersion,
     });
   }
@@ -476,13 +702,27 @@ class SessionEntry {
     return this.runner.stop();
   }
 
-  async dispose(reason: string): Promise<void> {
+  async dispose(reason: string): Promise<Array<{ sessionId: string; detail: string }>> {
     this.approvalRequests.clear();
     this.askRequests.clear();
     this.generations.clear();
     if (this.runner) this.runner.dispose(reason);
     this.runner = null;
-    await this.supervisor.reclaimAll().catch(() => undefined);
+    const failures: Array<{ sessionId: string; detail: string }> = [];
+    try {
+      const results = await this.supervisor.reclaimAll();
+      for (const result of results) {
+        if (!result.stopped) {
+          failures.push({
+            sessionId: this.sessionId,
+            detail: `reclaim incomplete: ${result.errors.join("; ") || "process group or run directory survived"}`,
+          });
+        }
+      }
+    } catch (error) {
+      failures.push({ sessionId: this.sessionId, detail: String((error as Error)?.message ?? error) });
+    }
+    return failures;
   }
 }
 
@@ -526,11 +766,30 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
 
   /** Get or create the per-session entry, refusing a project change. */
   function entryFor(spec: OmpSessionRuntimeSpec): SessionEntry {
+    const binding = {
+      providerId: spec.providerId,
+      modelId: spec.modelId,
+      thinkingLevel: spec.thinkingLevel,
+    };
     const existing = entries.get(spec.sessionId);
     if (existing) {
       if (existing.projectDirectory !== spec.projectDirectory) {
         throw Object.assign(
           new Error(`this OMP session already runs in ${existing.projectDirectory}; a different project directory is not supported`),
+          { errorCode: REFUSAL },
+        );
+      }
+      // A model/thinking binding change means the runtime's projection is stale:
+      // the entry must not be reused for a different binding. The caller
+      // (configure) disposes the old runtime before the binding is changed, so
+      // a mismatch here is a caller error and is refused rather than papered over.
+      if (
+        existing.binding.providerId !== binding.providerId ||
+        existing.binding.modelId !== binding.modelId ||
+        existing.binding.thinkingLevel !== binding.thinkingLevel
+      ) {
+        throw Object.assign(
+          new Error("this OMP session's model binding changed; reconfigure it before prompting"),
           { errorCode: REFUSAL },
         );
       }
@@ -546,6 +805,8 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       now,
       runnerFactory,
       persistNativeSession: options.persistNativeSession,
+      sessionDir: options.sessionDir,
+      binding,
     });
     entries.set(spec.sessionId, entry);
     return entry;
@@ -567,10 +828,18 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       thinkingLevel: typeof input.thinkingLevel === "string" && input.thinkingLevel.trim() ? input.thinkingLevel : null,
       nativeSessionId: input.nativeSessionId ?? null,
       nativeSessionPath: input.nativeSessionPath ?? null,
+      adapterVersion: input.adapterVersion ?? null,
+      runtimeVersion: input.runtimeVersion ?? null,
     };
     const entry = entryFor(spec);
     await entry.ensureNativeSession(gate, spec);
     const runner = await entry.ensureRunner(gate);
+    // Record the user prompt for branch-point correlation, before the turn
+    // consumes it (a branch later in this process must map the renderer's
+    // selected message to the native entry, never default to the first).
+    if (input.userMessageId) {
+      entry.userMessages.push({ id: input.userMessageId, content: input.content });
+    }
     const started = await runner.prompt(input.content);
     return { accepted: started.accepted, turnId: started.turnId };
   }
@@ -580,32 +849,143 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     return entry.runtimeHandle();
   }
 
-  async function rename(sessionId: string, title: string): Promise<OmpRenameResult> {
-    const entry = entryOf(sessionId);
-    if (!entry || !entry.activeRunner()) {
-      return { ok: false, reason: "no OMP runtime is running for this session" };
+  /** The session context a control operation needs to (re)start a runtime. */
+  type OperationContext = {
+    projectPath?: string | null;
+    providerId?: string | null;
+    modelId?: string | null;
+    thinkingLevel?: string | null;
+    nativeSessionId?: string | null;
+    nativeSessionPath?: string | null;
+    adapterVersion?: number | null;
+    runtimeVersion?: string | null;
+  };
+
+  /**
+   * Establish the entry and its native session for a control operation that may
+   * run against an idle or not-yet-started session.
+   *
+   * Returns `{ entry, startedForOperation }`: `startedForOperation` is true when
+   * the runtime was started on this call's behalf (no prior runner), so the
+   * caller can dispose it again rather than leave a runtime running for a
+   * one-shot rename.
+   */
+  async function ensureEntryForOperation(
+    sessionId: string,
+    context: OperationContext,
+  ): Promise<{ entry: SessionEntry; startedForOperation: boolean }> {
+    const gate = requireGate();
+    requireLauncher();
+    const projectDirectory = resolveProjectDirectory(context.projectPath ?? null);
+    const spec: OmpSessionRuntimeSpec = {
+      sessionId,
+      projectDirectory,
+      providerId: typeof context.providerId === "string" && context.providerId.trim() ? context.providerId : null,
+      modelId: typeof context.modelId === "string" && context.modelId.trim() ? context.modelId : null,
+      thinkingLevel: typeof context.thinkingLevel === "string" && context.thinkingLevel.trim() ? context.thinkingLevel : null,
+      nativeSessionId: context.nativeSessionId ?? null,
+      nativeSessionPath: context.nativeSessionPath ?? null,
+      adapterVersion: context.adapterVersion ?? null,
+      runtimeVersion: context.runtimeVersion ?? null,
+    };
+    const existing = entries.get(sessionId);
+    const hadRunner = existing?.activeRunner() != null;
+    const entry = entryFor(spec);
+    if (!entry.nativeSessionId && spec.nativeSessionPath) {
+      await entry.ensureNativeSession(gate, spec);
     }
-    const runtime = runtimeOf(entry);
-    const result = await runtime.request({ type: "set_session_name", name: title }, { timeoutMs: 20_000 });
-    if (result.success === false) {
-      return { ok: false, reason: result.error ?? "the runtime refused the name" };
-    }
-    await options.persistRename?.({ sessionId, title });
-    return { ok: true };
+    return { entry, startedForOperation: !hadRunner };
   }
 
-  async function branch(sessionId: string): Promise<{ sessionId: string }> {
+  async function rename(
+    sessionId: string,
+    title: string,
+    context: OperationContext = {},
+  ): Promise<OmpRenameResult> {
+    const { entry, startedForOperation } = await ensureEntryForOperation(sessionId, context);
+    try {
+      const gate = requireGate();
+      await entry.ensureNativeSession(gate, {
+        sessionId,
+        projectDirectory: entry.projectDirectory,
+        providerId: entry.binding.providerId,
+        modelId: entry.binding.modelId,
+        thinkingLevel: entry.binding.thinkingLevel,
+        nativeSessionId: context.nativeSessionId ?? entry.nativeSessionId,
+        nativeSessionPath: context.nativeSessionPath ?? entry.nativeSessionPath,
+        adapterVersion: context.adapterVersion ?? null,
+        runtimeVersion: context.runtimeVersion ?? null,
+      });
+      const runner = await entry.ensureRunner(gate);
+      void runner;
+      const runtime = runtimeOf(entry);
+      // Record the current name so a failed host persist can be reverted.
+      const before = await runtime.request({ type: "get_state" }, { timeoutMs: 20_000 });
+      const beforeName = (before.data as { sessionName?: string } | undefined)?.sessionName ?? "";
+      const result = await runtime.request({ type: "set_session_name", name: title }, { timeoutMs: 20_000 });
+      if (result.success === false) {
+        return { ok: false, reason: result.error ?? "the runtime refused the name" };
+      }
+      try {
+        await options.persistRename?.({ sessionId, title });
+      } catch (error) {
+        // Revert the native name so the desktop row and the transcript never
+        // fork: the two-phase rename either lands on both or neither.
+        if (beforeName) {
+          await runtime.request({ type: "set_session_name", name: beforeName }, { timeoutMs: 20_000 }).catch(() => undefined);
+        }
+        return { ok: false, reason: String((error as Error)?.message ?? error) };
+      }
+      return { ok: true };
+    } finally {
+      if (startedForOperation) {
+        await disposeSession(sessionId, "rename finished").catch(() => undefined);
+      }
+    }
+  }
+
+  /** Map the renderer's selected message to the OMP entry to branch from. */
+  function branchEntryId(entry: SessionEntry, entriesList: Array<{ entryId: string; text: string }>, throughMessageId: string | null | undefined): string {
+    if (entriesList.length === 0) {
+      throw Object.assign(new Error("the runtime reported no branchable entry"), { errorCode: "OMP_BRANCH_FAILED" });
+    }
+    if (throughMessageId) {
+      // Prefer a direct user-message id match, then an assistant id of the
+      // form omp:<session>:<turn> whose turn index names the user prompt that
+      // started it. Never default to the first entry.
+      const userIndex = entry.userMessages.findIndex((user) => user.id === throughMessageId);
+      if (userIndex >= 0 && userIndex < entriesList.length) {
+        return entriesList[userIndex].entryId;
+      }
+      const assistantMatch = /^omp:[^:]+:(\d+)$/.exec(throughMessageId);
+      if (assistantMatch) {
+        const turnIndex = Number.parseInt(assistantMatch[1], 10) - 1;
+        if (turnIndex >= 0 && turnIndex < entriesList.length) {
+          return entriesList[turnIndex].entryId;
+        }
+      }
+      throw Object.assign(
+        new Error("the selected message does not correspond to a known native branch point"),
+        { errorCode: "OMP_BRANCH_FAILED" },
+      );
+    }
+    // Sidebar fork: branch at the latest user message (the head).
+    return entriesList[entriesList.length - 1].entryId;
+  }
+
+  async function branch(sessionId: string, throughMessageId?: string | null): Promise<{ sessionId: string }> {
     const entry = entryOf(sessionId);
     if (!entry) {
       throw Object.assign(new Error("no OMP runtime is running for this session"), { errorCode: "NOT_FOUND" });
     }
     const runtime = runtimeOf(entry);
     const branchable = await runtime.request({ type: "get_branch_messages" }, { timeoutMs: 20_000 });
-    const branchData = branchable.data as { messages?: Array<{ entryId?: string }> } | undefined;
-    const entryId = branchData?.messages?.[0]?.entryId;
-    if (typeof entryId !== "string" || !entryId) {
-      throw Object.assign(new Error("the runtime reported no branchable entry"), { errorCode: "OMP_BRANCH_FAILED" });
-    }
+    const branchData = branchable.data as { messages?: Array<{ entryId?: string; text?: string }> } | undefined;
+    const entriesList = (branchData?.messages ?? [])
+      .filter((message): message is { entryId: string; text: string } => typeof message.entryId === "string" && message.entryId.length > 0)
+      .map((message) => ({ entryId: message.entryId, text: typeof message.text === "string" ? message.text : "" }));
+    const entryId = branchEntryId(entry, entriesList, throughMessageId);
+
     const branched = await runtime.request({ type: "branch", entryId }, { timeoutMs: 30_000 });
     const branchResult = branched.data as { cancelled?: boolean } | undefined;
     if (branched.success === false || branchResult?.cancelled === true) {
@@ -624,46 +1004,112 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
         { errorCode: "OMP_BRANCH_FAILED" },
       );
     }
+    // The branch output must pass the same containment/file-type checks as any
+    // other persisted native reference.
+    const canonicalPath = validateNativeSessionPath(options.sessionDir, nativeSessionId, nativeSessionPath);
     if (!options.createBranchSession) {
       throw Object.assign(new Error("branching is not wired in this build"), { errorCode: REFUSAL });
     }
-    const newSessionId = await options.createBranchSession({
-      parentSessionId: sessionId,
-      nativeSessionId,
-      nativeSessionPath,
-      runtimeVersion: entry.runtimeVersion,
-    });
-    return { sessionId: newSessionId };
+    try {
+      const newSessionId = await options.createBranchSession({
+        parentSessionId: sessionId,
+        nativeSessionId,
+        nativeSessionPath: canonicalPath,
+        runtimeVersion: entry.runtimeVersion,
+      });
+      return { sessionId: newSessionId };
+    } catch (error) {
+      // Compensation: a child that failed to bind must not be left behind. The
+      // native file lives in the app-owned session directory and was created by
+      // this branch, so removing it is safe and restores the pre-branch state.
+      try {
+        await options.persistBranchCleanup?.({ sessionId, nativeSessionPath: canonicalPath });
+      } catch {
+        // Best effort; the orphan is reported by the caller's error.
+      }
+      throw error;
+    }
   }
 
-  async function switchModel(
+  async function configure(
     sessionId: string,
-    command: { type: "set_model"; provider: string; modelId: string } | { type: "set_thinking_level"; level: string },
-    persist?: () => void | Promise<void>,
+    config: { providerId?: string | null; modelId?: string | null; thinkingLevel?: string | null },
   ): Promise<OmpModelSwitchResult> {
     const entry = entryOf(sessionId);
-    if (!entry || !entry.activeRunner()) {
-      return { ok: false, reason: "no OMP runtime is running for this session" };
+    const providerId = config.providerId ?? null;
+    const modelId = config.modelId ?? null;
+    const thinkingLevel = config.thinkingLevel ?? null;
+
+    if (!entry) {
+      // No runtime has ever run this session: the host DB is the authority and
+      // the next prompt will project the new binding.
+      try {
+        if (providerId !== null || modelId !== null) {
+          await options.persistModelBinding?.({ sessionId, providerId: providerId ?? "", modelId: modelId ?? "" });
+        }
+        if (thinkingLevel !== null) {
+          await options.persistThinkingLevel?.({ sessionId, level: thinkingLevel });
+        }
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, reason: String((error as Error)?.message ?? error) };
+      }
     }
-    const runtime = runtimeOf(entry);
-    const result = await runtime.request(command, { timeoutMs: 20_000 });
-    if (result.success === false) {
-      return { ok: false, reason: result.error ?? "the runtime refused the change" };
+
+    const modelChanged =
+      (providerId !== null && providerId !== entry.binding.providerId) ||
+      (modelId !== null && modelId !== entry.binding.modelId);
+    const thinkingChanged = thinkingLevel !== null && thinkingLevel !== entry.binding.thinkingLevel;
+
+    // A model change means the projection is stale: stop the runtime so the
+    // next prompt re-projects with the new binding. Persist to the host first
+    // (the DB authority); if that fails, nothing changed.
+    try {
+      if (modelChanged) {
+        await options.persistModelBinding?.({
+          sessionId,
+          providerId: providerId ?? entry.binding.providerId ?? "",
+          modelId: modelId ?? entry.binding.modelId ?? "",
+        });
+        if (thinkingChanged) {
+          await options.persistThinkingLevel?.({ sessionId, level: thinkingLevel });
+        }
+        await disposeSession(sessionId, "model reconfigured");
+        return { ok: true };
+      }
+      if (thinkingChanged) {
+        // Thinking is a runtime state that does not need re-projection; apply it
+        // to a running runtime and persist, reverting on a failed persist.
+        const oldLevel = entry.binding.thinkingLevel;
+        if (entry.activeRunner()) {
+          const result = await runtimeOf(entry).request({ type: "set_thinking_level", level: thinkingLevel }, { timeoutMs: 20_000 });
+          if (result.success === false) {
+            return { ok: false, reason: result.error ?? "the runtime refused the thinking change" };
+          }
+        }
+        try {
+          await options.persistThinkingLevel?.({ sessionId, level: thinkingLevel });
+        } catch (error) {
+          if (entry.activeRunner() && oldLevel) {
+            await runtimeOf(entry).request({ type: "set_thinking_level", level: oldLevel }, { timeoutMs: 20_000 }).catch(() => undefined);
+          }
+          return { ok: false, reason: String((error as Error)?.message ?? error) };
+        }
+        entry.binding.thinkingLevel = thinkingLevel;
+        return { ok: true };
+      }
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, reason: String((error as Error)?.message ?? error) };
     }
-    await persist?.();
-    return { ok: true };
   }
 
   function setModel(sessionId: string, providerId: string, modelId: string): Promise<OmpModelSwitchResult> {
-    return switchModel(sessionId, { type: "set_model", provider: providerId, modelId }, options.persistModelBinding
-      ? () => options.persistModelBinding?.({ sessionId, providerId, modelId })
-      : undefined);
+    return configure(sessionId, { providerId, modelId });
   }
 
   function setThinkingLevel(sessionId: string, level: string): Promise<OmpModelSwitchResult> {
-    return switchModel(sessionId, { type: "set_thinking_level", level }, options.persistThinkingLevel
-      ? () => options.persistThinkingLevel?.({ sessionId, level })
-      : undefined);
+    return configure(sessionId, { thinkingLevel: level });
   }
 
   function resolvePermission(requestId: string, decision: OmpUiDecision): OmpResolution {
@@ -805,30 +1251,32 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     return entryOf(sessionId)?.projectDirectory ?? null;
   }
 
-  async function disposeSession(sessionId: string, reason = "session disposed"): Promise<void> {
+  async function disposeSession(sessionId: string, reason = "session disposed"): Promise<OmpDisposeResult> {
     const entry = entries.get(sessionId);
-    if (!entry) return;
+    if (!entry) return { ok: true, failures: [] };
     entries.delete(sessionId);
-    await entry.dispose(reason);
+    const failures = await entry.dispose(reason);
+    for (const failure of failures) {
+      logger?.app("omp", "error", "omp session runtime reclaim incomplete", { data: failure });
+    }
+    return { ok: failures.length === 0, failures };
   }
 
-  async function dispose(reason = "application shutdown"): Promise<void> {
+  async function dispose(reason = "application shutdown"): Promise<OmpDisposeResult> {
     const retained = [...entries.entries()];
     entries.clear();
-    const failures: string[] = [];
+    const failures: Array<{ sessionId: string; detail: string }> = [];
     for (const [sessionId, entry] of retained) {
       try {
-        await entry.dispose(reason);
+        failures.push(...(await entry.dispose(reason)));
       } catch (error) {
-        failures.push(`${sessionId}: ${(error as Error)?.message ?? String(error)}`);
+        failures.push({ sessionId, detail: String((error as Error)?.message ?? error) });
       }
     }
-    if (failures.length > 0) {
-      throw Object.assign(
-        new Error(`failed to reclaim ${failures.length} OMP session runtime(s): ${failures.join("; ")}`),
-        { errorCode: "OMP_RUNTIME_CLEANUP_FAILED" },
-      );
+    for (const failure of failures) {
+      logger?.app("omp", "error", "omp session runtime reclaim failed", { data: failure });
     }
+    return { ok: failures.length === 0, failures };
   }
 
   function diagnostics() {
@@ -854,6 +1302,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     prompt,
     rename,
     branch,
+    configure,
     setModel,
     setThinkingLevel,
     stop,

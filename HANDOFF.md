@@ -4,7 +4,8 @@
 
 ## 0. M4 交付摘要（本轮）
 
-- 状态：**T14-T16 已完成并提交**（分支 `codex/m4-persistence`），等待独立复审。
+- 状态：**T14-T16 已完成并提交**（分支 `codex/m4-persistence`），含独立复审 R1-R9 返修，等待复审确认。
+- 独立复审返修（R1-R9）：恢复路径 canonicalize/containment/file-type/identity/版本校验并 switch 后核对 state（fail-closed）；branch 精确映射 renderer 选中点到 OMP entry 并做失败补偿；modelSwitch/thinking 接入 `sessionConfigure` 原子/补偿；投影对 disabled/unknown model/缺 key/oauth/basic/thinking 不兼容 fail-closed 且投影 headers；shutdown 部分失败可观察；delete/archive 只回收目标 OMP runtime；rename 支持 active/idle/restart 三态并回滚。详见 `docs/validation/M4-persistence.md` §0.1。
 - 证据：`docs/validation/M4-persistence.md`（功能→PI/OMP/本项目 证据表、验证命令与结果、先红后绿证据）；设计决策：`app/docs/adr/0302-omp-session-persistence-and-runtime-registry.md`（英文 ADR）。
 - 核心变更：
   - **schema v21**（`crates/host-core`）：`sessions` 加 4 个可空列（`engine_adapter_version`/`engine_runtime_version`/`native_session_id`/`native_session_path`），`session.bindEngine`/`session.getEngineRef` 两个主机边界 RPC；旧 Pi 记录读回 `engine=pi`、引用全 `None`。

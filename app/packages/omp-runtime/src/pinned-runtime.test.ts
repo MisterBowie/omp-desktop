@@ -83,7 +83,7 @@ describe.skipIf(!LAUNCHER)("pinned runtime smoke", () => {
       expect(status.reason).toBeNull();
       expect(status.capabilities.prompt).toBe(true);
       expect(status.capabilities.toolApproval).toBe(true);
-      expect(status.capabilities.resume).toBe(false);
+      expect(status.capabilities.resume).toBe(true);
 
       const result = await supervisor.stop();
       expect(result.reaped).toBe(true);

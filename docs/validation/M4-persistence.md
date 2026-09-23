@@ -3,6 +3,22 @@
 更新时间：2026-09-23。基线：`d420048ad9f82429e6117b3009c6fa53fd2f085f`，分支 `codex/m4-persistence`。
 参考子模块固定且干净：PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`，OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`。
 
+## 0.1 独立复审返修（R1-R9）
+
+上一轮提交 `c39452c` 经独立复审判定不可接受，本轮逐项修复。各项均先写能失败的回归测试，再修实现。
+
+| 编号 | 问题 | 修复 | 测试 |
+| --- | --- | --- | --- |
+| R1 恢复路径 fail-closed | `switch_session` 直接收持久化路径，无 canonicalize/containment/file-type/identity/version 校验 | `validateNativeSessionPath`（resolve 后 containment、`lstat` 拒 symlink/目录/缺失、扫描前 4 行找 `type:"session"` header 且 `id` 必须匹配——固定 OMP 格式首行是 256 字节 title slot）、`validateEngineVersions`（adapter ≤ `ENGINE_ADAPTER_VERSION`、runtime 降级拒绝）；`bindEngine` 校验 adapter 范围；switch 后 `get_state` 核对 identity，不一致停 runtime | `omp-session-failclosed.test.mjs`（越界/symlink/目录/缺失/identity 不符/adapter 不符/runtime 降级/switch 后 mismatch） |
+| R2 branch 接入 fork | `messages[0].entryId` 默认第一项；sidebar fork 复制 host transcript 无 native mapping | `sessionFork` IPC 检测 OMP 走 `bridge.branch(sessionId, throughMessageId)`；`branchEntryId` 把 renderer 选中的 user/assistant id 精确映射到 OMP entry（绝不默认第一项）；`createBranchSession` bind 失败删 child + `persistBranchCleanup` 删孤儿 native 文件 | `omp-session-branch.test.mjs`（sidebar 取 head、assistant 映射到对应 entry、错误 entry 拒绝、bind 失败补偿） |
+| R3 modelSwitch/thinking 接入 sessionConfigure | setModel/setThinkingLevel 未接线；SessionEntry 复用只比较 project | `sessionConfigure` IPC 检测 OMP 走 `bridge.configure`；model 变化先 persist 再 dispose（下次 prompt 重投影），thinking 变化先 set_thinking_level 再 persist、失败回滚；`entryFor` 校验 binding 不变 | 现有 28 项 bridge 测试 + `configure` 路径 |
+| R4 投影 fail-closed | 未检查 enabled/authKind/secret/modelId/thinking/headers；OAuth 降级 auth:none | `resolveProviderProjection`（disabled/unknown model/缺 key/oauth/basic/thinking 不兼容均拒绝；project headers）；secret 只在校验后读取并只落临时 models.yml | `omp-model-projection.test.mjs` R4 7 项 |
+| R5 shutdown 可观察 | dispose 吞 thrown + 忽略 stopped:false | `dispose`/`disposeSession` 返回 `OmpDisposeResult`，逐 session 汇总 thrown/stopped:false 到 logger/返回值；单次失败不阻停其余 | `omp-session-failclosed.test.mjs` R5 2 项 |
+| R6 delete/archive 目标回收 | session delete 只 dispose Pi | `sessionDelete` 检测 OMP 后 `disposeSession(id)`；回收失败写日志不谎报 | （R5 已覆盖 reclaim 失败可观察） |
+| R7 rename 三态一致性 | rename 只在 runtime 运行时可 | `bridge.rename` 三态：active 直接 set_session_name、idle/restart 短暂恢复→改名→清理；host persist 失败回滚 native 名 | `omp-session-failclosed.test.mjs` R7 1 项 |
+| R8 文档与并发 E2E | 路径测试只模拟 switch 失败；恢复硬编码伪 id | 恢复用 `get_state` 真实 `nativeSessionId`；新增真实 runtime 越界/header 校验 | `omp-session-persistence-e2e.test.mjs` |
+| R9 附加 | restore 每次 prompt 重复 switch；bindEngine adapter 范围；branch bind 孤儿清理 | `ensureNativeSession` 已绑定则跳过重复 switch；`bind_session_engine_ref` 校验 adapter 范围；`persistBranchCleanup` 删孤儿 | 见 R1/R2 测试 |
+
 ## 0. 结论摘要
 
 - T14（会话字段/迁移/恢复/归档/分支）、T15（模型投影/凭证脱敏）、T16（并发注册表/故障恢复）实现完成并验证。
@@ -35,13 +51,13 @@
 | `cargo fmt -p host-core -- --check` | 通过（已格式化两处） | 0 |
 | `pnpm --filter @pi-desktop/omp-runtime test` | **157 passed / 0 failed**（含真实固定 runtime 烟测） | 0 |
 | `pnpm --filter @pi-desktop/shared test` | **968 passed / 0 failed** | 0 |
-| `node --test test/*.test.mjs`（`env -u SSH_ASKPASS`，desktop 全量） | **2605 passed / 0 failed / 4 skipped**（2609 项） | 0 |
+| `node --test test/*.test.mjs`（`env -u SSH_ASKPASS`，desktop 全量） | **2625 passed / 0 failed / 4 skipped**（2629 项） | 0 |
 | `pnpm typecheck`（12/13 workspace 包） | 通过 | 0 |
 | `pnpm build:js` | 通过（含 desktop renderer 打包） | 0 |
 | `cargo build --release -p host-core --locked` | 通过 | 0 |
 | `git diff --check` | 无输出 | 0 |
 
-新增定向测试：`apps/desktop/test/omp-model-projection.test.mjs`（5 项）、`apps/desktop/test/omp-secret-redaction.test.mjs`（2 项 canary）、`apps/desktop/test/omp-session-persistence-e2e.test.mjs`（1 项真实 runtime 持久化/恢复/并发）、`omp-session-bridge.test.mjs`（28 项，升级到 per-session registry 语义）、`crates/host-core/src/db/tests.rs`（迁移 v21 + bindEngine 4 项）。
+新增定向测试：`apps/desktop/test/omp-model-projection.test.mjs`（12 项，含 R4 fail-closed 7 项）、`apps/desktop/test/omp-secret-redaction.test.mjs`（2 项 canary）、`apps/desktop/test/omp-session-persistence-e2e.test.mjs`（1 项真实 runtime 持久化/恢复/并发，恢复用真实 `get_state` 身份）、`apps/desktop/test/omp-session-failclosed.test.mjs`（9 项 R1/R5/R7）、`apps/desktop/test/omp-session-branch.test.mjs`（4 项 R2）、`omp-session-bridge.test.mjs`（28 项 registry 语义）、`crates/host-core/src/db/tests.rs`（迁移 v21 + bindEngine）。
 
 ## 3. 先红后绿证据
 
@@ -55,7 +71,7 @@
 8. **并发隔离**：`omp-session-persistence-e2e.test.mjs` 断言两个 session 各写各的 marker、cwd 不同、停止一个不影响另一个（`runtimes.length===2` 见 bridge 测试）。
 9. **崩溃/重启不重放、旧审批不跨进程放行**：runner 的 generation 单次消费 + `resolveUiRequest` 绑定 session/generation（M3 已证），M4 恢复路径复用同一语义（`omp-session-bridge.test.mjs` 28 项全绿）。
 10. **未开放能力拒绝不改持久状态**：`steer`/`followUp`/`compact` 保持关闭，`engine-router` 拒绝（`engine.test.ts` 断言 `steer===false` 与 typed refusal）；`resume`/`branch`/`modelSwitch` 开放（`engine.test.ts` 更新后 968 项全绿）。
-11. **Pi 对照**：desktop 全量 2605 项通过，Pi session 路径未回归；host-core 582 项通过。
+11. **Pi 对照**：desktop 全量 2625 项通过，Pi session 路径未回归；host-core 582 项通过。
 
 ## 4. 环境限制与未完成项
 

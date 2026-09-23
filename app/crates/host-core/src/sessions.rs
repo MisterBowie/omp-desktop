@@ -22,6 +22,11 @@ pub const ENGINES: [&str; 2] = ["pi", "omp"];
 /// session that predates the field.
 pub const DEFAULT_ENGINE: &str = "pi";
 
+/// The session-engine adapter version this build persists (matches the shared
+/// `ENGINE_ADAPTER_VERSION`). A bind that carries a larger value describes a
+/// reference shape this build cannot read, so it is refused rather than stored.
+pub const ENGINE_ADAPTER_VERSION: i64 = 1;
+
 pub fn is_valid_engine(engine: &str) -> bool {
     ENGINES.contains(&engine)
 }
@@ -1453,6 +1458,14 @@ pub fn bind_session_engine_ref(
     if session_id.is_empty() || session_path.is_empty() {
         return Err(anyhow!(
             "a native session reference requires a non-empty session id and path"
+        ));
+    }
+    // The adapter version must be a value this build understands: absent reads
+    // as the current version, and a larger value is a reference this build
+    // cannot act on (fail closed rather than store a shape it cannot read).
+    if adapter_version.is_some_and(|v| v <= 0 || v > ENGINE_ADAPTER_VERSION) {
+        return Err(anyhow!(
+            "unsupported session-engine adapter version {adapter_version:?}; this build supports 1..={ENGINE_ADAPTER_VERSION}"
         ));
     }
     let runtime_version = runtime_version.filter(|value| !value.trim().is_empty());

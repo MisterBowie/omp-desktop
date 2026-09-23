@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { register } from "node:module";
 import { tmpdir } from "node:os";
 import test, { after } from "node:test";
@@ -174,9 +174,17 @@ function bridgeHarness({ gate = "/repo/app/packages/omp-runtime/extensions/omp-d
   const supervisors = [];
   const envelopes = [];
   const logs = [];
+  const sessionDir = mkdtempSync(join(tmpdir(), "omp-bridge-sessions-"));
+  scratch.push(sessionDir);
+  // A native transcript the fake runtime reports, inside the session directory,
+  // so the bridge's containment/file-type/identity validation passes.
+  const nativeSessionId = "native-id";
+  const nativeSessionPath = join(sessionDir, "native-session.jsonl");
+  writeFileSync(nativeSessionPath, JSON.stringify({ type: "session", id: nativeSessionId, cwd: "/tmp", timestamp: "2026-01-01T00:00:00.000Z" }) + "\n");
   // Pre-create the first runtime/supervisor so the destructured handles the
   // single-session tests use are live before the first prompt.
   const firstRuntime = new FakeRuntime();
+  firstRuntime.stateResponse = { success: true, data: { sessionId: nativeSessionId, sessionFile: nativeSessionPath, sessionName: "session" } };
   const firstSupervisor = fakeSupervisor(firstRuntime);
   runtimes.push(firstRuntime);
   supervisors.push(firstSupervisor);
@@ -188,6 +196,7 @@ function bridgeHarness({ gate = "/repo/app/packages/omp-runtime/extensions/omp-d
         return firstSupervisor;
       }
       const runtime = new FakeRuntime();
+      runtime.stateResponse = { success: true, data: { sessionId: nativeSessionId, sessionFile: nativeSessionPath, sessionName: "session" } };
       const supervisor = fakeSupervisor(runtime);
       runtimes.push(runtime);
       supervisors.push(supervisor);
@@ -197,11 +206,12 @@ function bridgeHarness({ gate = "/repo/app/packages/omp-runtime/extensions/omp-d
     launcher,
     isPackaged: false,
     appPath: "/repo/app",
+    sessionDir,
     emitAgentEvent: (envelope) => envelopes.push(envelope),
     logger: { app: (scope, level, message, fields) => logs.push({ scope, level, message, fields }) },
     gateResolver: () => gate,
   });
-  return { bridge, runtime: firstRuntime, supervisor: firstSupervisor, runtimes, supervisors, envelopes, logs };
+  return { bridge, runtime: firstRuntime, supervisor: firstSupervisor, runtimes, supervisors, envelopes, logs, sessionDir, nativeSessionId, nativeSessionPath };
 }
 
 const APPROVAL_FRAME = {

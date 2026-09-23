@@ -392,12 +392,15 @@ export function registerAgentIpc({
           : null;
       // The native-session reference is a main/host-boundary value: it is read
       // here and handed to the runtime for restore, never surfaced to the
-      // renderer.
+      // renderer. The adapter and runtime versions are read too — the restore
+      // path refuses a reference this build cannot understand.
       const engineRef = await host
         .call<{
           engineRef?: {
             nativeSessionId?: string | null;
             nativeSessionPath?: string | null;
+            adapterVersion?: number | null;
+            runtimeVersion?: string | null;
           } | null;
         }>("session.getEngineRef", { id: req.sessionId })
         .then((r) => r.engineRef ?? null)
@@ -431,6 +434,9 @@ export function registerAgentIpc({
         thinkingLevel: typeof session.thinkingLevel === "string" ? session.thinkingLevel : null,
         nativeSessionId: engineRef?.nativeSessionId ?? null,
         nativeSessionPath: engineRef?.nativeSessionPath ?? null,
+        adapterVersion: engineRef?.adapterVersion ?? null,
+        runtimeVersion: engineRef?.runtimeVersion ?? null,
+        userMessageId: req.messageId ?? null,
       });
     }
     if (!sidecar) throw new Error("sidecar unavailable");

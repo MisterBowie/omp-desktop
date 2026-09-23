@@ -114,6 +114,7 @@ test(
       launcher: LAUNCHER,
       isPackaged: false,
       appPath: here,
+      sessionDir,
       gateResolver: () => GATE,
       emitAgentEvent: (envelope) => envelopes.push(envelope),
       logger: { app: () => undefined },
@@ -121,6 +122,7 @@ test(
     });
 
     const nativePathFor = async (sessionId) => bound.get(sessionId)?.nativeSessionPath ?? null;
+    const nativeIdFor = async (sessionId) => bound.get(sessionId)?.nativeSessionId ?? null;
 
     try {
       // --- 1. fresh session A: native transcript lands in the persistent dir --
@@ -143,7 +145,7 @@ test(
         content: "continue",
         projectPath: projectA,
         nativeSessionPath: sessionAPath,
-        nativeSessionId: "session-a",
+        nativeSessionId: await nativeIdFor("session-a"),
       });
       assert.ok(await waitFor(() => envelopes.some((e, i) => i >= replayEnvelopesBefore && e.event.type === "agent_end" && e.sessionId === "session-a")), "restored session must accept a prompt");
       // A restore must never rewrite the marker file from the prior turn.

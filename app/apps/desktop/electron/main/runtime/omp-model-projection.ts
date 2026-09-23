@@ -51,6 +51,93 @@ export type OmpModelProjectionError = {
   message: string;
 };
 
+/** The provider facts a projection resolver needs (the host's public row). */
+export type ProviderProjectionSource = {
+  id: string;
+  enabled?: boolean | null;
+  type?: string | null;
+  apiStyle?: string | null;
+  authKind?: string | null;
+  hasSecret?: boolean | null;
+  hasOauth?: boolean | null;
+  baseUrl?: string | null;
+  headers?: Record<string, string> | null;
+  models?: Array<{ id: string; contextWindow?: number | null; maxTokens?: number | null; thinkingLevels?: string[] }>;
+  defaultModelId?: string | null;
+  supportedThinkingLevels?: string[];
+};
+
+/** Auth kinds that need an API key (or a local none-auth endpoint). */
+const KEY_AUTH_KINDS: Record<string, true> = {
+  api_key: true,
+  api_key_and_base_url: true,
+};
+
+/** Auth kinds this build refuses to project (no auth:none downgrade). */
+const UNSUPPORTED_AUTH_KINDS: Record<string, true> = {
+  oauth: true,
+  basic: true,
+};
+
+/**
+ * Resolve the minimal projection for one provider/model binding, fail-closed.
+ *
+ * The checks, each of which refuses a prompt before any runtime starts:
+ *
+ *   - the provider is not disabled;
+ *   - the model id is one of the provider's configured models;
+ *   - the auth kind is one this build can project (`oauth`/`basic` are refused,
+ *     never downgraded to `auth: none`);
+ *   - a key-auth provider without a stored secret is refused (the endpoint
+ *     would silently fail or, worse, be served as auth-less);
+ *   - the requested thinking level is supported by the model (when the model
+ *     declares its levels).
+ */
+export function resolveProviderProjection(
+  source: ProviderProjectionSource,
+  modelId: string,
+  thinkingLevel: string | null | undefined,
+): { ok: true; projection: OmpModelProjection } | { ok: false; error: OmpModelProjectionError } {
+  if (source.enabled === false) {
+    return { ok: false, error: { errorCode: "OMP_PROJECTION_INVALID", message: `provider ${source.id} is disabled` } };
+  }
+  const api = ompApiForStyle(source.apiStyle);
+  if (!api) {
+    return { ok: false, error: { errorCode: "OMP_PROJECTION_UNSUPPORTED", message: `provider ${source.id} api style cannot be projected` } };
+  }
+  const authKind = source.authKind ?? "";
+  if (UNSUPPORTED_AUTH_KINDS[authKind]) {
+    return { ok: false, error: { errorCode: "OMP_PROJECTION_UNSUPPORTED", message: `provider ${source.id} uses ${authKind} authentication, which this build does not project` } };
+  }
+  const needsKey = KEY_AUTH_KINDS[authKind] === true;
+  if (needsKey && source.hasSecret !== true) {
+    return { ok: false, error: { errorCode: "OMP_PROJECTION_INVALID", message: `provider ${source.id} requires an API key but none is stored` } };
+  }
+  if (source.hasOauth === true) {
+    return { ok: false, error: { errorCode: "OMP_PROJECTION_UNSUPPORTED", message: `provider ${source.id} uses OAuth, which this build does not project` } };
+  }
+  const model = source.models?.find((entry) => entry.id === modelId);
+  if (!model) {
+    const known = source.models?.map((entry) => entry.id).join(", ") ?? "";
+    return { ok: false, error: { errorCode: "OMP_PROJECTION_INVALID", message: `model ${modelId} is not one of provider ${source.id}'s configured models (${known})` } };
+  }
+  if (thinkingLevel && model.thinkingLevels && model.thinkingLevels.length > 0 && !model.thinkingLevels.includes(thinkingLevel)) {
+    return { ok: false, error: { errorCode: "OMP_PROJECTION_INVALID", message: `thinking level ${thinkingLevel} is not supported by model ${modelId}` } };
+  }
+  const baseUrl = typeof source.baseUrl === "string" ? source.baseUrl.trim() : "";
+  const projection: OmpModelProjection = {
+    providerId: source.id,
+    modelId,
+    api,
+    baseUrl,
+    apiKey: null,
+    ...(source.headers && Object.keys(source.headers).length > 0 ? { headers: source.headers } : {}),
+    ...(model.contextWindow ? { contextWindow: model.contextWindow } : {}),
+    ...(model.maxTokens ? { maxTokens: model.maxTokens } : {}),
+  };
+  return { ok: true, projection };
+}
+
 /**
  * Map a PI `apiStyle` to an OMP `Api` value.
  *
