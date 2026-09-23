@@ -2238,6 +2238,47 @@ async fn handle_request(
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "ok": ok }))
         }
+        "session.getEngineRef" => {
+            let id = params
+                .get("id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            let reference = sessions::session_engine_ref(&st.db, id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                .ok_or_else(|| rpc_err(1007, "session not found", "NOT_FOUND"))?;
+            Ok(json!({ "engineRef": reference }))
+        }
+        "session.bindEngine" => {
+            let id = params
+                .get("id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
+            let adapter_version = params.get("adapterVersion").and_then(|v| v.as_i64());
+            let runtime_version = params
+                .get("runtimeVersion")
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
+            let native_session_id = params
+                .get("nativeSessionId")
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
+            let native_session_path = params
+                .get("nativeSessionPath")
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
+            let st = state.lock().await;
+            let ok = sessions::bind_session_engine_ref(
+                &st.db,
+                id,
+                adapter_version,
+                runtime_version,
+                native_session_id,
+                native_session_path,
+            )
+            .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+            Ok(json!({ "ok": ok }))
+        }
         "session.appendMessage" => {
             let session_id = params
                 .get("sessionId")

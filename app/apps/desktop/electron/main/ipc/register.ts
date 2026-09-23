@@ -252,6 +252,8 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     enrichSession,
     acquireSessionOperation,
     stripWinLongPrefix,
+    engineRouter,
+    ompSessions,
   });
   registerSettingsIpc({
     registrar,

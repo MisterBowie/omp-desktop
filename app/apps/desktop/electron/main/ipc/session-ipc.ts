@@ -105,6 +105,8 @@ export type SessionIpcDependencies = {
   enrichSession: (session: any, providers: any, defaults: any) => any;
   acquireSessionOperation: (sessionId: string) => Promise<() => void>;
   stripWinLongPrefix: (path: string) => string;
+  engineRouter?: { requireForSession(sessionId: string, capability: "prompt" | "stop"): Promise<string> };
+  ompSessions?: { rename(sessionId: string, title: string): Promise<{ ok: boolean }> } | null;
 };
 
 export function registerSessionIpc({
@@ -121,6 +123,8 @@ export function registerSessionIpc({
   enrichSession,
   acquireSessionOperation,
   stripWinLongPrefix,
+  engineRouter,
+  ompSessions,
 }: SessionIpcDependencies): void {
   let host: HostProcess | null = null;
   let sidecar: AgentSidecar | null = null;
@@ -351,6 +355,19 @@ export function registerSessionIpc({
       });
     }
     if (!host) throw new Error("host unavailable");
+    // An OMP session's name lives in its native transcript; the desktop row
+    // must not fork from it. The runtime's `set_session_name` is the authority,
+    // and only on its success is the desktop title persisted.
+    const engine = engineRouter ? await engineRouter.requireForSession(id, "prompt") : "pi";
+    if (engine === "omp" && ompSessions) {
+      const result = await ompSessions.rename(id, title);
+      if (!result.ok) {
+        throw Object.assign(new Error("the OMP runtime refused the rename"), {
+          errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+        });
+      }
+      return { ok: true };
+    }
     return host.call("session.rename", { id, title });
   });
   handle(

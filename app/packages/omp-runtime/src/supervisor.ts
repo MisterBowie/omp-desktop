@@ -55,6 +55,22 @@ export const RUNTIME_STATE_DIR = "omp-runtime";
 /** Prefix of a run root; ownership checks depend on it. */
 export const RUN_ROOT_PREFIX = "run";
 
+/** Name of the app-owned persistent native-session directory (M4/T14). */
+export const SESSION_STATE_DIR = "omp-sessions";
+
+/**
+ * Resolve and create the persistent native-session directory for an OMP runtime.
+ *
+ * The directory is the desktop's own, not the runtime's transient run root, so
+ * native transcripts survive stop/reclaim and application exit. It is created
+ * under `dataRoot` rather than under the run root, which the stop path deletes.
+ */
+export function ensureSessionStateDir(dataRoot: string): string {
+  const dir = join(dataRoot, SESSION_STATE_DIR);
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
 export type OmpRuntimeSupervisorOptions = {
   /** Product data root; run directories live below it and nothing else is touched. */
   dataRoot: string;
@@ -80,6 +96,16 @@ export type OmpRuntimeSupervisorOptions = {
    * and credential-shaped names are still decided by `buildOmpRuntimeEnv`.
    */
   extraEnv?: NodeJS.ProcessEnv;
+  /**
+   * Persistent directory the runtime writes its native session transcripts
+   * into (M4/T14). It is app-owned and survives stop/reclaim, unlike the
+   * transient run root that holds HOME/config/log/credential material. When
+   * set, the runtime is launched with `--session-dir <sessionDir>`, which the
+   * pinned runtime maps to its native session directory (`session-paths.ts`).
+   * The directory is created here so a caller cannot point it at a path the
+   * app does not own.
+   */
+  sessionDir?: string | null;
   requestTimeoutMs?: number;
   readyTimeoutMs?: number;
   /**
@@ -381,6 +407,16 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
     mkdirSync(launchDir, { recursive: true });
     const paths: OmpRunPaths = { runRoot, home, agentDir: codingAgentDir, configDirName, configRoot, launchDir };
 
+    // The persistent native-session directory is created before the child
+    // starts so a missing or unwritable path surfaces as a start failure rather
+    // than a runtime that silently fell back to the transient run root.
+    const sessionDir = this.options.sessionDir
+      ? (mkdirSync(this.options.sessionDir, { recursive: true }), this.options.sessionDir)
+      : null;
+    const launchArgs = sessionDir
+      ? [...this.args, "--session-dir", sessionDir]
+      : [...this.args];
+
     try {
       if (this.options.prepareRun) await this.options.prepareRun(paths);
       const runtimeFactory =
@@ -388,7 +424,7 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
         ((options: OmpRuntimeProcessOptions) => OmpRuntimeProcess.start(options));
       const runtime = await runtimeFactory({
         launcher,
-        ...(this.args.length > 0 ? { args: this.args } : {}),
+        ...(launchArgs.length > 0 ? { args: launchArgs } : {}),
         cwd: this.workingDirectory ?? this.options.cwd ?? launchDir,
         env,
         expectedRuntimeVersion: this.pinnedRuntimeVersion,

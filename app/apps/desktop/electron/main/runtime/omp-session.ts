@@ -1,26 +1,30 @@
 /**
- * Desktop side of one OMP conversation: start the runtime for a session, stream
- * its events into the desktop's vocabulary, and answer its dialogs.
+ * Desktop side of OMP conversations: one runtime per desktop session, streamed
+ * into the desktop's event vocabulary, with dialogs answered per session.
  *
- * The pieces below it already exist and are not re-implemented here: M2's
- * supervisor owns the process, its isolated home and the process-group
- * teardown; the runtime package owns framing, the event translation and the
- * decision registry. This module is the wiring, plus the three product
- * decisions that wiring has to make:
+ * M3 shipped "one runtime, one session" as a single bound runtime that refused a
+ * second session. M4 turns that into a registry: each desktop session gets its
+ * own supervisor, its own runtime process, its own native transcript, its own
+ * working directory and its own model projection, and the foreground sidebar
+ * switch never moves another session's runtime. The pieces below still exist and
+ * are not re-implemented here: the supervisor owns the process, its isolated
+ * home and the process-group teardown; the runtime package owns framing, the
+ * event translation and the decision registry.
  *
- *   1. **One runtime, one session (M3).** An OMP process hosts one native
- *      session with its own transcript. This build binds the runtime to the
- *      first session that prompts it, runs in that session's project directory,
- *      and refuses a different session instead of pretending two projects share
- *      a runtime. Engine-side session switching is M4.
- *   2. **The gate is loaded, or the engine stays closed.** A runtime started
+ * Three product decisions stay with this module:
+ *
+ *   1. **A session's runtime is bound to its project.** The working directory
+ *      and the model projection are fixed when the runtime is first started; a
+ *      later prompt for the same session reuses them, and a prompt that names a
+ *      different project is refused rather than re-pointed.
+ *   2. **The native transcript is restored, not replayed.** A session with a
+ *      persisted native reference reopens it with `switch_session` before any
+ *      prompt; a session without one creates it with `new_session` and persists
+ *      the validated `get_state` handles through `persistNativeSession`.
+ *   3. **The gate is loaded, or the engine stays closed.** A runtime started
  *      without `--extension <gate>` would execute native tools with no
- *      pre-execution approval at all. If the gate cannot be found, the prompt
- *      is refused and the reason is reported; there is no unguarded fallback.
- *   3. **Approvals and questions reach the existing cards.** A gate approval
- *      becomes the desktop's `tool_permission_request` envelope and a question
- *      becomes `asktool_request` — the same events the Pi path emits, so
- *      `PermissionCard` / `AskToolCard` and their resolution IPC work unchanged.
+ *      pre-execution approval. If the gate cannot be found, the prompt is
+ *      refused and the reason is reported.
  */
 import { existsSync, statSync } from "node:fs";
 import { isAbsolute, join, normalize } from "node:path";
@@ -30,21 +34,21 @@ import {
   type AgentEventEnvelope,
   type AskToolRequest,
   type AskToolResolution,
-  type MessageUsage,
   type Risk,
   type ToolPermissionRequest,
-  type UiMessage,
 } from "@pi-desktop/shared";
 import { BUNDLED_GATE_PATH } from "./omp-runtime";
 import {
   OmpSessionRunner,
   descriptorRisk,
   findGateExtension,
+  type OmpConversionDiagnostics,
   type OmpRunState,
   type OmpRuntimeSupervisor,
   type OmpSessionRuntime,
   type OmpStopOutcome,
   type OmpUiDecision,
+  type OmpUiRecord,
   type OmpUiRequest,
 } from "@pi-desktop/omp-runtime";
 
@@ -57,8 +61,43 @@ export type OmpSessionBridgeLogger = {
   ): void;
 };
 
+/** The per-session facts a supervisor factory needs before the process starts. */
+export type OmpSessionRuntimeSpec = {
+  sessionId: string;
+  /** Absolute project directory the runtime runs in (validated by the registry). */
+  projectDirectory: string;
+  providerId: string | null;
+  modelId: string | null;
+  thinkingLevel: string | null;
+  /** Restore target: present when the session already has a native reference. */
+  nativeSessionId?: string | null;
+  nativeSessionPath?: string | null;
+};
+
+/** A native session whose `get_state` handles were validated, ready to persist. */
+export type NativeSessionBoundInfo = {
+  sessionId: string;
+  nativeSessionId: string;
+  nativeSessionPath: string;
+  runtimeVersion: string | null;
+};
+
+/** What a branch produced, for the desktop to create a new session row. */
+export type BranchSessionInfo = {
+  parentSessionId: string;
+  nativeSessionId: string;
+  nativeSessionPath: string;
+  runtimeVersion: string | null;
+};
+
 export type OmpSessionBridgeOptions = {
-  supervisor: OmpRuntimeSupervisor;
+  /**
+   * Create a fresh supervisor per session (M4: one runtime per session). The
+   * factory receives the session's fixed project and model binding and returns
+   * a supervisor configured with that session's `--session-dir` and model
+   * projection; the registry does not read providers or secrets itself.
+   */
+  createSupervisor: (spec: OmpSessionRuntimeSpec) => OmpRuntimeSupervisor;
   /** Absolute launcher path, or null when this build has none. */
   launcher: string | null;
   isPackaged: boolean;
@@ -68,9 +107,19 @@ export type OmpSessionBridgeOptions = {
   emitAgentEvent: (envelope: AgentEventEnvelope) => void;
   logger?: OmpSessionBridgeLogger;
   now?: () => number;
-  /** Gate policy for this run; defaults to the runtime package's own list. */
+  /** Gate policy for a run; defaults to the runtime package's own list. */
   gateTools?: string;
   gateTimeoutMs?: number;
+  /** Persist a validated native session reference (host `session.bindEngine`). */
+  persistNativeSession?: (info: NativeSessionBoundInfo) => void | Promise<void>;
+  /** Persist a rename after `set_session_name` succeeds. */
+  persistRename?: (info: { sessionId: string; title: string }) => void | Promise<void>;
+  /** Persist a model switch after `set_model` succeeds. */
+  persistModelBinding?: (info: { sessionId: string; providerId: string; modelId: string }) => void | Promise<void>;
+  /** Persist a thinking-level switch after `set_thinking_level` succeeds. */
+  persistThinkingLevel?: (info: { sessionId: string; level: string }) => void | Promise<void>;
+  /** Create a branch session row and resolve with its new desktop session id. */
+  createBranchSession?: (info: BranchSessionInfo) => Promise<string>;
   /** Test seams. */
   runnerFactory?: (options: ConstructorParameters<typeof OmpSessionRunner>[0]) => OmpSessionRunner;
   gateResolver?: (startDir: string) => string | null;
@@ -86,13 +135,28 @@ export type OmpSessionStatus = {
 
 export type OmpPromptResult = { accepted: boolean; turnId: string };
 
+export type OmpPromptInput = {
+  sessionId: string;
+  content: string;
+  projectPath: string | null;
+  providerId?: string | null;
+  modelId?: string | null;
+  thinkingLevel?: string | null;
+  nativeSessionId?: string | null;
+  nativeSessionPath?: string | null;
+};
+
+export type OmpRenameResult = { ok: boolean; reason?: string };
+
+export type OmpModelSwitchResult = { ok: boolean; reason?: string };
+
 /**
  * The outcome of answering a dialog.
  *
  * `answered` means the user's decision reached the runtime; `cancelled` means
  * the dialog was failed closed instead — a skipped question, an answer the
  * runtime's protocol cannot carry, or a run that ended first. A refusal means
- * nothing was written, because the id was not this bridge's to answer.
+ * nothing was written, because the id was not this registry's to answer.
  */
 export type OmpResolution =
   | { ok: true; outcome: "answered" | "cancelled" }
@@ -140,79 +204,295 @@ export function resolveProjectDirectory(projectPath: string | null | undefined):
 }
 
 export type OmpSessionBridge = {
-  /** Resolve the gate path this build would load (diagnostics and tests). */
   gatePath(): string | null;
-  prompt(input: { sessionId: string; content: string; projectPath: string | null }): Promise<OmpPromptResult>;
+  prompt(input: OmpPromptInput): Promise<OmpPromptResult>;
+  rename(sessionId: string, title: string): Promise<OmpRenameResult>;
+  /** Branch the session at its native head; resolves with the new session id. */
+  branch(sessionId: string): Promise<{ sessionId: string }>;
+  setModel(sessionId: string, providerId: string, modelId: string): Promise<OmpModelSwitchResult>;
+  setThinkingLevel(sessionId: string, level: string): Promise<OmpModelSwitchResult>;
   stop(sessionId: string): Promise<OmpStopOutcome>;
-  /**
-   * Answer a tool approval.
-   *
-   * The renderer sends only the request id and the decision (the Pi path's own
-   * contract: the id is an opaque routing token). The session, run and tool
-   * call this decision belongs to are the ones the bridge stored when it
-   * surfaced the request — the caller cannot name them, and cannot redirect the
-   * decision to another session, run or kind of request.
-   */
   resolvePermission(requestId: string, decision: OmpUiDecision): OmpResolution;
-  /** Answer a question. Never consumes an approval's id, and vice versa. */
   resolveAsk(resolution: AskToolResolution): OmpResolution;
   status(sessionId: string): OmpSessionStatus;
-  /** Whether a dialog with this id is still waiting (resolution routing). */
   hasPendingRequest(requestId: string): boolean;
-  /** Whether this build ever raised a dialog with this id (routing + refusal). */
   hasKnownRequest(requestId: string): boolean;
-  /** The working directory the runtime was started in, once bound. */
-  workingDirectory(): string | null;
-  /** Reclaim the runtime; used by application shutdown. */
+  workingDirectory(sessionId: string): string | null;
+  disposeSession(sessionId: string, reason?: string): Promise<void>;
+  /** Reclaim every session's runtime; used by application shutdown. */
   dispose(reason?: string): Promise<void>;
-  /** Diagnostics for the validation report. */
-  diagnostics(): ReturnType<OmpSessionRunner["diagnostics"]> & { sessionId: string | null };
+  diagnostics(): {
+    sessionId: string | null;
+    lateFrames: number;
+    conversion: OmpConversionDiagnostics;
+    uiRecords: readonly OmpUiRecord[];
+    state: OmpRunState;
+    sessions: Array<{ sessionId: string; state: OmpRunState; lateFrames: number }>;
+  };
 };
 
 const REFUSAL = ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE;
+
+type PendingDialog = { request: OmpUiRequest; sessionId: string; generation: number };
+
+/**
+ * One desktop session's runtime and the bookkeeping that answers its dialogs.
+ *
+ * The registry keeps one of these per session id; the supervisor and the runner
+ * inside it are never shared, so stopping or crashing one session cannot touch
+ * another session's pending state, process or working directory.
+ */
+class SessionEntry {
+  readonly sessionId: string;
+  readonly projectDirectory: string;
+  private readonly supervisor: OmpRuntimeSupervisor;
+  private readonly emitAgentEvent: (envelope: AgentEventEnvelope) => void;
+  private readonly logger: OmpSessionBridgeLogger | undefined;
+  private readonly now: () => number;
+  private readonly runnerFactory: NonNullable<OmpSessionBridgeOptions["runnerFactory"]>;
+  private readonly persistNativeSession: OmpSessionBridgeOptions["persistNativeSession"];
+
+  private runner: OmpSessionRunner | null = null;
+  nativeSessionId: string | null = null;
+  nativeSessionPath: string | null = null;
+  runtimeVersion: string | null = null;
+
+  readonly approvalRequests = new Map<string, PendingDialog>();
+  readonly askRequests = new Map<string, PendingDialog>();
+  readonly knownRequests = new Map<string, "approval" | "ask">();
+  readonly generations = new Map<string, number>();
+
+  constructor(deps: {
+    sessionId: string;
+    projectDirectory: string;
+    supervisor: OmpRuntimeSupervisor;
+    emitAgentEvent: (envelope: AgentEventEnvelope) => void;
+    logger: OmpSessionBridgeLogger | undefined;
+    now: () => number;
+    runnerFactory: NonNullable<OmpSessionBridgeOptions["runnerFactory"]>;
+    persistNativeSession: OmpSessionBridgeOptions["persistNativeSession"];
+  }) {
+    this.sessionId = deps.sessionId;
+    this.projectDirectory = deps.projectDirectory;
+    this.supervisor = deps.supervisor;
+    this.emitAgentEvent = deps.emitAgentEvent;
+    this.logger = deps.logger;
+    this.now = deps.now;
+    this.runnerFactory = deps.runnerFactory;
+    this.persistNativeSession = deps.persistNativeSession;
+  }
+
+  supervisorHandle(): OmpRuntimeSupervisor {
+    return this.supervisor;
+  }
+
+  rememberRequest(id: string, kind: "approval" | "ask"): void {
+    this.knownRequests.set(id, kind);
+    if (this.knownRequests.size > 200) {
+      const oldest = this.knownRequests.keys().next().value;
+      if (oldest !== undefined) this.knownRequests.delete(oldest);
+    }
+  }
+
+  generationOf(frameId: string): number {
+    return this.generations.get(frameId) ?? 0;
+  }
+
+  /** Start the runtime (once) and construct the runner over it. */
+  async ensureRunner(gate: string): Promise<OmpSessionRunner> {
+    if (this.runner) return this.runner;
+    this.supervisor.setWorkingDirectory(this.projectDirectory);
+    if (this.supervisor.status().phase !== "idle") {
+      await this.supervisor.start();
+    }
+    const runtime = this.runtimeHandle();
+    this.runner = this.runnerFactory({
+      sessionId: this.sessionId,
+      runtime,
+      emit: (envelope) => this.emitAgentEvent(envelope),
+      onUiRequest: (request, info) => this.surfaceUiRequest(request, info.sessionId, info.generation),
+      onUiClosed: (requestId, reason) => {
+        this.approvalRequests.delete(requestId);
+        this.askRequests.delete(requestId);
+        this.generations.delete(requestId);
+        this.logger?.app("omp", "info", "omp dialog closed", { data: { requestId, reason } });
+      },
+      onUiRecord: (record) => {
+        this.logger?.app("omp", "info", "ui request decision", {
+          data: {
+            sessionId: this.sessionId,
+            frameId: record.frameId,
+            kind: record.kind,
+            outcome: record.outcome,
+            decision: record.decision,
+          },
+        });
+      },
+      teardown: async (teardownOptions) => {
+        const result = await this.supervisor.stop({ abortBash: teardownOptions.abortBash });
+        return { reaped: result.reaped, cleaned: result.cleaned };
+      },
+    });
+    this.logger?.app("omp", "info", "omp session runtime started", {
+      data: { sessionId: this.sessionId, projectDirectory: this.projectDirectory, gate },
+    });
+    return this.runner;
+  }
+
+  runtimeHandle(): OmpSessionRuntime {
+    const runtime = this.supervisor.currentRuntime();
+    if (!runtime) {
+      throw Object.assign(new Error("the OMP runtime is not available after start"), {
+        errorCode: "NOT_STARTED",
+      });
+    }
+    return runtime;
+  }
+
+  /** Establish the native session: restore by path, or create and persist. */
+  async ensureNativeSession(gate: string, spec: OmpSessionRuntimeSpec): Promise<void> {
+    const runner = await this.ensureRunner(gate);
+    const runtime = this.runtimeHandle();
+
+    if (spec.nativeSessionPath) {
+      // Restore: reopen the persisted native transcript before any prompt. A
+      // cancelled switch (the runtime refused the path) is a restore failure,
+      // not a reason to fabricate a new session.
+      const switched = await runtime.request({ type: "switch_session", sessionPath: spec.nativeSessionPath }, { timeoutMs: 20_000 });
+      const switchData = switched.data as { cancelled?: boolean } | undefined;
+      if (switched.success === false || switchData?.cancelled === true) {
+        throw Object.assign(
+          new Error(`the native session could not be restored: ${switched.error ?? "cancelled"}`),
+          { errorCode: "OMP_RESTORE_FAILED" },
+        );
+      }
+      this.nativeSessionId = spec.nativeSessionId ?? null;
+      this.nativeSessionPath = spec.nativeSessionPath;
+      this.runtimeVersion = this.supervisor.status().runtimeVersion;
+      return;
+    }
+
+    // Fresh session: create it, read back the validated handles, and persist.
+    const created = await runtime.request({ type: "new_session" }, { timeoutMs: 20_000 });
+    const createdData = created.data as { cancelled?: boolean } | undefined;
+    if (created.success === false || createdData?.cancelled === true) {
+      throw Object.assign(
+        new Error(`the native session could not be created: ${created.error ?? "cancelled"}`),
+        { errorCode: "OMP_SESSION_CREATE_FAILED" },
+      );
+    }
+    const state = await runtime.request({ type: "get_state" }, { timeoutMs: 20_000 });
+    const stateData = state.data as { sessionId?: string; sessionFile?: string } | undefined;
+    const sessionId = typeof stateData?.sessionId === "string" ? stateData.sessionId : "";
+    const sessionFile = typeof stateData?.sessionFile === "string" ? stateData.sessionFile : "";
+    if (!sessionId || !sessionFile) {
+      throw Object.assign(
+        new Error("the runtime returned no native session handles to persist"),
+        { errorCode: "OMP_SESSION_CREATE_FAILED" },
+      );
+    }
+    this.nativeSessionId = sessionId;
+    this.nativeSessionPath = sessionFile;
+    this.runtimeVersion = this.supervisor.status().runtimeVersion;
+    await this.persistNativeSession?.({
+      sessionId: this.sessionId,
+      nativeSessionId: sessionId,
+      nativeSessionPath: sessionFile,
+      runtimeVersion: this.runtimeVersion,
+    });
+  }
+
+  surfaceUiRequest(request: OmpUiRequest, sessionId: string, generation: number): void {
+    const ts = this.now();
+    this.generations.set(request.frameId, generation);
+    if (request.kind === "approval") {
+      const descriptor = request.descriptor;
+      const permission: ToolPermissionRequest = {
+        requestId: request.frameId,
+        sessionId,
+        toolCallId: descriptor?.toolCallId ?? request.frameId,
+        toolName: descriptor?.toolName ?? "tool",
+        argsPreview: descriptor?.argsPreview,
+        risk: this.riskForApproval(request),
+        reason: descriptor?.reason ?? request.title,
+      };
+      this.approvalRequests.set(request.frameId, { request, sessionId, generation });
+      this.rememberRequest(request.frameId, "approval");
+      this.emitAgentEvent({ sessionId, ts, event: { type: "tool_permission_request", request: permission } });
+      return;
+    }
+    if (request.kind === "question" && request.method === "select") {
+      const ask: AskToolRequest = {
+        requestId: request.frameId,
+        sessionId,
+        toolCallId: request.frameId,
+        questions: [{ question: request.title, options: request.options ?? [], multiSelect: false }],
+      };
+      this.askRequests.set(request.frameId, { request, sessionId, generation });
+      this.rememberRequest(request.frameId, "ask");
+      this.emitAgentEvent({ sessionId, ts, event: { type: "asktool_request", request: ask } });
+      return;
+    }
+    if (request.kind === "question" && request.method === "confirm") {
+      const ask: AskToolRequest = {
+        requestId: request.frameId,
+        sessionId,
+        toolCallId: request.frameId,
+        questions: [{
+          question: [request.title, request.message].filter(Boolean).join("\n\n"),
+          options: ["Yes", "No"],
+          multiSelect: false,
+        }],
+      };
+      this.askRequests.set(request.frameId, { request, sessionId, generation });
+      this.rememberRequest(request.frameId, "ask");
+      this.emitAgentEvent({ sessionId, ts, event: { type: "asktool_request", request: ask } });
+      return;
+    }
+    this.logger?.app("omp", "warn", "unsupported OMP dialog", {
+      data: { sessionId, frameId: request.frameId, kind: request.kind },
+    });
+  }
+
+  riskForApproval(request: OmpUiRequest): Risk {
+    if (request.kind !== "approval") return "high";
+    if (request.source === "runtime") return "high";
+    return descriptorRisk(request.descriptor);
+  }
+
+  runnerState(): OmpRunState {
+    return this.runner?.runState() ?? "idle";
+  }
+
+  /** The live runner, or null when the runtime has not started a turn yet. */
+  activeRunner(): OmpSessionRunner | null {
+    return this.runner;
+  }
+
+  async stop(): Promise<OmpStopOutcome> {
+    if (!this.runner) {
+      return { aborted: false, abortBashSent: false, converged: true, toreDown: false, steps: ["nothing running"], errors: [] };
+    }
+    return this.runner.stop();
+  }
+
+  async dispose(reason: string): Promise<void> {
+    this.approvalRequests.clear();
+    this.askRequests.clear();
+    this.generations.clear();
+    if (this.runner) this.runner.dispose(reason);
+    this.runner = null;
+    await this.supervisor.reclaimAll().catch(() => undefined);
+  }
+}
 
 export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSessionBridge {
   const logger = options.logger;
   const now = options.now ?? Date.now;
   const resolveGate = options.gateResolver ?? ((startDir: string) => findGateExtension(startDir));
+  const runnerFactory = options.runnerFactory ?? ((runnerOptions) => new OmpSessionRunner(runnerOptions));
 
-  let runner: OmpSessionRunner | null = null;
-  let boundSessionId: string | null = null;
-  /** The directory the runtime was started in; a session may not change it. */
-  let boundProjectDirectory: string | null = null;
-  /**
-   * The identity each surfaced dialog is answered under.
-   *
-   * `generation` is the run that raised it: a decision arriving after that run
-   * was stopped or superseded is refused by the runner's own registry, so a
-   * decision can never be replayed onto a later run of the same session.
-   */
-  type PendingDialog = { request: OmpUiRequest; sessionId: string; generation: number };
-  const approvalRequests = new Map<string, PendingDialog>();
-  const askRequests = new Map<string, PendingDialog>();
-  /** Bounded memory of every id this bridge raised, for routing and refusals. */
-  const knownRequests = new Map<string, "approval" | "ask">();
-  /** Run generation each surfaced dialog belongs to. */
-  const generations = new Map<string, number>();
-
-  function generationOf(frameId: string): number {
-    return generations.get(frameId) ?? 0;
-  }
-  const KNOWN_REQUEST_LIMIT = 200;
-
-  function rememberRequest(id: string, kind: "approval" | "ask"): void {
-    knownRequests.set(id, kind);
-    if (knownRequests.size > KNOWN_REQUEST_LIMIT) {
-      const oldest = knownRequests.keys().next().value;
-      if (oldest !== undefined) knownRequests.delete(oldest);
-    }
-  }
-
-  type OmpRefusalReason = "unknown" | "duplicate" | "wrong-kind" | "stale" | "refused";
-
-  function refuse(reason: OmpRefusalReason, detail: string): OmpResolution {
-    return { ok: false, reason, detail };
-  }
+  const entries = new Map<string, SessionEntry>();
 
   function gatePath(): string | null {
     if (options.isPackaged && options.resourcesPath) {
@@ -224,421 +504,278 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     return resolveGate(options.appPath);
   }
 
-  function requireRunner(): OmpSessionRunner {
-    if (!runner) {
-      throw Object.assign(new Error("no OMP runtime is running for this session"), {
-        errorCode: "NOT_FOUND",
-      });
+  function requireGate(): string {
+    const gate = gatePath();
+    if (!gate) {
+      throw Object.assign(
+        new Error("the OMP tool gate extension could not be found; refusing to start an unguarded runtime"),
+        { errorCode: REFUSAL },
+      );
     }
-    return runner;
+    return gate;
   }
 
-  async function prompt(input: {
-    sessionId: string;
-    content: string;
-    projectPath: string | null;
-  }): Promise<OmpPromptResult> {
+  function requireLauncher(): void {
     if (!options.launcher) {
       throw Object.assign(
         new Error("this build has no OMP runtime executable; run from a checkout or set OMP_DESKTOP_RUNTIME"),
         { errorCode: "NOT_FOUND" },
       );
     }
-    const gate = gatePath();
-    if (!gate) {
-      // Without the gate the runtime would execute native tools unapproved.
-      throw Object.assign(
-        new Error("the OMP tool gate extension could not be found; refusing to start an unguarded runtime"),
-        { errorCode: REFUSAL },
-      );
-    }
-    if (boundSessionId && boundSessionId !== input.sessionId) {
-      throw Object.assign(
-        new Error(
-          "this runtime already hosts a different OMP session; switching sessions is not available in this build",
-        ),
-        { errorCode: REFUSAL },
-      );
-    }
-    // The runtime's session is rooted at the process's working directory, so a
-    // project directory the runtime is not already running in can only be
-    // honoured before it starts. A relative or missing path is refused rather
-    // than resolved against wherever the app was launched.
-    const projectDirectory = resolveProjectDirectory(input.projectPath);
-    if (boundProjectDirectory && boundProjectDirectory !== projectDirectory) {
-      throw Object.assign(
-        new Error(
-          `this OMP runtime already runs in ${boundProjectDirectory}; a different project directory is not supported yet`,
-        ),
-        { errorCode: REFUSAL },
-      );
-    }
-    const supervisor = options.supervisor;
-    if (!runner) {
-      try {
-        supervisor.setWorkingDirectory(projectDirectory);
-      } catch (error) {
+  }
+
+  /** Get or create the per-session entry, refusing a project change. */
+  function entryFor(spec: OmpSessionRuntimeSpec): SessionEntry {
+    const existing = entries.get(spec.sessionId);
+    if (existing) {
+      if (existing.projectDirectory !== spec.projectDirectory) {
         throw Object.assign(
-          new Error(
-            `the OMP runtime is already running with another working directory: ${(error as Error).message}`,
-          ),
+          new Error(`this OMP session already runs in ${existing.projectDirectory}; a different project directory is not supported`),
           { errorCode: REFUSAL },
         );
       }
-      const status = supervisor.status();
-      if (status.phase !== "idle") {
-        await supervisor.start();
-      }
-      const runtime = runtimeHandle(supervisor);
-      runner = (options.runnerFactory ?? ((runnerOptions) => new OmpSessionRunner(runnerOptions)))({
-        sessionId: input.sessionId,
-        runtime,
-        emit: (envelope) => options.emitAgentEvent(envelope),
-        onUiRequest: (request, info) =>
-          surfaceUiRequest(request, info.sessionId, info.generation),
-        onUiClosed: (requestId, reason) => {
-          approvalRequests.delete(requestId);
-          askRequests.delete(requestId);
-          generations.delete(requestId);
-          logger?.app("omp", "info", "omp dialog closed", {
-            data: { requestId, reason },
-          });
-        },
-        onUiRecord: (record) => {
-          logger?.app("omp", "info", "ui request decision", {
-            data: {
-              sessionId: input.sessionId,
-              frameId: record.frameId,
-              kind: record.kind,
-              outcome: record.outcome,
-              decision: record.decision,
-            },
-          });
-        },
-        teardown: async (teardownOptions) => {
-          const result = await supervisor.stop({ abortBash: teardownOptions.abortBash });
-          return { reaped: result.reaped, cleaned: result.cleaned };
-        },
-        now,
-      });
-      boundSessionId = input.sessionId;
-      boundProjectDirectory = projectDirectory;
-      logger?.app("omp", "info", "omp session runtime started", {
-        data: { sessionId: input.sessionId, projectDirectory, gate },
-      });
+      return existing;
     }
-    const active = requireRunner();
-    const started = await active.prompt(input.content);
+    const supervisor = options.createSupervisor(spec);
+    const entry = new SessionEntry({
+      sessionId: spec.sessionId,
+      projectDirectory: spec.projectDirectory,
+      supervisor,
+      emitAgentEvent: options.emitAgentEvent,
+      logger,
+      now,
+      runnerFactory,
+      persistNativeSession: options.persistNativeSession,
+    });
+    entries.set(spec.sessionId, entry);
+    return entry;
+  }
+
+  function entryOf(sessionId: string): SessionEntry | null {
+    return entries.get(sessionId) ?? null;
+  }
+
+  async function prompt(input: OmpPromptInput): Promise<OmpPromptResult> {
+    requireLauncher();
+    const gate = requireGate();
+    const projectDirectory = resolveProjectDirectory(input.projectPath);
+    const spec: OmpSessionRuntimeSpec = {
+      sessionId: input.sessionId,
+      projectDirectory,
+      providerId: typeof input.providerId === "string" && input.providerId.trim() ? input.providerId : null,
+      modelId: typeof input.modelId === "string" && input.modelId.trim() ? input.modelId : null,
+      thinkingLevel: typeof input.thinkingLevel === "string" && input.thinkingLevel.trim() ? input.thinkingLevel : null,
+      nativeSessionId: input.nativeSessionId ?? null,
+      nativeSessionPath: input.nativeSessionPath ?? null,
+    };
+    const entry = entryFor(spec);
+    await entry.ensureNativeSession(gate, spec);
+    const runner = await entry.ensureRunner(gate);
+    const started = await runner.prompt(input.content);
     return { accepted: started.accepted, turnId: started.turnId };
   }
 
-  /**
-   * The supervisor's live runtime, as the runner's narrow interface.
-   *
-   * `start()` already proved it exists; a missing handle here would mean the
-   * supervisor lost ownership between start and use, which is a bug worth
-   * failing loudly on rather than papering over.
-   */
-  function runtimeHandle(supervisor: OmpRuntimeSupervisor): OmpSessionRuntime {
-    const runtime = supervisor.currentRuntime();
-    if (!runtime) {
-      throw Object.assign(new Error("the OMP runtime is not available after start"), {
-        errorCode: "NOT_STARTED",
-      });
-    }
-    return runtime;
+  /** The runtime handle for a session's runner (fails loudly if absent). */
+  function runtimeOf(entry: SessionEntry): OmpSessionRuntime {
+    return entry.runtimeHandle();
   }
 
-  function surfaceUiRequest(
-    request: OmpUiRequest,
-    sessionId: string,
-    generation: number,
-  ): void {
-    const ts = now();
-    // The generation is captured here, with the request: a decision for this
-    // dialog is only valid while the run that raised it is the current one.
-    generations.set(request.frameId, generation);
-    if (request.kind === "approval") {
-      const descriptor = request.descriptor;
-      const permission: ToolPermissionRequest = {
-        requestId: request.frameId,
-        sessionId,
-        toolCallId: descriptor?.toolCallId ?? request.frameId,
-        toolName: descriptor?.toolName ?? "tool",
-        argsPreview: descriptor?.argsPreview,
-        risk: riskForApproval(request),
-        reason: descriptor?.reason ?? request.title,
-      };
-      approvalRequests.set(request.frameId, { request, sessionId, generation: generationOf(request.frameId) });
-      rememberRequest(request.frameId, "approval");
-      options.emitAgentEvent({ sessionId, ts, event: { type: "tool_permission_request", request: permission } });
-      return;
+  async function rename(sessionId: string, title: string): Promise<OmpRenameResult> {
+    const entry = entryOf(sessionId);
+    if (!entry || !entry.activeRunner()) {
+      return { ok: false, reason: "no OMP runtime is running for this session" };
     }
-    if (request.kind === "question" && request.method === "select") {
-      const ask: AskToolRequest = {
-        requestId: request.frameId,
-        sessionId,
-        toolCallId: request.frameId,
-        questions: [
-          {
-            question: request.title,
-            options: request.options ?? [],
-            // The runtime's select answers with exactly one value.
-            multiSelect: false,
-          },
-        ],
-      };
-      askRequests.set(request.frameId, { request, sessionId, generation: generationOf(request.frameId) });
-      rememberRequest(request.frameId, "ask");
-      options.emitAgentEvent({ sessionId, ts, event: { type: "asktool_request", request: ask } });
-      return;
+    const runtime = runtimeOf(entry);
+    const result = await runtime.request({ type: "set_session_name", name: title }, { timeoutMs: 20_000 });
+    if (result.success === false) {
+      return { ok: false, reason: result.error ?? "the runtime refused the name" };
     }
-    if (request.kind === "question" && request.method === "confirm") {
-      const ask: AskToolRequest = {
-        requestId: request.frameId,
-        sessionId,
-        toolCallId: request.frameId,
-        questions: [
-          {
-            question: [request.title, request.message].filter(Boolean).join("\n\n"),
-            options: ["Yes", "No"],
-            multiSelect: false,
-          },
-        ],
-      };
-      askRequests.set(request.frameId, { request, sessionId, generation: generationOf(request.frameId) });
-      rememberRequest(request.frameId, "ask");
-      options.emitAgentEvent({ sessionId, ts, event: { type: "asktool_request", request: ask } });
-      return;
-    }
-    // Free-text dialogs have no card in this build. The registry already
-    // answered them fail-closed; say so instead of leaving the user guessing.
-    logger?.app("omp", "warn", "unsupported OMP dialog", {
-      data: { sessionId, frameId: request.frameId, kind: request.kind },
-    });
+    await options.persistRename?.({ sessionId, title });
+    return { ok: true };
   }
 
-  function riskForApproval(request: OmpUiRequest): Risk {
-    if (request.kind !== "approval") return "high";
-    if (request.source === "runtime") {
-      // The runtime's own prompt carries no structured risk; the fact that the
-      // runtime stopped to ask at all is the signal, so it is treated as high.
-      return "high";
-    }
-    return descriptorRisk(request.descriptor);
-  }
-
-  /**
-   * Find one pending dialog of the expected kind.
-   *
-   * The lookup is the authority on identity: the id must be an *open* dialog of
-   * this kind, and the session/run it belongs to are read from what the bridge
-   * stored when it surfaced the request — never from the caller. A dialog is
-   * only consumed once every check has passed: an answer the runtime never
-   * offered, or one that names another session, must leave the request open
-   * rather than stranding a runtime that is still waiting for it.
-   */
-  function lookupDialog(
-    requestId: string,
-    expected: "approval" | "ask",
-  ): { ok: true; entry: PendingDialog } | { ok: false; result: OmpResolution } {
-    const pending = expected === "approval" ? approvalRequests : askRequests;
-    const other = expected === "approval" ? askRequests : approvalRequests;
-    const entry = pending.get(requestId);
+  async function branch(sessionId: string): Promise<{ sessionId: string }> {
+    const entry = entryOf(sessionId);
     if (!entry) {
-      if (other.has(requestId)) {
-        return {
-          ok: false,
-          result: refuse(
-            "wrong-kind",
-            expected === "approval"
-              ? "this id belongs to a question, not a tool approval"
-              : "this id belongs to a tool approval, not a question",
-          ),
-        };
-      }
-      if (knownRequests.has(requestId)) {
-        return {
-          ok: false,
-          result: refuse("duplicate", "this request was already answered or cancelled"),
-        };
-      }
-      return {
-        ok: false,
-        result: refuse("unknown", "no dialog with this id was raised by this session"),
-      };
+      throw Object.assign(new Error("no OMP runtime is running for this session"), { errorCode: "NOT_FOUND" });
     }
-    if (boundSessionId && entry.sessionId !== boundSessionId) {
-      // Belt and braces: the stored entry already names the bound session, so a
-      // mismatch means the bridge's own bookkeeping moved under the request.
-      return { ok: false, result: refuse("stale", "the request belongs to another session") };
+    const runtime = runtimeOf(entry);
+    const branchable = await runtime.request({ type: "get_branch_messages" }, { timeoutMs: 20_000 });
+    const branchData = branchable.data as { messages?: Array<{ entryId?: string }> } | undefined;
+    const entryId = branchData?.messages?.[0]?.entryId;
+    if (typeof entryId !== "string" || !entryId) {
+      throw Object.assign(new Error("the runtime reported no branchable entry"), { errorCode: "OMP_BRANCH_FAILED" });
     }
-    return { ok: true, entry };
+    const branched = await runtime.request({ type: "branch", entryId }, { timeoutMs: 30_000 });
+    const branchResult = branched.data as { cancelled?: boolean } | undefined;
+    if (branched.success === false || branchResult?.cancelled === true) {
+      throw Object.assign(
+        new Error(`the runtime refused to branch: ${branched.error ?? "cancelled"}`),
+        { errorCode: "OMP_BRANCH_FAILED" },
+      );
+    }
+    const state = await runtime.request({ type: "get_state" }, { timeoutMs: 20_000 });
+    const stateData = state.data as { sessionId?: string; sessionFile?: string } | undefined;
+    const nativeSessionId = typeof stateData?.sessionId === "string" ? stateData.sessionId : "";
+    const nativeSessionPath = typeof stateData?.sessionFile === "string" ? stateData.sessionFile : "";
+    if (!nativeSessionId || !nativeSessionPath || nativeSessionPath === entry.nativeSessionPath) {
+      throw Object.assign(
+        new Error("the runtime did not produce a distinct native session for the branch"),
+        { errorCode: "OMP_BRANCH_FAILED" },
+      );
+    }
+    if (!options.createBranchSession) {
+      throw Object.assign(new Error("branching is not wired in this build"), { errorCode: REFUSAL });
+    }
+    const newSessionId = await options.createBranchSession({
+      parentSessionId: sessionId,
+      nativeSessionId,
+      nativeSessionPath,
+      runtimeVersion: entry.runtimeVersion,
+    });
+    return { sessionId: newSessionId };
   }
 
-  /**
-   * Finish a dialog the user will not answer, or whose answer cannot be
-   * delivered.
-   *
-   * The card disappears from the UI either way, so the runtime must not be left
-   * waiting for it: the request is answered `cancelled` (the runtime's own
-   * "no answer" value, which the gate reads as a denial and a question as no
-   * value) and both layers forget it.
-   */
-  function finishCancelled(requestId: string, reason: string): OmpResolution {
-    const active = runner;
-    if (!active) {
-      approvalRequests.delete(requestId);
-      askRequests.delete(requestId);
-      generations.delete(requestId);
-      return { ok: true, outcome: "cancelled" };
+  async function switchModel(
+    sessionId: string,
+    command: { type: "set_model"; provider: string; modelId: string } | { type: "set_thinking_level"; level: string },
+    persist?: () => void | Promise<void>,
+  ): Promise<OmpModelSwitchResult> {
+    const entry = entryOf(sessionId);
+    if (!entry || !entry.activeRunner()) {
+      return { ok: false, reason: "no OMP runtime is running for this session" };
     }
-    active.cancelUiRequest(requestId, reason);
-    approvalRequests.delete(requestId);
-    askRequests.delete(requestId);
-    generations.delete(requestId);
-    return { ok: true, outcome: "cancelled" };
+    const runtime = runtimeOf(entry);
+    const result = await runtime.request(command, { timeoutMs: 20_000 });
+    if (result.success === false) {
+      return { ok: false, reason: result.error ?? "the runtime refused the change" };
+    }
+    await persist?.();
+    return { ok: true };
   }
 
-  /** Consume a dialog, so no second reply can reach the runtime. */
-  function consume(requestId: string): void {
-    approvalRequests.delete(requestId);
-    askRequests.delete(requestId);
-    generations.delete(requestId);
+  function setModel(sessionId: string, providerId: string, modelId: string): Promise<OmpModelSwitchResult> {
+    return switchModel(sessionId, { type: "set_model", provider: providerId, modelId }, options.persistModelBinding
+      ? () => options.persistModelBinding?.({ sessionId, providerId, modelId })
+      : undefined);
+  }
+
+  function setThinkingLevel(sessionId: string, level: string): Promise<OmpModelSwitchResult> {
+    return switchModel(sessionId, { type: "set_thinking_level", level }, options.persistThinkingLevel
+      ? () => options.persistThinkingLevel?.({ sessionId, level })
+      : undefined);
   }
 
   function resolvePermission(requestId: string, decision: OmpUiDecision): OmpResolution {
-    const found = lookupDialog(requestId, "approval");
-    if (!found.ok) return found.result;
-    const { entry } = found;
-    if (entry.request.kind !== "approval") {
-      return refuse("wrong-kind", "the stored dialog is not a tool approval");
-    }
-    const active = runner;
-    if (!active) return refuse("unknown", "no OMP session is running");
-    consume(requestId);
-    const result = active.resolveUiRequest(requestId, decision, {
-      sessionId: entry.sessionId,
-      generation: entry.generation,
-    });
-    if (!result.ok) {
-      return refuse(
-        result.reason === "stale" ? "stale" : result.reason === "duplicate" ? "duplicate" : "refused",
-        result.detail ?? "the runtime refused the decision",
-      );
-    }
-    return { ok: true, outcome: "answered" };
-  }
-
-  /**
-   * A question's answer from the desktop's card.
-   *
-   * Confirms become the boolean decision the runtime's `confirm` resolves;
-   * selects carry the label the user picked. Neither path can consume an
-   * approval, and an empty answer is a cancellation rather than a yes.
-   */
-  function resolveAsk(resolution: AskToolResolution): OmpResolution {
-    const found = lookupDialog(resolution.requestId, "ask");
-    if (!found.ok) return found.result;
-    const { entry } = found;
-    if (entry.request.kind !== "question") {
-      return refuse("wrong-kind", "the stored dialog is not a question");
-    }
-    if (resolution.sessionId !== entry.sessionId) {
-      return refuse("stale", "the answer names another session");
-    }
-    const first = (resolution.answers ?? [])[0];
-    // `null` (or an empty answer) is the desktop's skip/decline — the Pi path's
-    // own contract for `AskToolResolution.answers` — and the card is gone by the
-    // time this returns, so the request has to be finished here.
-    if (!first || first.length === 0) {
-      return finishCancelled(resolution.requestId, "the user skipped the question");
-    }
-    const chosen = first[0] ?? "";
-    if (!runner) {
-      return finishCancelled(resolution.requestId, "the OMP runtime is no longer running");
-    }
-    if (entry.request.method === "confirm") {
-      if (chosen !== "Yes" && chosen !== "No") {
-        return finishCancelled(resolution.requestId, "the confirmation was dismissed");
+    for (const entry of entries.values()) {
+      const pending = entry.approvalRequests.get(requestId);
+      if (!pending) continue;
+      if (entry.askRequests.has(requestId)) {
+        return { ok: false, reason: "wrong-kind", detail: "this id belongs to a question, not a tool approval" };
       }
-      consume(resolution.requestId);
-      const result = runner.resolveUiRequest(
-        resolution.requestId,
-        chosen === "Yes" ? "allow-once" : "deny",
-        { sessionId: entry.sessionId, generation: entry.generation },
-      );
-      return result.ok
-        ? { ok: true, outcome: "answered" }
-        : refuse("refused", result.detail ?? "the runtime refused the answer");
+      entry.approvalRequests.delete(requestId);
+      entry.generations.delete(requestId);
+      const runner = entry.activeRunner();
+      if (!runner) return { ok: false, reason: "unknown", detail: "no OMP session is running" };
+      const result = runner.resolveUiRequest(requestId, decision, {
+        sessionId: pending.sessionId,
+        generation: pending.generation,
+      });
+      if (!result.ok) {
+        return { ok: false, reason: result.reason === "stale" ? "stale" : result.reason === "duplicate" ? "duplicate" : "refused", detail: result.detail ?? "the runtime refused the decision" };
+      }
+      return { ok: true, outcome: "answered" };
     }
-    const offered = entry.request.options ?? [];
-    if (!offered.includes(chosen)) {
-      // A free-text answer the runtime's `select` cannot carry. The card is
-      // already gone, so the dialog is failed closed rather than left waiting.
-      return finishCancelled(
-        resolution.requestId,
-        "the answer is not one of the options this dialog can return",
-      );
+    // Not a live approval: a question, an already-answered id, or unknown.
+    for (const entry of entries.values()) {
+      if (entry.askRequests.has(requestId)) {
+        return { ok: false, reason: "wrong-kind", detail: "this id belongs to a question, not a tool approval" };
+      }
+      if (entry.knownRequests.has(requestId)) {
+        return { ok: false, reason: "duplicate", detail: "this request was already answered or cancelled" };
+      }
     }
-    consume(resolution.requestId);
-    const result = runner.resolveUiRequest(resolution.requestId, "allow-once", {
-      sessionId: entry.sessionId,
-      generation: entry.generation,
-      value: chosen,
-    });
-    return result.ok
-      ? { ok: true, outcome: "answered" }
-      : refuse("refused", result.detail ?? "the runtime refused the answer");
+    return { ok: false, reason: "unknown", detail: "no dialog with this id was raised" };
   }
 
-  /**
-   * Stop the current run (T13).
-   *
-   * The runtime's order lives in the runner — dialogs cancelled first, then
-   * `abort`, then `abort_bash` while a command is still open, then a bounded
-   * wait, and only then M2's process teardown.
-   */
-  async function stop(sessionId: string): Promise<OmpStopOutcome> {
-    // Ownership is checked before anything is touched: a stop addressed to
-    // another session must not cancel this one's dialogs, change its state or
-    // write a single frame.
-    if (boundSessionId && boundSessionId !== sessionId) {
-      throw Object.assign(new Error("this runtime hosts a different session"), { errorCode: REFUSAL });
-    }
-    if (!runner) {
-      return {
-        aborted: false,
-        abortBashSent: false,
-        converged: true,
-        toreDown: false,
-        steps: ["nothing running"],
-        errors: [],
+  function resolveAsk(resolution: AskToolResolution): OmpResolution {
+    for (const entry of entries.values()) {
+      const pending = entry.askRequests.get(resolution.requestId);
+      if (!pending) continue;
+      if (pending.request.kind !== "question") {
+        return { ok: false, reason: "wrong-kind", detail: "the stored dialog is not a question" };
+      }
+      if (resolution.sessionId !== pending.sessionId) {
+        return { ok: false, reason: "stale", detail: "the answer names another session" };
+      }
+      const first = (resolution.answers ?? [])[0];
+      const chosen = first?.[0] ?? "";
+      const runner = entry.activeRunner();
+      const cancel = (reason: string): OmpResolution => {
+        if (runner) runner.cancelUiRequest(resolution.requestId, reason);
+        entry.askRequests.delete(resolution.requestId);
+        entry.generations.delete(resolution.requestId);
+        return { ok: true, outcome: "cancelled" };
       };
+      if (!first || first.length === 0 || !chosen) {
+        return cancel("the user skipped the question");
+      }
+      if (!runner) {
+        return cancel("the OMP runtime is no longer running");
+      }
+      if (pending.request.method === "confirm") {
+        if (chosen !== "Yes" && chosen !== "No") {
+          return cancel("the confirmation was dismissed");
+        }
+        entry.askRequests.delete(resolution.requestId);
+        entry.generations.delete(resolution.requestId);
+        const result = runner.resolveUiRequest(resolution.requestId, chosen === "Yes" ? "allow-once" : "deny", {
+          sessionId: pending.sessionId,
+          generation: pending.generation,
+        });
+        return result.ok ? { ok: true, outcome: "answered" } : { ok: false, reason: "refused", detail: result.detail ?? "the runtime refused the answer" };
+      }
+      const offered = pending.request.options ?? [];
+      if (!offered.includes(chosen)) {
+        return cancel("the answer is not one of the options this dialog can return");
+      }
+      entry.askRequests.delete(resolution.requestId);
+      entry.generations.delete(resolution.requestId);
+      const result = runner.resolveUiRequest(resolution.requestId, "allow-once", {
+        sessionId: pending.sessionId,
+        generation: pending.generation,
+        value: chosen,
+      });
+      return result.ok ? { ok: true, outcome: "answered" } : { ok: false, reason: "refused", detail: result.detail ?? "the runtime refused the answer" };
     }
-    // The runner cancels every dialog it is waiting on and reports the ids
-    // back, so both layers forget them together.
-    const outcome = await runner.stop();
+    for (const entry of entries.values()) {
+      if (entry.approvalRequests.has(resolution.requestId)) {
+        return { ok: false, reason: "wrong-kind", detail: "this id belongs to a tool approval, not a question" };
+      }
+      if (entry.knownRequests.has(resolution.requestId)) {
+        return { ok: false, reason: "duplicate", detail: "this request was already answered or cancelled" };
+      }
+    }
+    return { ok: false, reason: "unknown", detail: "no dialog with this id was raised" };
+  }
+
+  async function stop(sessionId: string): Promise<OmpStopOutcome> {
+    const entry = entryOf(sessionId);
+    if (!entry || !entry.activeRunner()) {
+      return { aborted: false, abortBashSent: false, converged: true, toreDown: false, steps: ["nothing running"], errors: [] };
+    }
+    const outcome = await entry.stop();
     logger?.app("omp", "info", "omp stop finished", {
-      data: {
-        sessionId,
-        converged: outcome.converged,
-        toreDown: outcome.toreDown,
-        steps: outcome.steps,
-        errors: outcome.errors,
-      },
+      data: { sessionId, converged: outcome.converged, toreDown: outcome.toreDown, steps: outcome.steps, errors: outcome.errors },
     });
     return outcome;
   }
 
   function status(sessionId: string): OmpSessionStatus {
-    if (!runner || (boundSessionId && boundSessionId !== sessionId)) {
-      return {
-        isRunning: false,
-        pendingToolConfirmations: 0,
-        engine: "omp",
-        state: "idle",
-      };
+    const entry = entryOf(sessionId);
+    const runner = entry?.activeRunner() ?? null;
+    if (!entry || !runner) {
+      return { isRunning: false, pendingToolConfirmations: 0, engine: "omp", state: "idle" };
     }
     const current = runner.status();
     return {
@@ -646,49 +783,79 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       ...(current.currentTurnId ? { currentTurnId: current.currentTurnId } : {}),
       pendingToolConfirmations: current.pendingToolConfirmations,
       engine: "omp",
-      state: runner.runState(),
+      state: entry.runnerState(),
     };
   }
 
-  async function dispose(reason = "application shutdown"): Promise<void> {
-    approvalRequests.clear();
-    askRequests.clear();
-    generations.clear();
-    if (runner) runner.dispose(reason);
-    await options.supervisor.reclaimAll().catch(() => undefined);
-    runner = null;
-    boundSessionId = null;
-    boundProjectDirectory = null;
-  }
-
-  function diagnostics(): ReturnType<OmpSessionRunner["diagnostics"]> & { sessionId: string | null } {
-    if (!runner) {
-      return {
-        sessionId: boundSessionId,
-        lateFrames: 0,
-        conversion: { unmappedFrames: {}, toolResultMessages: {}, droppedParts: {}, notes: [] },
-        uiRecords: [],
-        state: "idle",
-      };
-    }
-    return { sessionId: boundSessionId, ...runner.diagnostics() };
-  }
-
   function hasPendingRequest(requestId: string): boolean {
-    return approvalRequests.has(requestId) || askRequests.has(requestId);
+    for (const entry of entries.values()) {
+      if (entry.approvalRequests.has(requestId) || entry.askRequests.has(requestId)) return true;
+    }
+    return false;
   }
 
   function hasKnownRequest(requestId: string): boolean {
-    return knownRequests.has(requestId);
+    for (const entry of entries.values()) {
+      if (entry.knownRequests.has(requestId)) return true;
+    }
+    return false;
   }
 
-  function workingDirectory(): string | null {
-    return boundProjectDirectory;
+  function workingDirectory(sessionId: string): string | null {
+    return entryOf(sessionId)?.projectDirectory ?? null;
+  }
+
+  async function disposeSession(sessionId: string, reason = "session disposed"): Promise<void> {
+    const entry = entries.get(sessionId);
+    if (!entry) return;
+    entries.delete(sessionId);
+    await entry.dispose(reason);
+  }
+
+  async function dispose(reason = "application shutdown"): Promise<void> {
+    const retained = [...entries.entries()];
+    entries.clear();
+    const failures: string[] = [];
+    for (const [sessionId, entry] of retained) {
+      try {
+        await entry.dispose(reason);
+      } catch (error) {
+        failures.push(`${sessionId}: ${(error as Error)?.message ?? String(error)}`);
+      }
+    }
+    if (failures.length > 0) {
+      throw Object.assign(
+        new Error(`failed to reclaim ${failures.length} OMP session runtime(s): ${failures.join("; ")}`),
+        { errorCode: "OMP_RUNTIME_CLEANUP_FAILED" },
+      );
+    }
+  }
+
+  function diagnostics() {
+    const sessions = [...entries.entries()].map(([sessionId, entry]) => ({
+      sessionId,
+      state: entry.runnerState(),
+      lateFrames: entry.activeRunner()?.diagnostics().lateFrames ?? 0,
+    }));
+    const first = entries.values().next().value as SessionEntry | undefined;
+    const runnerDiagnostics = first?.activeRunner()?.diagnostics();
+    return {
+      sessionId: first?.sessionId ?? null,
+      lateFrames: runnerDiagnostics?.lateFrames ?? 0,
+      conversion: runnerDiagnostics?.conversion ?? { unmappedFrames: {}, toolResultMessages: {}, droppedParts: {}, notes: [] },
+      uiRecords: runnerDiagnostics?.uiRecords ?? [],
+      state: first?.runnerState() ?? "idle",
+      sessions,
+    };
   }
 
   return {
     gatePath,
     prompt,
+    rename,
+    branch,
+    setModel,
+    setThinkingLevel,
     stop,
     resolvePermission,
     resolveAsk,
@@ -696,6 +863,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     hasPendingRequest,
     hasKnownRequest,
     workingDirectory,
+    disposeSession,
     dispose,
     diagnostics,
   };

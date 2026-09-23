@@ -868,3 +868,40 @@ pub(crate) fn migrate_v19_to_v20(conn: &Connection, path: &Path) -> Result<()> {
     let _ = conn.pragma_update(None, "foreign_keys", true);
     result
 }
+
+/// v21 persists the versioned native-session reference the desktop needs to
+/// restore an OMP session (M4/T14).
+///
+/// Every column is nullable: a Pi session (and every session that predates the
+/// engine boundary) has no native transcript of its own, and an OMP session
+/// only gains a reference after its first real RPC `new_session` returns a
+/// `sessionId`/`sessionFile`. The columns are typed rather than a JSON blob so
+/// a reader can validate each field independently and an unknown or
+/// out-of-range value is a decode error, not a silently trusted blob.
+pub(crate) fn migrate_v20_to_v21_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+    tx.execute_batch(
+        "ALTER TABLE sessions ADD COLUMN engine_adapter_version INTEGER;
+         ALTER TABLE sessions ADD COLUMN engine_runtime_version TEXT;
+         ALTER TABLE sessions ADD COLUMN native_session_id TEXT;
+         ALTER TABLE sessions ADD COLUMN native_session_path TEXT;",
+    )?;
+    tx.pragma_update(None, "user_version", 21i64)?;
+    Ok(())
+}
+
+pub(crate) fn migrate_v20_to_v21(conn: &Connection, path: &Path) -> Result<()> {
+    let backup = create_migration_backup(conn, path, 20)?;
+    conn.pragma_update(None, "foreign_keys", false)?;
+    let result = (|| {
+        let tx = conn.unchecked_transaction()?;
+        migrate_v20_to_v21_tx(&tx)?;
+        tx.commit().with_context(|| {
+            format!(
+                "commit schema v20 to v21 migration; backup {} remains",
+                backup.display()
+            )
+        })
+    })();
+    let _ = conn.pragma_update(None, "foreign_keys", true);
+    result
+}

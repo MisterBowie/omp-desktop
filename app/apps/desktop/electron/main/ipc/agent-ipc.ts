@@ -390,6 +390,18 @@ export function registerAgentIpc({
         typeof session.projectPath === "string" && session.projectPath.trim()
           ? session.projectPath.trim()
           : null;
+      // The native-session reference is a main/host-boundary value: it is read
+      // here and handed to the runtime for restore, never surfaced to the
+      // renderer.
+      const engineRef = await host
+        .call<{
+          engineRef?: {
+            nativeSessionId?: string | null;
+            nativeSessionPath?: string | null;
+          } | null;
+        }>("session.getEngineRef", { id: req.sessionId })
+        .then((r) => r.engineRef ?? null)
+        .catch(() => null);
       const ompUserMessage: UiMessage = {
         id: req.messageId ?? `omp-user:${req.sessionId}`,
         role: "user",
@@ -414,6 +426,11 @@ export function registerAgentIpc({
         sessionId: req.sessionId,
         content: req.content,
         projectPath,
+        providerId: typeof session.providerId === "string" ? session.providerId : null,
+        modelId: typeof session.modelId === "string" ? session.modelId : null,
+        thinkingLevel: typeof session.thinkingLevel === "string" ? session.thinkingLevel : null,
+        nativeSessionId: engineRef?.nativeSessionId ?? null,
+        nativeSessionPath: engineRef?.nativeSessionPath ?? null,
       });
     }
     if (!sidecar) throw new Error("sidecar unavailable");

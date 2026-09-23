@@ -1358,6 +1358,123 @@ pub fn session_mode(db: &Database, id: &str) -> Result<Option<String>> {
         .map(|mode| normalize_mode(Some(&mode))))
 }
 
+// ---- native session reference (M4/T14) --------------------------------------
+
+/// The versioned native-session reference that binds a desktop OMP session to
+/// the native transcript its runtime owns.
+///
+/// This is deliberately a dedicated value rather than fields on
+/// `SessionSummary`: the native path is an absolute main/host-boundary value,
+/// and the renderer-facing session list must never carry it. The desktop's main
+/// process reads it through `session.getEngineRef` and validates it (identity,
+/// containment, file type, adapter version) before it is handed to a runtime.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionEngineRef {
+    pub engine: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adapter_version: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_session_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_session_path: Option<String>,
+}
+
+/// Read the persisted native-session reference for one session.
+///
+/// Returns `None` for an unknown session. A Pi session yields a reference with
+/// `engine: "pi"` and no native handles; an OMP session yields whatever its
+/// first `new_session` round-trip persisted (possibly still empty until then).
+pub fn session_engine_ref(db: &Database, id: &str) -> Result<Option<SessionEngineRef>> {
+    let row = db
+        .conn()
+        .query_row(
+            "SELECT engine, engine_adapter_version, engine_runtime_version,
+                    native_session_id, native_session_path
+             FROM sessions WHERE id = ?1 AND deleted_at IS NULL",
+            params![id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<i64>>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                ))
+            },
+        )
+        .optional()?;
+    Ok(row.map(
+        |(engine, adapter_version, runtime_version, native_session_id, native_session_path)| {
+            SessionEngineRef {
+                engine,
+                adapter_version,
+                runtime_version,
+                native_session_id,
+                native_session_path,
+            }
+        },
+    ))
+}
+
+/// Persist the native-session reference an OMP session earned through a real
+/// RPC `new_session` round-trip.
+///
+/// The reference is only meaningful for an OMP session: a Pi session has no
+/// native transcript and binding one would hand the Pi path an identity it does
+/// not own. A bind to an unknown or non-OMP session fails with a distinct
+/// reason so the caller never confuses "not found" with "wrong engine". The
+/// values are stored verbatim but validated for shape — an empty id/path is a
+/// refusal, not a stored surprise; containment and file-type checks happen at
+/// the main boundary before the path is ever handed to a runtime.
+pub fn bind_session_engine_ref(
+    db: &Database,
+    id: &str,
+    adapter_version: Option<i64>,
+    runtime_version: Option<String>,
+    native_session_id: Option<String>,
+    native_session_path: Option<String>,
+) -> Result<bool> {
+    let Some(engine) = db
+        .conn()
+        .prepare_cached("SELECT engine FROM sessions WHERE id = ?1")?
+        .query_row(params![id], |row| row.get::<_, String>(0))
+        .optional()?
+    else {
+        return Ok(false);
+    };
+    if engine != "omp" {
+        return Err(anyhow!("session {id} runs the {engine} engine; a native session reference only binds to an OMP session"));
+    }
+    let session_id = native_session_id.unwrap_or_default().trim().to_string();
+    let session_path = native_session_path.unwrap_or_default().trim().to_string();
+    if session_id.is_empty() || session_path.is_empty() {
+        return Err(anyhow!(
+            "a native session reference requires a non-empty session id and path"
+        ));
+    }
+    let runtime_version = runtime_version.filter(|value| !value.trim().is_empty());
+    let changed = db
+        .conn()
+        .prepare_cached(
+            "UPDATE sessions
+             SET engine_adapter_version = ?2, engine_runtime_version = ?3,
+                 native_session_id = ?4, native_session_path = ?5, updated_at = ?6
+             WHERE id = ?1",
+        )?
+        .execute(params![
+            id,
+            adapter_version,
+            runtime_version,
+            session_id,
+            session_path,
+            now_ms(),
+        ])?;
+    Ok(changed > 0)
+}
+
 /// Process-wide cache of transcript layouts, keyed by session id.
 ///
 /// The layout is derived data: it can always be rebuilt by scanning the file,

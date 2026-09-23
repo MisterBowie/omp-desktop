@@ -135,10 +135,17 @@ fn v19_database_migrates_to_session_engine() {
             crate::sessions::create_session(&db, Some("existing".into()), None, None, None, None)
                 .unwrap();
         session_id = session.id;
-        // Recreate the pre-v20 shape: the column did not exist, so neither does
-        // any value that could be read out of it.
+        // Recreate the pre-v20 shape: the engine column did not exist, and the
+        // v21 native-reference columns did not either, so none of them can be
+        // read out of the file.
         db.conn()
-            .execute_batch("ALTER TABLE sessions DROP COLUMN engine;")
+            .execute_batch(
+                "ALTER TABLE sessions DROP COLUMN engine;
+                 ALTER TABLE sessions DROP COLUMN engine_adapter_version;
+                 ALTER TABLE sessions DROP COLUMN engine_runtime_version;
+                 ALTER TABLE sessions DROP COLUMN native_session_id;
+                 ALTER TABLE sessions DROP COLUMN native_session_path;",
+            )
             .unwrap();
         db.conn().pragma_update(None, "user_version", 19).unwrap();
     }
@@ -156,9 +163,141 @@ fn v19_database_migrates_to_session_engine() {
     assert_eq!(engine, "pi");
 }
 
+/// M4/T14: a v20 database gains the four native-session reference columns, all
+/// nullable, and every session it already held reads back a reference with no
+/// native handles — the correct reading for a session created before the
+/// reference existed.
+#[test]
+fn v20_database_migrates_to_native_session_reference() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    let session_id;
+    {
+        let db = Database::open(&path).unwrap();
+        let session =
+            crate::sessions::create_session(&db, Some("existing".into()), None, None, None, None)
+                .unwrap();
+        session_id = session.id;
+        // Recreate the pre-v21 shape: the four reference columns did not exist.
+        db.conn()
+            .execute_batch(
+                "ALTER TABLE sessions DROP COLUMN engine_adapter_version;
+                 ALTER TABLE sessions DROP COLUMN engine_runtime_version;
+                 ALTER TABLE sessions DROP COLUMN native_session_id;
+                 ALTER TABLE sessions DROP COLUMN native_session_path;",
+            )
+            .unwrap();
+        db.conn().pragma_update(None, "user_version", 20).unwrap();
+    }
+    let db = Database::open(&path).unwrap();
+    assert_eq!(schema_version(db.conn()), SCHEMA_VERSION);
+    assert!(migration_backup_path(&path, 20).exists());
+    let reference = crate::sessions::session_engine_ref(&db, &session_id)
+        .unwrap()
+        .expect("the migrated session still resolves");
+    assert_eq!(reference.engine, "pi");
+    assert_eq!(reference.native_session_id, None);
+    assert_eq!(reference.native_session_path, None);
+    assert_eq!(reference.adapter_version, None);
+    assert_eq!(reference.runtime_version, None);
+}
+
 fn schema_version(conn: &Connection) -> i64 {
     conn.query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap()
+}
+
+#[test]
+fn bind_engine_ref_persists_and_reads_back_native_handles() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    let db = Database::open(&path).unwrap();
+    let session = crate::sessions::create_session_with_options(
+        &db,
+        crate::sessions::SessionCreateOptions {
+            title: Some("omp task".into()),
+            engine: Some("omp".into()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    let ok = crate::sessions::bind_session_engine_ref(
+        &db,
+        &session.id,
+        Some(1),
+        Some("18.2.7".into()),
+        Some("native-id-1".into()),
+        Some("/data/omp-sessions/native-id-1.jsonl".into()),
+    )
+    .unwrap();
+    assert!(ok);
+
+    let reference = crate::sessions::session_engine_ref(&db, &session.id)
+        .unwrap()
+        .expect("session resolves");
+    assert_eq!(reference.engine, "omp");
+    assert_eq!(reference.adapter_version, Some(1));
+    assert_eq!(reference.runtime_version.as_deref(), Some("18.2.7"));
+    assert_eq!(reference.native_session_id.as_deref(), Some("native-id-1"));
+    assert_eq!(
+        reference.native_session_path.as_deref(),
+        Some("/data/omp-sessions/native-id-1.jsonl")
+    );
+}
+
+#[test]
+fn bind_engine_ref_refuses_pi_sessions_and_blank_handles() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    let db = Database::open(&path).unwrap();
+    let pi = crate::sessions::create_session(&db, Some("pi task".into()), None, None, None, None)
+        .unwrap();
+    let omp = crate::sessions::create_session_with_options(
+        &db,
+        crate::sessions::SessionCreateOptions {
+            title: Some("omp task".into()),
+            engine: Some("omp".into()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    // A Pi session has no native transcript: binding one must refuse, not
+    // silently claim a native identity for the Pi path.
+    let refused = crate::sessions::bind_session_engine_ref(
+        &db,
+        &pi.id,
+        Some(1),
+        None,
+        Some("id".into()),
+        Some("/tmp/id.jsonl".into()),
+    );
+    assert!(refused.is_err(), "binding a Pi session must fail");
+
+    // A blank id or path is a shape failure, not a stored surprise.
+    let blank = crate::sessions::bind_session_engine_ref(
+        &db,
+        &omp.id,
+        Some(1),
+        None,
+        Some("".into()),
+        Some("/tmp/x.jsonl".into()),
+    );
+    assert!(blank.is_err(), "a blank native id must fail");
+
+    // An unknown session is not an error at the engine level; it just binds
+    // nothing (caller maps `false` to NOT_FOUND).
+    let unknown = crate::sessions::bind_session_engine_ref(
+        &db,
+        "does-not-exist",
+        Some(1),
+        None,
+        Some("id".into()),
+        Some("/tmp/x.jsonl".into()),
+    )
+    .unwrap();
+    assert!(!unknown);
 }
 
 fn insert_raw_app_settings(db: &Database, raw: &str) {

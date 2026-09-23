@@ -101,7 +101,7 @@ import { registerAppIpc } from "./ipc/app-ipc";
 import { registerNotificationIpc } from "./ipc/notification-ipc";
 import { registerSessionIpc } from "./ipc/session-ipc";
 import { createDesktopEngineRuntimeForApp } from "./runtime/engine-runtime";
-import { createOmpSessionBridge } from "./runtime/omp-session";
+import { wireOmpSessions } from "./runtime/omp-session-wiring";
 import { registerSettingsIpc } from "./ipc/settings-ipc";
 import { registerProviderIpc } from "./ipc/provider-ipc";
 import {
@@ -1245,18 +1245,18 @@ runtimeLifecycle = createRuntimeLifecycle({
 const { bootHostStatus, runtimeArch, bootBackends } = runtimeLifecycle;
 
 const engineRuntime = createDesktopEngineRuntimeForApp({ dataRoot: dataDir, app, getHost: () => host, piRuntimeLive: () => host !== null && sidecar !== null }); // engine gate + owned runtime (ADR 0300)
-// The OMP conversation bridge (M3): one runtime drives one session, streams its
-// events into the desktop's own vocabulary and answers its approval dialogs.
-const ompSessions = createOmpSessionBridge({
-  supervisor: engineRuntime.ompRuntime.supervisor(),
-  launcher: engineRuntime.ompRuntime.launcher,
+// The OMP conversation registry (M4): one runtime per session, each with its
+// own supervisor, project directory, native transcript and model projection.
+const ompSessions = wireOmpSessions({
+  dataRoot: dataDir,
+  host: () => host,
+  engineRuntime,
+  logger,
   isPackaged: app.isPackaged,
   resourcesPath: process.resourcesPath ?? null,
   appPath: app.getAppPath(),
   emitAgentEvent: (envelope) => emitAgentEvent(envelope),
-  logger,
-  gateResolver: () => engineRuntime.gateExtension,
-});
+}).bridge;
 function registerIpc() {
   return registerIpcHandlers({
     traySessions: applicationLifecycle!.traySessions,

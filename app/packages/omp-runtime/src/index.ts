@@ -92,9 +92,11 @@ export {
 } from "./transport.js";
 export {
   describeRuntimeLauncher,
+  ensureSessionStateDir,
   OmpRuntimeSupervisor,
   RUNTIME_STATE_DIR,
   RUN_ROOT_PREFIX,
+  SESSION_STATE_DIR,
   type OmpReclaimResult,
   type OmpRunPaths,
   type OmpRuntimeSupervisorOptions,

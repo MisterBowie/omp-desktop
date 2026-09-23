@@ -102,11 +102,11 @@ test("OMP status comes from its runtime, and unshipped capabilities stay closed"
   assert.equal(status.runtimeVersion, "18.2.7");
   assert.equal(status.protocolVersion, 2);
   assert.equal(status.reason, "not-implemented");
-  // Running is not the same as shipped: only the capabilities M3 implements
+  // Running is not the same as shipped: only the capabilities M4 implements
   // are open, and the rest are refused even with the runtime up.
   assert.equal(idleOmp.engineRouter.require({ engine: "omp" }, "prompt"), "omp");
   assert.throws(
-    () => idleOmp.engineRouter.require({ engine: "omp" }, "resume"),
+    () => idleOmp.engineRouter.require({ engine: "omp" }, "steer"),
     (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
   );
 

@@ -177,7 +177,7 @@ test(
     // prompt carries. A manual call here would hide that production defect.
 
     const bridge = createOmpSessionBridge({
-      supervisor,
+      createSupervisor: () => supervisor,
       launcher: LAUNCHER,
       isPackaged: false,
       appPath: here,
@@ -189,7 +189,7 @@ test(
     try {
       // The runtime needs a model: the fake provider is the only one reachable.
       const first = await bridge.prompt({ sessionId: SESSION, content: "read the readme, then write guarded.txt", projectPath: project });
-      assert.equal(bridge.workingDirectory(), project, "the runtime must run in the session's project");
+      assert.equal(bridge.workingDirectory(SESSION), project, "the runtime must run in the session's project");
       assert.equal(first.accepted, true);
 
       // --- 1. read file -----------------------------------------------------

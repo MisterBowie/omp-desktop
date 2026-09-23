@@ -1,10 +1,21 @@
 # OMP Desktop 开发交接
 
-更新时间：2026-09-23。当前状态：**M3 端到端对话与工具执行（T11-T13）实现完成（见下方摘要与 `docs/validation/M3-workflow.md`），等待独立复审。**接入路径沿用 M1 定案：「rpc-ui 子进程 + 受信扩展 tool_call 前置审批 + 桥接层进程组终止兜底」，M2 已把它落成产品包 `app/packages/omp-runtime` 与唯一路由点 `engine-router`。M2 已完成并按要求复审（`docs/validation/M2-runtime-boundary.md` §8-§11）。下一阶段 M4（T14-T16）。M3 的范围是 T11-T13，不含 T14-T16。
+更新时间：2026-09-23。当前状态：**M4 会话持久化、模型投影与并发注册表（T14-T16）实现完成并已提交**（见下方摘要与 `docs/validation/M4-persistence.md`），等待独立复审。接入路径沿用 M1 定案：「rpc-ui 子进程 + 受信扩展 tool_call 前置审批 + 桥接层进程组终止兜底」。M4 把 M3 的「单 runtime 单 session」升级为「每 session 一个 supervisor/runtime/原生 transcript/模型投影/审批注册表」，原生 transcript 落到应用自有持久目录并在重启后经 `switch_session` 恢复。下一阶段 M5（T17-T20）。
 
-## 0. M3 交付摘要（本轮）
+## 0. M4 交付摘要（本轮）
 
-- 状态：**T11-T13 已完成并提交**（分支 `codex/m3-workflow`），等待独立复审；M4 未开始。
+- 状态：**T14-T16 已完成并提交**（分支 `codex/m4-persistence`），等待独立复审。
+- 证据：`docs/validation/M4-persistence.md`（功能→PI/OMP/本项目 证据表、验证命令与结果、先红后绿证据）；设计决策：`app/docs/adr/0302-omp-session-persistence-and-runtime-registry.md`（英文 ADR）。
+- 核心变更：
+  - **schema v21**（`crates/host-core`）：`sessions` 加 4 个可空列（`engine_adapter_version`/`engine_runtime_version`/`native_session_id`/`native_session_path`），`session.bindEngine`/`session.getEngineRef` 两个主机边界 RPC；旧 Pi 记录读回 `engine=pi`、引用全 `None`。
+  - **持久原生目录**：supervisor 加 `sessionDir`，以 `--session-dir <dataRoot>/omp-sessions` 启动 runtime（原生 transcript 与临时 runRoot 分离），stop/reclaim 不删。
+  - **per-session registry**（`omp-session.ts` 重写）：每 session 独立 supervisor/runtime/cwd/模型投影/审批注册表；`new_session`→`get_state`→`bindEngine` 或 `switch_session` 恢复；`set_session_name`/`branch`/`set_model`/`set_thinking_level` 成功并持久化后才生效。
+  - **模型投影**（`omp-model-projection.ts` + `omp-session-wiring.ts`）：只投影目标 provider/model 到临时 `models.yml`，secret 只在 main/host 边界读取、只落进临时文件，canary 扫描覆盖日志/帧/持久引用/文档。
+  - **能力**：`resume`/`branch`/`modelSwitch` 开放；`steer`/`followUp`/`compact` 保持 typed refusal（RPC 队列语义未接线）。
+- 新增测试：`omp-session-persistence-e2e.test.mjs`（真实 runtime 持久化/恢复/并发 1 项）、`omp-model-projection.test.mjs`（5）、`omp-secret-redaction.test.mjs`（canary 2）、`omp-session-bridge.test.mjs`（28，升级到 registry 语义）、host-core `db/tests.rs`（迁移 v21 + bindEngine 4）。
+- 下一轮入口：M5/T17-T20（子代理面板、edit/LSP/DAP 展示、MCP/规则/技能/记忆）；`steer`/`followUp`/`compact` 与 `subagentEvents` 在 M5 逐项开放。
+
+## 0. M3 交付摘要（上一轮）
 - 证据：`docs/validation/M3-workflow.md`（三方证据位置、权限竞争矩阵、停止顺序、端到端夹具时间线与残留检查）；设计决策：`app/docs/adr/0301-omp-session-surface.md`。
 - 新增/改动核心：`app/packages/omp-runtime/src/session/`（events 转换器、ui-requests 决策注册表、runner 生命周期）、`app/packages/omp-runtime/extensions/omp-desktop-gate.ts`（随产品发布的执行前网关）、`app/apps/desktop/electron/main/runtime/omp-session.ts`（桌面桥接）、`agent-ipc.ts` 的 OMP 分支、`packages/shared/src/engine.ts` 的能力开放（prompt/stop/structuredQuestions/toolApproval）。
 - 新增测试：`events.test.ts`(16)、`ui-requests.test.ts`(19)、`gate.test.ts`(13)、`runner.test.ts`(14)、`omp-session-bridge.test.mjs`(13)、`omp-session-e2e.test.mjs`(真实固定 OMP 端到端 1 项：读→拒绝→批准一次→跑测试→长任务停止→无残留)。

@@ -67,10 +67,11 @@ describe("engine capabilities", () => {
   });
 
   it("opens exactly the OMP capabilities this release ships", () => {
-    // M3 ships prompting, stopping, approval and questions. Everything else
-    // stays closed until its behaviour exists: an open capability is a promise
-    // that there is an implementation behind the entry point.
-    const shipped = new Set(["prompt", "stop", "structuredQuestions", "toolApproval"]);
+    // M4 ships prompting, stopping, restore, branching, model/thinking switch,
+    // approval and questions. Steering, follow-up and compaction stay closed
+    // until their behaviour exists: an open capability is a promise that there
+    // is an implementation behind the entry point.
+    const shipped = new Set(["prompt", "stop", "resume", "branch", "modelSwitch", "structuredQuestions", "toolApproval"]);
     for (const key of ENGINE_CAPABILITY_KEYS) {
       expect(PI_ENGINE_CAPABILITIES[key], `pi.${key}`).toBe(true);
       expect(OMP_ENGINE_CAPABILITIES[key], `omp.${key}`).toBe(shipped.has(key));
@@ -80,14 +81,14 @@ describe("engine capabilities", () => {
   it("refuses a closed capability with a typed, attributable refusal", () => {
     expect(engineSupports("omp", "prompt")).toBe(true);
     expect(engineSupports("omp", "toolApproval")).toBe(true);
-    expect(engineSupports("omp", "resume")).toBe(false);
+    expect(engineSupports("omp", "resume")).toBe(true);
     expect(engineSupports("omp", "steer")).toBe(false);
-    const refusal = engineCapabilityRefusal("omp", "resume");
+    const refusal = engineCapabilityRefusal("omp", "steer");
     expect(refusal.errorCode).toBe(ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE);
     expect(refusal.engine).toBe("omp");
-    expect(refusal.capability).toBe("resume");
+    expect(refusal.capability).toBe("steer");
     expect(refusal.message).toContain("omp");
-    expect(refusal.message).toContain("resume");
+    expect(refusal.message).toContain("steer");
   });
 
   it("closes capabilities whenever the runtime is not up", () => {

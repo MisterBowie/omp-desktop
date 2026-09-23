@@ -84,7 +84,7 @@ test("a stopped runtime is reported as such without reclassifying the engine", a
   assert.equal(router.require({}, "prompt"), "pi");
   // An engine whose *declaration* closes the capability is still refused.
   assert.throws(
-    () => router.require({ engine: "omp" }, "resume"),
+    () => router.require({ engine: "omp" }, "steer"),
     (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
   );
 });
@@ -92,8 +92,8 @@ test("a stopped runtime is reported as such without reclassifying the engine", a
 test("an OMP session is refused every capability this release has not shipped", async () => {
   const router = routerWith();
   assert.deepEqual(router.liveCapabilities("omp"), OMP_ENGINE_CAPABILITIES);
-  // M3 ships prompt/stop/structuredQuestions/toolApproval; those pass the gate.
-  const shipped = new Set(["prompt", "stop", "structuredQuestions", "toolApproval"]);
+  // M4 ships prompt/stop/resume/branch/modelSwitch/structuredQuestions/toolApproval.
+  const shipped = new Set(["prompt", "stop", "resume", "branch", "modelSwitch", "structuredQuestions", "toolApproval"]);
   for (const capability of ENGINE_CAPABILITY_KEYS) {
     if (shipped.has(capability)) {
       assert.equal(router.require({ engine: "omp" }, capability), "omp", capability);
@@ -108,8 +108,8 @@ test("an OMP session is refused every capability this release has not shipped", 
   // The refusal names the engine it refused, so a caller can never mistake it
   // for a Pi failure it should retry on another path.
   assert.throws(
-    () => router.require({ engine: "omp" }, "resume"),
-    (error) => error.message.includes("omp") && error.capability === "resume",
+    () => router.require({ engine: "omp" }, "steer"),
+    (error) => error.message.includes("omp") && error.capability === "steer",
   );
 });
 
@@ -117,8 +117,8 @@ test("supports() answers without throwing, for UI affordances", async () => {
   const router = routerWith();
   assert.equal(router.supports({}, "prompt"), true);
   assert.equal(router.supports({ engine: "omp" }, "prompt"), true);
-  assert.equal(router.supports({ engine: "omp" }, "branch"), false);
-  assert.equal(router.supports({ engine: "omp" }, "resume"), false);
+  assert.equal(router.supports({ engine: "omp" }, "branch"), true);
+  assert.equal(router.supports({ engine: "omp" }, "steer"), false);
 });
 
 test("a persisted Pi session is still Pi, and an OMP one is OMP", async () => {
@@ -132,7 +132,7 @@ test("a persisted Pi session is still Pi, and an OMP one is OMP", async () => {
   // this release has not shipped is still refused.
   assert.equal(await router.requireForSession("omp-session", "prompt"), "omp");
   await assert.rejects(
-    () => router.requireForSession("omp-session", "resume"),
+    () => router.requireForSession("omp-session", "steer"),
     (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
   );
   assert.equal(await router.requireForSession("legacy-session", "prompt"), "pi");
@@ -210,7 +210,7 @@ test("a status provider that throws cannot open a capability", async () => {
   assert.deepEqual(router.liveCapabilities("omp"), closedEngineCapabilities());
   // A capability no release has shipped is refused whatever the status says.
   assert.throws(
-    () => router.require({ engine: "omp" }, "resume"),
+    () => router.require({ engine: "omp" }, "steer"),
     (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
   );
 });

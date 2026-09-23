@@ -109,25 +109,25 @@ export const PI_ENGINE_CAPABILITIES: EngineCapabilities = {
 };
 
 /**
- * M3 truth for the OMP engine: a session can be prompted, streamed, stopped and
- * asked about — turn streaming, tool rows, the pre-execution approval gate and
- * user questions are implemented and verified.
+ * M4 truth for the OMP engine: prompting, stopping, questions, approvals,
+ * restore (native `switch_session`), branching and model/thinking switching are
+ * implemented and verified. The native session lifecycle is real: a new session
+ * is created through `new_session` and persisted, and a restart reopens the
+ * persisted path with `switch_session` before any prompt.
  *
- * Still closed, and closed means closed: resume, branching, steering, follow-up,
- * model switching and subagent events belong to M4/M5. A caller that asks for
- * one of those on an OMP session is refused with `EngineCapabilityRefusal`,
- * never served by the Pi path — an unshipped capability has no implementation
- * behind it, and routing it to the other engine would run the user's session on
- * a runtime that does not own its transcript.
+ * Still closed, and closed means closed: steering, follow-up and compaction are
+ * not wired to the OMP RPC queue in this release, and subagent events belong to
+ * M5/T17. A caller that asks for one of those on an OMP session is refused with
+ * `EngineCapabilityRefusal`, never served by the Pi path.
  */
 export const OMP_ENGINE_CAPABILITIES: EngineCapabilities = {
   prompt: true,
   stop: true,
-  resume: false,
-  branch: false,
+  resume: true,
+  branch: true,
   steer: false,
   followUp: false,
-  modelSwitch: false,
+  modelSwitch: true,
   structuredQuestions: true,
   toolApproval: true,
   subagentEvents: false,

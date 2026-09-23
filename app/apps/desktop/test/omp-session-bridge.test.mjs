@@ -72,6 +72,8 @@ class FakeRuntime {
   onPrompt = undefined;
   promptResponse = undefined;
   promptFailure = undefined;
+  /** Scripted session state for the lifecycle commands (new_session/get_state). */
+  stateResponse = undefined;
 
   async request(command) {
     this.commands.push(command.type);
@@ -79,6 +81,28 @@ class FakeRuntime {
       this.onPrompt?.();
       if (this.promptFailure) throw this.promptFailure;
       if (this.promptResponse) return this.promptResponse;
+    }
+    if (command.type === "new_session") {
+      return { success: true, data: { cancelled: false } };
+    }
+    if (command.type === "get_state") {
+      if (this.stateResponse !== undefined) return this.stateResponse;
+      return {
+        success: true,
+        data: { sessionId: "native-id", sessionFile: "/tmp/native-session.jsonl", sessionName: "session" },
+      };
+    }
+    if (command.type === "switch_session") {
+      return { success: true, data: { cancelled: false } };
+    }
+    if (command.type === "set_session_name" || command.type === "set_model" || command.type === "set_thinking_level") {
+      return { success: true };
+    }
+    if (command.type === "get_branch_messages") {
+      return { success: true, data: { messages: [{ entryId: "entry-1", text: "root" }] } };
+    }
+    if (command.type === "branch") {
+      return { success: true, data: { text: "branched", cancelled: false } };
     }
     return { success: true };
   }
@@ -146,12 +170,30 @@ function fakeSupervisor(runtime) {
 }
 
 function bridgeHarness({ gate = "/repo/app/packages/omp-runtime/extensions/omp-desktop-gate.ts", launcher = "/repo/upstream/oh-my-pi/packages/coding-agent/scripts/omp" } = {}) {
-  const runtime = new FakeRuntime();
-  const supervisor = fakeSupervisor(runtime);
+  const runtimes = [];
+  const supervisors = [];
   const envelopes = [];
   const logs = [];
+  // Pre-create the first runtime/supervisor so the destructured handles the
+  // single-session tests use are live before the first prompt.
+  const firstRuntime = new FakeRuntime();
+  const firstSupervisor = fakeSupervisor(firstRuntime);
+  runtimes.push(firstRuntime);
+  supervisors.push(firstSupervisor);
+  let created = 0;
   const bridge = createOmpSessionBridge({
-    supervisor,
+    createSupervisor: () => {
+      if (created === 0) {
+        created += 1;
+        return firstSupervisor;
+      }
+      const runtime = new FakeRuntime();
+      const supervisor = fakeSupervisor(runtime);
+      runtimes.push(runtime);
+      supervisors.push(supervisor);
+      created += 1;
+      return supervisor;
+    },
     launcher,
     isPackaged: false,
     appPath: "/repo/app",
@@ -159,7 +201,7 @@ function bridgeHarness({ gate = "/repo/app/packages/omp-runtime/extensions/omp-d
     logger: { app: (scope, level, message, fields) => logs.push({ scope, level, message, fields }) },
     gateResolver: () => gate,
   });
-  return { bridge, runtime, supervisor, envelopes, logs };
+  return { bridge, runtime: firstRuntime, supervisor: firstSupervisor, runtimes, supervisors, envelopes, logs };
 }
 
 const APPROVAL_FRAME = {
@@ -232,14 +274,13 @@ test("starts the runtime once and streams the run under one turn id", async () =
   assert.equal(supervisor.started, 1);
 });
 
-test("refuses a second OMP session instead of sharing the runtime", async () => {
-  const { bridge } = bridgeHarness();
+test("runs two OMP sessions on independent runtimes", async () => {
+  const { bridge, runtimes, supervisors } = bridgeHarness();
   const project = makeProject();
   await bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: project });
-  await assert.rejects(
-    () => bridge.prompt({ sessionId: "another-session", content: "hi", projectPath: project }),
-    (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
-  );
+  await bridge.prompt({ sessionId: "another-session", content: "hi", projectPath: project });
+  assert.equal(runtimes.length, 2, "each session gets its own runtime");
+  assert.equal(supervisors.length, 2, "each session gets its own supervisor");
 });
 
 test("surfaces a gate approval as a permission request and answers it once", async () => {
@@ -435,10 +476,10 @@ test("an OMP prompt reaches the bridge without touching the Pi runtime", async (
   assert.match(result.turnId, /^omp-turn:/);
   assert.deepEqual(sidecarCalls, []);
   assert.deepEqual(launched, []);
-  // The handler reads the session record (and settings) on the way to the
-  // engine gate; what it must never reach is the Pi-side permission or plan
-  // machinery, or the sidecar.
-  assert.ok(hostCalls.every((method) => method === "session.get" || method === "settings.get"));
+  // The handler reads the session record, its native reference, and settings on
+  // the way to the engine gate; what it must never reach is the Pi-side
+  // permission or plan machinery, or the sidecar.
+  assert.ok(hostCalls.every((method) => method === "session.get" || method === "session.getEngineRef" || method === "settings.get"));
   assert.ok(!hostCalls.includes("permissions.resolve"));
 
   // A permission decision for a request the bridge never raised must not be
@@ -496,7 +537,7 @@ test("binds the session's project directory before the runtime starts", async ()
   const { bridge, supervisor } = bridgeHarness();
   await bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: project });
   assert.deepEqual(supervisor.calls, [`setWorkingDirectory:${project}`, "start"]);
-  assert.equal(bridge.workingDirectory(), project);
+  assert.equal(bridge.workingDirectory(OMP_SESSION), project);
 });
 
 test("refuses an empty or relative project directory without starting anything", async () => {
@@ -773,15 +814,15 @@ test("stopping another session leaves this one's dialogs, state and wire untouch
   runtime.push(APPROVAL_FRAME);
   const before = bridge.status(OMP_SESSION);
 
-  await assert.rejects(
-    () => bridge.stop("other-session"),
-    (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
-  );
+  // A stop addressed to a session with no runtime is a no-op, not a signal to
+  // this session's process.
+  const outcome = await bridge.stop("other-session");
+  assert.equal(outcome.converged, true);
 
   assert.equal(bridge.hasPendingRequest("ui-1"), true, "the pending dialog must survive");
   assert.deepEqual(bridge.status(OMP_SESSION), before, "the run state must not change");
   assert.deepEqual(runtime.written, [], "no frame may be written for another session's stop");
-  assert.deepEqual(runtime.commands, ["prompt"], "no abort may be sent for another session");
+  assert.deepEqual(runtime.commands, ["new_session", "get_state", "prompt"], "no abort may be sent for another session");
   assert.deepEqual(supervisor.stopped, []);
   // The pending dialog is still answerable by its own session.
   assert.deepEqual(bridge.resolvePermission("ui-1", "allow-once"), { ok: true, outcome: "answered" });

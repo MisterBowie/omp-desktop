@@ -27,6 +27,7 @@ import {
   findPinnedLauncher,
   isExecutableAt,
   type OmpReclaimResult,
+  type OmpRunPaths,
 } from "@pi-desktop/omp-runtime";
 
 /**
@@ -120,6 +121,19 @@ export type OmpRuntimeAdapter = {
   /** Shutdown path: stop every runtime this process owns. */
   reclaim(): Promise<OmpReclaimResult[]>;
   supervisor(): OmpRuntimeSupervisor;
+  /**
+   * Create a fresh supervisor for one session's runtime (M4/T14-T16).
+   *
+   * Each session gets its own process, isolated home, run root and persistent
+   * native-session directory. `prepareRun` is where the caller projects the
+   * session's model configuration before the child starts; nothing from the
+   * user's real directories is copied.
+   */
+  createSupervisor(options?: {
+    sessionDir?: string | null;
+    prepareRun?: (paths: OmpRunPaths) => void | Promise<void>;
+    extraEnv?: NodeJS.ProcessEnv;
+  }): OmpRuntimeSupervisor;
 };
 
 export function createOmpRuntimeAdapter(
@@ -138,6 +152,17 @@ export function createOmpRuntimeAdapter(
     ...(options.args && options.args.length > 0 ? { args: options.args } : {}),
   });
 
+  const createSupervisor: OmpRuntimeAdapter["createSupervisor"] = (createOptions = {}) =>
+    factory({
+      dataRoot: options.dataRoot,
+      launcherPath: resolved.path,
+      expectedRuntimeVersion: options.expectedRuntimeVersion,
+      ...(options.args && options.args.length > 0 ? { args: options.args } : {}),
+      ...(createOptions.sessionDir ? { sessionDir: createOptions.sessionDir } : {}),
+      ...(createOptions.prepareRun ? { prepareRun: createOptions.prepareRun } : {}),
+      ...(createOptions.extraEnv ? { extraEnv: createOptions.extraEnv } : {}),
+    });
+
   return {
     launcher: resolved.path,
     launcherSource: resolved.source,
@@ -147,5 +172,6 @@ export function createOmpRuntimeAdapter(
     stop: (stopOptions) => supervisor.stop(stopOptions ?? {}),
     reclaim: () => supervisor.reclaimAll(),
     supervisor: () => supervisor,
+    createSupervisor,
   };
 }
