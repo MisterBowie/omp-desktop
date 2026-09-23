@@ -6,6 +6,19 @@
 工作树：`/home/vv/person/code/omp-desktop-m5-t17`，分支 `codex/m5-subagents`。
 传输/权限决策沿用 `docs/decisions/001-omp-transport.md`；本轮新增产品侧 ADR `app/docs/adr/0303-omp-subagent-surfacing.md`。
 
+## 0.1 独立复审返修（R1-R8，2026-09-23）
+
+独立复审发现 8 项阻断缺陷并已在同一分支追加提交修复，全部有行为回归覆盖：
+
+- **R1 父 stop 泄漏 detached 子代理**：`stop()` 在父回合收敛后未查 `hasRunningChildren()`，会谎报干净收敛却留下存活进程组。现改为收敛后经 `get_subagents` reconcile 确认；若仍有存活子代理则走既有 supervisor 进程组回收（reclaim 父 + 全部子进程树），teardown 后清 registry/task-call 所有权。新增真实固定 OMP E2E：子代理运行 `long-task.mjs`（真实长命令）时停父，断言 `converged=false`/`toreDown=true`、子命令树（pid + 后代）已回收、无残留。
+- **R2 渲染器未接线详情桥**：`SubagentPanel` 只读 `useTranscriptView`，从未调 `ompSubagentRead`。现为 OMP 会话经 `useOmpSubagentRead` → `ompSubagentList`+`ompSubagentRead` 解析不透明子 id 并映射进既有 `SubagentRun`；Pi 会话不变、不触发 OMP IPC；含 loading/reset/游标续读/live 更新/缺失/错误/卸载失效（stale-request 序号）。读取为本地投影，不回放进主 transcript、无工具副作用；单独停止保持禁用。新增行为测试（真实 `api.ts` 经 `window.piDesktop.invoke` 打桩）+ SSR 渲染测试（Pi/OMP 分流）。
+- **R3 结算破坏父 Task 行**：`settlement()` 把 `parentToolCallId` 打在结算 envelope 上，`event-persistence.subagentTagged` 把它写到原 Task 行 → reload 时 `assistant-turns` 把该行滤出根 transcript。现结算用内部 `owningToolCallId`（只恢复回合），envelope 不再带 `parentToolCallId`；子行仍带。新增 event-persistence + transcript 投影回归（Task 卡可见、子行仍挂靠）。
+- **R4 所有权校验未 fail-closed**：lifecycle/progress/snapshot 把 `parentToolCallId` 当可选，tracker 不查 `taskCalls`，`unknownParentCalls` 从未自增，`emitSynthesis` 找不到父任务时回退到当前 run。现在子代理只有在其父 id 命中本 runner 观测到的 `task` 工具调用后才 surface；缺失/未知/冲突父 id 计数并拒绝；`emitSynthesis` 不再回退当前 run（找不到属主即丢弃）。覆盖 missing/unknown/conflicting 与新代开始后的迟到 child event。
+- **R5 读取无界且丢工具行**：固定 OMP `readRpcSubagentTranscript` 是 `file.slice(fromByte).text()` 读到 EOF（上游实现限制，子运行时内无法阻止）；桌面桥此前无界返回。现 `validateSubagentMessages` 加显式条目/消息上界与 `nextByte < fromByte` 拒绝（typed error）；读取改迭代 `entries`（含 entry id，稳定行身份）并映射 `toolResult` 为既有 tool 行；内容按 4 MiB 截断。工具行不丢失，reopen/增量读取行身份稳定。
+- **R6 快照缺失不结算被错过的终止生命周期**：固定 OMP 会把终止子代理移出活跃 registry。`reconcile` 现把「先前 running、本快照缺席」的子代理呈现为 `aborted`（Pi 拓扑词汇）并恰好结算一次父 Task 行；重复空快照/已终止子代理不重复结算。
+- **R7 订阅失败与已开放能力/文档矛盾**：`list/read` 现检查订阅级别，订阅未启用时抛 typed `capability-unavailable`（bridge 映射为 `ENGINE_CAPABILITY_UNAVAILABLE`）。prompt 仍可继续（仅子代理 surface 不可用），runtime status/IPC/渲染/测试/文档一致。
+- **R8 文档**：ADR 0303 已按以上实际行为改写（见下）。
+
 ## 0. 环境准备（固定子模块流程，与本轮代码无关）
 
 | 步骤 | 命令 | 结果 |
@@ -67,25 +80,28 @@
 
 | 命令 | 结果 | 退出码 |
 | --- | --- | --- |
-| `pnpm --filter @pi-desktop/omp-runtime test` | **197 passed / 0 failed**（含真实固定 runtime 烟测；新增 subagent-frames/subagents/subagent-runner 三套 41 项） | 0 |
-| `node --test test/omp-subagent-bridge.test.mjs`（`env -u SSH_ASKPASS`） | **7 passed / 0 failed** | 0 |
-| `node --test test/omp-subagent-e2e.test.mjs`（`env -u SSH_ASKPASS`） | **2 passed / 0 failed**（真实固定 OMP + 假 provider） | 0 |
+| `pnpm --filter @pi-desktop/omp-runtime test` | **210 passed / 0 failed**（含真实固定 runtime 烟测；新增 subagent-frames/subagents/subagent-runner 三套 + 返修用例） | 0 |
+| `node --test test/omp-subagent-bridge.test.mjs`（`env -u SSH_ASKPASS`） | **8 passed / 0 failed** | 0 |
+| `node --test test/omp-subagent-e2e.test.mjs`（`env -u SSH_ASKPASS`） | **3 passed / 0 failed**（真实固定 OMP + 假 provider） | 0 |
 | （全量回归见 §6） | | |
 
-新增定向测试：
-- `packages/omp-runtime/src/session/subagent-frames.test.ts`（16 项：帧校验、快照/消息响应、游标归一化）
-- `packages/omp-runtime/src/session/subagents.test.ts`（14 项：lifecycle 注册/结算、progress/event 归因、孤立帧、快照去重、路径不披露、重置）
-- `packages/omp-runtime/src/session/subagent-runner.test.ts`（5 项：订阅幂等、迟到代归因、list 快照拒绝、读取非披露、stop 恒拒）
-- `apps/desktop/test/omp-subagent-bridge.test.mjs`（7 项：桥 list/read/stop + IPC 真实 handler 路径 + Pi 路由不变）
-- `apps/desktop/test/omp-subagent-e2e.test.mjs`（2 项：真实固定 OMP `task` 子代理端到端——三帧族、子身份、`parentToolCallId`、子工具归因、deny 无副作用、allow 恰好一次、快照、停止回收）
+新增定向测试（含返修）：
+- `packages/omp-runtime/src/session/subagent-frames.test.ts`（帧校验、快照/消息响应、游标归一化、上界与游标不一致拒绝）
+- `packages/omp-runtime/src/session/subagents.test.ts`（含 R3/R4/R6 返修：结算无 `parentToolCallId`、missing/unknown/conflicting 父、快照缺席→aborted 且幂等）
+- `packages/omp-runtime/src/session/subagent-runner.test.ts`（含 R1/R4/R5/R7 返修：stop 回收运行中子代理、迟到 event 归旧回合、tool 行稳定 id、订阅 off fail-closed）
+- `apps/desktop/test/omp-subagent-bridge.test.mjs`（8 项：桥 list/read/stop + IPC 真实 handler 路径 + Pi 路由不变 + 订阅拒绝 fail-closed）
+- `apps/desktop/test/omp-subagent-e2e.test.mjs`（3 项：真实固定 OMP `task` 子代理端到端——三帧族、子身份、`parentToolCallId`、子工具归因、deny 无副作用、allow 恰好一次、快照、停止回收、**父 stop 回收仍在运行的 detached 子代理**）
+- `apps/desktop/test/subagent-reload-projection.test.mjs`（R3：结算为根 Task 行、子行挂靠）
+- `apps/desktop/test/omp-subagent-read.test.mjs`（R2：真实 `api.ts` 经组件数据路径解析/读取/映射）
+- `apps/desktop/test/omp-subagent-panel-render.test.mjs`（R2：Pi/OMP 详情桥分流 SSR）
 
 ## 6. 全量回归
 
 | 命令 | 结果 | 退出码 |
 | --- | --- | --- |
-| `pnpm --filter @pi-desktop/omp-runtime test` | **197 passed / 0 failed**（含真实固定 runtime 烟测） | 0 |
+| `pnpm --filter @pi-desktop/omp-runtime test` | **210 passed / 0 failed**（含真实固定 runtime 烟测） | 0 |
 | `pnpm --filter @pi-desktop/shared test` | **968 passed / 0 failed** | 0 |
-| `node --test test/*.test.mjs`（`env -u SSH_ASKPASS`，desktop 全量） | **2673 passed / 0 failed / 4 skipped**（2677 项） | 0 |
+| `node --test test/*.test.mjs`（`env -u SSH_ASKPASS`，desktop 全量） | **2682 passed / 0 failed / 4 skipped**（2686 项） | 0 |
 | `pnpm typecheck`（12/13 workspace 包） | 通过 | 0 |
 | `pnpm build:js` | 通过（含 desktop renderer 打包） | 0 |
 | `git diff --check` | 无输出 | 0 |
@@ -93,7 +109,8 @@
 ## 7. 关键限制与边界
 
 - **`subagent_event` 需要 `--model`**：固定 OMP 仅在显式 `--model provider/model` 时转发子代理事件流；仅靠 `models.yml` 发现则子代理有 lifecycle/progress 但无 event（详情/转录不流）。M4 投影已钉住单一 provider/model，故 `omp-session-wiring.ts` 现同时传 `--model` 与投影。这是本轮发现的真实上游行为，已用 E2E 前后对照复现。
-- **单独停止关闭**：固定 OMP 无 per-child stop RPC，子代理 `hasUI=false` 无可信子进程句柄；`stopSubagent` 恒拒并如实说明（停止子代理 = 停止父回合）。未臆造父 abort 伪成功。
-- **batch `task` 的拓扑卡**：Pi 模型是「一个 Task 行 = 一个 delegation」。OMP batch（`tasks[]`）会在一行下多个子代理；拓扑卡以首个 child 为主 `delegationId`，各子代理行仍按 `parentToolCallId` 归入该卡。单子代理（最常见、E2E 覆盖）完整。
+- **转录读取的上游 EOF 行为 vs 桌面输出上界**：固定 OMP `readRpcSubagentTranscript` 是 `file.slice(fromByte).text()` 读到 EOF（子运行时内无法阻止）；桌面桥因此对返回结果加显式上界——`SUBAGENT_MAX_ENTRIES`/`SUBAGENT_MAX_MESSAGES`（各 10000）超限即 typed 拒绝、`nextByte < fromByte` 拒绝、内容按 4 MiB 截断——任何无界结果都不会越过桥到渲染器或被保留。截断不静默跳过消息（超限整体拒绝，游标不推进）。
+- **单独停止关闭**：固定 OMP 无 per-child stop RPC，子代理 `hasUI=false` 无可信子进程句柄；`stopSubagent` 恒拒并如实说明（停止子代理 = 停止父回合，父回合停止也会回收该子代理）。未臆造父 abort 伪成功。
+- **batch `task` 的拓扑卡（能力限制，产品决定）**：Pi 模型是「一个 Task 行 = 一个 delegation」。OMP batch（`tasks[]`）会在一行下多个子代理；现有拓扑卡以首个 child 为主 `delegationId`，各子代理行仍按 `parentToolCallId` 归入该卡。**这是显式的 UI 近似，不是完整兼容**：多子代理 batch 的首个子代理详情完整，其余子代理只能作为行归入该卡、无独立详情卡。单子代理（最常见、E2E 覆盖）完整。若需完整多子代理拓扑，须在既有 `delegations[]` 模型上扩展独立详情入口（产品决定，非本轮范围）。
 - **重启边界**：固定 OMP 进程退出后无法重开 live 子代理 registry；桌面不谎报旧 detached 子代理仍在运行、不重放。持久父 transcript 已记录的 completed/failed 如实呈现，其余 `running` 按 `turnLive:false` 呈现为 `aborted`。
 - **子模块状态**：`upstream/oh-my-pi` 与 `upstream/pi-desktop` 均保持干净（HEAD 与固定 SHA 一致）；`bun install` 的 `tool-views.generated.js` 重生成结果与提交一致，未产生未提交改动。

@@ -33,7 +33,7 @@
 | T14 | M4 | 会话字段、迁移、恢复、归档 | T07,T13 | 旧库/新库，缺文件与中断恢复 | 已完成（`docs/validation/M4-persistence.md` §1-§3；host-core schema v21 + 582 项、`session.bindEngine`/`getEngineRef`、持久 `--session-dir`、registry 恢复/命名/归档；**分支 branch 关闭**——固定 OMP `branch` 语义与 PI fork 不兼容） |
 | T15 | M4 | 模型配置、认证投影和凭证脱敏 | T07,T13 | 配置不串用，凭证不泄漏 | 已完成（同上；`omp-model-projection.ts` + canary 扫描；model change 为最小投影约束下的**离线 reclaim-first/persist-second restart**，thinking-only 在线 `set_thinking_level` 并回滚，mode/permissionMode 一次持久化） |
 | T16 | M4 | 并发项目、队列、压缩与故障恢复 | T14,T15 | cwd 不漂移、无重复执行 | 已完成（同上；per-session registry、并发/恢复 E2E、`resume`/`modelSwitch` 开放、`branch`/`steer`/`followUp`/`compact` 保持拒绝） |
-| T17 | M5 | OMP 子代理面板与编排归属 | T16 | 父子事件、查看、停止、恢复边界 | 已完成（`docs/validation/M5-subagents.md`；ADR 0303；`subagent-frames.ts`/`subagents.ts` 严格校验与每子代理转换、`get_subagents` reconcile、`get_subagent_messages` 有界读取、`stopSubagent` 恒拒；`subagentEvents` 能力开放） |
+| T17 | M5 | OMP 子代理面板与编排归属 | T16 | 父子事件、查看、停止、恢复边界 | 已完成（`docs/validation/M5-subagents.md`；ADR 0303；`subagent-frames.ts`/`subagents.ts` 严格校验与每子代理转换、`get_subagents` reconcile、`get_subagent_messages` 上界读取、`stopSubagent` 恒拒、父 stop 回收 detached 子代理、详情桥接线；`subagentEvents` 能力开放；独立复审 R1-R8 返修已提交） |
 | T18 | M5 | edit/LSP/DAP 结果与必要的专用展示 | T16 | 结构正确、未知结果可读 | 待开始 |
 | T19 | M5 | MCP、规则、技能、记忆及插件分类适配 | T16 | 单一加载责任、不重复工具注册 | 待开始 |
 | T20 | M5 | Plan/Goal 和高权限工具能力门 | T17-T19 | 不借用不适用的原权限/模式语义 | 待开始 |

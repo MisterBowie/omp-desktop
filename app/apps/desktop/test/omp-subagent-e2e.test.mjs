@@ -332,3 +332,128 @@ test(
     }
   },
 );
+
+function pidAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    readFileSync(`/proc/${pid}/stat`, "utf8");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+test(
+  "M5 subagent end-to-end: parent stop reclaims a still-running detached child",
+  { timeout: 300_000 },
+  async () => {
+    assert.ok(LAUNCHER, "the pinned runtime launcher must be present");
+    assert.ok(GATE, "the shipped tool gate must be present");
+
+    const project = makeScratch("omp-subagent-stop-project-");
+    const dataRoot = makeScratch("omp-subagent-stop-data-");
+    const identityPath = join(project, "child-task.json");
+    const taskCallId = "call_task_stop";
+    const childBashId = "call_bash_stop";
+    const longTask = join(here, "..", "..", "..", "experiments", "omp-bridge", "tools", "long-task.mjs");
+
+    const provider = await FakeProvider.start({ model: "local-model" });
+    scratch.push({ close: () => provider.close?.() });
+    provider.routeBySession({
+      parent: [
+        {
+          text: "delegating",
+          finish: "tool_calls",
+          toolCalls: [{
+            id: taskCallId,
+            name: "task",
+            args: { context: "subagent evidence", tasks: [{ task: "run a long-lived command", agent: "task", name: "ScoutLong" }] },
+          }],
+        },
+        { text: "subagent finished", finish: "stop" },
+      ],
+      subagents: [
+        {
+          marker: "run a long-lived command",
+          turns: [
+            {
+              text: "launching the long command.",
+              finish: "tool_calls",
+              toolCalls: [{ id: childBashId, name: "bash", args: { command: `node ${longTask} ${identityPath}` } }],
+            },
+          ],
+        },
+      ],
+    });
+
+    const envelopes = [];
+    const sessionDir = ensureSessionStateDir(dataRoot);
+    const supervisor = new OmpRuntimeSupervisor({
+      dataRoot,
+      launcherPath: LAUNCHER,
+      expectedRuntimeVersion: "18.2.7",
+      sessionDir,
+      args: ["--model", "m1fake/local-model", "--extension", GATE],
+      extraEnv: {
+        OMP_DESKTOP_GATE_TOOLS: "write,bash",
+        OMP_DESKTOP_GATE_MODE: "allow",
+      },
+      prepareRun: (paths) => {
+        writeModelsConfig(paths.agentDir, { baseUrl: provider.baseUrl, modelId: "local-model" });
+        writeFileSync(join(paths.agentDir, "config.yml"), "tools:\n  approvalMode: yolo\n");
+      },
+      readyTimeoutMs: 60_000,
+    });
+
+    const bridge = createOmpSessionBridge({
+      createSupervisor: () => supervisor,
+      launcher: LAUNCHER,
+      isPackaged: false,
+      appPath: here,
+      sessionDir,
+      gateResolver: () => GATE,
+      emitAgentEvent: (envelope) => envelopes.push(envelope),
+      logger: { app: () => undefined },
+    });
+
+    let childPid = null;
+    let childDescendantPid = null;
+    try {
+      await bridge.prompt({ sessionId: "e2e-omp-subagent-stop", content: "delegate a long command", projectPath: project });
+
+      // The child's long-lived command starts and records its own identity.
+      const started = await waitFor(() => existsSync(identityPath));
+      assert.equal(started, true, "the child's long command must start");
+      const identity = JSON.parse(readFileSync(identityPath, "utf8"));
+      childPid = identity.pid;
+      childDescendantPid = identity.descendantPid;
+      assert.ok(pidAlive(childPid), "the child's command must be alive before the stop");
+
+      // The child is still running (its bash command has not finished). The
+      // parent turn is still in-flight because the `task` tool waits on it.
+      const listed = await bridge.listSubagents("e2e-omp-subagent-stop");
+      assert.ok(listed.some((entry) => entry.parentToolCallId === taskCallId && entry.status === "running"), "the child must still be running");
+
+      // Stop the parent while the detached child is still active: the runner
+      // must not report clean convergence while the process group is alive.
+      const stop = await bridge.stop("e2e-omp-subagent-stop");
+      assert.equal(stop.converged, false, "a still-running child must prevent clean convergence");
+      assert.equal(stop.toreDown, true, "the process-group teardown must run to reclaim the child");
+
+      // The teardown reclaims the child's command tree: no owned process remains.
+      const childReaped = await waitFor(() => !pidAlive(childPid) && !pidAlive(childDescendantPid), 15_000);
+      assert.equal(childReaped, true, "the detached child's command tree must be reclaimed");
+
+      await bridge.dispose("e2e finished");
+      const reclaimed = await supervisor.reclaimAll();
+      assert.ok(reclaimed.every((entry) => entry.reaped && entry.cleaned), "every run must be reclaimed");
+    } finally {
+      await bridge.dispose("e2e finished").catch(() => undefined);
+      await supervisor.reclaimAll().catch(() => undefined);
+      for (const entry of scratch.splice(0)) {
+        if (entry && typeof entry.close === "function") entry.close();
+        else rmSync(entry, { recursive: true, force: true });
+      }
+    }
+  },
+);

@@ -56,10 +56,13 @@ class SubagentRuntime {
   transcript = null;
   /** Native session path the `get_state` response reports (inside the session dir). */
   statePath = "/tmp/native.jsonl";
+  /** When true, `set_subagent_subscription` is refused (R7 fail-closed path). */
+  refuseSubscription = false;
 
   async request(command) {
     this.commands.push(command.type);
     if (command.type === "set_subagent_subscription") {
+      if (this.refuseSubscription) return { success: false, error: "subscription refused" };
       return { success: true, data: { level: command.level } };
     }
     if (command.type === "prompt") {
@@ -198,6 +201,8 @@ test("listSubagents returns the live snapshot, reconciled into the registry", as
   const { bridge, runtime } = harness();
   const project = makeProject();
   await bridge.prompt({ sessionId: OMP_SESSION, content: "delegate", projectPath: project });
+  // Ownership is fail-closed: the child's parent must name an observed task call.
+  runtime.push({ type: "tool_execution_start", toolCallId: "call-task-1", toolName: "task", args: { task: "t" } });
 
   runtime.snapshots = [
     { id: "child-1", index: 0, agent: "scout", agentSource: "bundled", status: "running", lastUpdate: 1, parentToolCallId: "call-task-1" },
@@ -215,6 +220,7 @@ test("readSubagentTranscript maps messages and never discloses the sessionFile",
   const { bridge, runtime } = harness();
   const project = makeProject();
   await bridge.prompt({ sessionId: OMP_SESSION, content: "delegate", projectPath: project });
+  runtime.push({ type: "tool_execution_start", toolCallId: "call-task-1", toolName: "task", args: { task: "t" } });
 
   // Register the child so the read can resolve its attribution.
   runtime.snapshots = [
@@ -227,7 +233,9 @@ test("readSubagentTranscript maps messages and never discloses the sessionFile",
     fromByte: 0,
     nextByte: 42,
     reset: false,
-    entries: [],
+    entries: [
+      { type: "message", id: "entry-1", parentId: null, timestamp: "2026-09-23T00:00:00.000Z", message: { role: "assistant", content: [{ type: "text", text: "report ALPHA" }], timestamp: 1 } },
+    ],
     messages: [
       { role: "assistant", content: [{ type: "text", text: "report ALPHA" }], timestamp: 1 },
     ],
@@ -245,6 +253,7 @@ test("readSubagentTranscript forwards the reset flag and cursor from a malformed
   const { bridge, runtime } = harness();
   const project = makeProject();
   await bridge.prompt({ sessionId: OMP_SESSION, content: "delegate", projectPath: project });
+  runtime.push({ type: "tool_execution_start", toolCallId: "call-task-1", toolName: "task", args: { task: "t" } });
 
   runtime.snapshots = [
     { id: "child-1", index: 0, agent: "scout", agentSource: "bundled", status: "running", lastUpdate: 1, parentToolCallId: "call-task-1" },
@@ -273,6 +282,7 @@ test("the OMP subagent IPC channels serve an OMP session", async () => {
   const { bridge, runtime } = harness();
   const project = makeProject();
   await bridge.prompt({ sessionId: OMP_SESSION, content: "delegate", projectPath: project });
+  runtime.push({ type: "tool_execution_start", toolCallId: "call-task-1", toolName: "task", args: { task: "t" } });
 
   runtime.snapshots = [
     { id: "child-1", index: 0, agent: "scout", agentSource: "bundled", status: "running", lastUpdate: 1, parentToolCallId: "call-task-1" },
@@ -294,6 +304,24 @@ test("the OMP subagent IPC channels refuse a Pi session without touching Pi", as
 
   await assert.rejects(
     () => handlers.get(IPC.invoke.ompSubagentList)("session-pi"),
+    (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE && error.capability === "subagentEvents",
+  );
+});
+
+test("a refused subscription makes list/read fail closed with a typed capability error", async () => {
+  const { bridge, runtime } = harness();
+  const project = makeProject();
+  // The prompt still succeeds (only the child surface is unavailable), but the
+  // subscription is refused by the runtime.
+  runtime.refuseSubscription = true;
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "delegate", projectPath: project });
+
+  await assert.rejects(
+    () => bridge.listSubagents(OMP_SESSION),
+    (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE && error.capability === "subagentEvents",
+  );
+  await assert.rejects(
+    () => bridge.readSubagentTranscript(OMP_SESSION, "child-1"),
     (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE && error.capability === "subagentEvents",
   );
 });

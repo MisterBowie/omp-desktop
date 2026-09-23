@@ -55,7 +55,10 @@ test("a topology node toggles a session-scoped side-panel selection", () => {
 test("the side panel renders the live conversation process", () => {
   assert.match(panelSource, /<SubagentDetail/);
   assert.match(panelSource, /data-testid="subagent-panel"/);
-  assert.match(panelSource, /selected\.item\.delegate/);
+  // Pi sessions keep the transcript-derived delegate; OMP sessions read the
+  // child through the OMP-only bridge (useOmpSubagentRead) instead.
+  assert.match(panelSource, /selected\?\.item\.delegate/);
+  assert.match(panelSource, /useOmpSubagentRead/);
   assert.doesNotMatch(panelSource, /role="tablist"|aria-selected|subagent-panel-tabs/);
   assert.match(transcriptSource, /function delegateTaskDescription\(message: UiMessage\)/);
   assert.match(detailSource, /className="subagent-detail-hero"/);

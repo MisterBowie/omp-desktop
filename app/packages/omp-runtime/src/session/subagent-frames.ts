@@ -263,6 +263,36 @@ export function parseSubagentMessages(data: unknown): SubagentMessagesResult | n
   return data as SubagentMessagesResult;
 }
 
+/**
+ * Product bounds for one child-transcript read. The pinned runtime reads its
+ * session file to EOF (a real upstream limitation this build cannot prevent
+ * inside the child runtime), so the desktop must bound what crosses the bridge
+ * and is retained here. A read that exceeds a bound is rejected with a typed
+ * error, never silently truncated: truncating would skip messages and corrupt
+ * the byte cursor the caller advances by.
+ */
+export const SUBAGENT_MAX_ENTRIES = 10_000;
+export const SUBAGENT_MAX_MESSAGES = 10_000;
+
+export type SubagentMessagesValidation =
+  | { ok: true; value: SubagentMessagesResult }
+  | { ok: false; reason: "malformed" | "over-limit" | "invalid-cursor" };
+
+/** Strictly validate a messages result, distinguishing the failure reasons. */
+export function validateSubagentMessages(data: unknown): SubagentMessagesValidation {
+  if (!Value.Check(RpcSubagentMessagesResultSchema, data)) {
+    return { ok: false, reason: "malformed" };
+  }
+  const value = data as SubagentMessagesResult;
+  if (value.entries.length > SUBAGENT_MAX_ENTRIES || value.messages.length > SUBAGENT_MAX_MESSAGES) {
+    return { ok: false, reason: "over-limit" };
+  }
+  if (value.nextByte < value.fromByte) {
+    return { ok: false, reason: "invalid-cursor" };
+  }
+  return { ok: true, value };
+}
+
 /** A bounded byte cursor for reading one child's transcript. */
 export type SubagentTranscriptCursor = {
   fromByte: number;

@@ -18,6 +18,7 @@ import {
 import { delegationIdForMessage, type SubagentPanelSelection } from "../../lib/subagent-panel";
 import { useAppStore } from "../../stores/app-store";
 import { useFollowScroll } from "../../hooks/use-follow-scroll";
+import { useOmpSubagentRead } from "../../hooks/use-omp-subagent-read";
 import { useTranscriptView } from "../../hooks/use-transcript-view";
 import { useTranscriptSearchFocus } from "../../hooks/use-transcript-search-focus";
 import { IconArrowDown } from "../icons";
@@ -68,10 +69,20 @@ function SubagentPanelSurface({ selection }: { selection: SubagentPanelSelection
   const isRunning = useAppStore(
     (state) => state.runningSessions[selection.sessionId] ?? false,
   );
+  // The OMP-only child detail: reads the opaque child id through the bridge and
+  // projects it into the existing SubagentRun structure. Pi sessions never enter
+  // this path (the hook returns `omp: false`), so their detail stays unchanged.
+  const ompRead = useOmpSubagentRead(selection.sessionId, selection.delegationId, {
+    enabled: true,
+    running: isRunning,
+  });
   const selected = useMemo(
     () => findSelectedSubagent(messages, selection.delegationId),
     [messages, selection.delegationId],
   );
+  const delegate = ompRead.omp
+    ? (ompRead.run ?? undefined)
+    : selected?.item.delegate;
   const delegationStatuses = useMemo<ReadonlyMap<string, SubagentOutcome>>(
     () =>
       selected
@@ -145,9 +156,7 @@ function SubagentPanelSurface({ selection }: { selection: SubagentPanelSelection
           {selected ? (
             <SubagentDetail
               message={selected.item.message}
-              {...(selected.item.delegate
-                ? { delegate: selected.item.delegate }
-                : {})}
+              {...(delegate ? { delegate } : {})}
               delegationStatuses={delegationStatuses}
               delegationFailures={delegationFailures}
               delegationTimings={delegationTimings}

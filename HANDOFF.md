@@ -4,16 +4,18 @@
 
 ## 0. M5/T17 交付摘要（本轮）
 
-- 状态：**T17 已完成并提交**（分支 `codex/m5-subagents`），含真实固定 OMP 子代理端到端验收，等待独立复审。
-- 证据：`docs/validation/M5-subagents.md`（PI 实现/测试 → 固定 OMP 能力 → 本项目决策证据表、归属矩阵、用户路径、失败/取消矩阵、命令与计数、限制）；设计决策：`app/docs/adr/0303-omp-subagent-surfacing.md`（英文 ADR）。
+- 状态：**T17 已完成并提交**（分支 `codex/m5-subagents`），含真实固定 OMP 子代理端到端验收，已按独立复审 R1-R8 返修并追加提交。
+- 证据：`docs/validation/M5-subagents.md`（PI 实现/测试 → 固定 OMP 能力 → 本项目决策证据表、归属矩阵、用户路径、失败/取消矩阵、命令与计数、限制；顶部 §0.1 为返修记录）；设计决策：`app/docs/adr/0303-omp-subagent-surfacing.md`（英文 ADR）。
 - 核心变更：
-  - **严格帧校验**（`packages/omp-runtime/src/session/subagent-frames.ts`）：typebox 校验三族帧（`subagent_lifecycle`/`subagent_progress`/`subagent_event`）与 `get_subagents`/`get_subagent_messages` 响应；缺子身份、`parentToolCallId`、状态或 `agentSource` 一律拒绝并计数，不作父事件。
-  - **每子代理 registry**（`subagents.ts`）：每子代理独立 `OmpEventConverter`，只转发 message/tool 行（`agent_end`/`turn_end`/`error` 留在子代理内，同 Pi `SubagentRun.handleEvent`）；`task` 工具结果 `details` 增补 `delegationId`/`agent`/`status`/`startedAt`/`completedAt`；终止 lifecycle 发 `message_end`(role tool) 结算；`sessionFile` 不进 list/读取结果。
-  - **runner**（`session/runner.ts`）：readiness 后一次性 `set_subagent_subscription events`；`task toolCallId → {generation,turnId}` 把迟到子代理帧归到发起回合；`listSubagents`（reconcile 补漏）/`readSubagentTranscript`（字节游标、非披露）/`stopSubagent`（恒拒 typed refusal）。
-  - **桥/IPC**（`omp-session.ts`/`agent-ipc.ts`/`protocol.ts`/`api.ts`）：`listSubagents`/`readSubagentTranscript`/`stopSubagent`；新 IPC `ompSubagentList`/`ompSubagentRead`/`ompSubagentStop`（OMP-only，Pi 会话 typed 拒绝，Pi `subagent*` catalog 通道不变）。
-  - **`--model` 必要性**：固定 OMP 仅在显式 `--model provider/model` 时转发子代理 `subagent_event`；仅 `models.yml` 发现则子代理有 lifecycle/progress 无 event。M4 投影已钉住单一 provider/model，`omp-session-wiring.ts` 现同时传 `--model`（E2E 前后对照复现）。
+  - **严格帧校验 + 所有权 fail-closed**（`subagent-frames.ts`/`subagents.ts`）：typebox 校验三族帧与 `get_subagents`/`get_subagent_messages` 响应；缺子身份/状态/`agentSource` 拒绝并计数。所有权单独 fail-closed：子代理只有在其父 id 命中本 runner 观测到的 `task` 调用后才 surface；missing/unknown/conflicting 父 id 计 `unknownParentCalls` 拒绝；`emitSynthesis` 找不到属主即丢弃，不回退当前 run。
+  - **每子代理 registry**（`subagents.ts`）：每子代理独立 `OmpEventConverter`，只转发 message/tool 行；`task` 结果 `details` 增补 `delegationId`/`agent`/`status`/…；终止 lifecycle 发 `message_end`(tool) 结算，结算为根 Task 行（内部 `owningToolCallId` 恢复回合，envelope 不带 `parentToolCallId`，防 reload 丢卡）；`reconcile` 把「先前 running、快照缺席」呈现为 `aborted` 且幂等结算；`sessionFile` 不进 list/读取结果。
+  - **runner**（`session/runner.ts`）：readiness 后一次 `set_subagent_subscription events`；`task toolCallId → {generation,turnId}` 归因迟到帧；`listSubagents`（reconcile 补漏）/`readSubagentTranscript`（显式上界、稳定行身份、tool 行映射、`nextByte<fromByte` 拒绝）/`stopSubagent`（恒拒）；**父 `stop` 收敛后 reconcile 存活子代理，有存活子代理即走 supervisor 进程组回收（reclaim 父 + 子进程树）**；订阅 off 时 list/read 抛 typed `capability-unavailable`。
+  - **桥/IPC**（`omp-session.ts`/`agent-ipc.ts`/`api.ts`）：`listSubagents`/`readSubagentTranscript`/`stopSubagent`；新 IPC `ompSubagentList`/`ompSubagentRead`/`ompSubagentStop`（OMP-only，Pi 会话 typed 拒绝）；订阅不可用映射为 `ENGINE_CAPABILITY_UNAVAILABLE`。
+  - **渲染器详情桥接线**（`use-omp-subagent-read.ts` + `omp-subagent-read.ts` + `SubagentPanel.tsx`）：OMP 会话经 `ompSubagentList`+`ompSubagentRead` 解析不透明子 id 并映射进既有 `SubagentRun`；Pi 不变、不触发 OMP IPC；读取为本地投影不回写主 transcript。
+  - **`--model` 必要性**：固定 OMP 仅在显式 `--model provider/model` 时转发 `subagent_event`；`omp-session-wiring.ts` 现同时传 `--model`（E2E 前后对照复现）。
   - **能力**：`OMP_ENGINE_CAPABILITIES.subagentEvents` 开放；`branch`/`steer`/`followUp`/`compact` 保持拒绝；`stopSubagent` 恒拒（无 per-child stop RPC）。
-- 新增测试：`subagent-frames.test.ts`(16)、`subagents.test.ts`(14)、`subagent-runner.test.ts`(5)、`omp-subagent-bridge.test.mjs`(7)、`omp-subagent-e2e.test.mjs`(2 真实固定 OMP)。
+- 新增/改动测试：`subagent-frames.test.ts`(16)、`subagents.test.ts`、`subagent-runner.test.ts`、`omp-subagent-bridge.test.mjs`(8)、`omp-subagent-e2e.test.mjs`(3 真实固定 OMP，含父 stop 回收运行中 detached 子代理)、`subagent-reload-projection.test.mjs`(R3)、`omp-subagent-read.test.mjs`(R2 真实 api)、`omp-subagent-panel-render.test.mjs`(R2 SSR)。
+- 全量回归：`@pi-desktop/omp-runtime` 210 通过、`@pi-desktop/shared` 968 通过、desktop 2682 通过/0 失败/4 跳过、`pnpm typecheck`/`build:js`/`git diff --check` 通过。
 - 下一轮入口：M5/T18-T20（edit/LSP/DAP 展示、MCP/规则/技能/记忆、Plan/Goal 能力门）。
 
 ## 0. M4 交付摘要（上一轮）

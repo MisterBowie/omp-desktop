@@ -68,6 +68,8 @@ type OmpMessage = {
   provider?: string;
   stopReason?: string;
   errorMessage?: string;
+  /** Present on `role: "toolResult"` messages; distinguishes a failed tool. */
+  isError?: boolean;
   timestamp?: number;
 };
 
@@ -155,22 +157,63 @@ export class OmpEventConverter {
   }
 
   /**
-   * Map one *complete* runtime message (a durable-transcript row, not an
-   * event) into a desktop row, or null when it is a folded tool result.
+   * Map one *durable-transcript entry* (`{ id, parentId, timestamp, message }`)
+   * into a desktop row, or null when it is a non-message entry.
    *
    * Used by `get_subagent_messages`: the pinned runtime returns a child's
-   * transcript as finished `AgentMessage`s, not as an event stream, so the
-   * detail read replays each message through the same role/content/usage
-   * mapping the live path uses. Tool result rows are folded (their rows come
-   * from the live `tool_execution_*` events) and return null.
+   * transcript as finished entries, not as an event stream, so the detail read
+   * replays each message through the same role/content/usage mapping the live
+   * path uses. The entry's own `id` gives the row a stable identity across
+   * reopen and incremental reads (a fresh converter must not remint ids).
+   * `toolResult` messages are mapped to tool rows — the read is the only path
+   * that can recover tool steps the live stream missed.
    */
-  convertMessage(message: unknown): UiMessage | null {
-    const parsed = asMessage(message);
+  convertEntry(entry: unknown): UiMessage | null {
+    const record = asRecord(entry);
+    if (!record) return null;
+    const parsed = asMessage(record.message);
     if (!parsed) return null;
     const role = roleOf(parsed);
-    if (!role || role === "tool") return null;
-    const id = this.mintId();
+    if (!role) return null;
+    const id =
+      typeof record.id === "string" && record.id
+        ? `omp:${this.sessionId}:entry:${record.id}`
+        : this.mintId();
+    if (role === "tool") return this.toToolRow(id, parsed);
     return this.toUiMessage(id, parsed, role, "complete");
+  }
+
+  /** Map a `toolResult` message into a tool row the renderer already presents. */
+  private toToolRow(id: string, message: OmpMessage): UiMessage {
+    const content = this.contentText(message.content);
+    return {
+      id,
+      role: "tool",
+      content,
+      createdAt: new Date(
+        typeof message.timestamp === "number" ? message.timestamp : this.now(),
+      ).toISOString(),
+      ...(message.toolCallId ? { toolCallId: message.toolCallId } : {}),
+      toolName: message.toolName ?? "unknown",
+      toolStatus: message.isError === true ? "error" : "success",
+      toolResult: message.content,
+      ...(this.parentToolCallId ? { parentToolCallId: this.parentToolCallId } : {}),
+      ...(this.agentName ? { agentName: this.agentName } : {}),
+      isError: message.isError === true,
+      status: "complete",
+    };
+  }
+
+  /** The flattened text of a message body, bounded for the read projection. */
+  private contentText(content: unknown): string {
+    if (typeof content === "string") return content.slice(0, ASSISTANT_TEXT_LIMIT);
+    if (!Array.isArray(content)) return "";
+    const parts: string[] = [];
+    for (const part of content) {
+      if (!isRecord(part)) continue;
+      if (part.type === "text" && typeof part.text === "string") parts.push(part.text);
+    }
+    return parts.join("\n").slice(0, ASSISTANT_TEXT_LIMIT);
   }
 
   /**
@@ -527,6 +570,10 @@ export function appError(code: string, message: string, details?: unknown): AppE
 
 function asMessage(value: unknown): OmpMessage | null {
   return isRecord(value) ? (value as OmpMessage) : null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return isRecord(value) ? (value as Record<string, unknown>) : null;
 }
 
 function asAssistantMessageEvent(value: unknown): OmpAssistantMessageEvent | null {

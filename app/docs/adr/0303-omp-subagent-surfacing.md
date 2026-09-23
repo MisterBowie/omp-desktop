@@ -47,11 +47,22 @@ and separate (`ompSubagentList`, `ompSubagentRead`, `ompSubagentStop`).
 ### 2. Strict validation, not a cast
 
 `subagent-frames.ts` typebox-validates the three frame payloads and the two read
-responses. A frame missing its child id, a valid `parentToolCallId`, a sane
-status or an `agentSource` is *rejected* (counted as malformed), never cast and
-never forwarded as a parent event. A `subagent_event` payload carries only
-`{ id, event }`; its owning parent and agent come from the lifecycle/progress
-record, and an event whose id is not in the registry is refused.
+responses. A frame missing its child id, a sane status or an `agentSource` is
+*rejected* (counted as malformed), never cast and never forwarded as a parent
+event. A `subagent_event` payload carries only `{ id, event }`; its owning parent
+and agent come from the lifecycle/progress record, and an event whose id is not
+in the registry is refused.
+
+Ownership is a separate, fail-closed check in `subagents.ts`, because the wire
+`parentToolCallId` is genuinely optional on the pinned runtime's frames. A child
+may only surface — or settle — after its parent id names an *observed* `task`
+tool call owned by this runner/session (`observeTaskStart` recorded it). A
+`started`/`terminal` lifecycle, a progress frame or a snapshot row whose parent
+is missing, unknown, or conflicts with the child's already-bound parent is
+counted (`unknownParentCalls`) and dropped; it is never attributed to the parent
+or to whatever runs next. `emitSynthesis` never falls back to the current run: a
+synthesis whose owning task call has no recorded turn is dropped rather than
+guessed.
 
 ### 3. Subscription, after readiness
 
@@ -82,14 +93,23 @@ Lifecycle and progress feed the existing topology: the parent `task` tool's
 `toolResult.details` is augmented with `delegationId`/`agent`/`status`/
 `startedAt`/`completedAt` (the fields `subagent-topology.ts` reads), and a
 terminal lifecycle emits the same `message_end` (role `tool`) settlement Pi uses
-to refresh the row. The `sessionFile` is kept on the record for the transcript
-read but never appears in `list()` or the read result.
+to refresh the row. The settlement is a *root* Task-row refresh: its envelope
+carries the owning task call only as an internal `owningToolCallId` (used to
+recover the turn), never as `parentToolCallId` — stamping `parentToolCallId`
+onto the settlement would file the Task row as a child and drop the card from
+the root transcript on reload. The `sessionFile` is kept on the record for the
+transcript read but never appears in `list()` or the read result.
 
 ### 5. Reconciliation, ownership and the restart boundary
 
 `get_subagents` is reconciled into the registry while the runtime is alive: a
 snapshot repairs a missed `started`/progress frame without duplicating a child
-or replaying tool side effects. A child frame that arrives after its parent turn
+or replaying tool side effects. A previously-`running` child that is *absent*
+from a snapshot reached a terminal state this desktop missed (fixed OMP removes
+terminal children from its active registry); it is represented as `aborted`
+("interrupted/unavailable" in the Pi topology vocabulary) and its parent Task
+row is settled exactly once — marking it terminal makes the settlement idempotent
+across repeated snapshots. A child frame that arrives after its parent turn
 closed is still attributed to the turn that spawned the `task` call (the runner
 keeps `task toolCallId → { generation, turnId }`), never to whatever runs next.
 `dispose` resets the registry and detaches the frame handler, so a stopped or
@@ -113,6 +133,14 @@ exactly once and stays attributed to that child. Parent stop, dispose and
 shutdown invalidate pending decisions through the existing M3 generation/session
 checks; a late allow can never execute after stop.
 
+Parent `stop` does not report clean convergence while an owned child is still
+active. After the parent turn converges it reconciles against `get_subagents` so
+a missed terminal frame cannot hide a running child; if any child survives, it
+tears down through the existing supervisor process-group boundary, which
+reclaims the parent and every child it spawned (measured end-to-end: the child's
+real command tree is gone after the stop). The registry and task-call ownership
+are cleared after teardown so a late frame cannot be re-attributed.
+
 Fixed OMP exposes no per-child stop command, and a child session has no
 trustworthy child-owned process handle to terminate without risking the parent
 or siblings. `stopSubagent` therefore always returns a typed
@@ -122,17 +150,25 @@ individual child stop disabled rather than silently calling a parent abort.
 ### 7. Capability
 
 `OMP_ENGINE_CAPABILITIES.subagentEvents` is opened, backed by the behaviour and
-tests above. `branch`, `steer`, `followUp` and `compact` remain closed.
+tests above. When the runtime refuses or fails the event subscription, the
+prompt still proceeds (only this child-surface feature is unavailable), but
+`listSubagents` and `readSubagentTranscript` fail closed with a typed
+`capability-unavailable` error rather than presenting a partial picture.
+`branch`, `steer`, `followUp` and `compact` remain closed.
 
 ## Consequences
 
 - OMP children render through the existing Pi cards/topology/detail/work-panel,
   with no second UI model and no engine branch in the renderer.
+- Opening an OMP child detail uses the OMP-only bridge (`ompSubagentList` +
+  `ompSubagentRead`) to resolve and read the opaque child id, then maps the
+  bounded result into the existing `SubagentRun` presentation; the read is a
+  local detail projection and never persists into the main transcript.
 - Malformed or ownership-ambiguous frames are counted, never attributed to the
   parent or a newer generation.
 - Child detail requires `--model` (the explicit projected binding); a build that
   omits it would show topology/progress but no child transcript, which is exactly
   the gap the projection now closes.
 - Per-child stop is visibly unavailable with an accurate reason; stopping a
-  child means stopping the parent run.
+  child means stopping the parent run (which also reclaims the child).
 - Pi subagent orchestration, catalog, panels and tests are unchanged.

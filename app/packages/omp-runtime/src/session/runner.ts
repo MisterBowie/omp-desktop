@@ -30,10 +30,10 @@ import {
   normalizeFromByte,
   parseSubagentEventFrame,
   parseSubagentLifecycleFrame,
-  parseSubagentMessages,
   parseSubagentProgressFrame,
   parseSubagentSnapshots,
   subagentFrameKind,
+  validateSubagentMessages,
 } from "./subagent-frames.js";
 import {
   SubagentTracker,
@@ -278,6 +278,7 @@ export class OmpSessionRunner {
    */
   async listSubagents(): Promise<SubagentListEntry[]> {
     this.throwIfDisposed();
+    this.requireSubagentSubscription();
     const response = await this.runtime.request({ type: "get_subagents" }, { timeoutMs: 10_000 });
     if (response.success === false) {
       throw new OmpRuntimeError(
@@ -306,6 +307,7 @@ export class OmpSessionRunner {
     fromByte?: number,
   ): Promise<{ cursor: { fromByte: number; nextByte: number; reset: boolean }; messages: UiMessage[] }> {
     this.throwIfDisposed();
+    this.requireSubagentSubscription();
     const start = normalizeFromByte(fromByte);
     const response = await this.runtime.request(
       { type: "get_subagent_messages", subagentId, fromByte: start },
@@ -317,12 +319,26 @@ export class OmpSessionRunner {
         `the runtime refused get_subagent_messages: ${response.error ?? "unknown error"}`,
       );
     }
-    const parsed = parseSubagentMessages(response.data);
-    if (parsed === null) {
+    const validated = validateSubagentMessages(response.data);
+    if (!validated.ok) {
+      if (validated.reason === "invalid-cursor") {
+        throw new OmpRuntimeError(
+          "transport-failed",
+          "get_subagent_messages returned an inconsistent cursor (nextByte < fromByte)",
+        );
+      }
+      if (validated.reason === "over-limit") {
+        throw new OmpRuntimeError(
+          "transport-failed",
+          "get_subagent_messages exceeded the product bound for a single read",
+        );
+      }
       throw new OmpRuntimeError("transport-failed", "get_subagent_messages returned a malformed result");
     }
+    const parsed = validated.value;
     // The owning parent tool call and agent name are the caller's context; the
-    // read itself maps each finished message through a fresh child converter.
+    // read itself maps each finished entry through a fresh child converter. The
+    // entry's own id keeps row identity stable across reopen/incremental reads.
     const attribution = this.subagents.lookup(subagentId);
     const converter = new OmpEventConverter({
       sessionId: `${this.sessionId}:subagent:${subagentId}`,
@@ -331,8 +347,8 @@ export class OmpSessionRunner {
       ...(attribution ? { agentName: attribution.agent } : {}),
     });
     const messages: UiMessage[] = [];
-    for (const message of parsed.messages) {
-      const row = converter.convertMessage(message);
+    for (const entry of parsed.entries) {
+      const row = converter.convertEntry(entry);
       if (row) messages.push(row);
     }
     return {
@@ -503,14 +519,23 @@ export class OmpSessionRunner {
 
     const converged = aborted && (await this.waitForConvergence(run.generation));
     steps.push(converged ? "turn converged" : "turn did not converge in time");
-    if (converged) {
+    // Even when the parent turn converged, a detached child may still be running
+    // in the same process group. Reconcile against the live snapshot so a missed
+    // terminal frame cannot hide an active child: if any owned child survives,
+    // the runtime is not actually idle and must be torn down.
+    const childStillRunning = converged && (await this.hasActiveChildren());
+    if (childStillRunning) {
+      steps.push("a detached child is still running after the parent converged");
+    }
+    if (converged && !childStillRunning) {
       this.closeRun(run.generation);
       return { aborted, abortBashSent, converged: true, toreDown: false, steps, errors };
     }
 
-    // The protocol could not stop it. The M2 teardown is the fallback and owns
-    // the process group from here; the run is closed either way, because the
-    // desktop must not keep reporting a turn the user already cancelled.
+    // The protocol could not stop it (or a detached child survives). The M2
+    // teardown is the fallback and owns the process group from here; it reclaims
+    // the parent and every child it spawned. The run is closed either way,
+    // because the desktop must not keep reporting a turn the user cancelled.
     let toreDown = false;
     if (this.teardown) {
       try {
@@ -527,7 +552,30 @@ export class OmpSessionRunner {
       errors.push("no process teardown is available");
     }
     this.closeRun(run.generation);
+    // The process group is gone, so a detached child cannot come back: clear the
+    // registry and task-call ownership so a late frame cannot be attributed.
+    this.subagents.reset();
+    this.taskCallTurn.clear();
     return { aborted, abortBashSent, converged: false, toreDown, steps, errors };
+  }
+
+  /**
+   * Whether any owned child is still running, reconciled against the live
+   * snapshot. A failed reconcile conservatively reports a tracked running child
+   * as still running rather than risk leaving its process group alive.
+   */
+  private async hasActiveChildren(): Promise<boolean> {
+    if (!this.subagents.hasRunningChildren()) return false;
+    try {
+      const response = await this.runtime.request({ type: "get_subagents" }, { timeoutMs: 10_000 });
+      if (response.success === false) return this.subagents.hasRunningChildren();
+      const snapshots = parseSubagentSnapshots(response.data);
+      if (snapshots === null) return this.subagents.hasRunningChildren();
+      for (const synthesis of this.subagents.reconcile(snapshots)) this.emitSynthesis(synthesis);
+      return this.subagents.hasRunningChildren();
+    } catch {
+      return this.subagents.hasRunningChildren();
+    }
   }
 
   /**
@@ -689,12 +737,17 @@ export class OmpSessionRunner {
 
   /** Emit one tracker synthesis, attributed to its owning turn. */
   private emitSynthesis(synthesis: SubagentSynthesis): void {
-    const turn = synthesis.parentToolCallId
-      ? this.taskCallTurn.get(synthesis.parentToolCallId)
-      : undefined;
+    const owner = synthesis.owningToolCallId ?? synthesis.parentToolCallId;
+    const turn = owner ? this.taskCallTurn.get(owner) : undefined;
+    if (owner && !turn) {
+      // The owning task call has no recorded turn. Attributing this to the
+      // current run would contaminate a newer generation, so it is dropped
+      // rather than guessed.
+      return;
+    }
     this.emitEnvelope({
       sessionId: this.sessionId,
-      ...(turn ? { turnId: turn.turnId } : this.run ? { turnId: this.run.turnId } : {}),
+      ...(turn ? { turnId: turn.turnId } : {}),
       ts: this.now(),
       event: synthesis.event,
       ...(synthesis.parentToolCallId ? { parentToolCallId: synthesis.parentToolCallId } : {}),
@@ -847,6 +900,21 @@ export class OmpSessionRunner {
   private throwIfDisposed(): void {
     if (this.disposed) {
       throw new OmpRuntimeError("stopping", `the session runner is closed (${this.disposed.code})`);
+    }
+  }
+
+  /**
+   * Fail closed when the subagent subscription never came up: a list/read with
+   * the subscription off would present a partial picture (lifecycle/progress
+   * frames may still arrive, but the event stream is unwired). The prompt is
+   * unaffected; only the child-surface feature is unavailable.
+   */
+  private requireSubagentSubscription(): void {
+    if (this.subagentSubscription === "off") {
+      throw new OmpRuntimeError(
+        "capability-unavailable",
+        "the subagent event subscription is unavailable; child list/read cannot present a complete picture",
+      );
     }
   }
 }

@@ -24,7 +24,9 @@ export type OmpRuntimeErrorCode =
   /** The runtime has exited or was never started. */
   | "not-started"
   /** A request was issued while the runtime was shutting down. */
-  | "stopping";
+  | "stopping"
+  /** A feature this build could not enable (e.g. the subagent subscription). */
+  | "capability-unavailable";
 
 export class OmpRuntimeError extends Error {
   readonly code: OmpRuntimeErrorCode;

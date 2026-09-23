@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  SUBAGENT_MAX_ENTRIES,
   normalizeFromByte,
   parseSubagentEventFrame,
   parseSubagentLifecycleFrame,
@@ -17,6 +18,7 @@ import {
   parseSubagentProgressFrame,
   parseSubagentSnapshots,
   subagentFrameKind,
+  validateSubagentMessages,
 } from "./subagent-frames.js";
 
 function lifecycle(overrides: Record<string, unknown> = {}) {
@@ -165,6 +167,20 @@ describe("get_subagent_messages validation", () => {
 
   it("rejects a negative cursor", () => {
     expect(parseSubagentMessages({ ...messages(), fromByte: -1 })).toBeNull();
+  });
+
+  it("distinguishes over-limit and inconsistent-cursor results", () => {
+    const overLimit = validateSubagentMessages({
+      ...messages(),
+      entries: new Array(SUBAGENT_MAX_ENTRIES + 1).fill({}),
+    });
+    expect(overLimit).toEqual({ ok: false, reason: "over-limit" });
+
+    const badCursor = validateSubagentMessages({ ...messages(), fromByte: 10, nextByte: 3 });
+    expect(badCursor).toEqual({ ok: false, reason: "invalid-cursor" });
+
+    const ok = validateSubagentMessages(messages());
+    expect(ok.ok).toBe(true);
   });
 });
 

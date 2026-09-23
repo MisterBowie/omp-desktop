@@ -45,7 +45,7 @@ class FakeRuntime implements OmpSessionRuntime {
   }
 }
 
-function harness() {
+function harness(options: { teardown?: () => Promise<{ reaped: boolean; cleaned: boolean }> } = {}) {
   const runtime = new FakeRuntime();
   const envelopes: AgentEventEnvelope[] = [];
   const runner = new OmpSessionRunner({
@@ -53,6 +53,7 @@ function harness() {
     runtime,
     emit: (envelope) => envelopes.push(envelope),
     now: () => 1_000,
+    ...(options.teardown ? { teardown: () => options.teardown!() } : {}),
   });
   return { runtime, runner, envelopes };
 }
@@ -69,6 +70,15 @@ describe("subscription", () => {
     expect(second.ok).toBe(true);
     // Idempotent: one request, not two.
     expect(runtime.commands.filter((c) => c === "set_subagent_subscription")).toHaveLength(1);
+  });
+
+  it("fails list/read closed with a capability-unavailable error while the subscription is off", async () => {
+    const { runner } = harness();
+    await runner.prompt("delegate");
+    // The subscription was never enabled, so the child surface must not present
+    // a partial picture.
+    await expect(runner.listSubagents()).rejects.toThrow(/subscription is unavailable/);
+    await expect(runner.readSubagentTranscript("child-1")).rejects.toThrow(/subscription is unavailable/);
   });
 });
 
@@ -93,17 +103,44 @@ describe("late generation attribution", () => {
       type: "subagent_lifecycle",
       payload: { id: "child-1", agent: "task", agentSource: "bundled", status: "completed", index: 0, parentToolCallId: "call-task-1" },
     });
-    const settlement = envelopes.find((e) => e.event.type === "message_end" && e.parentToolCallId === "call-task-1");
+    // The settlement is a root Task-row refresh: no parentToolCallId on the
+    // envelope, but attributed to the turn that spawned the task call.
+    const settlement = envelopes.find((e) => e.event.type === "message_end" && !e.parentToolCallId && e.agentName === "task");
     expect(settlement).toBeTruthy();
-    // The settlement carries the turn that spawned the task, not a new turn.
     expect(settlement?.turnId).toBe(turnId);
+  });
+
+  it("attributes a child event for a known child to the old turn after a new generation starts", async () => {
+    const { runtime, runner, envelopes } = harness();
+    const first = await runner.prompt("delegate");
+    runtime.push(taskStart());
+    runtime.push({
+      type: "subagent_lifecycle",
+      payload: { id: "child-1", agent: "task", agentSource: "bundled", status: "started", index: 0, parentToolCallId: "call-task-1" },
+    });
+    runtime.push({ type: "agent_end", isTerminal: true });
+    const second = await runner.prompt("next");
+    expect(second.turnId).not.toBe(first.turnId);
+
+    // A late child event after the new generation started must be attributed to
+    // the original turn, never to the current run.
+    runtime.push({
+      type: "subagent_event",
+      payload: { id: "child-1", event: { type: "message_start", message: { role: "assistant", content: [{ type: "text", text: "late" }], timestamp: 1_000 } } },
+    });
+    const row = envelopes.find((e) => e.event.type === "message_start" && e.parentToolCallId === "call-task-1");
+    expect(row).toBeTruthy();
+    expect(row?.turnId).toBe(first.turnId);
+    expect(row?.turnId).not.toBe(second.turnId);
   });
 });
 
 describe("live list and transcript read", () => {
   it("lists reconciled children and refuses a malformed snapshot", async () => {
     const { runtime, runner } = harness();
+    await runner.enableSubagentSubscription("events");
     await runner.prompt("delegate");
+    runtime.push(taskStart());
     runtime.dataByCommand.set("get_subagents", {
       subagents: [{ id: "child-1", index: 0, agent: "task", agentSource: "bundled", status: "running", lastUpdate: 1, parentToolCallId: "call-task-1" }],
     });
@@ -118,19 +155,109 @@ describe("live list and transcript read", () => {
 
   it("reads a bounded transcript and never discloses the native path", async () => {
     const { runtime, runner } = harness();
+    await runner.enableSubagentSubscription("events");
     await runner.prompt("delegate");
     runtime.dataByCommand.set("get_subagent_messages", {
       sessionFile: "/abs/native/child.jsonl",
       fromByte: 0,
       nextByte: 12,
       reset: false,
-      entries: [],
+      entries: [{ type: "message", id: "entry-1", parentId: null, timestamp: "2026-01-01T00:00:00.000Z", message: { role: "assistant", content: [{ type: "text", text: "hi" }], timestamp: 1 } }],
       messages: [{ role: "assistant", content: [{ type: "text", text: "hi" }], timestamp: 1 }],
     });
     const result = await runner.readSubagentTranscript("child-1");
     expect(result.cursor.nextByte).toBe(12);
     expect(result.messages).toHaveLength(1);
     expect(JSON.stringify(result)).not.toContain("/abs/native/child.jsonl");
+  });
+
+  it("maps a toolResult entry into a tool row with a stable id", async () => {
+    const { runtime, runner } = harness();
+    await runner.enableSubagentSubscription("events");
+    await runner.prompt("delegate");
+    runtime.dataByCommand.set("get_subagent_messages", {
+      sessionFile: "/abs/native/child.jsonl",
+      fromByte: 0,
+      nextByte: 8,
+      reset: false,
+      entries: [
+        { type: "message", id: "tool-entry-9", parentId: null, timestamp: "2026-01-01T00:00:00.000Z", message: { role: "toolResult", toolName: "read", toolCallId: "call-read", content: [{ type: "text", text: "file contents" }], timestamp: 1 } },
+      ],
+      messages: [],
+    });
+    const first = await runner.readSubagentTranscript("child-1");
+    expect(first.messages).toHaveLength(1);
+    expect(first.messages[0].role).toBe("tool");
+    expect(first.messages[0].toolName).toBe("read");
+    expect(first.messages[0].toolCallId).toBe("call-read");
+    // Stable identity: a second read must not remint the row id.
+    const second = await runner.readSubagentTranscript("child-1");
+    expect(second.messages[0].id).toBe(first.messages[0].id);
+  });
+
+  it("rejects an over-limit or inconsistent-cursor result with a typed error", async () => {
+    const { runtime, runner } = harness();
+    await runner.enableSubagentSubscription("events");
+    await runner.prompt("delegate");
+    runtime.dataByCommand.set("get_subagent_messages", {
+      sessionFile: "/abs/native/child.jsonl",
+      fromByte: 10,
+      nextByte: 3,
+      reset: false,
+      entries: [],
+      messages: [],
+    });
+    await expect(runner.readSubagentTranscript("child-1")).rejects.toThrow(/inconsistent cursor/);
+  });
+});
+
+describe("stop while a child is still running", () => {
+  it("does not report clean convergence and tears down the process group", async () => {
+    let teardownCalls = 0;
+    const { runtime, runner } = harness({
+      teardown: async () => {
+        teardownCalls += 1;
+        return { reaped: true, cleaned: true };
+      },
+    });
+    await runner.enableSubagentSubscription("events");
+    await runner.prompt("delegate");
+    runtime.push(taskStart());
+    runtime.push({
+      type: "subagent_lifecycle",
+      payload: { id: "child-1", agent: "task", agentSource: "bundled", status: "started", index: 0, parentToolCallId: "call-task-1" },
+    });
+    // Stop while the parent turn is still running. The abort converges the
+    // parent, but the detached child survives; the runner must tear down.
+    runtime.dataByCommand.set("get_subagents", {
+      subagents: [{ id: "child-1", index: 0, agent: "task", agentSource: "bundled", status: "running", lastUpdate: 1, parentToolCallId: "call-task-1" }],
+    });
+    const stopPromise = runner.stop();
+    // The abort converges the parent turn; pushing agent_end closes the run,
+    // which the convergence wait observes (no wall-clock wait needed).
+    runtime.push({ type: "agent_end", isTerminal: true });
+    const outcome = await stopPromise;
+    expect(outcome.converged).toBe(false);
+    expect(outcome.toreDown).toBe(true);
+    expect(teardownCalls).toBe(1);
+  });
+
+  it("reports clean convergence when no child is running", async () => {
+    let teardownCalls = 0;
+    const { runtime, runner } = harness({
+      teardown: async () => {
+        teardownCalls += 1;
+        return { reaped: true, cleaned: true };
+      },
+    });
+    await runner.enableSubagentSubscription("events");
+    await runner.prompt("delegate");
+    const stopPromise = runner.stop();
+    runtime.push({ type: "agent_end", isTerminal: true });
+    const outcome = await stopPromise;
+    expect(outcome.converged).toBe(true);
+    expect(outcome.toreDown).toBe(false);
+    expect(teardownCalls).toBe(0);
   });
 });
 

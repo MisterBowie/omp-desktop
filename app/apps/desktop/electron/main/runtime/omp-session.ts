@@ -42,6 +42,7 @@ import {
 import { BUNDLED_GATE_PATH } from "./omp-runtime";
 import {
   OmpSessionRunner,
+  OmpRuntimeError,
   descriptorRisk,
   findGateExtension,
   type OmpConversionDiagnostics,
@@ -1341,7 +1342,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
         errorCode: "NOT_STARTED",
       });
     }
-    return runner.listSubagents();
+    return runSubagentRead(() => runner.listSubagents());
   }
 
   async function readSubagentTranscript(
@@ -1359,7 +1360,26 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     if (typeof subagentId !== "string" || !subagentId.trim()) {
       throw Object.assign(new Error("a subagent id is required"), { errorCode: ErrorCodes.INVALID_ARGUMENT });
     }
-    return runner.readSubagentTranscript(subagentId, fromByte);
+    return runSubagentRead(() => runner.readSubagentTranscript(subagentId, fromByte));
+  }
+
+  /**
+   * Run a child-surface read, mapping a typed runtime capability failure to the
+   * desktop's engine-capability error so the renderer receives a real
+   * capability-unavailable rather than an internal error.
+   */
+  async function runSubagentRead<T>(read: () => Promise<T>): Promise<T> {
+    try {
+      return await read();
+    } catch (error) {
+      if (error instanceof OmpRuntimeError && error.code === "capability-unavailable") {
+        throw Object.assign(new Error(error.message), {
+          errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+          capability: "subagentEvents",
+        });
+      }
+      throw error;
+    }
   }
 
   function stopSubagent(_sessionId: string, _subagentId: string): SubagentStopResult {

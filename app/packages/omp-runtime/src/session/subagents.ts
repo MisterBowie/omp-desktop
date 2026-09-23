@@ -94,10 +94,18 @@ type TaskCallRecord = {
   startedAt: number;
 };
 
-/** A synthesized envelope body: the runner adds `sessionId`/`turnId`/`ts`. */
+/**
+ * A synthesized envelope body: the runner adds `sessionId`/`turnId`/`ts`.
+ *
+ * `parentToolCallId` marks the row as a *child* row (rendered under the
+ * `Task` node). `owningToolCallId` only recovers the turn a root-row
+ * settlement belongs to; it never reaches the envelope's `parentToolCallId`,
+ * so a settlement refreshing the parent `Task` row is not persisted as a child.
+ */
 export type SubagentSynthesis = {
   event: AgentEvent;
   parentToolCallId?: string;
+  owningToolCallId?: string;
   agentName?: string;
 };
 
@@ -169,6 +177,13 @@ export class SubagentTracker {
    */
   handleLifecycle(payload: SubagentLifecyclePayload): SubagentSynthesis[] {
     const existing = this.children.get(payload.id);
+    // Fail-closed ownership: a child may only surface (or settle) after its
+    // parent names an observed `task` tool call owned by this runner/session.
+    // Missing, unknown, or conflicting parents are counted, never attributed.
+    if (!this.ownedParent(payload.parentToolCallId, existing)) {
+      this.diagnosticCounts.unknownParentCalls += 1;
+      return [];
+    }
     if (!existing && payload.status !== "started") {
       // A terminal lifecycle for a child we never saw start is a late frame:
       // it carries a real outcome but no row to attach it to. Track the outcome
@@ -199,6 +214,12 @@ export class SubagentTracker {
     const existing = this.children.get(progress.id);
     if (!existing) {
       this.diagnosticCounts.orphanProgress += 1;
+      return;
+    }
+    // A progress frame claiming a different parent than the one that spawned
+    // the child is a conflict: reject it rather than re-parenting the child.
+    if (!this.ownedParent(payload.parentToolCallId, existing)) {
+      this.diagnosticCounts.unknownParentCalls += 1;
       return;
     }
     existing.agent = payload.agent;
@@ -269,8 +290,29 @@ export class SubagentTracker {
   /** Reconcile the live registry against a `get_subagents` snapshot. */
   reconcile(snapshots: SubagentSnapshot[]): SubagentSynthesis[] {
     const syntheses: SubagentSynthesis[] = [];
+    const snapshotIds = new Set(snapshots.map((snapshot) => snapshot.id));
+    // A previously-running child that is absent from the live snapshot reached
+    // a terminal state this desktop missed (fixed OMP removes terminal children
+    // from the active registry). Represent it as interrupted/aborted and settle
+    // its parent Task row once; marking it terminal makes the settlement
+    // idempotent across repeated snapshots.
+    for (const record of this.children.values()) {
+      if (record.status !== "running") continue;
+      if (snapshotIds.has(record.id)) continue;
+      record.status = "aborted";
+      record.completedAt ??= this.now();
+      record.lastUpdate = this.now();
+      syntheses.push(this.settlement(record));
+    }
     for (const snapshot of snapshots) {
       const existing = this.children.get(snapshot.id);
+      // Fail-closed ownership: a snapshot row may only surface or refresh a
+      // child whose parent names an observed `task` call. Missing, unknown, or
+      // conflicting parents are counted and skipped.
+      if (!this.ownedParent(snapshot.parentToolCallId, existing)) {
+        this.diagnosticCounts.unknownParentCalls += 1;
+        continue;
+      }
       const record =
         existing ??
         this.createChild(snapshot.id, snapshot.agent, snapshot.agentSource, snapshot.parentToolCallId);
@@ -401,9 +443,29 @@ export class SubagentTracker {
     };
     return {
       event: { type: "message_end", message },
-      ...(record.parentToolCallId ? { parentToolCallId: record.parentToolCallId } : {}),
+      // The settlement refreshes the parent `Task` row, so it must NOT carry
+      // `parentToolCallId` (which would file it as a child row and, on reload,
+      // drop the Task card from the root transcript). The owning task call only
+      // recovers the turn this root-row settlement belongs to.
+      ...(record.parentToolCallId ? { owningToolCallId: record.parentToolCallId } : {}),
       agentName: record.agent,
     };
+  }
+
+  /**
+   * Fail-closed ownership: a child's parent id must name an observed `task`
+   * tool call owned by this runner. Missing or unknown parents are rejected for
+   * a new child; a frame claiming a different parent than the one that spawned
+   * an existing child is a conflict.
+   */
+  private ownedParent(parentToolCallId: string | undefined, existing?: ChildRecord): boolean {
+    if (existing?.parentToolCallId && parentToolCallId && existing.parentToolCallId !== parentToolCallId) {
+      return false;
+    }
+    if (!existing && (!parentToolCallId || !this.taskCalls.has(parentToolCallId))) {
+      return false;
+    }
+    return true;
   }
 
   private stampDelegations(record: Record<string, unknown>, children: Array<{ id: string; agent: string; status: OmpSubagentOutcome; startedAt?: number; completedAt?: number }>): void {
