@@ -19,14 +19,14 @@ T17 已按已实现能力边界验收。验收代码基线 `ab07a888d6afb916561b
 | macOS arm64 | 五份真实固定 OMP E2E（本地假 provider） | 5 passed / 0 skipped | 0 |
 | macOS arm64 | bridge 套件 | 58 passed | 0 |
 | macOS arm64 | 全量 desktop `node --test test/*.test.mjs` | 2735 总数 / 2726 passed / 9 failed / 0 skipped | 1（9 项失败均为固定 PI 基线的 release 夹具中文路径缺陷；六份真实 OMP E2E（含并发审批）均在该全量内通过） |
-| Linux x64（远程，Node v24.14.0） | 根 typecheck / build | 通过 | 0 |
-| Linux x64 | `@pi-desktop/omp-runtime` test | 243 passed | 0 |
-| Linux x64 | `@pi-desktop/shared` test | 968 passed | 0 |
-| Linux x64 | desktop `node --test test/*.test.mjs`（`app/apps/desktop`，`SSH_ASKPASS` unset） | 2735 总数 / 2731 passed / 0 failed / 4 skipped | 0（4 项为非 darwin 显式跳过：dev-branding:141、macos-release-lane:86、macos-signing-watchdog:254/308） |
-| Linux x64 | desktop style-token lint | 通过 | 0 |
-| Linux x64 | 五份真实 E2E；lifecycle assertion wrapper；row 探针与 real-panel resume-poll 探针；symlink-TMPDIR bridge | 5 passed；25 passed；探针 0；50 passed | 0 |
+| Linux x64（远程，Node v24.14.0） | 根 typecheck / build | 通过 | not separately retained; observed completion/counts |
+| Linux x64 | `@pi-desktop/omp-runtime` test | 243 passed | not separately retained; observed completion/counts |
+| Linux x64 | `@pi-desktop/shared` test | 968 passed | not separately retained; observed completion/counts |
+| Linux x64 | desktop `node --test test/*.test.mjs`（`app/apps/desktop`，`SSH_ASKPASS` unset） | 2735 总数 / 2731 passed / 0 failed / 4 skipped | not separately retained; observed completion/counts（4 项为非 darwin 显式跳过：dev-branding:141、macos-release-lane:86、macos-signing-watchdog:254/308） |
+| Linux x64 | desktop style-token lint | 通过 | not separately retained; observed completion/counts |
+| Linux x64 | 五份真实 E2E；lifecycle assertion wrapper；row 探针与 real-panel resume-poll 探针；symlink-TMPDIR bridge | 5 passed；25 passed；50 passed；探针 exit 0 | E2E/lifecycle：not separately retained（`2>&1 \| tail`）；row/real-panel 探针（`echo "exit=$?"`）与 symlink bridge（`PIPESTATUS[0]`）：exit 0 独立保留 |
 
-macOS 全量 desktop 未宣称为绿：9 项失败已确认是固定 PI `0111e306c120ad5820688d7608cb37bad8fbcc1f` 基线的 release 夹具 URL.pathname/中文路径缺陷（相同测试 + 两个脚本在中文检出路径复现 0/9，未改动的 `git archive` 副本在 ASCII 路径 9/9）。该既有夹具修正登记到 M6/T22，此处不实现、不削弱其 release 检查。Linux 结果单独归属远程执行；部分旧命令管道接了 `tail` 而无 `pipefail`，不臆造独立退出码，仅记录底层测试/构建完成与计数。
+macOS 全量 desktop 未宣称为绿：9 项失败已确认是固定 PI `0111e306c120ad5820688d7608cb37bad8fbcc1f` 基线的 release 夹具 URL.pathname/中文路径缺陷（相同测试 + 两个脚本在中文检出路径复现 0/9，未改动的 `git archive` 副本在 ASCII 路径 9/9）。该既有夹具修正登记到 M6/T22，此处不实现、不削弱其 release 检查。Linux 结果单独归属远程执行；其 typecheck/build、`omp-runtime`/`shared` 测试、desktop `node --test` 与 lint 命令均经 `2>&1 | tail` 管道且无 `pipefail`，底层命令的退出码未单独保留，仅以输出中的完成/计数为准；row 探针与 real-panel resume-poll 探针（`echo "exit=$?"`）、symlink-TMPDIR bridge（`PIPESTATUS[0]`）的 exit 0 为独立保留值。
 
 ## 0.1 独立复审返修（R1-R8，2026-09-23）
 
