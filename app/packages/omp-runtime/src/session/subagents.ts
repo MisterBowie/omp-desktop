@@ -366,6 +366,15 @@ export class SubagentTracker {
     return [...this.children.values()].some((child) => child.status === "running");
   }
 
+  /**
+   * Whether any parent `task` call was observed. A detached child can only be
+   * spawned by a `task` call, so the runner uses this to decide whether a
+   * failed snapshot means "cannot confirm no child" rather than "no child".
+   */
+  hasObservedTaskCalls(): boolean {
+    return this.taskCalls.size > 0;
+  }
+
   /** Drop every child and task-call record (dispose/restart boundary). */
   reset(): void {
     this.children.clear();
@@ -453,16 +462,17 @@ export class SubagentTracker {
   }
 
   /**
-   * Fail-closed ownership: a child's parent id must name an observed `task`
-   * tool call owned by this runner. Missing or unknown parents are rejected for
-   * a new child; a frame claiming a different parent than the one that spawned
-   * an existing child is a conflict.
+   * Fail-closed ownership: every lifecycle/progress/snapshot row must name a
+   * non-empty parent that this runner observed as a `task` call. A missing
+   * parent is rejected even on an existing child — a child that already has an
+   * owner cannot shed it silently. A frame claiming a different parent than
+   * the one that spawned the child is a conflict and never re-parents it.
    */
   private ownedParent(parentToolCallId: string | undefined, existing?: ChildRecord): boolean {
-    if (existing?.parentToolCallId && parentToolCallId && existing.parentToolCallId !== parentToolCallId) {
+    if (!parentToolCallId || !this.taskCalls.has(parentToolCallId)) {
       return false;
     }
-    if (!existing && (!parentToolCallId || !this.taskCalls.has(parentToolCallId))) {
+    if (existing?.parentToolCallId && existing.parentToolCallId !== parentToolCallId) {
       return false;
     }
     return true;

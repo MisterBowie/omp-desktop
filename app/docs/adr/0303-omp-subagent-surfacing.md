@@ -134,12 +134,20 @@ shutdown invalidate pending decisions through the existing M3 generation/session
 checks; a late allow can never execute after stop.
 
 Parent `stop` does not report clean convergence while an owned child is still
-active. After the parent turn converges it reconciles against `get_subagents` so
-a missed terminal frame cannot hide a running child; if any child survives, it
+active. After the parent turn converges it *always* reconciles against
+`get_subagents` — the live snapshot, not the local registry, is the authority
+for "no child", because a missed lifecycle/started frame, a lost subscription,
+or a list that was never opened leaves the registry empty while the child is
+still alive. If a valid snapshot shows an owned child still running, the runner
 tears down through the existing supervisor process-group boundary, which
 reclaims the parent and every child it spawned (measured end-to-end: the child's
-real command tree is gone after the stop). The registry and task-call ownership
-are cleared after teardown so a late frame cannot be re-attributed.
+real command tree is gone after the stop). A refused or malformed snapshot is
+conservative: when a `task` call was observed it tears down (recording why)
+rather than claiming the process group is child-free. The registry and task-call
+ownership are cleared only after a *confirmed* reaped teardown; a teardown that
+fails to reap (or throws) retains them — matching the supervisor's
+ownership-retained-for-retry semantics — so a late frame is still attributed to
+its turn and a later stop/dispose can re-run the teardown.
 
 Fixed OMP exposes no per-child stop command, and a child session has no
 trustworthy child-owned process handle to terminate without risking the parent
@@ -162,10 +170,18 @@ prompt still proceeds (only this child-surface feature is unavailable), but
   with no second UI model and no engine branch in the renderer.
 - Opening an OMP child detail uses the OMP-only bridge (`ompSubagentList` +
   `ompSubagentRead`) to resolve and read the opaque child id, then maps the
-  bounded result into the existing `SubagentRun` presentation; the read is a
-  local detail projection and never persists into the main transcript.
+  bounded result into the existing `SubagentRun` presentation. Reads are
+  incremental by byte cursor: the renderer merges each read's rows into the
+  accumulated set by stable entry id, replaces the set on a `reset` response,
+  advances the cursor to `nextByte` on every response (including reset), and
+  leaves the current detail intact on an empty poll. The read is a local detail
+  projection and never persists into the main transcript.
 - Malformed or ownership-ambiguous frames are counted, never attributed to the
   parent or a newer generation.
+- The durable transcript read projects each tool result through a bounded,
+  structured envelope (`{ content, details }`, each part capped at the 4 MiB
+  content limit, images and provider-only parts dropped); a raw unbounded
+  `content` never crosses the bridge into the renderer.
 - Child detail requires `--model` (the explicit projected binding); a build that
   omits it would show topology/progress but no child transcript, which is exactly
   the gap the projection now closes.

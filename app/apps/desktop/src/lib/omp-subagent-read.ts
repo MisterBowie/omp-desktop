@@ -55,10 +55,10 @@ export function buildSubagentRun(messages: readonly UiMessage[]): SubagentRun {
 }
 
 /** The result of one child-transcript read, typed for the panel. */
-export type OmpSubagentReadResult =
-  | { kind: "ready"; run: SubagentRun; cursor: { nextByte: number; reset: boolean } }
-  | { kind: "empty"; detail: string }
-  | { kind: "error"; detail: string };
+export type OmpSubagentReadResult = {
+  messages: UiMessage[];
+  cursor: { nextByte: number; reset: boolean };
+};
 
 /** The two api.ts surfaces the read needs (the real api methods by default). */
 export type OmpSubagentReadDeps = {
@@ -74,8 +74,11 @@ export type OmpSubagentReadDeps = {
  * Resolve and read one child's transcript through the OMP-only bridge.
  *
  * The caller owns staleness (it can drop a result whose request is no longer
- * current). This function only does the list → resolve → read → map sequence
- * and never persists anything.
+ * current) and accumulation (it merges this read's rows into the panel set).
+ * This function only does the list → resolve → read sequence and never
+ * persists anything. A read that fails is reported as `kind: "error"` by the
+ * caller; here the rejection propagates so the caller can distinguish a typed
+ * bridge error from a resolved empty transcript.
  */
 export async function fetchOmpSubagentDetail(
   deps: OmpSubagentReadDeps,
@@ -94,16 +97,27 @@ export async function fetchOmpSubagentDetail(
   }
 
   const result = await deps.read(sessionId, childId, fromByte);
-  const run = buildSubagentRun(result.messages);
-  if (run.items.length === 0) {
-    return {
-      kind: "empty",
-      detail: "the child has no readable transcript rows",
-    };
-  }
   return {
-    kind: "ready",
-    run,
+    messages: result.messages,
     cursor: { nextByte: result.cursor.nextByte, reset: result.cursor.reset },
   };
+}
+
+/**
+ * Merge an incremental read into the accumulated set, deduplicating by stable
+ * message id and preserving both old rows and order. A reset response replaces
+ * the set instead of merging (the caller decides from the cursor).
+ */
+export function mergeSubagentMessages(
+  previous: readonly UiMessage[],
+  next: readonly UiMessage[],
+): UiMessage[] {
+  const seen = new Set<string>();
+  const merged: UiMessage[] = [];
+  for (const message of [...previous, ...next]) {
+    if (seen.has(message.id)) continue;
+    seen.add(message.id);
+    merged.push(message);
+  }
+  return merged;
 }

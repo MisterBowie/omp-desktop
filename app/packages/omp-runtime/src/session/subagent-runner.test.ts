@@ -15,6 +15,8 @@ class FakeRuntime implements OmpSessionRuntime {
   readonly commands: string[] = [];
   /** Scripted `data` per command type, for the subagent read commands. */
   readonly dataByCommand = new Map<string, unknown>();
+  /** Scripted `success: false` per command type. */
+  readonly refuseByCommand = new Map<string, string>();
   private readonly frameHandlers = new Set<(frame: OmpFrame) => void>();
   private readonly failureHandlers = new Set<(error: OmpRuntimeError) => void>();
 
@@ -24,6 +26,9 @@ class FakeRuntime implements OmpSessionRuntime {
 
   async request(command: OmpFrame): Promise<{ success?: boolean; error?: string; data?: unknown }> {
     this.commands.push(String(command.type));
+    if (this.refuseByCommand.has(String(command.type))) {
+      return { success: false, error: this.refuseByCommand.get(String(command.type)) };
+    }
     if (this.dataByCommand.has(String(command.type))) {
       return { success: true, data: this.dataByCommand.get(String(command.type)) };
     }
@@ -252,12 +257,130 @@ describe("stop while a child is still running", () => {
     });
     await runner.enableSubagentSubscription("events");
     await runner.prompt("delegate");
+    // The live snapshot is the authority for "no child": it must be queried
+    // even though the local registry has no running child.
+    runtime.dataByCommand.set("get_subagents", { subagents: [] });
     const stopPromise = runner.stop();
     runtime.push({ type: "agent_end", isTerminal: true });
     const outcome = await stopPromise;
     expect(outcome.converged).toBe(true);
     expect(outcome.toreDown).toBe(false);
     expect(teardownCalls).toBe(0);
+    expect(runtime.commands).toContain("get_subagents");
+  });
+
+  it("queries the live snapshot after convergence even when no child lifecycle was observed", async () => {
+    let teardownCalls = 0;
+    const { runtime, runner } = harness({
+      teardown: async () => {
+        teardownCalls += 1;
+        return { reaped: true, cleaned: true };
+      },
+    });
+    await runner.enableSubagentSubscription("events");
+    await runner.prompt("delegate");
+    // The parent `task` call is observed, but no child lifecycle frame arrives
+    // (lost subscription / missed frame / list never opened). The snapshot is
+    // the only witness of the still-running child.
+    runtime.push(taskStart());
+    runtime.dataByCommand.set("get_subagents", {
+      subagents: [{ id: "child-1", index: 0, agent: "task", agentSource: "bundled", status: "running", lastUpdate: 1, parentToolCallId: "call-task-1" }],
+    });
+    const stopPromise = runner.stop();
+    runtime.push({ type: "agent_end", isTerminal: true });
+    const outcome = await stopPromise;
+    expect(outcome.converged).toBe(false);
+    expect(outcome.toreDown).toBe(true);
+    expect(teardownCalls).toBe(1);
+  });
+
+  it("tears down conservatively when the snapshot is unavailable and a task call was observed", async () => {
+    let teardownCalls = 0;
+    const { runtime, runner } = harness({
+      teardown: async () => {
+        teardownCalls += 1;
+        return { reaped: true, cleaned: true };
+      },
+    });
+    await runner.enableSubagentSubscription("events");
+    await runner.prompt("delegate");
+    runtime.push(taskStart());
+    runtime.refuseByCommand.set("get_subagents", "subagent event bus is unavailable");
+    const stopPromise = runner.stop();
+    runtime.push({ type: "agent_end", isTerminal: true });
+    const outcome = await stopPromise;
+    // A task call was observed, so the process group cannot be declared
+    // child-free: the runner tears down rather than claiming clean convergence.
+    expect(outcome.converged).toBe(false);
+    expect(outcome.toreDown).toBe(true);
+    expect(outcome.steps.join(" ")).toMatch(/get_subagents refused/);
+    expect(teardownCalls).toBe(1);
+  });
+
+  it("retains child ownership when teardown does not reap, so a late terminal frame is still attributed", async () => {
+    let teardownCalls = 0;
+    const { runtime, runner, envelopes } = harness({
+      teardown: async () => {
+        teardownCalls += 1;
+        return { reaped: false, cleaned: false };
+      },
+    });
+    await runner.enableSubagentSubscription("events");
+    await runner.prompt("delegate");
+    runtime.push(taskStart());
+    runtime.push({
+      type: "subagent_lifecycle",
+      payload: { id: "child-1", agent: "task", agentSource: "bundled", status: "started", index: 0, parentToolCallId: "call-task-1" },
+    });
+    runtime.dataByCommand.set("get_subagents", {
+      subagents: [{ id: "child-1", index: 0, agent: "task", agentSource: "bundled", status: "running", lastUpdate: 1, parentToolCallId: "call-task-1" }],
+    });
+    const stopPromise = runner.stop();
+    runtime.push({ type: "agent_end", isTerminal: true });
+    const outcome = await stopPromise;
+    // The process group survived: teardown is not reported as done.
+    expect(outcome.toreDown).toBe(false);
+    expect(outcome.errors.join(" ")).toMatch(/could not be fully reclaimed/);
+    // Ownership is retained: a late terminal frame is still attributed to its
+    // owning turn rather than counted as an unknown parent.
+    runtime.push({
+      type: "subagent_lifecycle",
+      payload: { id: "child-1", agent: "task", agentSource: "bundled", status: "completed", index: 0, parentToolCallId: "call-task-1" },
+    });
+    const settlement = envelopes.find((e) => e.event.type === "message_end" && !e.parentToolCallId && e.agentName === "task");
+    expect(settlement).toBeTruthy();
+  });
+
+  it("clears child ownership once the process group is confirmed reaped", async () => {
+    let teardownCalls = 0;
+    const { runtime, runner, envelopes } = harness({
+      teardown: async () => {
+        teardownCalls += 1;
+        return { reaped: true, cleaned: true };
+      },
+    });
+    await runner.enableSubagentSubscription("events");
+    await runner.prompt("delegate");
+    runtime.push(taskStart());
+    runtime.push({
+      type: "subagent_lifecycle",
+      payload: { id: "child-1", agent: "task", agentSource: "bundled", status: "started", index: 0, parentToolCallId: "call-task-1" },
+    });
+    runtime.dataByCommand.set("get_subagents", {
+      subagents: [{ id: "child-1", index: 0, agent: "task", agentSource: "bundled", status: "running", lastUpdate: 1, parentToolCallId: "call-task-1" }],
+    });
+    const stopPromise = runner.stop();
+    runtime.push({ type: "agent_end", isTerminal: true });
+    const outcome = await stopPromise;
+    expect(outcome.toreDown).toBe(true);
+    // The process group is gone: a late terminal frame cannot be attributed.
+    runtime.push({
+      type: "subagent_lifecycle",
+      payload: { id: "child-1", agent: "task", agentSource: "bundled", status: "completed", index: 0, parentToolCallId: "call-task-1" },
+    });
+    const settlement = envelopes.find((e) => e.event.type === "message_end" && !e.parentToolCallId && e.agentName === "task");
+    expect(settlement).toBeUndefined();
+    expect(runner.diagnostics().subagentDiagnostics.unknownParentCalls).toBeGreaterThan(0);
   });
 });
 

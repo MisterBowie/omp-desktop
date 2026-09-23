@@ -63,6 +63,8 @@ type OmpMessage = {
   toolName?: string;
   toolCallId?: string;
   content?: string | OmpContentPart[];
+  /** Structured host result on `role: "toolResult"` messages (bounded before it crosses the bridge). */
+  details?: unknown;
   usage?: OmpUsage;
   model?: string;
   provider?: string;
@@ -196,7 +198,7 @@ export class OmpEventConverter {
       ...(message.toolCallId ? { toolCallId: message.toolCallId } : {}),
       toolName: message.toolName ?? "unknown",
       toolStatus: message.isError === true ? "error" : "success",
-      toolResult: message.content,
+      toolResult: boundedToolResult(message),
       ...(this.parentToolCallId ? { parentToolCallId: this.parentToolCallId } : {}),
       ...(this.agentName ? { agentName: this.agentName } : {}),
       isError: message.isError === true,
@@ -517,6 +519,88 @@ function splitContent(content: unknown): { content: string; thinking?: string } 
   const joined = text.join("\n").slice(0, ASSISTANT_TEXT_LIMIT);
   const reasoning = thinking.join("\n").slice(0, ASSISTANT_TEXT_LIMIT);
   return { content: joined, ...(reasoning ? { thinking: reasoning } : {}) };
+}
+
+/**
+ * A bounded, structured projection of a durable tool result.
+ *
+ * The pinned runtime persists tool results as `{ content: blocks, details }`;
+ * the renderer reads `details` for tool-specific presentation and the display
+ * text from the row's `content`. A raw `message.content` alias would carry the
+ * full bytes across the bridge. Text-only results therefore project to an
+ * empty result (the renderer reads the already-bounded `content` field), while
+ * results with structured details keep the bounded `{ content, details }`
+ * envelope the renderer already unwraps. Images and provider-only parts have no
+ * desktop row and are dropped.
+ */
+function boundedToolResult(message: OmpMessage): unknown {
+  const details =
+    message.details === undefined
+      ? undefined
+      : boundValue(message.details, ASSISTANT_TEXT_LIMIT, { remaining: ASSISTANT_TEXT_LIMIT });
+  if (details === undefined) {
+    return "";
+  }
+  const blocks = boundedTextBlocks(message.content, ASSISTANT_TEXT_LIMIT);
+  return blocks.length > 0 ? { content: blocks, details } : { details };
+}
+
+/** Text-only blocks of the runtime content, bounded to `limit` bytes total. */
+function boundedTextBlocks(
+  content: unknown,
+  limit: number,
+): Array<{ type: "text"; text: string }> {
+  if (typeof content === "string") {
+    return content.length === 0 ? [] : [{ type: "text", text: content.slice(0, limit) }];
+  }
+  if (!Array.isArray(content)) return [];
+  const blocks: Array<{ type: "text"; text: string }> = [];
+  let total = 0;
+  for (const part of content) {
+    if (!isRecord(part)) continue;
+    if (part.type !== "text" || typeof part.text !== "string") continue;
+    const remaining = limit - total;
+    if (remaining <= 0) break;
+    const text = part.text.slice(0, remaining);
+    blocks.push({ type: "text", text });
+    total += text.length;
+  }
+  return blocks;
+}
+
+/**
+ * Recursively bound a structured `details` value: strings are truncated and the
+ * total string bytes are capped, preserving object/array shape for the renderer
+ * while keeping the serialized size within the product bound.
+ */
+function boundValue(
+  value: unknown,
+  limit: number,
+  budget: { remaining: number },
+): unknown {
+  if (budget.remaining <= 0) return undefined;
+  if (typeof value === "string") {
+    const slice = value.slice(0, Math.min(limit, budget.remaining));
+    budget.remaining -= slice.length;
+    return slice;
+  }
+  if (Array.isArray(value)) {
+    const out: unknown[] = [];
+    for (const item of value) {
+      if (budget.remaining <= 0) break;
+      out.push(boundValue(item, limit, budget));
+    }
+    return out;
+  }
+  if (isRecord(value)) {
+    const out: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (budget.remaining <= 0) break;
+      out[key] = boundValue(item, limit, budget);
+    }
+    return out;
+  }
+  return value;
 }
 
 /** Only the usage fields the pinned runtime actually reports. */

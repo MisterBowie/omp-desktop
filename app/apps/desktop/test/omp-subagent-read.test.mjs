@@ -8,7 +8,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers/ts-import-hooks.mjs")));
 
 const { IPC } = await import("../../../packages/shared/src/protocol.ts");
-const { resolveChildId, buildSubagentRun, fetchOmpSubagentDetail } = await import(
+const { resolveChildId, buildSubagentRun, fetchOmpSubagentDetail, mergeSubagentMessages } = await import(
   "../src/lib/omp-subagent-read.ts"
 );
 
@@ -31,6 +31,25 @@ test("buildSubagentRun groups tool, thinking, and answer rows", () => {
     run.items.map((item) => item.kind),
     ["tool", "thinking", "answer"],
   );
+});
+
+test("mergeSubagentMessages dedups by stable id and preserves order", () => {
+  const merged = mergeSubagentMessages(
+    [
+      { id: "a", role: "assistant", content: "first" },
+      { id: "b", role: "assistant", content: "second" },
+    ],
+    [
+      { id: "b", role: "assistant", content: "second-dup" },
+      { id: "c", role: "assistant", content: "third" },
+    ],
+  );
+  assert.deepEqual(
+    merged.map((m) => m.id),
+    ["a", "b", "c"],
+  );
+  // The first occurrence wins; the duplicate row does not replace it.
+  assert.equal(merged[1].content, "second");
 });
 
 test("fetchOmpSubagentDetail resolves and reads through the real api surface", async () => {
@@ -72,8 +91,8 @@ test("fetchOmpSubagentDetail resolves and reads through the real api surface", a
       "s1",
       "task-1",
     );
-    assert.equal(result.kind, "ready");
-    assert.equal(result.run.items.length, 1);
+    assert.equal(result.messages.length, 1);
+    assert.equal(result.messages[0].content, "report ALPHA");
     assert.equal(result.cursor.nextByte, 12);
     assert.deepEqual(
       calls.map((call) => call.channel),
@@ -84,14 +103,15 @@ test("fetchOmpSubagentDetail resolves and reads through the real api surface", a
   }
 });
 
-test("fetchOmpSubagentDetail reports empty when the child has no readable rows", async () => {
+test("fetchOmpSubagentDetail returns empty messages and the cursor when the child has no rows", async () => {
   const result = await fetchOmpSubagentDetail(
     {
       list: async () => [{ id: "child-1" }],
-      read: async () => ({ cursor: { fromByte: 0, nextByte: 0, reset: false }, messages: [] }),
+      read: async () => ({ cursor: { fromByte: 0, nextByte: 40, reset: false }, messages: [] }),
     },
     "s1",
     "child-1",
   );
-  assert.equal(result.kind, "empty");
+  assert.deepEqual(result.messages, []);
+  assert.equal(result.cursor.nextByte, 40);
 });

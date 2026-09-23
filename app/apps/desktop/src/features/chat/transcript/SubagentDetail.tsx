@@ -130,6 +130,46 @@ function SubagentFailureCard({
 }
 
 /**
+ * The OMP-only child-detail read state, rendered in place of the delegate rows
+ * while the bridge read is loading, empty, or failed. Pi sessions never pass
+ * it (their delegate comes from the live transcript).
+ */
+export type SubagentReadStatus =
+  | { phase: "loading" }
+  | { phase: "empty" }
+  | { phase: "error"; detail?: string; onRetry?: () => void };
+
+function SubagentReadState({ status }: { status: SubagentReadStatus }) {
+  const { t } = useTranslation();
+  if (status.phase === "loading") {
+    return (
+      <div className="subagent-panel-empty" role="status">
+        {t("panel.subagentLoading")}
+      </div>
+    );
+  }
+  if (status.phase === "empty") {
+    return (
+      <div className="subagent-panel-empty" role="status">
+        {t("panel.subagentEmpty")}
+      </div>
+    );
+  }
+  return (
+    <div className="subagent-panel-empty" role="alert">
+      <div className="subagent-panel-read-error">
+        <span>{status.detail ?? t("panel.subagentError")}</span>
+        {status.onRetry ? (
+          <button type="button" className="btn btn-secondary" onClick={status.onRetry}>
+            {t("panel.subagentRetry")}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
  * The side-sheet view for a selected delegate. It shows a sticky identity
  * header, the task as an inset grouped card, and the live process timeline.
  * Reports and counters remain omitted from this compact surface.
@@ -137,12 +177,14 @@ function SubagentFailureCard({
 export function SubagentDetail({
   message,
   delegate,
+  readStatus,
   delegationStatuses,
   delegationFailures,
   delegationTimings,
 }: {
   message: UiMessage;
   delegate?: SubagentRun;
+  readStatus?: SubagentReadStatus;
   delegationStatuses?: ReadonlyMap<string, SubagentOutcome>;
   delegationFailures?: ReadonlyMap<string, DelegationFailure>;
   delegationTimings?: ReadonlyMap<string, SubagentTiming>;
@@ -314,6 +356,8 @@ export function SubagentDetail({
           scrollable={false}
           variant="dock"
         />
+      ) : readStatus ? (
+        <SubagentReadState status={readStatus} />
       ) : null}
       {/* A completed delegate has nothing to explain, so the card is tied to a
         * non-success terminal outcome rather than to the error field alone. */}

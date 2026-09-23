@@ -94,6 +94,47 @@ describe("ownership validation (fail-closed)", () => {
     expect(t.list()).toHaveLength(0);
     expect(t.diagnostics().unknownParentCalls).toBe(1);
   });
+
+  it("rejects a terminal lifecycle whose parent is missing for an existing child", () => {
+    const t = tracker();
+    t.observeTaskStart("call-task-1", { task: "t" });
+    t.handleLifecycle({ id: "child-1", agent: "scout", agentSource: "bundled", status: "started", index: 0, parentToolCallId: "call-task-1" });
+    const syntheses = t.handleLifecycle({ id: "child-1", agent: "scout", agentSource: "bundled", status: "completed", index: 0 });
+    expect(syntheses).toHaveLength(0);
+    expect(t.list()[0].status).toBe("running");
+    expect(t.diagnostics().unknownParentCalls).toBe(1);
+  });
+
+  it("rejects a progress frame whose parent is missing for an existing child", () => {
+    const t = tracker();
+    t.observeTaskStart("call-task-1", { task: "t" });
+    t.handleLifecycle({ id: "child-1", agent: "scout", agentSource: "bundled", status: "started", index: 0, parentToolCallId: "call-task-1" });
+    t.handleProgress({
+      index: 0, agent: "scout", agentSource: "bundled", task: "t",
+      progress: { index: 0, id: "child-1", agent: "scout", agentSource: "bundled", status: "running", task: "t" },
+    });
+    expect(t.diagnostics().unknownParentCalls).toBe(1);
+    expect(t.list()[0].parentToolCallId).toBe("call-task-1");
+  });
+
+  it("rejects a snapshot row whose parent is missing for an existing child", () => {
+    const t = tracker();
+    t.observeTaskStart("call-task-1", { task: "t" });
+    t.handleLifecycle({ id: "child-1", agent: "scout", agentSource: "bundled", status: "started", index: 0, parentToolCallId: "call-task-1" });
+    expect(t.reconcile([{ id: "child-1", index: 0, agent: "scout", agentSource: "bundled", status: "running", lastUpdate: 2 }])).toHaveLength(0);
+    expect(t.diagnostics().unknownParentCalls).toBe(1);
+    expect(t.list()[0].parentToolCallId).toBe("call-task-1");
+  });
+
+  it("rejects a snapshot row claiming a conflicting parent for an existing child", () => {
+    const t = tracker();
+    t.observeTaskStart("call-task-1", { task: "t" });
+    t.observeTaskStart("call-task-2", { task: "t2" });
+    t.handleLifecycle({ id: "child-1", agent: "scout", agentSource: "bundled", status: "started", index: 0, parentToolCallId: "call-task-1" });
+    expect(t.reconcile([{ id: "child-1", index: 0, agent: "scout", agentSource: "bundled", status: "running", lastUpdate: 2, parentToolCallId: "call-task-2" }])).toHaveLength(0);
+    expect(t.diagnostics().unknownParentCalls).toBe(1);
+    expect(t.list()[0].parentToolCallId).toBe("call-task-1");
+  });
 });
 
 describe("progress and event attribution", () => {

@@ -520,14 +520,15 @@ export class OmpSessionRunner {
     const converged = aborted && (await this.waitForConvergence(run.generation));
     steps.push(converged ? "turn converged" : "turn did not converge in time");
     // Even when the parent turn converged, a detached child may still be running
-    // in the same process group. Reconcile against the live snapshot so a missed
-    // terminal frame cannot hide an active child: if any owned child survives,
-    // the runtime is not actually idle and must be torn down.
-    const childStillRunning = converged && (await this.hasActiveChildren());
-    if (childStillRunning) {
-      steps.push("a detached child is still running after the parent converged");
+    // in the same process group. Always reconcile against the live snapshot: a
+    // missed lifecycle frame, a lost subscription, or a list that was never
+    // opened leaves the local registry empty while the child is alive, so the
+    // snapshot — not the registry — is the authority for "no child".
+    const children = converged ? await this.hasActiveChildren() : { active: false };
+    if (children.active) {
+      steps.push(`a detached child is still running after the parent converged${children.reason ? ` (${children.reason})` : ""}`);
     }
-    if (converged && !childStillRunning) {
+    if (converged && !children.active) {
       this.closeRun(run.generation);
       return { aborted, abortBashSent, converged: true, toreDown: false, steps, errors };
     }
@@ -537,10 +538,12 @@ export class OmpSessionRunner {
     // the parent and every child it spawned. The run is closed either way,
     // because the desktop must not keep reporting a turn the user cancelled.
     let toreDown = false;
+    let reaped = false;
     if (this.teardown) {
       try {
         const result = await this.teardown({ abortBash: run.bashOpen });
-        toreDown = true;
+        reaped = result.reaped;
+        toreDown = result.reaped;
         steps.push(`process teardown: reaped=${String(result.reaped)} cleaned=${String(result.cleaned)}`);
         if (!result.reaped || !result.cleaned) {
           errors.push("the runtime process group could not be fully reclaimed");
@@ -552,30 +555,52 @@ export class OmpSessionRunner {
       errors.push("no process teardown is available");
     }
     this.closeRun(run.generation);
-    // The process group is gone, so a detached child cannot come back: clear the
-    // registry and task-call ownership so a late frame cannot be attributed.
-    this.subagents.reset();
-    this.taskCallTurn.clear();
+    // Only once the process group is confirmed gone can a detached child not
+    // come back. A failed teardown retains the child registry and task-call
+    // ownership — the only retryable evidence of a surviving child — matching
+    // the supervisor's ownership-retained-for-retry semantics: a late frame can
+    // still be attributed, and a later stop/dispose can re-run the teardown.
+    if (reaped) {
+      this.subagents.reset();
+      this.taskCallTurn.clear();
+    }
     return { aborted, abortBashSent, converged: false, toreDown, steps, errors };
   }
 
   /**
    * Whether any owned child is still running, reconciled against the live
-   * snapshot. A failed reconcile conservatively reports a tracked running child
-   * as still running rather than risk leaving its process group alive.
+   * snapshot. This always asks the runtime: the local registry is only as good
+   * as the lifecycle frames it saw, and the snapshot repairs a missed started
+   * frame or a subscription that never delivered. A refused, malformed, or
+   * failing snapshot is conservative — when a task call was observed it reports
+   * an unresolved child (and why) rather than claiming the process group is
+   * child-free.
    */
-  private async hasActiveChildren(): Promise<boolean> {
-    if (!this.subagents.hasRunningChildren()) return false;
+  private async hasActiveChildren(): Promise<{ active: boolean; reason?: string }> {
+    let response: { success?: boolean; error?: string; data?: unknown };
     try {
-      const response = await this.runtime.request({ type: "get_subagents" }, { timeoutMs: 10_000 });
-      if (response.success === false) return this.subagents.hasRunningChildren();
-      const snapshots = parseSubagentSnapshots(response.data);
-      if (snapshots === null) return this.subagents.hasRunningChildren();
-      for (const synthesis of this.subagents.reconcile(snapshots)) this.emitSynthesis(synthesis);
-      return this.subagents.hasRunningChildren();
-    } catch {
-      return this.subagents.hasRunningChildren();
+      response = await this.runtime.request({ type: "get_subagents" }, { timeoutMs: 10_000 });
+    } catch (error) {
+      return { active: this.conservativeChildVerdict(), reason: `get_subagents failed: ${describe(error)}` };
     }
+    if (response.success === false) {
+      return { active: this.conservativeChildVerdict(), reason: `get_subagents refused: ${response.error ?? "unknown error"}` };
+    }
+    const snapshots = parseSubagentSnapshots(response.data);
+    if (snapshots === null) {
+      return { active: this.conservativeChildVerdict(), reason: "get_subagents returned a malformed snapshot" };
+    }
+    for (const synthesis of this.subagents.reconcile(snapshots)) this.emitSynthesis(synthesis);
+    return { active: this.subagents.hasRunningChildren() };
+  }
+
+  /**
+   * The conservative verdict when the live snapshot cannot be read: a locally
+   * running child, or an observed `task` call whose detached child may have
+   * been missed, means the process group cannot be declared child-free.
+   */
+  private conservativeChildVerdict(): boolean {
+    return this.subagents.hasRunningChildren() || this.subagents.hasObservedTaskCalls();
   }
 
   /**

@@ -26,6 +26,7 @@ import { DisclosureAnchorContext } from "../../lib/disclosure-anchor-context";
 import { TranscriptDisclosureProvider } from "../../features/chat/transcript/disclosure";
 import { TooltipButton } from "../ui";
 import { SubagentDetail } from "../ChatTranscript";
+import type { SubagentReadStatus } from "../../features/chat/transcript/SubagentDetail";
 
 type SelectedSubagent = {
   item: DelegationActivityItem;
@@ -83,6 +84,17 @@ function SubagentPanelSurface({ selection }: { selection: SubagentPanelSelection
   const delegate = ompRead.omp
     ? (ompRead.run ?? undefined)
     : selected?.item.delegate;
+  // The OMP child detail shows its own read state (loading/empty/error with a
+  // retry) when there are no rows yet; Pi keeps the transcript delegate and
+  // never passes a read state.
+  const readStatus: SubagentReadStatus | undefined =
+    ompRead.omp && delegate === undefined
+      ? ompRead.phase === "error"
+        ? { phase: "error", detail: ompRead.errorDetail, onRetry: ompRead.reload }
+        : ompRead.phase === "empty"
+          ? { phase: "empty" }
+          : { phase: "loading" }
+      : undefined;
   const delegationStatuses = useMemo<ReadonlyMap<string, SubagentOutcome>>(
     () =>
       selected
@@ -157,6 +169,7 @@ function SubagentPanelSurface({ selection }: { selection: SubagentPanelSelection
             <SubagentDetail
               message={selected.item.message}
               {...(delegate ? { delegate } : {})}
+              {...(readStatus ? { readStatus } : {})}
               delegationStatuses={delegationStatuses}
               delegationFailures={delegationFailures}
               delegationTimings={delegationTimings}

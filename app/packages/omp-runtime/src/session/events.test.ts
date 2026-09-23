@@ -262,3 +262,80 @@ describe("unknown frames", () => {
     expect(c.snapshot().notes.join(" ")).toMatch(/without a string type/);
   });
 });
+
+describe("durable entry conversion (bounded tool results)", () => {
+  const entry = (message: Record<string, unknown>, id = "entry-1") => ({
+    id,
+    parentId: null,
+    timestamp: "2026-01-01T00:00:00.000Z",
+    message,
+  });
+
+  it("bounds an oversized string tool result without leaking the raw bytes", () => {
+    const c = converter();
+    const big = "x".repeat(5 * 1024 * 1024);
+    const row = c.convertEntry(
+      entry({ role: "toolResult", toolName: "read", toolCallId: "call-1", content: big, timestamp: 1 }),
+    );
+    expect(row).not.toBeNull();
+    if (!row) return;
+    expect(row.content.length).toBe(4 * 1024 * 1024);
+    // The toolResult is a bounded projection, not the raw 5 MiB string.
+    expect(JSON.stringify(row.toolResult).length).toBeLessThan(4 * 1024 * 1024 + 256);
+    expect(JSON.stringify(row).length).toBeLessThan(4 * 1024 * 1024 + 256);
+  });
+
+  it("bounds text parts and drops non-text blocks", () => {
+    const c = converter();
+    const bigText = "y".repeat(5 * 1024 * 1024);
+    const row = c.convertEntry(
+      entry({
+        role: "toolResult",
+        toolName: "bash",
+        toolCallId: "call-1",
+        content: [
+          { type: "text", text: bigText },
+          { type: "image", data: "z".repeat(1024 * 1024), mimeType: "image/png" },
+        ],
+        timestamp: 1,
+      }),
+    );
+    expect(row).not.toBeNull();
+    if (!row) return;
+    // The display text is bounded; the image block has no desktop row.
+    expect(row.content.length).toBe(4 * 1024 * 1024);
+    expect(row.toolResult).toBe("");
+    expect(JSON.stringify(row)).not.toContain("image/png");
+  });
+
+  it("preserves bounded structured details readably", () => {
+    const c = converter();
+    const row = c.convertEntry(
+      entry({
+        role: "toolResult",
+        toolName: "read",
+        toolCallId: "call-1",
+        content: [{ type: "text", text: "file contents" }],
+        details: { path: "/tmp/a.txt", exitCode: 0, huge: "q".repeat(5 * 1024 * 1024) },
+        timestamp: 1,
+      }),
+    );
+    expect(row).not.toBeNull();
+    if (!row) return;
+    const result = row.toolResult as { details: { path: string; exitCode: number; huge: string } };
+    expect(result.details.path).toBe("/tmp/a.txt");
+    expect(result.details.exitCode).toBe(0);
+    expect(result.details.huge.length).toBeGreaterThan(4 * 1024 * 1024 - 1024);
+    expect(result.details.huge.length).toBeLessThan(4 * 1024 * 1024 + 1);
+    expect(JSON.stringify(row).length).toBeLessThan(4 * 1024 * 1024 + 4096);
+  });
+
+  it("keeps the entry id stable across reads", () => {
+    const c = converter();
+    const message = { role: "toolResult", toolName: "read", toolCallId: "call-1", content: [{ type: "text", text: "x" }], timestamp: 1 };
+    const first = c.convertEntry(entry(message, "entry-9"));
+    const second = c.convertEntry(entry(message, "entry-9"));
+    expect(first?.id).toBe("omp:s1:entry:entry-9");
+    expect(first?.id).toBe(second?.id);
+  });
+});

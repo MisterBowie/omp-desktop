@@ -395,6 +395,15 @@
   text-align: center;
 }
 
+.subagent-panel-read-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
 .subagent-panel-switcher:hover {
   background: transparent;
 }

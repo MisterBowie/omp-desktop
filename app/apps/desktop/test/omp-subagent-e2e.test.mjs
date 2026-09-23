@@ -431,8 +431,10 @@ test(
 
       // The child is still running (its bash command has not finished). The
       // parent turn is still in-flight because the `task` tool waits on it.
-      const listed = await bridge.listSubagents("e2e-omp-subagent-stop");
-      assert.ok(listed.some((entry) => entry.parentToolCallId === taskCallId && entry.status === "running"), "the child must still be running");
+      // The stop below must find the still-running child through the live
+      // snapshot (`get_subagents`), not through a pre-warmed list: a warmed
+      // tracker would mask the exactly-one `get_subagents` snapshot query the
+      // runner must perform after the parent converges.
 
       // Stop the parent while the detached child is still active: the runner
       // must not report clean convergence while the process group is alive.

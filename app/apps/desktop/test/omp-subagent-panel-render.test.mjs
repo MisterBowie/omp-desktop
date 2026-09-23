@@ -81,6 +81,54 @@ test("OMP sessions route child detail through the bridge read, Pi keeps the tran
     const ompPanel = render({ sessionId: "s", delegationId: "child-1" });
     assert.doesNotMatch(ompPanel, /child answer from transcript/, "OMP must not reuse the transcript child rows");
     assert.match(ompPanel, /subagent-detail/, "OMP still renders the Task card header");
+    // During SSR the bridge read has produced no rows yet, so the panel shows
+    // its loading state rather than an empty body.
+    assert.match(ompPanel, /Loading subagent details/, "OMP renders the loading state while the read is pending");
+  } finally {
+    globalThis.document = originalDocument;
+    globalThis.NodeFilter = originalFilter;
+    await server.close();
+  }
+});
+
+test("SubagentDetail renders the OMP read states: loading, empty, error, retry", async () => {
+  const server = await createServer({
+    root: fileURLToPath(new URL("..", import.meta.url)),
+    configFile: false,
+    server: { middlewareMode: true, hmr: false, ws: false },
+    esbuild: { jsx: "automatic" },
+    appType: "custom",
+    optimizeDeps: { noDiscovery: true, include: [] },
+  });
+  const originalDocument = globalThis.document;
+  const originalFilter = globalThis.NodeFilter;
+  try {
+    const { SubagentDetail } = await server.ssrLoadModule(
+      "/src/features/chat/transcript/SubagentDetail.tsx",
+    );
+    const i18n = createInstance();
+    await i18n.init({ lng: "en", resources: { en: { translation: catalogs.en } } });
+    const message = {
+      id: "task-1",
+      role: "tool",
+      toolName: "task",
+      toolCallId: "task-1",
+      content: "",
+      toolArgs: { task: "delegate" },
+      toolResult: { details: { delegationId: "child-1", status: "running" } },
+      status: "complete",
+      createdAt: "2026-09-23T00:00:00.000Z",
+    };
+    const render = (readStatus) =>
+      renderToStaticMarkup(
+        createElement(I18nextProvider, { i18n }, createElement(SubagentDetail, { message, readStatus })),
+      );
+
+    assert.match(render({ phase: "loading" }), /Loading subagent details/);
+    assert.match(render({ phase: "empty" }), /Subagent details are no longer available/);
+    const error = render({ phase: "error", detail: "boom", onRetry: () => {} });
+    assert.match(error, /boom/);
+    assert.match(error, /Try again/);
   } finally {
     globalThis.document = originalDocument;
     globalThis.NodeFilter = originalFilter;

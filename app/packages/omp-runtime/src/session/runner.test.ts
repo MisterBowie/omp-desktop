@@ -231,7 +231,9 @@ describe("stopping", () => {
     // The runtime converges while the runner waits.
     setTimeout(() => runtime.push({ type: "agent_end", messages: [] }), 10);
     const outcome = await stop;
-    expect(runtime.commands).toEqual(["prompt", "abort"]);
+    // The runner always reconciles the live child snapshot after convergence,
+    // even with no subagent subscription/task call observed.
+    expect(runtime.commands).toEqual(["prompt", "abort", "get_subagents"]);
     expect(outcome).toMatchObject({ aborted: true, converged: true, toreDown: false });
     expect(outcome.steps.join(" ")).toMatch(/abort acknowledged/);
   });
@@ -243,7 +245,7 @@ describe("stopping", () => {
     const withBash = runner.stop();
     setTimeout(() => runtime.push({ type: "agent_end", messages: [] }), 10);
     await withBash;
-    expect(runtime.commands).toEqual(["prompt", "abort", "abort_bash"]);
+    expect(runtime.commands).toEqual(["prompt", "abort", "abort_bash", "get_subagents"]);
 
     const second = harness();
     await second.runner.prompt("hello");
@@ -251,7 +253,7 @@ describe("stopping", () => {
     const stop = second.runner.stop();
     setTimeout(() => second.runtime.push({ type: "agent_end", messages: [] }), 10);
     await stop;
-    expect(second.runtime.commands).toEqual(["prompt", "abort"]);
+    expect(second.runtime.commands).toEqual(["prompt", "abort", "get_subagents"]);
   });
 
   it("falls back to the process teardown when the protocol cannot converge", async () => {
