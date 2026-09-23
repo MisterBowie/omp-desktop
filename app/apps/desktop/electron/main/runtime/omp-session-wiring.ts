@@ -106,11 +106,23 @@ export async function projectSessionModels(
     throw Object.assign(new Error(resolved.error.message), { errorCode: resolved.error.errorCode });
   }
   // The credential is read only after the source is validated, and only lands
-  // in the transient models.yml.
-  const secret = await client.call<{ value?: string | null }>("providers.getSecret", {
-    id: spec.providerId,
-  });
-  const projection = { ...resolved.projection, apiKey: secret?.value ?? null };
+  // in the transient models.yml. A key-auth provider whose stored secret reads
+  // back empty (a race, corruption, or a stale `hasSecret`) is refused here:
+  // an empty key must never be downgraded to `auth: none`.
+  let apiKey: string | null = null;
+  if (resolved.needsKey) {
+    const secret = await client.call<{ value?: string | null }>("providers.getSecret", {
+      id: spec.providerId,
+    });
+    const value = typeof secret?.value === "string" ? secret.value.trim() : "";
+    if (!value) {
+      throw Object.assign(new Error(`provider ${spec.providerId} requires an API key but its stored secret is empty`), {
+        errorCode: "OMP_PROJECTION_INVALID",
+      });
+    }
+    apiKey = value;
+  }
+  const projection = { ...resolved.projection, apiKey };
   const error = projectionError(projection);
   if (error) {
     throw Object.assign(new Error(error.message), { errorCode: error.errorCode });
@@ -160,21 +172,17 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
       const client = hostOrThrow(deps.host);
       await client.call("session.rename", { id: info.sessionId, title: info.title });
     },
-    persistModelBinding: async (info) => {
+    persistConfig: async (info) => {
       const client = hostOrThrow(deps.host);
+      // One host `session.configure` call carries every field, so mode and
+      // permissionMode are never dropped and the write is atomic on the host.
       await client.call("session.configure", {
         id: info.sessionId,
-        mode: "agent",
-        providerId: info.providerId,
-        modelId: info.modelId,
-      });
-    },
-    persistThinkingLevel: async (info) => {
-      const client = hostOrThrow(deps.host);
-      await client.call("session.configure", {
-        id: info.sessionId,
-        mode: "agent",
-        thinkingLevel: info.level,
+        ...(info.mode !== null && info.mode !== undefined ? { mode: info.mode } : {}),
+        ...(info.providerId !== null && info.providerId !== undefined ? { providerId: info.providerId } : {}),
+        ...(info.modelId !== null && info.modelId !== undefined ? { modelId: info.modelId } : {}),
+        ...(info.thinkingLevel !== null && info.thinkingLevel !== undefined ? { thinkingLevel: info.thinkingLevel } : {}),
+        ...(info.permissionMode !== null && info.permissionMode !== undefined ? { permissionMode: info.permissionMode } : {}),
       });
     },
     createBranchSession: async (info) => {

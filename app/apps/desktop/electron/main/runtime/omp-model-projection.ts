@@ -67,16 +67,11 @@ export type ProviderProjectionSource = {
   supportedThinkingLevels?: string[];
 };
 
-/** Auth kinds that need an API key (or a local none-auth endpoint). */
-const KEY_AUTH_KINDS: Record<string, true> = {
-  api_key: true,
-  api_key_and_base_url: true,
-};
-
-/** Auth kinds this build refuses to project (no auth:none downgrade). */
-const UNSUPPORTED_AUTH_KINDS: Record<string, true> = {
-  oauth: true,
-  basic: true,
+/** Auth kinds this build can project, mapped to whether they need a key. */
+const PROJECTABLE_AUTH_KINDS: Record<string, "key" | "none"> = {
+  api_key: "key",
+  api_key_and_base_url: "key",
+  none: "none",
 };
 
 /**
@@ -86,18 +81,22 @@ const UNSUPPORTED_AUTH_KINDS: Record<string, true> = {
  *
  *   - the provider is not disabled;
  *   - the model id is one of the provider's configured models;
- *   - the auth kind is one this build can project (`oauth`/`basic` are refused,
- *     never downgraded to `auth: none`);
- *   - a key-auth provider without a stored secret is refused (the endpoint
- *     would silently fail or, worse, be served as auth-less);
+ *   - the auth kind is in an explicit allowlist (`api_key`,
+ *     `api_key_and_base_url`, `none`); every other value — OAuth, basic, empty,
+ *     or unknown — is refused, never downgraded to `auth: none`;
+ *   - a key-auth provider must carry a stored secret;
  *   - the requested thinking level is supported by the model (when the model
  *     declares its levels).
+ *
+ * `needsKey` tells the caller that the credential must still be read from the
+ * host secret store and that an empty key is a failure (the actual key value is
+ * applied later, after the source has been validated).
  */
 export function resolveProviderProjection(
   source: ProviderProjectionSource,
   modelId: string,
   thinkingLevel: string | null | undefined,
-): { ok: true; projection: OmpModelProjection } | { ok: false; error: OmpModelProjectionError } {
+): { ok: true; projection: OmpModelProjection; needsKey: boolean } | { ok: false; error: OmpModelProjectionError } {
   if (source.enabled === false) {
     return { ok: false, error: { errorCode: "OMP_PROJECTION_INVALID", message: `provider ${source.id} is disabled` } };
   }
@@ -106,10 +105,11 @@ export function resolveProviderProjection(
     return { ok: false, error: { errorCode: "OMP_PROJECTION_UNSUPPORTED", message: `provider ${source.id} api style cannot be projected` } };
   }
   const authKind = source.authKind ?? "";
-  if (UNSUPPORTED_AUTH_KINDS[authKind]) {
-    return { ok: false, error: { errorCode: "OMP_PROJECTION_UNSUPPORTED", message: `provider ${source.id} uses ${authKind} authentication, which this build does not project` } };
+  const authRequirement = PROJECTABLE_AUTH_KINDS[authKind];
+  if (authRequirement === undefined) {
+    return { ok: false, error: { errorCode: "OMP_PROJECTION_UNSUPPORTED", message: `provider ${source.id} uses ${authKind || "an unknown"} authentication, which this build does not project` } };
   }
-  const needsKey = KEY_AUTH_KINDS[authKind] === true;
+  const needsKey = authRequirement === "key";
   if (needsKey && source.hasSecret !== true) {
     return { ok: false, error: { errorCode: "OMP_PROJECTION_INVALID", message: `provider ${source.id} requires an API key but none is stored` } };
   }
@@ -135,7 +135,7 @@ export function resolveProviderProjection(
     ...(model.contextWindow ? { contextWindow: model.contextWindow } : {}),
     ...(model.maxTokens ? { maxTokens: model.maxTokens } : {}),
   };
-  return { ok: true, projection };
+  return { ok: true, projection, needsKey };
 }
 
 /**
@@ -197,7 +197,10 @@ export function projectModelsYaml(projection: OmpModelProjection): string {
   }
   const provider = projection.providerId;
   const lines: string[] = ["providers:"];
-  lines.push(`  ${provider}:`);
+  // The provider id is a YAML mapping key; quote it so an arbitrary id (a
+  // colon, spaces, or other YAML-significant characters) is always a single
+  // key, matching what the pinned runtime's YAML parser produces.
+  lines.push(`  ${JSON.stringify(provider)}:`);
   lines.push(yamlField(4, "baseUrl", projection.baseUrl));
   lines.push(yamlField(4, "api", projection.api));
   if (projection.apiKey) {

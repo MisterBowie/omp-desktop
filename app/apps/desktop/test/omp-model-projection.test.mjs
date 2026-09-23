@@ -45,7 +45,7 @@ test("projects exactly one provider and one model, auth: none carries no key", (
     apiKey: null,
   });
   assert.match(yaml, /providers:/);
-  assert.match(yaml, /local:/);
+  assert.match(yaml, /"local":/);
   assert.match(yaml, /api: "openai-completions"/);
   assert.match(yaml, /auth: "none"/);
   assert.match(yaml, /id: "local-model"/);
@@ -139,4 +139,25 @@ test("R4: projects provider headers into the yaml", () => {
   assert.equal(result.ok, true);
   const yaml = projectModelsYaml({ ...result.projection, apiKey: "k" });
   assert.match(yaml, /X-Custom/);
+});
+
+test("F5: rejects unknown and empty authKind instead of downgrading to auth:none", () => {
+  for (const authKind of ["", "sso", "bearer-token"]) {
+    const result = resolveProviderProjection(source({ authKind }), "acme-x", null);
+    assert.equal(result.ok, false);
+    assert.equal(result.error.errorCode, "OMP_PROJECTION_UNSUPPORTED");
+  }
+});
+
+test("F5: a key-auth provider with no key fails closed via needsKey", () => {
+  const result = resolveProviderProjection(source({ hasSecret: false }), "acme-x", null);
+  assert.equal(result.ok, false);
+  assert.match(result.error.message, /requires an API key/);
+});
+
+test("F5: quotes a provider id containing a colon", () => {
+  const result = resolveProviderProjection(source({ id: "plugin:acme" }), "acme-x", null);
+  assert.equal(result.ok, true);
+  const yaml = projectModelsYaml({ ...result.projection, apiKey: "k" });
+  assert.match(yaml, /"plugin:acme":/);
 });

@@ -107,13 +107,13 @@ export type SessionIpcDependencies = {
   stripWinLongPrefix: (path: string) => string;
   engineRouter?: { requireForSession(sessionId: string, capability: "prompt" | "stop" | "branch" | "modelSwitch"): Promise<string> };
   ompSessions?: {
-    rename(sessionId: string, title: string, context?: unknown): Promise<{ ok: boolean; reason?: string }>;
+    rename(sessionId: string, title: string, context?: unknown): Promise<{ ok: boolean; reason?: string; inconsistent?: boolean }>;
     branch(sessionId: string, throughMessageId?: string | null): Promise<{ sessionId: string }>;
     configure(
       sessionId: string,
-      config: { providerId?: string | null; modelId?: string | null; thinkingLevel?: string | null },
+      config: { mode?: string | null; providerId?: string | null; modelId?: string | null; thinkingLevel?: string | null; permissionMode?: string | null },
     ): Promise<{ ok: boolean; reason?: string }>;
-    disposeSession(sessionId: string, reason?: string): Promise<unknown>;
+    disposeSession(sessionId: string, reason?: string): Promise<{ ok: boolean; failures: Array<{ sessionId: string; detail: string }> }>;
   } | null;
 };
 
@@ -222,25 +222,19 @@ export function registerSessionIpc({
           errorCode: ErrorCodes.INVALID_ARGUMENT,
         });
       }
-      // An OMP session's fork is a native branch: the renderer's selected point
-      // maps to an OMP entry, a new native transcript is created, and the child
-      // binds its own engine reference. The host transcript is never copied.
+      // An OMP fork is gated on the `branch` capability, which this build keeps
+      // closed (see OMP_ENGINE_CAPABILITIES): the pinned runtime's `branch` is a
+      // redo-from-user fork, not PI's copy-through-message fork, and the desktop
+      // cannot yet map a renderer message to an OMP entry id. The gate refuses an
+      // OMP fork here with ENGINE_CAPABILITY_UNAVAILABLE rather than silently
+      // producing a wrong child.
       const forkEngine = engineRouter ? await engineRouter.requireForSession(sessionId, "branch") : "pi";
       if (forkEngine === "omp") {
-        if (!ompSessions) {
-          throw Object.assign(new Error("this build has no OMP runtime"), {
-            errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
-          });
-        }
-        const throughMessageId =
-          typeof input.throughMessageId === "string" ? input.throughMessageId.trim() : "";
-        const child = await ompSessions.branch(sessionId, throughMessageId || null);
-        const childSession = await host.call<{ session?: RuntimeSession | null }>("session.get", {
-          id: child.sessionId,
-          messageLimit: 1,
+        throw Object.assign(new Error("branching is not available for OMP sessions in this build"), {
+          errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+          engine: "omp",
+          capability: "branch",
         });
-        const { providers, defaults } = await sessionCapabilityContext();
-        return { session: enrichSession(childSession.session, providers, defaults) };
       }
       if (activeTurns.has(sessionId)) {
         throw Object.assign(new Error("Cannot fork a running session"), {
@@ -361,7 +355,28 @@ export function registerSessionIpc({
       });
     }
     if (!host) throw new Error("host unavailable");
-    const res = await host.call("session.delete", { id });
+    // The engine must be resolved BEFORE the host row is deleted: a row that is
+    // gone can no longer tell the router it is OMP. An OMP session's runtime is
+    // reclaimed before the delete commits; a failed reclaim is observable and
+    // must not be reported as a clean delete.
+    let reclaimFailure: string | null = null;
+    let isOmp = false;
+    if (engineRouter) {
+      try {
+        isOmp = (await engineRouter.requireForSession(id, "stop")) === "omp";
+      } catch {
+        // A session whose engine cannot be resolved is not an OMP session this
+        // build can reclaim; the delete still proceeds but is not an OMP path.
+        isOmp = false;
+      }
+    }
+    if (isOmp && ompSessions) {
+      const outcome = await ompSessions.disposeSession(id, "session deleted");
+      if (!outcome.ok) {
+        reclaimFailure = outcome.failures.map((failure) => failure.detail).join("; ");
+      }
+    }
+    const res = await host.call<{ ok?: boolean }>("session.delete", { id });
     await persistenceOutbox.dropSession(id);
     // Drop the session's pi-agent so a later session with the same id (or a
     // stale runtime) can't answer with this session's context.
@@ -372,24 +387,44 @@ export function registerSessionIpc({
         .call("agent.disposeSession", { sessionId: id })
         .catch(() => undefined);
     }
-    // An OMP session owns a runtime/process group; deleting it reclaims that
-    // runtime and nothing else. A failed reclaim is logged, never swallowed as
-    // a clean delete.
+    sessionProjects.delete(id);
+    if (reclaimFailure) {
+      logger.app("session", "warn", "OMP session runtime cleanup after delete failed", {
+        data: { sessionId: id, error: reclaimFailure },
+      });
+      return { ...res, cleanupFailed: reclaimFailure };
+    }
+    logger.app("session", "info", "session deleted", { sessionId: id });
+    return res;
+  });
+  handle(IPC.invoke.sessionArchive, async (id: string) => {
+    // Archive is a product-visible state change. For an OMP session it must
+    // reclaim the runtime (archive A must not leave A's process running), and a
+    // failed reclaim is observable. Unarchive is a separate no-op path that
+    // never starts a runtime.
+    if (id.startsWith("native-pi:")) return { ok: true };
+    if (!host) throw new Error("host unavailable");
+    let reclaimFailure: string | null = null;
     if (engineRouter && ompSessions) {
       try {
         const engine = await engineRouter.requireForSession(id, "stop");
         if (engine === "omp") {
-          await ompSessions.disposeSession(id, "session deleted");
+          const outcome = await ompSessions.disposeSession(id, "session archived");
+          if (!outcome.ok) {
+            reclaimFailure = outcome.failures.map((failure) => failure.detail).join("; ");
+          }
         }
-      } catch (error) {
-        logger.app("session", "warn", "OMP session runtime cleanup after delete failed", {
-          data: { sessionId: id, error: String((error as Error)?.message ?? error) },
-        });
+      } catch {
+        // Not resolvable as OMP; nothing to reclaim.
       }
     }
-    sessionProjects.delete(id);
-    logger.app("session", "info", "session deleted", { sessionId: id });
-    return res;
+    if (reclaimFailure) {
+      logger.app("session", "warn", "OMP session runtime cleanup after archive failed", {
+        data: { sessionId: id, error: reclaimFailure },
+      });
+      return { ok: true, cleanupFailed: reclaimFailure };
+    }
+    return { ok: true };
   });
   handle(IPC.invoke.sessionRename, async (id: string, title: string) => {
     if (id.startsWith("native-pi:")) {
@@ -626,9 +661,11 @@ export function registerSessionIpc({
       let result: { session?: RuntimeSession | null };
       if (engine === "omp" && ompSessions) {
         const outcome = await ompSessions.configure(id, {
+          mode: config.mode ?? null,
           providerId: config.providerId ?? null,
           modelId: config.modelId ?? null,
           thinkingLevel: config.thinkingLevel ?? null,
+          permissionMode: config.permissionMode ?? null,
         });
         if (!outcome.ok) {
           throw Object.assign(new Error(outcome.reason ?? "the OMP runtime refused the configuration"), {

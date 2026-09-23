@@ -4,16 +4,16 @@
 
 ## 0. M4 交付摘要（本轮）
 
-- 状态：**T14-T16 已完成并提交**（分支 `codex/m4-persistence`），含独立复审 R1-R9 返修，等待复审确认。
-- 独立复审返修（R1-R9）：恢复路径 canonicalize/containment/file-type/identity/版本校验并 switch 后核对 state（fail-closed）；branch 精确映射 renderer 选中点到 OMP entry 并做失败补偿；modelSwitch/thinking 接入 `sessionConfigure` 原子/补偿；投影对 disabled/unknown model/缺 key/oauth/basic/thinking 不兼容 fail-closed 且投影 headers；shutdown 部分失败可观察；delete/archive 只回收目标 OMP runtime；rename 支持 active/idle/restart 三态并回滚。详见 `docs/validation/M4-persistence.md` §0.1。
+- 状态：**T14-T16 已完成并提交**（分支 `codex/m4-persistence`），含两轮独立复审（R1-R9、F1-F8）返修，等待复审确认。
+- 第二轮复审返修（F1-F8）：恢复路径用 `realpath` canonicalize（拒直接/中间目录 symlink 逃逸）、有界读 header、switch 后 `get_state` 必须同时返回 id+canonical path；delete 先取 engine 再回收 OMP runtime 且 `cleanupFailed` 可观察、新增 `sessionArchive` IPC（archive 回收目标、unarchive 不启动）；**branch capability 关闭**（固定 OMP `branch` 是 redo-from-user fork 而非 PI copy-through fork，rpc-ui 事件流不带 entry id，无法可靠映射）；modelSwitch 用单一 `persistConfig` 原子持久化全字段（含 mode/permissionMode）并处理 dispose 失败；投影 authKind 明确 allowlist、空 key fail-closed、provider id 结构化引号；rename 空标题回滚 + cleanup 失败可观察；新增真实 runtime 并发审批 E2E（A/B 同时卡审批、回答 A 不释放 B）。详见 `docs/validation/M4-persistence.md` §0.1/§0.2。
 - 证据：`docs/validation/M4-persistence.md`（功能→PI/OMP/本项目 证据表、验证命令与结果、先红后绿证据）；设计决策：`app/docs/adr/0302-omp-session-persistence-and-runtime-registry.md`（英文 ADR）。
 - 核心变更：
   - **schema v21**（`crates/host-core`）：`sessions` 加 4 个可空列（`engine_adapter_version`/`engine_runtime_version`/`native_session_id`/`native_session_path`），`session.bindEngine`/`session.getEngineRef` 两个主机边界 RPC；旧 Pi 记录读回 `engine=pi`、引用全 `None`。
   - **持久原生目录**：supervisor 加 `sessionDir`，以 `--session-dir <dataRoot>/omp-sessions` 启动 runtime（原生 transcript 与临时 runRoot 分离），stop/reclaim 不删。
-  - **per-session registry**（`omp-session.ts` 重写）：每 session 独立 supervisor/runtime/cwd/模型投影/审批注册表；`new_session`→`get_state`→`bindEngine` 或 `switch_session` 恢复；`set_session_name`/`branch`/`set_model`/`set_thinking_level` 成功并持久化后才生效。
+  - **per-session registry**（`omp-session.ts` 重写）：每 session 独立 supervisor/runtime/cwd/模型投影/审批注册表；`new_session`→`get_state`→`bindEngine` 或 `switch_session` 恢复；`set_session_name`/`set_model`/`set_thinking_level` 成功并持久化后才生效。
   - **模型投影**（`omp-model-projection.ts` + `omp-session-wiring.ts`）：只投影目标 provider/model 到临时 `models.yml`，secret 只在 main/host 边界读取、只落进临时文件，canary 扫描覆盖日志/帧/持久引用/文档。
-  - **能力**：`resume`/`branch`/`modelSwitch` 开放；`steer`/`followUp`/`compact` 保持 typed refusal（RPC 队列语义未接线）。
-- 新增测试：`omp-session-persistence-e2e.test.mjs`（真实 runtime 持久化/恢复/并发 1 项）、`omp-model-projection.test.mjs`（5）、`omp-secret-redaction.test.mjs`（canary 2）、`omp-session-bridge.test.mjs`（28，升级到 registry 语义）、host-core `db/tests.rs`（迁移 v21 + bindEngine 4）。
+  - **能力**：`resume`/`modelSwitch` 开放；`branch`（语义不兼容，见 F3）/`steer`/`followUp`/`compact` 保持 typed refusal。
+- 新增测试：`omp-session-persistence-e2e.test.mjs`（真实 runtime 持久化/恢复 1 项）、`omp-session-concurrent-approval-e2e.test.mjs`（F7 真实并发审批 1 项）、`omp-session-failclosed.test.mjs`（17 项 R1/F1/R5/F6/R7）、`omp-session-delete-archive.test.mjs`（5 项 F2）、`omp-model-projection.test.mjs`（17 项 R4/F5）、`omp-secret-redaction.test.mjs`（canary 2）、`omp-session-bridge.test.mjs`（28）、host-core `db/tests.rs`（迁移 v21 + bindEngine）。
 - 下一轮入口：M5/T17-T20（子代理面板、edit/LSP/DAP 展示、MCP/规则/技能/记忆）；`steer`/`followUp`/`compact` 与 `subagentEvents` 在 M5 逐项开放。
 
 ## 0. M3 交付摘要（上一轮）

@@ -38,6 +38,7 @@ class FakeRuntime {
   usable = true;
   commands = [];
   responses = new Map();
+  currentPath = null;
   #frames = new Set();
   onFrame(handler) { this.#frames.add(handler); return () => this.#frames.delete(handler); }
   onFailure() { return () => undefined; }
@@ -49,8 +50,8 @@ class FakeRuntime {
     if (scripted) return typeof scripted === "function" ? scripted(command) : scripted;
     if (command.type === "prompt") return { success: true };
     if (command.type === "new_session") return { success: true, data: { cancelled: false } };
-    if (command.type === "get_state") return { success: true, data: { sessionId: "native-1", sessionFile: null } };
-    if (command.type === "switch_session") return { success: true, data: { cancelled: false } };
+    if (command.type === "switch_session") { this.currentPath = command.sessionPath; return { success: true, data: { cancelled: false } }; }
+    if (command.type === "get_state") return { success: true, data: { sessionId: "native-1", sessionFile: this.currentPath } };
     return { success: true };
   }
 }
@@ -75,12 +76,12 @@ function fakeSupervisor(runtime, { reclaimThrows = false, reclaimStopped = false
   };
 }
 
-function harness(options = {}) {
+function harness(supervisorOptions = {}, bridgeOptions = {}) {
   const sessionDir = makeScratch("omp-fc-sessions-");
   const runtimes = [];
   const supervisors = [];
   const firstRuntime = new FakeRuntime();
-  const firstSupervisor = fakeSupervisor(firstRuntime, options);
+  const firstSupervisor = fakeSupervisor(firstRuntime, supervisorOptions);
   runtimes.push(firstRuntime);
   supervisors.push(firstSupervisor);
   let created = 0;
@@ -91,7 +92,7 @@ function harness(options = {}) {
     }
     const runtime = new FakeRuntime();
     runtimes.push(runtime);
-    const supervisor = fakeSupervisor(runtime, options);
+    const supervisor = fakeSupervisor(runtime, supervisorOptions);
     supervisors.push(supervisor);
     created += 1;
     return supervisor;
@@ -105,6 +106,7 @@ function harness(options = {}) {
     gateResolver: () => "/repo/app/packages/omp-runtime/extensions/omp-desktop-gate.ts",
     emitAgentEvent: () => undefined,
     logger: { app: () => undefined },
+    ...bridgeOptions,
   });
   return { bridge, sessionDir, runtimes, supervisors };
 }
@@ -223,4 +225,82 @@ test("R7: rename works for a not-yet-prompted session by briefly restoring and c
   // The briefly-started runtime must be disposed again (no lingering runtime).
   assert.ok(supervisors[0].started >= 1, "the runtime was started for the rename");
   assert.equal(bridge.status("s1").isRunning, false, "no runtime may linger after a rename");
+});
+
+test("F1: refuses a restore whose intermediate directory is a symlink escaping the session dir", async () => {
+  const { bridge, sessionDir } = harness();
+  const project = makeScratch("omp-fc-project-");
+  const outside = makeScratch("omp-fc-outside-");
+  const realFile = join(outside, "native-1.jsonl");
+  writeFileSync(realFile, JSON.stringify({ type: "session", id: "native-1" }) + "\n");
+  // A symlinked intermediate directory: <sessionDir>/link -> <outside>. The
+  // final file itself is not a symlink, so a lexical containment check passes;
+  // realpath must resolve the link and refuse the escape.
+  symlinkSync(outside, join(sessionDir, "link"));
+  await assert.rejects(
+    () => bridge.prompt({ sessionId: "s1", content: "hi", projectPath: project, nativeSessionId: "native-1", nativeSessionPath: join(sessionDir, "link", "native-1.jsonl") }),
+    (error) => error.errorCode === "OMP_RESTORE_FAILED",
+  );
+});
+
+test("F1: refuses a restore whose get_state reports no sessionFile", async () => {
+  const { bridge, sessionDir, runtimes } = harness();
+  const project = makeScratch("omp-fc-project-");
+  const file = writeNative(sessionDir, "native-1");
+  runtimes[0].responses.set("get_state", { success: true, data: { sessionId: "native-1", sessionFile: null } });
+  await assert.rejects(
+    () => bridge.prompt({ sessionId: "s1", content: "hi", projectPath: project, nativeSessionId: "native-1", nativeSessionPath: file }),
+    (error) => error.errorCode === "OMP_RESTORE_FAILED" && /different path/.test(error.message),
+  );
+});
+
+test("F1: refuses a restore whose get_state reports the same id at a different path", async () => {
+  const { bridge, sessionDir, runtimes } = harness();
+  const project = makeScratch("omp-fc-project-");
+  const file = writeNative(sessionDir, "native-1");
+  const other = writeNative(sessionDir, "native-1-b");
+  runtimes[0].responses.set("get_state", { success: true, data: { sessionId: "native-1", sessionFile: other } });
+  await assert.rejects(
+    () => bridge.prompt({ sessionId: "s1", content: "hi", projectPath: project, nativeSessionId: "native-1", nativeSessionPath: file }),
+    (error) => error.errorCode === "OMP_RESTORE_FAILED" && /different path/.test(error.message),
+  );
+});
+
+test("F6: a failed host persist on rename reverts an empty prior title and reports the fork", async () => {
+  // A bridge whose host rename always fails: the revert of an empty prior title
+  // is impossible (the runtime refuses an empty name), so the rename must report
+  // the inconsistency rather than pretend it rolled back.
+  const { bridge, sessionDir, runtimes } = harness({}, {
+    persistRename: async () => {
+      throw new Error("host rename failed");
+    },
+  });
+  const project = makeScratch("omp-fc-project-");
+  const file = writeNative(sessionDir, "native-1");
+  runtimes[0].responses.set("get_state", { success: true, data: { sessionId: "native-1", sessionFile: file, sessionName: "" } });
+  runtimes[0].responses.set("set_session_name", (command) => (command.name === "" ? { success: false, error: "empty name refused" } : { success: true }));
+  const outcome = await bridge.rename("s1", "new name", {
+    projectPath: project,
+    nativeSessionId: "native-1",
+    nativeSessionPath: file,
+  });
+  assert.equal(outcome.ok, false);
+  assert.equal(outcome.inconsistent, true, "an unrevertable fork must be reported");
+  assert.match(outcome.reason ?? "", /could not be reverted/);
+});
+
+test("F6: a one-shot rename whose runtime cleanup fails is reported as inconsistent", async () => {
+  // disposeSession returns {ok:false} on reclaim failure; the rename must
+  // surface that instead of returning a clean success.
+  const { bridge, sessionDir } = harness({ reclaimStopped: true });
+  const project = makeScratch("omp-fc-project-");
+  const file = writeNative(sessionDir, "native-1");
+  const outcome = await bridge.rename("s1", "new name", {
+    projectPath: project,
+    nativeSessionId: "native-1",
+    nativeSessionPath: file,
+  });
+  assert.equal(outcome.ok, false, "a leaked runtime must fail the rename");
+  assert.equal(outcome.inconsistent, true);
+  assert.match(outcome.reason ?? "", /could not be reclaimed/);
 });

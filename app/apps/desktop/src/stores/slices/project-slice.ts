@@ -472,8 +472,8 @@ export function createProjectSlice({
 
     toggleSessionArchived: (id) => {
       if (!id) return;
+      const archived = !sessionIsArchived(id, get().sessionMeta);
       set((state) => {
-        const archived = !sessionIsArchived(id, state.sessionMeta);
         const sessionMeta = {
           ...state.sessionMeta,
           [id]: { ...(state.sessionMeta[id] || {}), archived },
@@ -484,6 +484,10 @@ export function createProjectSlice({
         return { sessionMeta, sessions };
       });
       persistCurrentSidebar(get);
+      // Archiving an OMP session reclaims its runtime; the notification is
+      // fire-and-forget (the local metadata is already committed). Unarchiving
+      // never starts a runtime.
+      if (archived) void api.archiveSession(id);
     },
 
     archiveSession: (id) => {
@@ -498,6 +502,7 @@ export function createProjectSlice({
         ),
       }));
       persistCurrentSidebar(get);
+      void api.archiveSession(id);
     },
 
     restoreSession: (id) => {

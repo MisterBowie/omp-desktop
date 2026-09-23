@@ -110,21 +110,29 @@ export const PI_ENGINE_CAPABILITIES: EngineCapabilities = {
 
 /**
  * M4 truth for the OMP engine: prompting, stopping, questions, approvals,
- * restore (native `switch_session`), branching and model/thinking switching are
- * implemented and verified. The native session lifecycle is real: a new session
- * is created through `new_session` and persisted, and a restart reopens the
- * persisted path with `switch_session` before any prompt.
+ * restore (native `switch_session`) and model/thinking switching are
+ * implemented and verified.
  *
- * Still closed, and closed means closed: steering, follow-up and compaction are
- * not wired to the OMP RPC queue in this release, and subagent events belong to
- * M5/T17. A caller that asks for one of those on an OMP session is refused with
- * `EngineCapabilityRefusal`, never served by the Pi path.
+ * Still closed, and closed means closed:
+ *
+ *   - `branch` is closed. The pinned runtime's `branch(userEntryId)` is a
+ *     redo-from-user operation that forks at the *parent* of the selected user
+ *     entry and returns the selected text to re-prompt — it is not PI's
+ *     `fork_session_through`, which copies the transcript *through* a message.
+ *     The desktop also cannot yet persist a desktop-message-id → OMP-entry-id
+ *     mapping (the rpc-ui event stream does not carry entry ids), and the RPC
+ *     switches the running runtime to the new child, which forks the parent's
+ *     in-process state. Until the adapter carries entry ids and a faithful
+ *     full-fork, an OMP fork is refused rather than silently producing the
+ *     wrong child.
+ *   - `steer`/`followUp`/`compact` are not wired to the OMP RPC queue.
+ *   - `subagentEvents` belongs to M5/T17.
  */
 export const OMP_ENGINE_CAPABILITIES: EngineCapabilities = {
   prompt: true,
   stop: true,
   resume: true,
-  branch: true,
+  branch: false,
   steer: false,
   followUp: false,
   modelSwitch: true,

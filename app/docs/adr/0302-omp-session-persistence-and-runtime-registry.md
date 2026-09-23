@@ -96,10 +96,19 @@ child sees neither `~/.omp`, `~/.agents` nor the parent's API keys.
 
 ### 6. Capabilities open one at a time
 
-`OMP_ENGINE_CAPABILITIES` opens `resume`, `branch` and `modelSwitch`, each backed
-by the behaviour above and its tests. `steer`, `followUp` and `compact` stay
-closed with the typed refusal: their RPC queue semantics are not wired in this
-release, and a closed capability is refused, never served by the Pi path.
+`OMP_ENGINE_CAPABILITIES` opens `resume` and `modelSwitch`, each backed by the
+behaviour above and its tests. `branch`, `steer`, `followUp` and `compact` stay
+closed with the typed refusal.
+
+`branch` is closed for a stated reason rather than shipped half-correct: the
+pinned runtime's `branch(userEntryId)` is a *redo-from-user* fork — it forks at
+the parent of the selected user entry and returns the selected text for the
+caller to re-prompt — whereas PI's `fork_session_through` copies the transcript
+*through* a message. The rpc-ui event stream also does not carry OMP entry ids,
+so the desktop cannot yet persist a desktop-message-id → OMP-entry-id mapping,
+and the branch RPC switches the running runtime to the new child, which forks
+the parent's in-process state. A faithful full-fork needs an adapter extension;
+until then an OMP fork is refused rather than silently producing a wrong child.
 
 ## Consequences
 

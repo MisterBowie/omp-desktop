@@ -104,6 +104,7 @@ export const IPC = {
     /** Validate and select a durable session from a reviewed host operation. */
     sessionOpen: "pi-desktop/session/open",
     sessionDelete: "pi-desktop/session/delete",
+    sessionArchive: "pi-desktop/session/archive",
     sessionRename: "pi-desktop/session/rename",
     sessionSummarizeTitle: "pi-desktop/session/summarizeTitle",
     sessionConfigure: "pi-desktop/session/configure",

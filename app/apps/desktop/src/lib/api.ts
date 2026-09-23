@@ -539,6 +539,8 @@ export const api = {
   getSessionCollaboration: (sessionId: string) =>
     invoke<SessionCollaborationSummary>(IPC.invoke.sessionCollaboration, { sessionId }),
   deleteSession: (id: string) => invoke(IPC.invoke.sessionDelete, id),
+  archiveSession: (id: string) =>
+    invoke<{ ok: boolean; cleanupFailed?: string }>(IPC.invoke.sessionArchive, id),
   getSessionScratchPath: (sessionId: string) =>
     invoke<{ path: string }>(IPC.invoke.sessionGetScratchPath, { sessionId }),
   openSessionScratchPath: (sessionId: string) =>

@@ -26,7 +26,7 @@
  *      pre-execution approval. If the gate cannot be found, the prompt is
  *      refused and the reason is reported.
  */
-import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
+import { closeSync, existsSync, lstatSync, openSync, readSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, normalize, relative, resolve } from "node:path";
 
 import {
@@ -119,10 +119,20 @@ export type OmpSessionBridgeOptions = {
   persistNativeSession?: (info: NativeSessionBoundInfo) => void | Promise<void>;
   /** Persist a rename after `set_session_name` succeeds. */
   persistRename?: (info: { sessionId: string; title: string }) => void | Promise<void>;
-  /** Persist a model switch after `set_model` succeeds. */
-  persistModelBinding?: (info: { sessionId: string; providerId: string; modelId: string }) => void | Promise<void>;
-  /** Persist a thinking-level switch after `set_thinking_level` succeeds. */
-  persistThinkingLevel?: (info: { sessionId: string; level: string }) => void | Promise<void>;
+  /**
+   * Persist the full session configuration in one host `session.configure` call
+   * (atomic on the host side): mode, provider, model, thinking and permission
+   * mode. `configure` uses this so no field is dropped and a partial write is
+   * impossible.
+   */
+  persistConfig?: (info: {
+    sessionId: string;
+    mode?: string | null;
+    providerId?: string | null;
+    modelId?: string | null;
+    thinkingLevel?: string | null;
+    permissionMode?: string | null;
+  }) => void | Promise<void>;
   /** Create a branch session row and resolve with its new desktop session id. */
   createBranchSession?: (info: BranchSessionInfo) => Promise<string>;
   /** Remove a native session the bridge created for a branch that failed to bind. */
@@ -159,7 +169,7 @@ export type OmpPromptInput = {
   userMessageId?: string | null;
 };
 
-export type OmpRenameResult = { ok: boolean; reason?: string };
+export type OmpRenameResult = { ok: boolean; reason?: string; inconsistent?: boolean };
 
 export type OmpModelSwitchResult = { ok: boolean; reason?: string };
 
@@ -217,18 +227,70 @@ export function resolveProjectDirectory(projectPath: string | null | undefined):
 }
 
 /**
- * True when `candidate` is `root` or a descendant of it, after resolving both.
- *
- * The check is lexically on resolved absolute paths (no `..` traversal can
- * escape), and the caller has already canonicalised `candidate` so a symlink in
- * the middle cannot smuggle the path outside the root.
+ * The canonical on-disk path of `candidate`, or null when it does not exist or
+ * cannot be resolved. `realpathSync` resolves every symlink component, so the
+ * result can be compared against the session directory without a lexical `..`
+ * or an intermediate-directory symlink smuggling the file outside it.
+ */
+function canonicalizeIfExists(candidate: string): string | null {
+  try {
+    return realpathSync(candidate);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True when `candidate` is `root` or a descendant of it, after resolving both
+ * through `realpath` (every symlink component resolved). A candidate whose path
+ * or intermediate directory is a symlink resolves to its target, so a symlink
+ * escape is refused rather than smuggled past a lexical check.
  */
 export function isPathWithin(candidate: string, root: string): boolean {
-  const child = resolve(candidate);
-  const parent = resolve(root);
+  const child = canonicalizeIfExists(candidate);
+  const parent = canonicalizeIfExists(root);
+  if (child === null || parent === null) return false;
   if (child === parent) return true;
   const rel = relative(parent, child);
   return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+}
+
+/** The maximum leading bytes read to locate the fixed OMP session header. */
+const HEADER_READ_BYTES = 4096;
+
+/**
+ * Read the leading bytes of a file (bounded) and return the `type: "session"`
+ * header's `id`, or null when none is found. The pinned OMP format writes a
+ * 256-byte title slot as the first line and the `SessionHeader`
+ * (`type: "session"`, `id`, `cwd`, `timestamp`) next, so the header is searched
+ * over the leading lines rather than assumed to be the first.
+ */
+function readNativeHeaderId(path: string): string | null {
+  let fd: number | null = null;
+  try {
+    fd = openSync(path, "r");
+    const buffer = Buffer.alloc(HEADER_READ_BYTES);
+    const bytes = readSync(fd, buffer, 0, HEADER_READ_BYTES, 0);
+    const head = buffer.subarray(0, bytes).toString("utf8");
+    for (const line of head.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const parsed: unknown = JSON.parse(trimmed);
+        if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) continue;
+        if (!("type" in parsed) || parsed.type !== "session") continue;
+        if (!("id" in parsed) || typeof parsed.id !== "string") continue;
+        return parsed.id;
+      } catch {
+        // The title slot and other leading lines may not be JSON; keep scanning.
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    if (fd !== null) closeSync(fd);
+  }
 }
 
 /**
@@ -238,13 +300,15 @@ export function isPathWithin(candidate: string, root: string): boolean {
  * refuse anything that is not an ordinary transcript file inside the app-owned
  * session directory. The rules, each fail-closed:
  *
- *   - canonicalise (resolve symlinks) and reject if the result is outside the
- *     session directory;
- *   - reject a symlink itself, a directory, or a missing file (lstat, not stat,
- *     so a symlink to a regular file is still refused);
- *   - read the first line and confirm it is a `session` header whose `id`
- *     matches the persisted native session id (the fixed OMP `SessionHeader`
- *     JSONL format: `type: "session"`, `id`, `cwd`, `timestamp`).
+ *   - canonicalise through `realpath` (every symlink component resolved) and
+ *     reject when the result is outside the canonical session directory;
+ *   - reject a missing file, a directory, or any non-regular file (`lstat`, so a
+ *     final symlink to a regular file is still refused);
+ *   - read only the leading bytes and confirm the `type: "session"` header's
+ *     `id` matches the persisted native session id.
+ *
+ * The returned path is the canonical one, which is what `switch_session` and
+ * the post-switch identity check compare against.
  */
 export function validateNativeSessionPath(
   sessionDir: string,
@@ -262,22 +326,35 @@ export function validateNativeSessionPath(
       errorCode: "OMP_RESTORE_FAILED",
     });
   }
-  // Resolve the path as it exists on disk (symlinks resolved), then confirm the
-  // result stays inside the session directory.
-  let canonical: string;
+  // A direct symlink is refused outright; intermediate-directory symlinks are
+  // caught by the realpath containment check below.
   try {
-    canonical = resolve(raw);
-  } catch {
-    throw Object.assign(new Error("the persisted native session path cannot be resolved"), {
+    if (lstatSync(raw).isSymbolicLink()) {
+      throw Object.assign(new Error("the persisted native session path is a symbolic link"), {
+        errorCode: "OMP_RESTORE_FAILED",
+      });
+    }
+  } catch (error) {
+    if (error instanceof Error && "errorCode" in error) throw error;
+    // The lstat may fail because the file does not exist; the canonical check
+    // reports that with its own message.
+  }
+  const canonical = canonicalizeIfExists(raw);
+  if (canonical === null) {
+    throw Object.assign(new Error("the persisted native session file does not exist"), {
       errorCode: "OMP_RESTORE_FAILED",
     });
   }
-  if (!isPathWithin(canonical, sessionDir)) {
+  // The canonical session directory is resolved once, so a session-dir path
+  // that itself traverses a symlink still yields a stable containment root.
+  const canonicalRoot = canonicalizeIfExists(sessionDir);
+  if (canonicalRoot === null || !isPathWithin(canonical, canonicalRoot)) {
     throw Object.assign(new Error("the persisted native session path is outside the session directory"), {
       errorCode: "OMP_RESTORE_FAILED",
     });
   }
-  // Reject a symlink, a directory, a missing file, or any non-regular file.
+  // Reject a directory, a missing file, or any non-regular file (the canonical
+  // path has no symlink components, but lstat also refuses a direct symlink).
   let fileStats: ReturnType<typeof lstatSync>;
   try {
     fileStats = lstatSync(canonical);
@@ -296,31 +373,7 @@ export function validateNativeSessionPath(
       errorCode: "OMP_RESTORE_FAILED",
     });
   }
-  // The file's own header records its identity: a session whose header id does
-  // not match the persisted id is the wrong file, not this session. The pinned
-  // OMP format writes a 256-byte title slot as the first line and the
-  // `type: "session"` header next, so the header is searched over the leading
-  // lines rather than assumed to be the first.
-  let headerId: string | null = null;
-  try {
-    const head = readFileSync(canonical, "utf8").split("\n", 4);
-    for (const line of head) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (parsed && typeof parsed.type === "string" && parsed.type === "session" && typeof parsed.id === "string") {
-          headerId = parsed.id;
-          break;
-        }
-      } catch {
-        // The title slot and other leading lines may not be JSON the first time;
-        // keep scanning.
-      }
-    }
-  } catch {
-    headerId = null;
-  }
+  const headerId = readNativeHeaderId(canonical);
   if (headerId !== nativeSessionId) {
     throw Object.assign(
       new Error(headerId === null
@@ -384,10 +437,16 @@ export type OmpSessionBridge = {
   rename(sessionId: string, title: string): Promise<OmpRenameResult>;
   /** Branch the session at the renderer's selected point (or the head). */
   branch(sessionId: string, throughMessageId?: string | null): Promise<{ sessionId: string }>;
-  /** Apply a provider/model/thinking change consistently (runtime + host DB). */
+  /** Apply a provider/model/thinking/mode change consistently (runtime + host DB). */
   configure(
     sessionId: string,
-    config: { providerId?: string | null; modelId?: string | null; thinkingLevel?: string | null },
+    config: {
+      mode?: string | null;
+      providerId?: string | null;
+      modelId?: string | null;
+      thinkingLevel?: string | null;
+      permissionMode?: string | null;
+    },
   ): Promise<OmpModelSwitchResult>;
   setModel(sessionId: string, providerId: string, modelId: string): Promise<OmpModelSwitchResult>;
   setThinkingLevel(sessionId: string, level: string): Promise<OmpModelSwitchResult>;
@@ -581,10 +640,18 @@ class SessionEntry {
       const stateData = state.data as { sessionId?: string; sessionFile?: string } | undefined;
       const openedId = typeof stateData?.sessionId === "string" ? stateData.sessionId : "";
       const openedPath = typeof stateData?.sessionFile === "string" ? stateData.sessionFile : "";
-      if (openedId !== spec.nativeSessionId || (openedPath && resolve(openedPath) !== canonicalPath)) {
+      // The runtime must report BOTH the persisted id and the exact canonical
+      // path: a missing path, an empty id, or a different path is a restore
+      // failure, never a silently accepted partial match.
+      const openedCanonical = openedPath ? canonicalizeIfExists(openedPath) : null;
+      if (openedId !== spec.nativeSessionId || openedCanonical !== canonicalPath) {
         await this.supervisor.stop().catch(() => undefined);
         throw Object.assign(
-          new Error(`the runtime opened a different native session (${openedId || "none"}) than the persisted reference`),
+          new Error(
+            openedId !== spec.nativeSessionId
+              ? `the runtime opened a different native session (${openedId || "none"}) than the persisted reference`
+              : "the runtime opened the native session at a different path than the persisted reference",
+          ),
           { errorCode: "OMP_RESTORE_FAILED" },
         );
       }
@@ -903,6 +970,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     context: OperationContext = {},
   ): Promise<OmpRenameResult> {
     const { entry, startedForOperation } = await ensureEntryForOperation(sessionId, context);
+    let result: OmpRenameResult = { ok: true };
     try {
       const gate = requireGate();
       await entry.ensureNativeSession(gate, {
@@ -916,30 +984,61 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
         adapterVersion: context.adapterVersion ?? null,
         runtimeVersion: context.runtimeVersion ?? null,
       });
-      const runner = await entry.ensureRunner(gate);
-      void runner;
       const runtime = runtimeOf(entry);
-      // Record the current name so a failed host persist can be reverted.
+      // Record the current name so a failed host persist can be reverted. An
+      // empty name is a legitimate prior state; the rollback is always
+      // attempted, and its failure (the runtime refuses an empty name) is
+      // reported as an inconsistent state rather than a silent fork.
       const before = await runtime.request({ type: "get_state" }, { timeoutMs: 20_000 });
-      const beforeName = (before.data as { sessionName?: string } | undefined)?.sessionName ?? "";
-      const result = await runtime.request({ type: "set_session_name", name: title }, { timeoutMs: 20_000 });
-      if (result.success === false) {
-        return { ok: false, reason: result.error ?? "the runtime refused the name" };
+      const beforeData = before.data as { sessionName?: string } | undefined;
+      const beforeName = typeof beforeData?.sessionName === "string" ? beforeData.sessionName : "";
+      const setResult = await runtime.request({ type: "set_session_name", name: title }, { timeoutMs: 20_000 });
+      if (setResult.success === false) {
+        result = { ok: false, reason: setResult.error ?? "the runtime refused the name" };
+        return result;
       }
       try {
         await options.persistRename?.({ sessionId, title });
       } catch (error) {
         // Revert the native name so the desktop row and the transcript never
         // fork: the two-phase rename either lands on both or neither.
-        if (beforeName) {
-          await runtime.request({ type: "set_session_name", name: beforeName }, { timeoutMs: 20_000 }).catch(() => undefined);
+        let rolledBack = true;
+        let rollbackError: string | null = null;
+        try {
+          const revert = await runtime.request({ type: "set_session_name", name: beforeName }, { timeoutMs: 20_000 });
+          rolledBack = revert.success !== false;
+          if (revert.success === false) rollbackError = revert.error ?? "the runtime refused the revert";
+        } catch (revertError) {
+          rolledBack = false;
+          rollbackError = String((revertError as Error)?.message ?? revertError);
         }
-        return { ok: false, reason: String((error as Error)?.message ?? error) };
+        if (!rolledBack) {
+          result = {
+            ok: false,
+            reason: `${String((error as Error)?.message ?? error)}; the native title could not be reverted (${rollbackError ?? "unknown"})`,
+            inconsistent: true,
+          };
+          return result;
+        }
+        result = { ok: false, reason: String((error as Error)?.message ?? error) };
+        return result;
       }
-      return { ok: true };
+      result = { ok: true };
+      return result;
     } finally {
       if (startedForOperation) {
-        await disposeSession(sessionId, "rename finished").catch(() => undefined);
+        const cleanup = await disposeSession(sessionId, "rename finished");
+        if (!cleanup.ok) {
+          const cleanupFailure = cleanup.failures.map((failure) => failure.detail).join("; ");
+          logger?.app("omp", "error", "omp rename cleanup incomplete", { data: { sessionId, cleanupFailure } });
+          // A rename whose one-shot runtime could not be reclaimed has leaked a
+          // runtime; the caller must see that, never a clean success.
+          if (result.ok) {
+            result.ok = false;
+            result.reason = `the rename applied but its runtime could not be reclaimed: ${cleanupFailure}`;
+            result.inconsistent = true;
+          }
+        }
       }
     }
   }
@@ -1033,23 +1132,35 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
 
   async function configure(
     sessionId: string,
-    config: { providerId?: string | null; modelId?: string | null; thinkingLevel?: string | null },
+    config: {
+      mode?: string | null;
+      providerId?: string | null;
+      modelId?: string | null;
+      thinkingLevel?: string | null;
+      permissionMode?: string | null;
+    },
   ): Promise<OmpModelSwitchResult> {
     const entry = entryOf(sessionId);
     const providerId = config.providerId ?? null;
     const modelId = config.modelId ?? null;
     const thinkingLevel = config.thinkingLevel ?? null;
+    // The full configuration is persisted in one host `session.configure` call,
+    // so mode/permissionMode are never dropped and the host write is atomic.
+    const persistAll = () =>
+      options.persistConfig?.({
+        sessionId,
+        mode: config.mode ?? null,
+        providerId: providerId ?? entry?.binding.providerId ?? null,
+        modelId: modelId ?? entry?.binding.modelId ?? null,
+        thinkingLevel: thinkingLevel ?? entry?.binding.thinkingLevel ?? null,
+        permissionMode: config.permissionMode ?? null,
+      });
 
     if (!entry) {
       // No runtime has ever run this session: the host DB is the authority and
       // the next prompt will project the new binding.
       try {
-        if (providerId !== null || modelId !== null) {
-          await options.persistModelBinding?.({ sessionId, providerId: providerId ?? "", modelId: modelId ?? "" });
-        }
-        if (thinkingLevel !== null) {
-          await options.persistThinkingLevel?.({ sessionId, level: thinkingLevel });
-        }
+        await persistAll();
         return { ok: true };
       } catch (error) {
         return { ok: false, reason: String((error as Error)?.message ?? error) };
@@ -1061,20 +1172,20 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       (modelId !== null && modelId !== entry.binding.modelId);
     const thinkingChanged = thinkingLevel !== null && thinkingLevel !== entry.binding.thinkingLevel;
 
-    // A model change means the projection is stale: stop the runtime so the
-    // next prompt re-projects with the new binding. Persist to the host first
-    // (the DB authority); if that fails, nothing changed.
     try {
       if (modelChanged) {
-        await options.persistModelBinding?.({
-          sessionId,
-          providerId: providerId ?? entry.binding.providerId ?? "",
-          modelId: modelId ?? entry.binding.modelId ?? "",
-        });
-        if (thinkingChanged) {
-          await options.persistThinkingLevel?.({ sessionId, level: thinkingLevel });
+        // A model change means the projection is stale. The host DB is written
+        // first (one atomic call), then the runtime is stopped so the next
+        // prompt re-projects with the new binding. A failed reclaim must not be
+        // reported as success: the old runtime could still serve the old model.
+        await persistAll();
+        const disposed = await disposeSession(sessionId, "model reconfigured");
+        if (!disposed.ok) {
+          return {
+            ok: false,
+            reason: `the model binding was persisted but the old runtime could not be reclaimed: ${disposed.failures.map((failure) => failure.detail).join("; ")}`,
+          };
         }
-        await disposeSession(sessionId, "model reconfigured");
         return { ok: true };
       }
       if (thinkingChanged) {
@@ -1088,7 +1199,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
           }
         }
         try {
-          await options.persistThinkingLevel?.({ sessionId, level: thinkingLevel });
+          await persistAll();
         } catch (error) {
           if (entry.activeRunner() && oldLevel) {
             await runtimeOf(entry).request({ type: "set_thinking_level", level: oldLevel }, { timeoutMs: 20_000 }).catch(() => undefined);
@@ -1098,6 +1209,8 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
         entry.binding.thinkingLevel = thinkingLevel;
         return { ok: true };
       }
+      // A pure mode/permissionMode change has no runtime impact; persist it.
+      await persistAll();
       return { ok: true };
     } catch (error) {
       return { ok: false, reason: String((error as Error)?.message ?? error) };
