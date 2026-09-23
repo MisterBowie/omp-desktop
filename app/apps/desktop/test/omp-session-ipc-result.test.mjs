@@ -7,15 +7,20 @@ import { err, ok, ErrorCodes } from "../../../packages/shared/src/errors.ts";
 import * as sharedProtocol from "../../../packages/shared/src/protocol.ts";
 
 /**
- * J1: the `inconsistent` marker must survive the REAL IPC Result contract.
+ * J1: the `inconsistent` marker must survive the REAL IPC Result contract,
+ * through BOTH surfaces:
  *
- * A direct `registerSessionIpc` handler test only observes the thrown Error.
- * This test loads the real `registerIpcHandlers` (and therefore its real
- * `wrap()`), registers the real `sessionConfigure` handler through it, and
- * asserts the `Result` a renderer `invoke()` consumes — `result.error.details`
- * — carries `inconsistent: true`. The renderer copies that field verbatim into
- * `error.details` (`src/lib/api.ts` `invoke`), so this is the renderer-facing
- * contract.
+ * 1. The main-process side: this test loads the real `registerIpcHandlers`
+ *    (and therefore its real `wrap()`), registers the real `sessionConfigure`
+ *    handler through it, and asserts the `Result` a renderer `invoke()`
+ *    consumes — `result.error.details` — carries `inconsistent: true`.
+ *
+ * 2. The renderer side: it then imports the real `src/lib/api.ts`, installs a
+ *    `window.piDesktop.invoke` bridge backed by that wrapped handler, calls the
+ *    real `api.configureSession(...)`, and asserts the final caught Error has
+ *    `error.code === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE`,
+ *    `error.details.inconsistent === true`, and the useful configure reason in
+ *    `error.message`.
  */
 
 const { IPC } = sharedProtocol;
@@ -112,6 +117,14 @@ function harness({ ompConfigure } = {}) {
   return { wrapped };
 }
 
+// The REAL renderer API surface. Node 24 strips `api.ts` itself; the
+// extensionless/`.js`->`.ts` sibling hook resolves any transitive relative
+// imports, and `@pi-desktop/shared` resolves through the workspace package
+// (same channel strings as the source modules loaded above).
+const { register } = await import("node:module");
+register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
+const { api } = await import("../src/lib/api.ts");
+
 test("J1: registerIpcHandlers wraps a configure refusal so error.details.inconsistent === true", async () => {
   const { wrapped } = harness({
     ompConfigure: () => ({ ok: false, reason: "the thinking level could not be reverted", inconsistent: true }),
@@ -130,4 +143,40 @@ test("J1: a clean configure success still flows through the wrapper as an ok Res
   const { wrapped } = harness({ ompConfigure: () => ({ ok: true }) });
   const result = await wrapped.get(IPC.invoke.sessionConfigure)({}, "omp-session-1", { mode: "agent" });
   assert.equal(result.ok, true);
+});
+
+test("J1: renderer api.configureSession rejects with the caught Error carrying error.details.inconsistent === true", async () => {
+  const { wrapped } = harness({
+    ompConfigure: () => ({ ok: false, reason: "the thinking level could not be reverted", inconsistent: true }),
+  });
+  const previous = globalThis.window;
+  try {
+    // A controlled preload bridge backed by the real wrapped handler above, so
+    // the real renderer `invoke()` reads a real Result and converts it exactly
+    // as production does.
+    globalThis.window = {
+      piDesktop: {
+        invoke: async (channel, ...args) => {
+          assert.equal(channel, IPC.invoke.sessionConfigure, "the renderer must call sessionConfigure");
+          const handler = wrapped.get(channel);
+          assert.ok(handler, "sessionConfigure must be registered through the real wrapper");
+          return handler({}, ...args);
+        },
+        on: () => () => {},
+        channels: IPC,
+        platform: "linux",
+      },
+    };
+    await assert.rejects(
+      api.configureSession("omp-session-1", { mode: "agent", thinkingLevel: "high" }),
+      (error) => {
+        assert.equal(error.code, ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE, "the typed error code must reach the renderer");
+        assert.match(error.message, /thinking level could not be reverted/, "the useful configure reason must survive");
+        assert.equal(error.details?.inconsistent, true, "the marker must reach the caught renderer Error");
+        return true;
+      },
+    );
+  } finally {
+    globalThis.window = previous;
+  }
 });

@@ -44,11 +44,11 @@
 
 ## 0.4 第五轮独立复审返修（J1-J5）
 
-基线 `d599723`（第四轮 H1-H4 提交）。逐项先写能失败的回归测试再修实现。
+基线 `d599723`（第四轮 H1-H4 提交）。回归测试直接执行此前失败的路径，未声称实现与测试的先后顺序。
 
 | 编号 | 问题 | 修复 | 测试 |
 | --- | --- | --- | --- |
-| J1 inconsistent 穿透 IPC | configure/rename 把 `inconsistent:true` 放在 Error 顶层，`register.ts` 的 `wrap()` 只转发 `e.data` 进 `Result.error.details`，renderer `invoke()` 只暴露 `error.details`，标记丢失 | 标记移入既有 data/details 契约（`data: { inconsistent: true }`），保留 typed `ENGINE_CAPABILITY_UNAVAILABLE` 与 message；rename 同步补齐（此前 rename 直接丢弃 `inconsistent`） | `omp-session-ipc-result.test.mjs`（真实 `registerIpcHandlers`/`wrap` 路径，断言 `error.details.inconsistent === true` + code + message）；直接 handler 断言改查 `error.data.inconsistent` |
+| J1 inconsistent 穿透 IPC | configure/rename 把 `inconsistent:true` 放在 Error 顶层，`register.ts` 的 `wrap()` 只转发 `e.data` 进 `Result.error.details`，renderer `invoke()` 只暴露 `error.details`，标记丢失 | 标记移入既有 data/details 契约（`data: { inconsistent: true }`），保留 typed `ENGINE_CAPABILITY_UNAVAILABLE` 与 message；rename 同步补齐（此前 rename 直接丢弃 `inconsistent`） | `omp-session-ipc-result.test.mjs` 双断言：① 主进程 Result——真实 `registerIpcHandlers`/`wrap` 路径，断言 `result.error.details.inconsistent === true` + code + message（直接 handler 断言改查 `error.data.inconsistent`）；② 真实 renderer 捕获 Error——导入真实 `src/lib/api.ts`，以被包装的 `sessionConfigure` handler 为 `window.piDesktop.invoke` 桥，调用真实 `api.configureSession(...)` 捕获最终 Error，断言 `error.code === ENGINE_CAPABILITY_UNAVAILABLE`、`error.message` 保留失败原因、`error.details.inconsistent === true` |
 | J2 OMP 无桥接 fail-closed | `sessionRename`/`sessionConfigure` 在 `engine === "omp" && ompSessions` 为假时落到 `host.call("session.rename"/"session.configure")` | 两者在 `engine === "omp"` 且无 `ompSessions` 时抛 typed capability-unavailable error，先于任何 host 变更；Pi 路径不变 | `omp-session-configure-ipc.test.mjs`（rename/configure 拒绝 + 断言对应 host 调用从未发生） |
 | J3 archive store 行为测试 | `omp-session-archive-renderer.test.mjs` 只做源码文本断言 | 用 TS import hook + 最小 get/set 状态 harness 执行真实 `createProjectSlice().archiveSession()`：`api.archiveSession` reject 时 `sessionMeta[id].archived` 保持 false、`sessions[]` 条目保持未归档、`persistCurrentSidebar` 不被调用、拒绝传播到调用方（阻止 Sidebar no-next 兜底创建 fallback） | `omp-session-archive-renderer.test.mjs`（J3 可执行 store 测试；Sidebar await/catch 源码契约保留为补充检查） |
 | J4 主机专属变更空洞 | moveProject / replaceMessages / saveRevision / listRevisions / activateRevision 无引擎门，`engine === "omp"` 会改写/读取 host transcript/project 投影，与原生 transcript 分叉 | 五个 handler 在 host 变更前 `engineForSession` 取引擎，OMP 抛 typed refusal（`refuseOmpSessionAction`）；Pi 行为不变。`scratch` 判定独立：scratch 目录 host 所有（`<dataDir>/scratch/<sessionId>`），是 renderer 附件/粘贴/截图/语音图片存储，不是原生 transcript，**不**加引擎门（代码注释 + 本节记录） | `omp-session-host-mutation-gates.test.mjs`（每个 handler OMP 拒绝 + host 调用未发生 + Pi 路径不变） |
@@ -86,7 +86,7 @@
 | `cargo fmt -p host-core -- --check` | 通过（已格式化两处） | 0 |
 | `pnpm --filter @pi-desktop/omp-runtime test` | **157 passed / 0 failed**（含真实固定 runtime 烟测） | 0 |
 | `pnpm --filter @pi-desktop/shared test` | **968 passed / 0 failed** | 0 |
-| `node --test test/*.test.mjs`（`env -u SSH_ASKPASS`，desktop 全量） | **2663 passed / 0 failed / 4 skipped**（2667 项） | 0 |
+| `node --test test/*.test.mjs`（`env -u SSH_ASKPASS`，desktop 全量） | **2664 passed / 0 failed / 4 skipped**（2668 项） | 0 |
 | `pnpm typecheck`（12/13 workspace 包） | 通过 | 0 |
 | `pnpm build:js` | 通过（含 desktop renderer 打包） | 0 |
 | `cargo build --release -p host-core --locked` | 通过 | 0 |
