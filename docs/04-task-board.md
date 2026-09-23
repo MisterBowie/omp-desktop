@@ -2,7 +2,7 @@
 
 状态：`待开始`、`进行中`、`已完成`、`阻塞`。只有附验证证据才能将实现任务标为已完成。
 
-当前交付阶段：M5/T18（OMP 原生 Edit/LSP/Debug 结果的可读展示）进行中、独立复审返修 R1-R4 已完成、待复审确认（分支 `codex/m5-tool-results`，本轮基线 `5ca321262bee88ca6a4a81e949291965e22d86c5`；证据见 `docs/validation/M5-tool-results.md`）。T17 已通过最终独立复审并验收（验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`；证据见 `docs/validation/M5-subagents.md`、`app/docs/adr/0303-omp-subagent-surfacing.md`）。下一阶段入口：M5/T19-T20。历轮独立复审返修的历史记录见 `docs/validation/M5-subagents.md` §0.1-§0.14。
+当前交付阶段：M5/T18（OMP 原生 Edit/LSP/Debug 结果的可读展示）进行中、独立复审返修 R1-R4 与 S1-S4 已完成、待复审确认（分支 `codex/m5-tool-results`，本轮基线 `9c9ddc2da1091548fb142dc0b68ffad022914dbe`；证据见 `docs/validation/M5-tool-results.md`）。T17 已通过最终独立复审并验收（验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`；证据见 `docs/validation/M5-subagents.md`、`app/docs/adr/0303-omp-subagent-surfacing.md`）。下一阶段入口：M5/T19-T20。历轮独立复审返修的历史记录见 `docs/validation/M5-subagents.md` §0.1-§0.14。
 
 ## 准备工作
 
@@ -34,7 +34,7 @@
 | T15 | M4 | 模型配置、认证投影和凭证脱敏 | T07,T13 | 配置不串用，凭证不泄漏 | 已完成（同上；`omp-model-projection.ts` + canary 扫描；model change 为最小投影约束下的**离线 reclaim-first/persist-second restart**，thinking-only 在线 `set_thinking_level` 并回滚，mode/permissionMode 一次持久化） |
 | T16 | M4 | 并发项目、队列、压缩与故障恢复 | T14,T15 | cwd 不漂移、无重复执行 | 已完成（同上；per-session registry、并发/恢复 E2E、`resume`/`modelSwitch` 开放、`branch`/`steer`/`followUp`/`compact` 保持拒绝） |
 | T17 | M5 | OMP 子代理面板与编排归属 | T16 | 父子事件、查看、停止、恢复边界 | 已完成（`docs/validation/M5-subagents.md`；ADR 0303；验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`；真实固定 OMP 子代理端到端验收 + macOS arm64 独立复审；`subagentEvents` 能力开放；限制：`stopSubagent` 恒拒（无 per-child stop RPC）、子代理 `hasUI=false` 工具 gating、批拓扑近似、`branch`/`steer`/`followUp`/`compact` 仍关闭；历轮返修见 §0.1-§0.14） |
-| T18 | M5 | edit/LSP/DAP 结果与必要的专用展示 | T16 | 结构正确、未知结果可读 | 进行中（`docs/validation/M5-tool-results.md`；`tool-presentation.ts` 新增 OMP edit/LSP/debug 只读展示，LSP 诊断/失败/request 文本可见、debug snapshot/evaluation/断点 message/未知字段可见、edit 单/多文件/rename/create/delete/no-op/partial-error/pruned/diagnostics/firstChangedLine 可读且路径可点开；live 与 durable/子代理路径同 presenter，Pi/插件兼容与 4 MiB 预算不变；独立复审返修 R1-R4 已完成、待复审确认，未验收） |
+| T18 | M5 | edit/LSP/DAP 结果与必要的专用展示 | T16 | 结构正确、未知结果可读 | 进行中（`docs/validation/M5-tool-results.md`；`tool-presentation.ts` 新增 OMP edit/LSP/debug 只读展示，LSP 诊断/失败/request 文本可见、debug snapshot/evaluation/断点 message/未知字段可见、edit 单/多文件/rename/create/delete/no-op/partial-error/pruned/diagnostics/firstChangedLine 可读且路径可点开；live 与 durable/子代理路径同 presenter，Pi/插件兼容与 4 MiB 预算不变；独立复审返修 R1-R4 与 S1-S4 已完成（快照不抑制空结果文本、只消费已渲染值含嵌套余量、裁剪非 no-op、rename 关系 + 挂载交互回归），待复审确认，未验收） |
 | T19 | M5 | MCP、规则、技能、记忆及插件分类适配 | T16 | 单一加载责任、不重复工具注册 | 待开始 |
 | T20 | M5 | Plan/Goal 和高权限工具能力门 | T17-T19 | 不借用不适用的原权限/模式语义 | 待开始 |
 | T21 | M6 | OMP 运行时资源打包与版本固定 | T16 | 无全局依赖也能启动 | 待开始 |

@@ -218,6 +218,10 @@ test("edit rename shows source → destination with no diff body", () => {
   assert.deepEqual(files.paths, ["a.ts", "b.ts"]);
   assert.equal(blocks.some((block) => block.kind === "diff"), false, "a move has no diff body");
   assert.doesNotMatch(allText(blocks), /no changes/, "a move is not reported as a no-op");
+  assert.ok(
+    fieldValues(blocks).includes("move: a.ts → b.ts"),
+    "the rename relationship reads as a move, not two unrelated files",
+  );
 });
 
 test("edit create and delete show the added and removed content", () => {
@@ -533,4 +537,155 @@ test("a plugin name ending in edit keeps its own diff/revision metadata", () => 
   assert.ok(rendered.includes("PLUGIN_REVISION_42"), "the plugin revision stays visible");
   assert.ok(rendered.includes("UNKNOWN_PLUGIN_DATA"), "nested plugin data stays visible");
   assert.ok(rendered.includes("OPAQUE_PLUGIN_DIFF"), "the plugin's own diff stays visible");
+});
+
+// ---------------------------------------------------------------------------
+// Independent-review residuals: a metadata snapshot is not the action's result,
+// and a field is consumed only once its actual value was rendered.
+// ---------------------------------------------------------------------------
+
+test("a debug snapshot does not hide an empty output or breakpoint listing", () => {
+  const snapshot = {
+    id: "debug-session",
+    adapter: "fake",
+    status: "stopped",
+    cwd: "/tmp",
+    needsConfigurationDone: false,
+  };
+  const emptyOutput = converter.convertEntry(
+    tool("debug", [{ type: "text", text: "(no output captured)" }], {
+      action: "output",
+      success: true,
+      snapshot,
+      output: "",
+    }),
+  );
+  assert.ok(
+    byRole(buildToolPresentation(emptyOutput, { hideSummaryArg: true }), "output").some((b) =>
+      b.text.includes("no output captured"),
+    ),
+    "an empty console read keeps its producer text even with a snapshot",
+  );
+
+  const emptyBreakpoints = converter.convertEntry(
+    tool("debug", [{ type: "text", text: "Function breakpoints:\n(none)" }], {
+      action: "remove_breakpoint",
+      success: true,
+      snapshot,
+      functionBreakpoints: [],
+    }),
+  );
+  assert.ok(
+    byRole(buildToolPresentation(emptyBreakpoints, { hideSummaryArg: true }), "output").some((b) =>
+      b.text.includes("none"),
+    ),
+    "an empty breakpoint listing keeps its producer text even with a snapshot",
+  );
+});
+
+test("debug keeps the breakpoint id, per-item remainder and source remainder", () => {
+  const snapshot = {
+    id: "debug-session",
+    adapter: "fake",
+    status: "stopped",
+    cwd: "/tmp",
+    needsConfigurationDone: false,
+  };
+  const row = converter.convertEntry(
+    tool("debug", [{ type: "text", text: "- line 8: verified" }], {
+      action: "set_breakpoint",
+      success: true,
+      snapshot,
+      breakpoints: [{ id: 73918264, line: 8, verified: true, futureMeta: "BREAKPOINT_REMAINDER" }],
+    }),
+  );
+  const blocks = buildToolPresentation(row, { hideSummaryArg: true });
+  assert.ok(
+    fieldValues(blocks).some((v) => v.startsWith("breakpoint:") && v.includes("73918264")),
+    "the real breakpoint id is not dropped",
+  );
+  assert.ok(
+    allText(blocks).includes("BREAKPOINT_REMAINDER"),
+    "an unrecognized breakpoint field is not dropped",
+  );
+
+  const paused = converter.convertEntry(
+    tool("debug", [{ type: "text", text: "Paused" }], {
+      action: "pause",
+      success: true,
+      snapshot: { ...snapshot, source: { path: "a.ts", name: "SOURCE_NAME_REMAINDER" }, line: 8 },
+    }),
+  );
+  assert.ok(
+    allText(buildToolPresentation(paused, { hideSummaryArg: true })).includes("SOURCE_NAME_REMAINDER"),
+    "a source field beyond path stays readable",
+  );
+});
+
+test("unrecognized known-field values stay readable instead of vanishing", () => {
+  const lsp = converter.convertEntry(
+    tool("lsp", [{ type: "text", text: "Status OK" }], {
+      action: "status",
+      success: true,
+      request: "UNRECOGNIZED_REQUEST",
+    }),
+  );
+  assert.ok(
+    allText(buildToolPresentation(lsp, { hideSummaryArg: true })).includes("UNRECOGNIZED_REQUEST"),
+    "a scalar LSP request value stays readable",
+  );
+
+  const debug = converter.convertEntry(
+    tool("debug", [{ type: "text", text: "Output" }], {
+      action: "output",
+      success: true,
+      output: { message: "UNRECOGNIZED_OUTPUT" },
+    }),
+  );
+  assert.ok(
+    allText(buildToolPresentation(debug, { hideSummaryArg: true })).includes("UNRECOGNIZED_OUTPUT"),
+    "a non-string debug output value stays readable",
+  );
+
+  const edit = converter.convertEntry(
+    tool("edit", [{ type: "text", text: "Updated a.ts" }], {
+      path: "a.ts",
+      diff: "-1|old\n+1|new",
+      diagnostics: "UNRECOGNIZED_DIAGNOSTIC",
+    }),
+  );
+  assert.ok(
+    allText(buildToolPresentation(edit, { hideSummaryArg: true })).includes("UNRECOGNIZED_DIAGNOSTIC"),
+    "a non-record diagnostics value stays readable",
+  );
+});
+
+test("a multi-file edit keeps top-level diagnostics and a pruned file is not a no-op", () => {
+  const multi = converter.convertEntry(
+    tool("edit", [{ type: "text", text: "Updated two files" }], {
+      diff: "",
+      diagnostics: { messages: ["MULTI_TOP_WARNING"] },
+      perFileResults: [
+        { path: "a.ts", diff: "-1|old\n+1|new" },
+        { path: "b.ts", diff: "-1|before\n+1|after" },
+      ],
+    }),
+  );
+  const multiBlocks = buildToolPresentation(multi, { hideSummaryArg: true });
+  assert.ok(
+    byRole(multiBlocks, "notice").some((b) => b.text.includes("MULTI_TOP_WARNING")),
+    "a top-level multi-file diagnostic is not dropped",
+  );
+
+  const pruned = converter.convertEntry(
+    tool("edit", [{ type: "text", text: "Updated a.ts" }], {
+      diff: "",
+      perFileResults: [{ path: "a.ts", snapshotsPruned: true, truncated: true }],
+    }),
+  );
+  const prunedBlocks = buildToolPresentation(pruned, { hideSummaryArg: true });
+  assert.ok(
+    !allText(prunedBlocks).match(/no changes were made/i),
+    "a pruned/truncated file is missing its diff, not unchanged",
+  );
 });

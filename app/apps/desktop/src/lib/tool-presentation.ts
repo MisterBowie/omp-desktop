@@ -611,12 +611,14 @@ function ompLspBlocks(
   // its scalars read as rows. `success` is already the error tone above.
   const request = asRecord(details?.request);
   if (request) blocks.push(...recordBlocks(request, "details"));
-  const consumed: Record<string, true> = {
-    serverName: true,
-    action: true,
-    success: true,
-    request: true,
-  };
+  // A field is dropped from the fallback only once its value was actually
+  // rendered: a scalar `request` (or a malformed scalar field) stays readable
+  // instead of vanishing from the consumed list.
+  const consumed: Record<string, true> = {};
+  if (rows.some((row) => row.label === "serverName")) consumed.serverName = true;
+  if (rows.some((row) => row.label === "action")) consumed.action = true;
+  if (typeof details?.success === "boolean") consumed.success = true;
+  if (request) consumed.request = true;
   const remainder = Object.fromEntries(
     Object.entries(details ?? {}).filter(([key]) => !consumed[key]),
   );
@@ -669,6 +671,10 @@ function ompDebugSnapshotBlocks(snapshot: Record<string, unknown>): ToolBlock[] 
   }
   if (rows.length > 0) blocks.push({ kind: "fields", role: "details", rows });
 
+  // The location row shows `source.path[:line[:column]]`. A source object with
+  // any other field (a future `name`, `origin`, …) keeps that remainder, and a
+  // field is consumed only once its value was actually rendered.
+  const source = asRecord(snapshot.source);
   const consumed: Record<string, true> = {
     id: true,
     adapter: true,
@@ -677,16 +683,26 @@ function ompDebugSnapshotBlocks(snapshot: Record<string, unknown>): ToolBlock[] 
     program: true,
     stopReason: true,
     frameName: true,
-    source: true,
-    line: true,
-    column: true,
     instructionPointerReference: true,
     exitCode: true,
     needsConfigurationDone: true,
   };
+  let sourceRemainder: Record<string, unknown> | null = null;
+  if (source) {
+    consumed.source = true;
+    if (location) {
+      consumed.line = true;
+      consumed.column = true;
+    }
+    const rest = Object.fromEntries(
+      Object.entries(source).filter(([key]) => key !== "path"),
+    );
+    if (Object.keys(rest).length > 0) sourceRemainder = rest;
+  }
   const remainder = Object.fromEntries(
     Object.entries(snapshot).filter(([key]) => !consumed[key]),
   );
+  if (sourceRemainder) remainder.source = sourceRemainder;
   if (Object.keys(remainder).length > 0) {
     blocks.push(...recordBlocks(remainder, "details"));
   }
@@ -694,16 +710,36 @@ function ompDebugSnapshotBlocks(snapshot: Record<string, unknown>): ToolBlock[] 
 }
 
 /** Breakpoint listings read better as rows than as a JSON blob of records. */
-function ompDebugBreakpointRows(value: unknown): ToolFieldRow[] {
-  if (!Array.isArray(value)) return [];
+function ompDebugBreakpointRows(
+  value: unknown,
+): { rows: ToolFieldRow[]; remainder: unknown[] } {
+  if (!Array.isArray(value)) return { rows: [], remainder: [] };
   const rows: ToolFieldRow[] = [];
+  const remainder: unknown[] = [];
+  // Fields the row renders; anything else on an item (a real `id`, a future
+  // producer field) stays readable instead of vanishing.
+  const KNOWN: Record<string, true> = {
+    id: true,
+    name: true,
+    line: true,
+    verified: true,
+    message: true,
+    condition: true,
+  };
   for (const entry of value) {
     const record = asRecord(entry);
-    if (!record) continue;
+    if (!record) {
+      remainder.push(entry);
+      continue;
+    }
     const line = numberAt(record, "line");
+    const id = numberAt(record, "id");
     const target =
       stringAt(record, "name") ?? (line !== null ? `line ${line}` : null);
-    if (!target) continue;
+    if (!target) {
+      remainder.push(entry);
+      continue;
+    }
     const verified =
       record.verified === true ? "verified" : record.verified === false ? "pending" : "";
     // `message` is why a breakpoint is pending (e.g. "No executable code at
@@ -711,14 +747,19 @@ function ompDebugBreakpointRows(value: unknown): ToolFieldRow[] {
     const message = stringAt(record, "message");
     const condition = stringAt(record, "condition");
     const parts = [
+      id !== null ? `#${id}` : null,
       target,
       verified,
       message,
       condition ? `if ${condition}` : null,
     ].filter((part): part is string => Boolean(part));
     rows.push({ label: "breakpoint", value: parts.join(" · ") });
+    const rest = Object.fromEntries(
+      Object.entries(record).filter(([key]) => !Object.hasOwn(KNOWN, key)),
+    );
+    if (Object.keys(rest).length > 0) remainder.push(rest);
   }
-  return rows;
+  return { rows, remainder };
 }
 
 /**
@@ -738,15 +779,16 @@ function ompDebugBlocks(
 ): ToolBlock[] | null {
   if (!details) return null;
   const blocks: ToolBlock[] = [];
+  // The producer's text repeats the action's result (console output, an
+  // evaluation, a breakpoint listing); it is suppressed only when that result
+  // was actually rendered. The session snapshot is metadata, never the result,
+  // so a present snapshot must not hide an empty output's `(no output captured)`.
   let carried = false;
 
   const snapshot = asRecord(details.snapshot);
   if (snapshot) {
     const snapshotBlocks = ompDebugSnapshotBlocks(snapshot);
-    if (snapshotBlocks.length > 0) {
-      blocks.push(...snapshotBlocks);
-      carried = true;
-    }
+    if (snapshotBlocks.length > 0) blocks.push(...snapshotBlocks);
   }
 
   const output = stringAt(details, "output");
@@ -757,37 +799,40 @@ function ompDebugBlocks(
 
   const evaluation = asRecord(details.evaluation);
   if (evaluation) {
-    blocks.push(...recordBlocks(evaluation, "details"));
-    carried = true;
-  }
-
-  for (const key of ["breakpoints", "functionBreakpoints"] as const) {
-    const rows = ompDebugBreakpointRows(details[key]);
-    if (rows.length > 0) {
-      blocks.push({ kind: "fields", role: "details", rows });
+    const evaluationBlocks = recordBlocks(evaluation, "details");
+    if (evaluationBlocks.length > 0) {
+      blocks.push(...evaluationBlocks);
       carried = true;
     }
   }
 
-  // Everything else — action, success, state, timedOut, adapter, and any
-  // future producer fields — stays readable through the generic renderer.
-  const consumed: Record<string, true> = {
-    snapshot: true,
-    output: true,
-    evaluation: true,
-    breakpoints: true,
-    functionBreakpoints: true,
-  };
+  for (const key of ["breakpoints", "functionBreakpoints"] as const) {
+    const value = details[key];
+    if (!Array.isArray(value)) continue;
+    const { rows, remainder: breakpointRemainder } = ompDebugBreakpointRows(value);
+    if (rows.length > 0) {
+      blocks.push({ kind: "fields", role: "details", rows });
+      carried = true;
+    }
+    if (breakpointRemainder.length > 0) {
+      blocks.push(...recordBlocks({ [key]: breakpointRemainder }, "details"));
+    }
+  }
+
+  // A field is consumed only once its value was rendered: a non-string
+  // `output`, a non-record `evaluation`, or an unrecognized listing stays in
+  // the generic remainder instead of being dropped.
+  const consumed: Record<string, true> = {};
+  if (snapshot) consumed.snapshot = true;
+  if (output) consumed.output = true;
+  if (evaluation) consumed.evaluation = true;
+  if (Array.isArray(details.breakpoints)) consumed.breakpoints = true;
+  if (Array.isArray(details.functionBreakpoints)) consumed.functionBreakpoints = true;
   const remainder = Object.fromEntries(
     Object.entries(details).filter(([key]) => !consumed[key]),
   );
   if (Object.keys(remainder).length > 0) {
     blocks.push(...recordBlocks(remainder, "details"));
-    // `action`/`success` are always-present metadata; any other remainder key
-    // is unknown producer data and carries meaning of its own.
-    if (Object.keys(remainder).some((key) => key !== "action" && key !== "success")) {
-      carried = true;
-    }
   }
 
   if (!carried) {
@@ -814,7 +859,10 @@ function ompEditDiagnosticBlocks(
   for (const message of messages) {
     blocks.push({ kind: "note", role: errored ? "error" : "notice", text: message });
   }
-  const consumed: Record<string, true> = { messages: true };
+  // A non-array `messages` is malformed producer data, not an empty list: it
+  // stays in the fallback rather than being discarded by the filter above.
+  const consumed: Record<string, true> = {};
+  if (Array.isArray(diagnostics.messages)) consumed.messages = true;
   const remainder = Object.fromEntries(
     Object.entries(diagnostics).filter(([key]) => !consumed[key]),
   );
@@ -835,9 +883,11 @@ function ompEditFileBlocks(file: Record<string, unknown>): ToolBlock[] {
   const isError = file.isError === true;
   const errorText = stringAt(file, "displayErrorText") ?? stringAt(file, "errorText");
   const snapshotsPruned = file.snapshotsPruned === true;
+  const truncated = file.truncated === true;
   const oldText = typeof file.oldText === "string" ? file.oldText : null;
   const newText = typeof file.newText === "string" ? file.newText : null;
   const diffText = typeof file.diff === "string" && file.diff !== "" ? file.diff : null;
+  const rename = Boolean(sourcePath && move);
 
   // Identity: the edited path (and the rename source) as an openable file
   // list, so a restored or child row without `toolArgs` can still open the
@@ -851,7 +901,17 @@ function ompEditFileBlocks(file: Record<string, unknown>): ToolBlock[] {
   }
   const identity = filesBlock(paths);
   if (identity) blocks.push(identity);
-  if (op === "create") {
+
+  // The rename relationship stays readable next to the clickable paths: a flat
+  // `[a.ts, b.ts]` list alone reads as "two files edited", not "a.ts moved to
+  // b.ts".
+  if (rename) {
+    blocks.push({
+      kind: "fields",
+      role: "details",
+      rows: [{ label: "move", value: `${sourcePath} → ${move}` }],
+    });
+  } else if (op === "create") {
     blocks.push({ kind: "fields", role: "details", rows: [{ label: "operation", value: "create" }] });
   } else if (op === "delete") {
     blocks.push({ kind: "fields", role: "details", rows: [{ label: "operation", value: "delete" }] });
@@ -873,7 +933,7 @@ function ompEditFileBlocks(file: Record<string, unknown>): ToolBlock[] {
     const diff = diffBlock(oldText, newText);
     if (diff) {
       blocks.push(diff);
-    } else if (!sourcePath && !move) {
+    } else if (!rename) {
       blocks.push({
         kind: "note",
         role: "notice",
@@ -882,7 +942,10 @@ function ompEditFileBlocks(file: Record<string, unknown>): ToolBlock[] {
     }
   } else if (diffText) {
     blocks.push(codeBlock("diff", diffText, ""));
-  } else if (!sourcePath && !move) {
+  } else if (!rename && !snapshotsPruned && !truncated && !isError) {
+    // A genuine no-op has its own complete result: no diff, no snapshots, no
+    // rename, no omission marker. A pruned/truncated/failed file is missing
+    // its diff, not unchanged, and must not borrow the no-change preview.
     blocks.push({
       kind: "note",
       role: "notice",
@@ -899,7 +962,8 @@ function ompEditFileBlocks(file: Record<string, unknown>): ToolBlock[] {
     });
   }
 
-  blocks.push(...ompEditDiagnosticBlocks(asRecord(file.diagnostics)));
+  const diagnostics = asRecord(file.diagnostics);
+  if (diagnostics) blocks.push(...ompEditDiagnosticBlocks(diagnostics));
 
   const meta = asRecord(file.meta);
   if (meta) blocks.push(...recordBlocks(meta, "details"));
@@ -914,6 +978,13 @@ function ompEditFileBlocks(file: Record<string, unknown>): ToolBlock[] {
       text: "file snapshots were pruned from the result",
     });
   }
+  if (truncated) {
+    blocks.push({
+      kind: "note",
+      role: "notice",
+      text: "file content was truncated",
+    });
+  }
 
   // Any field this version does not know — future per-file metadata — stays
   // readable through the generic renderer instead of vanishing.
@@ -926,13 +997,14 @@ function ompEditFileBlocks(file: Record<string, unknown>): ToolBlock[] {
     errorText: true,
     displayErrorText: true,
     snapshotsPruned: true,
+    truncated: true,
     oldText: true,
     newText: true,
     diff: true,
     firstChangedLine: true,
-    diagnostics: true,
     meta: true,
   };
+  if (diagnostics) consumed.diagnostics = true;
   const remainder = Object.fromEntries(
     Object.entries(file).filter(([key]) => !consumed[key]),
   );
@@ -950,6 +1022,24 @@ function ompEditBlocks(details: Record<string, unknown>): ToolBlock[] {
     for (const entry of perFile) {
       const file = asRecord(entry);
       if (file) blocks.push(...ompEditFileBlocks(file));
+    }
+    // The aggregate `diff`/`firstChangedLine` repeat what each per-file block
+    // already rendered; a top-level `diagnostics`, `meta`, or unknown field is
+    // not per-file data and must stay readable rather than vanish with the
+    // early return.
+    const diagnostics = asRecord(details.diagnostics);
+    if (diagnostics) blocks.push(...ompEditDiagnosticBlocks(diagnostics));
+    const consumed: Record<string, true> = {
+      perFileResults: true,
+      diff: true,
+      firstChangedLine: true,
+    };
+    if (diagnostics) consumed.diagnostics = true;
+    const remainder = Object.fromEntries(
+      Object.entries(details).filter(([key]) => !consumed[key]),
+    );
+    if (Object.keys(remainder).length > 0) {
+      blocks.push(...recordBlocks(remainder, "details"));
     }
     return blocks;
   }
