@@ -80,8 +80,26 @@ test("H3: sessionConfigure carries inconsistent through the IPC error", async ()
   });
   await assert.rejects(
     () => handlers.get(IPC.invoke.sessionConfigure)("omp-session-1", { mode: "agent", thinkingLevel: "high" }),
-    (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE && error.inconsistent === true,
+    (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE && error.data?.inconsistent === true,
   );
+});
+
+test("J2: rename fails closed when an OMP session has no wired runtime", async () => {
+  const { handlers, calls } = harness({ ompSessions: null });
+  await assert.rejects(
+    () => handlers.get(IPC.invoke.sessionRename)("omp-session-1", "new title"),
+    (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE && /no OMP runtime/.test(error.message),
+  );
+  assert.equal(calls.some((call) => call.method === "session.rename"), false, "the host row must not be renamed");
+});
+
+test("J2: configure fails closed when an OMP session has no wired runtime", async () => {
+  const { handlers, calls } = harness({ ompSessions: null });
+  await assert.rejects(
+    () => handlers.get(IPC.invoke.sessionConfigure)("omp-session-1", { mode: "agent", thinkingLevel: "high" }),
+    (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE && /no OMP runtime/.test(error.message),
+  );
+  assert.equal(calls.some((call) => call.method === "session.configure"), false, "the host row must not be configured");
 });
 
 test("H3: delete fails closed when an OMP session has no wired runtime", async () => {

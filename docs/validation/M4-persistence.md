@@ -1,6 +1,6 @@
 # M4 验证记录：会话持久化、模型投影与并发注册表（T14-T16）
 
-更新时间：2026-09-23。基线：`d420048ad9f82429e6117b3009c6fa53fd2f085f`，分支 `codex/m4-persistence`。
+更新时间：2026-09-23。第五轮复审基线：`d5997232c1b4478c65a1497ceebdf491fed47703`，分支 `codex/m4-persistence`。
 参考子模块固定且干净：PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`，OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`。
 
 ## 0.1 独立复审返修（R1-R9）
@@ -42,6 +42,18 @@
 | G2 delete/archive 回收失败可观察 | delete 回收失败仍删 row；archive 返回 `{ok:true,cleanupFailed}`；renderer fire-and-forget；engine 解析失败被当非 OMP | delete 先解析 engine（失败 fail closed），OMP 回收失败则抛 typed error 不删 row/outbox；archive 回收失败抛 typed error；renderer archive 改 async：先 `api.archiveSession` 成功才提交 archived metadata，失败保持未归档并抛错 | `omp-session-delete-archive.test.mjs`（回收失败不写 host row / archive 抛错） |
 | G3 清理过期 branch | 关闭 capability 但保留序号猜测 branch 实现 + wiring | 删除 `branchEntryId`/`createBranchSession`/`persistBranchCleanup`/`userMessages` 追踪，`branch` 改为 typed refusal；文档不再把 modelSwitch 称为「原子」（改为「离线切换事务」） | — |
 
+## 0.4 第五轮独立复审返修（J1-J5）
+
+基线 `d599723`（第四轮 H1-H4 提交）。逐项先写能失败的回归测试再修实现。
+
+| 编号 | 问题 | 修复 | 测试 |
+| --- | --- | --- | --- |
+| J1 inconsistent 穿透 IPC | configure/rename 把 `inconsistent:true` 放在 Error 顶层，`register.ts` 的 `wrap()` 只转发 `e.data` 进 `Result.error.details`，renderer `invoke()` 只暴露 `error.details`，标记丢失 | 标记移入既有 data/details 契约（`data: { inconsistent: true }`），保留 typed `ENGINE_CAPABILITY_UNAVAILABLE` 与 message；rename 同步补齐（此前 rename 直接丢弃 `inconsistent`） | `omp-session-ipc-result.test.mjs`（真实 `registerIpcHandlers`/`wrap` 路径，断言 `error.details.inconsistent === true` + code + message）；直接 handler 断言改查 `error.data.inconsistent` |
+| J2 OMP 无桥接 fail-closed | `sessionRename`/`sessionConfigure` 在 `engine === "omp" && ompSessions` 为假时落到 `host.call("session.rename"/"session.configure")` | 两者在 `engine === "omp"` 且无 `ompSessions` 时抛 typed capability-unavailable error，先于任何 host 变更；Pi 路径不变 | `omp-session-configure-ipc.test.mjs`（rename/configure 拒绝 + 断言对应 host 调用从未发生） |
+| J3 archive store 行为测试 | `omp-session-archive-renderer.test.mjs` 只做源码文本断言 | 用 TS import hook + 最小 get/set 状态 harness 执行真实 `createProjectSlice().archiveSession()`：`api.archiveSession` reject 时 `sessionMeta[id].archived` 保持 false、`sessions[]` 条目保持未归档、`persistCurrentSidebar` 不被调用、拒绝传播到调用方（阻止 Sidebar no-next 兜底创建 fallback） | `omp-session-archive-renderer.test.mjs`（J3 可执行 store 测试；Sidebar await/catch 源码契约保留为补充检查） |
+| J4 主机专属变更空洞 | moveProject / replaceMessages / saveRevision / listRevisions / activateRevision 无引擎门，`engine === "omp"` 会改写/读取 host transcript/project 投影，与原生 transcript 分叉 | 五个 handler 在 host 变更前 `engineForSession` 取引擎，OMP 抛 typed refusal（`refuseOmpSessionAction`）；Pi 行为不变。`scratch` 判定独立：scratch 目录 host 所有（`<dataDir>/scratch/<sessionId>`），是 renderer 附件/粘贴/截图/语音图片存储，不是原生 transcript，**不**加引擎门（代码注释 + 本节记录） | `omp-session-host-mutation-gates.test.mjs`（每个 handler OMP 拒绝 + host 调用未发生 + Pi 路径不变） |
+| J5 文档诚实 | validation §3.6 仍称 `set_model`/`set_thinking_level` 失败返回 `{ok:false}` | 改写为最终行为：model change 不调 `set_model`（离线 reclaim-first/persist-second 重投影重启）；仅 thinking-only 在线 `set_thinking_level` 并回滚 | 本表 + §3.6 更正；task-board/HANDOFF 同步 |
+
 ## 0. 结论摘要
 
 - T14（会话字段/迁移/恢复/归档）、T15（模型投影/凭证脱敏）、T16（并发注册表/故障恢复）实现完成并验证。**分支（branch）经两轮复审确认与固定 OMP `branch` 语义不兼容（redo-from-user fork vs PI copy-through fork）且 rpc-ui 事件流不带 entry id，本版关闭该 capability 并明确拒绝，不宣称兼容**（见 §0.2 F3、ADR 0302 §6）。
@@ -74,7 +86,7 @@
 | `cargo fmt -p host-core -- --check` | 通过（已格式化两处） | 0 |
 | `pnpm --filter @pi-desktop/omp-runtime test` | **157 passed / 0 failed**（含真实固定 runtime 烟测） | 0 |
 | `pnpm --filter @pi-desktop/shared test` | **968 passed / 0 failed** | 0 |
-| `node --test test/*.test.mjs`（`env -u SSH_ASKPASS`，desktop 全量） | **2650 passed / 0 failed / 4 skipped**（2654 项） | 0 |
+| `node --test test/*.test.mjs`（`env -u SSH_ASKPASS`，desktop 全量） | **2663 passed / 0 failed / 4 skipped**（2667 项） | 0 |
 | `pnpm typecheck`（12/13 workspace 包） | 通过 | 0 |
 | `pnpm build:js` | 通过（含 desktop renderer 打包） | 0 |
 | `cargo build --release -p host-core --locked` | 通过 | 0 |
@@ -89,12 +101,12 @@
 3. **新进程恢复相同会话**：同一测试用 `nativeSessionPath` 重开，断言历史恢复、0 个旧工具执行、目标文件 mtime/content 不变（restore 不重放）。
 4. **缺失/损坏/越界引用**：`omp-session.ts` 的 `ensureNativeSession` 对 `switch_session` 返回 `cancelled`/`success:false` 抛 `OMP_RESTORE_FAILED`，不新建替代会话（bridge 测试 + registry 语义覆盖）。
 5. **rename/archive/delete 主路径与失败**：`session-ipc.ts` 重命名失败抛 `ENGINE_CAPABILITY_UNAVAILABLE`；`sessionDelete` 先取 engine 再回收 OMP runtime、回收失败抛 typed error 不删 host row；`sessionArchive` IPC 回收目标 runtime、回收失败抛 typed error（`omp-session-delete-archive.test.mjs`）。branch 关闭（见 §0.2 F3）。
-6. **模型投影只出现目标模型 + 默认变化不改旧 session**：`omp-model-projection.test.mjs` 断言只一个 `- id:`；投影固定于 session 绑定的 provider/model；`set_model`/`set_thinking_level` 失败返回 `{ok:false}` 且不改绑定。
+6. **模型投影只出现目标模型 + 默认变化不改旧 session**：`omp-model-projection.test.mjs` 断言只一个 `- id:`；投影固定于 session 绑定的 provider/model。模型变化**不调用**固定 OMP `set_model`——它是最小投影约束下的离线切换事务：先成功回收旧 runtime，再原子 persist（回收失败 host 原值不变；persist 失败下次 prompt 按旧 binding 重投影）；仅 thinking-only 变化才在线 `set_thinking_level` 并在 persist 失败时回滚、回滚失败报 `inconsistent`。
 7. **canary secret 不泄漏**：`omp-secret-redaction.test.mjs` 断言合成 key 只落在临时 `models.yml`，不在日志、事件 envelope、持久引用、文档/快照。
 8. **并发隔离（真实 runtime）**：`omp-session-concurrent-approval-e2e.test.mjs` 让 A/B 两个真实 OMP runtime 同时存活、同时卡各自 gate 审批，回答 A 不释放 B、各自 side effect、停止 A 不影响 B；`omp-session-persistence-e2e.test.mjs` 断言双项目 cwd/文件隔离。
 9. **崩溃/重启不重放、旧审批不跨进程放行**：runner 的 generation 单次消费 + `resolveUiRequest` 绑定 session/generation（M3 已证），M4 恢复路径复用同一语义（`omp-session-bridge.test.mjs` 28 项全绿）。
 10. **未开放能力拒绝不改持久状态**：`branch`/`steer`/`followUp`/`compact` 保持关闭，`engine-router` 拒绝（`engine.test.ts` 断言 `branch===false`/`steer===false` 与 typed refusal）；`resume`/`modelSwitch` 开放（`engine.test.ts` 更新后 968 项全绿）。
-11. **Pi 对照**：desktop 全量 2650 项通过，Pi session 路径未回归；host-core 582 项通过。
+11. **Pi 对照**：desktop 全量 2663 项通过，Pi session 路径未回归；host-core 582 项通过。
 
 ## 4. 环境限制与未完成项
 
@@ -110,6 +122,8 @@ shared：`packages/shared/src/engine.ts`、`src/engine.test.ts`。
 desktop：`apps/desktop/electron/main/runtime/omp-session.ts`（重写为 registry）、`omp-session-wiring.ts`（新增）、`omp-model-projection.ts`（新增）、`omp-runtime.ts`、`engine-runtime.ts`（未改）、`ipc/agent-ipc.ts`、`ipc/session-ipc.ts`、`ipc/register.ts`、`main/index.ts`。
 测试：`apps/desktop/test/omp-session-bridge.test.mjs`、`omp-session-e2e.test.mjs`、`omp-model-projection.test.mjs`、`omp-secret-redaction.test.mjs`、`omp-session-persistence-e2e.test.mjs`（新增）。
 文档：`app/docs/adr/0302-omp-session-persistence-and-runtime-registry.md`（新增）、本文件、`docs/04-task-board.md`、`HANDOFF.md`。
+
+第五轮返修（J1-J5）增量：desktop `ipc/session-ipc.ts`（configure/rename `inconsistent` 移入 `data`；rename/configure fail-closed；moveProject/replaceMessages/saveRevision/listRevisions/activateRevision 引擎门；scratch 加引擎无关注释）。测试新增：`omp-session-ipc-result.test.mjs`、`omp-session-host-mutation-gates.test.mjs`；更新：`omp-session-configure-ipc.test.mjs`、`omp-session-archive-renderer.test.mjs`。
 
 ## 6. 下一任务
 

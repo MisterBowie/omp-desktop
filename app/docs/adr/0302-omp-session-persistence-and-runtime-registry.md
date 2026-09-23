@@ -121,3 +121,9 @@ until then an OMP fork is refused rather than silently producing a wrong child.
   leaves the main/host boundary except into the transient `models.yml`.
 - `steer`, `followUp` and `compact` remain visibly closed (typed refusal) until
   their queue behaviour is implemented and tested; M5/T17 owns subagent events.
+- Host-only transcript and project mutations are refused for OMP sessions: the
+  desktop cannot move an OMP session's project (its working directory is fixed
+  when the runtime first starts and the pinned runtime exposes no dynamic cwd
+  RPC), nor replace/save/list/activate host transcript revisions (the native
+  transcript is the sole writer). The scratch directory is host-owned and stays
+  engine-agnostic, because it stores renderer material, not transcript history.

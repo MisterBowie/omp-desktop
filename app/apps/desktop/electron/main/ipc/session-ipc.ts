@@ -77,6 +77,22 @@ function rejectNativeMutation(sessionId: unknown, action: string): void {
   }
 }
 
+/**
+ * Refuse an OMP session from a host-only mutation that this build cannot map
+ * onto the OMP runtime. The pinned runtime exposes no dynamic working-directory
+ * RPC and no transcript rewrite/revision RPC — the native transcript is its
+ * sole writer — so forwarding one of these to the host would fork the desktop
+ * row from the native state. Pi sessions keep their existing path.
+ */
+function refuseOmpSessionAction(engine: string, action: string): void {
+  if (engine !== "omp") return;
+  throw Object.assign(new Error(`${action} is not available for OMP sessions in this build`), {
+    errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+    engine: "omp",
+    area: action,
+  });
+}
+
 function modelConfigSelectionKey(value: unknown): string | null {
   if (!value || typeof value !== "object") return null;
   const source = Reflect.get(value, "source");
@@ -105,7 +121,10 @@ export type SessionIpcDependencies = {
   enrichSession: (session: any, providers: any, defaults: any) => any;
   acquireSessionOperation: (sessionId: string) => Promise<() => void>;
   stripWinLongPrefix: (path: string) => string;
-  engineRouter?: { requireForSession(sessionId: string, capability: "prompt" | "stop" | "branch" | "modelSwitch"): Promise<string> };
+  engineRouter?: {
+    engineForSession(sessionId: string): Promise<string>;
+    requireForSession(sessionId: string, capability: "prompt" | "stop" | "branch" | "modelSwitch"): Promise<string>;
+  };
   ompSessions?: {
     rename(sessionId: string, title: string, context?: unknown): Promise<{ ok: boolean; reason?: string; inconsistent?: boolean }>;
     configure(
@@ -433,7 +452,15 @@ export function registerSessionIpc({
     // every state (active, idle, restart): the bridge briefly restores the
     // native session when needed and disposes it again afterwards.
     const engine = engineRouter ? await engineRouter.requireForSession(id, "prompt") : "pi";
-    if (engine === "omp" && ompSessions) {
+    if (engine === "omp") {
+      // A session that is OMP but has no wired bridge must fail closed: its
+      // name lives in the native transcript, and renaming the desktop row
+      // alone would fork the two.
+      if (!ompSessions) {
+        throw Object.assign(new Error("this build has no OMP runtime to rename this session"), {
+          errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+        });
+      }
       const session = await host.call<{ session?: { projectPath?: string | null; providerId?: string | null; modelId?: string | null; thinkingLevel?: string | null } | null }>(
         "session.get",
         { id, messageLimit: 1 },
@@ -455,6 +482,7 @@ export function registerSessionIpc({
       if (!result.ok) {
         throw Object.assign(new Error(result.reason ?? "the OMP runtime refused the rename"), {
           errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+          ...(result.inconsistent ? { data: { inconsistent: true } } : {}),
         });
       }
       return { ok: true };
@@ -478,6 +506,14 @@ export function registerSessionIpc({
           errorCode: ErrorCodes.INVALID_ARGUMENT,
         });
       }
+      // An OMP session's working directory is fixed when its runtime first
+      // starts (the pinned runtime exposes no dynamic cwd RPC, and a restored
+      // native header retains the original cwd). Moving the desktop row alone
+      // would fork the host projectPath from the runtime's actual cwd.
+      refuseOmpSessionAction(
+        engineRouter ? await engineRouter.engineForSession(sessionId) : "pi",
+        "moving a session between projects",
+      );
       const releaseSessionOperation = await acquireSessionOperation(sessionId);
       try {
       if (activeTurns.has(sessionId)) {
@@ -535,6 +571,13 @@ export function registerSessionIpc({
       const sessionId = String(input?.sessionId || "");
       if (!sessionId) throw new Error("sessionId required");
       rejectNativeMutation(sessionId, "transcript replacement");
+      // The OMP native transcript is the sole writer of its history; the host
+      // transcript is a Pi projection. Replacing messages in the host row for
+      // an OMP session would fork the two.
+      refuseOmpSessionAction(
+        engineRouter ? await engineRouter.engineForSession(sessionId) : "pi",
+        "transcript replacement",
+      );
       // Drop the live pi-agent so the next prompt reseeds from the truncated
       // transcript instead of replaying the discarded branch in memory.
       if (sidecar) {
@@ -560,6 +603,13 @@ export function registerSessionIpc({
     }) => {
       if (!host) throw new Error("host unavailable");
       rejectNativeMutation(input?.sessionId, "revision save");
+      // OMP revisions live inside its native transcript, which the desktop
+      // never rewrites; a host-side revision save would create a second,
+      // divergent history.
+      refuseOmpSessionAction(
+        engineRouter ? await engineRouter.engineForSession(String(input?.sessionId || "")) : "pi",
+        "saving a transcript revision",
+      );
       return host.call("session.saveRevision", {
         sessionId: String(input?.sessionId || ""),
         rootUserId: String(input?.rootUserId || ""),
@@ -573,6 +623,13 @@ export function registerSessionIpc({
     async (input: { sessionId: string; rootUserId: string }) => {
       if (!host) throw new Error("host unavailable");
       rejectNativeMutation(input?.sessionId, "revision listing");
+      // The host revision family is a Pi transcript projection; an OMP session
+      // has no host-side revision list to read, and masquerading an empty one
+      // would hide the native history.
+      refuseOmpSessionAction(
+        engineRouter ? await engineRouter.engineForSession(String(input?.sessionId || "")) : "pi",
+        "listing transcript revisions",
+      );
       return host.call("session.listRevisions", {
         sessionId: String(input?.sessionId || ""),
         rootUserId: String(input?.rootUserId || ""),
@@ -590,6 +647,13 @@ export function registerSessionIpc({
       if (!host) throw new Error("host unavailable");
       const sessionId = String(input?.sessionId || "");
       rejectNativeMutation(sessionId, "revision activation");
+      // Activating a Pi revision rewrites the host transcript; OMP has no
+      // corresponding native operation, so the desktop must not masquerade a
+      // host-only activation for it.
+      refuseOmpSessionAction(
+        engineRouter ? await engineRouter.engineForSession(sessionId) : "pi",
+        "activating a transcript revision",
+      );
       if (sidecar) {
         sidecar.clearProjectInstructionRoot(sessionId);
         sidecar.clearVendorAuthBindings(sessionId);
@@ -606,6 +670,11 @@ export function registerSessionIpc({
     },
   );
   handle(IPC.invoke.sessionGetScratchPath, async (input: { sessionId: string }) => {
+    // The scratch directory is host-owned (`<dataDir>/scratch/<sessionId>`)
+    // and is not the native transcript: it holds renderer-originated
+    // attachments, pasted files, screenshots and speech/image material for any
+    // session, independent of which engine serves it. It is deliberately NOT
+    // gated by engine — an OMP session still gets a desktop scratch store.
     rejectNativeMutation(input?.sessionId, "scratch access");
     if (!host) throw new Error("host unavailable");
     return host.call<{ path: string }>("session.getScratchPath", {
@@ -653,7 +722,15 @@ export function registerSessionIpc({
       // forked. The Pi path below is the plain host write.
       const engine = engineRouter ? await engineRouter.requireForSession(id, "modelSwitch") : "pi";
       let result: { session?: RuntimeSession | null };
-      if (engine === "omp" && ompSessions) {
+      if (engine === "omp") {
+        // A session that is OMP but has no wired bridge must fail closed: its
+        // model/thinking binding spans the runtime projection and the host DB,
+        // so a host-only write would fork the two.
+        if (!ompSessions) {
+          throw Object.assign(new Error("this build has no OMP runtime to configure this session"), {
+            errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+          });
+        }
         const outcome = await ompSessions.configure(id, {
           mode: config.mode ?? null,
           providerId: config.providerId ?? null,
@@ -664,10 +741,12 @@ export function registerSessionIpc({
         if (!outcome.ok) {
           // An inconsistent outcome means the runtime and the host DB have
           // forked (a revert failed); that fact must reach the caller, not be
-          // flattened into a generic capability error.
+          // flattened into a generic capability error. It travels in `data`
+          // because the IPC wrapper forwards only `error.data` into the
+          // renderer-facing `error.details`.
           throw Object.assign(new Error(outcome.reason ?? "the OMP runtime refused the configuration"), {
             errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
-            ...(outcome.inconsistent ? { inconsistent: true } : {}),
+            ...(outcome.inconsistent ? { data: { inconsistent: true } } : {}),
           });
         }
         result = await host.call<{ session?: RuntimeSession | null }>("session.get", {

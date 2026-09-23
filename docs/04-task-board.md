@@ -2,7 +2,7 @@
 
 状态：`待开始`、`进行中`、`已完成`、`阻塞`。只有附验证证据才能将实现任务标为已完成。
 
-当前交付阶段：M4 会话持久化、模型投影与并发注册表（T14-T16）实现完成并已提交，含真实固定 OMP 的持久化/恢复/并发端到端验收夹具；等待独立复审。证据见 `docs/validation/M4-persistence.md`。上一阶段 当前交付阶段：M2 运行时边界与应用身份（T08-T10）实现完成，并已按独立复审两轮返修（R1-R7：生产查询接线、查询失败 fail-closed、IPC 审计、supervisor 所有权与并发、shutdown 回收日志、测试夹具可移植；S1-S6：reorder gate、先 gate 后改动持久状态、router-first 顺序、启动失败所有权交接、保留记录语义、交付物无未跟踪文件；S7：扫描回收后按 runRoot 精确释放幽灵所有权、成功 stop 清理同运行保留记录、目录债务降级不再发信号；S8：进程组回收后替换而非追加同 runRoot 记录，一次运行最多一条记录），等待复审确认。证据见 `docs/validation/M2-runtime-boundary.md`；传输决策见 `docs/decisions/001-omp-transport.md`，引擎边界决策见 `app/docs/adr/0300-engine-boundary.md`（英文）。上一阶段证据见 `docs/validation/M1-compatibility.md`。下一阶段 M3（T11-T16）。
+当前交付阶段：M4 会话持久化、模型投影与并发注册表（T14-T16）实现完成并已提交，含真实固定 OMP 的持久化/恢复/并发端到端验收夹具；经五轮独立复审返修（R1-R9、F1-F8、G1-G3、H1-H4、J1-J5），等待复审确认。证据见 `docs/validation/M4-persistence.md`。上一阶段 当前交付阶段：M2 运行时边界与应用身份（T08-T10）实现完成，并已按独立复审两轮返修（R1-R7：生产查询接线、查询失败 fail-closed、IPC 审计、supervisor 所有权与并发、shutdown 回收日志、测试夹具可移植；S1-S6：reorder gate、先 gate 后改动持久状态、router-first 顺序、启动失败所有权交接、保留记录语义、交付物无未跟踪文件；S7：扫描回收后按 runRoot 精确释放幽灵所有权、成功 stop 清理同运行保留记录、目录债务降级不再发信号；S8：进程组回收后替换而非追加同 runRoot 记录，一次运行最多一条记录），等待复审确认。证据见 `docs/validation/M2-runtime-boundary.md`；传输决策见 `docs/decisions/001-omp-transport.md`，引擎边界决策见 `app/docs/adr/0300-engine-boundary.md`（英文）。上一阶段证据见 `docs/validation/M1-compatibility.md`。下一阶段 M3（T11-T16）。
 
 ## 准备工作
 
