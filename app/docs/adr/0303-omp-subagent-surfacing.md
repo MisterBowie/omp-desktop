@@ -1,6 +1,6 @@
 # ADR 0303: OMP subagent surfacing, attribution and the stop boundary
 
-- Status: Proposed (pending M5/T17 independent acceptance — B1 revised, C1 implemented, B2/B3 implemented; B3 follow-up answer preservation + structured truncation indication implemented; T17 unaccepted)
+- Status: Proposed (pending final M5/T17 independent acceptance — C1 independently accepted at `01ce56aab1f1df5a61be390cf750ab55e44d03ed`, B2 at `6b96bcdfc6a87f3f3c302ff90712c4851e863253`, B3 at `3a6df0df22f2078e96f5ea2dede432b909b19411`, and T17 fixture portability at baseline `ab07a888d6afb916561b80e5661ed27aa6be612a`; local full regression is green at this baseline; final T17 acceptance remains with the reviewer — not self-certified)
 - Date: 2026-09-23 (revised 2026-09-24 for the B1/C1 stop-boundary and runtime-replacement fixes, the B3 whole-row UTF-8 budget, and again for the B3 follow-up allocation priority and truncation indication)
 - Scope: M5/T17. Amends 0301 (conversation surface) by wiring the subagent
   frame families into the existing Pi delegation renderer, and 0302 (per-session

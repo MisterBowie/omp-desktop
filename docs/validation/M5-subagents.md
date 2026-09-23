@@ -1,6 +1,6 @@
 # M5 验证记录：OMP 子代理面板与编排归属（T17）
 
-状态：**未验收**（T17）。第三轮独立复审拆出 B1-B3 三项返修；B1 于 `9d0acde` 首实现后独立复审仍复现两项缺陷（F1 目录债二次 stop 丢失、F2 停期间短暂放行 prompt），本提交修复并追加行为回归，**B1 改定待独立验收**；第四轮独立复审拆出 C1（回收成功后的运行时替换/原生会话恢复，见 §0.5），C1 基本续聊已修复，但独立复审进一步复现三项残余缺陷（R1 替换后回复覆盖、R2 停止未完成即替换且跳过恢复、R3 启动/恢复中停止被忽略），由跟进提交 `0092572` 修复并追加行为回归（见 §0.6），第五轮独立复审已在 `0092572` 上独立确认 R1/R2/R3 修复（88 runtime + 63 desktop 定向用例通过）；**第五轮进一步复现两项生命周期门残留（D1 dispose 期间可启动孤儿替换、D2 启动/恢复停止期间新 prompt 逃逸 epoch，见 §0.7），由本提交修复并追加行为回归，`24d7270` D1/D2 定向探针已独立通过；第六轮复现两项残留（E1 既有会话绕过整桥关闭、E2 模型切换复用 live 消息/turn id，见 §0.8），本提交修复并追加行为回归，E1/E2 待独立验收**；**B2（renderer 单飞/错误可见，见 §0.9）已实现并追加行为回归，独立复审确认其夹具与初始行为通过，但仍复现运行恢复续读缺陷，由本提交修复并追加回归（见 §0.10），B2 follow-up 待独立验收**；**B3（总 UTF-8 预算，§0.11）已实现并追加回归，字节/Unicode 证据已独立通过；B3 follow-up（短答案保留 + 结构化截断指示，§0.12）已实现，短答案与普通结构化标记两路径已独立通过，整字段 details 丢弃的截断指示（§0.13）已实现、待独立验收；T17 不验收**。M5 后续任务 T18-T20 未开始。
+状态：**最终独立复审待验收**（T17，基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`）。C1 已独立通过 `01ce56aab1f1df5a61be390cf750ab55e44d03ed`、B2 已独立通过 `6b96bcdfc6a87f3f3c302ff90712c4851e863253`、B3 已独立通过 `3a6df0df22f2078e96f5ea2dede432b909b19411`，T17 夹具可移植性在本基线已由复审方于 macOS arm64 独立确认（五份真实固定 OMP E2E 5 passed / 0 failed、58 bridge tests、diff check、进程助手 10 轮 shell-quoting 往返与 owned-child PID/marker 存活断言均通过）。本基线本地完整回归通过。历史返修记录见 §0.1-§0.14；T17 保持「最终独立复审待验收」，未自证完成、未启动 T18。
 基线提交：`d26444407fc963c2e7efd51bda7d1bd4a70e8bbd`；第二轮独立复审返修（S1-S4）以追加普通提交落在该基线上（见 `git log` 最新提交）。
 固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未修改）。
 工作树：`/home/vv/person/code/omp-desktop-m5-t17`，分支 `codex/m5-subagents`。
@@ -153,7 +153,7 @@
 
 验证（`app/apps/desktop`，Node v24.14.0，`node --test`）：`omp-subagent-panel-mounted` **12 passed**（6 旧 + 6 本提交）、`omp-subagent-panel-real` **2 passed**；独立探针默认与 resume 两模式退出 0（`resumedPolling=true`、`readsAfterResume=4`）。先红后绿：在 `250fe6e` 基线（`git stash` 掉本提交 hook）上 `idle→running`/`running→stopped→running` 两例复现缺陷（断言 `1 !== 2`），恢复后通过。
 
-状态：**B2 follow-up 已实现、待独立验收**；B3（总 UTF-8 预算）、平台、最终 T17 验收仍待。
+状态：**B2 follow-up 已实现并独立通过**；B3（总 UTF-8 预算）已独立通过、平台（macOS 夹具可移植性）已独立确认，最终 T17 验收仍待。
 
 ## 0.11 第三轮复审返修（B3，2026-09-24）：总 UTF-8 预算
 
@@ -174,7 +174,7 @@
 
 验证（`app/`，Node v24.14.0，pnpm 10.34.5）：`pnpm --filter @pi-desktop/omp-runtime test` **239 passed / 0 failed**（+12 B3 回归，含真实固定 runtime 烟测）；`node --test test/omp-subagent-presentation.test.mjs` **6 passed**；复审探针退出 0，实测尺寸（字节，均 ≤ 4,194,304）：contentAndDetails 4,194,304、emoji 4,194,301、surrogateBoundary 4,194,302（`wellFormed=true`）、escapedControls 4,194,303、objectKeys 4,194,221、scalarArray 4,194,301、assistantString 4,194,304、assistantTextAndThinking 4,194,304；定向 desktop 回归 `omp-subagent-read` 5、`omp-subagent-bridge` 8、`subagent-reload-projection`、`omp-subagent-panel-mounted` 12、`omp-subagent-panel-render` 2、`tool-presentation` 30 全绿；`pnpm --filter @pi-desktop/omp-runtime typecheck` 与 `pnpm --filter @pi-desktop/desktop typecheck` 退出 0；`git diff --check` 无输出。
 
-状态：**B3 字节/Unicode 证据已独立通过，两处行为缺陷由 §0.12 跟进提交修复、待独立验收**；平台（macOS 夹具可移植性）、最终 T17 验收仍待。
+状态：**B3 字节/Unicode 证据已独立通过，两处行为缺陷由 §0.12 跟进提交修复并独立通过**；平台（macOS 夹具可移植性）已独立确认，最终 T17 验收仍待。
 
 ## 0.12 B3 follow-up：短答案保留 + 结构化截断指示（2026-09-24）
 
@@ -193,7 +193,7 @@
 
 验证（`app/`，Node v24.14.0，pnpm 10.34.5）：`pnpm --filter @pi-desktop/omp-runtime test` **243 passed / 0 failed**；定向 desktop `omp-subagent-read`/`omp-subagent-presentation`/`omp-subagent-panel-render`/`omp-subagent-panel-mounted`/`tool-presentation`/`assistant-turns` **75 passed / 0 failed**；复审探针 `/tmp/m5-row-budget-review.mjs` 8/8 与 `/tmp/m5-row-meaning-review.mjs` 全断言均退出 0（`answerPreserved` 两路径 true、`presentationMarksTruncation` true、两行字节均 ≤ 4,194,304）；`pnpm --filter @pi-desktop/omp-runtime typecheck`、`pnpm --filter @pi-desktop/desktop typecheck`、`git diff --check` 退出 0。
 
-状态：**B3 follow-up 的短答案保留与普通结构化标记已实现，两路径独立通过；整字段 details 丢弃的截断指示（§0.13）已实现、待独立验收**；平台（macOS 夹具可移植性）、最终 T17 验收仍待。
+状态：**B3 follow-up 的短答案保留与普通结构化标记已实现，两路径独立通过；整字段 details 丢弃的截断指示（§0.13）已实现并独立通过**；平台（macOS 夹具可移植性）已独立确认，最终 T17 验收仍待。
 
 ## 0.13 B3 follow-up 残余：整字段 details 丢弃时的截断指示（2026-09-24）
 
@@ -207,11 +207,11 @@
 
 验证（`app/`，Node v24.14.0，pnpm 10.34.5）：`node --test test/tool-presentation.test.mjs test/omp-subagent-presentation.test.mjs test/assistant-turns.test.mjs test/subagent-transcript.test.mjs test/session-message-presentation.test.mjs test/work-panel-presentation.test.mjs` **82 passed / 0 failed**；复审探针 `/tmp/m5-row-budget-review.mjs` 8/8 与 `/tmp/m5-row-meaning-review.mjs` 全断言退出 0（近/超边界 `presentationMarksTruncation=true`）；`pnpm --filter @pi-desktop/desktop typecheck` 退出 0；`git diff --check` 无输出。仅演示器改动、未改 converter 预算逻辑，故未重跑 243 runtime 全量与 E2E。
 
-状态：**B3 follow-up 的短答案/普通结构化标记两路径已独立通过，整字段 details 丢弃指示已实现、待独立验收**；平台（macOS 夹具可移植性）、最终 T17 验收仍待。
+状态：**B3 follow-up 的短答案/普通结构化标记两路径已独立通过，整字段 details 丢弃指示已实现并独立通过**；平台（macOS 夹具可移植性）已独立确认，最终 T17 验收仍待。
 
 ## 0.14 T17 夹具可移植性返修（macOS/`/proc` 缺失 + 封闭 PATH，2026-09-24）
 
-独立复审在 `01ce56a` 基线上于 macOS 本地复现五项夹具可移植性缺陷（Linux 全部通过、退出 0，仅 macOS 失败），本提交为 test-only 修复、待独立验收；最终 T17 回归门仍待。
+独立复审在 `01ce56a` 基线上于 macOS 本地复现五项夹具可移植性缺陷（Linux 全部通过、退出 0，仅 macOS 失败），本提交为 test-only 修复、已由复审方于 macOS arm64 独立确认（五份 E2E 5 passed / 0 failed、58 bridge tests、diff check、进程助手 10 轮 shell-quoting 往返与 owned-child PID/marker 存活断言均通过）；最终 T17 回归门仍待（最终独立复审待验收）。
 
 | 缺陷 | 根因 | 修复 |
 | --- | --- | --- |
@@ -229,7 +229,7 @@
 - `omp-subagent-bridge.test.mjs` → **8 passed / 0 failed，退出 0**。
 - `git diff --check` 退出 0；未改 `.ts`，故未重跑 typecheck。
 
-限制：仅 Linux x64 实测；macOS 由复审方拉取后运行，Windows 未声明；不主张 macOS 已通过。
+限制：macOS arm64 由复审方于本基线独立跑通（五份 E2E 5 passed / 0 failed、58 bridge tests、进程助手 10 轮往返及 PID/marker 存活断言），为夹具层面的 macOS 验收、非 Windows 或打包发布验收；Windows 未声明；本地 Linux x64 完整回归见任务看板。
 
 ## 0. 环境准备（固定子模块流程，与本轮代码无关）
 
