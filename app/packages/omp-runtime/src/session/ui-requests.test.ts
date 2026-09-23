@@ -208,7 +208,10 @@ describe("approval decisions", () => {
     const { requests, written } = harness();
     requests.observe(gateApprovalFrame("ui-1"));
     requests.observe(gateApprovalFrame("ui-2"));
-    expect(requests.cancelPending("the run was stopped", { timedOut: false })).toBe(2);
+    expect(requests.cancelPending("the run was stopped", { timedOut: false })).toEqual([
+      "ui-1",
+      "ui-2",
+    ]);
     expect(written).toEqual([
       { type: "extension_ui_response", id: "ui-1", cancelled: true },
       { type: "extension_ui_response", id: "ui-2", cancelled: true },
@@ -277,5 +280,31 @@ describe("question answers", () => {
     requests.observe({ type: "extension_ui_request", id: "q-3", method: "input", title: "name" });
     expect(responseFor(requests.open()[0].request, "allow-once")).toMatchObject({ cancelled: true });
     expect(written).toEqual([]);
+  });
+});
+
+describe("run generation lifecycle", () => {
+  it("refuses a decision whose dialog belongs to an earlier run", () => {
+    const { requests, written } = harness();
+    requests.beginRun();
+    requests.observe(gateApprovalFrame("ui-old"));
+    // The run ends and a new one starts.
+    requests.beginRun();
+    const late = requests.resolve("ui-old", "allow-once");
+    expect(late).toMatchObject({ ok: false, reason: "stale" });
+    expect(written).toEqual([]);
+    expect(requests.records().at(-1)).toMatchObject({ outcome: "refused-stale" });
+  });
+
+  it("cancels one dialog by id, and reports the ids it cancelled", () => {
+    const { requests, written } = harness();
+    requests.observe(gateApprovalFrame("ui-1"));
+    requests.observe(gateApprovalFrame("ui-2"));
+    expect(requests.cancel("ui-1", "the user skipped the question")).toBe(true);
+    expect(written).toEqual([{ type: "extension_ui_response", id: "ui-1", cancelled: true }]);
+    expect(requests.open().map((entry) => entry.requestId)).toEqual(["ui-2"]);
+    expect(requests.cancel("ui-1", "again")).toBe(false);
+    expect(written).toHaveLength(1);
+    expect(requests.cancelPending("stopped")).toEqual(["ui-2"]);
   });
 });

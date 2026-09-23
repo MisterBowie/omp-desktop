@@ -180,6 +180,50 @@
 | `node docs/validation/M0-rpc/verify-rpc.mjs` | PASS(未发送 prompt) |
 | 残留 | OMP/Electron 进程 0、临时运行根 0、`~/.omp-desktop*` 无、子模块 SHA 未变、工作树干净 |
 
+## 5.2 第二轮独立复审返修 R1-R3(基线 `60e0f7e743d5ad84750258fe68012519bf84f9db`)
+
+三项均先按复现脚本在基线上取得失败输出,再对照固定源码实现。
+
+### R1 跳过/拒绝提问会让 OMP 永久等待(已修)
+
+**固定 PI-Desktop 证据**:`AskToolResolution.answers` 规定 `null` 表示跳过该问题或拒绝整个提示(`packages/shared/src/types/agent.ts`);`AskToolCard` 提交 `null` 并在 `resolveAsk` 的 `finally` 中移除卡片;PI runtime 接受 `null` 并完成 pending。
+**固定 OMP 证据**:`RpcExtensionUIResponse` 含 `{ type:"extension_ui_response"; id; cancelled:true; timedOut? }`(`modes/rpc/rpc-types.ts:545`);`requestRpcDialog` 的响应解析把 `cancelled` 视为"无答案"(`parseValueDialogResponse` → `undefined`),网关据此 fail-closed 拒绝工具、提问返回空值。
+
+**基线复现**:`REPRO_DECLINE {"result":{"ok":false,"reason":"refused","detail":"the answer is not one of the offered options"},"written":[],"pending":true}` —— 卡片已移除、runtime 无人应答。
+
+**修正**:新增单条 fail-closed 完成路径——`OmpUiRequests.cancel(requestId, reason)` 写 `{cancelled:true}` 并单次消费;`OmpSessionRunner.cancelUiRequest()` 转调并通知桥接;桥接 `finishCancelled()` 同时清除两层 pending 并返回 `{ok:true, outcome:"cancelled"}`。以下情形全部走该路径(卡片消失后 runtime 不再等待):`answers:[null]`/空答案、OMP `select` 无法承载的自定义答案、非 Yes/No 的确认、以及运行时已不可用时的残留请求。
+
+### R2 旧 generation 的审批可在下一轮执行(已修)
+
+**基线复现**:`REPRO_OLD_GENERATION {"result":{"ok":true},"written":[{"type":"extension_ui_response","id":"ui-old","value":"Allow once"}]}` —— run 1 的审批在 run 2 被接受并写出允许帧。
+
+**根因**:`OmpUiRequests.resolve` 只比较调用者传入的 generation 与 entry 的 generation,未确认该 entry 仍属于**当前活跃** generation。
+
+**修正**:
+1. `resolve()` 先判定 `entry.generation !== this.generation` → `refused-stale`,不写任何帧;
+2. run 终止路径全部 fail closed 并通知桥接:`agent_end`(回合结束)、`stop`、传输失败、`dispose`,以及新 run 开始前对残留对话框的清理(纵深防御);`cancelPending` 现返回被取消的 id 列表,`onUiClosed` 回调让桥接同步删除自己的映射;
+3. OMP 主动 `method:"cancel"`(撤回自身请求)同样经 `onUiClosed` 通知,桥接不再报告 pending。
+
+### R3 错误 session 的 stop 会破坏正确 session 的 pending(已修)
+
+**基线复现**:`REPRO_WRONG_SESSION_STOP {"threw":true,"pending":false,"written":0}` —— 抛错前已清空正确 session 的 pending。
+**修正**:`bridge.stop()` 先校验会话所有权,再做任何清理或停止;错误会话的 stop 不改变 pending、运行状态、wire 输出,也不下发 `abort`。
+
+### 本轮返修验证
+
+| 命令 | 结果 |
+| --- | --- |
+| `pnpm --filter @pi-desktop/omp-runtime test` | 11 文件 / **148 项通过**(新增 generation 生命周期与对话框关闭路径) |
+| `pnpm --filter @pi-desktop/shared test` | 84 文件 / 968 项通过 |
+| `cd apps/desktop && env -u SSH_ASKPASS node --test test/*.test.mjs` | 2599 项:2595 通过 / 0 失败(桥接测试 26 项) |
+| `node --test apps/desktop/test/omp-session-e2e.test.mjs` | 1 项通过(不预设 cwd) |
+| `pnpm build` / `pnpm typecheck` | 12 包构建 + host-core release 构建 / 0 错误 |
+| `cd crates && cargo test -p host-core --locked` | 579 通过 / 0 失败 |
+| `node docs/validation/M0-rpc/verify-rpc.mjs` | PASS(未发送 prompt) |
+| `git diff --check` | 无输出(无空白错误) |
+
+强制回归覆盖:select 的 `answers:[null]` 写 `cancelled:true` 并清两层 pending;confirm 的 Yes/No 与跳过语义;自定义答案 fail closed 不悬挂;run 1 的审批与提问在 `agent_end` 后不能在 run 2 被回答(且只写取消帧);stop/传输失败/dispose 后的迟到回复不写第二帧;`stop(other-session)` 抛错且 pending/状态/wire 完全不变;OMP `method:cancel` 后桥接不再报告 pending;原 projectPath 与 approval/ask kind 隔离测试继续通过。
+
 ## 6. 已知限制(真实存在,且不属于本轮范围)
 
 1. **模型与凭证投影属于 M4/T15**:本产品尚未把用户模型设置投影进 OMP;产品内 OMP 会话需要一个可达模型配置,验收夹具用本地假 provider 提供。

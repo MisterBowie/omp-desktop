@@ -220,6 +220,20 @@ export class OmpUiRequests {
         detail: previous ? "request already answered" : "unknown request id",
       };
     }
+    if (entry.generation !== this.generation) {
+      // The dialog was raised by a run that has since ended, failed or been
+      // replaced. Its decision can no longer be delivered: the runtime waiting
+      // on it belongs to a run the desktop has already closed.
+      this.record({
+        frameId: requestId,
+        kind: entry.request.kind,
+        generation: entry.generation,
+        outcome: "refused-stale",
+        decision,
+        detail: `the dialog belongs to generation ${entry.generation}, the active run is ${this.generation}`,
+      });
+      return { ok: false, reason: "stale", detail: "the dialog belongs to an earlier run" };
+    }
     if (options.generation !== undefined && options.generation !== entry.generation) {
       this.record({
         frameId: requestId,
@@ -278,28 +292,47 @@ export class OmpUiRequests {
    * Called when a run stops, the window closes or the runtime exits. The
    * runtime treats a cancel as "no decision", which denies the tool call.
    */
-  cancelPending(reason: string, options: { timedOut?: boolean } = {}): number {
-    let cancelled = 0;
-    for (const [frameId, entry] of [...this.pending]) {
-      this.pending.delete(frameId);
-      entry.answered = true;
-      this.write({
-        type: "extension_ui_response",
-        id: frameId,
-        cancelled: true,
-        ...(options.timedOut ? { timedOut: true } : {}),
-      });
-      cancelled += 1;
-      this.record({
-        frameId,
-        kind: entry.request.kind,
-        generation: entry.generation,
-        outcome: "cancelled",
-        decision: "cancel",
-        detail: reason,
-      });
+  cancelPending(reason: string, options: { timedOut?: boolean } = {}): string[] {
+    const cancelled: string[] = [];
+    for (const frameId of [...this.pending.keys()]) {
+      if (this.cancel(frameId, reason, options)) cancelled.push(frameId);
     }
     return cancelled;
+  }
+
+  /**
+   * Fail closed for one dialog: answer it `cancelled` and forget it.
+   *
+   * This is the only correct answer when nobody will decide: the requester is
+   * blocked inside the runtime, and a `cancelled` response is what its own
+   * response parser turns into "no answer" — the gate denies, the question
+   * returns no value. Dropping the request without answering would strand that
+   * call forever.
+   */
+  cancel(
+    requestId: string,
+    reason: string,
+    options: { timedOut?: boolean } = {},
+  ): boolean {
+    const entry = this.pending.get(requestId);
+    if (!entry) return false;
+    this.pending.delete(requestId);
+    entry.answered = true;
+    this.write({
+      type: "extension_ui_response",
+      id: requestId,
+      cancelled: true,
+      ...(options.timedOut ? { timedOut: true } : {}),
+    });
+    this.record({
+      frameId: requestId,
+      kind: entry.request.kind,
+      generation: entry.generation,
+      outcome: "cancelled",
+      decision: "cancel",
+      detail: reason,
+    });
+    return true;
   }
 
   records(): readonly OmpUiRecord[] {

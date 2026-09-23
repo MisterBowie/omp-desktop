@@ -75,6 +75,15 @@ export type OmpSessionRunnerOptions = {
   /** Diagnostic trail for every dialog decision. */
   onUiRecord?: (record: OmpUiRecord) => void;
   /**
+   * A dialog is no longer answerable (retracted by the runtime, or cancelled
+   * because its run ended, stopped, failed or was replaced).
+   *
+   * The desktop's own bookkeeping is keyed by request id and must forget it in
+   * step with this registry, or a later question would report a dialog as
+   * pending that the runtime has already abandoned.
+   */
+  onUiClosed?: (requestId: string, reason: string) => void;
+  /**
    * Last resort for `stop`: the M2 process teardown. Absent in tests that only
    * exercise the protocol path.
    */
@@ -109,6 +118,7 @@ export class OmpSessionRunner {
     | ((request: OmpUiRequest, info: { sessionId: string; generation: number }) => void)
     | undefined;
   private readonly onUiRecord: ((record: OmpUiRecord) => void) | undefined;
+  private readonly onUiClosed: ((requestId: string, reason: string) => void) | undefined;
   private readonly teardown: OmpSessionRunnerOptions["teardown"];
   private readonly now: () => number;
   private readonly convergeTimeoutMs: number;
@@ -133,6 +143,7 @@ export class OmpSessionRunner {
     this.emitEnvelope = options.emit;
     this.onUiRequest = options.onUiRequest;
     this.onUiRecord = options.onUiRecord;
+    this.onUiClosed = options.onUiClosed;
     this.teardown = options.teardown;
     this.now = options.now ?? Date.now;
     this.convergeTimeoutMs = options.convergeTimeoutMs ?? DEFAULT_CONVERGE_TIMEOUT_MS;
@@ -201,6 +212,9 @@ export class OmpSessionRunner {
     if (!this.runtime.usable) {
       throw new OmpRuntimeError("transport-failed", "the runtime transport is not usable");
     }
+    // Defence in depth: a dialog from an earlier run can never be answered into
+    // this one, so it is closed before the new generation exists.
+    this.cancelOpenDialogs("the run was replaced by a new prompt");
     const generation = this.ui.beginRun();
     const turnId = `omp-turn:${this.sessionId}:${generation}`;
     this.run = {
@@ -253,6 +267,26 @@ export class OmpSessionRunner {
   }
 
   /**
+   * Fail closed for one dialog the desktop can no longer deliver an answer to.
+   *
+   * Used when a user skips a question or picks something the runtime's protocol
+   * cannot carry: the request is answered `cancelled` and both layers forget it,
+   * so the runtime is never left waiting on a card the user has dismissed.
+   */
+  cancelUiRequest(requestId: string, reason: string): boolean {
+    const cancelled = this.ui.cancel(requestId, reason);
+    if (cancelled) this.onUiClosed?.(requestId, reason);
+    return cancelled;
+  }
+
+  /** Cancel every open dialog, notifying the owner of each id. */
+  private cancelOpenDialogs(reason: string): string[] {
+    const cancelled = this.ui.cancelPending(reason);
+    for (const requestId of cancelled) this.onUiClosed?.(requestId, reason);
+    return cancelled;
+  }
+
+  /**
    * Stop the current run: the protocol first, the process only as a last resort.
    */
   async stop(): Promise<OmpStopOutcome> {
@@ -265,8 +299,8 @@ export class OmpSessionRunner {
     this.state = "stopping";
     // Fail closed first: every open dialog is answered "cancelled", so a tool
     // waiting on a user who is now stopping cannot be left mid-decision.
-    const cancelled = this.ui.cancelPending("the run was stopped");
-    if (cancelled > 0) steps.push(`cancelled ${cancelled} pending request(s)`);
+    const cancelled = this.cancelOpenDialogs("the run was stopped");
+    if (cancelled.length > 0) steps.push(`cancelled ${cancelled.length} pending request(s)`);
 
     let aborted = false;
     try {
@@ -327,7 +361,7 @@ export class OmpSessionRunner {
    * waiting on a UI that no longer exists.
    */
   dispose(reason = "the session was closed"): number {
-    const cancelled = this.ui.cancelPending(reason);
+    const cancelled = this.cancelOpenDialogs(reason).length;
     this.detachFrame();
     this.detachFailure();
     this.state = "idle";
@@ -346,6 +380,11 @@ export class OmpSessionRunner {
           sessionId: this.sessionId,
           generation: this.ui.currentGeneration(),
         });
+      }
+      if (request?.kind === "cancel") {
+        // The runtime withdrew its own request; the dialog disappears from the
+        // runtime's side, so the desktop must forget it too.
+        this.onUiClosed?.(request.targetId, "the runtime retracted its request");
       }
       for (const record of this.ui.records().slice(-1)) this.onUiRecord?.(record);
       return;
@@ -380,7 +419,12 @@ export class OmpSessionRunner {
         ts: this.now(),
         event,
       });
-      if (event.type === "agent_end") this.closeRun(this.run?.generation ?? 0);
+      if (event.type === "agent_end") {
+        // The run is over: any dialog it raised can no longer be answered into
+        // it, so it is cancelled rather than left pending for the next run.
+        this.cancelOpenDialogs("the run ended before the dialog was answered");
+        this.closeRun(this.run?.generation ?? 0);
+      }
     }
   }
 
@@ -401,7 +445,7 @@ export class OmpSessionRunner {
   private onTransportFailure(error: OmpRuntimeError): void {
     // A dead transport ends the run *and* everything waiting on a dialog: the
     // desktop must see one definite failure rather than a turn that hangs.
-    const cancelled = this.ui.cancelPending(`the runtime transport failed: ${error.code}`);
+    const cancelled = this.cancelOpenDialogs(`the runtime transport failed: ${error.code}`).length;
     const run = this.run;
     this.closeRun(run?.generation ?? 0);
     this.emitEnvelope({

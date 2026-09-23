@@ -294,23 +294,6 @@ test("surfaces a runtime question through the ask card and returns the chosen op
   });
 });
 
-test("refuses an answer the runtime never offered", async () => {
-  const { bridge, runtime } = bridgeHarness();
-  const project = makeProject();
-  await bridge.prompt({ sessionId: OMP_SESSION, content: "which file?", projectPath: project });
-  runtime.push({
-    type: "extension_ui_request",
-    id: "q-1",
-    method: "select",
-    title: "Which file should I open?",
-    options: ["a.ts", "b.ts"],
-  });
-  const refused = bridge.resolveAsk({ requestId: "q-1", sessionId: OMP_SESSION, answers: [["c.ts"]] });
-  assert.equal(refused.ok, false);
-  assert.equal(runtime.written.length, 0);
-  assert.equal(bridge.hasPendingRequest("q-1"), true);
-});
-
 test("stopping cancels the dialogs the runtime is blocked on", async () => {
   const { bridge, runtime } = bridgeHarness();
   const project = makeProject();
@@ -609,4 +592,177 @@ test("a duplicate decision, or one after a stop, never writes a second frame", a
   assert.equal(late.ok, false);
   assert.equal(runtime.written.length, 2, "the stop cancels it; nothing else is written");
   assert.equal(bridge.hasPendingRequest("ui-2"), false);
+});
+
+test("a skipped question is failed closed instead of leaving the runtime waiting", async () => {
+  const { bridge, runtime } = bridgeHarness();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "which file?", projectPath: makeProject() });
+  runtime.push({
+    type: "extension_ui_request",
+    id: "q-skip",
+    method: "select",
+    title: "Which file?",
+    options: ["a.ts", "b.ts"],
+  });
+  const resolution = bridge.resolveAsk({
+    requestId: "q-skip",
+    sessionId: OMP_SESSION,
+    answers: [null],
+  });
+  assert.equal(resolution.ok, true);
+  assert.equal(resolution.outcome, "cancelled");
+  assert.deepEqual(runtime.written, [
+    { type: "extension_ui_response", id: "q-skip", cancelled: true },
+  ]);
+  // Both layers forget it: the bridge reports nothing pending and the runtime's
+  // own status agrees.
+  assert.equal(bridge.hasPendingRequest("q-skip"), false);
+  assert.equal(bridge.status(OMP_SESSION).pendingToolConfirmations, 0);
+  assert.equal(bridge.diagnostics().uiRecords.at(-1).outcome, "cancelled");
+});
+
+test("an answer the runtime's select cannot carry is failed closed too", async () => {
+  const { bridge, runtime } = bridgeHarness();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "which file?", projectPath: makeProject() });
+  runtime.push({
+    type: "extension_ui_request",
+    id: "q-custom",
+    method: "select",
+    title: "Which file?",
+    options: ["a.ts", "b.ts"],
+  });
+  // The card allows a free-text answer; the runtime's `select` accepts only the
+  // options it offered, so the dialog must not be left open for it.
+  const resolution = bridge.resolveAsk({
+    requestId: "q-custom",
+    sessionId: OMP_SESSION,
+    answers: [["typed-by-hand"]],
+  });
+  assert.equal(resolution.ok, true);
+  assert.equal(resolution.outcome, "cancelled");
+  assert.deepEqual(runtime.written, [
+    { type: "extension_ui_response", id: "q-custom", cancelled: true },
+  ]);
+  assert.equal(bridge.hasPendingRequest("q-custom"), false);
+  assert.equal(bridge.status(OMP_SESSION).pendingToolConfirmations, 0);
+});
+
+test("a confirmation answers yes/no and a dismissal is a cancellation", async () => {
+  const { bridge, runtime } = bridgeHarness();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "proceed?", projectPath: makeProject() });
+  const confirmFrame = (id) => ({
+    type: "extension_ui_request",
+    id,
+    method: "confirm",
+    title: "Proceed?",
+    message: "really",
+  });
+  runtime.push(confirmFrame("c-yes"));
+  runtime.push(confirmFrame("c-dismissed"));
+  assert.deepEqual(
+    bridge.resolveAsk({ requestId: "c-yes", sessionId: OMP_SESSION, answers: [["Yes"]] }),
+    { ok: true, outcome: "answered" },
+  );
+  assert.deepEqual(
+    bridge.resolveAsk({ requestId: "c-dismissed", sessionId: OMP_SESSION, answers: [null] }),
+    { ok: true, outcome: "cancelled" },
+  );
+  assert.deepEqual(runtime.written, [
+    { type: "extension_ui_response", id: "c-yes", confirmed: true },
+    { type: "extension_ui_response", id: "c-dismissed", cancelled: true },
+  ]);
+  assert.equal(bridge.status(OMP_SESSION).pendingToolConfirmations, 0);
+});
+
+test("a dialog raised by an earlier run cannot be answered into the next one", async () => {
+  const { bridge, runtime } = bridgeHarness();
+  const project = makeProject();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "write a file", projectPath: project });
+  runtime.push(APPROVAL_FRAME);
+  runtime.push({
+    type: "extension_ui_request",
+    id: "q-old",
+    method: "select",
+    title: "Which file?",
+    options: ["a.ts"],
+  });
+  // The run ends with both dialogs still open.
+  runtime.push({ type: "agent_end", messages: [] });
+  assert.equal(bridge.hasPendingRequest("ui-1"), false);
+  assert.equal(bridge.hasPendingRequest("q-old"), false);
+  assert.equal(bridge.status(OMP_SESSION).pendingToolConfirmations, 0);
+
+  // A second run starts, and the old ids stay dead.
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "again", projectPath: project });
+  const staleApproval = bridge.resolvePermission("ui-1", "allow-once");
+  assert.equal(staleApproval.ok, false);
+  const staleAnswer = bridge.resolveAsk({ requestId: "q-old", sessionId: OMP_SESSION, answers: [["a.ts"]] });
+  assert.equal(staleAnswer.ok, false);
+  // The only frames written are the cancellations from the run that ended.
+  assert.deepEqual(
+    runtime.written.filter((frame) => frame.cancelled || frame.value || frame.confirmed),
+    [
+      { type: "extension_ui_response", id: "ui-1", cancelled: true },
+      { type: "extension_ui_response", id: "q-old", cancelled: true },
+    ],
+  );
+});
+
+test("a late reply after a transport failure or a dispose writes nothing", async () => {
+  const { OmpRuntimeError } = await import("../../../packages/omp-runtime/src/errors.ts");
+
+  const failed = bridgeHarness();
+  await failed.bridge.prompt({ sessionId: OMP_SESSION, content: "write", projectPath: makeProject() });
+  failed.runtime.push(APPROVAL_FRAME);
+  failed.runtime.fail(new OmpRuntimeError("transport-failed", "stdout closed"));
+  const afterFailure = failed.bridge.resolvePermission("ui-1", "allow-once");
+  assert.equal(afterFailure.ok, false);
+  assert.equal(failed.bridge.hasPendingRequest("ui-1"), false);
+  assert.deepEqual(failed.runtime.written, [
+    { type: "extension_ui_response", id: "ui-1", cancelled: true },
+  ]);
+
+  const disposed = bridgeHarness();
+  await disposed.bridge.prompt({ sessionId: OMP_SESSION, content: "write", projectPath: makeProject() });
+  disposed.runtime.push(APPROVAL_FRAME);
+  await disposed.bridge.dispose("window closed");
+  const afterDispose = disposed.bridge.resolvePermission("ui-1", "allow-once");
+  assert.equal(afterDispose.ok, false);
+  assert.deepEqual(disposed.runtime.written, [
+    { type: "extension_ui_response", id: "ui-1", cancelled: true },
+  ]);
+});
+
+test("the runtime retracting a dialog clears it in the bridge as well", async () => {
+  const { bridge, runtime } = bridgeHarness();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "write", projectPath: makeProject() });
+  runtime.push(APPROVAL_FRAME);
+  assert.equal(bridge.hasPendingRequest("ui-1"), true);
+  runtime.push({ type: "extension_ui_request", id: "ui-2", method: "cancel", targetId: "ui-1" });
+  assert.equal(bridge.hasPendingRequest("ui-1"), false);
+  assert.equal(bridge.status(OMP_SESSION).pendingToolConfirmations, 0);
+  assert.deepEqual(runtime.written, [], "a retraction is answered by nobody");
+  const decision = bridge.resolvePermission("ui-1", "allow-once");
+  assert.equal(decision.ok, false);
+  assert.equal(runtime.written.length, 0);
+});
+
+test("stopping another session leaves this one's dialogs, state and wire untouched", async () => {
+  const { bridge, runtime, supervisor } = bridgeHarness();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "write", projectPath: makeProject() });
+  runtime.push(APPROVAL_FRAME);
+  const before = bridge.status(OMP_SESSION);
+
+  await assert.rejects(
+    () => bridge.stop("other-session"),
+    (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+  );
+
+  assert.equal(bridge.hasPendingRequest("ui-1"), true, "the pending dialog must survive");
+  assert.deepEqual(bridge.status(OMP_SESSION), before, "the run state must not change");
+  assert.deepEqual(runtime.written, [], "no frame may be written for another session's stop");
+  assert.deepEqual(runtime.commands, ["prompt"], "no abort may be sent for another session");
+  assert.deepEqual(supervisor.stopped, []);
+  // The pending dialog is still answerable by its own session.
+  assert.deepEqual(bridge.resolvePermission("ui-1", "allow-once"), { ok: true, outcome: "answered" });
 });

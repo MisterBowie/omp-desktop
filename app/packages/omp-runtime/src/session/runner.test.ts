@@ -294,3 +294,86 @@ describe("dispose", () => {
     expect(envelopes).toHaveLength(before);
   });
 });
+
+describe("dialog lifecycle (R1/R2)", () => {
+  it("cancels the dialogs a run raised when the run ends", async () => {
+    const { runtime, runner } = harness();
+    const closed: Array<{ id: string; reason: string }> = [];
+    // A fresh runner with an observer, so the notification path is covered.
+    const observed = new OmpSessionRunner({
+      sessionId: "omp-1",
+      runtime,
+      emit: () => undefined,
+      onUiClosed: (requestId, reason) => closed.push({ id: requestId, reason }),
+      convergeTimeoutMs: 50,
+      abortTimeoutMs: 50,
+    });
+    void runner;
+    await observed.prompt("hello");
+    runtime.push(approvalFrame("ui-old"));
+    runtime.push({ type: "agent_end", messages: [] });
+    expect(observed.status().pendingToolConfirmations).toBe(0);
+    expect(runtime.written).toEqual([
+      { type: "extension_ui_response", id: "ui-old", cancelled: true },
+    ]);
+    expect(closed.map((entry) => entry.id)).toEqual(["ui-old"]);
+    // A decision for that dialog can no longer be delivered.
+    expect(observed.resolveUiRequest("ui-old", "allow-once")).toMatchObject({ ok: false });
+    expect(runtime.written).toHaveLength(1);
+    observed.dispose();
+  });
+
+  it("cancels leftovers before starting the next run", async () => {
+    const { runtime, runner } = harness();
+    await runner.prompt("first");
+    // A dialog the runtime never retracted and the run never ended around.
+    runtime.push(approvalFrame("ui-left"));
+    runtime.push({ type: "agent_end", messages: [] });
+    await runner.prompt("second");
+    // The ended run already cancelled it; the new run starts clean.
+    expect(runner.status().pendingToolConfirmations).toBe(0);
+    expect(runtime.written.filter((frame) => frame.cancelled === true)).toHaveLength(1);
+  });
+
+  it("fails one dialog closed on request, through the registry", async () => {
+    const { runtime, runner } = harness();
+    const closed: string[] = [];
+    const observed = new OmpSessionRunner({
+      sessionId: "omp-1",
+      runtime,
+      emit: () => undefined,
+      onUiClosed: (requestId) => closed.push(requestId),
+    });
+    await observed.prompt("hello");
+    runtime.push(approvalFrame("ui-1"));
+    expect(observed.cancelUiRequest("ui-1", "the user skipped it")).toBe(true);
+    expect(runtime.written).toEqual([
+      { type: "extension_ui_response", id: "ui-1", cancelled: true },
+    ]);
+    expect(observed.status().pendingToolConfirmations).toBe(0);
+    expect(closed).toEqual(["ui-1"]);
+    expect(observed.cancelUiRequest("ui-1", "again")).toBe(false);
+    expect(runtime.written).toHaveLength(1);
+    observed.dispose();
+    void runner;
+  });
+
+  it("forgets a dialog the runtime retracted, and says so", async () => {
+    const { runtime, runner } = harness();
+    const closed: string[] = [];
+    const observed = new OmpSessionRunner({
+      sessionId: "omp-1",
+      runtime,
+      emit: () => undefined,
+      onUiClosed: (requestId, reason) => closed.push(`${requestId}:${reason}`),
+    });
+    await observed.prompt("hello");
+    runtime.push(approvalFrame("ui-1"));
+    runtime.push({ type: "extension_ui_request", id: "ui-2", method: "cancel", targetId: "ui-1" });
+    expect(observed.status().pendingToolConfirmations).toBe(0);
+    expect(closed).toEqual(["ui-1:the runtime retracted its request"]);
+    expect(runtime.written).toEqual([]);
+    observed.dispose();
+    void runner;
+  });
+});

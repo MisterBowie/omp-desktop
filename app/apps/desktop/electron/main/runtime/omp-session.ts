@@ -86,9 +86,16 @@ export type OmpSessionStatus = {
 
 export type OmpPromptResult = { accepted: boolean; turnId: string };
 
-/** The outcome of answering a dialog; a refusal never reached the runtime. */
+/**
+ * The outcome of answering a dialog.
+ *
+ * `answered` means the user's decision reached the runtime; `cancelled` means
+ * the dialog was failed closed instead — a skipped question, an answer the
+ * runtime's protocol cannot carry, or a run that ended first. A refusal means
+ * nothing was written, because the id was not this bridge's to answer.
+ */
 export type OmpResolution =
-  | { ok: true }
+  | { ok: true; outcome: "answered" | "cancelled" }
   | { ok: false; reason: "unknown" | "duplicate" | "wrong-kind" | "stale" | "refused"; detail: string };
 
 /**
@@ -289,6 +296,14 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
         emit: (envelope) => options.emitAgentEvent(envelope),
         onUiRequest: (request, info) =>
           surfaceUiRequest(request, info.sessionId, info.generation),
+        onUiClosed: (requestId, reason) => {
+          approvalRequests.delete(requestId);
+          askRequests.delete(requestId);
+          generations.delete(requestId);
+          logger?.app("omp", "info", "omp dialog closed", {
+            data: { requestId, reason },
+          });
+        },
         onUiRecord: (record) => {
           logger?.app("omp", "info", "ui request decision", {
             data: {
@@ -461,6 +476,30 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     return { ok: true, entry };
   }
 
+  /**
+   * Finish a dialog the user will not answer, or whose answer cannot be
+   * delivered.
+   *
+   * The card disappears from the UI either way, so the runtime must not be left
+   * waiting for it: the request is answered `cancelled` (the runtime's own
+   * "no answer" value, which the gate reads as a denial and a question as no
+   * value) and both layers forget it.
+   */
+  function finishCancelled(requestId: string, reason: string): OmpResolution {
+    const active = runner;
+    if (!active) {
+      approvalRequests.delete(requestId);
+      askRequests.delete(requestId);
+      generations.delete(requestId);
+      return { ok: true, outcome: "cancelled" };
+    }
+    active.cancelUiRequest(requestId, reason);
+    approvalRequests.delete(requestId);
+    askRequests.delete(requestId);
+    generations.delete(requestId);
+    return { ok: true, outcome: "cancelled" };
+  }
+
   /** Consume a dialog, so no second reply can reach the runtime. */
   function consume(requestId: string): void {
     approvalRequests.delete(requestId);
@@ -488,7 +527,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
         result.detail ?? "the runtime refused the decision",
       );
     }
-    return { ok: true };
+    return { ok: true, outcome: "answered" };
   }
 
   /**
@@ -509,52 +548,64 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       return refuse("stale", "the answer names another session");
     }
     const first = (resolution.answers ?? [])[0];
-    const chosen = first && first.length > 0 ? (first[0] ?? "") : "";
-    const active = runner;
-    if (!active) return refuse("unknown", "no OMP session is running");
+    // `null` (or an empty answer) is the desktop's skip/decline — the Pi path's
+    // own contract for `AskToolResolution.answers` — and the card is gone by the
+    // time this returns, so the request has to be finished here.
+    if (!first || first.length === 0) {
+      return finishCancelled(resolution.requestId, "the user skipped the question");
+    }
+    const chosen = first[0] ?? "";
+    if (!runner) {
+      return finishCancelled(resolution.requestId, "the OMP runtime is no longer running");
+    }
     if (entry.request.method === "confirm") {
       if (chosen !== "Yes" && chosen !== "No") {
-        return refuse("refused", "a confirmation answer must be Yes or No");
+        return finishCancelled(resolution.requestId, "the confirmation was dismissed");
       }
       consume(resolution.requestId);
-      const result = active.resolveUiRequest(
+      const result = runner.resolveUiRequest(
         resolution.requestId,
         chosen === "Yes" ? "allow-once" : "deny",
         { sessionId: entry.sessionId, generation: entry.generation },
       );
       return result.ok
-        ? { ok: true }
+        ? { ok: true, outcome: "answered" }
         : refuse("refused", result.detail ?? "the runtime refused the answer");
     }
     const offered = entry.request.options ?? [];
     if (!offered.includes(chosen)) {
-      // An answer the runtime never offered is not a decision: refusing keeps
-      // the dialog open instead of sending a value the requester cannot parse.
-      return refuse("refused", "the answer is not one of the offered options");
+      // A free-text answer the runtime's `select` cannot carry. The card is
+      // already gone, so the dialog is failed closed rather than left waiting.
+      return finishCancelled(
+        resolution.requestId,
+        "the answer is not one of the options this dialog can return",
+      );
     }
     consume(resolution.requestId);
-    const result = active.resolveUiRequest(resolution.requestId, "allow-once", {
+    const result = runner.resolveUiRequest(resolution.requestId, "allow-once", {
       sessionId: entry.sessionId,
       generation: entry.generation,
       value: chosen,
     });
-    return result.ok ? { ok: true } : refuse("refused", result.detail ?? "the runtime refused the answer");
+    return result.ok
+      ? { ok: true, outcome: "answered" }
+      : refuse("refused", result.detail ?? "the runtime refused the answer");
   }
 
   /**
-   * Stop the current run.
+   * Stop the current run (T13).
    *
-   * The runtime's own order lives in the runner: dialogs cancelled first, then
+   * The runtime's order lives in the runner — dialogs cancelled first, then
    * `abort`, then `abort_bash` while a command is still open, then a bounded
    * wait, and only then M2's process teardown.
    */
   async function stop(sessionId: string): Promise<OmpStopOutcome> {
-    // The runtime cancels every dialog it is waiting on; the bridge forgets the
-    // same ids so a late reply is refused by kind and by identity rather than
-    // being replayed into the next run.
-    approvalRequests.clear();
-    askRequests.clear();
-    generations.clear();
+    // Ownership is checked before anything is touched: a stop addressed to
+    // another session must not cancel this one's dialogs, change its state or
+    // write a single frame.
+    if (boundSessionId && boundSessionId !== sessionId) {
+      throw Object.assign(new Error("this runtime hosts a different session"), { errorCode: REFUSAL });
+    }
     if (!runner) {
       return {
         aborted: false,
@@ -565,9 +616,8 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
         errors: [],
       };
     }
-    if (boundSessionId && boundSessionId !== sessionId) {
-      throw Object.assign(new Error("this runtime hosts a different session"), { errorCode: REFUSAL });
-    }
+    // The runner cancels every dialog it is waiting on and reports the ids
+    // back, so both layers forget them together.
     const outcome = await runner.stop();
     logger?.app("omp", "info", "omp stop finished", {
       data: {
