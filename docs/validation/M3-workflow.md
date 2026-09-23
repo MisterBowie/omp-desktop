@@ -130,6 +130,56 @@
 - 用户真实目录 `~/.pi-desktop`、`~/.omp`、`~/.agents` 时间戳未变。
 - 两个子模块 SHA 未变、工作树干净;`git status --porcelain` 为空。
 
+## 5.1 独立复审返修 R1-R2(基线 `cb6f7287565dd8838382c253696d59295f137345`)
+
+### R1 生产桥接忽略 projectPath(P1,已修)
+
+**原状**:`agent-ipc.ts` 把真实 `session.projectPath` 传给 `ompSessions.prompt()`,但桥接只在日志里使用它,启动前**从未**调用 `supervisor.setWorkingDirectory(...)`;运行时因此以 run root 为 cwd 启动,OMP 无法读写用户项目。E2E 里手工调用 `setWorkingDirectory(project)` 掩盖了该缺陷。
+
+**对照固定 PI-Desktop**:其运行时 cwd 是会话属性(host-core 按 `projectPath` 创建会话),桌面不把"项目"作为进程参数反复传递;M1 的实验也是以 `cwd: projectDir` 启动固定 OMP(`app/experiments/omp-bridge/e04-approval.mjs:87`),即"进程 cwd = 会话项目目录"。
+
+**修正**(`app/apps/desktop/electron/main/runtime/omp-session.ts`):
+1. 新增 `resolveProjectDirectory()`:空/纯空白 → `INVALID_ARGUMENT`;**非绝对路径拒绝**(不 `resolve()` 成 cwd 相对路径);不存在或非目录 → `INVALID_ARGUMENT`。
+2. `prompt()` 在 `supervisor.start()` **之前**调用 `supervisor.setWorkingDirectory(projectDirectory)`;若监督器已拥有运行时(目录无法更改)则明确拒绝。
+3. 绑定后同一 session 的**不同项目目录被明确拒绝**(`ENGINE_CAPABILITY_UNAVAILABLE`),相同项目继续;切换/并发属 M4。
+4. E2E 删除手工 `setWorkingDirectory`,并新增断言:`bridge.workingDirectory() === project`、项目目录内出现写入结果、run root 的 `cwd` 下**不得**出现会话产物。
+
+**先失败后通过**:把桥接回退到基线后用同一份新 E2E 运行 → `TypeError: bridge.workingDirectory is not a function`,且启动前没有任何 `setWorkingDirectory`(运行 root 作 cwd);修复后通过(2.2 s,读取/拒绝/批准/测试/长任务停止均发生在示例项目)。
+
+**新增桥单测**(`apps/desktop/test/omp-session-bridge.test.mjs`):
+`binds the session's project directory before the runtime starts`(断言调用序列恰为 `[setWorkingDirectory:<project>, start]`)、
+`refuses an empty or relative project directory without starting anything`(`null`/`""`/空白/相对路径/不存在目录一律 `INVALID_ARGUMENT` 且 `supervisor.calls` 为空)、
+`refuses a different project directory for a runtime already bound to one`(不同目录拒绝、同目录继续、`start` 只发生一次)。
+
+### R2 权限身份加固(已修)
+
+**原状**:`agent-ipc` 调用 `ompSessions.resolveUi(undefined, requestId, decision)`,显式绕过 session 检查;`approvalRequests` 虽保存了 `{request, sessionId}`,但解析路径未用它做权威路由。
+
+**基线行为实测**(脚本对基线桥接):把一个 **ask** 请求的 id 交给权限路径 →
+`BASELINE: permission path consumed an ASK request: true {"type":"extension_ui_response","id":"q-1","value":"a.ts"}` ——普通提问被当作权限决定消费并写回运行时。
+
+**修正**:
+1. 两个专用入口:`resolvePermission(requestId, decision)` 与 `resolveAsk(resolution)`,不再存在可绕过身份的通用入口;渲染器 IPC 负载不变(requestId 仍是 opaque token,`toolResolvePermission` 仍是 `{requestId, decision}`)。
+2. `lookupDialog(requestId, kind)` 做权威查找:id 必须是该 kind 的**未决**对话框,session/run 取自桥接在抛出请求时保存的值;kind 不匹配 → `wrong-kind`,已应答/已取消 → `duplicate`,未知 → `unknown`,与绑定 session 不一致 → `stale`。
+3. 校验通过后才 `consume()` 单次消费,再用**保存的 session + generation** 调用 runner;因此重复回复、停止后的回复、旧 generation 都不会写第二帧。
+4. 请求的 generation 在抛出时同请求一起保存;`OmpSessionRunner.resolveUiRequest` 增加 `sessionId`/`generation` 入参并在 runner 侧二次校验(runner 的单会话身份 + 注册表按代拒绝)。
+5. `lookupDialog` 与 `consume` 分离:格式不合法的回答(选项不在列表中、confirm 非 Yes/No、session 不符)**不消费**对话框,避免把仍在等待的运行时吊死。
+
+**新增行为测试**:`a question's id cannot be consumed through the permission path`(拒绝且 0 帧,随后 ask 路径仍可正常应答)、`an approval's id cannot be consumed through the ask path`(拒绝且 0 帧,随后权限路径可应答)、`an approval is answered under the session the bridge stored for it`(surface 的 `sessionId` 即绑定 session,决定无需也无法另指 session)、`an answer that names another session is refused`(refused 后同一请求仍可被正确 session 应答)、`a duplicate decision, or one after a stop, never writes a second frame`。
+
+### 本轮返修验证
+
+| 命令 | 结果 |
+| --- | --- |
+| `pnpm build:js` / `pnpm typecheck` | 12 包构建通过 / 0 错误 |
+| `pnpm --filter @pi-desktop/omp-runtime test` | 11 文件 / 142 项通过 |
+| `pnpm --filter @pi-desktop/shared test` | 84 文件 / 968 项通过 |
+| `cd apps/desktop && env -u SSH_ASKPASS node --test test/*.test.mjs` | 2593 项:2589 通过 / 0 失败(桥接测试由 13 增至 20) |
+| `node --test apps/desktop/test/omp-session-e2e.test.mjs` | 1 项通过(不预设 cwd) |
+| `cd crates && cargo test -p host-core --locked` | 579 通过 / 0 失败 |
+| `node docs/validation/M0-rpc/verify-rpc.mjs` | PASS(未发送 prompt) |
+| 残留 | OMP/Electron 进程 0、临时运行根 0、`~/.omp-desktop*` 无、子模块 SHA 未变、工作树干净 |
+
 ## 6. 已知限制(真实存在,且不属于本轮范围)
 
 1. **模型与凭证投影属于 M4/T15**:本产品尚未把用户模型设置投影进 OMP;产品内 OMP 会话需要一个可达模型配置,验收夹具用本地假 provider 提供。

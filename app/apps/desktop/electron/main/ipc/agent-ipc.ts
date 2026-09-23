@@ -923,9 +923,15 @@ export function registerAgentIpc({
       (resolution.decision === "allow-once" ||
         resolution.decision === "allow-session" ||
         resolution.decision === "deny") &&
-      ompSessions.hasPendingRequest(resolution.requestId)
+      (ompSessions.hasPendingRequest(resolution.requestId) ||
+        ompSessions.hasKnownRequest(resolution.requestId))
     ) {
-      const result = ompSessions.resolveUi(undefined, resolution.requestId, resolution.decision);
+      // The renderer sends an opaque request id (the Pi path's own contract);
+      // the session, run and tool call this decision belongs to are the ones
+      // the bridge stored when it raised the request, and it refuses anything
+      // that is no longer open, was already answered, or belongs to another
+      // kind of dialog.
+      const result = ompSessions.resolvePermission(resolution.requestId, resolution.decision);
       if (!result.ok) {
         throw Object.assign(new Error(result.detail ?? "the approval is no longer pending"), {
           errorCode: ErrorCodes.NOT_FOUND,

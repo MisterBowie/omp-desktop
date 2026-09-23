@@ -154,7 +154,9 @@ test(
       },
       readyTimeoutMs: 60_000,
     });
-    supervisor.setWorkingDirectory(project);
+    // Deliberately NOT calling `supervisor.setWorkingDirectory`: the bridge must
+    // bind the session's project directory itself, from the `projectPath` the
+    // prompt carries. A manual call here would hide that production defect.
 
     const bridge = createOmpSessionBridge({
       supervisor,
@@ -169,6 +171,7 @@ test(
     try {
       // The runtime needs a model: the fake provider is the only one reachable.
       const first = await bridge.prompt({ sessionId: SESSION, content: "read the readme, then write guarded.txt", projectPath: project });
+      assert.equal(bridge.workingDirectory(), project, "the runtime must run in the session's project");
       assert.equal(first.accepted, true);
 
       // --- 1. read file -----------------------------------------------------
@@ -181,7 +184,7 @@ test(
       // --- 2. deny the write; the file must not change -----------------------
       const firstApproval = await waitForApproval(bridge, envelopes, "call_write_1");
       assert.equal(firstApproval.ok, true, "the write must raise an approval");
-      const denied = bridge.resolveUi(undefined, firstApproval.request.requestId, "deny");
+      const denied = bridge.resolvePermission(firstApproval.request.requestId, "deny");
       assert.equal(denied.ok, true);
       const writeEnd = await waitFor(() => envelopes.some((e) => e.event.type === "tool_end" && e.event.toolCallId === "call_write_1"));
       assert.equal(writeEnd, true, "the denied call must still end");
@@ -199,7 +202,7 @@ test(
         firstApproval.request.requestId,
         "each call has its own request identity",
       );
-      const allowed = bridge.resolveUi(undefined, secondApproval.request.requestId, "allow-once");
+      const allowed = bridge.resolvePermission(secondApproval.request.requestId, "allow-once");
       assert.equal(allowed.ok, true);
       const written = await waitFor(() => readFileSync(guardedPath, "utf8") === "written by omp\n");
       assert.equal(written, true, "the approved write must land");
@@ -213,7 +216,7 @@ test(
       // `bash` is gated too: the command needs its own approval.
       const testsApproval = await waitForApproval(bridge, envelopes, "call_tests");
       assert.equal(testsApproval.ok, true, "the test command must raise an approval");
-      bridge.resolveUi(undefined, testsApproval.request.requestId, "allow-once");
+      bridge.resolvePermission(testsApproval.request.requestId, "allow-once");
       const testsEnd = await waitFor(() => envelopes.some((e) => e.event.type === "tool_end" && e.event.toolCallId === "call_tests"));
       assert.equal(testsEnd, true, "the test command must report a result");
       const testsResult = envelopes.find((e) => e.event.type === "tool_end" && e.event.toolCallId === "call_tests").event;
@@ -222,7 +225,7 @@ test(
       // --- 5. start the long task and stop it -------------------------------
       const longApproval = await waitForApproval(bridge, envelopes, "call_long");
       assert.equal(longApproval.ok, true, "the long command must raise an approval");
-      bridge.resolveUi(undefined, longApproval.request.requestId, "allow-once");
+      bridge.resolvePermission(longApproval.request.requestId, "allow-once");
       const started = await waitFor(() => existsSync(longTaskStarted), 30_000);
       assert.equal(started, true, "the long command must actually start");
       const longPid = Number(readFileSync(longTaskStarted, "utf8"));
@@ -264,6 +267,21 @@ test(
         "the stopped run's tool result must never appear under the new turn id",
       );
       assert.equal(bridge.status(SESSION).isRunning, false);
+
+      // The project directory is where the work happened: the file the model
+      // wrote is here, and the run root (the runtime's own scratch space) holds
+      // no copy of anything this session produced.
+      assert.equal(readdirSync(project).includes("guarded.txt"), true);
+      const runCwds = existsSync(dataRoot) ? readdirSync(dataRoot).filter((name) => name.startsWith("omp-runtime")) : [];
+      for (const runRoot of runCwds) {
+        const stray = join(dataRoot, runRoot, "cwd");
+        if (!existsSync(stray)) continue;
+        assert.equal(
+          readdirSync(stray).includes("guarded.txt"),
+          false,
+          `the run root ${stray} must not hold the session's files`,
+        );
+      }
 
       // --- evidence for the validation report --------------------------------
       // Printed (and asserted) so a reviewer can see the timeline this fixture

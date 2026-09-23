@@ -9,6 +9,7 @@
 - 新增/改动核心：`app/packages/omp-runtime/src/session/`（events 转换器、ui-requests 决策注册表、runner 生命周期）、`app/packages/omp-runtime/extensions/omp-desktop-gate.ts`（随产品发布的执行前网关）、`app/apps/desktop/electron/main/runtime/omp-session.ts`（桌面桥接）、`agent-ipc.ts` 的 OMP 分支、`packages/shared/src/engine.ts` 的能力开放（prompt/stop/structuredQuestions/toolApproval）。
 - 新增测试：`events.test.ts`(16)、`ui-requests.test.ts`(19)、`gate.test.ts`(13)、`runner.test.ts`(14)、`omp-session-bridge.test.mjs`(13)、`omp-session-e2e.test.mjs`(真实固定 OMP 端到端 1 项：读→拒绝→批准一次→跑测试→长任务停止→无残留)。
 - 本轮环境补充（新工作树必需）：`bun install --frozen-lockfile` 与 `bun --cwd=packages/natives run build`（未安装时 Bun 会解析到全局缓存 18.2.9，pinned 校验失败）。
+- 返修（独立复审 R1-R2，基线 `cb6f728`）：R1 `prompt(projectPath)` 现在会在 `start()` **之前**把经过校验的绝对项目目录交给监督器（空/相对/不存在一律 fail closed，绑定后不同目录明确拒绝），E2E 不再手工设置 cwd；R2 权限决定改走专用 `resolvePermission`/`resolveAsk`，身份取自桥接保存的 session+generation+kind，重复/停止后/跨 kind/未知一律 fail closed（基线实测缺陷：ask 请求 id 可被权限路径消费并写帧）。详见 `docs/validation/M3-workflow.md` §5.1。
 - 下一轮入口：M4/T14-T16（会话字段与恢复、模型与凭证投影、并发项目）；M3 未开放的入口（附件、steer/follow-up、压缩、分支、子代理交互审批、会话切换）保持显式拒绝。
 
 ## 1. 用户已确定的方向

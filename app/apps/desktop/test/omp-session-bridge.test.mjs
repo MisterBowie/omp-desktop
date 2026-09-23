@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
 import { register } from "node:module";
-import test from "node:test";
+import { tmpdir } from "node:os";
+import test, { after } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -28,6 +30,19 @@ const { registerAgentIpc } = await import("../electron/main/ipc/agent-ipc.ts");
 const { createEngineRouter } = await import("../electron/main/runtime/engine-router.ts");
 
 const OMP_SESSION = "session-omp";
+
+/** Every temporary directory this file creates, removed in `after`. */
+const scratch = [];
+after(() => {
+  for (const entry of scratch.splice(0)) rmSync(entry, { recursive: true, force: true });
+});
+
+/** A real directory: the bridge refuses a project path that does not exist. */
+function makeProject() {
+  const path = mkdtempSync(join(tmpdir(), "omp-bridge-project-"));
+  scratch.push(path);
+  return path;
+}
 
 /** A runtime the bridge can write to, exactly as `OmpRuntimeProcess` looks. */
 class FakeRuntime {
@@ -73,6 +88,14 @@ function fakeSupervisor(runtime) {
   return {
     started: 0,
     stopped: [],
+    /** Ordered call log: proves the working directory precedes the start. */
+    calls: [],
+    workingDirectory: null,
+    setWorkingDirectory(path) {
+      if (this.started > 0) throw new Error("the runtime is running");
+      this.calls.push(`setWorkingDirectory:${path}`);
+      this.workingDirectory = path;
+    },
     // M2's supervisor reports `stopped` until it owns a runtime, so the fake
     // does too: the bridge starts an engine that has not been started, and
     // reuses one that is already up.
@@ -87,6 +110,7 @@ function fakeSupervisor(runtime) {
       };
     },
     async start() {
+      this.calls.push("start");
       this.started += 1;
       return this.status();
     },
@@ -145,8 +169,9 @@ const APPROVAL_FRAME = {
 
 test("refuses to prompt when this build has no gate extension", async () => {
   const { bridge, supervisor } = bridgeHarness({ gate: null });
+  const project = makeProject();
   await assert.rejects(
-    () => bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: "/tmp/project" }),
+    () => bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: project }),
     (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
   );
   // Nothing was started: an unguarded runtime must not exist at all.
@@ -155,15 +180,17 @@ test("refuses to prompt when this build has no gate extension", async () => {
 
 test("refuses to prompt when this build has no runtime executable", async () => {
   const { bridge } = bridgeHarness({ launcher: null });
+  const project = makeProject();
   await assert.rejects(
-    () => bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: "/tmp/project" }),
+    () => bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: project }),
     (error) => error.errorCode === "NOT_FOUND",
   );
 });
 
 test("starts the runtime once and streams the run under one turn id", async () => {
   const { bridge, runtime, supervisor, envelopes } = bridgeHarness();
-  const first = await bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: "/tmp/project" });
+  const project = makeProject();
+  const first = await bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: project });
   assert.equal(supervisor.started, 1);
   assert.match(first.turnId, /^omp-turn:session-omp:1$/);
 
@@ -181,22 +208,24 @@ test("starts the runtime once and streams the run under one turn id", async () =
   assert.equal(bridge.status(OMP_SESSION).isRunning, false);
 
   // A second prompt on the same session is the same runtime, not a new one.
-  await bridge.prompt({ sessionId: OMP_SESSION, content: "again", projectPath: "/tmp/project" });
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "again", projectPath: project });
   assert.equal(supervisor.started, 1);
 });
 
 test("refuses a second OMP session instead of sharing the runtime", async () => {
   const { bridge } = bridgeHarness();
-  await bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: "/tmp/project" });
+  const project = makeProject();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: project });
   await assert.rejects(
-    () => bridge.prompt({ sessionId: "another-session", content: "hi", projectPath: "/tmp/other" }),
+    () => bridge.prompt({ sessionId: "another-session", content: "hi", projectPath: project }),
     (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
   );
 });
 
 test("surfaces a gate approval as a permission request and answers it once", async () => {
   const { bridge, runtime, envelopes } = bridgeHarness();
-  await bridge.prompt({ sessionId: OMP_SESSION, content: "write a file", projectPath: "/tmp/project" });
+  const project = makeProject();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "write a file", projectPath: project });
   runtime.push(APPROVAL_FRAME);
 
   const request = envelopes.at(-1).event;
@@ -208,7 +237,7 @@ test("surfaces a gate approval as a permission request and answers it once", asy
   assert.equal(bridge.hasPendingRequest("ui-1"), true);
   assert.equal(bridge.status(OMP_SESSION).pendingToolConfirmations, 1);
 
-  const allowed = bridge.resolveUi(undefined, "ui-1", "allow-once");
+  const allowed = bridge.resolvePermission("ui-1", "allow-once");
   assert.equal(allowed.ok, true);
   assert.deepEqual(runtime.written.at(-1), {
     type: "extension_ui_response",
@@ -217,24 +246,28 @@ test("surfaces a gate approval as a permission request and answers it once", asy
   });
 
   // Only one decision can authorise this call.
-  const second = bridge.resolveUi(undefined, "ui-1", "allow-once");
+  const second = bridge.resolvePermission("ui-1", "allow-once");
   assert.equal(second.ok, false);
   assert.equal(runtime.written.length, 1);
   assert.equal(bridge.hasPendingRequest("ui-1"), false);
 });
 
-test("a decision that names another session is refused", async () => {
-  const { bridge, runtime } = bridgeHarness();
-  await bridge.prompt({ sessionId: OMP_SESSION, content: "write a file", projectPath: "/tmp/project" });
+test("an approval is answered under the session the bridge stored for it", async () => {
+  const { bridge, runtime, envelopes } = bridgeHarness();
+  const project = makeProject();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "write a file", projectPath: project });
   runtime.push(APPROVAL_FRAME);
-  const refused = bridge.resolveUi("some-other-session", "ui-1", "allow-once");
-  assert.equal(refused.ok, false);
-  assert.equal(runtime.written.length, 0);
+  const request = envelopes.at(-1).event.request;
+  assert.equal(request.sessionId, OMP_SESSION, "the surfaced request names the bound session");
+  // No session id is passed back: the bridge's stored binding is the authority,
+  // and the decision is accepted for exactly that session.
+  assert.equal(bridge.resolvePermission(request.requestId, "allow-once").ok, true);
+  assert.equal(runtime.written.length, 1);
 });
-
 test("surfaces a runtime question through the ask card and returns the chosen option", async () => {
   const { bridge, runtime, envelopes } = bridgeHarness();
-  await bridge.prompt({ sessionId: OMP_SESSION, content: "which file?", projectPath: "/tmp/project" });
+  const project = makeProject();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "which file?", projectPath: project });
   runtime.push({
     type: "extension_ui_request",
     id: "q-1",
@@ -263,7 +296,8 @@ test("surfaces a runtime question through the ask card and returns the chosen op
 
 test("refuses an answer the runtime never offered", async () => {
   const { bridge, runtime } = bridgeHarness();
-  await bridge.prompt({ sessionId: OMP_SESSION, content: "which file?", projectPath: "/tmp/project" });
+  const project = makeProject();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "which file?", projectPath: project });
   runtime.push({
     type: "extension_ui_request",
     id: "q-1",
@@ -279,7 +313,8 @@ test("refuses an answer the runtime never offered", async () => {
 
 test("stopping cancels the dialogs the runtime is blocked on", async () => {
   const { bridge, runtime } = bridgeHarness();
-  await bridge.prompt({ sessionId: OMP_SESSION, content: "write a file", projectPath: "/tmp/project" });
+  const project = makeProject();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "write a file", projectPath: project });
   runtime.push(APPROVAL_FRAME);
   const stopped = bridge.stop(OMP_SESSION);
   // The turn converges only after the cancel was delivered.
@@ -293,13 +328,14 @@ test("stopping cancels the dialogs the runtime is blocked on", async () => {
     cancelled: true,
   });
   // A decision arriving after the stop cannot be delivered.
-  assert.equal(bridge.resolveUi(undefined, "ui-1", "allow-once").ok, false);
+  assert.equal(bridge.resolvePermission("ui-1", "allow-once").ok, false);
   assert.equal(bridge.hasPendingRequest("ui-1"), false);
 });
 
 test("dispose cancels dialogs and reclaims the runtime", async () => {
   const { bridge, runtime, supervisor, envelopes } = bridgeHarness();
-  await bridge.prompt({ sessionId: OMP_SESSION, content: "write a file", projectPath: "/tmp/project" });
+  const project = makeProject();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "write a file", projectPath: project });
   runtime.push(APPROVAL_FRAME);
   const before = envelopes.length;
   await bridge.dispose("application shutdown");
@@ -316,7 +352,8 @@ test("dispose cancels dialogs and reclaims the runtime", async () => {
 
 test("reports a transport failure as one typed error, not a hung turn", async () => {
   const { bridge, runtime, envelopes } = bridgeHarness();
-  await bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: "/tmp/project" });
+  const project = makeProject();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: project });
   const { OmpRuntimeError } = await import("../../../packages/omp-runtime/src/errors.ts");
   runtime.fail(new OmpRuntimeError("transport-failed", "stdout closed"));
   const last = envelopes.at(-1).event;
@@ -327,6 +364,7 @@ test("reports a transport failure as one typed error, not a hung turn", async ()
 
 test("an OMP prompt reaches the bridge without touching the Pi runtime", async () => {
   const { bridge } = bridgeHarness();
+  const project = makeProject();
   const handlers = new Map();
   const sidecarCalls = [];
   const hostCalls = [];
@@ -336,7 +374,7 @@ test("an OMP prompt reaches the bridge without touching the Pi runtime", async (
     async call(method, params) {
       hostCalls.push(method);
       if (method === "session.get") {
-        return { session: { id: params?.id, engine: "omp", projectPath: "/tmp/project" } };
+        return { session: { id: params?.id, engine: "omp", projectPath: project } };
       }
       if (method === "settings.get") return {};
       return {};
@@ -366,7 +404,7 @@ test("an OMP prompt reaches the bridge without touching the Pi runtime", async (
     claimedExecutionSessions: new Map(),
     resolveAgentRuntimeLaunch: async () => {
       launched.push(1);
-      return { projectPath: "/tmp/project", sidecarParams: {} };
+      return { projectPath: project, sidecarParams: {} };
     },
     engineRouter: createEngineRouter({
       status: (engine) => ({ engine, phase: "idle", runtimeVersion: null, protocolVersion: null, reason: null, capabilities: {} }),
@@ -407,7 +445,8 @@ test("an OMP prompt reaches the bridge without touching the Pi runtime", async (
 
 test("an OMP session's status comes from the runtime that owns it", async () => {
   const { bridge } = bridgeHarness();
-  await bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: "/tmp/project" });
+  const project = makeProject();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: project });
   const handlers = new Map();
   registerAgentIpc({
     registrar: { handle: (channel, handler) => handlers.set(channel, handler) },
@@ -426,7 +465,7 @@ test("an OMP session's status comes from the runtime that owns it", async () => 
     activeTurnUsages: new Map(),
     approvedExecutionIdsBySession: new Map(),
     claimedExecutionSessions: new Map(),
-    resolveAgentRuntimeLaunch: async () => ({ projectPath: "/tmp/project", sidecarParams: {} }),
+    resolveAgentRuntimeLaunch: async () => ({ projectPath: project, sidecarParams: {} }),
     engineRouter: createEngineRouter({
       status: (engine) => ({ engine, phase: "idle", runtimeVersion: null, protocolVersion: null, reason: null, capabilities: {} }),
       sessionEngine: async () => "omp",
@@ -447,4 +486,127 @@ test("an OMP session's status comes from the runtime that owns it", async () => 
   const status = await handlers.get(IPC.invoke.agentGetStatus)(OMP_SESSION);
   assert.equal(status.status.isRunning, true);
   assert.equal(status.status.currentTurnId, "omp-turn:session-omp:1");
+});
+
+test("binds the session's project directory before the runtime starts", async () => {
+  const project = makeProject();
+  const { bridge, supervisor } = bridgeHarness();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: project });
+  assert.deepEqual(supervisor.calls, [`setWorkingDirectory:${project}`, "start"]);
+  assert.equal(bridge.workingDirectory(), project);
+});
+
+test("refuses an empty or relative project directory without starting anything", async () => {
+  const { bridge, supervisor } = bridgeHarness();
+  for (const projectPath of [null, "", "   ", "relative/project", "./project"]) {
+    await assert.rejects(
+      () => bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath }),
+      (error) => error.errorCode === ErrorCodes.INVALID_ARGUMENT,
+      `projectPath ${JSON.stringify(projectPath)}`,
+    );
+  }
+  await assert.rejects(
+    () => bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: join(process.cwd(), "does-not-exist-omp") }),
+    (error) => error.errorCode === ErrorCodes.INVALID_ARGUMENT,
+  );
+  assert.deepEqual(supervisor.calls, []);
+  assert.equal(supervisor.started, 0);
+});
+
+test("refuses a different project directory for a runtime already bound to one", async () => {
+  const first = makeProject();
+  const second = makeProject();
+  const { bridge, runtime, supervisor } = bridgeHarness();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "one", projectPath: first });
+  runtime.push({ type: "agent_end", messages: [] });
+  await assert.rejects(
+    () => bridge.prompt({ sessionId: OMP_SESSION, content: "two", projectPath: second }),
+    (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+  );
+  // The same project keeps working on the runtime that is already up, and the
+  // directory was set exactly once, before the runtime started.
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "three", projectPath: first });
+  assert.deepEqual(supervisor.calls, [`setWorkingDirectory:${first}`, "start"]);
+  assert.equal(supervisor.started, 1);
+});
+
+test("a question's id cannot be consumed through the permission path", async () => {
+  const { bridge, runtime, envelopes } = bridgeHarness();
+  const project = makeProject();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "which file?", projectPath: project });
+  runtime.push({
+    type: "extension_ui_request",
+    id: "q-1",
+    method: "select",
+    title: "Which file?",
+    options: ["a.ts", "b.ts"],
+  });
+  const refused = bridge.resolvePermission("q-1", "allow-once");
+  assert.equal(refused.ok, false);
+  assert.equal(refused.reason, "wrong-kind");
+  assert.equal(runtime.written.length, 0, "a mismatched kind must not answer the runtime");
+  // The question is still answerable through its own path.
+  const answered = bridge.resolveAsk({ requestId: "q-1", sessionId: OMP_SESSION, answers: [["a.ts"]] });
+  assert.equal(answered.ok, true);
+  assert.deepEqual(runtime.written.at(-1), { type: "extension_ui_response", id: "q-1", value: "a.ts" });
+  assert.ok(envelopes.some((entry) => entry.event.type === "asktool_request"));
+});
+
+test("an approval's id cannot be consumed through the ask path", async () => {
+  const { bridge, runtime } = bridgeHarness();
+  const project = makeProject();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "write a file", projectPath: project });
+  runtime.push(APPROVAL_FRAME);
+  const refused = bridge.resolveAsk({
+    requestId: "ui-1",
+    sessionId: OMP_SESSION,
+    answers: [["Allow once"]],
+  });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.reason, "wrong-kind");
+  assert.equal(runtime.written.length, 0, "a mismatched kind must not answer the runtime");
+  const allowed = bridge.resolvePermission("ui-1", "allow-once");
+  assert.equal(allowed.ok, true);
+  assert.equal(runtime.written.length, 1);
+});
+
+test("an answer that names another session is refused", async () => {
+  const { bridge, runtime } = bridgeHarness();
+  const project = makeProject();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "which file?", projectPath: project });
+  runtime.push({
+    type: "extension_ui_request",
+    id: "q-2",
+    method: "select",
+    title: "Which file?",
+    options: ["a.ts"],
+  });
+  const refused = bridge.resolveAsk({ requestId: "q-2", sessionId: "someone-else", answers: [["a.ts"]] });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.reason, "stale");
+  assert.equal(runtime.written.length, 0);
+  // The stored session is the bound one: the same answer from it is accepted.
+  assert.equal(bridge.resolveAsk({ requestId: "q-2", sessionId: OMP_SESSION, answers: [["a.ts"]] }).ok, true);
+});
+
+test("a duplicate decision, or one after a stop, never writes a second frame", async () => {
+  const { bridge, runtime } = bridgeHarness();
+  const project = makeProject();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "write a file", projectPath: project });
+  runtime.push(APPROVAL_FRAME);
+  assert.equal(bridge.resolvePermission("ui-1", "allow-once").ok, true);
+  const duplicate = bridge.resolvePermission("ui-1", "allow-once");
+  assert.equal(duplicate.ok, false);
+  assert.equal(duplicate.reason, "duplicate");
+  assert.equal(runtime.written.length, 1);
+
+  // A second approval, answered only after the run was stopped, is refused too.
+  runtime.push({ ...APPROVAL_FRAME, id: "ui-2" });
+  const stop = bridge.stop(OMP_SESSION);
+  setTimeout(() => runtime.push({ type: "agent_end", messages: [] }), 5);
+  await stop;
+  const late = bridge.resolvePermission("ui-2", "allow-once");
+  assert.equal(late.ok, false);
+  assert.equal(runtime.written.length, 2, "the stop cancels it; nothing else is written");
+  assert.equal(bridge.hasPendingRequest("ui-2"), false);
 });

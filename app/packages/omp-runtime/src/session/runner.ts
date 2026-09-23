@@ -229,17 +229,25 @@ export class OmpSessionRunner {
    *
    * `value` names the option a question's user actually picked; approvals
    * ignore it, because their meaning is the decision, not a label.
+   *
+   * `sessionId` and `generation` are the identity the *desktop* stored when it
+   * surfaced the request. Supplying them is how a decision is bound to the
+   * session and run it was raised for: a decision that names another session,
+   * or whose dialog was raised by a run that has since been superseded, is
+   * refused here rather than being delivered to whatever is running now.
    */
   resolveUiRequest(
     requestId: string,
     decision: OmpUiDecision,
-    options: { value?: string } = {},
+    options: { value?: string; sessionId?: string; generation?: number } = {},
   ): { ok: boolean; reason?: string; detail?: string } {
-    const result = this.ui.resolve(
-      requestId,
-      decision,
-      options.value === undefined ? {} : { value: options.value },
-    );
+    if (options.sessionId !== undefined && options.sessionId !== this.sessionId) {
+      return { ok: false, reason: "unknown", detail: "the decision names another session" };
+    }
+    const result = this.ui.resolve(requestId, decision, {
+      ...(options.value === undefined ? {} : { value: options.value }),
+      ...(options.generation === undefined ? {} : { generation: options.generation }),
+    });
     for (const record of this.ui.records().slice(-1)) this.onUiRecord?.(record);
     return result.ok ? { ok: true } : { ok: false, reason: result.reason, detail: result.detail };
   }
