@@ -520,3 +520,91 @@ describe("late and failed dialog lifecycles (F1-F3)", () => {
     runner.dispose();
   });
 });
+
+describe("terminal signal for failed prompts (F2)", () => {
+  it("tells the desktop the turn is over when a refused prompt left a card behind", async () => {
+    const runtime = new FakeRuntime();
+    const envelopes: AgentEventEnvelope[] = [];
+    const presented: string[] = [];
+    const runner = new OmpSessionRunner({
+      sessionId: "omp-1",
+      runtime,
+      emit: (envelope) => envelopes.push(envelope),
+      onUiRequest: (request) => presented.push(request.frameId),
+      convergeTimeoutMs: 50,
+      abortTimeoutMs: 50,
+    });
+    runtime.onPrompt = () => runtime.push(approvalFrame("ui-refused"));
+    runtime.promptResponse = { success: false, error: "busy" };
+
+    await expect(runner.prompt("hello")).rejects.toMatchObject({ code: "not-started" });
+    // The card was presented (the bridge turns this into the renderer envelope),
+    // and the failure ends the turn exactly once.
+    expect(presented).toEqual(["ui-refused"]);
+    expect(envelopes.map((entry) => entry.event.type)).toEqual(["error"]);
+    const terminal = envelopes.at(-1)!;
+    expect(terminal.sessionId).toBe("omp-1");
+    expect(terminal.turnId).toBe("omp-turn:omp-1:1");
+    expect(terminal.event).toMatchObject({ type: "error" });
+    expect(runner.runState()).toBe("idle");
+    runner.dispose();
+  });
+
+  it("stays silent when a refused prompt never showed a card", async () => {
+    const runtime = new FakeRuntime();
+    const envelopes: AgentEventEnvelope[] = [];
+    const runner = new OmpSessionRunner({
+      sessionId: "omp-1",
+      runtime,
+      emit: (envelope) => envelopes.push(envelope),
+      convergeTimeoutMs: 50,
+      abortTimeoutMs: 50,
+    });
+    runtime.promptResponse = { success: false, error: "busy" };
+    await expect(runner.prompt("hello")).rejects.toMatchObject({ code: "not-started" });
+    // The caller receives the failure; there is no card to withdraw and no turn
+    // to end, so the desktop is not told twice.
+    expect(envelopes).toEqual([]);
+    runner.dispose();
+  });
+
+  it("emits one terminal error when the prompt failure races a transport failure", async () => {
+    const runtime = new FakeRuntime();
+    const envelopes: AgentEventEnvelope[] = [];
+    const runner = new OmpSessionRunner({
+      sessionId: "omp-1",
+      runtime,
+      emit: (envelope) => envelopes.push(envelope),
+      convergeTimeoutMs: 50,
+      abortTimeoutMs: 50,
+    });
+    runtime.onPrompt = () => {
+      runtime.push(approvalFrame("ui-race"));
+      runtime.fail(new OmpRuntimeError("transport-failed", "stdout closed"));
+    };
+    runtime.promptFailure = new OmpRuntimeError("transport-failed", "stdout closed");
+
+    await expect(runner.prompt("hello")).rejects.toBeInstanceOf(OmpRuntimeError);
+    expect(envelopes.filter((entry) => entry.event.type === "error")).toHaveLength(1);
+    expect(runtime.written.filter((frame) => frame.id === "ui-race")).toHaveLength(1);
+    expect(runner.status().pendingToolConfirmations).toBe(0);
+    expect(runner.runState()).toBe("idle");
+    runner.dispose();
+  });
+
+  it("does not signal anything extra for a run that ends normally", async () => {
+    const { runtime, envelopes, runner } = harness();
+    await runner.prompt("hello");
+    runtime.push(approvalFrame("ui-ok"));
+    runtime.push({ type: "agent_end", messages: [] });
+    expect(envelopes.filter((entry) => entry.event.type === "error")).toEqual([]);
+    expect(envelopes.filter((entry) => entry.event.type === "agent_end")).toHaveLength(1);
+    // A dialog arriving after that terminal event is still refused.
+    runtime.push(approvalFrame("ui-late"));
+    expect(runtime.written.at(-1)).toEqual({
+      type: "extension_ui_response",
+      id: "ui-late",
+      cancelled: true,
+    });
+  });
+});

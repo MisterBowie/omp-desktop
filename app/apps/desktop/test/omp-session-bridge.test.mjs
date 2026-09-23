@@ -25,6 +25,16 @@ const { IPC } = protocol;
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
 const { createOmpSessionBridge } = await import("../electron/main/runtime/omp-session.ts");
+const {
+  clearSessionPermissions,
+  enqueuePermission,
+  queuedPermissionCount,
+} = await import("../src/lib/pending-permissions.ts");
+const { clearSessionAsks, enqueueAsk, headAsk, queuedAskCount } = await import(
+  "../src/lib/pending-asks.ts"
+);
+const { readStoreSource } = await import("./helpers/source-contracts.mjs");
+const storeSource = await readStoreSource();
 const { OmpSessionRunner } = await import("../../../packages/omp-runtime/src/session/runner.ts");
 const { registerAgentIpc } = await import("../electron/main/ipc/agent-ipc.ts");
 const { createEngineRouter } = await import("../electron/main/runtime/engine-router.ts");
@@ -61,11 +71,13 @@ class FakeRuntime {
   /** Raised while the prompt request is in flight, when the test wants one. */
   onPrompt = undefined;
   promptResponse = undefined;
+  promptFailure = undefined;
 
   async request(command) {
     this.commands.push(command.type);
     if (command.type === "prompt") {
       this.onPrompt?.();
+      if (this.promptFailure) throw this.promptFailure;
       if (this.promptResponse) return this.promptResponse;
     }
     return { success: true };
@@ -775,7 +787,7 @@ test("stopping another session leaves this one's dialogs, state and wire untouch
   assert.deepEqual(bridge.resolvePermission("ui-1", "allow-once"), { ok: true, outcome: "answered" });
 });
 
-test("a refused prompt closes its dialog in both layers", async () => {
+test("a refused prompt closes its dialog and tells the renderer the turn ended", async () => {
   const { bridge, runtime, envelopes } = bridgeHarness();
   // The runtime raises a dialog while handling the prompt, then refuses it.
   runtime.onPrompt = () => {
@@ -807,23 +819,128 @@ test("a refused prompt closes its dialog in both layers", async () => {
   await assert.rejects(
     () => bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: makeProject() }),
     (error) => {
-      // The runner's typed refusal reaches the caller unchanged, with a message
-      // the UI can show.
+      // The refusal reaches the caller unchanged: the cleanup must not replace
+      // the root cause.
       assert.equal(error.code, "not-started");
       assert.match(error.message, /refused the prompt: busy/);
       return true;
     },
   );
-  // The dialog is failed closed once, the bridge forgets it, and the run is idle.
+
+  // The renderer's sequence: the card, then exactly one terminal event.
+  assert.deepEqual(
+    envelopes.map((entry) => entry.event.type),
+    ["tool_permission_request", "error"],
+  );
+  const terminal = envelopes.at(-1);
+  assert.equal(terminal.sessionId, OMP_SESSION);
+  assert.equal(terminal.turnId, "omp-turn:session-omp:1");
+  assert.equal(terminal.event.type, "error");
+  assert.match(terminal.event.error.message, /busy/);
+
+  // The dialog is failed closed exactly once, and forgotten.
   assert.deepEqual(runtime.written, [
     { type: "extension_ui_response", id: "ui-refused", cancelled: true },
   ]);
   assert.equal(bridge.hasPendingRequest("ui-refused"), false);
   assert.equal(bridge.status(OMP_SESSION).isRunning, false);
   assert.equal(bridge.status(OMP_SESSION).pendingToolConfirmations, 0);
-  // A late decision cannot authorise anything.
+
+  // Renderer contract: the terminal event is exactly the kind PI-Desktop's store
+  // clears pending permissions and asks on, and clearing by that session empties
+  // the queues the card was queued into.
+  assert.ok(
+    terminal.event.type === "agent_end" || terminal.event.type === "error",
+    "the terminal event must be the type the store clears on",
+  );
+  const permission = envelopes[0].event.request;
+  const queues = enqueuePermission(
+    enqueuePermission({}, permission),
+    { ...permission, requestId: "second-request" },
+  );
+  assert.equal(queuedPermissionCount(queues, terminal.sessionId), 1);
+  assert.deepEqual(Object.keys(clearSessionPermissions(queues, terminal.sessionId)), []);
+
+  const askQueues = enqueueAsk({}, {
+    requestId: "ask-1",
+    sessionId: terminal.sessionId,
+    toolCallId: "call-1",
+    questions: [{ question: "Which file?", options: ["a.ts"] }],
+  });
+  // One ask is queued: `queuedAskCount` counts the requests *behind* the head.
+  assert.equal(headAsk(askQueues, terminal.sessionId)?.requestId, "ask-1");
+  assert.equal(queuedAskCount(askQueues, terminal.sessionId), 0);
+  assert.deepEqual(Object.keys(clearSessionAsks(askQueues, terminal.sessionId)), []);
+
+  // The store's own cleanup branch, asserted the way PI-Desktop's
+  // permission-inline test asserts the abort path: pending permissions and asks
+  // are cleared on exactly the terminal event kinds the bridge emits.
+  assert.match(
+    storeSource,
+    /event\.type === "agent_end" \|\| event\.type === "error"/,
+    "the store clears on agent_end/error",
+  );
+  assert.match(storeSource, /clearSessionPermissions\(/);
+  assert.match(storeSource, /clearSessionAsks\(/);
+
+  // A decision arriving after the refusal cannot authorise anything.
   const late = bridge.resolvePermission("ui-refused", "allow-once");
   assert.equal(late.ok, false);
   assert.equal(runtime.written.length, 1);
-  assert.ok(envelopes.every((entry) => entry.event.type !== "tool_permission_request") || true);
+
+  // And a dialog arriving after the terminal event is not presented again.
+  runtime.push({
+    type: "extension_ui_request",
+    id: "ui-after-terminal",
+    method: "select",
+    title: "write",
+    options: ["Allow once", "Allow for this session", "Deny"],
+    optionDetails: [{ description: JSON.stringify({ v: 1, kind: "omp-desktop-approval", toolCallId: "c9", toolName: "write", risk: "high", reason: "r", argsPreview: {} }) }, {}, {}],
+  });
+  assert.equal(bridge.hasPendingRequest("ui-after-terminal"), false);
+  assert.equal(
+    envelopes.filter((entry) => entry.event.type === "tool_permission_request").length,
+    1,
+    "a post-terminal dialog must not be presented",
+  );
+});
+
+test("a thrown prompt request keeps its own error and still ends the turn", async () => {
+  const { bridge, runtime, envelopes } = bridgeHarness();
+  runtime.onPrompt = () => {
+    runtime.push({
+      type: "extension_ui_request",
+      id: "ui-error",
+      method: "select",
+      title: "write",
+      options: ["Allow once", "Allow for this session", "Deny"],
+      optionDetails: [
+        { description: JSON.stringify({ v: 1, kind: "omp-desktop-approval", toolCallId: "call_err", toolName: "write", risk: "high", reason: "r", argsPreview: {} }) },
+        {},
+        {},
+      ],
+    });
+  };
+  runtime.promptFailure = new (await import("../../../packages/omp-runtime/src/errors.ts")).OmpRuntimeError(
+    "request-timeout",
+    "no response to prompt within 30000 ms",
+  );
+
+  await assert.rejects(
+    () => bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: makeProject() }),
+    (error) => {
+      assert.equal(error.code, "request-timeout");
+      assert.match(error.message, /no response to prompt/);
+      return true;
+    },
+  );
+  assert.deepEqual(
+    envelopes.map((entry) => entry.event.type),
+    ["tool_permission_request", "error"],
+  );
+  assert.equal(envelopes.at(-1).turnId, "omp-turn:session-omp:1");
+  assert.deepEqual(runtime.written, [
+    { type: "extension_ui_response", id: "ui-error", cancelled: true },
+  ]);
+  assert.equal(bridge.status(OMP_SESSION).pendingToolConfirmations, 0);
 });

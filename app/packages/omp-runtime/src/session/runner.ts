@@ -21,7 +21,7 @@
  *      and decisions that arrive afterwards are counted as late instead of
  *      being attributed to whatever runs next.
  */
-import type { AgentEvent, AgentEventEnvelope } from "@pi-desktop/shared";
+import type { AgentEvent, AgentEventEnvelope, AppError } from "@pi-desktop/shared";
 
 import { OmpRuntimeError } from "../errors.js";
 import type { OmpFrame } from "../protocol.js";
@@ -134,6 +134,16 @@ export class OmpSessionRunner {
   private run: RunRecord | null = null;
   private lastClosedGeneration = 0;
   private readonly bashCallIds = new Set<string>();
+  /**
+   * Generations that presented at least one dialog to the desktop.
+   *
+   * A dialog the user can see must be withdrawn when its run dies; a run that
+   * never showed one needs no terminal event of its own (its caller already
+   * received the failure).
+   */
+  private readonly generationsWithDialogs = new Set<number>();
+  /** Generations whose terminal event was already emitted (emit at most once). */
+  private readonly terminalSignalled = new Set<number>();
   private lateFrames = 0;
   private readonly waiters = new Set<() => void>();
   private disposed: { code: string; message: string } | null = null;
@@ -240,7 +250,15 @@ export class OmpSessionRunner {
       // The run never started, so anything it raised on the way is unanswerable:
       // close the generation (cancelling its dialogs exactly once) and leave the
       // runner idle before the original failure reaches the caller.
-      this.closeGeneration(generation, "the prompt was refused by the runtime");
+      this.closeGeneration(generation, "the prompt was refused by the runtime", {
+        error: appError(
+          `OMP_${(error as OmpRuntimeError)?.code
+            ? String((error as OmpRuntimeError).code).toUpperCase().replace(/-/g, "_")
+            : "PROMPT_FAILED"}`,
+          error instanceof Error ? error.message : String(error),
+        ),
+        whenCardsPresented: true,
+      });
       throw error;
     }
   }
@@ -399,6 +417,7 @@ export class OmpSessionRunner {
           return;
         }
         this.ui.observe(frame);
+        this.generationsWithDialogs.add(this.ui.currentGeneration());
         this.onUiRequest?.(classified, {
           sessionId: this.sessionId,
           generation: this.ui.currentGeneration(),
@@ -476,18 +495,40 @@ export class OmpSessionRunner {
     this.closeGeneration(
       run?.generation ?? this.ui.currentGeneration(),
       `the runtime transport failed: ${error.code}`,
-    );
-    this.emitEnvelope({
-      sessionId: this.sessionId,
-      ...(run ? { turnId: run.turnId } : {}),
-      ts: this.now(),
-      event: {
-        type: "error",
+      {
         error: appError(`OMP_${error.code.toUpperCase().replace(/-/g, "_")}`, error.message, {
           detail: error.detail,
           cancelledRequests: cancelled,
         }),
+        // A dead runtime is a failure of the run itself: the desktop is told
+        // even when no dialog was involved.
+        whenCardsPresented: false,
       },
+    );
+  }
+
+  /**
+   * Emit the one event that tells the desktop this run is over.
+   *
+   * The transcript's terminal events (`agent_end`, `error`) are what the store
+   * clears a session's pending permissions and asks on, so a run that presented
+   * a dialog and then failed must emit exactly one of them — otherwise the card
+   * the user can see stays queued for a run that no longer exists. Emitting is
+   * idempotent per generation: a prompt failure and a transport failure can
+   * race, and the user must not see two errors for one failure.
+   */
+  private signalTerminal(generation: number, error: AppError): void {
+    if (this.terminalSignalled.has(generation)) return;
+    this.terminalSignalled.add(generation);
+    if (this.terminalSignalled.size > 16) {
+      const oldest = this.terminalSignalled.values().next().value;
+      if (oldest !== undefined) this.terminalSignalled.delete(oldest);
+    }
+    this.emitEnvelope({
+      sessionId: this.sessionId,
+      ...(this.run && this.run.generation === generation ? { turnId: this.run.turnId } : {}),
+      ts: this.now(),
+      event: { type: "error", error },
     });
   }
 
@@ -498,15 +539,25 @@ export class OmpSessionRunner {
    * and the second caller must not write a second cancellation or re-close a
    * run that is already gone.
    */
-  private closeGeneration(generation: number, reason: string): void {
+  private closeGeneration(
+    generation: number,
+    reason: string,
+    failure: { error: AppError; whenCardsPresented: boolean } | null = null,
+  ): void {
+    const presented = this.generationsWithDialogs.delete(generation);
     const open = this.ui.open();
     if (open.length > 0) this.cancelOpenDialogs(reason);
+    if (failure && (!failure.whenCardsPresented || presented)) {
+      // The run's dialogs are gone, so the desktop needs the terminal event that
+      // withdraws them; the failure itself is reported either way by the caller
+      // that received the exception.
+      this.signalTerminal(generation, failure.error);
+    }
     if (this.run?.generation === generation || this.state !== "idle") {
       this.closeRun(generation);
-      return;
     }
-    // Already closed by a concurrent path; the dialogs (if any survived it) were
-    // cancelled above, so there is nothing left to do.
+    // A concurrent path already closed the run; the dialogs (if any survived it)
+    // were cancelled above, so there is nothing left to do.
   }
 
   private closeRun(generation: number): void {
@@ -514,6 +565,7 @@ export class OmpSessionRunner {
     this.state = "idle";
     this.run = null;
     this.bashCallIds.clear();
+    this.generationsWithDialogs.delete(generation);
     this.wakeWaiters();
   }
 

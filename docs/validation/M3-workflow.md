@@ -272,6 +272,62 @@
 
 回归保留:迟到 approval/question 不呈现、stopping 窗口不呈现、prompt 拒绝/抛错后 idle 且取消一次、竞态下只取消一次、以及 ce2bf01 已有的 R1-R3 全部继续通过。本轮唯一未复现项:一次 desktop 全量运行出现 1 个未记录到名字的失败,随后连续 5 次运行均 0 失败(2596/2600),无法复现,如实记录。
 
+## 5.4 第四轮独立复审返修 F1-F2(基线 `db89c881118a1ffda68221e07ba201067a8bf46a`)
+
+### 参考的固定源码与测试
+
+| 契约 | PI-Desktop 实现 | PI-Desktop 测试 | OMP |
+| --- | --- | --- | --- |
+| renderer 何时清空待决权限/提问 | `apps/desktop/src/stores/slices/events-slice.ts:266`(`else if (event.type === "agent_end" \|\| event.type === "error")` → `clearSessionPermissions` / `clearSessionAsks`) | `apps/desktop/test/permission-inline.test.mjs`(队列 helper 行为 + 对 store 源码的契约断言风格);`app/apps/desktop/test/permission-inline.test.mjs` 为本仓库同源副本 | — |
+| 会话内取消全部待决 | `packages/agent-host/src/approvals.ts`(`ApprovalBroker.cancelForSession`) | `packages/agent-host/src/approvals.test.ts` | `extension_ui_response {cancelled:true}` → `parseValueDialogResponse` → `undefined`(`modes/rpc/rpc-mode.ts:601`);未知 id 的响应被忽略(`:358`) |
+
+**契约结论**:提示等回合级失败必须以**terminal event**(`error`)告知 renderer,否则已入队的权限卡不会从 `pendingPermissions`/`pendingAsks` 清除;清理必须绑定**同一 `sessionId`**(以及该回合的 `turnId`),每个失败回合最多一次。
+
+### F1 永真断言(已删)
+
+`a refused prompt closes its dialog in both layers` 结尾的
+`assert.ok(envelopes.every(...) || true)` 无条件通过。已**删除**该断言(未替换为其他弱断言),改为验证 renderer 可观察的 envelope 序列与清理契约。
+
+### F2 prompt 拒绝/异常后 renderer 留下孤儿权限卡(已修)
+
+**先红证据**(基线 `db89c88`,两条新用例均稳定失败):
+```
+actual:   [ 'tool_permission_request' ]
+expected: [ 'tool_permission_request', 'error' ]
+```
+即卡片已发给 renderer,而 prompt 失败后没有任何 terminal event。
+
+**修正**(`packages/omp-runtime/src/session/runner.ts`):
+1. 记录"该代是否呈现过对话框"(`generationsWithDialogs`);`closeGeneration()` 在 prompt 失败且呈现过卡片时发出**恰好一次** terminal `error` envelope(带正确 `sessionId` 与 `turnId`);
+2. 每个代只发一次(`terminalSignalled` 守卫),与 `onTransportFailure()` 并发时不会出现两次用户可见错误、也不会重复取消(传输失败本身仍照常上报,二者共享同一守卫);
+3. 未呈现卡片的 prompt 失败不发 terminal(调用方已收到异常),避免噪声;
+4. 原始失败原因保持不变:被拒绝仍是 `not-started` + "refused the prompt: busy",抛出的原异常继续上抛(错误码与消息均保留),清理不覆盖根因;
+5. terminal 之后到达的 approval/question 仍按 idle 规则 fail closed,不再呈现。
+
+**修后**:`["tool_permission_request", "error"]`、`turnId = omp-turn:session-omp:1`、取消帧恰好 1 条、三层 pending 收敛为空;并以真实 helper(`enqueuePermission`/`clearSessionPermissions`/`enqueueAsk`/`clearSessionAsks`)验证 terminal 事件按 `sessionId` 清空队列,并保留 PI 同款 store 源码契约断言(`agent_end || error` → `clearSessionPermissions`/`clearSessionAsks`)。
+
+### 本轮的测试稳定性问题(如实记录)
+
+全量 desktop 套件在 `db89c88` 与本轮修复过程中出现过**间歇性失败**(约 1/3–1/6),均来自 E2E 夹具自身的两处时序假设,而非产品行为:
+
+1. **长任务存活判定**:先用 `kill(pid,0)`/`/proc` 扫描标记名判断"后台进程已消失",被杀但未被回收的子进程仍会以僵尸态命中 `kill(pid,0)`;失败输出 `true !== false`。修正:`pidAlive()` 读取 `/proc/<pid>/stat` 的状态字段,把 `Z`/`X` 视为已退出,pid 判定为主、标记扫描为独立第二证据。
+2. **回合结算假设**:第二个 run 的 `bridge.status().isRunning === false` 在最后一个 token 到达后立即断言,负载下 `agent_end` 尚未到达;失败输出同为 `true !== false`(断言位置 `omp-session-e2e.test.mjs:290`)。修正:显式 `waitFor` 回合结算后再断言,并同时断言 `pendingToolConfirmations === 0`。
+
+修正后**连续 8 次**全量 desktop 运行均 `2597 通过 / 0 失败 / 4 skipped`,E2E 单跑与带 CPU 负载的 6 次运行亦全部通过。
+
+### 本轮返修验证
+
+| 命令 | 结果 |
+| --- | --- |
+| `pnpm --filter @pi-desktop/omp-runtime test` | 11 文件 / **157 项通过** |
+| `pnpm --filter @pi-desktop/shared test` | 84 文件 / 968 项通过 |
+| `cd apps/desktop && env -u SSH_ASKPASS node --test test/*.test.mjs` | **连续 8 次**:2597 通过 / 0 失败 / 4 skipped |
+| `node --test apps/desktop/test/omp-session-e2e.test.mjs` | 通过(真实固定 OMP,不预设 cwd) |
+| `pnpm build` / `pnpm typecheck` | 12 包 + host-core release 构建 / 0 错误 |
+| `cd crates && cargo test -p host-core --locked` | 579 通过 / 0 失败 |
+| `node docs/validation/M0-rpc/verify-rpc.mjs` | PASS(未发送 prompt,无付费 provider) |
+| `git diff --check` | 无输出(先修掉文件末尾多余空行) |
+
 ## 6. 已知限制(真实存在,且不属于本轮范围)
 
 1. **模型与凭证投影属于 M4/T15**:本产品尚未把用户模型设置投影进 OMP;产品内 OMP 会话需要一个可达模型配置,验收夹具用本地假 provider 提供。

@@ -12,6 +12,7 @@
 - 返修（独立复审 R1-R2，基线 `cb6f728`）：R1 `prompt(projectPath)` 现在会在 `start()` **之前**把经过校验的绝对项目目录交给监督器（空/相对/不存在一律 fail closed，绑定后不同目录明确拒绝），E2E 不再手工设置 cwd；R2 权限决定改走专用 `resolvePermission`/`resolveAsk`，身份取自桥接保存的 session+generation+kind，重复/停止后/跨 kind/未知一律 fail closed（基线实测缺陷：ask 请求 id 可被权限路径消费并写帧）。详见 `docs/validation/M3-workflow.md` §5.1。
 - 第二轮返修（独立复审 R1-R3，基线 `60e0f7e`）：R1 跳过/拒绝提问与无法投递的自定义答案现在 fail closed 完成（写 `{cancelled:true}` 并清两层 pending），不再让 OMP 永久等待；R2 旧 generation 的 UI 请求在回合结束/停止/失败/被新 run 替代后一律失效，旧决定绝不写入新 run；R3 `stop(sessionId)` 先校验会话所有权再清理，错误会话的停止不再破坏正确会话的 pending/状态/wire。详见 `docs/validation/M3-workflow.md` §5.2。
 - 第三轮返修（独立复审 F1-F3，基线 `ce2bf01`）：F1 只有存在 active run 时才呈现 approval/question，idle/stopping 期间到达的交互帧按 OMP 协议立即 `{cancelled:true}`（不呈现、不留 pending、不可事后放行）；F2/F3 prompt 被拒绝或抛错时统一走幂等的 `closeGeneration()`（取消该代 dialog、通知桥接、回到 idle、保留原异常），与传输失败并发时最多取消一次。详见 `docs/validation/M3-workflow.md` §5.3（含 PI-Desktop/OMP 参考文件与测试检索证据）。
+- 第四轮返修（独立复审 F1-F2，基线 `db89c88`）：删除 `omp-session-bridge.test.mjs` 中的永真断言 `|| true`；prompt 被拒绝或请求抛错且该回合已呈现过卡片时，runner 现在发出**恰好一次** terminal `error` envelope（带正确 `sessionId`/`turnId`，与传输失败共享单次守卫，原异常与拒绝原因保持不变），使 renderer 的 `pendingPermissions`/`pendingAsks` 按 PI-Desktop 既有契约被清空，不再留下孤儿卡片；terminal 之后的迟到交互请求仍 fail closed。附带修正 E2E 自身两处时序假设（僵尸进程判定、回合结算等待），全量 desktop 连续 8 次 0 失败。详见 `docs/validation/M3-workflow.md` §5.4。
 - 下一轮入口：M4/T14-T16（会话字段与恢复、模型与凭证投影、并发项目）；M3 未开放的入口（附件、steer/follow-up、压缩、分支、子代理交互审批、会话切换）保持显式拒绝。
 
 ## 1. 用户已确定的方向

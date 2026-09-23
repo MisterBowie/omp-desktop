@@ -62,7 +62,25 @@ function processAlive(marker) {
   }
 }
 
+/**
+ * Is this pid still a live process?
+ *
+ * A killed-but-unreaped child stays in `/proc` as a zombie, and `kill(pid, 0)`
+ * still succeeds for it — reporting a command as "still running" because its
+ * parent has not reaped it yet. The state field is what distinguishes the two:
+ * `Z` (and `X`) mean the process is gone for every purpose this fixture cares
+ * about. Falling back to the signal check keeps the helper honest on systems
+ * without `/proc`.
+ */
 function pidAlive(pid) {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+    const state = stat.slice(stat.lastIndexOf(")") + 2, stat.lastIndexOf(")") + 3);
+    if (state === "Z" || state === "X") return false;
+    return true;
+  } catch {
+    // No /proc entry (or no /proc): fall back to the signal check below.
+  }
   try {
     process.kill(pid, 0);
     return true;
@@ -237,9 +255,12 @@ test(
       assert.equal(stop.aborted, true, "the protocol abort must be acknowledged");
       assert.equal(stop.converged || stop.toreDown, true, "the run must actually stop");
 
-      const gone = await waitFor(() => !processAlive(longTaskMarker));
-      assert.equal(gone, true, "the background command must be gone after the stop");
-      assert.equal(pidAlive(longPid), false, "the command's own pid must be gone");
+      // The pid is authoritative; the command-line scan is the independent
+      // second witness that nothing else from the command lingers.
+      const gone = await waitFor(() => !pidAlive(longPid));
+      assert.equal(gone, true, "the command's own pid must be gone after the stop");
+      const noMarker = await waitFor(() => !processAlive(longTaskMarker));
+      assert.equal(noMarker, true, "no process may still carry the command's marker");
       assert.equal(bridge.status(SESSION).pendingToolConfirmations, 0, "no dialog may be left pending");
       assert.equal(bridge.hasPendingRequest(longApproval.request.requestId), false);
 
@@ -266,7 +287,12 @@ test(
         after.every((e) => !(e.event.type === "tool_end" && e.event.toolCallId === "call_long")),
         "the stopped run's tool result must never appear under the new turn id",
       );
-      assert.equal(bridge.status(SESSION).isRunning, false);
+      // The run settles when the runtime says so, which is not the same instant
+      // as the last token arriving: wait for the terminal state instead of
+      // assuming the two are ordered.
+      const settled = await waitFor(() => bridge.status(SESSION).isRunning === false);
+      assert.equal(settled, true, "the second run must settle");
+      assert.equal(bridge.status(SESSION).pendingToolConfirmations, 0);
 
       // The project directory is where the work happened: the file the model
       // wrote is here, and the run root (the runtime's own scratch space) holds
