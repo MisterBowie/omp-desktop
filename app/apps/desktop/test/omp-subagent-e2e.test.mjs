@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { register } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
+
+import { pidAlive, shellQuote } from "./helpers/omp-e2e-process.mjs";
 
 /**
  * T17 end-to-end acceptance: the *real* pinned OMP runtime, driven by the
@@ -38,24 +40,11 @@ const GATE = findGateExtension(here);
 
 const scratch = [];
 function makeScratch(prefix) {
-  const path = mkdtempSync(join(tmpdir(), prefix));
+  // Canonicalize like the product restore boundary: `mkdtempSync(tmpdir())`
+  // keeps a macOS `/var` alias while the runtime realpaths to `/private/var`.
+  const path = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
   scratch.push(path);
   return path;
-}
-
-function processAlive(marker) {
-  try {
-    for (const entry of readdirSync("/proc").filter((name) => /^\d+$/.test(name))) {
-      try {
-        if (readFileSync(`/proc/${entry}/cmdline`, "utf8").includes(marker)) return true;
-      } catch {
-        // The process exited between listing and reading.
-      }
-    }
-    return false;
-  } catch {
-    return false;
-  }
 }
 
 function waitFor(predicate, timeoutMs = 30_000, intervalMs = 50) {
@@ -225,11 +214,28 @@ test(
       console.log(`subagent E2E child envelopes: ${childEnvelopes.length}`);
       console.log(`subagent E2E task result delegated: ${envelopes.some((e) => e.event.type === "tool_end" && e.event.toolCallId === taskCallId)}`);
     } finally {
-      await bridge.dispose("e2e finished").catch(() => undefined);
-      await supervisor.reclaimAll().catch(() => undefined);
+      const cleanupErrors = [];
+      try {
+        await bridge.dispose("e2e finished");
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+      try {
+        const reclaimed = await supervisor.reclaimAll();
+        assert.ok(reclaimed.every((entry) => entry.reaped && entry.cleaned), "every run must be reclaimed");
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
       for (const entry of scratch.splice(0)) {
-        if (entry && typeof entry.close === "function") entry.close();
-        else rmSync(entry, { recursive: true, force: true });
+        try {
+          if (entry && typeof entry.close === "function") await entry.close();
+          else rmSync(entry, { recursive: true, force: true });
+        } catch (error) {
+          cleanupErrors.push(error);
+        }
+      }
+      if (cleanupErrors.length > 0) {
+        throw new AggregateError(cleanupErrors, "E2E cleanup failed");
       }
     }
   },
@@ -323,25 +329,32 @@ test(
       assert.equal(writeEnds[0].parentToolCallId, taskCallId, "the allowed child write stays attributed to its parent");
       assert.equal(writeEnds[0].agentName, "task");
     } finally {
-      await bridge.dispose("e2e finished").catch(() => undefined);
-      await supervisor.reclaimAll().catch(() => undefined);
+      const cleanupErrors = [];
+      try {
+        await bridge.dispose("e2e finished");
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+      try {
+        const reclaimed = await supervisor.reclaimAll();
+        assert.ok(reclaimed.every((entry) => entry.reaped && entry.cleaned), "every run must be reclaimed");
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
       for (const entry of scratch.splice(0)) {
-        if (entry && typeof entry.close === "function") entry.close();
-        else rmSync(entry, { recursive: true, force: true });
+        try {
+          if (entry && typeof entry.close === "function") await entry.close();
+          else rmSync(entry, { recursive: true, force: true });
+        } catch (error) {
+          cleanupErrors.push(error);
+        }
+      }
+      if (cleanupErrors.length > 0) {
+        throw new AggregateError(cleanupErrors, "E2E cleanup failed");
       }
     }
   },
 );
-
-function pidAlive(pid) {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try {
-    readFileSync(`/proc/${pid}/stat`, "utf8");
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 test(
   "M5 subagent end-to-end: parent stop reclaims a still-running detached child",
@@ -379,7 +392,7 @@ test(
             {
               text: "launching the long command.",
               finish: "tool_calls",
-              toolCalls: [{ id: childBashId, name: "bash", args: { command: `node ${longTask} ${identityPath}` } }],
+              toolCalls: [{ id: childBashId, name: "bash", args: { command: `${shellQuote(process.execPath)} ${shellQuote(longTask)} ${shellQuote(identityPath)}` } }],
             },
           ],
         },
@@ -508,11 +521,28 @@ test(
       const reclaimed = await supervisor.reclaimAll();
       assert.ok(reclaimed.every((entry) => entry.reaped && entry.cleaned), "every run must be reclaimed");
     } finally {
-      await bridge.dispose("e2e finished").catch(() => undefined);
-      await supervisor.reclaimAll().catch(() => undefined);
+      const cleanupErrors = [];
+      try {
+        await bridge.dispose("e2e finished");
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+      try {
+        const reclaimed = await supervisor.reclaimAll();
+        assert.ok(reclaimed.every((entry) => entry.reaped && entry.cleaned), "every run must be reclaimed");
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
       for (const entry of scratch.splice(0)) {
-        if (entry && typeof entry.close === "function") entry.close();
-        else rmSync(entry, { recursive: true, force: true });
+        try {
+          if (entry && typeof entry.close === "function") await entry.close();
+          else rmSync(entry, { recursive: true, force: true });
+        } catch (error) {
+          cleanupErrors.push(error);
+        }
+      }
+      if (cleanupErrors.length > 0) {
+        throw new AggregateError(cleanupErrors, "E2E cleanup failed");
       }
     }
   },

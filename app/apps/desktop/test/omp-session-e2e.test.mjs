@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { register } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { dirname } from "node:path";
 import test from "node:test";
+
+import { commandLineAlive, pidAlive, shellQuote } from "./helpers/omp-e2e-process.mjs";
 
 /**
  * End-to-end acceptance for the M3 conversation path: the *real* pinned OMP
@@ -41,52 +42,11 @@ const GATE = findGateExtension(here);
 const scratch = [];
 
 function makeScratch(prefix) {
-  const path = mkdtempSync(join(tmpdir(), prefix));
+  // Canonicalize like the product restore boundary: `mkdtempSync(tmpdir())`
+  // keeps a macOS `/var` alias while the runtime realpaths to `/private/var`.
+  const path = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
   scratch.push(path);
   return path;
-}
-
-/** Is a process with this marker on its command line still alive? */
-function processAlive(marker) {
-  try {
-    for (const entry of readdirSync("/proc").filter((name) => /^\d+$/.test(name))) {
-      try {
-        if (readFileSync(`/proc/${entry}/cmdline`, "utf8").includes(marker)) return true;
-      } catch {
-        // The process exited between listing and reading.
-      }
-    }
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Is this pid still a live process?
- *
- * A killed-but-unreaped child stays in `/proc` as a zombie, and `kill(pid, 0)`
- * still succeeds for it — reporting a command as "still running" because its
- * parent has not reaped it yet. The state field is what distinguishes the two:
- * `Z` (and `X`) mean the process is gone for every purpose this fixture cares
- * about. Falling back to the signal check keeps the helper honest on systems
- * without `/proc`.
- */
-function pidAlive(pid) {
-  try {
-    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
-    const state = stat.slice(stat.lastIndexOf(")") + 2, stat.lastIndexOf(")") + 3);
-    if (state === "Z" || state === "X") return false;
-    return true;
-  } catch {
-    // No /proc entry (or no /proc): fall back to the signal check below.
-  }
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function waitFor(predicate, timeoutMs = 20_000, intervalMs = 50) {
@@ -150,8 +110,8 @@ test(
       // The denial comes back as a tool result; the model's next turn tries the
       // same write again, which the test approves.
       { text: "Approved this time - writing again.", finish: "tool_calls", toolCalls: [{ id: "call_write_2", name: "write", args: { path: guardedPath, content: "written by omp\n" } }] },
-      { text: "Now running the tests.", finish: "tool_calls", toolCalls: [{ id: "call_tests", name: "bash", args: { command: "node run-tests.mjs" } }] },
-      { text: "Tests passed.", finish: "tool_calls", toolCalls: [{ id: "call_long", name: "bash", args: { command: `node long-task.mjs --marker ${longTaskMarker} --started ${longTaskStarted}` } }] },
+      { text: "Now running the tests.", finish: "tool_calls", toolCalls: [{ id: "call_tests", name: "bash", args: { command: `${shellQuote(process.execPath)} run-tests.mjs` } }] },
+      { text: "Tests passed.", finish: "tool_calls", toolCalls: [{ id: "call_long", name: "bash", args: { command: `${shellQuote(process.execPath)} long-task.mjs --marker ${shellQuote(longTaskMarker)} --started ${shellQuote(longTaskStarted)}` } }] },
       { text: "placeholder", finish: "stop" },
     ]);
 
@@ -251,7 +211,7 @@ test(
       assert.equal(started, true, "the long command must actually start");
       const longPid = Number(readFileSync(longTaskStarted, "utf8"));
       assert.ok(Number.isInteger(longPid) && longPid > 0, "the long command must report its pid");
-      assert.equal(processAlive(longTaskMarker), true, "the long command must still be running");
+      assert.equal(commandLineAlive(longTaskMarker), true, "the long command must still be running");
 
       const beforeStop = envelopes.length;
       const stop = await bridge.stop(SESSION);
@@ -262,7 +222,7 @@ test(
       // second witness that nothing else from the command lingers.
       const gone = await waitFor(() => !pidAlive(longPid));
       assert.equal(gone, true, "the command's own pid must be gone after the stop");
-      const noMarker = await waitFor(() => !processAlive(longTaskMarker));
+      const noMarker = await waitFor(() => !commandLineAlive(longTaskMarker));
       assert.equal(noMarker, true, "no process may still carry the command's marker");
       assert.equal(bridge.status(SESSION).pendingToolConfirmations, 0, "no dialog may be left pending");
       assert.equal(bridge.hasPendingRequest(longApproval.request.requestId), false);
@@ -334,12 +294,28 @@ test(
       assert.ok(diagnostics.conversion.notes.length >= 0);
       assert.ok(Array.isArray(diagnostics.uiRecords));
     } finally {
-      await bridge.dispose("e2e finished");
-      const reclaimed = await supervisor.reclaimAll();
-      assert.ok(reclaimed.every((entry) => entry.reaped && entry.cleaned), "every run must be reclaimed");
+      const cleanupErrors = [];
+      try {
+        await bridge.dispose("e2e finished");
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+      try {
+        const reclaimed = await supervisor.reclaimAll();
+        assert.ok(reclaimed.every((entry) => entry.reaped && entry.cleaned), "every run must be reclaimed");
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
       for (const entry of scratch.splice(0)) {
-        if (entry && typeof entry.close === "function") entry.close();
-        else rmSync(entry, { recursive: true, force: true });
+        try {
+          if (entry && typeof entry.close === "function") await entry.close();
+          else rmSync(entry, { recursive: true, force: true });
+        } catch (error) {
+          cleanupErrors.push(error);
+        }
+      }
+      if (cleanupErrors.length > 0) {
+        throw new AggregateError(cleanupErrors, "E2E cleanup failed");
       }
     }
   },

@@ -209,6 +209,28 @@
 
 状态：**B3 follow-up 的短答案/普通结构化标记两路径已独立通过，整字段 details 丢弃指示已实现、待独立验收**；平台（macOS 夹具可移植性）、最终 T17 验收仍待。
 
+## 0.14 T17 夹具可移植性返修（macOS/`/proc` 缺失 + 封闭 PATH，2026-09-24）
+
+独立复审在 `01ce56a` 基线上于 macOS 本地复现五项夹具可移植性缺陷（Linux 全部通过、退出 0，仅 macOS 失败），本提交为 test-only 修复、待独立验收；最终 T17 回归门仍待。
+
+| 缺陷 | 根因 | 修复 |
+| --- | --- | --- |
+| `omp-session-e2e` 的 `node run-tests.mjs`/`node long-task.mjs` 退出 127 | bash 工具在封闭运行时 PATH（`isolation.ts`）内解析不到 NVM 之外的全局 `node` | 命令改用 `shellQuote(process.execPath)`（执行测试的解释器自身），并对 long-task 路径/identity 路径做 POSIX shell 引号 |
+| `omp-session-persistence-e2e:134` 前缀断言失败 | `mkdtempSync(tmpdir())` 保留 macOS `/var` 别名，产品恢复边界 `realpathSync` 成 `/private/var`，`sessionAPath.startsWith(sessionDir)` 比较不同别名 | `makeScratch` 用 `realpathSync(mkdtempSync(...))` canonical 化（沿用 `182f88a` 与 `npm-executable.test.mjs:35` 的夹具约定） |
+| `omp-subagent-e2e` 第三项 `node <long-task> <identityPath>` 无法启动 | 同封闭 PATH | 同上，`process.execPath` + 引号 |
+| `omp-subagent-e2e` 的 `pidAlive` 只读 `/proc/<pid>/stat`，macOS 返回 false（正向存活断言误判为死亡） | `/proc` 在 macOS 不存在 | 共享 `pidAlive`：Linux 读 `/proc/<pid>/stat` 状态以区分僵尸（`Z`/`X`），无 `/proc` 时回退 `process.kill(pid, 0)`（ESRCH=死亡、EPERM=存活），缺 `/proc` 绝不读作「死亡」 |
+| `omp-session-e2e`/`omp-subagent-e2e` 的 `processAlive(marker)` 只扫 `/proc`，缺 `/proc` 静默返回 false（清理断言可空洞通过） | 同上 | 共享 `commandLineAlive(marker)`：POSIX `ps -axo pid=,command=`（BSD `-ax` 双平台有效），进程表不可读时抛错而非返回 false |
+
+新增共享夹具助手 `app/apps/desktop/test/helpers/omp-e2e-process.mjs`（`shellQuote`/`pidAlive`/`commandLineAlive`），会话/子代理两个 E2E 共用（消除重复的存活检测代码）；`processAlive(marker)` 在子代理 E2E 原为死代码，已删除。三份 E2E 的 `finally` 改为嵌套 try/catch 收集清理错误、逐个独立回收 provider/进程/目录并以 `AggregateError` 汇总上报（不再 `.catch(() => undefined)` 静默吞掉 dispose/reclaim 失败；persistence 补上 `dispose().ok` 断言）。detached-child「停止前不预先 list」与「同会话续聊」断言原样保留。
+
+验证（工作树 `app/apps/desktop`，Linux x64，`nvm use v24.14.0` → Node v24.14.0，pnpm 10.34.5，`env -u SSH_ASKPASS`；基线 `3a6df0df` + OMP `d49918fa` + PI `0111e306`）：
+- 五份真实固定 OMP + 本地假 provider E2E（`omp-session-e2e` 1、`omp-session-persistence-e2e` 1、`omp-subagent-e2e` 3）：`node --test test/omp-session-e2e.test.mjs test/omp-session-persistence-e2e.test.mjs test/omp-subagent-e2e.test.mjs` → **5 passed / 0 failed / 0 skipped，退出 0**。
+- bridge 套件在 symlink `TMPDIR` 下（复现 macOS `/var`→`/private/var` 别名）：`TMPDIR=<symlink> node --test test/omp-session-bridge.test.mjs` → **50 passed / 0 failed，退出 0**。
+- `omp-subagent-bridge.test.mjs` → **8 passed / 0 failed，退出 0**。
+- `git diff --check` 退出 0；未改 `.ts`，故未重跑 typecheck。
+
+限制：仅 Linux x64 实测；macOS 由复审方拉取后运行，Windows 未声明；不主张 macOS 已通过。
+
 ## 0. 环境准备（固定子模块流程，与本轮代码无关）
 
 | 步骤 | 命令 | 结果 |

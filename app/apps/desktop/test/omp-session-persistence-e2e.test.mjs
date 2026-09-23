@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { register } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -37,7 +37,11 @@ const GATE = findGateExtension(here);
 
 const scratch = [];
 function makeScratch(prefix) {
-  const path = mkdtempSync(join(tmpdir(), prefix));
+  // Canonicalize like the product restore boundary: `mkdtempSync(tmpdir())`
+  // keeps a macOS `/var` alias while the runtime realpaths to `/private/var`,
+  // which would otherwise break the `sessionAPath.startsWith(sessionDir)`
+  // containment assertion below.
+  const path = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
   scratch.push(path);
   return path;
 }
@@ -164,10 +168,27 @@ test(
       await bridge.stop("session-b");
       assert.deepEqual(bridge.status("session-a"), aBeforeStop, "stopping B must not change A's state");
     } finally {
-      await bridge.dispose("test cleanup");
+      const cleanupErrors = [];
+      try {
+        const disposed = await bridge.dispose("test cleanup");
+        assert.equal(
+          disposed.ok,
+          true,
+          `every session must be reclaimed: ${disposed.failures.map((failure) => failure.detail).join("; ")}`,
+        );
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
       for (const entry of scratch.splice(0)) {
-        if (entry && typeof entry.close === "function") await entry.close();
-        else rmSync(entry, { recursive: true, force: true });
+        try {
+          if (entry && typeof entry.close === "function") await entry.close();
+          else rmSync(entry, { recursive: true, force: true });
+        } catch (error) {
+          cleanupErrors.push(error);
+        }
+      }
+      if (cleanupErrors.length > 0) {
+        throw new AggregateError(cleanupErrors, "E2E cleanup failed");
       }
     }
   },
