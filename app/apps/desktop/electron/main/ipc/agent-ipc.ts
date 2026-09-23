@@ -878,6 +878,47 @@ export function registerAgentIpc({
     return sidecar.call("agent.getStatus", { sessionId });
   });
 
+  // ---------------------------------------------------------------------------
+  // OMP runtime subagent reads (T17). These are OMP-only: a Pi session or an
+  // OMP session with the capability closed is refused before any host/Pi
+  // mutation, and the Pi subagent catalog channels above are untouched.
+  // ---------------------------------------------------------------------------
+
+  async function requireOmpSubagentAccess(sessionId: string): Promise<OmpSessionBridge> {
+    const engine = await engineRouter.requireForSession(sessionId, "subagentEvents");
+    if (engine !== "omp") {
+      throw Object.assign(
+        new Error("subagent reads are only available for OMP sessions"),
+        { errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE, engine, capability: "subagentEvents" },
+      );
+    }
+    if (!ompSessions) {
+      throw Object.assign(new Error("this build has no OMP runtime"), {
+        errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+        engine: "omp",
+        capability: "subagentEvents",
+      });
+    }
+    return ompSessions;
+  }
+
+  handle(IPC.invoke.ompSubagentList, async (sessionId: string) => {
+    const bridge = await requireOmpSubagentAccess(sessionId);
+    return bridge.listSubagents(sessionId);
+  });
+
+  handle(IPC.invoke.ompSubagentRead, async (req: { sessionId: string; subagentId: string; fromByte?: number }) => {
+    const bridge = await requireOmpSubagentAccess(req.sessionId);
+    return bridge.readSubagentTranscript(req.sessionId, req.subagentId, req.fromByte);
+  });
+
+  handle(IPC.invoke.ompSubagentStop, async (req: { sessionId: string; subagentId: string }) => {
+    const bridge = await requireOmpSubagentAccess(req.sessionId);
+    // Refused unconditionally by the bridge: the pinned runtime has no per-child
+    // stop command, and there is no trustworthy child-owned process handle.
+    return bridge.stopSubagent(req.sessionId, req.subagentId);
+  });
+
   // The Host-owned turn queue (D375 / D386). The renderer mirrors it; the
   // headless module admits, orders, and drains it.
   handle(IPC.invoke.agentQueuePush, async (req: AgentQueuePushRequest) => {

@@ -109,9 +109,10 @@ export const PI_ENGINE_CAPABILITIES: EngineCapabilities = {
 };
 
 /**
- * M4 truth for the OMP engine: prompting, stopping, questions, approvals,
- * restore (native `switch_session`) and model/thinking switching are
- * implemented and verified.
+ * M5 truth for the OMP engine: prompting, stopping, questions, approvals,
+ * restore (native `switch_session`), model/thinking switching, and subagent
+ * lifecycle/progress/event surfacing (`subagentEvents`) are implemented and
+ * verified.
  *
  * Still closed, and closed means closed:
  *
@@ -126,7 +127,6 @@ export const PI_ENGINE_CAPABILITIES: EngineCapabilities = {
  *     full-fork, an OMP fork is refused rather than silently producing the
  *     wrong child.
  *   - `steer`/`followUp`/`compact` are not wired to the OMP RPC queue.
- *   - `subagentEvents` belongs to M5/T17.
  */
 export const OMP_ENGINE_CAPABILITIES: EngineCapabilities = {
   prompt: true,
@@ -138,7 +138,7 @@ export const OMP_ENGINE_CAPABILITIES: EngineCapabilities = {
   modelSwitch: true,
   structuredQuestions: true,
   toolApproval: true,
-  subagentEvents: false,
+  subagentEvents: true,
 };
 
 export const ENGINE_CAPABILITIES: Readonly<Record<EngineId, EngineCapabilities>> = {

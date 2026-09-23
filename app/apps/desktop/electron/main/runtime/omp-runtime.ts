@@ -133,6 +133,8 @@ export type OmpRuntimeAdapter = {
     sessionDir?: string | null;
     prepareRun?: (paths: OmpRunPaths) => void | Promise<void>;
     extraEnv?: NodeJS.ProcessEnv;
+    /** `provider/model` to pass as `--model`; subagent event forwarding requires it. */
+    modelSelector?: string | null;
   }): OmpRuntimeSupervisor;
 };
 
@@ -152,16 +154,21 @@ export function createOmpRuntimeAdapter(
     ...(options.args && options.args.length > 0 ? { args: options.args } : {}),
   });
 
-  const createSupervisor: OmpRuntimeAdapter["createSupervisor"] = (createOptions = {}) =>
-    factory({
+  const createSupervisor: OmpRuntimeAdapter["createSupervisor"] = (createOptions = {}) => {
+    const baseArgs = options.args && options.args.length > 0 ? [...options.args] : [];
+    const args = createOptions.modelSelector
+      ? [...baseArgs, "--model", createOptions.modelSelector]
+      : baseArgs;
+    return factory({
       dataRoot: options.dataRoot,
       launcherPath: resolved.path,
       expectedRuntimeVersion: options.expectedRuntimeVersion,
-      ...(options.args && options.args.length > 0 ? { args: options.args } : {}),
+      ...(args.length > 0 ? { args } : {}),
       ...(createOptions.sessionDir ? { sessionDir: createOptions.sessionDir } : {}),
       ...(createOptions.prepareRun ? { prepareRun: createOptions.prepareRun } : {}),
       ...(createOptions.extraEnv ? { extraEnv: createOptions.extraEnv } : {}),
     });
+  };
 
   return {
     launcher: resolved.path,

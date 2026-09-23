@@ -129,6 +129,22 @@ import {
 } from "@pi-desktop/shared";
 
 export type ImportSource = "claude-code" | "opencode" | "codex" | "pi";
+
+/** One OMP runtime child as the bridge reports it (opaque id, no native path). */
+export type OmpSubagentListItem = {
+  id: string;
+  agent: string;
+  agentSource: "bundled" | "user" | "project";
+  status: "running" | "completed" | "failed" | "aborted";
+  parentToolCallId?: string;
+  task?: string;
+  assignment?: string;
+  description?: string;
+  startedAt?: number;
+  completedAt?: number;
+  lastUpdate: number;
+};
+
 // One definition, owned by the shared package (the host and sidecar use the
 // same shape); re-exported so existing renderer imports keep working.
 import type {
@@ -839,6 +855,18 @@ export const api = {
     invoke(IPC.invoke.toolResolvePermission, resolution),
   resolveAskTool: (resolution: AskToolResolution) =>
     invoke(IPC.invoke.askToolResolve, resolution),
+  listOmpSubagents: (sessionId: string) =>
+    invoke<OmpSubagentListItem[]>(IPC.invoke.ompSubagentList, sessionId),
+  readOmpSubagent: (sessionId: string, subagentId: string, fromByte?: number) =>
+    invoke<{
+      cursor: { fromByte: number; nextByte: number; reset: boolean };
+      messages: UiMessage[];
+    }>(IPC.invoke.ompSubagentRead, { sessionId, subagentId, ...(fromByte === undefined ? {} : { fromByte }) }),
+  stopOmpSubagent: (sessionId: string, subagentId: string) =>
+    invoke<{ ok: false; reason: "capability-unavailable"; detail: string }>(
+      IPC.invoke.ompSubagentStop,
+      { sessionId, subagentId },
+    ),
   pendingPlans: (sessionId?: string) =>
     invoke<PlansPendingResult>(
       IPC.invoke.plansPending,

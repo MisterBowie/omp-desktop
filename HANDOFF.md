@@ -1,8 +1,22 @@
 # OMP Desktop 开发交接
 
-更新时间：2026-09-23。当前状态：**M4 会话持久化、模型投影与并发注册表（T14-T16）实现完成并已提交**（见下方摘要与 `docs/validation/M4-persistence.md`），等待独立复审。接入路径沿用 M1 定案：「rpc-ui 子进程 + 受信扩展 tool_call 前置审批 + 桥接层进程组终止兜底」。M4 把 M3 的「单 runtime 单 session」升级为「每 session 一个 supervisor/runtime/原生 transcript/模型投影/审批注册表」，原生 transcript 落到应用自有持久目录并在重启后经 `switch_session` 恢复。下一阶段 M5（T17-T20）。
+更新时间：2026-09-23。当前状态：**M5/T17（OMP 子代理生命周期、父子归属、进度/详情查看、取消边界与恢复语义）实现完成并已提交**（分支 `codex/m5-subagents`，见下方 §0.5 摘要与 `docs/validation/M5-subagents.md`），等待独立复审。接入路径沿用 M1 定案；M5 把子代理三类帧接入既有 Pi 拓扑/详情/工作面板 UI，单独立停止保持关闭（固定 OMP 无 per-child stop RPC）。下一阶段 M5/T18-T20（edit/LSP/DAP 展示、MCP/规则/技能/记忆、Plan/Goal 能力门）。
 
-## 0. M4 交付摘要（本轮）
+## 0. M5/T17 交付摘要（本轮）
+
+- 状态：**T17 已完成并提交**（分支 `codex/m5-subagents`），含真实固定 OMP 子代理端到端验收，等待独立复审。
+- 证据：`docs/validation/M5-subagents.md`（PI 实现/测试 → 固定 OMP 能力 → 本项目决策证据表、归属矩阵、用户路径、失败/取消矩阵、命令与计数、限制）；设计决策：`app/docs/adr/0303-omp-subagent-surfacing.md`（英文 ADR）。
+- 核心变更：
+  - **严格帧校验**（`packages/omp-runtime/src/session/subagent-frames.ts`）：typebox 校验三族帧（`subagent_lifecycle`/`subagent_progress`/`subagent_event`）与 `get_subagents`/`get_subagent_messages` 响应；缺子身份、`parentToolCallId`、状态或 `agentSource` 一律拒绝并计数，不作父事件。
+  - **每子代理 registry**（`subagents.ts`）：每子代理独立 `OmpEventConverter`，只转发 message/tool 行（`agent_end`/`turn_end`/`error` 留在子代理内，同 Pi `SubagentRun.handleEvent`）；`task` 工具结果 `details` 增补 `delegationId`/`agent`/`status`/`startedAt`/`completedAt`；终止 lifecycle 发 `message_end`(role tool) 结算；`sessionFile` 不进 list/读取结果。
+  - **runner**（`session/runner.ts`）：readiness 后一次性 `set_subagent_subscription events`；`task toolCallId → {generation,turnId}` 把迟到子代理帧归到发起回合；`listSubagents`（reconcile 补漏）/`readSubagentTranscript`（字节游标、非披露）/`stopSubagent`（恒拒 typed refusal）。
+  - **桥/IPC**（`omp-session.ts`/`agent-ipc.ts`/`protocol.ts`/`api.ts`）：`listSubagents`/`readSubagentTranscript`/`stopSubagent`；新 IPC `ompSubagentList`/`ompSubagentRead`/`ompSubagentStop`（OMP-only，Pi 会话 typed 拒绝，Pi `subagent*` catalog 通道不变）。
+  - **`--model` 必要性**：固定 OMP 仅在显式 `--model provider/model` 时转发子代理 `subagent_event`；仅 `models.yml` 发现则子代理有 lifecycle/progress 无 event。M4 投影已钉住单一 provider/model，`omp-session-wiring.ts` 现同时传 `--model`（E2E 前后对照复现）。
+  - **能力**：`OMP_ENGINE_CAPABILITIES.subagentEvents` 开放；`branch`/`steer`/`followUp`/`compact` 保持拒绝；`stopSubagent` 恒拒（无 per-child stop RPC）。
+- 新增测试：`subagent-frames.test.ts`(16)、`subagents.test.ts`(14)、`subagent-runner.test.ts`(5)、`omp-subagent-bridge.test.mjs`(7)、`omp-subagent-e2e.test.mjs`(2 真实固定 OMP)。
+- 下一轮入口：M5/T18-T20（edit/LSP/DAP 展示、MCP/规则/技能/记忆、Plan/Goal 能力门）。
+
+## 0. M4 交付摘要（上一轮）
 
 - 状态：**T14-T16 已完成并提交**（分支 `codex/m4-persistence`），含五轮独立复审（R1-R9、F1-F8、G1-G3、H1-H4、J1-J5）返修，等待复审确认。
 - 第五轮复审返修（J1-J5）：`inconsistent` 标记从 Error 顶层移入既有 data/details 契约并穿透真实 `registerIpcHandlers`/`wrap`（renderer `error.details.inconsistent === true`，rename 同步补齐此前丢弃的标记）；rename/configure 在 `engine=omp` 但桥接未接线时 fail closed（先于任何 host 变更）；moveProject/replaceMessages/saveRevision/listRevisions/activateRevision 对 OMP 抛 typed refusal（host 变更前），`scratch` 判定为 host 所有、非原生 transcript、保持引擎无关；renderer `archiveSession` 改真实可执行 store 测试（reject 时保持未归档、不落盘、不创建 fallback）；validation §3.6 改写为最终 model/thinking 行为。详见 `docs/validation/M4-persistence.md` §0.4。

@@ -271,6 +271,10 @@ export const IPC = {
     subagentSetScope: "pi-desktop/subagent/setScope",
     subagentSetBuiltinEnabled: "pi-desktop/subagent/setBuiltinEnabled",
     subagentReveal: "pi-desktop/subagent/reveal",
+    /** OMP runtime subagent reads (live list, bounded transcript, stop refusal). */
+    ompSubagentList: "pi-desktop/omp-subagent/list",
+    ompSubagentRead: "pi-desktop/omp-subagent/read",
+    ompSubagentStop: "pi-desktop/omp-subagent/stop",
     marketRefresh: "pi-desktop/market/refresh",
     marketSearch: "pi-desktop/market/search",
     marketGetDetail: "pi-desktop/market/getDetail",

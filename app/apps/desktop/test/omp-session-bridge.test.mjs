@@ -832,7 +832,7 @@ test("stopping another session leaves this one's dialogs, state and wire untouch
   assert.equal(bridge.hasPendingRequest("ui-1"), true, "the pending dialog must survive");
   assert.deepEqual(bridge.status(OMP_SESSION), before, "the run state must not change");
   assert.deepEqual(runtime.written, [], "no frame may be written for another session's stop");
-  assert.deepEqual(runtime.commands, ["new_session", "get_state", "prompt"], "no abort may be sent for another session");
+  assert.deepEqual(runtime.commands, ["new_session", "get_state", "set_subagent_subscription", "prompt"], "no abort may be sent for another session");
   assert.deepEqual(supervisor.stopped, []);
   // The pending dialog is still answerable by its own session.
   assert.deepEqual(bridge.resolvePermission("ui-1", "allow-once"), { ok: true, outcome: "answered" });

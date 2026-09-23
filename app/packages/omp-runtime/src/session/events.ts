@@ -96,6 +96,13 @@ export type OmpEventConverterOptions = {
   sessionId: string;
   /** Injectable clock; durations are measured, never invented. */
   now?: () => number;
+  /**
+   * Attribution for a child converter: every message it mints carries the
+   * parent `task` tool call and the child's agent name, so the renderer groups
+   * the child's rows under its delegation node (ADR 0062).
+   */
+  parentToolCallId?: string;
+  agentName?: string;
 };
 
 type StreamingMessage = {
@@ -123,10 +130,14 @@ export class OmpEventConverter {
   private readonly messageIds: string[] = [];
   /** Set from the assistant message itself, so a finished run can be named. */
   private modelId: string | undefined;
+  private readonly parentToolCallId: string | undefined;
+  private readonly agentName: string | undefined;
 
   constructor(options: OmpEventConverterOptions) {
     this.sessionId = options.sessionId;
     this.now = options.now ?? Date.now;
+    this.parentToolCallId = options.parentToolCallId;
+    this.agentName = options.agentName;
   }
 
   /** The run's message ids, in creation order. */
@@ -143,7 +154,27 @@ export class OmpEventConverter {
     };
   }
 
-  /** Translate one frame into zero or more desktop events. */
+  /**
+   * Map one *complete* runtime message (a durable-transcript row, not an
+   * event) into a desktop row, or null when it is a folded tool result.
+   *
+   * Used by `get_subagent_messages`: the pinned runtime returns a child's
+   * transcript as finished `AgentMessage`s, not as an event stream, so the
+   * detail read replays each message through the same role/content/usage
+   * mapping the live path uses. Tool result rows are folded (their rows come
+   * from the live `tool_execution_*` events) and return null.
+   */
+  convertMessage(message: unknown): UiMessage | null {
+    const parsed = asMessage(message);
+    if (!parsed) return null;
+    const role = roleOf(parsed);
+    if (!role || role === "tool") return null;
+    const id = this.mintId();
+    return this.toUiMessage(id, parsed, role, "complete");
+  }
+
+  /**
+   * Translate one frame into zero or more desktop events. */
   convert(frame: unknown): AgentEvent[] {
     if (!isRecord(frame) || typeof frame.type !== "string") {
       this.note("a frame without a string type was ignored");
@@ -406,6 +437,8 @@ export class OmpEventConverter {
       status,
       ...(role === "assistant" && modelId ? { modelId } : {}),
       ...(role === "assistant" && providerId ? { providerId } : {}),
+      ...(this.parentToolCallId ? { parentToolCallId: this.parentToolCallId } : {}),
+      ...(this.agentName ? { agentName: this.agentName } : {}),
       ...(usage ? { usage } : {}),
     };
   }

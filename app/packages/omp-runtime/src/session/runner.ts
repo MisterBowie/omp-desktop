@@ -21,11 +21,26 @@
  *      and decisions that arrive afterwards are counted as late instead of
  *      being attributed to whatever runs next.
  */
-import type { AgentEvent, AgentEventEnvelope, AppError } from "@pi-desktop/shared";
+import type { AgentEvent, AgentEventEnvelope, AppError, UiMessage } from "@pi-desktop/shared";
 
 import { OmpRuntimeError } from "../errors.js";
 import type { OmpFrame } from "../protocol.js";
 import { appError, OmpEventConverter } from "./events.js";
+import {
+  normalizeFromByte,
+  parseSubagentEventFrame,
+  parseSubagentLifecycleFrame,
+  parseSubagentMessages,
+  parseSubagentProgressFrame,
+  parseSubagentSnapshots,
+  subagentFrameKind,
+} from "./subagent-frames.js";
+import {
+  SubagentTracker,
+  type SubagentDiagnostics,
+  type SubagentListEntry,
+  type SubagentSynthesis,
+} from "./subagents.js";
 import { classifyUiRequest } from "./ui-requests.js";
 import {
   OmpUiRequests,
@@ -127,6 +142,7 @@ export class OmpSessionRunner {
 
   private readonly converter: OmpEventConverter;
   private readonly ui: OmpUiRequests;
+  private readonly subagents: SubagentTracker;
   private readonly detachFrame: () => void;
   private readonly detachFailure: () => void;
 
@@ -134,6 +150,13 @@ export class OmpSessionRunner {
   private run: RunRecord | null = null;
   private lastClosedGeneration = 0;
   private readonly bashCallIds = new Set<string>();
+  /** Parent `task` tool call → the generation/turn that spawned it, so a child
+   * frame that arrives after its parent turn closed (a detached child) is still
+   * attributed to the turn that owns it rather than whatever runs next. */
+  private readonly taskCallTurn = new Map<string, { generation: number; turnId: string }>();
+  private subagentSubscription: "off" | "progress" | "events" = "off";
+  private subscriptionRequested = false;
+  private malformedSubagentFrames = 0;
   /**
    * Generations that presented at least one dialog to the desktop.
    *
@@ -160,6 +183,7 @@ export class OmpSessionRunner {
     this.convergeTimeoutMs = options.convergeTimeoutMs ?? DEFAULT_CONVERGE_TIMEOUT_MS;
     this.abortTimeoutMs = options.abortTimeoutMs ?? DEFAULT_ABORT_TIMEOUT_MS;
     this.converter = new OmpEventConverter({ sessionId: this.sessionId, now: this.now });
+    this.subagents = new SubagentTracker({ sessionId: this.sessionId, now: this.now });
     this.ui = new OmpUiRequests({
       sessionId: this.sessionId,
       write: (frame) => this.runtime.write(frame as OmpFrame),
@@ -196,12 +220,139 @@ export class OmpSessionRunner {
     conversion: ReturnType<OmpEventConverter["snapshot"]>;
     uiRecords: readonly OmpUiRecord[];
     state: OmpRunState;
+    malformedSubagentFrames: number;
+    subagentDiagnostics: SubagentDiagnostics;
   } {
     return {
       lateFrames: this.lateFrames,
       conversion: this.converter.snapshot(),
       uiRecords: this.ui.records(),
       state: this.state,
+      malformedSubagentFrames: this.malformedSubagentFrames,
+      subagentDiagnostics: this.subagents.diagnostics(),
+    };
+  }
+
+  /**
+   * Enable the subagent frame subscription on the runtime.
+   *
+   * Sent once per runner, after readiness (the supervisor has validated the
+   * `ready` frame and the native session is established). Idempotent: a second
+   * call reports the already-requested level without re-sending. A refused or
+   * failed subscription leaves the runner with the subscription off, and the
+   * child list/read paths then report a typed capability-unavailable rather
+   * than silently presenting a partial subagent picture.
+   */
+  async enableSubagentSubscription(
+    level: "progress" | "events" = "events",
+  ): Promise<{ ok: boolean; level: string; error?: string }> {
+    if (this.subscriptionRequested) {
+      return { ok: this.subagentSubscription === level, level: this.subagentSubscription };
+    }
+    this.subscriptionRequested = true;
+    try {
+      const response = await this.runtime.request(
+        { type: "set_subagent_subscription", level },
+        { timeoutMs: 10_000 },
+      );
+      if (response.success === false) {
+        this.subagentSubscription = "off";
+        return { ok: false, level: "off", error: response.error ?? "the runtime refused the subagent subscription" };
+      }
+      this.subagentSubscription = level;
+      return { ok: true, level };
+    } catch (error) {
+      this.subagentSubscription = "off";
+      return { ok: false, level: "off", error: describe(error) };
+    }
+  }
+
+  subagentSubscriptionLevel(): "off" | "progress" | "events" {
+    return this.subagentSubscription;
+  }
+
+  /**
+   * List live children, reconciling the runtime's `get_subagents` snapshot into
+   * the registry so a missed lifecycle/progress frame is repaired while the
+   * runtime is alive.
+   */
+  async listSubagents(): Promise<SubagentListEntry[]> {
+    this.throwIfDisposed();
+    const response = await this.runtime.request({ type: "get_subagents" }, { timeoutMs: 10_000 });
+    if (response.success === false) {
+      throw new OmpRuntimeError(
+        "not-started",
+        `the runtime refused get_subagents: ${response.error ?? "unknown error"}`,
+      );
+    }
+    const snapshots = parseSubagentSnapshots(response.data);
+    if (snapshots === null) {
+      throw new OmpRuntimeError("transport-failed", "get_subagents returned a malformed snapshot");
+    }
+    for (const synthesis of this.subagents.reconcile(snapshots)) this.emitSynthesis(synthesis);
+    return this.subagents.list();
+  }
+
+  /**
+   * Read a bounded slice of one child's durable transcript by opaque child id.
+   *
+   * The native `sessionFile` is consumed here and never returned; the caller
+   * gets only the byte cursor plus the mapped rows. `fromByte` is validated and
+   * clamped; a `reset: true` result means the cursor was ahead of the file and
+   * the read started over.
+   */
+  async readSubagentTranscript(
+    subagentId: string,
+    fromByte?: number,
+  ): Promise<{ cursor: { fromByte: number; nextByte: number; reset: boolean }; messages: UiMessage[] }> {
+    this.throwIfDisposed();
+    const start = normalizeFromByte(fromByte);
+    const response = await this.runtime.request(
+      { type: "get_subagent_messages", subagentId, fromByte: start },
+      { timeoutMs: 15_000 },
+    );
+    if (response.success === false) {
+      throw new OmpRuntimeError(
+        "not-started",
+        `the runtime refused get_subagent_messages: ${response.error ?? "unknown error"}`,
+      );
+    }
+    const parsed = parseSubagentMessages(response.data);
+    if (parsed === null) {
+      throw new OmpRuntimeError("transport-failed", "get_subagent_messages returned a malformed result");
+    }
+    // The owning parent tool call and agent name are the caller's context; the
+    // read itself maps each finished message through a fresh child converter.
+    const attribution = this.subagents.lookup(subagentId);
+    const converter = new OmpEventConverter({
+      sessionId: `${this.sessionId}:subagent:${subagentId}`,
+      now: this.now,
+      ...(attribution?.parentToolCallId ? { parentToolCallId: attribution.parentToolCallId } : {}),
+      ...(attribution ? { agentName: attribution.agent } : {}),
+    });
+    const messages: UiMessage[] = [];
+    for (const message of parsed.messages) {
+      const row = converter.convertMessage(message);
+      if (row) messages.push(row);
+    }
+    return {
+      cursor: { fromByte: parsed.fromByte, nextByte: parsed.nextByte, reset: parsed.reset },
+      messages,
+    };
+  }
+
+  /**
+   * The pinned runtime exposes no per-child stop command (the RPC command
+   * union has no stop/cancel for a subagent, and a child session has
+   * `hasUI=false`), so a targeted stop is refused with an accurate reason
+   * rather than silently aborted through the parent.
+   */
+  stopSubagent(_subagentId: string): { ok: false; reason: "capability-unavailable"; detail: string } {
+    return {
+      ok: false,
+      reason: "capability-unavailable",
+      detail:
+        "the pinned OMP runtime exposes no per-child stop command; stopping a child is not available in this build",
     };
   }
 
@@ -389,6 +540,8 @@ export class OmpSessionRunner {
     const cancelled = this.cancelOpenDialogs(reason).length;
     this.detachFrame();
     this.detachFailure();
+    this.subagents.reset();
+    this.taskCallTurn.clear();
     this.state = "idle";
     this.run = null;
     this.wakeWaiters();
@@ -434,6 +587,37 @@ export class OmpSessionRunner {
       for (const record of this.ui.records().slice(-1)) this.onUiRecord?.(record);
       return;
     }
+
+    // The parent `task` tool is the delegation node: capture its identity and
+    // augment its result with the delegation fields the renderer reads. The
+    // capture happens before the idle check so a child's terminal frame can
+    // still find its owning turn after the parent turn has closed.
+    if (frame.type === "tool_execution_start" && frame.toolName === "task") {
+      const toolCallId = stringField(frame.toolCallId);
+      if (toolCallId) {
+        this.subagents.observeTaskStart(toolCallId, frame.args);
+        if (this.run) {
+          this.taskCallTurn.set(toolCallId, { generation: this.run.generation, turnId: this.run.turnId });
+          if (this.taskCallTurn.size > 256) {
+            const oldest = this.taskCallTurn.keys().next().value;
+            if (oldest !== undefined) this.taskCallTurn.delete(oldest);
+          }
+        }
+      }
+    }
+    if (frame.type === "tool_execution_end" && frame.toolName === "task") {
+      const toolCallId = stringField(frame.toolCallId);
+      if (toolCallId) {
+        frame = { ...frame, result: this.subagents.augmentTaskResult(toolCallId, frame.result) };
+      }
+    }
+
+    // Subagent frames are owned by the tracker, never by the parent converter.
+    if (subagentFrameKind(frame) !== null) {
+      this.handleSubagentFrame(frame);
+      return;
+    }
+
     if (this.state === "idle") {
       // A frame that arrives with no run in flight belongs to a run that was
       // already closed: attributing it to whatever runs next is exactly the
@@ -471,6 +655,51 @@ export class OmpSessionRunner {
         this.closeRun(this.run?.generation ?? 0);
       }
     }
+  }
+
+  /** Route one validated subagent frame and emit its syntheses. */
+  private handleSubagentFrame(frame: OmpFrame): void {
+    const kind = subagentFrameKind(frame);
+    let syntheses: SubagentSynthesis[] = [];
+    if (kind === "subagent_lifecycle") {
+      const parsed = parseSubagentLifecycleFrame(frame);
+      if (!parsed) {
+        this.malformedSubagentFrames += 1;
+        return;
+      }
+      syntheses = this.subagents.handleLifecycle(parsed.payload);
+    } else if (kind === "subagent_progress") {
+      const parsed = parseSubagentProgressFrame(frame);
+      if (!parsed) {
+        this.malformedSubagentFrames += 1;
+        return;
+      }
+      this.subagents.handleProgress(parsed.payload);
+      return;
+    } else {
+      const parsed = parseSubagentEventFrame(frame);
+      if (!parsed) {
+        this.malformedSubagentFrames += 1;
+        return;
+      }
+      syntheses = this.subagents.handleEvent(parsed.payload);
+    }
+    for (const synthesis of syntheses) this.emitSynthesis(synthesis);
+  }
+
+  /** Emit one tracker synthesis, attributed to its owning turn. */
+  private emitSynthesis(synthesis: SubagentSynthesis): void {
+    const turn = synthesis.parentToolCallId
+      ? this.taskCallTurn.get(synthesis.parentToolCallId)
+      : undefined;
+    this.emitEnvelope({
+      sessionId: this.sessionId,
+      ...(turn ? { turnId: turn.turnId } : this.run ? { turnId: this.run.turnId } : {}),
+      ts: this.now(),
+      event: synthesis.event,
+      ...(synthesis.parentToolCallId ? { parentToolCallId: synthesis.parentToolCallId } : {}),
+      ...(synthesis.agentName ? { agentName: synthesis.agentName } : {}),
+    });
   }
 
   private trackRunState(event: AgentEvent): void {
@@ -624,4 +853,9 @@ export class OmpSessionRunner {
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** A non-empty string value, or undefined. */
+function stringField(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }

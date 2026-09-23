@@ -151,6 +151,14 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
     createSupervisor: (spec: OmpSessionRuntimeSpec) =>
       engineRuntime.ompRuntime.createSupervisor({
         sessionDir,
+        // The pinned runtime only forwards a child's `subagent_event` frames
+        // when its model is selected explicitly (`--model provider/model`);
+        // discovery from `models.yml` alone leaves the child's event stream
+        // unwired. The projection already pins one provider/model, so pass the
+        // same binding the projection writes.
+        ...(spec.providerId && spec.modelId
+          ? { modelSelector: `${spec.providerId}/${spec.modelId}` }
+          : {}),
         prepareRun: async (paths) => {
           await projectSessionModels(deps.host, spec, paths);
         },

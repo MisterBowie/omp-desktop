@@ -92,8 +92,9 @@ test("a stopped runtime is reported as such without reclassifying the engine", a
 test("an OMP session is refused every capability this release has not shipped", async () => {
   const router = routerWith();
   assert.deepEqual(router.liveCapabilities("omp"), OMP_ENGINE_CAPABILITIES);
-  // M4 ships prompt/stop/resume/modelSwitch/structuredQuestions/toolApproval.
-  const shipped = new Set(["prompt", "stop", "resume", "modelSwitch", "structuredQuestions", "toolApproval"]);
+  // M4 ships prompt/stop/resume/modelSwitch/structuredQuestions/toolApproval;
+  // M5/T17 adds subagentEvents.
+  const shipped = new Set(["prompt", "stop", "resume", "modelSwitch", "structuredQuestions", "toolApproval", "subagentEvents"]);
   for (const capability of ENGINE_CAPABILITY_KEYS) {
     if (shipped.has(capability)) {
       assert.equal(router.require({ engine: "omp" }, capability), "omp", capability);

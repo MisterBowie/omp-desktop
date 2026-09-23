@@ -37,6 +37,7 @@ import {
   type AskToolResolution,
   type Risk,
   type ToolPermissionRequest,
+  type UiMessage,
 } from "@pi-desktop/shared";
 import { BUNDLED_GATE_PATH } from "./omp-runtime";
 import {
@@ -51,6 +52,7 @@ import {
   type OmpUiDecision,
   type OmpUiRecord,
   type OmpUiRequest,
+  type SubagentListEntry,
 } from "@pi-desktop/omp-runtime";
 
 export type OmpSessionBridgeLogger = {
@@ -443,6 +445,16 @@ export type OmpSessionBridge = {
   hasPendingRequest(requestId: string): boolean;
   hasKnownRequest(requestId: string): boolean;
   workingDirectory(sessionId: string): string | null;
+  /** Live child list (opaque ids, never a native path). */
+  listSubagents(sessionId: string): Promise<SubagentListEntry[]>;
+  /** Bounded child-transcript read by opaque id (native `sessionFile` stays internal). */
+  readSubagentTranscript(
+    sessionId: string,
+    subagentId: string,
+    fromByte?: number,
+  ): Promise<{ cursor: { fromByte: number; nextByte: number; reset: boolean }; messages: UiMessage[] }>;
+  /** Always refuses: the pinned runtime has no per-child stop command. */
+  stopSubagent(sessionId: string, subagentId: string): SubagentStopResult;
   disposeSession(sessionId: string, reason?: string): Promise<OmpDisposeResult>;
   /** Reclaim every session's runtime; used by application shutdown. */
   dispose(reason?: string): Promise<OmpDisposeResult>;
@@ -460,6 +472,13 @@ export type OmpSessionBridge = {
 export type OmpDisposeResult = {
   ok: boolean;
   failures: Array<{ sessionId: string; detail: string }>;
+};
+
+/** A per-child stop is refused: the pinned runtime exposes no such command. */
+export type SubagentStopResult = {
+  ok: false;
+  reason: "capability-unavailable";
+  detail: string;
 };
 
 const REFUSAL = ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE;
@@ -885,6 +904,16 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     const entry = entryFor(spec);
     await entry.ensureNativeSession(gate, spec);
     const runner = await entry.ensureRunner(gate);
+    // Enable the subagent subscription once the runtime is ready and the native
+    // session is established. A refused subscription is logged but does not fail
+    // the prompt: the turn still runs, and the child list/read paths report a
+    // typed capability-unavailable instead of presenting a partial picture.
+    const subscription = await runner.enableSubagentSubscription("events");
+    if (!subscription.ok) {
+      logger?.app("omp", "warn", "subagent subscription unavailable", {
+        data: { sessionId: input.sessionId, error: subscription.error ?? "refused" },
+      });
+    }
     const started = await runner.prompt(input.content);
     return { accepted: started.accepted, turnId: started.turnId };
   }
@@ -1301,6 +1330,51 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     return entryOf(sessionId)?.projectDirectory ?? null;
   }
 
+  async function listSubagents(sessionId: string): Promise<SubagentListEntry[]> {
+    const entry = entryOf(sessionId);
+    const runner = entry?.activeRunner() ?? null;
+    if (!runner) {
+      // No live runtime: the registry cannot answer, and claiming an empty list
+      // would read as "no children ever existed". The caller distinguishes this
+      // from a live empty list.
+      throw Object.assign(new Error("the OMP runtime is not running for this session"), {
+        errorCode: "NOT_STARTED",
+      });
+    }
+    return runner.listSubagents();
+  }
+
+  async function readSubagentTranscript(
+    sessionId: string,
+    subagentId: string,
+    fromByte?: number,
+  ): Promise<{ cursor: { fromByte: number; nextByte: number; reset: boolean }; messages: UiMessage[] }> {
+    const entry = entryOf(sessionId);
+    const runner = entry?.activeRunner() ?? null;
+    if (!runner) {
+      throw Object.assign(new Error("the OMP runtime is not running for this session"), {
+        errorCode: "NOT_STARTED",
+      });
+    }
+    if (typeof subagentId !== "string" || !subagentId.trim()) {
+      throw Object.assign(new Error("a subagent id is required"), { errorCode: ErrorCodes.INVALID_ARGUMENT });
+    }
+    return runner.readSubagentTranscript(subagentId, fromByte);
+  }
+
+  function stopSubagent(_sessionId: string, _subagentId: string): SubagentStopResult {
+    // No entry lookup is needed: the refusal is unconditional. The pinned RPC
+    // command union has no per-subagent stop, and a child session has
+    // `hasUI=false`, so there is no trustworthy child-owned process handle to
+    // terminate without risking the parent or siblings.
+    return {
+      ok: false,
+      reason: "capability-unavailable",
+      detail:
+        "the pinned OMP runtime exposes no per-child stop command; a child can only be stopped by stopping the parent run",
+    };
+  }
+
   async function disposeSession(sessionId: string, reason = "session disposed"): Promise<OmpDisposeResult> {
     const entry = entries.get(sessionId);
     if (!entry) return { ok: true, failures: [] };
@@ -1371,6 +1445,9 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     hasPendingRequest,
     hasKnownRequest,
     workingDirectory,
+    listSubagents,
+    readSubagentTranscript,
+    stopSubagent,
     disposeSession,
     dispose,
     diagnostics,

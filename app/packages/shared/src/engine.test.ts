@@ -68,10 +68,10 @@ describe("engine capabilities", () => {
 
   it("opens exactly the OMP capabilities this release ships", () => {
     // M4 ships prompting, stopping, restore, model/thinking switch, approval and
-    // questions. Branching, steering, follow-up and compaction stay closed until
-    // their behaviour exists: an open capability is a promise that there is an
-    // implementation behind the entry point.
-    const shipped = new Set(["prompt", "stop", "resume", "modelSwitch", "structuredQuestions", "toolApproval"]);
+    // questions; M5/T17 adds subagentEvents. Branching, steering, follow-up and
+    // compaction stay closed until their behaviour exists: an open capability is
+    // a promise that there is an implementation behind the entry point.
+    const shipped = new Set(["prompt", "stop", "resume", "modelSwitch", "structuredQuestions", "toolApproval", "subagentEvents"]);
     for (const key of ENGINE_CAPABILITY_KEYS) {
       expect(PI_ENGINE_CAPABILITIES[key], `pi.${key}`).toBe(true);
       expect(OMP_ENGINE_CAPABILITIES[key], `omp.${key}`).toBe(shipped.has(key));

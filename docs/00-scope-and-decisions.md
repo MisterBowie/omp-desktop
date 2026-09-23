@@ -66,7 +66,7 @@
 | D02 | 已定:完整会话来自 `omp --mode rpc-ui` 子进程,不使用低层 Agent 包 | E01、E10 |
 | D03 | 已定:原生会话由 OMP 保存在其 agent dir(JSONL + `sessionId`);桌面只保存索引、元数据与展示投影 | E06 |
 | D04 | 已定(含限制):权限由受信扩展的 `tool_call` 钩子在做执行前决策;原生工具、宿主工具与子代理工具调用都在同一条钩子上被阻断。**限制**:子代理会话 `hasUI=false`,OMP 不提供子代理 UI,因此子代理审批不能交互,必须由桌面策略或带外通道决定 | E04、E08、E11 |
-| D05 | 部分:子代理事件、进度与快照已实测(含 `parentToolCallId` 父子关联);父 `abort` 不回收 detached 子代理的命令树(需显式终止);父子关系的 UI 映射与单独停止留待 M5/T17 | E08、E11 |
+| D05 | 已定：OMP 会话的子代理由 OMP 原生 `task` 工具编排；三类帧（lifecycle/progress/event）经严格校验后，lifecycle/progress 喂入既有 Pi 拓扑结构（`task` 工具结果 `details.delegationId`/`status`/…），event 经每子代理转换器按 `parentToolCallId`/`agentName` 归因流入既有详情；`get_subagents` 存活期 reconcile、`get_subagent_messages` 按不透明 id 有界读取（`sessionFile` 不出桥）。单独停止关闭（固定 OMP 无 per-child stop RPC，恒拒 typed refusal）；子代理 `hasUI=false` 的 gated 工具 fail closed，策略允许恰好执行一次；重启不谎报旧 detached 子代理、不重放 | E08/E11、M5/T17（`docs/validation/M5-subagents.md`、ADR 0303） |
 | D06 | 部分:模型目录与配置已验证受控注入且不读用户全局配置;系统密钥存储命名留待 M4/T22 | E07 |
 | D07 | 已定:rpc 与 rpc-ui 的能力差异已实测(仅 rpc-ui 提供 `ask` 工具);ACP/SDK 仅源码比对,未做运行时结论 | E10 |
 
