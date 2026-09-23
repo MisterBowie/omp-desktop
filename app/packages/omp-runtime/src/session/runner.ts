@@ -405,6 +405,17 @@ export class OmpSessionRunner {
         `the runtime is ${this.state}; stop it before prompting again`,
       );
     }
+    // A stop owns the lifecycle for its whole span — abort, convergence, the
+    // child snapshot and the teardown — not just until the turn reports idle.
+    // `agent_end` closes the run (state becomes idle) while the stop is still
+    // waiting on get_subagents/teardown, so state alone cannot gate this: the
+    // in-flight stop operation is the ownership that refuses a new prompt.
+    if (this.stopping) {
+      throw new OmpRuntimeError(
+        "stopping",
+        "a stop is already in progress; wait for it to finish before prompting",
+      );
+    }
     if (!this.runtime.usable) {
       throw new OmpRuntimeError("transport-failed", "the runtime transport is not usable");
     }
@@ -951,6 +962,13 @@ export class OmpSessionRunner {
   }
 
   private closeRun(generation: number): void {
+    // A completion (or failure) that names an older generation must never close
+    // a run this runner has already superseded: `agent_end` and the prompt/
+    // transport failure paths carry the generation they end, and only that
+    // generation's run may be cleared. With no run in flight the close is
+    // already a no-op, but it still resets the shared fields so a late terminal
+    // signal cannot resurrect or leave stale state behind.
+    if (this.run && this.run.generation !== generation) return;
     this.lastClosedGeneration = Math.max(this.lastClosedGeneration, generation);
     this.state = "idle";
     this.run = null;

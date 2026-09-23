@@ -590,12 +590,14 @@ class SessionEntry {
       teardown: async (teardownOptions) => {
         const stop = await this.supervisor.stop({ abortBash: teardownOptions.abortBash });
         // A run whose group was reaped but whose directory survived is a
-        // directory-only debt: `stop` reports "nothing owned" for it on a
-        // retry, so only the sweep (`reclaimAll`) can finish the removal. The
-        // runner treats `reaped && cleaned` as the only fully-reclaimed verdict.
-        if (stop.reaped && !stop.cleaned) {
-          const sweep = await this.supervisor.reclaimAll();
-          return { reaped: true, cleaned: sweep.every((entry) => entry.cleaned) };
+        // directory-only debt — and on a retry, with no live runtime left,
+        // `stop` reports "nothing owned" while that retained directory debt is
+        // still owed. Only the sweep (`reclaimAll`) can finish either, so
+        // reconcile whenever a reaped stop leaves anything retained, and judge
+        // the verdict by whether any debt actually remains.
+        if (stop.reaped && (!stop.cleaned || this.supervisor.pendingCleanup.length > 0)) {
+          await this.supervisor.reclaimAll();
+          return { reaped: true, cleaned: this.supervisor.pendingCleanup.length === 0 };
         }
         return { reaped: stop.reaped, cleaned: stop.cleaned };
       },

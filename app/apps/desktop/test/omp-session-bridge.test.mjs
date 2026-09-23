@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { register } from "node:module";
 import { tmpdir } from "node:os";
 import test, { after } from "node:test";
@@ -36,6 +36,7 @@ const { clearSessionAsks, enqueueAsk, headAsk, queuedAskCount } = await import(
 const { readStoreSource } = await import("./helpers/source-contracts.mjs");
 const storeSource = await readStoreSource();
 const { OmpSessionRunner } = await import("../../../packages/omp-runtime/src/session/runner.ts");
+const { OmpRuntimeSupervisor } = await import("../../../packages/omp-runtime/src/supervisor.ts");
 const { registerAgentIpc } = await import("../electron/main/ipc/agent-ipc.ts");
 const { createEngineRouter } = await import("../electron/main/runtime/engine-router.ts");
 
@@ -402,6 +403,102 @@ test("dispose cancels dialogs and reclaims the runtime", async () => {
   runtime.push({ type: "message_start", message: { role: "assistant", content: [{ type: "text", text: "late" }] } });
   assert.equal(envelopes.length, before);
   assert.equal(supervisor.stopped.length >= 0, true);
+});
+
+test("retains a directory-only debt across stop retries until it is removable", async () => {
+  // A real supervisor + real SessionEntry, with the filesystem failure at the
+  // external boundary (the run root is made unremovable). Fake teardown
+  // verdicts cannot catch this: the bridge's teardown must re-sweep a retained
+  // directory even when `stop` reports "nothing owned" on the retry.
+  const root = mkdtempSync(join(tmpdir(), "omp-bridge-debt-"));
+  scratch.push(root);
+  const project = join(root, "project");
+  const sessionDir = join(root, "sessions");
+  mkdirSync(project);
+  mkdirSync(sessionDir);
+  const nativePath = join(sessionDir, "native.jsonl");
+  writeFileSync(nativePath, `${JSON.stringify({ type: "session", id: "native-debt", cwd: project, timestamp: "2026-09-24T00:00:00Z" })}\n`);
+
+  const handlers = new Set();
+  let runRoot;
+  const runtime = {
+    pid: 4242,
+    pgid: 4242,
+    currentPhase: "idle",
+    usable: true,
+    runtimeVersion: "18.2.7",
+    protocolVersion: 2,
+    write: () => true,
+    onFrame(fn) { handlers.add(fn); return () => handlers.delete(fn); },
+    onFailure: () => () => {},
+    async stop() { this.usable = false; return { reaped: true, escalated: "none", steps: [], errors: [], abortAcknowledged: true }; },
+    async request(command) {
+      if (command.type === "get_state") return { success: true, data: { sessionId: "native-debt", sessionFile: nativePath } };
+      if (command.type === "get_subagents") return { success: true, data: { subagents: [{ id: "child", index: 0, agent: "task", agentSource: "bundled", status: "running", lastUpdate: 1, parentToolCallId: "task-1" }] } };
+      if (command.type === "abort") for (const fn of handlers) fn({ type: "agent_end", isTerminal: true });
+      return { success: true, data: { cancelled: false } };
+    },
+  };
+  const mockLauncher = join(here, "..", "..", "..", "packages", "omp-runtime", "test", "mock-omp.mjs");
+  const supervisor = new OmpRuntimeSupervisor({
+    dataRoot: join(root, "data"),
+    sessionDir,
+    launcherPath: mockLauncher,
+    expectedRuntimeVersion: "18.2.7",
+    prepareRun(paths) { runRoot = paths.runRoot; },
+    runtimeFactory: async () => runtime,
+  });
+  const bridge = createOmpSessionBridge({
+    createSupervisor: () => supervisor,
+    launcher: mockLauncher,
+    isPackaged: false,
+    appPath: here,
+    sessionDir,
+    gateResolver: () => join(here, "..", "..", "..", "packages", "omp-runtime", "extensions", "omp-desktop-gate.ts"),
+    emitAgentEvent: () => {},
+  });
+
+  try {
+    await bridge.prompt({ sessionId: "debt", content: "delegate", projectPath: project });
+    for (const fn of handlers) fn({ type: "tool_execution_start", toolName: "task", toolCallId: "task-1", args: {} });
+
+    // The first stop reaps the group but cannot remove the run root.
+    chmodSync(runRoot, 0o500);
+    const first = await bridge.stop("debt");
+    assert.equal(first.toreDown, true);
+    assert.equal(supervisor.pendingCleanup.length, 1);
+    assert.equal(existsSync(runRoot), true);
+
+    // The retained debt blocks a new prompt: the bridge fails closed with a
+    // typed NOT_STARTED (the runtime was stopped and is not available) rather
+    // than accepting a turn against a session that still owes a directory.
+    await assert.rejects(
+      () => bridge.prompt({ sessionId: "debt", content: "again", projectPath: project }),
+      (error) => error.errorCode === "NOT_STARTED",
+    );
+
+    // A retry while the directory is still unremovable keeps the debt.
+    const second = await bridge.stop("debt");
+    assert.equal(supervisor.pendingCleanup.length, 1);
+    assert.equal(existsSync(runRoot), true);
+
+    // Once the directory is removable, the next stop clears the debt for good.
+    chmodSync(runRoot, 0o700);
+    const third = await bridge.stop("debt");
+    assert.equal(supervisor.pendingCleanup.length, 0);
+    assert.equal(existsSync(runRoot), false);
+
+    // A final stop has nothing left to do, and disposal succeeds cleanly.
+    const fourth = await bridge.stop("debt");
+    assert.deepEqual(fourth.steps, ["nothing running"]);
+    const disposed = await bridge.dispose("debt finished");
+    assert.deepEqual(disposed, { ok: true, failures: [] });
+  } finally {
+    if (runRoot && existsSync(runRoot)) chmodSync(runRoot, 0o700);
+    await bridge.dispose("debt cleanup").catch(() => undefined);
+    await supervisor.reclaimAll().catch(() => undefined);
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("reports a transport failure as one typed error, not a hung turn", async () => {

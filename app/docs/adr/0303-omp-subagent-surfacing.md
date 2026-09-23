@@ -1,7 +1,7 @@
 # ADR 0303: OMP subagent surfacing, attribution and the stop boundary
 
-- Status: Accepted
-- Date: 2026-09-23
+- Status: Proposed (pending M5/T17 independent acceptance — B1 revised, B2/B3 open; T17 unaccepted)
+- Date: 2026-09-23 (revised 2026-09-24 for the B1 stop-boundary fixes)
 - Scope: M5/T17. Amends 0301 (conversation surface) by wiring the subagent
   frame families into the existing Pi delegation renderer, and 0302 (per-session
   registry) by adding a per-child registry inside each session's runner.
@@ -148,6 +148,17 @@ ownership are cleared only after a *confirmed* reaped teardown; a teardown that
 fails to reap (or throws) retains them — matching the supervisor's
 ownership-retained-for-retry semantics — so a late frame is still attributed to
 its turn and a later stop/dispose can re-run the teardown.
+
+The stop operation owns the prompt gate for its entire span — abort,
+convergence, the child snapshot and the teardown — not just until the turn
+reports idle. `agent_end` closes the run (state becomes idle) while the stop is
+still reconciling or tearing down, so a second prompt is refused with a typed
+`stopping` error for the whole stop (and any pending-reclaim retry), and a
+completion that names an older generation never closes a run the runner has
+already superseded. A run whose group was reaped but whose directory survived
+is a directory-only debt: the bridge's teardown re-runs the supervisor sweep on
+every subsequent stop until no retained run directory remains, and never
+signals the ids of an already-reaped record.
 
 Fixed OMP exposes no per-child stop command, and a child session has no
 trustworthy child-owned process handle to terminate without risking the parent

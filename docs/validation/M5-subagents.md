@@ -1,6 +1,6 @@
 # M5 验证记录：OMP 子代理面板与编排归属（T17）
 
-状态：**未验收**（T17）。第三轮独立复审判定 T17 尚待 B1-B3 三项返修；本提交仅实现 **B1（回收未完成时的重试）** 并待复审，**B2（renderer 单飞/错误可见）与 B3（总 UTF-8 预算）仍未解决**。M5 后续任务 T18-T20 未开始。
+状态：**未验收**（T17）。第三轮独立复审拆出 B1-B3 三项返修；B1 于 `9d0acde` 首实现后独立复审仍复现两项缺陷（F1 目录债二次 stop 丢失、F2 停期间短暂放行 prompt），本提交修复并追加行为回归，**B1 改定待独立验收**；**B2（renderer 单飞/错误可见）与 B3（总 UTF-8 预算）仍未解决**。M5 后续任务 T18-T20 未开始。
 基线提交：`d26444407fc963c2e7efd51bda7d1bd4a70e8bbd`；第二轮独立复审返修（S1-S4）以追加普通提交落在该基线上（见 `git log` 最新提交）。
 固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未修改）。
 工作树：`/home/vv/person/code/omp-desktop-m5-t17`，分支 `codex/m5-subagents`。
@@ -30,11 +30,20 @@
 
 ## 0.3 第三轮独立复审返修（B1，2026-09-24）
 
-第三轮独立复审否定了"T17 已完成"，拆出 B1-B3 三项返修；**本提交只实现 B1**，B2、B3 仍未解决，T17 不验收。
+第三轮独立复审否定了"T17 已完成"，拆出 B1-B3 三项返修。B1 首实现于 `9d0acde`（下述回归均通过）；独立复审在 `9d0acde` 上进一步复现两项残余缺陷 **F1/F2**，由本提交修复（见 §0.4）。B2、B3 仍未解决，T17 不验收。
 
-- **B1 回收未完成时的重试（已实现，待复审）**：独立复现显示 `session/runner.ts` 的 teardown 未成功时仍 `closeRun()`，第二次 stop 命中 487-490 的 `nothing running` 早退、不再调用 supervisor——实际仍有存活进程组。现改为：teardown 未确认 `reaped && cleaned` 时记录可重试义务 `pendingReclaim`；第二次 stop 直接重跑同一 `teardown`（跳过协议 abort，绝不把旧父回合的 abort 重发到新回合）；pending 时 `prompt` 以 typed `stopping` 拒绝；只有确认 `reaped && cleaned` 才清义务并清 registry/task-call 所有权（保留迟到子帧归因）。`stop()` 加单飞（并发 stop 共享一次尝试，杜绝重叠 teardown、不短暂放行 prompt）。桥接 teardown 包装改为：组已回收但目录残留（`reaped:true/cleaned:false`）时补一次 `reclaimAll()` 扫目录，因为 `supervisor.stop()` 对 directory-only 债务回报 `nothing owned`。参考顺序：固定 PI 的 `TaskStop`（`agent-runtime/src/runtime.ts` 委托停止）是模型自调工具、无桌面侧进程组重试语义，PI 的 `provider-retry.ts` 是 provider HTTP 重试、与进程回收无关；OMP 无 per-child stop RPC；可复用语义来自本仓库 M2 supervisor 的 `reaped`/`cleaned` 独立判定与 ownership-retained-for-retry（`supervisor.ts` `performStop`/`reclaimAll`），B1 直接适配该契约，未臆造新语义。
+- **B1 回收未完成时的重试（首实现于 9d0acde；残余 F1/F2 见 §0.4）**：独立复现显示 `session/runner.ts` 的 teardown 未成功时仍 `closeRun()`，第二次 stop 命中 487-490 的 `nothing running` 早退、不再调用 supervisor——实际仍有存活进程组。现改为：teardown 未确认 `reaped && cleaned` 时记录可重试义务 `pendingReclaim`；第二次 stop 直接重跑同一 `teardown`（跳过协议 abort，绝不把旧父回合的 abort 重发到新回合）；pending 时 `prompt` 以 typed `stopping` 拒绝；只有确认 `reaped && cleaned` 才清义务并清 registry/task-call 所有权（保留迟到子帧归因）。`stop()` 加单飞（并发 stop 共享一次尝试，杜绝重叠 teardown）。桥接 teardown 包装补一次 `reclaimAll()` 扫目录（该初版仅覆盖 `reaped:true/cleaned:false` 单一路径，二次 stop 的 directory-only 债务仍会丢失——即 F1）。参考顺序：固定 PI 的 `TaskStop`（`agent-runtime/src/runtime.ts` 委托停止）是模型自调工具、无桌面侧进程组重试语义，PI 的 `provider-retry.ts` 是 provider HTTP 重试、与进程回收无关；OMP 无 per-child stop RPC；可复用语义来自本仓库 M2 supervisor 的 `reaped`/`cleaned` 独立判定与 ownership-retained-for-retry（`supervisor.ts` `performStop`/`reclaimAll`），B1 直接适配该契约，未臆造新语义。
 - 新增回归（`packages/omp-runtime/src/session/subagent-runner.test.ts` 的 `pending reclaim retry` 5 例，先红后绿）：首败二成后第三停 `nothing running`、连续失败仍拒 prompt、teardown 抛错仍可重试、`reaped:true/cleaned:false` 目录债保留义务、并发 stop 单飞（可控 promise，无 wall-clock sleep）。
 - 验证（`app/`，`nvm use 24`）：`@pi-desktop/omp-runtime` vitest **227 passed / 0 failed**（222 + 5 B1 回归，含真实固定 runtime 烟测）；desktop `node --test` 定向 OMP 用例全绿（`omp-subagent-bridge` 8、`omp-subagent-e2e` 3、`omp-session-ownership` 2、`omp-session-bridge`/`failclosed`/`configure`/`configure-ipc`/`delete-archive`/`host-mutation-gates`/`ipc-result` 共 68、`omp-session-e2e`/`concurrent-approval-e2e`/`persistence-e2e` 3，均为假 provider / 无付费模型）；`pnpm --filter @pi-desktop/omp-runtime exec tsc --noEmit` 与 desktop `pnpm typecheck` 通过；`git diff --check` 无输出。
+
+## 0.4 B1 残余缺陷返修（F1/F2，2026-09-24）
+
+独立复审在 `9d0acde` 上复现两项 B1 残余缺陷，均为可独立复现（隔离 fake-runtime/本地文件系统场景，无付费模型、无真实进程信号）：
+
+- **F1 目录债在二次 stop 丢失**：`9d0acde` 的桥接 teardown 只在 `supervisor.stop()` 返回 `reaped:true/cleaned:false` 时补 `reclaimAll()`；但二次 stop 时 supervisor 已不拥有 runtime，`stop()` 回报 `nothing owned`（`cleaned:true`）而 `pendingCleanup` 仍为 1，回调跳过扫目录、runner 清 `pendingReclaim` 后误报成功——目录与债务皆不可达。修复（`omp-session.ts` teardown）：`stop.reaped` 且（`!cleaned` 或 `supervisor.pendingCleanup.length > 0`）即补 `reclaimAll()`，以 `pendingCleanup.length === 0` 为唯一 `cleaned` 判定；连续文件系统失败保留 pending、恢复后下一次 stop 清除债务；已 reap 记录绝不再次发信号（supervisor 的 `reaped`/`pid:0` 语义不变）。回归（真实 `SessionEntry` + 真实 `OmpRuntimeSupervisor` + 外部边界 chmod 0500，`omp-session-bridge.test.mjs`）：失败→重复失败→恢复→末次 no-op，全程断言 `pendingCleanup` 与实际目录存在，并含 pending 期间 typed prompt 拒绝与债务清除后干净 dispose。
+- **F2 停期间短暂放行新 prompt**：`agent_end` 在 stop 等待 `get_subagents`/teardown 前已 `closeRun()`（state=idle/run=null），`prompt()` 只查 `pendingReclaim` 与 state、未查活动 stop，导致窗口内接受新代并随后被旧 stop 关闭。修复（`runner.ts`）：`prompt()` 增加 `this.stopping` 所有权检查（typed `stopping` 拒绝），覆盖 abort/收敛/快照/teardown/重试全窗口；`closeRun()` 增加代守卫（旧代完成/失败不得关闭已取代的新 run）。回归（`runner.test.ts` 可控 promise，先红后绿）：独立 hold 快照与 teardown 各拒 prompt、并发 pending-retry 拒 prompt、stop 期间 `agent_end` 不得关闭 stop 之后的新 run。
+
+验证（`app/`，`nvm use v24.14.0`，Node v24.14.0，pnpm 10.34.5）：`pnpm --filter @pi-desktop/omp-runtime test` **231 passed / 0 failed**（227 + 4 F2 回归）；`pnpm --filter @pi-desktop/omp-runtime build` 0；`env -u SSH_ASKPASS node --test test/omp-session-bridge.test.mjs` **29 passed / 0 failed**（28 + 1 F1 真实 supervisor 集成）；`omp-subagent-bridge` 8、`omp-subagent-e2e` 3（含不先 list 的 detached-child 场景）、`omp-session-ownership`/`failclosed`/`configure`/`configure-ipc`/`delete-archive`/`host-mutation-gates`/`ipc-result` 42、`omp-session-e2e`/`concurrent-approval-e2e`/`persistence-e2e` 3 全绿；`pnpm --filter @pi-desktop/omp-runtime typecheck` 与 `pnpm --filter @pi-desktop/desktop typecheck` 0；`git diff --check` 无输出。两个独立 repro（`/tmp/m5-stop-prompt-race.mjs`、`/tmp/m5-bridge-cleanup-retry.mjs`）在修复后均按预期输出。
 
 ## 0. 环境准备（固定子模块流程，与本轮代码无关）
 

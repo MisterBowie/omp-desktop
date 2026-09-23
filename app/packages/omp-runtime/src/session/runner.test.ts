@@ -610,3 +610,141 @@ describe("terminal signal for failed prompts (F2)", () => {
     });
   });
 });
+
+describe("stop owns the prompt gate for its whole span", () => {
+  /** A deferred value the test resolves at a controlled moment. */
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((yes) => { resolve = yes; });
+    return { promise, resolve };
+  }
+
+  /** A runtime whose `abort` pushes `agent_end` and whose snapshot can be held. */
+  function gateRuntime(commands: string[]) {
+    const handlers = new Set<(frame: OmpFrame) => void>();
+    const snapshot = deferred<{ success?: boolean; error?: string; data?: unknown }>();
+    const runtime: OmpSessionRuntime = {
+      pid: 4242,
+      usable: true,
+      write: () => true,
+      onFrame(handler) { handlers.add(handler); return () => handlers.delete(handler); },
+      onFailure: () => () => {},
+      async request(command) {
+        commands.push(String(command.type));
+        if (command.type === "abort") {
+          // The runtime converges while the runner waits: `agent_end` closes the
+          // run to idle before the stop has finished reconciling/tearing down.
+          for (const handler of handlers) handler({ type: "agent_end", isTerminal: true } as OmpFrame);
+        }
+        if (command.type === "get_subagents") {
+          return snapshot.promise;
+        }
+        return { success: true };
+      },
+    };
+    return { runtime, handlers, snapshot };
+  }
+
+  function gateRunner(
+    runtime: OmpSessionRuntime,
+    teardown: () => Promise<{ reaped: boolean; cleaned: boolean }>,
+  ): OmpSessionRunner {
+    return new OmpSessionRunner({
+      sessionId: "omp-gate",
+      runtime,
+      emit: () => undefined,
+      convergeTimeoutMs: 200,
+      abortTimeoutMs: 100,
+      teardown,
+    });
+  }
+
+  it("refuses a prompt while the stop is waiting on the live child snapshot", async () => {
+    const commands: string[] = [];
+    const { runtime, handlers, snapshot } = gateRuntime(commands);
+    const runner = gateRunner(runtime, async () => ({ reaped: true, cleaned: true }));
+    await runner.prompt("first");
+    for (const handler of handlers) handler({ type: "tool_execution_start", toolName: "task", toolCallId: "task-1", args: {} } as OmpFrame);
+    const stop = runner.stop();
+    // `agent_end` has already closed the run to idle, but the stop is still
+    // reconciling the live snapshot: the stop owns the lifecycle, not the run.
+    await expect(runner.prompt("second")).rejects.toMatchObject({ code: "stopping" });
+    snapshot.resolve({ success: true, data: { subagents: [] } });
+    await stop;
+    expect(runner.runState()).toBe("idle");
+    runner.dispose();
+  });
+
+  it("refuses a prompt while the stop is waiting on the process teardown", async () => {
+    const commands: string[] = [];
+    const { runtime, handlers, snapshot } = gateRuntime(commands);
+    const teardownGate = deferred<{ reaped: boolean; cleaned: boolean }>();
+    const runner = gateRunner(runtime, async () => teardownGate.promise);
+    await runner.prompt("first");
+    for (const handler of handlers) handler({ type: "tool_execution_start", toolName: "task", toolCallId: "task-1", args: {} } as OmpFrame);
+    const stop = runner.stop();
+    // The snapshot reports a surviving child, so the stop escalates to the
+    // teardown — which is held. Both windows are owned by the same stop.
+    snapshot.resolve({
+      success: true,
+      data: { subagents: [{ id: "child-1", index: 0, agent: "task", agentSource: "bundled", status: "running", lastUpdate: 1, parentToolCallId: "task-1" }] },
+    });
+    await expect(runner.prompt("second")).rejects.toMatchObject({ code: "stopping" });
+    teardownGate.resolve({ reaped: true, cleaned: true });
+    await stop;
+    expect(runner.runState()).toBe("idle");
+    runner.dispose();
+  });
+
+  it("refuses a prompt during a pending-reclaim retry", async () => {
+    const commands: string[] = [];
+    const { runtime, handlers, snapshot } = gateRuntime(commands);
+    let teardownCalls = 0;
+    const retryGate = deferred<{ reaped: boolean; cleaned: boolean }>();
+    const runner = gateRunner(runtime, async () => {
+      teardownCalls += 1;
+      if (teardownCalls === 1) return { reaped: false, cleaned: false };
+      return retryGate.promise;
+    });
+    await runner.prompt("first");
+    for (const handler of handlers) handler({ type: "tool_execution_start", toolName: "task", toolCallId: "task-1", args: {} } as OmpFrame);
+    const first = runner.stop();
+    snapshot.resolve({
+      success: true,
+      data: { subagents: [{ id: "child-1", index: 0, agent: "task", agentSource: "bundled", status: "running", lastUpdate: 1, parentToolCallId: "task-1" }] },
+    });
+    await first;
+    expect(teardownCalls).toBe(1);
+    // The obligation is retained; the retry re-enters the teardown and owns the
+    // lifecycle while it is blocked there.
+    const retry = runner.stop();
+    await expect(runner.prompt("next")).rejects.toMatchObject({ code: "stopping" });
+    retryGate.resolve({ reaped: true, cleaned: true });
+    await retry;
+    expect(teardownCalls).toBe(2);
+    // Fully reclaimed: a prompt is allowed again and owns the fresh generation.
+    const started = await runner.prompt("after");
+    expect(started.generation).toBe(2);
+    runner.dispose();
+  });
+
+  it("an agent_end during the stop never closes a run started after it", async () => {
+    const commands: string[] = [];
+    const { runtime, handlers, snapshot } = gateRuntime(commands);
+    const runner = gateRunner(runtime, async () => ({ reaped: true, cleaned: true }));
+    const started = await runner.prompt("first");
+    expect(started.generation).toBe(1);
+    for (const handler of handlers) handler({ type: "tool_execution_start", toolName: "task", toolCallId: "task-1", args: {} } as OmpFrame);
+    // The abort fires `agent_end`, closing generation 1 while the stop continues.
+    const stop = runner.stop();
+    snapshot.resolve({ success: true, data: { subagents: [] } });
+    await stop;
+    // The stopped run's completion is spent; the next prompt owns the runner.
+    const second = await runner.prompt("second");
+    expect(second.generation).toBe(2);
+    expect(runner.runState()).toBe("running");
+    expect(runner.status().currentTurnId).toBe(second.turnId);
+    expect(commands).toEqual(["prompt", "abort", "get_subagents", "prompt"]);
+    runner.dispose();
+  });
+});
