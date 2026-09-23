@@ -512,8 +512,24 @@ class SessionEntry {
   nativeSessionPath: string | null = null;
   /** True once the CURRENT runtime process is on this session (switch/new). */
   private nativeSessionBound = false;
+  /**
+   * The runner instance the native session is bound to. Restoring a session
+   * binds the process the runner drives; when the runner is retired and
+   * replaced, the replacement must re-issue `switch_session`/`get_state`, so
+   * the bound runner is remembered rather than trusting `nativeSessionBound`
+   * alone after a replacement.
+   */
+  private nativeSessionRunner: OmpSessionRunner | null = null;
   /** Turn counter seed for the next runner, carried across runtime replacement. */
   private generationSeed = 0;
+  /** Live message-id sequence seed for the next runner, carried across replacement. */
+  private messageSequenceSeed = 0;
+  /**
+   * Bumped on every stop or dispose. A prompt reads it when it begins and
+   * re-checks it immediately before submission, so a stop that raced the
+   * prompt's startup/restore cannot let the prompt submit content afterwards.
+   */
+  private stopEpoch = 0;
   runtimeVersion: string | null = null;
   /** The app-owned persistent native-session directory (containment root). */
   private readonly sessionDir: string;
@@ -591,13 +607,16 @@ class SessionEntry {
   /**
    * True when the current runner wraps a runtime the supervisor no longer owns.
    *
-   * Only a fully reclaimed runtime retires the runner: a stop still in flight,
-   * or a teardown that left a retryable obligation, keeps it (the supervisor's
-   * ownership must not be dropped merely because `currentRuntime` is null
-   * mid-cleanup, and no second runtime may start while that stop is unresolved).
+   * Only a fully reclaimed runtime retires the runner: a stop still in flight
+   * (even after `agent_end` made the visible state idle, the stop still owns
+   * the child snapshot and the teardown), or a teardown that left a retryable
+   * obligation, keeps it — the supervisor's ownership must not be dropped
+   * merely because `currentRuntime` is null mid-cleanup, and no second runtime
+   * may start while that stop is unresolved.
    */
   private shouldRetireRunner(): boolean {
     if (!this.runner) return false;
+    if (this.runner.isStopping()) return false;
     if (this.runner.runState() === "stopping") return false;
     if (this.runner.hasPendingReclaim()) return false;
     return this.supervisor.currentRuntime() === null;
@@ -608,8 +627,10 @@ class SessionEntry {
     const retired = this.runner;
     this.runner = null;
     this.nativeSessionBound = false;
+    this.nativeSessionRunner = null;
     if (retired) {
       this.generationSeed = retired.currentGeneration();
+      this.messageSequenceSeed = retired.currentMessageSequence();
       retired.dispose("the runtime was reclaimed");
     }
   }
@@ -625,6 +646,7 @@ class SessionEntry {
       sessionId: this.sessionId,
       runtime,
       generationSeed: this.generationSeed,
+      messageSequenceSeed: this.messageSequenceSeed,
       emit: (envelope) => this.emitAgentEvent(envelope),
       onUiRequest: (request, info) => this.surfaceUiRequest(request, info.sessionId, info.generation),
       onUiClosed: (requestId, reason) => {
@@ -679,10 +701,16 @@ class SessionEntry {
   async ensureNativeSession(gate: string, spec: OmpSessionRuntimeSpec): Promise<void> {
     // The current runtime process is already on this exact session: re-switching
     // would reopen the transcript, which OMP's `switch_session` treats as a
-    // session transition. `nativeSessionBound` is what makes a replacement
-    // process re-issue `switch_session` (a retired runner resets it) while the
-    // persisted identity (`nativeSessionId`/`nativeSessionPath`) is kept.
-    if (this.nativeSessionBound && this.nativeSessionId === spec.nativeSessionId && this.nativeSessionPath) {
+    // session transition. The check names the *runner* the session is bound to
+    // (`nativeSessionRunner`), not just the boolean: `ensureRunner` may retire
+    // and rebuild a runner after the bind, and a replacement process must
+    // re-issue `switch_session` instead of reusing a stale bind.
+    if (
+      this.nativeSessionBound &&
+      this.nativeSessionRunner === this.runner &&
+      this.nativeSessionId === spec.nativeSessionId &&
+      this.nativeSessionPath
+    ) {
       return;
     }
     if (this.nativeSessionBuild) return this.nativeSessionBuild;
@@ -742,6 +770,7 @@ class SessionEntry {
       this.nativeSessionPath = canonicalPath;
       this.runtimeVersion = this.supervisor.status().runtimeVersion;
       this.nativeSessionBound = true;
+      this.nativeSessionRunner = this.runner;
       return;
     }
 
@@ -772,6 +801,7 @@ class SessionEntry {
     this.nativeSessionPath = canonicalPath;
     this.runtimeVersion = this.supervisor.status().runtimeVersion;
     this.nativeSessionBound = true;
+    this.nativeSessionRunner = this.runner;
     await this.persistNativeSession?.({
       sessionId: this.sessionId,
       nativeSessionId: sessionId,
@@ -847,7 +877,43 @@ class SessionEntry {
     return this.runner;
   }
 
+  /**
+   * Prepare this session's runtime and native identity, then submit one prompt.
+   *
+   * The whole preparation is gated by the stop epoch: `stop`/`dispose` bump it
+   * synchronously, and this re-checks it immediately before submission, so a
+   * stop that raced a startup/restore cannot let the prompt land afterwards.
+   */
+  async prompt(gate: string, spec: OmpSessionRuntimeSpec, content: string): Promise<OmpPromptResult> {
+    const epoch = this.stopEpoch;
+    await this.ensureNativeSession(gate, spec);
+    const runner = await this.ensureRunner(gate);
+    // Enable the subagent subscription once the runtime is ready and the native
+    // session is established. A refused subscription is logged but does not fail
+    // the prompt: the turn still runs, and the child list/read paths report a
+    // typed capability-unavailable instead of presenting a partial picture.
+    const subscription = await runner.enableSubagentSubscription("events");
+    if (!subscription.ok) {
+      this.logger?.app("omp", "warn", "subagent subscription unavailable", {
+        data: { sessionId: this.sessionId, error: subscription.error ?? "refused" },
+      });
+    }
+    if (this.stopEpoch !== epoch) {
+      throw new OmpRuntimeError("stopping", "a stop was requested while the prompt was being prepared");
+    }
+    const started = await runner.prompt(content);
+    return { accepted: started.accepted, turnId: started.turnId };
+  }
+
   async stop(): Promise<OmpStopOutcome> {
+    // A stop owns the lifecycle for its whole span, including work that has not
+    // produced a runner yet. Bump the epoch first (synchronously) so a prompt
+    // that is mid-startup/mid-restore sees it and refuses to submit; then await
+    // any in-flight build so the runtime it started is owned rather than left
+    // to a late completion.
+    this.stopEpoch += 1;
+    if (this.runnerBuild) await this.runnerBuild.catch(() => undefined);
+    if (this.nativeSessionBuild) await this.nativeSessionBuild.catch(() => undefined);
     if (!this.runner) {
       return { aborted: false, abortBashSent: false, converged: true, toreDown: false, steps: ["nothing running"], errors: [] };
     }
@@ -864,12 +930,18 @@ class SessionEntry {
   }
 
   async dispose(reason: string): Promise<Array<{ sessionId: string; detail: string }>> {
+    // Invalidate any prompt that is still preparing, and own a runtime that is
+    // still starting or restoring, before the runner is detached and reclaimed.
+    this.stopEpoch += 1;
     this.approvalRequests.clear();
     this.askRequests.clear();
     this.generations.clear();
+    if (this.runnerBuild) await this.runnerBuild.catch(() => undefined);
+    if (this.nativeSessionBuild) await this.nativeSessionBuild.catch(() => undefined);
     if (this.runner) this.runner.dispose(reason);
     this.runner = null;
     this.nativeSessionBound = false;
+    this.nativeSessionRunner = null;
     const failures: Array<{ sessionId: string; detail: string }> = [];
     try {
       const results = await this.supervisor.reclaimAll();
@@ -994,20 +1066,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       runtimeVersion: input.runtimeVersion ?? null,
     };
     const entry = entryFor(spec);
-    await entry.ensureNativeSession(gate, spec);
-    const runner = await entry.ensureRunner(gate);
-    // Enable the subagent subscription once the runtime is ready and the native
-    // session is established. A refused subscription is logged but does not fail
-    // the prompt: the turn still runs, and the child list/read paths report a
-    // typed capability-unavailable instead of presenting a partial picture.
-    const subscription = await runner.enableSubagentSubscription("events");
-    if (!subscription.ok) {
-      logger?.app("omp", "warn", "subagent subscription unavailable", {
-        data: { sessionId: input.sessionId, error: subscription.error ?? "refused" },
-      });
-    }
-    const started = await runner.prompt(input.content);
-    return { accepted: started.accepted, turnId: started.turnId };
+    return entry.prompt(gate, spec, input.content);
   }
 
   /** The runtime handle for a session's runner (fails loudly if absent). */
@@ -1378,7 +1437,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
 
   async function stop(sessionId: string): Promise<OmpStopOutcome> {
     const entry = entryOf(sessionId);
-    if (!entry || !entry.activeRunner()) {
+    if (!entry) {
       return { aborted: false, abortBashSent: false, converged: true, toreDown: false, steps: ["nothing running"], errors: [] };
     }
     const outcome = await entry.stop();

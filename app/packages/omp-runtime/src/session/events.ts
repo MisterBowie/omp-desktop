@@ -101,6 +101,13 @@ export type OmpEventConverterOptions = {
   /** Injectable clock; durations are measured, never invented. */
   now?: () => number;
   /**
+   * The sequence the message-id counter starts at. A session that replaces its
+   * runtime passes the retired converter's last sequence so a new reply never
+   * remints an id the renderer already projected (the renderer upserts rows by
+   * id, so two replies sharing `omp:<session>:1` would collapse to one).
+   */
+  sequenceSeed?: number;
+  /**
    * Attribution for a child converter: every message it mints carries the
    * parent `task` tool call and the child's agent name, so the renderer groups
    * the child's rows under its delegation node (ADR 0062).
@@ -140,6 +147,7 @@ export class OmpEventConverter {
   constructor(options: OmpEventConverterOptions) {
     this.sessionId = options.sessionId;
     this.now = options.now ?? Date.now;
+    this.sequence = options.sequenceSeed ?? 0;
     this.parentToolCallId = options.parentToolCallId;
     this.agentName = options.agentName;
   }
@@ -147,6 +155,11 @@ export class OmpEventConverter {
   /** The run's message ids, in creation order. */
   runMessageIds(): string[] {
     return [...this.messageIds];
+  }
+
+  /** The sequence the next minted id will use; carried across runtime replacement. */
+  currentSequence(): number {
+    return this.sequence;
   }
 
   snapshot(): OmpConversionDiagnostics {

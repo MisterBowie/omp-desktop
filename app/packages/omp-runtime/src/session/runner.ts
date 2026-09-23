@@ -114,6 +114,13 @@ export type OmpSessionRunnerOptions = {
    * after a reclaim never reuses the turn id of a turn that already ended.
    */
   generationSeed?: number;
+  /**
+   * Sequence the live message-id counter starts at. The bridge passes the
+   * retired runner's last sequence when it rebuilds a runtime, so a reply on
+   * the replacement never remints an id the renderer already projected (rows
+   * are upserted by id, so a reused id would collapse an earlier reply).
+   */
+  messageSequenceSeed?: number;
   /** How long to wait for one convergence step before escalating. */
   convergeTimeoutMs?: number;
   /** How long to wait for `abort` itself to be answered. */
@@ -200,7 +207,11 @@ export class OmpSessionRunner {
     this.now = options.now ?? Date.now;
     this.convergeTimeoutMs = options.convergeTimeoutMs ?? DEFAULT_CONVERGE_TIMEOUT_MS;
     this.abortTimeoutMs = options.abortTimeoutMs ?? DEFAULT_ABORT_TIMEOUT_MS;
-    this.converter = new OmpEventConverter({ sessionId: this.sessionId, now: this.now });
+    this.converter = new OmpEventConverter({
+      sessionId: this.sessionId,
+      now: this.now,
+      ...(options.messageSequenceSeed !== undefined ? { sequenceSeed: options.messageSequenceSeed } : {}),
+    });
     this.subagents = new SubagentTracker({ sessionId: this.sessionId, now: this.now });
     this.ui = new OmpUiRequests({
       sessionId: this.sessionId,
@@ -247,6 +258,27 @@ export class OmpSessionRunner {
    */
   currentGeneration(): number {
     return this.ui.currentGeneration();
+  }
+
+  /**
+   * The live message-id sequence this runner last minted. The bridge reads it
+   * when it retires a runner so the replacement's message ids continue where
+   * the old one left off, keeping live rows distinct across a runtime swap.
+   */
+  currentMessageSequence(): number {
+    return this.converter.currentSequence();
+  }
+
+  /**
+   * True while a stop is in flight.
+   *
+   * `runState()` becomes idle the moment `agent_end` closes the run, but the
+   * stop still owns the lifecycle through the child snapshot and the teardown.
+   * The bridge reads this to refuse a replacement while a stop is unresolved,
+   * so a racing prompt cannot build a second runtime mid-teardown.
+   */
+  isStopping(): boolean {
+    return this.stopping !== null;
   }
 
   /** Open dialog requests, for the desktop's status surface. */

@@ -36,6 +36,7 @@ const { clearSessionAsks, enqueueAsk, headAsk, queuedAskCount } = await import(
 const { readStoreSource } = await import("./helpers/source-contracts.mjs");
 const storeSource = await readStoreSource();
 const { OmpSessionRunner } = await import("../../../packages/omp-runtime/src/session/runner.ts");
+const { projectMessageEnd } = await import("../src/lib/session-transcript.ts");
 const { OmpRuntimeSupervisor } = await import("../../../packages/omp-runtime/src/supervisor.ts");
 const { registerAgentIpc } = await import("../electron/main/ipc/agent-ipc.ts");
 const { createEngineRouter } = await import("../electron/main/runtime/engine-router.ts");
@@ -1374,4 +1375,399 @@ test("a thrown prompt request keeps its own error and still ends the turn", asyn
     { type: "extension_ui_response", id: "ui-error", cancelled: true },
   ]);
   assert.equal(bridge.status(OMP_SESSION).pendingToolConfirmations, 0);
+});
+
+/** A deferred value the tests resolve at a controlled moment. */
+function deferred() {
+  let resolve;
+  const promise = new Promise((yes) => { resolve = yes; });
+  return { promise, resolve };
+}
+
+/** A fake runtime whose prompt emits one assistant reply, keyed by ordinal. */
+function messageRuntime(nativeId, nativePath, ordinal) {
+  const handlers = new Set();
+  const failures = new Set();
+  const commands = [];
+  let bound = false;
+  return {
+    pid: 5000 + ordinal,
+    pgid: 5000 + ordinal,
+    currentPhase: "idle",
+    usable: true,
+    runtimeVersion: "18.2.7",
+    protocolVersion: 2,
+    commands,
+    handlers,
+    failures,
+    write() { return this.usable; },
+    onFrame(fn) { handlers.add(fn); return () => handlers.delete(fn); },
+    onFailure(fn) { failures.add(fn); return () => failures.delete(fn); },
+    emit(frame) { for (const fn of [...handlers]) fn(frame); },
+    async stop() {
+      this.usable = false;
+      return { reaped: true, escalated: "none", steps: [], errors: [], abortAcknowledged: true };
+    },
+    async request(command) {
+      commands.push(command.type);
+      if (!this.usable) throw new Error("request used a retired runtime");
+      if (command.type === "new_session" || command.type === "switch_session") bound = true;
+      if (command.type === "get_state") {
+        return { success: true, data: bound ? { sessionId: nativeId, sessionFile: nativePath } : { sessionId: "unbound", sessionFile: "" } };
+      }
+      if (command.type === "prompt" && !bound) throw new Error("replacement runtime was not restored before prompt");
+      if (command.type === "prompt") {
+        const message = { role: "assistant", content: [{ type: "text", text: `reply-runtime-${ordinal}` }], timestamp: 1 };
+        this.emit({ type: "message_start", message });
+        this.emit({ type: "message_end", message });
+      }
+      if (command.type === "abort") this.emit({ type: "agent_end", isTerminal: true });
+      if (command.type === "get_subagents") {
+        return { success: true, data: { subagents: [{ id: "child", index: 0, agent: "task", agentSource: "bundled", status: "running", lastUpdate: 1, parentToolCallId: "task-1" }] } };
+      }
+      return { success: true, data: { cancelled: false } };
+    },
+  };
+}
+
+/** A real supervisor whose factory mints one message-emitting runtime per start. */
+function messageHarness() {
+  const root = mkdtempSync(join(tmpdir(), "omp-bridge-msg-"));
+  scratch.push(root);
+  const project = join(root, "project");
+  const sessionDir = join(root, "sessions");
+  mkdirSync(project);
+  mkdirSync(sessionDir);
+  const nativeId = "native-msg";
+  const nativePath = join(sessionDir, "native.jsonl");
+  writeFileSync(nativePath, `${JSON.stringify({ type: "session", id: nativeId, cwd: project, timestamp: "2026-09-24T00:00:00Z" })}\n`);
+  const runtimes = [];
+  const envelopes = [];
+  let runRoot;
+  const mockLauncher = join(here, "..", "..", "..", "packages", "omp-runtime", "test", "mock-omp.mjs");
+  const supervisor = new OmpRuntimeSupervisor({
+    dataRoot: join(root, "data"),
+    sessionDir,
+    launcherPath: mockLauncher,
+    expectedRuntimeVersion: "18.2.7",
+    prepareRun(paths) { runRoot = paths.runRoot; },
+    runtimeFactory: async () => {
+      const runtime = messageRuntime(nativeId, nativePath, runtimes.length + 1);
+      runtime.pid = 5000 + runtimes.length;
+      runtime.pgid = runtime.pid;
+      runtimes.push(runtime);
+      return runtime;
+    },
+  });
+  const bridge = createOmpSessionBridge({
+    createSupervisor: () => supervisor,
+    launcher: mockLauncher,
+    isPackaged: false,
+    appPath: here,
+    sessionDir,
+    gateResolver: () => join(here, "..", "..", "..", "packages", "omp-runtime", "extensions", "omp-desktop-gate.ts"),
+    emitAgentEvent: (envelope) => envelopes.push(envelope),
+  });
+  return { root, project, nativeId, nativePath, supervisor, bridge, runtimes, envelopes, runRoot: () => runRoot };
+}
+
+test("replacement runtimes keep every reply visible with distinct ids", async () => {
+  // Two reclaim/rebuild cycles: the live message-id sequence must continue
+  // across runtimes, or the renderer's id-keyed projection would collapse the
+  // later replies into the first row.
+  const { project, nativeId, nativePath, supervisor, bridge, runtimes, envelopes } = messageHarness();
+  try {
+    const replyFor = () => {
+      const ordinal = runtimes.length;
+      for (const fn of runtimes[ordinal - 1].handlers) fn({ type: "tool_execution_start", toolName: "task", toolCallId: "task-1", args: {} });
+    };
+    await bridge.prompt({ sessionId: "reply-identity", content: "first", projectPath: project });
+    replyFor();
+    await bridge.stop("reply-identity");
+    await bridge.prompt({ sessionId: "reply-identity", content: "second", projectPath: project, nativeSessionId: nativeId, nativeSessionPath: nativePath });
+    replyFor();
+    await bridge.stop("reply-identity");
+    const third = await bridge.prompt({ sessionId: "reply-identity", content: "third", projectPath: project, nativeSessionId: nativeId, nativeSessionPath: nativePath });
+
+    assert.equal(third.accepted, true);
+    assert.equal(runtimes.length, 3, "two rebuilds must start three runtimes");
+    const assistantEnds = envelopes.filter(
+      (envelope) => envelope.event.type === "message_end" && envelope.event.message.role === "assistant",
+    );
+    const projected = assistantEnds.reduce((rows, envelope) => projectMessageEnd(rows, envelope.event), []);
+    assert.deepEqual(
+      projected.map(({ id, content }) => ({ id, content })),
+      [
+        { id: "omp:reply-identity:1", content: "reply-runtime-1" },
+        { id: "omp:reply-identity:2", content: "reply-runtime-2" },
+        { id: "omp:reply-identity:3", content: "reply-runtime-3" },
+      ],
+      "each reply must keep its own id and original content across rebuilds",
+    );
+  } finally {
+    await bridge.dispose("msg cleanup").catch(() => undefined);
+    await supervisor.reclaimAll().catch(() => undefined);
+  }
+});
+
+/** A c1-style runtime with a running child, for the teardown-race regression. */
+function r2Harness() {
+  const root = mkdtempSync(join(tmpdir(), "omp-bridge-r2-"));
+  scratch.push(root);
+  const project = join(root, "project");
+  const sessionDir = join(root, "sessions");
+  mkdirSync(project);
+  mkdirSync(sessionDir);
+  const nativeId = "native-r2";
+  const nativePath = join(sessionDir, "native.jsonl");
+  writeFileSync(nativePath, `${JSON.stringify({ type: "session", id: nativeId, cwd: project, timestamp: "2026-09-24T00:00:00Z" })}\n`);
+  const runtimes = [];
+  const state = { stopInFlight: false, startsDuringStop: 0 };
+  let runRoot;
+  const mockLauncher = join(here, "..", "..", "..", "packages", "omp-runtime", "test", "mock-omp.mjs");
+  const supervisor = new OmpRuntimeSupervisor({
+    dataRoot: join(root, "data"),
+    sessionDir,
+    launcherPath: mockLauncher,
+    expectedRuntimeVersion: "18.2.7",
+    prepareRun(paths) { runRoot = paths.runRoot; },
+    runtimeFactory: async () => {
+      if (state.stopInFlight) state.startsDuringStop += 1;
+      const runtime = c1Runtime(nativeId, nativePath, true);
+      runtime.pid = 7000 + runtimes.length;
+      runtime.pgid = runtime.pid;
+      runtimes.push(runtime);
+      return runtime;
+    },
+  });
+  const bridge = createOmpSessionBridge({
+    createSupervisor: () => supervisor,
+    launcher: mockLauncher,
+    isPackaged: false,
+    appPath: here,
+    sessionDir,
+    gateResolver: () => join(here, "..", "..", "..", "packages", "omp-runtime", "extensions", "omp-desktop-gate.ts"),
+    emitAgentEvent: () => {},
+  });
+  return { root, project, nativeId, nativePath, supervisor, bridge, runtimes, state, runRoot: () => runRoot };
+}
+
+test("a prompt racing a stop is refused and never starts a second runtime mid-teardown", async () => {
+  const { project, nativeId, nativePath, supervisor, bridge, runtimes, state } = r2Harness();
+  try {
+    await bridge.prompt({ sessionId: "r2", content: "delegate", projectPath: project });
+    for (const fn of runtimes[0].handlers) fn({ type: "tool_execution_start", toolName: "task", toolCallId: "task-1", args: {} });
+
+    state.stopInFlight = true;
+    const stopPromise = bridge.stop("r2").finally(() => { state.stopInFlight = false; });
+    // Wait until the runtime is stopped while the stop is still in flight: the
+    // run is already idle (agent_end) but the teardown still owns the lifecycle.
+    for (let turn = 0; turn < 100 && state.stopInFlight && supervisor.currentRuntime() !== null; turn += 1) await Promise.resolve();
+    assert.equal(state.stopInFlight, true, "the racing prompt must fire while the stop is still in flight");
+
+    const raced = await bridge.prompt({
+      sessionId: "r2",
+      content: "racing stop",
+      projectPath: project,
+      nativeSessionId: nativeId,
+      nativeSessionPath: nativePath,
+    }).then((result) => result, (error) => ({ refused: true, code: error.code ?? error.errorCode, message: error.message }));
+    await stopPromise;
+
+    assert.equal(raced.refused, true, "the racing prompt must be refused, not answered into the dead turn");
+    assert.equal(raced.code, "stopping");
+    assert.equal(state.startsDuringStop, 0, "no second runtime may start while the stop is unresolved");
+
+    // After the stop settles, the replacement restores the native identity first.
+    const next = await bridge.prompt({
+      sessionId: "r2",
+      content: "continue",
+      projectPath: project,
+      nativeSessionId: nativeId,
+      nativeSessionPath: nativePath,
+    });
+    assert.equal(next.accepted, true);
+    assert.equal(runtimes.length, 2);
+    assert.deepEqual(runtimes[1].commands, ["switch_session", "get_state", "set_subagent_subscription", "prompt"]);
+  } finally {
+    await bridge.dispose("r2 cleanup").catch(() => undefined);
+    await supervisor.reclaimAll().catch(() => undefined);
+  }
+});
+
+/** A runtime whose `switch_session` can be gated for the restore race. */
+function gatedRuntime(nativeId, nativePath, gate) {
+  const handlers = new Set();
+  const commands = [];
+  let bound = false;
+  return {
+    pid: 8000,
+    pgid: 8000,
+    currentPhase: "idle",
+    usable: true,
+    runtimeVersion: "18.2.7",
+    protocolVersion: 2,
+    commands,
+    handlers,
+    write() { return this.usable; },
+    onFrame(fn) { handlers.add(fn); return () => handlers.delete(fn); },
+    onFailure() { return () => {}; },
+    async stop() {
+      this.usable = false;
+      this.currentPhase = "exited";
+      return { reaped: true, escalated: "none", steps: [], errors: [], abortAcknowledged: true };
+    },
+    async request(command) {
+      commands.push(command.type);
+      if (!this.usable) throw new Error("request used a retired runtime");
+      if (command.type === "switch_session") {
+        if (gate) {
+          gate.entered.resolve();
+          await gate.release.promise;
+        }
+        bound = true;
+      }
+      if (command.type === "get_state") {
+        return { success: true, data: bound ? { sessionId: nativeId, sessionFile: nativePath } : {} };
+      }
+      if (command.type === "prompt" && !bound) throw new Error("native session was not restored before prompt");
+      if (command.type === "abort") this.emit({ type: "agent_end", isTerminal: true });
+      if (command.type === "get_subagents") return { success: true, data: { subagents: [] } };
+      return { success: true, data: { cancelled: false } };
+    },
+  };
+}
+
+/** A supervisor whose factory (start boundary) or `switch_session` (restore) can be held. */
+function r3Harness(boundary, afterReclaim) {
+  const root = mkdtempSync(join(tmpdir(), "omp-bridge-r3-"));
+  scratch.push(root);
+  const project = join(root, "project");
+  const sessionDir = join(root, "sessions");
+  mkdirSync(project);
+  mkdirSync(sessionDir);
+  const nativeId = "native-r3";
+  const nativePath = join(sessionDir, "native.jsonl");
+  writeFileSync(nativePath, `${JSON.stringify({ type: "session", id: nativeId, cwd: project, timestamp: "2026-09-24T00:00:00Z" })}\n`);
+  const entered = deferred();
+  const release = deferred();
+  const runtimes = [];
+  const targetOrdinal = afterReclaim ? 2 : 1;
+  let runRoot;
+  const mockLauncher = join(here, "..", "..", "..", "packages", "omp-runtime", "test", "mock-omp.mjs");
+  const supervisor = new OmpRuntimeSupervisor({
+    dataRoot: join(root, "data"),
+    sessionDir,
+    launcherPath: mockLauncher,
+    expectedRuntimeVersion: "18.2.7",
+    prepareRun(paths) { runRoot = paths.runRoot; },
+    runtimeFactory: async () => {
+      const ordinal = runtimes.length + 1;
+      if (boundary === "start" && ordinal === targetOrdinal) {
+        entered.resolve();
+        await release.promise;
+      }
+      const gate = boundary === "restore" && ordinal === targetOrdinal ? { entered, release } : undefined;
+      const runtime = gatedRuntime(nativeId, nativePath, gate);
+      runtime.pid = 8000 + ordinal;
+      runtime.pgid = runtime.pid;
+      runtimes.push(runtime);
+      return runtime;
+    },
+  });
+  const bridge = createOmpSessionBridge({
+    createSupervisor: () => supervisor,
+    launcher: mockLauncher,
+    isPackaged: false,
+    appPath: here,
+    sessionDir,
+    gateResolver: () => join(here, "..", "..", "..", "packages", "omp-runtime", "extensions", "omp-desktop-gate.ts"),
+    emitAgentEvent: () => {},
+  });
+  return { root, project, nativeId, nativePath, supervisor, bridge, runtimes, entered, release, runRoot: () => runRoot };
+}
+
+test("stop during startup or restore cancels the pending prompt and leaves the session idle", async () => {
+  for (const afterReclaim of [false, true]) {
+    for (const boundary of ["start", "restore"]) {
+      const { project, nativeId, nativePath, supervisor, bridge, runtimes, entered, release } = r3Harness(boundary, afterReclaim);
+      try {
+        if (afterReclaim) {
+          await bridge.prompt({ sessionId: "r3", content: "first", projectPath: project, nativeSessionId: nativeId, nativeSessionPath: nativePath });
+          for (const fn of runtimes[0].handlers) fn({ type: "tool_execution_start", toolName: "task", toolCallId: "task-1", args: {} });
+          await bridge.stop("r3");
+        }
+        const pendingPrompt = bridge.prompt({
+          sessionId: "r3",
+          content: "must be cancelled by stop",
+          projectPath: project,
+          nativeSessionId: nativeId,
+          nativeSessionPath: nativePath,
+        }).then((result) => result, (error) => ({ refused: true, code: error.code ?? error.errorCode, message: error.message }));
+
+        await entered.promise;
+        const pendingStop = bridge.stop("r3");
+        let stopSettledBeforeRelease = false;
+        pendingStop.then(() => { stopSettledBeforeRelease = true; });
+        for (let turn = 0; turn < 20; turn += 1) await Promise.resolve();
+        assert.equal(stopSettledBeforeRelease, false, `stop must own the pending ${boundary}, not return "nothing running"`);
+        release.resolve();
+        const [prompt, stop] = await Promise.all([pendingPrompt, pendingStop]);
+
+        assert.equal(prompt.refused, true, `the pending prompt must be cancelled on ${boundary}`);
+        assert.equal(prompt.code, "stopping");
+        assert.equal(stop.toreDown, false);
+        assert.equal(bridge.status("r3").isRunning, false);
+        assert.equal(bridge.status("r3").state, "idle");
+      } finally {
+        release.resolve();
+        await bridge.dispose("r3 cleanup").catch(() => undefined);
+        await supervisor.reclaimAll().catch(() => undefined);
+      }
+    }
+  }
+});
+
+test("dispose during startup or restore cancels the pending prompt and reclaims", async () => {
+  for (const boundary of ["start", "restore"]) {
+    const { project, nativeId, nativePath, supervisor, bridge, entered, release } = r3Harness(boundary, false);
+    try {
+      const pendingPrompt = bridge.prompt({
+        sessionId: "r3",
+        content: "must be cancelled by dispose",
+        projectPath: project,
+        nativeSessionId: nativeId,
+        nativeSessionPath: nativePath,
+      }).then((result) => result, (error) => ({ refused: true, code: error.code ?? error.errorCode, message: error.message }));
+
+      await entered.promise;
+      const pendingDispose = bridge.dispose("shutdown");
+      release.resolve();
+      const [prompt, disposed] = await Promise.all([pendingPrompt, pendingDispose]);
+
+      assert.equal(prompt.refused, true, `the pending prompt must be cancelled on ${boundary}`);
+      assert.equal(prompt.code, "stopping");
+      assert.deepEqual(disposed, { ok: true, failures: [] });
+    } finally {
+      release.resolve();
+      await bridge.dispose("r3 dispose cleanup").catch(() => undefined);
+      await supervisor.reclaimAll().catch(() => undefined);
+    }
+  }
+});
+
+test("two concurrent prompts share one runtime and only one starts a run", async () => {
+  const { bridge, supervisor } = bridgeHarness();
+  const project = makeProject();
+  const [first, second] = await Promise.allSettled([
+    bridge.prompt({ sessionId: OMP_SESSION, content: "one", projectPath: project }),
+    bridge.prompt({ sessionId: OMP_SESSION, content: "two", projectPath: project }),
+  ]);
+  const accepted = [first, second].filter((outcome) => outcome.status === "fulfilled");
+  const refused = [first, second].filter((outcome) => outcome.status === "rejected");
+  assert.equal(accepted.length, 1, "exactly one of the concurrent prompts starts the run");
+  assert.equal(refused.length, 1, "the other concurrent prompt is refused while the run is busy");
+  assert.equal(accepted[0].value.accepted, true);
+  assert.equal(refused[0].reason.code ?? refused[0].reason.errorCode, "not-started");
+  assert.equal(supervisor.started, 1, "concurrent prompts must not start a second runtime");
 });

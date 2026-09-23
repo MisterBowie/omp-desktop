@@ -1,6 +1,6 @@
 # M5 验证记录：OMP 子代理面板与编排归属（T17）
 
-状态：**未验收**（T17）。第三轮独立复审拆出 B1-B3 三项返修；B1 于 `9d0acde` 首实现后独立复审仍复现两项缺陷（F1 目录债二次 stop 丢失、F2 停期间短暂放行 prompt），本提交修复并追加行为回归，**B1 改定待独立验收**；第四轮独立复审拆出 C1（回收成功后的运行时替换/原生会话恢复，见 §0.5），**C1 已实现待独立验收**；**B2（renderer 单飞/错误可见）与 B3（总 UTF-8 预算）仍未解决**。M5 后续任务 T18-T20 未开始。
+状态：**未验收**（T17）。第三轮独立复审拆出 B1-B3 三项返修；B1 于 `9d0acde` 首实现后独立复审仍复现两项缺陷（F1 目录债二次 stop 丢失、F2 停期间短暂放行 prompt），本提交修复并追加行为回归，**B1 改定待独立验收**；第四轮独立复审拆出 C1（回收成功后的运行时替换/原生会话恢复，见 §0.5），C1 基本续聊已修复，但独立复审进一步复现三项残余缺陷（R1 替换后回复覆盖、R2 停止未完成即替换且跳过恢复、R3 启动/恢复中停止被忽略），由本提交修复并追加行为回归（见 §0.6），**C1 及本跟进提交待独立验收**；**B2（renderer 单飞/错误可见）与 B3（总 UTF-8 预算）仍未解决**。M5 后续任务 T18-T20 未开始。
 基线提交：`d26444407fc963c2e7efd51bda7d1bd4a70e8bbd`；第二轮独立复审返修（S1-S4）以追加普通提交落在该基线上（见 `git log` 最新提交）。
 固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未修改）。
 工作树：`/home/vv/person/code/omp-desktop-m5-t17`，分支 `codex/m5-subagents`。
@@ -62,6 +62,25 @@
 - 扩展真实固定 OMP E2E（`apps/desktop/test/omp-subagent-e2e.test.mjs` 第三项，保留不先 list 的 detached-child 场景与本地假 provider）：停掉仍运行的 detached 子代理后，**同会话**显式新消息续聊，断言 `accepted`、turnId 与首轮不同、新 turn 收到 `agent_end`、`get_state` 报同一 `sessionId`；finally 全量 reclaim。
 
 验证（`app/`，`nvm use v24.14.0`，Node v24.14.0，pnpm 10.34.5，Bun 1.4.2）：独立 repro `OMP_REVIEW_APP=/home/vv/person/code/omp-desktop-m5-t17/app OMP_REVIEW_NEXT_PROMPT=true node /tmp/m5-bridge-cleanup-retry.mjs` 现输出 `nextPrompt={accepted:true,turnId:"omp-turn:review-cleanup:2"}`、`runtimeStarts=2`、`replacementCommands=["switch_session","get_state","set_subagent_subscription","prompt"]`；`pnpm --filter @pi-desktop/omp-runtime test` **231 passed / 0 failed**（含真实固定 runtime 烟测）；`env -u SSH_ASKPASS node --test test/omp-session-bridge.test.mjs` **35 passed / 0 failed**（29 + 6 C1 回归）；`omp-subagent-e2e` 3（含同会话续聊）、`omp-session-ownership`/`failclosed`/`configure`/`configure-ipc`/`delete-archive`/`host-mutation-gates`/`ipc-result`/`subagent-bridge`/`subagent-read`/`subagent-panel-render`/`subagent-panel-mounted` 共 60、`omp-session-e2e`/`concurrent-approval-e2e`/`persistence-e2e` 3 全绿；`pnpm --filter @pi-desktop/omp-runtime exec tsc -p tsconfig.json --noEmit` 与 `pnpm --filter @pi-desktop/desktop typecheck` 0；`git diff --check` 无输出。
+
+## 0.6 C1 跟进返修（R1/R2/R3，2026-09-24）
+
+第四轮 C1 修复了「回收成功后同会话续聊」的基本路径，但独立复审在 C1 基线上用真实 `SessionEntry` + 真实 `OmpRuntimeSupervisor`（仅外部进程边界用假 runtime）复现三项残余缺陷（repro 见 `/tmp/m5-session-restart-review.mjs`、`/tmp/m5-restore-stop-review.mjs`）。本提交修复并追加行为回归，待独立验收。
+
+- **R1 替换后回复被覆盖**：`OmpEventConverter.mintId()` 的 `sequence` 每个 runner 从 0 起，替换 runtime 后新回复重铸 `omp:<session>:1`，渲染器按 id upsert 把旧回复覆盖（repro：`messageIds=["omp:review:1","omp:review:1"]`、`distinctMessages=false`、`projectedAssistantRows` 只剩 `reply-runtime-2`）。修复：`OmpEventConverterOptions` 增 `sequenceSeed`，runner 增 `messageSequenceSeed`（与既有 `generationSeed` 并行），`SessionEntry.retireRunner()` 捕获 `currentMessageSequence()`、`buildRunner()` 传给替换 runner，使 live 消息 id 跨替换续号；保留流式 start/update/end 同 id 与 durable-entry 稳定 id。
+- **R2 停止未完成即替换并跳过恢复**：`shouldRetireRunner()` 只查 `runState()` 与 `pendingReclaim`，但 `agent_end` 已把可见 state 置 idle 而 teardown 仍拥有生命周期；且 `ensureNativeSession()` 在 `ensureRunner()` 退役/替换 runner 之前就能从 `nativeSessionBound` 早退，导致新进程跳过 `switch_session`/`get_state`（repro：`startsDuringStop=1`、`replacementCommands=["set_subagent_subscription","prompt","switch_session","get_state","prompt"]`、假 runtime 拒 `"replacement runtime was not restored before prompt"`）。修复：runner 增 `isStopping()`，`shouldRetireRunner()` 在 stop 进行中不退役、不重建；native 绑定改记 `nativeSessionRunner`（绑定到具体 runner 实例），早退需 `nativeSessionRunner === this.runner`，退役/替换后强制重发恢复。
+- **R3 启动/恢复中停止被忽略**：`SessionEntry.stop()`/桥 `stop()` 在 runner 尚不存在或 `activeRunner()` 为空时立即返回 `nothing running`，既不取消 pending prompt 也不拥有正在启动/恢复的 runtime；release 后内容照常提交（repro：`stopSettledBeforeRelease=true`、`prompt.accepted=true`、`status.isRunning=true`）。修复：`SessionEntry` 增 `stopEpoch`（stop/dispose 同步自增），`prompt` 入口读 epoch、提交前复检（不一致即 typed `stopping` 拒绝）；`stop()`/`dispose()` 先 await 在途 `runnerBuild`/`nativeSessionBuild` 再停 runner/reclaim，已启动 runtime 保持被拥有并按既有合同收敛/回收，绝不复活已 dispose 的 entry。
+
+| 借用规则 | 固定 PI 来源 | 固定 OMP 来源 |
+| --- | --- | --- |
+| 活跃助手身份唯一、durable 完成仅替换命名的临时行（R1 身份隔离，不移植 PI 原生持久化） | `packages/agent-runtime/src/native-pi-session.ts:390-447`、`native-pi-session.test.ts:574-606` | — |
+| 同 id upsert 故意替换旧行，映射器不得复用旧消息 id（R1） | `apps/desktop/src/lib/session-transcript.ts:50-125`、`apps/desktop/test/session-transcript.test.mjs:109-119,151-178` | — |
+| 生命周期所有权而非仅显示 idle；attachSidecar 旧事件/替换隔离；onExit 清陈旧句柄并请求替换（R2） | `packages/host-runtime/src/runtime-supervisor.ts`（并发 join、shutdown 不重启）、`runtime-service.ts` `attachSidecar`（约 280 行）、`apps/desktop/electron/main/runtime/sidecar.ts` onExit（约 239-300） | — |
+| 恢复只经 `switch_session`+`get_state`、不重放；换会话清 per-runtime 初始化态（R2/R3） | — | `docs/rpc.md`、`packages/coding-agent/src/modes/rpc/rpc-mode.ts`（约 550 `handleRpcSessionChange`） |
+
+新增回归（`apps/desktop/test/omp-session-bridge.test.mjs` 5 例，真实 `SessionEntry` + 真实 `OmpRuntimeSupervisor` + 外部边界可控 promise/假 runtime，先红后绿）：① R1 两次重建后三条回复保留各自 id 与原内容（经真实 `projectMessageEnd` 投影）；② R2 stop 进行中 racing prompt 以 typed `stopping` 拒绝、`startsDuringStop=0`、替换 prompt 先 `switch_session`/`get_state` 再 `prompt`；③ R3 stop 在 start/restore（含 replacement）四组合下取消 pending prompt、stop 不提前 settle、会话 idle；④ R3 dispose 在 start/restore 下取消 pending prompt 并干净回收；⑤ 两个并发 prompt 共享一个 runtime、仅其一启动 run。扩展真实固定 OMP E2E（`omp-session-e2e.test.mjs`，本地假 provider）：同会话停后续聊断言真实助手回复 `status:"complete"` 且无 `error`（不再只凭 `agent_end`）。
+
+验证（`app/`，`nvm use v24.14.0`，Node v24.14.0，pnpm 10.34.5，Bun 1.4.2）：`pnpm --filter @pi-desktop/omp-runtime test` **231 passed / 0 failed**；`node --test test/omp-session-bridge.test.mjs` **40 passed / 0 failed**（35 + 5 C1 跟进回归）；`session-transcript`/`omp-session-ownership`/`failclosed`/`configure`/`configure-ipc`/`delete-archive`/`ipc-result`/`host-mutation-gates`/`archive-renderer`/`subagent-bridge`/`subagent-read`/`subagent-reload-projection` **76 passed / 0 failed**；`omp-session-e2e`/`concurrent-approval-e2e`/`persistence-e2e` **3 passed / 0 failed**（真实固定 OMP + 假 provider）；`omp-subagent-e2e` **3 passed / 0 failed**；`pnpm --filter @pi-desktop/omp-runtime typecheck` 与 desktop `pnpm typecheck` 退出码 0；`git diff --check` 无输出。
 
 ## 0. 环境准备（固定子模块流程，与本轮代码无关）
 

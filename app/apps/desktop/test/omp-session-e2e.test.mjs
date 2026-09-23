@@ -286,6 +286,13 @@ test(
       );
       const after = envelopes.filter((e) => e.turnId === second.turnId);
       assert.ok(after.length > 0, "the new run must publish its own events");
+      const reply = after.find((e) => e.event.type === "message_end" && e.event.message.role === "assistant");
+      assert.ok(reply, "the continuation must produce a real assistant reply, not only agent_end");
+      assert.equal(reply.event.message.status, "complete", "the continuation reply must succeed");
+      assert.ok(
+        after.every((e) => e.event.type !== "error"),
+        "the continuation must publish no error",
+      );
       assert.ok(
         after.every((e) => !(e.event.type === "tool_end" && e.event.toolCallId === "call_long")),
         "the stopped run's tool result must never appear under the new turn id",
