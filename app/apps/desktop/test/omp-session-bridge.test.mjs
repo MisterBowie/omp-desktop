@@ -266,7 +266,7 @@ test("starts the runtime once and streams the run under one turn id", async () =
   const project = makeProject();
   const first = await bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: project });
   assert.equal(supervisor.started, 1);
-  assert.match(first.turnId, /^omp-turn:session-omp:1$/);
+  assert.match(first.turnId, /^omp-turn:session-omp:[^:]+:1$/);
 
   runtime.push({ type: "agent_start" });
   runtime.push({
@@ -615,7 +615,7 @@ test("reclaims a dead runtime and rebuilds it for the next prompt in the same se
       nativeSessionPath: nativePath,
     });
     assert.equal(next.accepted, true);
-    assert.match(next.turnId, /^omp-turn:c1-retry:2$/, "the turn identity must not reuse the first turn's");
+    assert.match(next.turnId, /^omp-turn:c1-retry:[^:]+:2$/, "the turn identity must not reuse the first turn's");
     assert.equal(runtimes.length, 2, "a second runtime must start for the replacement");
     assert.deepEqual(runtimes[1].commands, ["switch_session", "get_state", "set_subagent_subscription", "prompt"]);
     assert.equal(runtimes[1].commands.filter((command) => command === "prompt").length, 1, "exactly one prompt is submitted");
@@ -648,7 +648,7 @@ test("an immediate successful teardown still lets the next prompt rebuild", asyn
     });
     assert.equal(next.accepted, true);
     assert.equal(runtimes.length, 2);
-    assert.match(next.turnId, /^omp-turn:c1-immediate:2$/);
+    assert.match(next.turnId, /^omp-turn:c1-immediate:[^:]+:2$/);
   } finally {
     await bridge.dispose("c1 cleanup").catch(() => undefined);
     await supervisor.reclaimAll().catch(() => undefined);
@@ -676,7 +676,7 @@ test("a converged protocol stop reuses the live runtime", async () => {
     });
     assert.equal(next.accepted, true);
     assert.equal(runtimes.length, 1, "a converged stop must not start a second runtime");
-    assert.match(next.turnId, /^omp-turn:c1-converged:2$/, "the same runner continues the turn sequence");
+    assert.match(next.turnId, /^omp-turn:c1-converged:[^:]+:2$/, "the same runner continues the turn sequence");
   } finally {
     await bridge.dispose("c1 cleanup").catch(() => undefined);
     await supervisor.reclaimAll().catch(() => undefined);
@@ -769,7 +769,8 @@ test("a dispose that cannot reclaim keeps the session's ownership, not a second 
 
     await assert.rejects(
       () => bridge.prompt({ sessionId: "c1-dispose-debt", content: "again", projectPath: project }),
-      (error) => error.code === "not-started" || error.errorCode === "NOT_STARTED",
+      (error) => error.errorCode === ErrorCodes.ENGINE_UNAVAILABLE,
+      "a whole-bridge shutdown refuses every session, existing or new",
     );
     assert.equal(runtimes.length, 1, "dispose must not start a second runtime");
 
@@ -881,7 +882,7 @@ test("an OMP prompt reaches the bridge without touching the Pi runtime", async (
 test("an OMP session's status comes from the runtime that owns it", async () => {
   const { bridge } = bridgeHarness();
   const project = makeProject();
-  await bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: project });
+  const result = await bridge.prompt({ sessionId: OMP_SESSION, content: "hello", projectPath: project });
   const handlers = new Map();
   registerAgentIpc({
     registrar: { handle: (channel, handler) => handlers.set(channel, handler) },
@@ -920,7 +921,7 @@ test("an OMP session's status comes from the runtime that owns it", async () => 
 
   const status = await handlers.get(IPC.invoke.agentGetStatus)(OMP_SESSION);
   assert.equal(status.status.isRunning, true);
-  assert.equal(status.status.currentTurnId, "omp-turn:session-omp:1");
+  assert.equal(status.status.currentTurnId, result.turnId);
 });
 
 test("binds the session's project directory before the runtime starts", async () => {
@@ -1266,7 +1267,7 @@ test("a refused prompt closes its dialog and tells the renderer the turn ended",
   );
   const terminal = envelopes.at(-1);
   assert.equal(terminal.sessionId, OMP_SESSION);
-  assert.equal(terminal.turnId, "omp-turn:session-omp:1");
+  assert.match(terminal.turnId, /^omp-turn:session-omp:[^:]+:1$/);
   assert.equal(terminal.event.type, "error");
   assert.match(terminal.event.error.message, /busy/);
 
@@ -1370,7 +1371,7 @@ test("a thrown prompt request keeps its own error and still ends the turn", asyn
     envelopes.map((entry) => entry.event.type),
     ["tool_permission_request", "error"],
   );
-  assert.equal(envelopes.at(-1).turnId, "omp-turn:session-omp:1");
+  assert.match(envelopes.at(-1).turnId, /^omp-turn:session-omp:[^:]+:1$/);
   assert.deepEqual(runtime.written, [
     { type: "extension_ui_response", id: "ui-error", cancelled: true },
   ]);
@@ -1496,13 +1497,24 @@ test("replacement runtimes keep every reply visible with distinct ids", async ()
     );
     const projected = assistantEnds.reduce((rows, envelope) => projectMessageEnd(rows, envelope.event), []);
     assert.deepEqual(
-      projected.map(({ id, content }) => ({ id, content })),
-      [
-        { id: "omp:reply-identity:1", content: "reply-runtime-1" },
-        { id: "omp:reply-identity:2", content: "reply-runtime-2" },
-        { id: "omp:reply-identity:3", content: "reply-runtime-3" },
-      ],
-      "each reply must keep its own id and original content across rebuilds",
+      projected.map(({ content }) => content),
+      ["reply-runtime-1", "reply-runtime-2", "reply-runtime-3"],
+      "each reply must keep its original content across rebuilds",
+    );
+    // The live ids stay distinct and share one execution context: the within-entry
+    // rebuild carries the same context token and only the sequence advances, so
+    // the renderer never collapses one reply into another.
+    const ids = projected.map(({ id }) => id);
+    assert.equal(new Set(ids).size, 3, "each reply must keep its own id");
+    const context = ids[0].slice(0, ids[0].lastIndexOf(":"));
+    assert.ok(
+      ids.every((id) => id.startsWith(`${context}:`)),
+      "all replies on one entry share the same live-id context",
+    );
+    assert.deepEqual(
+      ids.map((id) => id.slice(id.lastIndexOf(":") + 1)),
+      ["1", "2", "3"],
+      "the message sequence advances across the rebuilds",
     );
   } finally {
     await bridge.dispose("msg cleanup").catch(() => undefined);
@@ -1989,5 +2001,335 @@ test("concurrent stop and dispose overlap without reopening admission", async ()
     release.resolve();
     await bridge.dispose("r3 cleanup").catch(() => undefined);
     await supervisor.reclaimAll().catch(() => undefined);
+  }
+});
+
+/** A bridge over real per-session supervisors whose session A stop is held. */
+function shutdownAdmissionHarness() {
+  const root = mkdtempSync(join(tmpdir(), "omp-bridge-shutdown-"));
+  scratch.push(root);
+  const project = join(root, "project");
+  const sessionDir = join(root, "sessions");
+  mkdirSync(project);
+  mkdirSync(sessionDir);
+  const inputs = {};
+  for (const id of ["a", "b", "c"]) {
+    const nativeSessionId = `native-${id}`;
+    const nativeSessionPath = join(sessionDir, `${id}.jsonl`);
+    writeFileSync(nativeSessionPath, `${JSON.stringify({ type: "session", id: nativeSessionId, cwd: project, timestamp: "2026-09-24T00:00:00Z" })}\n`);
+    inputs[id] = { sessionId: id, projectPath: project, nativeSessionId, nativeSessionPath };
+  }
+  const entered = deferred();
+  const release = deferred();
+  const runtimes = new Map();
+  const supervisors = new Map();
+  const mockLauncher = join(here, "..", "..", "..", "packages", "omp-runtime", "test", "mock-omp.mjs");
+  const bridge = createOmpSessionBridge({
+    createSupervisor: (spec) => {
+      const id = spec.sessionId;
+      const supervisor = new OmpRuntimeSupervisor({
+        dataRoot: join(root, `data-${id}`),
+        sessionDir,
+        launcherPath: mockLauncher,
+        expectedRuntimeVersion: "18.2.7",
+        runtimeFactory: async () => {
+          const frames = new Set();
+          const failures = new Set();
+          let bound = false;
+          const runtime = {
+            pid: 5454 + runtimes.size,
+            pgid: 5454 + runtimes.size,
+            currentPhase: "idle",
+            usable: true,
+            runtimeVersion: "18.2.7",
+            protocolVersion: 2,
+            commands: [],
+            write() { return this.usable; },
+            onFrame(fn) { frames.add(fn); return () => frames.delete(fn); },
+            onFailure(fn) { failures.add(fn); return () => failures.delete(fn); },
+            emit(frame) { for (const fn of [...frames]) fn(frame); },
+            async stop() {
+              this.usable = false;
+              this.currentPhase = "stopping";
+              if (id === "a") { entered.resolve(); await release.promise; }
+              this.currentPhase = "exited";
+              return { reaped: true, escalated: "none", steps: [], errors: [], abortAcknowledged: true };
+            },
+            async request(command) {
+              this.commands.push(command.type);
+              if (!this.usable) throw new Error("request used a retired runtime");
+              if (command.type === "switch_session") {
+                if (command.sessionPath !== inputs[id].nativeSessionPath) throw new Error("incorrect session binding");
+                bound = true;
+              }
+              if (command.type === "get_state") return { success: true, data: bound ? { sessionId: inputs[id].nativeSessionId, sessionFile: inputs[id].nativeSessionPath } : {} };
+              if (command.type === "prompt" && !bound) throw new Error("prompt before restore");
+              return { success: true, data: { cancelled: false } };
+            },
+          };
+          runtimes.set(id, runtime);
+          return runtime;
+        },
+      });
+      supervisors.set(id, supervisor);
+      return supervisor;
+    },
+    launcher: mockLauncher,
+    isPackaged: false,
+    appPath: here,
+    sessionDir,
+    gateResolver: () => join(here, "..", "..", "..", "packages", "omp-runtime", "extensions", "omp-desktop-gate.ts"),
+    emitAgentEvent: () => {},
+  });
+  return { root, project, inputs, entered, release, runtimes, supervisors, bridge };
+}
+
+const captured = (promise) => promise.then(
+  (value) => value,
+  (error) => ({ refused: true, code: error.code ?? error.errorCode, message: error.message }),
+);
+
+test("whole-bridge shutdown refuses an existing session before any cleanup await", async () => {
+  const { inputs, entered, release, runtimes, supervisors, bridge } = shutdownAdmissionHarness();
+  try {
+    for (const id of ["a", "b"]) {
+      await bridge.prompt({ ...inputs[id], content: `first ${id}` });
+      runtimes.get(id).emit({ type: "agent_end", isTerminal: true });
+    }
+    const shutdown = bridge.dispose("review shutdown");
+    await entered.promise;
+    const existing = await captured(bridge.prompt({ ...inputs.b, content: "must not execute during shutdown" }));
+    const created = await captured(bridge.prompt({ ...inputs.c, content: "must not create during shutdown" }));
+    release.resolve();
+    await shutdown;
+
+    assert.equal(existing.refused, true, "an existing session must be refused during whole shutdown");
+    assert.equal(existing.code, "ENGINE_UNAVAILABLE");
+    assert.equal(created.refused, true, "a new session must still be refused during whole shutdown");
+    assert.equal(created.code, "ENGINE_UNAVAILABLE");
+    assert.equal(
+      runtimes.get("b").commands.filter((type) => type === "prompt").length,
+      1,
+      "no second prompt command may reach the existing session B",
+    );
+    assert.equal(runtimes.size, 2, "only A and B ever start a runtime");
+    assert.equal(supervisors.size, 2, "no supervisor may be created for C");
+    assert.deepEqual(
+      [...supervisors.entries()].filter(([, supervisor]) => supervisor.currentRuntime() !== null).map(([id]) => id),
+      [],
+      "no runtime may survive the shutdown sweep",
+    );
+  } finally {
+    release.resolve();
+    await bridge.dispose("shutdown cleanup").catch(() => undefined);
+    for (const supervisor of supervisors.values()) await supervisor.reclaimAll().catch(() => undefined);
+  }
+});
+
+test("whole-bridge shutdown invalidates a prompt still preparing before it submits", async () => {
+  const { inputs, entered, release, runtimes, supervisors, bridge } = shutdownAdmissionHarness();
+  try {
+    for (const id of ["a", "b"]) {
+      await bridge.prompt({ ...inputs[id], content: `first ${id}` });
+      runtimes.get(id).emit({ type: "agent_end", isTerminal: true });
+    }
+    // Admitted just before the sweep, still mid-preparation: the epoch bump must
+    // invalidate it before any content reaches B.
+    const preadmitted = captured(bridge.prompt({ ...inputs.b, content: "must not submit after shutdown begins" }));
+    const shutdown = bridge.dispose("review shutdown");
+    await entered.promise;
+    const existing = await preadmitted;
+    const created = await captured(bridge.prompt({ ...inputs.c, content: "must not create during shutdown" }));
+    release.resolve();
+    await shutdown;
+
+    assert.equal(existing.refused, true, "the pre-admitted prompt must be invalidated before submission");
+    assert.equal(existing.code, "stopping");
+    assert.equal(created.refused, true);
+    assert.equal(
+      runtimes.get("b").commands.filter((type) => type === "prompt").length,
+      1,
+      "the pre-admitted prompt must never submit a second prompt command to B",
+    );
+    assert.equal(runtimes.size, 2, "no runtime may start for a pre-admitted or new session");
+    assert.deepEqual(
+      [...supervisors.entries()].filter(([, supervisor]) => supervisor.currentRuntime() !== null).map(([id]) => id),
+      [],
+    );
+  } finally {
+    release.resolve();
+    await bridge.dispose("shutdown cleanup").catch(() => undefined);
+    for (const supervisor of supervisors.values()) await supervisor.reclaimAll().catch(() => undefined);
+  }
+});
+
+/** A bridge whose per-session supervisor mints one reply-emitting runtime. */
+function modelSwitchHarness() {
+  const root = mkdtempSync(join(tmpdir(), "omp-bridge-model-"));
+  scratch.push(root);
+  const project = join(root, "project");
+  const sessionDir = join(root, "sessions");
+  mkdirSync(project);
+  mkdirSync(sessionDir);
+  const nativeSessionId = "review-native";
+  const nativeSessionPath = join(sessionDir, "native.jsonl");
+  writeFileSync(nativeSessionPath, `${JSON.stringify({ type: "session", id: nativeSessionId, cwd: project, timestamp: "2026-09-24T00:00:00Z" })}\n`);
+  const runtimes = [];
+  const supervisors = [];
+  const envelopes = [];
+  const persisted = [];
+  const mockLauncher = join(here, "..", "..", "..", "packages", "omp-runtime", "test", "mock-omp.mjs");
+  const bridge = createOmpSessionBridge({
+    createSupervisor: () => {
+      const supervisor = new OmpRuntimeSupervisor({
+        dataRoot: join(root, `data-${supervisors.length}`),
+        sessionDir,
+        launcherPath: mockLauncher,
+        expectedRuntimeVersion: "18.2.7",
+        runtimeFactory: async () => {
+          const frames = new Set();
+          const failures = new Set();
+          let bound = false;
+          const number = runtimes.length + 1;
+          const runtime = {
+            pid: 6454 + number,
+            pgid: 6454 + number,
+            currentPhase: "idle",
+            usable: true,
+            runtimeVersion: "18.2.7",
+            protocolVersion: 2,
+            frames,
+            failures,
+            commands: [],
+            write() { return this.usable; },
+            onFrame(fn) { frames.add(fn); return () => frames.delete(fn); },
+            onFailure(fn) { failures.add(fn); return () => failures.delete(fn); },
+            emit(frame) { for (const fn of [...frames]) fn(frame); },
+            async stop() {
+              this.usable = false;
+              this.currentPhase = "exited";
+              return { reaped: true, escalated: "none", steps: [], errors: [], abortAcknowledged: true };
+            },
+            async request(command) {
+              this.commands.push(command.type);
+              if (!this.usable) throw new Error("request used a retired runtime");
+              if (command.type === "switch_session") {
+                if (command.sessionPath !== nativeSessionPath) throw new Error("incorrect session binding");
+                bound = true;
+              }
+              if (command.type === "get_state") {
+                return { success: true, data: bound ? { sessionId: nativeSessionId, sessionFile: nativeSessionPath } : {} };
+              }
+              if (command.type === "prompt") {
+                if (!bound) throw new Error("prompt before restore");
+                const message = { role: "assistant", content: [{ type: "text", text: `reply-model-${number}` }], timestamp: number };
+                this.emit({ type: "message_start", message });
+                this.emit({ type: "message_end", message });
+              }
+              return { success: true, data: { cancelled: false } };
+            },
+          };
+          runtimes.push(runtime);
+          return runtime;
+        },
+      });
+      supervisors.push(supervisor);
+      return supervisor;
+    },
+    launcher: mockLauncher,
+    isPackaged: false,
+    appPath: here,
+    sessionDir,
+    gateResolver: () => join(here, "..", "..", "..", "packages", "omp-runtime", "extensions", "omp-desktop-gate.ts"),
+    emitAgentEvent: (envelope) => envelopes.push(envelope),
+    persistConfig: async (config) => { persisted.push(config); },
+  });
+  return { root, project, nativeSessionId, nativeSessionPath, runtimes, supervisors, envelopes, persisted, bridge };
+}
+
+/** Project the assistant `message_end` rows exactly as the renderer does. */
+function projectedAssistantReplies(envelopes) {
+  return envelopes
+    .filter((envelope) => envelope.event.type === "message_end" && envelope.event.message.role === "assistant")
+    .reduce((rows, envelope) => projectMessageEnd(rows, envelope.event), []);
+}
+
+test("a model change reconfigures without reusing the earlier reply's live ids", async () => {
+  const { project, nativeSessionId, nativeSessionPath, runtimes, supervisors, envelopes, bridge } = modelSwitchHarness();
+  const input = { sessionId: "model-review", projectPath: project, nativeSessionId, nativeSessionPath, providerId: "local" };
+  try {
+    const first = await bridge.prompt({ ...input, modelId: "first", content: "first" });
+    runtimes[0].emit({ type: "agent_end", isTerminal: true });
+    const configured = await bridge.configure(input.sessionId, { providerId: "local", modelId: "second" });
+    const second = await bridge.prompt({ ...input, modelId: "second", content: "second" });
+    runtimes[1].emit({ type: "agent_end", isTerminal: true });
+
+    assert.equal(configured.ok, true);
+    assert.notEqual(first.turnId, second.turnId, "a recreated execution context must mint a distinct turn id");
+    const projected = projectedAssistantReplies(envelopes);
+    assert.deepEqual(
+      projected.map(({ content }) => content),
+      ["reply-model-1", "reply-model-2"],
+      "both replies must stay visible across the model change",
+    );
+    assert.equal(new Set(projected.map(({ id }) => id)).size, 2, "the two replies must not share a live id");
+    assert.equal(runtimes.length, 2, "the model change starts a fresh runtime");
+    assert.equal(supervisors.length, 2, "the recreated entry owns a fresh supervisor");
+    assert.equal(runtimes[0].frames.size + runtimes[0].failures.size, 0, "the old runtime's handlers must be detached");
+    assert.deepEqual(
+      runtimes[1].commands,
+      ["switch_session", "get_state", "set_subagent_subscription", "prompt"],
+      "the replacement restores the same native session before the prompt",
+    );
+  } finally {
+    await bridge.dispose("model cleanup").catch(() => undefined);
+    for (const supervisor of supervisors) await supervisor.reclaimAll().catch(() => undefined);
+  }
+});
+
+test("a disposed and reopened session mints fresh live ids without colliding", async () => {
+  const { project, nativeSessionId, nativeSessionPath, runtimes, supervisors, envelopes, bridge } = modelSwitchHarness();
+  const input = { sessionId: "model-review", projectPath: project, nativeSessionId, nativeSessionPath, providerId: "local" };
+  try {
+    const first = await bridge.prompt({ ...input, modelId: "first", content: "first" });
+    runtimes[0].emit({ type: "agent_end", isTerminal: true });
+    const disposed = await bridge.disposeSession(input.sessionId, "reopen regression");
+    assert.equal(disposed.ok, true);
+    const second = await bridge.prompt({ ...input, modelId: "first", content: "second" });
+    runtimes[1].emit({ type: "agent_end", isTerminal: true });
+
+    assert.notEqual(first.turnId, second.turnId, "a reopened session must mint a distinct turn id");
+    const projected = projectedAssistantReplies(envelopes);
+    assert.deepEqual(projected.map(({ content }) => content), ["reply-model-1", "reply-model-2"]);
+    assert.equal(new Set(projected.map(({ id }) => id)).size, 2, "the two replies must not share a live id");
+    assert.deepEqual(
+      runtimes[1].commands,
+      ["switch_session", "get_state", "set_subagent_subscription", "prompt"],
+      "the reopened session restores the same native session before the prompt",
+    );
+  } finally {
+    await bridge.dispose("reopen cleanup").catch(() => undefined);
+    for (const supervisor of supervisors) await supervisor.reclaimAll().catch(() => undefined);
+  }
+});
+
+test("a recreated bridge mints live ids that do not collide with a retained reply", async () => {
+  const first = modelSwitchHarness();
+  const second = modelSwitchHarness();
+  try {
+    const inputA = { sessionId: "model-review", projectPath: first.project, nativeSessionId: first.nativeSessionId, nativeSessionPath: first.nativeSessionPath, providerId: "local" };
+    const inputB = { sessionId: "model-review", projectPath: second.project, nativeSessionId: second.nativeSessionId, nativeSessionPath: second.nativeSessionPath, providerId: "local" };
+    await first.bridge.prompt({ ...inputA, modelId: "first", content: "first" });
+    first.runtimes[0].emit({ type: "agent_end", isTerminal: true });
+    await second.bridge.prompt({ ...inputB, modelId: "first", content: "second" });
+    second.runtimes[0].emit({ type: "agent_end", isTerminal: true });
+
+    const projected = projectedAssistantReplies([...first.envelopes, ...second.envelopes]);
+    assert.equal(projected.length, 2, "a recreated bridge must not collapse the retained reply");
+    assert.equal(new Set(projected.map(({ id }) => id)).size, 2, "the two replies must not share a live id");
+  } finally {
+    await first.bridge.dispose("bridge a cleanup").catch(() => undefined);
+    await second.bridge.dispose("bridge b cleanup").catch(() => undefined);
+    for (const supervisor of [...first.supervisors, ...second.supervisors]) await supervisor.reclaimAll().catch(() => undefined);
   }
 });

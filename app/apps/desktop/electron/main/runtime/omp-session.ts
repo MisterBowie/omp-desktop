@@ -27,6 +27,7 @@
  *      refused and the reason is reported.
  */
 import { closeSync, existsSync, lstatSync, openSync, readSync, realpathSync, statSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { isAbsolute, join, normalize, relative, resolve } from "node:path";
 
 import {
@@ -525,6 +526,15 @@ class SessionEntry {
   /** Live message-id sequence seed for the next runner, carried across replacement. */
   private messageSequenceSeed = 0;
   /**
+   * A token unique to this entry, embedded in live turn/message ids. It is
+   * minted when the entry is created and never changes while the entry lives,
+   * so a runtime replacement within one entry keeps ids ordered and distinct;
+   * an entry that is removed and recreated (a model change, an archive/reopen)
+   * mints a fresh token, so its live ids never collide with rows the renderer
+   * already projected for the earlier entry.
+   */
+  private readonly contextId: string;
+  /**
    * Bumped on every stop or dispose. A prompt reads it when it begins and
    * re-checks it immediately before submission, so a stop that raced the
    * prompt's startup/restore cannot let the prompt submit content afterwards.
@@ -578,6 +588,7 @@ class SessionEntry {
     this.persistNativeSession = deps.persistNativeSession;
     this.sessionDir = deps.sessionDir;
     this.binding = deps.binding;
+    this.contextId = randomUUID();
   }
 
   supervisorHandle(): OmpRuntimeSupervisor {
@@ -620,6 +631,21 @@ class SessionEntry {
         "a stop is in progress; wait for it to finish before prompting",
       );
     }
+  }
+
+  /**
+   * Synchronously close admission and invalidate in-flight preparation.
+   *
+   * `closed` makes `assertOpen` refuse every later prompt or runtime
+   * preparation, and the epoch bump makes a prompt that was admitted *before*
+   * this call re-check `stopEpoch` immediately before submission and refuse —
+   * so a prompt still preparing cannot submit content after shutdown began.
+   * Both are set with no await, so the whole-bridge sweep can apply them to
+   * every entry before the first entry's reclaim suspends the sweep.
+   */
+  closeAdmission(): void {
+    this.closed = true;
+    this.stopEpoch += 1;
   }
 
   /**
@@ -688,6 +714,7 @@ class SessionEntry {
       runtime,
       generationSeed: this.generationSeed,
       messageSequenceSeed: this.messageSequenceSeed,
+      contextId: this.contextId,
       emit: (envelope) => this.emitAgentEvent(envelope),
       onUiRequest: (request, info) => this.surfaceUiRequest(request, info.sessionId, info.generation),
       onUiClosed: (requestId, reason) => {
@@ -992,10 +1019,7 @@ class SessionEntry {
     // rename/configure runtime preparation) that races this disposal must be
     // refused, not allowed to build a fresh runtime that the bridge then
     // forgets when it deletes the entry after a "successful" reclaim.
-    this.closed = true;
-    // Invalidate any prompt that is still preparing, and own a runtime that is
-    // still starting or restoring, before the runner is detached and reclaimed.
-    this.stopEpoch += 1;
+    this.closeAdmission();
     this.approvalRequests.clear();
     this.askRequests.clear();
     this.generations.clear();
@@ -1074,6 +1098,18 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
 
   /** Get or create the per-session entry, refusing a project change. */
   function entryFor(spec: OmpSessionRuntimeSpec): SessionEntry {
+    // The shutdown sweep refuses every admission — a NEW session and an
+    // EXISTING one alike — before touching the entry map. An existing session
+    // must not keep accepting prompts while its entry awaits reclaim, and a
+    // check placed after the existing-entry return would let exactly that
+    // happen: the sweep disposes entries sequentially, so a session later in
+    // the snapshot would still admit content mid-shutdown.
+    if (shuttingDown) {
+      throw Object.assign(
+        new Error("the OMP runtime is shutting down; no session can start or continue"),
+        { errorCode: ErrorCodes.ENGINE_UNAVAILABLE },
+      );
+    }
     const binding = {
       providerId: spec.providerId,
       modelId: spec.modelId,
@@ -1102,12 +1138,6 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
         );
       }
       return existing;
-    }
-    if (shuttingDown) {
-      throw Object.assign(
-        new Error("the OMP runtime is shutting down; no new session can start"),
-        { errorCode: ErrorCodes.ENGINE_UNAVAILABLE },
-      );
     }
     const supervisor = options.createSupervisor(spec);
     const entry = new SessionEntry({
@@ -1647,6 +1677,16 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     // sweep passed its position must not start a runtime that outlives the
     // shutdown.
     shuttingDown = true;
+    // Close every entry synchronously, before the first reclaim await. The
+    // sweep disposes entries sequentially, so without this an existing session
+    // later in the snapshot would keep admitting content while an earlier
+    // session's reclaim is suspended — and a prompt admitted just before the
+    // sweep would still be able to submit. `closeAdmission` is await-free, so
+    // every entry is closed and every in-flight preparation is invalidated
+    // before any cleanup work can block the sweep.
+    for (const entry of entries.values()) {
+      entry.closeAdmission();
+    }
     // Reclaim every session, but only forget the ones that were fully reclaimed:
     // a session whose runtime could not be reclaimed keeps its entry so a later
     // dispose (or status) can retry the same supervisor instead of losing it.

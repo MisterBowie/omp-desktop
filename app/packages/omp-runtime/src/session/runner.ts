@@ -121,6 +121,15 @@ export type OmpSessionRunnerOptions = {
    * are upserted by id, so a reused id would collapse an earlier reply).
    */
   messageSequenceSeed?: number;
+  /**
+   * A token unique to one desktop execution context (one SessionEntry). Live
+   * turn and message ids embed it, so a turn or reply minted after the entry
+   * was removed and recreated — a model change, an archive/reopen — never
+   * remints an id the renderer already projected. It is stable across a
+   * within-entry runtime replacement (the entry keeps the same token), so the
+   * seed counters still order turns and messages inside one context.
+   */
+  contextId?: string;
   /** How long to wait for one convergence step before escalating. */
   convergeTimeoutMs?: number;
   /** How long to wait for `abort` itself to be answered. */
@@ -143,6 +152,7 @@ export class OmpSessionRunner {
   private readonly sessionId: string;
   private readonly runtime: OmpSessionRuntime;
   private readonly emitEnvelope: (envelope: AgentEventEnvelope) => void;
+  private readonly contextId: string | undefined;
   private readonly onUiRequest:
     | ((request: OmpUiRequest, info: { sessionId: string; generation: number }) => void)
     | undefined;
@@ -200,6 +210,7 @@ export class OmpSessionRunner {
     this.sessionId = options.sessionId;
     this.runtime = options.runtime;
     this.emitEnvelope = options.emit;
+    this.contextId = options.contextId;
     this.onUiRequest = options.onUiRequest;
     this.onUiRecord = options.onUiRecord;
     this.onUiClosed = options.onUiClosed;
@@ -211,6 +222,7 @@ export class OmpSessionRunner {
       sessionId: this.sessionId,
       now: this.now,
       ...(options.messageSequenceSeed !== undefined ? { sequenceSeed: options.messageSequenceSeed } : {}),
+      ...(options.contextId !== undefined ? { contextId: options.contextId } : {}),
     });
     this.subagents = new SubagentTracker({ sessionId: this.sessionId, now: this.now });
     this.ui = new OmpUiRequests({
@@ -482,7 +494,9 @@ export class OmpSessionRunner {
     // this one, so it is closed before the new generation exists.
     this.cancelOpenDialogs("the run was replaced by a new prompt");
     const generation = this.ui.beginRun();
-    const turnId = `omp-turn:${this.sessionId}:${generation}`;
+    const turnId = this.contextId
+      ? `omp-turn:${this.sessionId}:${this.contextId}:${generation}`
+      : `omp-turn:${this.sessionId}:${generation}`;
     this.run = {
       generation,
       turnId,

@@ -108,6 +108,14 @@ export type OmpEventConverterOptions = {
    */
   sequenceSeed?: number;
   /**
+   * A token unique to one desktop execution context (one SessionEntry). Live
+   * message ids embed it, so a reply minted after the entry was removed and
+   * recreated — a model change, an archive/reopen — never remints an id the
+   * renderer already projected. Durable transcript ids
+   * (`omp:<session>:entry:<id>`) do not embed it and stay stable across reads.
+   */
+  contextId?: string;
+  /**
    * Attribution for a child converter: every message it mints carries the
    * parent `task` tool call and the child's agent name, so the renderer groups
    * the child's rows under its delegation node (ADR 0062).
@@ -139,6 +147,7 @@ export class OmpEventConverter {
   private sequence = 0;
   private streaming: StreamingMessage | null = null;
   private readonly messageIds: string[] = [];
+  private readonly contextId: string | undefined;
   /** Set from the assistant message itself, so a finished run can be named. */
   private modelId: string | undefined;
   private readonly parentToolCallId: string | undefined;
@@ -148,6 +157,7 @@ export class OmpEventConverter {
     this.sessionId = options.sessionId;
     this.now = options.now ?? Date.now;
     this.sequence = options.sequenceSeed ?? 0;
+    this.contextId = options.contextId;
     this.parentToolCallId = options.parentToolCallId;
     this.agentName = options.agentName;
   }
@@ -503,7 +513,9 @@ export class OmpEventConverter {
 
   private mintId(): string {
     this.sequence += 1;
-    const id = `omp:${this.sessionId}:${this.sequence}`;
+    const id = this.contextId
+      ? `omp:${this.sessionId}:${this.contextId}:${this.sequence}`
+      : `omp:${this.sessionId}:${this.sequence}`;
     this.messageIds.push(id);
     return id;
   }
