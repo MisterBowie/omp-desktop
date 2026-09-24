@@ -75,7 +75,7 @@ test(
         launcherPath: LAUNCHER,
         expectedRuntimeVersion: "18.2.7",
         sessionDir,
-        args: ["--extension", GATE],
+        args: ["--trusted-extension", GATE],
         extraEnv: { OMP_DESKTOP_GATE_TOOLS: "write", OMP_DESKTOP_GATE_MODE: "ask", OMP_DESKTOP_GATE_TIMEOUT_MS: "60000" },
         prepareRun: (paths) => {
           const baseUrl = spec.sessionId === "session-b" ? providerB.baseUrl : providerA.baseUrl;

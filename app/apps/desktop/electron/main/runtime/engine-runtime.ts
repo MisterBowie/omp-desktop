@@ -198,7 +198,10 @@ export function createDesktopEngineRuntime(
     // Without the gate the runtime would execute native tools with no
     // pre-execution approval; the bridge refuses to prompt in that case, so an
     // empty argument list here can never become an unguarded conversation.
-    ...(gateExtension ? { args: ["--extension", gateExtension] } : {}),
+    // `--trusted-extension` is the pinned runtime's exact file allowlist: it
+    // loads only this module and disables ambient extension discovery, so no
+    // second extension (or duplicate copy of the gate) can run beside it.
+    ...(gateExtension ? { args: ["--trusted-extension", gateExtension] } : {}),
   });
 
   /**

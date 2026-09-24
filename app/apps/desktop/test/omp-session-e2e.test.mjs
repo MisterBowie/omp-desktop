@@ -22,7 +22,8 @@ import { commandLineAlive, pidAlive, shellQuote } from "./helpers/omp-e2e-proces
  * Nothing here talks to a paid provider: the runtime is pointed at a local
  * OpenAI-compatible server that replays scripted turns, and the runtime's
  * isolated home is a temporary directory. The extension under test is the gate
- * this product ships, loaded the way the product loads it (`--extension`).
+ * this product ships, loaded the way the product loads it
+ * (`--trusted-extension`, the pinned runtime's exact file allowlist).
  */
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
@@ -122,7 +123,7 @@ test(
       launcherPath: LAUNCHER,
       expectedRuntimeVersion: "18.2.7",
       sessionDir,
-      args: ["--extension", GATE],
+      args: ["--trusted-extension", GATE],
       extraEnv: {
         OMP_DESKTOP_GATE_TOOLS: "write,bash",
         OMP_DESKTOP_GATE_MODE: "ask",

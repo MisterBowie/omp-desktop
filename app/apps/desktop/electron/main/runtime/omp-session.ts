@@ -22,8 +22,9 @@
  *      prompt; a session without one creates it with `new_session` and persists
  *      the validated `get_state` handles through `persistNativeSession`.
  *   3. **The gate is loaded, or the engine stays closed.** A runtime started
- *      without `--extension <gate>` would execute native tools with no
- *      pre-execution approval. If the gate cannot be found, the prompt is
+ *      without `--trusted-extension <gate>` would execute native tools with no
+ *      pre-execution approval (and ambient discovery would load other
+ *      extensions beside it). If the gate cannot be found, the prompt is
  *      refused and the reason is reported.
  */
 import { closeSync, existsSync, lstatSync, openSync, readSync, realpathSync, statSync } from "node:fs";

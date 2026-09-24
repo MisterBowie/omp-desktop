@@ -1,10 +1,23 @@
 # OMP Desktop 开发交接
 
-更新时间：2026-09-24。当前状态：**M5/T18（OMP 原生 Edit/LSP/Debug 结果的可读展示）进行中，独立复审返修 R1-R4 与 S1-S4 已完成，待复审确认（未验收）**（本轮基线 `9c9ddc2da1091548fb142dc0b68ffad022914dbe`，分支 `codex/m5-tool-results`；T17 已验收基线 `ab07a888d6afb916561b80e5661ed27aa6be612a` 保持不动）。下一阶段入口：M5/T19-T20。T18 证据见 `docs/validation/M5-tool-results.md`；T17 历轮独立复审返修见 `docs/validation/M5-subagents.md` §0.1-§0.15。
+更新时间：2026-09-25。当前状态：**M5/T19（MCP、规则、技能、记忆及插件分类适配）进行中：T19-A（运行时能力源隔离、可信网关加载、能力所有权契约）已实现并验证**（分支 `codex/m5-capability-sources`，基线 `ff4c1efed63475b9f552ace8a3f28f69b317e176`）；**T19-B（host-tool RPC）与 T19-C（桌面技能/记忆/插件用户路径）待开始**。T18 已通过独立复审并验收（验收产品基线 `a35da2f87a745fbedd8f5beb46368607c2f6b72e`，分支 `codex/m5-tool-results`；证据见 `docs/validation/M5-tool-results.md`）。T17 已验收基线 `ab07a888d6afb916561b80e5661ed27aa6be612a` 保持不动。下一阶段入口：M5/T19-B。T19-A 证据见 `docs/validation/M5-capability-sources.md`；T18 证据见 `docs/validation/M5-tool-results.md`；T17 历轮独立复审返修见 `docs/validation/M5-subagents.md` §0.1-§0.15。
 
-## 0. M5/T18 交付摘要（本轮）
+## 0. M5/T19-A 交付摘要（本轮）
 
-- 状态：**T18 进行中**（独立复审返修 R1-R4 与 S1-S4 已完成，待复审确认）。只适配结果展示，不改执行/权限/生命周期/持久化语义；固定 OMP 拥有工具执行与权限。
+- 状态：**T19-A 已实现并验证**（探针先红后绿 + 定向/全量套件 + 真实固定 OMP 18.2.7 端到端；未声称 T19-B/T19-C）。实现的是**运行期能力源边界**：关闭 OMP 原生项目 MCP 与 OMP 记忆后端，并把桌面审批网关从 `--extension`（开放环境发现）迁移到 OMP 精确文件白名单 `--trusted-extension`。
+- 证据：`docs/validation/M5-capability-sources.md`（上游固定源码证据、先红后绿探针、命令/退出码/计数、限制）；设计决策：`app/docs/adr/0304-omp-capability-source-ownership.md`（英文 ADR，含完整所有权契约表）+ `app/docs/spec/03-runtime/02-agent-runtime.md` §14。
+- 核心变更：
+  - **每运行一份配置 overlay（机械强制）**：`packages/omp-runtime/src/config-overlay.ts` 新增；`supervisor.ts` 在 `startRuntime()` 内、`prepareRun` **之后**、spawn 之前写入 `runRoot/config-overlay.yml`（hook 无法削弱/替换，写失败走统一清理）并作为 `--config <overlay>` 追加在启动参数**最末**，强制 `mcp.enableProjectConfig: false` 与 `memory.backend: off`。按固定 OMP 18.2.7 优先级 `defaults < global < project < PI_CONFIG_FILES < --config < runtime override`（`settings.ts:3303-3307`），workspace（`.claude/settings.json`/`.omp`/`mcp.json` 等）与隔离 global 配置无法重新打开这两类来源。overlay 是 run 的属性（`OmpRunPaths.configOverlay`，run root 内），随 run root 被 stop/reclaim/启动失败清理，绝不进入静态构造参数；不读不写真实用户配置。
+  - **网关改走可信白名单**：`engine-runtime.ts` 生产参数 `--extension <gate>` → `--trusted-extension <gate>`（OMP 的精确 canonical 文件白名单，关闭一切环境扩展发现，`main.ts:1597-1614`、`sdk.ts:797-805`、`loader.ts:600-650`），网关恰好加载一次、环境扩展（含网关副本）不再执行。审批/取消/会话/进程清理语义不变（M3）；夹具（session/persistence/concurrent-approval/subagent 四份 E2E）同步改用可信标志并通过。
+  - **所有权契约**（ADR 0304）：workspace AGENTS/上下文、OMP 规则、OMP 原生项目技能与 task/LSP/debug/edit 归 OMP 且保持启用（未用 `--tools`/`--no-rules`/合成 HOME 替代源隔离）；桌面/插件 MCP 与插件 Agent Tools 归桌面宿主、T19-B 经 host-tool RPC 恰一次暴露；桌面技能 T19-C 按需读并复检作用域；桌面项目记忆归 host-core、T19-C 经可信网关按 `projectMemoryPrompt()` 语义注入；插件 UI/主题/独立服务归桌面；PI agent 扩展暂不兼容、不得注入 OMP；同一 MCP 服务器/工具绝不双载。
+- 新增测试：`packages/omp-runtime/src/config-overlay.test.ts`（6 例：overlay 传参/位置/清理/每 run 新建/参数顺序/启动失败无残留/`prepareRun` 覆盖无效/写失败统一清理）、`apps/desktop/test/omp-capability-source-boundary.test.mjs`（2 例：生产接线 `--trusted-extension` 唯一参数、per-session supervisor 无静态 `--config`）、`apps/desktop/test/omp-capability-source-e2e.test.mjs`（5 例真实固定 OMP：workspace MCP 不被发现（含无边界正对照）、workspace/global 配置无法重开记忆（canary 经 fake provider 系统提示断言）、环境扩展不加载、网关副本不执行且每调用恰一次审批、空格/中文路径启动/对话/清理）。
+- 先红后绿：基线 `ff4c1ef`（干净 worktree 重跑）上 vitest 探针 4/4 FAIL、接线探针 1/2 FAIL、E2E 4/5 FAIL（workspace MCP decoy 被连接、模型请求携带 canary 记忆、环境 decoy 扩展被执行、网关副本在真实网关弹审批前静默阻断 write（`isError: true`，文本 `blocked by the duplicate gate copy`）；路径守卫基线即过）；本阶段基线上对应全绿（含复核返修 2 例）。
+- 验证：`@pi-desktop/omp-runtime` vitest 249/249（+6）、desktop 定向 93/93、真实固定 OMP 既有四份 E2E 6/6、新边界 E2E 5/5、desktop 全量 2781 总数/2777 通过/0 失败/4 跳过、desktop typecheck 0、style-token lint 0、Biome（75 files）0、`git diff --check` 0。固定 OMP 18.2.7 为产品面 CLI/RPC 探针运行时；未调用付费模型（全部 fake/local fixture）。
+- 下一轮入口：M5/T19-B（host-tool RPC：桌面/插件 MCP 与插件 Agent Tools 恰一次暴露）；仍关闭：`branch`/`steer`/`followUp`/`compact`、子代理单独停止、子代理 `hasUI=false` 工具 gating。
+
+## 0. M5/T18 交付摘要（上一轮，已验收）
+
+- 状态：**T18 已通过独立复审并验收**（验收产品基线 `a35da2f87a745fbedd8f5beb46368607c2f6b72e`）。只适配结果展示，不改执行/权限/生命周期/持久化语义；固定 OMP 拥有工具执行与权限。
 - 证据：`docs/validation/M5-tool-results.md`（PI 源码/测试 → OMP 生产者形状 → 本项目适配证据、命令/计数/退出、先红后绿、限制、R1-R4 与 S1-S4 返修与环境修正）；本轮未新增 ADR（既有 `tool-presentation.ts` 边界内的纯展示适配，不改变接口/契约/权限/架构，沿用 ADR 0300/0303 的「差异集中在适配层」原则）。
 - 本轮返修（S1-S4，基线 `9c9ddc2` 上 residual 探针 11 例全 FAIL 的修复）：**S1** 快照/未知 key/空 evaluation 不再抑制结果文本——`ompDebugBlocks` 的 `carried` 只在 output/evaluation/断点实际渲染后置位，空 console output（`(no output captured)`）与空断点表（`Function breakpoints:\n(none)`）的真实 producer 文本保留；**S2** 只消费已渲染的值（含嵌套/多文件）——LSP 标量 `request`、debug 非字符串 `output`/非 record `evaluation`、edit 非 record `diagnostics` 不再消失，debug `source` 只消费 `path`（`name` 等留嵌套余量）、断点行补真实 `id` 且未识别字段/条目留余量、`ompEditBlocks` 多文件分支不再丢顶层 `diagnostics`/`meta`/未知字段；**S3** 裁剪/截断/失败文件不是 no-op——只在无 diff/快照/rename 且无 `snapshotsPruned`/`truncated`/`isError` 时才生成 `no changes were made`，否则给 missing-information 提示；**S4** rename 保留 `move: a.ts → b.ts` 关系字段行（不再是扁平 `[a.ts,b.ts]`）+ 真实挂载 `ToolRow` 交互回归。
 - 核心变更（`app/apps/desktop/src/lib/tool-presentation.ts`）：
@@ -159,9 +172,9 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 
 ## 4. 下一执行模型从哪里开始
 
-T17 已通过最终独立复审并验收（验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`；含真实固定 OMP 端到端验收与 macOS arm64 独立复审，证据见 `docs/validation/M5-subagents.md` §0.15 与 §0.14）。T18（OMP 原生 Edit/LSP/Debug 结果的可读展示）进行中、独立复审返修 R1-R4 已完成、待复审确认（分支 `codex/m5-tool-results`，本轮基线 `5ca321262bee88ca6a4a81e949291965e22d86c5`，证据见 `docs/validation/M5-tool-results.md`）。
+T17 已通过最终独立复审并验收（验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`；含真实固定 OMP 端到端验收与 macOS arm64 独立复审，证据见 `docs/validation/M5-subagents.md` §0.15 与 §0.14）。T18 已通过独立复审并验收（验收产品基线 `a35da2f87a745fbedd8f5beb46368607c2f6b72e`，分支 `codex/m5-tool-results`，证据见 `docs/validation/M5-tool-results.md`）。T19-A（运行时能力源隔离、可信网关加载、能力所有权契约）已实现并验证（分支 `codex/m5-capability-sources`，基线 `ff4c1efed63475b9f552ace8a3f28f69b317e176`，证据见 `docs/validation/M5-capability-sources.md`）。
 
-下一阶段入口：M5/T19-T20（MCP/规则/技能/记忆及插件分类适配；Plan/Goal 与高权限工具能力门）。仍在关闭的能力：`branch`/`steer`/`followUp`/`compact`、子代理单独停止（固定 OMP 无 per-child stop RPC）、子代理 `hasUI=false` 工具 gating（产品策略），留待对应阶段逐项开放。
+下一阶段入口：M5/T19-B（host-tool RPC：桌面/插件 MCP 与插件 Agent Tools 经单一宿主边界恰一次暴露；桌面技能/记忆/插件用户路径为 T19-C）。仍在关闭的能力：`branch`/`steer`/`followUp`/`compact`、子代理单独停止（固定 OMP 无 per-child stop RPC）、子代理 `hasUI=false` 工具 gating（产品策略），留待对应阶段逐项开放。
 
 ## 6. 下一轮必须保持的取舍
 

@@ -1,5 +1,7 @@
 /**
- * The desktop's tool gate, loaded into the pinned runtime with `--extension`.
+ * The desktop's tool gate, loaded into the pinned runtime with
+ * `--trusted-extension` (M5/T19-A: an exact file allowlist that disables
+ * ambient extension discovery, so this module is the only policy that runs).
  *
  * It exists to make one promise: a gated tool does not run until the desktop
  * has answered, and an answer that never arrives is a denial. The pinned

@@ -1570,3 +1570,44 @@ breaking the bridge; decide termination by process-group liveness, so a leader's
 exit does not exempt surviving descendants; treat a chunk-decode failure as
 fatal and rebuild the runtime; and report a stop that left processes or
 directories behind as a failure.
+
+## 14. Capability-source boundary (M5/T19-A, ADR 0304)
+
+Capability ownership is a contract, not an accident of discovery. Workspace
+AGENTS/context files, OMP rules, OMP-native project skills, and the native
+task/LSP/debug/edit tools are owned by OMP and stay enabled. Desktop MCP and
+plugin MCP are owned by the desktop host and will be exposed once through
+host-tool RPC (T19-B); desktop plugin Agent Tools are owned by the desktop
+plugin runtime and will be exposed once through host-tool RPC (T19-B); desktop
+user/plugin/builtin skills are owned by the desktop host and will be read on
+demand with scope revalidation (T19-C); desktop project memory is owned by
+host-core and will be injected through the trusted gate with the existing
+`projectMemoryPrompt()` semantics (T19-C). Plugin UI, themes and independent
+services remain desktop-owned. PI agent extensions are incompatible for now and
+must not be injected into OMP. The same MCP server or tool is never both
+natively discovered by OMP and registered by the desktop host.
+
+T19-A implements the boundary that holds until the desktop-owned equivalents
+arrive: every run is started with a run-scoped config overlay
+(`--config <run-root>/config-overlay.yml`, written by the supervisor after
+`prepareRun` and immediately before spawn — an embedder hook cannot weaken it,
+and a write failure is cleaned up like any other start failure — and removed
+with the run root) that forces `mcp.enableProjectConfig: false` and
+`memory.backend: off`. The pinned runtime merges `--config` overlays
+above the global and project config layers (`defaults < global < project <
+PI_CONFIG_FILES < --config overlays < runtime overrides`), so neither the
+runtime's isolated global config nor a workspace `.claude/settings.json`,
+`.omp` settings or `mcp.json` can re-open those sources. The overlay is the
+final launch argument, is run-scoped rather than a static constructor argument,
+and is covered through the production supervisor/session wiring. The desktop
+approval gate is loaded with `--trusted-extension <gate>` — the pinned
+runtime's exact, canonicalized file allowlist — which loads only that module
+and disables ambient extension discovery (native `.omp/extensions`, hook
+factories, plugin extension entry points, `settings.json` extension lists), so
+the gate runs exactly once and no ambient extension or duplicate copy can run
+beside it. Rules, OMP-native project context, the pre-execution approval,
+cancellation, session and process-cleanup semantics are unchanged; `--tools`,
+`--no-rules` and the synthetic HOME are not substitutes for this boundary.
+T19-B and T19-C expose the desktop-owned equivalents exactly once; this phase
+implements only the boundary that disables the OMP-native project MCP and
+memory sources.

@@ -118,7 +118,7 @@ test(
       // `--model` is required for the runtime to forward the child's
       // `subagent_event` frames (discovery alone leaves the child stream
       // unwired); it names the same provider/model the projection writes.
-      args: ["--model", "m1fake/local-model", "--extension", GATE],
+      args: ["--model", "m1fake/local-model", "--trusted-extension", GATE],
       extraEnv: {
         OMP_DESKTOP_GATE_TOOLS: "write,bash",
         OMP_DESKTOP_GATE_MODE: "ask",
@@ -291,7 +291,7 @@ test(
       launcherPath: LAUNCHER,
       expectedRuntimeVersion: "18.2.7",
       sessionDir,
-      args: ["--model", "m1fake/local-model", "--extension", GATE],
+      args: ["--model", "m1fake/local-model", "--trusted-extension", GATE],
       extraEnv: {
         OMP_DESKTOP_GATE_TOOLS: "write,bash",
         OMP_DESKTOP_GATE_MODE: "allow",
@@ -406,7 +406,7 @@ test(
       launcherPath: LAUNCHER,
       expectedRuntimeVersion: "18.2.7",
       sessionDir,
-      args: ["--model", "m1fake/local-model", "--extension", GATE],
+      args: ["--model", "m1fake/local-model", "--trusted-extension", GATE],
       extraEnv: {
         OMP_DESKTOP_GATE_TOOLS: "write,bash",
         OMP_DESKTOP_GATE_MODE: "allow",

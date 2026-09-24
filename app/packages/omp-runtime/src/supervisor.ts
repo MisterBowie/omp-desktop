@@ -32,6 +32,7 @@ import {
 } from "@pi-desktop/shared";
 
 import { OmpRuntimeError } from "./errors.js";
+import { CONFIG_OVERLAY_FILE, writeSourceIsolationOverlay } from "./config-overlay.js";
 import {
   buildOmpRuntimeEnv,
   isPathInside,
@@ -87,8 +88,9 @@ export type OmpRuntimeSupervisorOptions = {
   /** Working directory of the runtime process; defaults to the run root. */
   cwd?: string;
   /**
-   * Extra arguments after `--mode rpc-ui`; the desktop passes `--extension`
-   * for the tool gate it ships. Empty arguments are refused at spawn time.
+   * Extra arguments after `--mode rpc-ui`; the desktop passes
+   * `--trusted-extension` for the tool gate it ships (M5/T19-A). Empty
+   * arguments are refused at spawn time.
    */
   args?: readonly string[];
   /**
@@ -120,6 +122,8 @@ export type OmpRuntimeSupervisorOptions = {
   /** Test seams. */
   /** How a runtime is started; defaults to the real process implementation. */
   runtimeFactory?: OmpRuntimeFactory;
+  /** How the source-isolation overlay is written; defaults to the real write. */
+  writeOverlay?: (path: string) => void;
   /** How a retained group is terminated; defaults to the real implementation. */
   terminateTree?: typeof terminateProcessTree;
   spawnImpl?: OmpRuntimeProcessOptions["spawnImpl"];
@@ -138,6 +142,13 @@ export type OmpRunPaths = {
   configDirName: string;
   configRoot: string;
   launchDir: string;
+  /**
+   * The run-scoped source-isolation overlay (M5/T19-A). The supervisor writes
+   * it inside this run root and passes it as `--config <path>`; the owned
+   * cleanup removes it with the run root. It is a property of the run, never
+   * of a static constructor argument.
+   */
+  configOverlay: string;
 };
 
 /**
@@ -405,7 +416,8 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
     });
     const launchDir = join(runRoot, "cwd");
     mkdirSync(launchDir, { recursive: true });
-    const paths: OmpRunPaths = { runRoot, home, agentDir: codingAgentDir, configDirName, configRoot, launchDir };
+    const configOverlay = join(runRoot, CONFIG_OVERLAY_FILE);
+    const paths: OmpRunPaths = { runRoot, home, agentDir: codingAgentDir, configDirName, configRoot, launchDir, configOverlay };
 
     // The persistent native-session directory is created before the child
     // starts so a missing or unwritable path surfaces as a start failure rather
@@ -413,12 +425,26 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
     const sessionDir = this.options.sessionDir
       ? (mkdirSync(this.options.sessionDir, { recursive: true }), this.options.sessionDir)
       : null;
-    const launchArgs = sessionDir
-      ? [...this.args, "--session-dir", sessionDir]
-      : [...this.args];
+    // The overlay is the final argument: the pinned runtime merges repeated
+    // `--config` files in flag order (later wins), so this overlay outranks any
+    // base argument and the project/global config layers below it.
+    const launchArgs = [
+      ...this.args,
+      ...(sessionDir ? ["--session-dir", sessionDir] : []),
+      "--config",
+      configOverlay,
+    ];
 
     try {
       if (this.options.prepareRun) await this.options.prepareRun(paths);
+      // The run-scoped source boundary is written by the supervisor itself,
+      // *after* the embedder hook: a `prepareRun` that tries to weaken or
+      // replace the overlay file is overwritten, so every runtime this product
+      // starts is closed to ambient capability sources regardless of what any
+      // hook does. A write failure lands in the same cleanup path as every
+      // other start failure: the run root (and the partial overlay) is
+      // removed and `lastFailure` records the reason.
+      (this.options.writeOverlay ?? writeSourceIsolationOverlay)(configOverlay);
       const runtimeFactory =
         this.options.runtimeFactory ??
         ((options: OmpRuntimeProcessOptions) => OmpRuntimeProcess.start(options));

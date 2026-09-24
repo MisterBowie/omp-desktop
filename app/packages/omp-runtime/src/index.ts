@@ -102,6 +102,11 @@ export {
   type OmpRuntimeSupervisorOptions,
   type OwnedOmpRuntime,
 } from "./supervisor.js";
+export {
+  CONFIG_OVERLAY_FILE,
+  sourceIsolationOverlayYaml,
+  writeSourceIsolationOverlay,
+} from "./config-overlay.js";
 
 export {
   OmpEventConverter,

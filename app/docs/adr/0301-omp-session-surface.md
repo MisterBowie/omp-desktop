@@ -56,7 +56,8 @@ and error surfaces are unchanged. Rules:
 ### 2. Approvals are structural, never textual
 
 The desktop ships the gate it loads (`packages/omp-runtime/extensions/…`,
-passed with `--extension`). A gated call raises a `select` whose
+passed with `--trusted-extension` since M5/T19-A — an exact file allowlist
+that disables ambient extension discovery). A gated call raises a `select` whose
 `optionDetails[0].description` carries a versioned descriptor (tool call id,
 tool name, risk, reason, arguments, cwd). Classification
 (`src/session/ui-requests.ts`) accepts exactly two shapes as an approval:
