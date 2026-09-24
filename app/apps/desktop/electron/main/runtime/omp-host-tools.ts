@@ -326,9 +326,12 @@ function toDefinition(raw: { name: string; description: string; parameters: unkn
  * outside those shapes serializes as deterministic bounded JSON — nothing is
  * silently marked successful or dropped.
  *
- * Every path funnels through one `boundBlocks` pass, which measures the final
- * serialized `content` array (JSON escaping, brackets, commas and block
- * envelopes included) — no caller hand-computes byte budgets.
+ * Every path funnels through the shared `boundHostToolContent` pass, which
+ * measures the final serialized `content` array (JSON escaping, brackets,
+ * commas and block envelopes included) — no caller hand-computes byte
+ * budgets. The same function is the FINAL, authoritative runtime write
+ * boundary in `OmpHostToolCalls`, so a thrown executor error with a huge
+ * message is bounded there too, with the outer `isError` retained.
  */
 function outcomeFor(result: unknown): OmpHostToolOutcome {
   let blocks: OmpHostToolContentBlock[];
