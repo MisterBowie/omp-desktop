@@ -942,6 +942,11 @@ function ompEditFileBlocks(file: Record<string, unknown>): ToolBlock[] {
     if (newText !== null) {
       blocks.push(codeBlock("written", newText, langForPath(path)));
       consumed.newText = true;
+      // The producer always carries the new snapshot together with a
+      // hashline-format `diff`; the snapshot is the rendered content, so the
+      // redundant `diff` must not be emitted again through the remainder. A
+      // malformed `diff` was never represented and stays readable.
+      if (diffText !== null) consumed.diff = true;
     } else if (diffText) {
       blocks.push(codeBlock("written", diffText, ""));
       consumed.diff = true;
@@ -950,6 +955,9 @@ function ompEditFileBlocks(file: Record<string, unknown>): ToolBlock[] {
     if (oldText !== null) {
       blocks.push(codeBlock("content", oldText, langForPath(path), { label: "deleted" }));
       consumed.oldText = true;
+      // Same redundancy as create: the producer's `diff` repeats the deleted
+      // snapshot that was just rendered, so it is not emitted again.
+      if (diffText !== null) consumed.diff = true;
     } else if (diffText) {
       blocks.push(codeBlock("content", diffText, "", { label: "deleted" }));
       consumed.diff = true;

@@ -1,6 +1,6 @@
 # M5/T18：OMP 原生 Edit / LSP / Debug 结果的可读展示
 
-更新时间：2026-09-25。状态：**T18 进行中**（独立复审返修 R1-R4、S1-S4 与 Residual2 已完成，待复审确认；未验收）。分支 `codex/m5-tool-results`，本轮基线 `936f44c39983f2f7d36faefe8c9d53e15c81f171`（产品修复提交 `6914e68`；后续 `b0ef1e8..936f44c` 仅含预览打包文档/CI，未改产品源码）。固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未改 tracked 源码；仅在此自有固定子模块内构建 untracked 依赖/native 产物）。
+更新时间：2026-09-25。状态：**T18 进行中**（独立复审返修 R1-R4、S1-S4、Residual2 与 Create/Delete Duplicate 已完成，待复审确认；未验收）。分支 `codex/m5-tool-results`，本轮基线 `0f72145f440bcf4b44242183d0780f07bf4075f0`（产品修复提交 `6914e68`、`9c9ddc2`、`0f72145`；`b0ef1e8..936f44c` 仅含预览打包文档/CI，未改产品源码）。固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未改 tracked 源码；仅在此自有固定子模块内构建 untracked 依赖/native 产物）。
 
 ## 本轮独立复审返修（R1-R4）
 
@@ -35,6 +35,14 @@
 - **D5 edit 多文件按实际渲染消费**：`ompEditBlocks` 多文件分支把非 record `perFileResults` 项收进余量（经 `recordBlocks` 通用回退，仍受 `MAX_LIST_ITEMS` 有界并报 `hidden`），聚合 `diff`/`firstChangedLine` 仅在「合法字符串/数字且冗余于每文件块」时消费——非字符串聚合 `diff` 不再被当成重复值丢弃。顶层 `diagnostics`/`meta`/未知字段保留。
 
 新增回归：`omp-tool-results.test.mjs` +7 例（八类新例 + 一例「合法快照字段只渲染一次、不回退重复」+ 一例「250 项混合 `perFileResults` 仍受 200 上限并报 hidden 50」），全量 desktop 套件自 2763 → **2770**。复审探针 residual 19/19、paths（其末尾 import residual）33/33、preservation 8/8、mounted 全绿。
+
+## 本轮独立复审返修（Create/Delete Duplicate）
+
+独立复审在已推送基线 `0f72145` 复现 create/delete 单文件重复渲染：一个 create 携带 `{path, op:"create", newText, diff}` 时先渲染正确的 `written(newText)` 块，随后把 hashline `diff` 当作通用余量再次输出为 `diff` 字段行；delete 携带 `oldText` 加 `diff` 时同样重复。独立探针在该基线输出 create `written(newText)` + 通用 `diff: +1|…`、delete `content(oldText, label=deleted)` + 通用 `diff: -1|…`，违反前次「不重复合法 old/new/diff 内容」要求。update 分支已消费被快照取代的合法 hashline `diff`、多文件分支已消费冗余聚合 `diff`，create/delete 缺等价的 producer 感知处理（对照固定 PI `tool-presentation.ts` 与 OMP `coding-agent/src/edit/index.ts:243-292` / `tui/src/tools/edit.ts:1028-1165`）。修复仍只在 `tool-presentation.ts` 边界内（`ompEditFileBlocks`），未改 converter/预算/权限：
+
+- **create/delete 快照渲染时消费冗余 `diff`**：`op:"create"` 在 `newText !== null` 渲染 `written` 后、`op:"delete"` 在 `oldText !== null` 渲染 `content` 后，仅当 `diff` 为合法非空字符串（`diffText !== null`）才 `consumed.diff = true`——与 update/多文件分支同源：合法 hashline `diff` 是同一编辑的冗余表示，不再经通用余量二次输出。快照缺失时仍走既有 `else if (diffText)` 回退把 `diff` 渲染为 written/deleted 内容；malformed（非字符串）`diff` 因 `diffText === null` 不被消费，继续走既有回退。
+
+新增回归：`omp-tool-results.test.mjs` +2 例（快照缺失时 `diff` 仍渲染为 written/deleted 内容、per-file malformed `diff` 不被当作冗余丢弃）；既有 create/delete 用例补「语义内容只出现一次且 hashline `diff` 不回退重复」断言。复审探针 residual 19/19、paths 33/33、preservation 8/8、mounted 与既有 tool-text/row-budget/row-meaning 全绿。
 
 ## 0. 范围与结论
 
@@ -82,15 +90,15 @@ T18 只适配**结果展示**，不改执行、权限、生命周期或持久化
 | `pnpm --filter @pi-desktop/desktop lint`（style tokens） | style tokens OK | 0 |
 | `pnpm lint:biome` | Checked 75 files | 0 |
 | `pnpm --filter @pi-desktop/desktop build`（electron-vite renderer 重建） | built in ~6s | 0 |
-| 定向七套 `node --test test/tool-presentation.test.mjs test/omp-subagent-presentation.test.mjs test/omp-tool-results.test.mjs test/omp-tool-results-render.test.mjs test/tool-display.test.mjs test/tool-row-file-refs.test.mjs test/omp-tool-row-mounted.test.mjs` | **92 passed / 0 failed** | 0 |
+| 定向七套 `node --test test/tool-presentation.test.mjs test/omp-subagent-presentation.test.mjs test/omp-tool-results.test.mjs test/omp-tool-results-render.test.mjs test/tool-display.test.mjs test/tool-row-file-refs.test.mjs test/omp-tool-row-mounted.test.mjs` | **94 passed / 0 failed** | 0 |
 | 复审探针 `/tmp/m5-tool-paths-review.mjs` | 33/33（edit-update/move/multi-delete/pruned、lsp 诊断/全服失败/部分失败、debug evaluate/no-session/empty-output/future-field 各走 live/durable/child）+ 普通 PI 插件元数据（末尾 import residual） | 0 |
 | 复审探针 `/tmp/m5-tool-residual-review.mjs`（S1-S4 11 例 + Residual2 8 例，共 19 例） | 19/19（原 11 例 + malformed snapshot id/source path/breakpoint id、mixed diagnostics messages、scalar meta、future op、mixed per-file、malformed aggregate diff） | 0 |
 | 复审探针 `/tmp/m5-tool-preservation-review.mjs` | 8/8 均 `before=true` 且 `after=true` | 0 |
 | 复审探针 `/tmp/m5-tool-row-mounted-review.mjs` | lsp 文本可见、debug no-session 文本可见、edit 路径经真实 host `fsResolveRef` 解析并打开一次、missing/error 只出 toast | 0 |
 | 既有探针 `/tmp/m5-tool-text-review.mjs` / `/tmp/m5-row-budget-review.mjs` / `/tmp/m5-row-meaning-review.mjs` | lsp+debug 均 `presentationShowsText=true`；row-budget 全 `withinBudget`；row-meaning 全断言 | 0 |
-| 全量 desktop `node --test test/*.test.mjs`（`app/apps/desktop`，固定 runtime 已备） | **2770 总数 / 2766 passed / 0 failed / 4 skipped** | 0 |
+| 全量 desktop `node --test test/*.test.mjs`（`app/apps/desktop`，固定 runtime 已备） | **2772 总数 / 2768 passed / 0 failed / 4 skipped** | 0 |
 
-新增测试：`omp-tool-results.test.mjs`（32 例，真实 `OmpEventConverter.convertEntry`/`convert` → 真实 `buildToolPresentation`/`runOutcome`/`toolResultChips`，覆盖 LSP 诊断/服务器失败/text-only 失败/request、debug evaluate/paused+断点+output/no-session/empty-output/id/instructionPointerReference/未知字段、edit 单/多文件/rename/create/delete/no-op/pruned/partial-error/diagnostics/firstChangedLine/未知字段、live `tool_execution_end`、子代理转录、Pi `ops` 兼容、`plugin_publisher_edit` 兼容、大 Unicode 截断，以及 S1-S4 回归：snapshot 不抑制空 output/空断点、断点 id/每项余量/source 余量、未知值可读、多文件顶层诊断 + 裁剪非 no-op、rename 关系；Residual2 回归：八类新例 + 合法字段不回退重复 + 250 项混合数组仍受 200 上限并报 hidden 50）；`omp-tool-results-render.test.mjs`（1 例，SSR 渲染真实 `ToolDetailBlocks` 断言 LSP/edit/debug 文本可见）；`omp-tool-row-mounted.test.mjs`（2 例，真实挂载 `ToolRow` disclosure + `ToolDetails`/`useOpenPreviewTarget`/`api`，成功打开一次、missing/error 只出 toast 不打开、`autoOpen` 不打开、restored/child 行无 `toolArgs`）。
+新增测试：`omp-tool-results.test.mjs`（34 例，真实 `OmpEventConverter.convertEntry`/`convert` → 真实 `buildToolPresentation`/`runOutcome`/`toolResultChips`，覆盖 LSP 诊断/服务器失败/text-only 失败/request、debug evaluate/paused+断点+output/no-session/empty-output/id/instructionPointerReference/未知字段、edit 单/多文件/rename/create/delete/no-op/pruned/partial-error/diagnostics/firstChangedLine/未知字段、live `tool_execution_end`、子代理转录、Pi `ops` 兼容、`plugin_publisher_edit` 兼容、大 Unicode 截断，以及 S1-S4 回归：snapshot 不抑制空 output/空断点、断点 id/每项余量/source 余量、未知值可读、多文件顶层诊断 + 裁剪非 no-op、rename 关系；Residual2 回归：八类新例 + 合法字段不回退重复 + 250 项混合数组仍受 200 上限并报 hidden 50；Create/Delete Duplicate 回归：create/delete 语义内容只出现一次且 hashline `diff` 不回退重复、快照缺失时 `diff` 仍渲染、per-file malformed `diff` 不被当作冗余丢弃）；`omp-tool-results-render.test.mjs`（1 例，SSR 渲染真实 `ToolDetailBlocks` 断言 LSP/edit/debug 文本可见）；`omp-tool-row-mounted.test.mjs`（2 例，真实挂载 `ToolRow` disclosure + `ToolDetails`/`useOpenPreviewTarget`/`api`，成功打开一次、missing/error 只出 toast 不打开、`autoOpen` 不打开、restored/child 行无 `toolArgs`）。
 
 ### 3.1 环境修正（非源码改动）
 
@@ -112,4 +120,4 @@ T18 只适配**结果展示**，不改执行、权限、生命周期或持久化
 - 未新增 ADR：本轮是既有 `tool-presentation.ts` 边界内的纯展示适配，不改变接口/契约/权限/架构（沿用 ADR 0300/0303 的「差异集中在适配层」原则），故只在验证文档记录。
 - 真实付费模型烟测、Windows、打包均不在 T18 范围；`branch`/`steer`/`followUp`/`compact`、子代理单独停止仍关闭（T19/T20 逐项开放）。
 - macOS 中文路径的 9 项 PI release-fixture 失败属 M6/T22，本轮不做无关修复。
-- T18 仍待独立复审确认（未验收）；独立复审返修 R1-R4、S1-S4 与 Residual2 已完成。
+- T18 仍待独立复审确认（未验收）；独立复审返修 R1-R4、S1-S4、Residual2 与 Create/Delete Duplicate 已完成。

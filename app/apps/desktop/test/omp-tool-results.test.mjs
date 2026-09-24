@@ -224,7 +224,7 @@ test("edit rename shows source → destination with no diff body", () => {
   );
 });
 
-test("edit create and delete show the added and removed content", () => {
+test("edit create and delete show the added and removed content once", () => {
   const created = converter.convertEntry(
     tool("edit", [{ type: "text", text: "Created created.txt" }], {
       path: "created.txt",
@@ -236,7 +236,11 @@ test("edit create and delete show the added and removed content", () => {
   const createdBlocks = buildToolPresentation(created, { hideSummaryArg: true });
   assert.ok(fieldValues(createdBlocks).includes("operation: create"));
   const written = byRole(createdBlocks, "written");
+  assert.equal(written.length, 1, "the new snapshot renders as one written block");
   assert.equal(written[0].text, "created\n");
+  // The producer's hashline `diff` repeats the rendered `newText` snapshot; it
+  // must not surface again as a fallback field row.
+  assert.doesNotMatch(allText(createdBlocks), /\+1\|created/);
 
   const deleted = converter.convertEntry(
     tool("edit", [{ type: "text", text: "Deleted deleted.txt" }], {
@@ -249,7 +253,62 @@ test("edit create and delete show the added and removed content", () => {
   const deletedBlocks = buildToolPresentation(deleted, { hideSummaryArg: true });
   assert.ok(fieldValues(deletedBlocks).includes("operation: delete"));
   const content = byRole(deletedBlocks, "content");
+  assert.equal(content.length, 1, "the old snapshot renders as one content block");
   assert.equal(content[0].text, "gone\n");
+  // Same redundancy: the producer's `diff` repeats the deleted snapshot.
+  assert.doesNotMatch(allText(deletedBlocks), /-1\|gone/);
+});
+
+test("edit create/delete keep a valid diff when the snapshot is not rendered", () => {
+  // No snapshot present: the hashline `diff` is the only content and must be
+  // rendered, not dropped.
+  const created = converter.convertEntry(
+    tool("edit", [{ type: "text", text: "Created created.ts" }], {
+      path: "created.ts",
+      op: "create",
+      diff: "+1|const created = true;",
+    }),
+  );
+  const createdBlocks = buildToolPresentation(created, { hideSummaryArg: true });
+  const written = byRole(createdBlocks, "written");
+  assert.equal(written.length, 1, "a create without a snapshot renders the diff as the written block");
+  assert.equal(written[0].text, "+1|const created = true;");
+
+  const deleted = converter.convertEntry(
+    tool("edit", [{ type: "text", text: "Deleted deleted.ts" }], {
+      path: "deleted.ts",
+      op: "delete",
+      diff: "-1|const gone = true;",
+    }),
+  );
+  const deletedBlocks = buildToolPresentation(deleted, { hideSummaryArg: true });
+  const content = byRole(deletedBlocks, "content");
+  assert.equal(content.length, 1, "a delete without a snapshot renders the diff as the deleted block");
+  assert.equal(content[0].text, "-1|const gone = true;");
+});
+
+test("edit create/delete keep a malformed diff readable", () => {
+  // A per-file non-string `diff` was never represented by the snapshot render,
+  // so it is not consumed as redundant and stays in the generic remainder.
+  const created = converter.convertEntry(
+    tool("edit", [{ type: "text", text: "Created created.ts" }], {
+      perFileResults: [
+        {
+          path: "created.ts",
+          op: "create",
+          newText: "created\n",
+          diff: { future: "MALFORMED_DIFF_REMAINDER" },
+        },
+      ],
+    }),
+  );
+  const createdBlocks = buildToolPresentation(created, { hideSummaryArg: true });
+  assert.equal(byRole(createdBlocks, "written").length, 1, "the snapshot still renders");
+  assert.equal(byRole(createdBlocks, "written")[0].text, "created\n");
+  assert.ok(
+    allText(createdBlocks).includes("MALFORMED_DIFF_REMAINDER"),
+    "a non-string diff is not dropped as a redundant value",
+  );
 });
 
 test("edit no-op and pruned snapshots stay honest", () => {
