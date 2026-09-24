@@ -1623,3 +1623,47 @@ cancellation, session and process-cleanup semantics are unchanged; `--tools`,
 T19-B and T19-C expose the desktop-owned equivalents exactly once; this phase
 implements only the boundary that disables the OMP-native project MCP and
 memory sources.
+
+T19-B delivers the desktop-owned tools through the pinned runtime's host-tool
+RPC (evidence: `docs/validation/M5-host-tool-rpc.md`, ADR 0304 §4):
+
+- **Catalog and registration**: the desktop adapter assembles
+  `plugin_<plugin>_…` (Agent Tools and plugin-declared MCP) and
+  `mcp_<server>_<tool>` from the live plugin registry and the user MCP runtime
+  before every prompt (Pi `session-launch` reassembly semantics) and registers
+  them with `loadMode: "essential"`; the bridge re-registers whenever the
+  catalog changes (identical content is skipped by fingerprint, so the pinned
+  runtime always holds exactly the current set — a removed tool is removed,
+  nothing is exposed twice) and fails the prompt closed on a refused
+  registration or an echoed `toolNames` mismatch. A name colliding with an OMP
+  native tool is refused by the pinned runtime, never silently overridden.
+- **Execution**: `host_tool_call` frames bind to the owning run; at-most-once
+  is scoped to the whole active generation (no evictable cap; reclaimed when
+  the generation ends); re-checks at the last synchronous dispatch point cover
+  plugin load, activation scope, the user MCP server state and the live turn
+  (a per-entry `dispatchable` closure over the OMP runner — the Pi
+  `isTurnDispatchable` predicate is not used because OMP turns never enter the
+  Pi turn registry). The abort signal reaches plugin executions; MCP calls
+  have no call-level signal, so the guarantee is exactly "not dispatched after
+  cancel, late results dropped" — remote side effects are never claimed
+  retracted.
+- **Approval**: the trusted gate controls `plugin_*`/`mcp_*` unconditionally
+  (the `OMP_DESKTOP_GATE_TOOLS` list only tunes native names), raising a real
+  `tool_permission_request` before any execution — no parallel approval
+  system. Risk: `plugin_*` = `high` (conservative upper bound — the pinned
+  protocol carries no declared-risk channel, so low/medium-declared plugins
+  see a stricter prompt this phase), `mcp_*` = `medium` (matching the Pi host).
+- **Turn lifecycle**: the runner's `closeRun(generation, reason)` announces
+  `session:turnEnded` exactly once per turn — completed for a normal
+  `agent_end`, aborted for a user-requested stop (including a late `agent_end`
+  under stop) or a dispose of a live turn, error for a prompt or transport
+  failure (including a prompt RPC failure that presented no dialog). A mid-run
+  converter error is not a turn end.
+- **Results**: thrown errors and inner `AgentToolResult.isError` both map to an
+  outer failed `host_tool_result`; text and MCP image blocks pass through
+  faithfully; non-text blocks, `structuredContent` and any other key the
+  plugin returned become deterministic text (never raw base64 payloads, never
+  mapped onto OMP-internal `details`/`providerMetadata`/`useless` fields).
+  Every outcome funnels through one budget pass measured on the final
+  serialized `content` JSON (≤ 768 KiB), keeping the frame under the 1 MiB
+  line limit and preserving the head of an over-budget result.

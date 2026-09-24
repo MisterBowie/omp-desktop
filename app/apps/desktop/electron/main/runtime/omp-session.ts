@@ -48,6 +48,8 @@ import {
   descriptorRisk,
   findGateExtension,
   type OmpConversionDiagnostics,
+  type OmpHostToolDefinition,
+  type OmpHostToolExecutor,
   type OmpRunState,
   type OmpRuntimeSupervisor,
   type OmpSessionRuntime,
@@ -132,9 +134,76 @@ export type OmpSessionBridgeOptions = {
   }) => void | Promise<void>;
   /** The app-owned persistent native-session directory (containment root). */
   sessionDir: string;
+  /**
+   * The desktop's host tools (M5/T19-B): the per-project catalog the bridge
+   * registers through `set_host_tools`, and the executor that serves the
+   * model's calls. Absent (Pi path, unit fixtures) means no desktop tools are
+   * exposed and every `host_tool_call` the runtime emits is failed closed.
+   */
+  hostTools?: OmpHostToolProvider;
+  /**
+   * The desktop's `session:turnEnded` announcement (M5/T19-B): called exactly
+   * once per (sessionId, turnId) when a turn completes, is cancelled or
+   * fails, so a plugin that scoped resources to the turn id it received on a
+   * tool call learns its end — the same lifecycle Pi's `finishTurn` provides.
+   */
+  onTurnEnd?: (info: OmpTurnEndInfo) => void;
   /** Test seams. */
   runnerFactory?: (options: ConstructorParameters<typeof OmpSessionRunner>[0]) => OmpSessionRunner;
   gateResolver?: (startDir: string) => string | null;
+};
+
+/**
+ * The seam between the session registry and the desktop's tool registries.
+ *
+ * `catalog` is consulted once per runner/native-session pair, before the first
+ * prompt; `executor` is bound to one entry's project and model binding, so a
+ * session's tools can only ever reach its own project's scoped tools.
+ */
+export type OmpHostToolProvider = {
+  catalog(projectPath: string): Promise<OmpHostToolDefinition[]>;
+  executor(binding: {
+    sessionId: string;
+    projectPath: string;
+    /**
+     * Live model key, read at each execution — never a construction snapshot.
+     * (A model change rebuilds the entry, but the getter keeps the contract
+     * honest regardless of how the entry lifecycle evolves.)
+     */
+    modelKey(): string | null;
+    /**
+     * Live thinking level, read at each execution. The configure() thinking-
+     * only path mutates the entry's binding in place on the same entry
+     * (`entry.binding.thinkingLevel = level` after a successful persist), and
+     * the Pi host reads the current level at execution time too
+     * (`host.ts` session.get), so a snapshot taken at construction would hand
+     * plugins a stale level forever.
+     */
+    thinkingLevel(): string | null;
+    /**
+     * The OMP turn-dispatch gate the adapter re-checks at its last
+     * synchronous dispatch point. The bridge supplies it as a closure over
+     * its own entry, so it reads the live runner state at execution time —
+     * even when the executor was built before the runner existed. The Pi
+     * predicate is deliberately not used: OMP turns never enter the Pi turn
+     * registry (`activeTurns`), so it would refuse every call.
+     */
+    dispatchable(turnId: string): boolean;
+  }): OmpHostToolExecutor;
+};
+
+/**
+ * One turn's terminal announcement, the OMP-shaped twin of the Pi host's
+ * `TurnEndedPayload` (`session-coordination.ts`): `completed` for a turn the
+ * runtime finished, `aborted` for one the desktop cancelled, `error` for a
+ * failed or interrupted turn. The wiring forwards it to
+ * `announceTurnEnded`, which broadcasts `session:turnEnded` to plugins, panels
+ * and views exactly the way `finishTurn` does for Pi turns.
+ */
+export type OmpTurnEndInfo = {
+  sessionId: string;
+  turnId: string;
+  reason: "completed" | "aborted" | "error";
 };
 
 export type OmpSessionStatus = {
@@ -510,6 +579,20 @@ class SessionEntry {
   private runnerBuild: Promise<OmpSessionRunner> | null = null;
   /** Single-flight native-session establishment (switch/new + identity check). */
   private nativeSessionBuild: Promise<void> | null = null;
+  /**
+   * The desktop's host-tool seam, bound to this entry's project and model
+   * binding. Undefined when the bridge was built without one (Pi path, unit
+   * fixtures): no `set_host_tools` is sent and calls are failed closed.
+   */
+  private readonly hostTools: OmpHostToolProvider | undefined;
+  private readonly hostToolExecutor: OmpHostToolExecutor | undefined;
+  /** The (runner, native session, catalog) triple the tools were last registered for. */
+  private hostToolsRegisteredRunner: OmpSessionRunner | null = null;
+  private hostToolsRegisteredSession: string | null = null;
+  private hostToolsRegisteredFingerprint: string | null = null;
+  /** The desktop's `session:turnEnded` announcement, and its once-per-turn guard. */
+  private readonly onTurnEnd: OmpSessionBridgeOptions["onTurnEnd"];
+  private readonly announcedTurnEnds = new Set<string>();
   nativeSessionId: string | null = null;
   nativeSessionPath: string | null = null;
   /** True once the CURRENT runtime process is on this session (switch/new). */
@@ -578,6 +661,8 @@ class SessionEntry {
     persistNativeSession: OmpSessionBridgeOptions["persistNativeSession"];
     sessionDir: string;
     binding: { providerId: string | null; modelId: string | null; thinkingLevel: string | null };
+    hostTools?: OmpHostToolProvider;
+    onTurnEnd?: OmpSessionBridgeOptions["onTurnEnd"];
   }) {
     this.sessionId = deps.sessionId;
     this.projectDirectory = deps.projectDirectory;
@@ -589,6 +674,32 @@ class SessionEntry {
     this.persistNativeSession = deps.persistNativeSession;
     this.sessionDir = deps.sessionDir;
     this.binding = deps.binding;
+    this.hostTools = deps.hostTools;
+    this.onTurnEnd = deps.onTurnEnd;
+    // The executor is bound once: the project directory and model binding are
+    // fixed for the entry's lifetime, so the bound executor can never reach
+    // another project's scoped tools even if a later prompt tried. Its
+    // turn-dispatch gate reads the live runner state at execution time — the
+    // closure captures the entry, not a runner snapshot, so it works both
+    // before the first runner exists and across runner replacements.
+    this.hostToolExecutor = deps.hostTools?.executor({
+      sessionId: deps.sessionId,
+      projectPath: deps.projectDirectory,
+      // Live getters, not construction snapshots: the configure() thinking-only
+      // path mutates `this.binding` on this same entry after the executor was
+      // built, and every plugin execution must see the level that is current
+      // *now* (the Pi host reads it at execution time from session.get).
+      modelKey: () =>
+        this.binding.providerId && this.binding.modelId
+          ? `${this.binding.providerId}/${this.binding.modelId}`
+          : null,
+      thinkingLevel: () => this.binding.thinkingLevel,
+      dispatchable: (turnId) => {
+        const runner = this.runner;
+        if (!runner || runner.isStopping() || runner.runState() !== "running") return false;
+        return runner.status().currentTurnId === turnId;
+      },
+    });
     this.contextId = randomUUID();
   }
 
@@ -696,6 +807,11 @@ class SessionEntry {
     this.runner = null;
     this.nativeSessionBound = false;
     this.nativeSessionRunner = null;
+    // The replacement process has its own tool registry: the catalog must be
+    // registered again before its first prompt.
+    this.hostToolsRegisteredRunner = null;
+    this.hostToolsRegisteredSession = null;
+    this.hostToolsRegisteredFingerprint = null;
     if (retired) {
       this.generationSeed = retired.currentGeneration();
       this.messageSequenceSeed = retired.currentMessageSequence();
@@ -716,6 +832,18 @@ class SessionEntry {
       generationSeed: this.generationSeed,
       messageSequenceSeed: this.messageSequenceSeed,
       contextId: this.contextId,
+      ...(this.hostToolExecutor ? { hostToolExecutor: this.hostToolExecutor } : {}),
+      // The runner owns the turn-end announcement (its closeRun knows the
+      // real reason); the bridge forwards it through its once-guard to the
+      // desktop's `session:turnEnded` broadcast. Ordinary envelopes are never
+      // inspected for terminal state — a converter error mid-run is not a
+      // turn end, and a prompt failure may close a run without any envelope.
+      ...(this.onTurnEnd
+        ? {
+            onTurnEnd: (info: { sessionId: string; turnId: string; reason: "completed" | "aborted" | "error" }) =>
+              this.announceTurnEnded(info.turnId, info.reason),
+          }
+        : {}),
       emit: (envelope) => this.emitAgentEvent(envelope),
       onUiRequest: (request, info) => this.surfaceUiRequest(request, info.sessionId, info.generation),
       onUiClosed: (requestId, reason) => {
@@ -961,6 +1089,11 @@ class SessionEntry {
     const epoch = this.stopEpoch;
     await this.ensureNativeSession(gate, spec);
     const runner = await this.ensureRunner(gate);
+    // The session's desktop tools are (re)registered before every prompt, the
+    // way the Pi host reassembles its catalog per launch: a changed catalog —
+    // a plugin installed/unloaded, a scope edit, an MCP change — is visible to
+    // the next turn, and an unchanged one is skipped by fingerprint.
+    await this.registerHostTools(runner);
     // Enable the subagent subscription once the runtime is ready and the native
     // session is established. A refused subscription is logged but does not fail
     // the prompt: the turn still runs, and the child list/read paths report a
@@ -976,6 +1109,95 @@ class SessionEntry {
     }
     const started = await runner.prompt(content);
     return { accepted: started.accepted, turnId: started.turnId };
+  }
+
+  /**
+   * Register this session's desktop tool catalog through `set_host_tools`,
+   * fail-closed.
+   *
+   * The catalog is reassembled before every prompt, matching the Pi host,
+   * which rebuilds `pluginTools`/`userMcpTools` on every launch
+   * (`session-launch.ts` `resolveAgentRuntimeLaunch`) — so installing or
+   * unloading a plugin, changing an activation scope or editing an MCP server
+   * is visible to the very next turn. A registration is skipped only when the
+   * (runner, native session, catalog) triple is exactly what was last
+   * registered: the pinned runtime replaces its whole host-tool set per
+   * registration, so the fingerprint skip is what keeps an unchanged catalog
+   * from being re-sent, while any content change re-registers the new set —
+   * tools are never exposed twice, and a tool removed from the catalog is
+   * removed from the runtime too.
+   *
+   * A refused registration — a duplicate name, a collision with a native
+   * tool — or a response whose echoed `toolNames` differ from the request
+   * fails the prompt closed: the desktop never guesses what the runtime
+   * actually registered, and a tool the model cannot see is never silently
+   * dropped.
+   */
+  private async registerHostTools(runner: OmpSessionRunner): Promise<void> {
+    if (!this.hostTools) return;
+    const definitions = await this.hostTools.catalog(this.projectDirectory);
+    const fingerprint = JSON.stringify(
+      definitions.map((definition) => [definition.name, definition.description, definition.parameters, definition.loadMode ?? null]),
+    );
+    if (
+      this.hostToolsRegisteredRunner === runner &&
+      this.hostToolsRegisteredSession === this.nativeSessionId &&
+      this.hostToolsRegisteredFingerprint === fingerprint
+    ) {
+      return;
+    }
+    const runtime = this.runtimeHandle();
+    const response = await runtime.request(
+      { type: "set_host_tools", tools: definitions },
+      { timeoutMs: 20_000 },
+    );
+    if (response.success !== true) {
+      throw Object.assign(
+        new Error(`the runtime refused to register the desktop host tools: ${response.error ?? "unknown error"}`),
+        { errorCode: "OMP_HOST_TOOL_REGISTRATION_FAILED" },
+      );
+    }
+    const echoed = (response.data as { toolNames?: unknown } | undefined)?.toolNames;
+    const expected = definitions.map((definition) => definition.name);
+    const matches =
+      Array.isArray(echoed) &&
+      echoed.length === expected.length &&
+      echoed.every((name, index) => name === expected[index]);
+    if (!matches) {
+      throw Object.assign(
+        new Error(
+          `the runtime registered host tools with a different catalog: expected ${JSON.stringify(expected)}, received ${JSON.stringify(echoed)}`,
+        ),
+        { errorCode: "OMP_HOST_TOOL_REGISTRATION_FAILED" },
+      );
+    }
+    this.hostToolsRegisteredRunner = runner;
+    this.hostToolsRegisteredSession = this.nativeSessionId;
+    this.hostToolsRegisteredFingerprint = fingerprint;
+    this.logger?.app("omp", "info", "desktop host tools registered", {
+      data: { sessionId: this.sessionId, toolNames: expected },
+    });
+  }
+
+  /**
+   * Forward one turn end to the desktop's `session:turnEnded` broadcast, at
+   * most once per turn.
+   *
+   * The runner is the source of truth for the reason and its own monotonic
+   * guard already ensures once per generation; this set is the entry's second
+   * layer, kept for the entry's whole lifetime — never evicted — because a
+   * bounded cache could forget an old turn and let a replayed terminal
+   * announce twice. The set is released wholesale when the entry is disposed.
+   */
+  private announceTurnEnded(turnId: string, reason: "completed" | "aborted" | "error"): void {
+    if (!this.onTurnEnd || this.announcedTurnEnds.has(turnId)) return;
+    this.announcedTurnEnds.add(turnId);
+    try {
+      this.onTurnEnd({ sessionId: this.sessionId, turnId, reason });
+    } catch {
+      // The announcement is advisory: its failure must never disturb the
+      // runner close or the renderer's event fan-out.
+    }
   }
 
   async stop(): Promise<OmpStopOutcome> {
@@ -1024,6 +1246,8 @@ class SessionEntry {
     this.approvalRequests.clear();
     this.askRequests.clear();
     this.generations.clear();
+    // A turn still running when the session is torn down ends as "aborted" —
+    // announced by the runner itself when the dispose closes its live run.
     // Join any in-flight stop so its teardown/retirement and this disposal do
     // not overlap on the same runner/supervisor; admission stays closed via
     // `closed` for the whole span.
@@ -1152,6 +1376,8 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       persistNativeSession: options.persistNativeSession,
       sessionDir: options.sessionDir,
       binding,
+      ...(options.hostTools ? { hostTools: options.hostTools } : {}),
+      ...(options.onTurnEnd ? { onTurnEnd: options.onTurnEnd } : {}),
     });
     entries.set(spec.sessionId, entry);
     return entry;
@@ -1722,6 +1948,18 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       uiRecords: runnerDiagnostics?.uiRecords ?? [],
       state: first?.runnerState() ?? "idle",
       sessions,
+      hostTools: runnerDiagnostics?.hostTools ?? {
+        pending: 0,
+        executed: 0,
+        cancelled: 0,
+        duplicates: 0,
+        unknownCancels: 0,
+        noRun: 0,
+        malformed: 0,
+        lateCompletions: 0,
+        rememberedIds: 0,
+        trackedGenerations: 0,
+      },
     };
   }
 

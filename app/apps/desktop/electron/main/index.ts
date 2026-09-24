@@ -102,6 +102,7 @@ import { registerNotificationIpc } from "./ipc/notification-ipc";
 import { registerSessionIpc } from "./ipc/session-ipc";
 import { createDesktopEngineRuntimeForApp } from "./runtime/engine-runtime";
 import { wireOmpSessions } from "./runtime/omp-session-wiring";
+import { createOmpHostToolAdapter } from "./runtime/omp-host-tools";
 import { registerSettingsIpc } from "./ipc/settings-ipc";
 import { registerProviderIpc } from "./ipc/provider-ipc";
 import {
@@ -1247,6 +1248,11 @@ const { bootHostStatus, runtimeArch, bootBackends } = runtimeLifecycle;
 const engineRuntime = createDesktopEngineRuntimeForApp({ dataRoot: dataDir, app, getHost: () => host, piRuntimeLive: () => host !== null && sidecar !== null }); // engine gate + owned runtime (ADR 0300)
 // The OMP conversation registry (M4): one runtime per session, each with its
 // own supervisor, project directory, native transcript and model projection.
+// The desktop's plugin/MCP tools ride the host-tool RPC bridge (M5/T19-B):
+// each session exposes its own project's catalog, executed with live re-checks
+// — the turn-dispatch gate is the bridge's per-entry closure over its runner,
+// and the plugin lifecycle broadcast is the Pi host's `session:turnEnded`
+// (`announceTurnEnded`).
 const ompSessions = wireOmpSessions({
   dataRoot: dataDir,
   host: () => host,
@@ -1256,6 +1262,18 @@ const ompSessions = wireOmpSessions({
   resourcesPath: process.resourcesPath ?? null,
   appPath: app.getAppPath(),
   emitAgentEvent: (envelope) => emitAgentEvent(envelope),
+  hostTools: createOmpHostToolAdapter({
+    plugins,
+    userMcp,
+    pluginActiveInProject,
+    // The same post-execution toast drain `host.ts` performs after
+    // `plugins.execute`; a tool's toasts are never silently dropped, and a
+    // failing drain never changes the tool result (the adapter isolates it).
+    drainToasts: () => plugins.drainToasts(),
+    emitToast: (message) => sendToRenderer(IPC.event.toast, { message }),
+    log: (level, message, data) => logger.app("runtime", level, message, { data }),
+  }),
+  onTurnEnd: announceTurnEnded,
 }).bridge;
 function registerIpc() {
   return registerIpcHandlers({

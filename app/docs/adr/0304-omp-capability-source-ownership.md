@@ -163,12 +163,60 @@ roots — those remain governed by the config overlay (§2) and the ownership
 contract (§1). The gate's pre-execution `tool_call` hook, cancellation,
 session and process-cleanup semantics are unchanged (M3).
 
-### 4. Not implemented in this phase (declared, not claimed)
+### 4. T19-B realized: host-tool RPC with gate approval (amended)
 
-- T19-B host-tool RPC (desktop/plugin MCP and Agent Tools through one host
-  boundary).
+The desktop-owned tools declared in §1 now arrive through the pinned
+runtime's host-tool RPC, exactly once per session:
+
+- **Catalog**: `plugin_<plugin>_…` (Agent Tools and plugin-declared MCP) and
+  `mcp_<server>_<tool>` are assembled from the live plugin registry and the
+  user MCP runtime per prompt (Pi `session-launch` semantics) and registered
+  with `loadMode: "essential"`; the bridge re-registers on any catalog change
+  (fingerprint skip when identical) and fails closed on a refused registration
+  or an echoed `toolNames` mismatch. A name colliding with an OMP native tool
+  is refused by the pinned runtime (`session-tools.ts`); the desktop never
+  overrides it silently.
+- **Execution**: `host_tool_call` frames bind to the owning run; at-most-once
+  is scoped to the whole active generation (no evictable cap); re-checks at
+  the last synchronous dispatch point cover plugin load, activation scope,
+  the user MCP server state and the live turn (`dispatchable` over the OMP
+  runner — the Pi predicate is not used, OMP turns never enter the Pi turn
+  registry). Cancellation: the abort signal reaches plugin executions; MCP
+  calls have no call-level signal, so the guarantee is "not dispatched after
+  cancel, late results dropped" — remote side effects are never claimed
+  retracted.
+- **Approval**: host tools are controlled by this same gate, before any
+  execution — `plugin_*`/`mcp_*` are gated unconditionally (the
+  `OMP_DESKTOP_GATE_TOOLS` list only tunes native names) and raise a real
+  `tool_permission_request`. Risk: `plugin_*` = `high` (conservative upper
+  bound; the pinned protocol carries no declared-risk channel, so a
+  low/medium-declared plugin sees a stricter prompt this phase), `mcp_*` =
+  `medium` (matching the Pi host's fixed MCP classification). No parallel
+  approval system exists.
+- **Turn lifecycle**: the runner's `closeRun(generation, reason)` announces
+  `session:turnEnded` exactly once per turn — completed for a normal
+  `agent_end`, aborted for a user-requested stop (including a late `agent_end`
+  under stop) or a dispose of a live turn, error for prompt/transport failure
+  (including a prompt RPC failure that presented no dialog). A mid-run
+  converter error is not a turn end.
+- **Results**: two isError layers (thrown errors and inner
+  `AgentToolResult.isError`) both map to an outer failed `host_tool_result`;
+  text and MCP image blocks pass through faithfully; non-text blocks,
+  `structuredContent` and any other key (including a plugin's own
+  `details`/`providerMetadata`/`useless` — the Pi contract shows the plugin's
+  whole return value to the model) become deterministic text, never mapped
+  onto OMP-internal result metadata. Every outcome funnels through one budget
+  pass measured on the final serialized `content` JSON (≤ 768 KiB), which
+  keeps the frame under the 1 MiB line limit and preserves the head of an
+  over-budget result.
+
+Evidence: `docs/validation/M5-host-tool-rpc.md`.
+
+### 5. Not implemented (declared, not claimed)
+
 - T19-C desktop skills and project memory through the trusted gate.
 - Any user path for those capabilities.
+- T20 Plan/Goal and high-privilege capability gating.
 
 ## Consequences
 
@@ -181,4 +229,6 @@ session and process-cleanup semantics are unchanged (M3).
 - Existing approval, session, persistence, subagent and concurrent-approval
   fixtures now run under the trusted boundary and must keep passing.
 - ADR 0301's gate-loading description is amended (`--trusted-extension`).
-- T19-B is the next task.
+- Desktop host tools are approved through the same gate as native tools; the
+  declared-risk limitation (§4) is recorded, not hidden.
+- T19-C is the next task.

@@ -132,6 +132,19 @@ export {
   type OmpStopOutcome,
 } from "./session/runner.js";
 export {
+  OmpHostToolCalls,
+  isHostToolCallFrame,
+  isHostToolCancelFrame,
+  type OmpHostToolCall,
+  type OmpHostToolCallsOptions,
+  type OmpHostToolContentBlock,
+  type OmpHostToolCounters,
+  type OmpHostToolDefinition,
+  type OmpHostToolExecutor,
+  type OmpHostToolOutcome,
+  type OmpHostToolRun,
+} from "./session/host-tools.js";
+export {
   SubagentTracker,
   type OmpSubagentOutcome,
   type SubagentDiagnostics,

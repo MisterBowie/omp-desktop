@@ -27,6 +27,11 @@ import { OmpRuntimeError } from "../errors.js";
 import type { OmpFrame } from "../protocol.js";
 import { appError, OmpEventConverter } from "./events.js";
 import {
+  OmpHostToolCalls,
+  type OmpHostToolCounters,
+  type OmpHostToolExecutor,
+} from "./host-tools.js";
+import {
   normalizeFromByte,
   parseSubagentEventFrame,
   parseSubagentLifecycleFrame,
@@ -134,6 +139,25 @@ export type OmpSessionRunnerOptions = {
   convergeTimeoutMs?: number;
   /** How long to wait for `abort` itself to be answered. */
   abortTimeoutMs?: number;
+  /**
+   * The desktop's host-tool executor (M5/T19-B). When set, `host_tool_call`
+   * frames are served through it — executed at most once, cancelled by
+   * `host_tool_cancel`/stop/dispose/transport failure, and answered with a
+   * real `host_tool_result`. Without it, every call is failed closed with an
+   * `isError` result so the runtime is never left waiting on an answer.
+   */
+  hostToolExecutor?: OmpHostToolExecutor;
+  /**
+   * One turn's terminal announcement (M5/T19-B), called exactly once per
+   * generation when the run that owns it first truly closes. The runner is
+   * the source of truth for the end reason — it never guesses from ordinary
+   * envelopes: `completed` for a normal `agent_end`, `aborted` when the run
+   * closes under a stop (including an `agent_end` that arrives while
+   * stopping) or a dispose with a live turn, `error` for a prompt or
+   * transport failure. The callback is isolated: a throwing announcement
+   * must not block the run close or the event fan-out.
+   */
+  onTurnEnd?: (info: { sessionId: string; turnId: string; reason: "completed" | "aborted" | "error" }) => void;
 };
 
 type RunRecord = {
@@ -166,6 +190,15 @@ export class OmpSessionRunner {
   private readonly converter: OmpEventConverter;
   private readonly ui: OmpUiRequests;
   private readonly subagents: SubagentTracker;
+  private readonly hostTools: OmpHostToolCalls;
+  private readonly onTurnEnd: OmpSessionRunnerOptions["onTurnEnd"];
+  /**
+   * The highest generation whose turn end was announced. Generations only
+   * increase and only the live run ever closes, so a monotonic guard is
+   * provably replay-free — unlike a bounded set, it can never evict an id and
+   * let a repeated terminal announce twice.
+   */
+  private lastTurnEndGeneration = -1;
   private readonly detachFrame: () => void;
   private readonly detachFailure: () => void;
 
@@ -224,7 +257,12 @@ export class OmpSessionRunner {
       ...(options.messageSequenceSeed !== undefined ? { sequenceSeed: options.messageSequenceSeed } : {}),
       ...(options.contextId !== undefined ? { contextId: options.contextId } : {}),
     });
+    this.onTurnEnd = options.onTurnEnd;
     this.subagents = new SubagentTracker({ sessionId: this.sessionId, now: this.now });
+    this.hostTools = new OmpHostToolCalls({
+      ...(options.hostToolExecutor ? { execute: options.hostToolExecutor } : {}),
+      write: (frame) => this.runtime.write(frame as OmpFrame),
+    });
     this.ui = new OmpUiRequests({
       sessionId: this.sessionId,
       write: (frame) => this.runtime.write(frame as OmpFrame),
@@ -305,6 +343,7 @@ export class OmpSessionRunner {
     state: OmpRunState;
     malformedSubagentFrames: number;
     subagentDiagnostics: SubagentDiagnostics;
+    hostTools: OmpHostToolCounters;
   } {
     return {
       lateFrames: this.lateFrames,
@@ -313,6 +352,7 @@ export class OmpSessionRunner {
       state: this.state,
       malformedSubagentFrames: this.malformedSubagentFrames,
       subagentDiagnostics: this.subagents.diagnostics(),
+      hostTools: this.hostTools.snapshot(),
     };
   }
 
@@ -615,6 +655,11 @@ export class OmpSessionRunner {
     // waiting on a user who is now stopping cannot be left mid-decision.
     const cancelled = this.cancelOpenDialogs("the run was stopped");
     if (cancelled.length > 0) steps.push(`cancelled ${cancelled.length} pending request(s)`);
+    // Same for every pending host tool call: the desktop-side execution is
+    // aborted before the protocol abort, so a plugin tool cannot keep running
+    // (or answer late) into a turn the user just cancelled.
+    const cancelledHostCalls = this.hostTools.cancelAll("the run was stopped");
+    if (cancelledHostCalls > 0) steps.push(`cancelled ${cancelledHostCalls} pending host tool call(s)`);
 
     let aborted = false;
     try {
@@ -651,7 +696,7 @@ export class OmpSessionRunner {
       steps.push(`a detached child is still running after the parent converged${children.reason ? ` (${children.reason})` : ""}`);
     }
     if (converged && !children.active) {
-      this.closeRun(run.generation);
+      this.closeRun(run.generation, "aborted");
       return { aborted, abortBashSent, converged: true, toreDown: false, steps, errors };
     }
 
@@ -676,7 +721,7 @@ export class OmpSessionRunner {
     } else {
       errors.push("no process teardown is available");
     }
-    this.closeRun(run.generation);
+    this.closeRun(run.generation, "aborted");
     // Only once the process group is confirmed gone AND the run root removed can
     // a detached child not come back and nothing remain owed. A failed teardown
     // retains the child registry, the task-call ownership and a retryable
@@ -774,6 +819,13 @@ export class OmpSessionRunner {
    */
   dispose(reason = "the session was closed"): number {
     const cancelled = this.cancelOpenDialogs(reason).length;
+    this.hostTools.cancelAll(reason);
+    // A live turn torn down by a dispose ends as "aborted": the run closes
+    // through the same choke point as every other end, so the announcement
+    // fires exactly once with the right reason.
+    const run = this.run;
+    if (run) this.closeRun(run.generation, "aborted");
+    this.hostTools.clearGenerations();
     this.detachFrame();
     this.detachFailure();
     this.subagents.reset();
@@ -825,6 +877,23 @@ export class OmpSessionRunner {
         this.onUiClosed?.(request.targetId, "the runtime retracted its request");
       }
       for (const record of this.ui.records().slice(-1)) this.onUiRecord?.(record);
+      return;
+    }
+
+    // Host tool frames belong to the host-tool bridge, never to the event
+    // converter. A call is bound to the active run (a call with none is failed
+    // closed by the bridge); a cancel is correlated by `targetId` only.
+    if (frame.type === "host_tool_call") {
+      this.hostTools.handleCall(
+        frame,
+        this.state === "running" && this.run
+          ? { sessionId: this.sessionId, turnId: this.run.turnId, generation: this.run.generation }
+          : null,
+      );
+      return;
+    }
+    if (frame.type === "host_tool_cancel") {
+      this.hostTools.handleCancel(frame);
       return;
     }
 
@@ -892,7 +961,7 @@ export class OmpSessionRunner {
         // The run is over: any dialog it raised can no longer be answered into
         // it, so it is cancelled rather than left pending for the next run.
         this.cancelOpenDialogs("the run ended before the dialog was answered");
-        this.closeRun(this.run?.generation ?? 0);
+        this.closeRun(this.run?.generation ?? 0, this.state === "stopping" ? "aborted" : "completed");
       }
     }
   }
@@ -965,6 +1034,7 @@ export class OmpSessionRunner {
     // A dead transport ends the run *and* everything waiting on a dialog: the
     // desktop must see one definite failure rather than a turn that hangs.
     const cancelled = this.ui.open().length;
+    this.hostTools.cancelAll(`the runtime transport failed: ${error.code}`);
     const run = this.run;
     this.closeGeneration(
       run?.generation ?? this.ui.currentGeneration(),
@@ -1028,13 +1098,13 @@ export class OmpSessionRunner {
       this.signalTerminal(generation, failure.error);
     }
     if (this.run?.generation === generation || this.state !== "idle") {
-      this.closeRun(generation);
+      this.closeRun(generation, "error");
     }
     // A concurrent path already closed the run; the dialogs (if any survived it)
     // were cancelled above, so there is nothing left to do.
   }
 
-  private closeRun(generation: number): void {
+  private closeRun(generation: number, reason: "completed" | "aborted" | "error"): void {
     // A completion (or failure) that names an older generation must never close
     // a run this runner has already superseded: `agent_end` and the prompt/
     // transport failure paths carry the generation they end, and only that
@@ -1042,12 +1112,40 @@ export class OmpSessionRunner {
     // already a no-op, but it still resets the shared fields so a late terminal
     // signal cannot resurrect or leave stale state behind.
     if (this.run && this.run.generation !== generation) return;
+    const closed = this.run !== null;
+    const turnId = this.run?.turnId;
     this.lastClosedGeneration = Math.max(this.lastClosedGeneration, generation);
     this.state = "idle";
     this.run = null;
     this.bashCallIds.clear();
     this.generationsWithDialogs.delete(generation);
+    // The turn is over: a host tool call still executing can no longer feed a
+    // result into it, so it is aborted here rather than answered late — and
+    // the generation's at-most-once record is reclaimed, because a frame that
+    // arrives after this point has no owning run and fails closed instead.
+    this.hostTools.cancelAll("the run ended");
+    this.hostTools.closeGeneration(generation);
+    if (closed && turnId) this.signalTurnEnd(generation, turnId, reason);
     this.wakeWaiters();
+  }
+
+  /**
+   * Announce one turn's end, at most once per generation.
+   *
+   * The monotonic guard is replay-proof: generations only increase and only
+   * the live run ever closes, so a repeated terminal for an old generation can
+   * never pass it. The callback is isolated — a throwing announcement must not
+   * block the run close or the event fan-out.
+   */
+  private signalTurnEnd(generation: number, turnId: string, reason: "completed" | "aborted" | "error"): void {
+    if (!this.onTurnEnd || generation <= this.lastTurnEndGeneration) return;
+    this.lastTurnEndGeneration = generation;
+    try {
+      this.onTurnEnd({ sessionId: this.sessionId, turnId, reason });
+    } catch {
+      // The announcement is advisory: its failure is swallowed so the close
+      // path and the renderer's event fan-out are never held up by it.
+    }
   }
 
   /** Wait until the turn reports completion, bounded by `convergeTimeoutMs`. */

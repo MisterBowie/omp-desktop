@@ -160,6 +160,75 @@ describe("decisions", () => {
     expect(read).toMatchObject({ block: false, route: "not-gated" });
   });
 
+  it("gates desktop host tools even when the name list does not mention them", async () => {
+    // The name list only tunes native tools: a plugin_*/mcp_* tool must never
+    // slip past on a name, so an empty list still gates them.
+    const gated = policy({ gated: new Set() });
+    const plugin = await decideToolCall(
+      { ...EVENT, toolName: "plugin_demo_echo", input: { text: "hi" } },
+      { ...CONTEXT, ui: { select: async () => OMP_APPROVAL_OPTIONS[0] } },
+      gated,
+    );
+    expect(plugin).toMatchObject({ block: false, route: "allow-once" });
+    const mcp = await decideToolCall(
+      { ...EVENT, toolName: "mcp_stub_ping", input: {} },
+      { ...CONTEXT, ui: { select: async () => OMP_APPROVAL_OPTIONS[2] } },
+      gated,
+    );
+    expect(mcp).toMatchObject({ block: true, route: "deny" });
+  });
+
+  it("asks for a host tool before execution and reports the conservative risk", async () => {
+    let asked: string | undefined;
+    const verdict = await decideToolCall(
+      { ...EVENT, toolName: "plugin_demo_echo", input: { text: "hi" } },
+      {
+        ...CONTEXT,
+        ui: {
+          select: async (title: string) => {
+            asked = title;
+            return OMP_APPROVAL_OPTIONS[0];
+          },
+        },
+      },
+      policy(),
+    );
+    expect(verdict).toMatchObject({ block: false, route: "allow-once" });
+    expect(asked).toMatch(/plugin_demo_echo/);
+
+    const pluginDialog = buildApprovalDialog(
+      { ...EVENT, toolName: "plugin_demo_echo", input: { text: "hi" } },
+      CONTEXT,
+      1_000,
+    );
+    const pluginDescriptor = JSON.parse(pluginDialog.items[0]!.description!) as { risk?: string };
+    expect(pluginDescriptor.risk).toBe("high");
+
+    const mcpDialog = buildApprovalDialog(
+      { ...EVENT, toolName: "mcp_stub_ping", input: {} },
+      CONTEXT,
+      1_000,
+    );
+    const mcpDescriptor = JSON.parse(mcpDialog.items[0]!.description!) as { risk?: string };
+    expect(mcpDescriptor.risk).toBe("medium");
+  });
+
+  it("host tools honour deny mode and allow mode like native tools", async () => {
+    const denied = await decideToolCall(
+      { ...EVENT, toolName: "plugin_demo_echo", input: {} },
+      CONTEXT,
+      policy({ mode: "deny" }),
+    );
+    expect(denied).toMatchObject({ block: true, route: "mode-deny" });
+
+    const allowed = await decideToolCall(
+      { ...EVENT, toolName: "plugin_demo_echo", input: {} },
+      CONTEXT,
+      policy({ mode: "allow" }),
+    );
+    expect(allowed).toMatchObject({ block: false, route: "mode-allow" });
+  });
+
   it("blocks everything gated in deny mode, without asking", async () => {
     let asked = false;
     const denied = await decideToolCall(

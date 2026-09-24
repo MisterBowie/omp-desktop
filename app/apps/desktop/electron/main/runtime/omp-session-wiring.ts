@@ -27,8 +27,10 @@ import {
 } from "@pi-desktop/omp-runtime";
 import {
   createOmpSessionBridge,
+  type OmpHostToolProvider,
   type OmpSessionBridge,
   type OmpSessionRuntimeSpec,
+  type OmpTurnEndInfo,
 } from "./omp-session";
 import {
   projectionError,
@@ -61,6 +63,10 @@ export type OmpSessionWiringDeps = {
   appPath: string;
   resourcesPath?: string | null;
   emitAgentEvent: (envelope: AgentEventEnvelope) => void;
+  /** The desktop's host-tool seam (M5/T19-B), assembled from the plugin/MCP registries. */
+  hostTools?: OmpHostToolProvider;
+  /** The desktop's `session:turnEnded` broadcast (plugin lifecycle, M5/T19-B). */
+  onTurnEnd?: (info: OmpTurnEndInfo) => void;
 };
 
 function hostOrThrow(host: () => HostProcess | null): HostProcess {
@@ -165,6 +171,8 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
       }),
     emitAgentEvent: deps.emitAgentEvent,
     gateResolver: () => engineRuntime.gateExtension,
+    ...(deps.hostTools ? { hostTools: deps.hostTools } : {}),
+    ...(deps.onTurnEnd ? { onTurnEnd: deps.onTurnEnd } : {}),
     persistNativeSession: async (info) => {
       const client = hostOrThrow(deps.host);
       await client.call("session.bindEngine", {

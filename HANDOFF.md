@@ -1,6 +1,23 @@
 # OMP Desktop 开发交接
 
-更新时间：2026-09-25。当前状态：**M5/T19（MCP、规则、技能、记忆及插件分类适配）进行中：T19-A（运行时能力源隔离、可信网关加载、能力所有权契约）已实现并验证**（分支 `codex/m5-capability-sources`，基线 `ff4c1efed63475b9f552ace8a3f28f69b317e176`）；**T19-B（host-tool RPC）与 T19-C（桌面技能/记忆/插件用户路径）待开始**。T18 已通过独立复审并验收（验收产品基线 `a35da2f87a745fbedd8f5beb46368607c2f6b72e`，分支 `codex/m5-tool-results`；证据见 `docs/validation/M5-tool-results.md`）。T17 已验收基线 `ab07a888d6afb916561b80e5661ed27aa6be612a` 保持不动。下一阶段入口：M5/T19-B。T19-A 证据见 `docs/validation/M5-capability-sources.md`；T18 证据见 `docs/validation/M5-tool-results.md`；T17 历轮独立复审返修见 `docs/validation/M5-subagents.md` §0.1-§0.15。
+更新时间：2026-09-25。当前状态：**M5/T19（MCP、规则、技能、记忆及插件分类适配）进行中：T19-A（运行时能力源隔离、可信网关加载、能力所有权契约）与 T19-B（host-tool RPC：桌面/插件 MCP 与插件 Agent Tools 经单一宿主边界恰一次暴露）已实现并验证**（T19-A 分支 `codex/m5-capability-sources`，基线 `ff4c1efed63475b9f552ace8a3f28f69b317e176`；T19-B 分支 `codex/m5-host-tool-rpc`，基线 `93ee82b61bd8191722db199e0fb8f1c74ddfaa12`，证据 `docs/validation/M5-host-tool-rpc.md`）；**T19-C（桌面技能/记忆/插件用户路径）待开始**。T18 已通过独立复审并验收（验收产品基线 `a35da2f87a745fbedd8f5beb46368607c2f6b72e`，分支 `codex/m5-tool-results`；证据见 `docs/validation/M5-tool-results.md`）。T17 已验收基线 `ab07a888d6afb916561b80e5661ed27aa6be612a` 保持不动。下一阶段入口：M5/T19-C（桌面技能/记忆/插件用户路径）。T19-A 证据见 `docs/validation/M5-capability-sources.md`；T19-B 证据见 `docs/validation/M5-host-tool-rpc.md`；T18 证据见 `docs/validation/M5-tool-results.md`；T17 历轮独立复审返修见 `docs/validation/M5-subagents.md` §0.1-§0.15。
+
+## 0. M5/T19-B 交付摘要（本轮）
+
+- 状态：**T19-B 已实现并验证**（分支 `codex/m5-host-tool-rpc`，基线 `93ee82b`）。桌面/插件 MCP（`mcp_*`）与插件 Agent Tools/插件声明的 MCP（`plugin_*`）经固定 OMP 18.2.7 的 host-tool RPC 在每个 OMP session 按绑定项目恰一次暴露；T19-C/T20 未实现、未声称。
+- 证据：`docs/validation/M5-host-tool-rpc.md`（固定源码证据、最终测试文件在纯基线 93ee82b 上的严格红灯、绿测计数、限制）；设计决策：ADR 0304 §4 追加 + spec `03-runtime/02-agent-runtime.md` §14 追加。
+- 核心变更：
+  - **目录与注册**（`omp-host-tools.ts` + `omp-session.ts`）：按 PI `session-launch` 语义每个 prompt 前重装配目录（`loadMode:"essential"`、description/schema 原样、空白名/空描述/非对象 schema/重名 fail closed）；`set_host_tools` 以 `(runner, nativeSession, 目录指纹)` 跳过完全相同的注册，目录变化即整体替换（增/删工具下一 turn 可见，绝不重复暴露）；注册响应 `toolNames` 与请求严格一致否则拒绝，OMP 拒绝（重名/与原生工具冲突）同样 fail closed。
+  - **执行**（omp-runtime `host-tools.ts` `OmpHostToolCalls` + 桌面 executor）：`host_tool_call` 绑定当前 run；at-most-once 按 generation 无限记录、generation 结束回收（无 LRU 驱逐）；重复帧/未知 targetId/迟到 result/cancel 无副作用；`host_tool_cancel` 只按 `targetId` 关联、不进转换器；stop/abort/dispose/传输失败/run close 取消全部 pending、迟到完成丢弃；执行前复检插件加载/作用域/MCP 活性/最新工具表/最后同步派发点 `signal.aborted` + `dispatchable(turnId)`（OMP runner 实时状态，不混用 Pi `activeTurns`）；binding 的 modelKey/thinkingLevel 为执行时 getter（configure thinking-only 原位生效）。
+  - **审批**：既有 trusted gate 无条件受控 `plugin_*`/`mcp_*`（`OMP_DESKTOP_GATE_TOOLS` 只调原生名），副作用前真实 `tool_permission_request`；risk：plugin_=high（保守上界，协议无声明风险通道，低/中风险插件提示更严格——如实记录）、mcp_=medium（与 PI 一致）；无并行审批系统。
+  - **turn 生命周期**：runner `closeRun(generation, reason)` 为 source of truth——普通 agent_end=completed、用户 stop（含 stop 中迟到 agent_end）/teardown/dispose 活跃 turn=aborted、prompt/transport failure（含无 dialog 的 prompt RPC 失败）=error；每 turn 恰一次（runner 单调 generation 守卫 + bridge entry 级全集）转发 `announceTurnEnded` 广播 `session:turnEnded`；converter 中途错误不是 turn 终态。
+  - **结果保真**：两层 isError（抛错与内层 `{content,isError:true}`）→ 外层 `host_tool_result.isError`；text/image 保真透传（MCP image 与 OMP `ImageContent` 同形）；audio/resource/structuredContent/未知键（含插件返回的 details/providerMetadata/useless）确定性文本化、不因旁有 text 丢失、裸 base64 不跨线、绝不映射到 OMP 结果自身字段；所有 outcome 统一过 `boundBlocks` 按最终 `JSON.stringify(content)` 字节（≤768 KiB）判定/二分截断、标记计入预算、超限保留结果头部。
+  - **toast**：生产 adapter 执行后按 PI 顺序 drain+emit，异常隔离，不影响工具结果。
+  - **MCP 取消边界**：客户端无调用级 signal——只承诺「未派发不开始、已派发丢弃迟到结果」，不声称撤回远端副作用；plugin Agent Tool signal 真实中止。
+- 新增测试：`host-tools.test.ts`（13：at-most-once 跨 5000 调用无驱逐、closeGeneration 回收、cancel/迟到完成、两层 isError、malformed）、`turn-end.test.ts`（9：completed/aborted/error 各路径恰一次、converter 错误不误报、无 dialog prompt 失败仍公告、抛错公告不阻塞 close）、`host-tool-runner.test.ts`（9：帧路由/去重/取消/停止/传输/处置）、`omp-host-tool-bridge.test.mjs`（16：注册顺序/回显/拒绝/目录增删/每会话隔离/turn-end reason/execute gate/live thinking）、`omp-host-tool-adapter.test.mjs`（28：目录保真/空白名拒绝/作用域/重名/dispatch gate/signal/两层 isError/image 透传/structuredContent/details 文本化/Unicode 与转义预算/头部保留/toast 隔离）、`omp-host-tool-e2e.test.mjs`（6 真实固定 OMP：三类工具审批先到→allow 恰一次→结果专属 canary 进入 `role:"tool"` 模型消息、deny 零执行零副作用、取消无迟到副作用、decoy 不被原生发现；全部经生产 adapter）。
+- 先红后绿：最终测试文件 + 纯基线 93ee82b（本地对象硬链接准备的临时 worktree，已确认基线 HEAD、事后清理）——runner 9/9、turn-end 9/9、bridge 16/16、E2E 6/6 行为失败，host-tools/adapter 模块缺失；本阶段基线上对应全绿。
+- 验证：`@pi-desktop/omp-runtime` vitest 286/286、desktop 定向 139/139、真实固定 OMP E2E 17/17（host-tool 6 + capability 5 + session/concurrent/persistence/subagent 6）、desktop 全量 2831 总数/2827 通过/0 失败/4 跳过、typecheck 2×0、build 0、style-token lint 0、Biome 0、`git diff --check` 0、secret 扫描 0、子模块固定 SHA、无残留进程/临时目录。
+- 下一轮入口：M5/T19-C（桌面技能/记忆/插件用户路径）；仍关闭：`branch`/`steer`/`followUp`/`compact`、子代理单独停止、子代理 `hasUI=false` 工具 gating。
 
 ## 0. M5/T19-A 交付摘要（本轮）
 

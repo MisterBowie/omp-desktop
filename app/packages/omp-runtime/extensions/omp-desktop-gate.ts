@@ -28,7 +28,11 @@
  *      "allow".
  *
  * Environment (set by the desktop when it starts the runtime):
- *   - `OMP_DESKTOP_GATE_TOOLS` — comma-separated tool names (default below).
+ *   - `OMP_DESKTOP_GATE_TOOLS` — comma-separated native tool names (default
+ *     below). Desktop host tools (`plugin_*`, `mcp_*`, M5/T19-B) are gated
+ *     unconditionally and can only be opted out through
+ *     `OMP_DESKTOP_GATE_MODE` — a host tool is a desktop-side capability and
+ *     must never execute without the desktop's own approval first.
  *   - `OMP_DESKTOP_GATE_TIMEOUT_MS` — dialog deadline (default 120000).
  *   - `OMP_DESKTOP_GATE_MODE` — `ask` (default), `deny` (block everything
  *     gated without asking: unattended runs), or `allow`.
@@ -49,8 +53,18 @@ const DEFAULT_GATED_TOOLS = "write,edit,apply_patch,bash,eval";
  * report one, and inferring it from arguments would be guesswork, so the split
  * is by tool: anything that can change a file, spawn a process or drive a
  * browser is high, read-only tools are low, everything else in between.
+ *
+ * Desktop host tools (M5/T19-B) are always controlled here, before any
+ * execution, and their declared Pi risk cannot cross the pinned protocol:
+ * plugin tools are therefore shown as `high` — the conservative upper bound,
+ * so a high-risk plugin can never be downgraded — while user MCP tools are
+ * `medium`, matching the Pi host's fixed MCP classification. (A low- or
+ * medium-declared plugin sees a stricter high prompt this phase; that
+ * limitation is recorded in ADR 0304 / the T19-B validation.)
  */
 export function riskForTool(toolName: string): OmpApprovalRisk {
+  if (toolName.startsWith("plugin_")) return "high";
+  if (toolName.startsWith("mcp_")) return "medium";
   switch (toolName) {
     case "write":
     case "edit":
@@ -67,6 +81,18 @@ export function riskForTool(toolName: string): OmpApprovalRisk {
     default:
       return "medium";
   }
+}
+
+/**
+ * True for desktop host-tool names (`plugin_<plugin>_…`, `mcp_<server>_…`).
+ *
+ * These are gated unconditionally — the `OMP_DESKTOP_GATE_TOOLS` list only
+ * controls the native tool names; a host tool is a desktop-side capability
+ * and must never execute without the desktop's own approval first. The only
+ * opt-outs are the gate modes (`OMP_DESKTOP_GATE_MODE=allow`/`deny`).
+ */
+export function isHostToolName(toolName: string): boolean {
+  return toolName.startsWith("plugin_") || toolName.startsWith("mcp_");
 }
 const DEFAULT_TIMEOUT_MS = 120_000;
 
@@ -218,7 +244,11 @@ export async function decideToolCall(
     sessionAllowed: Set<string>;
   },
 ): Promise<{ block: boolean; reason?: string; route: string }> {
-  if (!policy.gated.has(event.toolName)) return { block: false, route: "not-gated" };
+  // Desktop host tools are controlled unconditionally: the name list only
+  // tunes the native tools, and a host tool must never slip past on a name.
+  if (!policy.gated.has(event.toolName) && !isHostToolName(event.toolName)) {
+    return { block: false, route: "not-gated" };
+  }
   if (policy.mode === "allow") return { block: false, route: "mode-allow" };
   if (policy.mode === "deny") {
     return { block: true, reason: "tool calls are denied in this run", route: "mode-deny" };
