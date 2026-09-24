@@ -176,15 +176,25 @@ runtime's host-tool RPC, exactly once per session:
   or an echoed `toolNames` mismatch. A name colliding with an OMP native tool
   is refused by the pinned runtime (`session-tools.ts`); the desktop never
   overrides it silently.
-- **Execution**: `host_tool_call` frames bind to the owning run; at-most-once
-  is scoped to the whole active generation (no evictable cap); re-checks at
-  the last synchronous dispatch point cover plugin load, activation scope,
-  the user MCP server state and the live turn (`dispatchable` over the OMP
-  runner — the Pi predicate is not used, OMP turns never enter the Pi turn
-  registry). Cancellation: the abort signal reaches plugin executions; MCP
-  calls have no call-level signal, so the guarantee is "not dispatched after
-  cancel, late results dropped" — remote side effects are never claimed
-  retracted.
+- **Execution**: `host_tool_call` frames bind to the owning run;
+  **at-most-once covers execution** within the owning generation (no evictable
+  cap; the record is reclaimed when the generation ends). Fail-closed
+  rejections (no active run, no wired executor) execute nothing; a replayed
+  rejected frame is answered fail-closed again — still zero executions, and
+  the runtime drops answers to ids it no longer tracks. Re-checks at the last
+  synchronous dispatch point cover plugin load, activation scope, the user MCP
+  server state and the live turn (`dispatchable` over the OMP runner — the Pi
+  predicate is not used, OMP turns never enter the Pi turn registry).
+  Cancellation: the abort signal reaches plugin executions; MCP calls have no
+  call-level signal, so the guarantee is "not dispatched after cancel, late
+  results dropped" — remote side effects are never claimed retracted.
+- **Execution context (limitation, T20)**: the adapter passes `mode: "agent"`
+  to plugin tools. The Pi host passes the durable session mode and the plugin
+  runtime enforces declared `planSafeActions` from `ctx.mode`
+  (`plugin-runtime.ts:2505-2525`); OMP prompt/spec carry no mode today and
+  Plan/Goal is deferred, so this phase does NOT claim full Pi execution-context
+  compatibility. T20 must propagate and enforce the real mode before Plan/Goal
+  is claimed.
 - **Approval**: host tools are controlled by this same gate, before any
   execution — `plugin_*`/`mcp_*` are gated unconditionally (the
   `OMP_DESKTOP_GATE_TOOLS` list only tunes native names) and raise a real

@@ -18,15 +18,18 @@
  * The rules that keep one desktop tool call from turning into two executions
  * or a leaked side effect:
  *
- *   - every call id is handled at most once: a duplicate frame, a settled id
- *     seen again, an unknown `targetId`, a late result and a late cancel are
- *     all counted and dropped;
- *   - the at-most-once record is scoped to the owning generation and is
- *     unbounded within it: every id the generation saw is remembered until the
- *     generation explicitly ends (`closeGeneration`), so no LRU cap can evict
- *     an id the transport later replays. After the generation ends the record
- *     is reclaimed — a frame that arrives then has no owning run and is failed
- *     closed instead of executed;
+ *   - **at-most-once execution within an owned generation**: every id a
+ *     generation saw is remembered until the generation explicitly ends
+ *     (`closeGeneration`) — no LRU cap can evict an id the transport later
+ *     replays — so an executed call never executes twice. A frame that
+ *     arrives after the generation ended has no owning run and is failed
+ *     closed instead of executed. Fail-closed rejections (no active run, no
+ *     wired executor, malformed frames) never execute anything; a replayed
+ *     rejected frame is answered fail-closed again, which is a repeat of an
+ *     `isError` answer with zero executions — the runtime's bridge drops
+ *     answers to ids it no longer tracks, so no side effect results;
+ *   - a cancel whose `targetId` names no pending call, a late result and a
+ *     late cancel are all counted and dropped;
  *   - cancellation settles the entry before the abort signal fires, so a
  *     completion that races the cancel can never write a result afterwards.
  *     The abort signal reaches plugin executions (which honour it); an MCP

@@ -1637,16 +1637,24 @@ RPC (evidence: `docs/validation/M5-host-tool-rpc.md`, ADR 0304 §4):
   nothing is exposed twice) and fails the prompt closed on a refused
   registration or an echoed `toolNames` mismatch. A name colliding with an OMP
   native tool is refused by the pinned runtime, never silently overridden.
-- **Execution**: `host_tool_call` frames bind to the owning run; at-most-once
-  is scoped to the whole active generation (no evictable cap; reclaimed when
-  the generation ends); re-checks at the last synchronous dispatch point cover
-  plugin load, activation scope, the user MCP server state and the live turn
-  (a per-entry `dispatchable` closure over the OMP runner — the Pi
-  `isTurnDispatchable` predicate is not used because OMP turns never enter the
-  Pi turn registry). The abort signal reaches plugin executions; MCP calls
-  have no call-level signal, so the guarantee is exactly "not dispatched after
-  cancel, late results dropped" — remote side effects are never claimed
-  retracted.
+- **Execution**: `host_tool_call` frames bind to the owning run;
+  **at-most-once covers execution** within the owning generation (no evictable
+  cap; reclaimed when the generation ends). Fail-closed rejections (no active
+  run, no wired executor) execute nothing; a replayed rejected frame is
+  answered fail-closed again — still zero executions. Re-checks at the last
+  synchronous dispatch point cover plugin load, activation scope, the user MCP
+  server state and the live turn (a per-entry `dispatchable` closure over the
+  OMP runner — the Pi `isTurnDispatchable` predicate is not used because OMP
+  turns never enter the Pi turn registry). The abort signal reaches plugin
+  executions; MCP calls have no call-level signal, so the guarantee is exactly
+  "not dispatched after cancel, late results dropped" — remote side effects
+  are never claimed retracted.
+- **Execution context (limitation, T20)**: the adapter passes `mode: "agent"`
+  to plugin tools; the Pi host passes the durable session mode and the plugin
+  runtime enforces declared `planSafeActions` from `ctx.mode`
+  (`plugin-runtime.ts:2505-2525`). OMP prompt/spec carry no mode today and
+  Plan/Goal is deferred, so full Pi execution-context compatibility is not
+  claimed; T20 must propagate and enforce the real mode first.
 - **Approval**: the trusted gate controls `plugin_*`/`mcp_*` unconditionally
   (the `OMP_DESKTOP_GATE_TOOLS` list only tunes native names), raising a real
   `tool_permission_request` before any execution — no parallel approval

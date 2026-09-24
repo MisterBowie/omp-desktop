@@ -416,12 +416,20 @@ function describeBlock(block: Record<string, unknown>): string {
  *
  * The measure is the FINAL `JSON.stringify(content)` — array brackets,
  * commas, block envelopes, quotes and JSON escaping all included — so no
- * caller ever adds up piecemeal byte overheads. When the array does not fit,
- * the first offending text block is truncated by binary search on its code
- * points (the candidate array is re-stringified per probe, so the verdict is
- * exact), the truncation marker is appended inside that block, and the
- * remaining blocks are dropped: the head of the result is what the model
- * keeps, deterministically.
+ * caller ever adds up piecemeal byte overheads. When the array does not fit:
+ *
+ *   - a text block is truncated by binary search on its code points, with the
+ *     truncation marker budgeted inside the same block (the candidate array is
+ *     re-stringified per probe, so the verdict is exact);
+ *   - a non-text block that does not fit is replaced by a standalone marker
+ *     block; when even that marker does not fit after the blocks kept so far,
+ *     the LAST kept text block is shortened (no inner marker — the standalone
+ *     marker is the indicator) so the head keeps as much of its content as
+ *     the budget allows, and only a kept non-text block is dropped when no
+ *     text remains to shorten.
+ *
+ * The result is deterministic and always within budget: the empty array plus
+ * a lone marker is the terminating floor.
  */
 function boundBlocks(blocks: OmpHostToolContentBlock[]): OmpHostToolContentBlock[] {
   if (Buffer.byteLength(JSON.stringify(blocks), "utf8") <= CONTENT_BYTES) return blocks;

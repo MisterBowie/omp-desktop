@@ -205,6 +205,30 @@ describe("host tool calls", () => {
     expect(results[0]?.isError).toBe(true);
   });
 
+  it("a replayed fail-closed call is answered fail-closed again, still with zero executions", async () => {
+    // The narrowed contract: at-most-once covers *execution* within an owned
+    // generation. A call rejected for having no active run is not remembered,
+    // so a replay receives another isError answer — but executions stay at
+    // zero either way, and the runtime drops answers to ids it no longer
+    // tracks, so no side effect results.
+    let count = 0;
+    const { calls, written } = harness({
+      execute: async () => {
+        count += 1;
+        return { content: [{ type: "text", text: "ok" }] };
+      },
+    });
+    calls.handleCall(callFrame("h1"), null);
+    calls.handleCall(callFrame("h1"), null);
+    await settle();
+
+    expect(count).toBe(0);
+    const results = written.filter((frame) => frame.type === "host_tool_result");
+    expect(results).toHaveLength(2, "each rejected delivery is answered fail-closed");
+    expect(results.every((frame) => frame.isError === true)).toBe(true);
+    expect(calls.snapshot().noRun).toBe(2);
+  });
+
   it("a throwing executor becomes an isError result with the error text", async () => {
     const { calls, written } = harness({
       execute: async () => {
