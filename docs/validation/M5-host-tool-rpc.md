@@ -57,10 +57,10 @@
 
 ### 3.2 绿（本阶段产品基线）
 
-- omp-runtime vitest **289/289**（基线 252 + host-tool-runner 9 + host-tools 16 + turn-end 9 + gate host-tool 3）。
-- bridge 16/16、adapter 28/28（含目录增删注册、空白名拒绝、预算/保留头部、toast 隔离、live thinking getter、两层 isError、image 透传、structuredContent/非文本确定性、Unicode/转义预算、details 文本化）。
+- omp-runtime vitest **290/290**（基线 252 + host-tool-runner 9 + host-tools 17 + turn-end 9 + gate host-tool 3）。
+- bridge 16/16、adapter 29/29（含目录增删注册、空白名拒绝、预算/保留头部（含非文本溢出保留头部）、toast 隔离、live thinking getter、两层 isError、image 透传、structuredContent/非文本确定性、Unicode/转义预算、details 文本化）。
 - 真实固定 OMP host-tool E2E **6/6**：plugin Agent Tool 审批先到→allow 恰一次→结果专属 canary 进入 `role:"tool"` 消息；deny 零执行零副作用；user MCP / plugin MCP 恰一次（真实 stdio 服务器各恰一次 tools/call）；取消无迟到副作用（迟到完成不进入模型上下文与转录）；decoy 项目 MCP 不被原生发现。全部经生产 `createOmpHostToolAdapter`（无测试专用映射实现）。
-- 回归：T19-A capability-source 5/5、session/approval/persistence/subagent 6/6、desktop 定向 139/139、desktop 全量 2831/2827/0/4 skip。
+- 回归：T19-A capability-source 5/5、session/approval/persistence/subagent 6/6、desktop 定向 140/140、desktop 全量 2832/2828/0/4 skip。
 - typecheck 2×0、build 0、style-token lint 0、Biome 0、`git diff --check` 0、secret canary 扫描 0、子模块固定 SHA、无残留进程/临时目录。
 
 ## 4. 实现文件
@@ -83,13 +83,13 @@
 
 | 检查 | 命令 | 结果 |
 | --- | --- | --- |
-| omp-runtime 全量 | `cd app/packages/omp-runtime && npx vitest run` | 286 passed / 0 failed |
+| omp-runtime 全量 | `cd app/packages/omp-runtime && npx vitest run` | 290 passed / 0 failed |
 | bridge 探针 | `node --test apps/desktop/test/omp-host-tool-bridge.test.mjs`（apps/desktop 目录） | 16 passed / 0 failed |
-| adapter 探针 | `node --test apps/desktop/test/omp-host-tool-adapter.test.mjs` | 28 passed / 0 failed |
+| adapter 探针 | `node --test apps/desktop/test/omp-host-tool-adapter.test.mjs` | 29 passed / 0 failed |
 | host-tool E2E | `node --test --test-concurrency=1 apps/desktop/test/omp-host-tool-e2e.test.mjs` | 6 passed / 0 failed（真实固定 OMP） |
 | 回归 E2E | capability-source + session + concurrent-approval + persistence + subagent | 17 passed / 0 failed（真实固定 OMP，含 host-tool 6） |
-| 桌面定向 | bridge/adapter/session-bridge/capability-boundary/engine-runtime/launcher/ipc-gates/failclosed | 139 passed / 0 failed |
-| 桌面全量 | `cd app/apps/desktop && env -u SSH_ASKPASS node --test test/*.test.mjs` | 2831 总数 / 2827 passed / 0 failed / 4 skipped |
+| 桌面定向 | bridge/adapter/session-bridge/capability-boundary/engine-runtime/launcher/ipc-gates/failclosed | 140 passed / 0 failed |
+| 桌面全量 | `cd app/apps/desktop && env -u SSH_ASKPASS node --test test/*.test.mjs` | 2832 总数 / 2828 passed / 0 failed / 4 skipped |
 | typecheck | `pnpm --filter @pi-desktop/omp-runtime typecheck`、`pnpm --filter @pi-desktop/desktop typecheck` | 退出 0 / 退出 0 |
 | 构建 | `pnpm build:js` | 退出 0 |
 | lint | `pnpm --filter @pi-desktop/desktop lint`、`pnpm lint:biome`（75 files） | 退出 0 / 退出 0 |
