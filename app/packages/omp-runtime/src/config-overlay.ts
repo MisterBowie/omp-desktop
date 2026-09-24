@@ -55,16 +55,22 @@ export function sourceIsolationOverlayYaml(): string {
  *
  * The path is owned by the run root the supervisor created, but an embedder
  * `prepareRun` hook runs before this write and may plant a filesystem alias
- * there. The write therefore removes whatever entry occupies the path first —
- * `rmSync` acts on the entry itself and never follows a symlink or resolves a
- * hard link, so a planted alias cannot redirect the write outside the run
- * root — and then creates the file exclusively (`wx`) with restrictive mode
- * 0600. If another entry appears between the removal and the create, the
- * create fails with EEXIST instead of writing through it, and the
- * supervisor's unified cleanup removes the run root. An actively concurrent
- * malicious process that keeps racing the remove/create pair is outside this
- * guarantee: the exclusive create is the only protection, and its failure
- * fails the start.
+ * at the overlay path. The write therefore removes whatever entry occupies
+ * the path first — `rmSync` acts on the entry itself and never follows a
+ * symlink or resolves a hard link, so an alias planted at the path cannot
+ * redirect the write — and then creates the file exclusively (`wx`) with
+ * restrictive mode 0600. The supervisor separately verifies the run root's
+ * canonical location is unchanged after the hook (resolved paths, not inode
+ * identity), so the overlay path itself cannot be re-rooted outside the run.
+ * If another entry appears
+ * between the removal and the create, the create fails with EEXIST instead
+ * of writing through it, and the supervisor's unified cleanup removes the
+ * run root. An actively concurrent process is outside this guarantee in two
+ * windows: one that re-plants a final-component entry between the removal
+ * and the create (the exclusive create is the only protection there, and
+ * its failure fails the start), and one that swaps the run root after the
+ * supervisor's canonical-location check but before this write (the
+ * exclusive create cannot detect a parent-directory swap).
  */
 export function writeSourceIsolationOverlay(path: string): void {
   rmSync(path, { recursive: true, force: true });

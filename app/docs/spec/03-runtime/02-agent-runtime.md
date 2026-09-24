@@ -1590,12 +1590,20 @@ natively discovered by OMP and registered by the desktop host.
 T19-A implements the boundary that holds until the desktop-owned equivalents
 arrive: every run is started with a run-scoped config overlay
 (`--config <run-root>/config-overlay.yml`, written by the supervisor after
-`prepareRun` and immediately before spawn — the writer removes whatever entry
-the hook left at the overlay path (never following a planted symlink or hard
-link) and creates the boundary file exclusively (`wx`/`O_EXCL`, mode 0600),
-so an embedder hook can neither weaken it nor redirect the write outside the
-run root, and a write/create failure is cleaned up like any other start
-failure — and removed with the run root) that forces
+`prepareRun` and immediately before spawn — the supervisor records the run
+root's canonical location before the hook and re-resolves the overlay's
+parent after it (resolved paths, not inode identity), so a hook that
+deletes the run root or replaces it with a symlink fails the start before
+any write — these checks cover mutations the hook completes before
+`prepareRun` returns; concurrent filesystem mutation between the
+canonical-location check and the write, or between the writer's removal
+and exclusive creation, is outside the guarantee, and the exclusive create
+protects only the final-component race; the writer then removes whatever
+entry the hook left at the overlay path (never following a planted symlink
+or hard link) and creates the boundary file exclusively (`wx`/`O_EXCL`,
+mode 0600), so an embedder hook can neither weaken it nor redirect the
+write outside the run root, and a write/create failure is cleaned up like
+any other start failure — and removed with the run root) that forces
 `mcp.enableProjectConfig: false` and
 `memory.backend: off`. The pinned runtime merges `--config` overlays
 above the global and project config layers (`defaults < global < project <

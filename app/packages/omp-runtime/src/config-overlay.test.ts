@@ -24,6 +24,7 @@ import {
   existsSync,
   linkSync,
   lstatSync,
+  mkdirSync,
   readFileSync,
   readdirSync,
   rmSync,
@@ -33,7 +34,7 @@ import {
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { writeSourceIsolationOverlay } from "./config-overlay.js";
+import { CONFIG_OVERLAY_FILE, writeSourceIsolationOverlay } from "./config-overlay.js";
 import { OmpRuntimeSupervisor } from "./supervisor.js";
 import type { OmpSpawnOptions } from "./process.js";
 import {
@@ -286,6 +287,55 @@ describe("run-scoped source isolation overlay", () => {
     expect(content).toContain("backend: off");
     await supervisor.stop();
   });
+
+  // POSIX-only: the parent-directory redirection this probe reproduces can
+  // only be expressed with a symlink, and Windows symlink creation needs
+  // elevated privileges (or Developer Mode). The hard-link probe above plants
+  // an alias at the overlay path itself — a different vector (a final
+  // component), which a hard link does cover portably.
+  it.skipIf(process.platform === "win32")(
+    "fails the start when a hook replaces the run root itself instead of writing outside it",
+    async () => {
+      const captured: OmpSpawnOptions[] = [];
+      const dataRoot = makeRoot("source-boundary-runroot");
+      created.push(dataRoot);
+      // Sentinel directory outside the owned run root.
+      const outside = join(dataRoot, "outside");
+      mkdirSync(outside);
+      writeFileSync(join(outside, "user-config.yml"), "sentinel: keep\n");
+      const supervisor = new OmpRuntimeSupervisor({
+        dataRoot,
+        launcherPath: MOCK_LAUNCHER,
+        expectedRuntimeVersion: MOCK_VERSION,
+        probeVersion: fakeVersionProbe(MOCK_VERSION),
+        pathEntries: mockPathEntries(),
+        spawnImpl: captureSpawn(captured),
+        prepareRun: (paths) => {
+          // Replace the run root itself with a symlink to an outside
+          // directory: a writer that resolved the overlay path through it
+          // would create the boundary file outside the owned run root.
+          rmSync(paths.runRoot, { recursive: true, force: true });
+          symlinkSync(outside, paths.runRoot);
+        },
+      });
+      supervisors.push(supervisor);
+
+      await expect(supervisor.start()).rejects.toThrow();
+      // The start fails before the runtime is ever spawned.
+      expect(captured).toHaveLength(0);
+
+      // No write ever reached the outside directory: the sentinel is intact
+      // and no overlay file was created next to it.
+      expect(readFileSync(join(outside, "user-config.yml"), "utf8")).toBe("sentinel: keep\n");
+      expect(existsSync(join(outside, CONFIG_OVERLAY_FILE))).toBe(false);
+      // The start is recorded as failed, and the unified cleanup removed the
+      // planted run-root entry without touching the outside directory.
+      expect(supervisor.status().phase).toBe("failed");
+      expect(supervisor.status().reason).toBe("start-failed");
+      expect(runDirs(dataRoot)).toEqual([]);
+      expect(existsSync(outside)).toBe(true);
+    },
+  );
 });
 
 describe("source isolation overlay writer", () => {

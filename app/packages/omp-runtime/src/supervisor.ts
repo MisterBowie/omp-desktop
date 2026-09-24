@@ -19,8 +19,8 @@
  *     runtime's own group kill does not reach it — the desktop needs an explicit
  *     termination entry, which is `terminateOwnedTree`.
  */
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 
 import {
   closedEngineCapabilities,
@@ -436,7 +436,29 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
     ];
 
     try {
+      // Canonical location of the owned run root, recorded before the
+      // embedder hook runs. The hook may delete the run root or replace it
+      // with a symlink to an outside directory; the overlay's parent is
+      // re-resolved immediately after the hook and a changed (or
+      // unresolvable) canonical location fails the start before any write,
+      // so the boundary file is never created outside the owned run root.
+      // The check compares resolved locations, not inode identity: a fresh
+      // regular directory at the same lexical path resolves identically and
+      // cannot redirect the write, so it is deliberately allowed. A failure
+      // here — including the pre-hook realpath itself — lands in the same
+      // cleanup path as every other start failure. The check covers
+      // mutations the hook completes before `prepareRun` returns; a
+      // concurrent process that swaps the run root after this check but
+      // before the write is outside the guarantee (the exclusive create
+      // cannot see a parent-directory swap).
+      const runRootReal = realpathSync(runRoot);
       if (this.options.prepareRun) await this.options.prepareRun(paths);
+      const overlayParentReal = realpathSync(dirname(configOverlay));
+      if (overlayParentReal !== runRootReal) {
+        throw new Error(
+          "the canonical location of the run root changed during prepareRun; refusing to write the source-isolation overlay outside the owned run root",
+        );
+      }
       // The run-scoped source boundary is written by the supervisor itself,
       // *after* the embedder hook. The writer first removes whatever entry
       // the hook left at the overlay path — removal never follows a planted

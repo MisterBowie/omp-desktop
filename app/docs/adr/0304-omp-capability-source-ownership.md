@@ -107,14 +107,26 @@ Properties:
   spawn. The writer first removes whatever entry occupies the owned overlay
   path — removal acts on the entry itself and never follows a planted
   symlink or hard link — and then creates the boundary file exclusively
-  (`wx`/`O_EXCL`, mode 0600). An embedder hook therefore can neither weaken
-  the overlay nor redirect the write outside the run root, and a write or
-  create failure takes the same cleanup path as every other start failure
-  (the run root is removed and the failure recorded). The guarantee covers
-  any entry a single in-process hook plants; an actively concurrent
-  malicious process that re-plants an entry inside the remove/create window
-  is outside it — the exclusive create is the only protection, and its
-  failure fails the start.
+  (`wx`/`O_EXCL`, mode 0600). The supervisor also records
+  `realpathSync(runRoot)` before the hook and re-resolves the overlay's
+  parent immediately after it: a changed or unresolvable canonical location
+  — a hook that deletes the run root or replaces it with a symlink to an
+  outside directory — fails the start before any write. (Resolved
+  locations, not inode identity, are compared: a fresh regular directory at
+  the same lexical path resolves identically, cannot redirect the write,
+  and is deliberately allowed.) An embedder hook therefore
+  can neither weaken the overlay nor redirect the write outside the run
+  root, and a write or create failure takes the same cleanup path as every
+  other start failure (the run root is removed and the failure recorded).
+  The guarantee covers mutations the hook completes before `prepareRun`
+  returns — entries planted at the overlay path and canonical-location
+  swaps of the run root. It is not a claim
+  of security against arbitrary malicious hooks: concurrent filesystem
+  mutation is outside it in two windows — a final-component entry
+  re-planted between the writer's remove and create (the exclusive create
+  is the only protection there), and a parent-directory swap between the
+  post-hook canonical-location check and the write (which the exclusive
+  create cannot detect).
 - **Run-scoped.** `OmpRunPaths.configOverlay` is the per-run path inside the
   owned run root; it is never a static constructor argument.
 - **Owned cleanup.** The existing `removeRunRoot` sweep removes the overlay
