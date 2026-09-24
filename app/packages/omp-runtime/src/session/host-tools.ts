@@ -34,9 +34,13 @@
  *     completion that races the cancel can never write a result afterwards.
  *     The abort signal reaches plugin executions (which honour it); an MCP
  *     call has no client-side abort (`McpServerClient.callTool` takes no
- *     signal), so for MCP the guarantee is exactly: the pending entry is
- *     cancelled locally and a late completion is dropped — the remote server's
- *     side effect is never claimed to be retracted;
+ *     signal) and the user-MCP runtime awaits a connection handshake before
+ *     the actual `tools/call` dispatch, so the guarantee for MCP is exactly:
+ *     a cancellation already observed before the call path is entered refuses
+ *     it; once the path is entered, connection or request may continue and
+ *     only the cancelled pending entry drops the late completion — remote
+ *     side effects are never claimed prevented or retracted (the fixed Pi
+ *     client has the same limitation);
  *   - a call that arrives with no active run (or no wired executor) is answered
  *     `isError` rather than executed: the runtime is waiting on an answer, and
  *     dropping the frame would hang the turn until the bridge disconnects;
@@ -164,6 +168,135 @@ export function isHostToolCancelFrame(value: unknown): value is Record<string, u
   );
 }
 
+/**
+ * Serialized bytes the `content` array may occupy inside one
+ * `host_tool_result` frame: the pinned runtime's 1 MiB line limit minus the
+ * envelope (id, result wrapper, optional isError) with headroom.
+ */
+export const OMP_HOST_TOOL_CONTENT_BYTES = 768 * 1024;
+
+const TRUNCATION_MARKER = "\u2026";
+
+/**
+ * Bound the serialized `content` array to the frame budget, or return it
+ * untouched when it fits.
+ *
+ * This is the FINAL, authoritative protocol write boundary: every
+ * `host_tool_result` this package writes — successful outcomes from the
+ * desktop adapter, thrown-executor errors and fail-closed answers — passes
+ * through here, so no path can emit a frame over the runtime's line limit.
+ * The measure is the final `JSON.stringify(content)` (array brackets, commas,
+ * block envelopes, quotes and JSON escaping included). When the array does
+ * not fit:
+ *
+ *   - a text block is truncated by binary search on its code points, with the
+ *     truncation marker budgeted inside the same block (the candidate array
+ *     is re-stringified per probe, so the verdict is exact);
+ *   - a non-text block that does not fit is replaced by a standalone marker
+ *     block; when even that marker does not fit after the blocks kept so far,
+ *     the LAST kept text block is shortened (no inner marker — the standalone
+ *     marker is the indicator) so the head keeps as much of its content as
+ *     the budget allows, and only a kept non-text block is dropped when no
+ *     text remains to shorten.
+ *
+ * The result is deterministic and always within budget: the empty array plus
+ * a lone marker is the terminating floor.
+ */
+export function boundHostToolContent(blocks: OmpHostToolContentBlock[]): OmpHostToolContentBlock[] {
+  if (Buffer.byteLength(JSON.stringify(blocks), "utf8") <= OMP_HOST_TOOL_CONTENT_BYTES) return blocks;
+  const out: OmpHostToolContentBlock[] = [];
+  const marker: OmpHostToolContentBlock = { type: "text", text: TRUNCATION_MARKER };
+  for (const block of blocks) {
+    if (fitsContent([...out, block])) {
+      out.push(block);
+      continue;
+    }
+    if (block.type === "text") {
+      const units = largestTextPrefix(block.text, out);
+      const truncated: OmpHostToolContentBlock = {
+        type: "text",
+        text: `${block.text.slice(0, units)}${TRUNCATION_MARKER}`,
+      };
+      if (fitsContent([...out, truncated])) {
+        out.push(truncated);
+        return out;
+      }
+    }
+    let prefix = out;
+    for (;;) {
+      const last = prefix[prefix.length - 1];
+      if (last && last.type === "text") {
+        const head = prefix.slice(0, -1);
+        const units = largestTextPrefixWithoutMarker(last.text, head, marker);
+        const shortened: OmpHostToolContentBlock = { type: "text", text: last.text.slice(0, units) };
+        if (fitsContent([...head, shortened, marker])) {
+          return [...head, shortened, marker];
+        }
+        prefix = head;
+        continue;
+      }
+      if (prefix.length > 0) {
+        prefix = prefix.slice(0, -1);
+        continue;
+      }
+      return [marker];
+    }
+  }
+  return out;
+}
+
+function fitsContent(candidate: OmpHostToolContentBlock[]): boolean {
+  return Buffer.byteLength(JSON.stringify(candidate), "utf8") <= OMP_HOST_TOOL_CONTENT_BYTES;
+}
+
+/**
+ * The largest code-point prefix of `text` such that
+ * `prefix + [{"type":"text","text": prefix + marker}]` serializes within the
+ * budget. Binary search over code units, snapped back to a code-point
+ * boundary so a surrogate pair is never cut.
+ */
+function largestTextPrefix(text: string, prefix: OmpHostToolContentBlock[]): number {
+  const candidateFits = (units: number): boolean =>
+    fitsContent([...prefix, { type: "text", text: `${text.slice(0, units)}${TRUNCATION_MARKER}` }]);
+  return binarySearchPrefix(text, candidateFits);
+}
+
+/**
+ * The largest code-point prefix of `text` such that
+ * `prefix + [{"type":"text","text": prefix}, trailing]` serializes within the
+ * budget — no inner marker, because `trailing` is the standalone truncation
+ * marker block.
+ */
+function largestTextPrefixWithoutMarker(
+  text: string,
+  prefix: OmpHostToolContentBlock[],
+  trailing: OmpHostToolContentBlock,
+): number {
+  const candidateFits = (units: number): boolean =>
+    fitsContent([...prefix, { type: "text", text: text.slice(0, units) }, trailing]);
+  return binarySearchPrefix(text, candidateFits);
+}
+
+function binarySearchPrefix(text: string, candidateFits: (units: number) => boolean): number {
+  if (!candidateFits(0)) return 0;
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (candidateFits(mid)) {
+      lo = mid;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  while (lo > 0 && lo < text.length) {
+    const code = text.charCodeAt(lo);
+    if (code >= 0xdc00 && code <= 0xdfff) lo -= 1;
+    else break;
+  }
+  return lo;
+}
+
 export class OmpHostToolCalls {
   private readonly execute: OmpHostToolExecutor | undefined;
   private readonly write: (frame: OmpFrame) => boolean;
@@ -226,12 +359,12 @@ export class OmpHostToolCalls {
         type: "host_tool_result",
         id,
         result: {
-          content: [
+          content: boundHostToolContent([
             {
               type: "text",
               text: run ? "no host tool executor is wired for this session" : "no active run owns this host tool call",
             },
-          ],
+          ]),
         },
         isError: true,
       });
@@ -341,7 +474,7 @@ export class OmpHostToolCalls {
     this.write({
       type: "host_tool_result",
       id,
-      result: { content: outcome.content },
+      result: { content: boundHostToolContent(outcome.content) },
       ...(outcome.isError === true ? { isError: true } : {}),
     });
   }

@@ -246,6 +246,44 @@ describe("host tool calls", () => {
     expect((results[0]?.result as { content?: Array<{ text?: string }> })?.content?.[0]?.text).toContain("stub is not active");
   });
 
+  it("a huge thrown error is bounded at the protocol write boundary", async () => {
+    // Escapes plus multibyte text: the serialized form expands far beyond the
+    // raw message, so only a serialized-bytes budget holds the line limit.
+    const huge = `err-"\\中`.repeat(300_000);
+    const { calls, written } = harness({
+      execute: async () => {
+        throw new Error(huge);
+      },
+    });
+    calls.handleCall(callFrame("h1"), RUN);
+    await settle();
+
+    const results = written.filter((frame) => frame.type === "host_tool_result");
+    expect(results).toHaveLength(1);
+    expect(results[0]?.isError).toBe(true);
+    const content = (results[0]?.result as { content?: Array<{ text?: string }> })?.content ?? [];
+    expect(Buffer.byteLength(JSON.stringify(content), "utf8")).toBeLessThanOrEqual(768 * 1024);
+    expect(content[0]?.text?.endsWith("\u2026")).toBe(true);
+  });
+
+  it("a huge executor outcome is bounded at the protocol write boundary too", async () => {
+    // The desktop adapter bounds its own outcomes, but the write boundary is
+    // authoritative: an executor that bypasses the adapter's pass must still
+    // never emit a frame over the line limit.
+    const huge = "中".repeat(400_000);
+    const { calls, written } = harness({
+      execute: async () => ({ content: [{ type: "text", text: huge }] }),
+    });
+    calls.handleCall(callFrame("h1"), RUN);
+    await settle();
+
+    const results = written.filter((frame) => frame.type === "host_tool_result");
+    expect(results).toHaveLength(1);
+    const content = (results[0]?.result as { content?: Array<{ text?: string }> })?.content ?? [];
+    expect(Buffer.byteLength(JSON.stringify(content), "utf8")).toBeLessThanOrEqual(768 * 1024);
+    expect(content[0]?.text?.endsWith("\u2026")).toBe(true);
+  });
+
   it("an executor outcome that is itself an error is written with isError", async () => {
     const { calls, written } = harness({
       execute: async () => ({

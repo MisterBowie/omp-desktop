@@ -49,19 +49,24 @@
  *     the final serialized JSON bytes — never on the raw text.
  *   - Cancellation boundary: plugin agent tools receive the abort signal
  *     (`RegisteredPluginTool.execute` ctx.signal → the plugin runtime's
- *     `sendToChild` aborts the child call, `plugin-runtime.ts`); the MCP
+ *     `sendToChild` aborts the child call, `plugin-runtime.ts`). The MCP
  *     client exposes no call-level signal (`McpServerClient.callTool(name,
- *     args)`), so for MCP the guarantee is the cancelled pending entry and the
- *     dropped late completion — the remote side effect is never claimed
- *     retracted.
+ *     args)`), and `UserMcpRuntime.callTool` awaits a connection handshake
+ *     before the actual `tools/call` dispatch, so the guarantee is exactly: a
+ *     cancellation already observed before the MCP call path is entered
+ *     refuses it; once the path is entered, connection or request may
+ *     continue and only the cancelled pending entry drops the late completion
+ *     — remote side effects are never claimed prevented or retracted (the
+ *     fixed Pi client has the same limitation).
  */
-import type {
-  OmpHostToolCall,
-  OmpHostToolContentBlock,
-  OmpHostToolDefinition,
-  OmpHostToolExecutor,
-  OmpHostToolOutcome,
-  OmpHostToolRun,
+import {
+  boundHostToolContent,
+  type OmpHostToolCall,
+  type OmpHostToolContentBlock,
+  type OmpHostToolDefinition,
+  type OmpHostToolExecutor,
+  type OmpHostToolOutcome,
+  type OmpHostToolRun,
 } from "@pi-desktop/omp-runtime";
 import type { RegisteredPluginTool } from "../plugin-runtime";
 import type { UserMcpToolDescriptor } from "../user-mcp";
@@ -124,11 +129,13 @@ export type OmpHostToolAdapter = {
 };
 
 const FALLBACK_SCHEMA = { type: "object", properties: {} } as const;
-/** Serialized bytes the `content` array may occupy; the frame stays under the 1 MiB line limit with room for the envelope. */
-const CONTENT_BYTES = 768 * 1024;
-/** One image block must leave room for the frame envelope and other blocks. */
+/**
+ * One image block must leave room for the frame envelope and other blocks.
+ * The frame-level budget itself is enforced at the protocol write boundary
+ * (`boundHostToolContent` in the runtime package), which every outcome —
+ * successful or thrown-error — passes through.
+ */
 const IMAGE_BYTES = 512 * 1024;
-const TRUNCATION_MARKER = "\u2026";
 
 /** One content block the runtime's `host_tool_result` accepts. */
 type OutcomeBlock = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
@@ -192,14 +199,19 @@ export function createOmpHostToolAdapter(deps: OmpHostToolAdapterDeps): OmpHostT
       async execute(call: OmpHostToolCall, run: OmpHostToolRun, signal: AbortSignal): Promise<OmpHostToolOutcome> {
         try {
           if (call.toolName.startsWith("mcp_")) {
-            // Last synchronous gate before the dispatch: the Pi host has no
-            // turn gate on its user-MCP branch (`host.ts` calls `callTool`
-            // directly), but the OMP adapter checks here — a turn that was
-            // stopped or cancelled before the dispatch must never start the
-            // call. Once `tools/call` is sent, the client owns the dispatch
-            // (no call-level signal exists) and only the cancelled pending
-            // entry can drop the late result; the remote side effect is never
-            // claimed retracted.
+            // Last synchronous gate before entering the MCP call path: the Pi
+            // host has no turn gate on its user-MCP branch (`host.ts` calls
+            // `callTool` directly), but the OMP adapter checks here — a
+            // cancellation already observed before the call path is entered
+            // refuses it. The guarantee ends at the path boundary:
+            // `UserMcpRuntime.callTool` awaits `connect(record)` before the
+            // client dispatches `tools/call`, and neither runtime nor client
+            // accepts an AbortSignal (the fixed Pi client has the same
+            // limitation), so a cancellation landing during that handshake
+            // window may still let a `tools/call` through. Once the call path
+            // is entered, only the cancelled pending entry can drop the late
+            // completion — the remote side effect is never claimed prevented
+            // or retracted.
             assertDispatchable(run, signal);
             // `callTool` re-checks the server scope, the connection state and the
             // latest tool list before dispatching — the same re-checks the Pi
@@ -356,7 +368,7 @@ function outcomeFor(result: unknown): OmpHostToolOutcome {
     }
   }
   return {
-    content: boundBlocks(blocks),
+    content: boundHostToolContent(blocks),
     ...(failed ? { isError: true } : {}),
   };
 }
@@ -408,132 +420,6 @@ function describeBlock(block: Record<string, unknown>): string {
     meta[typeof block.resource === "undefined" ? "content" : "resource"] = describeBlock(nested as Record<string, unknown>);
   }
   return stringifyJson(meta);
-}
-
-/**
- * Bound the serialized `content` array to the frame budget, or return it
- * untouched when it fits.
- *
- * The measure is the FINAL `JSON.stringify(content)` — array brackets,
- * commas, block envelopes, quotes and JSON escaping all included — so no
- * caller ever adds up piecemeal byte overheads. When the array does not fit:
- *
- *   - a text block is truncated by binary search on its code points, with the
- *     truncation marker budgeted inside the same block (the candidate array is
- *     re-stringified per probe, so the verdict is exact);
- *   - a non-text block that does not fit is replaced by a standalone marker
- *     block; when even that marker does not fit after the blocks kept so far,
- *     the LAST kept text block is shortened (no inner marker — the standalone
- *     marker is the indicator) so the head keeps as much of its content as
- *     the budget allows, and only a kept non-text block is dropped when no
- *     text remains to shorten.
- *
- * The result is deterministic and always within budget: the empty array plus
- * a lone marker is the terminating floor.
- */
-function boundBlocks(blocks: OmpHostToolContentBlock[]): OmpHostToolContentBlock[] {
-  if (Buffer.byteLength(JSON.stringify(blocks), "utf8") <= CONTENT_BYTES) return blocks;
-  const out: OmpHostToolContentBlock[] = [];
-  const marker: OmpHostToolContentBlock = { type: "text", text: TRUNCATION_MARKER };
-  for (const block of blocks) {
-    // A block whose full form fits is kept intact, marker-free.
-    if (fits([...out, block])) {
-      out.push(block);
-      continue;
-    }
-    if (block.type === "text") {
-      const units = largestTextPrefix(block.text, out);
-      const truncated: OmpHostToolContentBlock = {
-        type: "text",
-        text: `${block.text.slice(0, units)}${TRUNCATION_MARKER}`,
-      };
-      if (fits([...out, truncated])) {
-        out.push(truncated);
-        return out;
-      }
-    }
-    // Neither the block nor the marker fits after `out`. Shorten the LAST
-    // text block so the standalone marker fits after it — the head keeps as
-    // much of its content as the budget allows. Only when the last block is
-    // not text (an unrepresentable block) is it dropped, and only then does
-    // the retry walk further back. Terminating: the empty array plus a lone
-    // marker always fits.
-    let prefix = out;
-    for (;;) {
-      const last = prefix[prefix.length - 1];
-      if (last && last.type === "text") {
-        // The text is cut without an inner marker: the standalone marker
-        // block that follows it is the truncation indicator.
-        const head = prefix.slice(0, -1);
-        const units = largestTextPrefixWithoutMarker(last.text, head, marker);
-        const shortened: OmpHostToolContentBlock = { type: "text", text: last.text.slice(0, units) };
-        if (fits([...head, shortened, marker])) {
-          return [...head, shortened, marker];
-        }
-        prefix = head;
-        continue;
-      }
-      if (prefix.length > 0) {
-        prefix = prefix.slice(0, -1);
-        continue;
-      }
-      return [marker];
-    }
-  }
-  return out;
-}
-
-function fits(candidate: OmpHostToolContentBlock[]): boolean {
-  return Buffer.byteLength(JSON.stringify(candidate), "utf8") <= CONTENT_BYTES;
-}
-
-/**
- * The largest code-point prefix of `text` such that
- * `prefix + [{"type":"text","text": prefix + marker}]` serializes within the
- * budget. Binary search over code units, snapped back to a code-point
- * boundary so a surrogate pair is never cut.
- */
-function largestTextPrefix(text: string, prefix: OmpHostToolContentBlock[]): number {
-  const marker = TRUNCATION_MARKER;
-  const candidateFits = (units: number): boolean =>
-    fits([...prefix, { type: "text", text: `${text.slice(0, units)}${marker}` }]);
-  return binarySearchPrefix(text, candidateFits);
-}
-
-/**
- * The largest code-point prefix of `text` such that
- * `prefix + [{"type":"text","text": prefix}, trailing]` serializes within the
- * budget — no inner marker, because `trailing` is the standalone truncation
- * marker block.
- */
-function largestTextPrefixWithoutMarker(
-  text: string,
-  prefix: OmpHostToolContentBlock[],
-  trailing: OmpHostToolContentBlock,
-): number {
-  const candidateFits = (units: number): boolean =>
-    fits([...prefix, { type: "text", text: text.slice(0, units) }, trailing]);
-  return binarySearchPrefix(text, candidateFits);
-}
-
-function binarySearchPrefix(text: string, candidateFits: (units: number) => boolean): number {
-  if (!candidateFits(0)) return 0;
-  let lo = 0;
-  let hi = text.length;
-  while (lo < hi) {
-    const mid = Math.ceil((lo + hi) / 2);
-    if (candidateFits(mid)) {
-      lo = mid;
-    } else {
-      hi = mid - 1;
-    }
-  }
-  while (lo > 0 && lo < text.length) {
-    const code = text.charCodeAt(lo);
-    if (code >= 0xdc00 && code <= 0xdfff) lo -= 1;
-    else break;
-  }
-  return lo;
 }
 
 function stringifyJson(value: unknown): string {

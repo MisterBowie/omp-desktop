@@ -133,8 +133,10 @@ export {
 } from "./session/runner.js";
 export {
   OmpHostToolCalls,
+  boundHostToolContent,
   isHostToolCallFrame,
   isHostToolCancelFrame,
+  OMP_HOST_TOOL_CONTENT_BYTES,
   type OmpHostToolCall,
   type OmpHostToolCallsOptions,
   type OmpHostToolContentBlock,

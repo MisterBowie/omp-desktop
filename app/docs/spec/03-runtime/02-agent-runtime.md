@@ -1646,9 +1646,13 @@ RPC (evidence: `docs/validation/M5-host-tool-rpc.md`, ADR 0304 §4):
   server state and the live turn (a per-entry `dispatchable` closure over the
   OMP runner — the Pi `isTurnDispatchable` predicate is not used because OMP
   turns never enter the Pi turn registry). The abort signal reaches plugin
-  executions; MCP calls have no call-level signal, so the guarantee is exactly
-  "not dispatched after cancel, late results dropped" — remote side effects
-  are never claimed retracted.
+  executions; MCP calls have no call-level signal and the user-MCP runtime
+  awaits a connection handshake before the actual `tools/call` dispatch, so
+  the guarantee is exactly: a cancellation already observed before the MCP
+  call path is entered refuses it; once entered, connection or request may
+  continue and only the cancelled pending entry drops the late completion —
+  remote side effects are never claimed prevented or retracted (the fixed Pi
+  client has the same limitation).
 - **Execution context (limitation, T20)**: the adapter passes `mode: "agent"`
   to plugin tools; the Pi host passes the durable session mode and the plugin
   runtime enforces declared `planSafeActions` from `ctx.mode`
