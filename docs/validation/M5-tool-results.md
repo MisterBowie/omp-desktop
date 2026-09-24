@@ -1,6 +1,6 @@
 # M5/T18：OMP 原生 Edit / LSP / Debug 结果的可读展示
 
-更新时间：2026-09-24。状态：**T18 进行中**（独立复审返修 R1-R4 与 S1-S4 已完成，待复审确认；未验收）。分支 `codex/m5-tool-results`，本轮基线 `9c9ddc2da1091548fb142dc0b68ffad022914dbe`。固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未改 tracked 源码；仅在此自有固定子模块内构建 untracked 依赖/native 产物）。
+更新时间：2026-09-25。状态：**T18 进行中**（独立复审返修 R1-R4、S1-S4 与 Residual2 已完成，待复审确认；未验收）。分支 `codex/m5-tool-results`，本轮基线 `936f44c39983f2f7d36faefe8c9d53e15c81f171`（产品修复提交 `6914e68`；后续 `b0ef1e8..936f44c` 仅含预览打包文档/CI，未改产品源码）。固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未改 tracked 源码；仅在此自有固定子模块内构建 untracked 依赖/native 产物）。
 
 ## 本轮独立复审返修（R1-R4）
 
@@ -23,6 +23,18 @@
 - **S4 保留 rename 关系 + 挂载交互回归**：rename 在可点开的双路径 `files` 块之外增加 `move: a.ts → b.ts` 字段行，恢复 source→destination 语义（不再读作「两个文件被编辑」）。新增真实挂载回归 `omp-tool-row-mounted.test.mjs`：真实 `ToolRow` disclosure + `ToolDetails`/`useOpenPreviewTarget`/`api`，控制宿主/store 目标——成功解析并打开一次、missing/error 只出 error toast 不打开、`autoOpen` 不解析/打开任何文件、restored/child 行无 `toolArgs`（组件 harness，非浏览器/截图 E2E）。
 
 新增回归：`omp-tool-results.test.mjs` +4 例（snapshot 不抑制空 output/空断点、断点 id/每项余量/source 余量、未知值可读、多文件顶层诊断 + 裁剪非 no-op），既有 rename 用例补 `move` 关系断言；`omp-tool-row-mounted.test.mjs` 2 例。复审探针 paths 33/33、preservation 8/8、mounted、residual 11/11 与既有 tool-text/row-budget/row-meaning 全绿。
+
+## 本轮独立复审返修（Residual2）
+
+独立复审在已推送基线 `936f44c` 将 `/tmp/m5-tool-residual-review.mjs` 扩到 **19 例**：原 11 例全过，新增 8 例全 FAIL。每个新例都先断言同一实际 `OmpEventConverter` 行在已验收 `ca6a255` 的通用 JSON 回退下可见，故是复现回归而非假设审查。8 例暴露的是「静态 known-key 无条件消费」与「值未被表示就被消费」的残余——与 S2 注释「只在值被表示后才消费」直接矛盾。修复仍只在 `tool-presentation.ts` 边界内，构造余量以「实际渲染了什么」为准：
+
+- **D1 snapshot 按字段记录消费**：`ompDebugSnapshotBlocks` 的 `push` 在成功入行时标记消费；`snapshot.id` 等已知字段只在值为字符串/有限数字且入行后才消费，非字符串 `id` 不再被静态 `consumed.id=true` 抹掉。`source.path`/`line`/`column` 只在 `location` 行真正编码了这些值时才消费（`ompDebugLocation` 只接受字符串 `path`、数字 `line`/`column`）；非字符串 `source.path` 时 location 不生成，`source` 整体（含 `path`）与 `line` 留余量。`needsConfigurationDone` 为 boolean 时消费（`false` 是默认、不渲染），非 boolean 留余量。
+- **D2 断点按字段记录消费**：`ompDebugBreakpointRows` 移除静态 `KNOWN` 集，改为每项 `consumed`——`id`（数字）、`name`（非空字符串）、`line`（仅当作为 target 使用，即无 `name`）、`verified`（boolean）、`message`/`condition`（非空字符串）只在值实际进了行时消费；非数字 `id`、非 boolean `verified` 等留在余量。非 record 条目与未知字段仍保留。
+- **D3 diagnostics messages 混合数组**：`ompEditDiagnosticBlocks` 把 `messages` 数组拆为「合法字符串 → note」与「非字符串 → 经 `recordBlocks({messages})` 的有界通用余量」，空字符串按通用回退语义丢弃（不伪造为 note 或 files 路径）；只有数组整体被完整表示时才消费 `messages`，非字符串项不再被 `filter` 吞掉。
+- **D4 edit 单文件按实际渲染消费**：`ompEditFileBlocks` 把静态 `consumed` 集改为逐分支标记——`path`（files 块/rename 下冗余于 `move`）、`op`（仅 create/delete 的 `operation` 行）、`move`/`sourcePath`（仅 rename）、`oldText`/`newText`/`diff`（仅实际进入 diff/内容块，或作为冗余 hashline 被快照取代）、`firstChangedLine`/`diagnostics`/`meta`（仅实际渲染）、`isError`/`errorText`/`displayErrorText`（仅实际作为错误 note 文本）、`snapshotsPruned`/`truncated`（仅 `true`）。标量 `meta`、未知 `op`、非字符串错误字段不再被抹掉。
+- **D5 edit 多文件按实际渲染消费**：`ompEditBlocks` 多文件分支把非 record `perFileResults` 项收进余量（经 `recordBlocks` 通用回退，仍受 `MAX_LIST_ITEMS` 有界并报 `hidden`），聚合 `diff`/`firstChangedLine` 仅在「合法字符串/数字且冗余于每文件块」时消费——非字符串聚合 `diff` 不再被当成重复值丢弃。顶层 `diagnostics`/`meta`/未知字段保留。
+
+新增回归：`omp-tool-results.test.mjs` +7 例（八类新例 + 一例「合法快照字段只渲染一次、不回退重复」+ 一例「250 项混合 `perFileResults` 仍受 200 上限并报 hidden 50」），全量 desktop 套件自 2763 → **2770**。复审探针 residual 19/19、paths（其末尾 import residual）33/33、preservation 8/8、mounted 全绿。
 
 ## 0. 范围与结论
 
@@ -70,15 +82,15 @@ T18 只适配**结果展示**，不改执行、权限、生命周期或持久化
 | `pnpm --filter @pi-desktop/desktop lint`（style tokens） | style tokens OK | 0 |
 | `pnpm lint:biome` | Checked 75 files | 0 |
 | `pnpm --filter @pi-desktop/desktop build`（electron-vite renderer 重建） | built in ~6s | 0 |
-| 定向七套 `node --test test/tool-presentation.test.mjs test/omp-subagent-presentation.test.mjs test/omp-tool-results.test.mjs test/omp-tool-results-render.test.mjs test/tool-display.test.mjs test/tool-row-file-refs.test.mjs test/omp-tool-row-mounted.test.mjs` | **85 passed / 0 failed** | 0 |
-| 复审探针 `/tmp/m5-tool-paths-review.mjs` | 33/33（edit-update/move/multi-delete/pruned、lsp 诊断/全服失败/部分失败、debug evaluate/no-session/empty-output/future-field 各走 live/durable/child）+ 普通 PI 插件元数据 | 0 |
-| 复审探针 `/tmp/m5-tool-residual-review.mjs`（S1-S4，11 例） | 11/11（debug 空 output/空断点带 snapshot 文本保留、断点 id/source/每项余量、LSP 标量 request、debug 非字符串 output、edit 非 record diagnostics、多文件顶层诊断、裁剪非 no-op、rename 关系） | 0 |
+| 定向七套 `node --test test/tool-presentation.test.mjs test/omp-subagent-presentation.test.mjs test/omp-tool-results.test.mjs test/omp-tool-results-render.test.mjs test/tool-display.test.mjs test/tool-row-file-refs.test.mjs test/omp-tool-row-mounted.test.mjs` | **92 passed / 0 failed** | 0 |
+| 复审探针 `/tmp/m5-tool-paths-review.mjs` | 33/33（edit-update/move/multi-delete/pruned、lsp 诊断/全服失败/部分失败、debug evaluate/no-session/empty-output/future-field 各走 live/durable/child）+ 普通 PI 插件元数据（末尾 import residual） | 0 |
+| 复审探针 `/tmp/m5-tool-residual-review.mjs`（S1-S4 11 例 + Residual2 8 例，共 19 例） | 19/19（原 11 例 + malformed snapshot id/source path/breakpoint id、mixed diagnostics messages、scalar meta、future op、mixed per-file、malformed aggregate diff） | 0 |
 | 复审探针 `/tmp/m5-tool-preservation-review.mjs` | 8/8 均 `before=true` 且 `after=true` | 0 |
 | 复审探针 `/tmp/m5-tool-row-mounted-review.mjs` | lsp 文本可见、debug no-session 文本可见、edit 路径经真实 host `fsResolveRef` 解析并打开一次、missing/error 只出 toast | 0 |
 | 既有探针 `/tmp/m5-tool-text-review.mjs` / `/tmp/m5-row-budget-review.mjs` / `/tmp/m5-row-meaning-review.mjs` | lsp+debug 均 `presentationShowsText=true`；row-budget 全 `withinBudget`；row-meaning 全断言 | 0 |
-| 全量 desktop `node --test test/*.test.mjs`（`app/apps/desktop`，固定 runtime 已备） | **2763 总数 / 2759 passed / 0 failed / 4 skipped** | 0 |
+| 全量 desktop `node --test test/*.test.mjs`（`app/apps/desktop`，固定 runtime 已备） | **2770 总数 / 2766 passed / 0 failed / 4 skipped** | 0 |
 
-新增测试：`omp-tool-results.test.mjs`（25 例，真实 `OmpEventConverter.convertEntry`/`convert` → 真实 `buildToolPresentation`/`runOutcome`/`toolResultChips`，覆盖 LSP 诊断/服务器失败/text-only 失败/request、debug evaluate/paused+断点+output/no-session/empty-output/id/instructionPointerReference/未知字段、edit 单/多文件/rename/create/delete/no-op/pruned/partial-error/diagnostics/firstChangedLine/未知字段、live `tool_execution_end`、子代理转录、Pi `ops` 兼容、`plugin_publisher_edit` 兼容、大 Unicode 截断，以及 S1-S4 回归：snapshot 不抑制空 output/空断点、断点 id/每项余量/source 余量、未知值可读、多文件顶层诊断 + 裁剪非 no-op、rename 关系）；`omp-tool-results-render.test.mjs`（1 例，SSR 渲染真实 `ToolDetailBlocks` 断言 LSP/edit/debug 文本可见）；`omp-tool-row-mounted.test.mjs`（2 例，真实挂载 `ToolRow` disclosure + `ToolDetails`/`useOpenPreviewTarget`/`api`，成功打开一次、missing/error 只出 toast 不打开、`autoOpen` 不打开、restored/child 行无 `toolArgs`）。
+新增测试：`omp-tool-results.test.mjs`（32 例，真实 `OmpEventConverter.convertEntry`/`convert` → 真实 `buildToolPresentation`/`runOutcome`/`toolResultChips`，覆盖 LSP 诊断/服务器失败/text-only 失败/request、debug evaluate/paused+断点+output/no-session/empty-output/id/instructionPointerReference/未知字段、edit 单/多文件/rename/create/delete/no-op/pruned/partial-error/diagnostics/firstChangedLine/未知字段、live `tool_execution_end`、子代理转录、Pi `ops` 兼容、`plugin_publisher_edit` 兼容、大 Unicode 截断，以及 S1-S4 回归：snapshot 不抑制空 output/空断点、断点 id/每项余量/source 余量、未知值可读、多文件顶层诊断 + 裁剪非 no-op、rename 关系；Residual2 回归：八类新例 + 合法字段不回退重复 + 250 项混合数组仍受 200 上限并报 hidden 50）；`omp-tool-results-render.test.mjs`（1 例，SSR 渲染真实 `ToolDetailBlocks` 断言 LSP/edit/debug 文本可见）；`omp-tool-row-mounted.test.mjs`（2 例，真实挂载 `ToolRow` disclosure + `ToolDetails`/`useOpenPreviewTarget`/`api`，成功打开一次、missing/error 只出 toast 不打开、`autoOpen` 不打开、restored/child 行无 `toolArgs`）。
 
 ### 3.1 环境修正（非源码改动）
 
@@ -100,4 +112,4 @@ T18 只适配**结果展示**，不改执行、权限、生命周期或持久化
 - 未新增 ADR：本轮是既有 `tool-presentation.ts` 边界内的纯展示适配，不改变接口/契约/权限/架构（沿用 ADR 0300/0303 的「差异集中在适配层」原则），故只在验证文档记录。
 - 真实付费模型烟测、Windows、打包均不在 T18 范围；`branch`/`steer`/`followUp`/`compact`、子代理单独停止仍关闭（T19/T20 逐项开放）。
 - macOS 中文路径的 9 项 PI release-fixture 失败属 M6/T22，本轮不做无关修复。
-- T18 仍待独立复审确认（未验收）；独立复审返修 R1-R4 与 S1-S4 已完成。
+- T18 仍待独立复审确认（未验收）；独立复审返修 R1-R4、S1-S4 与 Residual2 已完成。

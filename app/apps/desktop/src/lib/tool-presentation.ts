@@ -648,55 +648,53 @@ function ompDebugLocation(snapshot: Record<string, unknown>): string | null {
 function ompDebugSnapshotBlocks(snapshot: Record<string, unknown>): ToolBlock[] {
   const blocks: ToolBlock[] = [];
   const rows: ToolFieldRow[] = [];
-  const push = (label: string, value: unknown) => {
+  const consumed: Record<string, true> = {};
+  const push = (label: string, key: string, value: unknown) => {
     if (typeof value === "string" && value !== "") {
       rows.push({ label, value });
+      consumed[key] = true;
     } else if (typeof value === "number" && Number.isFinite(value)) {
       rows.push({ label, value: String(value) });
+      consumed[key] = true;
     }
   };
-  push("id", snapshot.id);
-  push("adapter", snapshot.adapter);
-  push("status", snapshot.status);
-  push("cwd", snapshot.cwd);
-  push("program", snapshot.program);
-  push("stopReason", snapshot.stopReason);
-  push("frameName", snapshot.frameName);
+  push("id", "id", snapshot.id);
+  push("adapter", "adapter", snapshot.adapter);
+  push("status", "status", snapshot.status);
+  push("cwd", "cwd", snapshot.cwd);
+  push("program", "program", snapshot.program);
+  push("stopReason", "stopReason", snapshot.stopReason);
+  push("frameName", "frameName", snapshot.frameName);
   const location = ompDebugLocation(snapshot);
   if (location) rows.push({ label: "location", value: location });
-  push("instructionPointerReference", snapshot.instructionPointerReference);
-  push("exitCode", snapshot.exitCode);
+  push("instructionPointerReference", "instructionPointerReference", snapshot.instructionPointerReference);
+  push("exitCode", "exitCode", snapshot.exitCode);
   if (snapshot.needsConfigurationDone === true) {
     rows.push({ label: "configuration", value: "pending configurationDone" });
   }
+  if (typeof snapshot.needsConfigurationDone === "boolean") {
+    // `false` is the default ("no pending configuration"), so a boolean is
+    // consumed either way; a non-boolean value is malformed and stays readable.
+    consumed.needsConfigurationDone = true;
+  }
   if (rows.length > 0) blocks.push({ kind: "fields", role: "details", rows });
 
-  // The location row shows `source.path[:line[:column]]`. A source object with
-  // any other field (a future `name`, `origin`, …) keeps that remainder, and a
-  // field is consumed only once its value was actually rendered.
+  // The location row encodes `source.path[:line[:column]]`, and only when the
+  // values are the types the row actually prints. Consume those fields only
+  // then: a malformed `path` (non-string), a non-numeric `line`/`column`, and
+  // any other `source` field stay readable in the generic remainder.
   const source = asRecord(snapshot.source);
-  const consumed: Record<string, true> = {
-    id: true,
-    adapter: true,
-    status: true,
-    cwd: true,
-    program: true,
-    stopReason: true,
-    frameName: true,
-    instructionPointerReference: true,
-    exitCode: true,
-    needsConfigurationDone: true,
-  };
+  if (location) {
+    consumed.source = true;
+    const line = numberAt(snapshot, "line");
+    if (line !== null) consumed.line = true;
+    if (line !== null && numberAt(snapshot, "column") !== null) consumed.column = true;
+  }
   let sourceRemainder: Record<string, unknown> | null = null;
   if (source) {
-    consumed.source = true;
-    if (location) {
-      consumed.line = true;
-      consumed.column = true;
-    }
-    const rest = Object.fromEntries(
-      Object.entries(source).filter(([key]) => key !== "path"),
-    );
+    const rest = consumed.source
+      ? Object.fromEntries(Object.entries(source).filter(([key]) => key !== "path"))
+      : source;
     if (Object.keys(rest).length > 0) sourceRemainder = rest;
   }
   const remainder = Object.fromEntries(
@@ -716,26 +714,16 @@ function ompDebugBreakpointRows(
   if (!Array.isArray(value)) return { rows: [], remainder: [] };
   const rows: ToolFieldRow[] = [];
   const remainder: unknown[] = [];
-  // Fields the row renders; anything else on an item (a real `id`, a future
-  // producer field) stays readable instead of vanishing.
-  const KNOWN: Record<string, true> = {
-    id: true,
-    name: true,
-    line: true,
-    verified: true,
-    message: true,
-    condition: true,
-  };
   for (const entry of value) {
     const record = asRecord(entry);
     if (!record) {
       remainder.push(entry);
       continue;
     }
-    const line = numberAt(record, "line");
     const id = numberAt(record, "id");
-    const target =
-      stringAt(record, "name") ?? (line !== null ? `line ${line}` : null);
+    const name = stringAt(record, "name");
+    const line = numberAt(record, "line");
+    const target = name ?? (line !== null ? `line ${line}` : null);
     if (!target) {
       remainder.push(entry);
       continue;
@@ -754,8 +742,19 @@ function ompDebugBreakpointRows(
       condition ? `if ${condition}` : null,
     ].filter((part): part is string => Boolean(part));
     rows.push({ label: "breakpoint", value: parts.join(" · ") });
+    // A known field is consumed only once its actual value contributed to the
+    // rendered row: a non-numeric `id`, a `line` unused as the target, a
+    // non-boolean `verified`, or a non-string `message`/`condition` stays in
+    // the remainder instead of vanishing.
+    const consumed: Record<string, true> = {};
+    if (id !== null) consumed.id = true;
+    if (name !== null) consumed.name = true;
+    if (name === null && line !== null) consumed.line = true;
+    if (typeof record.verified === "boolean") consumed.verified = true;
+    if (message !== null) consumed.message = true;
+    if (condition !== null) consumed.condition = true;
     const rest = Object.fromEntries(
-      Object.entries(record).filter(([key]) => !Object.hasOwn(KNOWN, key)),
+      Object.entries(record).filter(([key]) => !consumed[key]),
     );
     if (Object.keys(rest).length > 0) remainder.push(rest);
   }
@@ -851,18 +850,26 @@ function ompEditDiagnosticBlocks(
   if (!diagnostics) return [];
   const blocks: ToolBlock[] = [];
   const errored = diagnostics.errored === true;
-  const messages = Array.isArray(diagnostics.messages)
-    ? diagnostics.messages.filter(
-        (message): message is string => typeof message === "string" && message !== "",
-      )
-    : [];
-  for (const message of messages) {
-    blocks.push({ kind: "note", role: errored ? "error" : "notice", text: message });
-  }
-  // A non-array `messages` is malformed producer data, not an empty list: it
-  // stays in the fallback rather than being discarded by the filter above.
   const consumed: Record<string, true> = {};
-  if (Array.isArray(diagnostics.messages)) consumed.messages = true;
+  if (Array.isArray(diagnostics.messages)) {
+    consumed.messages = true;
+    const notes: string[] = [];
+    const unrendered: unknown[] = [];
+    for (const message of diagnostics.messages) {
+      if (typeof message === "string" && message !== "") notes.push(message);
+      else if (typeof message !== "string") unrendered.push(message);
+      // An empty string is dropped by the generic renderer too, so it neither
+      // becomes a note nor a remainder entry.
+    }
+    for (const message of notes) {
+      blocks.push({ kind: "note", role: errored ? "error" : "notice", text: message });
+    }
+    if (unrendered.length > 0) {
+      // Keep the non-string messages readable through the generic renderer
+      // instead of dropping them with the rendered strings above.
+      blocks.push(...recordBlocks({ messages: unrendered }, "details"));
+    }
+  }
   const remainder = Object.fromEntries(
     Object.entries(diagnostics).filter(([key]) => !consumed[key]),
   );
@@ -881,13 +888,19 @@ function ompEditFileBlocks(file: Record<string, unknown>): ToolBlock[] {
   const move = stringAt(file, "move");
   const sourcePath = stringAt(file, "sourcePath");
   const isError = file.isError === true;
-  const errorText = stringAt(file, "displayErrorText") ?? stringAt(file, "errorText");
+  const displayErrorText = stringAt(file, "displayErrorText");
+  const rawErrorText = stringAt(file, "errorText");
+  const errorText = displayErrorText ?? rawErrorText;
   const snapshotsPruned = file.snapshotsPruned === true;
   const truncated = file.truncated === true;
   const oldText = typeof file.oldText === "string" ? file.oldText : null;
   const newText = typeof file.newText === "string" ? file.newText : null;
   const diffText = typeof file.diff === "string" && file.diff !== "" ? file.diff : null;
   const rename = Boolean(sourcePath && move);
+
+  // A known field is consumed only once its actual value was rendered into a
+  // block; a malformed or future value falls back to the generic remainder.
+  const consumed: Record<string, true> = {};
 
   // Identity: the edited path (and the rename source) as an openable file
   // list, so a restored or child row without `toolArgs` can still open the
@@ -896,8 +909,14 @@ function ompEditFileBlocks(file: Record<string, unknown>): ToolBlock[] {
   const paths: string[] = [];
   if (sourcePath && move) {
     paths.push(sourcePath, move);
+    consumed.sourcePath = true;
+    consumed.move = true;
+    // `path` is the destination again (`move` already names it), so a valid
+    // `path` is redundant here and is not repeated as a field row.
+    if (path !== null) consumed.path = true;
   } else if (path) {
     paths.push(path);
+    consumed.path = true;
   }
   const identity = filesBlock(paths);
   if (identity) blocks.push(identity);
@@ -913,18 +932,27 @@ function ompEditFileBlocks(file: Record<string, unknown>): ToolBlock[] {
     });
   } else if (op === "create") {
     blocks.push({ kind: "fields", role: "details", rows: [{ label: "operation", value: "create" }] });
+    consumed.op = true;
   } else if (op === "delete") {
     blocks.push({ kind: "fields", role: "details", rows: [{ label: "operation", value: "delete" }] });
+    consumed.op = true;
   }
 
   if (op === "create") {
-    if (newText !== null) blocks.push(codeBlock("written", newText, langForPath(path)));
-    else if (diffText) blocks.push(codeBlock("written", diffText, ""));
+    if (newText !== null) {
+      blocks.push(codeBlock("written", newText, langForPath(path)));
+      consumed.newText = true;
+    } else if (diffText) {
+      blocks.push(codeBlock("written", diffText, ""));
+      consumed.diff = true;
+    }
   } else if (op === "delete") {
     if (oldText !== null) {
       blocks.push(codeBlock("content", oldText, langForPath(path), { label: "deleted" }));
+      consumed.oldText = true;
     } else if (diffText) {
       blocks.push(codeBlock("content", diffText, "", { label: "deleted" }));
+      consumed.diff = true;
     }
   } else if (oldText !== null && newText !== null) {
     // Source-of-truth snapshots render a clean colored diff; the hashline-format
@@ -940,8 +968,14 @@ function ompEditFileBlocks(file: Record<string, unknown>): ToolBlock[] {
         text: path ? `no changes were made to ${path}` : "no changes were made",
       });
     }
+    consumed.oldText = true;
+    consumed.newText = true;
+    // A valid hashline `diff` is redundant with the snapshots above; a
+    // malformed one was never represented and stays readable.
+    if (diffText !== null) consumed.diff = true;
   } else if (diffText) {
     blocks.push(codeBlock("diff", diffText, ""));
+    consumed.diff = true;
   } else if (!rename && !snapshotsPruned && !truncated && !isError) {
     // A genuine no-op has its own complete result: no diff, no snapshots, no
     // rename, no omission marker. A pruned/truncated/failed file is missing
@@ -960,16 +994,26 @@ function ompEditFileBlocks(file: Record<string, unknown>): ToolBlock[] {
       role: "details",
       rows: [{ label: "firstChangedLine", value: String(firstChangedLine) }],
     });
+    consumed.firstChangedLine = true;
   }
 
   const diagnostics = asRecord(file.diagnostics);
-  if (diagnostics) blocks.push(...ompEditDiagnosticBlocks(diagnostics));
+  if (diagnostics) {
+    blocks.push(...ompEditDiagnosticBlocks(diagnostics));
+    consumed.diagnostics = true;
+  }
 
   const meta = asRecord(file.meta);
-  if (meta) blocks.push(...recordBlocks(meta, "details"));
+  if (meta) {
+    blocks.push(...recordBlocks(meta, "details"));
+    consumed.meta = true;
+  }
 
   if (isError) {
     blocks.push({ kind: "note", role: "error", text: errorText || "the edit failed" });
+    consumed.isError = true;
+    if (displayErrorText !== null) consumed.displayErrorText = true;
+    else if (rawErrorText !== null) consumed.errorText = true;
   }
   if (snapshotsPruned) {
     blocks.push({
@@ -977,6 +1021,7 @@ function ompEditFileBlocks(file: Record<string, unknown>): ToolBlock[] {
       role: "notice",
       text: "file snapshots were pruned from the result",
     });
+    consumed.snapshotsPruned = true;
   }
   if (truncated) {
     blocks.push({
@@ -984,27 +1029,11 @@ function ompEditFileBlocks(file: Record<string, unknown>): ToolBlock[] {
       role: "notice",
       text: "file content was truncated",
     });
+    consumed.truncated = true;
   }
 
   // Any field this version does not know — future per-file metadata — stays
   // readable through the generic renderer instead of vanishing.
-  const consumed: Record<string, true> = {
-    path: true,
-    op: true,
-    move: true,
-    sourcePath: true,
-    isError: true,
-    errorText: true,
-    displayErrorText: true,
-    snapshotsPruned: true,
-    truncated: true,
-    oldText: true,
-    newText: true,
-    diff: true,
-    firstChangedLine: true,
-    meta: true,
-  };
-  if (diagnostics) consumed.diagnostics = true;
   const remainder = Object.fromEntries(
     Object.entries(file).filter(([key]) => !consumed[key]),
   );
@@ -1019,25 +1048,29 @@ function ompEditBlocks(details: Record<string, unknown>): ToolBlock[] {
   const perFile = Array.isArray(details.perFileResults) ? details.perFileResults : null;
   if (perFile && perFile.length > 0) {
     const blocks: ToolBlock[] = [];
+    const perFileRemainder: unknown[] = [];
     for (const entry of perFile) {
       const file = asRecord(entry);
       if (file) blocks.push(...ompEditFileBlocks(file));
+      else perFileRemainder.push(entry);
     }
     // The aggregate `diff`/`firstChangedLine` repeat what each per-file block
     // already rendered; a top-level `diagnostics`, `meta`, or unknown field is
     // not per-file data and must stay readable rather than vanish with the
-    // early return.
+    // early return. A malformed aggregate value (a non-string `diff`, a
+    // non-numeric `firstChangedLine`) was never represented, so it stays too.
     const diagnostics = asRecord(details.diagnostics);
     if (diagnostics) blocks.push(...ompEditDiagnosticBlocks(diagnostics));
-    const consumed: Record<string, true> = {
-      perFileResults: true,
-      diff: true,
-      firstChangedLine: true,
-    };
+    const consumed: Record<string, true> = { perFileResults: true };
+    if (typeof details.diff === "string") consumed.diff = true;
+    if (typeof details.firstChangedLine === "number") consumed.firstChangedLine = true;
     if (diagnostics) consumed.diagnostics = true;
     const remainder = Object.fromEntries(
       Object.entries(details).filter(([key]) => !consumed[key]),
     );
+    // Non-record `perFileResults` entries are malformed producer data, not
+    // silently skipped files; keep them readable through the generic renderer.
+    if (perFileRemainder.length > 0) remainder.perFileResults = perFileRemainder;
     if (Object.keys(remainder).length > 0) {
       blocks.push(...recordBlocks(remainder, "details"));
     }

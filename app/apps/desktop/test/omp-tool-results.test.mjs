@@ -689,3 +689,191 @@ test("a multi-file edit keeps top-level diagnostics and a pruned file is not a n
     "a pruned/truncated file is missing its diff, not unchanged",
   );
 });
+
+// ---------------------------------------------------------------------------
+// Independent-review residuals (round two): a known field is consumed only once
+// its actual value was rendered, so malformed/future values stay readable.
+// ---------------------------------------------------------------------------
+
+test("malformed known snapshot fields stay readable", () => {
+  const snapshot = {
+    id: "debug-session",
+    adapter: "fake",
+    status: "stopped",
+    cwd: "/tmp",
+    needsConfigurationDone: false,
+  };
+  const malformedId = converter.convertEntry(
+    tool("debug", [{ type: "text", text: "Paused" }], {
+      action: "pause",
+      success: true,
+      snapshot: { ...snapshot, id: { future: "MALFORMED_SNAPSHOT_ID" } },
+    }),
+  );
+  assert.ok(
+    allText(buildToolPresentation(malformedId, { hideSummaryArg: true })).includes(
+      "MALFORMED_SNAPSHOT_ID",
+    ),
+    "a non-string snapshot id is not silently dropped",
+  );
+
+  const malformedSource = converter.convertEntry(
+    tool("debug", [{ type: "text", text: "Paused" }], {
+      action: "pause",
+      success: true,
+      snapshot: { ...snapshot, source: { path: { future: "MALFORMED_SOURCE_PATH" }, name: "source" }, line: 8 },
+    }),
+  );
+  assert.ok(
+    allText(buildToolPresentation(malformedSource, { hideSummaryArg: true })).includes(
+      "MALFORMED_SOURCE_PATH",
+    ),
+    "a non-string source path stays readable even though no location rendered",
+  );
+});
+
+test("a malformed breakpoint id stays readable", () => {
+  const snapshot = {
+    id: "debug-session",
+    adapter: "fake",
+    status: "stopped",
+    cwd: "/tmp",
+    needsConfigurationDone: false,
+  };
+  const row = converter.convertEntry(
+    tool("debug", [{ type: "text", text: "- line 8: verified" }], {
+      action: "set_breakpoint",
+      success: true,
+      snapshot,
+      breakpoints: [{ line: 8, verified: true, id: { future: "MALFORMED_BREAKPOINT_ID" } }],
+    }),
+  );
+  assert.ok(
+    allText(buildToolPresentation(row, { hideSummaryArg: true })).includes(
+      "MALFORMED_BREAKPOINT_ID",
+    ),
+    "a non-numeric breakpoint id is not dropped from the remainder",
+  );
+});
+
+test("mixed diagnostic messages keep non-string items", () => {
+  const row = converter.convertEntry(
+    tool("edit", [{ type: "text", text: "Updated a.ts" }], {
+      path: "a.ts",
+      diff: "-1|old\n+1|new",
+      diagnostics: { messages: ["warning", { future: "DIAGNOSTIC_MESSAGE_REMAINDER" }] },
+    }),
+  );
+  const blocks = buildToolPresentation(row, { hideSummaryArg: true });
+  assert.ok(
+    byRole(blocks, "notice").some((b) => b.text === "warning"),
+    "the valid string message still renders as a note",
+  );
+  assert.ok(
+    allText(blocks).includes("DIAGNOSTIC_MESSAGE_REMAINDER"),
+    "a non-string message is not dropped with the rendered strings",
+  );
+});
+
+test("a scalar meta and an unknown edit operation fall back readably", () => {
+  const meta = converter.convertEntry(
+    tool("edit", [{ type: "text", text: "Updated a.ts" }], {
+      path: "a.ts",
+      diff: "-1|old\n+1|new",
+      meta: "EDIT_META_SCALAR",
+    }),
+  );
+  assert.ok(
+    allText(buildToolPresentation(meta, { hideSummaryArg: true })).includes("EDIT_META_SCALAR"),
+    "a non-record meta is not dropped",
+  );
+
+  const futureOp = converter.convertEntry(
+    tool("edit", [{ type: "text", text: "Updated a.ts" }], {
+      path: "a.ts",
+      diff: "-1|old\n+1|new",
+      op: "FUTURE_EDIT_OPERATION",
+    }),
+  );
+  assert.ok(
+    allText(buildToolPresentation(futureOp, { hideSummaryArg: true })).includes(
+      "FUTURE_EDIT_OPERATION",
+    ),
+    "an operation other than create/delete is not silently consumed",
+  );
+});
+
+test("mixed per-file results and a malformed aggregate diff stay readable", () => {
+  const mixed = converter.convertEntry(
+    tool("edit", [{ type: "text", text: "Updated files" }], {
+      diff: "",
+      perFileResults: ["PER_FILE_SCALAR_REMAINDER", { path: "a.ts", diff: "-1|old\n+1|new" }],
+    }),
+  );
+  const mixedBlocks = buildToolPresentation(mixed, { hideSummaryArg: true });
+  assert.ok(
+    allText(mixedBlocks).includes("PER_FILE_SCALAR_REMAINDER"),
+    "a non-record per-file entry is not skipped",
+  );
+  assert.ok(allText(mixedBlocks).includes("a.ts"), "the valid per-file entry still renders");
+
+  const malformedDiff = converter.convertEntry(
+    tool("edit", [{ type: "text", text: "Updated files" }], {
+      diff: { future: "AGGREGATE_DIFF_REMAINDER" },
+      perFileResults: [{ path: "a.ts", diff: "-1|old\n+1|new" }],
+    }),
+  );
+  assert.ok(
+    allText(buildToolPresentation(malformedDiff, { hideSummaryArg: true })).includes(
+      "AGGREGATE_DIFF_REMAINDER",
+    ),
+    "a non-string aggregate diff is not dropped as a redundant value",
+  );
+});
+
+test("a valid snapshot field renders once and is not repeated in the fallback", () => {
+  const row = converter.convertEntry(
+    tool("debug", [{ type: "text", text: "Paused" }], {
+      action: "pause",
+      success: true,
+      snapshot: {
+        id: "debug-session",
+        adapter: "fake",
+        status: "stopped",
+        cwd: "/tmp",
+        needsConfigurationDone: false,
+        source: { path: "a.ts" },
+        line: 8,
+      },
+    }),
+  );
+  const blocks = buildToolPresentation(row, { hideSummaryArg: true });
+  assert.deepEqual(
+    fieldValues(blocks).filter((v) => v === "id: debug-session"),
+    ["id: debug-session"],
+    "the session id renders exactly once",
+  );
+  assert.equal(
+    blocks.some((block) => block.lang === "json"),
+    false,
+    "no JSON fallback repeats the already-rendered snapshot fields",
+  );
+});
+
+test("a large mixed per-file result respects the generic list bound", () => {
+  const scalars = Array.from({ length: 250 }, (_, i) => `PER_FILE_SCALAR_${i}`);
+  const row = converter.convertEntry(
+    tool("edit", [{ type: "text", text: "Updated files" }], {
+      diff: "",
+      perFileResults: [{ path: "a.ts", diff: "-1|old\n+1|new" }, ...scalars],
+    }),
+  );
+  const blocks = buildToolPresentation(row, { hideSummaryArg: true });
+  assert.ok(allText(blocks).includes("a.ts"), "the valid per-file entry still renders");
+  const remainderFiles = blocks.find(
+    (block) => block.kind === "files" && block.label === "perFileResults",
+  );
+  assert.ok(remainderFiles, "the non-record entries render as a bounded files block");
+  assert.equal(remainderFiles.paths.length, 200, "the generic list cap still applies");
+  assert.equal(remainderFiles.hidden, 50, "the overflow is reported, not dropped");
+});
