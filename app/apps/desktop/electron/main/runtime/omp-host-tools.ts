@@ -68,12 +68,16 @@ import {
   type OmpHostToolOutcome,
   type OmpHostToolRun,
 } from "@pi-desktop/omp-runtime";
-import type { RegisteredPluginTool } from "../plugin-runtime";
+import type { RegisteredPluginSkill, RegisteredPluginTool } from "../plugin-runtime";
 import type { UserMcpToolDescriptor } from "../user-mcp";
 
 /** The plugin registry slice this adapter reads. */
 type PluginToolSource = {
   getTools(): RegisteredPluginTool[];
+  /** The plugin skill catalog (ids are `<pluginId>/<skillId>`). */
+  getSkills(): RegisteredPluginSkill[];
+  /** Live body read: throws NOT_FOUND/INVALID_ARGUMENT like the Pi runtime. */
+  loadSkillBody(id: string): { id: string; name: string; body: string };
 };
 
 /** The user MCP runtime slice this adapter reads. */
@@ -87,6 +91,19 @@ export type OmpHostToolAdapterDeps = {
   userMcp: UserMcpSource;
   /** PI's activation-scope predicate; the same one `session-launch.ts` uses. */
   pluginActiveInProject(pluginId: string, projectPath: string | null | undefined): boolean;
+  /**
+   * Builtin skill body reader (`builtin-skills.ts`): null for any id the host
+   * does not ship, which lets the lookup fall through to the user catalog.
+   */
+  loadBuiltinSkillBody?: (id: string) => { id: string; name: string; body: string } | null;
+  /**
+   * User skill body reader (PI `loadUserSkillBody`): null when the id is not
+   * a user skill; throws when the skill is not active in the bound project —
+   * the scope re-check at execution, not at catalog time.
+   */
+  loadUserSkillBody?: (id: string, projectPath: string | null) => Promise<{ id: string; name: string; body: string } | null>;
+  /** The user's active skill ids (PI `activeUserSkills`), for the error hint. */
+  activeUserSkills?: (projectPath: string | undefined) => Promise<Array<{ id: string }>>;
   /**
    * The plugin runtime's toast queue (`PluginRuntime.drainToasts()`), drained
    * after every tool execution the way `host.ts` does after `plugins.execute`;
@@ -129,6 +146,39 @@ export type OmpHostToolAdapter = {
 };
 
 const FALLBACK_SCHEMA = { type: "object", properties: {} } as const;
+
+/**
+ * The on-demand skill tool's name — the exact PI `Skill` contract, served as a
+ * desktop host tool (M5/T19-C). The bridge adds it to the catalog only when
+ * the desktop skill catalog is non-empty (the Pi registration gate), so a
+ * model never sees a `Skill` tool without a Skills section to read.
+ */
+export const DESKTOP_SKILL_TOOL_NAME = "Skill";
+
+/**
+ * The constant host-tool definition the bridge registers for the on-demand
+ * path. The description is the Pi runtime's verbatim; `essential` keeps it in
+ * the top-level schema (an undeclared load mode would demote it to xd://
+ * discovery and hide it from the model).
+ */
+export function desktopSkillToolDefinition(): OmpHostToolDefinition {
+  return {
+    name: DESKTOP_SKILL_TOOL_NAME,
+    description:
+      "Load the full instructions of one skill listed in the Skills section of your system prompt. Pass its exact id (for example \"demo.hello/release-notes\"). Returns the skill document; follow it for the current task.",
+    parameters: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "Skill id exactly as listed in the Skills section.",
+        },
+      },
+      required: ["id"],
+    },
+    loadMode: "essential",
+  };
+}
 /**
  * One image block must leave room for the frame envelope and other blocks.
  * The frame-level budget itself is enforced at the protocol write boundary
@@ -195,9 +245,64 @@ export function createOmpHostToolAdapter(deps: OmpHostToolAdapterDeps): OmpHostT
         });
       }
     };
+
+    /**
+     * Serve one on-demand skill load with the exact PI precedence and error
+     * shape (`sidecar.ts` local `Skill` tool): builtin first, then the user's
+     * own (scope re-checked at execution, not at catalog time), then the
+     * plugin's (load state and size cap re-checked by the plugin runtime).
+     * Everything is read live, so an unload, disable, rescope, delete or edit
+     * between the catalog and this call takes effect here, without a restart.
+     */
+    const runSkillLoad = async (
+      call: OmpHostToolCall,
+      run: OmpHostToolRun,
+      signal: AbortSignal,
+    ): Promise<OmpHostToolOutcome> => {
+      assertDispatchable(run, signal);
+      const args = call.arguments ?? {};
+      const id = String((args as { id?: unknown }).id ?? "").trim();
+      if (!id) {
+        return outcomeFor({
+          content: [{ type: "text", text: "Skill: `id` is required. Use an id from the Skills section." }],
+          isError: true,
+        });
+      }
+      try {
+        const skill =
+          deps.loadBuiltinSkillBody?.(id) ??
+          (await deps.loadUserSkillBody?.(id, binding.projectPath)) ??
+          deps.plugins.loadSkillBody(id);
+        return outcomeFor({
+          content: [{ type: "text", text: `# Skill: ${skill.name} (${skill.id})\n\n${skill.body}` }],
+        });
+      } catch (error) {
+        const userIds =
+          (await deps.activeUserSkills?.(binding.projectPath))?.map((skill) => skill.id) ?? [];
+        const pluginIds = deps.plugins
+          .getSkills()
+          .filter((skill) => deps.pluginActiveInProject(skill.pluginId, binding.projectPath))
+          .map((skill) => skill.id);
+        const available = [...userIds, ...pluginIds].join(", ");
+        return outcomeFor({
+          content: [
+            {
+              type: "text",
+              text: `Skill: ${error instanceof Error ? error.message : String(error)}.${
+                available ? ` Available skills: ${available}.` : ""
+              }`,
+            },
+          ],
+          isError: true,
+        });
+      }
+    };
     return {
       async execute(call: OmpHostToolCall, run: OmpHostToolRun, signal: AbortSignal): Promise<OmpHostToolOutcome> {
         try {
+          if (call.toolName === DESKTOP_SKILL_TOOL_NAME) {
+            return await runSkillLoad(call, run, signal);
+          }
           if (call.toolName.startsWith("mcp_")) {
             // Last synchronous gate before entering the MCP call path: the Pi
             // host has no turn gate on its user-MCP branch (`host.ts` calls

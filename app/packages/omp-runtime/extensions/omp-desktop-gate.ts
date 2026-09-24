@@ -36,6 +36,11 @@
  *   - `OMP_DESKTOP_GATE_TIMEOUT_MS` — dialog deadline (default 120000).
  *   - `OMP_DESKTOP_GATE_MODE` — `ask` (default), `deny` (block everything
  *     gated without asking: unattended runs), or `allow`.
+ *   - `OMP_DESKTOP_STATE` — the run-scoped desktop-capability state file
+ *     (M5/T19-C). Its `before_agent_start` handler appends the PI-identical
+ *     skill-catalog and project-memory blocks to the runtime's system prompt
+ *     when the file is fresh, valid and owned by the firing session; any
+ *     other case injects nothing and never replaces the native prompt.
  */
 import {
   OMP_APPROVAL_OPTIONS,
@@ -43,6 +48,11 @@ import {
   type OmpApprovalDescriptor,
   type OmpApprovalRisk,
 } from "../src/session/approval-protocol.ts";
+import {
+  desktopCapabilityPrompt,
+  readDesktopCapabilityState,
+  type DesktopCapabilityState,
+} from "../src/desktop-state.ts";
 
 const DEFAULT_GATED_TOOLS = "write,edit,apply_patch,bash,eval";
 
@@ -131,8 +141,15 @@ interface ToolCallContext {
   hasUI?: boolean | (() => boolean);
 }
 
-interface ExtensionAPI {
+export interface ExtensionAPI {
   on(event: "tool_call", handler: (event: ToolCallEvent, ctx: ToolCallContext) => unknown): void;
+  on(
+    event: "before_agent_start",
+    handler: (
+      event: BeforeAgentStartEventSlice,
+      ctx: BeforeAgentStartContextSlice,
+    ) => { systemPrompt: string[] } | undefined | Promise<{ systemPrompt: string[] } | undefined>,
+  ): void;
   logger?: { warn?(message: string, meta?: unknown): void; info?(message: string, meta?: unknown): void };
 }
 
@@ -295,6 +312,52 @@ export function parseGatedTools(value: string | undefined): Set<string> {
   );
 }
 
+/** The `before_agent_start` event slice the injection handler reads. */
+export type BeforeAgentStartEventSlice = {
+  systemPrompt: string[];
+};
+
+/** The session identity the injection handler compares against the state. */
+export type BeforeAgentStartContextSlice = {
+  sessionManager?: { getSessionId?: () => string } | null;
+};
+
+/**
+ * Decide the `before_agent_start` answer for one state file.
+ *
+ * Returns `{ systemPrompt: [...event.systemPrompt, block] }` — an append that
+ * never replaces or drops the runtime's native prompt parts — when the state
+ * file is fresh, valid, owned by the firing session and carries at least one
+ * block. Every other case (missing, malformed, oversized, stale, wrong
+ * session, empty catalog and memory) returns undefined: nothing is injected
+ * and the turn proceeds with the native prompt untouched. The desktop skill
+ * catalog and project memory are best-effort injections, exactly where Pi is
+ * best-effort; they never weaken the approval gate, which is a separate
+ * `tool_call` policy in this same module.
+ */
+export function beforeAgentStartInjection(
+  event: BeforeAgentStartEventSlice,
+  context: BeforeAgentStartContextSlice,
+  statePath: string | undefined | null,
+  now: number,
+): { systemPrompt: string[] } | undefined {
+  const state = readDesktopCapabilityState(statePath, now);
+  if (!state) return undefined;
+  let sessionId: string | undefined;
+  try {
+    sessionId = context.sessionManager?.getSessionId?.();
+  } catch {
+    return undefined;
+  }
+  // Only the session the bridge wrote the state for may read it: a subagent
+  // session sharing the process sees the same file but a different identity
+  // and gets nothing (Pi's delegates never receive project memory either).
+  if (!sessionId || sessionId !== state.sessionId) return undefined;
+  const block = desktopCapabilityPrompt(state);
+  if (!block) return undefined;
+  return { systemPrompt: [...event.systemPrompt, block] };
+}
+
 export default function ompDesktopGate(pi: ExtensionAPI): void {
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
     ?.env;
@@ -312,5 +375,16 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
     });
     if (!verdict.block) return undefined;
     return { block: true, reason: verdict.reason ?? "denied" };
+  });
+
+  // Desktop skills and project memory enter the provider-visible system
+  // prompt here, and nowhere else. A failed read injects nothing; the handler
+  // never throws into the agent start.
+  pi.on("before_agent_start", async (event, context) => {
+    try {
+      return beforeAgentStartInjection(event, context, env?.OMP_DESKTOP_STATE, Date.now());
+    } catch {
+      return undefined;
+    }
   });
 }

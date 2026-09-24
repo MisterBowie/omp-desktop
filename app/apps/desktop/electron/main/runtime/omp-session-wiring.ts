@@ -27,6 +27,7 @@ import {
 } from "@pi-desktop/omp-runtime";
 import {
   createOmpSessionBridge,
+  type OmpCapabilityProvider,
   type OmpHostToolProvider,
   type OmpSessionBridge,
   type OmpSessionRuntimeSpec,
@@ -65,6 +66,8 @@ export type OmpSessionWiringDeps = {
   emitAgentEvent: (envelope: AgentEventEnvelope) => void;
   /** The desktop's host-tool seam (M5/T19-B), assembled from the plugin/MCP registries. */
   hostTools?: OmpHostToolProvider;
+  /** The desktop's capability snapshot loader (M5/T19-C): skills + memory. */
+  capabilities?: OmpCapabilityProvider;
   /** The desktop's `session:turnEnded` broadcast (plugin lifecycle, M5/T19-B). */
   onTurnEnd?: (info: OmpTurnEndInfo) => void;
 };
@@ -172,6 +175,7 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
     emitAgentEvent: deps.emitAgentEvent,
     gateResolver: () => engineRuntime.gateExtension,
     ...(deps.hostTools ? { hostTools: deps.hostTools } : {}),
+    ...(deps.capabilities ? { capabilities: deps.capabilities } : {}),
     ...(deps.onTurnEnd ? { onTurnEnd: deps.onTurnEnd } : {}),
     persistNativeSession: async (info) => {
       const client = hostOrThrow(deps.host);

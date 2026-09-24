@@ -14,6 +14,7 @@ import {
   parseGatedTools,
   type ExtensionAPI,
 } from "../../extensions/omp-desktop-gate.ts";
+import ompDesktopGate from "../../extensions/omp-desktop-gate.ts";
 import { classifyUiRequest } from "./ui-requests.js";
 import { OMP_APPROVAL_OPTIONS } from "./approval-protocol.js";
 
@@ -259,16 +260,20 @@ describe("policy parsing", () => {
 
 describe("registration", () => {
   it("registers one tool_call handler that blocks through the decision table", async () => {
-    const handlers: Array<(event: unknown, ctx: unknown) => unknown> = [];
+    const toolCallHandlers: Array<(event: unknown, ctx: unknown) => unknown> = [];
+    const registeredEvents: string[] = [];
     const pi = {
-      on: (_event: "tool_call", handler: (event: unknown, ctx: unknown) => unknown) => {
-        handlers.push(handler);
+      on: (event: string, handler: (event: unknown, ctx: unknown) => unknown) => {
+        registeredEvents.push(event);
+        if (event === "tool_call") toolCallHandlers.push(handler);
       },
-    } satisfies ExtensionAPI;
-    const module = await import("../../extensions/omp-desktop-gate.ts");
-    module.default(pi);
-    expect(handlers).toHaveLength(1);
-    const blocked = await handlers[0]!(EVENT, { ...CONTEXT, hasUI: false, ui: undefined });
+    };
+    ompDesktopGate(pi);
+    // The gate registers exactly the two policies: the tool_call approval gate
+    // and the before_agent_start capability injection (M5/T19-C).
+    expect(registeredEvents.sort()).toEqual(["before_agent_start", "tool_call"]);
+    expect(toolCallHandlers).toHaveLength(1);
+    const blocked = await toolCallHandlers[0]!(EVENT, { ...CONTEXT, hasUI: false, ui: undefined });
     expect(blocked).toMatchObject({ block: true });
   });
 });

@@ -107,6 +107,27 @@ export {
   sourceIsolationOverlayYaml,
   writeSourceIsolationOverlay,
 } from "./config-overlay.js";
+export {
+  DESKTOP_STATE_ENV,
+  DESKTOP_STATE_FILE,
+  DESKTOP_STATE_VERSION,
+  MAX_DESKTOP_STATE_AGE_MS,
+  MAX_DESKTOP_STATE_BYTES,
+  MAX_DESKTOP_STATE_SKILLS,
+  MAX_MEMORY_CHARS,
+  MAX_SKILL_DESCRIPTION_CHARS,
+  MAX_SKILL_ID_CHARS,
+  MAX_SKILL_NAME_CHARS,
+  desktopCapabilityPrompt,
+  desktopMemoryPrompt,
+  desktopSkillsPrompt,
+  readDesktopCapabilityState,
+  serializeDesktopCapabilityState,
+  writeDesktopCapabilityState,
+  type DesktopCapabilitySnapshot,
+  type DesktopCapabilityState,
+  type DesktopSkillMeta,
+} from "./desktop-state.js";
 
 export {
   OmpEventConverter,

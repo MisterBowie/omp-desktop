@@ -1681,3 +1681,50 @@ RPC (evidence: `docs/validation/M5-host-tool-rpc.md`, ADR 0304 §4):
   Every outcome funnels through one budget pass measured on the final
   serialized `content` JSON (≤ 768 KiB), keeping the frame under the 1 MiB
   line limit and preserving the head of an over-budget result.
+
+T19-C delivers desktop skills and project memory through the same trusted gate
+(evidence: `docs/validation/M5-capability-user-paths.md`, ADR 0304 §5):
+
+- **Single loader**: `omp-desktop-capabilities.ts` assembles one snapshot per
+  prompt with the exact Pi sources, ordering and metadata — builtin skills,
+  then the scope-filtered plugin catalog, then host-core's `skills.active`
+  user skills (id/name/description only), plus project memory read through
+  `project.group.context` with the legacy `project.memory.get` fallback,
+  best-effort exactly where Pi is best-effort.
+- **Run-scoped state**: the supervisor points the child's
+  `OMP_DESKTOP_STATE` at `<runRoot>/desktop-state.json` (decided at start,
+  so neither a static argument nor `extraEnv` can redirect it). The bridge
+  rewrites the state before every prompt — alias-safe exclusive create, mode
+  0600, bounded, credential-free, removed with the run root — so edits,
+  removals, scope changes and unloads are visible on the very next prompt.
+- **Gate injection**: a `before_agent_start` handler validates the state
+  (regular file, size, schema, freshness ≤ 10 min, owning-session match) and
+  returns `{ systemPrompt: [...event.systemPrompt, block] }` — an append that
+  never replaces the native prompt, rules, context files or the native
+  `<skills>`/`skill://` catalog. The block is the exact Pi
+  `pluginSkillsPrompt` + `projectMemoryPrompt` text. Any failed read or
+  validation returns no override: the turn proceeds with the native prompt
+  intact, and the approval gate is untouched. Subagent sessions get nothing
+  (Pi delegates never receive project memory).
+- **On-demand `Skill` path**: the bridge registers a host tool named `Skill`
+  (exact Pi description and `{ id }` schema, `loadMode: "essential"`) only
+  when the desktop catalog is non-empty — the Pi registration gate. The
+  adapter serves it with the exact Pi precedence and error shape: builtin →
+  user (scope re-checked at execution) → plugin (load state and size
+  re-checked), bodies read live; success renders
+  `# Skill: <name> (<id>)\n\n<body>`, failure
+  `Skill: <message>. Available skills: <ids>.` as an `isError` result. The
+  read-only load raises no approval.
+- **Fail-closed decision**: a host read failure follows Pi's best-effort
+  memory behavior (no memory block; a failed `skills.active` drops only the
+  user skills); a missing, malformed, oversized or stale state injects
+  nothing. A failed snapshot or state write also withdraws the `Skill` tool
+  for that turn — the model is never handed a skill loader without its
+  catalog.
+- **User path**: Settings, the project-memory editor, skill management,
+  plugin enable/scope controls and the composer slash-skill path already
+  write through the stores this loader reads; `/skill-id` routes to the
+  `Skill` tool. OMP-native project skills stay discoverable and loadable
+  through `skill://` beside the desktop catalog. No new or decorative UI was
+  added. T20 (Plan/Goal, real-mode propagation, high-privilege tools, child
+  stop/`hasUI` policy) stays closed and unclaimed.

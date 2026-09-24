@@ -103,6 +103,8 @@ import { registerSessionIpc } from "./ipc/session-ipc";
 import { createDesktopEngineRuntimeForApp } from "./runtime/engine-runtime";
 import { wireOmpSessions } from "./runtime/omp-session-wiring";
 import { createOmpHostToolAdapter } from "./runtime/omp-host-tools";
+import { createOmpDesktopCapabilities } from "./runtime/omp-desktop-capabilities";
+import { loadBuiltinSkillBody } from "./builtin-skills";
 import { registerSettingsIpc } from "./ipc/settings-ipc";
 import { registerProviderIpc } from "./ipc/provider-ipc";
 import {
@@ -1266,12 +1268,27 @@ const ompSessions = wireOmpSessions({
     plugins,
     userMcp,
     pluginActiveInProject,
+    // The on-demand Skill path (M5/T19-C) reads bodies live with the exact
+    // PI precedence: builtin first, then the user's own (scope re-checked),
+    // then the plugin's — the same readers the Pi sidecar's local tool uses.
+    loadBuiltinSkillBody,
+    loadUserSkillBody,
+    activeUserSkills,
     // The same post-execution toast drain `host.ts` performs after
     // `plugins.execute`; a tool's toasts are never silently dropped, and a
     // failing drain never changes the tool result (the adapter isolates it).
     drainToasts: () => plugins.drainToasts(),
     emitToast: (message) => sendToRenderer(IPC.event.toast, { message }),
     log: (level, message, data) => logger.app("runtime", level, message, { data }),
+  }),
+  // The desktop's live skill catalog and project memory (M5/T19-C): one
+  // loader, refreshed per prompt into the run-scoped state the gate reads.
+  capabilities: createOmpDesktopCapabilities({
+    host: () => host,
+    plugins,
+    pluginActiveInProject,
+    activeUserSkills,
+    log: logger,
   }),
   onTurnEnd: announceTurnEnded,
 }).bridge;

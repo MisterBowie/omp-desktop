@@ -43,10 +43,13 @@ import {
 } from "@pi-desktop/shared";
 import { BUNDLED_GATE_PATH } from "./omp-runtime";
 import {
+  DESKTOP_STATE_FILE,
   OmpSessionRunner,
   OmpRuntimeError,
   descriptorRisk,
   findGateExtension,
+  serializeDesktopCapabilityState,
+  writeDesktopCapabilityState,
   type OmpConversionDiagnostics,
   type OmpHostToolDefinition,
   type OmpHostToolExecutor,
@@ -59,6 +62,7 @@ import {
   type OmpUiRequest,
   type SubagentListEntry,
 } from "@pi-desktop/omp-runtime";
+import { desktopSkillToolDefinition } from "./omp-host-tools";
 
 export type OmpSessionBridgeLogger = {
   app(
@@ -135,6 +139,13 @@ export type OmpSessionBridgeOptions = {
   /** The app-owned persistent native-session directory (containment root). */
   sessionDir: string;
   /**
+   * The desktop's live capability snapshot (M5/T19-C): skills + project
+   * memory, written into the run-scoped state file before every prompt and
+   * read by the trusted gate's `before_agent_start` handler. Absent (Pi path,
+   * unit fixtures) means no state is written and no `Skill` tool is exposed.
+   */
+  capabilities?: OmpCapabilityProvider;
+  /**
    * The desktop's host tools (M5/T19-B): the per-project catalog the bridge
    * registers through `set_host_tools`, and the executor that serves the
    * model's calls. Absent (Pi path, unit fixtures) means no desktop tools are
@@ -151,6 +162,28 @@ export type OmpSessionBridgeOptions = {
   /** Test seams. */
   runnerFactory?: (options: ConstructorParameters<typeof OmpSessionRunner>[0]) => OmpSessionRunner;
   gateResolver?: (startDir: string) => string | null;
+};
+
+/**
+ * One per-prompt capability snapshot: skill metadata (builtin, plugin, user
+ * — in that order) and the bound project's memory. `memory` absent means
+ * "none read" (Pi's best-effort semantics); a failed read never fails the
+ * prompt.
+ */
+export type OmpCapabilitySnapshot = {
+  skills: Array<{ id: string; name: string; description: string }>;
+  memory?: string;
+};
+
+/**
+ * The desktop's live capability snapshot (M5/T19-C): the skill catalog and
+ * the bound project's memory, assembled with PI `session-launch` semantics
+ * once per prompt. The bridge writes the snapshot into the run-scoped state
+ * file the trusted gate reads; the provider is the single loader for the
+ * capability, so no second path re-reads or re-registers it.
+ */
+export type OmpCapabilityProvider = {
+  snapshot(projectPath: string): Promise<OmpCapabilitySnapshot>;
 };
 
 /**
@@ -586,6 +619,12 @@ class SessionEntry {
    */
   private readonly hostTools: OmpHostToolProvider | undefined;
   private readonly hostToolExecutor: OmpHostToolExecutor | undefined;
+  /**
+   * The desktop's live capability snapshot (M5/T19-C), refreshed into the
+   * run-scoped state file before every prompt. Undefined when the bridge was
+   * built without one: no state is written and no `Skill` tool is exposed.
+   */
+  private readonly capabilities: OmpCapabilityProvider | undefined;
   /** The (runner, native session, catalog) triple the tools were last registered for. */
   private hostToolsRegisteredRunner: OmpSessionRunner | null = null;
   private hostToolsRegisteredSession: string | null = null;
@@ -662,6 +701,7 @@ class SessionEntry {
     sessionDir: string;
     binding: { providerId: string | null; modelId: string | null; thinkingLevel: string | null };
     hostTools?: OmpHostToolProvider;
+    capabilities?: OmpCapabilityProvider;
     onTurnEnd?: OmpSessionBridgeOptions["onTurnEnd"];
   }) {
     this.sessionId = deps.sessionId;
@@ -675,6 +715,7 @@ class SessionEntry {
     this.sessionDir = deps.sessionDir;
     this.binding = deps.binding;
     this.hostTools = deps.hostTools;
+    this.capabilities = deps.capabilities;
     this.onTurnEnd = deps.onTurnEnd;
     // The executor is bound once: the project directory and model binding are
     // fixed for the entry's lifetime, so the bound executor can never reach
@@ -1089,11 +1130,18 @@ class SessionEntry {
     const epoch = this.stopEpoch;
     await this.ensureNativeSession(gate, spec);
     const runner = await this.ensureRunner(gate);
+    // The desktop's skill catalog and project memory are refreshed into the
+    // run-scoped state file before every prompt, the way the Pi host re-reads
+    // them per launch: an edit, a removal, a scope change or a plugin unload
+    // is visible to the very next prompt, and the trusted gate reads the
+    // file during `before_agent_start` of the prompt that follows. The
+    // returned flag decides the `Skill` tool's presence for this turn.
+    const capabilityRefresh = await this.refreshDesktopState();
     // The session's desktop tools are (re)registered before every prompt, the
     // way the Pi host reassembles its catalog per launch: a changed catalog —
     // a plugin installed/unloaded, a scope edit, an MCP change — is visible to
     // the next turn, and an unchanged one is skipped by fingerprint.
-    await this.registerHostTools(runner);
+    await this.registerHostTools(runner, capabilityRefresh.skillsPresent);
     // Enable the subagent subscription once the runtime is ready and the native
     // session is established. A refused subscription is logged but does not fail
     // the prompt: the turn still runs, and the child list/read paths report a
@@ -1109,6 +1157,54 @@ class SessionEntry {
     }
     const started = await runner.prompt(content);
     return { accepted: started.accepted, turnId: started.turnId };
+  }
+
+  /**
+   * Refresh the run-scoped desktop-capability state before one prompt.
+   *
+   * The snapshot is read once per prompt from the single loader and written
+   * atomically (alias-safe, 0600) into the run root. A failed read or write
+   * fails closed for injection — the gate injects nothing — and reports
+   * `skillsPresent: false` so the `Skill` tool is not registered either: the
+   * model must never be handed a skill tool without its catalog. The native
+   * prompt and the approval gate are untouched by any failure here.
+   */
+  private async refreshDesktopState(): Promise<{ skillsPresent: boolean }> {
+    if (!this.capabilities) return { skillsPresent: false };
+    let snapshot: OmpCapabilitySnapshot;
+    try {
+      snapshot = await this.capabilities.snapshot(this.projectDirectory);
+    } catch (error) {
+      this.logger?.app("omp", "warn", "desktop capability snapshot failed", {
+        data: { sessionId: this.sessionId, error: String((error as Error)?.message ?? error) },
+      });
+      return { skillsPresent: false };
+    }
+    const runRoot = this.supervisor.runRoot();
+    if (!runRoot || !this.nativeSessionId) {
+      // No owned run root means the gate has nothing to read either.
+      return { skillsPresent: false };
+    }
+    const statePath = join(runRoot, DESKTOP_STATE_FILE);
+    try {
+      writeDesktopCapabilityState(
+        statePath,
+        serializeDesktopCapabilityState(
+          {
+            sessionId: this.nativeSessionId,
+            skills: snapshot.skills,
+            ...(snapshot.memory !== undefined ? { memory: snapshot.memory } : {}),
+          },
+          this.now(),
+        ),
+      );
+    } catch (error) {
+      this.logger?.app("omp", "warn", "desktop capability state write failed", {
+        data: { sessionId: this.sessionId, error: String((error as Error)?.message ?? error) },
+      });
+      return { skillsPresent: false };
+    }
+    return { skillsPresent: snapshot.skills.length > 0 };
   }
 
   /**
@@ -1133,11 +1229,17 @@ class SessionEntry {
    * actually registered, and a tool the model cannot see is never silently
    * dropped.
    */
-  private async registerHostTools(runner: OmpSessionRunner): Promise<void> {
+  private async registerHostTools(runner: OmpSessionRunner, includeSkillTool: boolean): Promise<void> {
     if (!this.hostTools) return;
     const definitions = await this.hostTools.catalog(this.projectDirectory);
+    // The on-demand `Skill` tool rides the same registration, and only when
+    // the desktop catalog is non-empty (the Pi registration gate): the model
+    // is never offered a skill loader without a Skills section to read. The
+    // bridge — not the adapter — owns its presence, so a state refresh that
+    // failed closed also withdraws the tool.
+    const withSkill = includeSkillTool ? [...definitions, desktopSkillToolDefinition()] : definitions;
     const fingerprint = JSON.stringify(
-      definitions.map((definition) => [definition.name, definition.description, definition.parameters, definition.loadMode ?? null]),
+      withSkill.map((definition) => [definition.name, definition.description, definition.parameters, definition.loadMode ?? null]),
     );
     if (
       this.hostToolsRegisteredRunner === runner &&
@@ -1148,7 +1250,7 @@ class SessionEntry {
     }
     const runtime = this.runtimeHandle();
     const response = await runtime.request(
-      { type: "set_host_tools", tools: definitions },
+      { type: "set_host_tools", tools: withSkill },
       { timeoutMs: 20_000 },
     );
     if (response.success !== true) {
@@ -1158,7 +1260,7 @@ class SessionEntry {
       );
     }
     const echoed = (response.data as { toolNames?: unknown } | undefined)?.toolNames;
-    const expected = definitions.map((definition) => definition.name);
+    const expected = withSkill.map((definition) => definition.name);
     const matches =
       Array.isArray(echoed) &&
       echoed.length === expected.length &&
@@ -1377,6 +1479,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       sessionDir: options.sessionDir,
       binding,
       ...(options.hostTools ? { hostTools: options.hostTools } : {}),
+      ...(options.capabilities ? { capabilities: options.capabilities } : {}),
       ...(options.onTurnEnd ? { onTurnEnd: options.onTurnEnd } : {}),
     });
     entries.set(spec.sessionId, entry);

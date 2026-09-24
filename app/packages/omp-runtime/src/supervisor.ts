@@ -33,6 +33,7 @@ import {
 
 import { OmpRuntimeError } from "./errors.js";
 import { CONFIG_OVERLAY_FILE, writeSourceIsolationOverlay } from "./config-overlay.js";
+import { DESKTOP_STATE_ENV, DESKTOP_STATE_FILE } from "./desktop-state.js";
 import {
   buildOmpRuntimeEnv,
   isPathInside,
@@ -149,6 +150,14 @@ export type OmpRunPaths = {
    * of a static constructor argument.
    */
   configOverlay: string;
+  /**
+   * The run-scoped desktop-capability state file (M5/T19-C). The supervisor
+   * points the child's `OMP_DESKTOP_STATE` at this path (inside the owned run
+   * root); the bridge rewrites it before every prompt and the owned cleanup
+   * removes it with the run root. Like the overlay, it is a property of the
+   * run, never of a static constructor argument.
+   */
+  desktopState: string;
 };
 
 /**
@@ -281,6 +290,17 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
     return this.options.expectedRuntimeVersion === undefined
       ? OMP_RUNTIME_VERSION
       : this.options.expectedRuntimeVersion;
+  }
+
+  /**
+   * The run root this supervisor currently owns, or null when no run exists.
+   *
+   * The bridge writes the desktop-capability state file inside this root
+   * before every prompt; the path only exists while the run is owned (live or
+   * awaiting reclaim), so a stale path can never be written after cleanup.
+   */
+  runRoot(): string | null {
+    return this.ownership?.runRoot ?? null;
   }
 
   /** Runs this supervisor started and could not remove cleanly. */
@@ -417,7 +437,22 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
     const launchDir = join(runRoot, "cwd");
     mkdirSync(launchDir, { recursive: true });
     const configOverlay = join(runRoot, CONFIG_OVERLAY_FILE);
-    const paths: OmpRunPaths = { runRoot, home, agentDir: codingAgentDir, configDirName, configRoot, launchDir, configOverlay };
+    const desktopState = join(runRoot, DESKTOP_STATE_FILE);
+    // The gate finds its capability state through this variable, which only
+    // exists once the run root is minted: it is decided here, after the env
+    // is built, so neither a static constructor argument nor an embedder's
+    // `extraEnv` can redirect it outside the owned run root.
+    env[DESKTOP_STATE_ENV] = desktopState;
+    const paths: OmpRunPaths = {
+      runRoot,
+      home,
+      agentDir: codingAgentDir,
+      configDirName,
+      configRoot,
+      launchDir,
+      configOverlay,
+      desktopState,
+    };
 
     // The persistent native-session directory is created before the child
     // starts so a missing or unwritable path surfaces as a start failure rather

@@ -1,11 +1,11 @@
 # ADR 0304: OMP capability-source ownership and the run-scoped source boundary
 
-- Status: Accepted (M5/T19-A)
+- Status: Accepted (M5/T19-A; amended by T19-B and T19-C)
 - Date: 2026-09-25
-- Scope: M5/T19-A (runtime capability-source isolation, trusted gate loading,
+- Scope: M5/T19 (runtime capability-source isolation, trusted gate loading,
   and the capability ownership contract). T19-B (host-tool RPC) and T19-C
-  (desktop skills/memory/plugin user paths) are declared here as ownership
-  decisions but are not implemented by this phase.
+  (desktop skills/memory/plugin user paths) are realized by the amendments
+  in §4 and §5. T20 remains declared, not claimed.
 - Amends: 0301 (gate loading — `--extension` becomes `--trusted-extension`).
 - Evidence: `docs/validation/M5-capability-sources.md`,
   `packages/omp-runtime/src/config-overlay.ts`,
@@ -228,16 +228,78 @@ runtime's host-tool RPC, exactly once per session:
 
 Evidence: `docs/validation/M5-host-tool-rpc.md`.
 
-### 5. Not implemented (declared, not claimed)
+### 5. T19-C realized: desktop skills and project memory through the gate (amended)
 
-- T19-C desktop skills and project memory through the trusted gate.
-- Any user path for those capabilities.
-- T20 Plan/Goal and high-privilege capability gating.
+The desktop-owned skills and project memory declared in §1 now arrive through
+one path per capability, with the PI-Desktop semantics and fallbacks:
+
+- **Single loader**: `omp-desktop-capabilities.ts` assembles one snapshot per
+  prompt — the skill catalog (`builtinSkills` → the plugin registry's
+  scope-filtered, id-sorted skills → host-core's `skills.active` user skills;
+  metadata only) and the bound project's memory (`project.group.context`
+  group memory, legacy `project.memory.get` fallback when the group reports
+  no context, best-effort exactly where Pi is best-effort). Nothing else
+  re-reads or re-registers these capabilities.
+- **Run-scoped state file**: the supervisor adds
+  `<runRoot>/desktop-state.json` to `OmpRunPaths` and points the child's
+  `OMP_DESKTOP_STATE` at it — decided at start time, after the env is built,
+  so neither a static constructor argument nor an embedder's `extraEnv` can
+  redirect it. The bridge rewrites it before every prompt (alias-safe
+  removal + exclusive create, mode 0600, the T19-A overlay ownership model;
+  bounded, credential-free, removed with the run root). A failed snapshot or
+  write fails closed for injection and also withdraws the `Skill` tool for
+  that turn — the model is never handed a skill loader without its catalog.
+- **Gate injection**: the gate registers a `before_agent_start` handler that
+  reads and validates the state (regular file, size, schema, freshness
+  ≤ 10 min, owning-session match — subagent sessions get nothing, matching
+  Pi, whose delegates never receive project memory) and returns
+  `{ systemPrompt: [...event.systemPrompt, block] }` — an append; the
+  native prompt, rules, context files and the native `<skills>`/`skill://`
+  catalog are never replaced or dropped (the pinned runtime's own test
+  `agent-session-before-agent-start-prompt-override.test.ts` pins the
+  per-turn override contract: provider requests read it, the base returns
+  after the turn). The block is the exact Pi texts — `pluginSkillsPrompt`
+  (D174) then `projectMemoryPrompt` — pinned byte-for-byte by a
+  cross-package test. Any failed read or validation returns no override: the
+  turn proceeds with the native prompt intact and the approval gate
+  (a separate `tool_call` policy) is untouched.
+- **On-demand `Skill` path**: the bridge registers a host tool named `Skill`
+  (`loadMode: "essential"`, the Pi runtime's verbatim description and
+  `{ id }` schema) only when the desktop catalog is non-empty — the Pi
+  registration gate. The adapter serves it with the exact Pi precedence and
+  error shape: builtin → user (scope re-checked at execution) → plugin
+  (load state and size re-checked by the plugin runtime), bodies read live
+  so an unload, disable, rescope, delete or edit takes effect without a
+  restart; success renders `# Skill: <name> (<id>)\n\n<body>`, failure
+  `Skill: <message>. Available skills: <ids>.` as an `isError` result. The
+  name is neither a `plugin_*`/`mcp_*` name nor a native OMP tool, so the
+  gate does not ask approval for the read-only load (Pi-consistent) and the
+  runtime accepts the registration (no collision).
+- **Fail-closed decision**: a host read failure follows Pi's best-effort
+  memory behavior (no memory block; a failed `skills.active` drops only the
+  user skills); an inconsistent catalog — a state file that is missing,
+  malformed, oversized, stale or foreign at the gate — injects nothing, and
+  the turn proceeds with the native prompt. Tests cover both sides.
+- **User path**: Settings, the project-memory editor, skill management,
+  plugin enable/scope controls and the composer slash-skill path already
+  write through the desktop-owned stores this loader reads; an OMP session
+  therefore sees the same catalog the Pi path listed, and `/skill-id` still
+  routes to the `Skill` tool. No new or decorative UI was added.
+
+Evidence: `docs/validation/M5-capability-user-paths.md`.
+
+### 6. Not implemented (declared, not claimed)
+
+- T20 Plan/Goal and high-privilege capability gating (including real-mode
+  propagation to plugin tools, browser/computer/eval completion).
+- Child individual stop and child `hasUI` policy completion.
+- PI agent extensions remain incompatible and are not injected into OMP.
 
 ## Consequences
 
 - Every OMP runtime this product starts is closed to project MCP config and
-  OMP memory backends; the desktop-owned equivalents arrive later and once.
+  OMP memory backends; the desktop-owned equivalents arrive through the
+  host-tool RPC (§4) and the trusted gate (§5), each exactly once.
 - Only the shipped gate runs as an extension; ambient extension code in the
   isolated agent dir is inert.
 - `--config` overlay path handling is exercised through paths with spaces and
@@ -247,4 +309,10 @@ Evidence: `docs/validation/M5-host-tool-rpc.md`.
 - ADR 0301's gate-loading description is amended (`--trusted-extension`).
 - Desktop host tools are approved through the same gate as native tools; the
   declared-risk limitation (§4) is recorded, not hidden.
-- T19-C is the next task.
+- The desktop-capability state file rides the same owned-cleanup model as the
+  overlay: 0600, alias-safe writes, removed with the run root; a malformed or
+  stale state injects nothing and never touches the approval gate.
+- Desktop skill catalog lines and project memory enter the prompt only
+  through `before_agent_start` `systemPrompt` appends — never as transcript
+  messages — so no provider request duplicates them into history.
+- T20 is the next task.

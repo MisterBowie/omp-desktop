@@ -1,6 +1,21 @@
 # OMP Desktop 开发交接
 
-更新时间：2026-09-25。当前状态：**M5/T19（MCP、规则、技能、记忆及插件分类适配）进行中：T19-A（运行时能力源隔离、可信网关加载、能力所有权契约）与 T19-B（host-tool RPC：桌面/插件 MCP 与插件 Agent Tools 经单一宿主边界恰一次暴露）已实现并验证**（T19-A 分支 `codex/m5-capability-sources`，基线 `ff4c1efed63475b9f552ace8a3f28f69b317e176`；T19-B 分支 `codex/m5-host-tool-rpc`，基线 `93ee82b61bd8191722db199e0fb8f1c74ddfaa12`，证据 `docs/validation/M5-host-tool-rpc.md`）；**T19-C（桌面技能/记忆/插件用户路径）待开始**。T18 已通过独立复审并验收（验收产品基线 `a35da2f87a745fbedd8f5beb46368607c2f6b72e`，分支 `codex/m5-tool-results`；证据见 `docs/validation/M5-tool-results.md`）。T17 已验收基线 `ab07a888d6afb916561b80e5661ed27aa6be612a` 保持不动。下一阶段入口：M5/T19-C（桌面技能/记忆/插件用户路径）。T19-A 证据见 `docs/validation/M5-capability-sources.md`；T19-B 证据见 `docs/validation/M5-host-tool-rpc.md`；T18 证据见 `docs/validation/M5-tool-results.md`；T17 历轮独立复审返修见 `docs/validation/M5-subagents.md` §0.1-§0.15。
+更新时间：2026-09-25。当前状态：**M5/T19（MCP、规则、技能、记忆及插件分类适配）进行中：T19-A（运行时能力源隔离、可信网关加载、能力所有权契约）与 T19-B（host-tool RPC：桌面/插件 MCP 与插件 Agent Tools 经单一宿主边界恰一次暴露）已实现并验证**（T19-A 分支 `codex/m5-capability-sources`，基线 `ff4c1efed63475b9f552ace8a3f28f69b317e176`；T19-B 分支 `codex/m5-host-tool-rpc`，基线 `93ee82b61bd8191722db199e0fb8f1c74ddfaa12`，证据 `docs/validation/M5-host-tool-rpc.md`）；**T19-C（桌面技能/记忆/插件用户路径）已实现并验证**（分支 `codex/m5-capability-user-paths`，基线 `df49b84f8246a83c4ed5cb1e2a3e0c72ee88e538`，证据 `docs/validation/M5-capability-user-paths.md`）。T18 已通过独立复审并验收（验收产品基线 `a35da2f87a745fbedd8f5beb46368607c2f6b72e`，分支 `codex/m5-tool-results`；证据见 `docs/validation/M5-tool-results.md`）。T17 已验收基线 `ab07a888d6afb916561b80e5661ed27aa6be612a` 保持不动。下一阶段入口：M5/T20（Plan/Goal 与高权限工具能力门，待开始）。T19-A 证据见 `docs/validation/M5-capability-sources.md`；T19-B 证据见 `docs/validation/M5-host-tool-rpc.md`；T19-C 证据见 `docs/validation/M5-capability-user-paths.md`；T18 证据见 `docs/validation/M5-tool-results.md`；T17 历轮独立复审返修见 `docs/validation/M5-subagents.md` §0.1-§0.15。
+
+## 0. M5/T19-C 交付摘要（本轮）
+
+- 状态：**T19-C 已实现并验证**（分支 `codex/m5-capability-user-paths`，基线 `df49b84`）。桌面技能目录与项目记忆经可信 gate 的 `before_agent_start` 每 prompt 注入 OMP 系统提示（追加、绝不替换原生 prompt/规则/上下文/原生技能目录），正文经按需 `Skill` host tool 实时读取（PI 优先级与错误形状）；T20 未实现、未声称。
+- 证据：`docs/validation/M5-capability-user-paths.md`（固定源码证据、纯基线 df49b84 严格红灯、绿测计数、限制）；设计决策：ADR 0304 §5 追加 + spec `03-runtime/02-agent-runtime.md` §14 追加。
+- 核心变更：
+  - **单一快照装载器**（`omp-desktop-capabilities.ts`）：每 prompt 组装 `skills`（builtin → plugin(作用域过滤, 注册表 id 序) → user(host `skills.active`)）+ `memory`（`project.group.context` 组记忆 → 旧路径回退，best-effort 与 PI 逐条对应）。
+  - **运行域状态文件**（`packages/omp-runtime/src/desktop-state.ts` + supervisor）：`OmpRunPaths.desktopState`（`<runRoot>/desktop-state.json`）；supervisor 在 buildOmpRuntimeEnv 之后设 `OMP_DESKTOP_STATE`（静态参数/`extraEnv` 无法改道）；bridge 每 prompt 前 `rmSync` 条目本身 + `wx` 独占创建 + 0600（T19-A overlay 同款别名安全）；随 run root 清理。
+  - **gate 注入**（`omp-desktop-gate.ts`）：`before_agent_start` 读取并校验（常规文件/大小/schema/新鲜度 ≤10 min/属主 session 匹配；子代理零注入），返回 `{systemPrompt:[...event.systemPrompt, block]}`；block 与 PI `pluginSkillsPrompt`/`projectMemoryPrompt` 逐字节一致（跨包 parity 测试钉死）；任何失败 → 无 override、turn 以原生 prompt 继续、审批门不受影响。解析器依赖无关（gate 在 OMP 进程内加载，包导入会解析到运行时模块图——实测 typebox 解析错误致启动失败后改为显式字段校验）。
+  - **按需 `Skill` host tool**：目录非空才注册（PI gate）；executor 按 builtin → user(作用域复检) → plugin(加载态复检) 实时读 body；成功 `# Skill: <name> (<id>)\n\n<body>`、失败 `Skill: <msg>. Available skills: <ids>.`（isError）；不是 `plugin_/mcp_` 名 → 网关不审批（PI 一致只读）。
+  - **一致退化**：host 读失败 = PI best-effort（无 memory 块/仅少 user 技能）；快照或状态写入失败 → 无注入且该 turn 不注册 Skill（不产生「有工具无目录」半脑状态）+ warn，prompt 照常。
+- 新增测试：`desktop-state.test.ts`（14）、`desktop-state-supervisor.test.ts`（4）、`gate-desktop-state.test.ts`（7）；`omp-desktop-capabilities.test.mjs`（6，含 PI parity）、`omp-skill-path-bridge.test.mjs`（5）、`omp-skill-path-adapter.test.mjs`（9）、`omp-skill-path-e2e.test.mjs`（6 真实固定 OMP）。
+- 先红后绿：全部探针文件 + 纯基线 df49b84（已确认基线 HEAD；E2E 清理经 `t.after` 账本重写后红跑正常退出、零残留）——vitest 3 文件全 fail（模块缺失）、capabilities 5/5、bridge 5/5、adapter 7/9（2 guard 基线即过：目录不含 Skill、`isHostToolName("Skill")===false`）、E2E 6/6（T5 原生技能断言基线即过=正守卫，红的只是桌面目录缺失）；本阶段基线上对应全绿。
+- 验证：`@pi-desktop/omp-runtime` vitest 317/317、desktop 定向 172/172、T19-C E2E 6/6、真实固定 OMP 既有六套件回归 17/17、desktop 全量 2858 总数/2854 通过/0 失败/4 跳过、typecheck 2×0、`pnpm build:js` 0、style-token lint 0、Biome 0、`git diff --check` 0、子模块固定 SHA、无残留进程/临时目录。
+- 下一轮入口：M5/T20（Plan/Goal 与高权限工具能力门）；仍关闭：`branch`/`steer`/`followUp`/`compact`、子代理单独停止、子代理 `hasUI=false` 工具 gating、PI agent 扩展注入。
 
 ## 0. M5/T19-B 交付摘要（本轮）
 
@@ -189,9 +204,9 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 
 ## 4. 下一执行模型从哪里开始
 
-T17 已通过最终独立复审并验收（验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`；含真实固定 OMP 端到端验收与 macOS arm64 独立复审，证据见 `docs/validation/M5-subagents.md` §0.15 与 §0.14）。T18 已通过独立复审并验收（验收产品基线 `a35da2f87a745fbedd8f5beb46368607c2f6b72e`，分支 `codex/m5-tool-results`，证据见 `docs/validation/M5-tool-results.md`）。T19-A（运行时能力源隔离、可信网关加载、能力所有权契约）已实现并验证（分支 `codex/m5-capability-sources`，基线 `ff4c1efed63475b9f552ace8a3f28f69b317e176`，证据见 `docs/validation/M5-capability-sources.md`）。
+T17 已通过最终独立复审并验收（验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`；含真实固定 OMP 端到端验收与 macOS arm64 独立复审，证据见 `docs/validation/M5-subagents.md` §0.15 与 §0.14）。T18 已通过独立复审并验收（验收产品基线 `a35da2f87a745fbedd8f5beb46368607c2f6b72e`，分支 `codex/m5-tool-results`，证据见 `docs/validation/M5-tool-results.md`）。T19-A（运行时能力源隔离、可信网关加载、能力所有权契约）已实现并验证（分支 `codex/m5-capability-sources`，基线 `ff4c1efed63475b9f552ace8a3f28f69b317e176`，证据见 `docs/validation/M5-capability-sources.md`）。T19-B（host-tool RPC）已实现并验证（分支 `codex/m5-host-tool-rpc`，证据见 `docs/validation/M5-host-tool-rpc.md`）。T19-C（桌面技能/记忆/插件用户路径）已实现并验证（分支 `codex/m5-capability-user-paths`，基线 `df49b84`，证据见 `docs/validation/M5-capability-user-paths.md`）。
 
-下一阶段入口：M5/T19-B（host-tool RPC：桌面/插件 MCP 与插件 Agent Tools 经单一宿主边界恰一次暴露；桌面技能/记忆/插件用户路径为 T19-C）。仍在关闭的能力：`branch`/`steer`/`followUp`/`compact`、子代理单独停止（固定 OMP 无 per-child stop RPC）、子代理 `hasUI=false` 工具 gating（产品策略），留待对应阶段逐项开放。
+下一阶段入口：M5/T20（Plan/Goal 与高权限工具能力门）。仍在关闭的能力：`branch`/`steer`/`followUp`/`compact`、子代理单独停止（固定 OMP 无 per-child stop RPC）、子代理 `hasUI=false` 工具 gating（产品策略）、PI agent 扩展注入，留待对应阶段逐项开放。
 
 ## 6. 下一轮必须保持的取舍
 
