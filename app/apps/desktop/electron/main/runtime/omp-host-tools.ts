@@ -249,10 +249,15 @@ export function createOmpHostToolAdapter(deps: OmpHostToolAdapterDeps): OmpHostT
     /**
      * Serve one on-demand skill load with the exact PI precedence and error
      * shape (`sidecar.ts` local `Skill` tool): builtin first, then the user's
-     * own (scope re-checked at execution, not at catalog time), then the
-     * plugin's (load state and size cap re-checked by the plugin runtime).
-     * Everything is read live, so an unload, disable, rescope, delete or edit
-     * between the catalog and this call takes effect here, without a restart.
+     * own — whose body is re-checked against the project scope at every call
+     * (PI `loadUserSkillBody` throws when the skill is no longer active) —
+     * then the plugin's, read with PI `loadSkillBody`'s checks only:
+     * registered, plugin loaded, file readable, ≤128 KiB, non-empty body.
+     * PI performs no scope predicate on the plugin body path, and neither
+     * does this adapter; a plugin scope change lands on the next prompt's
+     * catalog rebuild instead. Everything is read live, so an unload,
+     * delete or edit between the catalog and this call takes effect here,
+     * without a restart.
      */
     const runSkillLoad = async (
       call: OmpHostToolCall,

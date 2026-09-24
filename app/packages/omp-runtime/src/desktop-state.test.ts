@@ -21,6 +21,7 @@ import {
   lstatSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -101,7 +102,7 @@ describe("writer", () => {
     expect(state?.writtenAt).toBe(NOW + 1);
   });
 
-  it("removes a planted symlink at the path and never writes through it", () => {
+  it("replaces a planted symlink entry at the path and never writes through it", () => {
     const dir = makeDir();
     const sentinel = join(dir, "outside-target.json");
     writeFileSync(sentinel, "untouched\n");
@@ -112,7 +113,7 @@ describe("writer", () => {
     expect(readFileSync(sentinel, "utf8")).toBe("untouched\n");
   });
 
-  it("removes a planted hard link at the path and never rewrites its other name", () => {
+  it("replaces a planted hard link entry at the path and never rewrites its other name", () => {
     const dir = makeDir();
     const alias = join(dir, "hard-alias.json");
     writeFileSync(alias, "untouched\n");
@@ -123,20 +124,66 @@ describe("writer", () => {
     expect(readDesktopCapabilityState(path, NOW)?.sessionId).toBe("s");
   });
 
-  it("fails the exclusive create when another entry appears at the path", () => {
+  it("fails cleanly when the directory is unwritable", () => {
     const dir = makeDir();
     const path = join(dir, DESKTOP_STATE_FILE);
-    mkdirSync(path);
-    // A directory can be removed, but a second create must fail rather than
-    // write through: re-create the entry between removal and creation is
-    // exactly what `wx` protects; planting an unwritable parent shows the
-    // failure surfaces instead of silently writing elsewhere.
+    // The atomic replacement creates its temporary file in the same
+    // directory: an unwritable parent fails the exclusive create, the old
+    // final entry is untouched and nothing is written elsewhere.
     chmodSync(dir, 0o500);
     try {
       expect(() => writeDesktopCapabilityState(path, serializeDesktopCapabilityState({ sessionId: "s", skills: [] }, NOW))).toThrow();
     } finally {
       chmodSync(dir, 0o700);
     }
+  });
+
+  it("replaces the file atomically and leaves no temporary file behind", () => {
+    const dir = makeDir();
+    const path = join(dir, DESKTOP_STATE_FILE);
+    writeDesktopCapabilityState(path, serializeDesktopCapabilityState({ sessionId: "s", skills: [], memory: "first" }, NOW));
+    writeDesktopCapabilityState(path, serializeDesktopCapabilityState({ sessionId: "s", skills: [skill()], memory: "second" }, NOW + 1));
+    expect(readDesktopCapabilityState(path, NOW + 1)?.memory).toBe("second");
+    // The atomic replacement writes a unique same-directory temporary file
+    // and renames it: after success only the final path may remain.
+    const entries = readdirSync(dir);
+    expect(entries).toEqual([DESKTOP_STATE_FILE]);
+  });
+
+  it("refuses to replace a planted directory at the final path", () => {
+    const dir = makeDir();
+    const path = join(dir, DESKTOP_STATE_FILE);
+    mkdirSync(path);
+    writeFileSync(join(path, "planted.txt"), "planted\n");
+    // An atomic rename cannot replace a directory with a file: the write must
+    // fail (the caller then invalidates or fails the prompt) and the planted
+    // entry must survive untouched — never silently swapped or removed.
+    expect(() =>
+      writeDesktopCapabilityState(path, serializeDesktopCapabilityState({ sessionId: "s", skills: [] }, NOW)),
+    ).toThrow();
+    expect(readFileSync(join(path, "planted.txt"), "utf8")).toBe("planted\n");
+    expect(readdirSync(dir)).toEqual([DESKTOP_STATE_FILE]);
+  });
+
+  it("a failed replacement preserves the previous file and leaves no temporary file", () => {
+    const dir = makeDir();
+    const path = join(dir, DESKTOP_STATE_FILE);
+    writeDesktopCapabilityState(path, serializeDesktopCapabilityState({ sessionId: "s", skills: [skill()], memory: "old-content" }, NOW));
+    chmodSync(dir, 0o500);
+    try {
+      expect(() =>
+        writeDesktopCapabilityState(path, serializeDesktopCapabilityState({ sessionId: "s", skills: [], memory: "new-content" }, NOW + 1)),
+      ).toThrow();
+    } finally {
+      chmodSync(dir, 0o700);
+    }
+    // The old state is still on disk, byte-identical, and no `.tmp` entry was
+    // stranded by the failed replacement.
+    const entries = readdirSync(dir);
+    expect(entries).toEqual([DESKTOP_STATE_FILE]);
+    const state = readDesktopCapabilityState(path, NOW);
+    expect(state?.memory).toBe("old-content");
+    expect(state?.skills).toHaveLength(1);
   });
 });
 
@@ -194,6 +241,15 @@ describe("reader fails closed", () => {
     const dir = makeDir();
     const path = join(dir, DESKTOP_STATE_FILE);
     writeFileSync(path, stateOf({ writtenAt: NOW - MAX_DESKTOP_STATE_AGE_MS - 1 }));
+    expect(readDesktopCapabilityState(path, NOW)).toBeNull();
+  });
+
+  it("on a future timestamp, so a forged write time can never stay fresh forever", () => {
+    const dir = makeDir();
+    const path = join(dir, DESKTOP_STATE_FILE);
+    writeFileSync(path, stateOf({ writtenAt: NOW + 1 }));
+    expect(readDesktopCapabilityState(path, NOW)).toBeNull();
+    writeFileSync(path, stateOf({ writtenAt: NOW + 60 * 60_000 }));
     expect(readDesktopCapabilityState(path, NOW)).toBeNull();
   });
 

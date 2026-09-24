@@ -1694,12 +1694,25 @@ T19-C delivers desktop skills and project memory through the same trusted gate
 - **Run-scoped state**: the supervisor points the child's
   `OMP_DESKTOP_STATE` at `<runRoot>/desktop-state.json` (decided at start,
   so neither a static argument nor `extraEnv` can redirect it). The bridge
-  rewrites the state before every prompt — alias-safe exclusive create, mode
-  0600, bounded, credential-free, removed with the run root — so edits,
-  removals, scope changes and unloads are visible on the very next prompt.
+  rewrites the state before every prompt with an atomic replacement (unique
+  same-directory temporary file, exclusive create, mode 0600, renamed over
+  the final path — a planted symlink or hard link is swapped as an entry,
+  never followed, and a failed write preserves the previous file with no
+  stranded temporary file) — bounded, credential-free, removed with the run
+  root — so edits, removals, scope changes and unloads are visible on the
+  very next prompt. After the write, the bridge re-reads the on-disk file
+  with the same `readDesktopCapabilityState` contract the gate uses and
+  confirms the owning session, deciding tool presence from the validated
+  state only. A failed snapshot or write, or a failed self-validation, first
+  installs an empty tombstone so the previous turn's state can never reach
+  the gate; if even the tombstone cannot be written, the prompt is refused
+  before submission. Failure logs carry only a presence-only classification
+  (`Error` instance or not, code-shaped property present or not) — never
+  error text, error property values, stacks or state content.
 - **Gate injection**: a `before_agent_start` handler validates the state
-  (regular file, size, schema, freshness ≤ 10 min, owning-session match) and
-  returns `{ systemPrompt: [...event.systemPrompt, block] }` — an append that
+  (regular file, size, schema, freshness ≤ 10 min, rejected future write
+  times, owning-session match) and returns
+  `{ systemPrompt: [...event.systemPrompt, block] }` — an append that
   never replaces the native prompt, rules, context files or the native
   `<skills>`/`skill://` catalog. The block is the exact Pi
   `pluginSkillsPrompt` + `projectMemoryPrompt` text. Any failed read or
@@ -1710,17 +1723,23 @@ T19-C delivers desktop skills and project memory through the same trusted gate
   (exact Pi description and `{ id }` schema, `loadMode: "essential"`) only
   when the desktop catalog is non-empty — the Pi registration gate. The
   adapter serves it with the exact Pi precedence and error shape: builtin →
-  user (scope re-checked at execution) → plugin (load state and size
-  re-checked), bodies read live; success renders
-  `# Skill: <name> (<id>)\n\n<body>`, failure
+  user, whose body is re-checked against the project scope at every call
+  (Pi `loadUserSkillBody` throws when the skill is no longer active) →
+  plugin, read with Pi `loadSkillBody`'s checks only (registered, plugin
+  loaded, file readable, ≤128 KiB, non-empty body) — Pi performs no scope
+  predicate on the plugin body path and neither does this adapter; a plugin
+  scope change lands on the next prompt's catalog rebuild. Bodies are read
+  live, so an unload, delete or edit takes effect immediately; success
+  renders `# Skill: <name> (<id>)\n\n<body>`, failure
   `Skill: <message>. Available skills: <ids>.` as an `isError` result. The
   read-only load raises no approval.
 - **Fail-closed decision**: a host read failure follows Pi's best-effort
   memory behavior (no memory block; a failed `skills.active` drops only the
-  user skills); a missing, malformed, oversized or stale state injects
-  nothing. A failed snapshot or state write also withdraws the `Skill` tool
-  for that turn — the model is never handed a skill loader without its
-  catalog.
+  user skills); a missing, malformed, oversized, stale or future-dated state
+  injects nothing. A failed snapshot or state write invalidates the previous
+  state with an empty tombstone (withdrawing the `Skill` tool too), and a
+  tombstone that cannot be written fails the prompt before submission — a
+  stale catalog or memory can never reach a provider request.
 - **User path**: Settings, the project-memory editor, skill management,
   plugin enable/scope controls and the composer slash-skill path already
   write through the stores this loader reads; `/skill-id` routes to the

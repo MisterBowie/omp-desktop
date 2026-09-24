@@ -15,10 +15,12 @@
  *   - **run-scoped**: `<runRoot>/desktop-state.json`, addressed by the
  *     `OMP_DESKTOP_STATE` environment variable the supervisor sets at spawn;
  *     the supervisor's owned cleanup removes it with the run root;
- *   - **owned and 0600**: the writer removes whatever entry occupies the
- *     path first (`rmSync` acts on the entry itself, never following a
- *     planted symlink or hard link) and creates the file exclusively (`wx`,
- *     mode 0600) — the same ownership model as the T19-A config overlay;
+ *   - **owned, 0600 and atomically replaced**: the writer lands the content
+ *     in a unique same-directory temporary file (exclusive create, mode
+ *     0600) and renames it over the final path — no window where the path is
+ *     missing or half-written, and a planted symlink or hard link at the
+ *     final path is replaced as an entry, never followed or rewritten through
+ *     its other name;
  *   - **bounded**: a size ceiling, per-field length ceilings, a skill-count
  *     ceiling and a freshness window; a state file that violates any of them
  *     is treated as absent (fail closed — no injection, the native prompt is
@@ -27,7 +29,9 @@
  *     metadata and memory text may enter it.
  */
 import type { Stats } from "node:fs";
-import { lstatSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { lstatSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { basename, dirname, join } from "node:path";
 
 /** File name of the run-scoped desktop-capability state inside each run root. */
 export const DESKTOP_STATE_FILE = "desktop-state.json";
@@ -130,6 +134,12 @@ export function readDesktopCapabilityState(
     return null;
   }
   if (typeof state.writtenAt !== "number" || !Number.isFinite(state.writtenAt)) return null;
+  // A future write time cannot come from a live refresh (the bridge writes
+  // with the same machine clock the gate reads), so it is rejected outright
+  // instead of being treated as fresh forever. No skew allowance: the
+  // write-to-read gap is milliseconds, and a rare backward clock step costs
+  // one turn's injection — fail closed, never stale.
+  if (state.writtenAt > now) return null;
   if (now - state.writtenAt > MAX_DESKTOP_STATE_AGE_MS) return null;
   if (state.memory !== null && (typeof state.memory !== "string" || state.memory.length > MAX_MEMORY_CHARS)) {
     return null;
@@ -226,13 +236,30 @@ export function serializeDesktopCapabilityState(
 }
 
 /**
- * Write one state file at an owned path, with the same alias-safety as the
- * T19-A overlay writer: remove whatever entry occupies the path (never
- * following a planted symlink or hard link), then create exclusively with
- * mode 0600. A concurrent re-plant fails the create with EEXIST instead of
- * writing through an alias.
+ * Atomically replace the state file at `path`.
+ *
+ * The write never leaves a window where the final path is missing or
+ * half-written: the content lands in a unique temporary file in the same
+ * directory (exclusive `wx` create, mode 0600 — the unique name means a
+ * planted alias at the temporary path can only fail the create, never
+ * redirect it), and a `rename` over the final path then swaps it in
+ * atomically (the same pattern `npm-preferences.ts` uses). The rename
+ * replaces whatever entry occupies the final path as an entry: a planted
+ * symlink or hard link is never followed and its target or other name is
+ * never rewritten. A failure — an unwritable directory, a planted directory
+ * at the final path, an interrupted write — throws, leaves the previous file
+ * (if any) intact, and never strands the temporary file.
  */
 export function writeDesktopCapabilityState(path: string, content: string): void {
-  rmSync(path, { recursive: true, force: true });
-  writeFileSync(path, content, { encoding: "utf8", flag: "wx", mode: 0o600 });
+  const temporary = join(dirname(path), `.${basename(path)}.${randomUUID()}.tmp`);
+  try {
+    writeFileSync(temporary, content, { encoding: "utf8", flag: "wx", mode: 0o600 });
+    renameSync(temporary, path);
+  } finally {
+    try {
+      rmSync(temporary, { force: true });
+    } catch {
+      // Best-effort: a failed cleanup must not mask the write's own outcome.
+    }
+  }
 }

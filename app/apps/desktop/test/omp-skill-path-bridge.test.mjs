@@ -175,7 +175,7 @@ function skillBridgeHarness({ skills = [], memory, perSession = {} } = {}) {
     emitAgentEvent: () => undefined,
     logger: {
       app: (scope, level, message, fields) => {
-        if (level === "warn") warnings.push({ scope, message });
+        if (level === "warn" || level === "error") warnings.push({ scope, level, message, fields });
       },
     },
     gateResolver: () => "/repo/app/packages/omp-runtime/extensions/omp-desktop-gate.ts",
@@ -275,35 +275,175 @@ test("memory and skill edits reach the rewritten state on the next prompt", asyn
   assert.ok(!rewritten.includes("first notes"), "the old memory must not linger in the state");
 });
 
-test("a state write failure degrades consistently: no injection surface, prompt proceeds", async () => {
+test("a state write failure fails the prompt closed when no tombstone can be written", async () => {
   const project = makeProject();
   const harness = skillBridgeHarness({
     skills: [{ id: "demo.hello/release-notes", name: "Release notes", description: "" }],
   });
   const { bridge, warnings } = harness;
-  // Make the run root unwritable after the bridge builds it: the state writer's
-  // exclusive create fails and the bridge must not register the Skill tool.
-  // The bridge writes before the prompt, so the directory must be unwritable
-  // before the first prompt — plant the failure by wrapping the first prompt
-  // with a chmod performed from a mutated harness: the run root is created
-  // lazily, so pre-seed it.
+  // Make the run root unwritable after the bridge builds it: the state
+  // writer's exclusive create fails, and with no way to make a stale state
+  // invisible the prompt must fail before reaching the runtime — the gate
+  // would otherwise read whatever previous state the run root still held.
   const runRoot = mkdtempSync(join(tmpdir(), "omp-skill-bridge-runroot-"));
   scratch.push(runRoot);
   harness.runRootsBySession.set("session-omp", runRoot);
   chmodSync(runRoot, 0o500);
   try {
-    await bridge.prompt({ sessionId: "session-omp", content: "hello", projectPath: project });
-    const runtime = harness.runtime;
-    const registrations = runtime.commands.filter((command) => command.type === "set_host_tools");
-    assert.equal(registrations.length, 1);
-    assert.ok(
-      !registrations[0].tools.some((tool) => tool.name === "Skill"),
-      "a failed state write must not register the Skill tool",
+    await assert.rejects(
+      () => bridge.prompt({ sessionId: "session-omp", content: "hello", projectPath: project }),
+      (error) => /capability state|stale state|state could not/i.test(String(error?.message ?? error)),
     );
-    assert.ok(runtime.commands.some((command) => command.type === "prompt"), "the prompt must still run");
+    const runtime = harness.runtime;
+    assert.equal(
+      runtime.commands.some((command) => command.type === "prompt"),
+      false,
+      "no prompt may reach the runtime while a stale state could still be read",
+    );
+    assert.equal(
+      runtime.commands.some((command) => command.type === "set_host_tools"),
+      false,
+      "no host tools may be registered either: the prompt failed before submission",
+    );
     assert.ok(warnings.length >= 1, "the failure must be logged");
   } finally {
     chmodSync(runRoot, 0o700);
+  }
+});
+
+test("a snapshot failure after a successful turn installs an empty tombstone, never the stale state", async () => {
+  const project = makeProject();
+  const harness = skillBridgeHarness({
+    skills: [{ id: "demo.hello/release-notes", name: "Release notes", description: "Draft release notes." }],
+    memory: "first-turn memory",
+  });
+  const { bridge, warnings } = harness;
+  await bridge.prompt({ sessionId: "session-omp", content: "hello", projectPath: project });
+  const runtime = harness.runtime;
+  const { path } = stateFileOf(harness, "session-omp");
+  const first = JSON.parse(readFileSync(path, "utf8"));
+  assert.equal(first.memory, "first-turn memory");
+  assert.deepEqual(first.skills, [{ id: "demo.hello/release-notes", name: "Release notes", description: "Draft release notes." }]);
+
+  // The second turn's snapshot fails. The previous state must not survive:
+  // the bridge installs an empty tombstone so the gate can only read "no
+  // catalog, no memory" — never the first turn's content.
+  runtime.push({ type: "agent_end", messages: [] });
+  await new Promise((resolve) => setImmediate(resolve));
+  harness.capabilities.snapshot = async () => {
+    throw new Error("host unavailable during the second snapshot");
+  };
+  const second = await bridge.prompt({ sessionId: "session-omp", content: "again", projectPath: project });
+  assert.equal(second.accepted, true, "a snapshot failure keeps the PI best-effort prompt experience");
+
+  const after = JSON.parse(readFileSync(path, "utf8"));
+  assert.equal(after.sessionId, "native-id", "the tombstone must still name the owning session");
+  assert.deepEqual(after.skills, [], "the stale catalog must be gone");
+  assert.equal(after.memory, null, "the stale memory must be gone");
+  assert.ok(!readFileSync(path, "utf8").includes("first-turn memory"), "no stale memory text may remain");
+
+  const registrations = runtime.commands.filter((command) => command.type === "set_host_tools");
+  const lastRegistration = registrations[registrations.length - 1];
+  assert.ok(
+    !lastRegistration.tools.some((tool) => tool.name === "Skill"),
+    "the Skill tool must be withdrawn with the invalidated catalog",
+  );
+  assert.ok(warnings.some((entry) => /snapshot failed/i.test(entry.message)), "the snapshot failure must be logged");
+});
+
+test("when the stale state cannot be invalidated, the prompt fails before submission", async () => {
+  const project = makeProject();
+  const harness = skillBridgeHarness({
+    skills: [{ id: "demo.hello/release-notes", name: "Release notes", description: "" }],
+    memory: "first-turn memory",
+  });
+  const { bridge } = harness;
+  await bridge.prompt({ sessionId: "session-omp", content: "hello", projectPath: project });
+  const runtime = harness.runtime;
+  const { path, runRoot } = stateFileOf(harness, "session-omp");
+  assert.ok(readFileSync(path, "utf8").includes("first-turn memory"), "the first turn must have written state");
+
+  // The second snapshot fails AND the run root is unwritable, so the
+  // tombstone cannot replace the stale file: the prompt must be refused
+  // before the runtime can read the old state.
+  runtime.push({ type: "agent_end", messages: [] });
+  await new Promise((resolve) => setImmediate(resolve));
+  harness.capabilities.snapshot = async () => {
+    throw new Error("host unavailable");
+  };
+  chmodSync(runRoot, 0o500);
+  try {
+    await assert.rejects(
+      () => bridge.prompt({ sessionId: "session-omp", content: "again", projectPath: project }),
+      (error) => /stale state|could not be invalidated|refusing to prompt/i.test(String(error?.message ?? error)),
+    );
+    const prompts = runtime.commands.filter((command) => command.type === "prompt");
+    assert.equal(prompts.length, 1, "only the first turn's prompt may have reached the runtime");
+  } finally {
+    chmodSync(runRoot, 0o700);
+  }
+});
+
+test("a fresh state the gate would reject never decides the Skill tool", async () => {
+  const project = makeProject();
+  // A non-empty snapshot whose content the gate contract rejects (an empty
+  // skill id): writing it succeeds, but the gate would read null and inject
+  // no catalog. The bridge must re-validate the on-disk state with the same
+  // contract before deciding tool presence — never from the raw snapshot.
+  const harness = skillBridgeHarness({
+    skills: [{ id: "", name: "Gate rejects empty ids", description: "" }],
+  });
+  const { bridge } = harness;
+  const second = await bridge.prompt({ sessionId: "session-omp", content: "hello", projectPath: project });
+  assert.equal(second.accepted, true, "the prompt keeps the PI best-effort experience");
+
+  const runtime = harness.runtime;
+  const registrations = runtime.commands.filter((command) => command.type === "set_host_tools");
+  assert.equal(registrations.length, 1);
+  assert.ok(
+    !registrations[0].tools.some((tool) => tool.name === "Skill"),
+    "a catalog the gate would reject must not register the Skill tool",
+  );
+  // The rejected state is invalidated like any other failed refresh: the
+  // on-disk file is the empty tombstone, never the gate-rejected content.
+  const { path } = stateFileOf(harness, "session-omp");
+  const state = JSON.parse(readFileSync(path, "utf8"));
+  assert.deepEqual(state.skills, []);
+  assert.equal(state.memory, null);
+});
+
+test("capability failure logs carry no error text, only a stable classification", async () => {
+  const project = makeProject();
+  const harness = skillBridgeHarness({ skills: [], memory: "first notes" });
+  const { bridge, warnings } = harness;
+  await bridge.prompt({ sessionId: "session-omp", content: "hello", projectPath: project });
+  const runtime = harness.runtime;
+
+  // Every channel an exception exposes — message, name, code, errorCode —
+  // carries a distinct secret sentinel: none of them may reach a log line.
+  const sentinels = ["MSG-CANARY", "NAME-CANARY", "CODE-CANARY", "ERRCODE-CANARY"].map(
+    (part) => `${part}-${process.pid}`,
+  );
+  harness.capabilities.snapshot = async () => {
+    throw Object.assign(new Error(sentinels[0]), {
+      name: sentinels[1],
+      code: sentinels[2],
+      errorCode: sentinels[3],
+    });
+  };
+  runtime.push({ type: "agent_end", messages: [] });
+  await new Promise((resolve) => setImmediate(resolve));
+  const second = await bridge.prompt({ sessionId: "session-omp", content: "again", projectPath: project });
+  assert.equal(second.accepted, true);
+
+  const warning = warnings.find((entry) => /snapshot failed/i.test(entry.message));
+  assert.ok(warning, "the snapshot failure must be logged");
+  const serialized = JSON.stringify(warning.fields ?? {});
+  for (const sentinel of sentinels) {
+    assert.ok(
+      !serialized.includes(sentinel),
+      `log fields must never carry the error's ${sentinel.split("-")[0]} text`,
+    );
   }
 });
 

@@ -112,6 +112,19 @@ describe("before_agent_start injection", () => {
     expect(beforeAgentStartInjection({ systemPrompt: [...BASE_PROMPT] }, context(), path, NOW)).toBeUndefined();
   });
 
+  it("injects nothing for a state written in the future", () => {
+    const dir = stateDir();
+    const path = join(dir, DESKTOP_STATE_FILE);
+    writeFileSync(
+      path,
+      serializeDesktopCapabilityState(
+        { sessionId: OWNING_SESSION, skills: [{ id: "a", name: "A", description: "" }], memory: "m" },
+        NOW + 60_000,
+      ),
+    );
+    expect(beforeAgentStartInjection({ systemPrompt: [...BASE_PROMPT] }, context(), path, NOW)).toBeUndefined();
+  });
+
   it("returns no override when the state carries neither skills nor memory", () => {
     const dir = stateDir();
     const path = join(dir, DESKTOP_STATE_FILE);

@@ -2,9 +2,15 @@
  * T19-C probes: the on-demand Skill user path on the desktop adapter.
  *
  * The adapter must serve the PI `Skill` contract with the exact PI precedence
- * and error shape — builtin first, then the user's own (scope re-checked at
- * execution), then the plugin's — reading the body live so an unload, disable,
- * rescope, delete or edit takes effect without a restart.
+ * and error shape — builtin first, then the user's own, then the plugin's.
+ * The live-recheck boundaries are PI's own, not tighter: a user skill body is
+ * re-checked against the project scope at every call (PI `loadUserSkillBody`
+ * throws when the skill is no longer active); a plugin skill body is read
+ * with PI `loadSkillBody`'s checks only — registered, plugin loaded, file
+ * readable, ≤128 KiB, non-empty body — with no execution-time scope predicate
+ * (PI `sidecar.ts` calls `plugins.loadSkillBody(id)` directly). Plugin scope
+ * changes land on the next prompt's catalog rebuild instead. An unload,
+ * delete or edit therefore takes effect at the very next call.
  *
  * On the T19-C baseline (`df49b84`) the adapter has no Skill branch: a `Skill`
  * call falls into the plugin-tool branch and fails with
@@ -109,7 +115,8 @@ test("user skills answer after builtins and re-check scope at execution", async 
     { type: "text", text: "# Skill: User skill (user-skill)\n\nUSER-BODY" },
   ]);
 
-  // A rescope between catalog and execution fails closed with the PI error.
+  // A user skill rescoped between catalog and execution fails closed with the
+  // PI error (PI `loadUserSkillBody` re-checks the scope at the call).
   const rescoped = harness({
     userThrows: new Error('skill "user-skill" is not enabled for this project'),
     userSkills: [{ id: "user-skill" }],
@@ -168,6 +175,24 @@ test("a plugin unloaded between catalog and execution fails closed", async () =>
   // non-empty; an unloaded plugin with no other skills yields the bare
   // message.
   assert.match(outcome.content[0].text, /^Skill: unknown skill: demo\.hello\/release-notes\.$/);
+});
+
+test("plugin skill bodies load without a scope re-check, exactly like Pi", async () => {
+  // PI's sidecar calls plugins.loadSkillBody(id) with no scope predicate
+  // (`sidecar.ts`: builtin -> loadUserSkillBody -> plugins.loadSkillBody);
+  // scope filters the catalog and the error hint, not the body read. The
+  // harness's pluginActiveInProject rejects scoped.away, so this pins that
+  // the OMP adapter does not add an incompatible execution-time gate.
+  const { executor } = harness({
+    pluginSkills: [
+      { id: "scoped.away/notes", pluginId: "scoped.away", name: "Scoped away", body: "SCOPED-BODY" },
+    ],
+  });
+  const outcome = await executor.execute(skillCall({ id: "scoped.away/notes" }), skillRun(), SIGNAL);
+  assert.equal(outcome.isError, undefined);
+  assert.deepEqual(outcome.content, [
+    { type: "text", text: "# Skill: Scoped away (scoped.away/notes)\n\nSCOPED-BODY" },
+  ]);
 });
 
 test("body edits are read live: the next call sees the new document", async () => {

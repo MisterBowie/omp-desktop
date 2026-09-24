@@ -65,7 +65,7 @@ dispatched through host-core `plugins.execute`).
 | OMP-native task/LSP/debug/edit tools | OMP | native | T17/T18/T19-A |
 | Desktop MCP and plugin MCP | desktop host | once, through host-tool RPC | T19-B |
 | Desktop plugin Agent Tools | desktop plugin runtime | once, through host-tool RPC | T19-B |
-| Desktop user/plugin/builtin skills | desktop host | on demand, scope-revalidated | T19-C |
+| Desktop user/plugin/builtin skills | desktop host | on demand: user body scope-rechecked at the call, plugin body live-read (loaded/file/size), catalog scope refreshed per prompt | T19-C |
 | Desktop project memory | host-core | trusted gate, `projectMemoryPrompt()` semantics | T19-C |
 | Plugin UI, themes, independent services | desktop | desktop | unchanged |
 | PI agent extensions | incompatible | must not be injected into OMP | now |
@@ -244,15 +244,30 @@ one path per capability, with the PI-Desktop semantics and fallbacks:
   `<runRoot>/desktop-state.json` to `OmpRunPaths` and points the child's
   `OMP_DESKTOP_STATE` at it — decided at start time, after the env is built,
   so neither a static constructor argument nor an embedder's `extraEnv` can
-  redirect it. The bridge rewrites it before every prompt (alias-safe
-  removal + exclusive create, mode 0600, the T19-A overlay ownership model;
-  bounded, credential-free, removed with the run root). A failed snapshot or
-  write fails closed for injection and also withdraws the `Skill` tool for
+  redirect it. The bridge rewrites it before every prompt with an atomic
+  replacement (unique same-directory temporary file, exclusive create, mode
+  0600, renamed over the final path — a planted symlink or hard link is
+  replaced as an entry, never followed, and a failure leaves the previous
+  file intact with no stranded temporary file; bounded, credential-free,
+  removed with the run root). After the write, the bridge re-reads the
+  on-disk file with the same `readDesktopCapabilityState` contract the gate
+  uses and confirms it belongs to the owning native session — tool presence
+  is decided from the validated state, never from the raw snapshot, so a
+  loader-produced catalog the gate would reject can never register the
+  `Skill` tool. A failed snapshot or write, or a failed self-validation,
+  first installs an empty tombstone so the previous turn's state can never
+  reach the gate; if even the tombstone cannot be written, the prompt is
+  refused before submission. Either way the `Skill` tool is withdrawn for
   that turn — the model is never handed a skill loader without its catalog.
+  Failure logs carry only a presence-only classification (whether the thrown
+  value is an `Error` instance and whether a code-shaped property exists);
+  error text, stacks, error property values and state content never enter a
+  log line.
 - **Gate injection**: the gate registers a `before_agent_start` handler that
   reads and validates the state (regular file, size, schema, freshness
-  ≤ 10 min, owning-session match — subagent sessions get nothing, matching
-  Pi, whose delegates never receive project memory) and returns
+  ≤ 10 min and a rejected future write time, owning-session match — subagent
+  sessions get nothing, matching Pi, whose delegates never receive project
+  memory) and returns
   `{ systemPrompt: [...event.systemPrompt, block] }` — an append; the
   native prompt, rules, context files and the native `<skills>`/`skill://`
   catalog are never replaced or dropped (the pinned runtime's own test
@@ -267,19 +282,28 @@ one path per capability, with the PI-Desktop semantics and fallbacks:
   (`loadMode: "essential"`, the Pi runtime's verbatim description and
   `{ id }` schema) only when the desktop catalog is non-empty — the Pi
   registration gate. The adapter serves it with the exact Pi precedence and
-  error shape: builtin → user (scope re-checked at execution) → plugin
-  (load state and size re-checked by the plugin runtime), bodies read live
-  so an unload, disable, rescope, delete or edit takes effect without a
-  restart; success renders `# Skill: <name> (<id>)\n\n<body>`, failure
-  `Skill: <message>. Available skills: <ids>.` as an `isError` result. The
-  name is neither a `plugin_*`/`mcp_*` name nor a native OMP tool, so the
-  gate does not ask approval for the read-only load (Pi-consistent) and the
-  runtime accepts the registration (no collision).
+  error shape: builtin → user, whose body is re-checked against the project
+  scope at every call (Pi `loadUserSkillBody` throws when the skill is no
+  longer active) → plugin, read with Pi `loadSkillBody`'s checks only
+  (registered, plugin loaded, file readable, ≤128 KiB, non-empty body) —
+  Pi performs no scope predicate on the plugin body path and neither does
+  this adapter; a plugin scope change lands on the next prompt's catalog
+  rebuild. Bodies are read live, so an unload, delete or edit takes effect
+  without a restart; success renders `# Skill: <name> (<id>)\n\n<body>`,
+  failure `Skill: <message>. Available skills: <ids>.` as an `isError`
+  result. The name is neither a `plugin_*`/`mcp_*` name nor a native OMP
+  tool, so the gate does not ask approval for the read-only load
+  (Pi-consistent) and the runtime accepts the registration (no collision).
 - **Fail-closed decision**: a host read failure follows Pi's best-effort
   memory behavior (no memory block; a failed `skills.active` drops only the
   user skills); an inconsistent catalog — a state file that is missing,
-  malformed, oversized, stale or foreign at the gate — injects nothing, and
-  the turn proceeds with the native prompt. Tests cover both sides.
+  malformed, oversized, stale, future-dated or foreign at the gate —
+  injects nothing, and the turn proceeds with the native prompt. A failed
+  snapshot or state write is different: the previous state is invalidated
+  with an empty tombstone first, and if the tombstone itself cannot be
+  written the prompt is refused before it reaches the runtime — stale
+  catalog or memory can never reach a provider request. Tests cover all
+  three sides.
 - **User path**: Settings, the project-memory editor, skill management,
   plugin enable/scope controls and the composer slash-skill path already
   write through the desktop-owned stores this loader reads; an OMP session
@@ -310,8 +334,11 @@ Evidence: `docs/validation/M5-capability-user-paths.md`.
 - Desktop host tools are approved through the same gate as native tools; the
   declared-risk limitation (§4) is recorded, not hidden.
 - The desktop-capability state file rides the same owned-cleanup model as the
-  overlay: 0600, alias-safe writes, removed with the run root; a malformed or
-  stale state injects nothing and never touches the approval gate.
+  overlay: 0600, atomically replaced (a planted alias at the final path is
+  swapped as an entry, never followed), removed with the run root; a
+  malformed, stale or future-dated state injects nothing, a failed refresh
+  installs an empty tombstone or fails the prompt, and none of it ever
+  touches the approval gate.
 - Desktop skill catalog lines and project memory enter the prompt only
   through `before_agent_start` `systemPrompt` appends — never as transcript
   messages — so no provider request duplicates them into history.

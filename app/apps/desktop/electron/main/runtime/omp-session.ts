@@ -48,6 +48,7 @@ import {
   OmpRuntimeError,
   descriptorRisk,
   findGateExtension,
+  readDesktopCapabilityState,
   serializeDesktopCapabilityState,
   writeDesktopCapabilityState,
   type OmpConversionDiagnostics,
@@ -489,6 +490,25 @@ function compareVersions(a: string, b: string): number {
     if (left !== right) return left > right ? 1 : -1;
   }
   return 0;
+}
+
+/**
+ * The stable, presence-only classification of a capability error for logs.
+ *
+ * Error text, stacks and any state content a caller may have spliced into a
+ * message or error property (provider keys, memory or skill text) must never
+ * enter a log line: an exception's `name`/`code`/`errorCode` are caller-
+ * supplied strings too. Only booleans derived from the object's shape are
+ * recorded — `kind` for whether the thrown value is an `Error` instance, and
+ * `hasCode` for whether a code-shaped property merely exists — so the three
+ * failure sites share one redaction boundary instead of three ad-hoc ones.
+ */
+function capabilityErrorFields(error: unknown): { kind: "error" | "non-error"; hasCode: boolean } {
+  const candidate = error as { code?: unknown; errorCode?: unknown } | null;
+  const hasCode =
+    (typeof candidate?.code === "string" && candidate.code.length > 0) ||
+    (typeof candidate?.errorCode === "string" && candidate.errorCode.length > 0);
+  return { kind: error instanceof Error ? "error" : "non-error", hasCode };
 }
 
 /**
@@ -1164,10 +1184,16 @@ class SessionEntry {
    *
    * The snapshot is read once per prompt from the single loader and written
    * atomically (alias-safe, 0600) into the run root. A failed read or write
-   * fails closed for injection — the gate injects nothing — and reports
-   * `skillsPresent: false` so the `Skill` tool is not registered either: the
-   * model must never be handed a skill tool without its catalog. The native
-   * prompt and the approval gate are untouched by any failure here.
+   * must never let the previous turn's state reach the gate — the gate
+   * accepts files up to 10 minutes old, so a silent skip would inject a
+   * stale catalog and stale memory. The failure path therefore installs an
+   * empty tombstone in place of any previous state; if even that cannot be
+   * written, the prompt is refused before submission (the runtime must never
+   * read a stale file). With the state provably invisible, the turn proceeds
+   * with the native prompt — the PI best-effort experience — and reports
+   * `skillsPresent: false` so the `Skill` tool is withdrawn too: the model
+   * is never handed a skill loader without its catalog. The native prompt
+   * and the approval gate are untouched by any failure here.
    */
   private async refreshDesktopState(): Promise<{ skillsPresent: boolean }> {
     if (!this.capabilities) return { skillsPresent: false };
@@ -1176,13 +1202,15 @@ class SessionEntry {
       snapshot = await this.capabilities.snapshot(this.projectDirectory);
     } catch (error) {
       this.logger?.app("omp", "warn", "desktop capability snapshot failed", {
-        data: { sessionId: this.sessionId, error: String((error as Error)?.message ?? error) },
+        data: { sessionId: this.sessionId, error: capabilityErrorFields(error) },
       });
+      this.invalidateDesktopState();
       return { skillsPresent: false };
     }
     const runRoot = this.supervisor.runRoot();
     if (!runRoot || !this.nativeSessionId) {
-      // No owned run root means the gate has nothing to read either.
+      // No owned run root means the gate's path is gone with it: nothing to
+      // read, nothing to invalidate.
       return { skillsPresent: false };
     }
     const statePath = join(runRoot, DESKTOP_STATE_FILE);
@@ -1200,11 +1228,61 @@ class SessionEntry {
       );
     } catch (error) {
       this.logger?.app("omp", "warn", "desktop capability state write failed", {
-        data: { sessionId: this.sessionId, error: String((error as Error)?.message ?? error) },
+        data: { sessionId: this.sessionId, error: capabilityErrorFields(error) },
       });
+      this.invalidateDesktopState();
       return { skillsPresent: false };
     }
-    return { skillsPresent: snapshot.skills.length > 0 };
+    // A successful write does not decide tool presence: the gate accepts
+    // exactly what `readDesktopCapabilityState` accepts, and a loader bug or
+    // an out-of-bounds catalog line could produce a file that contract
+    // rejects. Re-validate the on-disk state with the very same contract (no
+    // second, driftable rule set) and confirm it belongs to this native
+    // session; otherwise the refresh follows the same tombstone path as a
+    // failed snapshot — a gate-invisible catalog must never register the
+    // Skill tool.
+    const verified = readDesktopCapabilityState(statePath, this.now());
+    if (!verified || verified.sessionId !== this.nativeSessionId) {
+      this.logger?.app("omp", "warn", "desktop capability state failed self-validation", {
+        data: { sessionId: this.sessionId },
+      });
+      this.invalidateDesktopState();
+      return { skillsPresent: false };
+    }
+    return { skillsPresent: verified.skills.length > 0 };
+  }
+
+  /**
+   * Make any previously written state invisible before the prompt is
+   * submitted: an empty tombstone (no skills, no memory) atomically replaces
+   * the stale file, so the gate can only read "nothing to inject". If even
+   * the tombstone cannot be written, the prompt must not reach the runtime —
+   * the gate would otherwise read the previous turn's catalog and memory —
+   * so the failure is raised instead of swallowed. Logs carry only stable
+   * error classification, never error text, stack or state content.
+   */
+  private invalidateDesktopState(): void {
+    const runRoot = this.supervisor.runRoot();
+    if (!runRoot || !this.nativeSessionId) return;
+    try {
+      writeDesktopCapabilityState(
+        join(runRoot, DESKTOP_STATE_FILE),
+        serializeDesktopCapabilityState(
+          { sessionId: this.nativeSessionId, skills: [], memory: null },
+          this.now(),
+        ),
+      );
+    } catch (error) {
+      this.logger?.app("omp", "error", "desktop capability state could not be invalidated", {
+        data: { sessionId: this.sessionId, error: capabilityErrorFields(error) },
+      });
+      throw Object.assign(
+        new Error(
+          "the desktop capability state could not be refreshed and the previous state could not be invalidated; refusing to prompt with stale state",
+        ),
+        { errorCode: "OMP_CAPABILITY_STATE_FAILED" },
+      );
+    }
   }
 
   /**

@@ -656,9 +656,10 @@ test(
     assert.ok(runRoot, "the supervisor must report its run root");
     const statePath = join(runRoot, DESKTOP_STATE_FILE);
     // Plant a symlink at the final state path pointing outside the run root:
-    // the per-prompt rewrite must remove the entry itself and never write
-    // through it. The first prompt's real state file is removed first so the
-    // alias occupies the exact path the next write targets.
+    // the per-prompt atomic replacement swaps the final entry itself and never
+    // follows the alias, so the target must stay untouched. The first prompt's
+    // real state file is removed first so the alias occupies the exact path
+    // the next replacement targets.
     const sentinel = join(dataRoot, "outside-sentinel.txt");
     writeFileSync(sentinel, "untouched\n");
     rmSync(statePath, { force: true });
