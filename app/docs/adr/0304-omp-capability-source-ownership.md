@@ -185,14 +185,15 @@ runtime's host-tool RPC, exactly once per session:
   synchronous dispatch point cover plugin load, activation scope, the user MCP
   server state and the live turn (`dispatchable` over the OMP runner — the Pi
   predicate is not used, OMP turns never enter the Pi turn registry).
-  Cancellation: the abort signal reaches plugin executions; MCP calls have no
-  call-level signal and the user-MCP runtime awaits a connection handshake
-  before the actual `tools/call` dispatch, so the guarantee is exactly: a
-  cancellation already observed before the MCP call path is entered refuses
-  it; once entered, connection or request may continue and only the cancelled
-  pending entry drops the late completion — remote side effects are never
-  claimed prevented or retracted (the fixed Pi client has the same
-  limitation).
+  Cancellation: the abort signal reaches child-backed plugin Agent Tools
+  (the plugin runtime's `sendToChild` aborts the child call); plugin-declared
+  MCP tools are registered with an execute closure that ignores `ctx.signal`
+  (`plugin-runtime.ts:3506-3519`) and MCP clients take no call-level signal,
+  so those share the MCP guarantee: a cancellation already observed before the
+  MCP call path is entered refuses it; once entered, connection or request may
+  continue and only the cancelled pending entry drops the late completion —
+  remote side effects are never claimed prevented or retracted (the fixed Pi
+  client has the same limitation).
 - **Execution context (limitation, T20)**: the adapter passes `mode: "agent"`
   to plugin tools. The Pi host passes the durable session mode and the plugin
   runtime enforces declared `planSafeActions` from `ctx.mode`

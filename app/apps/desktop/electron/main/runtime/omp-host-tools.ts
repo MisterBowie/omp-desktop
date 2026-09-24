@@ -47,17 +47,17 @@
  *     1 MiB line limit, and JSON escaping expands raw text (quotes,
  *     backslashes, control characters), so every truncation is measured on
  *     the final serialized JSON bytes — never on the raw text.
- *   - Cancellation boundary: plugin agent tools receive the abort signal
- *     (`RegisteredPluginTool.execute` ctx.signal → the plugin runtime's
- *     `sendToChild` aborts the child call, `plugin-runtime.ts`). The MCP
- *     client exposes no call-level signal (`McpServerClient.callTool(name,
- *     args)`), and `UserMcpRuntime.callTool` awaits a connection handshake
- *     before the actual `tools/call` dispatch, so the guarantee is exactly: a
- *     cancellation already observed before the MCP call path is entered
- *     refuses it; once the path is entered, connection or request may
- *     continue and only the cancelled pending entry drops the late completion
- *     — remote side effects are never claimed prevented or retracted (the
- *     fixed Pi client has the same limitation).
+ *   - Cancellation boundary: child-backed plugin Agent Tools receive the abort
+ *     signal (`RegisteredPluginTool.execute` ctx.signal → the plugin runtime's
+ *     `sendToChild` aborts the child call, `plugin-runtime.ts:2200-2222`).
+ *     Plugin-declared MCP tools are registered with an execute closure that
+ *     ignores `ctx.signal` (`plugin-runtime.ts:3506-3519`), and
+ *     `McpServerClient.callTool(name, args)` takes no signal, so those share
+ *     the MCP limitation below: a cancellation already observed before the
+ *     call path is entered refuses it; once the path is entered, connection
+ *     or request may continue and only the cancelled pending entry drops the
+ *     late completion — remote side effects are never claimed prevented or
+ *     retracted (the fixed Pi client has the same limitation).
  */
 import {
   boundHostToolContent,

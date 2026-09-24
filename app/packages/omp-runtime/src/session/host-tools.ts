@@ -33,15 +33,16 @@
  *     late cancel are all counted and dropped;
  *   - cancellation settles the entry before the abort signal fires, so a
  *     completion that races the cancel can never write a result afterwards.
- *     The abort signal reaches plugin executions (which honour it); an MCP
- *     call has no client-side abort (`McpServerClient.callTool` takes no
- *     signal) and the user-MCP runtime awaits a connection handshake before
- *     the actual `tools/call` dispatch, so the guarantee for MCP is exactly:
- *     a cancellation already observed before the call path is entered refuses
- *     it; once the path is entered, connection or request may continue and
- *     only the cancelled pending entry drops the late completion — remote
- *     side effects are never claimed prevented or retracted (the fixed Pi
- *     client has the same limitation);
+ *     The abort signal reaches child-backed plugin Agent Tool executions,
+ *     which honour it (the plugin runtime's `sendToChild` aborts the child
+ *     call); plugin-declared MCP tools are registered with an execute closure
+ *     that ignores `ctx.signal` (`plugin-runtime.ts:3506-3519`) and the MCP
+ *     client takes no call-level signal (`McpServerClient.callTool`), so
+ *     those share the MCP guarantee below: a cancellation already observed
+ *     before the call path is entered refuses it; once the path is entered,
+ *     connection or request may continue and only the cancelled pending entry
+ *     drops the late completion — remote side effects are never claimed
+ *     prevented or retracted (the fixed Pi client has the same limitation);
  *   - a call that arrives with no active run (or no wired executor) is answered
  *     `isError` rather than executed: the runtime is waiting on an answer, and
  *     dropping the frame would hang the turn until the bridge disconnects;
@@ -223,6 +224,15 @@ export function boundHostToolContent(blocks: OmpHostToolContentBlock[]): OmpHost
         return out;
       }
     }
+    // The block (or its truncated form) does not fit after `out`. Try the
+    // standalone marker after the kept prefix FIRST — that preserves the head
+    // exactly, whether the overflow came from a text or a non-text block.
+    if (fitsContent([...out, marker])) return [...out, marker];
+    // Even the marker does not fit: shorten the LAST kept text block so the
+    // marker fits after it (the head keeps as much of its content as the
+    // budget allows), and only a kept non-text block is dropped when no text
+    // remains to shorten. Terminating: the empty array plus a lone marker
+    // always fits.
     let prefix = out;
     for (;;) {
       const last = prefix[prefix.length - 1];

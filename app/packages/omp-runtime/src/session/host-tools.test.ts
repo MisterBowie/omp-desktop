@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import type { OmpFrame } from "../protocol.js";
 import {
+  boundHostToolContent,
   OmpHostToolCalls,
   type OmpHostToolExecutor,
   type OmpHostToolRun,
@@ -331,5 +332,19 @@ describe("host tool calls", () => {
 
     expect(calls.snapshot().malformed).toBe(2);
     expect(calls.snapshot().executed).toBe(0);
+  });
+
+  it("a non-text overflow keeps the head blocks verbatim plus a standalone marker", async () => {
+    // Two individually valid image blocks that together exceed the budget:
+    // the first must survive verbatim and only the second is replaced by the
+    // standalone marker — never dropped wholesale for the marker's sake.
+    const imageA = { type: "image", data: "a".repeat(400 * 1024), mimeType: "image/png" };
+    const imageB = { type: "image", data: "b".repeat(400 * 1024), mimeType: "image/png" };
+    const content = boundHostToolContent([imageA, imageB]);
+
+    expect(Buffer.byteLength(JSON.stringify(content), "utf8")).toBeLessThanOrEqual(768 * 1024);
+    expect(content[0]).toEqual(imageA);
+    expect(content[1]).toEqual({ type: "text", text: "\u2026" });
+    expect(content).toHaveLength(2);
   });
 });

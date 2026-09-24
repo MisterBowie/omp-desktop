@@ -42,7 +42,7 @@
 4. **turn 生命周期**：source of truth 在 runner 的 `closeRun(generation, reason)`——普通 `agent_end`=completed；stop 中的 `agent_end`/teardown=aborted（用户取消意图优先）；prompt/transport failure=error（含无 dialog 的 prompt RPC 失败）；dispose 活跃 turn=aborted。每 turn 恰一次（runner 单调 generation 守卫 + bridge entry 级全集，无 LRU）；bridge 转发给 `announceTurnEnded` 广播 `session:turnEnded`。converter 中途错误**不是** turn 终态。
 5. **结果保真**：两层 isError 区分——抛错与内层 `{content, isError:true}` 都映射为外层 `host_tool_result.isError`；text block 透传；MCP image block 与 OMP `ImageContent` 同形**保真透传**；audio/resource/embedded/structuredContent/未知键（含插件返回的 `details`/`providerMetadata`/`useless`——PI 契约是插件完整返回值对模型可见，故以 JSON 文本保留，**绝不**映射到 OMP 结果自身的这些字段）确定性文本化，不因旁有 text block 而静默丢失，裸 base64 不跨线。**预算**：所有 outcome 路径统一过共享的 `boundHostToolContent`（runtime 包），以最终 `JSON.stringify(candidateContent)` 的 UTF-8 字节判定（数组括号/逗号/块信封/引号/转义全计入，≤768 KiB），超限对首个放不下的 text 块做二分截断、标记计入同一块；后续放不下时优先缩短最后一个 text 块为独立标记让位、**保留结果头部**，只有确实无可缩短文本才丢不可表示块。同一函数是 `OmpHostToolCalls` 的**最终权威写入边界**——执行器抛出超大 message 的错误同样在此受限并保留外层 `isError: true`，任何路径都无法写出超过行限制的帧。
 6. **toast**：生产 adapter 执行后按 PI 顺序 drain + 逐条 emit，drain/emit 异常隔离并 warn，**绝不**把成功工具结果改写为失败。
-7. **MCP 取消边界**：客户端无调用级 signal，且 `UserMcpRuntime.callTool` 在真正派发 `tools/call` 前还要 await 连接握手——承诺严格为「进入 MCP 调用路径**之前**已观察到的取消会拒绝该调用（路径入口同步 gate）；一旦进入路径，连接或请求可能继续进行，只能取消本地 pending 并丢弃迟到完成」，**不声称阻止或撤回远端副作用**（固定 PI 客户端同此限制）；plugin Agent Tool 经 signal 真实中止。文档/测试均按此表述。
+7. **MCP 取消边界**：客户端无调用级 signal，且 `UserMcpRuntime.callTool` 在真正派发 `tools/call` 前还要 await 连接握手——承诺严格为「进入 MCP 调用路径**之前**已观察到的取消会拒绝该调用（路径入口同步 gate）；一旦进入路径，连接或请求可能继续进行，只能取消本地 pending 并丢弃迟到完成」，**不声称阻止或撤回远端副作用**（固定 PI 客户端同此限制）。**中止边界按固定源码细分**：child-backed plugin Agent Tool 经 `ctx.signal` 真实中止（`plugin-runtime.ts:2200-2222` `sendToChild` abort）；plugin-declared MCP 的注册闭包忽略 `ctx.signal`（`plugin-runtime.ts:3506-3519`），与 MCP 客户端同样没有调用级取消——只能丢弃迟到完成。文档/测试均按此表述。
 
 ## 3. 先红后绿
 
@@ -100,7 +100,7 @@
 
 - **风险保真**：pinned 协议无插件声明 risk 通道——`plugin_*` 一律 high（保守上界，低/中风险插件会得到更严格提示）、`mcp_*` 一律 medium；不声称与 PI 风险完全等价。
 - **description/name 归一化**：桌面原样转发；固定 OMP 的 `normalizeHostToolDefinitions` 在注册时 trim——该归一化是 OMP 的行为，桌面不重复实现、不伪造「注册原样」承诺。
-- **MCP 取消**：客户端无调用级 AbortSignal 且 `callTool` 前有连接握手 await；仅承诺「进入 MCP 调用路径前已观察到的取消会拒绝该调用；进入后连接/请求可能继续，只能丢弃迟到完成」，不声称阻止或撤回远端副作用。plugin Agent Tool 的 signal 中止是真实的。
+- **MCP 取消**：客户端无调用级 AbortSignal 且 `callTool` 前有连接握手 await；仅承诺「进入 MCP 调用路径前已观察到的取消会拒绝该调用；进入后连接/请求可能继续，只能丢弃迟到完成」，不声称阻止或撤回远端副作用。child-backed plugin Agent Tool 的 signal 中止真实；plugin-declared MCP 闭包忽略 `ctx.signal`（`plugin-runtime.ts:3506-3519`），同受无调用级取消限制。
 - **at-most-once 口径**：覆盖 owned generation 内的**执行**；generation 结束后帧无属主 run、fail closed 而非执行；fail-closed 拒绝本身不记忆，重放会被再次 fail-closed 应答（执行数恒为 0）。
 - **执行上下文（T20 前置）**：adapter 固定 `mode: "agent"`；`planSafeActions`（`plugin-runtime.ts:2505-2525`）在 OMP 路径因此惰性。T20 传播并执行真实 mode 之前不声称 Plan/Goal 或完整 PI 执行上下文兼容。
 - 子代理 `hasUI=false`：子代理会话中 host tool 会被网关以 no-UI 拒绝（既有 M1/T17 语义保持）。

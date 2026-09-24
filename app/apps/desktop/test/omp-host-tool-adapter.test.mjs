@@ -395,6 +395,36 @@ test("MCP image blocks pass through faithfully as OMP ImageContent", async () =>
   assert.deepEqual(outcome.content, [{ type: "image", data: "aGVsbG8=", mimeType: "image/png" }]);
 });
 
+test("an over-budget MCP image pair keeps the first image verbatim plus the marker", async () => {
+  const provider = createOmpHostToolAdapter({
+    plugins: { getTools: () => [] },
+    userMcp: {
+      toolsForProject: async () => [],
+      callTool: async () => ({
+        content: [
+          { type: "image", data: "a".repeat(400 * 1024), mimeType: "image/png" },
+          { type: "image", data: "b".repeat(400 * 1024), mimeType: "image/png" },
+        ],
+      }),
+    },
+    pluginActiveInProject: () => true,
+  });
+  const { execute } = provider.executor(binding());
+
+  const outcome = await execute(
+    { id: "h1", toolCallId: "tc1", toolName: "mcp_stub_ping", arguments: {} },
+    RUN,
+    SIGNAL(),
+  );
+  assert.ok(
+    Buffer.byteLength(JSON.stringify(outcome.content), "utf8") <= 768 * 1024,
+    "the serialized content must fit the budget",
+  );
+  assert.deepEqual(outcome.content[0], { type: "image", data: "a".repeat(400 * 1024), mimeType: "image/png" });
+  assert.equal(outcome.content[1].text, "\u2026");
+  assert.equal(outcome.content.length, 2);
+});
+
 test("non-text blocks and structuredContent are preserved as deterministic text beside text blocks", async () => {
   const provider = createOmpHostToolAdapter({
     plugins: { getTools: () => [] },
