@@ -936,3 +936,59 @@ test("a large mixed per-file result respects the generic list bound", () => {
   assert.equal(remainderFiles.paths.length, 200, "the generic list cap still applies");
   assert.equal(remainderFiles.hidden, 50, "the overflow is reported, not dropped");
 });
+
+test("a large mixed diagnostic message list respects the generic list bound", () => {
+  const row = converter.convertEntry(
+    tool("edit", [{ type: "text", text: "Updated a.ts" }], {
+      path: "a.ts",
+      diff: "-1|old\n+1|new",
+      diagnostics: {
+        messages: [
+          "warning",
+          ...Array.from({ length: 250 }, (_, i) => ({ future: `DIAGNOSTIC_${i}` })),
+        ],
+      },
+    }),
+  );
+  const blocks = buildToolPresentation(row, { hideSummaryArg: true });
+  assert.ok(
+    byRole(blocks, "notice").some((b) => b.text === "warning"),
+    "the valid string message still renders as a note",
+  );
+  const text = allText(blocks);
+  assert.ok(text.includes("DIAGNOSTIC_0"), "the first non-string message is represented");
+  assert.ok(text.includes("DIAGNOSTIC_199"), "the 200th non-string message is represented");
+  assert.ok(!text.includes("DIAGNOSTIC_200"), "items past the cap are not serialized");
+  assert.ok(!text.includes("DIAGNOSTIC_249"), "the final item past the cap is not serialized");
+  assert.ok(
+    byRole(blocks, "notice").some((b) => b.text === "50 diagnostic messages were omitted"),
+    "the omitted count is reported deterministically",
+  );
+  assert.ok(
+    !blocks.some((b) => b.kind === "files" && b.label === "messages"),
+    "the diagnostic remainder is not turned into a file path list",
+  );
+});
+
+test("an empty diagnostic message is dropped, not rendered or treated as a path", () => {
+  const row = converter.convertEntry(
+    tool("edit", [{ type: "text", text: "Updated a.ts" }], {
+      path: "a.ts",
+      diff: "-1|old\n+1|new",
+      diagnostics: { messages: ["", "warning"] },
+    }),
+  );
+  const blocks = buildToolPresentation(row, { hideSummaryArg: true });
+  assert.ok(
+    byRole(blocks, "notice").some((b) => b.text === "warning"),
+    "the valid sibling message still renders as a note",
+  );
+  assert.ok(
+    !byRole(blocks, "notice").some((b) => b.text === ""),
+    "an empty message is not rendered as an empty note",
+  );
+  assert.ok(
+    !blocks.some((b) => b.kind === "files" && b.label === "messages"),
+    "an empty message is not turned into an empty file path",
+  );
+});

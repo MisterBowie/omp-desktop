@@ -1,6 +1,15 @@
 # M5/T18：OMP 原生 Edit / LSP / Debug 结果的可读展示
 
-更新时间：2026-09-25。状态：**T18 进行中**（独立复审返修 R1-R4、S1-S4、Residual2 与 Create/Delete Duplicate 已完成，待复审确认；未验收）。分支 `codex/m5-tool-results`，本轮基线 `0f72145f440bcf4b44242183d0780f07bf4075f0`（产品修复提交 `6914e68`、`9c9ddc2`、`0f72145`；`b0ef1e8..936f44c` 仅含预览打包文档/CI，未改产品源码）。固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未改 tracked 源码；仅在此自有固定子模块内构建 untracked 依赖/native 产物）。
+更新时间：2026-09-25。状态：**T18 进行中**（独立复审返修 R1-R4、S1-S4、Residual2、Create/Delete Duplicate 与诊断余量有界已完成，待复审确认；未验收）。分支 `codex/m5-tool-results`，本轮基线 `d3b7c6d85199d38766e169f0677fa750f39f2041`（此前产品修复提交 `6914e68`、`9c9ddc2`、`0f72145`；`b0ef1e8..936f44c` 仅含预览打包文档/CI，未改产品源码）。固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未改 tracked 源码；仅在此自有固定子模块内构建 untracked 依赖/native 产物）。
+
+## 本轮独立复审返修（诊断余量有界 / Diagnostic Remainder Bound）
+
+独立复审在已推送基线 `d3b7c6d` 复现「诊断余量无界」：一个 edit 结果携带 `diagnostics.messages = ["warning", ...250 个非字符串对象]` 时，合法字符串正确渲染为 note，但 250 个非字符串对象被 `recordBlocks({messages})` 的通用回退序列化为**单个** `kind:"code"`、`label:"messages"` JSON 块——该块同时含 `DIAGNOSTIC_0` 与 `DIAGNOSTIC_249`、无 `hidden` 计数，因此绕过了既有 `MAX_LIST_ITEMS=200` 预算（既有回归只覆盖单个对象，漏掉显式有界要求）。修复仍只在 `tool-presentation.ts` 边界内（`ompEditDiagnosticBlocks`），未改 converter/预算/权限/`recordBlocks`/通用插件呈现：
+
+- **非字符串余量按共享预算有界**：`ompEditDiagnosticBlocks` 把 `unrendered` 切片到 `slice(0, MAX_LIST_ITEMS)`（前 200 项），仍经 `recordBlocks({messages})` 的 JSON/details 回退渲染（对象不当作 files 路径、不可点开），并新增确定性 note `${omitted} diagnostic messages were omitted` 报告被省略的项数（250 非字符串 → 前 200 表示、50 省略）。顺序与 JSON 序列化确定性保持。
+- **空字符串处理显式化**：修正「空字符串被通用渲染器丢弃」的错误注释（通用字符串数组回退会把空串当空路径），改为「空字符串不是有效诊断消息，在此被有意丢弃，既不伪造空 note 也不经字符串数组回退成空路径」，并新增回归断言锁定该行为。
+
+新增回归：`omp-tool-results.test.mjs` +2 例（250 项混合诊断消息：note 可见、含对象 0/199、不含对象 200/249、报 50 省略、不产生 `files` 块；空字符串消息被丢弃且不渲染为 note/路径）。既有单对象混合用例保持。全量 desktop 套件自 2772 → **2774**；复审探针 residual 19/19、paths 33/33、preservation 8/8、mounted 与既有 tool-text/row-budget/row-meaning 全绿。
 
 ## 本轮独立复审返修（R1-R4）
 
@@ -90,15 +99,15 @@ T18 只适配**结果展示**，不改执行、权限、生命周期或持久化
 | `pnpm --filter @pi-desktop/desktop lint`（style tokens） | style tokens OK | 0 |
 | `pnpm lint:biome` | Checked 75 files | 0 |
 | `pnpm --filter @pi-desktop/desktop build`（electron-vite renderer 重建） | built in ~6s | 0 |
-| 定向七套 `node --test test/tool-presentation.test.mjs test/omp-subagent-presentation.test.mjs test/omp-tool-results.test.mjs test/omp-tool-results-render.test.mjs test/tool-display.test.mjs test/tool-row-file-refs.test.mjs test/omp-tool-row-mounted.test.mjs` | **94 passed / 0 failed** | 0 |
+| 定向七套 `node --test test/tool-presentation.test.mjs test/omp-subagent-presentation.test.mjs test/omp-tool-results.test.mjs test/omp-tool-results-render.test.mjs test/tool-display.test.mjs test/tool-row-file-refs.test.mjs test/omp-tool-row-mounted.test.mjs` | **96 passed / 0 failed** | 0 |
 | 复审探针 `/tmp/m5-tool-paths-review.mjs` | 33/33（edit-update/move/multi-delete/pruned、lsp 诊断/全服失败/部分失败、debug evaluate/no-session/empty-output/future-field 各走 live/durable/child）+ 普通 PI 插件元数据（末尾 import residual） | 0 |
 | 复审探针 `/tmp/m5-tool-residual-review.mjs`（S1-S4 11 例 + Residual2 8 例，共 19 例） | 19/19（原 11 例 + malformed snapshot id/source path/breakpoint id、mixed diagnostics messages、scalar meta、future op、mixed per-file、malformed aggregate diff） | 0 |
 | 复审探针 `/tmp/m5-tool-preservation-review.mjs` | 8/8 均 `before=true` 且 `after=true` | 0 |
 | 复审探针 `/tmp/m5-tool-row-mounted-review.mjs` | lsp 文本可见、debug no-session 文本可见、edit 路径经真实 host `fsResolveRef` 解析并打开一次、missing/error 只出 toast | 0 |
 | 既有探针 `/tmp/m5-tool-text-review.mjs` / `/tmp/m5-row-budget-review.mjs` / `/tmp/m5-row-meaning-review.mjs` | lsp+debug 均 `presentationShowsText=true`；row-budget 全 `withinBudget`；row-meaning 全断言 | 0 |
-| 全量 desktop `node --test test/*.test.mjs`（`app/apps/desktop`，固定 runtime 已备） | **2772 总数 / 2768 passed / 0 failed / 4 skipped** | 0 |
+| 全量 desktop `node --test test/*.test.mjs`（`app/apps/desktop`，固定 runtime 已备） | **2774 总数 / 2770 passed / 0 failed / 4 skipped** | 0 |
 
-新增测试：`omp-tool-results.test.mjs`（34 例，真实 `OmpEventConverter.convertEntry`/`convert` → 真实 `buildToolPresentation`/`runOutcome`/`toolResultChips`，覆盖 LSP 诊断/服务器失败/text-only 失败/request、debug evaluate/paused+断点+output/no-session/empty-output/id/instructionPointerReference/未知字段、edit 单/多文件/rename/create/delete/no-op/pruned/partial-error/diagnostics/firstChangedLine/未知字段、live `tool_execution_end`、子代理转录、Pi `ops` 兼容、`plugin_publisher_edit` 兼容、大 Unicode 截断，以及 S1-S4 回归：snapshot 不抑制空 output/空断点、断点 id/每项余量/source 余量、未知值可读、多文件顶层诊断 + 裁剪非 no-op、rename 关系；Residual2 回归：八类新例 + 合法字段不回退重复 + 250 项混合数组仍受 200 上限并报 hidden 50；Create/Delete Duplicate 回归：create/delete 语义内容只出现一次且 hashline `diff` 不回退重复、快照缺失时 `diff` 仍渲染、per-file malformed `diff` 不被当作冗余丢弃）；`omp-tool-results-render.test.mjs`（1 例，SSR 渲染真实 `ToolDetailBlocks` 断言 LSP/edit/debug 文本可见）；`omp-tool-row-mounted.test.mjs`（2 例，真实挂载 `ToolRow` disclosure + `ToolDetails`/`useOpenPreviewTarget`/`api`，成功打开一次、missing/error 只出 toast 不打开、`autoOpen` 不打开、restored/child 行无 `toolArgs`）。
+新增测试：`omp-tool-results.test.mjs`（36 例，真实 `OmpEventConverter.convertEntry`/`convert` → 真实 `buildToolPresentation`/`runOutcome`/`toolResultChips`，覆盖 LSP 诊断/服务器失败/text-only 失败/request、debug evaluate/paused+断点+output/no-session/empty-output/id/instructionPointerReference/未知字段、edit 单/多文件/rename/create/delete/no-op/pruned/partial-error/diagnostics/firstChangedLine/未知字段、live `tool_execution_end`、子代理转录、Pi `ops` 兼容、`plugin_publisher_edit` 兼容、大 Unicode 截断，以及 S1-S4 回归：snapshot 不抑制空 output/空断点、断点 id/每项余量/source 余量、未知值可读、多文件顶层诊断 + 裁剪非 no-op、rename 关系；Residual2 回归：八类新例 + 合法字段不回退重复 + 250 项混合数组仍受 200 上限并报 hidden 50；Create/Delete Duplicate 回归：create/delete 语义内容只出现一次且 hashline `diff` 不回退重复、快照缺失时 `diff` 仍渲染、per-file malformed `diff` 不被当作冗余丢弃；诊断余量有界回归：250 项混合诊断消息有界（含对象 0/199、不含 200/249、报 50 省略、不产生 `files` 块）+ 空字符串显式丢弃）；`omp-tool-results-render.test.mjs`（1 例，SSR 渲染真实 `ToolDetailBlocks` 断言 LSP/edit/debug 文本可见）；`omp-tool-row-mounted.test.mjs`（2 例，真实挂载 `ToolRow` disclosure + `ToolDetails`/`useOpenPreviewTarget`/`api`，成功打开一次、missing/error 只出 toast 不打开、`autoOpen` 不打开、restored/child 行无 `toolArgs`）。
 
 ### 3.1 环境修正（非源码改动）
 
@@ -120,4 +129,4 @@ T18 只适配**结果展示**，不改执行、权限、生命周期或持久化
 - 未新增 ADR：本轮是既有 `tool-presentation.ts` 边界内的纯展示适配，不改变接口/契约/权限/架构（沿用 ADR 0300/0303 的「差异集中在适配层」原则），故只在验证文档记录。
 - 真实付费模型烟测、Windows、打包均不在 T18 范围；`branch`/`steer`/`followUp`/`compact`、子代理单独停止仍关闭（T19/T20 逐项开放）。
 - macOS 中文路径的 9 项 PI release-fixture 失败属 M6/T22，本轮不做无关修复。
-- T18 仍待独立复审确认（未验收）；独立复审返修 R1-R4、S1-S4、Residual2 与 Create/Delete Duplicate 已完成。
+- T18 仍待独立复审确认（未验收）；独立复审返修 R1-R4、S1-S4、Residual2、Create/Delete Duplicate 与诊断余量有界已完成。

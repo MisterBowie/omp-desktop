@@ -858,16 +858,29 @@ function ompEditDiagnosticBlocks(
     for (const message of diagnostics.messages) {
       if (typeof message === "string" && message !== "") notes.push(message);
       else if (typeof message !== "string") unrendered.push(message);
-      // An empty string is dropped by the generic renderer too, so it neither
-      // becomes a note nor a remainder entry.
+      // An empty string is not a real diagnostic message: it is dropped here
+      // rather than surfacing as an empty note or, through the generic
+      // string-array fallback, an empty file path.
     }
     for (const message of notes) {
       blocks.push({ kind: "note", role: errored ? "error" : "notice", text: message });
     }
     if (unrendered.length > 0) {
       // Keep the non-string messages readable through the generic renderer
-      // instead of dropping them with the rendered strings above.
-      blocks.push(...recordBlocks({ messages: unrendered }, "details"));
+      // instead of dropping them with the rendered strings above. That fallback
+      // serializes the whole array into one JSON block with no list cap, so cap
+      // the presented items at the shared budget and report the omitted
+      // remainder instead of silently blowing past it.
+      const presented = unrendered.slice(0, MAX_LIST_ITEMS);
+      const omitted = unrendered.length - presented.length;
+      blocks.push(...recordBlocks({ messages: presented }, "details"));
+      if (omitted > 0) {
+        blocks.push({
+          kind: "note",
+          role: "notice",
+          text: `${omitted} diagnostic messages were omitted`,
+        });
+      }
     }
   }
   const remainder = Object.fromEntries(
