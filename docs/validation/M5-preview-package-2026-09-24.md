@@ -1,4 +1,4 @@
-# M5 预览构建与 GitHub Release（Linux x64）
+# M5 预览构建与 GitHub Release（Linux x64 / macOS arm64）
 
 日期：2026-09-24。范围：按用户指示对 M5 当前基线做一次可直接试用的打包并发布到本仓库 GitHub Releases；**不是** M6/T21、T22 的完成证据。
 
@@ -71,9 +71,23 @@ gh release create m5-preview -R MisterBowie/omp-desktop --prerelease \
 # asset: OMP-Desktop-0.15.2-m5preview-linux-x64.AppImage 282,103,304 B, state=uploaded
 ```
 
-## 6. 未完成 / 限制
+## 6. macOS arm64 附加产物（CI）
+
+本机无 macOS，`electron-builder` 的 dmg 目标只能在 macOS 上构建，故用 GitHub Actions 的 `macos-15`（arm64）runner 构建未签名产物，工作流 `.github/workflows/mac-preview-package.yml`（push 到 `codex/m5-tool-results` 触发，`contents: write`，`CSC_IDENTITY_AUTO_DISCOVERY=false` 跳过签名）。
+
+| 项 | 值 |
+| --- | --- |
+| run | https://github.com/MisterBowie/omp-desktop/actions/runs/35946927004（success） |
+| 步骤 | install → workspace build → host-core release → bundle+renderer → `--mac --dir` → 植入运行时 → `--mac dmg zip --prepackaged` → 上传 |
+| 运行时 | `omp-darwin-arm64`（v18.2.7 官方资产，`shasum -c` 输出 `omp-darwin-arm64: OK`，`--version` 输出 `omp/18.2.7`），植入 `OMP Desktop.app/Contents/Resources/omp-runtime/{omp,extensions/omp-desktop-gate.ts}` |
+| 产物 | `OMP-Desktop-0.15.2-m5preview-mac-arm64.dmg`（219,309,291 B）、`...zip`（216,752,607 B）、`SHA256SUMS.txt` |
+| 校验和 | dmg `09a5a633068172cefa42c6297e74e8c3d7a5025a56dedc1eb4708a881f1e9dfe`；zip `c48cfc4fe0c3980af25373cfc608bd095ba46d9fd4976e44de006cf212e9b600` |
+
+未做：签名/公证（无 Developer ID，产物需 `xattr -cr` 或右键打开）；Intel x64 未构建；上传的 `latest-mac.yml` 未发布（prerelease 不走应用内更新）。
+
+## 7. 未完成 / 限制
 
 - `.deb` 目标在 electron-builder 的 fpm 压缩阶段挂起（>10 分钟无子进程输出），已取消；本轮只提供 AppImage。
 - 未签名、未做品牌替换（`appId`/`productName` 已是 OMP Desktop，图标与内部 PI-Desktop 命名仍为上游值），属 M6/T22；`rpm` 目标未尝试。
 - 手工植入运行时不是 M6/T21 的交付物：该步骤未进仓库脚本，产物不可从源码一键复现。
-- 未在 Linux 之外的平台验证；T23 仍未开始。
+- macOS arm64 产物只完成构建与打包（CI）、未在 macOS 上实际启动；Windows 未涉及；T23 仍未开始。

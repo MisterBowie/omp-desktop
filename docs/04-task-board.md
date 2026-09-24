@@ -4,7 +4,7 @@
 
 当前交付阶段：M5/T18（OMP 原生 Edit/LSP/Debug 结果的可读展示）进行中、独立复审返修 R1-R4 与 S1-S4 已完成、待复审确认（分支 `codex/m5-tool-results`，本轮基线 `9c9ddc2da1091548fb142dc0b68ffad022914dbe`；证据见 `docs/validation/M5-tool-results.md`）。T17 已通过最终独立复审并验收（验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`；证据见 `docs/validation/M5-subagents.md`、`app/docs/adr/0303-omp-subagent-surfacing.md`）。下一阶段入口：M5/T19-T20。历轮独立复审返修的历史记录见 `docs/validation/M5-subagents.md` §0.1-§0.14。
 
-2026-09-24：按用户要求以 `6914e68ef6e2bad632a8f549fde718e1f7f9db54` 做了一次 Linux x64 预览打包，发布 prerelease `m5-preview`（内置固定 OMP 18.2.7 运行时，仅为试用；证据见 `docs/validation/M5-preview-package-2026-09-24.md`）。该产物不是 M6/T21、T22 的完成证据。
+2026-09-24：按用户要求以 `6914e68ef6e2bad632a8f549fde718e1f7f9db54` 做了一次 Linux x64 预览打包，发布 prerelease `m5-preview`（Linux AppImage 与 macOS arm64 dmg/zip，均内置固定 OMP 18.2.7 运行时，仅为试用；证据见 `docs/validation/M5-preview-package-2026-09-24.md`）。该产物不是 M6/T21、T22 的完成证据。
 
 ## 准备工作
 
