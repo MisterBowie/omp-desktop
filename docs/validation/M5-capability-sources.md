@@ -118,6 +118,8 @@ this.#merged = this.#deepMerge(this.#merged, this.#overrides);
 | lint | `pnpm --filter @pi-desktop/desktop lint`（style tokens）、`pnpm lint:biome`（75 files） | 退出 0 / 退出 0 |
 | 空白检查 | `git diff --check` | 退出 0 |
 
+表注（独立复审别名返修轮，加法提交）：定向 vitest 18/18（overlay 8 + supervisor 10）、`@pi-desktop/omp-runtime` 全量 251/251（+2：硬链接 supervisor 探针 + 符号链接 writer 探针）；desktop 定向与真实固定 OMP E2E 重跑结果、typecheck/build 均与上表一致（本轮未改动 desktop 源码）。红/绿与实现细节见 §7.7。
+
 注意：desktop 全量套件必须在 `apps/desktop` 目录下运行（`node --test test/*.test.mjs`）；从仓库根以 `apps/desktop/test/*.test.mjs` 运行会让少量 cwd 相对夹具（`browser-cdp`、`bundled-plugins`、`plugin-work-panel-views`）报 ENOENT——与本轮变更无关。
 
 ## 6. 限制与已知边界
@@ -136,3 +138,4 @@ this.#merged = this.#deepMerge(this.#merged, this.#overrides);
 4. **红跑基线环境**：基线 worktree 的子模块克隆缺生成文件（`tool-views.generated.js`），以本地 rsync 同步 untracked 产物后红跑通过。
 5. **复核返修 1（overlay 写入失败泄漏路径）**：初版把 `writeSourceIsolationOverlay(configOverlay)` 放在 `startRuntime` 的 try 之前——写失败（磁盘/权限）会留下无主 runRoot 且不更新 `lastFailure`。修复：写入移入 try（`prepareRun` 之后、spawn 之前），写失败走统一 catch/`removeRunRoot`；新增 `writeOverlay` 测试缝 + 回归「overlay 写失败后 run root 无残留、`status().reason === "start-failed"`」。
 6. **复核返修 2（prepareRun 可覆盖 overlay）**：`OmpRunPaths.configOverlay` 暴露给 `prepareRun`，初版先写 overlay 后跑 hook，hook 可覆盖边界文件——与「不受 embedder hook 影响」的注释矛盾。修复：改为 **hook 之后重写 overlay**（机械强制不依赖 hook 自律），新增回归「prepareRun 把 overlay 改写为 `enableProjectConfig: true`/`backend: local` 后，实际传给运行时的文件仍强制两项关闭」。ADR 0304 与 spec §14 同步更新写入时机。
+7. **独立复审返修（overlay 写入跟随文件系统别名，`e9d727b` 之后的加法提交）**：复审复现——`prepareRun` 在 `paths.configOverlay` 放置指向 run root 之外哨兵文件的符号链接或硬链接时，`writeFileSync(path, …, "utf8")` 会跟随链接改写哨兵（本地复现：`config-overlay.yml` 为指向 `user-config.yml` 的硬链接时，哨兵被替换为 overlay YAML），与「hook 无法替换 overlay、绝不写真实用户配置」的注释与文档矛盾。修复：`writeSourceIsolationOverlay` 先 `rmSync(path, {recursive:true, force:true})` 移除占位条目本身（Node 语义：作用于条目，不跟随符号链接、不解引用硬链接；Linux x64 实测五项：symlink 移除目标保留、目录内嵌链接不被跟随、`wx` 对既有条目 EEXIST、mode 0600 生效、缺失路径不抛错），再 `writeFileSync(path, yaml, {encoding:"utf8", flag:"wx", mode:0o600})` 独占创建——移除与创建之间若再现条目则 EEXIST 失败并走统一清理；该保证覆盖单次进程内 hook 种植的任意条目，**不声称**防护移除/创建窗口内主动并发对抗的恶意进程（此时独占创建失败、启动清理）。新增探针 2 例（先红后绿）：supervisor 级硬链接探针（哨兵不变、overlay 为 nlink=1 的普通文件、含两项强制设置；`linkSync` 全平台可用）+ writer 级符号链接探针（POSIX，`it.skipIf(win32)`：Windows 建符号链接需提权/开发者模式，硬链接探针已覆盖别名类）。同步更新 supervisor 写点注释、ADR 0304 决策 2、spec §14、HANDOFF §0。验证：vitest 定向 18/18（overlay 8 + supervisor 10）、`@pi-desktop/omp-runtime` 全量 **251/251（+2）**，desktop 与 E2E/typecheck/build 计数见 §5 表注（本轮未改动 desktop 源码）。

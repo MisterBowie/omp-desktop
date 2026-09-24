@@ -27,7 +27,7 @@
  * and failed starts. It is never a static constructor argument and never
  * touches the user's real configuration.
  */
-import { writeFileSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 
 /** File name of the run-scoped overlay inside each run root. */
 export const CONFIG_OVERLAY_FILE = "config-overlay.yml";
@@ -50,7 +50,27 @@ export function sourceIsolationOverlayYaml(): string {
   ].join("\n");
 }
 
-/** Write the run-scoped source-isolation overlay to `path`. */
+/**
+ * Write the run-scoped source-isolation overlay to `path`.
+ *
+ * The path is owned by the run root the supervisor created, but an embedder
+ * `prepareRun` hook runs before this write and may plant a filesystem alias
+ * there. The write therefore removes whatever entry occupies the path first —
+ * `rmSync` acts on the entry itself and never follows a symlink or resolves a
+ * hard link, so a planted alias cannot redirect the write outside the run
+ * root — and then creates the file exclusively (`wx`) with restrictive mode
+ * 0600. If another entry appears between the removal and the create, the
+ * create fails with EEXIST instead of writing through it, and the
+ * supervisor's unified cleanup removes the run root. An actively concurrent
+ * malicious process that keeps racing the remove/create pair is outside this
+ * guarantee: the exclusive create is the only protection, and its failure
+ * fails the start.
+ */
 export function writeSourceIsolationOverlay(path: string): void {
-  writeFileSync(path, sourceIsolationOverlayYaml(), "utf8");
+  rmSync(path, { recursive: true, force: true });
+  writeFileSync(path, sourceIsolationOverlayYaml(), {
+    encoding: "utf8",
+    flag: "wx",
+    mode: 0o600,
+  });
 }

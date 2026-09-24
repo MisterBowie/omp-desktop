@@ -20,10 +20,20 @@
  */
 import { spawn } from "node:child_process";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  linkSync,
+  lstatSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { writeSourceIsolationOverlay } from "./config-overlay.js";
 import { OmpRuntimeSupervisor } from "./supervisor.js";
 import type { OmpSpawnOptions } from "./process.js";
 import {
@@ -237,4 +247,68 @@ describe("run-scoped source isolation overlay", () => {
     expect(supervisor.status().reason).toBe("start-failed");
     expect(runDirs(dataRoot)).toEqual([]);
   });
+
+  it("never writes through a filesystem alias a hook plants at the overlay path", async () => {
+    const captured: OmpSpawnOptions[] = [];
+    const dataRoot = makeRoot("source-boundary-alias");
+    created.push(dataRoot);
+    // Sentinel outside the run root (run roots live under dataRoot/omp-runtime).
+    const sentinel = join(dataRoot, "user-config.yml");
+    writeFileSync(sentinel, "sentinel: keep\n");
+    const supervisor = new OmpRuntimeSupervisor({
+      dataRoot,
+      launcherPath: MOCK_LAUNCHER,
+      expectedRuntimeVersion: MOCK_VERSION,
+      probeVersion: fakeVersionProbe(MOCK_VERSION),
+      pathEntries: mockPathEntries(),
+      spawnImpl: captureSpawn(captured),
+      prepareRun: (paths) => {
+        // A buggy or hostile hook plants a hard link to a file outside the
+        // run root. A writer that opens the overlay path for writing would
+        // truncate and overwrite the sentinel through the shared inode.
+        linkSync(sentinel, paths.configOverlay);
+      },
+    });
+    supervisors.push(supervisor);
+
+    await supervisor.start();
+
+    const overlay = overlayArgOf(captured[0]);
+    expect(overlay).not.toBeNull();
+    // The sentinel is untouched: the overlay write never went through the link.
+    expect(readFileSync(sentinel, "utf8")).toBe("sentinel: keep\n");
+    // The effective overlay is a new regular file, not an alias of the sentinel.
+    const stat = lstatSync(overlay!);
+    expect(stat.isFile()).toBe(true);
+    expect(stat.nlink).toBe(1);
+    const content = readFileSync(overlay!, "utf8");
+    expect(content).toContain("enableProjectConfig: false");
+    expect(content).toContain("backend: off");
+    await supervisor.stop();
+  });
+});
+
+describe("source isolation overlay writer", () => {
+  // Windows needs elevated privileges (or Developer Mode) to create symbolic
+  // links; the hard-link probe above covers the alias class on all platforms.
+  it.skipIf(process.platform === "win32")(
+    "replaces a planted symbolic link with a new regular file and never touches the target",
+    () => {
+      const root = makeRoot("overlay-writer");
+      created.push(root);
+      const sentinel = join(root, "sentinel.yml");
+      writeFileSync(sentinel, "sentinel: keep\n");
+      const overlay = join(root, "config-overlay.yml");
+      symlinkSync(sentinel, overlay);
+
+      writeSourceIsolationOverlay(overlay);
+
+      expect(readFileSync(sentinel, "utf8")).toBe("sentinel: keep\n");
+      const stat = lstatSync(overlay);
+      expect(stat.isSymbolicLink()).toBe(false);
+      expect(stat.isFile()).toBe(true);
+      expect(readFileSync(overlay, "utf8")).toContain("enableProjectConfig: false");
+      expect(readFileSync(overlay, "utf8")).toContain("backend: off");
+    },
+  );
 });

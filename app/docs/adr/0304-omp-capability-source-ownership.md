@@ -104,9 +104,17 @@ Properties:
 
 - **Mechanical, not caller-dependent.** The supervisor writes the overlay
   itself in `startRuntime()`, after `prepareRun` and immediately before
-  spawn — so no embedder hook can weaken or replace it, and a write failure
-  takes the same cleanup path as every other start failure (the run root is
-  removed and the failure recorded).
+  spawn. The writer first removes whatever entry occupies the owned overlay
+  path — removal acts on the entry itself and never follows a planted
+  symlink or hard link — and then creates the boundary file exclusively
+  (`wx`/`O_EXCL`, mode 0600). An embedder hook therefore can neither weaken
+  the overlay nor redirect the write outside the run root, and a write or
+  create failure takes the same cleanup path as every other start failure
+  (the run root is removed and the failure recorded). The guarantee covers
+  any entry a single in-process hook plants; an actively concurrent
+  malicious process that re-plants an entry inside the remove/create window
+  is outside it — the exclusive create is the only protection, and its
+  failure fails the start.
 - **Run-scoped.** `OmpRunPaths.configOverlay` is the per-run path inside the
   owned run root; it is never a static constructor argument.
 - **Owned cleanup.** The existing `removeRunRoot` sweep removes the overlay

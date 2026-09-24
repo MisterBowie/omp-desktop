@@ -438,12 +438,14 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
     try {
       if (this.options.prepareRun) await this.options.prepareRun(paths);
       // The run-scoped source boundary is written by the supervisor itself,
-      // *after* the embedder hook: a `prepareRun` that tries to weaken or
-      // replace the overlay file is overwritten, so every runtime this product
-      // starts is closed to ambient capability sources regardless of what any
-      // hook does. A write failure lands in the same cleanup path as every
-      // other start failure: the run root (and the partial overlay) is
-      // removed and `lastFailure` records the reason.
+      // *after* the embedder hook. The writer first removes whatever entry
+      // the hook left at the overlay path — removal never follows a planted
+      // symlink or hard link — and then creates the boundary file
+      // exclusively, so a hook can neither weaken the boundary nor redirect
+      // the write outside the run root. A write or create failure lands in
+      // the same cleanup path as every other start failure: the run root
+      // (and any partial overlay) is removed and `lastFailure` records the
+      // reason.
       (this.options.writeOverlay ?? writeSourceIsolationOverlay)(configOverlay);
       const runtimeFactory =
         this.options.runtimeFactory ??
