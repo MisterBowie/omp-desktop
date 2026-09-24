@@ -1,6 +1,21 @@
 # M5/T18：OMP 原生 Edit / LSP / Debug 结果的可读展示
 
-更新时间：2026-09-25。状态：**T18 进行中**（独立复审返修 R1-R4、S1-S4、Residual2、Create/Delete Duplicate 与诊断余量有界已完成，待复审确认；未验收）。分支 `codex/m5-tool-results`，本轮基线 `d3b7c6d85199d38766e169f0677fa750f39f2041`（此前产品修复提交 `6914e68`、`9c9ddc2`、`0f72145`；`b0ef1e8..936f44c` 仅含预览打包文档/CI，未改产品源码）。固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未改 tracked 源码；仅在此自有固定子模块内构建 untracked 依赖/native 产物）。
+更新时间：2026-09-25。状态：**T18 已通过独立复审并验收**（独立复审方为验收主体；验收产品基线 `a35da2f87a745fbedd8f5beb46368607c2f6b72e`；本次文档验收提交与产品基线分离，仅更新验证记录与任务看板，不改产品源码）。分支 `codex/m5-tool-results`，验收产品基线 `a35da2f87a745fbedd8f5beb46368607c2f6b72e`（此前产品修复提交 `6914e68`、`9c9ddc2`、`0f72145`、`d3b7c6d`；`b0ef1e8..936f44c` 仅含预览打包文档/CI，未改产品源码）。固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`（本轮未改 tracked 源码；仅在此自有固定子模块内构建 untracked 依赖/native 产物）。
+
+## 独立复审验收结论（2026-09-25）
+
+独立复审方已复核并通过 T18，验收主体为独立复审方（非实现者自评）。验收产品基线为 `a35da2f87a745fbedd8f5beb46368607c2f6b72e`；本次文档验收提交与产品基线分离，仅更新本验证文档与 `docs/04-task-board.md`，不改产品源码/测试/工作流/预览发布资产/上游子模块。固定子模块不变：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`、PI-Desktop `0111e306c120ad5820688d7608cb37bad8fbcc1f`。
+
+独立复审方基于精确基线 `a35da2f`、Node 24 与项目内安装的 TypeScript 编译器重建 `@pi-desktop/omp-runtime`，对照固定 PI `0111e306c120ad5820688d7608cb37bad8fbcc1f` 与固定 OMP `d49918fab2dba3986927f2d46721629ed0f3a02c` 复核最终源码，未发现遗留 T18 问题。关键复核证据：
+
+- **独立边界探针（create/delete 快照 + 诊断余量）**：create/delete 快照结果与此前单次呈现结构完全一致（无重复 hashline `diff`）；`diagnostics` 对象余量含索引 0 与 199、不含 200 与 249，报 `50 diagnostic messages were omitted`，且不产生可点开的 `files` 块。
+- **复审探针本地全绿**：residual 19/19、producer paths 33/33、已验收基线保真 8/8、挂载交互 `failures: []`、tool-text、row-budget 8/8、row-meaning 全部通过。
+- **七套定向套件**：96/96 通过（本地）。
+- **构建/静态检查**（Node 24）：desktop typecheck、style lint、Biome（75 files）、renderer build 均通过。
+- **macOS 全量桌面运行（文件系统/网络沙箱外）**：2774 总数 / 2765 通过 / 9 失败。仅有的 9 项失败均为已知的固定 PI macOS release 夹具缺陷——在调用 shell 脚本前把中文工作区路径段 URL 编码（`对话` → `%E5%AF%B9%E8%AF%9D`），产生 `No such file or directory`。这属于未变的 M6/T22 工作，非 T18 回归；**不声称 macOS 2774/2774**。
+- **远程 Linux 全量桌面证据**：2774 总数 / 2770 通过 / 0 失败 / 4 跳过。
+
+结论：T18 独立复审通过并验收（验收产品基线 `a35da2f87a745fbedd8f5beb46368607c2f6b72e`）。
 
 ## 本轮独立复审返修（诊断余量有界 / Diagnostic Remainder Bound）
 
@@ -129,4 +144,4 @@ T18 只适配**结果展示**，不改执行、权限、生命周期或持久化
 - 未新增 ADR：本轮是既有 `tool-presentation.ts` 边界内的纯展示适配，不改变接口/契约/权限/架构（沿用 ADR 0300/0303 的「差异集中在适配层」原则），故只在验证文档记录。
 - 真实付费模型烟测、Windows、打包均不在 T18 范围；`branch`/`steer`/`followUp`/`compact`、子代理单独停止仍关闭（T19/T20 逐项开放）。
 - macOS 中文路径的 9 项 PI release-fixture 失败属 M6/T22，本轮不做无关修复。
-- T18 仍待独立复审确认（未验收）；独立复审返修 R1-R4、S1-S4、Residual2、Create/Delete Duplicate 与诊断余量有界已完成。
+- T18 已通过独立复审并验收（验收产品基线 `a35da2f87a745fbedd8f5beb46368607c2f6b72e`；独立复审方为验收主体）；独立复审返修 R1-R4、S1-S4、Residual2、Create/Delete Duplicate 与诊断余量有界已完成。

@@ -2,7 +2,7 @@
 
 状态：`待开始`、`进行中`、`已完成`、`阻塞`。只有附验证证据才能将实现任务标为已完成。
 
-当前交付阶段：M5/T18（OMP 原生 Edit/LSP/Debug 结果的可读展示）进行中、独立复审返修 R1-R4、S1-S4、Residual2 与 Create/Delete Duplicate 已完成、待复审确认（分支 `codex/m5-tool-results`，本轮基线 `0f72145f440bcf4b44242183d0780f07bf4075f0`；证据见 `docs/validation/M5-tool-results.md`）。T17 已通过最终独立复审并验收（验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`；证据见 `docs/validation/M5-subagents.md`、`app/docs/adr/0303-omp-subagent-surfacing.md`）。下一阶段入口：M5/T19-T20。历轮独立复审返修的历史记录见 `docs/validation/M5-subagents.md` §0.1-§0.14。
+当前交付阶段：M5/T18（OMP 原生 Edit/LSP/Debug 结果的可读展示）已通过独立复审并验收（验收产品基线 `a35da2f87a745fbedd8f5beb46368607c2f6b72e`，分支 `codex/m5-tool-results`；证据见 `docs/validation/M5-tool-results.md`）。T17 已通过最终独立复审并验收（验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`；证据见 `docs/validation/M5-subagents.md`、`app/docs/adr/0303-omp-subagent-surfacing.md`）。下一实现任务入口：M5/T19（MCP、规则、技能、记忆及插件分类适配）；T19/T20 均未开始。历轮独立复审返修的历史记录见 `docs/validation/M5-subagents.md` §0.1-§0.14。
 
 2026-09-24：按用户要求以 `6914e68ef6e2bad632a8f549fde718e1f7f9db54` 做了一次 Linux x64 预览打包，发布 prerelease `m5-preview`（Linux AppImage 与 macOS arm64 dmg/zip，均内置固定 OMP 18.2.7 运行时，仅为试用；证据见 `docs/validation/M5-preview-package-2026-09-24.md`）。该产物不是 M6/T21、T22 的完成证据。
 
@@ -36,7 +36,7 @@
 | T15 | M4 | 模型配置、认证投影和凭证脱敏 | T07,T13 | 配置不串用，凭证不泄漏 | 已完成（同上；`omp-model-projection.ts` + canary 扫描；model change 为最小投影约束下的**离线 reclaim-first/persist-second restart**，thinking-only 在线 `set_thinking_level` 并回滚，mode/permissionMode 一次持久化） |
 | T16 | M4 | 并发项目、队列、压缩与故障恢复 | T14,T15 | cwd 不漂移、无重复执行 | 已完成（同上；per-session registry、并发/恢复 E2E、`resume`/`modelSwitch` 开放、`branch`/`steer`/`followUp`/`compact` 保持拒绝） |
 | T17 | M5 | OMP 子代理面板与编排归属 | T16 | 父子事件、查看、停止、恢复边界 | 已完成（`docs/validation/M5-subagents.md`；ADR 0303；验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`；真实固定 OMP 子代理端到端验收 + macOS arm64 独立复审；`subagentEvents` 能力开放；限制：`stopSubagent` 恒拒（无 per-child stop RPC）、子代理 `hasUI=false` 工具 gating、批拓扑近似、`branch`/`steer`/`followUp`/`compact` 仍关闭；历轮返修见 §0.1-§0.14） |
-| T18 | M5 | edit/LSP/DAP 结果与必要的专用展示 | T16 | 结构正确、未知结果可读 | 进行中（`docs/validation/M5-tool-results.md`；`tool-presentation.ts` 新增 OMP edit/LSP/debug 只读展示，LSP 诊断/失败/request 文本可见、debug snapshot/evaluation/断点 message/未知字段可见、edit 单/多文件/rename/create/delete/no-op/partial-error/pruned/diagnostics/firstChangedLine 可读且路径可点开；live 与 durable/子代理路径同 presenter，Pi/插件兼容与 4 MiB 预算不变；独立复审返修 R1-R4、S1-S4 与 Residual2 已完成——快照不抑制空结果文本、只消费已渲染值（含嵌套余量与 malformed/未来值回退）、裁剪非 no-op、rename 关系 + 挂载交互回归、residual 探针扩至 19/19），待复审确认，未验收） |
+| T18 | M5 | edit/LSP/DAP 结果与必要的专用展示 | T16 | 结构正确、未知结果可读 | 已完成（`docs/validation/M5-tool-results.md`；`tool-presentation.ts` 新增 OMP edit/LSP/debug 只读展示，LSP 诊断/失败/request 文本可见、debug snapshot/evaluation/断点 message/未知字段可见、edit 单/多文件/rename/create/delete/no-op/partial-error/pruned/diagnostics/firstChangedLine 可读且路径可点开；live 与 durable/子代理路径同 presenter，Pi/插件兼容与 4 MiB 预算不变；独立复审返修 R1-R4、S1-S4、Residual2、Create/Delete Duplicate 与诊断余量有界已完成——快照不抑制空结果文本、只消费已渲染值（含嵌套余量与 malformed/未来值回退）、裁剪非 no-op、rename 关系 + 挂载交互回归、residual 探针扩至 19/19；独立复审方已验收，验收产品基线 `a35da2f87a745fbedd8f5beb46368607c2f6b72e`） |
 | T19 | M5 | MCP、规则、技能、记忆及插件分类适配 | T16 | 单一加载责任、不重复工具注册 | 待开始 |
 | T20 | M5 | Plan/Goal 和高权限工具能力门 | T17-T19 | 不借用不适用的原权限/模式语义 | 待开始 |
 | T21 | M6 | OMP 运行时资源打包与版本固定 | T16 | 无全局依赖也能启动 | 待开始 |
