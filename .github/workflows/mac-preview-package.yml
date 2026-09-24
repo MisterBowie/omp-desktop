@@ -1,0 +1,114 @@
+# macOS 预览打包（M5 试用产物）
+#
+# 用途：在没有 macOS 机器的前提下，用 GitHub Actions 的 macOS arm64 runner 产出
+# 可直接试用的未签名 dmg/zip，并附加到既有 prerelease `m5-preview`。
+#
+# 与 app/.github/workflows/release.yml 的区别：本仓库根管理 docs/ 与 app/ 源码，
+# 产品源码位于 app/，所以每一步都显式指定工作目录；本工作流不签名、不公证，
+# 不发布 electron-updater 的 latest*.yml，也不改动版本号。
+#
+# 内置 OMP 运行时：M6/T21 尚未实现，这里按 Linux 预览构建的同一做法手工植入
+# 上游 v18.2.7 官方 `omp-darwin-arm64` 与桌面工具门到 .app/Contents/Resources/omp-runtime/。
+
+name: macOS preview package
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/m5-tool-results]
+    paths: [".github/workflows/mac-preview-package.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  mac-arm64:
+    name: macOS arm64 unsigned preview
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      # 未签名预览：不尝试查找 Developer ID，跳过 codesign，但仍产出 dmg/zip。
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        working-directory: app
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        working-directory: app
+        run: pnpm --filter '@pi-desktop/desktop^...' --fail-if-no-match build
+
+      - name: Build host-core (release)
+        working-directory: app
+        run: cargo build --release --locked -p host-core
+
+      - name: Build agent-runtime bundle and renderer
+        working-directory: app/apps/desktop
+        run: |
+          set -euo pipefail
+          pnpm run bundle:runtime
+          pnpm exec electron-vite build
+
+      - name: Package unpacked .app
+        working-directory: app/apps/desktop
+        run: pnpm exec electron-builder --mac --dir --publish never
+
+      - name: Inject pinned OMP runtime
+        working-directory: app/apps/desktop
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          gh release download v18.2.7 -R can1357/oh-my-pi -p omp-darwin-arm64 -p SHA256SUMS.txt -D "$work"
+          (cd "$work" && grep ' omp-darwin-arm64$' SHA256SUMS.txt | shasum -a 256 -c -)
+          chmod +x "$work/omp-darwin-arm64"
+          "$work/omp-darwin-arm64" --version
+          app="release/mac-arm64/OMP Desktop.app/Contents/Resources/omp-runtime"
+          mkdir -p "$app/extensions"
+          cp "$work/omp-darwin-arm64" "$app/omp"
+          cp ../../packages/omp-runtime/extensions/omp-desktop-gate.ts "$app/extensions/"
+          ls -la "$app" "$app/extensions"
+
+      - name: Package dmg and zip
+        working-directory: app/apps/desktop
+        run: |
+          set -euo pipefail
+          pnpm exec electron-builder --mac dmg zip \
+            --prepackaged "release/mac-arm64/OMP Desktop.app" --publish never
+          ls -la release
+
+      - name: Stage assets
+        working-directory: app/apps/desktop
+        run: |
+          set -euo pipefail
+          mkdir -p ../../../.artifacts/mac-arm64
+          out=../../../.artifacts/mac-arm64
+          cp "release/PI-Desktop-0.15.2-arm64.dmg" "$out/OMP-Desktop-0.15.2-m5preview-mac-arm64.dmg"
+          cp "release/PI-Desktop-0.15.2-arm64-mac.zip" "$out/OMP-Desktop-0.15.2-m5preview-mac-arm64.zip"
+          (cd "$out" && shasum -a 256 ./* > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+      - name: Upload to release
+        working-directory: app/apps/desktop
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload m5-preview \
+            ../../../.artifacts/mac-arm64/OMP-Desktop-0.15.2-m5preview-mac-arm64.dmg \
+            ../../../.artifacts/mac-arm64/OMP-Desktop-0.15.2-m5preview-mac-arm64.zip \
+            ../../../.artifacts/mac-arm64/SHA256SUMS.txt \
+            --clobber -R "$GITHUB_REPOSITORY"
+          gh release view m5-preview -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[] | "\(.name) \(.size)"'
