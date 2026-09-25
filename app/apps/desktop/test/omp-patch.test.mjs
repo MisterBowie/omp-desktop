@@ -342,6 +342,19 @@ test("canonicalizes --source, so an --out inside the real checkout is still refu
   assert.match(viaLink.stderr, /must not be reached through a symlink/);
   assert.deepEqual(readdirSync(fixture.source).sort(), listing);
   assert.equal(git(fixture.source, ["status", "--porcelain"]), "");
+
+  // Canonicalizing the source must not become a blanket refusal of symlinked
+  // sources: named through a link, the checkout still prepares normally, and
+  // the tree is reported at its canonical path.
+  const fromLink = join(tmp, "from-link");
+  const created = runScript(
+    ["--apply", "--out", fromLink, "--manifest", manifestPath, "--source", sourceLink, "--json"],
+    tmp,
+  );
+  assert.equal(created.status, 0, created.stderr);
+  assert.equal(JSON.parse(created.stdout.trim()).tree, realpathSync(fromLink));
+  assert.equal(readFileSync(join(fromLink, "src", "example.ts"), "utf8"), "export const value = 2;\n");
+  assert.equal(git(fixture.source, ["status", "--porcelain"]), "");
 });
 
 test("refuses a target reached through a symlinked parent and never writes or deletes the link target", () => {
