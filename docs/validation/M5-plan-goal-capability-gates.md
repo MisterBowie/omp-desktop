@@ -1,6 +1,6 @@
 # M5/T20-A：Plan/Goal 与高权限工具能力门 —— 能力审计与可执行契约
 
-更新时间：2026-09-25（F8-F12 复审返修轮）。状态：**T20-A 审计与最小契约已完成，但"无硬阻塞"结论已被可行性 spike 推翻：R3 是硬阻塞，T20-B 不得开始**（分支 `codex/m5-plan-goal-capability-gates`；审计基线 `2ca256520980aa80bb812730fbad132e9e95f503`，R1-R4 返修基线 `07de0a725269486c909d36bcccb9d8bb209770de`，F1-F7 返修基线 `5da616f04c1ec132954785b955c1b20cc17bfc54`，本轮 F8-F12 返修基线 `dd2ec72cbe2dc2d338ce20467da390bb1110601e`）。T20-B/C/D 未开始，**T20 未完成、未声称**。
+更新时间：2026-09-25。状态：**T20-A 审计与最小契约已完成，但"无硬阻塞"结论已被可行性 spike 推翻：R3 是硬阻塞，T20-B 不得开始**（分支 `codex/m5-plan-goal-capability-gates`）。**四轮提交坐标（按真实 git 历史）**：审计基线 `2ca256520980aa80bb812730fbad132e9e95f503` → T20-A 初稿 `07de0a725269486c909d36bcccb9d8bb209770de` → R1-R4 返修 `5da616f04c1ec132954785b955c1b20cc17bfc54` → F1-F7 返修 `dd2ec72cbe2dc2d338ce20467da390bb1110601e` → **F8-F12 返修 `25e0d4d254ff641df1840cfe2cd767a7e9f00eb1`**；本文件当前描述的实验与判据以 F8-F12 提交为准，其后的 F13/F14 轮为纯文档澄清（无新增实验）。T20-B/C/D 未开始，**T20 未完成、未声称**。
 
 本轮（F8-F12）结论摘要：
 
@@ -12,12 +12,25 @@
 | F11 R4-3 证据范围过度 | **已修**：§4.2 与 B13 改称"**目标模式目录序列 / 模拟的 catalog 生命周期**"，明确它**不证明**真实持久 `sessions.mode` 切换（T20-B 尚未实现），真实模式切换仍是 B1/B13 验收项；同 session 连续 prompt、目录增删重加、无滞留的结论保留。 | §4.2 R4-3、§7 B13 |
 | F12 外部路径行含义 | **已修**：矩阵该行注明**仅适用于已通过契约 allowlist 的工具**；`ask`/`accept-edits` 无 session grant 弹卡、有 grant `AllowSession`；Plan/Goal 的非许可工具仍先被契约硬拒绝。 | §1.3.1 矩阵末行 |
 
+文档澄清（F13/F14，纯文档轮，无新增实验）：
+
+- **g1 最终口径唯一化（F13）**：本文件所有历史行（F2、F1-F7 表、R1-R4 表）都只作为历史事实保留；凡提到"四段链路可判 `GAP-CLOSED`"的地方都已标注**该静态分支已被 F8 推翻并删除，现状以 F8 为准**。当前契约（§4 g1）：g1 **永不自动判 closed**——基线 `GAP-OPEN`，出现 mode-ish state 字段 / composer 接缝 / 协议键一律 `REVIEW-REQUIRED` 并计入退出码，退场只能由 T20-B 的 B2/B13 行为测试替换。
+- **提交坐标唯一化（F14）**：四轮提交与各自基线见下表；文中凡引用这些 SHA，语义按本表判定（"基线"= 该轮开工时的提交，"返修"= 该轮的产出提交）。
+
+| 轮次 | 产出提交 | 该轮基线 |
+| --- | --- | --- |
+| T20-A 初稿（审计 + 红灯诊断 + 契约） | `07de0a725269486c909d36bcccb9d8bb209770de` | `2ca256520980aa80bb812730fbad132e9e95f503`（审计基线） |
+| R1-R4 返修（权限语义、mode block、R3 硬阻塞、R4 顺序） | `5da616f04c1ec132954785b955c1b20cc17bfc54` | `07de0a7` |
+| F1-F7 返修（风险表、严格序列、目录生命周期、真实字节、矩阵唯一性） | `dd2ec72cbe2dc2d338ce20467da390bb1110601e` | `5da616f` |
+| F8-F12 返修（g1 保守判据、R4-4 真实变化、UTF-8 不变量、范围收窄） | `25e0d4d254ff641df1840cfe2cd767a7e9f00eb1` | `dd2ec72` |
+| F13/F14 澄清（纯文档，无实验） | F8-F12 之后的文档提交 | `25e0d4d` |
+
 前一轮（F1-F7）结论摘要：
 
 | 项 | 结论 | 证据 |
 | --- | --- | --- |
 | F1 风险表事实错误 | **已修**：§1.3.1 矩阵不再把 `BrowserPreview`/`new_context` 写成"Low/契约许可放行"——`BrowserPreview` 在 `plan_mode_allows` 内但**不在风险表 → Medium**（`ask`/`accept-edits` 卡、`auto` 放行、grant 可 `AllowSession`）；`new_context` 是 sidecar-side、不到 host gate。C7 并入这条验收（矩阵保持 C1-C8），C1 明确契约许可集合。 | §1.3.1、§7 C1/C7 |
-| F2 g1 可假绿 | **已修**：g1 改为**四段链路同时成立**（状态 schema 有 mode block 字段 / 引擎接缝同一文件既 compose 又写状态 / gate 读校验后状态 / gate 追加且引用该字段名，裸 `mode` 不算）。**对照实验**：注入裸 `mode` 字段仍 `GAP-OPEN`；注入完整链路才 `GAP-CLOSED`。协议加键 → `REVIEW-REQUIRED`，不判 closed。 | §4 g1、脚本 `app/scripts/check-omp-plan-goal-gaps.mjs` |
+| F2 g1 可假绿 | **已修（其静态判据已被 F8 推翻，现状以 F8 为准）**：F2 当时把 g1 改为"四段链路同时成立"（状态 schema 有 mode block 字段 / 引擎接缝同一文件既 compose 又写状态 / gate 读校验后状态 / gate 追加且引用该字段名，裸 `mode` 不算），并观察到"注入完整链路 → `GAP-CLOSED`"。**该静态 `GAP-CLOSED` 分支已由 F8 删除**：静态符号不能证明数据流，g1 现在**永不自动判 closed**——基线 `GAP-OPEN`，出现字段/composer 接缝/协议键一律 `REVIEW-REQUIRED`，只由 T20-B 的 B2/B13 行为测试替换退场（见下方 F8 行与 §4）。F2 保留的历史事实：裸 `mode` 字段不构成证据、协议加键走 `REVIEW-REQUIRED`。 | §4 g1（最终口径）、F8 行、`app/scripts/check-omp-plan-goal-gaps.mjs` |
 | F3 R4-3 假绿 | **已修**：R4 工具表断言改为**严格序列相等**（缺失/多余/顺序/重复皆失败），不再用"子集"。重测的旧写法正是丢了 `SubmitGoal` 仍通过，现已判红。 | §4.2 R4-3、`t20-feasibility.mjs` `sameSequence` |
 | F4 生命周期未覆盖 | **已修**：同一 session 上 5 个连续 prompt，每 prompt 先真实 `set_host_tools` 再夹取：Agent(无提交工具)→Plan(`SubmitPlan`)→Goal(`SubmitGoal`)→Agent(删除)→Plan(重加)；`SubmitGoal` 用真实定义注册；5 个工具表与 catalog+clamp 严格相等、无重复/滞留；反向顺序对照与 policy retry 计数保留。 | §4.2 R4-3/R4-2/R4-4 |
 | F5 R2 证据过度声明 | **已修**：spike 现在追加的是**生产 `composeModeSystemPrompt(mode, "")` 的三个真实块**（Agent/Plan/Goal，UTF-8 176/1726/2156），断言各自恰出现一次、其它块 0 次、单 system 消息、PI 默认 base 不出现、块为纯追加（system = prefix + block，工具目录相同的 prompt 前缀字节相同），同时断言 `app` 与固定 PI 的 `mode-prompts.ts` 逐字节相等；**技能/记忆块内容与顺序**明确留作 T20-B 的 B2 ④，§4.2 不再声称覆盖。 | §4.2 R2-字节/R2-范围声明、§7 B2 |
@@ -226,7 +239,7 @@
 
 新增 `app/scripts/check-omp-plan-goal-gaps.mjs`（跟随仓库 `check-*` 脚本约定）：**独立 opt-in 诊断**，不进默认测试套件；只读当前已发布源码接缝报告事实，不传虚构字段、不断言未定 API。无 `OMP_T20_GAP_PROBE=1` 时打印 SKIP 并退出 0；有则每缺口一行稳定输出，任何 T20 缺口开放即退出 1。
 
-运行命令与输出（F8-F12 返修轮，head `dd2ec72`，Node v24.14.0，工作目录 `app/`）：
+运行命令与输出（F8-F12 返修轮；当时工作树基于 `dd2ec72`，该轮产出提交为 `25e0d4d`；Node v24.14.0，工作目录 `app/`）：
 
 ```text
 $ node scripts/check-omp-plan-goal-gaps.mjs
@@ -249,7 +262,7 @@ exit=1
 
 新增 `app/experiments/omp-bridge/t20-feasibility.mjs`（驱动）+ `app/experiments/omp-bridge/extensions/t20-spike-gate.ts`（可信扩展），复用 M1 的隔离夹具（`lib/base.mjs` 合成 HOME、`lib/provider.mjs` 本地 fake provider、`lib/rpc.mjs` 协议客户端、固定 launcher `omp/18.2.7`），**不调用任何付费/远程模型**；结果落 `app/experiments/omp-bridge/results/t20-feasibility.json`。每次断言的是 **PI 目标契约**，失败即该契约在固定 OMP 上不可实现的行为证据。
 
-命令与结果（F8-F12 返修轮，head `dd2ec72`，Node v24.14.0）：
+命令与结果（F8-F12 返修轮；工作树基于 `dd2ec72`，该轮产出提交 `25e0d4d`；Node v24.14.0）：
 
 ```text
 $ cd app/experiments/omp-bridge && node t20-feasibility.mjs
@@ -286,7 +299,7 @@ FAIL t20-feasibility: 38/46 checks
 
 ---
 
-## 5. 当前差距表（OMP Desktop，基线 2ca2565）
+## 5. 当前差距表（OMP Desktop 产品代码基线 `2ca2565`；T20-A 至今各轮返修均未改产品代码，差距仍以该状态为准）
 
 | 编号 | 差距 | 证据（app/，行号已验证） | 归属 |
 | --- | --- | --- | --- |
@@ -404,4 +417,4 @@ FAIL t20-feasibility: 38/46 checks
 
 ## 10. T20 完成状态
 
-**T20-A 的审计、契约与验收矩阵已完成三轮返修（R1-R4、F1-F7、F8-F12），但 T20-A 不能标为"已完成、无硬阻塞"：R3 是硬阻塞（§8），T20-B 不得开始。** T20-B/C/D 未开始；Plan/Goal 与高权限工具门未实现、未声称完成。F1-F7（风险表/验收、g1 判据、严格序列、目录生命周期、mode block 字节与范围、矩阵唯一性、行号）与 **F8-F12**（g1 改为永不自动 closed 的保守判据 + 注释假绿对照、R4-4 真实变化、UTF-8 字节与前缀不变量、R4-3 证据范围收窄为目录序列、外部路径行限定 allowlist）已按固定源码与无费用实验修正；R3 需要上游能力、或用户明确接受的语义差异、或把提交移出模型循环三者之一，才能解除。`branch`/`steer`/`followUp`/`compact`/子代理单独停止保持关闭（T17-T19 延续）。
+**T20-A 的审计、契约与验收矩阵已完成三轮返修（R1-R4、F1-F7、F8-F12），并由 F13/F14 纯文档轮统一了 g1 最终口径与提交坐标（不改变任何结论），但 T20-A 不能标为"已完成、无硬阻塞"：R3 是硬阻塞（§8），T20-B 不得开始。** T20-B/C/D 未开始；Plan/Goal 与高权限工具门未实现、未声称完成。F1-F7（风险表/验收、g1 判据、严格序列、目录生命周期、mode block 字节与范围、矩阵唯一性、行号）与 **F8-F12**（g1 改为永不自动 closed 的保守判据 + 注释假绿对照、R4-4 真实变化、UTF-8 字节与前缀不变量、R4-3 证据范围收窄为目录序列、外部路径行限定 allowlist）已按固定源码与无费用实验修正；R3 需要上游能力、或用户明确接受的语义差异、或把提交移出模型循环三者之一，才能解除。`branch`/`steer`/`followUp`/`compact`/子代理单独停止保持关闭（T17-T19 延续）。
