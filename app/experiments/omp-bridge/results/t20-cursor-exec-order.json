@@ -1,0 +1,755 @@
+{
+  "generatedAt": "2026-09-25T15:17:27.740Z",
+  "runtime": {
+    "ompRoot": "/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi",
+    "ompHead": "d49918fab2dba3986927f2d46721629ed0f3a02c",
+    "pinnedOmpSha": "d49918fab2dba3986927f2d46721629ed0f3a02c",
+    "bun": "1.4.2",
+    "node": "26.3.0",
+    "fileHashes": {
+      "packages/ai/src/providers/cursor.ts": "e72442233d5b2f0d2acc43b8263dec1042d1965c10bd91c59e52fb8d4ade12d1",
+      "packages/coding-agent/src/cursor.ts": "0e02a9d923dc9526684487a94252a193d4b2b353b8dfd7ebf1456976321cb0fc",
+      "packages/ai/src/utils/block-symbols.ts": "5d9f39486f98c1cc34f7b7f7a556c3c42eca7bd37f1f0e834b467972d5ff6db1"
+    }
+  },
+  "scenarios": {
+    "siblingFirst": {
+      "label": "s1-mixed-sibling-first",
+      "order": [
+        "shell",
+        "mcp"
+      ],
+      "events": [
+        {
+          "seq": 1,
+          "event": "dispatch:shellArgs"
+        },
+        {
+          "seq": 2,
+          "event": "tool_execution_start:bash"
+        },
+        {
+          "seq": 4,
+          "event": "dispatch:mcpArgs"
+        },
+        {
+          "seq": 5,
+          "event": "tool_execution_start:SubmitPlan"
+        },
+        {
+          "seq": 7,
+          "event": "tool_execution_end:bash"
+        },
+        {
+          "seq": 8,
+          "event": "tool_execution_end:SubmitPlan"
+        },
+        {
+          "seq": 9,
+          "event": "toolcall_start:bash"
+        },
+        {
+          "seq": 10,
+          "event": "toolcall_end:bash"
+        },
+        {
+          "seq": 11,
+          "event": "toolcall_start:SubmitPlan"
+        },
+        {
+          "seq": 12,
+          "event": "toolcall_end:SubmitPlan"
+        },
+        {
+          "seq": 13,
+          "event": "drain:complete"
+        },
+        {
+          "seq": 14,
+          "event": "done"
+        }
+      ],
+      "toolExecutions": [
+        {
+          "seq": 3,
+          "toolName": "bash",
+          "toolCallId": "call-sibling-1"
+        },
+        {
+          "seq": 6,
+          "toolName": "SubmitPlan",
+          "toolCallId": "call-submit-1"
+        }
+      ],
+      "executionsBeforeDone": [
+        {
+          "seq": 3,
+          "toolName": "bash",
+          "toolCallId": "call-sibling-1",
+          "args": {
+            "command": "touch sibling.txt",
+            "cwd": "/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi"
+          }
+        },
+        {
+          "seq": 6,
+          "toolName": "SubmitPlan",
+          "toolCallId": "call-submit-1",
+          "args": {
+            "title": "T",
+            "markdown": "# Plan",
+            "question": "Approve?"
+          }
+        }
+      ],
+      "wire": [
+        {
+          "frame": "execClientMessage",
+          "answer": "shellResult",
+          "result": "success",
+          "payload": "{\"$typeName\":\"agent.v1.ShellSuccess\",\"command\":\"touch sibling.txt\",\"workingDirectory\":\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\",\"exitCode\":0,\"signal\":\"\",\"stdout\":\"sibling ran\",\"stderr\":\"\",\"executionTime\":0}"
+        },
+        {
+          "frame": "execClientMessage",
+          "answer": "mcpResult",
+          "result": "success",
+          "payload": "{\"$typeName\":\"agent.v1.McpSuccess\",\"content\":[{\"$typeName\":\"agent.v1.McpToolResultContentItem\",\"content\":{\"case\":\"text\",\"value\":{\"$typeName\":\"agent.v1.McpTextContent\",\"text\":\"plan submitted\"}}}],\"isError\":false}"
+        }
+      ],
+      "blocks": [
+        {
+          "id": "call-sibling-1",
+          "name": "bash",
+          "resolved": true,
+          "args": {
+            "command": "touch sibling.txt",
+            "cwd": "/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi"
+          }
+        },
+        {
+          "id": "call-submit-1",
+          "name": "SubmitPlan",
+          "resolved": true,
+          "args": {
+            "title": "T",
+            "markdown": "# Plan",
+            "question": "Approve?"
+          }
+        }
+      ],
+      "results": [
+        {
+          "toolCallId": "call-sibling-1",
+          "toolName": "bash",
+          "isError": false,
+          "text": "sibling ran",
+          "hasTerminate": false
+        },
+        {
+          "toolCallId": "call-submit-1",
+          "toolName": "SubmitPlan",
+          "isError": false,
+          "text": "plan submitted",
+          "hasTerminate": false
+        }
+      ],
+      "sideEffects": {
+        "sibling": true,
+        "submit": true
+      },
+      "doneSeq": 14
+    },
+    "submitFirst": {
+      "label": "s2-mixed-submit-first",
+      "order": [
+        "mcp",
+        "shell"
+      ],
+      "events": [
+        {
+          "seq": 1,
+          "event": "dispatch:mcpArgs"
+        },
+        {
+          "seq": 2,
+          "event": "tool_execution_start:SubmitPlan"
+        },
+        {
+          "seq": 4,
+          "event": "dispatch:shellArgs"
+        },
+        {
+          "seq": 5,
+          "event": "tool_execution_start:bash"
+        },
+        {
+          "seq": 7,
+          "event": "tool_execution_end:SubmitPlan"
+        },
+        {
+          "seq": 8,
+          "event": "tool_execution_end:bash"
+        },
+        {
+          "seq": 9,
+          "event": "toolcall_start:SubmitPlan"
+        },
+        {
+          "seq": 10,
+          "event": "toolcall_end:SubmitPlan"
+        },
+        {
+          "seq": 11,
+          "event": "toolcall_start:bash"
+        },
+        {
+          "seq": 12,
+          "event": "toolcall_end:bash"
+        },
+        {
+          "seq": 13,
+          "event": "drain:complete"
+        },
+        {
+          "seq": 14,
+          "event": "done"
+        }
+      ],
+      "toolExecutions": [
+        {
+          "seq": 3,
+          "toolName": "SubmitPlan",
+          "toolCallId": "call-submit-2"
+        },
+        {
+          "seq": 6,
+          "toolName": "bash",
+          "toolCallId": "call-sibling-2"
+        }
+      ],
+      "executionsBeforeDone": [
+        {
+          "seq": 3,
+          "toolName": "SubmitPlan",
+          "toolCallId": "call-submit-2",
+          "args": {
+            "title": "T",
+            "markdown": "# Plan",
+            "question": "Approve?"
+          }
+        },
+        {
+          "seq": 6,
+          "toolName": "bash",
+          "toolCallId": "call-sibling-2",
+          "args": {
+            "command": "touch sibling.txt",
+            "cwd": "/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi"
+          }
+        }
+      ],
+      "wire": [
+        {
+          "frame": "execClientMessage",
+          "answer": "mcpResult",
+          "result": "success",
+          "payload": "{\"$typeName\":\"agent.v1.McpSuccess\",\"content\":[{\"$typeName\":\"agent.v1.McpToolResultContentItem\",\"content\":{\"case\":\"text\",\"value\":{\"$typeName\":\"agent.v1.McpTextContent\",\"text\":\"plan submitted\"}}}],\"isError\":false}"
+        },
+        {
+          "frame": "execClientMessage",
+          "answer": "shellResult",
+          "result": "success",
+          "payload": "{\"$typeName\":\"agent.v1.ShellSuccess\",\"command\":\"touch sibling.txt\",\"workingDirectory\":\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\",\"exitCode\":0,\"signal\":\"\",\"stdout\":\"sibling ran\",\"stderr\":\"\",\"executionTime\":0}"
+        }
+      ],
+      "blocks": [
+        {
+          "id": "call-submit-2",
+          "name": "SubmitPlan",
+          "resolved": true,
+          "args": {
+            "title": "T",
+            "markdown": "# Plan",
+            "question": "Approve?"
+          }
+        },
+        {
+          "id": "call-sibling-2",
+          "name": "bash",
+          "resolved": true,
+          "args": {
+            "command": "touch sibling.txt",
+            "cwd": "/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi"
+          }
+        }
+      ],
+      "results": [
+        {
+          "toolCallId": "call-submit-2",
+          "toolName": "SubmitPlan",
+          "isError": false,
+          "text": "plan submitted",
+          "hasTerminate": false
+        },
+        {
+          "toolCallId": "call-sibling-2",
+          "toolName": "bash",
+          "isError": false,
+          "text": "sibling ran",
+          "hasTerminate": false
+        }
+      ],
+      "sideEffects": {
+        "sibling": true,
+        "submit": true
+      },
+      "doneSeq": 14
+    },
+    "soleSubmit": {
+      "label": "s3-sole-submit",
+      "order": [
+        "mcp"
+      ],
+      "events": [
+        {
+          "seq": 1,
+          "event": "dispatch:mcpArgs"
+        },
+        {
+          "seq": 2,
+          "event": "tool_execution_start:SubmitPlan"
+        },
+        {
+          "seq": 4,
+          "event": "tool_execution_end:SubmitPlan"
+        },
+        {
+          "seq": 5,
+          "event": "toolcall_start:SubmitPlan"
+        },
+        {
+          "seq": 6,
+          "event": "toolcall_end:SubmitPlan"
+        },
+        {
+          "seq": 7,
+          "event": "drain:complete"
+        },
+        {
+          "seq": 8,
+          "event": "done"
+        }
+      ],
+      "toolExecutions": [
+        {
+          "seq": 3,
+          "toolName": "SubmitPlan",
+          "toolCallId": "call-submit-sole"
+        }
+      ],
+      "executionsBeforeDone": [
+        {
+          "seq": 3,
+          "toolName": "SubmitPlan",
+          "toolCallId": "call-submit-sole",
+          "args": {
+            "title": "T",
+            "markdown": "# Plan",
+            "question": "?"
+          }
+        }
+      ],
+      "wire": [
+        {
+          "frame": "execClientMessage",
+          "answer": "mcpResult",
+          "result": "success",
+          "payload": "{\"$typeName\":\"agent.v1.McpSuccess\",\"content\":[{\"$typeName\":\"agent.v1.McpToolResultContentItem\",\"content\":{\"case\":\"text\",\"value\":{\"$typeName\":\"agent.v1.McpTextContent\",\"text\":\"plan submitted\"}}}],\"isError\":false}"
+        }
+      ],
+      "blocks": [
+        {
+          "id": "call-submit-sole",
+          "name": "SubmitPlan",
+          "resolved": true,
+          "args": {
+            "title": "T",
+            "markdown": "# Plan",
+            "question": "?"
+          }
+        }
+      ],
+      "results": [
+        {
+          "toolCallId": "call-submit-sole",
+          "toolName": "SubmitPlan",
+          "isError": false,
+          "text": "plan submitted",
+          "hasTerminate": false
+        }
+      ],
+      "sideEffects": {
+        "sibling": false,
+        "submit": true
+      },
+      "doneSeq": 8
+    },
+    "noHandlers": {
+      "label": "s4-no-handlers",
+      "order": [
+        "shell",
+        "mcp"
+      ],
+      "events": [
+        {
+          "seq": 1,
+          "event": "dispatch:shellArgs"
+        },
+        {
+          "seq": 2,
+          "event": "dispatch:mcpArgs"
+        },
+        {
+          "seq": 3,
+          "event": "toolcall_start:bash"
+        },
+        {
+          "seq": 4,
+          "event": "toolcall_end:bash"
+        },
+        {
+          "seq": 5,
+          "event": "drain:complete"
+        },
+        {
+          "seq": 6,
+          "event": "done"
+        }
+      ],
+      "toolExecutions": [],
+      "executionsBeforeDone": [],
+      "wire": [
+        {
+          "frame": "execClientMessage",
+          "answer": "mcpResult",
+          "result": "toolNotFound",
+          "payload": "{\"$typeName\":\"agent.v1.McpToolNotFound\",\"name\":\"SubmitPlan\",\"availableTools\":[]}"
+        },
+        {
+          "frame": "execClientMessage",
+          "answer": "shellResult",
+          "result": "rejected",
+          "payload": "{\"$typeName\":\"agent.v1.ShellRejected\",\"command\":\"touch sibling.txt\",\"workingDirectory\":\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\",\"reason\":\"Tool not available\",\"isReadonly\":false}"
+        }
+      ],
+      "blocks": [
+        {
+          "id": "call-sibling-none",
+          "name": "bash",
+          "resolved": true,
+          "args": {
+            "command": "touch sibling.txt",
+            "cwd": "/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi"
+          }
+        }
+      ],
+      "results": [
+        {
+          "toolCallId": "call-sibling-none",
+          "toolName": "bash",
+          "isError": true,
+          "text": "Tool not available",
+          "hasTerminate": false
+        }
+      ],
+      "sideEffects": {
+        "sibling": false,
+        "submit": false
+      },
+      "doneSeq": 6
+    },
+    "externalHandoff": {
+      "label": "s5-external-handoff",
+      "order": [
+        "mcp"
+      ],
+      "events": [
+        {
+          "seq": 1,
+          "event": "dispatch:mcpArgs"
+        },
+        {
+          "seq": 2,
+          "event": "drain:complete"
+        },
+        {
+          "seq": 3,
+          "event": "done"
+        }
+      ],
+      "toolExecutions": [],
+      "executionsBeforeDone": [],
+      "wire": [
+        {
+          "frame": "execClientMessage",
+          "answer": "mcpResult",
+          "result": "success",
+          "payload": "{\"$typeName\":\"agent.v1.McpSuccess\",\"content\":[{\"$typeName\":\"agent.v1.McpToolResultContentItem\",\"content\":{\"case\":\"text\",\"value\":{\"$typeName\":\"agent.v1.McpTextContent\",\"text\":\"Tool call received and handed off to the external client for execution. Do not retry or call it again; end the turn. The result will be provided in the next request.\"}}}],\"isError\":false}"
+        }
+      ],
+      "blocks": [],
+      "results": [],
+      "sideEffects": {
+        "sibling": false,
+        "submit": false
+      },
+      "doneSeq": 3
+    },
+    "schemeB": {
+      "label": "s7-scheme-b-config",
+      "order": [
+        "shell",
+        "mcp"
+      ],
+      "events": [
+        {
+          "seq": 1,
+          "event": "dispatch:shellArgs"
+        },
+        {
+          "seq": 2,
+          "event": "dispatch:mcpArgs"
+        },
+        {
+          "seq": 3,
+          "event": "toolcall_start:bash"
+        },
+        {
+          "seq": 4,
+          "event": "toolcall_end:bash"
+        },
+        {
+          "seq": 5,
+          "event": "drain:complete"
+        },
+        {
+          "seq": 6,
+          "event": "done"
+        }
+      ],
+      "toolExecutions": [],
+      "executionsBeforeDone": [],
+      "wire": [
+        {
+          "frame": "execClientMessage",
+          "answer": "mcpResult",
+          "result": "success",
+          "payload": "{\"$typeName\":\"agent.v1.McpSuccess\",\"content\":[{\"$typeName\":\"agent.v1.McpToolResultContentItem\",\"content\":{\"case\":\"text\",\"value\":{\"$typeName\":\"agent.v1.McpTextContent\",\"text\":\"Tool call received and handed off to the external client for execution. Do not retry or call it again; end the turn. The result will be provided in the next request.\"}}}],\"isError\":false}"
+        },
+        {
+          "frame": "execClientMessage",
+          "answer": "shellResult",
+          "result": "rejected",
+          "payload": "{\"$typeName\":\"agent.v1.ShellRejected\",\"command\":\"touch sibling.txt\",\"workingDirectory\":\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\",\"reason\":\"Tool not available\",\"isReadonly\":false}"
+        }
+      ],
+      "blocks": [
+        {
+          "id": "call-sibling-b",
+          "name": "bash",
+          "resolved": true,
+          "args": {
+            "command": "touch sibling.txt",
+            "cwd": "/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi"
+          }
+        }
+      ],
+      "results": [
+        {
+          "toolCallId": "call-sibling-b",
+          "toolName": "bash",
+          "isError": true,
+          "text": "Tool not available",
+          "hasTerminate": false
+        }
+      ],
+      "sideEffects": {
+        "sibling": false,
+        "submit": false
+      },
+      "doneSeq": 6
+    },
+    "gated": {
+      "label": "s6-gated-handler",
+      "submitRanWhileShellPending": true,
+      "pendingLocalWork": true,
+      "doneBeforeRelease": false,
+      "handlerLeaveBeforeDrain": true,
+      "doneAfterDrain": true,
+      "events": [
+        {
+          "seq": 1,
+          "event": "dispatch:shellArgs"
+        },
+        {
+          "seq": 2,
+          "event": "handler:shell:enter"
+        },
+        {
+          "seq": 3,
+          "event": "dispatch:mcpArgs"
+        },
+        {
+          "seq": 4,
+          "event": "tool:SubmitPlan:execute"
+        },
+        {
+          "seq": 5,
+          "event": "handler:shell:leave"
+        },
+        {
+          "seq": 6,
+          "event": "drain:complete"
+        },
+        {
+          "seq": 7,
+          "event": "done"
+        }
+      ],
+      "blocks": [
+        {
+          "id": "call-gate-shell",
+          "name": "bash",
+          "resolved": true
+        },
+        {
+          "id": "call-gate-submit",
+          "name": "SubmitPlan",
+          "resolved": true
+        }
+      ],
+      "results": [
+        {
+          "toolCallId": "call-gate-submit",
+          "toolName": "SubmitPlan",
+          "isError": false
+        },
+        {
+          "toolCallId": "call-gate-shell",
+          "toolName": "bash",
+          "isError": true
+        }
+      ]
+    }
+  },
+  "observations": {
+    "gated": {
+      "framesNotSerialized": true,
+      "pendingLocalWorkWhileHandlerRuns": true,
+      "doneBeforeGateRelease": false,
+      "doneAfterDrain": true,
+      "note": "a handler that never settles keeps stream.hasPendingLocalWork true and blocks the provider's pre-done drain (cursor.ts:950-960); upstream's own http2 fixture asserts the same for done/error/abort (packages/ai/test/cursor-terminal-error.test.ts)"
+    },
+    "externalHandoff": {
+      "blocks": [],
+      "pairedResults": [],
+      "wire": [
+        {
+          "frame": "execClientMessage",
+          "answer": "mcpResult",
+          "result": "success",
+          "payload": "{\"$typeName\":\"agent.v1.McpSuccess\",\"content\":[{\"$typeName\":\"agent.v1.McpToolResultContentItem\",\"content\":{\"case\":\"text\",\"value\":{\"$typeName\":\"agent.v1.McpTextContent\",\"text\":\"Tool call received and handed off to the external client for execution. Do not retry or call it again; end the turn. The result will be provided in the next request.\"}}}],\"isError\":false}"
+        }
+      ],
+      "note": "with no `mcp` handler the exec branch synthesizes no block and pairs nothing (cursor.ts:1938-1952); the block for such a call must therefore come from the interaction-update channel, which this harness does not fabricate"
+    }
+  },
+  "checks": [
+    {
+      "name": "siblingFirst: the sibling in a batch that also holds SubmitPlan executes ZERO times",
+      "ok": false,
+      "detail": "sibling executions: 1, side-effect file: true"
+    },
+    {
+      "name": "siblingFirst: the transition call itself is not executed by the provider",
+      "ok": false,
+      "detail": "SubmitPlan executions: 1"
+    },
+    {
+      "name": "siblingFirst: every execution happens after the batch verdict (i.e. after the message is complete)",
+      "ok": false,
+      "detail": "executions before the stream's done event: 2 of 2"
+    },
+    {
+      "name": "siblingFirst: the server is not told the sibling succeeded",
+      "ok": false,
+      "detail": "[{\"frame\":\"execClientMessage\",\"answer\":\"shellResult\",\"result\":\"success\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.ShellSuccess\\\",\\\"command\\\":\\\"touch sibling.txt\\\",\\\"workingDirectory\\\":\\\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\\\",\\\"exitCode\\\":0,\\\"signal\\\":\\\"\\\",\\\"stdout\\\":\\\"sibling ran\\\",\\\"stderr\\\":\\\"\\\",\\\"executionTime\\\":0}\"},{\"frame\":\"execClientMessage\",\"answer\":\"mcpResult\",\"result\":\"success\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.McpSuccess\\\",\\\"content\\\":[{\\\"$typeName\\\":\\\"agent.v1.McpToolResultContentItem\\\",\\\"content\\\":{\\\"case\\\":\\\"text\\\",\\\"value\\\":{\\\"$typeName\\\":\\\"agent.v1.McpTextContent\\\",\\\"text\\\":\\\"plan submitted\\\"}}}],\\\"isError\\\":false}\"}]"
+    },
+    {
+      "name": "siblingFirst: the successful submit cannot end the run (no terminate reaches the loop)",
+      "ok": false,
+      "detail": "blocks=[{\"id\":\"call-sibling-1\",\"name\":\"bash\",\"resolved\":true,\"args\":{\"command\":\"touch sibling.txt\",\"cwd\":\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\"}},{\"id\":\"call-submit-1\",\"name\":\"SubmitPlan\",\"resolved\":true,\"args\":{\"title\":\"T\",\"markdown\":\"# Plan\",\"question\":\"Approve?\"}}] results=[{\"toolCallId\":\"call-sibling-1\",\"toolName\":\"bash\",\"isError\":false,\"text\":\"sibling ran\",\"hasTerminate\":false},{\"toolCallId\":\"call-submit-1\",\"toolName\":\"SubmitPlan\",\"isError\":false,\"text\":\"plan submitted\",\"hasTerminate\":false}]"
+    },
+    {
+      "name": "submitFirst: the sibling in a batch that also holds SubmitPlan executes ZERO times",
+      "ok": false,
+      "detail": "sibling executions: 1, side-effect file: true"
+    },
+    {
+      "name": "submitFirst: the transition call itself is not executed by the provider",
+      "ok": false,
+      "detail": "SubmitPlan executions: 1"
+    },
+    {
+      "name": "submitFirst: every execution happens after the batch verdict (i.e. after the message is complete)",
+      "ok": false,
+      "detail": "executions before the stream's done event: 2 of 2"
+    },
+    {
+      "name": "submitFirst: the server is not told the sibling succeeded",
+      "ok": false,
+      "detail": "[{\"frame\":\"execClientMessage\",\"answer\":\"mcpResult\",\"result\":\"success\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.McpSuccess\\\",\\\"content\\\":[{\\\"$typeName\\\":\\\"agent.v1.McpToolResultContentItem\\\",\\\"content\\\":{\\\"case\\\":\\\"text\\\",\\\"value\\\":{\\\"$typeName\\\":\\\"agent.v1.McpTextContent\\\",\\\"text\\\":\\\"plan submitted\\\"}}}],\\\"isError\\\":false}\"},{\"frame\":\"execClientMessage\",\"answer\":\"shellResult\",\"result\":\"success\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.ShellSuccess\\\",\\\"command\\\":\\\"touch sibling.txt\\\",\\\"workingDirectory\\\":\\\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\\\",\\\"exitCode\\\":0,\\\"signal\\\":\\\"\\\",\\\"stdout\\\":\\\"sibling ran\\\",\\\"stderr\\\":\\\"\\\",\\\"executionTime\\\":0}\"}]"
+    },
+    {
+      "name": "submitFirst: the successful submit cannot end the run (no terminate reaches the loop)",
+      "ok": false,
+      "detail": "blocks=[{\"id\":\"call-submit-2\",\"name\":\"SubmitPlan\",\"resolved\":true,\"args\":{\"title\":\"T\",\"markdown\":\"# Plan\",\"question\":\"Approve?\"}},{\"id\":\"call-sibling-2\",\"name\":\"bash\",\"resolved\":true,\"args\":{\"command\":\"touch sibling.txt\",\"cwd\":\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\"}}] results=[{\"toolCallId\":\"call-submit-2\",\"toolName\":\"SubmitPlan\",\"isError\":false,\"text\":\"plan submitted\",\"hasTerminate\":false},{\"toolCallId\":\"call-sibling-2\",\"toolName\":\"bash\",\"isError\":false,\"text\":\"sibling ran\",\"hasTerminate\":false}]"
+    },
+    {
+      "name": "sole SubmitPlan: the provider leaves the call to the agent loop",
+      "ok": false,
+      "detail": "SubmitPlan executions: 1, blocks: [{\"id\":\"call-submit-sole\",\"name\":\"SubmitPlan\",\"resolved\":true,\"args\":{\"title\":\"T\",\"markdown\":\"# Plan\",\"question\":\"?\"}}]"
+    },
+    {
+      "name": "sole SubmitPlan: termination stays available to the loop",
+      "ok": false,
+      "detail": "[{\"id\":\"call-submit-sole\",\"name\":\"SubmitPlan\",\"resolved\":true,\"args\":{\"title\":\"T\",\"markdown\":\"# Plan\",\"question\":\"?\"}}]"
+    },
+    {
+      "name": "no handlers: no tool call is answered with a fabricated failure",
+      "ok": false,
+      "detail": "[{\"frame\":\"execClientMessage\",\"answer\":\"mcpResult\",\"result\":\"toolNotFound\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.McpToolNotFound\\\",\\\"name\\\":\\\"SubmitPlan\\\",\\\"availableTools\\\":[]}\"},{\"frame\":\"execClientMessage\",\"answer\":\"shellResult\",\"result\":\"rejected\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.ShellRejected\\\",\\\"command\\\":\\\"touch sibling.txt\\\",\\\"workingDirectory\\\":\\\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\\\",\\\"reason\\\":\\\"Tool not available\\\",\\\"isReadonly\\\":false}\"}]"
+    },
+    {
+      "name": "external handoff: the exec branch leaves a non-native call to the loop (no block, no pair, handoff ack)",
+      "ok": true,
+      "detail": "blocks=[] results=0 wire=[{\"frame\":\"execClientMessage\",\"answer\":\"mcpResult\",\"result\":\"success\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.McpSuccess\\\",\\\"content\\\":[{\\\"$typeName\\\":\\\"agent.v1.McpToolResultContentItem\\\",\\\"content\\\":{\\\"case\\\":\\\"text\\\",\\\"value\\\":{\\\"$typeName\\\":\\\"agent.v1.McpTextContent\\\",\\\"text\\\":\\\"Tool call received and handed off to the external client for execution. Do not retry or call it again; end the turn. The result will be provided in the next request.\\\"}}}],\\\"isError\\\":false}\"}]"
+    },
+    {
+      "name": "deferral is expressible: the message can complete while an exec handler is still pending",
+      "ok": false,
+      "detail": "the provider's pre-done drain means an unresolved handler blocks `done`; a scheme that waits for message_end before executing would deadlock against its own completion"
+    },
+    {
+      "name": "scheme B: native frames can be executed without a local executor (no fabricated failure)",
+      "ok": false,
+      "detail": "executions=0 wire=[{\"frame\":\"execClientMessage\",\"answer\":\"mcpResult\",\"result\":\"success\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.McpSuccess\\\",\\\"content\\\":[{\\\"$typeName\\\":\\\"agent.v1.McpToolResultContentItem\\\",\\\"content\\\":{\\\"case\\\":\\\"text\\\",\\\"value\\\":{\\\"$typeName\\\":\\\"agent.v1.McpTextContent\\\",\\\"text\\\":\\\"Tool call received and handed off to the external client for execution. Do not retry or call it again; end the turn. The result will be provided in the next request.\\\"}}}],\\\"isError\\\":false}\"},{\"frame\":\"execClientMessage\",\"answer\":\"shellResult\",\"result\":\"rejected\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.ShellRejected\\\",\\\"command\\\":\\\"touch sibling.txt\\\",\\\"workingDirectory\\\":\\\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\\\",\\\"reason\\\":\\\"Tool not available\\\",\\\"isReadonly\\\":false}\"}]"
+    }
+  ],
+  "summary": {
+    "total": 16,
+    "contractHeld": 1,
+    "contractViolated": 15,
+    "red": true
+  }
+}
