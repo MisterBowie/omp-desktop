@@ -1,7 +1,7 @@
 {
-  "experiment": "t20-feasibility",
+  "experiment": "t20-feasibility-patched",
   "runId": null,
-  "startedAt": "2026-09-25T13:56:49.638Z",
+  "startedAt": "2026-09-25T13:56:08.544Z",
   "checks": [
     {
       "description": "s1-mixed-bash-first: process group reaped",
@@ -9,13 +9,13 @@
     },
     {
       "description": "R3-a [bash, SubmitPlan]: the sibling bash call has ZERO side effects",
-      "ok": false,
+      "ok": true,
       "detail": "PI blocks every call in a batch that contains a transition tool"
     },
     {
       "description": "R3-a [bash, SubmitPlan]: the transition call is blocked before it executes",
-      "ok": false,
-      "detail": "SubmitPlan host calls: 1, execution starts: 2"
+      "ok": true,
+      "detail": "SubmitPlan host calls: 0, execution starts: 0"
     },
     {
       "description": "s2-mixed-submit-first: process group reaped",
@@ -23,8 +23,8 @@
     },
     {
       "description": "R3-a [SubmitPlan, bash]: the sibling bash call has ZERO side effects",
-      "ok": false,
-      "detail": "sibling file: true, execution starts: 2"
+      "ok": true,
+      "detail": "sibling file: false, execution starts: 0"
     },
     {
       "description": "s3-double-submit: process group reaped",
@@ -32,8 +32,8 @@
     },
     {
       "description": "R3-a [SubmitPlan, SubmitPlan]: a duplicated transition call executes zero times",
-      "ok": false,
-      "detail": "PI's batch guard blocks the whole batch; observed 2 submissions, 2 execution starts"
+      "ok": true,
+      "detail": "PI's batch guard blocks the whole batch; observed 0 submissions, 0 execution starts"
     },
     {
       "description": "s3b-blocked-transition-sibling: process group reaped",
@@ -41,7 +41,7 @@
     },
     {
       "description": "R3-a: blocking the transition call in the gate still leaves the sibling with ZERO side effects",
-      "ok": false,
+      "ok": true,
       "detail": "the interception payload has no batch view, so a per-call block cannot protect the siblings"
     },
     {
@@ -50,12 +50,12 @@
     },
     {
       "description": "R3-b: a successful submission leaves no further provider step",
-      "ok": false,
-      "detail": "model calls after the submit result: 2"
+      "ok": true,
+      "detail": "model calls after the submit result: 0"
     },
     {
       "description": "R3-b: a successful submission leaves no further tool execution",
-      "ok": false
+      "ok": true
     },
     {
       "description": "s5-failure-branch: process group reaped",
@@ -63,8 +63,8 @@
     },
     {
       "description": "R3-c: a failed submission also leaves no further provider step",
-      "ok": false,
-      "detail": "model calls after the failed submit result: 2"
+      "ok": true,
+      "detail": "model calls after the failed submit result: 0"
     },
     {
       "description": "s6-abort-pending: process group reaped",
@@ -73,7 +73,7 @@
     {
       "description": "R3-d: abandoning a pending transition call cancels it by targetId",
       "ok": true,
-      "detail": "cancel.targetId=158d84135bf4ac17 call.id=158d84135bf4ac17"
+      "detail": "cancel.targetId=158d83ed3e525a75 call.id=158d83ed3e525a75"
     },
     {
       "description": "R3-d: the aborted turn terminates",
@@ -83,7 +83,7 @@
     {
       "description": "R3-d: the session stays observable after the abort",
       "ok": true,
-      "detail": "{\"id\":\"req-b92c16fd\",\"type\":\"response\",\"command\":\"get_state\",\"success\":true,\"data\":{\"model\":{\"id\":\"local-model\",\"name\":\"local-model\",\"api\":\"openai-completions\",\"provider\":\"m1fake\",\"baseUrl\":\"http://12"
+      "detail": "{\"id\":\"req-f07239f2\",\"type\":\"response\",\"command\":\"get_state\",\"success\":true,\"data\":{\"model\":{\"id\":\"local-model\",\"name\":\"local-model\",\"api\":\"openai-completions\",\"provider\":\"m1fake\",\"baseUrl\":\"http://12"
     },
     {
       "description": "s7-abort-on-intercept: process group reaped",
@@ -218,71 +218,70 @@
     }
   ],
   "artifacts": {
-    "s1.observed": {
-      "hookOrder": [
-        "bash",
-        "SubmitPlan"
+    "patched.runtime": {
+      "patchLevel": "d49918f+omp-desktop.1",
+      "baseSha": "d49918fab2dba3986927f2d46721629ed0f3a02c",
+      "capabilities": [
+        "rpc-host-tool-concurrency",
+        "rpc-host-tool-sole-batch-policy",
+        "agent-tool-result-terminate",
+        "rpc-host-tool-result-terminate"
       ],
-      "bashSideEffect": true,
-      "submitHostCalls": 1,
+      "launcher": "/tmp/omp-patch-kJhcvY/packages/coding-agent/scripts/omp",
+      "carriesPatch": {
+        "batchPolicy": true,
+        "concurrency": true,
+        "terminate": true
+      },
+      "note": "a scratch copy of the pinned commit with app/patches/oh-my-pi applied; nothing in upstream/oh-my-pi is modified"
+    },
+    "s1.observed": {
+      "hookOrder": [],
+      "bashSideEffect": false,
+      "submitHostCalls": 0,
       "providerRequests": 2,
-      "executions": [
-        "bash",
-        "SubmitPlan"
-      ]
+      "executions": []
     },
     "s2.observed": {
-      "hookOrder": [
-        "SubmitPlan",
-        "bash"
-      ],
-      "bashSideEffect": true,
-      "submitHostCalls": 1,
-      "executions": [
-        "SubmitPlan",
-        "bash"
-      ]
+      "hookOrder": [],
+      "bashSideEffect": false,
+      "submitHostCalls": 0,
+      "executions": []
     },
     "s3.observed": {
-      "submitHostCalls": 2,
-      "hookCalls": 2
+      "submitHostCalls": 0,
+      "hookCalls": 0
     },
     "s3b.observed": {
-      "blockedEvents": [
-        "SubmitPlan"
-      ],
-      "bashSideEffect": true,
+      "blockedEvents": [],
+      "bashSideEffect": false,
       "submitHostCalls": 0,
-      "executions": [
-        "bash",
-        "SubmitPlan"
-      ],
+      "executions": [],
       "executionsNote": "tool_execution_start also fires for a blocked call; the side-effect signals are the sibling file and the host_tool_call frame"
     },
     "s4.observed": {
-      "providerRequestsAfterSubmit": 3,
-      "continuedToolRan": true,
+      "providerRequestsAfterSubmit": 1,
+      "continuedToolRan": false,
       "executions": [
-        "SubmitPlan",
-        "bash"
+        "SubmitPlan"
       ]
     },
     "s5.observed": {
-      "providerRequests": 3,
-      "continuedToolRan": true,
+      "providerRequests": 1,
+      "continuedToolRan": false,
       "hostCalls": [
         "SubmitPlan"
       ]
     },
     "s6.observed": {
       "pendingCall": {
-        "id": "158d84135bf4ac17",
+        "id": "158d83ed3e525a75",
         "toolName": "SubmitPlan"
       },
       "hostToolCancel": {
         "type": "host_tool_cancel",
-        "id": "158d84140ff4ac18",
-        "targetId": "158d84135bf4ac17"
+        "id": "158d83edf2d25a76",
+        "targetId": "158d83ed3e525a75"
       },
       "agentEndCount": 1,
       "providerRequests": 1,
@@ -327,20 +326,10 @@
       ]
     },
     "s7.observed": {
-      "abortEvents": [
-        {
-          "at": 1790344628691,
-          "event": "spike_abort_requested",
-          "toolName": "SubmitPlan",
-          "hadAbort": true
-        }
-      ],
+      "abortEvents": [],
       "bashSideEffect": false,
       "submitHostCalls": 0,
-      "executions": [
-        "bash",
-        "SubmitPlan"
-      ],
+      "executions": [],
       "frames": [
         "ready",
         "extension_ui_request",
@@ -353,7 +342,6 @@
         "message_start",
         "message_end",
         "message_update",
-        "tool_execution_start",
         "tool_execution_end",
         "turn_end",
         "agent_end"
@@ -364,7 +352,7 @@
         "toolUse",
         null,
         null,
-        "aborted"
+        "stop"
       ]
     },
     "r4a.observed": {
@@ -633,10 +621,7 @@
       ]
     }
   },
-  "limitations": [
-    "A mixed batch containing a transition tool is the exact case PI's beforeToolCall batch guard exists for; the patched track enforces it (`--patched`).",
-    "Abort-on-intercept is the only per-batch lever the fixed surface offers; if it works it is abort semantics, not PI's block-and-continue."
-  ],
-  "finishedAt": "2026-09-25T13:57:28.333Z",
-  "ok": false
+  "limitations": [],
+  "finishedAt": "2026-09-25T13:56:49.565Z",
+  "ok": true
 }

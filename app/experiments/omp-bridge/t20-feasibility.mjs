@@ -33,12 +33,25 @@
  * masquerade as a successful catalog. Provider, runtime and extension are all
  * local (fake provider, pinned launcher) — no paid or remote model is called.
  *
- * Usage: node t20-feasibility.mjs [--keep-artifacts]
+ * Two tracks, one scenario set:
+ *
+ *   node t20-feasibility.mjs            → the fixed submodule (baseline track)
+ *   node t20-feasibility.mjs --patched  → the OMP Desktop patch set
+ *
+ * The baseline track records what the *unpatched* fixed source can do, so the
+ * R3 failures stay reproducible; the patched track applies
+ * `app/patches/oh-my-pi/` to a scratch copy of the same commit and must flip
+ * exactly those R3 checks. The two tracks write different result files
+ * (`results/t20-feasibility.json` vs `results/t20-feasibility-patched.json`) —
+ * the unpatched baseline is never overwritten by a patched run.
+ *
+ * Usage: node t20-feasibility.mjs [--patched] [--keep-artifacts]
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { OmpRpc } from "./lib/rpc.mjs";
+import { preparePatchedTree } from "../../scripts/omp-patch.mjs";
 import { FakeProvider } from "./lib/provider.mjs";
 import { resolveRepoRoot, EXPERIMENT_ROOT } from "./lib/base.mjs";
 import { runExperiment, experimentRoot } from "./lib/run.mjs";
@@ -55,10 +68,22 @@ const PINNED_MODE_PROMPTS = join(
 const { composeModeSystemPrompt } = await import(pathToFileURL(APP_MODE_PROMPTS).href);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * `--patched` runs every scenario against a scratch copy of the pinned source
+ * with the OMP Desktop patch set applied; without it the pinned submodule is
+ * used unchanged. The launcher override is resolved once, before any scenario.
+ */
+const PATCHED = process.argv.includes("--patched");
+let launcherOverride;
+
 const SUBMIT_TOOL = {
   name: "SubmitPlan",
   label: "Submit plan",
   description: "Submit one complete Markdown plan for user approval.",
+  // Declared admission/scheduling policy (RPC host tool definition fields).
+  // The unpatched runtime ignores both; the patched runtime enforces them.
+  batchPolicy: "sole",
+  concurrency: "exclusive",
   parameters: {
     type: "object",
     properties: {
@@ -74,6 +99,8 @@ const SUBMIT_GOAL_TOOL = {
   name: "SubmitGoal",
   label: "Submit goal",
   description: "Submit one complete Markdown goal contract for user approval.",
+  batchPolicy: "sole",
+  concurrency: "exclusive",
   parameters: {
     type: "object",
     properties: {
@@ -143,6 +170,10 @@ async function runScenario(ctx, provider, config) {
     rpc = await OmpRpc.start({
       repoRoot,
       runRoot,
+      // `launcher` is the experiment client's test seam for launching a
+      // different checkout (see lib/rpc.mjs); the pinned launcher is used when
+      // no `--patched` tree was prepared.
+      launcher: launcherOverride,
       mode: "rpc-ui",
       args: ["--model", selector, "--trusted-extension", SPIKE_GATE, "--approval-mode", "yolo"],
       cwd: projectDir,
@@ -245,9 +276,34 @@ async function runScenario(ctx, provider, config) {
   }
 }
 
-const evidence = await runExperiment("t20-feasibility", async (ctx) => {
+const evidence = await runExperiment(PATCHED ? "t20-feasibility-patched" : "t20-feasibility", async (ctx) => {
   const provider = await FakeProvider.start({ model: "local-model" });
   ctx.onCleanup(() => provider.close());
+
+  if (PATCHED) {
+    // Scratch copy of the pinned commit + the OMP Desktop patch set + the
+    // per-worktree dependency payload, so the launcher runs from the copy.
+    const prepared = preparePatchedTree({ prepareBuild: true, keep: true });
+    ctx.onCleanup(prepared.cleanup);
+    const read = (relative) => readFileSync(join(prepared.tree, relative), "utf8");
+    launcherOverride = join(prepared.tree, "packages", "coding-agent", "scripts", "omp");
+    const carriesPatch = {
+      batchPolicy: read("packages/agent/src/types.ts").includes("batchPolicy?: \"any\" | \"sole\""),
+      concurrency: read("packages/coding-agent/src/modes/rpc/rpc-types.ts").includes('concurrency?: "shared" | "exclusive"'),
+      terminate: read("packages/agent/src/types.ts").includes("terminate?: boolean"),
+    };
+    ctx.note("patched.runtime", {
+      patchLevel: prepared.manifest.patchLevel,
+      baseSha: prepared.manifest.base.sha,
+      capabilities: prepared.manifest.capabilities,
+      launcher: launcherOverride,
+      carriesPatch,
+      note: "a scratch copy of the pinned commit with app/patches/oh-my-pi applied; nothing in upstream/oh-my-pi is modified",
+    });
+    if (!carriesPatch.batchPolicy || !carriesPatch.concurrency || !carriesPatch.terminate) {
+      throw new Error(`patched tree does not carry the patch set: ${JSON.stringify(carriesPatch)}`);
+    }
+  }
 
   // ==========================================================================
   // R3-1  mixed batch [bash, SubmitPlan]
@@ -285,10 +341,14 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
     );
     ctx.check(
       "R3-a [bash, SubmitPlan]: the transition call is blocked before it executes",
-      submitsSeen === 0,
-      `SubmitPlan host calls: ${submitsSeen}`,
+      submitsSeen === 0 && run.frames.filter((f) => f.type === "tool_execution_start").length === 0,
+      `SubmitPlan host calls: ${submitsSeen}, execution starts: ${run.frames.filter((f) => f.type === "tool_execution_start").length}`,
     );
-    ctx.limit("A mixed batch containing a transition tool is the exact case PI's beforeToolCall batch guard exists for.");
+    if (!PATCHED) {
+      ctx.limit(
+        "A mixed batch containing a transition tool is the exact case PI's beforeToolCall batch guard exists for; the patched track enforces it (`--patched`).",
+      );
+    }
   }
 
   // ==========================================================================
@@ -320,8 +380,8 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
     });
     ctx.check(
       "R3-a [SubmitPlan, bash]: the sibling bash call has ZERO side effects",
-      !existsSync(touched),
-      "order inside the batch must not matter",
+      !existsSync(touched) && run.frames.filter((f) => f.type === "tool_execution_start").length === 0,
+      `sibling file: ${existsSync(touched)}, execution starts: ${run.frames.filter((f) => f.type === "tool_execution_start").length}`,
     );
   }
 
@@ -349,8 +409,8 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
     ctx.note("s3.observed", { submitHostCalls: submitsSeen, hookCalls: run.log.filter((e) => e.event === "tool_call").length });
     ctx.check(
       "R3-a [SubmitPlan, SubmitPlan]: a duplicated transition call executes zero times",
-      submitsSeen === 0,
-      `PI's batch guard blocks the whole batch; observed ${submitsSeen} submissions`,
+      submitsSeen === 0 && run.frames.filter((f) => f.type === "tool_execution_start").length === 0,
+      `PI's batch guard blocks the whole batch; observed ${submitsSeen} submissions, ${run.frames.filter((f) => f.type === "tool_execution_start").length} execution starts`,
     );
   }
 
@@ -399,6 +459,10 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
     const run = await runScenario(ctx, provider, {
       label: "s4-continue-after-success",
       tools: [SUBMIT_TOOL],
+      // A successful submission ends the turn (PI: every terminal branch of the
+      // submit tool returns `terminate: true`); the unpatched runtime drops the
+      // flag, the patched one ends the run after the batch.
+      answerHostTool: () => ({ content: [{ type: "text", text: "plan submitted" }], terminate: true }),
       turns: [
         { text: "submitting", toolCalls: [{ id: "s4-submit", name: "SubmitPlan", args: submitArgs }], finish: "tool_calls" },
         { text: "continuing anyway", toolCalls: [{ id: "s4-bash", name: "bash", args: { command: `touch ${touched}` } }], finish: "tool_calls" },
@@ -424,7 +488,10 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
   {
     const project = ctx.scratch("t20-s5-project");
     const touched = join(project, "failed-continue.txt");
-    const failing = () => ({ content: [{ type: "text", text: "submission failed: PLAN_SUBMIT_FAILED" }] });
+    const failing = () => ({
+      content: [{ type: "text", text: "submission failed: PLAN_SUBMIT_FAILED" }],
+      terminate: true,
+    });
     failing.isError = true;
     const run = await runScenario(ctx, provider, {
       label: "s5-failure-branch",
@@ -519,7 +586,11 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
       "R3-a: aborting from the transition interception still leaves the sibling with ZERO side effects",
       !existsSync(touched),
     );
-    ctx.limit("Abort-on-intercept is the only per-batch lever the fixed surface offers; if it works it is abort semantics, not PI's block-and-continue.");
+    if (!PATCHED) {
+      ctx.limit(
+        "Abort-on-intercept is the only per-batch lever the fixed surface offers; if it works it is abort semantics, not PI's block-and-continue.",
+      );
+    }
   }
 
   // ==========================================================================

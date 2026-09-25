@@ -1747,3 +1747,46 @@ T19-C delivers desktop skills and project memory through the same trusted gate
   through `skill://` beside the desktop catalog. No new or decorative UI was
   added. T20 (Plan/Goal, real-mode propagation, high-privilege tools, child
   stop/`hasUI` policy) stays closed and unclaimed.
+
+## 15. Pinned runtime patch level (M5/T20-R3A, ADR 0305)
+
+The runtime source stays at the pinned upstream commit; this project's
+additions to it live in `app/patches/oh-my-pi/` as a numbered patch set
+(`<base-short-sha>+omp-desktop.<n>`, currently `d49918f+omp-desktop.1`) with a
+manifest that records the base SHA, the expected runtime version, the patch
+checksum and the capability ids. `scripts/omp-patch.mjs` is the only
+application path: it validates the manifest against the source checkout, copies
+exactly the tracked tree of the pinned commit into a scratch directory, applies
+the patch, optionally copies the per-worktree dependency payload, optionally
+verifies the result, and removes every scratch it created on every path.
+Packaging (M6/T21) consumes `--apply --out <dir> --prepare-build`; nothing else
+re-implements patch application and the submodule is never edited by hand.
+
+The patch set adds four capabilities the desktop declares on its own host tools,
+none of which names a desktop product:
+
+- `rpc-host-tool-concurrency` — `RpcHostToolDefinition.concurrency?: "shared" |
+  "exclusive"`, omitted normalizes to `"shared"`, and any other value rejects the
+  whole `set_host_tools` request instead of degrading to the default.
+- `rpc-host-tool-sole-batch-policy` — `RpcHostToolDefinition.batchPolicy?: "any"
+  | "sole"`. A `"sole"` tool must be the only tool call in its assistant
+  message; a batch that carries one plus any sibling is rejected whole before
+  scheduling — no call in it executes, no `tool_execution_start` is emitted, and
+  each call is answered with the same blocked error result in call order. The
+  pre-dispatch hook (approval, extension policy) is not consulted for a rejected
+  batch, matching PI's ordering.
+- `agent-tool-result-terminate` — `AgentToolResult.terminate?: boolean` and the
+  same field on the `afterToolCall` override. Once the batch settles, a
+  requested termination ends the run before the next provider call; success and
+  error results terminate alike, the turn keeps its own stop reason (it is not an
+  abort), queued steering stays queued for the next run, and a streaming partial
+  can never terminate.
+- `rpc-host-tool-result-terminate` — `host_tool_result.result.terminate` reaches
+  the loop verbatim. A frame that sets both top-level `isError` and
+  `result.terminate` resolves with `isError: true, terminate: true` rather than
+  being rejected, because a thrown error cannot carry the flag; the loop reads
+  `isError = frame.isError || result.isError`.
+
+Evidence, per-track spike counts and the script's negative-path tests are in
+`docs/validation/M5-omp-transition-patch.md`. T20-B/C/D remain unstarted and
+unclaimed by this contract: it removes the runtime blocker only.

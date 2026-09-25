@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "patchLevel": "d49918f+omp-desktop.1",
+  "description": "OMP Desktop patch set for the pinned upstream OMP runtime: RPC host-tool scheduling and batch policy plus settle-time run termination.",
+  "base": {
+    "submodule": "upstream/oh-my-pi",
+    "repository": "https://github.com/can1357/oh-my-pi",
+    "sha": "d49918fab2dba3986927f2d46721629ed0f3a02c",
+    "version": "18.2.7"
+  },
+  "patch": {
+    "file": "0001-rpc-host-tool-transition-contract.patch",
+    "sha256": "4351025dbb8bf7b6a7b58dacfcabc8b61f86710d19c0f1219483ffe25aea2b24",
+    "bytes": 52556
+  },
+  "capabilities": [
+    "rpc-host-tool-concurrency",
+    "rpc-host-tool-sole-batch-policy",
+    "agent-tool-result-terminate",
+    "rpc-host-tool-result-terminate"
+  ],
+  "files": [
+    "docs/rpc.md",
+    "packages/agent/src/agent-loop.ts",
+    "packages/agent/src/telemetry.ts",
+    "packages/agent/src/types.ts",
+    "packages/agent/test/agent-loop.test.ts",
+    "packages/coding-agent/src/modes/rpc/host-tools.ts",
+    "packages/coding-agent/src/modes/rpc/rpc-client.ts",
+    "packages/coding-agent/src/modes/rpc/rpc-mode.ts",
+    "packages/coding-agent/src/modes/rpc/rpc-types.ts",
+    "packages/coding-agent/test/rpc-host-tools.test.ts"
+  ],
+  "contract": {
+    "concurrencyField": "RpcHostToolDefinition.concurrency",
+    "batchPolicyField": "RpcHostToolDefinition.batchPolicy",
+    "terminateField": "AgentToolResult.terminate",
+    "invalidDeclaration": "set_host_tools request is rejected; the value never degrades to the default",
+    "invalidDeclarationDetail": "RpcHostToolDefinition.concurrency/batchPolicy values outside their union throw in normalizeHostToolPolicy, which the set_host_tools command and the host-tool adapter both call"
+  },
+  "verification": {
+    "patchCheck": "node scripts/omp-patch.mjs --check",
+    "prepareAndVerify": "node scripts/omp-patch.mjs --apply --out <dir> --prepare-build --verify",
+    "suites": [
+      "packages/agent/test/agent-loop.test.ts",
+      "packages/coding-agent/test/rpc-host-tools.test.ts"
+    ],
+    "spike": "node experiments/omp-bridge/t20-feasibility.mjs --patched"
+  },
+  "notes": [
+    "This is an OMP Desktop-maintained patch level, not upstream OMP support: the runtime remains pinned at d49918f (omp/18.2.7) plus this patch set.",
+    "Rebuild the patch after any source edit with: git -C <checkout> diff > app/patches/oh-my-pi/0001-rpc-host-tool-transition-contract.patch, then refresh patch.sha256 and patch.bytes."
+  ]
+}
