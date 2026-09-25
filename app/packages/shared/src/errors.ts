@@ -246,4 +246,8 @@ export const ErrorCodes = {
   // is refused with these codes; it is never served by another engine.
   ENGINE_CAPABILITY_UNAVAILABLE: "ENGINE_CAPABILITY_UNAVAILABLE",
   ENGINE_UNAVAILABLE: "ENGINE_UNAVAILABLE",
+  // Plan/Goal × model product gate (M5/T20-R3C): the Cursor provider's exec
+  // channel cannot honour the transition-tool contract, so the desktop refuses
+  // to combine it with Plan or Goal mode (see shared/plan-goal-model-gate.ts).
+  PLAN_GOAL_CURSOR_UNSUPPORTED: "PLAN_GOAL_CURSOR_UNSUPPORTED",
 } as const;

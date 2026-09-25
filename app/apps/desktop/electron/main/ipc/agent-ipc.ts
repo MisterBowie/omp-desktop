@@ -1,4 +1,4 @@
-import { IPC, ErrorCodes, isGlobalPermissionMode, type AgentEventEnvelope, type AgentPromptRequest, type AgentSteerRequest, type UiMessage, type AgentQueuePushRequest, type AgentStopRequest, type AskToolResolution, type GlobalPermissionMode, type MessageUsage, type PlanExecutionFinishStatus, type PlanResolutionResult, type PlanResolveRequest, type PromptEnhancementRequest, type SessionSummarizeTitleRequest, canonicalThinkingLevel, type ThinkingLevel } from "@pi-desktop/shared";
+import { IPC, ErrorCodes, isGlobalPermissionMode, planGoalCursorRefusal, type AgentEventEnvelope, type AgentPromptRequest, type AgentSteerRequest, type UiMessage, type AgentQueuePushRequest, type AgentStopRequest, type AskToolResolution, type GlobalPermissionMode, type MessageUsage, type PlanExecutionFinishStatus, type PlanResolutionResult, type PlanResolveRequest, type PromptEnhancementRequest, type SessionSummarizeTitleRequest, canonicalThinkingLevel, type ThinkingLevel } from "@pi-desktop/shared";
 import type { FinishTurn } from "../runtime/plans";
 import { expandSlashInvocation, enhancePromptDraft, summarizeSessionTitle, visionFromModelConfig, type ComposerTemplate, type RuntimeProviderConfig } from "@pi-desktop/agent-runtime";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
@@ -365,6 +365,16 @@ export function registerAgentIpc({
     // durable record, so the refusal does not depend on the Pi sidecar being
     // absent or present.
     const promptEngine = engineRouter.require(session, "prompt");
+    // Plan/Goal × Cursor product gate (T20-R3C). The durable binding is the
+    // authority, so a stale or imported combination (Plan/Goal + the Cursor
+    // provider) is refused here — before any runtime work — instead of running
+    // a contract mode whose transition contract Cursor's exec channel cannot
+    // honour. The refusal names both escape paths; it never rewrites the mode
+    // or the model itself.
+    const planGoalRefusal = planGoalCursorRefusal(session.mode, session.providerId);
+    if (planGoalRefusal) {
+      throw Object.assign(new Error(planGoalRefusal.message), planGoalRefusal);
+    }
     if (promptEngine === "omp") {
       // The OMP runtime owns this session's transcript, its tools and its
       // approvals; the Pi sidecar and the host turn queue are not part of this

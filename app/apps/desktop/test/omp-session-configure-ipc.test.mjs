@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { register } from "node:module";
 import test from "node:test";
 import ts from "typescript";
+import { pathToFileURL } from "node:url";
 import { ErrorCodes } from "../../../packages/shared/src/errors.ts";
 import * as sharedProtocol from "../../../packages/shared/src/protocol.ts";
 
@@ -10,7 +12,8 @@ import * as sharedProtocol from "../../../packages/shared/src/protocol.ts";
  * H3: the sessionConfigure IPC must carry `inconsistent` through the error, and
  * delete/archive must fail closed when an OMP session has no wired runtime.
  */
-const shared = { ErrorCodes, ...sharedProtocol };
+register(pathToFileURL(path.join(import.meta.dirname, "helpers", "ts-import-hooks.mjs")));
+const shared = { ErrorCodes, ...sharedProtocol, ...(await import("../../../packages/shared/src/plan-goal-model-gate.ts")) };
 const { IPC } = sharedProtocol;
 
 function load(relative, imports, globals = {}) {

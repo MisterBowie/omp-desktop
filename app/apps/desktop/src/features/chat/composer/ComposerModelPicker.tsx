@@ -56,6 +56,7 @@ export function ComposerModelPicker({
     modelListRef,
     thinkingListRef,
     modelGroups,
+    hiddenCursorProviders,
     flatModels,
     thinkingMenuLevels,
     showView,
@@ -235,8 +236,16 @@ export function ComposerModelPicker({
                     </div>
                   ));
                 })()}
-                {flatModels.length === 0 ? (
+                {flatModels.length === 0 && hiddenCursorProviders === 0 ? (
                   <div className="composer-model-empty">{t("chat.noModelResults")}</div>
+                ) : null}
+                {/* Plan/Goal × Cursor product gate (T20-R3C): the Cursor
+                    provider's models are withheld in Plan/Goal mode, and the
+                    reason is stated rather than silently missing. */}
+                {hiddenCursorProviders > 0 ? (
+                  <div className="composer-model-empty">
+                    {t("errors.PLAN_GOAL_CURSOR_UNSUPPORTED")}
+                  </div>
                 ) : null}
               </div>
             </>

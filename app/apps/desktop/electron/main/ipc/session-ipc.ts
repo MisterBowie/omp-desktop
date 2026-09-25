@@ -9,6 +9,7 @@ import {
   draftMatchesExisting,
   providerCreateInputFromDraft,
   isModelConfigImportSource,
+  planGoalCursorRefusal,
   type ActivationScope,
   type ModelConfigImportDraft,
   type Mode,
@@ -192,6 +193,14 @@ export function registerSessionIpc({
   });
   handle(IPC.invoke.sessionCreate, async (input = {}) => {
     if (!host) throw new Error("host unavailable");
+    // Plan/Goal × Cursor product gate (T20-R3C): a new session is created with
+    // the mode and binding the composer inherited, so it is the third boundary
+    // that can accept the combination. Refuse it here rather than persisting a
+    // session whose next prompt would be rejected.
+    const planGoalRefusal = planGoalCursorRefusal(input.mode, input.providerId);
+    if (planGoalRefusal) {
+      throw Object.assign(new Error(planGoalRefusal.message), planGoalRefusal);
+    }
     const capabilityPromise = sessionCapabilityContext();
     const res = await host.call<{ session?: (RuntimeSession & { id?: string }) | null }>(
       "session.create",
@@ -721,6 +730,23 @@ export function registerSessionIpc({
       // through its own callbacks; a failed persist is reverted rather than left
       // forked. The Pi path below is the plain host write.
       const engine = engineRouter ? await engineRouter.requireForSession(id, "modelSwitch") : "pi";
+      // Plan/Goal × Cursor product gate (T20-R3C): the only desktop writer of
+      // mode/provider/model refuses the combination before any persistence, so
+      // the durable record cannot gain it by entering Plan/Goal on a
+      // Cursor-bound session or by binding Cursor while Plan/Goal is active.
+      // The renderer sends partial updates (a mode change carries no provider,
+      // a model change carries no new mode), so the effective pair is the
+      // update merged over the record the engine lookup just read.
+      const current = await host
+        .call<{ session?: RuntimeSession | null }>("session.get", { id, messageLimit: 1 })
+        .then((read) => read?.session ?? null);
+      const planGoalRefusal = planGoalCursorRefusal(
+        config.mode ?? current?.mode ?? null,
+        config.providerId ?? current?.providerId ?? null,
+      );
+      if (planGoalRefusal) {
+        throw Object.assign(new Error(planGoalRefusal.message), planGoalRefusal);
+      }
       let result: { session?: RuntimeSession | null };
       if (engine === "omp") {
         // A session that is OMP but has no wired bridge must fail closed: its

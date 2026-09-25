@@ -1,12 +1,13 @@
 import i18n from "i18next";
 import { prepareTranscriptAction } from "../runtime/transcript-action";
-import type {
-  Mode,
-  PlanProposal,
-  ProposalKind,
-  SessionDetail,
-  SessionSummary,
-  UiMessage,
+import {
+  planGoalCursorRefusal,
+  type Mode,
+  type PlanProposal,
+  type ProposalKind,
+  type SessionDetail,
+  type SessionSummary,
+  type UiMessage,
 } from "@pi-desktop/shared";
 import {
   isActivePlanExecution,
@@ -409,26 +410,37 @@ export function createSessionSlice({
             providers: get().providers,
           });
           if (pin.providerId && pin.modelId) {
-            set((state) => ({
-              sessions: state.sessions.map((session) =>
-                session.id === id
-                  ? applyOptimisticSessionConfiguration(session, pin)
-                  : session,
-              ),
-            }));
-            if (get().activeSessionId === id) {
-              void get().configureActiveSession({
-                mode: selected.mode,
-                providerId: pin.providerId,
-                modelId: pin.modelId,
-                thinkingLevel: selected.thinkingLevel,
+            // Plan/Goal × Cursor product gate (T20-R3C): pinning a Cursor model
+            // onto a Plan/Goal session would create the refused pair, so the
+            // pin is skipped and the reason surfaced instead of leaving an
+            // optimistic local binding the main process will reject.
+            const pinRefusal = planGoalCursorRefusal(selected.mode, pin.providerId);
+            if (pinRefusal) {
+              get().showToast(i18n.t(`errors.${pinRefusal.errorCode}`), {
+                variant: "error",
               });
             } else {
-              void api.configureSession(id, {
-                mode: selected.mode,
-                providerId: pin.providerId,
-                modelId: pin.modelId,
-              });
+              set((state) => ({
+                sessions: state.sessions.map((session) =>
+                  session.id === id
+                    ? applyOptimisticSessionConfiguration(session, pin)
+                    : session,
+                ),
+              }));
+              if (get().activeSessionId === id) {
+                void get().configureActiveSession({
+                  mode: selected.mode,
+                  providerId: pin.providerId,
+                  modelId: pin.modelId,
+                  thinkingLevel: selected.thinkingLevel,
+                });
+              } else {
+                void api.configureSession(id, {
+                  mode: selected.mode,
+                  providerId: pin.providerId,
+                  modelId: pin.modelId,
+                });
+              }
             }
           }
         }
@@ -576,6 +588,23 @@ export function createSessionSlice({
 
     configureActiveSession: async (config) => {
       const sessionId = get().activeSessionId;
+      // Plan/Goal × Cursor product gate (T20-R3C). The main-process gate is
+      // authoritative; refusing here keeps the invalid pair out of the composer
+      // state and explains it in the user's language instead of round-tripping
+      // the English refusal message through a toast.
+      const boundProviderId = sessionId
+        ? get().sessions.find((session) => session.id === sessionId)?.providerId
+        : get().draftConfiguration?.providerId;
+      const planGoalRefusal = planGoalCursorRefusal(
+        config.mode,
+        config.providerId ?? boundProviderId ?? null,
+      );
+      if (planGoalRefusal) {
+        get().showToast(i18n.t(`errors.${planGoalRefusal.errorCode}`), {
+          variant: "error",
+        });
+        return;
+      }
       if (!sessionId) {
         set((state) => ({
           draftConfiguration: {

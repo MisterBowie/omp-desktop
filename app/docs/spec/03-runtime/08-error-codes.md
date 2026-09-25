@@ -92,6 +92,22 @@ path.
 | `ENGINE_CAPABILITY_UNAVAILABLE` | no | the session's engine does not support the requested capability in this build (its declaration is closed, or its runtime is not up). Carries `engine` and `capability`; the message names the engine, never a fallback |
 | `ENGINE_UNAVAILABLE` | yes | the engine's runtime is not running or failed to start; the caller may retry once the runtime is available (protocol, version, or process failure) |
 
+### 3.2b Plan/Goal × model gate
+
+Plan and Goal mode are not supported with Cursor models (M5/T20-R3C, user-approved
+product decision). Cursor's exec channel runs tool calls while a response is still
+streaming — before the assistant message that carries them exists — so PI's
+transition-tool contract (the submit tool owns the whole batch; its siblings
+produce no side effects) cannot be honoured and its effects cannot be undone
+(evidence: validation `M5-omp-transition-patch.md` §9/§10). The desktop refuses the
+pair at the boundary that accepts a mode, a model change, or a new session, and
+before any runtime work for a persisted or imported pair — never by rewriting the
+user's mode or model.
+
+| code | retriable | meaning |
+|---|---|---|
+| `PLAN_GOAL_CURSOR_UNSUPPORTED` | no | the session is (or would become) bound to the Cursor provider while Plan or Goal mode is active. Carries `mode` and `providerId`; the message names both escape paths (switch to Agent mode, or choose another model) |
+
 ### 3.2 Agent / session
 
 | code | retriable | meaning |

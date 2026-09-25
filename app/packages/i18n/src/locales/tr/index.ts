@@ -2196,6 +2196,8 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
     SUBAGENT_CONTEXT_OVERFLOW:
       "Bir alt ajanın görevi, modelinin bağlam sınırını aştı. Görevi daraltın, alt ajana daha büyük bağlam penceresi olan bir model verin veya bir defada daha az okumasını sağlayın.",
     AGENT_BUSY: "Bu sohbet zaten çalışıyor. Bitmesini bekleyin veya önce durdurun.",
+    PLAN_GOAL_CURSOR_UNSUPPORTED:
+      "Cursor modellerinde Plan ve Goal modu kullanılamaz. Agent moduna geçin veya başka bir model seçin.",
     TURN_ABORTED: "Durduruldu.",
     workspaceActivationFailed: "Proje çalışma alanı etkinleştirilemedi",
     sessionNotFound: "Oturum bulunamadı",

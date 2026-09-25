@@ -2196,6 +2196,8 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
     SUBAGENT_CONTEXT_OVERFLOW:
       "서브에이전트의 작업이 모델의 컨텍스트 한도를 넘었습니다. 작업 범위를 좁히거나, 컨텍스트 창이 더 큰 모델을 지정하거나, 한 번에 읽는 양을 줄이세요.",
     AGENT_BUSY: "이 채팅은 이미 작업 중입니다. 완료될 때까지 기다리거나 먼저 중지하세요.",
+    PLAN_GOAL_CURSOR_UNSUPPORTED:
+      "Cursor 모델에서는 Plan 및 Goal 모드를 사용할 수 없습니다. Agent 모드로 전환하거나 다른 모델을 선택하세요.",
     TURN_ABORTED: "중지됨",
     workspaceActivationFailed: "프로젝트 작업 공간을 활성화할 수 없습니다",
     sessionNotFound: "세션을 찾을 수 없습니다",

@@ -2156,6 +2156,8 @@ sklm: {
     "CONTEXT_COMPACTION_FAILED": "Der Modellkontext dieser Konversation konnte nicht komprimiert werden.",
     "SUBAGENT_CONTEXT_OVERFLOW": "Die Aufgabe eines Subagenten hat das Kontextlimit seines Modells überschritten. Grenzen Sie die Aufgabe ein, geben Sie dem Subagenten ein Modell mit größerem Kontextfenster oder lassen Sie ihn weniger auf einmal lesen.",
     "AGENT_BUSY": "Dieser Chat funktioniert bereits. Warten Sie, bis der Vorgang abgeschlossen ist, oder stoppen Sie ihn zuerst.",
+    "PLAN_GOAL_CURSOR_UNSUPPORTED":
+      "Plan- und Goal-Modus sind mit Cursor-Modellen nicht verfügbar. Wechseln Sie in den Agent-Modus oder wählen Sie ein anderes Modell.",
     "TURN_ABORTED": "Gestoppt.",
     "workspaceActivationFailed": "Projekt-Arbeitsbereich konnte nicht aktiviert werden",
     "sessionNotFound": "Sitzung nicht gefunden",

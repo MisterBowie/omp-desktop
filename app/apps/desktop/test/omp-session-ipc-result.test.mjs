@@ -25,6 +25,13 @@ import * as sharedProtocol from "../../../packages/shared/src/protocol.ts";
 
 const { IPC } = sharedProtocol;
 
+// The transpiled main modules resolve `@pi-desktop/shared` from the object
+// below, and the Plan/Goal × Cursor gate lives in that package, so the hook and
+// the module must exist before the first `load()` runs.
+const { register: registerImportHooks } = await import("node:module");
+registerImportHooks(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
+const sharedPlanGoalGate = await import("../../../packages/shared/src/plan-goal-model-gate.ts");
+
 function load(relative, imports, globals = {}) {
   const file = new URL(relative, import.meta.url);
   const { outputText } = ts.transpileModule(fs.readFileSync(file, "utf8"), {
@@ -44,7 +51,7 @@ const { registerSessionIpc } = load("../electron/main/ipc/session-ipc.ts", {
   electron: { shell: {} },
   "node:fs": fs,
   "node:path": path,
-  "@pi-desktop/shared": { ErrorCodes, ...sharedProtocol },
+  "@pi-desktop/shared": { ErrorCodes, ...sharedProtocol, ...sharedPlanGoalGate },
   "../importers": {},
   "../services/session-collaboration": { readSessionCollaboration: async () => null },
   "../services/session-search": { searchSessionsAcrossSources: async () => ({ hits: [], nextOffset: null }) },

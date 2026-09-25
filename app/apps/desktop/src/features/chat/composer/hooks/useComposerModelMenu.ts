@@ -6,6 +6,7 @@ import type {
 } from "@pi-desktop/shared";
 import {
   initialThinkingLevelForBinding,
+  isCursorProviderId,
   isImageGenerationModel,
   modelIdsMatch,
 } from "@pi-desktop/shared";
@@ -105,30 +106,40 @@ export function useComposerModelMenu({
     );
   const availableThinkingLevels = providerThinkingLevels(thinkingProvider);
   const thinkingMenuLevels = sessionThinkingMenuLevels(availableThinkingLevels);
-  const modelGroups = useMemo(
-    () =>
-      providers
-        .filter(
-          (candidate) =>
-            candidate.enabled &&
-            (candidate.hasSecret || candidate.authKind === "none"),
-        )
-        .map((candidate) => {
-          const models = composerModelsForProvider(
-            candidate,
-            providerModels[candidate.id],
-            imageGeneration,
-          );
-          return {
-            provider: candidate,
-            providerDisplayName: composerProviderDisplayName(candidate),
-            providerSearchText: composerProviderSearchText(candidate),
-            models,
-          };
-        })
-        .filter((group) => group.models.length > 0),
-    [providers, providerModels, imageGeneration],
-  );
+  // Plan/Goal × Cursor product gate (T20-R3C): the Cursor provider's models are
+  // not selectable while a contract mode is active, so the invalid pair cannot
+  // be picked here. The main process refuses it regardless; hiding the entries
+  // keeps the choice out of reach and the notice explains why.
+  const { modelGroups, hiddenCursorProviders } = useMemo(() => {
+    const groups = providers
+      .filter(
+        (candidate) =>
+          candidate.enabled &&
+          (candidate.hasSecret || candidate.authKind === "none"),
+      )
+      .map((candidate) => {
+        const models = composerModelsForProvider(
+          candidate,
+          providerModels[candidate.id],
+          imageGeneration,
+        );
+        return {
+          provider: candidate,
+          providerDisplayName: composerProviderDisplayName(candidate),
+          providerSearchText: composerProviderSearchText(candidate),
+          models,
+        };
+      })
+      .filter((group) => group.models.length > 0);
+    if (mode === "agent") return { modelGroups: groups, hiddenCursorProviders: 0 };
+    const selectable = groups.filter(
+      (group) => !isCursorProviderId(group.provider.id),
+    );
+    return {
+      modelGroups: selectable,
+      hiddenCursorProviders: groups.length - selectable.length,
+    };
+  }, [providers, providerModels, imageGeneration, mode]);
   const queryNeedle = query.trim().toLowerCase();
   const filteredModelGroups = useMemo(
     () =>
@@ -365,6 +376,7 @@ export function useComposerModelMenu({
     modelListRef,
     thinkingListRef,
     modelGroups: filteredModelGroups,
+    hiddenCursorProviders,
     flatModels,
     thinkingMenuLevels,
     showView,

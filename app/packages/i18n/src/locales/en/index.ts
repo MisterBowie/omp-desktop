@@ -2198,6 +2198,8 @@ importConfirm: "Imported extensions run inside the agent process with the same a
     SUBAGENT_CONTEXT_OVERFLOW:
       "A subagent's task grew past its model's context limit. Narrow the task, give the subagent a model with a larger context window, or have it read less at once.",
     AGENT_BUSY: "This chat is already working. Wait for it to finish, or stop it first.",
+    PLAN_GOAL_CURSOR_UNSUPPORTED:
+      "Plan and Goal mode aren't available with Cursor models. Switch to Agent mode, or pick another model.",
     TURN_ABORTED: "Stopped.",
     workspaceActivationFailed: "Unable to activate project workspace",
     sessionNotFound: "Session not found",

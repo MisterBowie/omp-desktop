@@ -2158,6 +2158,8 @@ sklm: {
     SUBAGENT_CONTEXT_OVERFLOW:
       "子智慧體的任務超出了其模型的上下文上限。請縮小任務範圍、為它選擇上下文視窗更大的模型，或讓它一次讀取更少的內容。",
     AGENT_BUSY: "此對話正在處理中。請等待完成，或先停止當前任務。",
+    PLAN_GOAL_CURSOR_UNSUPPORTED:
+      "Cursor 模型不支援 Plan 與 Goal 模式。請切換到 Agent 模式，或改選其他模型。",
     TURN_ABORTED: "已停止。",
     workspaceActivationFailed: "無法啟用專案工作區",
     sessionNotFound: "找不到工作階段",
