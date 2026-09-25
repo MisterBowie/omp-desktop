@@ -1,7 +1,7 @@
 {
   "experiment": "t20-feasibility",
   "runId": null,
-  "startedAt": "2026-09-25T12:45:02.065Z",
+  "startedAt": "2026-09-25T12:54:00.014Z",
   "checks": [
     {
       "description": "s1-mixed-bash-first: process group reaped",
@@ -73,7 +73,7 @@
     {
       "description": "R3-d: abandoning a pending transition call cancels it by targetId",
       "ok": true,
-      "detail": "cancel.targetId=158d73a3693bea65 call.id=158d73a3693bea65"
+      "detail": "cancel.targetId=158d75b0c9fac3e3 call.id=158d75b0c9fac3e3"
     },
     {
       "description": "R3-d: the aborted turn terminates",
@@ -83,7 +83,7 @@
     {
       "description": "R3-d: the session stays observable after the abort",
       "ok": true,
-      "detail": "{\"id\":\"req-dff62679\",\"type\":\"response\",\"command\":\"get_state\",\"success\":true,\"data\":{\"model\":{\"id\":\"local-model\",\"name\":\"local-model\",\"api\":\"openai-completions\",\"provider\":\"m1fake\",\"baseUrl\":\"http://12"
+      "detail": "{\"id\":\"req-a4019f0e\",\"type\":\"response\",\"command\":\"get_state\",\"success\":true,\"data\":{\"model\":{\"id\":\"local-model\",\"name\":\"local-model\",\"api\":\"openai-completions\",\"provider\":\"m1fake\",\"baseUrl\":\"http://12"
     },
     {
       "description": "s7-abort-on-intercept: process group reaped",
@@ -102,12 +102,7 @@
       "ok": true
     },
     {
-      "description": "R4: the clamp hides every tool outside its list",
-      "ok": true,
-      "detail": "read,grep,glob,bash,SubmitPlan"
-    },
-    {
-      "description": "R4: the clamp hides a second host tool (HostEcho)",
+      "description": "R4: the clamped tool list equals the clamp exactly (sequence, no extras)",
       "ok": true,
       "detail": "read,grep,glob,bash,SubmitPlan"
     },
@@ -116,7 +111,7 @@
       "ok": true
     },
     {
-      "description": "R4: a clamp without registration exposes no host tool",
+      "description": "R4: a clamp without registration equals the clamp exactly",
       "ok": true,
       "detail": "read,grep,glob,bash"
     },
@@ -126,30 +121,39 @@
       "detail": "read,grep,glob,bash,SubmitPlan,HostEcho"
     },
     {
-      "description": "r4c-mode-cycle: process group reaped",
+      "description": "r4c-catalog-lifecycle: process group reaped",
       "ok": true
     },
     {
-      "description": "R4: every prompt's tool list matches its own clamp",
+      "description": "R4: every prompt's tool list equals its own catalog+clamp exactly (sequence, no residue, no duplicates)",
       "ok": true,
-      "detail": "[[\"read\",\"grep\",\"glob\",\"bash\"],[\"read\",\"grep\",\"glob\",\"bash\",\"SubmitPlan\"],[\"read\",\"grep\",\"glob\",\"bash\"],[\"read\",\"grep\",\"glob\",\"bash\"]]"
+      "detail": "[[\"read\",\"grep\",\"glob\",\"bash\",\"HostEcho\"],[\"read\",\"grep\",\"glob\",\"bash\",\"HostEcho\",\"SubmitPlan\"],[\"read\",\"grep\",\"glob\",\"bash\",\"HostEcho\",\"SubmitGoal\"],[\"read\",\"grep\",\"glob\",\"bash\",\"HostEcho\"],[\"read\",\"grep\",\"glob\",\"bash\",\"HostEcho\",\"SubmitPlan\"]]"
     },
     {
-      "description": "R4: the prompt-policy retry settles (no prompt needs more than one retry)",
+      "description": "R4: the removed submit tool stays out after the catalog drops it (prompt 4 = agent)",
       "ok": true,
-      "detail": "4 before_agent_start attempts for 4 prompts"
+      "detail": "read,grep,glob,bash,HostEcho"
     },
     {
-      "description": "R4: agent-mode prompts after the cycle are unrestricted again (back to the base clamp)",
+      "description": "R4: the re-registered submit tool is visible again on the next plan prompt (prompt 5)",
       "ok": true,
-      "detail": "read,grep,glob,bash"
+      "detail": "read,grep,glob,bash,HostEcho,SubmitPlan"
     },
     {
-      "description": "r4d-clamp-and-override: process group reaped",
+      "description": "R4: the goal prompt carries SubmitGoal and not SubmitPlan (prompt 3)",
+      "ok": true,
+      "detail": "read,grep,glob,bash,HostEcho,SubmitGoal"
+    },
+    {
+      "description": "r4d-clamp-and-mode-block: process group reaped",
       "ok": true
     },
     {
-      "description": "R4: a prompt that both clamps and appends is delivered within one policy retry",
+      "description": "R4: the registered host tool is hidden by the clamp exactly",
+      "ok": true
+    },
+    {
+      "description": "R4: a prompt that both clamps and appends a mode block is delivered within one policy retry",
       "ok": true,
       "detail": "attempts=2 requests=1"
     },
@@ -161,12 +165,17 @@
     {
       "description": "R4: an in-place clamp change converges within one retry",
       "ok": true,
-      "detail": "attempts=2 requests=1"
+      "detail": "attempts=1 requests=1"
     },
     {
-      "description": "R2: the appended mode block survives the retry exactly once",
+      "description": "R2: the appended block is the production composeModeSystemPrompt(mode, '') bytes, exactly once",
       "ok": true,
       "detail": "[1,1,1]"
+    },
+    {
+      "description": "R2: no other mode block is mixed into the prompt",
+      "ok": true,
+      "detail": "[[0,0],[0,0],[0,0]]"
     },
     {
       "description": "R2: the runtime keeps exactly one system message",
@@ -175,6 +184,15 @@
     },
     {
       "description": "R2: PI Desktop's default base prompt is not injected",
+      "ok": true
+    },
+    {
+      "description": "R2: the block is appended after the runtime prompt (prefix is stable across prompts)",
+      "ok": true,
+      "detail": "[12024,12024,12024]"
+    },
+    {
+      "description": "R2: this is byte-parity evidence for the mode block only (source module equality)",
       "ok": true
     }
   ],
@@ -226,10 +244,6 @@
       "executions": [
         "SubmitPlan",
         "bash"
-      ],
-      "submitResultDelivered": [
-        "SubmitPlan",
-        "bash"
       ]
     },
     "s5.observed": {
@@ -241,13 +255,13 @@
     },
     "s6.observed": {
       "pendingCall": {
-        "id": "158d73a3693bea65",
+        "id": "158d75b0c9fac3e3",
         "toolName": "SubmitPlan"
       },
       "hostToolCancel": {
         "type": "host_tool_cancel",
-        "id": "158d73a41cfbea66",
-        "targetId": "158d73a3693bea65"
+        "id": "158d75b17dbac3e4",
+        "targetId": "158d75b0c9fac3e3"
       },
       "agentEndCount": 1,
       "providerRequests": 1,
@@ -294,7 +308,7 @@
     "s7.observed": {
       "abortEvents": [
         {
-          "at": 1790340319547,
+          "at": 1790340857539,
           "event": "spike_abort_requested",
           "toolName": "SubmitPlan",
           "hadAbort": true
@@ -373,18 +387,40 @@
       ]
     },
     "r4c.observed": {
-      "plan": [
+      "catalogPlan": [
+        [
+          "HostEcho"
+        ],
+        [
+          "HostEcho",
+          "SubmitPlan"
+        ],
+        [
+          "HostEcho",
+          "SubmitGoal"
+        ],
+        [
+          "HostEcho"
+        ],
+        [
+          "HostEcho",
+          "SubmitPlan"
+        ]
+      ],
+      "clampPlan": [
         [
           "read",
           "grep",
           "glob",
-          "bash"
+          "bash",
+          "HostEcho"
         ],
         [
           "read",
           "grep",
           "glob",
           "bash",
+          "HostEcho",
           "SubmitPlan"
         ],
         [
@@ -392,13 +428,23 @@
           "grep",
           "glob",
           "bash",
+          "HostEcho",
           "SubmitGoal"
         ],
         [
           "read",
           "grep",
           "glob",
-          "bash"
+          "bash",
+          "HostEcho"
+        ],
+        [
+          "read",
+          "grep",
+          "glob",
+          "bash",
+          "HostEcho",
+          "SubmitPlan"
         ]
       ],
       "observed": [
@@ -406,60 +452,83 @@
           "read",
           "grep",
           "glob",
-          "bash"
+          "bash",
+          "HostEcho"
         ],
         [
           "read",
           "grep",
           "glob",
           "bash",
+          "HostEcho",
           "SubmitPlan"
         ],
         [
           "read",
           "grep",
           "glob",
-          "bash"
+          "bash",
+          "HostEcho",
+          "SubmitGoal"
         ],
         [
           "read",
           "grep",
           "glob",
-          "bash"
+          "bash",
+          "HostEcho"
+        ],
+        [
+          "read",
+          "grep",
+          "glob",
+          "bash",
+          "HostEcho",
+          "SubmitPlan"
         ]
       ],
       "startAttempts": [
         1,
-        2,
-        3,
-        4
+        1,
+        1,
+        1,
+        1
+      ],
+      "duplicates": [
+        [],
+        [],
+        [],
+        [],
+        []
       ]
     },
     "r4d.observed": {
       "attemptsPerPrompt": [
         2,
         1,
-        2
+        1
       ],
       "toolsPerPrompt": [
         [
           "read",
           "grep",
           "glob",
-          "bash"
-        ],
-        [
-          "read",
-          "grep",
-          "glob",
-          "bash"
+          "bash",
+          "HostEcho"
         ],
         [
           "read",
           "grep",
           "glob",
           "bash",
-          "SubmitPlan"
+          "HostEcho"
+        ],
+        [
+          "read",
+          "grep",
+          "glob",
+          "bash",
+          "HostEcho"
         ]
       ],
       "systemMessagesPerPrompt": [
@@ -467,10 +536,29 @@
         1,
         1
       ],
-      "markerOccurrences": [
+      "expectedBlockBytes": [
+        176,
+        1726,
+        2156
+      ],
+      "blockOccurrences": [
         1,
         1,
         1
+      ],
+      "otherBlockOccurrences": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
       ],
       "piDefaultBasePresent": [
         false,
@@ -478,9 +566,9 @@
         false
       ],
       "systemBytes": [
-        12022,
-        12022,
-        12050
+        12200,
+        13748,
+        14178
       ]
     }
   },
@@ -488,6 +576,6 @@
     "A mixed batch containing a transition tool is the exact case PI's beforeToolCall batch guard exists for.",
     "Abort-on-intercept is the only per-batch lever the fixed surface offers; if it works it is abort semantics, not PI's block-and-continue."
   ],
-  "finishedAt": "2026-09-25T12:45:37.006Z",
+  "finishedAt": "2026-09-25T12:54:36.428Z",
   "ok": false
 }

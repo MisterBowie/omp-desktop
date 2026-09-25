@@ -23,8 +23,12 @@
  *   T20_SPIKE_CLAMP_FILE    JSON file `{"activeTools": [...]}` read fresh on
  *                           every `before_agent_start`; when present and
  *                           `pi.setActiveTools` exists, that list is applied.
- *   T20_SPIKE_PROMPT_SUFFIX string appended to the system prompt on every
- *                           `before_agent_start`.
+ *   T20_SPIKE_MODE_FILE     JSON file `{"modeBlock": "<text>"}` read fresh on
+ *                           every `before_agent_start`; the text is appended to
+ *                           `event.systemPrompt` verbatim. The driver writes
+ *                           the real `composeModeSystemPrompt(mode, "")` output
+ *                           here (the production composer), so the measurement
+ *                           covers the production block bytes, not a marker.
  *   T20_SPIKE_BLOCK         comma list of tool names to block pre-execution.
  *   T20_SPIKE_ABORT_ON      comma list of tool names whose interception calls
  *                           `ctx.abort()` (the spike's probe for whether a
@@ -34,6 +38,7 @@
  * so every handler body is wrapped.
  */
 import { readFileSync, appendFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 
 interface ToolCallEvent {
   type: "tool_call";
@@ -101,6 +106,17 @@ function readClamp(): string[] | null {
   }
 }
 
+function readModeBlock(): string | null {
+  const path = env("T20_SPIKE_MODE_FILE");
+  if (!path) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf8")) as { modeBlock?: unknown };
+    return typeof parsed.modeBlock === "string" && parsed.modeBlock.length > 0 ? parsed.modeBlock : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function t20SpikeGate(pi: ExtensionAPI): void {
   const block = (env("T20_SPIKE_BLOCK") ?? "")
     .split(",")
@@ -156,7 +172,8 @@ export default function t20SpikeGate(pi: ExtensionAPI): void {
       event: "before_agent_start",
       attempt: startAttempt,
       parts: parts.length,
-      bytes: joined.length,
+      chars: joined.length,
+      bytes: Buffer.byteLength(joined, "utf8"),
       activeTools: typeof pi.getActiveTools === "function" ? pi.getActiveTools() : null,
       sessionId: ctx?.sessionManager?.getSessionId?.() ?? null,
     });
@@ -169,8 +186,17 @@ export default function t20SpikeGate(pi: ExtensionAPI): void {
         log({ event: "spike_error", where: "setActiveTools", message: String(error) });
       }
     }
-    const suffix = env("T20_SPIKE_PROMPT_SUFFIX");
-    if (suffix) return { systemPrompt: [...parts, suffix] };
+    const modeBlock = readModeBlock();
+    if (modeBlock) {
+      log({
+        event: "spike_mode_block",
+        attempt: startAttempt,
+        chars: modeBlock.length,
+        bytes: Buffer.byteLength(modeBlock, "utf8"),
+        sha256: createHash("sha256").update(modeBlock).digest("hex").slice(0, 16),
+      });
+      return { systemPrompt: [...parts, modeBlock] };
+    }
     return undefined;
   });
 }

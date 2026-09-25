@@ -1,15 +1,27 @@
 # M5/T20-A：Plan/Goal 与高权限工具能力门 —— 能力审计与可执行契约
 
-更新时间：2026-09-25（复审返修轮）。状态：**T20-A 审计与最小契约已完成，但"无硬阻塞"结论已被本轮可行性 spike 推翻：R3 是硬阻塞，T20-B 不得开始**（分支 `codex/m5-plan-goal-capability-gates`；审计基线 `2ca256520980aa80bb812730fbad132e9e95f503`，复审返修基线 `07de0a725269486c909d36bcccb9d8bb209770de`）。T20-B/C/D 未开始，**T20 未完成、未声称**。
+更新时间：2026-09-25（F1-F7 复审返修轮）。状态：**T20-A 审计与最小契约已完成，但"无硬阻塞"结论已被可行性 spike 推翻：R3 是硬阻塞，T20-B 不得开始**（分支 `codex/m5-plan-goal-capability-gates`；审计基线 `2ca256520980aa80bb812730fbad132e9e95f503`，R1-R4 返修基线 `07de0a725269486c909d36bcccb9d8bb209770de`，本轮 F1-F7 返修基线 `5da616f04c1ec132954785b955c1b20cc17bfc54`）。T20-B/C/D 未开始，**T20 未完成、未声称**。
 
-本轮（复审返修 R1-R4）结论摘要：
+本轮（F1-F7）结论摘要：
 
 | 项 | 结论 | 证据 |
 | --- | --- | --- |
-| R1 permissionMode/风险语义 | **契约已修**：新增 §1.3.1 完整有效权限决策表；`mcp_*` = PI `Risk::Low`（此前文档称 medium 与 PI 一致，已更正）；plugin 风险按 manifest 声明、缺失/非法 → medium；browser/computer/eval 是 OMP 名，PI 无对应名（PI parity = medium/未知，现状 gate 映射为 high 属桌面选择），**Agent+auto 仍按 PI 放行**；Plan/Goal 下它们是契约硬拒绝（不在 `plan_mode_allows`），不是"仍需审批"。验收矩阵新增 Agent 权限模式与风险保真行（B11-B14）。 | §1.3.1、§5 G9、§7 B11-B14 |
-| R2 模式提示词拼接 | **契约已修**：只使用 `composeModeSystemPrompt(mode, "")` 的 mode block（base 为空串时被 `.filter(Boolean)` 丢弃），追加到 `event.systemPrompt`；不注入 `DEFAULT_RUNTIME_SYSTEM_PROMPT`、不复制 OMP 原生 prompt。spike 实测：单 system 消息、marker 恰一次、PI 默认 base 不出现。 | §1.1、§4.2 R2/R4-4 |
+| F1 风险表事实错误 | **已修**：§1.3.1 矩阵不再把 `BrowserPreview`/`new_context` 写成"Low/契约许可放行"——`BrowserPreview` 在 `plan_mode_allows` 内但**不在风险表 → Medium**（`ask`/`accept-edits` 卡、`auto` 放行、grant 可 `AllowSession`）；`new_context` 是 sidecar-side、不到 host gate。C7 并入这条验收（矩阵保持 C1-C8），C1 明确契约许可集合。 | §1.3.1、§7 C1/C7 |
+| F2 g1 可假绿 | **已修**：g1 改为**四段链路同时成立**（状态 schema 有 mode block 字段 / 引擎接缝同一文件既 compose 又写状态 / gate 读校验后状态 / gate 追加且引用该字段名，裸 `mode` 不算）。**对照实验**：注入裸 `mode` 字段仍 `GAP-OPEN`；注入完整链路才 `GAP-CLOSED`。协议加键 → `REVIEW-REQUIRED`，不判 closed。 | §4 g1、脚本 `app/scripts/check-omp-plan-goal-gaps.mjs` |
+| F3 R4-3 假绿 | **已修**：R4 工具表断言改为**严格序列相等**（缺失/多余/顺序/重复皆失败），不再用"子集"。重测的旧写法正是丢了 `SubmitGoal` 仍通过，现已判红。 | §4.2 R4-3、`t20-feasibility.mjs` `sameSequence` |
+| F4 生命周期未覆盖 | **已修**：同一 session 上 5 个连续 prompt，每 prompt 先真实 `set_host_tools` 再夹取：Agent(无提交工具)→Plan(`SubmitPlan`)→Goal(`SubmitGoal`)→Agent(删除)→Plan(重加)；`SubmitGoal` 用真实定义注册；5 个工具表与 catalog+clamp 严格相等、无重复/滞留；反向顺序对照与 policy retry 计数保留。 | §4.2 R4-3/R4-2/R4-4 |
+| F5 R2 证据过度声明 | **已修**：spike 现在追加的是**生产 `composeModeSystemPrompt(mode, "")` 的三个真实块**（Agent/Plan/Goal，UTF-8 176/1726/2156），断言各自恰出现一次、其它块 0 次、单 system 消息、PI 默认 base 不出现、块在既有 parts 之后且前缀跨 prompt 稳定，同时断言 `app` 与固定 PI 的 `mode-prompts.ts` 逐字节相等；**技能/记忆块内容与顺序**明确留作 T20-B 的 B2 ④，§4.2 不再声称覆盖。 | §4.2 R2-字节/R2-范围声明、§7 B2 |
+| F6 矩阵重复 | **已修**：删除重复的 B6-B10 行；新增 `app/scripts/check-t20-matrix-ids.mjs`（B1-B14、C1-C8、D1-D3 每个编号恰一次），并用含重复的旧文档验证过它会判红。 | §7、`app/scripts/check-t20-matrix-ids.mjs` |
+| F7 行号不一致 | **已修**：`permissions.rs:219-235` → `219-234`（与固定源码代码块一致）；本轮新增/修改的关键行号已按固定源码逐一核对（`128-141`、`148-153`、`219-234`、`238-248`、`250-269`、`4167-4172`、`442-452`、`910-922`、`8714-8725`、`2003-2005`、`407`、`6691-6760`）。 | §1.3.1、§4.2、§6.6、§7 |
+
+此前（R1-R4 返修轮）结论摘要：
+
+| 项 | 结论 | 证据 |
+| --- | --- | --- |
+| R1 permissionMode/风险语义 | **契约已修**：新增 §1.3.1 完整有效权限决策表；`mcp_*` = PI `Risk::Low`（此前文档称 medium 与 PI 一致，已更正）；plugin 风险按 manifest 声明、缺失/非法 → medium；browser/computer/eval 是 OMP 名，PI 无对应名（PI parity = medium/未知，现状 gate 映射为 high 属桌面选择），**Agent+auto 仍按 PI 放行**；Plan/Goal 下它们是契约硬拒绝（不在 `plan_mode_allows`），不是"仍需审批"。 | §1.3.1、§5 G9、§7 C5-C7 |
+| R2 模式提示词拼接 | **契约已修**：只使用 `composeModeSystemPrompt(mode, "")` 的 mode block（base 为空串时被 `.filter(Boolean)` 丢弃），追加到 `event.systemPrompt`；不注入 `DEFAULT_RUNTIME_SYSTEM_PROMPT`、不复制 OMP 原生 prompt。spike 实测（本轮升级为真实块）：三模式块各恰一次、单 system 消息、PI 默认 base 不出现。 | §1.1、§4.2 R4-4/R2-字节 |
 | R3 SubmitPlan/SubmitGoal 独占批次与终止 | **硬阻塞**：固定 OMP 无批次可见性、无 terminate 通道、host tool 无 concurrency 覆盖；spike 六场景全部失败（同批兄弟工具产生真实副作用、重复提交执行两次、提交成功后模型继续 2 步并继续执行工具、失败终支同样不终止）。唯一能阻止同批副作用的杠杆是 `ctx.abort()`，且只得到"整回合 aborted"语义，不是 PI 的 block-and-continue。**T20-B 不得开始。** | §4.2 R3-1…R3-7、§8 |
-| R4 setActiveTools/set_host_tools 顺序 | **已定并实测**：每 prompt 必须**先** `set_host_tools` 完成目录替换，再由 `before_agent_start` 的 `setActiveTools` 夹取；顺序颠倒会被自动激活撤销（实测重新暴露）。收敛：首次变更恰 1 次 policy retry（attempts=2），同 clamp 的下一 prompt 恰 1 次，夹取变化同样 ≤2，未出现第 3 次或 `AgentStartPolicyChangedError`。 | §4.2 R4-1…R4-4、§7 B15-B16 |
+| R4 setActiveTools/set_host_tools 顺序 | **已定并实测**：每 prompt 必须**先** `set_host_tools` 完成目录替换，再由 `before_agent_start` 的 `setActiveTools` 夹取；顺序颠倒会被自动激活撤销（实测重新暴露）。收敛：首次变更恰 1 次 policy retry（attempts=2），同 clamp 的下一 prompt 恰 1 次，未出现第 3 次或 `AgentStartPolicyChangedError`。 | §4.2 R4-1…R4-4、§7 B11-B13 |
 
 固定子模块（本轮证据基准，与任务要求一致）：
 
@@ -103,9 +115,12 @@
 | 模式 | 工具/风险 | `ask` | `accept-edits` | `auto` |
 | --- | --- | --- | --- | --- |
 | Agent | `Write`/`Edit`/`Bash`/`GenerateImages`（High）、未知（Medium）、`plugin_*`（medium/high） | 卡 | 仅 Write/Edit 放行，其余卡 | **放行** |
-| Agent | `Read`/`Glob`/`Grep`/`ScheduledTaskList`（Low）、`mcp_*`（Low）、`plugin_*`（low）、`BrowserPreview`（未在表内 → Medium，非契约模式） | Low 放行；`BrowserPreview` 卡 | Low 放行；`BrowserPreview` 卡 | 放行 |
+| Agent | `Read`/`Glob`/`Grep`/`ScheduledTaskList`（Low）、`mcp_*`（Low）、`plugin_*`（low） | 放行 | 放行 | 放行 |
+| Agent | `BrowserPreview`（**不在风险表内 → Medium**） | 卡 | 卡 | 放行 |
 | Agent | `plugin_*` 声明缺失/非法（Medium） | 卡 | 卡 | 放行 |
-| Plan/Goal | 只读核 `Read`/`Glob`/`Grep`/`BrowserPreview`/`new_context` | 放行（Low/契约许可） | 放行 | 放行 |
+| Plan/Goal | `Read`/`Glob`/`Grep`（Low，且在 `plan_mode_allows` 内） | 放行 | 放行 | 放行 |
+| Plan/Goal | `BrowserPreview`（在 `plan_mode_allows` 内，但**不在风险表内 → Medium**）：契约硬拒绝只**绕过**它，之后仍走普通权限模式判定，session grant 可 `AllowSession` | **卡** | **卡** | 放行 |
+| Plan/Goal | `new_context`（在 `plan_mode_allows` 内，但固定源码注明它是 **sidecar-side 工具**，不经过 host gate——没有风险等级/弹卡语义，bridge 两侧只为清单一致而列出） | n/a（sidecar） | n/a | n/a |
 | Plan/Goal | `Bash`（High，在 `plan_mode_allows` 内） | 卡 | 卡 | **放行**（提示词只读，硬边界是权限模式） |
 | Plan/Goal | `Write`/`Edit`/未知/`mcp_*`/`plugin_*` 无声明 | **Deny** | **Deny** | **Deny** |
 | Plan/Goal | `plugin_*` 有非空 `planSafeActions` | 同 Agent 行（按声明 risk） | 同 | 同 |
@@ -201,7 +216,7 @@
 
 新增 `app/scripts/check-omp-plan-goal-gaps.mjs`（跟随仓库 `check-*` 脚本约定）：**独立 opt-in 诊断**，不进默认测试套件；只读当前已发布源码接缝报告事实，不传虚构字段、不断言未定 API。无 `OMP_T20_GAP_PROBE=1` 时打印 SKIP 并退出 0；有则每缺口一行稳定输出，任何 T20 缺口开放即退出 1。
 
-运行命令与输出（复审返修轮，head `07de0a7`，Node v24.14.0，工作目录 `app/`）：
+运行命令与输出（F1-F7 返修轮，head `5da616f`，Node v24.14.0，工作目录 `app/`）：
 
 ```text
 $ node scripts/check-omp-plan-goal-gaps.mjs
@@ -209,7 +224,7 @@ SKIP: T20-A gap diagnostic not enabled (set OMP_T20_GAP_PROBE=1 to run it)
 exit=0
 
 $ OMP_T20_GAP_PROBE=1 node scripts/check-omp-plan-goal-gaps.mjs
-GAP-OPEN g1 (owner: T20-B) session mode/permissionMode persist to the host DB only; no OMP prompt/tool path reads them [evidence: pinned prompt command has no mode/systemPrompt/tools key: true (| { id?: string; type: "prompt"; message: string; images?: ImageContent[]; streamingBehavior?: "steer" | "followUp" }); runtime-domain state carries a mode field: false; desktop engine seam composes the PI mode prompt: false]
+GAP-OPEN g1 (owner: T20-B) session mode/permissionMode persist to the host DB only; no OMP prompt/tool path reads them [evidence: pinned prompt command has no mode/systemPrompt/tools key: true; state mode-ish fields: none; bridge composes a mode prompt AND writes the state: false; gate reads the validated state: true; gate appends to event.systemPrompt: true; gate references a state mode-block field (excluding bare `mode`): false]
 GAP-OPEN g2 (owner: T20-C) the host-tool adapter executes every plugin tool with a hardcoded mode 'agent'; the session's durable mode never reaches plugin execution [evidence: omp-host-tools.ts hardcoded execution-context mode literal present: true]
 GAP-OPEN g3 (owner: T20-B) an approved Plan/Goal execution for an OMP session is refused before claiming; the queued row stays queued and nothing runs on the OMP engine [evidence: runtime/plans.ts refuseOutsidePiRuntime("plan execution") present: true]
 VERDICT g4: pinned rpc-ui RpcCommand union has 42 commands: negotiate_protocol, prompt, steer, follow_up, abort, abort_and_prompt, new_session, get_state, set_fast_mode, get_available_commands, set_todos, set_host_tools, set_host_uri_schemes, set_subagent_subscription, get_subagents, get_subagent_messages, set_model, cycle_model, get_available_models, set_thinking_level, cycle_thinking_level, set_steering_mode, set_follow_up_mode, set_interrupt_mode, compact, set_auto_compaction, set_auto_retry, abort_retry, bash, abort_bash, get_session_stats, export_html, switch_session, branch, get_branch_messages, get_last_assistant_text, set_session_name, handoff, get_messages, get_messages_page, get_login_providers, login
@@ -218,20 +233,20 @@ SUMMARY: 3 gap(s) open [g1, g2, g3]
 exit=1
 ```
 
-各检查证明什么：**g1**（红，R1 复审已重写判据）——判据不再是任何注释文本，而是"有效模式是否有任一运行期通道"的析取式：(1) 固定协议 `prompt` 命令载荷无 mode/systemPrompt/tools 键（`rpc-types.ts` 单一 prompt 变体，实测 true）；(2) `packages/omp-runtime/src/desktop-state.ts` 的状态快照无 mode 字段（实测 false）；(3) 桌面引擎接缝（`apps/desktop/electron/main/runtime/*.ts` 非测试文件）不出现 `composeModeSystemPrompt`/`mode-prompts`（实测 false）。三者皆无 → 模式进不了运行时。任一条成立即 GAP-CLOSED；若固定协议将来携带 mode 键，该行改为 `REVIEW-REQUIRED` 并计入退出码（与 g4 同语义），强制重审判定。**g2**（红）——`omp-host-tools.ts` 插件执行上下文仍是硬编码 `mode: "agent"` 字面量 → 真实模式不传播；**g3**（红）——`runtime/plans.ts` 仍以 `refuseOutsidePiRuntime(…, "plan execution")` 拒绝 OMP 会话的已批准计划执行 → 队列行为 queued、永不运行；**g4**（判定，非缺口）——固定 rpc-ui 命令面 42 个变体全列，无 plan/goal/permission/approval 命令；若未来上游新增此类命令，该行变为 `REVIEW-REQUIRED` 并计入退出码。该脚本是诊断而非正确性断言：仍是 opt-in、不进默认套件，T20-B/C 落地后由真实行为测试替换，不得转正为 pin。
+各检查证明什么：**g1**（红，F1-F7 返修已改为**真实链路**判据）——判据要求下述四件事**同时**在已发布源码里成立，任缺其一即 GAP-OPEN：(1) 运行域状态 schema 里存在 mode block 字段（收集 `desktop-state.ts` 中所有 mode-ish 字段名，实测 `none`）；(2) 桌面引擎接缝里**同一个文件**既引用 `composeModeSystemPrompt`/`mode-prompts`、又引用状态写入面（`writeDesktopCapabilityState`/`DesktopCapabilitySnapshot`/`serializeDesktopCapabilityState`/`desktopState`），实测 `false`；(3) trusted gate 从**校验过的**状态读取（`readDesktopCapabilityState`，当前 `true`，是 T19-C 的既有读面）；(4) gate 把该字段追加到 `event.systemPrompt`（`...event.systemPrompt`，当前 `true`）且**引用了状态里的具体 mode block 字段名**（排除裸 `mode`，实测 `false`）。**假绿对照实验**（本轮实做，均在临时注入后 `git checkout` 复原、工作树已确认干净）：把裸 `mode?: "agent"|"plan"|"goal"` 字段塞进 `desktop-state.ts` → g1 仍 `GAP-OPEN`（证据串变为 `state mode-ish fields: mode`、`gate references a state mode-block field (excluding bare 'mode'): false`）；把完整链路（`modePrompt` 字段 + 引擎接缝引用 `composeModeSystemPrompt` 与状态写入面 + gate 引用 `modePrompt`）临时注入 → g1 变 `GAP-CLOSED`（证明判定能真正收敛，不是永假 pin）。**协议侧**：只要固定 `prompt` 命令出现 mode/systemPrompt/tools 键，就输出 `REVIEW-REQUIRED g1` 并计入退出码，**不判 closed**。**g2**（红）——`omp-host-tools.ts` 插件执行上下文仍是硬编码 `mode: "agent"` 字面量 → 真实模式不传播；**g3**（红）——`runtime/plans.ts` 仍以 `refuseOutsidePiRuntime(…, "plan execution")` 拒绝 OMP 会话的已批准计划执行 → 队列行为 queued、永不运行；**g4**（判定，非缺口）——固定 rpc-ui 命令面 42 个变体全列，无 plan/goal/permission/approval 命令；若未来上游新增此类命令，该行变为 `REVIEW-REQUIRED` 并计入退出码。该脚本是诊断而非正确性断言：仍是 opt-in、不进默认套件，T20-B/C 落地后由真实行为测试替换，不得转正为 pin。
 
 ### 4.2 可行性 spike（R3/R4 的行为证据，固定 OMP + fake provider）
 
 新增 `app/experiments/omp-bridge/t20-feasibility.mjs`（驱动）+ `app/experiments/omp-bridge/extensions/t20-spike-gate.ts`（可信扩展），复用 M1 的隔离夹具（`lib/base.mjs` 合成 HOME、`lib/provider.mjs` 本地 fake provider、`lib/rpc.mjs` 协议客户端、固定 launcher `omp/18.2.7`），**不调用任何付费/远程模型**；结果落 `app/experiments/omp-bridge/results/t20-feasibility.json`。每次断言的是 **PI 目标契约**，失败即该契约在固定 OMP 上不可实现的行为证据。
 
-命令与结果（head `07de0a7`，Node v24.14.0）：
+命令与结果（F1-F7 返修轮，head `5da616f`，Node v24.14.0）：
 
 ```text
 $ cd app/experiments/omp-bridge && node t20-feasibility.mjs
-FAIL t20-feasibility: 30/38 checks
+FAIL t20-feasibility: 34/42 checks
 ```
 
-**R3（SubmitPlan/SubmitGoal 独占批次与终止）——全部契约检查失败：**
+**R3（SubmitPlan/SubmitGoal 独占批次与终止）——8 项契约检查全部失败（下表为本轮重测结果，与上一轮一致）：**
 
 | 场景 | 观测（`results/t20-feasibility.json` artifacts） | 结论 |
 | --- | --- | --- |
@@ -246,14 +261,16 @@ FAIL t20-feasibility: 30/38 checks
 
 **根因（固定源码）**：`packages/coding-agent/src/modes/rpc/host-tools.ts` `RpcHostToolAdapter.concurrency` 硬编码 `"shared"`、`RpcHostToolDefinition` 无 `concurrency`/`terminate` 字段（`rpc-types.ts:442-452`）；扩展 `tool_call` 事件载荷无批次/助手消息（`agent-session.ts:4167-4172`）；`AgentToolResult` 无 `terminate`（`packages/agent/src/types.ts:910-922`）；唯一"优雅终止"路径 `#isTerminalYieldToolResult` 只认字面 `toolName === "yield"`（`agent-session.ts:8714-8725`，`yield` 是 hidden 内置子代理工具 `tools/builtin-names.ts:35`）；扩展 `ExtensionContext.abort()` 不接收 reason 且语义是用户打断（`runtime-init.ts` `abort: () => session.abort({ reason: USER_INTERRUPT_LABEL })`）。
 
-**R4（顺序与收敛）——契约检查全部通过：**
+**R4（顺序、目录生命周期与收敛）与 R2（mode block 字节）——全部通过（R4 断言为严格序列相等：缺失、多余、顺序不符或重复都判失败）：**
 
-| 场景 | 观测 | 结论 |
+| 场景 | 观测（`results/t20-feasibility.json` artifacts） | 结论 |
 | --- | --- | --- |
-| R4-1 先 `set_host_tools` 再 `before_agent_start` 内 `setActiveTools` | provider 实际工具表 = clamp 列表（`read,grep,glob,bash,SubmitPlan`；`HostEcho` 被隐藏） | **这就是唯一正确顺序** |
-| R4-2 先夹取、后注册 | 第二 prompt 的工具表 = `read,grep,glob,bash,SubmitPlan,HostEcho` | `#applyRpcHostToolRefresh` 的 `autoActivatedRpcToolNames`（`session/session-tools.ts:2003-2005`）会撤销先前的夹取——顺序颠倒即重新暴露 |
-| R4-3 Agent→Plan→Goal→Agent 每 prompt 各自夹取 | 4 个 prompt 的工具表逐一等于各自 clamp；`before_agent_start` 各 1 次 | 每 prompt 先 `set_host_tools`、后夹取可稳定工作 |
-| R4-4 同一 handler 内"夹取 + 追加提示词块"（T20-B 的真实形态） | 首次变更：`before_agent_start` **2 次**（1 次 policy retry，`AGENT_START_POLICY_MAX_ATTEMPTS = 3`，`agent-session.ts:407`），prompt 仍被投递；同 clamp 的下一 prompt：**1 次**；夹取变化：2 次。单 system 消息、marker 恰 1 次、PI 默认 base 不出现 | 收敛成立，不出现第 3 次或 `AgentStartPolicyChangedError` |
+| R4-1 先 `set_host_tools` 再 `before_agent_start` 内 `setActiveTools` | provider 实际工具表与 clamp **严格相等**：`read,grep,glob,bash,SubmitPlan`（`HostEcho` 被隐藏） | **这就是唯一正确顺序** |
+| R4-2 先夹取、后注册（对照） | 第一 prompt 严格等于 `read,grep,glob,bash`；第二 prompt 出现 `SubmitPlan,HostEcho` | `#applyRpcHostToolRefresh` 的 `autoActivatedRpcToolNames`（`session/session-tools.ts:2003-2005`）会撤销先前夹取——顺序颠倒即重新暴露 |
+| R4-3 **目录生命周期**（同一 session、5 个连续 prompt，每 prompt 先真实 `set_host_tools` 再夹取）：Agent(无提交工具) → Plan(`SubmitPlan`) → Goal(`SubmitGoal`) → Agent(删除提交工具) → Plan(重加 `SubmitPlan`) | 5 个 prompt 的工具表与各自 catalog+clamp **逐一严格相等**、无重复：`…,HostEcho` → `…,HostEcho,SubmitPlan` → `…,HostEcho,SubmitGoal` → `…,HostEcho` → `…,HostEcho,SubmitPlan`；prompt 3 只有 `SubmitGoal`（无 `SubmitPlan`）；prompt 4 两者都不在；prompt 5 `SubmitPlan` 回来；`before_agent_start` 各 1 次 | 真实增/删/重加与 Agent→Plan→Goal→Agent→Plan 切换可收敛，`SubmitGoal` 用**真实定义**注册（不再用未注册名字伪装）、无滞留/重复 |
+| R4-4 同一 handler 内"夹取 + 追加真实 mode block"（T20-B 的真实形态，三种模式各一次） | 首次变更：`before_agent_start` **2 次**（1 次 policy retry，`AGENT_START_POLICY_MAX_ATTEMPTS = 3`，`agent-session.ts:407`），prompt 仍被投递；同 clamp 的后续 prompt：**1 次** | 收敛成立，不出现第 3 次或 `AgentStartPolicyChangedError` |
+| R2-字节（并入 R4-4） | 追加的块就是生产 `composeModeSystemPrompt(mode, "")` 的输出（Agent/Plan/Goal 三块，UTF-8 字节 **176/1726/2156**，spike 记录的 `expectedBlockBytes`），在各自 prompt 的 system 文本里**恰出现 1 次**；另外两个模式块出现 **0 次**；`role:"system"` 消息恰 1 条；PI `DEFAULT_RUNTIME_SYSTEM_PROMPT` 不出现；块**追加在运行期 prompt 之后**且前缀在三个 prompt 间字节稳定（三 prompt 的 system 字节 12200/13748/14178，差值即块长） | **mode block 的字节与追加形态**已实测；`app` 与固定 PI 的 `mode-prompts.ts` 逐字节相等（spike 内断言） |
+| R2-范围声明 | — | 本 spike 覆盖的是 **mode block 的字节与追加 transport**；技能/记忆块的**内容与相互顺序**属 T19-C 通道 + B2 的未来必测项，§4.2 只证明"块在既有 parts 之后、前缀稳定"，不代替 B2 的 ④ |
 
 
 
@@ -281,12 +298,12 @@ FAIL t20-feasibility: 30/38 checks
 
 **原则**：复用 Pi 的 host 自持产物/审批/状态机与渲染层，不建第二套审批流；不手抄提示词；权限模式语义照抄 PI。
 
-1. **模式提示词（R2 返修：只追加 mode block，绝不带 base）**：桥接每 prompt 前把 **`composeModeSystemPrompt(mode, "")`** 的输出（`app/packages/agent-runtime/src/mode-prompts.ts`，与固定 PI 字节平价；`""` 经 `.filter(Boolean)` 被丢弃，返回值就是纯 mode block）写入运行域状态（扩展现有 `desktop-state.json` 快照，v2），gate `before_agent_start` 以 `{systemPrompt: [...event.systemPrompt, block]}` 追加。**禁止**：注入 `DEFAULT_RUNTIME_SYSTEM_PROMPT`、任何形式的 base prompt 复制或替换 OMP 原生 prompt（`event.systemPrompt` 是权威 base，只能追加）。**模式不是 best-effort**：状态写入失败 → 该 prompt 拒绝（沿 `OMP_CAPABILITY_STATE_FAILED` 语义），绝不把契约模式意图当 agent 跑。子代理零注入保持。R4-4 已实测该追加形态在 policy retry 后恰出现一次、单 system 消息、PI 默认 base 不出现。
+1. **模式提示词（R2 返修：只追加 mode block，绝不带 base）**：桥接每 prompt 前把 **`composeModeSystemPrompt(mode, "")`** 的输出（`app/packages/agent-runtime/src/mode-prompts.ts`，与固定 PI 字节平价；`""` 经 `.filter(Boolean)` 被丢弃，返回值就是纯 mode block）写入运行域状态（扩展现有 `desktop-state.json` 快照，v2），gate `before_agent_start` 以 `{systemPrompt: [...event.systemPrompt, block]}` 追加。**禁止**：注入 `DEFAULT_RUNTIME_SYSTEM_PROMPT`、任何形式的 base prompt 复制或替换 OMP 原生 prompt（`event.systemPrompt` 是权威 base，只能追加）。**模式不是 best-effort**：状态写入失败 → 该 prompt 拒绝（沿 `OMP_CAPABILITY_STATE_FAILED` 语义），绝不把契约模式意图当 agent 跑。子代理零注入保持。§4.2 R4-4 实测的是**本契约的 transport 与块字节**：追加的块等于生产 `composeModeSystemPrompt(mode, "")` 输出、三模式各恰一次、单 `role:"system"` 消息、PI 默认 base 不出现、块在运行期 prompt 之后且前缀稳定；**技能/记忆块的内容与相互顺序**仍由 T19-C 通道与 B2 的未来必测项覆盖，§4.2 不代替。
 2. **工具目录（R4 返修：顺序是契约的一部分）**：每个 prompt **先**完成 `set_host_tools` 目录替换，**再**由 `before_agent_start` 内的 `pi.setActiveTools`（`runtime-init.ts:105-107`，rpc 可用）夹取——`#applyRpcHostToolRefresh` 会把新注册的非 hidden host tool 自动激活（`session/session-tools.ts:2003-2005`），顺序颠倒会撤销夹取（R4-2 实测重新暴露）。首次夹取允许 1 次 prompt-policy retry（`AGENT_START_POLICY_MAX_ATTEMPTS=3`），第二次起必须稳定（R4-3/R4-4 实测 1–2 次）；目录内容：原生只读核 + 提交工具 + 声明了非空 `planSafeActions` 的插件 host 工具；Agent 模式目录不变（T17-T19 回归）。
 3. **提交工具（R3 返修：硬阻塞，不得开工）**：PI 要求过渡工具独占 assistant 批次且提交终支终止回合；§4.2 已用固定 OMP 实测证明**当前通道做不到**：host tool `concurrency` 硬编码 shared、无 terminate 字段、扩展 `tool_call` 无批次视图、唯一优雅终止只认 `"yield"`。因此 T20-B **不得**按"结果文本 + 提示词 + 一次提交规则"实现并声称兼容。开工前置条件（任一）：(a) 上游 OMP 给 host tool 目录/结果加 `concurrency`/`terminate` 能力（或等价的批次可见钩子）；(b) 用户明确接受"整回合 abort"作为过渡工具的强制手段并接受其与 PI 的语义差异（模型看不到 block 结果、无法同回合重试单调用提交）；(c) 桌面把提交移出模型循环（例如由审批卡驱动的显式用户动作），并重新定义与 PI 的差异。三条都需用户决定或上游变更，本轮无此决定。
 4. **审批**：渲染层继续用 `PlanApprovalBar` → `plansResolve` IPC（去掉 OMP 拒绝分支）→ host-core `plans.resolve`（批准原子写 mode=agent + permission_mode + queued 执行；reject/过期/打断语义全部复用）。
 5. **派发（OMP 路径）**：把 `plans.ts` 的 OMP 拒绝替换为：claim CAS（复用）成功后，经 OMP 桥接启动一个 agent 模式回合——该 prompt 前写状态（agent 提示词 + 网关权限模式 = 选定 permissionMode），`finishApprovedExecution` 复用；drain/boot_maintenance/配置冻结不变（host-core 自持，恰一次与不重放天然成立）。
-6. **执行时强制（gate，实现 §1.3.1 的固定 PI 决策表）**：按 §1.3.1 的**顺序**实现，不得简化：(a) 契约模式硬拒绝**先于一切**——Write/Edit/apply_patch/未知原生工具、`mcp_*`、无非空 `planSafeActions` 的插件工具一律 block（PI `permissions.rs:219-235`）；(b) 显式外部路径：`auto` 放行、其余弹卡；(c) `risk=Low` 放行（含 `mcp_*`）；(d) 有效模式 `auto` 放行、`accept-edits` 仅 Write/Edit、`ask` 无自动决策；(e) session grant；(f) 其余弹卡，无 UI 时 fail closed（PI 超时 120 s → Deny）。**Bash 不做命令分类/只读解析**（`inherit` → 解析全局默认；`ask`/`accept-edits` 弹卡；`auto` 放行；契约硬拒绝高于任何权限模式）。**明确不等于现状**：`OMP_DESKTOP_GATE_MODE=ask|deny|allow`（启动期 env）与 OMP `tools.approvalMode=always-ask|write|yolo`（启动期设置）都不是 PI 权限模式；T20-B 必须把 per-session/per-turn 的有效权限模式经运行域状态传入 gate，并让 browser/computer/eval 在 Agent+auto 下按 PI 放行（Plan/Goal 下由契约硬拒绝处理），不得沿用"任何模式都审批"的表述。
+6. **执行时强制（gate，实现 §1.3.1 的固定 PI 决策表）**：按 §1.3.1 的**顺序**实现，不得简化：(a) 契约模式硬拒绝**先于一切**——Write/Edit/apply_patch/未知原生工具、`mcp_*`、无非空 `planSafeActions` 的插件工具一律 block（PI `permissions.rs:219-234`）；契约许可的 `Read`/`Glob`/`Grep`/`Bash`/`BrowserPreview`/`new_context` 继续走后续判定——其中 `BrowserPreview` 风险为 **Medium**（不在风险表内），`new_context` 是 sidecar-side、根本不到 host gate；(b) 显式外部路径：`auto` 放行、其余弹卡；(c) `risk=Low` 放行（**Agent/非契约判定**下含 `mcp_*`；Plan/Goal 下 `mcp_*` 已在 (a) 被硬拒绝）；(d) 有效模式 `auto` 放行、`accept-edits` 仅 Write/Edit、`ask` 无自动决策；(e) session grant；(f) 其余弹卡，无 UI 时 fail closed（PI 超时 120 s → Deny）。**Bash 不做命令分类/只读解析**（`inherit` → 解析全局默认；`ask`/`accept-edits` 弹卡；`auto` 放行；契约硬拒绝高于任何权限模式）。**明确不等于现状**：`OMP_DESKTOP_GATE_MODE=ask|deny|allow`（启动期 env）与 OMP `tools.approvalMode=always-ask|write|yolo`（启动期设置）都不是 PI 权限模式；T20-B 必须把 per-session/per-turn 的有效权限模式经运行域状态传入 gate，并让 browser/computer/eval 在 Agent+auto 下按 PI 放行（Plan/Goal 下由契约硬拒绝处理），不得沿用"任何模式都审批"的表述。
 7. **插件模式传播与风险保真**：adapter 执行上下文 `mode` 改为执行时读取会话持久模式（替换 G2 硬编码），`planSafeActions` 逐 action 把关照抄 `plugin-runtime.ts:2504-2532`；子代理 `hasUI=false` 保持 fail-closed。风险**不得**继续由名字猜（G9）：见 §6.10。
 8. **能力声明**：`EngineCapability` 增 plan/goal（T20-B 决定键名与门控面），渲染层模式片/审批卡按能力显示；Pi 会话零变化。
 9. **扩展点清单**（确切符号）：`omp-session.ts` `configure()`/`persistConfig`（读模式进状态写入）、`OmpHostToolProvider.catalog`（提交工具注册）、`omp-host-tools.ts` executor（`mode` 来源 + `planSafeActions` 把关）、`omp-desktop-gate.ts` `decideToolCall`（模式感知决策表）、`desktop-state.ts` 快照（模式块字段）、`runtime/plans.ts` `dispatchApprovedPlan`（OMP 派发分支）、`ipc/agent-ipc.ts` `plansResolve`（去 Pi-only 门）、`packages/shared/src/engine.ts` 能力表、`PlanApprovalBar.tsx`（零改动，纯复用）。
@@ -305,7 +322,7 @@ FAIL t20-feasibility: 30/38 checks
 | 行 | 场景 | 层 | 期望 | 先例 |
 | --- | --- | --- | --- | --- |
 | B1 | OMP 会话 Agent/Plan/Goal 模式片切换持久化（现有 T15 语义回归） | desktop main 单元 + host-core | configure 原子持久 mode+permissionMode；无 pending/queued/running 才允许（`PLAN_CONFIGURATION_BLOCKED`） | `sessions.rs:1651`、`approval.rs:54-119` |
-| B2 | 模式提示词注入（R2 返修后的确切契约）：**只**用 `composeModeSystemPrompt(mode, "")` 的 mode block，经状态文件→`before_agent_start` **追加**到 `event.systemPrompt` | gate 单元 + 真实 OMP E2E（fake provider 断言 system 消息） | 四条同时成立：① plan/goal/agent 三块与固定 PI 逐字节一致；② OMP 原生 prompt 恰保留一次（单 `role:"system"` 消息）；③ PI `DEFAULT_RUNTIME_SYSTEM_PROMPT` 不出现；④ 技能/记忆块顺序稳定；状态文件失败 → prompt 拒绝（不按 agent 跑契约意图） | `mode-prompts.ts:58-64`（`""` 被 `.filter(Boolean)` 丢弃）；§4.2 R4-4 实测 ①②③ |
+| B2 | 模式提示词注入（R2 返修后的确切契约）：**只**用 `composeModeSystemPrompt(mode, "")` 的 mode block，经状态文件→`before_agent_start` **追加**到 `event.systemPrompt` | gate 单元 + 真实 OMP E2E（fake provider 断言 system 消息） | 四条同时成立：① plan/goal/agent 三块与固定 PI 逐字节一致；② OMP 原生 prompt 恰保留一次（单 `role:"system"` 消息）；③ PI `DEFAULT_RUNTIME_SYSTEM_PROMPT` 不出现；④ 技能/记忆块内容与相互顺序稳定；状态文件失败 → prompt 拒绝（不按 agent 跑契约意图）。§4.2 R4-4 已实测 ①（块=生产 composer 输出，且 `mode-prompts.ts` 与固定 PI 逐字节相等）、②、③ 与"块追加在既有 parts 之后、前缀跨 prompt 稳定"；**④ 仍须 T20-B 自测**（spike 不覆盖技能/记忆块内容） | `mode-prompts.ts:58-64`（`""` 被 `.filter(Boolean)` 丢弃）；§4.2 R2-字节/R2-范围声明 |
 | B3 | 契约模式工具目录：只读核 + 提交工具 + 非空 planSafeActions 插件 host tool；Write/Edit/apply_patch/未知不可见 | 桥接夹具（`set_host_tools` 帧）+ gate `setActiveTools` 单元 | 目录与 PI `plan_mode_allows` + 目录过滤一致；Agent 模式目录不变 | PI `runtime.ts:3314,3453-3467`、`permissions.rs:148-153`；OMP `runtime-init.ts:105-107` |
 | B4 | SubmitPlan/SubmitGoal 可见性与错误模式拒绝 ⚠ 受 G8 阻塞 | host-core + 桥接夹具 | 仅当前 kind 的提交工具注册；`SubmitPlan` 于 Goal / 无契约时 → `PLAN_NOT_ACTIVE`/`PLAN_KIND_MISMATCH`；每会话恰一 pending（`PLAN_ALREADY_PENDING`） | `approval.rs:216-236`、`plans/tests.rs:785` |
 | B5 | 提交产物：`.pi/<kind>/<slug>.md` 不可变、sha256/大小记录、防覆盖、symlink 拒；`awaiting_approval` 状态可见 ⚠ 受 G8 阻塞（触发路径） | host-core + 渲染层 | 与 PI 相同路径/内容契约；pending 行驱动审批卡 | `artifact.rs:99-152`、`plans/tests.rs:122,156,183,685` |
@@ -314,27 +331,22 @@ FAIL t20-feasibility: 30/38 checks
 | B8 | 批准后执行：选定 permissionMode 到达该回合 gate（agent 提示词 + 权限策略），执行失败 → interrupted 且可观察 | 桥接夹具 + 真实 OMP E2E（fake provider） | 回合以选定权限模式运行；失败清理不留 running 行 | 上游 `plans.ts:413-470`（Pi 侧）；§6.5 映射 |
 | B9 | 能力声明：`OMP_ENGINE_CAPABILITIES` 增 plan/goal；渲染层按能力显隐；Pi 会话行为零变化 | shared 单元 + 渲染层 | 能力表准确；Pi 全绿回归 | `engine.ts` 既有表 |
 | B10 | Agent 模式回归 + T17-T19 回归（子代理/工具结果/MCP/技能/记忆不受影响） | 既有套件 | 全绿；无模式相关行为变化 | T17-T19 验收记录 |
-| **B11** | **R4 顺序契约**：每 prompt 先完成 `set_host_tools` 目录替换，再由 `before_agent_start` 内 `setActiveTools` 夹取；**反向顺序必须有对照断言** | 桥接夹具 + 真实固定 OMP E2E | provider 实际工具表 == 夹取结果（含 host tool 被隐藏）；反向顺序时新注册 host tool 重新出现（证明顺序不是可选） | §4.2 R4-1/R4-2；`session-tools.ts:1999-2010`（`autoActivatedRpcToolNames`） |
-| **B12** | **R4 收敛契约**：首次夹取允许 1 次 prompt-policy retry，第二次起稳定；不得出现 `AgentStartPolicyChangedError` | 桥接夹具（`before_agent_start` attempts 计数）+ 真实固定 OMP E2E | 首次变更 attempts ≤2 且 prompt 被投递；同 clamp 的下一 prompt attempts ==1；夹取变化 ≤2 | §4.2 R4-3/R4-4；`agent-session.ts:407,6691-6760` |
-| **B13** | **R4 生命周期**：删除/重加 host tool、Agent→Plan→Goal→Agent、续写与模型重试后目录仍收敛；host tool 策略表（risk/planSafeActions）随目录一起替换 | 真实固定 OMP E2E | 每次 prompt 的工具表等于该模式目录；无滞留/重复注册；策略表与目录同源 | §4.2 R4-3；§6.10 |
+| **B11** | **R4 顺序契约**：每 prompt 先完成 `set_host_tools` 目录替换，再由 `before_agent_start` 内 `setActiveTools` 夹取；**反向顺序必须有对照断言** | 桥接夹具 + 真实固定 OMP E2E | provider 实际工具表与 clamp **严格序列相等**（含 host tool 被隐藏）；反向顺序时新注册 host tool 重新出现（证明顺序不是可选） | §4.2 R4-1/R4-2；`session-tools.ts:1999-2010`（`autoActivatedRpcToolNames`） |
+| **B12** | **R4 收敛契约**：首次夹取允许 1 次 prompt-policy retry，第二次起稳定；不得出现 `AgentStartPolicyChangedError` | 桥接夹具（`before_agent_start` attempts 计数）+ 真实固定 OMP E2E | 首次变更 attempts ≤2 且 prompt 被投递；同 clamp 的下一 prompt attempts ==1 | §4.2 R4-4（实测 2/1/1）；`agent-session.ts:407,6691-6760` |
+| **B13** | **R4 生命周期**：同一 session 上按 catalog 计划真实增/删/重加提交工具、Agent→Plan→Goal→Agent→Plan 切换、续写与模型重试后目录仍收敛；host tool 策略表（risk/planSafeActions）随目录一起替换 | 真实固定 OMP E2E | 每 prompt 工具表与 catalog+clamp**严格序列相等**、无滞留、无重复、无未注册名字冒充；策略表与目录同源 | §4.2 R4-3（实测 5 prompt 序列）；§6.10 |
 | **B14** | **R2 反例守卫**：任何把 base prompt（PI 默认或 OMP 原生）写进状态或作为 second block 的实现在 B2 的四条断言下必须判红 | gate 单元 | 反例实现被 B2 断言捕获（不是仅正向断言） | §1.1、§6.1；R2 复审要求 |
-| B6 | 审批：reject/过期/打断回 planning（新回合新产物，旧产物不可变）；approve 原子写 mode=agent+permission_mode+queued 执行；重复决议幂等、冲突/过期拒绝 | host-core + 渲染层 IPC | 与 PI 状态机一致；无第二套审批 | `approval.rs:351-471`、`plans/tests.rs:254,349,384,444` |
-| B7 | 恰一次执行：claim CAS queued→running 先于任何 OMP prompt；finish CAS；drain 只派 queued；boot 重启打断 pending 与 queued/running、不重放；执行期间配置冻结 | host-core + desktop main 单元 + 桥接夹具 | OMP 派发路径复用全部既有 CAS；无重复执行、无重放 | `execution.rs:65-83,110-152`、`migrations.rs` boot_maintenance、`plan-drain-engine-gate.test.mjs`（fork 语义：OMP 会话也要 claim） |
-| B8 | 批准后执行：选定 permissionMode 到达该回合 gate（agent 提示词 + 权限策略），执行失败 → interrupted 且可观察 | 桥接夹具 + 真实 OMP E2E（fake provider） | 回合以选定权限模式运行；失败清理不留 running 行 | 上游 `plans.ts:413-470`（Pi 侧）；§6.5 映射 |
-| B9 | 能力声明：`OMP_ENGINE_CAPABILITIES` 增 plan/goal；渲染层按能力显隐；Pi 会话行为零变化 | shared 单元 + 渲染层 | 能力表准确；Pi 全绿回归 | `engine.ts` 既有表 |
-| B10 | Agent 模式回归 + T17-T19 回归（子代理/工具结果/MCP/技能/记忆不受影响） | 既有套件 | 全绿；无模式相关行为变化 | T17-T19 验收记录 |
 
 ### T20-C（执行时强制与模式传播）
 
 | 行 | 场景 | 层 | 期望 | 先例 |
 | --- | --- | --- | --- | --- |
-| C1 | 契约模式执行时硬拒绝：Write/Edit/apply_patch/未知工具/`mcp_*`/无非空 `planSafeActions` 的插件工具 block，**任何**权限模式下（含 auto/allow） | gate 单元 + 真实 OMP E2E | 执行前 block、无副作用；`auto` 也不能复活 | `permissions.rs:219-234,538,559`；`rpc/mod.rs:3488-3497` 拒绝码 |
+| **C1** | 契约模式执行时硬拒绝：Write/Edit/apply_patch/未知工具/`mcp_*`/无非空 `planSafeActions` 的插件工具 block，**任何**权限模式下（含 auto/allow）；契约许可的只有 `Read`/`Glob`/`Grep`/`Bash`/`BrowserPreview`/`new_context` | gate 单元 + 真实 OMP E2E | 执行前 block、无副作用；`auto` 也不能复活 | `permissions.rs:219-234,538,559`；`rpc/mod.rs:3488-3497` 拒绝码 |
 | C2 | Bash 按有效权限模式（**不做命令分类**）：inherit→解析默认；ask→审批；accept-edits→Bash 仍审批；auto→放行；契约硬拒绝之上 | gate 单元 + 真实 OMP E2E | 与 PI `plan_bash_follows_permission_mode` 语义一致；Auto 警示文案保留 | `permissions.rs:250-269,547-556`；`plan-mode-source-contract.test.mjs` |
 | C3 | 插件 `planSafeActions`：无非空声明的插件工具契约模式拒绝；有声明逐 action 允许/拒绝；ctx.mode = 真实模式（替换硬编码 agent） | desktop main 单元 + 桥接夹具 | 与 PI `plugin-runtime.ts:2504-2532` 同语义；补充 PI 缺失的专测 | ADR 0211；`plugin-runtime.ts:776-817` |
 | C4 | 子代理 `hasUI=false`：契约模式策略 fail-closed（无交互审批，按策略拒绝）；Agent 模式与既有 T17 语义不变 | gate 单元 + 真实 OMP E2E | 子代理不因模式改变而获得更高权限；无 UI 无审批通道 | gate no-UI 分支；M1/T17 结论 |
 | **C5** | **高权限工具（browser/computer/eval）按 §1.3.1 决策表**：Agent+`auto` **放行**（PI `auto` 放行 High/Medium）；`ask`/`accept-edits` 弹卡；Plan/Goal 下不在 `plan_mode_allows` → **契约硬拒绝**（先于权限模式） | gate 单元 + 真实 OMP E2E | 与 §1.3.1 逐格一致；**不得**要求"任何模式都审批"（那是 PI 冲突表述，R1 已推翻） | §1.3.1；PI `permissions.rs:250-269`、`:219-234` |
 | **C6** | **普通 Agent 会话的四条有效权限模式**：`inherit` 解析全局默认；`ask` 弹卡；`accept-edits` 仅 Write/Edit 自动；`auto` 放行 High/Medium；解析在桌面侧完成，gate 只读结果 | gate 单元 + 桥接夹具 | 与 §1.3.1 矩阵一致；`inherit` 不经 gate 解析 | §1.3.1；spec `03-tools-and-permissions.md:421-425`；R1 复审要求 |
-| **C7** | **风险保真**：`mcp_*` = low（放行）；`plugin_*` 取 manifest 声明（low/medium/high，缺失/非法→medium）；未知 → medium；host tool 风险来自状态里的策略表而非名字前缀 | gate 单元 + 桥接夹具（目录带 risk） | 决策与宿主声明的 risk 一致；名字前缀不再决定 host tool 风险 | §6.10；PI `permissions.rs:128-141`；R1 复审要求 |
+| **C7** | **风险保真（含 F1 的契约许可工具）**：`plugin_*` 取 manifest 声明（low/medium/high，缺失/非法→medium）；未知 → medium；`mcp_*` = low **仅在 Agent/非契约的常规风险判定下自动放行**（Plan/Goal 下 `mcp_*` 先被 C1 契约硬拒绝，Low 不适用）；**`BrowserPreview` 在契约模式内被 `plan_mode_allows` 许可，但它不在风险表 → Medium**：`ask`/`accept-edits` 弹卡、`auto` 放行、grant 可 `AllowSession`（不得写成 Low/契约许可放行）；`new_context` 是 sidecar-side、不到 host gate（无风险等级）；host tool 风险来自状态里的策略表而非名字前缀 | gate 单元 + 桥接夹具（目录带 risk） | 决策与宿主声明的 risk 一致；名字前缀不再决定 host tool 风险；契约模式下 Low 不能让 `mcp_*`/Write/Edit 复活；`BrowserPreview` 与 `Read`/`Glob`/`Grep` 行为不同 | §1.3.1；PI `permissions.rs:128-141,148-153,219-234,250-269`；R1/F1 复审要求 |
 | **C8** | **外部路径例外**：`auto` 放行；`ask`/`accept-edits` 弹卡（除非该工具已有 session grant）；无 UI 时**只在本来需要交互时** fail closed | gate 单元 | 与 §1.3.1 第 2/6 步一致；无 UI 不等于所有调用都拒绝 | PI `permissions.rs:238-248`；`PERMISSION_TIMEOUT_MS = 120_000` |
 
 ### T20-D（Goal 差异与整体验收）
@@ -350,32 +362,35 @@ FAIL t20-feasibility: 30/38 checks
 ## 8. 阻塞与未知
 
 - **硬阻塞（R3）**：固定 OMP 18.2.7 上**无法**实现 PI 的过渡工具契约——(a) 过渡工具独占 assistant 批次、同批其它调用零副作用；(b) 提交成功或失败后不再继续模型循环；(c) 不依赖结果文本或模型服从。§4.2 六场景实测：同批兄弟真实落盘、同批两次提交执行两次、gate 逐调用 block 保护不了兄弟、提交结果后再走 2 个 provider step 并继续执行工具。根因是上游能力缺口（`RpcHostToolAdapter.concurrency` 硬编码 `"shared"`、`RpcHostToolDefinition` 无 `concurrency`/`terminate`、扩展 `tool_call` 载荷无批次视图、`AgentToolResult` 无 `terminate`、唯一优雅终止只认字面工具名 `"yield"`）。**T20-B 不得开始**（§6.3 列出解除条件：上游能力、或用户明确接受的语义差异、或把提交移出模型循环）。解除前不得声称 Plan/Goal 与 PI 兼容。
-- **已解决（R4，本轮实测）**：`setActiveTools` 与 `set_host_tools` 的顺序与收敛不再是"未知"——唯一稳定顺序是每 prompt 先 `set_host_tools`、后 `before_agent_start` 内夹取；首次夹取恰 1 次 policy retry、第二次起稳定（§4.2 R4-1…R4-4）。撤销夹取的路径（先夹取后注册）也有对照证据。
-- **已解决（R2）**：模式提示词拼接不再是"含糊契约"——只用 `composeModeSystemPrompt(mode, "")` 的 mode block 追加，实测单 system 消息、块恰一次、PI 默认 base 不出现（§4.2 R4-4）。
+- **已解决（R4，本轮扩大实测范围）**：顺序、收敛与**目录生命周期**都不再是"未知"——唯一稳定顺序是每 prompt 先 `set_host_tools`、后 `before_agent_start` 内夹取；首次夹取恰 1 次 policy retry、之后稳定；同一 session 上 5 个连续 prompt 真实增/删/重加 `SubmitPlan`/`SubmitGoal` 并与 catalog+clamp **严格序列相等**、无滞留/重复（§4.2 R4-1…R4-4）。撤销夹取的路径（先夹取后注册）与"严格相等而非子集"的断言方式都有对照证据。
+- **已解决（R2，范围明确）**：模式提示词拼接不再是"含糊契约"——只用 `composeModeSystemPrompt(mode, "")` 的 mode block 追加；spike 用**三个真实块**实测：各自恰一次、其它块 0 次、单 system 消息、PI 默认 base 不出现、块在既有 parts 之后且前缀跨 prompt 稳定，并断言 `app` 与固定 PI 的 `mode-prompts.ts` 逐字节相等（§4.2 R2-字节）。**技能/记忆块的内容与相互顺序不在本证据范围内**，仍由 T19-C 通道与 B2 ④ 在 T20-B 覆盖。
 - **已知限制（设计前提，非假设）**：OMP 原生 Plan/Goal 状态机（interactive/ACP）不可复用；审批不持久不重放（桌面经 host-core `plan_approvals` 自持，语义由 §6.4 覆盖）；无 per-turn 权限模式 RPC——per-turn 权限策略与 per-tool 风险只能经运行域状态 → gate 通道（§6.6/§6.10）；`ctx.abort()` 是用户打断语义（整回合 aborted），只能作为"零副作用"的兜底而不能替代 PI 的 block-and-continue。
 - **未知（留给解除阻塞后的轮次实测）**：goal 契约在 OMP 的"自停"表现（无延续定时器，依赖提示词与工具结果，D1 实测）；`pi.setActiveTools` 对 `xd://` 挂载类工具的夹取边界（本轮只测了顶层工具表）。
 - **如实声明**：当前 `OMP_DESKTOP_GATE_MODE`（ask|deny|allow，启动期）与 OMP `--approval-mode`（always-ask|write|yolo，启动期）**都不是** PI 权限模式（inherit/ask/accept-edits/auto）；在 §6.6 映射落地前，不得宣称既有 env 门已提供权限模式。`mcp_*=medium`/"与 PI 一致"的旧表述已按 §1.3.1 更正（PI 为 `Low`）。
 
 ---
 
-## 9. 验证命令与结果（复审返修轮，Node v24.14.0 / Bun 1.4.2）
+## 9. 验证命令与结果（F1-F7 返修轮，Node v24.14.0 / Bun 1.4.2）
 
 环境（复审要求）：`source /home/vv/.nvm/nvm.sh && nvm use system`（本机 system → v24.14.0；`nvm use 24` 别名在本机为 N/A）+ `export PATH="/home/vv/.bun/bin:/home/vv/.nvm/versions/node/v24.14.0/bin:$PATH"`；固定 launcher 报 `omp/18.2.7`。未调用任何付费/远程模型。
 
 | 命令（工作目录） | 结果 |
 | --- | --- |
 | `node scripts/check-omp-plan-goal-gaps.mjs`（`app/`） | SKIP 行，**退出 0**（opt-in 未启用） |
-| `OMP_T20_GAP_PROBE=1 node scripts/check-omp-plan-goal-gaps.mjs`（`app/`） | 3×`GAP-OPEN` + g4 判定，**退出 1**（完整输出见 §4；g1 判据已重写） |
-| `node t20-feasibility.mjs`（`app/experiments/omp-bridge/`） | **30/38 checks**：R3 的 8 项契约检查全部失败（硬阻塞证据）；R4-1…R4-4 与 R2 共 14 项、R3-d 的 3 项事实断言、12 次进程组回收校验全部通过；结果 JSON 落 `results/t20-feasibility.json`（§4.2） |
-| `node --test apps/desktop/test/plan-drain-engine-gate.test.mjs apps/desktop/test/omp-session-configure.test.mjs apps/desktop/test/engine-router.test.mjs apps/desktop/test/plan-artifact-contract.test.mjs apps/desktop/test/plan-mode-source-contract.test.mjs`（`app/`） | **37 通过 / 0 失败 / 0 跳过**（494 ms） |
-| `pnpm lint:biome`（`app/`） | Checked **75 files，0 问题**；`scripts/`（仅 `check-architecture.mjs`、`scripts/e2e/*.mjs` 在面内）与 `experiments/` 按 `biome.json` 的 `files.includes` **不在 lint 面内**，新增两个实验文件因此不经 Biome |
+| `OMP_T20_GAP_PROBE=1 node scripts/check-omp-plan-goal-gaps.mjs`（`app/`） | 3×`GAP-OPEN`（g1 为新的四段链路证据串）+ g4 判定，**退出 1** |
+| g1 假绿对照（临时注入后 `git checkout` 复原） | 裸 `mode` 字段注入 → 仍 `GAP-OPEN`；完整链路注入 → `GAP-CLOSED`；复原后工作树干净（§4） |
+| `node scripts/check-t20-matrix-ids.mjs`（`app/`） | `MATRIX-ID-OK: B1-B14, C1-C8, D1-D3 each appear exactly once`，**退出 0**；对含重复的上一版文档判 `MATRIX-ID-FAIL B6…B10`、退出 1（证明非空转） |
+| `node t20-feasibility.mjs`（`app/experiments/omp-bridge/`） | **34/42 checks**：R3 的 8 项契约检查全部失败（硬阻塞证据，与上一轮同一组）；R4-1…R4-4（含 5-prompt 目录生命周期与严格序列相等）与 R2 字节断言、R3-d 的 3 项事实断言、12 次进程组回收校验全部通过；结果 JSON 落 `results/t20-feasibility.json`（§4.2） |
+| `node --test apps/desktop/test/plan-drain-engine-gate.test.mjs apps/desktop/test/omp-session-configure.test.mjs apps/desktop/test/engine-router.test.mjs apps/desktop/test/plan-artifact-contract.test.mjs apps/desktop/test/plan-mode-source-contract.test.mjs`（`app/`） | **37 通过 / 0 失败 / 0 跳过** |
+| `pnpm lint:biome`（`app/`） | 0 问题；`scripts/`（仅 `check-architecture.mjs`、`scripts/e2e/*.mjs` 在面内）与 `experiments/` 按 `biome.json` 的 `files.includes` **不在 lint 面内**，新增脚本/实验文件因此不经 Biome（已对新文件跑 `node --check`） |
 | `git diff --check`（根） | 0 |
 | `bun test packages/coding-agent/test/rpc-host-tools.test.ts`（`upstream/oh-my-pi/`） | **5 pass / 0 fail**（`set_host_tools` 注册与自动激活接缝） |
 | `bun test packages/agent/test/agent-loop.test.ts -t concurren`（`upstream/oh-my-pi/`） | **3 pass / 0 fail**（并发调度接缝） |
 | `bun test packages/agent/test/agent-loop.test.ts -t terminal`（`upstream/oh-my-pi/`） | **3 pass / 0 fail**（terminal-yield 接缝） |
+| 字节平价复核（`diff -q`） | `mode-prompts.ts`、`crates/host-core/src/permissions.rs`、`docs/spec/03-runtime/03-tools-and-permissions.md`、`docs/spec/04-ux/03-permission-ux.md` 与固定 `upstream/pi-desktop` **全等** |
 | `git submodule status`（根） | OMP `d49918fab`、PI `0111e306` 未动；两个子模块工作树 `git status --short` 均为空 |
-| spike 资源回收 | 每次 `runScenario` 校验「process group reaped」；`--keep-artifacts` 未启用时 scratch 目录全部删除，无残留进程 |
+| spike 资源回收 | 每次 `runScenario` 校验「process group reaped」；scratch 目录全部删除，无残留进程/临时目录 |
 
 ## 10. T20 完成状态
 
-**T20-A 的审计、契约与验收矩阵已完成返修，但 T20-A 不能标为"已完成、无硬阻塞"：R3 是硬阻塞（§8），T20-B 不得开始。** T20-B/C/D 未开始；Plan/Goal 与高权限工具门未实现、未声称完成。R1（权限决策表/风险语义/验收矩阵）、R2（mode block 只追加）、R4（顺序与收敛）已按固定源码与无费用实验修正；R3 需要上游能力、或用户明确接受的语义差异、或把提交移出模型循环三者之一，才能解除。`branch`/`steer`/`followUp`/`compact`/子代理单独停止保持关闭（T17-T19 延续）。
+**T20-A 的审计、契约与验收矩阵已完成两轮返修（R1-R4、F1-F7），但 T20-A 不能标为"已完成、无硬阻塞"：R3 是硬阻塞（§8），T20-B 不得开始。** T20-B/C/D 未开始；Plan/Goal 与高权限工具门未实现、未声称完成。F1（`BrowserPreview`/`new_context` 风险与验收）、F2（g1 真实链路判据 + 假绿对照）、F3（严格序列断言）、F4（真实目录生命周期）、F5（真实 mode block 字节 + 范围收窄）、F6（矩阵唯一性 + 脚本）、F7（行号一致）已按固定源码与无费用实验修正；R3 需要上游能力、或用户明确接受的语义差异、或把提交移出模型循环三者之一，才能解除。`branch`/`steer`/`followUp`/`compact`/子代理单独停止保持关闭（T17-T19 延续）。

@@ -19,29 +19,61 @@
  *   R4    Per-prompt tool availability must be clamp-able through
  *         `set_host_tools` + `setActiveTools` with a stable order/convergence
  *         (`set_host_tools` auto-activates new non-hidden host tools, so the
- *         clamp must come second and the prompt-policy retry must settle).
+ *         clamp must come second and the prompt-policy retry must settle), and
+ *         the catalog must be replaceable per prompt (add/remove/re-add a
+ *         submit tool) without residue.
+ *   R2    The mode block appended to the system prompt must be the production
+ *         `composeModeSystemPrompt(mode, "")` bytes — appended, never merged
+ *         with a base prompt, and stable across the prompt-policy retry.
  *
  * Every check below asserts the CONTRACT, not current behavior: a failing
- * check is the evidence that the fixed surface cannot satisfy it. Provider,
- * runtime and extension are all local (fake provider, pinned launcher) — no
- * paid or remote model is called.
+ * check is the evidence that the fixed surface cannot satisfy it. Tool-list
+ * assertions are STRICT (exact sequence: missing, extra, reordered, or
+ * duplicated names all fail) — a subset check would let an unregistered tool
+ * masquerade as a successful catalog. Provider, runtime and extension are all
+ * local (fake provider, pinned launcher) — no paid or remote model is called.
  *
  * Usage: node t20-feasibility.mjs [--keep-artifacts]
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { OmpRpc } from "./lib/rpc.mjs";
 import { FakeProvider } from "./lib/provider.mjs";
 import { resolveRepoRoot, EXPERIMENT_ROOT } from "./lib/base.mjs";
 import { runExperiment, experimentRoot } from "./lib/run.mjs";
 
 const SPIKE_GATE = join(EXPERIMENT_ROOT, "extensions", "t20-spike-gate.ts");
+const APP_ROOT = resolve(EXPERIMENT_ROOT, "../..");
+const APP_MODE_PROMPTS = join(APP_ROOT, "packages/agent-runtime/src/mode-prompts.ts");
+const PINNED_MODE_PROMPTS = join(
+  resolveRepoRoot(),
+  "upstream/pi-desktop/packages/agent-runtime/src/mode-prompts.ts",
+);
+// The real production composer, imported directly (the module has only a
+// type-only import, so Node's type stripping loads it without a bundler).
+const { composeModeSystemPrompt } = await import(pathToFileURL(APP_MODE_PROMPTS).href);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const SUBMIT_TOOL = {
   name: "SubmitPlan",
   label: "Submit plan",
   description: "Submit one complete Markdown plan for user approval.",
+  parameters: {
+    type: "object",
+    properties: {
+      title: { type: "string" },
+      markdown: { type: "string" },
+      question: { type: "string" },
+    },
+    required: ["title", "markdown", "question"],
+  },
+};
+
+const SUBMIT_GOAL_TOOL = {
+  name: "SubmitGoal",
+  label: "Submit goal",
+  description: "Submit one complete Markdown goal contract for user approval.",
   parameters: {
     type: "object",
     properties: {
@@ -62,20 +94,35 @@ const ECHO_TOOL = {
 
 const submitArgs = { title: "T", markdown: "# Plan", question: "Approve?" };
 
+/** Exact-sequence equality: order, duplicates, missing and extra all matter. */
+function sameSequence(observed, expected) {
+  if (!Array.isArray(observed) || !Array.isArray(expected)) return false;
+  return observed.length === expected.length && observed.every((name, index) => name === expected[index]);
+}
+
+const toolNamesOf = (request) => (request?.body?.tools ?? []).map((tool) => tool?.function?.name ?? tool?.name);
+
+function systemTextOf(request) {
+  const messages = request?.body?.messages ?? [];
+  const system = messages.find((message) => message?.role === "system");
+  return typeof system?.content === "string" ? system.content : JSON.stringify(system?.content ?? "");
+}
+
+const occurrences = (text, needle) => (needle ? text.split(needle).length - 1 : 0);
+
 /** Run one isolated runtime and return everything the checks read. */
 async function runScenario(ctx, provider, config) {
   const {
     label,
-    project,
     turns,
     env = {},
-    tools = [SUBMIT_TOOL],
-    registerToolsAfterPrompts = 0,
+    tools = [],
+    catalogPlan = null,
     clampPlan = [],
+    modePlan = null,
     prompts = [{ message: "go" }],
     answerHostTool = () => ({ content: [{ type: "text", text: "host-answer" }] }),
     abortAfterHostCallMs = null,
-    hostToolDeadlineMs = 20_000,
     settleMs = 1_200,
   } = config;
 
@@ -85,13 +132,13 @@ async function runScenario(ctx, provider, config) {
   mkdirSync(projectDir, { recursive: true });
   const logPath = join(root, "spike.log");
   const clampFile = join(root, "clamp.json");
+  const modeFile = join(root, "mode.json");
   const requestBase = provider.requests.length;
   provider.script(turns);
 
   const hostCalls = [];
   const answered = new Set();
   let rpc;
-  let registerIndex = 0;
   try {
     rpc = await OmpRpc.start({
       repoRoot,
@@ -101,21 +148,19 @@ async function runScenario(ctx, provider, config) {
       cwd: projectDir,
       extraEnv: {
         T20_SPIKE_LOG: logPath,
-        ...(env.T20_SPIKE_PROMPT_SUFFIX ? { T20_SPIKE_PROMPT_SUFFIX: env.T20_SPIKE_PROMPT_SUFFIX } : {}),
+        ...(clampPlan.length > 0 ? { T20_SPIKE_CLAMP_FILE: clampFile } : {}),
+        ...(modePlan ? { T20_SPIKE_MODE_FILE: modeFile } : {}),
         ...(env.T20_SPIKE_BLOCK ? { T20_SPIKE_BLOCK: env.T20_SPIKE_BLOCK } : {}),
         ...(env.T20_SPIKE_ABORT_ON ? { T20_SPIKE_ABORT_ON: env.T20_SPIKE_ABORT_ON } : {}),
-        ...(clampPlan.length > 0 ? { T20_SPIKE_CLAMP_FILE: clampFile } : {}),
       },
     });
     await rpc.request({ type: "negotiate_protocol", protocolVersion: 2 });
-
-    if (registerToolsAfterPrompts === 0 && tools.length > 0) {
+    if (!catalogPlan && tools.length > 0) {
       const registered = await rpc.request({ type: "set_host_tools", tools });
       if (!registered.success) throw new Error(`set_host_tools rejected: ${JSON.stringify(registered)}`);
     }
 
-    const perPromptRequests = [];
-    const perPromptStartAttempts = [];
+    const perPrompt = [];
     const countStartEvents = () => {
       if (!existsSync(logPath)) return 0;
       return readFileSync(logPath, "utf8")
@@ -123,8 +168,12 @@ async function runScenario(ctx, provider, config) {
         .filter((line) => line.includes('"event":"before_agent_start"')).length;
     };
     for (const [index, prompt] of prompts.entries()) {
-      if (registerToolsAfterPrompts > 0 && index === registerToolsAfterPrompts) {
-        await rpc.request({ type: "set_host_tools", tools });
+      let catalogNames = tools.map((tool) => tool.name);
+      if (catalogPlan) {
+        const catalog = catalogPlan[index] ?? [];
+        catalogNames = catalog.map((tool) => tool.name);
+        const registered = await rpc.request({ type: "set_host_tools", tools: catalog });
+        if (!registered.success) throw new Error(`set_host_tools(${index}) rejected: ${JSON.stringify(registered)}`);
       }
       if (clampPlan[index] !== undefined) {
         writeFileSync(clampFile, JSON.stringify({ activeTools: clampPlan[index] }));
@@ -132,6 +181,16 @@ async function runScenario(ctx, provider, config) {
         // An explicit "no clamp for this prompt" must clear the previous list,
         // otherwise the previous clamp would silently apply again.
         writeFileSync(clampFile, JSON.stringify({ activeTools: null }));
+      }
+      if (modePlan) {
+        writeFileSync(
+          modeFile,
+          JSON.stringify(
+            modePlan[index]
+              ? { modeBlock: composeModeSystemPrompt(modePlan[index], "") }
+              : { modeBlock: null },
+          ),
+        );
       }
       const framesBefore = rpc.frames.length;
       const requestCountBefore = provider.requests.length;
@@ -155,11 +214,18 @@ async function runScenario(ctx, provider, config) {
       await promptPromise.catch(() => {});
       await rpc.waitFor((f) => f.type === "agent_end", 10_000, framesBefore);
       await sleep(settleMs);
-      perPromptRequests.push(provider.requests.slice(requestCountBefore));
-      perPromptStartAttempts.push(countStartEvents() - startEventsBefore);
-      // Consume a per-prompt host-call deadline: a prompt that expects no host
-      // call still ends through agent_end or the loop deadline above.
-      void hostToolDeadlineMs;
+      const requests = provider.requests.slice(requestCountBefore);
+      const first = requests[0];
+      perPrompt.push({
+        requests,
+        catalogNames,
+        clamp: clampPlan[index] ?? null,
+        mode: modePlan?.[index] ?? null,
+        toolNames: toolNamesOf(first),
+        systemText: systemTextOf(first),
+        systemMessages: (first?.body?.messages ?? []).filter((message) => message?.role === "system").length,
+        startAttempts: countStartEvents() - startEventsBefore,
+      });
     }
 
     const log = existsSync(logPath)
@@ -170,7 +236,7 @@ async function runScenario(ctx, provider, config) {
     const postAbortState = abortAfterHostCallMs === null
       ? null
       : await rpc.request({ type: "get_state" }, { timeoutMs: 10_000 }).catch((error) => ({ error: String(error) }));
-    return { rpc, projectDir, log, hostCalls, perPromptRequests, perPromptStartAttempts, requestBase, postAbortState, frames: rpc.frames.slice(0) };
+    return { projectDir, log, hostCalls, perPrompt, requestBase, postAbortState, frames: rpc.frames.slice(0) };
   } finally {
     if (rpc?.pid) {
       const reaped = await rpc.stop();
@@ -178,8 +244,6 @@ async function runScenario(ctx, provider, config) {
     }
   }
 }
-
-const toolNamesOf = (request) => (request?.body?.tools ?? []).map((tool) => tool?.function?.name ?? tool?.name);
 
 const evidence = await runExperiment("t20-feasibility", async (ctx) => {
   const provider = await FakeProvider.start({ model: "local-model" });
@@ -189,12 +253,11 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
   // R3-1  mixed batch [bash, SubmitPlan]
   // ==========================================================================
   {
-    const sideEffect = (name) => join(name, "sibling.txt");
     const project = ctx.scratch("t20-s1-project");
     const touched = join(project, "sibling.txt");
     const run = await runScenario(ctx, provider, {
       label: "s1-mixed-bash-first",
-      project,
+      tools: [SUBMIT_TOOL],
       turns: [
         {
           text: "running both",
@@ -206,16 +269,14 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
         },
         { text: "after the batch", finish: "stop" },
       ],
-      env: {},
     });
-    const submitted = run.hostCalls.filter((call) => call.toolName === "SubmitPlan");
-    const submitsSeen = submitted.length;
+    const submitsSeen = run.hostCalls.filter((call) => call.toolName === "SubmitPlan").length;
     ctx.note("s1.observed", {
       hookOrder: run.log.filter((e) => e.event === "tool_call").map((e) => e.toolName),
       bashSideEffect: existsSync(touched),
       submitHostCalls: submitsSeen,
-      providerRequests: run.perPromptRequests[0]?.length ?? 0,
-      executions: run.rpc.frames.filter((f) => f.type === "tool_execution_start").map((f) => f.toolName),
+      providerRequests: run.perPrompt[0]?.requests.length ?? 0,
+      executions: run.frames.filter((f) => f.type === "tool_execution_start").map((f) => f.toolName),
     });
     ctx.check(
       "R3-a [bash, SubmitPlan]: the sibling bash call has ZERO side effects",
@@ -228,7 +289,6 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
       `SubmitPlan host calls: ${submitsSeen}`,
     );
     ctx.limit("A mixed batch containing a transition tool is the exact case PI's beforeToolCall batch guard exists for.");
-    void sideEffect;
   }
 
   // ==========================================================================
@@ -239,7 +299,7 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
     const touched = join(project, "sibling.txt");
     const run = await runScenario(ctx, provider, {
       label: "s2-mixed-submit-first",
-      project,
+      tools: [SUBMIT_TOOL],
       turns: [
         {
           text: "running both",
@@ -256,7 +316,7 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
       hookOrder: run.log.filter((e) => e.event === "tool_call").map((e) => e.toolName),
       bashSideEffect: existsSync(touched),
       submitHostCalls: run.hostCalls.filter((call) => call.toolName === "SubmitPlan").length,
-      executions: run.rpc.frames.filter((f) => f.type === "tool_execution_start").map((f) => f.toolName),
+      executions: run.frames.filter((f) => f.type === "tool_execution_start").map((f) => f.toolName),
     });
     ctx.check(
       "R3-a [SubmitPlan, bash]: the sibling bash call has ZERO side effects",
@@ -272,7 +332,7 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
     const project = ctx.scratch("t20-s3-project");
     const run = await runScenario(ctx, provider, {
       label: "s3-double-submit",
-      project,
+      tools: [SUBMIT_TOOL],
       turns: [
         {
           text: "submitting twice",
@@ -302,7 +362,7 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
     const touched = join(project, "sibling.txt");
     const run = await runScenario(ctx, provider, {
       label: "s3b-blocked-transition-sibling",
-      project,
+      tools: [SUBMIT_TOOL],
       env: { T20_SPIKE_BLOCK: "SubmitPlan" },
       turns: [
         {
@@ -320,7 +380,7 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
       blockedEvents: run.log.filter((e) => e.event === "spike_block").map((e) => e.toolName),
       bashSideEffect: existsSync(touched),
       submitHostCalls: run.hostCalls.filter((call) => call.toolName === "SubmitPlan").length,
-      executions: run.rpc.frames.filter((f) => f.type === "tool_execution_start").map((f) => f.toolName),
+      executions: run.frames.filter((f) => f.type === "tool_execution_start").map((f) => f.toolName),
       executionsNote: "tool_execution_start also fires for a blocked call; the side-effect signals are the sibling file and the host_tool_call frame",
     });
     ctx.check(
@@ -338,7 +398,7 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
     const touched = join(project, "continued.txt");
     const run = await runScenario(ctx, provider, {
       label: "s4-continue-after-success",
-      project,
+      tools: [SUBMIT_TOOL],
       turns: [
         { text: "submitting", toolCalls: [{ id: "s4-submit", name: "SubmitPlan", args: submitArgs }], finish: "tool_calls" },
         { text: "continuing anyway", toolCalls: [{ id: "s4-bash", name: "bash", args: { command: `touch ${touched}` } }], finish: "tool_calls" },
@@ -346,15 +406,14 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
       ],
     });
     ctx.note("s4.observed", {
-      providerRequestsAfterSubmit: run.perPromptRequests[0]?.length ?? 0,
+      providerRequestsAfterSubmit: run.perPrompt[0]?.requests.length ?? 0,
       continuedToolRan: existsSync(touched),
-      executions: run.rpc.frames.filter((f) => f.type === "tool_execution_start").map((f) => f.toolName),
-      submitResultDelivered: run.rpc.frames.filter((f) => f.type === "tool_execution_end").map((f) => f.toolName),
+      executions: run.frames.filter((f) => f.type === "tool_execution_start").map((f) => f.toolName),
     });
     ctx.check(
       "R3-b: a successful submission leaves no further provider step",
-      (run.perPromptRequests[0]?.length ?? 0) <= 1,
-      `model calls after the submit result: ${(run.perPromptRequests[0]?.length ?? 0) - 1}`,
+      (run.perPrompt[0]?.requests.length ?? 0) <= 1,
+      `model calls after the submit result: ${(run.perPrompt[0]?.requests.length ?? 0) - 1}`,
     );
     ctx.check("R3-b: a successful submission leaves no further tool execution", !existsSync(touched));
   }
@@ -369,7 +428,7 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
     failing.isError = true;
     const run = await runScenario(ctx, provider, {
       label: "s5-failure-branch",
-      project,
+      tools: [SUBMIT_TOOL],
       answerHostTool: failing,
       turns: [
         { text: "submitting", toolCalls: [{ id: "s5-submit", name: "SubmitPlan", args: submitArgs }], finish: "tool_calls" },
@@ -378,14 +437,14 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
       ],
     });
     ctx.note("s5.observed", {
-      providerRequests: run.perPromptRequests[0]?.length ?? 0,
+      providerRequests: run.perPrompt[0]?.requests.length ?? 0,
       continuedToolRan: existsSync(touched),
       hostCalls: run.hostCalls.map((call) => call.toolName),
     });
     ctx.check(
       "R3-c: a failed submission also leaves no further provider step",
-      (run.perPromptRequests[0]?.length ?? 0) <= 1,
-      `model calls after the failed submit result: ${(run.perPromptRequests[0]?.length ?? 0) - 1}`,
+      (run.perPrompt[0]?.requests.length ?? 0) <= 1,
+      `model calls after the failed submit result: ${(run.perPrompt[0]?.requests.length ?? 0) - 1}`,
     );
   }
 
@@ -396,22 +455,22 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
     const project = ctx.scratch("t20-s6-project");
     const run = await runScenario(ctx, provider, {
       label: "s6-abort-pending",
-      project,
+      tools: [SUBMIT_TOOL],
       abortAfterHostCallMs: 700,
       turns: [
         { text: "submitting", toolCalls: [{ id: "s6-submit", name: "SubmitPlan", args: submitArgs }], finish: "tool_calls" },
         { text: "should not run", finish: "stop" },
       ],
     });
-    const cancelFrame = run.rpc.frames.find((f) => f.type === "host_tool_cancel");
-    const agentEnd = run.rpc.frames.filter((f) => f.type === "agent_end");
+    const cancelFrame = run.frames.find((f) => f.type === "host_tool_cancel");
+    const agentEnd = run.frames.filter((f) => f.type === "agent_end");
     const pendingCall = run.hostCalls[0];
     ctx.note("s6.observed", {
       pendingCall: pendingCall ? { id: pendingCall.id, toolName: pendingCall.toolName } : null,
       hostToolCancel: cancelFrame ?? null,
       agentEndCount: agentEnd.length,
-      providerRequests: run.perPromptRequests[0]?.length ?? 0,
-      frames: run.rpc.frames.map((f) => f.type),
+      providerRequests: run.perPrompt[0]?.requests.length ?? 0,
+      frames: run.frames.map((f) => f.type),
     });
     ctx.check(
       "R3-d: abandoning a pending transition call cancels it by targetId",
@@ -434,7 +493,7 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
     const touched = join(project, "sibling.txt");
     const run = await runScenario(ctx, provider, {
       label: "s7-abort-on-intercept",
-      project,
+      tools: [SUBMIT_TOOL],
       env: { T20_SPIKE_ABORT_ON: "SubmitPlan" },
       turns: [
         {
@@ -452,9 +511,9 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
       abortEvents: run.log.filter((e) => e.event === "spike_abort_requested"),
       bashSideEffect: existsSync(touched),
       submitHostCalls: run.hostCalls.filter((call) => call.toolName === "SubmitPlan").length,
-      executions: run.rpc.frames.filter((f) => f.type === "tool_execution_start").map((f) => f.toolName),
-      frames: [...new Set(run.rpc.frames.map((f) => f.type))],
-      messages: run.rpc.frames.filter((f) => f.type === "message_end").map((f) => f.message?.stopReason ?? null),
+      executions: run.frames.filter((f) => f.type === "tool_execution_start").map((f) => f.toolName),
+      frames: [...new Set(run.frames.map((f) => f.type))],
+      messages: run.frames.filter((f) => f.type === "message_end").map((f) => f.message?.stopReason ?? null),
     });
     ctx.check(
       "R3-a: aborting from the transition interception still leaves the sibling with ZERO side effects",
@@ -471,22 +530,20 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
     const clamp = ["read", "grep", "glob", "bash", "SubmitPlan"];
     const run = await runScenario(ctx, provider, {
       label: "r4a-forward-order",
-      project,
       tools: [SUBMIT_TOOL, ECHO_TOOL],
       clampPlan: [clamp],
       prompts: [{ message: "first" }],
       turns: [{ text: "ok", finish: "stop" }],
     });
-    const names = toolNamesOf(run.perPromptRequests[0]?.[0]);
+    const observed = run.perPrompt[0]?.toolNames ?? [];
     ctx.note("r4a.observed", {
       clamp,
-      providerToolNames: names,
+      providerToolNames: observed,
       startEvents: run.log.filter((e) => e.event === "before_agent_start").length,
       clampEvents: run.log.filter((e) => e.event === "spike_clamp").length,
     });
-    ctx.check("R4: the registered host tool is visible before the clamp", names.includes("SubmitPlan"));
-    ctx.check("R4: the clamp hides every tool outside its list", names.every((name) => clamp.includes(name)), names.join(","));
-    ctx.check("R4: the clamp hides a second host tool (HostEcho)", !names.includes("HostEcho"), names.join(","));
+    ctx.check("R4: the registered host tool is visible before the clamp", observed.includes("SubmitPlan"));
+    ctx.check("R4: the clamped tool list equals the clamp exactly (sequence, no extras)", sameSequence(observed, clamp), observed.join(","));
   }
 
   // ==========================================================================
@@ -497,20 +554,18 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
     const clamp = ["read", "grep", "glob", "bash"];
     const run = await runScenario(ctx, provider, {
       label: "r4b-reverse-order",
-      project,
-      tools: [SUBMIT_TOOL, ECHO_TOOL],
-      registerToolsAfterPrompts: 1,
-      clampPlan: [clamp],
+      catalogPlan: [[], [SUBMIT_TOOL, ECHO_TOOL]],
+      clampPlan: [clamp, null],
       prompts: [{ message: "first" }, { message: "second" }],
       turns: [
         { text: "first turn", finish: "stop" },
         { text: "second turn", finish: "stop" },
       ],
     });
-    const first = toolNamesOf(run.perPromptRequests[0]?.[0]);
-    const second = toolNamesOf(run.perPromptRequests[1]?.[0]);
+    const first = run.perPrompt[0]?.toolNames ?? [];
+    const second = run.perPrompt[1]?.toolNames ?? [];
     ctx.note("r4b.observed", { first, second, clamp });
-    ctx.check("R4: a clamp without registration exposes no host tool", !first.includes("SubmitPlan"), first.join(","));
+    ctx.check("R4: a clamp without registration equals the clamp exactly", sameSequence(first, clamp), first.join(","));
     ctx.check(
       "R4: registering host tools after a clamp re-exposes them (the clamp does not stick)",
       second.includes("SubmitPlan") && second.includes("HostEcho"),
@@ -519,64 +574,88 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
   }
 
   // ==========================================================================
-  // R4-3  per-prompt clamp across a mode cycle, with retry accounting
+  // R4-3  catalog lifecycle across a mode cycle: real set_host_tools
+  //       add / remove / re-add, with a strict per-prompt tool-list contract
   // ==========================================================================
   {
     const project = ctx.scratch("t20-r4c-project");
-    const plan = [
-      ["read", "grep", "glob", "bash"], // agent
-      ["read", "grep", "glob", "bash", "SubmitPlan"], // plan
-      ["read", "grep", "glob", "bash", "SubmitGoal"], // goal (unregistered on purpose)
-      ["read", "grep", "glob", "bash"], // agent again
+    const agentClamp = ["read", "grep", "glob", "bash", "HostEcho"];
+    const planClamp = ["read", "grep", "glob", "bash", "HostEcho", "SubmitPlan"];
+    const goalClamp = ["read", "grep", "glob", "bash", "HostEcho", "SubmitGoal"];
+    const catalogPlan = [
+      [ECHO_TOOL], // 1 agent: no submit tool
+      [ECHO_TOOL, SUBMIT_TOOL], // 2 plan: SubmitPlan registered
+      [ECHO_TOOL, SUBMIT_GOAL_TOOL], // 3 goal: catalog replaced with SubmitGoal
+      [ECHO_TOOL], // 4 agent again: submit tools removed
+      [ECHO_TOOL, SUBMIT_TOOL], // 5 plan again: SubmitPlan re-registered
     ];
+    const clampPlan = [agentClamp, planClamp, goalClamp, agentClamp, planClamp];
     const run = await runScenario(ctx, provider, {
-      label: "r4c-mode-cycle",
-      project,
-      tools: [SUBMIT_TOOL, ECHO_TOOL],
-      clampPlan: plan,
-      prompts: [{ message: "agent" }, { message: "plan" }, { message: "goal" }, { message: "agent again" }],
+      label: "r4c-catalog-lifecycle",
+      catalogPlan,
+      clampPlan,
+      prompts: [
+        { message: "agent" },
+        { message: "plan" },
+        { message: "goal" },
+        { message: "agent again" },
+        { message: "plan again" },
+      ],
       turns: [
         { text: "one", finish: "stop" },
         { text: "two", finish: "stop" },
         { text: "three", finish: "stop" },
         { text: "four", finish: "stop" },
+        { text: "five", finish: "stop" },
       ],
     });
-    const observed = run.perPromptRequests.map((requests) => toolNamesOf(requests[0]));
-    const startEvents = run.log.filter((e) => e.event === "before_agent_start");
-    ctx.note("r4c.observed", { plan, observed, startAttempts: startEvents.map((e) => e.attempt) });
+    const observed = run.perPrompt.map((entry) => entry.toolNames);
+    ctx.note("r4c.observed", {
+      catalogPlan: catalogPlan.map((catalog) => catalog.map((tool) => tool.name)),
+      clampPlan,
+      observed,
+      startAttempts: run.perPrompt.map((entry) => entry.startAttempts),
+      duplicates: observed.map((names) => names.filter((name, index) => names.indexOf(name) !== index)),
+    });
     ctx.check(
-      "R4: every prompt's tool list matches its own clamp",
-      observed.every((names, index) => names.length > 0 && names.every((name) => plan[index].includes(name))),
+      "R4: every prompt's tool list equals its own catalog+clamp exactly (sequence, no residue, no duplicates)",
+      observed.every((names, index) => sameSequence(names, clampPlan[index])),
       JSON.stringify(observed),
     );
     ctx.check(
-      "R4: the prompt-policy retry settles (no prompt needs more than one retry)",
-      startEvents.length <= 8,
-      `${startEvents.length} before_agent_start attempts for 4 prompts`,
-    );
-    ctx.check(
-      "R4: agent-mode prompts after the cycle are unrestricted again (back to the base clamp)",
-      observed[3]?.includes("SubmitPlan") === false,
+      "R4: the removed submit tool stays out after the catalog drops it (prompt 4 = agent)",
+      !observed[3]?.includes("SubmitPlan") && !observed[3]?.includes("SubmitGoal"),
       (observed[3] ?? []).join(","),
     );
+    ctx.check(
+      "R4: the re-registered submit tool is visible again on the next plan prompt (prompt 5)",
+      observed[4]?.includes("SubmitPlan") === true && observed[4]?.includes("SubmitGoal") === false,
+      (observed[4] ?? []).join(","),
+    );
+    ctx.check(
+      "R4: the goal prompt carries SubmitGoal and not SubmitPlan (prompt 3)",
+      observed[2]?.includes("SubmitGoal") === true && observed[2]?.includes("SubmitPlan") === false,
+      (observed[2] ?? []).join(","),
+    );
   }
+
   // ==========================================================================
-  // R4-4  clamp + system-prompt override in one before_agent_start (the exact
-  //       T20-B shape): does the prompt-policy retry settle, and is the block
-  //       appended exactly once after the native prompt?
+  // R4-4  clamp + real mode block in one before_agent_start (the exact T20-B
+  //       shape): retry convergence, block bytes, block placement
   // ==========================================================================
   {
     const project = ctx.scratch("t20-r4d-project");
-    const marker = "<t20-spike-mode-block>";
-    const agentClamp = ["read", "grep", "glob", "bash"];
-    const planClamp = ["read", "grep", "glob", "bash", "SubmitPlan"];
+    const agentClamp = ["read", "grep", "glob", "bash", "HostEcho"];
+    const planClamp = ["read", "grep", "glob", "bash", "HostEcho"];
+    const modePlan = ["agent", "plan", "goal"];
+    const agentBlock = composeModeSystemPrompt("agent", "");
+    const planBlock = composeModeSystemPrompt("plan", "");
+    const goalBlock = composeModeSystemPrompt("goal", "");
     const run = await runScenario(ctx, provider, {
-      label: "r4d-clamp-and-override",
-      project,
-      tools: [SUBMIT_TOOL, ECHO_TOOL],
-      clampPlan: [agentClamp, agentClamp, planClamp],
-      env: { T20_SPIKE_PROMPT_SUFFIX: marker },
+      label: "r4d-clamp-and-mode-block",
+      catalogPlan: [[ECHO_TOOL], [ECHO_TOOL], [ECHO_TOOL]],
+      clampPlan: [agentClamp, planClamp, planClamp],
+      modePlan,
       prompts: [{ message: "one" }, { message: "two" }, { message: "three" }],
       turns: [
         { text: "one", finish: "stop" },
@@ -584,50 +663,72 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
         { text: "three", finish: "stop" },
       ],
     });
-    const systemOf = (request) => {
-      const messages = request?.body?.messages ?? [];
-      const system = messages.find((message) => message?.role === "system");
-      const content = typeof system?.content === "string" ? system.content : JSON.stringify(system?.content ?? "");
-      return { messages, content };
-    };
-    const systems = run.perPromptRequests.map((requests) => systemOf(requests[0]));
-    const occurrences = (text, needle) => text.split(needle).length - 1;
+    const systems = run.perPrompt.map((entry) => entry.systemText);
+    const expectedBlocks = [agentBlock, planBlock, goalBlock];
+    const prefixOf = (text, block) => (block.length > 0 && text.endsWith(block) ? text.slice(0, -block.length) : null);
     ctx.note("r4d.observed", {
-      attemptsPerPrompt: run.perPromptStartAttempts,
-      toolsPerPrompt: run.perPromptRequests.map((requests) => toolNamesOf(requests[0])),
-      systemMessagesPerPrompt: systems.map((entry) => entry.messages.filter((message) => message?.role === "system").length),
-      markerOccurrences: systems.map((entry) => occurrences(entry.content, marker)),
-      piDefaultBasePresent: systems.map((entry) => entry.content.includes("You are PI-Desktop, a local-first coding agent")),
-      systemBytes: systems.map((entry) => entry.content.length),
+      attemptsPerPrompt: run.perPrompt.map((entry) => entry.startAttempts),
+      toolsPerPrompt: run.perPrompt.map((entry) => entry.toolNames),
+      systemMessagesPerPrompt: run.perPrompt.map((entry) => entry.systemMessages),
+      expectedBlockBytes: expectedBlocks.map((block) => Buffer.byteLength(block, "utf8")),
+      blockOccurrences: systems.map((text, index) => occurrences(text, expectedBlocks[index])),
+      otherBlockOccurrences: systems.map((text, index) =>
+        expectedBlocks.filter((_, other) => other !== index).map((block) => occurrences(text, block)),
+      ),
+      piDefaultBasePresent: systems.map((text) => text.includes("You are PI-Desktop, a local-first coding agent")),
+      systemBytes: systems.map((text) => text.length),
     });
+    ctx.check("R4: the registered host tool is hidden by the clamp exactly", sameSequence(run.perPrompt[0]?.toolNames ?? [], agentClamp));
     ctx.check(
-      "R4: a prompt that both clamps and appends is delivered within one policy retry",
-      run.perPromptStartAttempts[0] <= 2 && (run.perPromptRequests[0]?.length ?? 0) >= 1,
-      `attempts=${run.perPromptStartAttempts[0]} requests=${run.perPromptRequests[0]?.length ?? 0}`,
+      "R4: a prompt that both clamps and appends a mode block is delivered within one policy retry",
+      run.perPrompt[0].startAttempts <= 2 && run.perPrompt[0].requests.length >= 1,
+      `attempts=${run.perPrompt[0].startAttempts} requests=${run.perPrompt[0].requests.length}`,
     );
     ctx.check(
       "R4: an unchanged clamp on the next prompt needs exactly one preparation",
-      run.perPromptStartAttempts[1] === 1,
-      `attempts=${run.perPromptStartAttempts[1]}`,
+      run.perPrompt[1].startAttempts === 1,
+      `attempts=${run.perPrompt[1].startAttempts}`,
     );
     ctx.check(
       "R4: an in-place clamp change converges within one retry",
-      run.perPromptStartAttempts[2] <= 2 && (run.perPromptRequests[2]?.length ?? 0) >= 1,
-      `attempts=${run.perPromptStartAttempts[2]} requests=${run.perPromptRequests[2]?.length ?? 0}`,
+      run.perPrompt[2].startAttempts <= 2 && run.perPrompt[2].requests.length >= 1,
+      `attempts=${run.perPrompt[2].startAttempts} requests=${run.perPrompt[2].requests.length}`,
     );
     ctx.check(
-      "R2: the appended mode block survives the retry exactly once",
-      systems.every((entry) => occurrences(entry.content, marker) === 1),
-      JSON.stringify(systems.map((entry) => occurrences(entry.content, marker))),
+      "R2: the appended block is the production composeModeSystemPrompt(mode, '') bytes, exactly once",
+      systems.every((text, index) => occurrences(text, expectedBlocks[index]) === 1),
+      JSON.stringify(systems.map((text, index) => occurrences(text, expectedBlocks[index]))),
+    );
+    ctx.check(
+      "R2: no other mode block is mixed into the prompt",
+      systems.every((text, index) =>
+        expectedBlocks.every((block, other) => other === index || occurrences(text, block) === 0),
+      ),
+      JSON.stringify(
+        systems.map((text, index) =>
+          expectedBlocks.filter((_, other) => other !== index).map((block) => occurrences(text, block)),
+        ),
+      ),
     );
     ctx.check(
       "R2: the runtime keeps exactly one system message",
-      systems.every((entry) => entry.messages.filter((message) => message?.role === "system").length === 1),
-      JSON.stringify(systems.map((entry) => entry.messages.filter((message) => message?.role === "system").length)),
+      run.perPrompt.every((entry) => entry.systemMessages === 1),
+      JSON.stringify(run.perPrompt.map((entry) => entry.systemMessages)),
     );
     ctx.check(
       "R2: PI Desktop's default base prompt is not injected",
-      systems.every((entry) => !entry.content.includes("You are PI-Desktop, a local-first coding agent")),
+      systems.every((text) => !text.includes("You are PI-Desktop, a local-first coding agent")),
+    );
+    const prefixes = systems.map((text, index) => prefixOf(text, expectedBlocks[index]));
+    ctx.check(
+      "R2: the block is appended after the runtime prompt (prefix is stable across prompts)",
+      prefixes.every((prefix) => prefix !== null && prefix.length > 0) &&
+        prefixes.every((prefix) => prefix === prefixes[0]),
+      JSON.stringify(prefixes.map((prefix) => prefix?.length ?? -1)),
+    );
+    ctx.check(
+      "R2: this is byte-parity evidence for the mode block only (source module equality)",
+      readFileSync(APP_MODE_PROMPTS, "utf8") === readFileSync(PINNED_MODE_PROMPTS, "utf8"),
     );
   }
 });

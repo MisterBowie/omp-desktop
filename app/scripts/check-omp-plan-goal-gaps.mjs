@@ -63,37 +63,61 @@ function sourceSeam(rel) {
   )?.[0] ?? "";
   const promptCarriesModeKey = /(mode|systemPrompt|tools)\s*[?:]/.test(promptVariant);
 
-  // The gap is "no runtime channel carries the durable mode". It closes when
-  // any channel does, so the verdict is a disjunction over real seams — never a
-  // comment match:
-  //   1. the pinned per-prompt `prompt` command grows a mode/tools key,
-  //   2. the runtime-domain state snapshot (`desktop-state.ts`) carries a mode
-  //      block that `before_agent_start` reads,
-  //   3. the desktop engine seam composes PI's mode prompt (directly or through
-  //      the `mode-prompts` module).
-  const stateSource = sourceSeam("packages/omp-runtime/src/desktop-state.ts");
-  const stateCarriesMode = /^\s*mode(Prompt)?\s*[?:]/m.test(stateSource);
-  const engineSeamDir = join(appRoot, "apps/desktop/electron/main/runtime");
-  const engineSeamSources = readdirSync(engineSeamDir)
-    .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
-    .map((name) => readFileSync(join(engineSeamDir, name), "utf8"));
-  const composesModePrompt = engineSeamSources.some(
-    (source) => source.includes("composeModeSystemPrompt") || source.includes("mode-prompts"),
-  );
-
   if (promptCarriesModeKey) {
     console.log(
       `REVIEW-REQUIRED g1: the pinned prompt command now carries a mode/systemPrompt/tools key (${promptVariant.trim().replace(/\s+/g, " ")}) — the T20-A g1 verdict is stale and must be re-audited before T20-B`,
     );
     open.push("g1");
   } else {
-    const gapOpen = !stateCarriesMode && !composesModePrompt;
+    // The gap is "no runtime channel carries the durable mode". It only closes
+    // when the WHOLE chain exists in shipped source — a state field alone is
+    // not evidence that anything reads it:
+    //   (1) the runtime-domain state schema carries a mode-block field,
+    //   (2) the desktop bridge composes that field with the production
+    //       `composeModeSystemPrompt(mode, "")` and writes the state,
+    //   (3) the trusted gate reads the validated state and appends that field
+    //       to `event.systemPrompt`.
+    // Field names are matched, not assumed: a bare `mode` field with no reader
+    // or no writer must not turn g1 green.
+    const stateSource = sourceSeam("packages/omp-runtime/src/desktop-state.ts");
+    const stateFieldNames = new Set(
+      [...stateSource.matchAll(/^\s*([A-Za-z]*[Mm]ode[A-Za-z]*)\s*\??\s*:/gm)].map((match) => match[1]),
+    );
+
+    const engineSeamDir = join(appRoot, "apps/desktop/electron/main/runtime");
+    const engineSeams = readdirSync(engineSeamDir)
+      .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
+      .map((name) => ({ name, source: readFileSync(join(engineSeamDir, name), "utf8") }));
+    const writesState = (source) =>
+      /writeDesktopCapabilityState|DesktopCapabilitySnapshot|serializeDesktopCapabilityState|desktopState/.test(source);
+    const bridgeComposes = engineSeams.some(
+      (seam) =>
+        writesState(seam.source) &&
+        (seam.source.includes("composeModeSystemPrompt") || seam.source.includes("mode-prompts")),
+    );
+
+    const gateSource = sourceSeam("packages/omp-runtime/extensions/omp-desktop-gate.ts");
+    const gateReadsValidatedState = /readDesktopCapabilityState/.test(gateSource);
+    const gateAppends = /\.\.\.event\.systemPrompt/.test(gateSource);
+    const sharedField = [...stateFieldNames].filter(
+      (name) => name !== "mode" && gateSource.includes(name),
+    );
+    const gateCarriesField = sharedField.length > 0;
+
+    const channelOpen = !(stateFieldNames.size > 0 && bridgeComposes && gateReadsValidatedState && gateAppends && gateCarriesField);
     report(
       "g1",
       "T20-B",
-      gapOpen,
+      channelOpen,
       "session mode/permissionMode persist to the host DB only; no OMP prompt/tool path reads them",
-      `pinned prompt command has no mode/systemPrompt/tools key: ${!promptCarriesModeKey} (${promptVariant.trim().replace(/\s+/g, " ")}); runtime-domain state carries a mode field: ${stateCarriesMode}; desktop engine seam composes the PI mode prompt: ${composesModePrompt}`,
+      [
+        `pinned prompt command has no mode/systemPrompt/tools key: ${!promptCarriesModeKey}`,
+        `state mode-ish fields: ${[...stateFieldNames].join("|") || "none"}`,
+        `bridge composes a mode prompt AND writes the state: ${bridgeComposes}`,
+        `gate reads the validated state: ${gateReadsValidatedState}`,
+        `gate appends to event.systemPrompt: ${gateAppends}`,
+        `gate references a state mode-block field (excluding bare \`mode\`): ${gateCarriesField}${gateCarriesField ? ` (${sharedField.join("|")})` : ""}`,
+      ].join("; "),
     );
   }
 }
