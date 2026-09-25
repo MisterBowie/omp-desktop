@@ -1,8 +1,9 @@
 {
-  "generatedAt": "2026-09-25T15:17:27.740Z",
+  "generatedAt": "2026-09-25T15:24:24.898Z",
   "runtime": {
     "ompRoot": "/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi",
     "ompHead": "d49918fab2dba3986927f2d46721629ed0f3a02c",
+    "expectedOmpSha": "d49918fab2dba3986927f2d46721629ed0f3a02c",
     "pinnedOmpSha": "d49918fab2dba3986927f2d46721629ed0f3a02c",
     "bun": "1.4.2",
     "node": "26.3.0",
@@ -583,7 +584,7 @@
       "label": "s6-gated-handler",
       "submitRanWhileShellPending": true,
       "pendingLocalWork": true,
-      "doneBeforeRelease": false,
+      "doneBeforeGateReleaseHarness": false,
       "handlerLeaveBeforeDrain": true,
       "doneAfterDrain": true,
       "events": [
@@ -646,9 +647,17 @@
     "gated": {
       "framesNotSerialized": true,
       "pendingLocalWorkWhileHandlerRuns": true,
-      "doneBeforeGateRelease": false,
-      "doneAfterDrain": true,
-      "note": "a handler that never settles keeps stream.hasPendingLocalWork true and blocks the provider's pre-done drain (cursor.ts:950-960); upstream's own http2 fixture asserts the same for done/error/abort (packages/ai/test/cursor-terminal-error.test.ts)"
+      "handlerExitBeforeHarnessDrain": true,
+      "harnessOrder": [
+        "dispatch:shellArgs",
+        "handler:shell:enter",
+        "dispatch:mcpArgs",
+        "tool:SubmitPlan:execute",
+        "handler:shell:leave",
+        "drain:complete",
+        "done"
+      ],
+      "note": "measured: a second frame's handler runs while the first exec handler is still pending, and a pending handler keeps stream.hasPendingLocalWork true. The harness itself decides when to push `done` (it mirrors cursor.ts:854-882/949-960), so its own done ordering is a harness property, NOT independent provider evidence. The claim that `done` waits for every exec handler rests on the production source (cursor.ts:949-960) plus upstream's real HTTP/2 fixture (packages/ai/test/cursor-terminal-error.test.ts:453-521)."
     },
     "externalHandoff": {
       "blocks": [],
@@ -661,10 +670,39 @@
           "payload": "{\"$typeName\":\"agent.v1.McpSuccess\",\"content\":[{\"$typeName\":\"agent.v1.McpToolResultContentItem\",\"content\":{\"case\":\"text\",\"value\":{\"$typeName\":\"agent.v1.McpTextContent\",\"text\":\"Tool call received and handed off to the external client for execution. Do not retry or call it again; end the turn. The result will be provided in the next request.\"}}}],\"isError\":false}"
         }
       ],
-      "note": "with no `mcp` handler the exec branch synthesizes no block and pairs nothing (cursor.ts:1938-1952); the block for such a call must therefore come from the interaction-update channel, which this harness does not fabricate"
+      "note": "measured: with no `mcp` handler the exec branch answers the frame with a handoff ack and, in this branch, synthesizes no block, marks nothing resolved and pairs no result (cursor.ts:1938-1967). Source shows a block for such a call can still arrive later on the interaction-update channel and stay unresolved (cursor.ts:4291-4322), which the agent loop would then execute and pair itself; this harness fabricates no interaction update and drives no loop, so it proves nothing about loop execution, about whether a real server sends that update, or about exactly-once behavior."
+    },
+    "schemeB": {
+      "executions": 0,
+      "blocks": [
+        {
+          "id": "call-sibling-b",
+          "name": "bash",
+          "resolved": true,
+          "args": {
+            "command": "touch sibling.txt",
+            "cwd": "/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi"
+          }
+        }
+      ],
+      "wire": [
+        {
+          "frame": "execClientMessage",
+          "answer": "mcpResult",
+          "result": "success",
+          "payload": "{\"$typeName\":\"agent.v1.McpSuccess\",\"content\":[{\"$typeName\":\"agent.v1.McpToolResultContentItem\",\"content\":{\"case\":\"text\",\"value\":{\"$typeName\":\"agent.v1.McpTextContent\",\"text\":\"Tool call received and handed off to the external client for execution. Do not retry or call it again; end the turn. The result will be provided in the next request.\"}}}],\"isError\":false}"
+        },
+        {
+          "frame": "execClientMessage",
+          "answer": "shellResult",
+          "result": "rejected",
+          "payload": "{\"$typeName\":\"agent.v1.ShellRejected\",\"command\":\"touch sibling.txt\",\"workingDirectory\":\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\",\"reason\":\"Tool not available\",\"isReadonly\":false}"
+        }
+      ],
+      "note": "measured: with no native handlers and no `mcp` handler, plus external handoff, the native sibling executes nothing but is answered `ShellRejected \"Tool not available\"` while its block stays synthesized+resolved; the non-native frame gets the handoff ack described above."
     }
   },
-  "checks": [
+  "strictContractChecks": [
     {
       "name": "siblingFirst: the sibling in a batch that also holds SubmitPlan executes ZERO times",
       "ok": false,
@@ -724,32 +762,37 @@
       "name": "sole SubmitPlan: termination stays available to the loop",
       "ok": false,
       "detail": "[{\"id\":\"call-submit-sole\",\"name\":\"SubmitPlan\",\"resolved\":true,\"args\":{\"title\":\"T\",\"markdown\":\"# Plan\",\"question\":\"?\"}}]"
-    },
+    }
+  ],
+  "candidateChecks": [
     {
-      "name": "no handlers: no tool call is answered with a fabricated failure",
+      "name": "no handlers (candidate): no tool call is answered with a fabricated failure",
       "ok": false,
       "detail": "[{\"frame\":\"execClientMessage\",\"answer\":\"mcpResult\",\"result\":\"toolNotFound\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.McpToolNotFound\\\",\\\"name\\\":\\\"SubmitPlan\\\",\\\"availableTools\\\":[]}\"},{\"frame\":\"execClientMessage\",\"answer\":\"shellResult\",\"result\":\"rejected\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.ShellRejected\\\",\\\"command\\\":\\\"touch sibling.txt\\\",\\\"workingDirectory\\\":\\\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\\\",\\\"reason\\\":\\\"Tool not available\\\",\\\"isReadonly\\\":false}\"}]"
     },
     {
-      "name": "external handoff: the exec branch leaves a non-native call to the loop (no block, no pair, handoff ack)",
+      "name": "external handoff (candidate): the mcpArgs branch answers a handoff ack without synthesizing, resolving or pairing",
       "ok": true,
       "detail": "blocks=[] results=0 wire=[{\"frame\":\"execClientMessage\",\"answer\":\"mcpResult\",\"result\":\"success\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.McpSuccess\\\",\\\"content\\\":[{\\\"$typeName\\\":\\\"agent.v1.McpToolResultContentItem\\\",\\\"content\\\":{\\\"case\\\":\\\"text\\\",\\\"value\\\":{\\\"$typeName\\\":\\\"agent.v1.McpTextContent\\\",\\\"text\\\":\\\"Tool call received and handed off to the external client for execution. Do not retry or call it again; end the turn. The result will be provided in the next request.\\\"}}}],\\\"isError\\\":false}\"}]"
     },
     {
-      "name": "deferral is expressible: the message can complete while an exec handler is still pending",
-      "ok": false,
-      "detail": "the provider's pre-done drain means an unresolved handler blocks `done`; a scheme that waits for message_end before executing would deadlock against its own completion"
-    },
-    {
-      "name": "scheme B: native frames can be executed without a local executor (no fabricated failure)",
+      "name": "scheme B native (candidate): a native frame without an executor avoids a fabricated failure",
       "ok": false,
       "detail": "executions=0 wire=[{\"frame\":\"execClientMessage\",\"answer\":\"mcpResult\",\"result\":\"success\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.McpSuccess\\\",\\\"content\\\":[{\\\"$typeName\\\":\\\"agent.v1.McpToolResultContentItem\\\",\\\"content\\\":{\\\"case\\\":\\\"text\\\",\\\"value\\\":{\\\"$typeName\\\":\\\"agent.v1.McpTextContent\\\",\\\"text\\\":\\\"Tool call received and handed off to the external client for execution. Do not retry or call it again; end the turn. The result will be provided in the next request.\\\"}}}],\\\"isError\\\":false}\"},{\"frame\":\"execClientMessage\",\"answer\":\"shellResult\",\"result\":\"rejected\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.ShellRejected\\\",\\\"command\\\":\\\"touch sibling.txt\\\",\\\"workingDirectory\\\":\\\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\\\",\\\"reason\\\":\\\"Tool not available\\\",\\\"isReadonly\\\":false}\"}]"
     }
   ],
   "summary": {
-    "total": 16,
-    "contractHeld": 1,
-    "contractViolated": 15,
+    "strictContract": {
+      "total": 12,
+      "held": 0,
+      "violated": 12
+    },
+    "candidateChecks": {
+      "total": 3,
+      "held": 1,
+      "violated": 2,
+      "note": "reported separately; not R3 evidence and not part of the exit code"
+    },
     "red": true
   }
 }

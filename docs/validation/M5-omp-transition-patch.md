@@ -8,7 +8,7 @@
 
 **第四轮（最终独立复审证据落盘，基线 `47d0258bd4610dcefb8a15f6c437a3afa46b9296`）**：独立复审在从远端 `47d0258` 建立的全新 detached worktree 上实跑 macOS 证据——① `node --test apps/desktop/test/omp-patch.test.mjs` 连续两次 exit 0、**24 通过 / 0 失败 / 0 跳过**（含第三轮修正的「canonicalizes the ancestor chain through a trusted alias and still refuses deeper links」与「follows the aliases the platform ships directly below the filesystem root」）；② F7 最小真实 git fixture 在最新提交上 status 1、错误 `scratch target must not live inside the source checkout: /private/tmp/…/source/inside`、真实 `out` 未创建、source `git status` 为空；③ `node scripts/omp-patch.mjs --check --json` exit 0（patch sha `e08ca7fff29bbd03e298f4488888b2692adda1486e3fff80536a31dd8af6fd5c`、追踪文件 7518）；④ `git diff --check ba7806c…` 与 `git show --check HEAD` 均 exit 0；⑤ 两个子模块固定 SHA 且干净。本轮只追加文档：生产脚本、补丁 artifact、manifest、子模块均未改动；**R3 结论不变**。
 
-**第五轮（T20-R3B：provider/bridge 层可行性审计，基线 `e56979e9a40abf04df842f1e9c9860ffc7a5ed2e`，分支 `codex/m5-r3-provider-gate`）**：本轮**未改生产代码、补丁、manifest、测试与子模块**，只新增一个确定性 RED 实验（`app/experiments/omp-bridge/t20-cursor-exec-order.mjs` + `results/t20-cursor-exec-order.json`）与本文 §9。结论与第三轮独立复审一致并**加强**：Cursor exec channel 让"批次裁决前零执行"在本层不可满足——**方案 A（延迟 exec 到 message_end）不可行（自锁死）**，**方案 B（全 loop 路由：关 `mcp` bridge + `cursorExternalToolExecutor` + 处理原生帧）在非原生半边可测通，但原生半边无任何请求侧开关，只能永久拒绝 = 产品限制**。R3 仍为硬阻塞，T20-B/C/D 未开始。
+**第五轮（T20-R3B：provider/bridge 层可行性审计，基线 `e56979e9a40abf04df842f1e9c9860ffc7a5ed2e`，分支 `codex/m5-r3-provider-gate`）**：本轮**未改生产代码、补丁、manifest、测试与子模块**，只新增一个确定性 RED 实验（`app/experiments/omp-bridge/t20-cursor-exec-order.mjs` + `results/t20-cursor-exec-order.json`）与本文 §9/§10。结论与第三轮独立复审一致并**加强**：Cursor exec channel 让"批次裁决前零执行"在本层不可满足——**方案 A（延迟 exec 到 message_end）不可行（自锁死）**，**方案 B（全 loop 路由：关 `mcp` bridge + `cursorExternalToolExecutor` + 处理原生帧）只有非原生半边在 exec 分支一级可测、原生半边无任何请求侧开关，只能永久拒绝 = 产品限制**。R3 仍为硬阻塞，T20-B/C/D 未开始。**复审返修 F1-F5（§10）**：严格契约检查与候选方案检查分组统计——**严格 R3 契约 12 项全部违反（0/12 成立）**，候选方案检查 3 项单独统计（1 成立 / 2 违反，不计入契约、不参与退出码）；s5/s6 的表述收窄到本实验真正测到的范围。
 
 ## 1. 结论（含撤回）
 
@@ -164,7 +164,7 @@ macOS 复审的两项失败都落在第二轮新增测试**自己构造的形状
 | 子模块 | OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`（omp/18.2.7）、PI `0111e306c120ad5820688d7608cb37bad8fbcc1f`；gitlink 与工作树未改动 |
 | 运行时 | Bun 1.4.2（`process.versions.node` 报 26.3.0，是 bun 内置的 Node 兼容版本号；系统 `node` 为 v24.14.0） |
 | 本轮新增 | 仅 `app/experiments/omp-bridge/t20-cursor-exec-order.mjs`、`app/experiments/omp-bridge/results/t20-cursor-exec-order.json`、本文 §9 |
-| 网络/费用 | 全程无网络、无付费模型：所有帧与工具体都是本地夹具 |
+| 网络/费用 | **实验与测试本身**不调用远程 provider/API、不产生模型费用：所有帧与工具体都是本地 fixture。这不等于整个工作轮次没有网络——本轮仍有 `git fetch`/`push`（§9.1 子模块说明里的下载尝试也已放弃） |
 
 子模块初始化说明（可复核）：本工作树原先只有空子模块目录，`git submodule update --init --recursive` 实测下载速率约 35 KB/s（pack 目标 544 MiB，不可行），因此按完全相同的方式从同仓库另一工作树（`/home/vv/person/code/omp-desktop-m5-t20`，同一固定 SHA）**本地复制**子模块 git dir 并 `reset --hard`；随后用 project 自己的构建载荷清单（`app/scripts/omp-patch.mjs` 的 `BUILD_PAYLOAD`）以**硬链接**补齐 `node_modules`、`packages/natives/native`、`packages/coding-agent/src/export/html/tool-views.generated.js`，使实验与上游套件可在本树内运行。这些载荷全部被上游 `.gitignore` 覆盖：两个子模块 `git status --short` 为空、gitlink 未变（§9.10 残留说明）。
 
@@ -195,7 +195,7 @@ macOS 复审的两项失败都落在第二轮新增测试**自己构造的形状
 | 每个 exec 块在**执行前**就被 `markCursorExecResolved`（`kCursorExecResolved`），因此 agent-loop 永不重复执行、也无法阻止 | `cursor.ts:4143-4169` `synthesizeCursorExecToolCall`；loop 侧过滤 `packages/agent/src/agent-loop.ts:638-641,1436-1440,1488-1499,2681-2682,2791-2793,2852-2858` |
 | 无 handler 的出口：`buildRejected("Tool not available")` + 合成一个 isError 的配对结果；块**仍**是 resolved | `cursor.ts:2618-2674` `resolveExecHandler`（`if (!handler) { const reason = "Tool not available"; … }`） |
 | `mcpArgs` 分支：只有存在 `execHandlers.mcp` 才 synth+mark+记录 `resolvedMcpToolCallIds`；无 `mcp` 时既不建块也不配对，答复为 `toolNotFound`，仅当 `externalToolExecutor` 才改为 handoff success | `cursor.ts:1938-1967`（`:1959-1962` handoff/toolNotFound 选择）、`buildMcpExternalHandoffResult` `:4025-4035` |
-| 无 `mcp` handler 时块来自交互更新（`toolCallStarted` → `selectMcpCall`），`resolvedByExec` 仅当 id 在 `state.resolvedMcpToolCallIds` 中才为真 → 否则**未标记 resolved**，由 loop 执行并自行配对 | `cursor.ts:4291-4322`；`resolvedMcpToolCallIds` 定义/写入 `:776,790,1115-1116,1951` |
+| 无 `mcp` handler 时块来自交互更新（`toolCallStarted` → `selectMcpCall`），`resolvedByExec` 仅当 id 在 `state.resolvedMcpToolCallIds` 中才为真 → 否则**未标记 resolved**（源码行为；本轮实验**未**构造该 update、**未**驱动 loop，故不构成"loop 执行"的实测） | `cursor.ts:4291-4322`；`resolvedMcpToolCallIds` 定义/写入 `:776,790,1115-1116,1951` |
 | 真实桥接：`CursorExecHandlers` 的方法直接调用 `tool.execute(...)`（`bash`/`write`/`edit`/`read`/`grep`/`glob`/`lsp`/`mcp`），不经过任何 loop 钩子 | `packages/coding-agent/src/cursor.ts:230-289`（`executeTool`）、`:434-435`、`:495-504`（shell→bash）、`:935-958`（mcp） |
 | 桥接装配：每会话一次，`sdk.ts:3114-3148` 构造并 `:3726-3727` 交给 Agent；`allowDirectFileMutation` 只是**策略**开关（approval），非批次延迟 | `packages/coding-agent/src/sdk.ts:3114-3148,3726-3727`、`packages/coding-agent/src/cursor.ts:305-336` |
 | `cursorExternalToolExecutor` **仅**由 auth-gateway 设置（两处） | `packages/ai/src/types.ts:671-672`；`packages/ai/src/auth-gateway/server.ts:136,558` |
@@ -210,8 +210,8 @@ macOS 复审的两项失败都落在第二轮新增测试**自己构造的形状
 
 问题：Cursor server 是否等待 exec response 才继续产生后续 toolCall/message_end？
 
-- **客户端可证的强结论**：任何 exec handler 未 settle 时，assistant 消息的终态事件**不能**发出——`cursor.ts:949-960` 在 `stream.push({type:"done"})` 前 `await drainInFlightDispatches()`；上游 `cursor-terminal-error.test.ts:453-521` 用真实 http2 夹具（handler 用闸门挂住）断言 `done` 必须等 handler 完成，本机实跑该文件 **11 通过 / 0 失败**。
-- **服务端行为的证据层级**：`cursor.ts:1170-1180` 的注释（"The server is waiting on OUR local tool result during this window"）与 `docs/provider-whitespace`→`docs/provider-quirks.md:457-459`（`interactionQuery` "block the turn until the client writes `interactionResponse`"，未回复则由 300s idle watchdog 中止）属**上游自述**；本轮**未**、也无法用 fake transport 观测真实服务端行为（fake 传输由我控制，观测不到对端）。因此本文件不声称"已实测服务端等待"，只声称"客户端结构上无法在消息完成后再执行"。
+- **客户端可证的强结论**：任何 exec handler 未 settle 时，assistant 消息的终态事件**不能**发出——`cursor.ts:949-960` 在 `stream.push({type:"done"})` 前 `await drainInFlightDispatches()`；上游 `cursor-terminal-error.test.ts:453-521` 用真实 http2 夹具（handler 用闸门挂住）断言 `done` 必须等 handler 完成，本机实跑该文件 **11 通过 / 0 失败**。**这条结论只由生产源码 + 上游真实夹具支撑**：§9.6 的 s6 是我方 harness，`done` 何时 push 由 harness 自己决定（它只是照抄 `cursor.ts:854-882/949-960`），因此 s6 的 done 次序**不是**独立 provider 证据，只用于记录 `hasPendingLocalWork` 与帧不串行。
+- **服务端行为的证据层级**：`cursor.ts:1170-1180` 的注释（"The server is waiting on OUR local tool result during this window"）与 `docs/provider-quirks.md:457-459`（`interactionQuery` "block the turn until the client writes `interactionResponse`"，未回复则由 300s idle watchdog 中止）属**上游自述**；本轮**未**、也无法用 fake transport 观测真实服务端行为（fake 传输由我控制，观测不到对端）。因此本文件不声称"已实测服务端等待"，只声称"客户端结构上无法在消息完成后再执行"。
 
 因此，"延迟 exec 到 message_end"在客户端**自锁死**：等待 message_end 的 handler 正是 message_end 的前置条件。
 
@@ -219,12 +219,13 @@ macOS 复审的两项失败都落在第二轮新增测试**自己构造的形状
 
 - 路径：`app/experiments/omp-bridge/t20-cursor-exec-order.mjs`（结果 `results/t20-cursor-exec-order.json`）。
 - 走的**真实**路径：`cursor.ts` 导出的 `handleServerMessage`（生产 socket 读取循环调用的同一函数）+ `packages/coding-agent/src/cursor.ts` 的 `CursorExecHandlers`（`sdk.ts:3114` 为 Cursor 会话安装的同一类）；帧用 `create(...)` 由 `agent.proto` 编解码构造，仅 h2 socket 与两个工具体是本地夹具，副作用由工具体产生。**没有任何手工 `kCursorExecResolved` 标记**：标记来自 provider 自己的 `synthesizeCursorExecToolCall`。
-- 命令（本机实跑，退出码 1 = 严格契约被违反，即 RED）：
+- **前置校验（返修 F4）**：脚本在导入任何模块之前先 `git rev-parse HEAD` 校验检出等于期望的固定 SHA（默认 `d49918f…`，可用 `--expected-sha` 覆写；不匹配或不是 git 仓库即 exit 2，不产出任何结果文件），因此结果 JSON 不会被误当成"固定基线"的证据。结果里同时记录 `ompHead` / `expectedOmpSha` / `pinnedOmpSha`。
+- 命令（本机实跑，退出码 1 表示**严格契约**被违反，即 RED）：
 
 ```
 bun app/experiments/omp-bridge/t20-cursor-exec-order.mjs
-bun test packages/ai/test/cursor-terminal-error.test.ts     # 补丁树/固定树，11 pass
-bun test packages/coding-agent/test/cursor-exec.test.ts     # 69 pass
+bun test packages/ai/test/cursor-terminal-error.test.ts     # 固定树，11 pass / 0 fail
+bun test packages/coding-agent/test/cursor-exec.test.ts     # 固定树，69 pass / 0 fail
 ```
 
 - 精确调用序列（同步记录点，`toolcall_*` 事件经异步消费者记录、次序上滞后，不做结论依据）：
@@ -234,27 +235,31 @@ bun test packages/coding-agent/test/cursor-exec.test.ts     # 69 pass
 | s1 `[shell(兄弟), mcp(SubmitPlan)]` | `dispatch:shellArgs → tool_execution_start:bash → dispatch:mcpArgs → tool_execution_start:SubmitPlan → tool_execution_end:bash → tool_execution_end:SubmitPlan → drain:complete → done` | bash ×1、SubmitPlan ×1（**均在 done 之前**），兄弟文件已落盘 |
 | s2 `[mcp(SubmitPlan), shell(兄弟)]` | `dispatch:mcpArgs → tool_execution_start:SubmitPlan → dispatch:shellArgs → tool_execution_start:bash → … → done` | SubmitPlan ×1、bash ×1（均在 done 之前） |
 | s3 单独 `SubmitPlan` | `dispatch:mcpArgs → tool_execution_start:SubmitPlan → tool_execution_end:SubmitPlan → done` | SubmitPlan ×1，块 `resolved: true`，配对结果 `hasTerminate: false` |
-| s4 无 handler（`execHandlers: undefined`） | `dispatch:shellArgs → dispatch:mcpArgs → drain:complete → done` | 0 次物理执行；但 bash 块仍 `resolved: true` 且收到 `ShellRejected{reason:"Tool not available"}`，SubmitPlan 收到 `McpToolNotFound` |
-| s5 无 `mcp` handler + `externalToolExecutor` | `dispatch:mcpArgs → drain:complete → done` | 0 次执行；**不建块、不配对**，答复 `McpSuccess`（handoff 文案） |
-| s6 闸门（shell handler 挂住） | `dispatch:shellArgs → handler:shell:enter → dispatch:mcpArgs → tool:SubmitPlan:execute → handler:shell:leave → drain:complete → done` | 帧**不串行**（SubmitPlan 在 shell 未完成时执行）；`hasPendingLocalWork === true`；`done` 只能在 handler 结束后 |
+| s4 无 handler（`execHandlers: undefined`，**候选**） | `dispatch:shellArgs → dispatch:mcpArgs → drain:complete → done` | 0 次物理执行；但 bash 块仍 `resolved: true` 且收到 `ShellRejected{reason:"Tool not available"}`，SubmitPlan 收到 `McpToolNotFound` |
+| s5 无 `mcp` handler + `externalToolExecutor`（**候选**） | `dispatch:mcpArgs → drain:complete → done` | 0 次执行；**该分支**不建块、不标记 resolved、不配对，答复 `McpSuccess`（handoff 文案） |
+| s7 `{}` handlers + `externalToolExecutor`（**候选**，方案 B 形状） | `dispatch:shellArgs → dispatch:mcpArgs → drain:complete → done` | 原生帧 0 执行但被拒为 `Tool not available` 且块 `resolved: true`；mcp 帧如上得 handoff ack |
+| s6 闸门（shell handler 挂住，**harness 观察**） | `dispatch:shellArgs → handler:shell:enter → dispatch:mcpArgs → tool:SubmitPlan:execute → handler:shell:leave → drain:complete → done` | 帧**不串行**（SubmitPlan 在 shell 未完成时执行）；`hasPendingLocalWork === true`；done 的次序由 harness 决定，不作证据（见 §9.5） |
 
-- 判定：16 项契约检查中 **1 项成立 / 15 项被违反**。唯一成立的是"无 `mcp` handler 时 exec 分支把一个非原生调用留给 loop"（方案 B 的使能事实）。线帧实测：s1/s2 里客户端向 server 回的是 `shellResult: success`（带 `stdout`）与 `mcpResult: success`——即**服务端收到的是"兄弟调用成功执行"**。
-- 补充实测的**不对称**（对方案 B 关键）：无 handler 时，**原生帧**的块仍是 synthesized 且 `resolved`（loop 永不接管、无本地回退，模型只看到伪造的 `Tool not available`）；而**MCP 帧**的块才是未 resolved、交给 loop。
+- **判定（返修 F1 后的口径）**：检查分两组，只有第一组决定退出码。
+  - **严格 R3 契约检查 12 项：0 成立 / 12 违反**（两个混合批次顺序各 5 项 + 单独 `SubmitPlan` 2 项）。
+  - **候选方案检查 3 项（单独统计，不计入 contractHeld/contractViolated）**：1 成立 / 2 违反——成立的是 s5"`mcpArgs` 分支只回 handoff ack、本分支不建块/不标记/不配对"；违反的是 s4（无 handler 时仍伪造 `Tool not available`）与 s7（方案 B 配置下原生帧仍只能被伪拒）。
+  - 线帧实测：s1/s2 里客户端向 server 回的是 `shellResult: success`（带 `stdout`）与 `mcpResult: success`——即**服务端收到的是"兄弟调用成功执行"**。
+- 补充实测的**不对称**（对方案 B 关键）：无 handler 时，**原生帧**的块仍是 synthesized 且 `resolved`（loop 永不接管、无本地回退，模型只看到伪造的 `Tool not available`）；而**MCP 帧**在该分支不建块——源码显示随后的 interaction update 可以建出**未**标记 resolved 的块并交由 loop 执行，但本实验**没有**构造该 update、也没有驱动 loop，因此不证明真实服务端一定发送该 update，也不证明 loop 实际执行或"恰好一次"（§9.8 第 4 点保持 NOT FOUND）。
 
 ### 9.7 方案 A：延迟 exec 直到 message_end —— **不可行**
 
 | 判据（任务给定） | 实测/源码证据 | 判定 |
 | --- | --- | --- |
-| 不得死锁 | `cursor.ts:949-960` 在 `done` 前 drain 所有 exec dispatch；§9.6 s6 复现；上游 `cursor-terminal-error.test.ts:453-521` 真实 http2 断言 | **死锁（自锁死）**：等 message_end 的 handler 就是 message_end 的前置条件 |
+| 不得死锁 | `cursor.ts:949-960` 在 `done` 前 drain 所有 exec dispatch；上游 `cursor-terminal-error.test.ts:453-521` 用真实 http2 夹具断言同一件事（本机 11 pass）；§9.6 s6 只记录我方 harness 的顺序，不作独立证据 | **死锁（自锁死）**：等 message_end 的 handler 就是 message_end 的前置条件 |
 | 不得让模型先看到伪失败 | 若改用"先答 `rejected` 再由 loop 执行"，则模型看到 `Tool not available`（§9.6 s4 实测）而工具随后真的执行了 | 伪造失败，违反 |
 | 不得破坏 transcript pairing/replay | 执行被推迟则 `done` 之前没有配对结果；`buildSessionContext` 会剥掉未配对调用（`cursor.ts:4143-4168` 注释、`packages/agent/test/agent.test.ts:896-932`） | 破坏 replay，违反 |
 | 不得重复 continuation | 服务端 handoff/拒绝文案与本地结果分叉（`cursor-external-tool-handoff.md` 文案要求"end the turn…result in the next request"） | 违反 |
 
-### 9.8 方案 B：全 loop 路由（关 `mcp` bridge + `cursorExternalToolExecutor` + 处理原生帧）—— **非原生半边可测通，原生半边无开关，整体不可行**
+### 9.8 方案 B：全 loop 路由（关 `mcp` bridge + `cursorExternalToolExecutor` + 处理原生帧）—— **仅非原生半边在 exec 分支一级可测，loop 半边未验证；原生半边无开关；整体不可行**
 
 按任务给定的 5 点逐项：
 
-1. **能否动态关闭 Cursor `mcp` bridge 并打开 `cursorExternalToolExecutor`，让 SubmitPlan/SubmitGoal 走未 resolved 的 loop 路径？** 机制**存在且实测**（§9.6 s5：不建块、不配对、答复 handoff success；`cursor.ts:1938-1967`）。但**没有受支持的开关**：`cursorExternalToolExecutor` 在本检出中只有 auth-gateway 两个设置点（`server.ts:136,558`），coding-agent/sdk 从不设置；桥接对象是**每会话构造一次**（`sdk.ts:3114`），而"关掉 `mcp`"同时会关掉**所有** MCP 路由能力（xd:// 设备/mounted 工具、`mcp` 审批预检 `cursor.ts:1920-1935`、`session-advisors` 的 advisor 工具桥），功能损失远超 SubmitPlan。这是一项**新的会话级能力**，不是现成开关。
+1. **能否动态关闭 Cursor `mcp` bridge 并打开 `cursorExternalToolExecutor`，让 SubmitPlan/SubmitGoal 走未 resolved 的 loop 路径？** 源码上机制成立（`cursor.ts:1938-1967`：无 `mcp` handler 时不 synth/不 mark/不配对，`externalToolExecutor` 时答复 handoff 而非 `toolNotFound`），本轮**实测到的只是该分支自身**（§9.6 s5：handoff ack、`blocks=[]`、`results=[]`）；**未**测得块随后由 interaction update 到达、**未**测得 loop 执行、**未**测得恰好一次。此外没有受支持的开关：`cursorExternalToolExecutor` 在本检出中只有 auth-gateway 两个设置点（`server.ts:136,558`），coding-agent/sdk 从不设置；桥接对象是**每会话构造一次**（`sdk.ts:3114`），而"关掉 `mcp`"同时会关掉**所有** MCP 路由能力（xd:// 设备/mounted 工具、`mcp` 审批预检 `cursor.ts:1920-1935`、`session-advisors` 的 advisor 工具桥），功能损失远超 SubmitPlan。这是一项**新的会话级能力**，不是现成开关。
 2. **必须同时处理原生 `read/bash/write/grep/ls/delete/…` 帧。** 实测：请求侧**没有**任何字段能让服务端不使用原生工具目录（§9.4：`AgentRunRequest`/`RequestContext` 字段枚举；唯一的工具**集合**字段是 `CustomSubagent.tools`，客户端恒发 `customSubagents: []`）；分发器只看 `execCase`（`cursor.ts:1600-1616`）。**只能永久拒绝**，而拒绝的形状就是 `Tool not available`（§9.6 s4/s7 实测：0 次执行 + 伪造失败 + 块仍 resolved）。
 3. **能否在 Plan/Goal 目录中移除/隐藏全部 Cursor 原生工具，用非原生 wire name 的 host/RPC wrapper 提供 PI 的 Read/Glob/Grep/Bash/…？** `customWireName` 在 Cursor 路径**零出现**，改名不改变"服务端仍持有原生目录"这一事实；`buildMcpToolDefinitions` 只按 `tool.name` 排除 `CURSOR_NATIVE_TOOL_NAMES`（`cursor.ts:4640-4699`），host 工具与既有工具同名会在注册期直接失败（`session-tools.ts:1966-1974`）。即：可以给 host 工具取非原生名，但**不能**让服务端不发原生帧——该点失败。
 4. **用现有 Cursor fake transport 测试证明 handoff 块未带 `kCursorExecResolved`、由 loop 恰一次执行、continuation/转录不冲突、并验证原生能力可被请求侧显式禁用。** 前三项的上游覆盖是**分裂**的（provider 侧 `cursor-exec-handlers.test.ts:1535-1615`；loop 侧 `agent-loop.test.ts:5519-5612` 用手工标记块），**没有**"no-handler + external 的 MCP 调用交给 loop 并断言恰好一次"的端到端测试（NOT FOUND）；第四项（请求侧禁用原生能力）**不存在**（§9.4）→ 该点失败。
@@ -274,6 +279,35 @@ bun test packages/coding-agent/test/cursor-exec.test.ts     # 69 pass
 ### 9.10 本轮未做/未声称 + 复核入口
 
 - **未改任何生产代码、patch artifact、manifest、测试与子模块**；未开始 T20-B/C/D；不声称阶段完成。
+- **不得越界解读本轮实验**：s5 只证明 `mcpArgs` 分支自身（handoff ack、本分支不建块/不标记/不配对），**不**证明 loop 接管、**不**证明恰好一次、**不**证明真实服务端一定发送携带该调用的 interaction update；s6 的 `done` 次序由我方 harness 决定，**不**作为"provider 会阻塞 done"的独立证据（该结论只来自 `cursor.ts:949-960` 与上游 `cursor-terminal-error.test.ts:453-521`）。
 - **未运行**：真实付费/远程模型、真实 Cursor 服务端行为实验（因此 §9.5 的服务端等待只引上游自述）、Windows 行为、`packages/agent` 全量套件。
 - 实验的 §9.6 证据依赖"provider 的帧处理实现"（`handleServerMessage`）与真实桥接类，而不是完整 `streamCursor` 传输；后者由上游 `cursor-terminal-error.test.ts` 的 http2 夹具覆盖（本机实跑 11 pass），两者互补。
 - 残留/临时资源：实验脚本用 `mkdtempSync` 建场景目录并在 `finally` 中删除（本机核查无 `/tmp/t20-cursor-exec-*` 目录残留）；无子进程残留。固定子模块内为运行实验而补齐的构建载荷（`node_modules`、`packages/natives/native`、`tool-views.generated.js`，硬链接、被上游 `.gitignore` 覆盖）保留以便复核；如需纯净工作树，删除这些路径即可（不影响 gitlink 与任何追踪文件）。
+
+## 10. T20-R3B 返修轮（复审 F1-F5，2026-09-25）
+
+本轮只改实验脚本、结果 JSON 与文档口径；**生产代码、patch artifact、manifest、上游测试与子模块未改动**，R3 结论不变（仍为硬阻塞，T20-B/C/D 未开始）。
+
+| 复审项 | 处置 | 落点 |
+| --- | --- | --- |
+| **F1** 契约检查与候选方案观察混在一组统计 | 检查拆成两组：`strictContractChecks`（12 项：两个混合批次顺序各 5 项 + 单独 `SubmitPlan` 2 项）与 `candidateChecks`（3 项：`no handlers`、`external handoff`、`scheme B native`）。JSON 顶层不再有 `checks`/`summary.total`；`summary.strictContract = {total:12, held:0, violated:12}`，`summary.candidateChecks` 单独统计并注明"非 R3 证据、不参与退出码"；CLI 分两段输出；**退出码只由严格契约是否全部成立决定** | 脚本检查分组、`summary` 结构、CLI 打印；本文 §9.6；任务板 |
+| **F2** s5 被写成"把调用留给 loop"/暗示 exactly-once | 更名为候选检查 "external handoff (candidate): the mcpArgs branch answers a handoff ack without synthesizing, resolving or pairing"；observation note 明确：本轮只测该分支自身，源码显示 interaction update 可建出未标记 resolved 的块，但本实验未构造该 update、未驱动 loop，**不证明** loop 执行、不证明服务端一定发送该 update、不证明恰好一次；§9.8 第 1 点同样改写并保留第 4 点 NOT FOUND | 脚本 check 名/note、§9.4 行注、§9.6、§9.8、§9.10 |
+| **F3** `doneBeforeRelease` 是 harness 自身产物 | 删除 "deferral is expressible…" 检查；`runGatedScenario` 字段改名为 `doneBeforeGateReleaseHarness` 并注明是 harness 属性；s6 只保留可实测项（`hasPendingLocalWork`、帧不串行、handler 退出早于 harness drain）并降级为 observation；"done 必须等 handler"只由 `cursor.ts:949-960` + 上游真实 http2 夹具 `cursor-terminal-error.test.ts:453-521` 支撑 | 脚本 observation/字段、§9.5、§9.6 s6 行、§9.7 第一行 |
+| **F4** 未校验检出 SHA | 脚本在**导入任何模块前** fail-fast：`git rev-parse HEAD` 必须等于期望固定 SHA（默认 `d49918f…`，`--expected-sha` 可覆写，非法值 exit 2），不匹配/非 git 仓库即 exit 2 且不写任何结果文件；结果同时记录 `ompHead`/`expectedOmpSha`/`pinnedOmpSha` | 脚本前置校验与 `runtime` 字段、§9.6 |
+| **F5** §9.1"全程无网络"与 `git fetch`/`push` 冲突 | 改为"**实验与测试本身**不调用远程 provider/API、不产生模型费用；这不等于整个工作轮次无网络" | §9.1 |
+
+### 10.1 返修后的实跑证据
+
+| 命令 | 结果 |
+| --- | --- |
+| 临时副本运行（`cp` 到 `mktemp -d`，`--omp <repo>/upstream/oh-my-pi`） | exit 1；确认验证过程不触碰已提交的结果 JSON |
+| `bun app/experiments/omp-bridge/t20-cursor-exec-order.mjs`（正式运行，两次） | 两次 exit 1；除 `generatedAt` 外结果 JSON **逐字节一致**；`summary.strictContract = 12/0/12`（total/held/violated）、`summary.candidateChecks = 3/1/2`、`red: true` |
+| CLI 分段计数 | `strict R3 contract checks: 0/12 held (12 violated)`；`candidate-scheme checks (never R3 evidence, never the exit code): 1/3 held` |
+| `--expected-sha 0000…` / `--omp /tmp`（F4 负向） | 均 exit 2，错误信息给出 expected/observed；未产出结果文件 |
+| `node --check app/experiments/omp-bridge/t20-cursor-exec-order.mjs` | 通过 |
+| `bun test packages/ai/test/cursor-terminal-error.test.ts`（固定树） | **11 pass / 0 fail** |
+| `bun test packages/coding-agent/test/cursor-exec.test.ts`（固定树） | **69 pass / 0 fail** |
+| `git diff --check` / `git show --check HEAD` | 均 exit 0 |
+| 工作树与子模块 | 父仓库除本轮文件外干净；OMP `d49918f…`、PI `0111e306…`，gitlink 未变、子模块 `git status --short` 为空；无 `/tmp/t20-cursor-exec-*` 与临时验证目录残留 |
+
+未运行/未声称：真实付费或远程模型、真实 Cursor 服务端行为实验、Windows 行为、`packages/agent` 全量套件。返回码语义仍是"严格契约未被满足"（RED），不因任何候选方案观察而改变。

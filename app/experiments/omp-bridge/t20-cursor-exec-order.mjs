@@ -34,11 +34,19 @@
  * reproduces that drain, because it is the reason "defer the exec until the
  * message is complete" cannot be expressed inside the client.
  *
- *   bun app/experiments/omp-bridge/t20-cursor-exec-order.mjs [--omp <checkout>] [--json]
+ *   bun app/experiments/omp-bridge/t20-cursor-exec-order.mjs [--omp <checkout>] [--expected-sha <sha>] [--json]
  *
- * Exit code 0 = the strict contract held in every scenario; 1 = RED (the
- * contract is violated, which is the expected outcome for the pinned runtime).
- * No network, no paid model: every frame and every tool body is local.
+ * Exit code 0 = every STRICT CONTRACT check held; 1 = RED (at least one strict
+ * contract check was violated, which is the expected outcome for the pinned
+ * runtime). Candidate-scheme checks and observations (`no handlers`,
+ * `external handoff`, `scheme B native`, `gated`) never decide the exit code —
+ * they record what a candidate configuration does, not whether R3 holds.
+ *
+ * The checkout under test is verified against the pinned OMP SHA before any
+ * module is imported, so evidence cannot be produced for the wrong tree.
+ *
+ * The experiment itself makes no network calls and invokes no model: every
+ * frame and every tool body is a local fixture.
  */
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -53,6 +61,24 @@ const ompIndex = argv.indexOf("--omp");
 const OMP_ROOT = resolve(ompIndex === -1 ? join(REPO_ROOT, "upstream/oh-my-pi") : argv[ompIndex + 1]);
 const AS_JSON = argv.includes("--json");
 const PINNED_OMP_SHA = "d49918fab2dba3986927f2d46721629ed0f3a02c";
+const shaIndex = argv.indexOf("--expected-sha");
+const EXPECTED_OMP_SHA = shaIndex === -1 ? PINNED_OMP_SHA : argv[shaIndex + 1];
+if (shaIndex !== -1 && !/^[0-9a-f]{40}$/.test(EXPECTED_OMP_SHA ?? "")) {
+  process.stderr.write("--expected-sha requires a full 40-character git SHA\n");
+  process.exit(2);
+}
+
+// Fail fast: the whole point of this experiment is that it measures the PINNED
+// runtime. Importing the modules first would let a wrong checkout produce
+// plausible-looking numbers under the pinned baseline's name.
+const observedHead = spawnSync("git", ["-C", OMP_ROOT, "rev-parse", "HEAD"], { encoding: "utf8" });
+const OMP_HEAD = observedHead.status === 0 ? observedHead.stdout.trim() : "";
+if (OMP_HEAD !== EXPECTED_OMP_SHA) {
+  process.stderr.write(
+    `refusing to measure the wrong checkout: ${OMP_ROOT}\n  expected ${EXPECTED_OMP_SHA}\n  observed ${OMP_HEAD || `<git rev-parse failed: ${observedHead.stderr?.trim()}>`}\n`,
+  );
+  process.exit(2);
+}
 
 const SUBMIT_TOOL = "SubmitPlan";
 const SIBLING_TOOL = "bash";
@@ -76,7 +102,7 @@ const [
   mod("packages/coding-agent/src/cursor.ts"),
 ]);
 
-const { handleServerMessage, synthesizeCursorExecToolCall } = cursorProvider;
+const { handleServerMessage } = cursorProvider;
 const { create, encodeJsonValue } = protobuf;
 const {
   AgentServerMessageSchema,
@@ -403,12 +429,15 @@ async function runGatedScenario(scratch) {
 
   const submitRanWhileShellPending = submitExecutions > 0 && !events.some(event => event.event === "handler:shell:leave");
   const pendingLocalWork = stream.hasPendingLocalWork === true;
-  const doneBeforeRelease = events.some(event => event.event === "done");
+  // Harness property, not provider evidence: this harness decides when to push
+  // `done` (mirroring cursor.ts:854-882/949-960). It is recorded, never judged.
+  const doneBeforeGateReleaseHarness = events.some(event => event.event === "done");
 
   gate.resolve();
   await Promise.all([...inFlight]);
   record("drain:complete");
-  // cursor.ts:949-955 — the provider's own completion rule.
+  // cursor.ts:949-960 — the provider's own completion rule; the harness mirrors
+  // it so the recorded order is comparable, which is all it can claim.
   stream.push({ type: "done", reason: output.stopReason, message: output });
   record("done");
   stream.end(output);
@@ -421,7 +450,7 @@ async function runGatedScenario(scratch) {
     label: "s6-gated-handler",
     submitRanWhileShellPending,
     pendingLocalWork,
-    doneBeforeRelease,
+    doneBeforeGateReleaseHarness,
     handlerLeaveBeforeDrain: eventOrder.indexOf("handler:shell:leave") < eventOrder.indexOf("drain:complete"),
     doneAfterDrain: eventOrder.indexOf("done") > eventOrder.indexOf("drain:complete"),
     events,
@@ -434,9 +463,17 @@ async function runGatedScenario(scratch) {
 
 // ---------------------------------------------------------------------------
 // Strict-contract checks. `ok` means the contract HELD.
+//
+// Two groups, deliberately kept apart (review F1): only `contractChecks` decide
+// whether the strict R3 contract holds and therefore the process exit code.
+// `candidateChecks` record what a candidate configuration does and are
+// reported separately — a candidate property that happens to hold is not
+// evidence that R3 holds.
 // ---------------------------------------------------------------------------
-const checks = [];
-const check = (name, ok, detail) => checks.push({ name, ok, detail });
+const contractChecks = [];
+const candidateChecks = [];
+const checkContract = (name, ok, detail) => contractChecks.push({ name, ok, detail });
+const checkCandidate = (name, ok, detail) => candidateChecks.push({ name, ok, detail });
 
 const scenarioDir = mkdtempSync(join(tmpdir(), "t20-cursor-exec-"));
 const scenarioScratch = label => {
@@ -493,10 +530,12 @@ try {
   // The Cursor `mcpArgs` branch only synthesizes/marks a block when
   // `execHandlers.mcp` exists (cursor.ts:1938-1952), and with
   // `externalToolExecutor` the wire answer becomes a handoff instead of
-  // `toolNotFound` (cursor.ts:1959-1962). This scenario measures what the
-  // dispatcher does by itself in that configuration: it cannot show the loop
-  // picking the call up, because the block arrives on a different channel
-  // (`processInteractionUpdate`), which this harness does not fabricate.
+  // `toolNotFound` (cursor.ts:1959-1962). What this scenario measures is only
+  // that branch's own behavior: a handoff ack, no synthesized block, no
+  // resolved marker, no paired result. It fabricates no interaction update and
+  // drives no agent loop, so it says nothing about loop execution, about
+  // whether a real server sends the update that would carry the block, or
+  // about exactly-once behavior.
   scenarios.externalHandoff = await runScenario({
     label: "s5-external-handoff",
     order: ["mcp"],
@@ -533,31 +572,35 @@ try {
 // Verdicts
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Strict R3 contract: 5 checks per mixed-batch order + 2 for the sole call.
+// ---------------------------------------------------------------------------
+
 for (const key of ["siblingFirst", "submitFirst"]) {
   const scenario = scenarios[key];
   const siblingRuns = scenario.toolExecutions.filter(execution => execution.toolName === SIBLING_TOOL);
   const submitRuns = scenario.toolExecutions.filter(execution => execution.toolName === SUBMIT_TOOL);
-  check(
+  checkContract(
     `${key}: the sibling in a batch that also holds ${SUBMIT_TOOL} executes ZERO times`,
     siblingRuns.length === 0 && !scenario.sideEffects.sibling,
     `sibling executions: ${siblingRuns.length}, side-effect file: ${scenario.sideEffects.sibling}`,
   );
-  check(
+  checkContract(
     `${key}: the transition call itself is not executed by the provider`,
     submitRuns.length === 0,
     `SubmitPlan executions: ${submitRuns.length}`,
   );
-  check(
+  checkContract(
     `${key}: every execution happens after the batch verdict (i.e. after the message is complete)`,
     scenario.executionsBeforeDone.length === 0,
     `executions before the stream's done event: ${scenario.executionsBeforeDone.length} of ${scenario.toolExecutions.length}`,
   );
-  check(
+  checkContract(
     `${key}: the server is not told the sibling succeeded`,
     !scenario.wire.some(frame => frame.answer === "shellResult" && frame.result === "success"),
     JSON.stringify(scenario.wire),
   );
-  check(
+  checkContract(
     `${key}: the successful submit cannot end the run (no terminate reaches the loop)`,
     scenario.blocks.every(block => block.resolved !== true) &&
       scenario.results.every(result => result.hasTerminate !== true),
@@ -565,68 +608,76 @@ for (const key of ["siblingFirst", "submitFirst"]) {
   );
 }
 
-check(
+checkContract(
   "sole SubmitPlan: the provider leaves the call to the agent loop",
   scenarios.soleSubmit.toolExecutions.filter(execution => execution.toolName === SUBMIT_TOOL).length === 0,
   `SubmitPlan executions: ${scenarios.soleSubmit.toolExecutions.length}, blocks: ${JSON.stringify(scenarios.soleSubmit.blocks)}`,
 );
-check(
+checkContract(
   "sole SubmitPlan: termination stays available to the loop",
   scenarios.soleSubmit.blocks.every(block => block.resolved !== true),
   JSON.stringify(scenarios.soleSubmit.blocks),
 );
-check(
-  "no handlers: no tool call is answered with a fabricated failure",
+
+// ---------------------------------------------------------------------------
+// Candidate-scheme checks. Never counted as R3 evidence, never decide the exit
+// code: each one records one property of a candidate configuration.
+// ---------------------------------------------------------------------------
+
+checkCandidate(
+  "no handlers (candidate): no tool call is answered with a fabricated failure",
   !scenarios.noHandlers.wire.some(
     frame => /Tool not available/.test(frame.payload) || frame.result === "toolNotFound",
   ),
   JSON.stringify(scenarios.noHandlers.wire),
 );
-
-// Scheme-relevant facts (not strict-contract verdicts): recorded so the
-// scheme analysis below rests on measurements, not on reading only.
-const observations = {
-  gated: {
-    framesNotSerialized: scenarios.gated.submitRanWhileShellPending,
-    pendingLocalWorkWhileHandlerRuns: scenarios.gated.pendingLocalWork,
-    doneBeforeGateRelease: scenarios.gated.doneBeforeRelease,
-    doneAfterDrain: scenarios.gated.doneAfterDrain,
-    note: "a handler that never settles keeps stream.hasPendingLocalWork true and blocks the provider's pre-done drain (cursor.ts:950-960); upstream's own http2 fixture asserts the same for done/error/abort (packages/ai/test/cursor-terminal-error.test.ts)",
-  },
-  externalHandoff: {
-    blocks: scenarios.externalHandoff.blocks,
-    pairedResults: scenarios.externalHandoff.results,
-    wire: scenarios.externalHandoff.wire,
-    note: "with no `mcp` handler the exec branch synthesizes no block and pairs nothing (cursor.ts:1938-1952); the block for such a call must therefore come from the interaction-update channel, which this harness does not fabricate",
-  },
-};
-
-check(
-  "external handoff: the exec branch leaves a non-native call to the loop (no block, no pair, handoff ack)",
+checkCandidate(
+  "external handoff (candidate): the mcpArgs branch answers a handoff ack without synthesizing, resolving or pairing",
   scenarios.externalHandoff.blocks.length === 0 &&
     scenarios.externalHandoff.results.length === 0 &&
     scenarios.externalHandoff.wire.some(frame => frame.answer === "mcpResult" && frame.result === "success"),
   `blocks=${JSON.stringify(scenarios.externalHandoff.blocks)} results=${scenarios.externalHandoff.results.length} wire=${JSON.stringify(scenarios.externalHandoff.wire)}`,
 );
-check(
-  "deferral is expressible: the message can complete while an exec handler is still pending",
-  scenarios.gated.doneBeforeRelease === true,
-  "the provider's pre-done drain means an unresolved handler blocks `done`; a scheme that waits for message_end before executing would deadlock against its own completion",
-);
-
-check(
-  "scheme B: native frames can be executed without a local executor (no fabricated failure)",
+checkCandidate(
+  "scheme B native (candidate): a native frame without an executor avoids a fabricated failure",
   scenarios.schemeB.toolExecutions.length === 0 &&
     !scenarios.schemeB.wire.some(frame => /Tool not available/.test(frame.payload) || frame.result === "toolNotFound"),
   `executions=${scenarios.schemeB.toolExecutions.length} wire=${JSON.stringify(scenarios.schemeB.wire)}`,
 );
 
-const passed = checks.filter(entry => entry.ok).length;
+// Scheme-relevant facts. These are observations, not verdicts of any kind: they
+// record what this harness measured, and their interpretation rests on the
+// quoted source.
+const observations = {
+  gated: {
+    framesNotSerialized: scenarios.gated.submitRanWhileShellPending,
+    pendingLocalWorkWhileHandlerRuns: scenarios.gated.pendingLocalWork,
+    handlerExitBeforeHarnessDrain: scenarios.gated.handlerLeaveBeforeDrain,
+    harnessOrder: scenarios.gated.events.map(event => event.event),
+    note: "measured: a second frame's handler runs while the first exec handler is still pending, and a pending handler keeps stream.hasPendingLocalWork true. The harness itself decides when to push `done` (it mirrors cursor.ts:854-882/949-960), so its own done ordering is a harness property, NOT independent provider evidence. The claim that `done` waits for every exec handler rests on the production source (cursor.ts:949-960) plus upstream's real HTTP/2 fixture (packages/ai/test/cursor-terminal-error.test.ts:453-521).",
+  },
+  externalHandoff: {
+    blocks: scenarios.externalHandoff.blocks,
+    pairedResults: scenarios.externalHandoff.results,
+    wire: scenarios.externalHandoff.wire,
+    note: "measured: with no `mcp` handler the exec branch answers the frame with a handoff ack and, in this branch, synthesizes no block, marks nothing resolved and pairs no result (cursor.ts:1938-1967). Source shows a block for such a call can still arrive later on the interaction-update channel and stay unresolved (cursor.ts:4291-4322), which the agent loop would then execute and pair itself; this harness fabricates no interaction update and drives no loop, so it proves nothing about loop execution, about whether a real server sends that update, or about exactly-once behavior.",
+  },
+  schemeB: {
+    executions: scenarios.schemeB.toolExecutions.length,
+    blocks: scenarios.schemeB.blocks,
+    wire: scenarios.schemeB.wire,
+    note: "measured: with no native handlers and no `mcp` handler, plus external handoff, the native sibling executes nothing but is answered `ShellRejected \"Tool not available\"` while its block stays synthesized+resolved; the non-native frame gets the handoff ack described above.",
+  },
+};
+
+const strictHeld = contractChecks.filter(entry => entry.ok).length;
+const candidateHeld = candidateChecks.filter(entry => entry.ok).length;
 const report = {
   generatedAt: new Date().toISOString(),
   runtime: {
     ompRoot: OMP_ROOT,
-    ompHead: spawnSync("git", ["-C", OMP_ROOT, "rev-parse", "HEAD"], { encoding: "utf8" }).stdout.trim(),
+    ompHead: OMP_HEAD,
+    expectedOmpSha: EXPECTED_OMP_SHA,
     pinnedOmpSha: PINNED_OMP_SHA,
     bun: process.versions.bun ?? null,
     node: process.versions.node,
@@ -645,8 +696,22 @@ const report = {
   },
   scenarios,
   observations,
-  checks,
-  summary: { total: checks.length, contractHeld: passed, contractViolated: checks.length - passed, red: passed < checks.length },
+  strictContractChecks: contractChecks,
+  candidateChecks,
+  summary: {
+    strictContract: {
+      total: contractChecks.length,
+      held: strictHeld,
+      violated: contractChecks.length - strictHeld,
+    },
+    candidateChecks: {
+      total: candidateChecks.length,
+      held: candidateHeld,
+      violated: candidateChecks.length - candidateHeld,
+      note: "reported separately; not R3 evidence and not part of the exit code",
+    },
+    red: strictHeld < contractChecks.length,
+  },
 };
 
 const resultsDir = join(HERE, "results");
@@ -658,7 +723,7 @@ if (AS_JSON) {
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 } else {
   const lines = [
-    `OMP ${report.runtime.ompHead} @ ${OMP_ROOT}`,
+    `OMP ${report.runtime.ompHead} @ ${OMP_ROOT} (expected ${report.runtime.expectedOmpSha})`,
     ...Object.values(scenarios)
       .filter(scenario => scenario.order !== undefined)
       .flatMap(scenario => [
@@ -672,15 +737,17 @@ if (AS_JSON) {
         `  side effects: ${JSON.stringify(scenario.sideEffects)}`,
       ]),
     "",
-    `## ${scenarios.gated.label}`,
+    `## ${scenarios.gated.label} (harness mirror of cursor.ts:854-882/949-960)`,
     `  call order: ${scenarios.gated.events.map(event => event.event).join(" | ")}`,
     `  submit ran while shell handler was pending: ${scenarios.gated.submitRanWhileShellPending}`,
     `  pendingLocalWork while handler runs: ${scenarios.gated.pendingLocalWork}`,
-    `  done before gate release: ${scenarios.gated.doneBeforeRelease}`,
-    `  done after drain: ${scenarios.gated.doneAfterDrain}`,
+    `  handler exit recorded before harness drain: ${scenarios.gated.handlerLeaveBeforeDrain}`,
     "",
-    `## checks (${passed}/${checks.length} contract checks held)`,
-    ...checks.map(entry => `  ${entry.ok ? "PASS" : "FAIL"}  ${entry.name}\n        ${entry.detail}`),
+    `## strict R3 contract checks: ${strictHeld}/${contractChecks.length} held (${contractChecks.length - strictHeld} violated)`,
+    ...contractChecks.map(entry => `  ${entry.ok ? "PASS" : "FAIL"}  ${entry.name}\n        ${entry.detail}`),
+    "",
+    `## candidate-scheme checks (never R3 evidence, never the exit code): ${candidateHeld}/${candidateChecks.length} held`,
+    ...candidateChecks.map(entry => `  ${entry.ok ? "PASS" : "FAIL"}  ${entry.name}\n        ${entry.detail}`),
     "",
     `results: ${resultsPath}`,
   ];
