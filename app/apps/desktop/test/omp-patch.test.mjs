@@ -432,12 +432,18 @@ test("canonicalizes the ancestor chain through a trusted alias and still refuses
   mkdirSync(realTree, { recursive: true });
   const alias = join(fixtureRoot, "var");
   symlinkSync(join(fixtureRoot, "private", "var"), alias);
+  // `canonicalizeAncestor` hands the policy the canonical form of every
+  // component it walks, so the fixture alias must be spelled canonically too:
+  // on macOS the walk has already rewritten the `tmpdir()` prefix itself
+  // (`/var/folders/…` -> `/private/var/folders/…`) before it reaches this
+  // alias, and a lexical comparison would never match what it planted.
+  const canonicalAlias = join(realpathSync(fixtureRoot), "var");
 
   // The shipped policy trusts only entries directly below the *filesystem*
   // root, which a test user cannot create; the fixture policy adds this tree's
   // alias and keeps the shipped rule for the platform aliases above it (macOS
   // `/var`), so the walk is exercised unchanged on either platform.
-  const trustAlias = (componentPath, stats) => isTrustedRootAlias(componentPath, stats) || componentPath === alias;
+  const trustAlias = (componentPath, stats) => isTrustedRootAlias(componentPath, stats) || componentPath === canonicalAlias;
   assert.equal(canonicalizeAncestor(join(alias, "T", "tree"), trustAlias), realpathSync(realTree));
 
   const deeper = join(realTree, "link");
@@ -454,28 +460,37 @@ test("canonicalizes the ancestor chain through a trusted alias and still refuses
   );
 });
 
-test("follows the aliases the platform ships directly below the filesystem root", () => {
+test("follows the aliases the platform ships directly below the filesystem root", (t) => {
   // macOS ships `/var`, `/tmp`, and `/etc` as root-owned links into `/private`
   // (so `tmpdir()` is `/var/folders/…`); a usrmerged Linux ships `/bin`,
-  // `/lib`, `/sbin`. These are the platform's own doing and must resolve, while
-  // everything the walk was told not to trust stays refused — the shipped
-  // policy is exercised here against the real filesystem root.
-  const aliases = readdirSync("/").filter((entry) => {
+  // `/sbin`, `/lib`, `/lib64`. These are the platform's own doing and must
+  // resolve, while everything the walk was told not to trust stays refused —
+  // the shipped policy is exercised here against the real filesystem root.
+  //
+  // Only aliases that resolve are probed. A platform also ships *dangling*
+  // links directly below `/` (macOS `/.VolumeIcon.icns`), but the walk is never
+  // called with one: production canonicalizes only
+  // `nearestExistingParent(...)`, whose `existsSync` follows the link and skips
+  // a dangling entry, so no component it stats can fail to resolve.
+  const candidates = ["/var", "/tmp", "/etc", "/bin", "/sbin", "/lib", "/lib64"];
+  const aliases = candidates.filter((candidate) => {
     try {
-      return lstatSync(join("/", entry)).isSymbolicLink();
+      return lstatSync(candidate).isSymbolicLink() && existsSync(candidate);
     } catch {
       return false;
     }
   });
-  assert.ok(aliases.length > 0, "expected this platform to ship a root-level alias to probe with");
+  if (aliases.length === 0) {
+    t.skip("this platform ships no resolvable alias directly below the filesystem root");
+    return;
+  }
   for (const alias of aliases) {
-    const componentPath = join("/", alias);
     assert.equal(
-      isTrustedRootAlias(componentPath, lstatSync(componentPath)),
+      isTrustedRootAlias(alias, lstatSync(alias)),
       true,
-      `${componentPath} is a root-owned link directly below the filesystem root`,
+      `${alias} is a root-owned link directly below the filesystem root`,
     );
-    assert.equal(canonicalizeAncestor(componentPath), realpathSync(componentPath));
+    assert.equal(canonicalizeAncestor(alias), realpathSync(alias));
   }
   // The shape that failed on macOS: the platform temp directory resolves
   // through its aliases, so the scratch parent must canonicalize, not refuse.

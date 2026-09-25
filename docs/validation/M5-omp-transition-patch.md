@@ -4,6 +4,8 @@
 
 **第二轮独立复审返修（F6-F9，基线 `474408de2b2bdb538f5b2249d71398b8537e1fed`）**：只修本阶段脚本与证据，补丁 artifact 与 manifest 未改动（`sha256 e08ca7ff…fd8`、72978 字节，与 manifest 一致，见 §5）。R3 仍是硬阻塞、T20-B 仍不得开始；脚本测试面从 17 项增至 **24 项**（§6.1）。
 
+**第三轮返修（macOS 复审的测试面跨平台修正，基线 `81ab2ce41faea2e2c62aab41431ea651a4b341e3`）**：macOS 独立复审实跑 `node --test apps/desktop/test/omp-patch.test.mjs` 得 **22/24**——F6 的 6 个正常 CLI 路径与 F7 的 `--source` symlink 攻击用例**全部通过**（生产修复在 macOS 上有效），失败的恰是第二轮新增的**两个测试自身的夹具/平台假设缺陷**（逐行可达性分析见 §6.2）：①夹具别名用词法拼写与 canonical 组件比较，被 macOS `tmpdir()` 前缀自身的 `/var -> /private/var` 改写击穿；②对**悬空**的根级符号链接（macOS `/.VolumeIcon.icns`）直接调用 `canonicalizeAncestor`，而该形状在生产中不可达。本轮只改测试与本文档；生产脚本、补丁 artifact、manifest 均未改动。macOS 修正后结果**待复审实跑确认**，本文档不声称 macOS 24/24。
+
 ## 1. 结论（含撤回）
 
 - **R3（过渡工具独占批次 → 同批零执行；提交后终止）在 PI 语义下不可满足**，因此**不得解除**：PI 对 assistant message 的**全部** `toolCall` 计数（`upstream/pi-desktop/packages/agent-runtime/src/runtime.ts:2222-2234`：`content.filter(block => block.type === "toolCall")`，无任何排除），而 OMP 存在**在 assistant message 形成之前就已执行**的调用通道（Cursor exec channel / provider bridge），其副作用不可撤销，补丁层无法阻止。
@@ -75,7 +77,10 @@
 | `bun test packages/agent/test/agent-loop.test.ts`（补丁树） | 143 通过 / 0 失败 |
 | `bun test packages/coding-agent/test/rpc-host-tools.test.ts`（补丁树） | 13 通过 / 0 失败 |
 | `bun test packages/agent/test/agent-loop.test.ts packages/coding-agent/test/rpc-host-tools.test.ts packages/coding-agent/test/rpc-input-frame.test.ts`（补丁树，合并） | **171 通过 / 0 失败**（143 + 13 + 15） |
-| `node --test apps/desktop/test/omp-patch.test.mjs`（`app/`，F6-F9 返修后） | **24 通过 / 0 失败 / 0 跳过**（连跑 3 次结果一致） |
+| `node --test apps/desktop/test/omp-patch.test.mjs`（`app/`，F6-F9 返修后，本机 Linux） | **24 通过 / 0 失败 / 0 跳过**（连跑 3 次结果一致） |
+| 同一命令（`app/`，第三轮测试修正后，本机 Linux） | **24 通过 / 0 失败 / 0 跳过**（连续两次；两项修正后的用例另以 `--test-name-pattern` 单独复核） |
+| 同一命令在本机 macOS（`81ab2ce`，第三轮修正**前**） | **22 通过 / 2 失败**：F6 的 6 个正常 CLI 路径与 F7 的 `--source` symlink 用例全部通过；失败的 2 项是新增测试自身的跨平台夹具缺陷（§6.2），非生产回退。修正后 macOS 结果**待复审实跑确认**，本文件不声称 macOS 24/24 |
+| 第三轮修正的两项测试失效性对照（本机 Linux，临时改坏生产脚本后立即还原） | `isTrustedRootAlias` 恒 false → 真实根别名用例失败；`canonicalizeAncestor` 的链接拒绝整段短路 → 遍历用例失败；两项修正都不是空转断言 |
 | 同一命令在 `474408de` 上（RED 证据；输出见交付报告） | **18 通过 / 5 失败**，失败原因逐项核对：F7 `--source <symlink>` + `--out <real-source>/inside` `actual: 0, expected: 1`、`TypeError: isTrustedRootAlias is not a function` / `canonicalizeAncestor is not a function` / `isSignalableProcessGroup is not a function`、`--out --json` `actual: 0, expected: 2` 并在 `$PWD` 建出 `--json/` 树 |
 | 旧策略 vs 新策略（本机 Linux 真实根别名；一次性探针，旧判定即 `realpath(nearestExistingParent) !== nearestExistingParent`） | 旧策略即拒 `/bin`、`/lib`（与 macOS `/var → /private/var` 同类）；新策略 canonicalize 为 `/usr/bin`、`/usr/lib`；`/tmp`（真实目录）两者均接受。该判定的常驻回归是 suite 中的「真实根别名」用例 |
 | `node scripts/omp-patch.mjs --apply --out /tmp/omp-t20-fix2-smoke --json` | exit 0；7518 追踪文件；`tree` 为 canonical `/tmp/omp-t20-fix2-smoke`；补丁内容可见（`soleBatchRejectionReason` 等 7 处） |
@@ -95,7 +100,7 @@
 
 ## 6. 边界与安全修复（复审附加项）
 
-- **F1/F6 目标目录 canonical 化（含 macOS 系统别名）**：`--out` 的最近存在父目录逐组件 canonicalize（`canonicalizeAncestor` + `isTrustedRootAlias`）。只有**文件系统根直属、属主为 root** 的符号链接被跟随（macOS `/var`、`/tmp`、`/etc` → `/private/…`，usrmerge Linux `/bin`、`/lib`、`/sbin`）：这类条目非 root 无法创建/替换/删除，属于平台自身的别名，拒绝它们会让 macOS 上任何 `--out /tmp/…`（含 `tmpdir()` = `/var/folders/…`）失败。其余任何深度、任何属主的符号链接仍在创建/复制/删除前拒绝（例：`/tmp/link -> /protected` 时 `--out /tmp/link/new-tree` 被拒，`/protected` 未被写入也未被删除）。拒绝后仍对 canonical 目标做保护路径、自身符号链接、非空目录检查，创建/复制/失败清理全部使用 canonical 路径，`tree` 报告 canonical 路径。回归测试：策略单测（synthetic stats 的 macOS/Linux 形状）+ 遍历单测（伪造根下跟随别名、深层链接仍拒）+ 真实根别名用例（对本机 `/bin`、`/lib` 断言 canonical 目标，并对 `tmpdir()` 断言 canonicalize 而非拒绝）。**macOS 真实 24/24 需本机复审确认**（见 §7）。
+- **F1/F6 目标目录 canonical 化（含 macOS 系统别名）**：`--out` 的最近存在父目录逐组件 canonicalize（`canonicalizeAncestor` + `isTrustedRootAlias`）。只有**文件系统根直属、属主为 root** 的符号链接被跟随（macOS `/var`、`/tmp`、`/etc` → `/private/…`，usrmerge Linux `/bin`、`/lib`、`/sbin`）：这类条目非 root 无法创建/替换/删除，属于平台自身的别名，拒绝它们会让 macOS 上任何 `--out /tmp/…`（含 `tmpdir()` = `/var/folders/…`）失败。其余任何深度、任何属主的符号链接仍在创建/复制/删除前拒绝（例：`/tmp/link -> /protected` 时 `--out /tmp/link/new-tree` 被拒，`/protected` 未被写入也未被删除）。拒绝后仍对 canonical 目标做保护路径、自身符号链接、非空目录检查，创建/复制/失败清理全部使用 canonical 路径，`tree` 报告 canonical 路径。回归测试（第三轮已修正跨平台夹具，见 §6.2）：策略单测（synthetic stats 的 macOS/Linux 形状）+ 遍历单测（伪造根下跟随别名、深层链接仍拒；夹具别名按 **canonical** 拼写比较）+ 真实根别名用例（只探测**存在且可 realpath** 的候选 `/var`、`/tmp`、`/etc`、`/bin`、`/sbin`、`/lib`、`/lib64`，断言 `isTrustedRootAlias` 与 canonical 目标；平台没有这类**可解析**别名时显式 skip，不伪装通过；并对 `tmpdir()` 断言 canonicalize 而非拒绝）。**macOS 真实 24/24 需本机复审确认**（见 §6.2、§7）。
 - **F7 `--source` 等保护边界同样 canonical 化**：`--source`、仓库根、app 根、`process.cwd()` 全部 canonicalize 后才做等值/祖先/后代判断。此前只 canonicalize 目标，`--source source-link`（`source-link -> real-source`）+ `--out real-source/inside` 会绕过"不得位于 source 内"，在**真实检出**中创建目录（本机 macOS 已用真实 git fixture 复现：status 0、`?? inside/`）。回归测试断言拒绝、`inside` 不存在、source 文件内容/条目列表不变且 `git status --porcelain` 为空；同样断言 `--out` 经符号链接指向 source 时拒绝、目标不变。
 - **参数取值边界（F9 与缺值）**：`--out`/`--manifest`/`--source` 缺少值、或下一 token 以 `-` 开头（本身是 flag）时，一律报 `<flag> requires a value`（exit 2，零副作用）。此前 `--out --json` 会把 flag 当路径，在 `$PWD` 创建 `--json/` 并填充整棵追踪树；`--out --source foo` 则报出无关的 `unknown argument: foo`。取值要写以 `-` 开头的路径请用 `./-name`。
 - **manifest schemaVersion**：只接受脚本明确支持的 `1`，其它值 fail closed（回归测试 99 → 拒绝）。
@@ -116,12 +121,20 @@
 | 进程组信号与退化 pid | `apps/desktop/electron/main/npm-executable.ts:96-135`（`killProcessTree` 先判 `pid`，`process.kill(-pid, …)` 失败回退 `child.kill`） | `packages/coding-agent/src/eval/kernel-base.ts:144-176` `isSignalableProcessGroup` / `killProcessGroup`（注释明确 `-0` 杀自身进程组、`-1` 杀全部可杀进程）、`packages/coding-agent/src/eval/probe.ts:103` | **借鉴** OMP 的 `pid > 1` 守卫（含理由）与 PI 的 `-pid` + 回退写法（F8） |
 | flag 取值边界 | 该检出无同形 patch/scratch CLI 工具 | 未检索到同类参数解析先例 | **自有**（`parseArgs` + 定向回归，F9） |
 
+### 6.2 第三轮：两项失败测试的生产可达性分析（测试缺陷，非生产回退）
+
+macOS 复审的两项失败都落在第二轮新增测试**自己构造的形状**上；逐行核对生产调用路径后确认**生产脚本无需改动**：
+
+- **「canonicalizes the ancestor chain through a trusted alias and still refuses deeper links」**（`app/apps/desktop/test/omp-patch.test.mjs:425`）：夹具在 `tmpdir()` 下造 `fakeroot/private/var` 与 `fakeroot/var -> private/var`，其"信任本夹具别名"的策略比较 `componentPath === alias`——`alias` 是**词法**拼写（`/var/folders/…/fakeroot/var`），而 `canonicalizeAncestor` 交给策略的 `componentPath` 是**逐组件 realpath 后**的规范化路径（`/private/var/folders/…/fakeroot/var`）。macOS 上 `tmpdir()` 自身就经 `/var -> private/var`，前缀被改写后词法比较永不相等，夹具别名被判为未受信任而抛错（复审所见 `scratch target must not be reached through a symlink: /private/var/folders/…/fakeroot/var`）。**生产可达性**：脚本只把 `nearestExistingParent(...)` 的结果交给 `canonicalizeAncestor`，生产代码里**不存在**"按拼写给出信任名单"的输入；被误判的只是夹具策略本身。本机用**生产** `canonicalizeAncestor` 复现了同一机制：受信任的中间别名一旦改写 canonical 前缀，词法比较策略必抛出同一错误串；改按 canonical 别名比较即解析成功，且**更深的可植入链接仍被拒绝**（§5 对照行）。修正：夹具别名改按 `join(realpathSync(fixtureRoot), "var")` 比较；三条断言（跟随别名、深层仍拒、默认策略仍拒）全部保留。
+- **「follows the aliases the platform ships directly below the filesystem root」**（同文件 `:463`）：原实现枚举 `/` 下**全部**符号链接并无条件调用 `canonicalizeAncestor`，于是撞上 macOS 根目录中 root-owned 的**悬空**链接 `/.VolumeIcon.icns`（复审所见 `ENOENT … stat '/.VolumeIcon.icns'`）。**生产可达性**：`canonicalizeAncestor` 的入参只会是 `nearestExistingParent(resolvedTarget)` 的结果，而它的 `existsSync` **跟随链接**、对悬空项返回 false，因此悬空项从不成为入参；反之只要 `existsSync(existingParent)` 为真，链上每个组件都必然可解析，遍历中的 `realpathSync` 不会 ENOENT。本机 CLI 端到端复核（真实 git 夹具，`--out` 前缀是悬空链接）：**不出现**符号链接策略错误，exit 1 且为 `mkdir … ENOENT`（fail closed），目标未创建、source 未改动、`git status --porcelain` 为空。修正：只探测**存在且可 realpath** 的明确候选 `/var`、`/tmp`、`/etc`、`/bin`、`/sbin`、`/lib`、`/lib64`（macOS 覆盖 `/var`/`/tmp`/`/etc`；usrmerge Linux 覆盖 `/bin`/`/sbin`/`/lib`/`/lib64`，本机实测这四个 link → `/usr/…`），并保留对 `tmpdir()` 的 canonicalize 断言；平台若一个可解析别名都没有，则 `t.skip` 显式跳过并给出原因，不伪装通过。
+- **为什么不是生产回退**：macOS 复审中同一 suite 里 F6 的 6 个正常 CLI 路径（含 `--apply --out /tmp/omp-review-81ab-apply --json` 成功、`tree` 报告 canonical `/private/tmp/omp-review-81ab-apply`、7518 追踪文件）与 F7 的最小真实 git 夹具（exit 1、`scratch target must not live inside the source checkout: /private/tmp/…/source/inside`、`out` 不存在、source `git status` 为空）**全部通过**，说明 canonical 化与围栏在 macOS 上按设计工作；两项失败各自停留在夹具拼写与不可达入参形状，未经过生产脚本的对应分支。失效性对照（§5）：把 `isTrustedRootAlias` 改成恒 false、或把遍历的链接拒绝整段短路，两项修正后的测试都会立即失败——不是空转断言。
+
 ## 7. 未做/未声称
 
 - **R3 仍阻塞**：不得开始 T20-B/C/D；产品侧 gap 诊断保持 3 缺口 exit 1。
 - **不声称上游支持**：patch level 仍是本项目维护的 `d49918f+omp-desktop.1`，运行时仍报 `omp/18.2.7`。
 - **未跑完的套件不得声称通过**：补丁树内 `packages/agent` 全量 `bun test` 曾卡在既有夹具 `delayed-tool-mcp.ts`（本轮已实现并验证进程组回收通道，但未重跑该全量套件）；通过证据只来自改动面套件、typecheck 与父仓库定向套件。
-- **macOS 端到端验收未在本机完成**：F6 的最终验收是"本机 macOS 上同一 suite 全过（含 6 个此前因 `/var → /private/var` 失败的用例）"，本机 Linux 只能提供策略/遍历单测、真实根别名用例、旧策略探针对照与 CLI 冒烟（§5、§6）；**需复审在本机 macOS 复跑确认**。行为差异须注意：macOS 上 `--out /tmp/…` 的 `tree` 报告 canonical `/private/tmp/…`（同一目录）。
+- **macOS 端到端验收仍待复审确认**：macOS 复审在 `81ab2ce` 上实跑为 **22/24**，其中 F6 的 6 个正常 CLI 路径与 F7 的 symlink 攻击用例均已通过，另 2 项失败经 §6.2 确认为**测试夹具缺陷**并已最小修正（只改测试与本文档）；修正后的 macOS 结果**必须由复审在本机实跑确认**，本文件只声称本机 Linux 24/24（连续两次）。行为差异须注意：macOS 上 `--out /tmp/…` 的 `tree` 报告 canonical `/private/tmp/…`（同一目录）。
 - **未测的异常分支（不得声称已测）**：`child.on("error")` 在"子进程已存在且 pid 有效"时整组杀灭属防御性分支——本脚本可达的 spawn 错误形状没有 pid；已测的只有 ENOENT/EACCES 的立即结算与定时器清理，以及退化 pid 的守卫单测。
 - **补丁本体未改动**：因此按约定未重跑补丁内 171 项测试，只复核 `sha256`/字节数与 `manifest.json` 一致（§5）。
 - 未覆盖：真实付费模型、Windows 平台行为、T20-B 的模式/审批链路。
