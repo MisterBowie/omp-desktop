@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "patchLevel": "d49918f+omp-desktop.1",
-  "description": "OMP Desktop patch set for the pinned upstream OMP runtime: RPC host-tool scheduling and batch policy plus settle-time run termination.",
+  "description": "OMP Desktop patch set for the pinned upstream OMP runtime: RPC host-tool scheduling and batch policy, settle-time run termination, and the all-toolCall batch count. Risk reduction only: it does NOT make the sole-batch contract strict — see status.",
   "base": {
     "submodule": "upstream/oh-my-pi",
     "repository": "https://github.com/can1357/oh-my-pi",
@@ -10,8 +10,8 @@
   },
   "patch": {
     "file": "0001-rpc-host-tool-transition-contract.patch",
-    "sha256": "4351025dbb8bf7b6a7b58dacfcabc8b61f86710d19c0f1219483ffe25aea2b24",
-    "bytes": 52556
+    "sha256": "e08ca7fff29bbd03e298f4488888b2692adda1486e3fff80536a31dd8af6fd5c",
+    "bytes": 72978
   },
   "capabilities": [
     "rpc-host-tool-concurrency",
@@ -45,10 +45,27 @@
       "packages/agent/test/agent-loop.test.ts",
       "packages/coding-agent/test/rpc-host-tools.test.ts"
     ],
-    "spike": "node experiments/omp-bridge/t20-feasibility.mjs --patched"
+    "spike": "node experiments/omp-bridge/t20-feasibility.mjs --patched",
+    "targetedSuites": [
+      "packages/agent/test/agent-loop.test.ts",
+      "packages/coding-agent/test/rpc-host-tools.test.ts",
+      "packages/coding-agent/test/rpc-input-frame.test.ts"
+    ]
   },
   "notes": [
     "This is an OMP Desktop-maintained patch level, not upstream OMP support: the runtime remains pinned at d49918f (omp/18.2.7) plus this patch set.",
     "Rebuild the patch after any source edit with: git -C <checkout> diff > app/patches/oh-my-pi/0001-rpc-host-tool-transition-contract.patch, then refresh patch.sha256 and patch.bytes."
-  ]
+  ],
+  "status": {
+    "soleBatchContract": "not-strict",
+    "blocker": "F3: a `kCursorExecResolved` sibling was executed by the provider/editor bridge before the assistant message existed, so its side effect cannot be prevented or retracted by any loop-level patch; PI counts every toolCall block, so the batch is still rejected, but \"zero side effects in a rejected batch\" is unreachable at this layer.",
+    "mitigationsApplied": [
+      "batch admission counts every toolCall block of the assistant message (Cursor-resolved included), matching PI runtime.ts:2222",
+      "speculation is disabled for a provider call whose active tool set advertises a sole-declared tool, so no speculative physical work starts before the batch decision"
+    ],
+    "retractedClaims": [
+      "R3 lifted",
+      "T20-B may start"
+    ]
+  }
 }

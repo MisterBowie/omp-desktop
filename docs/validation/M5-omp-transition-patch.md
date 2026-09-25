@@ -1,123 +1,109 @@
-# M5/T20-R3A：OMP 过渡工具契约补丁 —— 可复现 patch set 与能力解除证据
+# M5/T20-R3A：OMP 过渡工具契约补丁 —— 风险收敛补丁与 R3 仍阻塞的复审结论
 
-更新时间：2026-09-25。状态：**R3 的 OMP 底层能力阻塞已解除（patch level `d49918f+omp-desktop.1`），T20-B 可以开始；T20-B/C/D 仍未开始、未实现、未声称。** 分支 `codex/m5-omp-transition-hooks`，本轮基线 `ba7806c`（父仓库 `worktree`：`/home/vv/person/code/omp-desktop-m5-r3`）。固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`（omp/18.2.7）、PI `0111e306c120ad5820688d7608cb37bad8fbcc1f`，两者 gitlink 与工作树均未改动。
+更新时间：2026-09-25。状态：**R3 仍为硬阻塞（独立复审 F3 确认），T20-B 不得开始。** 本轮（复审返修轮）撤回了上一提交中"R3 已解除 / T20-B 可以开始"的结论，并把已完成的补丁收敛为**风险收敛**（loop 可控路径），而不是 PI 兼容性声明。分支 `codex/m5-omp-transition-hooks`；返修基线 `a78cec6df4572031365e8ea6a4237ca8db04ab20`；本文件描述返修后的最终状态。固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`（omp/18.2.7）、PI `0111e306c120ad5820688d7608cb37bad8fbcc1f`，gitlink 与工作树均未改动。
 
-本轮不实现任何桌面 Plan/Goal UI、模式状态或审批闭环，只做实「OMP 底层能力 + 可重复应用的补丁入口」，供 M6/T21 打包与 T20-B 消费。
+## 1. 结论（含撤回）
 
----
+- **R3（过渡工具独占批次 → 同批零执行；提交后终止）在 PI 语义下不可满足**，因此**不得解除**：PI 对 assistant message 的**全部** `toolCall` 计数（`upstream/pi-desktop/packages/agent-runtime/src/runtime.ts:2222-2234`：`content.filter(block => block.type === "toolCall")`，无任何排除），而 OMP 存在**在 assistant message 形成之前就已执行**的调用通道（Cursor exec channel / provider bridge），其副作用不可撤销，补丁层无法阻止。
+- **撤回**：`a78cec6` 中"R3 已解除 / T20-B 可以开始"的声明（任务板、HANDOFF、ADR 0305、运行时 spec §15、本文件旧版本）全部撤回；相关文档现统一写"仍阻塞"。
+- **保留并加强**（作为风险收敛，不构成解除依据）：批次计数改为**全部** `toolCall` 块（与 PI 同口径）、speculation 预执行门禁、批次拒绝语义、terminate 透传、RPC 边界严格校验。
+- **不减小契约**：验收口径仍是"批次内全部调用零执行/零 `tool_execution_start`/零 host call/零副作用"；正因为 Cursor 通道使该口径不可满足，才判定阻塞。
 
-## 1. 阻塞与解决方式
+## 2. F3：为什么严格契约在本层不可实现（源码依据）
 
-T20-A（`docs/validation/M5-plan-goal-capability-gates.md` §4.2/§8）用无费用 spike 证明：固定 OMP 18.2.7 上无法实现 PI 的过渡工具契约（R3 硬阻塞），根因是上游能力缺口——RPC host tool 定义没有调度/批次声明（`RpcHostToolAdapter.concurrency` 硬编码 `"shared"`）、`AgentToolResult`/`AfterToolCallResult` 没有 `terminate`、唯一"优雅终止"路径只认内置 `yield` 工具名。当时给出的解除条件之一就是"上游能力"。
+| 事实 | 源码位置 | 结论 |
+| --- | --- | --- |
+| PI 对整条 assistant message 的全部 `toolCall` 计数，含任何特殊/已解析调用；含过渡工具且总数 ≠ 1 时逐个 block | `upstream/pi-desktop/packages/agent-runtime/src/runtime.ts:2222-2234` | PI 的"批次"= 消息内的全部 toolCall 块；任何排除都是偏离 |
+| 提交工具的三个终支都 `terminate: true`（host 调用抛错 / proposal 非法 / 成功提交） | `runtime.ts:5110-5120`、`5137-5144`、`5165-5171` | 终止语义本身可实现（本补丁已实现并有测试） |
+| `kCursorExecResolved` 标记的含义：Cursor exec channel **已在流式期间于服务端执行**该调用，结果另行缓冲；`agent-loop.ts` **必须**跳过执行，否则重复副作用 | `packages/ai/src/utils/block-symbols.ts:46-57`、`packages/agent/src/agent-loop.ts:1436-1441`、`1493-1496` | 该调用的副作用发生在 loop 之前，loop 只能"不重复执行"，无法阻止或撤销 |
+| Cursor 结果在 assistant 消息关闭后由 agent 侧缓冲统一发出；非 Cursor provider 不会产生这些块 | `packages/agent/src/agent.ts:1491-1497` | 该通道由 provider/bridge 驱动；对 loop 是不可控输入 |
+| 投机执行的候选在**流式期间**启动物理执行：`toolcall_end` → `admitFinalized` → `#insertCandidate` → `#drain()` → `#startCandidate` → `policy.execute(...)` | `packages/agent/src/agent-loop.ts:2264`、`packages/agent/src/speculative-execution.ts:847-905`、`884-953` | 若不做门禁，候选可在批次组成未知时先执行；本补丁用门禁消除了这条 loop 内路径 |
+| 投机收敛与准入完成点：`reconcileFinalCalls` → `finalizeAdmissions`（置 `#admissionsFinalized` 并 drain）→ `discardAll/close` 会丢弃候选与 stream session | `packages/agent/src/agent-loop.ts:2033-2049`、`speculative-execution.ts:283-288`、`419-439` | 门禁可做到"批次判定前不启动候选" |
+| 唯一 `finalized` 投机策略是 `read`（纯本地读）；`eval` 只有 `stream` 影子单元，且注释自认"已开始的物理工作无法撤销" | `packages/coding-agent/src/tools/read.ts:841-855`、`packages/coding-agent/src/tools/eval.ts:409-441`、`packages/coding-agent/src/eval/speculation/cell-session.ts:148-152` | 上游自身承认存在不可撤销的预执行，佐证阻塞成立 |
+| 投机配置来源：`speculativeToolExecution.enabled`，每个 provider 调用创建协调器 | `packages/coding-agent/src/sdk.ts:3662,3749`、`packages/agent/src/agent-loop.ts:1919-1926` | 门禁点可选在协调器创建处，且不影响未声明 sole 的会话 |
 
-本轮采用**可维护的 patch level**解除它：运行时源码仍固定在 `d49918f`，本项目在该固定提交之上维护编号补丁集，并把它做成可重复、可验证、可清理的构建入口（ADR 0305）。**这不是官方 OMP 18.2.7 原生支持**：能力标识、patch SHA-256、base SHA 与版本都记在 manifest 里，文档与打包都必须带上 patch level。
+**判定**：严格契约要求"含 sole 工具的批次内所有调用（含 Cursor 已执行调用）零副作用"。Cursor 已执行调用的副作用发生在 assistant message 存在之前，属于 provider/editor bridge（`packages/ai/src/utils/block-symbols.ts:46-57`），**当前 patch 层无法阻止**；因此 F3 判定为**架构性阻塞**，本轮不解除 R3，也不得把口径缩小为"仅 loop dispatch 的调用"。
 
-## 2. 上游最新 main 仍是缺口（不是版本号猜测）
+## 3. 本轮实际修复（风险收敛，逐项）
 
-只读稀疏克隆 `/tmp/omp-latest-ea8b542` @ `ea8b54247afb85fa10ba784b35b54f90d7b28c7f`（`packages/agent/src`、`packages/coding-agent/src/modes/rpc`、`packages/coding-agent/src/session`、`packages/coding-agent/test`、`packages/agent/test`、`docs` 稀疏面）实测：
+### 3.1 全 toolCall 计数（对齐 PI）
 
-| 检查 | 结果 |
-| --- | --- |
-| `packages/agent/src/types.ts` 是否含 `terminate` | **无**（`grep -n "concurrency\|terminate"` 只命中 `concurrency` 的文档注释与 `AgentTool.concurrency` 联合类型） |
-| `RpcHostToolDefinition` 字段 | `name/label?/description/parameters/hidden?/loadMode?/readsSkillUris?`——**无** `concurrency`、**无**批次策略 |
-| `packages/coding-agent/src/modes/rpc/host-tools.ts` | `concurrency: "shared" | "exclusive" = "shared"` 仍**硬编码** |
+- `batchToolCalls(assistantMessage)` 取消息内**全部** `toolCall` 块；`batchAdmissionEntries(...)` 用与派发相同的工具解析给出 `{name, sole}`；pre-dispatch 准入与执行期守卫**共用**同一裁决（`soleBatchRejectionReason`）。
+- 效果：`[Cursor 已执行调用, sole]` 现在**会被判定为多调用批次并整批拒绝**——sole 工具不执行、loop 不重复执行 Cursor 调用、无 `tool_execution_start`、无 host call；被派发的调用按顺序得到 blocked 结果。
+- 诚实边界（测试内注明）：Cursor 调用**已在上游执行**、其结果由上游缓冲发出；本补丁只保证 loop 不再重复执行它，不保证"整批零副作用"。
 
-结论：能力缺口在最新 main 上依然存在，补丁不是"回移已上游修复的功能"，而是本项目自持的 patch level。
+### 3.2 speculative 预执行门禁
 
-## 3. 补丁内容与契约映射（A-E）
+- 当该 provider 调用的活动工具表里存在 `batchPolicy: "sole"` 的工具时，本 provider 调用**不创建投机协调器**：不 admit 候选、不开启 stream 影子单元，因此批次判定之前不可能有任何投机物理执行。
+- 影响（必须明示）：注册了过渡工具的会话（Plan/Goal 模式）失去 `read`/`eval` 投机预执行；未声明 sole 工具的会话（含 OMP 自身全部既有测试）行为不变。普通批次、并发调度、steering、provider replay、host cancel 均未改动。
 
-`app/patches/oh-my-pi/0001-rpc-host-tool-transition-contract.patch`（10 文件，907 insertions / 30 deletions；`sha256 4351025dbb8bf7b6a7b58dacfcabc8b61f86710d19c0f1219483ffe25aea2b24`，52556 字节）：
+### 3.3 批次拒绝语义（保留）
 
-| 文件 | 改动 |
-| --- | --- |
-| `packages/agent/src/types.ts` | `AgentTool.batchPolicy?: "any" \| "sole"`；`AgentToolResult.terminate?: boolean`；`AfterToolCallResult.terminate?: boolean`（含语义文档注释） |
-| `packages/agent/src/agent-loop.ts` | 批次准入（纯函数 `soleBatchRejectionReason`）、阻断路径不产生 `tool_execution_start`、`terminate` 规范化与合并、批次结算后终止 run、partial 永不带 `terminate` |
-| `packages/agent/src/telemetry.ts` | `recordSkippedTool` 状态联合加入 `"blocked"`（run collector 本就统计该状态） |
-| `packages/coding-agent/src/modes/rpc/rpc-types.ts` | `RpcHostToolDefinition.concurrency`/`batchPolicy` 声明与语义文档；`RpcHostToolResult.result`/`isError` 的 terminate 契约 |
-| `packages/coding-agent/src/modes/rpc/host-tools.ts` | `normalizeHostToolPolicy`（唯一校验实现）、adapter 应用声明、`setTools` 先建后提交（拒绝不留半注册）、`handleResult` 保留 `terminate` 并组合错误位 |
-| `packages/coding-agent/src/modes/rpc/rpc-mode.ts` | `set_host_tools` 归一化调用 `normalizeHostToolPolicy`（非法值整请求拒绝） |
-| `packages/coding-agent/src/modes/rpc/rpc-client.ts` | SDK 侧 host 工具定义透传两个新字段 |
-| `docs/rpc.md` | 运行时自带文档同步（字段、批次语义、终止语义、partial 不终止） |
-| `packages/agent/test/agent-loop.test.ts` | 12 项新测试（见 §4） |
-| `packages/coding-agent/test/rpc-host-tools.test.ts` | 4 项新测试（见 §4） |
+含 sole 工具且调用数 ≠ 1 时整批拒绝：不调度、零 `tool_execution_start`、零 host call、按调用顺序逐个 blocked 错误结果，且**不触发审批/扩展钩子**（PI 的顺序：批次守卫先于扩展钩子，`runtime.ts:2225-2234` 之前的 `beforeToolCall` 分支）。
 
-契约要求逐条落地：
+### 3.4 RPC 边界严格校验（F2 与附加项）
 
-- **A（并发声明）**：`concurrency?: "shared" | "exclusive"`，省略 → `"shared"`（既有行为不变）；非法值在可信边界 fail closed——`set_host_tools` 整请求报错，**绝不静默变 shared**。校验只有一份实现（`normalizeHostToolPolicy`），命令路径与 adapter 路径都调用它，`RpcHostToolBridge.setTools` 先构建 adapter 再提交定义表，被拒绝的声明不会留下半注册状态。
-- **B（批次唯一策略）**：`batchPolicy: "sole"`（通用命名，与桌面产品/工具名无关）。批次含该工具且调用数 ≠ 1 时**整批拒绝**：不调度、不执行、**零 `tool_execution_start`**、零 `host_tool_call`、零副作用；每个调用（含未知工具名与非法参数兄弟）都得到同一句 reason 的 blocked 错误结果，**按调用顺序**产出，保证 provider 的 tool_use/tool_result 配对完整。准入判定发生在 `beforeToolCall` 之前（PI 的顺序）：被拒批次不会触发审批/扩展钩子，因此不会为一个永不执行的调用弹卡。
-- **C（终止）**：`AgentToolResult.terminate` 与 `afterToolCall` override 都可携带；批次结算后只要最终结果要求 terminate，run 在**下一次 provider 请求之前**结束，成功与错误结果同样适用，普通结果行为不变。终止**不是 abort**：`stopReason` 不被改写为 `aborted`，`onTurnEnd` 收到 `willContinue:false` 且 `signal.aborted === false`；队列中的 steering 保留给下一次 run（与外部中断一致）。
-- **D（RPC 透传）**：`host_tool_result.result.terminate` 原样进入 agent loop。组合行为明确：`isError = frame.isError || result.isError`；frame 顶层 `isError` 且 result 要求 terminate 时**解析**为 `{isError:true, terminate:true}`（抛错无法携带该标志），否则维持既有"拒绝并抛出文本"契约。流式 `host_tool_update` 的 partial 永不终止：bridge 原样转发，loop 在归一化时剥离 `terminate`，只有结算结果参与终止判定。
-- **E（不回归）**：既有 OMP 工具并发（shared/exclusive/函数式）、steering（含批内软信号）、synthetic/skip 结果、provider replay、host cancel（按 `targetId`）路径均未改动；`concurrency` 默认与既有硬编码值一致。
+- `concurrency`/`batchPolicy` 只有**省略**（`undefined`）才取默认值；JSON `null` 及任何非法值使整个 `set_host_tools` 请求被拒绝，且不会留下半注册集合（`normalizeHostToolPolicy` + `setTools` 先建后提交）。
+- `host_tool_result.result.terminate` 必须是可选 JSON boolean：非 boolean 帧在 `isRpcHostToolResult` 被拒（作为未知命令 fail closed），直接调用 bridge 时也会以错误终结该调用，绝不按真值转换为终止。
+
+### 3.5 terminate 透传（保留）
+
+`AgentToolResult.terminate` / `afterToolCall` override → 批次结算后结束 run，成功与错误同样适用、非 abort（不改写 `stopReason`、`signal.aborted === false`、steering 保留）；`host_tool_result.result.terminate` 原样进 loop 并对顶层 `isError` 组合为 `frame.isError || result.isError`；流式 partial 永不终止。
 
 ## 4. 交付物
 
 | 位置 | 内容 |
 | --- | --- |
-| `app/patches/oh-my-pi/0001-rpc-host-tool-transition-contract.patch` | 补丁本体（可用 `git apply --check` 在固定子模块干净副本上通过） |
-| `app/patches/oh-my-pi/manifest.json` | base SHA、期望版本、patch SHA-256/字节数、能力标识、契约字段、验证入口 |
-| `app/scripts/omp-patch.mjs` | 唯一应用入口：manifest/checksum/base 校验 → 安全 scratch → 应用 → 可选 `--prepare-build` → 可选 `--verify` → finally 清理 |
-| `app/apps/desktop/test/omp-patch.test.mjs` | 12 项脚本正向/负向测试（错误 SHA、版本不符、checksum、应用失败、已有目录、符号链接、越界目标、patch 路径逃逸、参数组合、凭据不外泄、payload 符号链接相对性） |
-| `app/experiments/omp-bridge/t20-feasibility.mjs` | 双轨 spike：默认未补丁（`results/t20-feasibility.json`），`--patched` 走补丁 scratch（`results/t20-feasibility-patched.json`） |
-| `app/docs/adr/0305-pinned-runtime-patch-set.md`、`app/docs/spec/03-runtime/02-agent-runtime.md` §15 | 决策与运行时契约（英文） |
+| `app/patches/oh-my-pi/0001-rpc-host-tool-transition-contract.patch` | 补丁本体（10 文件；`sha256 378c3d6b91e4e1a60974ee4dc8805b709d71aa1671e7c5831d9cd7fe954ea5c7`，72885 字节） |
+| `app/patches/oh-my-pi/manifest.json` | base SHA、版本、patch SHA-256/字节数、能力标识、**status（not-strict + 阻塞原因 + 已撤回声明）** |
+| `app/scripts/omp-patch.mjs` | 唯一应用入口：manifest/checksum/base 校验（schemaVersion 仅接受 1）、**canonical 目标解析**、安全 scratch、应用、`--prepare-build`、`--verify`（进程组回收）、finally 清理 |
+| `app/apps/desktop/test/omp-patch.test.mjs` | **17 项**脚本正向/负向测试（含父级符号链接越界、缺失参数值、未知 schemaVersion、孙进程回收） |
+| `app/experiments/omp-bridge/t20-feasibility.mjs` | 双轨 spike（未补丁 / `--patched`），结果分别落 `results/t20-feasibility.json`、`results/t20-feasibility-patched.json` |
 
-新增 OMP 测试（补丁内）：
+新增 OMP 测试（补丁内）：`packages/agent/test/agent-loop.test.ts` 新增 4 项（Cursor-resolved sibling 计入批次并整批拒绝；speculation 两种顺序下都不启动候选；无 sole 工具时投机照常工作的对照）；`packages/coding-agent/test/rpc-host-tools.test.ts` 新增 3 项（null 策略在 bridge 与 `set_host_tools` 边界都被拒且不留半注册、非 boolean terminate 被拒且不被强转）。
 
-- `packages/agent/test/agent-loop.test.ts`（+12）：sole 工具单独调用可执行；`[sideEffect, sole]`、`[sole, sideEffect]`、`[sole, sole]`、`[unknown, sole]`、`[invalidArgs, sole]` 五种批次**整批零执行 + 零 `tool_execution_start` + 顺序稳定 + 全 blocked**；被拒批次不触发 pre-dispatch 钩子而单独调用会触发；默认 shared 与显式 exclusive 调度；成功 terminate 无下一次 provider 请求且非 aborted；错误 terminate 同样；普通结果继续；`afterToolCall` 可请求也可撤销 terminate；流式 partial 的 terminate 被忽略。
-- `packages/coding-agent/test/rpc-host-tools.test.ts`（+4）：声明映射到 adapter（省略 → `shared`/`any`）；非法声明抛错且不留半注册；terminate 透传 + 三层错误组合（成功/`result.isError`/顶层 `isError`/无 terminate 的既有拒绝路径）；update 帧不结算调用、迟到 update 被忽略。
-- RpcClient 侧新增"自定义工具的调度与批次声明跨线上帧"测试（SDK 定义 → 服务器收到）。
+## 5. 证据（返修轮，全部实跑）
 
-## 5. 证据（命令与结果）
-
-环境：`source /home/vv/.nvm/nvm.sh` 后使用 Node v24.14.0；`PATH` 含 `~/.bun/bin`（Bun 1.4.2）。全部使用 fake provider/本地夹具，**未调用任何付费或远程模型**。
+环境：Node v24.14.0（nvm）、Bun 1.4.2；全部使用 fake provider/本地夹具，未调用付费或远程模型。
 
 | 命令（工作目录） | 结果 |
 | --- | --- |
-| `node t20-feasibility.mjs`（`app/experiments/omp-bridge/`） | **38/46，失败恰为 8 项 R3 契约**（R3-1×2、R3-2、R3-3、R3-3b、R3-4×2、R3-5）；`results/t20-feasibility.json` 刷新为本次未补丁基线 |
-| `node t20-feasibility.mjs --patched` | **46/46 PASS**（8 项 R3 全绿：同批兄弟零副作用、零 host call/零 execution start、重复提交零执行、成功/失败提交后 0 次后续 provider 请求）；`results/t20-feasibility-patched.json`（与未补丁基线文件分开） |
-| `node scripts/omp-patch.mjs --check`（`app/`） | `OMP-PATCH-OK d49918f+omp-desktop.1`；base/version/checksum 校验通过；固定提交 tracked 文件 7518 个；scratch 已清理 |
-| `node scripts/omp-patch.mjs --apply --out <dir> --prepare-build --verify`（`app/`） | 9.6 秒完成；launcher 报 `18.2.7`，树内 `bun test packages/agent/test/agent-loop.test.ts packages/coding-agent/test/rpc-host-tools.test.ts` 通过；payload=toplevel `node_modules` + `packages/natives/native` + `tool-views.generated.js` |
-| `node --test apps/desktop/test/omp-patch.test.mjs`（`app/`） | **12 通过 / 0 失败** |
-| `bun test packages/agent/test/agent-loop.test.ts packages/coding-agent/test/rpc-host-tools.test.ts packages/coding-agent/test/rpc-input-frame.test.ts`（补丁树 `/tmp/omp-verify-tree`） | **164 通过 / 0 失败**（139 + 10 + 15） |
-| `bun test`（补丁树 `packages/agent/`，全量） | **未跑完（不计入证据）**：运行 6 分钟后卡在既有夹具 `packages/coding-agent/test/fixtures/delayed-tool-mcp.ts` 的子进程上，已中止并显式终止该夹具进程组。本补丁未触碰该夹具，但**不声称该全量套件通过**；跨包全量运行需要夹具子进程回收（见 §7）。早前在等价开发树（同样打过本补丁、仅 scratch 布局不同）跑同一条命令曾在 11.6 秒内完成 637/637，但**该次观测不作为本阶段任何配置的通过证据** |
-| `bun run check:types`（补丁树 `packages/agent/`） | 0 错误 |
-| `bun run check:types`（补丁树 `packages/coding-agent/`） | 仅 `test/judgment-chain.test.ts(296,52)` 的 `fetch/preconnect` 预存在错误；**在未改动的固定检出上逐字复现**，与补丁无关 |
-| `bun run lint`（agent）与 `bunx oxlint src/modes/rpc test/rpc-host-tools.test.ts`（coding-agent） | 0 问题 |
-| `bunx oxfmt --check`（补丁树 9 个改动文件） | 全部符合格式 |
-| `node --test apps/desktop/test/{plan-drain-engine-gate,omp-session-configure,engine-router,plan-artifact-contract,plan-mode-source-contract}.test.mjs`（`app/`） | **37 通过 / 0 失败**（T20 定向基线计数一致；需先备好 app 依赖与 workspace `dist`） |
-| `node scripts/check-t20-matrix-ids.mjs`（`app/`） | `MATRIX-ID-OK: B1-B14, C1-C8, D1-D3 each appear exactly once`，退出 0 |
-| `node scripts/check-omp-plan-goal-gaps.mjs`（`app/`） | SKIP，退出 0（opt-in 未启用） |
-| `OMP_T20_GAP_PROBE=1 node scripts/check-omp-plan-goal-gaps.mjs`（`app/`） | **3 个缺口仍开放（g1/g2/g3，归属 T20-B/C），退出 1**——本轮只解除 OMP 底层能力，产品侧缺口诊断保持红灯，未静态假绿 |
-| `biome lint`（`app/`，配置面 75 文件） | 0 问题；新增的 `scripts/omp-patch.mjs`、`apps/desktop/test/omp-patch.test.mjs`、`experiments/**` **不在 `biome.json` 的 `files.includes` 面内**（与既有 `check-*`/实验脚本同），改以 `node --check` 兜底 |
-| `node --check`（3 个改动的 `.mjs`） | 全部通过 |
-| `git diff --check`（根） | 0 |
+| `node t20-feasibility.mjs`（`app/experiments/omp-bridge/`） | **38/46**，失败恰为 8 项 R3 契约（未补丁基线，`results/t20-feasibility.json`） |
+| `node t20-feasibility.mjs --patched` | **46/46**（全新 scratch 树）——**仅证明 loop 可控路径**：批次拒绝、零 host call/零 execution start、提交成功/失败后 0 次后续 provider 请求；**不构成 R3 解除依据**（该 spike 的 fake provider 不产生 Cursor exec 通道，也不启用工具投机；相关路径由 §3.1/§3.2 的单元测试覆盖） |
+| `bun test packages/agent/test/agent-loop.test.ts`（补丁树） | 143 通过 / 0 失败 |
+| `bun test packages/coding-agent/test/rpc-host-tools.test.ts`（补丁树） | 13 通过 / 0 失败 |
+| `bun test packages/agent/test/agent-loop.test.ts packages/coding-agent/test/rpc-host-tools.test.ts packages/coding-agent/test/rpc-input-frame.test.ts`（补丁树，合并） | **171 通过 / 0 失败**（143 + 13 + 15） |
+| `node --test apps/desktop/test/omp-patch.test.mjs`（`app/`） | **17 通过 / 0 失败** |
+| `node scripts/omp-patch.mjs --check --json` | 通过：`patchLevel d49918f+omp-desktop.1`、`patchSha256 e08ca7fff29bbd03e298f4488888b2692adda1486e3fff80536a31dd8af6fd5c`、追踪文件 7518、scratch 清理 |
+| `node scripts/omp-patch.mjs --apply --out <dir> --prepare-build --verify` | 通过，7.7 秒：launcher 报 **18.2.7**；树内 agent-loop + rpc-host-tools **156 通过 / 0 失败**；异常/超时按进程组回收 |
+| `bun run check:types`（补丁树 agent / coding-agent） | agent 0 错误；coding-agent 仅 `test/judgment-chain.test.ts(296,52)` 预存在错误（未改动固定检出逐字复现） |
+| `bun run lint` / `bunx oxlint` / `bunx oxfmt --check` | oxlint 0 问题；改动面 9 个**代码**文件全部符合 oxfmt 格式 |
+| `bunx oxfmt --check docs/rpc.md`（固定基线未改文件） | **基线即不符合**（上游该 markdown 自身未按 oxfmt 排版）：因此**不对其做全文件重排**，只手工追加 42 行同风格内容（`git diff --numstat` 为 `42+/0-`）；同理，本轮曾误跑 oxfmt 使其膨胀到 86650 字节，已回退并重新生成（现 72978 字节）。逐文件 hunk 与删除行审计见 §6 |
+| `biome lint`（`app/`，配置面 75 文件） | 0 问题（新增脚本与实验文件不在 `biome.json` 的 `files.includes` 面内，以 `node --check` 兜底） |
+| `node --check`（新增/修改 `.mjs`） | 全部通过 |
+| `git diff --check ba7806c0646180b2b40a83fa998f2437295174af..HEAD` | exit 0（`.patch` artifact 的作用域 whitespace 豁免，见 §6；返修前该命令 exit 2 / 34 行报错） |
+| `git show --check HEAD` | exit 0 |
+| T20 定向 37 项 / 矩阵 lint / gap 诊断 | 37/37；`MATRIX-ID-OK` exit 0；`OMP_T20_GAP_PROBE=1` 报 **3 缺口（g1/g2/g3 归属 T20-B/C）exit 1**——产品侧缺口保持红灯，未静态假绿 |
 
-### 5.1 OMP 未补丁基线回归（同一环境，固定子模块）
+## 6. 边界与安全修复（复审附加项）
 
-| 命令（`upstream/oh-my-pi/`） | 结果 |
-| --- | --- |
-| `bun test packages/agent/test/agent-loop.test.ts`（补丁前基线检出） | 126 通过 / 0 失败（补丁后为 139） |
-| `bun test packages/coding-agent/test/rpc-host-tools.test.ts` | 5 通过 / 0 失败（补丁后为 10） |
-
-### 5.2 R2 字节数的 1 字节漂移（如实记录）
-
-本次未补丁 spike 的 R2 记录为 `prefixBytes=14431/14431/14435`、`systemBytes=14607/16157/16591`，而 T20-A 文档记录为 `14432/14432/14436`、`14608/16158/16592`。原因已定位并实测：系统提示里包含**当前 worktree 的 `AGENTS.md` 绝对路径**（`keep in sync: /home/vv/person/code/omp-desktop-m5-**t20**/AGENTS.md` → 本轮为 `...-m5-**r3**`，恰好短 1 字节），与本补丁无关。对照实验：本轮在**同一 worktree** 内分别以"带 `batchPolicy`/`concurrency` 声明的 host tool 定义"和"不带"运行 R4-4，三次 prompt 的 system 文本**逐字节相同**（16591 字节），证明新字段不进入模型提示词。
-
-## 6. 脚本安全性与踩坑记录
-
-- **目标目录**：`--out` 必须不存在或为空目录；拒绝符号链接、拒绝源码检出内部、拒绝仓库根/应用根/cwd 自身与其祖先、"不得包含"被保护路径；`--check` 不产生任何输出目录。
-- **异常清理**：任何失败路径（校验、复制、`git apply --check`、应用、构建准备、验证）都在 `finally` 语义下删除本次创建的 scratch；脚本自带测试用独立 `TMPDIR` 断言"零残留"。
-- **符号链接必须逐字复制（实测踩坑）**：`fs.cpSync` 默认会把符号链接**改写为指向源检出的绝对路径**，于是 `node_modules/@oh-my-pi/*` 会解析回**未补丁**的 workspace——树"看起来打了补丁实际跑旧代码"。修复为 `verbatimSymlinks: true`，并新增回归测试（payload 复制后 `node_modules/@fixture/example` 仍是相对链接）。该 bug 是被 §5 的双轨计数抓出来的：首次 `--patched` 仍是 38/46。
-- **不打印凭据**：脚本只打印路径、哈希、命令名；测试用 `MY_API_KEY=canary-...` 断言 stdout/stderr 不含该值。验证子进程使用隔离 `HOME`/配置目录并剥离凭据类环境变量。
+- **F1 目标目录 canonical 化**：先取最近存在父目录并 `realpath`；**父级经符号链接到达的目标一律拒绝**（例：`/tmp/link -> /protected` 时 `--out /tmp/link/new-tree` 被拒，`/protected` 未被写入也未被删除；指向 source 检出/仓库根同理），拒绝后仍对 canonical 目标做保护路径、自身符号链接、非空目录检查，创建/复制/清理都使用 canonical 路径。回归测试用真实符号链接断言"链接目标未被写入且未被删除"。
+- **参数缺值**：`--out`/`--manifest`/`--source` 缺少值时报参数错误（exit 2），不再把末尾 `--out` 当成未提供并偷偷走临时 apply。
+- **manifest schemaVersion**：只接受脚本明确支持的 `1`，其它值 fail closed（回归测试 99 → 拒绝）。
+- **`--verify` 进程组回收**：`runReaped` 以 `detached` 建组，超时按 SIGTERM→SIGKILL 升级杀整组，直接子进程结束后再对整组补杀一次；回归测试用一个"生成孙进程后挂起"的夹具，断言超时后孙进程确实消失（不再出现 `delayed-tool-mcp.ts` 式残留）。`verifyPatchedTree` 的两个子步骤都走该通道。
+- **`.patch` artifact 的 whitespace**：`app/.gitattributes` 仅对 `patches/oh-my-pi/*.patch` 关闭 whitespace 检查（patch 载荷行天然是"diff 标记 + 原缩进"），普通源码检查未放宽；`git diff --check <base>..HEAD` 与 `git show --check HEAD` 均为 exit 0。
+- 凭据不外泄：脚本只打印路径/哈希/命令名；测试用 `MY_API_KEY=canary-…` 断言输出不含该值；验证子进程使用隔离 HOME 并剥离凭据类变量。
+- **不做大面积机械重排**：`docs/rpc.md` 在固定基线上就不符合 `oxfmt`，因此本补丁不对它（或任何其它上游文件）做全文件格式化；新增/修改片段按文件既有风格手工对齐。修复轮逐文件审计：`docs/rpc.md 42+/0-`、`agent-loop.ts 188+/24-`、`agent-loop.test.ts 635+/1-`、`rpc-host-tools.test.ts 329+/1-`、`host-tools.ts 85+/5-`、其余 1-30 行；全部 25 行删除都是本轮被替换的实现/断言行，无无关改动。返回码：`git diff --check <base>..HEAD` 与 `git show --check HEAD` 均 0（F4）。
 
 ## 7. 未做/未声称
 
-- **T20-B/C/D 未开始**：桌面 Plan/Goal UI、模式状态、审批闭环、权限模式传播、`planSafeActions` 仍未实现；`OMP_T20_GAP_PROBE` 的 g1/g2/g3 仍为 `GAP-OPEN`。
-- **不声称上游支持**：patch level 为 `d49918f+omp-desktop.1`（OMP Desktop 维护），运行时仍报 `omp/18.2.7`；任何"18.2.7 原生支持这些字段"的说法都是错误的。
-- **未改子模块**：两个 gitlink 与工作树 SHA 未变；补丁只存在于父仓库文件与临时 scratch 中。
-- **未打包**：M6/T21 才会用 `--apply --out <dir> --prepare-build` 产出内置运行时；本阶段只做实入口。
-- **全量套件夹具挂起（非补丁结论）**：在补丁树的 `packages/agent` 目录内跑 `bun test`（全量）会卡在既有夹具 `packages/coding-agent/test/fixtures/delayed-tool-mcp.ts` 的子进程上（该文件与本次补丁无关，补丁只改 agent 包源码与 coding-agent 的 RPC host-tool 映射）。本轮以**改动面套件**（`agent-loop.test.ts` 139 + `rpc-host-tools.test.ts` 10 + `rpc-input-frame.test.ts` 15 = 164 项）、agent 包 typecheck/lint/format 与父仓库定向套件作为通过证据；**未声称** agent 包全量套件通过。补丁树运行结束后已显式终止该夹具进程组，无残留进程。
-- 本阶段 spike 未覆盖：真实付费模型、macOS/Windows 平台行为、T20-B 的模式持久化/提示词/审批链路。
+- **R3 仍阻塞**：不得开始 T20-B/C/D；产品侧 gap 诊断保持 3 缺口 exit 1。
+- **不声称上游支持**：patch level 仍是本项目维护的 `d49918f+omp-desktop.1`，运行时仍报 `omp/18.2.7`。
+- **未跑完的套件不得声称通过**：补丁树内 `packages/agent` 全量 `bun test` 曾卡在既有夹具 `delayed-tool-mcp.ts`（本轮已实现并验证进程组回收通道，但未重跑该全量套件）；通过证据只来自改动面套件、typecheck 与父仓库定向套件。
+- 未覆盖：真实付费模型、macOS/Windows 平台行为、T20-B 的模式/审批链路。
 
-## 8. 下一轮入口
+## 8. 解除 R3 的可能路径（供后续决策，不构成本轮承诺）
 
-**M5/T20-B（Plan/Goal 模式状态机、提示词、目录、提交/审批/派发闭环）可以开始**：R3 的解除条件是三条同时满足——(1) patched spike 46/46；(2) OMP 定向/相关单测在补丁树上全绿；(3) 应用脚本 `--check`/`--apply --prepare-build --verify` 与父仓库负向测试通过。三条均已满足（§5）。T20-B 必须继续使用 patch level 而非直接改子模块，并在 B 系列验收里覆盖同批阻断与终止的真实产品行为。
+1. 上游或补丁让"过渡工具批次"不再走会预执行的通道：Cursor exec channel 不在会话内预执行、工具投机对这类会话关闭（本补丁已做后者）；
+2. 产品层显式决策：声明 sole 工具的会话禁用 Cursor exec 通道（需要 provider/bridge 侧开关，非 loop 能决定）；
+3. 用户明确接受语义差异：只保证 loop 可控路径（当前补丁的状态），并据此重写验收口径。

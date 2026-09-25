@@ -1,1 +1,5 @@
 * text=auto eol=lf
+# Patch artifacts are diffs of upstream sources: their payload lines begin
+# with a diff marker plus the original indentation, which trips the generic
+# whitespace checks. Scope the exemption to these files only.
+patches/oh-my-pi/*.patch -whitespace

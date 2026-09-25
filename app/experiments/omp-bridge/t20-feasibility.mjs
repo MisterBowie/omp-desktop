@@ -283,7 +283,7 @@ const evidence = await runExperiment(PATCHED ? "t20-feasibility-patched" : "t20-
   if (PATCHED) {
     // Scratch copy of the pinned commit + the OMP Desktop patch set + the
     // per-worktree dependency payload, so the launcher runs from the copy.
-    const prepared = preparePatchedTree({ prepareBuild: true, keep: true });
+    const prepared = await preparePatchedTree({ prepareBuild: true, keep: true });
     ctx.onCleanup(prepared.cleanup);
     const read = (relative) => readFileSync(join(prepared.tree, relative), "utf8");
     launcherOverride = join(prepared.tree, "packages", "coding-agent", "scripts", "omp");

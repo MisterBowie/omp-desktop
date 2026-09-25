@@ -31,7 +31,7 @@
  *   node scripts/omp-patch.mjs --apply --out /tmp/omp-patched --prepare-build --verify
  *   node scripts/omp-patch.mjs --apply --prepare-build --verify --json
  */
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   cpSync,
@@ -41,6 +41,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
 } from "node:fs";
 import { homedir, tmpdir } from "node:os";
@@ -50,6 +51,8 @@ import { fileURLToPath } from "node:url";
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(appRoot, "..");
 const defaultManifest = join(appRoot, "patches", "oh-my-pi", "manifest.json");
+/** The only manifest schema this tool understands; anything else fails closed. */
+const SUPPORTED_MANIFEST_SCHEMA_VERSION = 1;
 
 /** Variables that would steer OMP back to the user's real configuration. */
 const STEER_VARS = [
@@ -121,6 +124,11 @@ export function loadManifest(manifestPath = defaultManifest) {
       throw new PatchError(`manifest field ${field} is missing`);
     }
   }
+  if (manifest.schemaVersion !== SUPPORTED_MANIFEST_SCHEMA_VERSION) {
+    throw new PatchError(
+      `unsupported manifest schemaVersion ${JSON.stringify(manifest.schemaVersion)}; this tool supports ${SUPPORTED_MANIFEST_SCHEMA_VERSION}`,
+    );
+  }
   if (!Array.isArray(manifest.capabilities) || manifest.capabilities.length === 0) {
     throw new PatchError("manifest.capabilities must list at least one capability id");
   }
@@ -170,35 +178,74 @@ export function validateSource(sourceDir, manifest) {
   return { source, head, version };
 }
 
+/** The closest existing directory at or above `target`. */
+function nearestExistingParent(target) {
+  let current = target;
+  for (;;) {
+    if (existsSync(current)) return current;
+    const parent = dirname(current);
+    if (parent === current) return current;
+    current = parent;
+  }
+}
+
 /**
- * A scratch target is refused unless it is a path this script may create or
- * fill: never a symlink, never the source, the repository, their ancestors, or
- * an existing non-empty directory.
+ * Resolve a caller-provided scratch target and refuse anything this script may
+ * not create, fill, or later delete.
+ *
+ * Everything runs on the canonical path: the nearest existing parent is
+ * resolved first, because a symlinked parent would otherwise make `mkdir`, the
+ * copy, and the failure cleanup operate on whatever the link points at (the
+ * example that motivated this: `--out /tmp/link/new-tree` with
+ * `link -> /protected`). A parent reached through a symlink is refused outright
+ * — the caller must pass the real path — and the protected-path and emptiness
+ * checks then apply to the canonical target the script will actually use.
  */
-function assertSafeScratchTarget(target, source) {
+function resolveScratchTarget(target, source) {
   const resolvedTarget = resolve(target);
   if (resolvedTarget === parse(resolvedTarget).root) {
     throw new PatchError("scratch target must not be the filesystem root");
   }
+  if (existsSync(resolvedTarget) && lstatSync(resolvedTarget).isSymbolicLink()) {
+    throw new PatchError(`scratch target must not be a symlink: ${resolvedTarget}`);
+  }
+  const existingParent = nearestExistingParent(resolvedTarget);
+  let canonicalParent;
+  try {
+    canonicalParent = realpathSync(existingParent);
+  } catch (error) {
+    throw new PatchError(`cannot resolve ${existingParent}: ${error.message}`);
+  }
+  if (canonicalParent !== existingParent) {
+    throw new PatchError(
+      `scratch target must not be reached through a symlink: ${existingParent} resolves to ${canonicalParent}`,
+    );
+  }
+  const scrubbed = relative(existingParent, resolvedTarget).split(sep);
+  if (scrubbed.includes("..")) {
+    throw new PatchError(`scratch target escapes its parent: ${resolvedTarget}`);
+  }
+  const canonicalTarget = join(canonicalParent, ...scrubbed);
+
   const forbidden = [source, repoRoot, appRoot, process.cwd()].map((path) => resolve(path));
   for (const path of forbidden) {
-    if (resolvedTarget === path) throw new PatchError(`scratch target must not be ${path}`);
-    if (path.startsWith(resolvedTarget + sep)) {
+    if (canonicalTarget === path) throw new PatchError(`scratch target must not be ${path}`);
+    if (path.startsWith(canonicalTarget + sep)) {
       throw new PatchError(`scratch target must not contain ${path}`);
     }
   }
-  if (resolvedTarget.startsWith(source + sep)) {
-    throw new PatchError(`scratch target must not live inside the source checkout: ${resolvedTarget}`);
+  if (canonicalTarget.startsWith(source + sep)) {
+    throw new PatchError(`scratch target must not live inside the source checkout: ${canonicalTarget}`);
   }
-  if (existsSync(resolvedTarget)) {
-    const stats = lstatSync(resolvedTarget);
-    if (stats.isSymbolicLink()) throw new PatchError(`scratch target must not be a symlink: ${resolvedTarget}`);
-    if (!stats.isDirectory()) throw new PatchError(`scratch target exists and is not a directory: ${resolvedTarget}`);
-    if (readdirSync(resolvedTarget).length > 0) {
-      throw new PatchError(`scratch target exists and is not empty: ${resolvedTarget}`);
+  if (existsSync(canonicalTarget)) {
+    const stats = lstatSync(canonicalTarget);
+    if (stats.isSymbolicLink()) throw new PatchError(`scratch target must not be a symlink: ${canonicalTarget}`);
+    if (!stats.isDirectory()) throw new PatchError(`scratch target exists and is not a directory: ${canonicalTarget}`);
+    if (readdirSync(canonicalTarget).length > 0) {
+      throw new PatchError(`scratch target exists and is not empty: ${canonicalTarget}`);
     }
   }
-  return resolvedTarget;
+  return canonicalTarget;
 }
 
 /** Copy exactly the tracked tree, so the scratch carries no local edits. */
@@ -285,6 +332,67 @@ function isolatedEnv(runRoot) {
   return env;
 }
 
+/**
+ * Run a child in its own process group and reap the whole group once it exits,
+ * times out, or fails to start.
+ *
+ * `verifyPatchedTree` runs the OMP launcher and a `bun test` pass, and those
+ * spawn fixtures with their own children (MCP servers, kernels). A plain
+ * `spawnSync` timeout would kill only the direct child and leave the rest
+ * running, so this escalates SIGTERM -> SIGKILL on the group and sweeps the
+ * group again after the direct child closes.
+ */
+export function runReaped(command, args, options = {}) {
+  const { cwd, env, timeoutMs = 0 } = options;
+  return new Promise((resolvePromise) => {
+    let child;
+    try {
+      child = spawn(command, args, { cwd, env, detached: true, stdio: ["ignore", "pipe", "pipe"] });
+    } catch (error) {
+      resolvePromise({ status: null, signal: null, stdout: "", stderr: "", timedOut: false, error });
+      return;
+    }
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    let settled = false;
+    const killGroup = (signal) => {
+      try {
+        process.kill(-child.pid, signal);
+      } catch {
+        // The group is already empty (or was never created): nothing to reap.
+      }
+    };
+    const timer =
+      timeoutMs > 0
+        ? setTimeout(() => {
+            timedOut = true;
+            killGroup("SIGTERM");
+            setTimeout(() => killGroup("SIGKILL"), 2_000).unref();
+          }, timeoutMs)
+        : undefined;
+    timer?.unref?.();
+    child.stdout?.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    const settle = (result) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolvePromise(result);
+    };
+    child.on("error", (error) => settle({ status: null, signal: null, stdout, stderr, timedOut, error }));
+    child.on("close", (status, signal) => {
+      // The direct child is gone, but its descendants may still hold the group.
+      killGroup("SIGKILL");
+      settle({ status, signal, stdout, stderr, timedOut, error: null });
+    });
+  });
+}
+
 function bunBinary() {
   const override = process.env.BUN_BINARY;
   if (override) return override;
@@ -296,35 +404,36 @@ function bunBinary() {
  * Prove the prepared tree is the patched runtime: the pinned launcher reports
  * the pinned version and the agent + RPC host-tool suites pass inside it.
  */
-export function verifyPatchedTree(tree, manifest) {
+export async function verifyPatchedTree(tree, manifest) {
   const runRoot = mkdtempSync(join(tmpdir(), "omp-patch-verify-"));
   try {
     const launcher = join(tree, "packages", "coding-agent", "scripts", "omp");
-    const probe = spawnSync(launcher, ["--version"], {
+    const probe = await runReaped(launcher, ["--version"], {
       cwd: join(runRoot, "cwd"),
       env: isolatedEnv(runRoot),
-      encoding: "utf8",
-      timeout: 180_000,
+      timeoutMs: 180_000,
     });
-    const reported = /^omp\/(.+)$/m.exec(probe.stdout ?? "")?.[1] ?? null;
+    const reported = /^omp\/(.+)$/m.exec(probe.stdout)?.[1] ?? null;
     if (probe.status !== 0 || reported !== manifest.base.version) {
       throw new PatchError(
-        `patched launcher reported ${reported ?? `(exit ${probe.status})`}, expected ${manifest.base.version}`,
+        `patched launcher reported ${reported ?? `(exit ${probe.status}${probe.timedOut ? ", timed out" : ""})`}, expected ${manifest.base.version}`,
       );
     }
 
-    const tests = spawnSync(
+    const tests = await runReaped(
       bunBinary(),
       ["test", "packages/agent/test/agent-loop.test.ts", "packages/coding-agent/test/rpc-host-tools.test.ts"],
-      { cwd: tree, env: isolatedEnv(runRoot), encoding: "utf8", timeout: 900_000 },
+      { cwd: tree, env: isolatedEnv(runRoot), timeoutMs: 900_000 },
     );
     // Bun prints its summary on stderr when stdout is not a TTY; read both and
     // report the tail that carries the counts.
-    const output = `${tests.stdout ?? ""}\n${tests.stderr ?? ""}`;
+    const output = `${tests.stdout}\n${tests.stderr}`;
     const lines = output.split("\n").map((line) => line.trim()).filter(Boolean);
     const counts = lines.filter((line) => /^\d+ (pass|fail)$/.test(line) || line.startsWith("Ran ")).join(", ");
     if (tests.status !== 0) {
-      throw new PatchError(`patched suites failed (exit ${tests.status}): ${counts || lines.slice(-1)[0] || "no output"}`);
+      throw new PatchError(
+        `patched suites failed (exit ${tests.status}${tests.timedOut ? ", timed out" : ""}): ${counts || lines.slice(-1)[0] || "no output"}`,
+      );
     }
     return { version: reported, testsSummary: counts };
   } finally {
@@ -339,7 +448,7 @@ export function verifyPatchedTree(tree, manifest) {
  * `cleanup()` is idempotent and is the caller's responsibility when `keep` is
  * true. With `keep: false` the tree is removed before returning.
  */
-export function preparePatchedTree(options = {}) {
+export async function preparePatchedTree(options = {}) {
   const { manifest, manifestPath, patchPath } = loadManifest(options.manifestPath ?? defaultManifest);
   const { source } = validateSource(options.source ?? join(repoRoot, "upstream", "oh-my-pi"), manifest);
 
@@ -355,7 +464,7 @@ export function preparePatchedTree(options = {}) {
       tree = mkdtempSync(join(tmpdir(), "omp-patch-"));
       ownedScratch = true;
     } else {
-      tree = assertSafeScratchTarget(options.out, source);
+      tree = resolveScratchTarget(options.out, source);
       mkdirSync(tree, { recursive: true });
       ownedScratch = true;
     }
@@ -363,7 +472,7 @@ export function preparePatchedTree(options = {}) {
     const files = copyTrackedTree(source, tree);
     applyPatchSet(tree, patchPath);
     const payload = options.prepareBuild === true ? copyBuildPayload(source, tree) : [];
-    const verify = options.verify === true ? verifyPatchedTree(tree, manifest) : null;
+    const verify = options.verify === true ? await verifyPatchedTree(tree, manifest) : null;
     if (!keep) {
       cleanup();
       return { tree: null, manifest, manifestPath, patchPath, files, payload, verify, cleanup };
@@ -388,9 +497,13 @@ function parseArgs(argv) {
     else if (arg === "--prepare-build") options.prepareBuild = true;
     else if (arg === "--verify") options.verify = true;
     else if (arg === "--json") options.json = true;
-    else if (arg === "--out") options.out = argv[++index];
-    else if (arg === "--manifest") options.manifestPath = argv[++index];
-    else if (arg === "--source") options.source = argv[++index];
+    else if (arg === "--out" || arg === "--manifest" || arg === "--source") {
+      const value = argv[++index];
+      if (value === undefined) throw new PatchError(`${arg} requires a value`);
+      if (arg === "--out") options.out = value;
+      else if (arg === "--manifest") options.manifestPath = value;
+      else options.source = value;
+    }
     else if (arg === "--help" || arg === "-h") options.mode = "help";
     else throw new PatchError(`unknown argument: ${arg}`);
   }
@@ -404,7 +517,7 @@ function parseArgs(argv) {
   return options;
 }
 
-function main(argv) {
+async function main(argv) {
   let options;
   try {
     options = parseArgs(argv);
@@ -420,7 +533,7 @@ function main(argv) {
 
   const keep = options.mode === "apply" && options.out !== undefined;
   try {
-    const result = preparePatchedTree({
+    const result = await preparePatchedTree({
       manifestPath: options.manifestPath,
       source: options.source,
       out: options.out,
@@ -459,7 +572,13 @@ function main(argv) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  process.exit(main(process.argv.slice(2)));
+  main(process.argv.slice(2)).then(
+    (code) => process.exit(code),
+    (error) => {
+      console.error(`OMP-PATCH-FAIL ${error?.message ?? error}`);
+      process.exit(1);
+    },
+  );
 }
 
 export { BUILD_PAYLOAD, PatchError };

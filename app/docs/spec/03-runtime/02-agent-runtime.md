@@ -1748,7 +1748,7 @@ T19-C delivers desktop skills and project memory through the same trusted gate
   added. T20 (Plan/Goal, real-mode propagation, high-privilege tools, child
   stop/`hasUI` policy) stays closed and unclaimed.
 
-## 15. Pinned runtime patch level (M5/T20-R3A, ADR 0305)
+## 15. Pinned runtime patch level (M5/T20-R3A, ADR 0305) — risk reduction, R3 not lifted
 
 The runtime source stays at the pinned upstream commit; this project's
 additions to it live in `app/patches/oh-my-pi/` as a numbered patch set
@@ -1788,5 +1788,17 @@ none of which names a desktop product:
   `isError = frame.isError || result.isError`.
 
 Evidence, per-track spike counts and the script's negative-path tests are in
-`docs/validation/M5-omp-transition-patch.md`. T20-B/C/D remain unstarted and
-unclaimed by this contract: it removes the runtime blocker only.
+`docs/validation/M5-omp-transition-patch.md`.
+
+**The sole-batch contract is not strict, so R3 is not lifted and T20-B must not
+start.** PI counts every `toolCall` block of the assistant message
+(`upstream/pi-desktop/packages/agent-runtime/src/runtime.ts:2222-2234`). OMP can
+carry a `kCursorExecResolved` block — a call the Cursor exec channel already ran
+during streaming, with its result buffered out of band
+(`packages/ai/src/utils/block-symbols.ts:46-57`,
+`packages/agent/src/agent.ts:1491-1497`). The patch counts that sibling (so the
+batch is still rejected and the loop never re-runs it), and it disables
+speculation for provider calls whose tool set advertises a sole-declared tool,
+but it cannot prevent or retract the execution that already happened — no
+loop-level implementation can. The "R3 lifted / T20-B may start" status from the
+previous commit of this branch is retracted.

@@ -20,11 +20,14 @@ import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import test, { after } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const scriptPath = join(here, "..", "..", "..", "scripts", "omp-patch.mjs");
+const scriptDir = join(here, "..", "..", "..", "scripts");
+const scriptPath = join(scriptDir, "omp-patch.mjs");
+const { runReaped } = await import(pathToFileURL(scriptPath).href);
 const appRoot = join(here, "..", "..", "..");
 
 /** Every temporary directory this file creates, removed in `after`. */
@@ -79,7 +82,7 @@ function makeSourceFixture() {
   return { root, source, sha: git(source, ["rev-parse", "HEAD"]) };
 }
 
-function writeManifest(root, { sha, patchBody = GOOD_PATCH, sha256, patchFile = "0001-test.patch", version = "18.2.7" }) {
+function writeManifest(root, { sha, patchBody = GOOD_PATCH, sha256, patchFile = "0001-test.patch", version = "18.2.7", schemaVersion = 1 }) {
   const patchesDir = join(root, "patches", "oh-my-pi");
   mkdirSync(patchesDir, { recursive: true });
   const patchPath = join(patchesDir, patchFile);
@@ -88,7 +91,7 @@ function writeManifest(root, { sha, patchBody = GOOD_PATCH, sha256, patchFile = 
   writeFileSync(
     manifestPath,
     JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion,
       patchLevel: `${sha.slice(0, 7)}+test.1`,
       base: { sha, version },
       patch: {
@@ -285,6 +288,102 @@ test("refuses a target inside the source checkout or holding the repository", ()
   assert.match(overRepoRoot.stderr, /must not contain /);
 });
 
+test("refuses a target reached through a symlinked parent and never writes or deletes the link target", () => {
+  const fixture = makeSourceFixture();
+  const tmp = mkdtempSync(join(tmpdir(), "omp-patch-tmp-"));
+  scratch.push(tmp);
+  const manifestPath = writeManifest(fixture.root, { sha: fixture.sha });
+
+  // The dangerous shape: the target itself does not exist, so only the parent
+  // link is in the path. Writing (and, on failure, cleaning up) through it would
+  // hit the real directory behind the link.
+  const protectedDir = join(tmp, "protected");
+  mkdirSync(protectedDir);
+  writeFileSync(join(protectedDir, "keep.txt"), "keep me\n");
+  const link = join(tmp, "link-to-protected");
+  symlinkSync(protectedDir, link);
+
+  const viaLink = runScript(
+    ["--apply", "--out", join(link, "new-tree"), "--manifest", manifestPath, "--source", fixture.source],
+    tmp,
+  );
+  assert.equal(viaLink.status, 1);
+  assert.match(viaLink.stderr, /must not be reached through a symlink/);
+  assert.equal(readdirSync(protectedDir).join(","), "keep.txt");
+  assert.equal(readFileSync(join(protectedDir, "keep.txt"), "utf8"), "keep me\n");
+
+  // Same shape pointing at the source checkout, with a patch that fails to
+  // apply: neither the source nor the link target may be touched, and the
+  // failure must not delete anything behind the link.
+  const stalePath = writeManifest(fixture.root, { sha: fixture.sha, patchBody: STALE_PATCH, patchFile: "0002-stale.patch" });
+  const intoSource = join(tmp, "link-to-source");
+  symlinkSync(fixture.source, intoSource);
+  const sourceListing = readdirSync(fixture.source).sort();
+  const viaSourceLink = runScript(
+    ["--apply", "--out", join(intoSource, "tree"), "--manifest", stalePath, "--source", fixture.source],
+    tmp,
+  );
+  assert.equal(viaSourceLink.status, 1);
+  assert.match(viaSourceLink.stderr, /must not be reached through a symlink/);
+  // Nothing behind the link was created or removed.
+  assert.deepEqual(readdirSync(fixture.source).sort(), sourceListing);
+  assert.equal(existsSync(join(fixture.source, "tree")), false);
+  assert.equal(git(fixture.source, ["status", "--porcelain"]), "");
+  assert.deepEqual(readdirSync(protectedDir), ["keep.txt"]);
+});
+
+test("creates a missing nested target and accepts an existing empty one", () => {
+  const fixture = makeSourceFixture();
+  const tmp = mkdtempSync(join(tmpdir(), "omp-patch-tmp-"));
+  scratch.push(tmp);
+  const manifestPath = writeManifest(fixture.root, { sha: fixture.sha });
+
+  const nested = join(tmp, "a", "b", "c");
+  const created = runScript(
+    ["--apply", "--out", nested, "--manifest", manifestPath, "--source", fixture.source, "--json"],
+    tmp,
+  );
+  assert.equal(created.status, 0, created.stderr);
+  assert.equal(JSON.parse(created.stdout.trim()).tree, nested);
+  assert.equal(readFileSync(join(nested, "src", "example.ts"), "utf8"), "export const value = 2;\n");
+
+  const empty = join(tmp, "empty-target");
+  mkdirSync(empty);
+  const accepted = runScript(
+    ["--apply", "--out", empty, "--manifest", manifestPath, "--source", fixture.source, "--json"],
+    tmp,
+  );
+  assert.equal(accepted.status, 0, accepted.stderr);
+  assert.equal(readFileSync(join(empty, "src", "example.ts"), "utf8"), "export const value = 2;\n");
+});
+
+test("rejects a flag whose value is missing instead of silently applying to a temp tree", () => {
+  const fixture = makeSourceFixture();
+  const tmp = mkdtempSync(join(tmpdir(), "omp-patch-tmp-"));
+  scratch.push(tmp);
+  const manifestPath = writeManifest(fixture.root, { sha: fixture.sha });
+
+  for (const flag of ["--out", "--manifest", "--source"]) {
+    const result = runScript(["--apply", "--manifest", manifestPath, "--source", fixture.source, flag], tmp);
+    assert.equal(result.status, 2, `${flag}: ${result.stderr}`);
+    assert.match(result.stderr, new RegExp(`${flag} requires a value`));
+    assert.deepEqual(leftovers(tmp), []);
+  }
+});
+
+test("rejects an unsupported manifest schema version", () => {
+  const fixture = makeSourceFixture();
+  const tmp = mkdtempSync(join(tmpdir(), "omp-patch-tmp-"));
+  scratch.push(tmp);
+  const manifestPath = writeManifest(fixture.root, { sha: fixture.sha, schemaVersion: 99 });
+
+  const result = runScript(["--check", "--manifest", manifestPath, "--source", fixture.source], tmp);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /unsupported manifest schemaVersion 99/);
+  assert.deepEqual(leftovers(tmp), []);
+});
+
 test("refuses a manifest whose patch escapes the patch directory", () => {
   const fixture = makeSourceFixture();
   const tmp = mkdtempSync(join(tmpdir(), "omp-patch-tmp-"));
@@ -322,6 +421,43 @@ test("rejects unusable argument combinations without touching anything", () => {
   assert.equal(unknown.status, 2);
   assert.match(unknown.stderr, /unknown argument: --frobnicate/);
   assert.deepEqual(leftovers(tmp), []);
+});
+
+test("reaps the whole process group when a verification child times out", async () => {
+  const tmp = mkdtempSync(join(tmpdir(), "omp-patch-tmp-"));
+  scratch.push(tmp);
+  const pidFile = join(tmp, "grandchild.pid");
+  const fixture = join(tmp, "hang.mjs");
+  // A verification child that spawns its own long-lived child (the shape of the
+  // OMP test fixtures: MCP servers, kernels) and then never exits. A plain
+  // spawnSync timeout would kill only the parent and leave the grandchild.
+  writeFileSync(
+    fixture,
+    [
+      'import { spawn } from "node:child_process";',
+      'import { writeFileSync } from "node:fs";',
+      'const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });',
+      `writeFileSync(${JSON.stringify(pidFile)}, String(child.pid));`,
+      "setInterval(() => {}, 1000);",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await runReaped(process.execPath, [fixture], { cwd: tmp, env: process.env, timeoutMs: 1_500 });
+
+  assert.equal(result.timedOut, true);
+  const grandchildPid = Number(readFileSync(pidFile, "utf8"));
+  assert.ok(grandchildPid > 0, "fixture did not report its grandchild");
+  let alive = true;
+  for (let attempt = 0; attempt < 60 && alive; attempt += 1) {
+    await new Promise(resolvePromise => setTimeout(resolvePromise, 50));
+    try {
+      process.kill(grandchildPid, 0);
+    } catch {
+      alive = false;
+    }
+  }
+  assert.equal(alive, false, `grandchild ${grandchildPid} survived the reaped timeout`);
 });
 
 test("never prints inherited credential values", () => {

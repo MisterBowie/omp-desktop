@@ -1,7 +1,7 @@
 {
   "experiment": "t20-feasibility",
   "runId": null,
-  "startedAt": "2026-09-25T13:56:49.638Z",
+  "startedAt": "2026-09-25T14:26:05.738Z",
   "checks": [
     {
       "description": "s1-mixed-bash-first: process group reaped",
@@ -73,7 +73,7 @@
     {
       "description": "R3-d: abandoning a pending transition call cancels it by targetId",
       "ok": true,
-      "detail": "cancel.targetId=158d84135bf4ac17 call.id=158d84135bf4ac17"
+      "detail": "cancel.targetId=158d8ac504a7c8a3 call.id=158d8ac504a7c8a3"
     },
     {
       "description": "R3-d: the aborted turn terminates",
@@ -83,7 +83,7 @@
     {
       "description": "R3-d: the session stays observable after the abort",
       "ok": true,
-      "detail": "{\"id\":\"req-b92c16fd\",\"type\":\"response\",\"command\":\"get_state\",\"success\":true,\"data\":{\"model\":{\"id\":\"local-model\",\"name\":\"local-model\",\"api\":\"openai-completions\",\"provider\":\"m1fake\",\"baseUrl\":\"http://12"
+      "detail": "{\"id\":\"req-a83ef0f7\",\"type\":\"response\",\"command\":\"get_state\",\"success\":true,\"data\":{\"model\":{\"id\":\"local-model\",\"name\":\"local-model\",\"api\":\"openai-completions\",\"provider\":\"m1fake\",\"baseUrl\":\"http://12"
     },
     {
       "description": "s7-abort-on-intercept: process group reaped",
@@ -276,13 +276,13 @@
     },
     "s6.observed": {
       "pendingCall": {
-        "id": "158d84135bf4ac17",
+        "id": "158d8ac504a7c8a3",
         "toolName": "SubmitPlan"
       },
       "hostToolCancel": {
         "type": "host_tool_cancel",
-        "id": "158d84140ff4ac18",
-        "targetId": "158d84135bf4ac17"
+        "id": "158d8ac5b8e7c8a4",
+        "targetId": "158d8ac504a7c8a3"
       },
       "agentEndCount": 1,
       "providerRequests": 1,
@@ -329,7 +329,7 @@
     "s7.observed": {
       "abortEvents": [
         {
-          "at": 1790344628691,
+          "at": 1790346383280,
           "event": "spike_abort_requested",
           "toolName": "SubmitPlan",
           "hadAbort": true
@@ -637,6 +637,6 @@
     "A mixed batch containing a transition tool is the exact case PI's beforeToolCall batch guard exists for; the patched track enforces it (`--patched`).",
     "Abort-on-intercept is the only per-batch lever the fixed surface offers; if it works it is abort semantics, not PI's block-and-continue."
   ],
-  "finishedAt": "2026-09-25T13:57:28.333Z",
+  "finishedAt": "2026-09-25T14:26:42.224Z",
   "ok": false
 }

@@ -1,7 +1,7 @@
 {
   "experiment": "t20-feasibility-patched",
   "runId": null,
-  "startedAt": "2026-09-25T13:56:08.544Z",
+  "startedAt": "2026-09-25T14:29:58.557Z",
   "checks": [
     {
       "description": "s1-mixed-bash-first: process group reaped",
@@ -73,7 +73,7 @@
     {
       "description": "R3-d: abandoning a pending transition call cancels it by targetId",
       "ok": true,
-      "detail": "cancel.targetId=158d83ed3e525a75 call.id=158d83ed3e525a75"
+      "detail": "cancel.targetId=158d8ba9ded64aaf call.id=158d8ba9ded64aaf"
     },
     {
       "description": "R3-d: the aborted turn terminates",
@@ -83,7 +83,7 @@
     {
       "description": "R3-d: the session stays observable after the abort",
       "ok": true,
-      "detail": "{\"id\":\"req-f07239f2\",\"type\":\"response\",\"command\":\"get_state\",\"success\":true,\"data\":{\"model\":{\"id\":\"local-model\",\"name\":\"local-model\",\"api\":\"openai-completions\",\"provider\":\"m1fake\",\"baseUrl\":\"http://12"
+      "detail": "{\"id\":\"req-b1a27f70\",\"type\":\"response\",\"command\":\"get_state\",\"success\":true,\"data\":{\"model\":{\"id\":\"local-model\",\"name\":\"local-model\",\"api\":\"openai-completions\",\"provider\":\"m1fake\",\"baseUrl\":\"http://12"
     },
     {
       "description": "s7-abort-on-intercept: process group reaped",
@@ -227,7 +227,7 @@
         "agent-tool-result-terminate",
         "rpc-host-tool-result-terminate"
       ],
-      "launcher": "/tmp/omp-patch-kJhcvY/packages/coding-agent/scripts/omp",
+      "launcher": "/tmp/omp-patch-LZdRLQ/packages/coding-agent/scripts/omp",
       "carriesPatch": {
         "batchPolicy": true,
         "concurrency": true,
@@ -275,13 +275,13 @@
     },
     "s6.observed": {
       "pendingCall": {
-        "id": "158d83ed3e525a75",
+        "id": "158d8ba9ded64aaf",
         "toolName": "SubmitPlan"
       },
       "hostToolCancel": {
         "type": "host_tool_cancel",
-        "id": "158d83edf2d25a76",
-        "targetId": "158d83ed3e525a75"
+        "id": "158d8baa93564ab0",
+        "targetId": "158d8ba9ded64aaf"
       },
       "agentEndCount": 1,
       "providerRequests": 1,
@@ -622,6 +622,6 @@
     }
   },
   "limitations": [],
-  "finishedAt": "2026-09-25T13:56:49.565Z",
+  "finishedAt": "2026-09-25T14:30:36.850Z",
   "ok": true
 }

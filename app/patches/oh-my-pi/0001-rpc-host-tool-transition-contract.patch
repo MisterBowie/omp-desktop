@@ -1,8 +1,8 @@
 diff --git a/docs/rpc.md b/docs/rpc.md
-index b91b20a85a..d67a41816c 100644
+index b91b20a85a..845a1c8561 100644
 --- a/docs/rpc.md
 +++ b/docs/rpc.md
-@@ -442,6 +442,21 @@ Definitions also accept `hidden?: boolean` and
+@@ -442,6 +442,23 @@ Definitions also accept `hidden?: boolean` and
  known essential built-in names remain `"essential"`; other host tools default
  to `"discoverable"`. `toolNames` in the response lists the registered names.
  
@@ -19,12 +19,14 @@ index b91b20a85a..d67a41816c 100644
 +  with a blocked error result.
 +
 +An unrecognized value for either field rejects the whole `set_host_tools`
-+request with an error response; it never degrades to the default.
++request with an error response; it never degrades to the default. Only an
++*omitted* field takes the default: JSON `null` is a declared value and is
++rejected like any other unrecognized one.
 +
  ### `set_host_uri_schemes` payload
  
  Replaces the current set of host-owned URL schemes the RPC server should
-@@ -692,6 +707,28 @@ Completion uses:
+@@ -692,6 +709,31 @@ Completion uses:
  
  Set top-level `isError: true` on `host_tool_result` to reject the pending host tool call and surface the returned text content as a tool error.
  
@@ -41,20 +43,23 @@ index b91b20a85a..d67a41816c 100644
 +}
 +```
 +
-+`result.terminate: true` ends the agent run once the current tool batch settles:
-+the loop appends every result and stops before the next model call. This is a
-+normal completion, not an abort — the turn keeps its own stop reason, and queued
-+steering stays queued for the next run. Error results terminate the same way: a
-+frame that sets both `isError` and `result.terminate` resolves with
-+`isError: true, terminate: true` instead of being rejected, because a thrown
-+error cannot carry the flag. A `host_tool_update` partial never terminates, even
-+if its `partialResult` carries the field.
++`result.terminate` must be a JSON boolean or absent; any other value (for
++example the string `"false"`) fails the call instead of being read for
++truthiness. `result.terminate: true` ends the agent run once the current tool
++batch settles: the loop appends every result and stops before the next model
++call. This is a normal completion, not an abort — the turn keeps its own stop
++reason, and queued steering stays queued for the next run. Error results
++terminate the same way: a frame that sets both `isError` and
++`result.terminate` resolves with `isError: true, terminate: true` instead of
++being rejected, because a thrown error cannot carry the flag. A
++`host_tool_update` partial never terminates, even if its `partialResult`
++carries the field.
 +
  ## Host URI Sub-Protocol
  
  RPC hosts can also own custom URL schemes (virtual files). After
 diff --git a/packages/agent/src/agent-loop.ts b/packages/agent/src/agent-loop.ts
-index 26a018a194..1584c17b30 100644
+index 26a018a194..43614998a6 100644
 --- a/packages/agent/src/agent-loop.ts
 +++ b/packages/agent/src/agent-loop.ts
 @@ -524,6 +524,12 @@ function coerceToolResult(raw: unknown): { result: AgentToolResult<unknown>; mal
@@ -143,10 +148,63 @@ index 26a018a194..1584c17b30 100644
  				if (isDeadlineExceeded(config.deadline)) {
  					endAgentStream(stream, newMessages, telemetry, stepCounter.count);
  					return;
-@@ -2659,6 +2681,22 @@ function formatToolNotFoundMessage(
+@@ -1916,8 +1938,18 @@ async function streamAssistantResponse(
+ 				}
+ 				argStreams.clear();
+ 			};
++			// A sole-declared tool makes this message's admission a whole-batch
++			// decision, and speculation starts physical work (`#drain` ->
++			// `policy.execute`) while the message is still streaming — before the
++			// batch composition is known. The two cannot coexist: while the active
++			// tool set advertises such a tool, this provider call runs without
++			// speculation, so a rejected batch can never have speculative work
++			// started for it. Sessions without sole-declared tools are unchanged.
+ 			const speculationConfig =
+-				config.speculativeToolExecution?.enabled === true ? config.speculativeToolExecution : undefined;
++				config.speculativeToolExecution?.enabled === true &&
++				!(context.tools ?? []).some(tool => tool.batchPolicy === "sole")
++					? config.speculativeToolExecution
++					: undefined;
+ 			const speculationCoordinator = speculationConfig
+ 				? new SpeculativeOperationCoordinator(speculationConfig, {
+ 						context,
+@@ -2659,6 +2691,55 @@ function formatToolNotFoundMessage(
  	return `Tool ${name} not found. Closest available: ${suggestions.slice(0, MAX_TOOL_NAME_SUGGESTIONS).join(", ")}`;
  }
  
++/**
++ * Every `toolCall` block of an assistant message, in order — the batch the
++ * sole-call rule counts.
++ *
++ * This deliberately includes blocks the loop never dispatches (notably
++ * `kCursorExecResolved` ones, which the Cursor exec channel already ran
++ * server-side): PI counts `assistantMessage.content` without exclusions, and a
++ * pre-executed sibling is still a sibling. Excluding them would let a sole tool
++ * run in a batch that has one.
++ */
++function batchToolCalls(assistantMessage: AssistantMessage): AgentToolCall[] {
++	return assistantMessage.content.filter(
++		(block): block is Extract<AssistantMessage["content"][number], { type: "toolCall" }> => block.type === "toolCall",
++	);
++}
++
++/**
++ * The batch's admission entries: one `{ name, sole }` per toolCall block,
++ * resolved through the same tool lookup the dispatch uses. Shared by the
++ * pre-dispatch admission check and the execution-time guard so both read the
++ * same batch.
++ */
++function batchAdmissionEntries(
++	assistantMessage: AssistantMessage,
++	tools: AgentTool<any>[] | undefined,
++	resolveFallbackTool: AgentLoopConfig["resolveFallbackTool"],
++): Array<{ name: string; sole: boolean }> {
++	return batchToolCalls(assistantMessage).map(toolCall => ({
++		name: toolCall.name,
++		sole: resolveToolForCall(tools, toolCall, resolveFallbackTool)?.batchPolicy === "sole",
++	}));
++}
++
 +/**
 + * Batch admission rule for one assistant message.
 + *
@@ -166,7 +224,7 @@ index 26a018a194..1584c17b30 100644
  /**
   * Pre-dispatch phase for every pending tool call on `assistantMessage`, run in
   * call order: intent extraction, argument validation, and the `beforeToolCall`
-@@ -2677,12 +2715,35 @@ async function prepareToolCallDispatch(
+@@ -2677,12 +2758,32 @@ async function prepareToolCallDispatch(
  ): Promise<Map<string, PreparedToolCall>> {
  	const { resolveFallbackTool, suggestFallbackToolNames, intentTracing, beforeToolCall } = config;
  	const prepared = new Map<string, PreparedToolCall>();
@@ -176,20 +234,17 @@ index 26a018a194..1584c17b30 100644
 -		const tool = resolveToolForCall(context.tools, toolCall, resolveFallbackTool);
 +	// Resolve the batch before any per-call work: admission is a property of the
 +	// message, and a rejected batch must not reach the host hook (no approval
-+	// prompt for a call that can never run) or argument validation.
-+	const batchCalls: AgentToolCall[] = [];
++	// prompt for a call that can never run) or argument validation. The verdict
++	// counts every toolCall block (see `batchToolCalls`); the dispatch map below
++	// only carries the calls this loop may run.
 +	const toolsByCallId = new Map<string, AgentTool<any> | undefined>();
 +	for (const content of assistantMessage.content) {
 +		if (content.type !== "toolCall") continue;
 +		if ((content as CursorExecResolvedCarrier)[kCursorExecResolved] === true) continue;
-+		batchCalls.push(content);
 +		toolsByCallId.set(content.id, resolveToolForCall(context.tools, content, resolveFallbackTool));
 +	}
 +	const batchRejection = soleBatchRejectionReason(
-+		batchCalls.map(toolCall => ({
-+			name: toolCall.name,
-+			sole: toolsByCallId.get(toolCall.id)?.batchPolicy === "sole",
-+		})),
++		batchAdmissionEntries(assistantMessage, context.tools, resolveFallbackTool),
 +	);
 +	for (const content of assistantMessage.content) {
 +		if (content.type !== "toolCall") continue;
@@ -206,7 +261,7 @@ index 26a018a194..1584c17b30 100644
  		let argsForExecution = toolCall.arguments as Record<string, unknown>;
  		if (intentTracing) {
  			const { intent, strippedArgs } = extractIntent(toolCall.arguments);
-@@ -2834,7 +2895,7 @@ async function executeToolCalls(
+@@ -2834,7 +2935,7 @@ async function executeToolCalls(
  	config: AgentLoopConfig,
  	telemetry: AgentTelemetry | undefined,
  	invokeAgentSpan: Span | undefined,
@@ -215,7 +270,7 @@ index 26a018a194..1584c17b30 100644
  	const tools = currentContext.tools;
  	const {
  		hasSteeringMessages,
-@@ -2987,18 +3048,20 @@ async function executeToolCalls(
+@@ -2987,18 +3088,20 @@ async function executeToolCalls(
  		await checkAsideInterrupts();
  	};
  
@@ -246,7 +301,7 @@ index 26a018a194..1584c17b30 100644
  		stream.push({
  			type: "tool_execution_end",
  			toolCallId: toolCall.id,
-@@ -3028,6 +3091,59 @@ async function executeToolCalls(
+@@ -3028,6 +3131,56 @@ async function executeToolCalls(
  		stream.push({ type: "message_end", message: toolResultMessage });
  	};
  
@@ -273,18 +328,15 @@ index 26a018a194..1584c17b30 100644
 +	// declaring `batchPolicy: "sole"` may only run as the single call of its
 +	// assistant message, and a batch that carries one plus any sibling is
 +	// rejected whole — the sole call, its siblings, unknown names and invalid
-+	// arguments alike. Nothing executes, nothing starts (`tool_execution_start`
-+	// is deliberately not emitted: no call started), and every call of the batch
-+	// is answered with the same blocked error result, in call order, so the
-+	// provider still gets a well-formed tool_use/tool_result pairing for each.
-+	// Pre-dispatch already refused the batch; this repeats the pure check so a
-+	// record that never went through it cannot slip past.
-+	const batchRejection = soleBatchRejectionReason(
-+		records.map(record => ({
-+			name: record.toolCall.name,
-+			sole: record.tool?.batchPolicy === "sole",
-+		})),
-+	);
++	// arguments alike. Nothing this loop dispatches executes, nothing starts
++	// (`tool_execution_start` is deliberately not emitted: no call started), and
++	// every dispatched call of the batch is answered with the same blocked error
++	// result, in call order, so the provider still gets a well-formed
++	// tool_use/tool_result pairing for each. The verdict counts every toolCall
++	// block of the message, not just the dispatched records: a pre-executed
++	// sibling (e.g. a `kCursorExecResolved` call the Cursor exec channel already
++	// ran) still rejects the batch, matching PI's count of the whole message.
++	const batchRejection = soleBatchRejectionReason(batchAdmissionEntries(assistantMessage, tools, resolveFallbackTool));
 +	if (batchRejection !== undefined) {
 +		SpeculativeOperationCoordinator.discardForMessage(
 +			assistantMessage,
@@ -306,7 +358,7 @@ index 26a018a194..1584c17b30 100644
  	const runTool = async (record: (typeof records)[number], index: number): Promise<void> => {
  		// A pending interrupt preempts not-yet-started *interruptible* waits so
  		// the message injects promptly instead of sitting out a `hub wait`.
-@@ -3168,12 +3284,17 @@ async function executeToolCalls(
+@@ -3168,12 +3321,17 @@ async function executeToolCalls(
  							executionArgs,
  							record.signal,
  							partialResult => {
@@ -325,7 +377,7 @@ index 26a018a194..1584c17b30 100644
  								});
  							},
  							toolContext,
-@@ -3219,6 +3340,7 @@ async function executeToolCalls(
+@@ -3219,6 +3377,7 @@ async function executeToolCalls(
  							isError: after.isError ?? result.isError,
  							providerMetadata: after.providerMetadata ?? result.providerMetadata,
  							useless: after.useless ?? result.useless,
@@ -333,7 +385,7 @@ index 26a018a194..1584c17b30 100644
  						});
  						result = coerced.result;
  						isError = coerced.malformed || (after.isError ?? isError);
-@@ -3388,7 +3510,12 @@ async function executeToolCalls(
+@@ -3388,7 +3547,12 @@ async function executeToolCalls(
  	}
  	await speculationCoordinator?.discardAll("candidate was not dispatched");
  
@@ -416,7 +468,7 @@ index 66a9179df1..9f2931b0b9 100644
  	 * Declares the bounded, validated effect of a finalized call that may execute
  	 * before ordinary dispatch commits its result.
 diff --git a/packages/agent/test/agent-loop.test.ts b/packages/agent/test/agent-loop.test.ts
-index 66a43bae4d..bc19591e89 100644
+index 66a43bae4d..885731e403 100644
 --- a/packages/agent/test/agent-loop.test.ts
 +++ b/packages/agent/test/agent-loop.test.ts
 @@ -20,7 +20,7 @@ import type {
@@ -428,7 +480,7 @@ index 66a43bae4d..bc19591e89 100644
  import { kCursorExecResolved, setStreamingPartialJson } from "@oh-my-pi/pi-ai/utils/block-symbols";
  import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
  import { INTENT_FIELD } from "@oh-my-pi/pi-wire";
-@@ -4330,6 +4330,389 @@ describe("agentLoop useless-flag propagation", () => {
+@@ -4330,6 +4330,640 @@ describe("agentLoop useless-flag propagation", () => {
  	});
  });
  
@@ -815,14 +867,297 @@ index 66a43bae4d..bc19591e89 100644
 +	});
 +});
 +
++describe("agentLoop sole-batch admission over every tool-call path", () => {
++	const toolSchema = type({ value: "string?" });
++
++	/**
++	 * Two provider turns: the batch under test, then a plain text turn. Every
++	 * block that is not stamped with `kCursorExecResolved` streams its tool calls
++	 * through `toolcall_end` (that event is what admits speculation), while a
++	 * Cursor-resolved block only appears in the final message — exactly like the
++	 * exec channel, which executes it and buffers the result out of band.
++	 */
++	function twoTurnStream(makeBlocks: () => AssistantMessage["content"]) {
++		let turn = 0;
++		return () => {
++			const response = new AssistantMessageEventStream();
++			queueMicrotask(() => {
++				if (turn++ === 0) {
++					const blocks = makeBlocks();
++					const streaming = createAssistantMessage(blocks, "toolUse");
++					response.push({ type: "start", partial: streaming });
++					const streamed = blocks.filter(
++						(block): block is Extract<AssistantMessage["content"][number], { type: "toolCall" }> =>
++							block.type === "toolCall" && !(kCursorExecResolved in (block as object)),
++					);
++					streamed.forEach((call, index) => {
++						response.push({
++							type: "toolcall_start",
++							contentIndex: index,
++							partial: streaming,
++						});
++						response.push({
++							type: "toolcall_delta",
++							contentIndex: index,
++							delta: JSON.stringify(call.arguments ?? {}),
++							partial: streaming,
++						});
++						response.push({
++							type: "toolcall_end",
++							contentIndex: index,
++							toolCall: call,
++							partial: streaming,
++						});
++					});
++					const done = createAssistantMessage(blocks, "toolUse");
++					response.push({ type: "done", reason: "toolUse", message: done });
++					return;
++				}
++				const textTurn = createAssistantMessage([{ type: "text", text: "done" }], "stop");
++				response.push({ type: "start", partial: textTurn });
++				response.push({ type: "done", reason: "stop", message: textTurn });
++			});
++			return response;
++		};
++	}
++
++	it("counts a Cursor exec-resolved sibling toward the batch and still blocks the sole call", async () => {
++		const executed: string[] = [];
++		const submit: AgentTool<typeof toolSchema, { value?: string }> = {
++			name: "submit",
++			label: "Submit",
++			description: "Declares that it must be the only call of its batch",
++			parameters: toolSchema,
++			batchPolicy: "sole",
++			async execute() {
++				executed.push("submit");
++				return { content: [{ type: "text", text: "submitted" }], details: {} };
++			},
++		};
++		const bash: AgentTool<typeof toolSchema, { value?: string }> = {
++			name: "bash",
++			label: "Bash",
++			description: "Runs a shell command locally",
++			parameters: toolSchema,
++			async execute() {
++				executed.push("bash");
++				return { content: [{ type: "text", text: "ran" }], details: {} };
++			},
++		};
++		const context: AgentContext = { systemPrompt: [""], messages: [], tools: [submit, bash] };
++		const config: AgentLoopConfig = {
++			model: createMockModel().model,
++			convertToLlm: identityConverter,
++		};
++
++		// The Cursor exec channel already ran `bash` server-side and stamped the
++		// block with `kCursorExecResolved`; the loop must therefore count it as a
++		// sibling (PI counts every `toolCall` block of the assistant message)
++		// instead of treating the batch as a lone sole call.
++		let batchBlocks: AssistantMessage["content"] = [];
++		const streamFn = twoTurnStream(() => {
++			batchBlocks = [
++				{
++					type: "toolCall",
++					id: "cursor-bash-1",
++					name: "bash",
++					arguments: { value: "rm -rf /tmp/cursor-sibling" },
++					[kCursorExecResolved]: true as const,
++				},
++				{ type: "toolCall", id: "submit-1", name: "submit", arguments: { value: "plan" } },
++			] as AssistantMessage["content"];
++			return batchBlocks;
++		});
++
++		const events: AgentEvent[] = [];
++		const stream = agentLoop([createUserMessage("go")], context, config, undefined, streamFn);
++		for await (const event of stream) events.push(event);
++
++		// Nothing the loop dispatches ran, and nothing started.
++		expect(executed).toEqual([]);
++		expect(events.filter(event => event.type === "tool_execution_start")).toEqual([]);
++		// The sole call is answered with the blocked result, in batch order.
++		const results = events
++			.filter((event): event is Extract<AgentEvent, { type: "message_end" }> => event.type === "message_end")
++			.map(event => event.message)
++			.filter((message): message is ToolResultMessage => message.role === "toolResult");
++		expect(results.map(message => message.toolCallId)).toEqual(["submit-1"]);
++		expect(results[0]?.isError).toBe(true);
++		expect(JSON.stringify(results[0]?.content)).toContain("must be the only tool call in the assistant message");
++
++		// Recorded limit, not a pass: the exec-resolved sibling was already run by
++		// the provider/editor bridge before this assistant message existed, so
++		// "the whole batch had zero side effects" is NOT true for this path. The
++		// loop only guarantees it never dispatches a call of the rejected batch
++		// a second time — the marker asserted here is exactly what prevents that
++		// duplicate side effect, and nothing the loop does can retract the
++		// execution that already happened.
++		const cursorBlock = batchBlocks[0] as { [kCursorExecResolved]?: true };
++		expect(cursorBlock[kCursorExecResolved]).toBe(true);
++	});
++
++	for (const order of ["speculative-first", "sole-first"] as const) {
++		it(`does not start a speculative candidate when the batch advertises a sole-batch tool (${order})`, async () => {
++			const speculativeExecutions: string[] = [];
++			const ordinaryExecutions: string[] = [];
++			const shadow: AgentTool<typeof toolSchema, { value?: string }> = {
++				name: "shadow",
++				label: "Shadow",
++				description: "Speculates a pure result while streaming",
++				parameters: toolSchema,
++				speculation: {
++					finalized: {
++						assess: () => ({ eligible: true, effect: { kind: "pure" as const } }),
++						async execute() {
++							speculativeExecutions.push("shadow");
++							return {
++								kind: "result" as const,
++								result: { content: [{ type: "text", text: "shadow" }] },
++								isError: false,
++							};
++						},
++					},
++				},
++				async execute() {
++					ordinaryExecutions.push("shadow");
++					return { content: [{ type: "text", text: "shadow" }], details: {} };
++				},
++			};
++			const submit: AgentTool<typeof toolSchema, { value?: string }> = {
++				name: "submit",
++				label: "Submit",
++				description: "Declares that it must be the only call of its batch",
++				parameters: toolSchema,
++				batchPolicy: "sole",
++				async execute() {
++					ordinaryExecutions.push("submit");
++					return { content: [{ type: "text", text: "submitted" }], details: {} };
++				},
++			};
++			const shadowCall = { type: "toolCall" as const, id: "shadow-1", name: "shadow", arguments: { value: "x" } };
++			const submitCall = { type: "toolCall" as const, id: "submit-1", name: "submit", arguments: { value: "plan" } };
++			const context: AgentContext = { systemPrompt: [""], messages: [], tools: [shadow, submit] };
++			const config: AgentLoopConfig = {
++				model: createMockModel().model,
++				convertToLlm: identityConverter,
++				getToolContext: () => ({}),
++				speculativeToolExecution: { enabled: true },
++			};
++			const streamFn = twoTurnStream(
++				() =>
++					(order === "speculative-first"
++						? [shadowCall, submitCall]
++						: [submitCall, shadowCall]) as AssistantMessage["content"],
++			);
++
++			const events: AgentEvent[] = [];
++			const stream = agentLoop([createUserMessage("go")], context, config, undefined, streamFn);
++			for await (const event of stream) events.push(event);
++
++			// A rejecting batch must not have speculative physical work started
++			// before its admission is decided.
++			expect(speculativeExecutions).toEqual([]);
++			expect(ordinaryExecutions).toEqual([]);
++			expect(events.filter(event => event.type === "tool_execution_start")).toEqual([]);
++			const results = events
++				.filter((event): event is Extract<AgentEvent, { type: "message_end" }> => event.type === "message_end")
++				.map(event => event.message)
++				.filter((message): message is ToolResultMessage => message.role === "toolResult");
++			expect(results.map(message => message.toolCallId)).toEqual(
++				(order === "speculative-first" ? [shadowCall, submitCall] : [submitCall, shadowCall]).map(call => call.id),
++			);
++			expect(results.every(message => message.isError === true)).toBe(true);
++		});
++	}
++
++	it("keeps speculation working when no sole-batch tool is advertised (control)", async () => {
++		const speculativeExecutions: string[] = [];
++		const shadow: AgentTool<typeof toolSchema, { value?: string }> = {
++			name: "shadow",
++			label: "Shadow",
++			description: "Speculates a pure result while streaming",
++			parameters: toolSchema,
++			speculation: {
++				finalized: {
++					assess: () => ({ eligible: true, effect: { kind: "pure" as const } }),
++					async execute() {
++						speculativeExecutions.push("shadow");
++						return {
++							kind: "result" as const,
++							result: { content: [{ type: "text", text: "shadow" }] },
++							isError: false,
++						};
++					},
++				},
++			},
++			async execute() {
++				throw new Error("ordinary execution must not run when the candidate commits");
++			},
++		};
++		const context: AgentContext = { systemPrompt: [""], messages: [], tools: [shadow] };
++		const config: AgentLoopConfig = {
++			model: createMockModel().model,
++			convertToLlm: identityConverter,
++			getToolContext: () => ({}),
++			speculativeToolExecution: { enabled: true },
++		};
++		const streamFn = twoTurnStream(
++			() =>
++				[
++					{ type: "toolCall", id: "shadow-1", name: "shadow", arguments: { value: "x" } },
++				] as AssistantMessage["content"],
++		);
++
++		const events: AgentEvent[] = [];
++		const stream = agentLoop([createUserMessage("go")], context, config, undefined, streamFn);
++		for await (const event of stream) events.push(event);
++
++		expect(speculativeExecutions).toEqual(["shadow"]);
++		const toolEnd = events.find(event => event.type === "tool_execution_end");
++		expect(toolEnd?.isError).toBe(false);
++	});
++});
++
  describe("agentLoopContinue with AgentMessage", () => {
  	it("should throw when context has no messages", () => {
  		const context: AgentContext = {
 diff --git a/packages/coding-agent/src/modes/rpc/host-tools.ts b/packages/coding-agent/src/modes/rpc/host-tools.ts
-index 62be077ca0..eac6491533 100644
+index 62be077ca0..84fb74cc94 100644
 --- a/packages/coding-agent/src/modes/rpc/host-tools.ts
 +++ b/packages/coding-agent/src/modes/rpc/host-tools.ts
-@@ -38,6 +38,35 @@ export function isRpcHostToolUpdate(value: unknown): value is RpcHostToolUpdate
+@@ -29,7 +29,30 @@ function isAgentToolResult(value: unknown): value is AgentToolResult<unknown> {
+ export function isRpcHostToolResult(value: unknown): value is RpcHostToolResult {
+ 	if (!value || typeof value !== "object") return false;
+ 	const frame = value as { type?: unknown; id?: unknown; result?: unknown };
+-	return frame.type === "host_tool_result" && typeof frame.id === "string" && isAgentToolResult(frame.result);
++	if (frame.type !== "host_tool_result" || typeof frame.id !== "string" || !isAgentToolResult(frame.result)) {
++		return false;
++	}
++	// `terminate` is an optional boolean. Any other JSON value (a string "false",
++	// a number, an object) is a malformed frame: it must be refused at the
++	// boundary instead of being coerced by truthiness into a termination request.
++	const terminate = (frame.result as { terminate?: unknown }).terminate;
++	return terminate === undefined || typeof terminate === "boolean";
++}
++
++/**
++ * True when a settled result carries a usable termination request.
++ *
++ * `undefined` means "no request"; anything that is not a boolean fails closed
++ * (the call errors) so no transport path can turn a malformed value into a
++ * termination.
++ */
++function readTerminateRequest(result: AgentToolResult<unknown>): boolean | undefined {
++	const terminate = (result as { terminate?: unknown }).terminate;
++	if (terminate === undefined) return undefined;
++	if (typeof terminate !== "boolean") {
++		throw new Error(`Host tool result declares a non-boolean terminate: ${JSON.stringify(terminate)}`);
++	}
++	return terminate;
+ }
+ 
+ export function isRpcHostToolUpdate(value: unknown): value is RpcHostToolUpdate {
+@@ -38,6 +61,38 @@ export function isRpcHostToolUpdate(value: unknown): value is RpcHostToolUpdate
  	return frame.type === "host_tool_update" && typeof frame.id === "string" && isAgentToolResult(frame.partialResult);
  }
  
@@ -840,13 +1175,16 @@ index 62be077ca0..eac6491533 100644
 +	name: string,
 +	definition: Pick<RpcHostToolDefinition, "concurrency" | "batchPolicy">,
 +): { concurrency: "shared" | "exclusive"; batchPolicy: "any" | "sole" } {
-+	const concurrency = definition.concurrency ?? "shared";
++	// Only an *omitted* field falls back to the documented default. JSON `null`
++	// is a declared value and fails closed like any other unrecognized one — a
++	// `??` here would silently accept `"concurrency": null` as `"shared"`.
++	const concurrency = definition.concurrency === undefined ? "shared" : definition.concurrency;
 +	if (concurrency !== "shared" && concurrency !== "exclusive") {
 +		throw new Error(
 +			`Host tool "${name}" declares an invalid concurrency ${JSON.stringify(definition.concurrency)}; expected "shared" or "exclusive"`,
 +		);
 +	}
-+	const batchPolicy = definition.batchPolicy ?? "any";
++	const batchPolicy = definition.batchPolicy === undefined ? "any" : definition.batchPolicy;
 +	if (batchPolicy !== "any" && batchPolicy !== "sole") {
 +		throw new Error(
 +			`Host tool "${name}" declares an invalid batchPolicy ${JSON.stringify(definition.batchPolicy)}; expected "any" or "sole"`,
@@ -858,7 +1196,7 @@ index 62be077ca0..eac6491533 100644
  class RpcHostToolAdapter<TParams extends TSchema = TSchema, TTheme extends Theme = Theme> implements AgentTool<
  	TParams,
  	unknown,
-@@ -49,6 +78,8 @@ class RpcHostToolAdapter<TParams extends TSchema = TSchema, TTheme extends Theme
+@@ -49,6 +104,8 @@ class RpcHostToolAdapter<TParams extends TSchema = TSchema, TTheme extends Theme
  	declare parameters: TParams;
  	readonly strict = true;
  	concurrency: "shared" | "exclusive" = "shared";
@@ -867,7 +1205,7 @@ index 62be077ca0..eac6491533 100644
  	readonly loadMode: ToolLoadMode;
  	#bridge: RpcHostToolBridge;
  	#definition: RpcHostToolDefinition;
-@@ -58,6 +89,9 @@ class RpcHostToolAdapter<TParams extends TSchema = TSchema, TTheme extends Theme
+@@ -58,6 +115,9 @@ class RpcHostToolAdapter<TParams extends TSchema = TSchema, TTheme extends Theme
  		this.#bridge = bridge;
  		applyToolProxy(definition, this);
  		this.loadMode = defaultLoadModeForToolName(definition.name, definition.loadMode);
@@ -877,7 +1215,7 @@ index 62be077ca0..eac6491533 100644
  	}
  
  	execute(
-@@ -91,16 +125,24 @@ export class RpcHostToolBridge {
+@@ -91,16 +151,33 @@ export class RpcHostToolBridge {
  	}
  
  	setTools(tools: RpcHostToolDefinition[]): AgentTool[] {
@@ -896,7 +1234,16 @@ index 62be077ca0..eac6491533 100644
 -		if (frame.isError) {
 -			const text = frame.result.content
 +		const { result } = frame;
-+		if (frame.isError && !result.terminate) {
++		let terminate: boolean | undefined;
++		try {
++			terminate = readTerminateRequest(result);
++		} catch (error) {
++			// Fail closed: a malformed termination flag fails the call instead of
++			// being coerced into one.
++			pending.reject(error instanceof Error ? error : new Error(String(error)));
++			return true;
++		}
++		if (frame.isError && terminate !== true) {
 +			// Documented error contract: a top-level `isError` rejects the pending
 +			// call so the host's text becomes the tool error. A terminating result
 +			// cannot ride that path — a thrown error has nowhere to carry
@@ -905,7 +1252,7 @@ index 62be077ca0..eac6491533 100644
  				.filter(
  					(item): item is { type: "text"; text: string } => item.type === "text" && typeof item.text === "string",
  				)
-@@ -110,7 +152,10 @@ export class RpcHostToolBridge {
+@@ -110,7 +187,10 @@ export class RpcHostToolBridge {
  			pending.reject(new Error(text || "Host tool execution failed"));
  			return true;
  		}
@@ -931,7 +1278,7 @@ index 8bd0b4d771..69abe270db 100644
  		const response = await this.#send({ type: "set_host_tools", tools: definitions });
  		return this.#getData<{ toolNames: string[] }>(response).toolNames;
 diff --git a/packages/coding-agent/src/modes/rpc/rpc-mode.ts b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
-index 750fb8e44c..635bbef9d4 100644
+index 750fb8e44c..a2b174c590 100644
 --- a/packages/coding-agent/src/modes/rpc/rpc-mode.ts
 +++ b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
 @@ -40,7 +40,7 @@ import type { EventBus } from "../../utils/event-bus";
@@ -943,7 +1290,21 @@ index 750fb8e44c..635bbef9d4 100644
  import { isRpcHostUriResult, RpcHostUriBridge } from "./host-uris";
  import { MAX_RPC_FRAME_BYTES, MAX_RPC_REASSEMBLED_BYTES, RpcFrameEncoder } from "./rpc-frame";
  import { claimRpcInput, readRpcInputFrames } from "./rpc-input";
-@@ -586,6 +586,7 @@ function normalizeHostToolDefinitions(tools: RpcHostToolDefinition[]): RpcHostTo
+@@ -572,7 +572,12 @@ export async function handleRpcSessionChange(
+ 	throw new Error("Unsupported RPC session change command");
+ }
+ 
+-function normalizeHostToolDefinitions(tools: RpcHostToolDefinition[]): RpcHostToolDefinition[] {
++/**
++ * Normalize and validate a `set_host_tools` payload at the trusted boundary.
++ * Throws for any malformed declaration, which fails the whole request before
++ * the tool registry is touched.
++ */
++export function normalizeHostToolDefinitions(tools: RpcHostToolDefinition[]): RpcHostToolDefinition[] {
+ 	return tools.map((tool, index) => {
+ 		const name = typeof tool.name === "string" ? tool.name.trim() : "";
+ 		if (!name) {
+@@ -586,6 +591,7 @@ function normalizeHostToolDefinitions(tools: RpcHostToolDefinition[]): RpcHostTo
  			throw new Error(`Host tool "${name}" must provide a JSON Schema object`);
  		}
  		const label = typeof tool.label === "string" && tool.label.trim() ? tool.label.trim() : name;
@@ -951,7 +1312,7 @@ index 750fb8e44c..635bbef9d4 100644
  		return {
  			name,
  			label,
-@@ -594,6 +595,7 @@ function normalizeHostToolDefinitions(tools: RpcHostToolDefinition[]): RpcHostTo
+@@ -594,6 +600,7 @@ function normalizeHostToolDefinitions(tools: RpcHostToolDefinition[]): RpcHostTo
  			hidden: tool.hidden === true,
  			loadMode: defaultLoadModeForToolName(name, tool.loadMode),
  			readsSkillUris: tool.readsSkillUris,
@@ -1008,10 +1369,20 @@ index 2b27134cea..e5c6f62806 100644
  }
  
 diff --git a/packages/coding-agent/test/rpc-host-tools.test.ts b/packages/coding-agent/test/rpc-host-tools.test.ts
-index f3c807d93a..c019783bb5 100644
+index f3c807d93a..c48f03f2cd 100644
 --- a/packages/coding-agent/test/rpc-host-tools.test.ts
 +++ b/packages/coding-agent/test/rpc-host-tools.test.ts
-@@ -128,6 +128,175 @@ describe("RpcHostToolBridge", () => {
+@@ -3,7 +3,8 @@ import * as os from "node:os";
+ import * as path from "node:path";
+ import type { AgentEvent } from "@oh-my-pi/pi-agent-core";
+ import { defineRpcClientTool, RpcClient } from "@oh-my-pi/pi-coding-agent/modes";
+-import { RpcHostToolBridge } from "@oh-my-pi/pi-coding-agent/modes/rpc/host-tools";
++import { isRpcHostToolResult, RpcHostToolBridge } from "@oh-my-pi/pi-coding-agent/modes/rpc/host-tools";
++import { normalizeHostToolDefinitions } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-mode";
+ import type {
+ 	RpcHostToolCallRequest,
+ 	RpcHostToolCancelRequest,
+@@ -128,6 +129,280 @@ describe("RpcHostToolBridge", () => {
  
  		expect(toolReadsSkillUris(tool)).toBe(true);
  	});
@@ -1058,6 +1429,111 @@ index f3c807d93a..c019783bb5 100644
 +		// A refusal must not leave the bridge holding a half-registered set.
 +		expect(bridge.getToolNames()).toEqual([]);
 +		expect(bridge.setTools([definition])).toHaveLength(1);
++	});
++
++	it("rejects a null policy value instead of treating it as omitted", () => {
++		const bridge = new RpcHostToolBridge(() => {});
++		const registered = bridge.setTools([
++			{
++				name: "host_ok",
++				label: "Host Ok",
++				description: "Registered before the rejected update",
++				parameters: { type: "object", properties: {}, additionalProperties: false },
++			},
++		]);
++		expect(registered).toHaveLength(1);
++
++		// JSON `null` is a declared value, not an omission: only `undefined` may
++		// fall back to the documented defaults.
++		expect(() =>
++			bridge.setTools([
++				{
++					name: "host_null_concurrency",
++					label: "Host Null",
++					description: "Declares null concurrency",
++					parameters: { type: "object", properties: {}, additionalProperties: false },
++					concurrency: null as unknown as "shared",
++				},
++			]),
++		).toThrow(/invalid concurrency/);
++		expect(() =>
++			bridge.setTools([
++				{
++					name: "host_null_policy",
++					label: "Host Null",
++					description: "Declares null batchPolicy",
++					parameters: { type: "object", properties: {}, additionalProperties: false },
++					batchPolicy: null as unknown as "sole",
++				},
++			]),
++		).toThrow(/invalid batchPolicy/);
++		// A refused update leaves the previously registered set untouched.
++		expect(bridge.getToolNames()).toEqual(["host_ok"]);
++	});
++
++	it("rejects a null policy at the set_host_tools boundary", () => {
++		const definition = {
++			name: "host_boundary",
++			label: "Host Boundary",
++			description: "Declares a null policy",
++			parameters: { type: "object", properties: {}, additionalProperties: false },
++		};
++		expect(() => normalizeHostToolDefinitions([{ ...definition, concurrency: null as unknown as "shared" }])).toThrow(
++			/invalid concurrency/,
++		);
++		expect(() => normalizeHostToolDefinitions([{ ...definition, batchPolicy: null as unknown as "sole" }])).toThrow(
++			/invalid batchPolicy/,
++		);
++		// Omission still normalizes to the defaults.
++		const [normalized] = normalizeHostToolDefinitions([definition]);
++		expect({ concurrency: normalized?.concurrency, batchPolicy: normalized?.batchPolicy }).toEqual({
++			concurrency: "shared",
++			batchPolicy: "any",
++		});
++	});
++
++	it("refuses a non-boolean terminate instead of coercing it", async () => {
++		const frames: Array<RpcHostToolCallRequest | RpcHostToolCancelRequest> = [];
++		const bridge = new RpcHostToolBridge(frame => {
++			frames.push(frame);
++		});
++		const [tool] = bridge.setTools([
++			{
++				name: "host_submit",
++				label: "Host Submit",
++				description: "Submits a host-owned proposal",
++				parameters: { type: "object", properties: {}, additionalProperties: false },
++			},
++		]);
++
++		// The frame guard rejects the malformed flag outright: the transport
++		// treats `"false"` as an invalid frame, never as a truthy request.
++		expect(
++			isRpcHostToolResult({
++				type: "host_tool_result",
++				id: "frame-1",
++				result: { content: [{ type: "text", text: "submitted" }], terminate: "false" as unknown as boolean },
++			}),
++		).toBe(false);
++		expect(
++			isRpcHostToolResult({
++				type: "host_tool_result",
++				id: "frame-2",
++				result: { content: [{ type: "text", text: "submitted" }], terminate: true },
++			}),
++		).toBe(true);
++
++		// A direct call that bypasses the guard still fails closed rather than
++		// coercing the value into a termination request.
++		const execution = tool.execute("toolu_bad_terminate", {});
++		const request = frames[0];
++		if (request?.type !== "host_tool_call") throw new Error("Expected host_tool_call frame");
++		bridge.handleResult({
++			type: "host_tool_result",
++			id: request.id,
++			result: { content: [{ type: "text", text: "submitted" }], terminate: "yes" as unknown as boolean },
++		});
++		await expect(execution).rejects.toThrow(/terminate/);
 +	});
 +
 +	it("passes a terminating host result through and composes the error flags", async () => {
@@ -1187,7 +1663,7 @@ index f3c807d93a..c019783bb5 100644
  });
  
  describe("RpcClient custom tools", () => {
-@@ -300,4 +469,57 @@ function handle(frame) {
+@@ -300,4 +575,57 @@ function handle(frame) {
  			await client.stop();
  		}
  	});
