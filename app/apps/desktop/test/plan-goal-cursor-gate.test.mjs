@@ -205,6 +205,13 @@ test("a persisted Plan session bound to Cursor is refused before any runtime wor
     // and the reason is not flattened into a generic error.
     assert.equal(error.mode, "plan");
     assert.equal(error.providerId, CURSOR_PROVIDER);
+    // `data` is what crosses IPC as `error.details`; `register.ts` reads the
+    // wire code from it, so a refusal without it degrades on the way out.
+    assert.deepEqual(error.data, {
+      errorCode: ErrorCodes.PLAN_GOAL_CURSOR_UNSUPPORTED,
+      mode: "plan",
+      providerId: CURSOR_PROVIDER,
+    });
     return true;
   });
   assert.equal(sidecarCalls.length, 0, "no Pi turn may start for the refused pair");
@@ -277,6 +284,7 @@ test("entering Plan or Goal on a Cursor-bound session is refused without a write
       (error) => {
         assert.equal(isCursorRefusal(error), true, `entering ${mode} must be refused: ${error.message}`);
         assert.equal(error.mode, mode);
+        assert.equal(error.data.mode, mode);
         return true;
       },
     );

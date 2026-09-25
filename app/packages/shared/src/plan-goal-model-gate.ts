@@ -34,6 +34,17 @@ export type PlanGoalCursorRefusal = {
   mode: Mode;
   providerId: string;
   message: string;
+  /**
+   * What the IPC boundary forwards to the renderer. `register.ts` reads the
+   * wire code from `data.errorCode` and hands the whole `data` object to the
+   * renderer as `error.details`, so the pair travels with the refusal instead
+   * of being dropped on the way across.
+   */
+  data: {
+    errorCode: typeof ErrorCodes.PLAN_GOAL_CURSOR_UNSUPPORTED;
+    mode: Mode;
+    providerId: string;
+  };
 };
 
 /**
@@ -67,5 +78,21 @@ export function planGoalCursorRefusal(
     message:
       "Plan and Goal mode are not supported with Cursor models in this build. " +
       "Switch to Agent mode, or select a different model.",
+    data: {
+      errorCode: ErrorCodes.PLAN_GOAL_CURSOR_UNSUPPORTED,
+      mode: kind,
+      providerId: CURSOR_PROVIDER_ID,
+    },
   };
+}
+
+/**
+ * The single way a refused main-process boundary throws this refusal. `errorCode`
+ * keeps direct callers typed; `data` is what crosses IPC (`error.details`), so a
+ * refusal is never reduced to a bare code or a bare message for the renderer.
+ */
+export function planGoalCursorError(
+  refusal: PlanGoalCursorRefusal,
+): Error & PlanGoalCursorRefusal {
+  return Object.assign(new Error(refusal.message), refusal);
 }

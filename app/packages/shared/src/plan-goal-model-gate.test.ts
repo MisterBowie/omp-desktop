@@ -4,6 +4,7 @@ import { ErrorCodes } from "./errors.js";
 import {
   CURSOR_PROVIDER_ID,
   isCursorProviderId,
+  planGoalCursorError,
   planGoalCursorRefusal,
 } from "./plan-goal-model-gate.js";
 
@@ -22,6 +23,13 @@ describe("planGoalCursorRefusal", () => {
         providerId: CURSOR_PROVIDER_ID,
       });
       expect(refusal?.message).toMatch(/not supported with Cursor models/);
+      // The pair travels with the refusal: `register.ts` forwards `data` to the
+      // renderer as `error.details`, so dropping it would lose the pair.
+      expect(refusal?.data).toEqual({
+        errorCode: ErrorCodes.PLAN_GOAL_CURSOR_UNSUPPORTED,
+        mode,
+        providerId: CURSOR_PROVIDER_ID,
+      });
     }
   });
 
@@ -60,5 +68,17 @@ describe("planGoalCursorRefusal", () => {
   it("names the requested mode kind in the refusal", () => {
     expect(planGoalCursorRefusal("plan", CURSOR_PROVIDER_ID)?.mode).toBe("plan");
     expect(planGoalCursorRefusal("goal", CURSOR_PROVIDER_ID)?.mode).toBe("goal");
+  });
+
+  it("builds a thrown error that keeps the code, the pair and the message", () => {
+    const refusal = planGoalCursorRefusal("goal", CURSOR_PROVIDER_ID);
+    expect(refusal).not.toBeNull();
+    const error = planGoalCursorError(refusal!);
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toBe(refusal!.message);
+    expect(error.errorCode).toBe(ErrorCodes.PLAN_GOAL_CURSOR_UNSUPPORTED);
+    expect(error.mode).toBe("goal");
+    expect(error.providerId).toBe(CURSOR_PROVIDER_ID);
+    expect(error.data).toEqual(refusal!.data);
   });
 });

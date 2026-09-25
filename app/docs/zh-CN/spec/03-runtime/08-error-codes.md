@@ -93,11 +93,11 @@ stdio 与 Tokio 的动态阻塞池隔离，因此后一种情况
 
 ### 3.2b Plan/Goal × 模型门
 
-Cursor 模型不支持 Plan 与 Goal 模式（M5/T20-R3C，用户确认的产品决策）。Cursor 的 exec 通道会在响应仍在流式期间执行工具调用——早于承载它们的 assistant 消息——因此 PI 的过渡工具契约（提交工具独占整批；同批兄弟调用零副作用）无法满足，其副作用也无法撤销（证据：验证文档 `M5-omp-transition-patch.md` §9/§10）。桌面在接受模式、模型变更或新建会话的边界拒绝该组合，并对已持久化或导入的组合在任何运行时工作之前拒绝——绝不改写用户的模式或模型。
+Cursor 模型不支持 Plan 与 Goal 模式（M5/T20-R3C，用户确认的产品决策）。Cursor 的 exec 通道会在响应仍在流式期间执行工具调用——早于承载它们的 assistant 消息——因此 PI 的过渡工具契约（提交工具独占整批；同批兄弟调用零副作用）无法满足，其副作用也无法撤销（证据：验证文档 `M5-omp-transition-patch.md` §9/§10）。host-core 在**持久化写入本身**拒绝该组合（`crates/host-core/src/plan_goal_guard.rs`），桌面的会话配置、新建会话与派发边界在任何运行时工作之前拒绝它。两侧都不会改写用户的模式或模型。
 
 | 代码 | 可重试 | 含义 |
 |---|---|---|
-| `PLAN_GOAL_CURSOR_UNSUPPORTED` | 否 | 会话（或将变为）绑定 Cursor 提供方，而 Plan 或 Goal 模式处于激活状态。携带 `mode` 与 `providerId`；消息同时给出两条出路（切换到 Agent 模式，或改选其他模型） |
+| `PLAN_GOAL_CURSOR_UNSUPPORTED` | 否 | 该写入会使 Plan 或 Goal 模式与 Cursor 提供方组合在一起。携带 `mode` 与 `providerId`；两条出路是去掉模式或改选其他提供方 |
 
 ### 3. 2 Agent/会话
 

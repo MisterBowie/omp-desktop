@@ -881,6 +881,22 @@ fn plan_rpc_err(error: impl ToString) -> JsonRpcError {
     rpc_err(1015, message, &error_code)
 }
 
+/// A refused durable session write keeps its own product code (M5/T20-R3C).
+///
+/// The Plan/Goal × Cursor guard refuses inside the write itself — a trigger
+/// abort whose message begins with the code — so the RPC layer must not flatten
+/// it into `INTERNAL`. Every other error keeps this handler's fallback.
+/// `session.configure` carries the same rule inline, because its fallback is
+/// an argument error rather than an internal one.
+fn session_write_rpc_err(error: anyhow::Error) -> JsonRpcError {
+    let message = error.to_string();
+    if message.starts_with("PLAN_") {
+        plan_rpc_err(message)
+    } else {
+        rpc_err(1000, message, "INTERNAL")
+    }
+}
+
 fn resolve_persisted_project_workspace(
     state: &AppState,
     session_id: &str,
@@ -2075,7 +2091,10 @@ async fn handle_request(
                         .map(str::to_string),
                 },
             )
-            .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            // A refused Plan/Goal × Cursor write is a product refusal, not an
+            // internal fault: report its own code to direct RPC callers
+            // (M5/T20-R3C).
+            .map_err(session_write_rpc_err)?;
             Ok(json!({ "session": session }))
         }
         "session.fork" => {
@@ -2088,7 +2107,7 @@ async fn handle_request(
             let st = state.lock().await;
             let session =
                 match sessions::fork_session_through(&st.db, session_id, title, through_message_id)
-                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                    .map_err(session_write_rpc_err)?
                 {
                     sessions::ForkSessionResult::Created(session) => session,
                     sessions::ForkSessionResult::NotFound => {
@@ -2510,7 +2529,7 @@ async fn handle_request(
             .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
             let st = state.lock().await;
             let imported = sessions::import_session(&st.db, &summary, &messages)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+                .map_err(session_write_rpc_err)?;
             Ok(json!({ "ok": true, "imported": imported, "skipped": !imported }))
         }
 
@@ -7594,6 +7613,173 @@ mod tests {
             assert_eq!(session_count, 0, "{mode}");
             assert_eq!(run_count, 0, "{mode}");
         }
+    }
+
+    /// T20-R3C (F1/F2): every direct host RPC that can write the Plan/Goal ×
+    /// Cursor pair refuses it with the stable product code — including the
+    /// `plans.enter` call the sidecar makes outside the desktop's IPC.
+    #[tokio::test]
+    async fn cursor_contract_refusals_keep_their_code_at_the_rpc_boundary() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let cursor = sessions::create_session(
+            &app_state.db,
+            Some("Agent".into()),
+            Some("agent".into()),
+            Some("cursor".into()),
+            Some("claude-4.6-opus-high".into()),
+            None,
+        )
+        .unwrap();
+        let turn_id = sessions::begin_turn(&app_state.db, &cursor.id, None, None).unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+
+        // The transition tool's host call for both kinds. This session carries a
+        // running turn, which is what makes `plans.enter` reachable at all.
+        for kind in ["plan", "goal"] {
+            let error = handle_request(
+                state.clone(),
+                "plans.enter",
+                json!({
+                    "sessionId": cursor.id,
+                    "turnId": turn_id,
+                    "toolCallId": "enter-call",
+                    "kind": kind
+                }),
+                tx.clone(),
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(
+                error.data.unwrap()["errorCode"],
+                "PLAN_GOAL_CURSOR_UNSUPPORTED",
+                "{kind}"
+            );
+        }
+
+        // Entering a contract mode through the configuration RPC. A separate
+        // session: the running turn above is refused by the pre-existing state
+        // gate before any pair check, which would hide this one.
+        let plain = sessions::create_session(
+            &state.lock().await.db,
+            Some("Plain".into()),
+            Some("agent".into()),
+            Some("openai".into()),
+            Some("gpt-5.2".into()),
+            None,
+        )
+        .unwrap();
+        for mode in ["plan", "goal"] {
+            let error = handle_request(
+                state.clone(),
+                "session.configure",
+                json!({ "id": plain.id, "mode": mode }),
+                tx.clone(),
+            )
+            .await
+            .unwrap();
+            // Non-Cursor sessions keep entering Plan/Goal.
+            assert_eq!(error["session"]["mode"], mode, "{mode}");
+        }
+        let cursor_idle = sessions::create_session(
+            &state.lock().await.db,
+            Some("Cursor idle".into()),
+            Some("agent".into()),
+            Some("cursor".into()),
+            Some("claude-4.6-opus-high".into()),
+            None,
+        )
+        .unwrap();
+        for mode in ["plan", "goal"] {
+            let error = handle_request(
+                state.clone(),
+                "session.configure",
+                json!({ "id": cursor_idle.id, "mode": mode }),
+                tx.clone(),
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(
+                error.data.unwrap()["errorCode"],
+                "PLAN_GOAL_CURSOR_UNSUPPORTED",
+                "{mode}"
+            );
+        }
+
+        // The pre-existing state gate still refuses configuration while a turn
+        // runs, whatever the pair is.
+        let blocked = handle_request(
+            state.clone(),
+            "session.configure",
+            json!({ "id": cursor.id, "mode": "plan" }),
+            tx.clone(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            blocked.data.unwrap()["errorCode"],
+            "PLAN_CONFIGURATION_BLOCKED"
+        );
+
+        // Binding Cursor while a contract mode is active.
+        let error = handle_request(
+            state.clone(),
+            "session.configure",
+            json!({
+                "id": plain.id,
+                "mode": "goal",
+                "providerId": "cursor",
+                "modelId": "claude-4.6-opus-high"
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            error.data.unwrap()["errorCode"],
+            "PLAN_GOAL_CURSOR_UNSUPPORTED"
+        );
+
+        // Creating a session that would already hold the pair.
+        for mode in ["plan", "goal"] {
+            let error = handle_request(
+                state.clone(),
+                "session.create",
+                json!({ "mode": mode, "providerId": "cursor", "modelId": "m" }),
+                tx.clone(),
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(
+                error.data.unwrap()["errorCode"],
+                "PLAN_GOAL_CURSOR_UNSUPPORTED",
+                "{mode}"
+            );
+        }
+
+        // Nothing moved: the Cursor session is still the valid agent + Cursor,
+        // and the refused creates added no session.
+        let st = state.lock().await;
+        let mode = sessions::session_mode(&st.db, &cursor.id).unwrap();
+        assert_eq!(mode.as_deref(), Some("agent"));
+        let cursor_provider: Option<String> = st
+            .db
+            .conn()
+            .query_row(
+                "SELECT provider_id FROM sessions WHERE id = ?1",
+                rusqlite::params![cursor.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(cursor_provider.as_deref(), Some("cursor"));
+        let sessions_created: i64 = st
+            .db
+            .conn()
+            .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(sessions_created, 3);
     }
 
     #[tokio::test]

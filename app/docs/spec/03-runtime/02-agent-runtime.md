@@ -1808,41 +1808,46 @@ previous commit of this branch is retracted.
 Because §15's blocker is architectural, the product excludes the combination
 instead of claiming compatibility: **a session may not combine an active Cursor
 model/provider with Plan or Goal mode** (user-approved decision, ADR 0306).
+Cursor's exec channel runs tool calls while a response is still streaming, so PI's
+transition-tool contract cannot be honoured for a Cursor-backed session and its
+effects cannot be undone.
 
-The gate is one shared predicate, `planGoalCursorRefusal(mode, providerId)` in
-`packages/shared/src/plan-goal-model-gate.ts`, and one code,
-`PLAN_GOAL_CURSOR_UNSUPPORTED` (spec 08 §3.2b), which carries `mode` and
-`providerId`. Identity is the canonical provider id `cursor` — an exact
-comparison, never a display label, vendor hint, endpoint URL, or case variant.
+The invariant is enforced by host-core at the durable write, not by the desktop:
 
-Enforcement sits at the boundaries that accept a combination, each immediately
-before it would take effect: `sessionConfigure` (a mode or model change, judged
-against the resulting pair, because the renderer sends partial updates),
-`sessionCreate` (the initial pairing inherited from the composer), and
-`agentPrompt` (a persisted or imported pair, before any runtime work — this is
-what a stale or imported session hits). A refusal names both escape paths
-(switch to Agent mode, or choose another model) and never rewrites the mode or
-the model itself. Cursor sessions in Agent mode and every non-Cursor provider in
-Plan/Goal mode keep their existing behavior.
+* `crates/host-core/src/plan_goal_guard.rs` installs two `sessions` triggers on
+  every database open — one for `INSERT`, one for `UPDATE OF mode, provider_id`.
+  A write whose result is Plan/Goal + the Cursor provider is aborted by SQLite
+  itself, so the transition tool (`plans.enter`), `session.configure`,
+  `session.create`, forks, imports and any future writer are all covered, and no
+  caller can land the pair between a read and a write.
+* Identity is the canonical provider id `"cursor"` and the code is
+  `PLAN_GOAL_CURSOR_UNSUPPORTED` (spec 08 §3.2b). Both literals live once per
+  language and are pinned together by
+  `apps/desktop/test/plan-goal-cursor-constant-parity.test.mjs`; the guard's SQL is
+  generated from them.
+* Every host RPC that can write the pair answers with that code. `plans.enter`
+  and `session.configure` already report any `PLAN_*` refusal verbatim;
+  `session.create`, `session.fork` and `session.import` now do the same instead of
+  flattening it into `INTERNAL`.
+* A row that already holds the pair (hand-edited, or produced by a historical
+  migration before the guard existed) keeps opening, and unrelated writes to it
+  still work — but only as long as both guarded columns keep exactly their
+  previous values. Hopping such a row to the other contract mode is a transition
+  into the pair and is refused. Both repairs are ordinary writes: drop the mode,
+  or choose another provider. Nothing ever rewrites the user's mode or model.
 
-The renderer is prevention and explanation, not the gate: the store refuses
-before IPC with the localized `errors.PLAN_GOAL_CURSOR_UNSUPPORTED` message, the
-model menu withholds the Cursor provider while a contract mode is active and
-states why, and an automatic model pin that would create the pair is skipped
-with the same reason.
+The desktop adds the boundaries a database trigger cannot cover:
 
-`host-core` deliberately does not implement this check. The pinned rpc-ui
-exposes no plan/goal command and the desktop registers no OMP transition tools,
-so no OMP pair can be written through the host. One Pi path is adjusted rather
-than intercepted: a session whose durable `provider_id` is `cursor` can still
-run a turn (the launch resolver substitutes the default or first provider when
-the binding does not resolve, `packages/host-runtime/src/launch-resolver.ts`),
-and its model's `EnterPlanMode` tool then writes `mode='plan'` through
-`plans.enter` (`crates/host-core/src/plans/approval.rs`), which the sidecar calls
-outside the desktop's IPC. The prompt gate refuses that pair before any further
-runtime work, with the same reason and escape paths. Closing the write itself
-would need a provider check in host-core's `PlanManager::enter` plus a
-cross-language test pinning the `cursor` literal; the engine-specific provider
-knowledge otherwise stays in the boundary and adapter layer (ADR 0300's rule).
-R3 remains blocked and T20-B/C/D remain unstarted — this gate is a precondition
-for that work, not the feature.
+* `sessionConfigure`, `sessionCreate` and `agentPrompt` refuse the same pair
+  before any runtime work, with the same code and with `mode`/`providerId` in the
+  thrown payload so the renderer's `error.details` carries them
+  (`packages/shared/src/plan-goal-model-gate.ts`).
+* The prompt gate is the last line of defence for a row that reached the database
+  through a path the guard cannot see (a migration, a manual edit).
+* The renderer withholds the Cursor provider in contract modes and states why,
+  refuses the pair before IPC with a localized message, and skips an automatic
+  model pin that would create it.
+
+Non-Cursor providers and Cursor models in Agent mode are untouched. R3 itself
+remains blocked and T20-B/C/D remain unstarted: this gate is a precondition for
+that work, not the feature.

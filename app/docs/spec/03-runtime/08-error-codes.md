@@ -99,14 +99,14 @@ product decision). Cursor's exec channel runs tool calls while a response is sti
 streaming — before the assistant message that carries them exists — so PI's
 transition-tool contract (the submit tool owns the whole batch; its siblings
 produce no side effects) cannot be honoured and its effects cannot be undone
-(evidence: validation `M5-omp-transition-patch.md` §9/§10). The desktop refuses the
-pair at the boundary that accepts a mode, a model change, or a new session, and
-before any runtime work for a persisted or imported pair — never by rewriting the
-user's mode or model.
+(evidence: validation `M5-omp-transition-patch.md` §9/§10). Host-core refuses the
+pair inside the durable write itself (`crates/host-core/src/plan_goal_guard.rs`),
+and the desktop's session-configure, session-create and prompt boundaries refuse it
+before any runtime work. Neither side ever rewrites the user's mode or model.
 
 | code | retriable | meaning |
 |---|---|---|
-| `PLAN_GOAL_CURSOR_UNSUPPORTED` | no | the session is (or would become) bound to the Cursor provider while Plan or Goal mode is active. Carries `mode` and `providerId`; the message names both escape paths (switch to Agent mode, or choose another model) |
+| `PLAN_GOAL_CURSOR_UNSUPPORTED` | no | the write would leave Plan or Goal mode combined with the Cursor provider. Carries `mode` and `providerId`; the two escapes are dropping the mode or choosing another provider |
 
 ### 3.2 Agent / session
 

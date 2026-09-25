@@ -6875,4 +6875,278 @@ mod tests {
             Some(0)
         );
     }
+
+    /// T20-R3C (F2): the pair is refused by the durable write, in both
+    /// directions, while both repair paths stay open.
+    #[test]
+    fn configure_refuses_the_cursor_contract_combination_in_both_directions() {
+        let db = test_db();
+
+        // Direction 1: entering Plan or Goal on a Cursor-bound session.
+        let cursor = create_session(
+            &db,
+            None,
+            Some("agent".into()),
+            Some("cursor".into()),
+            Some("claude-4.6-opus-high".into()),
+            None,
+        )
+        .unwrap();
+        for mode in ["plan", "goal"] {
+            assert_eq!(
+                configure_session_with_thinking(&db, &cursor.id, mode, None, None, None, None)
+                    .unwrap_err()
+                    .to_string(),
+                "PLAN_GOAL_CURSOR_UNSUPPORTED"
+            );
+        }
+        // The refused writes changed nothing.
+        let after = get_session(&db, &cursor.id).unwrap().unwrap().summary;
+        assert_eq!(after.mode, "agent");
+        assert_eq!(after.provider_id.as_deref(), Some("cursor"));
+
+        // Direction 2: binding Cursor while a contract mode is active.
+        let plain = create_session(
+            &db,
+            None,
+            Some("agent".into()),
+            Some("openai".into()),
+            Some("gpt-5.2".into()),
+            None,
+        )
+        .unwrap();
+        configure_session_with_thinking(&db, &plain.id, "plan", None, None, None, None)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            configure_session_with_thinking(
+                &db,
+                &plain.id,
+                "plan",
+                Some("cursor"),
+                Some("claude-4.6-opus-high"),
+                None,
+                None,
+            )
+            .unwrap_err()
+            .to_string(),
+            "PLAN_GOAL_CURSOR_UNSUPPORTED"
+        );
+        assert_eq!(
+            get_session(&db, &plain.id)
+                .unwrap()
+                .unwrap()
+                .summary
+                .provider_id
+                .as_deref(),
+            Some("openai")
+        );
+
+        // Repair path A: drop the mode, keep the Cursor model.
+        let repaired = configure_session_with_thinking(&db, &cursor.id, "agent", None, None, Some("high"), None)
+            .unwrap()
+            .unwrap();
+        assert_eq!(repaired.mode, "agent");
+        assert_eq!(repaired.provider_id.as_deref(), Some("cursor"));
+
+        // Repair path B: keep the mode, choose another provider.
+        let repaired = configure_session_with_thinking(
+            &db,
+            &plain.id,
+            "plan",
+            Some("anthropic"),
+            Some("claude-sonnet"),
+            None,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(repaired.mode, "plan");
+        assert_eq!(repaired.provider_id.as_deref(), Some("anthropic"));
+    }
+
+    /// Non-Cursor behaviour is untouched, including the "CURSOR"/near-miss ids
+    /// that are not the canonical provider.
+    #[test]
+    fn configure_leaves_non_cursor_and_agent_combinations_alone() {
+        let db = test_db();
+        for provider in ["openai", "anthropic", "Cursor", "cursor ", "plugin:acme:cursor"] {
+            let session = create_session(
+                &db,
+                None,
+                Some("agent".into()),
+                Some(provider.into()),
+                Some("m".into()),
+                None,
+            )
+            .unwrap();
+            let configured =
+                configure_session_with_thinking(&db, &session.id, "plan", None, None, None, None)
+                    .unwrap()
+                    .unwrap();
+            assert_eq!(configured.mode, "plan", "provider {provider} must stay usable");
+        }
+        // Agent mode with the Cursor provider keeps working, including a
+        // thinking-level-only change.
+        let cursor = create_session(
+            &db,
+            None,
+            Some("agent".into()),
+            Some("cursor".into()),
+            Some("m".into()),
+            None,
+        )
+        .unwrap();
+        let configured = configure_session_with_thinking(&db, &cursor.id, "agent", None, None, Some("high"), None)
+            .unwrap()
+            .unwrap();
+        assert_eq!(configured.thinking_level, "high");
+    }
+
+    /// T20-R3C (F2): a new session cannot be created holding the pair.
+    #[test]
+    fn create_refuses_the_cursor_contract_combination() {
+        let db = test_db();
+        for mode in ["plan", "goal"] {
+            assert_eq!(
+                create_session(
+                    &db,
+                    None,
+                    Some(mode.into()),
+                    Some("cursor".into()),
+                    Some("m".into()),
+                    None,
+                )
+                .unwrap_err()
+                .to_string(),
+                "PLAN_GOAL_CURSOR_UNSUPPORTED"
+            );
+            let rows: i64 = db
+                .conn()
+                .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(rows, 0, "a refused create must not persist a session");
+        }
+        assert!(create_session(
+            &db,
+            None,
+            Some("agent".into()),
+            Some("cursor".into()),
+            Some("m".into()),
+            None
+        )
+        .is_ok());
+        assert!(create_session(
+            &db,
+            None,
+            Some("plan".into()),
+            Some("openai".into()),
+            Some("m".into()),
+            None
+        )
+        .is_ok());
+    }
+
+    /// T20-R3C (F2, review follow-up): a database that already holds the pair
+    /// may keep the row, but nothing may *move it into* the other contract mode,
+    /// and the unrelated-field and repair writes stay open.
+    #[test]
+    fn configure_refuses_a_legacy_pair_hopping_between_contract_modes() {
+        let db = test_db();
+        crate::plan_goal_guard::plant_legacy_contract_cursor_session(&db, "legacy-plan").unwrap();
+
+        // The composer's mode cycle asks for Goal next: refused, because the
+        // resulting pair is new even though a plan + Cursor row already existed.
+        assert_eq!(
+            configure_session_with_thinking(&db, "legacy-plan", "goal", None, None, None, None)
+                .unwrap_err()
+                .to_string(),
+            "PLAN_GOAL_CURSOR_UNSUPPORTED"
+        );
+        assert_eq!(
+            session_mode(&db, "legacy-plan").unwrap().as_deref(),
+            Some("plan")
+        );
+
+        // Echoing the mode it already has, with a new model, is not a transition.
+        let echoed = configure_session_with_thinking(
+            &db,
+            "legacy-plan",
+            "plan",
+            None,
+            Some("claude-4.6-opus-high"),
+            Some("high"),
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(echoed.mode, "plan");
+        assert_eq!(echoed.thinking_level, "high");
+
+        // Both repairs still land: drop the mode, or choose another provider.
+        let repaired = configure_session_with_thinking(&db, "legacy-plan", "agent", None, None, None, None)
+            .unwrap()
+            .unwrap();
+        assert_eq!(repaired.mode, "agent");
+        let repaired = configure_session_with_thinking(
+            &db,
+            "legacy-plan",
+            "goal",
+            Some("openai"),
+            Some("gpt-5.2"),
+            None,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(repaired.mode, "goal");
+        assert_eq!(repaired.provider_id.as_deref(), Some("openai"));
+    }
+
+    /// T20-R3C (F2) atomicity: the host judges the update against the row the
+    /// database holds at write time, not against whatever the caller read
+    /// earlier — the exact window a desktop-side pre-read leaves open.
+    #[test]
+    fn configure_judges_the_effective_pair_against_the_database_at_write_time() {
+        let db = test_db();
+        let session = create_session(
+            &db,
+            None,
+            Some("agent".into()),
+            Some("openai".into()),
+            Some("gpt-5.2".into()),
+            None,
+        )
+        .unwrap();
+
+        // The desktop pre-read (its engine gate) saw agent + openai, so a merged
+        // `mode: plan` update passed its own check.
+        let pre_read = get_session(&db, &session.id).unwrap().unwrap().summary;
+        assert_eq!(pre_read.mode, "agent");
+        assert_eq!(pre_read.provider_id.as_deref(), Some("openai"));
+
+        // Another update lands in between and binds the session to Cursor.
+        configure_session_with_thinking(
+            &db,
+            &session.id,
+            "agent",
+            Some("cursor"),
+            Some("claude-4.6-opus-high"),
+            None,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+
+        // The stale merged update is refused by the write itself.
+        assert_eq!(
+            configure_session_with_thinking(&db, &session.id, "plan", None, None, None, None)
+                .unwrap_err()
+                .to_string(),
+            "PLAN_GOAL_CURSOR_UNSUPPORTED"
+        );
+        let after = get_session(&db, &session.id).unwrap().unwrap().summary;
+        assert_eq!(after.mode, "agent");
+        assert_eq!(after.provider_id.as_deref(), Some("cursor"));
+    }
 }

@@ -93,10 +93,15 @@ const { registerIpcHandlers } = load("../electron/main/ipc/register.ts", {
   "./speech-ipc": { registerSpeechIpc: noopRegister },
 });
 
-function harness({ ompConfigure } = {}) {
+function harness({ ompConfigure, sessionRecord = null } = {}) {
   const wrapped = new Map();
   const ipcMain = { handle: (channel, fn) => wrapped.set(channel, fn) };
-  const host = { call: async () => ({}) };
+  const host = {
+    call: async (method, input) =>
+      method === "session.get" && sessionRecord
+        ? { session: { id: input?.id, ...sessionRecord } }
+        : {},
+  };
   registerIpcHandlers({
     ipcMain,
     getHost: () => host,
@@ -180,6 +185,85 @@ test("J1: renderer api.configureSession rejects with the caught Error carrying e
         assert.equal(error.code, ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE, "the typed error code must reach the renderer");
         assert.match(error.message, /thinking level could not be reverted/, "the useful configure reason must survive");
         assert.equal(error.details?.inconsistent, true, "the marker must reach the caught renderer Error");
+        return true;
+      },
+    );
+  } finally {
+    globalThis.window = previous;
+  }
+});
+
+/**
+ * T20-R3C (F3): the Plan/Goal × Cursor refusal must survive the REAL wrapper.
+ *
+ * The refusal carries `mode`/`providerId` in `data`; the wrapper reads the wire
+ * code from `data.errorCode` and forwards `data` as `error.details`. Testing the
+ * handler directly would not prove either hop.
+ */
+test("F3: a configure refusal keeps its code and its { errorCode, mode, providerId } details", async () => {
+  const { wrapped } = harness({
+    sessionRecord: { mode: "agent", providerId: "cursor", modelId: "claude-4.6-opus-high" },
+  });
+  const handler = wrapped.get(IPC.invoke.sessionConfigure);
+  const result = await handler({}, "cursor-session", { mode: "plan" });
+
+  assert.equal(result.ok, false, "the refusal must be a Result failure");
+  assert.equal(
+    result.error.code,
+    ErrorCodes.PLAN_GOAL_CURSOR_UNSUPPORTED,
+    "the product code must survive the wrapper",
+  );
+  assert.deepEqual(
+    result.error.details,
+    { errorCode: ErrorCodes.PLAN_GOAL_CURSOR_UNSUPPORTED, mode: "plan", providerId: "cursor" },
+    "error.details must carry the refused pair (the renderer contract)",
+  );
+  assert.match(result.error.message, /not supported with Cursor models/);
+});
+
+test("F3: a create refusal keeps its code and details through the wrapper too", async () => {
+  const { wrapped } = harness();
+  const result = await wrapped.get(IPC.invoke.sessionCreate)({}, {
+    mode: "goal",
+    providerId: "cursor",
+    modelId: "claude-4.6-opus-high",
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, ErrorCodes.PLAN_GOAL_CURSOR_UNSUPPORTED);
+  assert.deepEqual(result.error.details, {
+    errorCode: ErrorCodes.PLAN_GOAL_CURSOR_UNSUPPORTED,
+    mode: "goal",
+    providerId: "cursor",
+  });
+});
+
+test("F3: the renderer receives the same code and details on the caught Error", async () => {
+  const { wrapped } = harness({
+    sessionRecord: { mode: "agent", providerId: "cursor", modelId: "m" },
+  });
+  const previous = globalThis.window;
+  try {
+    globalThis.window = {
+      piDesktop: {
+        invoke: async (channel, ...args) => wrapped.get(channel)({}, ...args),
+        on: () => () => {},
+        channels: IPC,
+        platform: "linux",
+      },
+    };
+    await assert.rejects(
+      api.configureSession("cursor-session", { mode: "goal" }),
+      (error) => {
+        assert.equal(
+          error.code,
+          ErrorCodes.PLAN_GOAL_CURSOR_UNSUPPORTED,
+          "the renderer must see the product code, not INTERNAL",
+        );
+        assert.deepEqual(error.details, {
+          errorCode: ErrorCodes.PLAN_GOAL_CURSOR_UNSUPPORTED,
+          mode: "goal",
+          providerId: "cursor",
+        });
         return true;
       },
     );

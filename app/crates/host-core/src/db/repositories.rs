@@ -226,6 +226,12 @@ impl Database {
             migrate_v20_to_v21(&conn, path)?;
         }
         let db = Self { conn, data_dir };
+        // The Plan/Goal × Cursor write guard rides the open path rather than a
+        // schema-version step so every existing database gains it on upgrade
+        // (M5/T20-R3C, ADR 0306). Installed after the migration chain: rows a
+        // historical migration produced are pre-existing data, not a new write,
+        // and are covered by the desktop's prompt gate.
+        crate::plan_goal_guard::install(&db)?;
         db.boot_maintenance()?;
         crate::session_collaboration::recover(&db)?;
         Ok(db)

@@ -8,6 +8,7 @@ mod mcp_servers;
 mod network_proxy;
 mod notifications;
 mod permissions;
+mod plan_goal_guard;
 mod plans;
 mod plugin_sessions;
 mod plugin_usage;

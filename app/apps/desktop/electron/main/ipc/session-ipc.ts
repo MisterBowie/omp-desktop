@@ -9,6 +9,7 @@ import {
   draftMatchesExisting,
   providerCreateInputFromDraft,
   isModelConfigImportSource,
+  planGoalCursorError,
   planGoalCursorRefusal,
   type ActivationScope,
   type ModelConfigImportDraft,
@@ -199,7 +200,7 @@ export function registerSessionIpc({
     // session whose next prompt would be rejected.
     const planGoalRefusal = planGoalCursorRefusal(input.mode, input.providerId);
     if (planGoalRefusal) {
-      throw Object.assign(new Error(planGoalRefusal.message), planGoalRefusal);
+      throw planGoalCursorError(planGoalRefusal);
     }
     const capabilityPromise = sessionCapabilityContext();
     const res = await host.call<{ session?: (RuntimeSession & { id?: string }) | null }>(
@@ -745,7 +746,7 @@ export function registerSessionIpc({
         config.providerId ?? current?.providerId ?? null,
       );
       if (planGoalRefusal) {
-        throw Object.assign(new Error(planGoalRefusal.message), planGoalRefusal);
+        throw planGoalCursorError(planGoalRefusal);
       }
       let result: { session?: RuntimeSession | null };
       if (engine === "omp") {

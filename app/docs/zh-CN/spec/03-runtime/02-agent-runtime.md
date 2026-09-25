@@ -1099,3 +1099,40 @@ System/Direct/Custom 代理路由保持不变。
 终态。结构化原因会穿过 adapter 的错误扁平化，保留在最终错误行中，也不会触发
 provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行为。详见
 [证书信任 ADR](../../../adr/provider-system-certificates.md)。
+
+## 16. Plan/Goal × Cursor 产品门（M5/T20-R3C，ADR 0306）
+
+因为 §15 的阻塞是架构性的，产品选择排除该组合而不是声称兼容：**一个会话不得把活跃的 Cursor
+模型/提供方与 Plan 或 Goal 模式组合**（用户确认的决策，ADR 0306）。Cursor 的 exec 通道会在响应
+仍在流式期间执行工具调用，因此 Cursor 会话无法满足 PI 的过渡工具契约，其副作用也无法撤销。
+
+该不变量由 host-core 在**持久化写入处**强制，而不是由桌面：
+
+* `crates/host-core/src/plan_goal_guard.rs` 在每次打开数据库时安装两个 `sessions` 触发器——
+  一个针对 `INSERT`，一个针对 `UPDATE OF mode, provider_id`。凡是结果为 Plan/Goal + Cursor
+  提供方的写入都会被 SQLite 本身中止，因此过渡工具（`plans.enter`）、`session.configure`、
+  `session.create`、fork、导入以及任何将来的写入者都在覆盖范围内，也没有调用方能在"读"与
+  "写"之间把该组合落盘。
+* 身份是规范 provider id `"cursor"`，错误码是 `PLAN_GOAL_CURSOR_UNSUPPORTED`（规格 08 §3.2b）。
+  两种语言各自只保留一份字面量，并由
+  `apps/desktop/test/plan-goal-cursor-constant-parity.test.mjs` 将其钉在一起；守卫的 SQL 由这些
+  常量生成。
+* 每个可能写入该组合的 host RPC 都返回该错误码。`plans.enter` 与 `session.configure` 本来就会原样
+  上报 `PLAN_*` 拒绝；`session.create`、`session.fork`、`session.import` 现在同样如此，而不再压成
+  `INTERNAL`。
+* 已经持有该组合的行（手工改过，或由守卫存在之前的历史迁移产生）仍可打开，且对其做无关写入仍然
+  可用——前提是两个受守卫列**完全保持原值**。把这样的行切换到另一种契约模式属于"新形成该组合"，
+  会被拒绝。两条修复路径都是普通写入：去掉模式，或改选其他提供方。任何情况下都不会改写用户的模式
+  或模型。
+
+桌面补上触发器覆盖不到的边界：
+
+* `sessionConfigure`、`sessionCreate`、`agentPrompt` 在任何运行时工作之前以同一错误码拒绝同一组合，
+  并把 `mode`/`providerId` 放进抛出载荷，使渲染层的 `error.details` 能带上它们
+  （`packages/shared/src/plan-goal-model-gate.ts`）。
+* 派发门是"守卫看不到的路径"（迁移、手工编辑）的最后防线。
+* 渲染层在契约模式下不提供 Cursor 提供方并说明原因；在 IPC 之前以本地化提示拒绝该组合；并跳过会
+  形成该组合的自动模型 pin。
+
+非 Cursor 提供方与 Agent 模式下的 Cursor 模型不受影响。R3 本身仍未解除、T20-B/C/D 仍未开始：
+本门是这些工作的前置条件，而不是该功能本身。

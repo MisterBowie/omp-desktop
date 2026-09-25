@@ -886,3 +886,84 @@ fn entering_goal_mode_writes_the_goal_mode_and_kind() {
         "PLAN_INVALID_ARGUMENT"
     );
 }
+
+/// T20-R3C (F1): the durable mode write itself refuses the Plan/Goal × Cursor
+/// combination. `plans.enter` is the boundary the Pi sidecar calls directly
+/// (outside the desktop's IPC), so a desktop-level gate cannot stand in for it.
+#[test]
+fn enter_refuses_the_cursor_contract_combination_without_writing_the_mode() {
+    for kind in [KIND_PLAN, KIND_GOAL] {
+        let (dir, db) = test_db();
+        let root = dir.path().join("workspace");
+        fs::create_dir_all(&root).unwrap();
+        let session = sessions::create_session(
+            &db,
+            Some("Agent".into()),
+            Some("agent".into()),
+            Some("cursor".into()),
+            Some("claude-4.6-opus-high".into()),
+            Some(root.to_string_lossy().into_owned()),
+        )
+        .unwrap();
+        let turn = live_turn(&db, &session.id);
+
+        assert_eq!(
+            PlanManager
+                .enter(&db, &session.id, &turn, "enter-call", kind)
+                .unwrap_err()
+                .to_string(),
+            "PLAN_GOAL_CURSOR_UNSUPPORTED"
+        );
+
+        // Nothing was written on the refused path: no mode, no proposal row.
+        assert_eq!(
+            sessions::session_mode(&db, &session.id).unwrap().as_deref(),
+            Some("agent")
+        );
+        let approvals: i64 = db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*) FROM plan_approvals WHERE session_id = ?1",
+                params![session.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(approvals, 0);
+        let audits: i64 = db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*) FROM audit_log WHERE session_id = ?1 AND kind = 'plan_entered'",
+                params![session.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(audits, 0);
+    }
+}
+
+/// The same entry still works for every other provider, for both kinds.
+#[test]
+fn enter_still_writes_the_mode_for_a_non_cursor_provider() {
+    for kind in [KIND_PLAN, KIND_GOAL] {
+        let (dir, db) = test_db();
+        let root = dir.path().join("workspace");
+        fs::create_dir_all(&root).unwrap();
+        let session = sessions::create_session(
+            &db,
+            Some("Agent".into()),
+            Some("agent".into()),
+            Some("openai".into()),
+            Some("gpt-5.2".into()),
+            Some(root.to_string_lossy().into_owned()),
+        )
+        .unwrap();
+        let turn = live_turn(&db, &session.id);
+        PlanManager
+            .enter(&db, &session.id, &turn, "enter-call", kind)
+            .unwrap();
+        assert_eq!(
+            sessions::session_mode(&db, &session.id).unwrap().as_deref(),
+            Some(kind)
+        );
+    }
+}

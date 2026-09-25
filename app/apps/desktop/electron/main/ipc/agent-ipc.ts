@@ -1,4 +1,4 @@
-import { IPC, ErrorCodes, isGlobalPermissionMode, planGoalCursorRefusal, type AgentEventEnvelope, type AgentPromptRequest, type AgentSteerRequest, type UiMessage, type AgentQueuePushRequest, type AgentStopRequest, type AskToolResolution, type GlobalPermissionMode, type MessageUsage, type PlanExecutionFinishStatus, type PlanResolutionResult, type PlanResolveRequest, type PromptEnhancementRequest, type SessionSummarizeTitleRequest, canonicalThinkingLevel, type ThinkingLevel } from "@pi-desktop/shared";
+import { IPC, ErrorCodes, isGlobalPermissionMode, planGoalCursorError, planGoalCursorRefusal, type AgentEventEnvelope, type AgentPromptRequest, type AgentSteerRequest, type UiMessage, type AgentQueuePushRequest, type AgentStopRequest, type AskToolResolution, type GlobalPermissionMode, type MessageUsage, type PlanExecutionFinishStatus, type PlanResolutionResult, type PlanResolveRequest, type PromptEnhancementRequest, type SessionSummarizeTitleRequest, canonicalThinkingLevel, type ThinkingLevel } from "@pi-desktop/shared";
 import type { FinishTurn } from "../runtime/plans";
 import { expandSlashInvocation, enhancePromptDraft, summarizeSessionTitle, visionFromModelConfig, type ComposerTemplate, type RuntimeProviderConfig } from "@pi-desktop/agent-runtime";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
@@ -373,7 +373,7 @@ export function registerAgentIpc({
     // or the model itself.
     const planGoalRefusal = planGoalCursorRefusal(session.mode, session.providerId);
     if (planGoalRefusal) {
-      throw Object.assign(new Error(planGoalRefusal.message), planGoalRefusal);
+      throw planGoalCursorError(planGoalRefusal);
     }
     if (promptEngine === "omp") {
       // The OMP runtime owns this session's transcript, its tools and its
