@@ -12,11 +12,17 @@
  *                                                          -> one stable line per
  *                                                             open gap, exit 1
  *
- * Baseline: commit 2ca2565, OMP d49918fab, PI 0111e306. Each gap is owned by
- * the noted later stage; the checks here must be REPLACED by real behavioral
- * tests there, not converted into pins.
+ * Baseline: commit 2ca2565, OMP d49918fab, PI 0111e306 (re-verified on the
+ * T20-A rework head 07de0a7; the measured seams are unchanged). Each gap is
+ * owned by the noted later stage; the checks here must be REPLACED by real
+ * behavioral tests there, not converted into pins.
+ *
+ * g1's verdict is a disjunction over real runtime channels (protocol prompt
+ * key, runtime-domain state field, engine-seam mode prompt) — the previous
+ * version keyed the verdict on a comment in the bridge, which is not evidence
+ * of anything and has been removed.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -48,13 +54,6 @@ function sourceSeam(rel) {
 // g1 (owner: T20-B) — mode/permissionMode is persistence-only in the bridge
 // ---------------------------------------------------------------------------
 {
-  const sessionSource = sourceSeam("apps/desktop/electron/main/runtime/omp-session.ts");
-  const persistenceOnly = sessionSource.includes(
-    "A pure mode/permissionMode change has no runtime impact; persist it.",
-  );
-  // The pinned prompt command is the whole per-prompt surface: message plus
-  // optional images/streamingBehavior. No mode, system prompt, or tool list
-  // can ride on it — that is the protocol fact that keeps mode out of OMP.
   const typesSource = readFileSync(
     ompSource("packages/coding-agent/src/modes/rpc/rpc-types.ts"),
     "utf8",
@@ -62,14 +61,41 @@ function sourceSeam(rel) {
   const promptVariant = typesSource.match(
     /\|\s*\{[^{}]*?type:\s*"prompt";[^{}]*?\}/s,
   )?.[0] ?? "";
-  const promptCarriesNoMode = /(mode|systemPrompt|tools)\s*[?:]/.test(promptVariant) === false;
-  report(
-    "g1",
-    "T20-B",
-    persistenceOnly,
-    "session mode/permissionMode persist to the host DB only; no OMP prompt/tool path reads them",
-    `omp-session.ts persistence-only branch present: ${persistenceOnly}; pinned prompt command has no mode/systemPrompt/tools key: ${promptCarriesNoMode} (${promptVariant.trim().replace(/\s+/g, " ")})`,
+  const promptCarriesModeKey = /(mode|systemPrompt|tools)\s*[?:]/.test(promptVariant);
+
+  // The gap is "no runtime channel carries the durable mode". It closes when
+  // any channel does, so the verdict is a disjunction over real seams — never a
+  // comment match:
+  //   1. the pinned per-prompt `prompt` command grows a mode/tools key,
+  //   2. the runtime-domain state snapshot (`desktop-state.ts`) carries a mode
+  //      block that `before_agent_start` reads,
+  //   3. the desktop engine seam composes PI's mode prompt (directly or through
+  //      the `mode-prompts` module).
+  const stateSource = sourceSeam("packages/omp-runtime/src/desktop-state.ts");
+  const stateCarriesMode = /^\s*mode(Prompt)?\s*[?:]/m.test(stateSource);
+  const engineSeamDir = join(appRoot, "apps/desktop/electron/main/runtime");
+  const engineSeamSources = readdirSync(engineSeamDir)
+    .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
+    .map((name) => readFileSync(join(engineSeamDir, name), "utf8"));
+  const composesModePrompt = engineSeamSources.some(
+    (source) => source.includes("composeModeSystemPrompt") || source.includes("mode-prompts"),
   );
+
+  if (promptCarriesModeKey) {
+    console.log(
+      `REVIEW-REQUIRED g1: the pinned prompt command now carries a mode/systemPrompt/tools key (${promptVariant.trim().replace(/\s+/g, " ")}) — the T20-A g1 verdict is stale and must be re-audited before T20-B`,
+    );
+    open.push("g1");
+  } else {
+    const gapOpen = !stateCarriesMode && !composesModePrompt;
+    report(
+      "g1",
+      "T20-B",
+      gapOpen,
+      "session mode/permissionMode persist to the host DB only; no OMP prompt/tool path reads them",
+      `pinned prompt command has no mode/systemPrompt/tools key: ${!promptCarriesModeKey} (${promptVariant.trim().replace(/\s+/g, " ")}); runtime-domain state carries a mode field: ${stateCarriesMode}; desktop engine seam composes the PI mode prompt: ${composesModePrompt}`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
