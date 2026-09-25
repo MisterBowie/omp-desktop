@@ -1,7 +1,7 @@
 {
   "experiment": "t20-feasibility",
   "runId": null,
-  "startedAt": "2026-09-25T12:54:00.014Z",
+  "startedAt": "2026-09-25T13:07:37.451Z",
   "checks": [
     {
       "description": "s1-mixed-bash-first: process group reaped",
@@ -73,7 +73,7 @@
     {
       "description": "R3-d: abandoning a pending transition call cancels it by targetId",
       "ok": true,
-      "detail": "cancel.targetId=158d75b0c9fac3e3 call.id=158d75b0c9fac3e3"
+      "detail": "cancel.targetId=158d78cf06789706 call.id=158d78cf06789706"
     },
     {
       "description": "R3-d: the aborted turn terminates",
@@ -83,7 +83,7 @@
     {
       "description": "R3-d: the session stays observable after the abort",
       "ok": true,
-      "detail": "{\"id\":\"req-a4019f0e\",\"type\":\"response\",\"command\":\"get_state\",\"success\":true,\"data\":{\"model\":{\"id\":\"local-model\",\"name\":\"local-model\",\"api\":\"openai-completions\",\"provider\":\"m1fake\",\"baseUrl\":\"http://12"
+      "detail": "{\"id\":\"req-fcfaf916\",\"type\":\"response\",\"command\":\"get_state\",\"success\":true,\"data\":{\"model\":{\"id\":\"local-model\",\"name\":\"local-model\",\"api\":\"openai-completions\",\"provider\":\"m1fake\",\"baseUrl\":\"http://12"
     },
     {
       "description": "s7-abort-on-intercept: process group reaped",
@@ -149,8 +149,14 @@
       "ok": true
     },
     {
-      "description": "R4: the registered host tool is hidden by the clamp exactly",
-      "ok": true
+      "description": "R4: every prompt's tool list equals its catalog+clamp exactly (sequence, no residue, no duplicates)",
+      "ok": true,
+      "detail": "[[\"read\",\"grep\",\"glob\",\"bash\",\"HostEcho\"],[\"read\",\"grep\",\"glob\",\"bash\",\"HostEcho\"],[\"read\",\"grep\",\"glob\",\"bash\",\"SubmitGoal\"]]"
+    },
+    {
+      "description": "R4: the third prompt is a real change (catalog gains SubmitGoal, clamp drops HostEcho)",
+      "ok": true,
+      "detail": "read,grep,glob,bash,SubmitGoal"
     },
     {
       "description": "R4: a prompt that both clamps and appends a mode block is delivered within one policy retry",
@@ -163,9 +169,9 @@
       "detail": "attempts=1"
     },
     {
-      "description": "R4: an in-place clamp change converges within one retry",
+      "description": "R4: the real catalog+clamp change converges within one retry",
       "ok": true,
-      "detail": "attempts=1 requests=1"
+      "detail": "attempts=2 requests=1"
     },
     {
       "description": "R2: the appended block is the production composeModeSystemPrompt(mode, '') bytes, exactly once",
@@ -187,9 +193,24 @@
       "ok": true
     },
     {
-      "description": "R2: the block is appended after the runtime prompt (prefix is stable across prompts)",
+      "description": "R2: the block is a pure append — the prompt text ends with it, and no mode block leaks into the prefix",
       "ok": true,
-      "detail": "[12024,12024,12024]"
+      "detail": "[12024,12024,12028]"
+    },
+    {
+      "description": "R2: UTF-8 bytes satisfy system = prefix + block on every prompt",
+      "ok": true,
+      "detail": "prefixBytes=[14432,14432,14436] systemBytes=[14608,16158,16592] blockBytes=[176,1726,2156]"
+    },
+    {
+      "description": "R2: prompts with the same tool catalog keep byte-identical prefixes (the block does not perturb the base)",
+      "ok": true,
+      "detail": "prefixBytes=[14432,14432,14436] tools0=read,grep,glob,bash,HostEcho tools1=read,grep,glob,bash,HostEcho"
+    },
+    {
+      "description": "R2: a changed tool catalog changes the base prefix, not the append shape (prompt 3 vs 2)",
+      "ok": true,
+      "detail": "prefixBytes2=14436 prefixBytes1=14432"
     },
     {
       "description": "R2: this is byte-parity evidence for the mode block only (source module equality)",
@@ -255,13 +276,13 @@
     },
     "s6.observed": {
       "pendingCall": {
-        "id": "158d75b0c9fac3e3",
+        "id": "158d78cf06789706",
         "toolName": "SubmitPlan"
       },
       "hostToolCancel": {
         "type": "host_tool_cancel",
-        "id": "158d75b17dbac3e4",
-        "targetId": "158d75b0c9fac3e3"
+        "id": "158d78cfbaf89707",
+        "targetId": "158d78cf06789706"
       },
       "agentEndCount": 1,
       "providerRequests": 1,
@@ -308,7 +329,7 @@
     "s7.observed": {
       "abortEvents": [
         {
-          "at": 1790340857539,
+          "at": 1790341674937,
           "event": "spike_abort_requested",
           "toolName": "SubmitPlan",
           "hadAbort": true
@@ -506,7 +527,7 @@
       "attemptsPerPrompt": [
         2,
         1,
-        1
+        2
       ],
       "toolsPerPrompt": [
         [
@@ -528,7 +549,42 @@
           "grep",
           "glob",
           "bash",
+          "SubmitGoal"
+        ]
+      ],
+      "catalogsPerPrompt": [
+        [
           "HostEcho"
+        ],
+        [
+          "HostEcho"
+        ],
+        [
+          "HostEcho",
+          "SubmitGoal"
+        ]
+      ],
+      "clampsPerPrompt": [
+        [
+          "read",
+          "grep",
+          "glob",
+          "bash",
+          "HostEcho"
+        ],
+        [
+          "read",
+          "grep",
+          "glob",
+          "bash",
+          "HostEcho"
+        ],
+        [
+          "read",
+          "grep",
+          "glob",
+          "bash",
+          "SubmitGoal"
         ]
       ],
       "systemMessagesPerPrompt": [
@@ -566,9 +622,14 @@
         false
       ],
       "systemBytes": [
-        12200,
-        13748,
-        14178
+        14608,
+        16158,
+        16592
+      ],
+      "prefixBytes": [
+        14432,
+        14432,
+        14436
       ]
     }
   },
@@ -576,6 +637,6 @@
     "A mixed batch containing a transition tool is the exact case PI's beforeToolCall batch guard exists for.",
     "Abort-on-intercept is the only per-batch lever the fixed surface offers; if it works it is abort semantics, not PI's block-and-continue."
   ],
-  "finishedAt": "2026-09-25T12:54:36.428Z",
+  "finishedAt": "2026-09-25T13:08:13.861Z",
   "ok": false
 }

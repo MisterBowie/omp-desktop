@@ -13,14 +13,16 @@
  *                                                             open gap, exit 1
  *
  * Baseline: commit 2ca2565, OMP d49918fab, PI 0111e306 (re-verified on the
- * T20-A rework head 07de0a7; the measured seams are unchanged). Each gap is
- * owned by the noted later stage; the checks here must be REPLACED by real
- * behavioral tests there, not converted into pins.
+ * T20-A rework heads 5da616f/dd2ec72; the measured seams are unchanged). Each
+ * gap is owned by the noted later stage; the checks here must be REPLACED by
+ * real behavioral tests there, not converted into pins.
  *
- * g1's verdict is a disjunction over real runtime channels (protocol prompt
- * key, runtime-domain state field, engine-seam mode prompt) — the previous
- * version keyed the verdict on a comment in the bridge, which is not evidence
- * of anything and has been removed.
+ * g1's verdict policy: static symbols cannot prove that the durable mode
+ * actually reaches the prompt, so g1 NEVER auto-closes. The baseline (no
+ * mode-ish state field, no composer seam, no protocol key) reports GAP-OPEN;
+ * any appearance of such a symbol reports REVIEW-REQUIRED and keeps the exit
+ * code non-zero for a human re-review. Only the T20-B behavior test (B2/B13)
+ * may replace this check.
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -52,6 +54,16 @@ function sourceSeam(rel) {
 
 // ---------------------------------------------------------------------------
 // g1 (owner: T20-B) — mode/permissionMode is persistence-only in the bridge
+//
+// Verdict policy (F8): this check NEVER auto-closes. Static keyword matching
+// cannot prove a data flow — a state property plus comments naming the
+// composer and the gate would satisfy any `includes` heuristic — so the only
+// way g1 retires is the T20-B behavior test (B2/B13), which replaces it.
+//   - baseline (no mode-ish state field, no composer seam, no protocol key):
+//     GAP-OPEN, exit 1;
+//   - ANY appearance of a mode-ish state field, a composer seam, or a
+//     protocol mode/systemPrompt/tools key: REVIEW-REQUIRED, exit 1, with the
+//     matched symbols reported for the human re-review.
 // ---------------------------------------------------------------------------
 {
   const typesSource = readFileSync(
@@ -63,60 +75,45 @@ function sourceSeam(rel) {
   )?.[0] ?? "";
   const promptCarriesModeKey = /(mode|systemPrompt|tools)\s*[?:]/.test(promptVariant);
 
-  if (promptCarriesModeKey) {
+  const stateSource = sourceSeam("packages/omp-runtime/src/desktop-state.ts");
+  const stateFieldNames = [
+    ...new Set([...stateSource.matchAll(/^\s*([A-Za-z]*[Mm]ode[A-Za-z]*)\s*\??\s*:/gm)].map((match) => match[1])),
+  ];
+
+  const engineSeamDir = join(appRoot, "apps/desktop/electron/main/runtime");
+  const engineSeams = readdirSync(engineSeamDir)
+    .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
+    .map((name) => ({ name, source: readFileSync(join(engineSeamDir, name), "utf8") }));
+  const composerSeamFiles = engineSeams
+    .filter((seam) => /composeModeSystemPrompt|mode-prompts/.test(seam.source))
+    .map((seam) => seam.name);
+
+  const gateSource = sourceSeam("packages/omp-runtime/extensions/omp-desktop-gate.ts");
+  const gateReadsValidatedState = /readDesktopCapabilityState/.test(gateSource);
+
+  const triggers = [
+    promptCarriesModeKey ? `pinned prompt command carries a mode/systemPrompt/tools key (${promptVariant.trim().replace(/\s+/g, " ")})` : null,
+    stateFieldNames.length > 0 ? `runtime-domain state has mode-ish field(s): ${stateFieldNames.join("|")}` : null,
+    composerSeamFiles.length > 0 ? `engine seam references the mode composer: ${composerSeamFiles.join("|")}` : null,
+  ].filter((entry) => entry !== null);
+
+  if (triggers.length > 0) {
     console.log(
-      `REVIEW-REQUIRED g1: the pinned prompt command now carries a mode/systemPrompt/tools key (${promptVariant.trim().replace(/\s+/g, " ")}) — the T20-A g1 verdict is stale and must be re-audited before T20-B`,
+      `REVIEW-REQUIRED g1: ${triggers.join("; ")} — static symbols cannot prove the mode actually reaches the prompt (a field or comment would match them), so g1 is NOT closed here; a human must replace this diagnostic with the T20-B behavior test (B2/B13) that asserts the bridge writes composeModeSystemPrompt(mode, "") into the validated state and the gate appends it`,
     );
     open.push("g1");
   } else {
-    // The gap is "no runtime channel carries the durable mode". It only closes
-    // when the WHOLE chain exists in shipped source — a state field alone is
-    // not evidence that anything reads it:
-    //   (1) the runtime-domain state schema carries a mode-block field,
-    //   (2) the desktop bridge composes that field with the production
-    //       `composeModeSystemPrompt(mode, "")` and writes the state,
-    //   (3) the trusted gate reads the validated state and appends that field
-    //       to `event.systemPrompt`.
-    // Field names are matched, not assumed: a bare `mode` field with no reader
-    // or no writer must not turn g1 green.
-    const stateSource = sourceSeam("packages/omp-runtime/src/desktop-state.ts");
-    const stateFieldNames = new Set(
-      [...stateSource.matchAll(/^\s*([A-Za-z]*[Mm]ode[A-Za-z]*)\s*\??\s*:/gm)].map((match) => match[1]),
-    );
-
-    const engineSeamDir = join(appRoot, "apps/desktop/electron/main/runtime");
-    const engineSeams = readdirSync(engineSeamDir)
-      .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
-      .map((name) => ({ name, source: readFileSync(join(engineSeamDir, name), "utf8") }));
-    const writesState = (source) =>
-      /writeDesktopCapabilityState|DesktopCapabilitySnapshot|serializeDesktopCapabilityState|desktopState/.test(source);
-    const bridgeComposes = engineSeams.some(
-      (seam) =>
-        writesState(seam.source) &&
-        (seam.source.includes("composeModeSystemPrompt") || seam.source.includes("mode-prompts")),
-    );
-
-    const gateSource = sourceSeam("packages/omp-runtime/extensions/omp-desktop-gate.ts");
-    const gateReadsValidatedState = /readDesktopCapabilityState/.test(gateSource);
-    const gateAppends = /\.\.\.event\.systemPrompt/.test(gateSource);
-    const sharedField = [...stateFieldNames].filter(
-      (name) => name !== "mode" && gateSource.includes(name),
-    );
-    const gateCarriesField = sharedField.length > 0;
-
-    const channelOpen = !(stateFieldNames.size > 0 && bridgeComposes && gateReadsValidatedState && gateAppends && gateCarriesField);
     report(
       "g1",
       "T20-B",
-      channelOpen,
+      true,
       "session mode/permissionMode persist to the host DB only; no OMP prompt/tool path reads them",
       [
         `pinned prompt command has no mode/systemPrompt/tools key: ${!promptCarriesModeKey}`,
-        `state mode-ish fields: ${[...stateFieldNames].join("|") || "none"}`,
-        `bridge composes a mode prompt AND writes the state: ${bridgeComposes}`,
-        `gate reads the validated state: ${gateReadsValidatedState}`,
-        `gate appends to event.systemPrompt: ${gateAppends}`,
-        `gate references a state mode-block field (excluding bare \`mode\`): ${gateCarriesField}${gateCarriesField ? ` (${sharedField.join("|")})` : ""}`,
+        `state mode-ish fields: ${stateFieldNames.join("|") || "none"}`,
+        `engine seams referencing the mode composer: ${composerSeamFiles.join("|") || "none"}`,
+        `gate reads the validated state (T19-C skills/memory only, not mode): ${gateReadsValidatedState}`,
+        "retirement: T20-B behavior test (B2/B13) replaces this check; g1 never auto-closes",
       ].join("; "),
     );
   }

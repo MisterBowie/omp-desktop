@@ -4,18 +4,24 @@
 
 ## 0. M5/T20-A 交付摘要（本轮）
 
-- 状态：**T20-A 审计与契约已完成两轮返修，但"无硬阻塞"结论已撤回**（分支 `codex/m5-plan-goal-capability-gates`，审计基线 `2ca2565`，R1-R4 返修基线 `07de0a7`，**F1-F7 返修基线 `5da616f`**）。本轮为**第二轮独立复审返修 F1-F7**：未实现任何生产 Plan/Goal 行为、未改 UI/host 架构、**T20 未完成、未声称**；固定子模块零改动。
+- 状态：**T20-A 审计与契约已完成三轮返修，但"无硬阻塞"结论已撤回**（分支 `codex/m5-plan-goal-capability-gates`，审计基线 `2ca2565`，R1-R4 基线 `07de0a7`，F1-F7 基线 `5da616f`，**F8-F12 基线 `dd2ec72`**）。本轮为**第三轮独立复审返修 F8-F12**：未实现任何生产 Plan/Goal 行为、未改 UI/host 架构、**T20 未完成、未声称**；固定子模块零改动。
 - 证据：`docs/validation/M5-plan-goal-capability-gates.md`（§1.3.1 完整有效权限决策表；§4 四段链路判据的 opt-in 诊断 + 假绿对照实验；§4.2 固定 OMP + fake provider 的可行性 spike；§5 差距表含 G8/G9；§6 最小设计；§7 验收矩阵 B1-B14/C1-C8/D1-D3（编号唯一性由脚本校验）；§8 阻塞）。
-- 核心结论（F1-F7 返修后）：
+- 核心结论（F8-F12 返修后）：
+  - **F8 已修（保守方案）**：静态符号不能证明数据流 → g1 **永不自动判 closed**；基线 `GAP-OPEN`，任何 mode-ish state 字段 / composer 接缝 / 协议键只报 `REVIEW-REQUIRED` 并计入退出码，退场只能由 T20-B 的 B2/B13 行为测试替换。对照：仅注释写关键词 → `REVIEW-REQUIRED`（exit 1）；仅加 state 字段 → `REVIEW-REQUIRED`；复原 → `GAP-OPEN`。脚本头部"disjunction"与文档"真实链路"措辞已删除。
+  - **F9 已修**：R4-4 第三个 prompt 改为真实变化（catalog 加 `SubmitGoal`、clamp 去 `HostEcho`），实测 attempts **2/1/2**，三 prompt 工具表与 clamp 严格相等。
+  - **F10 已修**：systemBytes 改用 `Buffer.byteLength(..., "utf8")` 并新增 `prefixBytes = system − block` 断言；实测 blockBytes 176/1726/2156、systemBytes 14608/16158/16592、prefixBytes 14432/14432/14436（工具目录变化使第三个前缀 +4 字节，块仍是纯追加）。
+  - **F11 已修**：R4-3 改称"目标模式目录序列 / 模拟的 catalog 生命周期"，明确不证明真实持久模式切换（仍属 B1/B13 的 T20-B 验收）；同 session 连续 prompt、增删重加、无滞留结论保留。
+  - **F12 已修**：权限矩阵外部路径行注明仅适用于已通过契约 allowlist 的工具，Plan/Goal 非许可工具仍先 Deny。
+- 核心结论（F1-F7 返修轮）：
   - **F1 已修**：`BrowserPreview` 在 `plan_mode_allows` 内但**不在风险表 → Medium**（`ask`/`accept-edits` 弹卡、`auto` 放行、grant 可 `AllowSession`），`new_context` 是 sidecar-side 不到 host gate——不再写成"Low/契约许可放行"；该验收并入 C7（矩阵保持 C1-C8，未新增 C9）。
   - **F2 已修**：g1 判据改为四段链路同时成立（状态 schema 有 mode block 字段 / 引擎接缝同一文件既 compose 又写状态 / gate 读校验后状态 / gate 追加且引用该字段名，裸 `mode` 不算）；注入裸 `mode` 仍 `GAP-OPEN`、注入完整链路才 `GAP-CLOSED`；协议加键仍 `REVIEW-REQUIRED`。
   - **F3/F4 已修**：spike 工具表断言改为**严格序列相等**；R4-3 升级为同一 session 5 个连续 prompt 的真实目录生命周期（Agent→Plan→Goal→Agent→Plan，`set_host_tools` 真实增/删/重加 `SubmitPlan`/`SubmitGoal`，`SubmitGoal` 用真实定义），无滞留/重复。
-  - **F5 已修**：spike 追加**生产 `composeModeSystemPrompt(mode, "")` 的三个真实块**并断言字节/次数/位置/前缀稳定，同时断言 `app` 与固定 PI 的 `mode-prompts.ts` 逐字节相等；技能/记忆块内容与顺序明确留给 T20-B 的 B2 ④。
+  - **F5 已修**：spike 追加**生产 `composeModeSystemPrompt(mode, "")` 的三个真实块**并断言 UTF-8 字节/次数/位置（`system = prefix + block`）；技能/记忆块内容与顺序明确留给 T20-B 的 B2 ④。
   - **F6/F7 已修**：删除矩阵重复的 B6-B10 行，新增 `app/scripts/check-t20-matrix-ids.mjs`（B1-B14/C1-C8/D1-D3 各恰一次，并用旧文档验证会判红）；`permissions.rs:219-235` → `219-234`，关键行号逐一复核。
   - **R1-R4（上一轮）**：§1.3.1 决策表（`mcp_*`=Low、plugin 声明风险、契约硬拒绝顺序、无 UI 只在需交互时 fail closed）；mode block 只追加；**R3 = 硬阻塞**（同批兄弟真实落盘、重复提交执行两次、逐调用 block 保护不了兄弟、提交成功/失败后各再走 2 个 provider step），`ctx.abort()` 只得到整回合 aborted；R4 顺序/收敛已定。
   - 其余设计（§6）：复用 host-core plans 模块/`PlanApprovalBar`、状态文件通道传模式块 + 有效权限模式 + per-host-tool 策略表（risk/planSafeActions，避免靠名字猜风险，G9）；claim/drain/boot_maintenance 原样复用。
 - 验收矩阵：B1-B14（T20-B）、C1-C8（T20-C）、D1-D3（T20-D）；T20-B 表头明确 R3 阻塞、依赖模型提交的行标 ⚠。
-- 验证：诊断默认退出 0（SKIP）/ opt-in 退出 1（3 缺口 + g4）；g1 假绿对照两项；矩阵编号脚本 0；spike `t20-feasibility.mjs` **34/42**（R3 契约 8 项全失败；R4-1…R4-4、R2 字节断言、R3-d 事实断言 3 项、12 次进程回收全通过）；37 项定向测试 37/37；Biome 0；`git diff --check` 0；固定 OMP 局部测试 5+3+3 通过；字节平价 `diff -q` 四文件全等；两个子模块 SHA 未动、工作树干净。
+- 验证：诊断默认退出 0（SKIP）/ opt-in 退出 1（3 缺口 + g4）；g1 假绿对照两项（注释关键词、仅加字段，均 `REVIEW-REQUIRED`）；矩阵编号脚本 0；spike `t20-feasibility.mjs` **38/46**（失败恰为 R3 契约 8 项；attempts 2/1/2、blockBytes 176/1726/2156、systemBytes 14608/16158/16592、prefixBytes 14432/14432/14436）；37 项定向测试 37/37；Biome 0；`git diff --check` 0；固定 OMP 局部测试 5+3+3 通过；字节平价 `diff -q` 四文件全等；两个子模块 SHA 未动、工作树干净。
 - 下一轮入口：**无（受阻）**；仍关闭：`branch`/`steer`/`followUp`/`compact`、子代理单独停止、子代理 `hasUI=false` 工具 gating、PI agent 扩展注入。
 
 ## 0. M5/T19-C 交付摘要（上一轮，含第二轮复审返修）

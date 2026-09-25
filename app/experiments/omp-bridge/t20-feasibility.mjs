@@ -646,15 +646,19 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
   {
     const project = ctx.scratch("t20-r4d-project");
     const agentClamp = ["read", "grep", "glob", "bash", "HostEcho"];
-    const planClamp = ["read", "grep", "glob", "bash", "HostEcho"];
+    // The third prompt is a REAL change: the catalog gains SubmitGoal and the
+    // clamp drops HostEcho for it, so the preparation inputs differ from the
+    // second prompt instead of repeating the same list.
+    const goalClamp = ["read", "grep", "glob", "bash", "SubmitGoal"];
+    const clampPlan = [agentClamp, agentClamp, goalClamp];
     const modePlan = ["agent", "plan", "goal"];
     const agentBlock = composeModeSystemPrompt("agent", "");
     const planBlock = composeModeSystemPrompt("plan", "");
     const goalBlock = composeModeSystemPrompt("goal", "");
     const run = await runScenario(ctx, provider, {
       label: "r4d-clamp-and-mode-block",
-      catalogPlan: [[ECHO_TOOL], [ECHO_TOOL], [ECHO_TOOL]],
-      clampPlan: [agentClamp, planClamp, planClamp],
+      catalogPlan: [[ECHO_TOOL], [ECHO_TOOL], [ECHO_TOOL, SUBMIT_GOAL_TOOL]],
+      clampPlan,
       modePlan,
       prompts: [{ message: "one" }, { message: "two" }, { message: "three" }],
       turns: [
@@ -666,19 +670,36 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
     const systems = run.perPrompt.map((entry) => entry.systemText);
     const expectedBlocks = [agentBlock, planBlock, goalBlock];
     const prefixOf = (text, block) => (block.length > 0 && text.endsWith(block) ? text.slice(0, -block.length) : null);
+    const expectedBlockBytes = expectedBlocks.map((block) => Buffer.byteLength(block, "utf8"));
+    const systemBytes = systems.map((text) => Buffer.byteLength(text, "utf8"));
+    const prefixBytes = systemBytes.map((bytes, index) => bytes - expectedBlockBytes[index]);
     ctx.note("r4d.observed", {
       attemptsPerPrompt: run.perPrompt.map((entry) => entry.startAttempts),
       toolsPerPrompt: run.perPrompt.map((entry) => entry.toolNames),
+      catalogsPerPrompt: run.perPrompt.map((entry) => entry.catalogNames),
+      clampsPerPrompt: run.perPrompt.map((entry) => entry.clamp),
       systemMessagesPerPrompt: run.perPrompt.map((entry) => entry.systemMessages),
-      expectedBlockBytes: expectedBlocks.map((block) => Buffer.byteLength(block, "utf8")),
+      expectedBlockBytes,
       blockOccurrences: systems.map((text, index) => occurrences(text, expectedBlocks[index])),
       otherBlockOccurrences: systems.map((text, index) =>
         expectedBlocks.filter((_, other) => other !== index).map((block) => occurrences(text, block)),
       ),
       piDefaultBasePresent: systems.map((text) => text.includes("You are PI-Desktop, a local-first coding agent")),
-      systemBytes: systems.map((text) => text.length),
+      systemBytes,
+      prefixBytes,
     });
-    ctx.check("R4: the registered host tool is hidden by the clamp exactly", sameSequence(run.perPrompt[0]?.toolNames ?? [], agentClamp));
+    ctx.check(
+      "R4: every prompt's tool list equals its catalog+clamp exactly (sequence, no residue, no duplicates)",
+      run.perPrompt.every((entry, index) => sameSequence(entry.toolNames, clampPlan[index])),
+      JSON.stringify(run.perPrompt.map((entry) => entry.toolNames)),
+    );
+    ctx.check(
+      "R4: the third prompt is a real change (catalog gains SubmitGoal, clamp drops HostEcho)",
+      !sameSequence(run.perPrompt[2].toolNames, run.perPrompt[1].toolNames) &&
+        run.perPrompt[2].toolNames.includes("SubmitGoal") &&
+        !run.perPrompt[2].toolNames.includes("HostEcho"),
+      (run.perPrompt[2].toolNames ?? []).join(","),
+    );
     ctx.check(
       "R4: a prompt that both clamps and appends a mode block is delivered within one policy retry",
       run.perPrompt[0].startAttempts <= 2 && run.perPrompt[0].requests.length >= 1,
@@ -690,7 +711,7 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
       `attempts=${run.perPrompt[1].startAttempts}`,
     );
     ctx.check(
-      "R4: an in-place clamp change converges within one retry",
+      "R4: the real catalog+clamp change converges within one retry",
       run.perPrompt[2].startAttempts <= 2 && run.perPrompt[2].requests.length >= 1,
       `attempts=${run.perPrompt[2].startAttempts} requests=${run.perPrompt[2].requests.length}`,
     );
@@ -720,11 +741,31 @@ const evidence = await runExperiment("t20-feasibility", async (ctx) => {
       systems.every((text) => !text.includes("You are PI-Desktop, a local-first coding agent")),
     );
     const prefixes = systems.map((text, index) => prefixOf(text, expectedBlocks[index]));
+    const sameToolList = (left, right) => sameSequence(run.perPrompt[left]?.toolNames ?? [], run.perPrompt[right]?.toolNames ?? []);
     ctx.check(
-      "R2: the block is appended after the runtime prompt (prefix is stable across prompts)",
-      prefixes.every((prefix) => prefix !== null && prefix.length > 0) &&
-        prefixes.every((prefix) => prefix === prefixes[0]),
+      "R2: the block is a pure append — the prompt text ends with it, and no mode block leaks into the prefix",
+      prefixes.every((prefix, index) =>
+        prefix !== null &&
+        prefix.length > 0 &&
+        !expectedBlocks.some((block) => occurrences(prefix, block) > 0),
+      ),
       JSON.stringify(prefixes.map((prefix) => prefix?.length ?? -1)),
+    );
+    ctx.check(
+      "R2: UTF-8 bytes satisfy system = prefix + block on every prompt",
+      systemBytes.every((bytes, index) => bytes === prefixBytes[index] + expectedBlockBytes[index]) &&
+        prefixBytes.every((bytes) => bytes > 0),
+      `prefixBytes=${JSON.stringify(prefixBytes)} systemBytes=${JSON.stringify(systemBytes)} blockBytes=${JSON.stringify(expectedBlockBytes)}`,
+    );
+    ctx.check(
+      "R2: prompts with the same tool catalog keep byte-identical prefixes (the block does not perturb the base)",
+      prefixBytes[0] === prefixBytes[1] && sameToolList(0, 1),
+      `prefixBytes=${JSON.stringify(prefixBytes)} tools0=${(run.perPrompt[0]?.toolNames ?? []).join(",")} tools1=${(run.perPrompt[1]?.toolNames ?? []).join(",")}`,
+    );
+    ctx.check(
+      "R2: a changed tool catalog changes the base prefix, not the append shape (prompt 3 vs 2)",
+      prefixBytes[2] !== prefixBytes[1] && systemBytes[2] === prefixBytes[2] + expectedBlockBytes[2],
+      `prefixBytes2=${prefixBytes[2]} prefixBytes1=${prefixBytes[1]}`,
     );
     ctx.check(
       "R2: this is byte-parity evidence for the mode block only (source module equality)",
