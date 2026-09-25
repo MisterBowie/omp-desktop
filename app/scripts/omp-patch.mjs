@@ -18,6 +18,11 @@
  *     With `--out` the tree is kept at that path for a later build; `--out`
  *     must not exist yet (or be an empty directory) and is refused when it is a
  *     symlink, the source checkout, the repository root, or an ancestor of it.
+ *     The path is resolved to its canonical form first: the aliases the
+ *     platform itself installs directly below the filesystem root (macOS
+ *     `/var`, `/tmp`, `/etc` -> `/private/...`) are followed, every other
+ *     symlinked parent is refused, and the reported tree is that canonical
+ *     path.
  *     `--prepare-build` copies the dependency payload (`node_modules`, built
  *     natives, generated tool views) the same way the per-worktree setup does,
  *     which is what makes the tree runnable without installing anything.
@@ -153,7 +158,11 @@ export function loadManifest(manifestPath = defaultManifest) {
 
 /** The source checkout must be the exact commit the manifest patches. */
 export function validateSource(sourceDir, manifest) {
-  const source = resolve(sourceDir);
+  const requested = resolve(sourceDir);
+  // Canonicalize before anything is compared against the checkout: `--source`
+  // may name a symlink to it, and the containment checks downstream must
+  // compare against the directory the files actually live in.
+  const source = existsSync(requested) ? realpathSync(requested) : requested;
   if (!existsSync(join(source, "packages", "coding-agent", "scripts", "omp"))) {
     throw new PatchError(`source does not look like the OMP checkout: ${source}`);
   }
@@ -190,16 +199,81 @@ function nearestExistingParent(target) {
 }
 
 /**
+ * True when a symlinked path component is one the platform itself installed:
+ * a direct child of the filesystem root, owned by root.
+ *
+ * macOS reaches `/var`, `/tmp`, and `/etc` through root-owned symlinks into
+ * `/private`, so `--out /tmp/tree` — and `tmpdir()`, which reports
+ * `/var/folders/…` there — always traverses a link. Refusing those would break
+ * every ordinary invocation on that platform, while following them is safe: an
+ * unprivileged caller cannot create, replace, or delete an entry directly below
+ * `/`. Every other link, at any depth or with any other owner, is
+ * caller-reachable and stays refused. A platform that does not report an owner
+ * is treated as untrusted.
+ */
+export function isTrustedRootAlias(componentPath, stats) {
+  return (
+    stats?.isSymbolicLink?.() === true &&
+    dirname(componentPath) === parse(componentPath).root &&
+    typeof stats.uid === "number" &&
+    stats.uid === 0
+  );
+}
+
+/**
+ * Canonicalize the closest existing ancestor of a scratch target one component
+ * at a time, asking `trustAlias` about every symlink in the chain.
+ *
+ * `realpathSync` alone cannot be used here: it erases where the links were, so
+ * comparing its result to the caller's spelling cannot tell a platform alias
+ * from a link the caller planted. Walking the components keeps that
+ * distinction, and the returned canonical path is what `mkdir`, the copy, and
+ * the failure cleanup all operate on. A link the policy rejects aborts before
+ * anything is created, copied, or deleted — including the platform aliases
+ * themselves when the policy does not name them.
+ */
+export function canonicalizeAncestor(existingParent, trustAlias = isTrustedRootAlias) {
+  const root = parse(existingParent).root;
+  let canonical = root;
+  for (const part of relative(root, existingParent).split(sep).filter((entry) => entry !== "")) {
+    const component = join(canonical, part);
+    const stats = lstatSync(component);
+    if (stats.isSymbolicLink() && !trustAlias(component, stats)) {
+      throw new PatchError(`scratch target must not be reached through a symlink: ${component}`);
+    }
+    canonical = realpathSync(component);
+  }
+  return canonical;
+}
+
+/**
+ * Canonical form of one of the paths a scratch target must never be or hold.
+ * `source` arrives canonical from `validateSource`; the repository roots and
+ * the invoking cwd are resolved here, so a lexically different but physically
+ * identical spelling cannot slip past the equality and ancestor checks below.
+ * A boundary that cannot be resolved (a deleted cwd) keeps its lexical form,
+ * which the same checks still cover.
+ */
+function canonicalBoundary(path) {
+  try {
+    return realpathSync(path);
+  } catch {
+    return resolve(path);
+  }
+}
+
+/**
  * Resolve a caller-provided scratch target and refuse anything this script may
  * not create, fill, or later delete.
  *
  * Everything runs on the canonical path: the nearest existing parent is
- * resolved first, because a symlinked parent would otherwise make `mkdir`, the
- * copy, and the failure cleanup operate on whatever the link points at (the
- * example that motivated this: `--out /tmp/link/new-tree` with
- * `link -> /protected`). A parent reached through a symlink is refused outright
- * — the caller must pass the real path — and the protected-path and emptiness
- * checks then apply to the canonical target the script will actually use.
+ * canonicalized component by component first, so a symlinked parent cannot make
+ * `mkdir`, the copy, and the failure cleanup operate on whatever the link
+ * points at (the example that motivated this: `--out /tmp/link/new-tree` with
+ * `link -> /protected`). A parent reached through an untrusted link is refused
+ * outright — the caller must pass the real path or a platform alias — and the
+ * protected-path and emptiness checks then apply to the canonical target the
+ * script will actually use.
  */
 function resolveScratchTarget(target, source) {
   const resolvedTarget = resolve(target);
@@ -212,14 +286,10 @@ function resolveScratchTarget(target, source) {
   const existingParent = nearestExistingParent(resolvedTarget);
   let canonicalParent;
   try {
-    canonicalParent = realpathSync(existingParent);
+    canonicalParent = canonicalizeAncestor(existingParent);
   } catch (error) {
+    if (error instanceof PatchError) throw error;
     throw new PatchError(`cannot resolve ${existingParent}: ${error.message}`);
-  }
-  if (canonicalParent !== existingParent) {
-    throw new PatchError(
-      `scratch target must not be reached through a symlink: ${existingParent} resolves to ${canonicalParent}`,
-    );
   }
   const scrubbed = relative(existingParent, resolvedTarget).split(sep);
   if (scrubbed.includes("..")) {
@@ -227,7 +297,7 @@ function resolveScratchTarget(target, source) {
   }
   const canonicalTarget = join(canonicalParent, ...scrubbed);
 
-  const forbidden = [source, repoRoot, appRoot, process.cwd()].map((path) => resolve(path));
+  const forbidden = [source, repoRoot, appRoot, process.cwd()].map(canonicalBoundary);
   for (const path of forbidden) {
     if (canonicalTarget === path) throw new PatchError(`scratch target must not be ${path}`);
     if (path.startsWith(canonicalTarget + sep)) {
@@ -333,14 +403,33 @@ function isolatedEnv(runRoot) {
 }
 
 /**
- * Run a child in its own process group and reap the whole group once it exits,
- * times out, or fails to start.
+ * True when `pid` is safe to use as a process-group target for `kill(2)`.
+ *
+ * `process.kill(-pid, …)` negates its argument, and the degenerate targets are
+ * catastrophic rather than merely useless: `-0` would signal *our own* group
+ * (killing this script) and `-1` every process the user is permitted to signal.
+ * Both are refused before the negation is applied, exactly as upstream does
+ * (`upstream/oh-my-pi/packages/coding-agent/src/eval/kernel-base.ts`).
+ */
+export function isSignalableProcessGroup(pid) {
+  return typeof pid === "number" && Number.isInteger(pid) && pid > 1;
+}
+
+/**
+ * Run a child in its own process group and reap the whole group once it exits
+ * or times out.
  *
  * `verifyPatchedTree` runs the OMP launcher and a `bun test` pass, and those
  * spawn fixtures with their own children (MCP servers, kernels). A plain
  * `spawnSync` timeout would kill only the direct child and leave the rest
  * running, so this escalates SIGTERM -> SIGKILL on the group and sweeps the
  * group again after the direct child closes.
+ *
+ * A spawn failure is the other terminal path: Node reports ENOENT/EACCES as an
+ * `error` event with `pid === undefined` (or, if the process could not be
+ * killed, for a child that did start), so the group is killed when there is one
+ * and skipped otherwise, and either way the timeout is cleared and the call
+ * settles at once.
  */
 export function runReaped(command, args, options = {}) {
   const { cwd, env, timeoutMs = 0 } = options;
@@ -357,10 +446,13 @@ export function runReaped(command, args, options = {}) {
     let timedOut = false;
     let settled = false;
     const killGroup = (signal) => {
+      if (!isSignalableProcessGroup(child.pid)) return false;
       try {
         process.kill(-child.pid, signal);
+        return true;
       } catch {
         // The group is already empty (or was never created): nothing to reap.
+        return false;
       }
     };
     const timer =
@@ -384,7 +476,13 @@ export function runReaped(command, args, options = {}) {
       if (timer) clearTimeout(timer);
       resolvePromise(result);
     };
-    child.on("error", (error) => settle({ status: null, signal: null, stdout, stderr, timedOut, error }));
+    child.on("error", (error) => {
+      // A child that did start can still report an error (for example when it
+      // could not be killed or was aborted): sweep its group before settling.
+      // A spawn failure has no pid, so the guard makes this a no-op.
+      killGroup("SIGKILL");
+      settle({ status: null, signal: null, stdout, stderr, timedOut, error });
+    });
     child.on("close", (status, signal) => {
       // The direct child is gone, but its descendants may still hold the group.
       killGroup("SIGKILL");
@@ -498,8 +596,13 @@ function parseArgs(argv) {
     else if (arg === "--verify") options.verify = true;
     else if (arg === "--json") options.json = true;
     else if (arg === "--out" || arg === "--manifest" || arg === "--source") {
-      const value = argv[++index];
-      if (value === undefined) throw new PatchError(`${arg} requires a value`);
+      const value = argv[index + 1];
+      // A value is a path; a following flag is a missing value, not a path that
+      // happens to start with a dash (`./-name` spells such a path). Consuming
+      // the flag made `--out --json` create `$PWD/--json` and fill it with the
+      // whole tree, and reported the wrong argument for `--out --source foo`.
+      if (value === undefined || value.startsWith("-")) throw new PatchError(`${arg} requires a value`);
+      index += 1;
       if (arg === "--out") options.out = value;
       else if (arg === "--manifest") options.manifestPath = value;
       else options.source = value;

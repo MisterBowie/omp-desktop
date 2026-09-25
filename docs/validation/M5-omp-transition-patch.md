@@ -2,6 +2,8 @@
 
 更新时间：2026-09-25。状态：**R3 仍为硬阻塞（独立复审 F3 确认），T20-B 不得开始。** 本轮（复审返修轮）撤回了上一提交中"R3 已解除 / T20-B 可以开始"的结论，并把已完成的补丁收敛为**风险收敛**（loop 可控路径），而不是 PI 兼容性声明。分支 `codex/m5-omp-transition-hooks`；返修基线 `a78cec6df4572031365e8ea6a4237ca8db04ab20`；本文件描述返修后的最终状态。固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`（omp/18.2.7）、PI `0111e306c120ad5820688d7608cb37bad8fbcc1f`，gitlink 与工作树均未改动。
 
+**第二轮独立复审返修（F6-F9，基线 `474408de2b2bdb538f5b2249d71398b8537e1fed`）**：只修本阶段脚本与证据，补丁 artifact 与 manifest 未改动（`sha256 e08ca7ff…fd8`、72978 字节，与 manifest 一致，见 §5）。R3 仍是硬阻塞、T20-B 仍不得开始；脚本测试面从 17 项增至 **24 项**（§6.1）。
+
 ## 1. 结论（含撤回）
 
 - **R3（过渡工具独占批次 → 同批零执行；提交后终止）在 PI 语义下不可满足**，因此**不得解除**：PI 对 assistant message 的**全部** `toolCall` 计数（`upstream/pi-desktop/packages/agent-runtime/src/runtime.ts:2222-2234`：`content.filter(block => block.type === "toolCall")`，无任何排除），而 OMP 存在**在 assistant message 形成之前就已执行**的调用通道（Cursor exec channel / provider bridge），其副作用不可撤销，补丁层无法阻止。
@@ -54,10 +56,10 @@
 
 | 位置 | 内容 |
 | --- | --- |
-| `app/patches/oh-my-pi/0001-rpc-host-tool-transition-contract.patch` | 补丁本体（10 文件；`sha256 378c3d6b91e4e1a60974ee4dc8805b709d71aa1671e7c5831d9cd7fe954ea5c7`，72885 字节） |
+| `app/patches/oh-my-pi/0001-rpc-host-tool-transition-contract.patch` | 补丁本体（10 文件；`sha256 e08ca7fff29bbd03e298f4488888b2692adda1486e3fff80536a31dd8af6fd5c`，72978 字节，F6-F9 轮复核对齐 manifest，§4 旧值 378c3d6b…/72885 已被更正） |
 | `app/patches/oh-my-pi/manifest.json` | base SHA、版本、patch SHA-256/字节数、能力标识、**status（not-strict + 阻塞原因 + 已撤回声明）** |
-| `app/scripts/omp-patch.mjs` | 唯一应用入口：manifest/checksum/base 校验（schemaVersion 仅接受 1）、**canonical 目标解析**、安全 scratch、应用、`--prepare-build`、`--verify`（进程组回收）、finally 清理 |
-| `app/apps/desktop/test/omp-patch.test.mjs` | **17 项**脚本正向/负向测试（含父级符号链接越界、缺失参数值、未知 schemaVersion、孙进程回收） |
+| `app/scripts/omp-patch.mjs` | 唯一应用入口：manifest/checksum/base 校验（schemaVersion 仅接受 1）、**逐组件 canonical 解析（仅跟随 root 直属系统别名）**、source/仓库根/cwd 的 canonical 保护边界、安全 scratch、应用、`--prepare-build`、`--verify`（进程组回收 + 退化 pid 防护）、finally 清理 |
+| `app/apps/desktop/test/omp-patch.test.mjs` | **24 项**脚本正向/负向测试（含父级符号链接越界、真实根别名、source symlink 围栏、flag 取值边界、退化 pid、spawn 失败快速结算、孙进程回收） |
 | `app/experiments/omp-bridge/t20-feasibility.mjs` | 双轨 spike（未补丁 / `--patched`），结果分别落 `results/t20-feasibility.json`、`results/t20-feasibility-patched.json` |
 
 新增 OMP 测试（补丁内）：`packages/agent/test/agent-loop.test.ts` 新增 4 项（Cursor-resolved sibling 计入批次并整批拒绝；speculation 两种顺序下都不启动候选；无 sole 工具时投机照常工作的对照）；`packages/coding-agent/test/rpc-host-tools.test.ts` 新增 3 项（null 策略在 bridge 与 `set_host_tools` 边界都被拒且不留半注册、非 boolean terminate 被拒且不被强转）。
@@ -73,7 +75,13 @@
 | `bun test packages/agent/test/agent-loop.test.ts`（补丁树） | 143 通过 / 0 失败 |
 | `bun test packages/coding-agent/test/rpc-host-tools.test.ts`（补丁树） | 13 通过 / 0 失败 |
 | `bun test packages/agent/test/agent-loop.test.ts packages/coding-agent/test/rpc-host-tools.test.ts packages/coding-agent/test/rpc-input-frame.test.ts`（补丁树，合并） | **171 通过 / 0 失败**（143 + 13 + 15） |
-| `node --test apps/desktop/test/omp-patch.test.mjs`（`app/`） | **17 通过 / 0 失败** |
+| `node --test apps/desktop/test/omp-patch.test.mjs`（`app/`，F6-F9 返修后） | **24 通过 / 0 失败 / 0 跳过**（连跑 3 次结果一致） |
+| 同一命令在 `474408de` 上（RED 证据；输出见交付报告） | **18 通过 / 5 失败**，失败原因逐项核对：F7 `--source <symlink>` + `--out <real-source>/inside` `actual: 0, expected: 1`、`TypeError: isTrustedRootAlias is not a function` / `canonicalizeAncestor is not a function` / `isSignalableProcessGroup is not a function`、`--out --json` `actual: 0, expected: 2` 并在 `$PWD` 建出 `--json/` 树 |
+| 旧策略 vs 新策略（本机 Linux 真实根别名；一次性探针，旧判定即 `realpath(nearestExistingParent) !== nearestExistingParent`） | 旧策略即拒 `/bin`、`/lib`（与 macOS `/var → /private/var` 同类）；新策略 canonicalize 为 `/usr/bin`、`/usr/lib`；`/tmp`（真实目录）两者均接受。该判定的常驻回归是 suite 中的「真实根别名」用例 |
+| `node scripts/omp-patch.mjs --apply --out /tmp/omp-t20-fix2-smoke --json` | exit 0；7518 追踪文件；`tree` 为 canonical `/tmp/omp-t20-fix2-smoke`；补丁内容可见（`soleBatchRejectionReason` 等 7 处） |
+| 同上把 `--out` 指向 `<tmp>/link/new-tree`（`link -> <tmp>/protected`） | exit 1：`OMP-PATCH-FAIL scratch target must not be reached through a symlink: …/link`；`protected/` 仍为空 |
+| `./node_modules/.bin/biome lint`（`app/`） | Checked 75 files，0 问题 |
+| 补丁 artifact 复核 | `sha256 e08ca7ff…fd8`、72978 字节，与 `manifest.json` 完全一致（未改动；按约定不重跑补丁内 171 项） |
 | `node scripts/omp-patch.mjs --check --json` | 通过：`patchLevel d49918f+omp-desktop.1`、`patchSha256 e08ca7fff29bbd03e298f4488888b2692adda1486e3fff80536a31dd8af6fd5c`、追踪文件 7518、scratch 清理 |
 | `node scripts/omp-patch.mjs --apply --out <dir> --prepare-build --verify` | 通过，7.7 秒：launcher 报 **18.2.7**；树内 agent-loop + rpc-host-tools **156 通过 / 0 失败**；异常/超时按进程组回收 |
 | `bun run check:types`（补丁树 agent / coding-agent） | agent 0 错误；coding-agent 仅 `test/judgment-chain.test.ts(296,52)` 预存在错误（未改动固定检出逐字复现） |
@@ -87,20 +95,36 @@
 
 ## 6. 边界与安全修复（复审附加项）
 
-- **F1 目标目录 canonical 化**：先取最近存在父目录并 `realpath`；**父级经符号链接到达的目标一律拒绝**（例：`/tmp/link -> /protected` 时 `--out /tmp/link/new-tree` 被拒，`/protected` 未被写入也未被删除；指向 source 检出/仓库根同理），拒绝后仍对 canonical 目标做保护路径、自身符号链接、非空目录检查，创建/复制/清理都使用 canonical 路径。回归测试用真实符号链接断言"链接目标未被写入且未被删除"。
-- **参数缺值**：`--out`/`--manifest`/`--source` 缺少值时报参数错误（exit 2），不再把末尾 `--out` 当成未提供并偷偷走临时 apply。
+- **F1/F6 目标目录 canonical 化（含 macOS 系统别名）**：`--out` 的最近存在父目录逐组件 canonicalize（`canonicalizeAncestor` + `isTrustedRootAlias`）。只有**文件系统根直属、属主为 root** 的符号链接被跟随（macOS `/var`、`/tmp`、`/etc` → `/private/…`，usrmerge Linux `/bin`、`/lib`、`/sbin`）：这类条目非 root 无法创建/替换/删除，属于平台自身的别名，拒绝它们会让 macOS 上任何 `--out /tmp/…`（含 `tmpdir()` = `/var/folders/…`）失败。其余任何深度、任何属主的符号链接仍在创建/复制/删除前拒绝（例：`/tmp/link -> /protected` 时 `--out /tmp/link/new-tree` 被拒，`/protected` 未被写入也未被删除）。拒绝后仍对 canonical 目标做保护路径、自身符号链接、非空目录检查，创建/复制/失败清理全部使用 canonical 路径，`tree` 报告 canonical 路径。回归测试：策略单测（synthetic stats 的 macOS/Linux 形状）+ 遍历单测（伪造根下跟随别名、深层链接仍拒）+ 真实根别名用例（对本机 `/bin`、`/lib` 断言 canonical 目标，并对 `tmpdir()` 断言 canonicalize 而非拒绝）。**macOS 真实 24/24 需本机复审确认**（见 §7）。
+- **F7 `--source` 等保护边界同样 canonical 化**：`--source`、仓库根、app 根、`process.cwd()` 全部 canonicalize 后才做等值/祖先/后代判断。此前只 canonicalize 目标，`--source source-link`（`source-link -> real-source`）+ `--out real-source/inside` 会绕过"不得位于 source 内"，在**真实检出**中创建目录（本机 macOS 已用真实 git fixture 复现：status 0、`?? inside/`）。回归测试断言拒绝、`inside` 不存在、source 文件内容/条目列表不变且 `git status --porcelain` 为空；同样断言 `--out` 经符号链接指向 source 时拒绝、目标不变。
+- **参数取值边界（F9 与缺值）**：`--out`/`--manifest`/`--source` 缺少值、或下一 token 以 `-` 开头（本身是 flag）时，一律报 `<flag> requires a value`（exit 2，零副作用）。此前 `--out --json` 会把 flag 当路径，在 `$PWD` 创建 `--json/` 并填充整棵追踪树；`--out --source foo` 则报出无关的 `unknown argument: foo`。取值要写以 `-` 开头的路径请用 `./-name`。
 - **manifest schemaVersion**：只接受脚本明确支持的 `1`，其它值 fail closed（回归测试 99 → 拒绝）。
-- **`--verify` 进程组回收**：`runReaped` 以 `detached` 建组，超时按 SIGTERM→SIGKILL 升级杀整组，直接子进程结束后再对整组补杀一次；回归测试用一个"生成孙进程后挂起"的夹具，断言超时后孙进程确实消失（不再出现 `delayed-tool-mcp.ts` 式残留）。`verifyPatchedTree` 的两个子步骤都走该通道。
+- **`--verify` 进程组回收 + 退化 pid 防护（F8）**：`runReaped` 以 `detached` 建组，超时按 SIGTERM→SIGKILL 升级杀整组，直接子进程结束后再对整组补杀一次；回归测试用一个"生成孙进程后挂起"的夹具，断言超时后孙进程确实消失（不再出现 `delayed-tool-mcp.ts` 式残留）。`isSignalableProcessGroup` 在取负之前拒绝退化目标（`pid` 必须是 >1 的整数）——`process.kill(-0)` 会杀本进程组、`-1` 会杀用户可杀的全部进程，上游 `eval/kernel-base.ts` 同口径；单测覆盖 `undefined/0/1/负数/非整数/NaN`。`child.on("error")` 改为先对有 pid 的子进程整组 SIGKILL 再 settle；**可达的 spawn 失败（ENOENT/EACCES）没有 pid、也就没有进程组**，回归测试断言立即结算（`< 5s`，`timeoutMs` 为 60s）、`timedOut === false`、`error.code === "ENOENT"` 且 `getActiveResourcesInfo()` 无残留 `Timeout`；"子进程已存在再收到 error"的整组杀灭是防御性分支，本脚本可达的错误形状不产生该情况，**不声称已实测**（见 §7）。
 - **`.patch` artifact 的 whitespace**：`app/.gitattributes` 仅对 `patches/oh-my-pi/*.patch` 关闭 whitespace 检查（patch 载荷行天然是"diff 标记 + 原缩进"），普通源码检查未放宽；`git diff --check <base>..HEAD` 与 `git show --check HEAD` 均为 exit 0。
 - 凭据不外泄：脚本只打印路径/哈希/命令名；测试用 `MY_API_KEY=canary-…` 断言输出不含该值；验证子进程使用隔离 HOME 并剥离凭据类变量。
 - **不做大面积机械重排**：`docs/rpc.md` 在固定基线上就不符合 `oxfmt`，因此本补丁不对它（或任何其它上游文件）做全文件格式化；新增/修改片段按文件既有风格手工对齐。修复轮逐文件审计：`docs/rpc.md 42+/0-`、`agent-loop.ts 188+/24-`、`agent-loop.test.ts 635+/1-`、`rpc-host-tools.test.ts 329+/1-`、`host-tools.ts 85+/5-`、其余 1-30 行；全部 25 行删除都是本轮被替换的实现/断言行，无无关改动。返回码：`git diff --check <base>..HEAD` 与 `git show --check HEAD` 均 0（F4）。
+
+### 6.1 固定源码检索结果（先例 / 借鉴 / 自有）
+
+按约定先查 PI Desktop 固定检出（`upstream/pi-desktop@0111e30`），再查 OMP 固定检出（`upstream/oh-my-pi@d49918f`）：
+
+| 问题 | PI Desktop（可引用路径） | OMP（可引用路径） | 本轮处置 |
+| --- | --- | --- | --- |
+| macOS `/var`、`/tmp` 别名 | Rust 侧显式处理：`crates/host-core/src/workspace.rs:239-256`（把字面 scratch 前缀改写后重解析，注释点明 `/var vs /private/var`）、`crates/host-core/src/rpc/mod.rs:945`；测试注释 `apps/desktop/test/plugin-fs-scope.test.mjs:715`（raw 比较永不相等） | `packages/utils/src/dirs.ts:139-160` `standardizeMacOSPath` / `resolveEquivalentPath`（"preserves aliases like /private/tmp -> /tmp"）；`packages/coding-agent/src/tools/plan-mode-guard.ts:99` | **借鉴**"平台别名必须归一"的事实；但两处都**未找到**"逐组件拒绝父级符号链接、同时豁免 root 直属别名"的实现 → 属 **OMP Desktop 自有构建工具**（`isTrustedRootAlias` + `canonicalizeAncestor`），安全边界写明为"非 root 无法在 `/` 下直接创建/替换条目" |
+| 逐组件符号链接拒绝 | `apps/desktop/electron/main/imported-package-skills.ts:11-30`（`assertImportedPackagePath`：逐段 `lstatSync`，命中链接即 `invalid`） | 未检索到同类逐段拒绝工具 | **借鉴**遍历写法（逐段 `lstatSync`），另加别名策略与 canonical 返回值 |
+| canonical 后再做包含判断 | `apps/desktop/electron/main/services/image-generation-service.ts:71-75`（两侧 `realpath` + `within`）、`apps/desktop/pi-host/src/host-operations.ts:164-196`、`apps/desktop/electron/main/session-list-probe.ts:35-38`（`realpath(tmpdir())` 对 `realpath(dataDir)`） | `plan-mode-guard.ts:99`（realpath 归一后比较） | **借鉴**：source/仓库根/app 根/cwd 全部 realpath 后再比较（F7） |
+| 进程组信号与退化 pid | `apps/desktop/electron/main/npm-executable.ts:96-135`（`killProcessTree` 先判 `pid`，`process.kill(-pid, …)` 失败回退 `child.kill`） | `packages/coding-agent/src/eval/kernel-base.ts:144-176` `isSignalableProcessGroup` / `killProcessGroup`（注释明确 `-0` 杀自身进程组、`-1` 杀全部可杀进程）、`packages/coding-agent/src/eval/probe.ts:103` | **借鉴** OMP 的 `pid > 1` 守卫（含理由）与 PI 的 `-pid` + 回退写法（F8） |
+| flag 取值边界 | 该检出无同形 patch/scratch CLI 工具 | 未检索到同类参数解析先例 | **自有**（`parseArgs` + 定向回归，F9） |
 
 ## 7. 未做/未声称
 
 - **R3 仍阻塞**：不得开始 T20-B/C/D；产品侧 gap 诊断保持 3 缺口 exit 1。
 - **不声称上游支持**：patch level 仍是本项目维护的 `d49918f+omp-desktop.1`，运行时仍报 `omp/18.2.7`。
 - **未跑完的套件不得声称通过**：补丁树内 `packages/agent` 全量 `bun test` 曾卡在既有夹具 `delayed-tool-mcp.ts`（本轮已实现并验证进程组回收通道，但未重跑该全量套件）；通过证据只来自改动面套件、typecheck 与父仓库定向套件。
-- 未覆盖：真实付费模型、macOS/Windows 平台行为、T20-B 的模式/审批链路。
+- **macOS 端到端验收未在本机完成**：F6 的最终验收是"本机 macOS 上同一 suite 全过（含 6 个此前因 `/var → /private/var` 失败的用例）"，本机 Linux 只能提供策略/遍历单测、真实根别名用例、旧策略探针对照与 CLI 冒烟（§5、§6）；**需复审在本机 macOS 复跑确认**。行为差异须注意：macOS 上 `--out /tmp/…` 的 `tree` 报告 canonical `/private/tmp/…`（同一目录）。
+- **未测的异常分支（不得声称已测）**：`child.on("error")` 在"子进程已存在且 pid 有效"时整组杀灭属防御性分支——本脚本可达的 spawn 错误形状没有 pid；已测的只有 ENOENT/EACCES 的立即结算与定时器清理，以及退化 pid 的守卫单测。
+- **补丁本体未改动**：因此按约定未重跑补丁内 171 项测试，只复核 `sha256`/字节数与 `manifest.json` 一致（§5）。
+- 未覆盖：真实付费模型、Windows 平台行为、T20-B 的模式/审批链路。
 
 ## 8. 解除 R3 的可能路径（供后续决策，不构成本轮承诺）
 

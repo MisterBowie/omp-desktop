@@ -13,11 +13,16 @@
  * Every expectation below fails on a script that silently rewrote a checksum,
  * applied to a moved base, followed a symlink, overwrote a user directory, or
  * left a half-applied tree (or its temporary root) after an error.
+ *
+ * Scratch paths are spelled exactly as `mkdtempSync(tmpdir())` returns them —
+ * on macOS `/var/folders/…`, whose canonical form is `/private/var/…` — so a
+ * script that mistakes the platform's own root aliases for caller-planted
+ * links fails here rather than only on a developer's machine.
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -27,7 +32,9 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const scriptDir = join(here, "..", "..", "..", "scripts");
 const scriptPath = join(scriptDir, "omp-patch.mjs");
-const { runReaped } = await import(pathToFileURL(scriptPath).href);
+const { canonicalizeAncestor, isSignalableProcessGroup, isTrustedRootAlias, runReaped } = await import(
+  pathToFileURL(scriptPath).href
+);
 const appRoot = join(here, "..", "..", "..");
 
 /** Every temporary directory this file creates, removed in `after`. */
@@ -148,7 +155,10 @@ test("apply writes the patched tree to the requested directory only", () => {
 
   assert.equal(result.status, 0, result.stderr);
   const report = JSON.parse(result.stdout.trim());
-  assert.equal(report.tree, out);
+  // The reported path is canonical: on macOS the caller's `/var/folders/…`
+  // spelling resolves to `/private/var/folders/…`, and every write below is
+  // made on the canonical path.
+  assert.equal(report.tree, realpathSync(out));
   assert.equal(readFileSync(join(out, "src", "example.ts"), "utf8"), "export const value = 2;\n");
   // The source is untouched: the patch lives only in the scratch copy.
   assert.equal(readFileSync(join(fixture.source, "src", "example.ts"), "utf8"), "export const value = 1;\n");
@@ -288,6 +298,52 @@ test("refuses a target inside the source checkout or holding the repository", ()
   assert.match(overRepoRoot.stderr, /must not contain /);
 });
 
+test("canonicalizes --source, so an --out inside the real checkout is still refused", () => {
+  const fixture = makeSourceFixture();
+  const tmp = mkdtempSync(join(tmpdir(), "omp-patch-tmp-"));
+  scratch.push(tmp);
+  const manifestPath = writeManifest(fixture.root, { sha: fixture.sha });
+  // The real checkout named through a symlink: comparing `--source` lexically
+  // would miss it and write (then clean up) inside the source itself.
+  const sourceLink = join(fixture.root, "source-link");
+  symlinkSync(fixture.source, sourceLink);
+  const listing = readdirSync(fixture.source).sort();
+
+  const insideReal = runScript(
+    ["--apply", "--out", join(fixture.source, "inside"), "--manifest", manifestPath, "--source", sourceLink],
+    tmp,
+  );
+  assert.equal(insideReal.status, 1, insideReal.stderr);
+  assert.match(insideReal.stderr, /must not live inside the source checkout/);
+  assert.equal(existsSync(join(fixture.source, "inside")), false);
+  assert.deepEqual(readdirSync(fixture.source).sort(), listing);
+  assert.equal(readFileSync(join(fixture.source, "src", "example.ts"), "utf8"), "export const value = 1;\n");
+  assert.equal(git(fixture.source, ["status", "--porcelain"]), "");
+
+  // The same pair with the output spelled inside the symlinked name: the
+  // untrusted-parent rule fires first, and the source stays untouched.
+  const insideLink = runScript(
+    ["--apply", "--out", join(sourceLink, "inside-link"), "--manifest", manifestPath, "--source", sourceLink],
+    tmp,
+  );
+  assert.equal(insideLink.status, 1, insideLink.stderr);
+  assert.match(insideLink.stderr, /must not be reached through a symlink/);
+  assert.equal(existsSync(join(fixture.source, "inside-link")), false);
+
+  // An output reached through a link that lands in the checkout is refused
+  // before anything is created there either.
+  const linkToSource = join(fixture.root, "link-to-source");
+  symlinkSync(fixture.source, linkToSource);
+  const viaLink = runScript(
+    ["--apply", "--out", join(linkToSource, "tree"), "--manifest", manifestPath, "--source", fixture.source],
+    tmp,
+  );
+  assert.equal(viaLink.status, 1, viaLink.stderr);
+  assert.match(viaLink.stderr, /must not be reached through a symlink/);
+  assert.deepEqual(readdirSync(fixture.source).sort(), listing);
+  assert.equal(git(fixture.source, ["status", "--porcelain"]), "");
+});
+
 test("refuses a target reached through a symlinked parent and never writes or deletes the link target", () => {
   const fixture = makeSourceFixture();
   const tmp = mkdtempSync(join(tmpdir(), "omp-patch-tmp-"));
@@ -332,6 +388,87 @@ test("refuses a target reached through a symlinked parent and never writes or de
   assert.deepEqual(readdirSync(protectedDir), ["keep.txt"]);
 });
 
+test("trusts only root-owned aliases directly below the filesystem root", () => {
+  // macOS reaches `tmpdir()` through `/var -> private/var` (and `/tmp`,
+  // `/etc`): root-owned links the platform itself installs as direct children
+  // of `/`. Following them is safe — an unprivileged caller cannot create,
+  // replace, or delete such an entry — while every other link stays refused.
+  const rootOwnedLink = { isSymbolicLink: () => true, uid: 0 };
+  const userOwnedLink = { isSymbolicLink: () => true, uid: 1000 };
+
+  assert.equal(isTrustedRootAlias("/var", rootOwnedLink), true);
+  assert.equal(isTrustedRootAlias("/tmp", rootOwnedLink), true);
+  assert.equal(isTrustedRootAlias("/var", { isSymbolicLink: () => false, uid: 0 }), false, "a real directory is not an alias");
+  assert.equal(isTrustedRootAlias("/var", userOwnedLink), false, "only root may own an alias");
+  assert.equal(isTrustedRootAlias("/home/runner/work/link", rootOwnedLink), false, "a deeper link is caller-reachable");
+  assert.equal(isTrustedRootAlias("/private/var/folders/x/T/link", rootOwnedLink), false);
+  assert.equal(
+    isTrustedRootAlias("/var", { isSymbolicLink: () => true, uid: undefined }),
+    false,
+    "an unknown owner must not be trusted",
+  );
+});
+
+test("canonicalizes the ancestor chain through a trusted alias and still refuses deeper links", () => {
+  const tmp = mkdtempSync(join(tmpdir(), "omp-patch-tmp-"));
+  scratch.push(tmp);
+  // The macOS shape, reproduced below a fixture root: the alias sits at the top
+  // of the tree, the link a caller could plant sits deeper inside it.
+  const fixtureRoot = join(tmp, "fakeroot");
+  const realTree = join(fixtureRoot, "private", "var", "T", "tree");
+  mkdirSync(realTree, { recursive: true });
+  const alias = join(fixtureRoot, "var");
+  symlinkSync(join(fixtureRoot, "private", "var"), alias);
+
+  // The shipped policy trusts only entries directly below the *filesystem*
+  // root, which a test user cannot create; the fixture policy adds this tree's
+  // alias and keeps the shipped rule for the platform aliases above it (macOS
+  // `/var`), so the walk is exercised unchanged on either platform.
+  const trustAlias = (componentPath, stats) => isTrustedRootAlias(componentPath, stats) || componentPath === alias;
+  assert.equal(canonicalizeAncestor(join(alias, "T", "tree"), trustAlias), realpathSync(realTree));
+
+  const deeper = join(realTree, "link");
+  symlinkSync(join(fixtureRoot, "private", "var"), deeper);
+  assert.throws(
+    () => canonicalizeAncestor(join(deeper, "elsewhere"), trustAlias),
+    /must not be reached through a symlink/,
+    "a link the caller can plant stays refused even under a permissive fixture policy",
+  );
+  assert.throws(
+    () => canonicalizeAncestor(join(alias, "T", "tree")),
+    /must not be reached through a symlink/,
+    "the shipped policy refuses an alias it was not told to trust",
+  );
+});
+
+test("follows the aliases the platform ships directly below the filesystem root", () => {
+  // macOS ships `/var`, `/tmp`, and `/etc` as root-owned links into `/private`
+  // (so `tmpdir()` is `/var/folders/…`); a usrmerged Linux ships `/bin`,
+  // `/lib`, `/sbin`. These are the platform's own doing and must resolve, while
+  // everything the walk was told not to trust stays refused — the shipped
+  // policy is exercised here against the real filesystem root.
+  const aliases = readdirSync("/").filter((entry) => {
+    try {
+      return lstatSync(join("/", entry)).isSymbolicLink();
+    } catch {
+      return false;
+    }
+  });
+  assert.ok(aliases.length > 0, "expected this platform to ship a root-level alias to probe with");
+  for (const alias of aliases) {
+    const componentPath = join("/", alias);
+    assert.equal(
+      isTrustedRootAlias(componentPath, lstatSync(componentPath)),
+      true,
+      `${componentPath} is a root-owned link directly below the filesystem root`,
+    );
+    assert.equal(canonicalizeAncestor(componentPath), realpathSync(componentPath));
+  }
+  // The shape that failed on macOS: the platform temp directory resolves
+  // through its aliases, so the scratch parent must canonicalize, not refuse.
+  assert.equal(canonicalizeAncestor(tmpdir()), realpathSync(tmpdir()));
+});
+
 test("creates a missing nested target and accepts an existing empty one", () => {
   const fixture = makeSourceFixture();
   const tmp = mkdtempSync(join(tmpdir(), "omp-patch-tmp-"));
@@ -344,7 +481,7 @@ test("creates a missing nested target and accepts an existing empty one", () => 
     tmp,
   );
   assert.equal(created.status, 0, created.stderr);
-  assert.equal(JSON.parse(created.stdout.trim()).tree, nested);
+  assert.equal(JSON.parse(created.stdout.trim()).tree, realpathSync(nested));
   assert.equal(readFileSync(join(nested, "src", "example.ts"), "utf8"), "export const value = 2;\n");
 
   const empty = join(tmp, "empty-target");
@@ -369,6 +506,31 @@ test("rejects a flag whose value is missing instead of silently applying to a te
     assert.match(result.stderr, new RegExp(`${flag} requires a value`));
     assert.deepEqual(leftovers(tmp), []);
   }
+});
+
+test("rejects a flag whose value is another flag instead of using it as a path", () => {
+  const fixture = makeSourceFixture();
+  const tmp = mkdtempSync(join(tmpdir(), "omp-patch-tmp-"));
+  scratch.push(tmp);
+  const manifestPath = writeManifest(fixture.root, { sha: fixture.sha });
+
+  // `--out --json` used to consume the flag as a *path*, create `$PWD/--json`
+  // and copy the whole tracked tree into it. A value is a path; a following flag
+  // is a missing value (`./-name` spells a path that really starts with a dash).
+  for (const [flag, next] of [
+    ["--out", "--json"],
+    ["--out", "--source"],
+    ["--manifest", "--out"],
+    ["--source", "--manifest"],
+  ]) {
+    const stray = resolve(process.cwd(), next);
+    const result = runScript(["--apply", "--manifest", manifestPath, "--source", fixture.source, flag, next], tmp);
+    assert.equal(result.status, 2, `${flag} ${next}: ${result.stderr}`);
+    assert.match(result.stderr, new RegExp(`${flag} requires a value`));
+    assert.equal(existsSync(stray), false, `${next} must never be used as a scratch tree`);
+    assert.deepEqual(leftovers(tmp), []);
+  }
+  assert.equal(git(fixture.source, ["status", "--porcelain"]), "");
 });
 
 test("rejects an unsupported manifest schema version", () => {
@@ -458,6 +620,43 @@ test("reaps the whole process group when a verification child times out", async 
     }
   }
   assert.equal(alive, false, `grandchild ${grandchildPid} survived the reaped timeout`);
+});
+
+test("never signals a degenerate process-group target", () => {
+  // `process.kill(-pid, …)` negates its argument, so the degenerate targets are
+  // catastrophic rather than useless: `-0` would signal this process's own
+  // group and `-1` every process the user may signal. Upstream guards the same
+  // set before negating (`upstream/oh-my-pi`…/eval/kernel-base.ts,
+  // `isSignalableProcessGroup`).
+  assert.equal(isSignalableProcessGroup(undefined), false);
+  assert.equal(isSignalableProcessGroup(0), false);
+  assert.equal(isSignalableProcessGroup(1), false);
+  assert.equal(isSignalableProcessGroup(-9), false);
+  assert.equal(isSignalableProcessGroup(2.5), false);
+  assert.equal(isSignalableProcessGroup(Number.NaN), false);
+  assert.equal(isSignalableProcessGroup(4321), true);
+});
+
+test("reports a spawn failure at once, with no timer left armed", async () => {
+  const tmp = mkdtempSync(join(tmpdir(), "omp-patch-tmp-"));
+  scratch.push(tmp);
+  // Node reports a missing command as an `error` event with `pid === undefined`:
+  // there is no process and no group to reap, so the call has to settle
+  // immediately instead of waiting the timeout out.
+  const timersBefore = process.getActiveResourcesInfo().filter((resource) => resource === "Timeout").length;
+  const started = Date.now();
+  const result = await runReaped(join(tmp, "no-such-command"), [], { cwd: tmp, env: process.env, timeoutMs: 60_000 });
+  const elapsed = Date.now() - started;
+
+  assert.equal(result.status, null);
+  assert.equal(result.timedOut, false);
+  assert.equal(result.error?.code, "ENOENT");
+  assert.ok(elapsed < 5_000, `spawn failure settled only after ${elapsed}ms`);
+  assert.equal(
+    process.getActiveResourcesInfo().filter((resource) => resource === "Timeout").length,
+    timersBefore,
+    "the verification timeout must be cleared when the child cannot be spawned",
+  );
 });
 
 test("never prints inherited credential values", () => {
