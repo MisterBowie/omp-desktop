@@ -15,11 +15,12 @@ const { CURSOR_PROVIDER_ID, planGoalCursorRefusal } = await import(
 /**
  * T20-R3C: the Cursor identity and the refusal code cross a language boundary.
  *
- * Rust host-core refuses the pair at the write itself (the `sessions` triggers in
- * `crates/host-core/src/plan_goal_guard.rs`) and reports the code the desktop's
- * `ErrorCodes` registry declares; the TypeScript predicate refuses the same pair
- * at the IPC boundaries. Nothing in the compiler spans the two, so this test
- * pins the literals and the guard's construction together — a drift would
+ * Rust host-core refuses the pair at the write itself (the per-connection TEMP
+ * `sessions` triggers in `crates/host-core/src/plan_goal_guard.rs`) and reports
+ * the code the desktop's `ErrorCodes` registry declares; the TypeScript
+ * predicate refuses the same pair at the IPC boundaries. Nothing in the
+ * compiler spans the two, so this test pins the literals, the guard's
+ * construction and the trigger's connection scope together — a drift would
  * silently split the invariant instead of failing a build.
  */
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
@@ -65,8 +66,17 @@ test("the guard SQL is generated from those constants, not retyped", () => {
   assert.doesNotMatch(generator, /'\s*cursor\s*'/);
   // The pair is refused on both write shapes, and the update guard only tolerates
   // a row that already held exactly that pair (so plan⇄goal hopping is refused).
-  assert.match(generator, /BEFORE INSERT ON sessions/);
-  assert.match(generator, /BEFORE UPDATE OF mode, provider_id ON sessions/);
+  assert.match(generator, /BEFORE INSERT ON main\.sessions/);
+  assert.match(generator, /BEFORE UPDATE OF mode, provider_id ON main\.sessions/);
   assert.match(generator, /new\.mode IN \('plan', 'goal'\)/);
   assert.match(generator, /NOT \(old\.mode = new\.mode AND old\.provider_id = new\.provider_id\)/);
+  // The guards are per-connection TEMP triggers, never durable schema objects,
+  // and carry no `IF NOT EXISTS` that could pin a superseded definition.
+  assert.match(generator, /CREATE TEMP TRIGGER/);
+  assert.doesNotMatch(generator, /CREATE TRIGGER/);
+  assert.doesNotMatch(generator, /IF NOT EXISTS/);
+  // Installing clears both schemas first: the residual durable trigger commit
+  // 876fb07 wrote into sqlite_master, and this connection's previous TEMP one.
+  assert.match(rustGuard, /DROP TRIGGER IF EXISTS main\.\{name\}/);
+  assert.match(rustGuard, /DROP TRIGGER IF EXISTS temp\.\{name\}/);
 });

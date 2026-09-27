@@ -93,7 +93,7 @@ stdio 与 Tokio 的动态阻塞池隔离，因此后一种情况
 
 ### 3.2b Plan/Goal × 模型门
 
-Cursor 模型不支持 Plan 与 Goal 模式（M5/T20-R3C，用户确认的产品决策）。Cursor 的 exec 通道会在响应仍在流式期间执行工具调用——早于承载它们的 assistant 消息——因此 PI 的过渡工具契约（提交工具独占整批；同批兄弟调用零副作用）无法满足，其副作用也无法撤销（证据：验证文档 `M5-omp-transition-patch.md` §9/§10）。host-core 在**持久化写入本身**拒绝该组合（`crates/host-core/src/plan_goal_guard.rs`），桌面的会话配置、新建会话与派发边界在任何运行时工作之前拒绝它。两侧都不会改写用户的模式或模型。
+Cursor 模型不支持 Plan 与 Goal 模式（M5/T20-R3C，用户确认的产品决策）。Cursor 的 exec 通道会在响应仍在流式期间执行工具调用——早于承载它们的 assistant 消息——因此 PI 的过渡工具契约（提交工具独占整批；同批兄弟调用零副作用）无法满足，其副作用也无法撤销（证据：验证文档 `M5-omp-transition-patch.md` §9/§10）。host-core 在自己的数据库连接上于**持久化写入本身**拒绝该组合（`crates/host-core/src/plan_goal_guard.rs`，按连接安装的 TEMP 触发器：不写入 schema、降级也不会继承），桌面的会话配置、新建会话与派发边界在任何运行时工作之前拒绝它。两侧都不会改写用户的模式或模型。
 
 | 代码 | 可重试 | 含义 |
 |---|---|---|

@@ -1108,11 +1108,16 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
 
 该不变量由 host-core 在**持久化写入处**强制，而不是由桌面：
 
-* `crates/host-core/src/plan_goal_guard.rs` 在每次打开数据库时安装两个 `sessions` 触发器——
-  一个针对 `INSERT`，一个针对 `UPDATE OF mode, provider_id`。凡是结果为 Plan/Goal + Cursor
-  提供方的写入都会被 SQLite 本身中止，因此过渡工具（`plans.enter`）、`session.configure`、
-  `session.create`、fork、导入以及任何将来的写入者都在覆盖范围内，也没有调用方能在"读"与
-  "写"之间把该组合落盘。
+* `crates/host-core/src/plan_goal_guard.rs` 在每次打开数据库时在该连接上安装两个 **TEMP**
+  `sessions` 触发器——一个针对 `INSERT`，一个针对 `UPDATE OF mode, provider_id`，均为
+  `ON main.sessions`。凡是结果为 Plan/Goal + Cursor 提供方的写入都会被 SQLite 本身中止，
+  因此过渡工具（`plans.enter`）、`session.configure`、`session.create`、fork、导入以及任何
+  将来的写入者都在覆盖范围内，也没有调用方能在"读"与"写"之间把该组合落盘。
+* 守卫是**连接状态，不是 schema 状态**：TEMP 触发器只属于 `Database` 持有的那一条连接，连接关闭
+  即消失——不会写入 `sqlite_master`、不推进 schema 版本，旧版二进制之后再打开同一文件也不会继承
+  任何行为。安装时还会删除提交 `876fb07` 曾写进 `sqlite_master` 的同名持久触发器，使从该版本升级
+  只收敛到一份定义；修订后的定义总是替换此前的 TEMP 定义（不使用 `IF NOT EXISTS`）。通过裸
+  `sqlite3` 连接（手工编辑）产生的写入不在守卫范围内，仍由派发门兜底。
 * 身份是规范 provider id `"cursor"`，错误码是 `PLAN_GOAL_CURSOR_UNSUPPORTED`（规格 08 §3.2b）。
   两种语言各自只保留一份字面量，并由
   `apps/desktop/test/plan-goal-cursor-constant-parity.test.mjs` 将其钉在一起；守卫的 SQL 由这些

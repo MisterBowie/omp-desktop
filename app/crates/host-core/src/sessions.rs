@@ -6943,9 +6943,17 @@ mod tests {
         );
 
         // Repair path A: drop the mode, keep the Cursor model.
-        let repaired = configure_session_with_thinking(&db, &cursor.id, "agent", None, None, Some("high"), None)
-            .unwrap()
-            .unwrap();
+        let repaired = configure_session_with_thinking(
+            &db,
+            &cursor.id,
+            "agent",
+            None,
+            None,
+            Some("high"),
+            None,
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(repaired.mode, "agent");
         assert_eq!(repaired.provider_id.as_deref(), Some("cursor"));
 
@@ -6970,7 +6978,13 @@ mod tests {
     #[test]
     fn configure_leaves_non_cursor_and_agent_combinations_alone() {
         let db = test_db();
-        for provider in ["openai", "anthropic", "Cursor", "cursor ", "plugin:acme:cursor"] {
+        for provider in [
+            "openai",
+            "anthropic",
+            "Cursor",
+            "cursor ",
+            "plugin:acme:cursor",
+        ] {
             let session = create_session(
                 &db,
                 None,
@@ -6984,7 +6998,10 @@ mod tests {
                 configure_session_with_thinking(&db, &session.id, "plan", None, None, None, None)
                     .unwrap()
                     .unwrap();
-            assert_eq!(configured.mode, "plan", "provider {provider} must stay usable");
+            assert_eq!(
+                configured.mode, "plan",
+                "provider {provider} must stay usable"
+            );
         }
         // Agent mode with the Cursor provider keeps working, including a
         // thinking-level-only change.
@@ -6997,9 +7014,17 @@ mod tests {
             None,
         )
         .unwrap();
-        let configured = configure_session_with_thinking(&db, &cursor.id, "agent", None, None, Some("high"), None)
-            .unwrap()
-            .unwrap();
+        let configured = configure_session_with_thinking(
+            &db,
+            &cursor.id,
+            "agent",
+            None,
+            None,
+            Some("high"),
+            None,
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(configured.thinking_level, "high");
     }
 
@@ -7084,9 +7109,10 @@ mod tests {
         assert_eq!(echoed.thinking_level, "high");
 
         // Both repairs still land: drop the mode, or choose another provider.
-        let repaired = configure_session_with_thinking(&db, "legacy-plan", "agent", None, None, None, None)
-            .unwrap()
-            .unwrap();
+        let repaired =
+            configure_session_with_thinking(&db, "legacy-plan", "agent", None, None, None, None)
+                .unwrap()
+                .unwrap();
         assert_eq!(repaired.mode, "agent");
         let repaired = configure_session_with_thinking(
             &db,

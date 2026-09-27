@@ -100,9 +100,11 @@ streaming — before the assistant message that carries them exists — so PI's
 transition-tool contract (the submit tool owns the whole batch; its siblings
 produce no side effects) cannot be honoured and its effects cannot be undone
 (evidence: validation `M5-omp-transition-patch.md` §9/§10). Host-core refuses the
-pair inside the durable write itself (`crates/host-core/src/plan_goal_guard.rs`),
-and the desktop's session-configure, session-create and prompt boundaries refuse it
-before any runtime work. Neither side ever rewrites the user's mode or model.
+pair at the durable write on its own database connection
+(`crates/host-core/src/plan_goal_guard.rs` — per-connection TEMP triggers, so
+nothing enters the schema and a downgrade inherits nothing), and the desktop's
+session-configure, session-create and prompt boundaries refuse it before any
+runtime work. Neither side ever rewrites the user's mode or model.
 
 | code | retriable | meaning |
 |---|---|---|

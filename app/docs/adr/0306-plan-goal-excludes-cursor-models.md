@@ -1,8 +1,11 @@
 # ADR 0306: Plan/Goal mode excludes Cursor models
 
-- Status: Accepted (M5/T20-R3C), **revised after independent review (F1-F3)**.
+- Status: Accepted (M5/T20-R3C), **revised after independent review (F1-F6)**.
   User-approved product decision; it restricts which combinations any writer may
-  persist, and it does **not** resolve R3.
+  persist, and it does **not** resolve R3. F1-F4 moved the enforcement into the
+  durable write; F5 scopes the write guard to each database connection as TEMP
+  triggers instead of persisting it in the schema, and F6 is the rustfmt pass
+  over that code.
 - Date: 2026-09-25
 - Scope: which (mode, model) combinations a session may hold, and where the
   desktop refuses the invalid ones.
@@ -67,15 +70,27 @@ Three facts shaped the decision:
   Rust constants, and
   `apps/desktop/test/plan-goal-cursor-constant-parity.test.mjs` fails if either
   drifts.
-- **Primary enforcement — the durable write itself.** Two triggers on `sessions`
-  (`plan_goal_guard`, installed idempotently on every database open) abort any
-  `INSERT`, or any `UPDATE OF mode, provider_id`, whose result is Plan/Goal + the
-  Cursor provider. That covers the transition tool (`plans.enter`, which the Pi
-  sidecar calls directly, outside the desktop's IPC), `session.configure`,
+- **Primary enforcement — the durable write itself, scoped to the host's
+  connection.** Two TEMP triggers on `sessions` (`plan_goal_guard`, installed by
+  `Database::open` on the single connection the host owns) abort any `INSERT`, or
+  any `UPDATE OF mode, provider_id`, whose result is Plan/Goal + the Cursor
+  provider. That covers the transition tool (`plans.enter`, which the Pi sidecar
+  calls directly, outside the desktop's IPC), `session.configure`,
   `session.create`, forks, imports and every future writer in one place, and it
   closes the window a caller-side pre-read leaves open: SQLite evaluates the
   condition against the row as it is written, so a racing update cannot land on
   the pair.
+- **The guard is connection state, not schema state.** TEMP triggers live in the
+  connection's temp schema and disappear when it closes; nothing is written to
+  `sqlite_master` and no schema version moves, so a downgrade to a build that
+  knows nothing about this decision inherits nothing. Installing also drops the
+  same-named durable triggers commit `876fb07` wrote into `sqlite_master`, so
+  upgrading from that build converges on one definition instead of leaving both
+  behind, and a revised definition always replaces the previous TEMP one (no
+  `IF NOT EXISTS` to pin a superseded text). The trade-off is named: a write made
+  through a raw `sqlite3` connection — a manual edit — is outside the guard. That
+  is the same manual-edit path the prompt gate already covers, not a gap this ADR
+  claims to close.
 - **Rows that already hold the pair are tolerated, not legalised.** A database
   that already holds it (a hand edit, or a historical migration from before the
   guard) keeps opening, and unrelated writes to that row still work — but only
@@ -114,7 +129,10 @@ Three facts shaped the decision:
 - Coverage: host-core tests that first reproduce the hole and then prove the
   guard (the transition tool, configure, create, forks, imports, the plan⇄goal hop
   on a pre-existing row, both repairs, non-Cursor behaviour, the RPC codes, and
-  the write-time judgement a stale caller's pre-read cannot defeat); the
+  the write-time judgement a stale caller's pre-read cannot defeat); the guard's
+  connection scope (definition only in `sqlite_temp_master`, absent after close,
+  re-installed on the next open, the durable `876fb07` residual dropped and
+  replaced, a stale connection definition replaced rather than kept); the
   predicate's boundary table; IPC behaviour tests for every reachable invalid
   combination plus both escape paths and the non-Cursor regressions; the
   cross-language literal parity check; and renderer contracts for the withheld

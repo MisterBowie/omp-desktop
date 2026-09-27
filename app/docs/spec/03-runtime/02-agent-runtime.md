@@ -1814,12 +1814,22 @@ effects cannot be undone.
 
 The invariant is enforced by host-core at the durable write, not by the desktop:
 
-* `crates/host-core/src/plan_goal_guard.rs` installs two `sessions` triggers on
-  every database open — one for `INSERT`, one for `UPDATE OF mode, provider_id`.
-  A write whose result is Plan/Goal + the Cursor provider is aborted by SQLite
-  itself, so the transition tool (`plans.enter`), `session.configure`,
-  `session.create`, forks, imports and any future writer are all covered, and no
-  caller can land the pair between a read and a write.
+* `crates/host-core/src/plan_goal_guard.rs` installs two **TEMP** `sessions`
+  triggers on every database open — one for `INSERT`, one for
+  `UPDATE OF mode, provider_id`, both `ON main.sessions`. A write whose result is
+  Plan/Goal + the Cursor provider is aborted by SQLite itself, so the transition
+  tool (`plans.enter`), `session.configure`, `session.create`, forks, imports and
+  any future writer are all covered, and no caller can land the pair between a
+  read and a write.
+* The guard is connection state, not schema state. TEMP triggers belong to the
+  single connection `Database` owns and vanish when it closes: nothing is written
+  to `sqlite_master`, no schema version moves, and a later open by an older binary
+  inherits nothing. Installing also drops the same-named durable triggers commit
+  `876fb07` wrote into `sqlite_master`, so upgrading from that build converges on
+  one definition instead of leaving both, and a revised definition always replaces
+  the previous TEMP one (there is no `IF NOT EXISTS`). A write made through a raw
+  `sqlite3` connection — a manual edit — is outside the guard and stays the prompt
+  gate's job.
 * Identity is the canonical provider id `"cursor"` and the code is
   `PLAN_GOAL_CURSOR_UNSUPPORTED` (spec 08 §3.2b). Both literals live once per
   language and are pinned together by
