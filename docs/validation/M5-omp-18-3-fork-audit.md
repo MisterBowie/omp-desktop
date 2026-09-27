@@ -4,24 +4,26 @@
 
 状态：**审计完成（只读源码 + 确定性对比 + `git apply --check` 迁移分析）。本轮不改生产代码、不改两个固定子模块的 gitlink/内容、不改 patch artifact 与 manifest；R3 仍为硬阻塞，Cursor 产品门（ADR 0306）保留，T20 未完成、未声称。**
 
+复审返修（独立复审 F1-F6，2026-09-27）：argv 表述、内置 sidecar 解析（`OMP_BUNDLED_OMP`/资源树扫描无 `app.isPackaged` 门）、bundled sidecar 的构建来源可归因性、符号级证据强度、`prepareToolCallDispatch` 与投机的时序、补丁迁移成本按目标分档——六项均已回到固定源码逐条核对后改写（核对命令与观察见 §12.1）。
+
 本轮只新增本文档，并按真实状态最小更新 `docs/04-task-board.md` 与 `HANDOFF.md`。
 
 ---
 
 ## 0. 结论摘要
 
-1. **oh-my-pi-gui 的真实架构已被源码证明**：Electron 主进程每个标签页各自 spawn 一个 sidecar，命令行**只有** `["--mode", "rpc-ui"]`（`src/main/sidecar.ts:297`），且 `--mode` 同时在 `DENYLISTED_FLAGS` 与 `DENYLISTED_WITH_VALUE`（`src/shared/launch-profile.ts:44,62,84`）——用户启动 profile / `extraFlags` 无法改道模式。正式包只运行 `process.resourcesPath/omp`（`electron-builder.yml` 的 `extraResources: resources/omp → omp`），缺失即报错，**不存在系统 `omp` 回退**（`src/main/index.ts:57-90`、`src/main/sidecar.ts:250-262` 的闭环保守分支、`src/main/bundled-omp-path.test.ts`）。
-2. **sidecar 是“固定 fork 编译产物”，不是 `npm` 依赖**：`scripts/build-bundled-omp.ts` 从**外层 monorepo**（即 nornzach OMP fork）的 `packages/coding-agent/src/cli.ts` 用 Bun 编译成独立可执行文件（`packages/coding-agent/scripts/compile-binary.ts:35-79`，`Bun.build({compile:{…}, bytecode:true})`），产物 `resources/omp*` 被 `.gitignore` 排除（>100 MB，不进库）；发布流程要求记录用于构建 sidecar 的 monorepo commit（`README.md` §Releasing 步骤 7，`CHANGELOG.md:130,168,190` 留有历史先例）。
-3. **Bun 只用于开发与构建**：`package.json` 脚本、`build:omp`、`sync-upstream.sh` 全部用 Bun；运行期 spawn 的是编译后的二进制（`src/main/sidecar.ts:305-307`）；`resolveBunExe()`（`src/main/sidecar.ts:166-172`）**仅**在显式开发覆盖 `OMP_SIDECAR=source`（`src/main/index.ts:94-110`）时使用。GUI 的 `dependencies` 中没有任何 `omp`/`bun` 运行期包。
+1. **oh-my-pi-gui 的架构已由源码核对**：Electron 主进程每个标签页各自 spawn 一个 sidecar，argv **以固定模式前缀 `["--mode", "rpc-ui"]` 开头**，随后按需追加 `--session <file>` 或 `--no-auto-resume`、`--chat`，再追加经拒绝名单过滤的用户 flag（`src/main/sidecar.ts:297-306`；`sidecar.test.ts:46,70,94,100,133,183-198` 钉住完整 argv）。`--mode` 同时在 `DENYLISTED_FLAGS` 与 `DENYLISTED_WITH_VALUE`（`src/shared/launch-profile.ts:44,62,84`）——用户 profile / `extraFlags` **无法改道模式**。内置 sidecar 的解析（`src/main/index.ts:66-112`）依次是：① `OMP_BUNDLED_OMP` 环境变量覆盖（**在任何 `app.isPackaged` 判断之前**）；② `process.resourcesPath/omp`；③ 从 `app.getAppPath()`/`process.cwd()` 向上最多 8 层扫描 `resources/omp` 与 `packages/gui/resources/omp`；此外 `OMP_SIDECAR=source`（+ `OMP_SIDECAR_CLI`）可切到工作区源码 CLI，同样**不看 `app.isPackaged`**。因此可严格证明的是：**不从系统 `PATH` 解析 `omp`**（全部 spawn 调用点都传已解析的绝对路径：`sidecar.ts:317`、`stats-server.ts:61`、`benchmark-runner.ts:121`），且**常规打包产物把 `Resources/omp`（`electron-builder.yml` 的 `extraResources`）作为首选内置资源**；同时存在**显式环境覆盖**与**资源树扫描**两条开发/夹具通道（`e2e/runtime.e2e.ts:21`、`e2e/real-core.e2e.ts:32,37`、`scripts/capture-showcase.ts:76` 都在用 `OMP_BUNDLED_OMP`）。当两条通道都解析不出路径时，`start()` 直接进入 `error` 状态（`sidecar.ts:250-262`）而**不会**去找系统 `omp`。
+2. **sidecar 是本地编译产物，不是 `npm` 依赖；但“具体是哪个 fork commit”无法从当前证据精确归因**：`scripts/build-bundled-omp.ts` 只是**按相对路径**读取外层 monorepo（`repoRoot = guiRoot/../..`）的 `packages/coding-agent/src/cli.ts`，用 Bun 编译成独立可执行文件（`packages/coding-agent/scripts/compile-binary.ts:35-79`，`Bun.build({compile:{…}, bytecode:true})`），产物 `resources/omp*` 被 `.gitignore` 排除（>100 MB，不进库）。构建脚本**不校验**外层仓库的 git remote 或 commit（脚本内无 `git rev-parse`/remote 检查；`sync-upstream.sh` 也只 `git fetch upstream` 与读 `packages/coding-agent/package.json` 的版本）；README:212-218 把 `nornzach/oh-my-pi` 规定为**推荐的**外层布局，README §Releasing 步骤 7 只**要求记录**所用 monorepo commit；`CHANGELOG.md` 的 0.9.9/0.9.10 条目只写 “omp 18.3.0”，**没有** commit SHA（历史条目如 `CHANGELOG.md:130,168,190` 有 SHA，但那不能替当前版本作证）。因此可证明的是**设计/推荐流程**从外层 nornzach fork 构建 bundled binary，**不能**把已发布产物精确归因到 `81b9f250`。
+3. **Bun 只用于开发与构建（用户侧）**：`package.json` 脚本、`build:omp`、`sync-upstream.sh` 全部用 Bun；运行期 spawn 的是编译后的**自包含**二进制（`src/main/sidecar.ts:305-307`；该二进制由 `Bun.build({compile:true})` 生成，内嵌 Bun 运行时，所以用户无需安装 Bun/Node，也不需要系统 `bun` 去跑脚本）；`resolveBunExe()`（`src/main/sidecar.ts:166-172`）**仅**在显式开发覆盖 `OMP_SIDECAR=source`（`src/main/index.ts:94-110`）时使用。GUI 的 `dependencies` 中没有任何 `omp`/`bun` 运行期包。
 4. **13 个指定文件中，6 个在 can1357 v18.3.0 与 nornzach fork 之间逐字相同**：`packages/agent/src/agent-loop.ts`、`packages/agent/src/types.ts`、`packages/ai/src/types.ts`、`packages/ai/src/providers/cursor.ts`、`packages/coding-agent/src/tools/resolve.ts`、`packages/coding-agent/src/modes/rpc/host-tools.ts`（md5 与逐字节比较均为 0 差异）。
-5. **另外 7 个文件的差异全部是三类**：①与过渡契约无关的 fork 产品修改（`tools/write.ts` 新增 overwrite diff 详情；`main.ts` 移除上游的 protocol-host 默认设置覆盖、新增 `--chat` 会话类型）；②fork 专有 RPC 面（`modes/rpc/rpc-plan.ts`、`modes/rpc/rpc-modes.ts` 为新文件，`rpc-mode.ts`/`rpc-types.ts`/`agent-session.ts` 大幅扩写）；③格式化漂移（同一行集合仅空白不同，agent-session 3087 行新增中 1014 行、rpc-mode 1940 中 816 行、rpc-types 1803 中 582 行属此类）。**符号级核验**：18.3 相对 18.2.7 引入的标识符在 fork 对应文件中**缺失数为 0**——即 fork 的分歧文件在符号层面是 18.3 的超集，不存在“fork 丢了 18.3 的功能”。
+5. **另外 7 个文件的差异全部是三类**：①与过渡契约无关的 fork 产品修改（`tools/write.ts` 新增 overwrite diff 详情；`main.ts` 移除上游的 protocol-host 默认设置覆盖、新增 `--chat` 会话类型）；②fork 专有 RPC 面（`modes/rpc/rpc-plan.ts`、`modes/rpc/rpc-modes.ts` 为新文件，`rpc-mode.ts`/`rpc-types.ts`/`agent-session.ts` 大幅扩写）；③格式化漂移（同一行集合仅空白不同，agent-session 3087 行新增中 1014 行、rpc-mode 1940 中 816 行、rpc-types 1803 中 582 行属此类）。**符号级核验（弱证据，只说明“未发现符号级缺失”）**：18.3 相对 18.2.7 新引入的标识符（agent-session 154 / rpc-mode 30 / rpc-types 9 / main 6 / write 23）在 fork 对应文件中**缺失数为 0**。这只说明这些**名字**仍在文件里出现，**不能**推出函数体语义、调用关系或功能行为与 18.3 一致（同名函数可能被改写、调用点可能被替换、行为可能被 fork 的其它改动覆盖）；要断言“功能未丢失”必须由行为测试证明（见 §11 限制）。
 6. **nornzach fork 完全没有实现 PI 的 SubmitPlan/SubmitGoal 合同**：`SubmitPlan`/`SubmitGoal` 在**整棵 fork 树（含文档）出现 0 次**；`soleBatch`/`batchPolicy`/“must be the only tool call”同样 0 次。它的 Plan/Goal 走 OMP 原生语义（见第 5 节），与 PI 的“待审批提交工具”是不同概念。
 7. **OMP 原生 Plan 链路在 fork 中被完整暴露为 RPC**（上游 18.2.7 与 18.3.0 均无此面，`set_plan_mode`/`plan_proposal`/`plan_approval` 在两者的 `rpc-types.ts` 命中均为 0）：`set_plan_mode` → 模型把计划写到 `local://<slug>-plan.md` → `write xd://propose` → `tool_execution_end` → 发 `plan_proposal` 帧 → **静默 abort**（`markPlanInternalAbortPending` + `session.abort()`）→ 宿主回 `plan_approval` → 控制器按 option 执行/压缩/保存/refine。Goal 侧同理：RPC `set_goal`（objective/tokenBudget + `action: pause|resume|drop`）映射到 **上游早已存在的 `GoalRuntime`**（`goals/runtime.ts` 522 行，三树 md5 相同：create/replace/pause/resume/drop + continuation prompt）。
-8. **18.3 的 `BeforeToolCallContext.assistantMessage` + `prepareToolCallDispatch` 只有“整批可见”，没有“整批裁决”**：hook 能看到整条 assistant 消息（`packages/agent/src/types.ts:847-866`）且在任何调度前按调用顺序执行（`agent-loop.ts:2698-2780`，流式路径在 `message_end` 之前，`agent-loop.ts:2046-2056`），因此“非 Cursor 的 PI 式整批预检”**可以用宿主侧逻辑表达**（对批内**每个**调用返回 block）；但它不是 PI 语义的等价物：hook 对未知工具/参数非法/已被策略 deny 的调用**根本不被咨询**（`agent-loop.ts:2749-2753`），`kCursorExecResolved` 调用被直接 `continue` 跳过（`agent-loop.ts:2708`），且投机执行仍可能在流式期抢先起物理执行。
+8. **18.3 的 `BeforeToolCallContext.assistantMessage` + `prepareToolCallDispatch` 只有“整批可见”，没有“整批裁决”**：hook 能看到整条 assistant 消息（`packages/agent/src/types.ts:847-866`），并在**最终/常规 loop dispatch 之前**按调用顺序逐个执行（`agent-loop.ts:2698-2780`；流式路径在 `message_end` 时点，`agent-loop.ts:2033-2056`，受 `finalToolCallsCanDispatch` 门控）。因此“非 Cursor 的 PI 式整批预检”**可以用宿主侧逻辑表达**（对批内**每个**调用返回 block）；但它不是 PI 语义的等价物：hook 对未知工具/参数非法/已被策略 deny 的调用**根本不被咨询**（`agent-loop.ts:2749-2753`），`kCursorExecResolved` 调用被直接 `continue` 跳过（`agent-loop.ts:2708`），且**投机执行不受 hook 时序保护**——`admitFinalized` 在 `toolcall_end`（流式期间）就被调用（`agent-loop.ts:2282-2288`），`#insertCandidate` 随后立刻 `#drain()`（`speculative-execution.ts:808-816`），只有声明 `deferBeforeToolCall` 的候选才等 `#admissionsFinalized`（`:852-855`）；该声明目前只由 coding-agent 的**本地读**投机宿主给出，且**仅当 loop 装了 `beforeToolCall` 时才被协调器采纳**（`packages/coding-agent/src/speculation/host.ts:169-183`），其它 host/无 hook 会话没有普遍保证。
 9. **Cursor 的预执行在 18.3 与 18.2.7 中同构，仍使“被拒批次零副作用”不可满足**：`kCursorExecResolved` 语义未变（`packages/ai/src/providers/cursor.ts:1142-1143,1669+`；`agent-loop.ts:647,1376,1451,1507` 一律把这些块从 loop 可执行调用中剔除），provider 侧 `cursor.ts` 在 18.2.7→18.3 的 7 行改动与本主题无关（仅 `node:crypto` → `Bun.SHA256`）。结论与 R3A/R3B 一致，**不解除 R3**。
-10. **补丁迁移成本极低，但“能力已进上游”为 0**：现有 40 个 hunk 的补丁对 18.2.7 全部适用（40/40），对 **18.3.0 为 39/40**、对 **nornzach fork 为 38/40**；**没有任何 hunk 命中 “ALREADY-UPSTREAM”**——`batchPolicy`/`soleBatchRejectionReason`/`AgentToolResult.terminate`/host-tool 的 `concurrency` 在 18.3 与 fork 的 `agent-loop.ts`/`types.ts`/`host-tools.ts`/`rpc-types.ts` 中命中均为 0。冲突只有 1–2 处且都是**锚点文本**（18.3 把注释里的 `hub wait` 改成 `wait`；fork 重排了 `rpc-mode.ts` 的 import），不是语义冲突。
+10. **迁移成本按目标不同，且“能力已进上游”为 0**：现有 40 个 hunk 的补丁对 18.2.7 全部适用（40/40）；**以 can1357 18.3.0 为目标为 39/40**（需修 **1** 个锚点：`agent-loop.ts` 的注释 `hub wait`→`wait`）；**直接以 nornzach fork 为目标为 38/40**（需修 **2** 个锚点：上述 `agent-loop.ts` 注释，加上 fork 重排的 `rpc-mode.ts` import 行）。**没有任何 hunk 命中 “ALREADY-UPSTREAM”**——`batchPolicy`/`soleBatchRejectionReason`/`AgentToolResult.terminate`/host-tool 的 `concurrency` 在 18.3 与 fork 的 `agent-loop.ts`/`types.ts`/`host-tools.ts`/`rpc-types.ts` 中命中均为 0；冲突都是**锚点文本**而非语义冲突。
 
-**决策（要求 8 的完整表述见 §9）**：可以借鉴「自有 OMP fork + 固定 bundled sidecar + 双仓库同步」的架构；**不能**用 OMP 原生 Plan/Goal 冒充 PI parity；**不据此解除 R3，也不删除 Cursor 产品门**。
+**决策（要求 8 的完整表述见 §9）**：可以借鉴「自有 OMP fork + 固定 bundled sidecar + 双仓库同步」的架构（**但打包态“固定 sidecar”必须由我们自己加门**：nornzach 的解释器不区分打包态）；**不能**用 OMP 原生 Plan/Goal 冒充 PI parity；**不据此解除 R3，也不删除 Cursor 产品门**。
 
 ---
 
@@ -41,46 +43,54 @@
 
 ---
 
-## 2. 要求 1：oh-my-pi-gui 的实际架构（逐条证明）
+## 2. 要求 1：oh-my-pi-gui 的实际架构（逐条核对；可证明与不可证明分开写）
 
 ### 2.1 Electron 启动 `omp --mode rpc-ui`
 
 | 事实 | 坐标 |
 | --- | --- |
-| 每个会话一个 `SidecarManager`，spawn 的 argv 是 `["--mode", "rpc-ui"]`，随后才追加 `--session` / `--no-auto-resume` / `--chat` 与用户 flag | `src/main/sidecar.ts:295-303`（`const args = ["--mode", "rpc-ui"];`） |
-| `--mode` 属代码控制 flag：用户启动 profile 与 `extraFlags` 里的 `--mode` 会被成对剥离（含取值 token） | `src/shared/launch-profile.ts:42-57,60-78,82-90`；`src/main/sidecar.ts:303-306` 先 `stripDenylistedFlags(userFlags)` 再拼接 |
-| 行为测试钉住 argv（含 `--chat`、`--session`、`--no-auto-resume`、注入 flag 顺序） | `src/main/sidecar.test.ts:46,70,94,100,180-198` |
+| 每个会话一个 `SidecarManager`：argv 以**固定模式前缀** `["--mode", "rpc-ui"]` 初始化，随后依次追加 `--session <file>`（或 `--no-auto-resume`）、`--chat`（仅 chat 会话），最后追加经拒绝名单过滤的用户 flag | `src/main/sidecar.ts:297-306`（`const args = ["--mode", "rpc-ui"];` → `args.push("--session"…)`/`"--no-auto-resume"`/`"--chat"` → `args.push(...stripDenylistedFlags(userFlags))`） |
+| `--mode` 属代码控制 flag：用户启动 profile 与 `extraFlags` 里的 `--mode` 会被成对剥离（含取值 token），因此**模式本身不可被用户改道**（argv 的其余部分是可变的） | `src/shared/launch-profile.ts:42-57,60-78,82-90`；`src/main/sidecar.ts:303-306` |
+| 行为测试钉住**完整 argv**（`["--mode","rpc-ui","--session",…]`、`[…,"--chat"]`、`[…,"--no-auto-resume"]`、重启后 `["--mode","rpc-ui"]`、以及注入的 `--append-system-prompt/--no-rules/--add-dir/--tools` 顺序） | `src/main/sidecar.test.ts:46,70,94,100,133,183-198` |
+| 源码侧（开发覆盖）`OMP_SIDECAR=source` 时 argv 变成 `[bun, <sourceCli>, ...args]`，模式前缀不变 | `src/main/sidecar.ts:305-307`；`src/main/index.ts:94-110` |
 | NDJSON 解析 + 协议 v2 分片仅在 ready 通过 `supportedProtocolVersions` 含 2 且帧上限匹配时启用 | `src/main/rpc-bridge.ts:13-24`、`src/main/sidecar.ts:398-402` |
 | 事件面按 AGENT_EVENT_TYPES 表路由（含 `plan_proposal`、`goal_updated`、`loop_mode_update` 等） | `src/main/sidecar.ts:57-89`、`src/main/sidecar.ts:404+` |
 
-### 2.2 正式包只运行 bundled sidecar（无系统 `omp` 回退）
+### 2.2 内置 sidecar 的解析：无系统 `omp` 回退，但存在开发覆盖与资源树扫描
 
 | 事实 | 坐标 |
 | --- | --- |
-| 打包把 `resources/omp` 作为 `extraResources` 放到应用 `Resources/omp`（macOS 默认配置） | `electron-builder.yml`（`extraResources: [{from: resources/omp, to: omp}]`）；x64/Windows 变体分别指向 `resources/omp.x64`、`resources/omp.exe` |
-| 解析顺序：`process.resourcesPath/<omp|omp.exe>` → 开发树里向上 8 层找 `resources/omp`（本仓库布局下即 `packages/gui/resources/omp`）；注释明确“**没有系统安装的 omp 被咨询，也没有外部回退**” | `src/main/index.ts:57-90` |
-| 启动前闭环检查：`binaryPath` 与 `sourceCli` 都为空即进入 `error` 状态并给出按构建形态措辞的错误，**绝不回退** | `src/main/sidecar.ts:250-262`；`missingSidecarMessage` `src/main/sidecar.ts:182-189` |
+| 打包把 `resources/omp` 作为 `extraResources` 放到应用 `Resources/omp`（macOS 默认配置），即**常规打包产物的首选内置资源** | `electron-builder.yml`（`extraResources: [{from: resources/omp, to: omp}]`）；x64/Windows 变体分别指向 `resources/omp.x64`、`resources/omp.exe` |
+| 解析顺序：① `OMP_BUNDLED_OMP` 环境变量（**先于任何 `app.isPackaged` 判断**，存在即采用）；② `process.resourcesPath/<omp|omp.exe>`；③ 从 `app.getAppPath()`/`process.cwd()` 向上最多 8 层找 `resources/omp`（含 `packages/gui/resources/omp`）。注释里的“没有系统安装的 omp 被咨询，也没有外部回退”指的是**不查 PATH**，不是“打包态只能走 ②” | `src/main/index.ts:66-90`（`resolveBundledOmp`）；`src/main/bundled-omp-path.ts:5-16` |
+| 开发/夹具另有 `OMP_SIDECAR=source`（+ `OMP_SIDECAR_CLI`）切到工作区源码 CLI，**同样不检查 `app.isPackaged`** | `src/main/index.ts:94-112`（`resolveSourceCli`）；使用方 `e2e/real-core.e2e.ts:35,37`、`e2e/runtime.e2e.ts:21`、`scripts/capture-showcase.ts:76`（`OMP_BUNDLED_OMP`） |
+| 全仓库**没有**按名字（PATH）启动 `omp` 的调用点：`spawn` 的命令一律是已解析路径（sidecar/stats/benchmark），或用 `bun`+源码入口 | `src/main/sidecar.ts:317`、`src/main/stats-server.ts:61`、`src/main/benchmark-runner.ts:121`（`binaryPath`）；`src/main/sidecar.ts:305`（`sourceCli ? resolveBunExe() : binaryPath`） |
+| 两条通道都解析不出时：`binaryPath` 与 `sourceCli` 皆空 → `start()` 进入 `error` 状态并给出按构建形态措辞的错误，**不找系统 `omp`** | `src/main/sidecar.ts:250-262`；`missingSidecarMessage` `src/main/sidecar.ts:182-189` |
 | sidecar 二进制本身被 `.gitignore` 排除（>100 MB，不进仓库），发布流程要求逐个 `--smoke-test` | `.gitignore`（`resources/omp`、`resources/omp.*`）；`scripts/sync-upstream.sh` 第 6 步；`README.md` §Releasing 步骤 5 |
 | 打包配置契约测试（每个 mac 变体都注册 `omp://`、`extraResources` 存在等） | `src/main/packaging-config.test.ts` |
 
-### 2.3 固定 sidecar 由 nornzach OMP fork 编译
+**对本产品的含义（要求 8 的输入）**：nornzach GUI 的“闭环保守”只保证**没有 PATH 回退**，**不保证**打包态不会被环境变量或资源树扫描改道（`OMP_BUNDLED_OMP`、`OMP_SIDECAR=source` 在 `app.isPackaged` 下同样生效，e2e 正是这样驱动夹具的）。若我们的发布态要求“真正固定 sidecar”，T20-R4 必须在 `app.isPackaged` 下**禁用/忽略**这些开发覆盖与向上的资源树扫描（或提供等价的机械门，例如只接受清单校验过的资源路径），并补上行为测试（打包态注入 `OMP_BUNDLED_OMP`/`OMP_SIDECAR`、放置同名伪资源时仍拒绝启动）。本轮不改 nornzach 生产代码。
+
+### 2.3 bundled sidecar 的构建路径：设计上来自外层 fork，但无法把已发布产物精确归因到某个 commit
 
 | 事实 | 坐标 |
 | --- | --- |
-| `build:omp` 在 **GUI 仓库之外的 monorepo** 里编译 agent：`repoRoot = guiRoot/../..`，入口 `packages/coding-agent/src/cli.ts`，并校验 `packages/coding-agent/scripts/compile-binary.ts` 与 monorepo 的 `packageManager`（Bun 版本门槛） | `scripts/build-bundled-omp.ts:1-40` |
+| `build:omp` **按相对路径**在外层目录编译 agent：`repoRoot = guiRoot/../..`，入口 `packages/coding-agent/src/cli.ts`，并只校验 `packages/coding-agent/scripts/compile-binary.ts` 存在与 monorepo 的 `packageManager`（Bun 版本门槛） | `scripts/build-bundled-omp.ts:1-40` |
+| **没有任何 remote/commit 校验**：构建脚本内无 `git rev-parse`/remote 检查；`sync-upstream.sh` 也只 `git fetch upstream`、读 `packages/coding-agent/package.json` 的版本号 | `scripts/build-bundled-omp.ts`、`scripts/sync-upstream.sh:34,50` |
 | 编译是 Bun 单文件可执行（bytecode、外置原生依赖、可选跨平台 target、`outfile=resources/omp*`） | `packages/coding-agent/scripts/compile-binary.ts:35-79` |
 | 原生 `.node` 载荷按目标平台/版本 staged 并在 finally 还原（含 `pi_natives` 版本哨兵校验、跨架构 `--os/--cpu` 安装、失败时给出从源码构建的指引） | `scripts/build-bundled-omp.ts:120-210` |
-| 两个仓库的边界与嵌套布局（monorepo 里 `packages/gui/` 是独立仓库、永不 stage 进 monorepo） | `README.md` §Repository boundaries |
+| README 规定**推荐**的双仓库布局与责任边界：外层 `nornzach/oh-my-pi`（agent 源码与 sidecar 构建）、内嵌 `packages/gui/`（GUI 仓库）、`can1357/oh-my-pi` 仅作 upstream | `README.md:196-221` |
 | 上游同步是一等流程（merge `upstream/main` → natives → stats → `build:omp` → GUI build/typecheck/test） | `scripts/sync-upstream.sh` |
-| 每个版本记录“用于 sidecar 的 monorepo commit”（历史条目可见，如 `d9e6bdaa2d`、`36732cf5ed`、`6655097656`） | `CHANGELOG.md:130,168,190`；`README.md` §Releasing 步骤 7 |
-| 本版本发布说明与内置 agent 版本 | `CHANGELOG.md:9,28`（`omp/18.3.0`） |
+| 发布流程步骤 7 **要求记录**“用于 sidecar 的 monorepo commit”，并**只在**该 commit 与 upstream main 不同时才强调 | `README.md` §Releasing 步骤 7 |
+| 版本可核验的只有 agent 版本：`CHANGELOG.md` 的 0.9.9/0.9.10 条目只写 `omp/18.3.0`，**没有** monorepo commit；历史条目（0.9.x 早期）曾写 SHA，但那不能替当前版本作证 | `CHANGELOG.md:9,28`（无 SHA）对照 `:130,168,190`（有 SHA） |
 
-### 2.4 Bun 只用于开发与构建
+**结论与限制**：可以证明的是**设计与推荐流程**（外层 nornzach fork + 内嵌 GUI 仓库 → `build:omp` 编译 bundled binary → 打进 `Resources/omp`），**不能**证明某个已发布安装包就是由 `81b9f250` 编译的（脚本不校验、产物不入库、版本说明不含 SHA）。因此本审计把 `81b9f250` 当作**fork 源码的固定证据源**（用于对比与读源码），而不是“已发布 sidecar 的构建来源”。T20-R4 的清单必须自带可核验字段（fork commit + desktop version + platform + sha256），不能依赖发布说明（见 §10 R4-3/R4-9）。
+
+### 2.4 Bun 只用于开发与构建（用户侧不需要安装）
 
 | 事实 | 坐标 |
 | --- | --- |
-| GUI 运行期依赖里没有 `omp`/`bun`（只有 Electron/React/渲染类依赖） | `package.json` `dependencies` |
-| 运行期 spawn 的是二进制路径本身；`resolveBunExe()` 只在 `sourceCli` 存在时被调用，而 `sourceCli` **仅**由 `OMP_SIDECAR=source` 的开发覆盖产生 | `src/main/sidecar.ts:166-172,305-307`；`src/main/index.ts:94-110` |
+| GUI 运行期依赖里没有 `omp`/`bun`（只有 Electron/React/渲染类依赖）；用户侧不需要 Bun/Node | `package.json` `dependencies`；`README.md` §Install & start |
+| 运行期 spawn 的是编译后的自包含二进制（内嵌 Bun 运行时），`resolveBunExe()` 只在 `sourceCli` 存在时被调用，而 `sourceCli` **仅**由 `OMP_SIDECAR=source` 的开发覆盖产生 | `src/main/sidecar.ts:166-172,305-307`；`src/main/index.ts:94-110` |
 | 主进程 bundle 的“打包后不得再有裸 import”守卫（`check-main-bundle.ts`，`bun run build` 的一部分） | `scripts/check-main-bundle.ts` |
 | README 明确“DMG/NSIS/portable 用户无需另装 omp、Bun 或 Node”；单靠 GUI 仓库 clone 无法编译 sidecar（必须嵌在 monorepo 的 `packages/gui/`） | `README.md` §Install & start、§Development、§Troubleshooting（`Built-in omp not found` 条目） |
 | 测试：`bundled-omp-path.test.ts`（文件名/`.exe` 解析）、`sidecar.test.ts`（argv、重启、崩溃循环）、`packaging-config.test.ts`（打包契约）；GUI 共 153 个 `*.test.*`/`*.spec.*` 文件，e2e 目录另有 6 个 Playwright 套件 | `src/main/*.test.ts`；`e2e/` |
@@ -91,7 +101,7 @@
 
 ## 3. 要求 2：can1357 v18.3.0 ↔ nornzach fork 逐文件对比
 
-方法：两棵树都在 `/tmp` 且已按 §1 完成逐 blob 校验；用 `diff -u` 逐文件比较，并用 `difflib` 计算“上游新增行在 fork 中的保留率”“fork 新增行”与“仅空白差异行”，另用标识符集合做“18.3 新引入符号是否在 fork 缺失”的核验（缺失数为 0 表示 fork 是 18.3 的符号超集）。
+方法：两棵树都在 `/tmp` 且已按 §1 完成逐 blob 校验；用 `diff -u` 逐文件比较，并用 `difflib` 计算“上游新增行在 fork 中的保留率”“fork 新增行”与“仅空白差异行”。另做一次**符号级核验**（18.3 相对 18.2.7 新引入的标识符是否仍出现在 fork 文件中）——它只用于说明“**未发现**符号级缺失”，**不**等价于功能/行为等价（见 §0 第 5 条与 §11 限制）。
 
 行数与变化量：
 
@@ -115,14 +125,14 @@
 
 - 保留率：agent-loop/agent types/ai types/cursor/resolve/host-tools 对 18.3 新增行保留 **100%**（且逐字节相同）；write.ts 保留 54/54；main.ts 保留 11/11；agent-session 保留 471/556；rpc-mode 保留 37/38；rpc-types 保留 25/25。
 - fork 新增行中的“仅空白差异”行：agent-session 1014、rpc-mode 816、rpc-types 582、write.ts 23 —— 即 fork 对本仓库做过一次整体格式化（`biome/oxfmt` 风格），这部分不承载语义。
-- 符号级：18.3 相对 18.2.7 新引入的标识符（agent-session 154、rpc-mode 30、rpc-types 9、main 6、write 23）在 fork 对应文件中**缺失数为 0**。因此“fork 丢掉了 18.3 的某个功能”在符号层面不成立；差异是**新增 + 重排 + 格式**。
+- 符号级（**弱证据**）：18.3 相对 18.2.7 新引入的标识符（agent-session 154、rpc-mode 30、rpc-types 9、main 6、write 23）在 fork 对应文件中**缺失数为 0**，即**未发现**符号级缺失。这只说明名字还在文件里出现；同名函数的函数体、调用关系与运行时行为是否与 18.3 一致**未验证**（也不能由本方法验证），需要行为测试（§11 限制）。
 
 ### 3.1 与过渡契约无关的修改（示例）
 
 - `tools/write.ts`：fork 新增 `overwriteDiffFields()`（以 `editDiffString` 计算覆盖写前的 unified diff，并带 `MAX_WRITE_DIFF_TEXT_CHARS = 128_000` 预算与 best-effort 降级），结果详情多出 `overwritten`/`diff`/`firstChangedLine`；与工具批次/终止契约无关。18.3 相对 18.2.7 在该文件的 +54 行同样与契约无关（UTF-8 字节计数、行选择器等）。
 - `main.ts`：fork **刻意删除**上游的 `HOST_DEFAULTED_SETTING_PATHS` / `applyRpcDefaultSettingOverrides` / `applyAcpDefaultSettingOverrides`（18.2.7 与 18.3.0 都存在，fork 为 0 命中），并留注释“Our fork deliberately omits them because they mask settings persisted by the GUI host”；另有 `--chat` 会话类型与 chat 系统提示注入、`!isInteractive && !session.model` 的报错被限制为“仅非 rpc 模式”。
   - **对我们的意义**：如果我们采用自有 fork，`rpc-ui` 启动时的“宿主默认设置覆盖”行为必须在 fork 里明确保留或按我们自己的契约重写（本产品目前依赖外部注入配置，见 T19-C 的 state 文件通道）。
-- `agent-session.ts`：fork 删除/重排的部分包含上游 18.3 新增的 auto-title、ephemeral turn、附件来源提示、reset credits、obfuscation 等行——这些在 fork 里是被**重排/格式**处理（符号保留率见上），不构成本主题的能力差异。
+- `agent-session.ts`：fork 删除/重排的部分包含上游 18.3 新增的 auto-title、ephemeral turn、附件来源提示、reset credits、obfuscation 等行；本轮只确认这些**标识符仍出现在 fork 文件中**（缺失 0），**未**验证它们的函数体与运行时行为是否与 18.3 等价——要断言“这部分没有能力差异”需要行为测试，本轮不做该断言。
 
 ### 3.2 fork 专用 RPC（新增命令面）
 
@@ -221,7 +231,9 @@ get_settings / set_setting / get_settings_schema / get_model_roles / set_model_r
 | --- | --- |
 | hook 上下文携带**整条 assistant 消息**（`assistantMessage`）、原始 `toolCall`、解析后的 `tool` 与校验后的 `args` | `packages/agent/src/types.ts:847-866` |
 | 返回 `{block:true, reason}` 只作用于**当前调用**；`{args}` 会重新校验并写回 `toolCall.arguments`（成为历史/事件/持久化/replay 的唯一版本） | `agent-loop.ts:2749-2780` |
-| prepare 发生在**任何调度之前**：流式路径在 `message_end` 之前（`agent-loop.ts:2040-2056`，受 `finalToolCallsCanDispatch` 门控），执行期复用同一份 prepared（`agent-loop.ts:2911-2918`） | 同上 |
+| prepare 在**最终/常规 loop dispatch 之前**执行：流式路径在 `message_end` 时点、受 `finalToolCallsCanDispatch` 门控（`agent-loop.ts:2033-2056`），非流式入口按需再跑一次；执行期复用同一份 prepared（`agent-loop.ts:2911-2918`）。**这不是“任何调度之前”**——投机候选可在流式期间先行起物理执行（见下） | `agent-loop.ts:2033-2056,2698-2780,2911-2918` |
+| 投机时序（同一文件）：`toolcall_end` → `admitFinalized` → `#insertCandidate` → `#drain()`；只有 `deferBeforeToolCall` 候选会等 `#admissionsFinalized`；`finalizeAdmissions()` 在 `prepareToolCallDispatch` + `reconcileFinalCalls` 之后 | `agent-loop.ts:2282-2288`、`speculative-execution.ts:808-816,834-840,852-855`、`agent-loop.ts:2057-2071` |
+| `deferBeforeToolCall` 目前只在 coding-agent 的**本地读**投机宿主上声明，且协调器**仅在该 provider 调用装了 `beforeToolCall` 时才采纳**（无 hook 的会话照样立即执行） | `packages/coding-agent/src/speculation/host.ts:169-183`、`speculative-execution.ts:803-805` |
 | prepare 对每个调用按顺序执行；**未知工具或参数非法**时 `continue`（不咨询 hook）；**已被策略 deny** 时也不进入 | `agent-loop.ts:2708,2740-2753` |
 | `kCursorExecResolved` 的调用在 prepare 与所有可执行计数中被**跳过/剔除** | `agent-loop.ts:2708`（prepare）、`647,1376,1451,1507`（计数/派发） |
 
@@ -230,7 +242,7 @@ get_settings / set_setting / get_settings_schema / get_model_roles / set_model_r
 - **可用**：因为 hook 能看到整条消息，宿主可以对该消息**每个**调用返回 `{block:true, reason:"<transition tool> must be the only tool call in the assistant message."}`，从而在 loop 可控路径上实现“含过渡工具的批次整批不执行”，且发生在 `tool_execution_start` 之前。
 - **不等价**（三条硬限制）：
   1. hook 的返回值是**逐调用**的，没有任何“批裁决”原语；实现整批语义必须由调用方对批内每个调用自算一次，且对“未知工具/参数非法”的成员根本不会被问（`agent-loop.ts:2749-2753`），只能由缓存/重算补齐——这不是 PI 的单次批判定。
-  2. hook 在**投机执行已经可能启动物理工作之后**才被调用：投机候选在流式期由 `toolcall_end` 触发（18.2.7 的 `agent-loop.ts:2264`；18.3 对应区域未变），prepare/`finalizeAdmissions` 只是收敛点（`agent-loop.ts:2057-2071`）。
+  2. hook 的时序**不构成零副作用的保证**：投机候选在流式期由 `toolcall_end` 触发（`agent-loop.ts:2282-2288`）并立刻 `#drain()`（`speculative-execution.ts:808-816`），只有声明 `deferBeforeToolCall` 的候选才被推迟到 `finalizeAdmissions()`（`:852-855`）；该声明目前只有 coding-agent 的本地读宿主给出，且**仅当本 provider 调用装有 `beforeToolCall` 时协调器才采纳**（`packages/coding-agent/src/speculation/host.ts:169-183`、`speculative-execution.ts:803-805`）。因此“把整批预检放进 hook 就能零副作用”**不能泛化**——严格零副作用仍必须依赖投机 admission 门（R3A 补丁对声明 sole 工具的会话关闭投机，正是为此）。
   3. hook 看不到、也拦不住 Cursor exec channel 的**已执行**调用（§7.3）。
 - **对我们的实现选择**：这正好解释了 R3A 补丁为什么把批次裁决放在 `agent-loop.ts` 的 `prepareToolCallDispatch`/`executeToolCalls`（在那里才能同时拿到“整条消息的全部 toolCall”与“投机/派发门”），而不是放在 `AgentSession.#beforeToolCall`——后者只承载扩展 `tool_call` 派发，且在**没有扩展注册 `tool_call` handler 时直接 early return**（`agent-session.ts:4197-4200`，三树同形）。
 
@@ -273,22 +285,22 @@ get_settings / set_setting / get_settings_schema / get_model_roles / set_model_r
 
 | 补丁能力 | 18.3/上游是否已有 | 迁移结论 |
 | --- | --- | --- |
-| 批次计数 = 消息内**全部** `toolCall`（含 Cursor 已执行块） | **否**（`batchPolicy`/`soleBatchRejectionReason` 命中 0） | **必须保留**；建议合并为 18.3 上的 1-hunk 锚点修复后重生成 artifact |
+| 批次计数 = 消息内**全部** `toolCall`（含 Cursor 已执行块） | **否**（`batchPolicy`/`soleBatchRejectionReason` 命中 0） | **必须保留**；在 18.3 上合并只需修 1 个注释锚点（若目标改为 fork 则为 2 个），随后重生成 artifact |
 | `batchPolicy: "sole"` 声明 + 含 sole 且调用数≠1 时**整批拒绝**（零 `tool_execution_start`、零 host call、按序 blocked 结果、不触发审批钩子） | **否** | **必须保留**（这是 PI 批次语义在 OMP 上的唯一落点） |
 | 投机预执行门禁（活动工具表含 sole 工具时该 provider 调用不创建投机协调器） | **否**（`speculativeToolExecution` 在 18.3 与 18.2.7 同形） | **必须保留**；**应继续留在 loop 层**（移到 `AgentSession.#beforeToolCall` 无法阻止流式期已启动的候选） |
 | `AgentToolResult.terminate` / `afterToolCall.terminate` 覆盖（结算后终止、非 abort、流式 partial 永不终止） | **否**；但上游已有近似机制 `TERMINAL_TOOL_RESULT_ABORT_REASON`（`agent-loop.ts:166,744`，由 `agent-session.ts:2758,4183` 的 subagent yield 产出）——它是 **abort 语义**（signal 置位、`stopReason` 走 aborted 分支） | **保留 terminate**（非 abort 是产品要求：提交成功后是正常完成，不写 aborted、不清 steering）；同时**不要**改用上游 abort 路径 |
 | host-tool RPC 的 `concurrency` / `batchPolicy` 策略字段 + `host_tool_result.result.terminate` 严格校验 | **否**（`RpcHostToolDefinition` 三树字段一致，无这两项） | **保留在 host-tool RPC 层**（`host-tools.ts`/`rpc-mode.ts`/`rpc-types.ts` 三棵树逐字相同，hunk 全部适用） |
 | `docs/rpc.md` 文档与测试 | — | 迁移时同步（两棵树均 100% 适用） |
 
-**结论**：迁移到 18.3（或自有 fork）的成本是**修复 1 个注释锚点 + 重新生成 artifact**；没有任何能力需要删除，也没有任何能力可以“因为上游已有”而丢弃。
+**结论（按目标分开）**：迁移到 **can1357 18.3.0** 的成本是**修复 1 个注释锚点 + 重新生成 artifact**；直接迁移到 **nornzach fork** 的成本是**修复 2 个锚点**（同一个 `agent-loop.ts` 注释 + `rpc-mode.ts` 的 import 重排）+ 重新生成 artifact。两种目标下都**没有任何能力需要删除**，也没有任何能力可以“因为上游已有”而丢弃（`ALREADY-UPSTREAM = 0`）。
 
 ---
 
 ## 9. 要求 8：决策
 
 1. **架构可以借鉴：自有 OMP fork + 固定 bundled sidecar + 双仓库同步。**
-   - 证据：§2 证明该架构在 GUI 侧是**可验证、无系统回退、无运行期 Bun** 的；§8 证明我们的补丁迁移到 18.3 只需 1 个锚点修复；§3 证明 fork 面（RPC Plan/Goal）是**可读、可审、可移植**的实现样板。
-   - 落地边界（不能照抄）：fork 必须是我们自己维护的（`MisterBowie` 名下新仓库，**绝不**向 `can1357/oh-my-pi` 推送，符合根 `AGENTS.md`）；sidecar 构建产物必须带（fork commit + 桌面版本 + 平台 + 校验值）清单；`rpc-ui` 的宿主默认设置覆盖行为要在 fork 里明确写出（nornzach fork 选择移除，我们必须显式选择，不能默认漂移）。
+   - 证据（按其真实强度）：§2 证明 GUI 侧**不从 PATH 解析 `omp`**、常规打包产物以 `Resources/omp` 为首选资源、运行期不需要 Bun；§8 证明我们的补丁迁移到 **18.3 只需修 1 个注释锚点**（若直接以 fork 为目标则需 2 个）；§3 证明 fork 面（RPC Plan/Goal）是**可读、可审**的实现样板。**不**以此声称“nornzach 的打包态绝对固定 sidecar”，也**不**把已发布产物归因到某个 fork commit。
+   - 落地边界（不能照抄）：① fork 必须是我们自己维护的（`MisterBowie` 名下新仓库，**绝不**向 `can1357/oh-my-pi` 推送，符合根 `AGENTS.md`）；② sidecar 构建产物必须自带可核验清单（fork commit + 桌面版本 + 平台 + sha256），并在打包态**由代码校验**（nornzach 只“要求记录”，脚本不校验外层仓库，不足以照抄）；③ 打包态必须显式处理 nornzach 那两条**无 `app.isPackaged` 门**的开发通道（`OMP_BUNDLED_OMP`、`OMP_SIDECAR=source`）与向上资源树扫描——我们要么在 `app.isPackaged` 下禁用/忽略它们，要么用等价的机械门（只接受清单校验过的资源路径）并补行为测试；④ `rpc-ui` 的宿主默认设置覆盖行为要在 fork 里明确写出（nornzach fork 选择移除，我们必须显式选择，不能默认漂移）。
 2. **不能用 OMP 原生 Plan/Goal 冒充 PI parity。** §4/§5 已列清语义差异（工具形态、审批、终止方式、批次语义、Goal 是续跑而非待审批）。产品对 Plan/Goal 的对外说法必须写“OMP 原生 Plan/Goal（模式 + 计划文件审批 / 目标续跑）”，不得标为 PI 的 SubmitPlan/SubmitGoal 等价物。
 3. **不解除 R3，也不删除 Cursor 产品门。**
    - §7.3 复核了 18.3 的 Cursor 预执行路径（同构、无新开关），严格契约仍不可满足；
@@ -300,8 +312,8 @@ get_settings / set_setting / get_settings_schema / get_model_roles / set_model_r
 
 **范围（最小、可审阅、不越权）**：
 
-1. 建立**自有的** OMP 基线与补丁级：以 `62bc57be`（18.3.0）为新基（或经用户确认继续用 18.2.7 并只做记录），把 `0001-rpc-host-tool-transition-contract.patch` 迁移为 `+omp-desktop.2`（预期只有 `agent-loop.ts` 锚点 1 处 + `rpc-mode.ts` 视目标树而定），更新 `manifest.json`（新 base SHA/version/patch sha/bytes），并把 §8 的逐 hunk 结论写进 ADR 0305。
-2. 实现**bundled sidecar 的构建与启动闭环**（不接 UI 功能）：`app/scripts` 下的构建脚本产出可执行 sidecar + 清单（fork commit、桌面版本、平台、sha256），`packages/omp-runtime` 的 launcher 增加“打包内固定 sidecar（无系统回退、启动前版本/协议断言）”路径；开发态仍走固定子模块。
+1. 建立**自有的** OMP 基线与补丁级：以 `62bc57be`（18.3.0）为新基（或经用户确认继续用 18.2.7 并只做记录），把 `0001-rpc-host-tool-transition-contract.patch` 迁移为 `+omp-desktop.2`（预期：目标为 18.3.0 时修 `agent-loop.ts` 注释锚点 **1** 处；目标为 fork 时再加 `rpc-mode.ts` import 锚点，共 **2** 处），更新 `manifest.json`（新 base SHA/version/patch sha/bytes），并把 §8 的逐 hunk 结论写进 ADR 0305。
+2. 实现**bundled sidecar 的构建与启动闭环**（不接 UI 功能）：`app/scripts` 下的构建脚本产出可执行 sidecar + 清单（fork commit、桌面版本、平台、sha256，且构建时**校验外层仓库的 remote/commit**），`packages/omp-runtime` 的 launcher 增加“打包内固定 sidecar”路径——在 `app.isPackaged` 下**只接受**清单校验过的资源路径，拒绝环境覆盖（`OMP_BUNDLED_OMP`/`OMP_SIDECAR=source`）与向上资源树扫描，并在启动前做版本/协议断言；开发态仍走固定子模块。行为测试必须覆盖“打包态注入覆盖变量/放置同名伪资源仍拒绝启动”。
 3. **不动** Plan/Goal 运行时面、不动 Cursor 门、不解除 R3、不开放 T20-B/C/D 的缺口项。
 4. 需要用户/仓库决策的事项（本轮已识别，不在本轮执行）：自有 fork 的仓库名与归属；是否把 18.3 作为新基（会引入 §3.1 的 `main.ts`/`write.ts` 上游变化）。
 
@@ -311,12 +323,13 @@ get_settings / set_setting / get_settings_schema / get_model_roles / set_model_r
 | --- | --- | --- | --- |
 | R4-1 | 补丁迁移到新基 | 新基树上 `git apply --check -p1` **退出码 0**；补丁内改动面套件（`agent-loop.test.ts`、`rpc-host-tools.test.ts`、`rpc-input-frame.test.ts`）通过 | 命令+退出码+计数；artifact sha256/bytes 与 manifest 一致 |
 | R4-2 | 无能力丢失 | §8 表中“必须保留”的 5 项在新基树中存在（符号级 grep + 行为测试各 ≥1 项，含 sole 批次整批拒绝、terminate 非 abort、RPC 策略字段严格校验） | 测试名与失败/通过输出；对照实验（移回旧基应判红） |
-| R4-3 | 构建产物固定且可核验 | 构建脚本输出清单含 fork commit/桌面版本/平台/sha256；重复构建在相同输入下产出相同清单 | 两份清单 diff；`sha256sum` |
-| R4-4 | 打包内 sidecar，无系统回退 | 在 PATH 中**没有** `omp`、且未安装 Bun/Node 的环境下启动成功；删掉/改坏资源中的 sidecar → 启动报“缺少内置 omp”类错误且**不**尝试系统 omp | 启动日志；移除资源后的错误文本；`strace`/进程表佐证（或 `spawn` 记录） |
+| R4-3 | 构建产物固定且可核验 | 构建脚本输出清单含 fork commit/桌面版本/平台/sha256，且**构建时校验**外层仓库的 remote 与 commit（不匹配即失败）；重复构建在相同输入下产出相同清单 | 两份清单 diff；`sha256sum`；故意用错 remote/commit 时的失败输出 |
+| R4-4 | 打包内 sidecar，无系统回退 | 在 PATH 中**没有** `omp`、且未安装 Bun/Node 的环境下启动成功；删掉/改坏资源中的 sidecar → 启动报“缺少内置 omp”类错误且**不**尝试系统 `omp` | 启动日志；移除资源后的错误文本；`strace`/进程表佐证（或 `spawn` 记录） |
 | R4-5 | 版本/协议断言 | 启动前校验版本与 `supportedProtocolVersions` 含 2（沿用 `rpc-bridge.ts:13-24` 契约）；版本不匹配时拒绝启动并给出可操作错误 | 命中/不命中两组的退出码与错误文本 |
 | R4-6 | 数据与凭证隔离不回退 | 沿用现有隔离断言（独立数据根、`PI_CODING_AGENT_DIR` 注入、开发态禁用更新），新构建路径不得绕过（测试用 canary 证明不读用户目录） | canary 扫描输出 |
 | R4-7 | R3/门未被动摇 | `node scripts/check-omp-plan-goal-gaps.mjs`（opt-in）仍报 3 缺口 exit 1；ADR 0306 的门测试仍全绿 | 命令+退出码+计数 |
 | R4-8 | 文档一致 | 新基 SHA 写入 `docs/source-baseline.json` 的**新增日期化记录**（不改历史）、HANDOFF/任务板与本审计文档互相引用一致；`node docs/scripts/check-docs.mjs` 无**新增**问题 | 命令+退出码；仅记录预存在的 6 项 |
+| R4-9 | 打包态不接受开发覆盖（nornzach 现状缺这道门） | `app.isPackaged` 为真时：注入 `OMP_BUNDLED_OMP`/`OMP_SIDECAR`(+`OMP_SIDECAR_CLI`) **不生效**；在资源树中放置同名伪 `omp` 不生效；仅清单校验过的资源路径被接受 | 打包态（或等价 `isPackaged` 仿真）下三组注入的行为测试与启动日志 |
 
 非目标（明确不做）：解除 R3、开放 T20-B/C/D、实现 Plan/Goal 运行时面、删除或放宽 Cursor 门、把 OMP 原生 Plan/Goal 标成 PI parity、向 `can1357/oh-my-pi` 推送。
 
@@ -326,9 +339,12 @@ get_settings / set_setting / get_settings_schema / get_model_roles / set_model_r
 
 1. **只读审计**：未改生产代码、未改两个子模块的 gitlink/内容、未改 `app/patches/**`、未改 manifest、未新增/修改测试。
 2. **未实跑**：nornzach GUI 与 fork 的测试套件（vitest/Playwright/bun test）、编译 sidecar、打包安装产物；PI Desktop 的测试套件本轮也未重跑。“18.3 无此能力”“fork 无此测试”等判定基于**源码与测试文本的检索**，不是运行结果（检索命令与命中数见 §6/§12）。
-3. **fork 差异的性质**：§3 的符号级核验只证明“18.3 新引入的标识符在 fork 中未缺失”，不构成对 fork 合并质量的整体背书；fork 的 `main` 与其自身 `upstream/main` 的提交拓扑（本轮观察到 `merge-base` 为 18.3.0 标签提交、但两侧历史计数达 24570）**未进一步归因**，本轮不需要该结论。
-4. **上游/服务端行为**：Cursor 服务端是否阻塞 `done`、以及真实付费模型行为未测（沿用 R3B 的既有结论与证据层级）。
-5. **未核验的区域**：GUI 的 e2e/打包运行、Windows 路径行为、macOS 实机。
+3. **fork 差异的性质（弱证据边界，复审 F4 后收窄）**：§3 的符号级核验只说明“18.3 新引入的标识符在 fork 文件中**未缺失**”，**不能**推出函数体语义、调用关系或功能行为与 18.3 一致；本轮**不**声称“fork 不存在功能丢失”。要得到功能层结论必须跑两侧的行为测试（本轮未跑）。fork 的 `main` 与其自身 `upstream/main` 的提交拓扑（本轮观察到 `merge-base` 为 18.3.0 标签提交、但两侧历史计数达 24570）**未进一步归因**，本轮不需要该结论。
+4. **打包态“固定 sidecar”不可由 GUI 源码证明（复审 F2）**：`OMP_BUNDLED_OMP` 覆盖与向上资源树扫描都**没有** `app.isPackaged` 门，`OMP_SIDECAR=source` 也一样；可证明的只有“不查 PATH + 常规产物首选 `Resources/omp` + 解析不到就报错”。nornzach 的实际发布包是否被这些通道改道**未测**（本轮未运行该 GUI）。
+5. **发布产物与 fork commit 的对应关系不可证明（复审 F3）**：`build:omp` 不校验外层仓库的 remote/commit，sidecar 不入库，0.9.9/0.9.10 的 CHANGELOG 也没有 SHA；因此 `81b9f250` 只作为**源码证据源**使用，不作为任何已发布物件的构建身份。
+6. **投机/hook 时序（复审 F5）**：`prepareToolCallDispatch` 只在**最终/常规 loop dispatch 之前**执行；投机候选可在 `toolcall_end` 期间立即执行，`deferBeforeToolCall` 目前只有 coding-agent 的本地读宿主声明且仅在有 `beforeToolCall` 时被采纳。因此本审计**不**泛化“hook 可保证零副作用”。
+7. **上游/服务端行为**：Cursor 服务端是否阻塞 `done`、以及真实付费模型行为未测（沿用 R3B 的既有结论与证据层级）。
+8. **未核验的区域**：GUI 的 e2e/打包运行、Windows 路径行为、macOS 实机。
 
 ---
 
@@ -363,6 +379,21 @@ get_settings / set_setting / get_settings_schema / get_model_roles / set_model_r
 | 文档内固定 SHA 核对（脚本列出文档里全部 40 位十六进制串并逐个回查来源） | 文档含 **6** 个不同 SHA，5 个固定坐标全部回查一致：PI `0111e306…`（clone HEAD）、18.2.7 `d49918fa…`（clone HEAD + 根 gitlink）、18.3.0 `62bc57be…`（git 对象 + `git ls-remote` 标签）、fork `81b9f250…`（clone HEAD + 逐 blob 校验）、GUI `31327996…`（clone HEAD）；第 6 个 `4a7a5d82…` 为本分支基线提交，`git rev-parse HEAD` 一致 |
 
 限制：`git apply --check` 的管道写法曾吞掉退出码（`| head` 改变 `$?`），上表列的是**去掉管道后**重新取得的真实退出码。`check-docs.mjs` 的 6 项与 `check-architecture.mjs` 的 1 项都是**起点提交即存在**的问题，本轮按“只做当前阶段”的约定不作顺带修复，以免把无关改动混进审计轮。
+
+### 12.1 复审返修轮（F1-F6）的源码复核
+
+复审提出的六项都先回到固定源码逐条核对，再改文档字句；核对命令与观察如下（全部只读）：
+
+| 复审项 | 复核命令（工作目录） | 观察 |
+| --- | --- | --- |
+| F1 argv | `sed -n '290,315p' src/main/sidecar.ts`；`grep -n "launch\|--mode" src/main/sidecar.test.ts`（GUI 仓库） | 复审成立：`:297` 只是 `const args = ["--mode","rpc-ui"]`，`:298-306` 再 push `--session`/`--no-auto-resume`/`--chat`/过滤后的用户 flag；测试钉住**完整** argv（`:46,70,94,100,133,183-198`） |
+| F2 解析顺序 | `sed -n '56,113p' src/main/index.ts`；`grep -rn "spawn(\|execFile(" src/main/*.ts`；`grep -rn "OMP_BUNDLED_OMP\|OMP_SIDECAR" src scripts e2e` | 复审成立：`OMP_BUNDLED_OMP` 在 `:68`（早于 `:71` 的 `resourcesPath`）且无 `isPackaged` 门；`:76-89` 仍向上扫描 `app.getAppPath()`/`cwd`；`resolveSourceCli` `:98-112` 无 `isPackaged` 门；`spawn` 一律用已解析路径（无 PATH 查找）；e2e/showcase 正在使用该覆盖 |
+| F3 构建来源 | `sed -n '205,250p' README.md`；`grep -n "rev-parse\|remote" scripts/build-bundled-omp.ts scripts/sync-upstream.sh`；`sed -n '1,30p' CHANGELOG.md` | 复审成立：脚本无 remote/commit 校验；README 只规定**推荐**布局与“记录 commit”；0.9.9/0.9.10 条目无 SHA（历史条目有） |
+| F4 符号集合 | 复算标识符缺失数（方法见 §3） | 复审成立：只能支持“未发现符号级缺失”，不能支持功能等价 |
+| F5 prepare/投机时序 | `sed -n '2278,2295p;2015,2045p' packages/agent/src/agent-loop.ts`；`sed -n '800,860p' packages/agent/src/speculative-execution.ts`；`sed -n '155,200p' packages/coding-agent/src/speculation/host.ts`（18.3 树） | 复审成立：`toolcall_end` → `admitFinalized`（`:2282-2288`）→ `#insertCandidate` → `#drain()`（`:808-816`）；`deferBeforeToolCall` 才等 `#admissionsFinalized`（`:852-855`），该 flag 只在本地读宿主声明且仅在装了 `beforeToolCall` 时被采纳（`host.ts:169-183`）；§7.1 原先的“任何调度之前”是错误表述 |
+| F6 迁移成本 | `python3 /tmp/t20r3d/analyze_patch.py`；逐文件 `git apply --check` | 复审成立：18.3 = 39/40（1 个锚点）、fork = 38/40（2 个锚点）；原 §8 结论把两者合并为“1 个”是错误表述 |
+
+返修范围：仅本文档、`docs/04-task-board.md`、`HANDOFF.md` 的字句与结论分档；**未改**生产代码、测试、两个子模块、patch artifact 与 manifest；**未**解除 R3、**未**删除 Cursor 产品门、**未**声称 T20 完成。
 
 ## 13. 复核入口
 
