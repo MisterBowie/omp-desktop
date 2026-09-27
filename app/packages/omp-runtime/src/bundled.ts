@@ -240,15 +240,25 @@ export function verifyBundledRuntime(options: {
   const arch = options.arch ?? process.arch;
   const expected = options.expected ?? BUNDLED_EXPECTATION;
   const resourcesRoot = resolve(options.resourcesPath);
-  const dir = join(resourcesRoot, BUNDLED_RUNTIME_DIR);
+  // Compare the root and its child in the same canonical form. A lexical root
+  // comparison is wrong on any path with an aliased ancestor — macOS resolves
+  // the default temp root `/var/...` to `/private/var/...` — and would report
+  // a false escape for a resource tree that is entirely inside the root.
+  let canonicalRoot: string;
+  try {
+    canonicalRoot = realpathSync(resourcesRoot);
+  } catch {
+    refuse(`the resources root ${resourcesRoot} does not exist`);
+  }
+  const dir = join(canonicalRoot, BUNDLED_RUNTIME_DIR);
 
   const dirStats = lstatSyncOrNull(dir);
   if (!dirStats) refuse(`missing ${BUNDLED_RUNTIME_DIR}/ under the resources root`);
   if (dirStats.isSymbolicLink()) refuse(`${BUNDLED_RUNTIME_DIR} must not be a symlink`);
   if (!dirStats.isDirectory()) refuse(`${BUNDLED_RUNTIME_DIR} is not a directory`);
   const canonicalDir = realpathSync(dir);
-  const canonicalRoot = resourcesRoot.endsWith(sep) ? resourcesRoot : resourcesRoot + sep;
-  if (canonicalDir !== resourcesRoot && !canonicalDir.startsWith(canonicalRoot)) {
+  const canonicalPrefix = canonicalRoot.endsWith(sep) ? canonicalRoot : canonicalRoot + sep;
+  if (canonicalDir !== canonicalRoot && !canonicalDir.startsWith(canonicalPrefix)) {
     refuse(`${BUNDLED_RUNTIME_DIR} resolves outside the resources root`);
   }
 
@@ -379,15 +389,52 @@ export function resolveBundledGate(options: {
   arch?: string;
   expected?: BundledExpectation;
 }): { path: string; provenance: BundledSidecarProvenance } | null {
+  const result = inspectBundledGate(options);
+  return result.ok ? { path: result.path, provenance: result.provenance } : null;
+}
+
+/**
+ * The reason a packaged gate could not be resolved.
+ *
+ * `resolveBundledGate` answers "usable or not"; a packaged application that has
+ * no runtime must also be able to say *why* (missing file, tampered digest,
+ * schema mismatch). This keeps the stable `bundled-runtime-invalid` code and
+ * the concrete detail — which is the same string every `verifyBundledRuntime`
+ * refusal produces — so the session bridge can surface it instead of a generic
+ * "gate not found".
+ */
+export type BundledGateInspection =
+  | { ok: true; path: string; provenance: BundledSidecarProvenance }
+  | { ok: false; code: "bundled-runtime-invalid"; detail: string };
+
+/** Resolve the packaged tool gate, preserving the verification refusal reason. */
+export function inspectBundledGate(options: {
+  resourcesPath: string;
+  platform?: NodeJS.Platform | string;
+  arch?: string;
+  expected?: BundledExpectation;
+}): BundledGateInspection {
   let verified: BundledVerification;
   try {
     verified = verifyBundledRuntime(options);
-  } catch {
-    return null;
+  } catch (error) {
+    const typed = error as { detail?: unknown; message?: unknown };
+    const detail =
+      typeof typed.detail === "string" && typed.detail.length > 0
+        ? typed.detail
+        : String(typed.message ?? error);
+    return { ok: false, code: "bundled-runtime-invalid", detail };
   }
   const gatePath = BUNDLED_GATE_RELATIVE_PATH.split(sep).join("/");
   const gate = verified.extensions.find((extension) => extension.path === gatePath);
-  return gate ? { path: gate.absolutePath, provenance: verified.provenance } : null;
+  if (!gate) {
+    return {
+      ok: false,
+      code: "bundled-runtime-invalid",
+      detail: `the provenance manifest does not declare ${gatePath}`,
+    };
+  }
+  return { ok: true, path: gate.absolutePath, provenance: verified.provenance };
 }
 
 function lstatSyncOrNull(path: string): Stats | null {

@@ -34,11 +34,13 @@ export {
   BUNDLED_RUNTIME_DIR,
   BundledProvenanceSchema,
   bundledBinaryFilename,
+  inspectBundledGate,
   normalizeRepositoryUrl,
   resolveBundledGate,
   sha256File,
   verifyBundledRuntime,
   type BundledExpectation,
+  type BundledGateInspection,
   type BundledSidecarProvenance,
   type BundledVerification,
 } from "./bundled.js";

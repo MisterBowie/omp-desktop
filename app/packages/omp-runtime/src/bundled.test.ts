@@ -6,7 +6,16 @@
  * not match this build's pins — or does not match the bytes on disk — must stop
  * the engine rather than run something else (ADR 0307).
  */
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, sep } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -36,6 +45,10 @@ afterEach(() => {
   for (const root of created.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
+/** A platform/architecture that is not this host, for the mismatch refusals. */
+const NOT_HOST_PLATFORM = process.platform === "darwin" ? "linux" : "darwin";
+const NOT_HOST_ARCH = process.arch === "arm64" ? "x64" : "arm64";
+
 /** A resource tree as a build would lay it out, with a tiny stand-in binary. */
 function writeFixture(options: {
   platform?: NodeJS.Platform | string;
@@ -45,10 +58,12 @@ function writeFixture(options: {
   omitManifest?: boolean;
   patch?: (provenance: BundledSidecarProvenance) => unknown;
   executable?: boolean;
+  /** Lay the fixture out under an existing directory instead of a fresh scratch root. */
+  root?: string;
 }): { resourcesPath: string; provenance: BundledSidecarProvenance; gatePath: string } {
-  const platform = options.platform ?? "linux";
-  const arch = options.arch ?? "x64";
-  const resourcesPath = scratch();
+  const platform = options.platform ?? process.platform;
+  const arch = options.arch ?? process.arch;
+  const resourcesPath = options.root ?? scratch();
   const dir = join(resourcesPath, "omp-runtime");
   mkdirSync(dir, { recursive: true });
   const filename = bundledBinaryFilename(platform);
@@ -102,7 +117,12 @@ function writeFixture(options: {
   return { resourcesPath, provenance, gatePath };
 }
 
-function verify(resourcesPath: string, expected: Partial<BundledExpectation> = {}, platform = "linux", arch = "x64") {
+function verify(
+  resourcesPath: string,
+  expected: Partial<BundledExpectation> = {},
+  platform = process.platform,
+  arch = process.arch,
+) {
   return verifyBundledRuntime({
     resourcesPath,
     platform,
@@ -111,7 +131,12 @@ function verify(resourcesPath: string, expected: Partial<BundledExpectation> = {
   });
 }
 
-function refusal(resourcesPath: string, expected: Partial<BundledExpectation> = {}, platform = "linux", arch = "x64"): string {
+function refusal(
+  resourcesPath: string,
+  expected: Partial<BundledExpectation> = {},
+  platform = process.platform,
+  arch = process.arch,
+): string {
   try {
     verify(resourcesPath, expected, platform, arch);
   } catch (error) {
@@ -169,6 +194,26 @@ describe("bundled runtime verification", () => {
     );
   });
 
+  it("defaults the fixture target to the host, so the host-reading resolver accepts it", () => {
+    // `resolveBundledGate`/`verifyBundledRuntime` read the real host when no
+    // target is passed. A fixture pinned to linux/x64 is therefore only correct
+    // on linux/x64 — on an arm64 Mac it would be refused as a foreign artifact.
+    // Simulate another platform the way that Mac sees it and require the
+    // default fixture to follow the host.
+    const original = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", { value: "darwin", configurable: true });
+    try {
+      const { resourcesPath, provenance } = writeFixture({});
+      expect(provenance.platform).toBe("darwin");
+      const canonicalGate = realpathSync(
+        join(resourcesPath, "omp-runtime", ...BUNDLED_GATE_RELATIVE_PATH.split(sep)),
+      );
+      expect(resolveBundledGate({ resourcesPath })?.path).toBe(canonicalGate);
+    } finally {
+      if (original) Object.defineProperty(process, "platform", original);
+    }
+  });
+
   it("refuses a missing sidecar or manifest", () => {
     expect(refusal(scratch())).toMatch(/missing omp-runtime/);
     const { resourcesPath } = writeFixture({ omitManifest: true });
@@ -190,11 +235,11 @@ describe("bundled runtime verification", () => {
     expect(refusal(writeFixture({ patch: (p) => ({ ...p, schema: "other/1" }) }).resourcesPath)).toMatch(
       /schema is other\/1/,
     );
-    expect(refusal(writeFixture({ patch: (p) => ({ ...p, platform: "darwin" }) }).resourcesPath)).toMatch(
-      /platform is darwin/,
-    );
-    expect(refusal(writeFixture({ patch: (p) => ({ ...p, arch: "arm64" }) }).resourcesPath)).toMatch(
-      /arch is arm64/,
+    expect(
+      refusal(writeFixture({ patch: (p) => ({ ...p, platform: NOT_HOST_PLATFORM }) }).resourcesPath),
+    ).toMatch(new RegExp(`platform is ${NOT_HOST_PLATFORM}`));
+    expect(refusal(writeFixture({ patch: (p) => ({ ...p, arch: NOT_HOST_ARCH }) }).resourcesPath)).toMatch(
+      new RegExp(`arch is ${NOT_HOST_ARCH}`),
     );
     expect(refusal(writeFixture({ patch: (p) => ({ ...p, ompVersion: "18.2.7" }) }).resourcesPath)).toMatch(
       /OMP version is 18.2.7/,
@@ -252,6 +297,100 @@ describe("bundled runtime verification", () => {
     mkdirSync(join(outside, "omp-runtime"), { recursive: true });
     symlinkSync(join(outside, "omp-runtime"), join(root, "omp-runtime"));
     expect(refusal(root)).toMatch(/must not be a symlink/);
+  });
+
+  /**
+   * The resources root as the OS reports it is what the verifier must compare
+   * against. On macOS the default temp root is `/var/...`, which resolves to
+   * `/private/var/...`, so a lexical comparison against the unresolved root
+   * falsely reports that `omp-runtime` escaped.
+   */
+  it("accepts a resource tree reached through a symlinked ancestor", (ctx) => {
+    const realRoot = scratch();
+    const alias = join(scratch(), "alias");
+    try {
+      symlinkSync(realRoot, alias, "dir");
+    } catch {
+      // Windows without developer mode, or a filesystem that forbids symlinks.
+      ctx.skip();
+      return;
+    }
+    const { gatePath } = writeFixture({ root: realRoot });
+    const canonicalDir = realpathSync(join(alias, "omp-runtime"));
+    const verified = verify(alias);
+    expect(verified.path).toBe(join(canonicalDir, "omp"));
+    expect(verified.extensions[0].absolutePath).toBe(
+      realpathSync(join(alias, "omp-runtime", ...BUNDLED_GATE_RELATIVE_PATH.split(sep))),
+    );
+    expect(verified.extensions[0].absolutePath).toBe(realpathSync(gatePath));
+    expect(resolveBundledGate({ resourcesPath: alias })?.path).toBe(verified.extensions[0].absolutePath);
+  });
+
+  it("still refuses symlinked runtime members under a symlinked ancestor", (ctx) => {
+    const aliased = (): { real: string; alias: string } | null => {
+      const real = scratch();
+      const alias = join(scratch(), "alias");
+      try {
+        symlinkSync(real, alias, "dir");
+      } catch {
+        return null;
+      }
+      return { real, alias };
+    };
+
+    // `omp-runtime` itself is a link, reached through a linked ancestor.
+    {
+      const roots = aliased();
+      if (!roots) {
+        ctx.skip();
+        return;
+      }
+      const outside = scratch();
+      writeFixture({ root: outside });
+      mkdirSync(roots.real, { recursive: true });
+      symlinkSync(join(outside, "omp-runtime"), join(roots.real, "omp-runtime"));
+      expect(refusal(roots.alias)).toMatch(/must not be a symlink/);
+    }
+
+    // The binary is a link into an identical copy: lstat must refuse it before
+    // the digest is ever compared.
+    {
+      const roots = aliased() as { real: string; alias: string };
+      const { real } = roots;
+      const { provenance } = writeFixture({ root: real });
+      const binaryPath = join(real, "omp-runtime", provenance.binary.filename);
+      const copy = join(scratch(), provenance.binary.filename);
+      writeFileSync(copy, readFileSync(binaryPath));
+      chmodSync(copy, 0o755);
+      rmSync(binaryPath);
+      symlinkSync(copy, binaryPath);
+      expect(refusal(roots.alias)).toMatch(/must not be a symlink/);
+    }
+
+    // The provenance manifest is a link.
+    {
+      const roots = aliased() as { real: string; alias: string };
+      const { real } = roots;
+      writeFixture({ root: real });
+      const manifestPath = join(real, "omp-runtime", "provenance.json");
+      const copy = join(scratch(), "provenance.json");
+      writeFileSync(copy, readFileSync(manifestPath));
+      rmSync(manifestPath);
+      symlinkSync(copy, manifestPath);
+      expect(refusal(roots.alias)).toMatch(/must not be a symlink/);
+    }
+
+    // The gate is a link.
+    {
+      const roots = aliased() as { real: string; alias: string };
+      const { real } = roots;
+      const { gatePath } = writeFixture({ root: real });
+      const copy = join(scratch(), "omp-desktop-gate.js");
+      writeFileSync(copy, readFileSync(gatePath));
+      rmSync(gatePath);
+      symlinkSync(copy, gatePath);
+      expect(refusal(roots.alias)).toMatch(/must not be a symlink/);
+    }
   });
 });
 
