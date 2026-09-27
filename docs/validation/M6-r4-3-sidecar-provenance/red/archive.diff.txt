@@ -1,0 +1,22 @@
+# Isolating the embedded native-addon archive (patch-2 sources, Bun 1.4.2)
+#
+# $ cd packages/natives && bun scripts/embed-native.ts   (twice, unchanged addons)
+#   run 1: sha256 85279643af29babbb33433e611eb356980be6c1db5166ca8ca175f9ecae2e161  88695390 bytes
+#   run 2: sha256 171d16ad7e6bac46e165a362fb4851429300162d3dd751fadef099b5134b6ff5  88695392 bytes
+# $ cmp run1.tar.gz run2.tar.gz
+#   differ: char 13, line 1   (exit 1)
+#
+# Decompressed tars are equal everywhere except the entry timestamps:
+#   differing regions: 4 bytes total
+#     145-147        (entry 1 header mtime field, octal ...57 -> ...66; the runs were 7 s apart)
+#     184287889-184287891 (entry 2 header mtime field)
+#   both headers keep the same name/size/typeflag/mode; only mtime and the checksum
+#   Bun computed over that header changed.
+#
+# Bun.Archive layout, probed on a two-entry in-memory archive:
+#   name@0..100, size@124..136, mtime@136..148 (wall clock), checksum@148..156, typeflag@156 = '0'
+#   header sample: size field "00000000004\0", mtime field "15256271155 " (11 octal digits + space)
+#
+# Result after the fix: two runs of bun scripts/embed-native.ts produce
+#   sha256 7ac75ad0bbf69d7c96f71ca3aebcc2c18caa690be1781b15dca248a5f43c06bd (both runs)
+#   cmp exit 0; `tar -tzvf` lists both addons with mtime 1970-01-01.

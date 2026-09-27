@@ -1,0 +1,9 @@
+$ sha256sum <out>/omp
+fb96afe54a8864703bf14013b5993e73d1bc0e32b3713fedeba2b3cf8304560d  /tmp/r43/red-a/omp
+b64d84a6911f35eb15c6f431f4360b9b25aaf821865d01287330ff91c51d795f  /tmp/r43/red-b/omp
+
+$ cmp /tmp/r43/red-a/omp /tmp/r43/red-b/omp
+/tmp/r43/red-a/omp /tmp/r43/red-b/omp differ: char 81260681, line 257973
+cmp exit 1
+
+bytes: 283559392 / 283559392

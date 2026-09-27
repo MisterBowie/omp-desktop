@@ -1,0 +1,13 @@
+$ diff -u red/build-a.provenance.json red/build-b.provenance.json
+--- /tmp/r43/red-a/provenance.json	2026-09-28 03:42:04.787077069 +0800
++++ /tmp/r43/red-b/provenance.json	2026-09-28 03:42:18.513786043 +0800
+@@ -23,7 +23,7 @@
+   "binary": {
+     "filename": "omp",
+     "bytes": 283559392,
+-    "sha256": "fb96afe54a8864703bf14013b5993e73d1bc0e32b3713fedeba2b3cf8304560d"
++    "sha256": "b64d84a6911f35eb15c6f431f4360b9b25aaf821865d01287330ff91c51d795f"
+   },
+   "extensions": [
+     {
+(diff exit 1)

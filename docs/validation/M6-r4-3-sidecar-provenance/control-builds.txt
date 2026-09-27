@@ -1,0 +1,18 @@
+# Control experiments (Bun 1.4.2, same checkout, same isolated env)
+#
+# 1) archive unfixed + bytecode on   -> builds differ
+#    a fb96afe54a8864703bf14013b5993e73d1bc0e32b3713fedeba2b3cf8304560d  283559392 B
+#    b b64d84a6911f35eb15c6f431f4360b9b25aaf821865d01287330ff91c51d795f  283559392 B  (cmp: char 81260681)
+# 2) archive unfixed + bytecode off  -> builds differ
+#    a e24ffab5fdb3a60c14e406cad75807dcf1f9ede7c4e21951882fef96537d2b89  212399584 B
+#    b 00e0dbce45c2accfe3a683b87abbb0eb4f872489befcce6d65eb4137da72dd5f  212399584 B  (cmp: char 93265022)
+# 3) archive fixed + bytecode off    -> identical
+#    both 34ae33023c1fcc9ad0c6a9d335177f90eb4811b9b3b68292fa63e1636881176c  212399584 B  (cmp exit 0)
+# 4) archive fixed + bytecode on     -> identical
+#    both f69ee0b283691bf449e10734775995057cf7b89f4c68bfb077defaeaa7ffe02d  283997664 B  (cmp exit 0)
+#
+# Minimal Bun cases (no OMP sources): `bun build --compile [--bytecode] --outfile <same path> app.ts` twice
+#   -> cmp exit 0 in both modes (sha256 fb2c3b2d3b06daf6e80f43f21e23eb3ada31f8c20a805ac7018ce8312b500999);
+#   with two different output paths the only differing bytes are the embedded output name.
+#   => Bun 1.4.2 bytecode alone is reproducible here; oven-sh/bun#42151 requires --splitting,
+#      which compileCodingAgent does not set.

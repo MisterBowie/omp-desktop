@@ -1,0 +1,39 @@
+{
+  "schema": "omp-desktop.bundled-sidecar/2",
+  "fork": {
+    "repository": "https://github.com/MisterBowie/oh-my-pi",
+    "commit": "3c845eb27f6f7b0a5b182f1868969ced86d10a3d",
+    "tree": "135ad4b6bc27f58a6220260233e9ff377b14f231"
+  },
+  "upstreamBase": {
+    "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+    "version": "18.3.0"
+  },
+  "patchLevel": "62bc57b+omp-desktop.2",
+  "capabilities": [
+    "rpc-host-tool-concurrency",
+    "rpc-host-tool-sole-batch-policy",
+    "agent-tool-result-terminate",
+    "rpc-host-tool-result-terminate"
+  ],
+  "ompVersion": "18.3.0",
+  "desktopVersion": "0.15.2",
+  "platform": "linux",
+  "arch": "x64",
+  "binary": {
+    "filename": "omp",
+    "bytes": 283559392,
+    "sha256": "b64d84a6911f35eb15c6f431f4360b9b25aaf821865d01287330ff91c51d795f"
+  },
+  "extensions": [
+    {
+      "path": "extensions/omp-desktop-gate.js",
+      "bytes": 10112,
+      "sha256": "bb110256984d6588108bd9e656ea3a874e0e81a8d9eb5655d2df129c2505b3f7"
+    }
+  ],
+  "build": {
+    "tool": "bun",
+    "bunVersion": "1.4.2"
+  }
+}

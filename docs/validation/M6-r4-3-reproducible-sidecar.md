@@ -123,6 +123,9 @@ B: …/$bunfs/root/embedded-addons.linux-x64.tar-6vvy
 
 ## 5. GREEN：逐位可复现（本轮验收）
 
+原始证据（两次构建的完整清单、`diff -u`、`sha256sum`/`cmp`、差异区段统计与对照构建记录）保存在
+`docs/validation/M6-r4-3-sidecar-provenance/`，按构建原样保留、不做手工编辑。
+
 ```
 node app/scripts/omp-sidecar.mjs --build --source /home/vv/person/code/omp-fork-m6/oh-my-pi --out /tmp/r43/green-a
 node app/scripts/omp-sidecar.mjs --build --source /home/vv/person/code/omp-fork-m6/oh-my-pi --out /tmp/r43/green-b
