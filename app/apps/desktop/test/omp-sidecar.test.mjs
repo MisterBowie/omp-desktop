@@ -11,9 +11,7 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { register } from "node:module";
@@ -26,6 +24,14 @@ import {
   OMP_RUNTIME_PATCH_LEVEL,
   OMP_RUNTIME_VERSION,
 } from "@pi-desktop/shared";
+
+import {
+  FIXTURE_VERSION,
+  cleanupScratch,
+  fixtureRepo,
+  git,
+  writeFixtureManifest,
+} from "./helpers/omp-fork-fixture.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = join(here, "..", "..", "..");
@@ -42,91 +48,7 @@ const { normalizeRepositoryUrl: packageNormalize } = await import(
   "../../../packages/omp-runtime/src/bundled.ts"
 );
 
-const FIXTURE_VERSION = "9.9.9";
-const created = [];
-
-function scratch(label) {
-  const root = mkdtempSync(join(tmpdir(), `omp-sidecar-${label}-`));
-  created.push(root);
-  return root;
-}
-
-process.on("exit", () => {
-  for (const root of created.splice(0)) rmSync(root, { recursive: true, force: true });
-});
-
-function gitRaw(args, cwd) {
-  const result = spawnSync("git", args, { cwd, encoding: "utf8" });
-  assert.equal(result.status, 0, `git ${args.join(" ")} failed: ${result.stderr}`);
-  return result.stdout ?? "";
-}
-
-function git(args, cwd) {
-  return gitRaw(args, cwd).trim();
-}
-
-/**
- * A minimal OMP-shaped checkout whose HEAD is `base + one patch`, with a
- * manifest that describes exactly that. Returns `{ root, manifest, patchPath }`.
- */
-function fixtureRepo({ remote = "git@github.com:MisterBowie/oh-my-pi.git" } = {}) {
-  const root = scratch("repo");
-  git(["init", "-q"], root);
-  git(["config", "user.email", "fixture@example.invalid"], root);
-  git(["config", "user.name", "Fixture"], root);
-  git(["remote", "add", "origin", remote], root);
-  mkdirSync(join(root, "packages", "utils"), { recursive: true });
-  mkdirSync(join(root, "packages", "coding-agent", "scripts"), { recursive: true });
-  mkdirSync(join(root, "src"), { recursive: true });
-  writeFileSync(join(root, "packages", "utils", "package.json"), JSON.stringify({ version: FIXTURE_VERSION }));
-  writeFileSync(join(root, "packages", "coding-agent", "scripts", "build-binary.ts"), "// fixture build entry\n");
-  writeFileSync(join(root, "src", "tool.ts"), "export const value = 'base';\n");
-  git(["add", "-A"], root);
-  git(["commit", "-q", "-m", "base"], root);
-  const baseSha = git(["rev-parse", "HEAD"], root);
-
-  writeFileSync(join(root, "src", "tool.ts"), "export const value = 'patched';\n");
-  git(["commit", "-q", "-am", "patch"], root);
-  const headSha = git(["rev-parse", "HEAD"], root);
-
-  const patchDir = scratch("patch");
-  const patchPath = join(patchDir, "0001-fixture.patch");
-  writeFileSync(patchPath, gitRaw(["diff", baseSha, headSha], root));
-
-  const manifest = {
-    fork: { repository: OMP_RUNTIME_FORK_REPOSITORY, branch: "fixture", commit: headSha },
-    base: { sha: baseSha, version: FIXTURE_VERSION },
-    files: ["src/tool.ts"],
-  };
-  return { root, manifest, patchDir, patchPath, baseSha, headSha };
-}
-
-/**
- * The same fixture as a manifest the CLI can load: the patch next to
- * `manifest.json`, with its checksum and byte count, so `--check` exercises the
- * real manifest validation rather than a mock.
- */
-function writeFixtureManifest(fixture, mutate = () => {}) {
-  const dir = scratch("manifest");
-  const patchFile = "0001-fixture.patch";
-  cpSync(fixture.patchPath, join(dir, patchFile));
-  const manifest = {
-    schemaVersion: 1,
-    patchLevel: `${fixture.baseSha.slice(0, 7)}+fixture.1`,
-    base: { sha: fixture.baseSha, version: FIXTURE_VERSION },
-    fork: { repository: OMP_RUNTIME_FORK_REPOSITORY, branch: "fixture", commit: fixture.headSha },
-    patch: {
-      file: patchFile,
-      sha256: createHash("sha256").update(readFileSync(join(dir, patchFile))).digest("hex"),
-      bytes: statSync(join(dir, patchFile)).size,
-    },
-    capabilities: ["fixture-capability"],
-    files: ["src/tool.ts"],
-  };
-  mutate(manifest);
-  writeFileSync(join(dir, "manifest.json"), JSON.stringify(manifest, null, 2));
-  return join(dir, "manifest.json");
-}
+process.on("exit", cleanupScratch);
 
 test("the desktop pins agree with the controlled patch manifest", () => {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
@@ -251,9 +173,16 @@ test("--check runs the same gate as a process, exiting non-zero on refusal", () 
   // The same gate rejects a checkout whose HEAD is not the manifest's commit.
   const wrongCommit = spawnSync(
     process.execPath,
-    [sidecarScript, "--check", "--source", good.root, "--manifest", writeFixtureManifest(good, (m) => {
-      m.fork.commit = "f".repeat(40);
-    })],
+    [
+      sidecarScript,
+      "--check",
+      "--source",
+      good.root,
+      "--manifest",
+      writeFixtureManifest(good, (m) => {
+        m.fork.commit = "f".repeat(40);
+      }),
+    ],
     { encoding: "utf8" },
   );
   assert.equal(wrongCommit.status, 1);

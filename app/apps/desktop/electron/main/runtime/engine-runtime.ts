@@ -21,17 +21,11 @@ import {
   type EngineRuntimeStatus,
 } from "@pi-desktop/shared";
 import { ErrorCodes } from "@pi-desktop/shared";
-import { findGateExtension } from "@pi-desktop/omp-runtime";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { findGateExtension, resolveBundledGate } from "@pi-desktop/omp-runtime";
 
 import type { EngineRouter, EngineSessionLookup } from "./engine-router";
 import { createEngineRouter } from "./engine-router";
-import {
-  BUNDLED_GATE_PATH,
-  createOmpRuntimeAdapter,
-  type OmpRuntimeAdapter,
-} from "./omp-runtime";
+import { createOmpRuntimeAdapter, type OmpRuntimeAdapter } from "./omp-runtime";
 
 export type EngineRuntimeDependencies = {
   /** Product data root; the OMP supervisor owns everything below it. */
@@ -168,18 +162,27 @@ export async function reclaimOwnedRuntime(
 /**
  * Where the tool gate this build loads into the runtime lives.
  *
- * Packaged builds use the copy inside Resources; a development checkout uses
- * the one in the runtime package. Null means "this build has none", which the
- * session bridge turns into a refusal rather than an unguarded runtime.
+ * A packaged build has exactly one gate: the copy inside Resources, verified
+ * against the provenance manifest together with the sidecar. There is no
+ * development search on that path — a missing, unverifiable or tampered
+ * resource is a refusal, never a reason to look beside the application
+ * (ADR 0307). A development checkout keeps the walk-up it always had.
  */
 export function resolveGateExtension(dependencies: {
   isPackaged: boolean;
   appPath: string;
   resourcesPath?: string | null;
+  platform?: NodeJS.Platform;
+  arch?: string;
 }): string | null {
-  if (dependencies.isPackaged && dependencies.resourcesPath) {
-    const bundled = join(dependencies.resourcesPath, BUNDLED_GATE_PATH);
-    return existsSync(bundled) ? bundled : null;
+  if (dependencies.isPackaged) {
+    if (!dependencies.resourcesPath) return null;
+    const verified = resolveBundledGate({
+      resourcesPath: dependencies.resourcesPath,
+      ...(dependencies.platform ? { platform: dependencies.platform } : {}),
+      ...(dependencies.arch ? { arch: dependencies.arch } : {}),
+    });
+    return verified?.path ?? null;
   }
   return findGateExtension(dependencies.appPath);
 }

@@ -139,7 +139,7 @@ test("sandbox preload entries use standalone shared subpath bundles", () => {
   assert.doesNotMatch(pluginPanelPreloadSource, /from "@pi-desktop\/shared"/);
 });
 
-test("packaging keeps only shipped locales and excludes non-runtime artifacts", () => {
+test("packaging keeps only shipped locales and excludes non-runtime artifacts", async () => {
   assert.deepEqual(packageJson.build.electronLanguages, [
     "en-US",
     "zh-CN",
@@ -220,12 +220,18 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
     // The bundled OMP sidecar and its provenance manifest (ADR 0307): a build
     // product produced by scripts/omp-sidecar.mjs, gitignored, and admitted by
     // a packaged build only after the manifest verifies. The tool gate is
-    // copied into the same directory by that build.
+    // copied into the same directory by that build; the directory's own
+    // `.gitignore` exists only so the output location is tracked, so the copy
+    // filters it out of the packaged resources.
     {
       from: "resources/omp-runtime",
       to: "omp-runtime",
+      filter: ["**/*", "!.gitignore"],
     },
   ]);
+  // The output directory must stay tracked so a clean checkout can build into
+  // it; the filter above keeps its `.gitignore` out of the packaged resources.
+  await readFile(new URL("../resources/omp-runtime/.gitignore", import.meta.url), "utf8");
   assert.doesNotMatch(JSON.stringify(packageJson.build), /node-pty/);
 });
 

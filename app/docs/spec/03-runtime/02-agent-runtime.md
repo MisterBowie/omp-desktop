@@ -1892,23 +1892,48 @@ level `62bc57b+omp-desktop.2`, carried by the controlled fork commit recorded in
   manifest's file list with the controlled patch reverse-applied. The compile is
   OMP's own Bun single-file build, so the artifact is the executable `omp
   --version` reports for that commit. The artifact and the tool gate are copied
-  into `apps/desktop/resources/omp-runtime/` (gitignored) and declared in
-  electron-builder `extraResources`.
+  into `apps/desktop/resources/omp-runtime/` (gitignored; the packaged copy
+  filters the directory's own `.gitignore` out) and declared in electron-builder
+  `extraResources`.
+* **Release gate.** `pack`, `dist`, `dist:mac`, `dist:win` and `dist:linux` each
+  run `verify:sidecar[:<platform>]` (`--preflight`) between `bundle:runtime` and
+  `electron-vite build`, mirroring the upstream product's in-chain sidecar
+  bundle step. A host-target preflight builds the artifact; a cross-target one
+  refuses to compile and requires an artifact staged for exactly that
+  platform/architecture that verifies against the controlled manifest being
+  released. The host binary is never reused for another platform.
+* **Tool gate.** The runtime loads the gate with `--trusted-extension`, so it
+  ships as a self-contained bundle (`omp-runtime/extensions/omp-desktop-gate.js`)
+  built from `packages/omp-runtime/extensions/omp-desktop-gate.ts`: a copy of the
+  source would still import `../src/...`, which does not exist beside the sidecar,
+  and the runtime refuses to start. The build proves the bundle has no relative
+  imports left, clears the build-owned `extensions/` directory first, and records
+  the gate's byte count and digest.
 * **Provenance.** The build writes `provenance.json` beside the executable:
   schema `omp-desktop.bundled-sidecar/1`, fork repository/commit/tree, upstream
   base SHA and version, patch level, capability ids, OMP version, desktop
-  version, platform, architecture, binary file name, byte count and SHA-256, and
-  the build tool and its version. Every value comes from the validated checkout,
-  the patch manifest, the host, or the produced file.
+  version, platform, architecture, binary file name, byte count and SHA-256,
+  the extensions' paths with their byte counts and digests, and the build tool
+  and its version. Every value comes from the validated checkout, the patch
+  manifest, the host, or the produced file. Verified at startup are the schema,
+  platform, architecture, OMP version, patch level, upstream base SHA and
+  version, fork repository and commit, desktop release, binary name, and the
+  digests/byte counts of the binary and of every extension; `fork.tree`,
+  `capabilities` and `build.*` are audit records the application cannot
+  re-derive and are never presented as verified.
 * **Admission.** A packaged build's only candidate is
   `process.resourcesPath/omp-runtime/{omp|omp.exe}`; it is used only when the
   manifest verifies against this build's pins and the binary's byte count and
-  SHA-256 match the file on disk. A missing, symlinked, escaping, malformed,
-  mismatched or tampered resource is refused as
-  `OmpRuntimeError("bundled-runtime-invalid")`. In a packaged build
+  SHA-256 match the file on disk. The tool gate resolves through the same
+  verification (`resolveBundledGate`): a missing `resourcesPath`, a missing gate,
+  a symlink, an escaping path or a changed digest is a refusal, never a fallback
+  to the app path, the environment or `PATH`. A missing, symlinked, escaping,
+  malformed, mismatched or tampered resource is refused as
+  `OmpRuntimeError("bundled-runtime-invalid")`, and the reason reaches the engine
+  status instead of being flattened into "no runtime". In a packaged build
   `OMP_DESKTOP_RUNTIME` is not consulted, the app path is not scanned upward, and
   `PATH` is never a source. Development keeps the explicit override and the
-  pinned-submodule walk-up.
+  pinned-submodule walk-up for both the runtime and the gate.
 * **Startup.** The start path probes `--version` before spawning and negotiates
   protocol v2 after `ready`; a mismatch leaves the engine `failed` with reason
   `version-mismatch` or `protocol-unsupported` and no capabilities, so no usable
@@ -1926,5 +1951,8 @@ The pins this build checks are mirrored in `@pi-desktop/shared`
 read, and a desktop test asserts they equal the controlled manifest.
 
 Not addressed here: R3 stays blocked and T20-B/C/D stay unstarted, and the
-artifact is not bit-reproducible across builds, so the manifest describes one
-build rather than claiming reproducible bytes.
+artifact is not bit-reproducible across builds — four builds of the same commit
+produced four different SHA-256s in this round — so the manifest describes one
+build and the reproducibility clause of the R4-3 acceptance item is **not
+satisfied**; it is carried as an open blocker for M6/T21 rather than reported as
+green.

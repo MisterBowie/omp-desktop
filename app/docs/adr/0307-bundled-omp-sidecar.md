@@ -72,16 +72,38 @@ rather than a desktop-side reimplementation.
 The build writes `provenance.json` next to the executable:
 `schema` (`omp-desktop.bundled-sidecar/1`), `fork.{repository,commit,tree}`,
 `upstreamBase.{sha,version}`, `patchLevel`, `capabilities`, `ompVersion`,
-`desktopVersion`, `platform`, `arch`, `binary.{filename,bytes,sha256}`, and
-`build.{tool,bunVersion}`. Every value is read from the validated checkout, the
-patch manifest, the host, or the produced file — none is entered by hand.
+`desktopVersion`, `platform`, `arch`, `binary.{filename,bytes,sha256}`,
+`extensions[]` (`{path,bytes,sha256}`), and `build.{tool,bunVersion}`. Every
+value is read from the validated checkout, the patch manifest, the host, or the
+produced file — none is entered by hand.
+
+**Verified at startup** (a mismatch refuses the runtime): the schema, the
+platform and architecture, the OMP version, the patch level, the upstream base
+SHA and version, the fork repository (normalized) and fork commit, the desktop
+release the artifact was built for, the binary's file name, and the byte count
+and SHA-256 of both the binary and every declared extension.
+
+**Recorded, not verified**: `fork.tree`, `capabilities` and `build.*`. A
+packaged application cannot re-derive them — it has no repository and no
+compiler — so they are audit/provenance information and must never be presented
+as checked. The trust anchors are the pins plus the digests.
 
 Both land in the application's Resources at the fixed location
-`omp-runtime/{omp|omp.exe, provenance.json}`, declared once in
-`apps/desktop/package.json` under `build.extraResources`; the built files are
-gitignored. The same build copies the tool gate to
-`omp-runtime/extensions/omp-desktop-gate.ts`, so a packaged build loads the gate
-from Resources instead of a source tree.
+`omp-runtime/{omp|omp.exe, provenance.json, extensions/}`; the built files are
+gitignored, and the `extraResources` entry filters the directory's own
+`.gitignore` out of the packaged copy.
+
+**The gate is shipped as a bundle.** The runtime loads it with
+`--trusted-extension`, so it must be a module the runtime can import from where
+it sits. A copy of the source is *not*: the source gate imports `../src/...`,
+which does not exist beside the sidecar in Resources, and the runtime refuses to
+start (`Trusted extension failed to load: Cannot find module
+'../src/session/approval-protocol.ts'`, measured against the compiled
+artifact). The build therefore bundles the gate into one self-contained file
+(`extensions/omp-desktop-gate.js`), proves it retains no relative imports,
+clears the build-owned `extensions/` directory first so a stale file from an
+earlier build cannot be shipped, and records its digest — which the desktop then
+verifies with the same rules as the binary.
 
 ### 3. A packaged build admits exactly one runtime, and verifies it
 
@@ -122,25 +144,47 @@ build has no repository to read. They are not hand-maintained evidence:
 manifest, and `scripts/omp-sidecar.mjs --check` refuses a checkout that
 disagrees with either.
 
+### 6. Every packaging command runs the preflight
+
+`pack`, `dist`, `dist:mac`, `dist:win` and `dist:linux` each run
+`pnpm run verify:sidecar[:<platform>]` between `bundle:runtime` and
+`electron-vite build`. This mirrors upstream PI Desktop, whose `pack`/`dist*`
+commands build the sidecar bundle in-chain (`bundle:runtime`) before
+`electron-builder`, rather than trusting whatever happens to be on disk; the OMP
+runtime needs a stricter form of the same step because it is a native,
+platform-specific artifact:
+
+- **Host target**: the preflight builds the sidecar (`--build`), so a missing or
+  stale artifact cannot be packaged.
+- **Non-host target**: it refuses to compile (there is no cross-compiler here)
+  and requires an artifact staged for exactly that platform and architecture
+  that verifies against *the controlled manifest being released* — a foreign
+  patch level, fork commit, base or desktop version is refused. The host binary
+  is never reused for another platform, and a cross-target release without an
+  explicit `--arch` is refused instead of defaulting to the host's.
+
+`apps/desktop/test/omp-release-gate.test.mjs` asserts each release command still
+runs the right preflight in the right position, and exercises the refusals with
+fixture artifacts.
+
 ## Consequences
 
 - A shipped application cannot be pointed at another runtime by an environment
   variable, a stray `omp` on `PATH`, or a directory that happens to look right.
 - The build gains one gate and one manifest; developers must pass `--source`
   (or `OMP_SIDECAR_SOURCE`) pointing at the controlled fork checkout. Packaging
-  is not wired into `pack:dist`, which would require that checkout at package
-  time; `pnpm build:sidecar` is the explicit entry point M6/T21 consumes.
-- The artifact is large (~280 MB) and **not bit-reproducible**: two builds of the
-  same commit produced different SHA-256s on this machine (recorded in
-  `docs/validation/M5-bundled-sidecar.md`). The manifest therefore describes one
-  build rather than claiming reproducible bytes, and must be regenerated with
-  every build. `--check` remains deterministic: it validates inputs, not
-  compiler output.
-- Verification costs one hash of the binary at boot (~0.13 s for 280 MB); it
-  only runs in packaged builds.
-- The tool gate under `omp-runtime/extensions/` is copied by the same build but
-  is still resolved by existence, unchanged from M5/T19-A. Its integrity rests
-  on the application bundle's own signing, not on the provenance manifest; this
-  is recorded as a limit, not a claim.
+  runs the preflight in-chain, so a release host needs that checkout and a
+  staged artifact for every non-host target it builds.
+- **Reproducibility is not achieved.** Builds of the same commit produce
+  different binary SHA-256s on this machine (four observed in this round,
+  recorded in `docs/validation/M5-bundled-sidecar.md`), so the R4-3 acceptance
+  clause "identical inputs produce an identical manifest" is **not satisfied**
+  and is carried as an open, blocking item for M6/T21 rather than reported as
+  green. `--check`/`--preflight` remain deterministic: they validate inputs and
+  staged artifacts, not compiler output.
+- Verification costs one hash of the binary at boot (~0.13 s for 280 MB) plus
+  one hash of each extension; it only runs in packaged builds.
+- The tool gate is bundled, digest-recorded and verified like the binary; its
+  refusal path is the same `bundled-runtime-invalid`.
 - The patch level's semantics are untouched (ADR 0305): R3 stays blocked, the
   Cursor product gate (ADR 0306) stands, and T20-B/C/D remain unimplemented.

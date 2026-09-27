@@ -15,11 +15,18 @@
  *     with `lstat`, and the resolved directory must stay inside the resources
  *     root, so a resource tree cannot redirect the runtime at a file outside
  *     it.
- *  3. **The manifest is a claim that must be re-proven.** Every field the
- *     desktop can check is checked against the binary on disk (byte count and
- *     SHA-256) or against this build's own pins (fork repository/commit, patch
- *     level, OMP version, platform, architecture). A mismatch is refused; the
- *     verification never degrades into "close enough".
+ *  3. **The manifest is a claim that must be re-proven.** Every field this build
+ *     can check is checked against the binary on disk (byte count and SHA-256),
+ *     the extensions on disk (byte count and SHA-256), or against this build's
+ *     own pins (fork repository/commit, patch level, OMP version, desktop
+ *     version, platform, architecture). A mismatch is refused; the verification
+ *     never degrades into "close enough".
+ *
+ * Which fields are *verified* and which are *recorded* is a deliberate line
+ * (ADR 0307): `fork.tree`, `capabilities` and `build.*` are provenance/audit
+ * records the running application cannot re-derive, so they are informational
+ * and are never presented as checked. The trust anchors are the pinned
+ * constants plus the digests, not the descriptive fields.
  *
  * `platform`/`arch` are parameters rather than reads of `process`, so the
  * macOS and Windows naming and mismatch paths are testable on any host.
@@ -32,6 +39,7 @@ import Type from "typebox";
 import * as Value from "typebox/value";
 
 import {
+  APP_VERSION,
   OMP_RUNTIME_BASE_SHA,
   OMP_RUNTIME_FORK_COMMIT,
   OMP_RUNTIME_FORK_REPOSITORY,
@@ -47,6 +55,18 @@ export const BUNDLED_RUNTIME_DIR = "omp-runtime";
 
 /** The provenance manifest's fixed file name inside that directory. */
 export const BUNDLED_PROVENANCE_FILENAME = "provenance.json";
+
+/**
+ * The tool gate's path inside the runtime directory.
+ *
+ * The desktop loads it with the runtime's `--trusted-extension` allowlist, so
+ * its location is part of the runtime contract rather than a desktop detail.
+ * The shipped file is a **bundle**, not a copy of the source: the source gate
+ * imports `../src/...`, which does not exist beside the sidecar in Resources,
+ * and the runtime fails to load an extension whose imports do not resolve. The
+ * build bundles it and records its digest, and the desktop verifies both.
+ */
+export const BUNDLED_GATE_RELATIVE_PATH = join("extensions", "omp-desktop-gate.js");
 
 /** The only provenance schema this build understands; anything else fails closed. */
 export const BUNDLED_PROVENANCE_SCHEMA = "omp-desktop.bundled-sidecar/1";
@@ -93,6 +113,12 @@ export type BundledSidecarProvenance = {
   platform: string;
   arch: string;
   binary: { filename: string; bytes: number; sha256: string };
+  /**
+   * Files the build copied beside the binary and the desktop loads from there
+   * (today: the tool gate). Each is verified against its recorded bytes and
+   * digest before use, so a swapped gate cannot ride on a valid binary.
+   */
+  extensions: Array<{ path: string; bytes: number; sha256: string }>;
   build: { tool: string; bunVersion?: string };
 };
 
@@ -122,6 +148,14 @@ export const BundledProvenanceSchema = Type.Object({
     bytes: Type.Integer({ minimum: 1 }),
     sha256: DIGEST,
   }),
+  extensions: Type.Array(
+    Type.Object({
+      path: Type.String(),
+      bytes: Type.Integer({ minimum: 1 }),
+      sha256: DIGEST,
+    }),
+    { minItems: 1 },
+  ),
   build: Type.Object({
     tool: Type.String(),
     bunVersion: Type.Optional(Type.String()),
@@ -135,6 +169,12 @@ export type BundledExpectation = {
   baseSha: string;
   forkRepository: string;
   forkCommit: string;
+  /**
+   * The desktop release the artifact was built for. A packaged application
+   * ships one release and its runtime together, so an artifact built for
+   * another release is refused rather than quietly reused.
+   */
+  desktopVersion: string;
 };
 
 /** The pins this build ships; tests override them to exercise each refusal. */
@@ -144,6 +184,7 @@ export const BUNDLED_EXPECTATION: BundledExpectation = {
   baseSha: OMP_RUNTIME_BASE_SHA,
   forkRepository: OMP_RUNTIME_FORK_REPOSITORY,
   forkCommit: OMP_RUNTIME_FORK_COMMIT,
+  desktopVersion: APP_VERSION,
 };
 
 export type BundledVerification = {
@@ -151,6 +192,8 @@ export type BundledVerification = {
   path: string;
   /** The verified manifest, so callers can report the build identity. */
   provenance: BundledSidecarProvenance;
+  /** Every declared extension, at the absolute path it was verified at. */
+  extensions: Array<{ path: string; absolutePath: string; bytes: number; sha256: string }>;
 };
 
 function refuse(detail: string): never {
@@ -254,6 +297,11 @@ export function verifyBundledRuntime(options: {
   if (provenance.patchLevel !== expected.patchLevel) {
     refuse(`provenance patch level is ${provenance.patchLevel}, this build pins ${expected.patchLevel}`);
   }
+  if (provenance.desktopVersion !== expected.desktopVersion) {
+    refuse(
+      `provenance desktop version is ${provenance.desktopVersion}, this build is ${expected.desktopVersion}`,
+    );
+  }
   if (provenance.upstreamBase.sha !== expected.baseSha) {
     refuse(`provenance upstream base is ${provenance.upstreamBase.sha}, this build pins ${expected.baseSha}`);
   }
@@ -278,7 +326,68 @@ export function verifyBundledRuntime(options: {
     refuse("binary SHA-256 does not match the provenance manifest");
   }
 
-  return { path: binaryPath, provenance };
+  // Extensions are loaded by the runtime from the same directory, so they must
+  // be inside it, be plain files, and match the digest the build recorded —
+  // otherwise a valid binary could carry a swapped tool gate.
+  const extensions: BundledVerification["extensions"] = [];
+  for (const extension of provenance.extensions) {
+    const relative = extension.path.split(/[\\/]/).filter((part) => part.length > 0);
+    if (relative.length === 0 || relative.includes("..")) {
+      refuse(`extension path is not inside the runtime directory: ${extension.path}`);
+    }
+    const extensionPath = join(canonicalDir, ...relative);
+    const extensionRoot = canonicalDir.endsWith(sep) ? canonicalDir : canonicalDir + sep;
+    if (!extensionPath.startsWith(extensionRoot)) {
+      refuse(`extension path escapes the runtime directory: ${extension.path}`);
+    }
+    const extensionStats = lstatSyncOrNull(extensionPath);
+    if (!extensionStats) refuse(`missing extension ${extension.path}`);
+    if (extensionStats.isSymbolicLink()) refuse(`extension ${extension.path} must not be a symlink`);
+    if (!extensionStats.isFile()) refuse(`extension ${extension.path} is not a regular file`);
+    if (extensionStats.size !== extension.bytes) {
+      refuse(`extension ${extension.path} is ${extensionStats.size} bytes, provenance declares ${extension.bytes}`);
+    }
+    if (sha256File(extensionPath) !== extension.sha256) {
+      refuse(`extension ${extension.path} does not match the provenance manifest`);
+    }
+    extensions.push({
+      path: relative.join("/"),
+      absolutePath: extensionPath,
+      bytes: extensionStats.size,
+      sha256: extension.sha256,
+    });
+  }
+  const gatePath = BUNDLED_GATE_RELATIVE_PATH.split(sep).join("/");
+  if (!extensions.some((extension) => extension.path === gatePath)) {
+    refuse(`the provenance manifest does not declare ${BUNDLED_GATE_RELATIVE_PATH}`);
+  }
+
+  return { path: binaryPath, provenance, extensions };
+}
+
+/**
+ * Resolve the packaged tool gate through the same verification as the sidecar.
+ *
+ * Returns the absolute path of the verified gate, or `null` when the resources
+ * do not verify. A packaged build must never fall back to a source-tree gate:
+ * the gate is what makes a native tool call wait for the desktop, so an
+ * unverified one is the same as none.
+ */
+export function resolveBundledGate(options: {
+  resourcesPath: string;
+  platform?: NodeJS.Platform | string;
+  arch?: string;
+  expected?: BundledExpectation;
+}): { path: string; provenance: BundledSidecarProvenance } | null {
+  let verified: BundledVerification;
+  try {
+    verified = verifyBundledRuntime(options);
+  } catch {
+    return null;
+  }
+  const gatePath = BUNDLED_GATE_RELATIVE_PATH.split(sep).join("/");
+  const gate = verified.extensions.find((extension) => extension.path === gatePath);
+  return gate ? { path: gate.absolutePath, provenance: verified.provenance } : null;
 }
 
 function lstatSyncOrNull(path: string): Stats | null {

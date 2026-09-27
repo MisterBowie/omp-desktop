@@ -28,12 +28,14 @@ export {
 export { OmpRuntimeError, isFatalTransportError, type OmpRuntimeErrorCode } from "./errors.js";
 export {
   BUNDLED_EXPECTATION,
+  BUNDLED_GATE_RELATIVE_PATH,
   BUNDLED_PROVENANCE_FILENAME,
   BUNDLED_PROVENANCE_SCHEMA,
   BUNDLED_RUNTIME_DIR,
   BundledProvenanceSchema,
   bundledBinaryFilename,
   normalizeRepositoryUrl,
+  resolveBundledGate,
   sha256File,
   verifyBundledRuntime,
   type BundledExpectation,

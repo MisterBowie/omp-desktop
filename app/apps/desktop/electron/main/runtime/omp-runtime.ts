@@ -45,9 +45,6 @@ export const PINNED_LAUNCHER_PATH = PINNED_LAUNCHER_RELATIVE_PATH;
 
 export { findPinnedLauncher };
 
-/** Bundled tool gate inside a packaged app's resources (the runtime loads it). */
-export const BUNDLED_GATE_PATH = join("omp-runtime", "extensions", "omp-desktop-gate.ts");
-
 export type LauncherResolutionInput = {
   env?: NodeJS.ProcessEnv;
   isPackaged: boolean;
@@ -163,6 +160,13 @@ export type OmpRuntimeAdapter = {
   /** Absolute launcher path, or null when this build has none. */
   readonly launcher: string | null;
   readonly launcherSource: ResolvedLauncher["source"];
+  /**
+   * Why resolution refused every candidate, or null when one was accepted.
+   *
+   * Kept verbatim (never re-worded) so the engine status and the operator see
+   * the same reason the verification produced.
+   */
+  readonly launcherError: string | null;
   readonly tried: string[];
   status(): EngineRuntimeStatus;
   start(): Promise<EngineRuntimeStatus>;
@@ -196,10 +200,13 @@ export function createOmpRuntimeAdapter(
     ((supervisorOptions: ConstructorParameters<typeof OmpRuntimeSupervisor>[0]) =>
       new OmpRuntimeSupervisor(supervisorOptions));
 
+  const resolutionError = resolved.path === null ? (resolved.error ?? null) : null;
+
   const supervisor = factory({
     dataRoot: options.dataRoot,
     launcherPath: resolved.path,
     expectedRuntimeVersion: options.expectedRuntimeVersion,
+    ...(resolutionError ? { launcherResolutionError: resolutionError } : {}),
     ...(options.args && options.args.length > 0 ? { args: options.args } : {}),
   });
 
@@ -212,6 +219,7 @@ export function createOmpRuntimeAdapter(
       dataRoot: options.dataRoot,
       launcherPath: resolved.path,
       expectedRuntimeVersion: options.expectedRuntimeVersion,
+      ...(resolutionError ? { launcherResolutionError: resolutionError } : {}),
       ...(args.length > 0 ? { args } : {}),
       ...(createOptions.sessionDir ? { sessionDir: createOptions.sessionDir } : {}),
       ...(createOptions.prepareRun ? { prepareRun: createOptions.prepareRun } : {}),
@@ -222,6 +230,7 @@ export function createOmpRuntimeAdapter(
   return {
     launcher: resolved.path,
     launcherSource: resolved.source,
+    launcherError: resolutionError,
     tried: resolved.tried,
     status: () => supervisor.status(),
     start: () => supervisor.start(),

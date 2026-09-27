@@ -82,6 +82,15 @@ export type OmpRuntimeSupervisorOptions = {
   bundledLauncherPath?: string | null;
   /** Development-only fallback: the launcher inside the pinned submodule. */
   devLauncherPath?: string | null;
+  /**
+   * Why the embedder's own resolution refused every candidate (ADR 0307).
+   *
+   * A packaged build resolves and verifies its resource before a supervisor
+   * exists; when that verification refused the resource, the reason is the
+   * actionable diagnostic and must reach `status().detail` instead of being
+   * flattened into "no runtime executable is configured".
+   */
+  launcherResolutionError?: string | null;
   /** Version this build pins; `null` disables the check. */
   expectedRuntimeVersion?: string | null;
   /** PATH entries published to the child; defaults to the launcher's runtime. */
@@ -249,6 +258,12 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
     this.options = options;
     this.terminateTree = options.terminateTree ?? terminateProcessTree;
     this.args = (options.args ?? []).filter((arg) => typeof arg === "string" && arg.length > 0);
+    // A build whose own resolution already refused its runtime reports that
+    // reason from the start instead of pretending the engine simply has not
+    // been started.
+    if (options.launcherResolutionError) {
+      this.lastFailure = { reason: "start-failed", detail: options.launcherResolutionError };
+    }
   }
 
   /**
@@ -415,8 +430,14 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
         devLauncherPath: this.options.devLauncherPath,
       });
     } catch (error) {
-      this.lastFailure = { reason: "start-failed", detail: (error as Error).message };
-      throw error;
+      // The embedder's own refusal (a verification failure, with its exact
+      // reason) outranks the generic "nothing configured" message: it is the
+      // one an operator can act on.
+      const candidates = (error as OmpRuntimeError).detail ?? (error as Error).message;
+      const resolution = this.options.launcherResolutionError;
+      const detail = resolution ? `${resolution}; candidates: ${candidates}` : candidates;
+      this.lastFailure = { reason: "start-failed", detail };
+      throw new OmpRuntimeError("launcher-missing", "no usable OMP runtime is configured", detail);
     }
 
     const runRoot = this.createRunRoot();

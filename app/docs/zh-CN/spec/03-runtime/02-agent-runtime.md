@@ -1158,18 +1158,34 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
   `HEAD` 不是清单中的 fork 提交、工作树不干净、上报版本不是 `18.3.0`，或相对基线的差异不等于清单
   的文件列表（且受控补丁不能反向应用）时，它一律拒绝。编译使用 OMP 自身的 Bun 单文件构建，因此
   产物就是该提交下 `omp --version` 所报告的可执行文件。产物与工具门被复制到
-  `apps/desktop/resources/omp-runtime/`（已 gitignore），并在 electron-builder 的
-  `extraResources` 中声明。
+  `apps/desktop/resources/omp-runtime/`（已 gitignore；打包复制会用 filter 排除该目录自身的
+  `.gitignore`），并在 electron-builder 的 `extraResources` 中声明。
+* **发布门。** `pack`、`dist`、`dist:mac`、`dist:win`、`dist:linux` 各自在 `bundle:runtime` 与
+  `electron-vite build` 之间执行 `verify:sidecar[:<platform>]`（`--preflight`），与上游产品
+  把 sidecar bundle 步骤串进发布命令的做法一致。宿主目标的 preflight 会实际构建产物；跨目标
+  preflight 拒绝编译，并要求存在**恰好为该平台/架构**暂存、且相对本次发布的受控清单校验通过的
+  产物。绝不把宿主二进制复用到其他平台。
+* **工具门。** 运行时用 `--trusted-extension` 加载工具门，因此它以自包含 bundle 的形式发布
+  （`omp-runtime/extensions/omp-desktop-gate.js`，由
+  `packages/omp-runtime/extensions/omp-desktop-gate.ts` 构建）：直接复制源码仍会 import
+  `../src/...`，而该路径在 sidecar 旁并不存在，运行时会拒绝启动。构建会证明 bundle 不再含相对
+  导入、先清空构建自有的 `extensions/` 目录（避免旧构建残留被一起发布），并记录工具门的字节数与
+  摘要。
 * **provenance。** 构建会在可执行文件旁写出 `provenance.json`：schema
   `omp-desktop.bundled-sidecar/1`、fork 仓库/提交/tree、上游基线 SHA 与版本、patch level、能力
-  id、OMP 版本、桌面版本、平台、架构、二进制文件名、字节数与 SHA-256，以及构建工具及其版本。
-  每个值都来自已校验的检出、补丁清单、本机环境或实际产物。
+  id、OMP 版本、桌面版本、平台、架构、二进制文件名、字节数与 SHA-256、各扩展的路径与其字节数/摘要，
+  以及构建工具及其版本。每个值都来自已校验的检出、补丁清单、本机环境或实际产物。启动时**校验**的是
+  schema、平台、架构、OMP 版本、patch level、上游基线 SHA 与版本、fork 仓库与提交、桌面发布版本、
+  二进制名，以及二进制与每个扩展的字节数/摘要；`fork.tree`、`capabilities` 与 `build.*` 是应用
+  无法自行推导的审计记录，绝不作为“已验证”呈现。
 * **准入。** 打包构建的唯一候选是
   `process.resourcesPath/omp-runtime/{omp|omp.exe}`；只有当清单相对本构建的 pins 校验通过、且
-  二进制字节数与 SHA-256 与磁盘文件一致时才使用。缺失、符号链接、逃逸、格式错误、不匹配或被篡改
-  的资源一律以 `OmpRuntimeError("bundled-runtime-invalid")` 拒绝。打包构建下不读取
-  `OMP_DESKTOP_RUNTIME`、不向上扫描 app path，也绝不使用 `PATH`。开发态保留显式覆盖与固定子模块
-  的向上查找。
+  二进制字节数与 SHA-256 与磁盘文件一致时才使用。工具门走同一套校验（`resolveBundledGate`）：
+  `resourcesPath` 缺失、工具门缺失、符号链接、路径逃逸或摘要变化都是拒绝，绝不回退到 app path、
+  环境变量或 `PATH`。缺失、符号链接、逃逸、格式错误、不匹配或被篡改的资源一律以
+  `OmpRuntimeError("bundled-runtime-invalid")` 拒绝，且原因会进入引擎状态，而不是被压成
+  “no runtime”。打包构建下不读取 `OMP_DESKTOP_RUNTIME`、不向上扫描 app path，也绝不使用 `PATH`。
+  开发态的运行时与工具门都保留显式覆盖与固定子模块的向上查找。
 * **启动。** 启动路径在 spawn 之前探测 `--version`，并在 `ready` 之后协商协议 v2；不一致时引擎停在
   `failed`，原因为 `version-mismatch` 或 `protocol-unsupported`，且能力全部关闭，因此不会创建可用
   会话。这里复用 M1 的握手，而不是新增第二套。
@@ -1181,5 +1197,6 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
 `OMP_RUNTIME_PATCH_LEVEL`、`OMP_RUNTIME_FORK_REPOSITORY`、`OMP_RUNTIME_FORK_COMMIT`），因为打包
 后的应用没有仓库可读；桌面测试断言它们与受控清单一致。
 
-本文不涉及：R3 仍然阻塞、T20-B/C/D 仍未开始；产物在不同构建之间并非逐位可复现，因此清单描述的是
-单次构建，而不是宣称字节可复现。
+本文不涉及：R3 仍然阻塞、T20-B/C/D 仍未开始；产物在不同构建之间并非逐位可复现——本轮同一提交的
+四次构建得到四个不同 SHA-256——因此清单描述的是单次构建，R4-3 验收项中的“可复现”条款**未满足**，
+作为 M6/T21 的未决阻塞项记录，而不是写成已通过。

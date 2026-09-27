@@ -1,203 +1,237 @@
-# M5/T20-R4B：自有 OMP fork + bundled sidecar 的可验证闭环
+# M5/T20-R4B：自有 OMP fork + bundled sidecar 的可验证闭环（含复审返修）
 
-更新时间：2026-09-27。桌面分支 `codex/m5-r4b-bundled-sidecar`，基线 `d8c0a35d34e424dec02acc24df444f7bb8a71cf4`（单线追加）。
+更新时间：2026-09-27。桌面分支 `codex/m5-r4b-bundled-sidecar`；首个 R4B 提交 `b25eb60c077deb5b200cf5f5bf6e8a3cddbbf679`，本文件记录的返修追加在其之上（不 amend、不强推）。
 
-状态：**R4B 完成**——建立自有 OMP fork 源码坐标、可复现（且 fail-closed 校验的）sidecar 构建入口与 provenance 清单、打包资源的 `app.isPackaged` 准入、启动前身份/协议断言，并用真实编译产物完成无费用启动、隔离 canary 与进程组/临时目录回收验证。**R3 仍为硬阻塞；ADR 0306 的 Cursor 产品门保留；T20-B/C/D 未开始；T20 未完成；T21 未完成。**
+状态：**R4B 完成（含复审返修）。** 三项阻塞问题已按「先复现 → 修复 → 重跑」处理：①发布命令强制 sidecar 预检；②真实 smoke 走与桌面相同的 `--trusted-extension` 参数链并验证复制后的真实工具门；③打包态工具门解析彻底 fail closed。附带逐项处理了 diag 传播、provenance 信任分级、工具门完整性、`.gitignore` 打包、R4-3 可复现性冲突。
 
-非目标（明确不做）：解除 R3、实现 Plan/Goal 运行时面、删除或放宽 Cursor 门、声称 PI parity、向 `can1357/oh-my-pi` 推送、executor-builder 真实打包与 macOS/Windows 实机。
+**R3 仍为硬阻塞；ADR 0306 的 Cursor 产品门保留；T20-B/C/D 未开始；T20 未完成；T21 未完成；R4-3 的“可复现”条款未满足（见 §10）。**
 
----
-
-## 0. 结论摘要
-
-1. **自有 fork 坐标已建立并只推自有仓库**：`https://github.com/MisterBowie/oh-my-pi` 分支 `codex/omp-desktop-18.3.0-patch-2`，commit `3c845eb27f6f7b0a5b182f1868969ced86d10a3d`（tree `135ad4b6bc27f58a6220260233e9ff377b14f231`），内容 = can1357 `v18.3.0`（`62bc57be…`）+ 受控补丁 `62bc57b+omp-desktop.2`（10 文件，+1350/−34）。`git ls-remote` 回读与本地 HEAD 一致；`can1357/oh-my-pi` 只作只读 upstream（`git ls-remote` 仅用于读标签），未推送、未改写其历史。补丁应用后的 18.3.0 检出上，R4A 目标三套件 **177 pass / 0 fail**，`git apply --check --reverse` 通过。
-2. **构建入口 fail closed**：`app/scripts/omp-sidecar.mjs` 在编译前校验 `origin`（规范化后必须等于清单 `fork.repository`，SSH/`ssh://`/HTTPS 三种写法等价）、`HEAD`（必须等于 `fork.commit`）、工作树干净、`packages/utils/package.json` 版本、`git diff --name-only <base> HEAD` 等于清单文件集、`git apply --check --reverse` 接受受控补丁。编译走 OMP 官方 `packages/coding-agent/scripts/build-binary.ts`（Bun 单文件、自包含），产物 + 工具门落到 `app/apps/desktop/resources/omp-runtime/`（gitignore），并写出机器可读 `provenance.json`。所有值由脚本从已校验检出/清单/本机/产物取得，无手填。
-3. **打包态只接受被校验过的资源**：`resolveRuntimeLauncher` 在 `app.isPackaged` 下**只**考虑 `process.resourcesPath/omp-runtime/{omp|omp.exe}`，且 binary 与 `provenance.json` 的 schema/platform/arch/OMP 版本/patch level/upstream base SHA/fork 仓库/fork commit/文件名/字节数/SHA-256 全部校验通过才可用；缺失（或 `resourcesPath` 为空）、符号链接、目录逃逸、畸形 JSON、任一字段不符、字节数或摘要不符、binary 被篡改，一律 `OmpRuntimeError("bundled-runtime-invalid")`。同一状态下 `OMP_DESKTOP_RUNTIME`、向上资源树扫描（`appPath`/cwd）与 `PATH` **均不是候选**。开发态保留显式覆盖与固定子模块向上查找。
-4. **启动前断言**：沿用既有路径——spawn 前 `--version` 探测、`ready` 后 `negotiate_protocol` v2；不符时引擎停在 `failed`（`version-mismatch` / `protocol-unsupported`，后者本轮从 `start-failed` 细分）且能力全关，因此不会产生可用会话。
-5. **真实产物无费用验证通过（Linux x64，模型零调用）**：`omp-sidecar.mjs --build` 产出 283559392 字节、sha256 `a0cf758652e6a89b71c8717f49902c7732696016c59e2a963c7719ec5c2c4213` 的自包含可执行文件；在最小 PATH（`/usr/bin:/bin`，本机 `/usr/bin/node`、`/usr/bin/bun` 均不存在）下 `--version` 输出 `omp/18.3.0`。监督器真实启动到达 `idle`（runtimeVersion `18.3.0`、protocolVersion `2`），隔离诱饵目录零写入，异常死亡后的 `stop()`（`reaped`/`cleaned` 均为真）与永不 ready 的超时清理均通过。
+非目标：解除 R3、实现 Plan/Goal 运行时面、放宽 Cursor 门、声称 PI parity、向 can1357 推送、跑 electron-builder 真实打包。
 
 ---
 
-## 1. 证据源与完整性核验
+## 0. 结论摘要（返修轮）
 
-| 来源 | 固定坐标 | 本机获取与核验 |
+1. **发布命令现在是机械的 fail-closed 入口。** `pack`/`dist`/`dist:mac`/`dist:win`/`dist:linux` 各自在 `bundle:runtime` 与 `electron-vite build` 之间插入 `pnpm run verify:sidecar[:<platform>]`（`omp-sidecar.mjs --preflight`）。宿主目标**实际构建** sidecar（缺失/过期不可能被打包）；跨目标**拒绝编译**，要求存在恰好为该平台/架构暂存、且相对**本次发布的受控清单**校验通过的产物——宿主二进制绝不会被复用到别的平台，缺少 `--arch` 的跨目标发布也直接拒绝。对照：上游 PI Desktop 的 `pack`/`dist*` 同样把 sidecar bundle 串进发布命令（`bundle:runtime`），而不是信任磁盘上的既有产物；OMP 需要更严格的形式，因为产物是平台相关的原生可执行文件。
+2. **真实 smoke 走生产参数链，并因此发现并修复了一个真实缺陷。** smoke 现在用与 `createDesktopEngineRuntime` 相同的 `--trusted-extension <Resources>/omp-runtime/extensions/omp-desktop-gate.js` 启动真实编译产物，完成 `--version`、`negotiate_protocol` v2 与一次无费用 RPC。**复现到的缺陷**：工具门此前只是被**复制**，而源 gate 会 `import "../src/..."`；该路径在 Resources 下不存在，运行时直接拒绝启动（实测 `Trusted extension failed to load: Cannot find module '../src/session/approval-protocol.ts'`，exit 1）。修复：构建把 gate **打成自包含 bundle**（`bun build … --target=bun`），校验 bundle 内不再有相对导入，并先清空构建自有的 `extensions/` 目录（避免旧构建残留被一起发布）；gate 的字节数与 SHA-256 进入 provenance 并在启动前校验。
+3. **打包态工具门解析彻底 fail closed。** `resolveGateExtension` 与 `createOmpSessionBridge.gatePath()` 都改成「只要 `isPackaged`，就只允许 Resources 下经同一套校验的工具门」：`resourcesPath` 缺失、gate 缺失、符号链接、路径逃逸、摘要不符一律拒绝，**不再**落入 `findGateExtension(appPath)` 开发搜索；appPath、环境变量、PATH、dev candidates 都无法绕过。开发态行为不变。
+4. **诊断不再被吞。** 解析失败的原因（`bundled-runtime-invalid: …`）现在通过 `launcherResolutionError` 进入 supervisor，`status()` 从一开始就是 `failed` + 真实原因（含文件名与失败种类），不再退化成 “no runtime executable is configured”。
+5. **provenance 的信任分级被写死并测试。** 启动时**校验**：schema、平台、架构、OMP 版本、patch level、上游 base SHA 与版本、fork 仓库/提交、**desktopVersion**、二进制名、二进制与每个扩展的字节数/SHA-256。**仅记录不校验**：`fork.tree`、`capabilities`、`build.*`（打包应用无法自行推导），ADR 明确禁止把它们说成已验证，并有测试固定该语义。
+6. **R4-3 的“可复现”条款未满足。** 同一提交本轮出现 **4 个不同**的二进制 SHA-256（`83bd4a7c…`、`12f4aee5…`、`a0cf7586…`、`8360d6a3…`、`021408a8…`、`076b3531…` 中的多次独立构建）。任务板与 ADR/spec/本文均按**未满足/阻塞**记录，未写成通过。（gate bundle 本身两次构建逐位一致。）
+
+---
+
+## 1. 证据源
+
+| 来源 | 固定坐标 | 核验 |
 | --- | --- | --- |
-| PI Desktop | `0111e306c120ad5820688d7608cb37bad8fbcc1f` | `upstream/pi-desktop` 子模块（`git submodule status` = 该 SHA，`git status --porcelain` 空）。由 R4A worktree 的本地副本 `git clone --no-checkout` 重建，**未走网络** |
-| 当前 OMP（子模块） | `62bc57be1b03ef0802a33cf7f5f530e534527531`（omp/18.3.0） | `upstream/oh-my-pi` 同法由本地副本重建；`git rev-parse HEAD` 一致、`git status --porcelain` 空；按 worktree 单独 `bun install --frozen-lockfile` 并放入官方预编译 natives（`@oh-my-pi/pi-natives-linux-x64@18.3.0`，取自 `pi_natives.linux-x64-{baseline,modern}.node`） |
-| 自有 fork 检出 | `MisterBowie/oh-my-pi @ 3c845eb27f6f7b0a5b182f1868969ced86d10a3d` | `/tmp/r4b/oh-my-pi`（`git clone --filter=blob:none` 经 `127.0.0.1:7897`）；`git rev-parse HEAD`、`git remote get-url origin` 均与记录一致；构建后 `git status --porcelain` 仍为空（`dist/`、`*.node` 被忽略） |
-| can1357 v18.3.0 | `62bc57be1b03ef0802a33cf7f5f530e534527531`（`refs/tags/v18.3.0`） | `git ls-remote https://github.com/can1357/oh-my-pi refs/tags/v18.3.0`（只读）；fork 上同名标签指向同一 commit |
+| PI Desktop | `0111e306c120ad5820688d7608cb37bad8fbcc1f` | `upstream/pi-desktop` 子模块 HEAD 一致、工作树干净（由本机 R4A 检出本地 `git clone` 重建，未走网络） |
+| OMP 基线（子模块） | `62bc57be1b03ef0802a33cf7f5f530e534527531`（18.3.0） | `upstream/oh-my-pi` 同法重建；`git status --porcelain` 空 |
+| 自有 fork 检出 | `MisterBowie/oh-my-pi @ 3c845eb27f6f7b0a5b182f1868969ced86d10a3d` | `/tmp/r4b/oh-my-pi`；远端回读一致 |
+| can1357 上游 | `refs/tags/v18.3.0` = `62bc57be…` | 仅只读 `git ls-remote` |
+| nornzach GUI | `313279965a30b14505934a78b584fedb095f117b` | 架构参考，未据其断言 R4B 契约 |
 
-网络事实：任务书给出的 `http://127.0.0.1:7890` 代理未监听；本机可用的是 `127.0.0.1:7897`。`upstream/pi-desktop` 的 `git submodule update --init` 因网络 clone 过慢被外部终止一次；随后**未重试网络大仓库**，改用本机已存在的 R4A 检出做本地 `git clone`（`/home/vv/person/code/omp-desktop-m5-r4/upstream/*`），子模块状态因此可用且不需要网络。全程**未调用任何模型**。
-
----
-
-## 2. 先查固定 PI Desktop 上游（要求 2）
-
-PI Desktop `0111e306` 对内置可执行文件的解析（逐行核对，行号取自该固定检出）：
-
-| 位置 | 事实 |
-| --- | --- |
-| `apps/desktop/electron/main/agent-sidecar.ts:18-27` | `resolveSidecarEntry()` 依次尝试 `process.resourcesPath/agent-runtime/sidecar.js`、`__dirname/../../../agent-runtime/dist/sidecar.js`、`__dirname/../../../../packages/agent-runtime/dist/sidecar.js`，**只用 `existsSync`** 判定，最后无条件回落到开发路径 |
-| `apps/desktop/electron/main/host-process.ts:22-38` | `resolveHostBinary()` 先看 `PI_DESKTOP_HOST_BIN`（**存在即用，无 `app.isPackaged` 门**），再看 `process.resourcesPath/bin/pi-desktop-host-core{exe}`，再看开发 `target/{debug,release}`；同样只做存在性检查 |
-| `apps/desktop/electron/main/host-process.ts:49-57` | `resolveBuiltinPluginsDir()`：`resourcesPath/plugins` → 开发相对路径，存在性检查 |
-
-结论：**PI 上游没有「内置资源完整性校验」的先例，也没有把开发覆盖按打包态关闭**。因此 R4B 的「provenance 校验 + `app.isPackaged` 下忽略开发通道」是**本产品的新决策**（新 ADR，见 §7），不是照抄上游；同时它也不与上游冲突（我们不改变 PI 自身行为）。
-
-参考架构（nornzach `oh-my-pi-gui@313279965`）的对照结论沿用 R3D 审计：该 GUI **不从 PATH 解析 `omp`**，但 `OMP_BUNDLED_OMP`（早于 `resourcesPath` 判断）、向上资源树扫描与 `OMP_SIDECAR=source` **都无 `app.isPackaged` 门**，故「打包态固定 sidecar」需自加门（R4-9）。我产品侧已按 R4-9 实现，未改其源码。
+代理事实：`127.0.0.1:7890` 未监听，实际使用 `127.0.0.1:7897`。全程未调用任何模型（无费用）。
 
 ---
 
-## 3. 要求 A：fork 源码坐标与补丁
+## 2. 固定上游对照证据（要求：先查 PI，再查 OMP）
 
-| 步骤 | 命令 | 结果 |
-| --- | --- | --- |
-| origin 核对 | `git -C /tmp/r4b/oh-my-pi remote -v` | `origin https://github.com/MisterBowie/oh-my-pi (fetch/push)` |
-| 建分支 | `git checkout -b codex/omp-desktop-18.3.0-patch-2 62bc57be…`（fork 上 `refs/tags/v18.3.0` 即该 commit） | HEAD = `62bc57be…` |
-| 应用受控补丁 | `git apply -p1 <app/patches/oh-my-pi/0001-rpc-host-tool-transition-contract.patch>` | 干净应用，`git status --porcelain` 恰 10 个 `M`，`diff --stat` = 10 files changed, 1350 insertions(+), 34 deletions(−) |
-| R4A 目标三套件 | `bun test packages/agent/test/agent-loop.test.ts packages/coding-agent/test/rpc-host-tools.test.ts packages/coding-agent/test/rpc-input-frame.test.ts` | **exit 0：177 pass / 0 fail，755 expect() calls，Ran 177 tests across 3 files**（与 R4A 记录一致） |
-| 提交 | `git commit`（10 文件）| commit `3c845eb27f6f7b0a5b182f1868969ced86d10a3d`，tree `135ad4b6bc27f58a6220260233e9ff377b14f231` |
-| 往返核验 | `git apply --check --reverse <artifact>`；`git diff --name-only 62bc57be… HEAD` | 反向应用 exit 0；差异文件集 = 清单 10 文件 |
-| 推送 | `git push origin codex/omp-desktop-18.3.0-patch-2` | exit 0，`* [new branch]`；`git ls-remote origin refs/heads/codex/omp-desktop-18.3.0-patch-2` = `3c845eb2…` |
+### 2.1 PI Desktop 的发布/构建链路（问题 1 的对照）
 
-冻结坐标写进 `app/patches/oh-my-pi/manifest.json` 的新 `fork` 块（`repository`/`branch`/`commit`/`tree`），并由 `omp-patch.mjs` 在加载清单时校验（40 位十六进制 commit、可选 tree、非空 repository/branch）。
+`upstream/pi-desktop/apps/desktop/package.json`（该固定检出）：
 
----
-
-## 4. 要求 B：可复现构建入口与 provenance
-
-`app/scripts/omp-sidecar.mjs`（新）提供 `--check` / `--build`：
-
-* `validateForkCheckout(source, manifest, patchPath)`：remote 规范化比较 → `HEAD == manifest.fork.commit` → 工作树干净 → 版本 → `git cat-file -e <base>` → 差异文件集 → `git apply --check --reverse`。任一不满足抛 `PatchError`，CLI 退出码 1。
-* `buildSidecar()`：调用 OMP 官方 `bun packages/coding-agent/scripts/build-binary.ts`（隔离环境、进程组回收、超时分级终止），把 `dist/omp`（或 `omp.exe`）与 `packages/omp-runtime/extensions/omp-desktop-gate.ts` 复制到输出目录，探测产物 `--version` 必须等于 `base.version`，随后写出 `provenance.json`。
-* 输出目录安全：拒绝文件系统根、符号链接、非目录、位于源码 checkout 内或包含仓库根的路径。
-
-生成逻辑不依赖任何网络：`bun install` 的依赖来自本机缓存，native 来自本机既有文件。
-
----
-
-## 5. 要求 C：打包接入与打包态准入
-
-* `apps/desktop/package.json`：`build.extraResources` 新增 `{ "from": "resources/omp-runtime", "to": "omp-runtime" }`；新增脚本 `build:sidecar`（`node ../../scripts/omp-sidecar.mjs --build`）。`resources/omp-runtime/.gitignore` 忽略 `omp`、`omp.exe`、`provenance.json`、`extensions/`；`git add -An` 只会加入该 `.gitignore`。
-* `packages/omp-runtime/src/bundled.ts`（新）：`BUNDLED_RUNTIME_DIR`/`BUNDLED_PROVENANCE_FILENAME`/`BUNDLED_PROVENANCE_SCHEMA`、`bundledBinaryFilename(platform)`、`normalizeRepositoryUrl(url)`、typebox 形状校验 `BundledProvenanceSchema`、`verifyBundledRuntime({resourcesPath, platform, arch, expected})`（含分块 SHA-256，避免整文件分配）。
-* `apps/desktop/electron/main/runtime/omp-runtime.ts`：`resolveRuntimeLauncher` 重排为「打包态只看校验过的资源 / 开发态看显式覆盖再看向上查找」；`LauncherResolutionInput` 增加 `platform`/`arch`（fixture 用），`ResolvedLauncher` 增加 `error`/`provenance`。
-* 打包态的候选空间是**闭集**：`OMP_DESKTOP_RUNTIME`、`PATH`、`appPath`/cwd 向上扫描都不参与（R4-9）。
-
----
-
-## 6. 要求 D/E：启动断言、隔离 canary 与清理
-
-`app/packages/omp-runtime/src/bundled-smoke.test.ts`（新，opt-in）：
-
-* 恒开：用 mock 启动器验证「版本不符」→ `version-mismatch`、`phase=failed`、能力全关；「拒绝 v2」→ `protocol-unsupported`、能力全关。
-* `OMP_SIDECAR_TEST_RESOURCES` 指向构建出的 resources 根时，3 项真实产物测试：
-  1. `verifyBundledRuntime` 通过 → 监督器真实启动 → `idle`、`runtimeVersion=18.3.0`、`protocolVersion=2`；诱饵目录（`XDG_CONFIG_HOME`/`XDG_DATA_HOME`/`OMP_PROFILE`/`PI_DESKTOP_DATA_DIR`）零写入、HOME 落在 run root 内、`configRoot` 在 HOME 内；`stop()` 的 `stopped/reaped/cleaned` 均为真、无残留 run 目录。
-  2. 异常死亡：外部 `kill -9` 整个进程组后 `stop()` 仍 `cleaned`/`reaped` 为真，无残留。
-  3. 永不 ready（`readyTimeoutMs=50`）：`start()` 以 `ready-timeout` 拒绝、`phase=failed`、无残留 run 目录。
-
-EPIPE / 忽略 EOF / 组长退出但后代存活等终止语义由既有 mock 套件覆盖（`process.test.ts` 的 `exit-immediately`/`never-ready`/`deaf`/`detached-descendant`/`ignore-eof` 等模式），本轮未新增重复断言。
-
----
-
-## 7. 要求 F：测试与 RED/变异证据
-
-### 7.1 套件与计数
-
-| 命令 | 结果 |
-| --- | --- |
-| `pnpm --filter @pi-desktop/omp-runtime test`（未设 `OMP_SIDECAR_TEST_RESOURCES`） | **exit 0：23 files / 335 passed / 3 skipped**（3 skipped = 真实产物块） |
-| `OMP_SIDECAR_TEST_RESOURCES=<app>/apps/desktop/resources npx vitest run src/bundled-smoke.test.ts` | **exit 0：5 passed**（2 恒开 + 3 真实产物） |
-| `env -u SSH_ASKPASS node --test test/*.test.mjs`（`apps/desktop`，全量） | **exit 0：tests 2919 / pass 2915 / fail 0 / skipped 4**（`duration_ms` 46619） |
-| 其中 `test/omp-runtime-launcher.test.mjs` + `test/omp-sidecar.test.mjs` | 17/17 通过（10 + 7） |
-| `pnpm -C packages/omp-runtime run build`、`pnpm -C packages/shared run build`、`pnpm -C apps/desktop typecheck` | 均 exit 0 |
-
-新增/迁移的既有测试（行为契约变化，均已同步）：
-* `packaging-footprint.test.mjs`：`extraResources` 期望值增加 `resources/omp-runtime → omp-runtime`。
-* `omp-patch.test.mjs`：fixture 清单增加必需的 `fork` 块。
-
-### 7.2 变异（RED）证据
-
-| 变异 | 命令 | 结果 |
-| --- | --- | --- |
-| 移除 `omp-sidecar.mjs` 的 remote 校验 | `node --test test/omp-sidecar.test.mjs` | **exit 1：7 项中 2 项判红**——`the wrong remote, commit, cleanliness, version, file set, or patch is refused`、`--check runs the same gate as a process, exiting non-zero on refusal` |
-| 移除 `bundled.ts` 的 SHA-256 比较 | `npx vitest run src/bundled.test.ts` | **exit 1：11 项中 1 项判红**——`refuses a binary that does not match the declared bytes or digest` |
-| 关闭 `resolveRuntimeLauncher` 的 `isPackaged` 分支 | `node --test test/omp-runtime-launcher.test.mjs` | **exit 1：10 项中 3 项判红**——`a packaged build admits only a resource that matches its provenance`、`a packaged build ignores every development channel`、`a packaged build refuses a tampered or absent provenance manifest` |
-| 移除 `omp-patch.mjs` 的 `fork` 块校验（开发过程中的自然红灯） | `node --test test/*.test.mjs` | `omp-patch.test.mjs` 报 `OMP-PATCH-FAIL manifest field fork.repository is missing`（`1 !== 0`），补 fixture 后转绿 |
-
-三次变异均已还原；`grep -rn "false &&"` 在三个改动文件中返回 NONE，还原后两套件 17/17 通过。
-
-### 7.3 平台命名与校验边界的 fixture 覆盖
-
-`bundled.test.ts` 用 `platform`/`arch` 参数覆盖：`omp.exe`（win32）命名与解析、platform/arch 不符拒绝、schema 不符、fork commit/repository 不符、base SHA 不符、文件名不符、字节数与摘要不符、畸形 JSON、`omp-runtime` 目录为符号链接。**这些是逻辑覆盖，不代表 macOS/Windows 实机打包通过。**
-
----
-
-## 8. 真实构建与启动记录（要求 B/E 的实跑）
-
-| 命令 | 结果 |
-| --- | --- |
-| `node scripts/omp-sidecar.mjs --check --source /tmp/r4b/oh-my-pi` | exit 0：`OMP-SIDECAR-OK 62bc57b+omp-desktop.2 (fork 3c845eb2…)` |
-| `node scripts/omp-sidecar.mjs --build --source /tmp/r4b/oh-my-pi` | exit 0：`OMP-SIDECAR-BUILT omp in app/apps/desktop/resources/omp-runtime`，sha256 `a0cf758652e6a89b71c8717f49902c7732696016c59e2a963c7719ec5c2c4213`，bytes `283559392` |
-| `env -i HOME=… PATH=/usr/bin:/bin ./omp --version` | `omp/18.3.0`（exit 0；本机 `/usr/bin/node`、`/usr/bin/bun` 均不存在） |
-| `ldd ./omp` | 仅 `libc`/`libpthread`/`libdl`/`ld-linux`（自包含 Bun） |
-| `OMP_SIDECAR_TEST_RESOURCES=… npx vitest run src/bundled-smoke.test.ts` | exit 0：5 passed（真实启动到达 idle、协议 v2、隔离 canary、异常/超时清理） |
-
-产物 `provenance.json`（脚本生成，未手填）：
-
-```json
-{
-  "schema": "omp-desktop.bundled-sidecar/1",
-  "fork": { "repository": "https://github.com/MisterBowie/oh-my-pi",
-            "commit": "3c845eb27f6f7b0a5b182f1868969ced86d10a3d",
-            "tree": "135ad4b6bc27f58a6220260233e9ff377b14f231" },
-  "upstreamBase": { "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531", "version": "18.3.0" },
-  "patchLevel": "62bc57b+omp-desktop.2",
-  "capabilities": ["rpc-host-tool-concurrency","rpc-host-tool-sole-batch-policy",
-                   "agent-tool-result-terminate","rpc-host-tool-result-terminate"],
-  "ompVersion": "18.3.0",
-  "desktopVersion": "0.15.2",
-  "platform": "linux", "arch": "x64",
-  "binary": { "filename": "omp", "bytes": 283559392,
-              "sha256": "a0cf758652e6a89b71c8717f49902c7732696016c59e2a963c7719ec5c2c4213" },
-  "build": { "tool": "bun", "bunVersion": "1.4.2" }
-}
+```
+26|    "bundle:runtime": "pnpm -C ../../packages/agent-runtime bundle",
+27|    "pack":      "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --dir",
+28|    "dist":      "... && pnpm run bundle:runtime && electron-vite build && electron-builder --publish never",
+29|    "dist:mac":  "... && pnpm run bundle:runtime && electron-vite build && electron-builder --mac --publish never",
+30|    "dist:win":  "... && pnpm run bundle:runtime && electron-vite build && electron-builder --win --publish never",
+31|    "dist:linux":"... && pnpm run bundle:runtime && electron-vite build && electron-builder --linux --publish never"
 ```
 
-**非逐位可复现（实测）**：同一 commit、同一检出连续两次直接 `bun scripts/build-binary.ts` 得到 sha256 `83bd4a7ca3b61c2053c53d6a9b3092f715a38f77d5c9ca94e55a33b25404e9ab` 与 `12f4aee5cd3132eea843c2b638098e909aca6fbacee0194abeba6a35874bfc7a`（`cmp` 在第 81260545 字节不同）；经构建脚本的第三次得到 `a0cf7586…`。因此清单描述**单次构建**，不声明字节可复现；`--check` 校验的是输入（确定性的），不是编译器输出。
+即：PI **每个发布命令都在 electron-builder 之前构建自己的 sidecar bundle**（`extraResources` 指向 `../../packages/agent-runtime/dist-bundle`）。因此「发布命令必须自带 sidecar 步骤」与本产品一致；差异在于 OMP 的产物是**平台相关的原生可执行文件**，不能像 JS bundle 那样一次构建到处使用，故本产品在同一个位置上做更严格的入口（宿主构建 / 跨目标验证既有产物）。这与上游同一形状、更强约束。
+
+PI 对内置资源的解析仍是「存在性 + 无 `isPackaged` 门」（`agent-sidecar.ts:18-27`、`host-process.ts:22-38`，见 ADR 0307 Context），所以“打包态只接受被校验资源”仍是本产品的新决策，未照抄。
+
+### 2.2 OMP 侧（问题 2/3 的对照）
+
+`packages/coding-agent/src/main.ts:1598-1613`：`--trusted-extension` 的值经 `realpathSync.native` + `statSync` 校验，必须是**存在的普通文件**，随后作为 `additionalExtensionPaths` 交给扩展加载器（`import()`）。因此：
+
+* 工具门必须是运行时**能 import** 的模块——这正是「复制源码」失败的机制，也是选择 bundle 的依据；
+* 加载器不做扩展名限制（`.js` 合法），故自包含 `.js` bundle 可用;
+* `disableExtensionDiscovery = true`，即 `--trusted-extension` 是精确白名单，我们的 fail-closed 与之一致。
+
+`packages/coding-agent/src/main.ts:526-529`：扩展加载失败会抛出 `Trusted extension failed to load: …` 并终止进程——实测复现了这条路径（见 §8）。
 
 ---
 
-## 9. 要求 G：文档与仓库检查
+## 3. fork 源码坐标（要求 A，未变化）
 
-| 命令（`app/`） | 结果 |
+fork 分支 `codex/omp-desktop-18.3.0-patch-2`，commit `3c845eb27f6f7b0a5b182f1868969ced86d10a3d`（tree `135ad4b6bc27f58a6220260233e9ff377b14f231`）= can1357 `v18.3.0` + 受控补丁 `62bc57b+omp-desktop.2`（10 文件）。`omp-sidecar.mjs --check` 与 `--preflight` 都会重新校验 origin/HEAD/干净/版本/文件集/补丁反向应用。本轮未改动 fork 内容。
+
+---
+
+## 4. 构建入口与 provenance（要求 B）
+
+`app/scripts/omp-sidecar.mjs`：`--check` / `--build` / **`--preflight`**。
+
+* provenance 新增 `extensions[]`（门禁文件路径 + 字节数 + SHA-256）与既有 `desktopVersion`；`ompVersion`/`upstreamBase.version` 由产物与清单取得并互相校验。
+* gate 由 `bun build <gate.ts> --target=bun --outfile <out>/extensions/omp-desktop-gate.js` 生成；构建后断言 bundle 文本中不存在 `from "./…"` / `from "../…"` 形式（自包含），否则 fail closed。
+* 构建先 `rm -rf <out>/extensions`（构建自有目录），避免旧构建残留被发布。
+* 所有校验值由脚本取得/校验，无手填。
+
+当前产物（本机 Linux x64）：
+
+```
+binary : apps/desktop/resources/omp-runtime/omp       283559392 B  sha256 076b3531dc6eea7b497bb9d5ccfe9166172cb8ca238ab7fbd78c5a3a96455666
+gate   : apps/desktop/resources/omp-runtime/extensions/omp-desktop-gate.js   sha256 bb110256984d6588108bd9e656ea3a874e0e81a8d9eb5655d2df129c2505b3f7
+```
+
+---
+
+## 5. 发布门（问题 1）
+
+`apps/desktop/package.json` 新增脚本与插入点：
+
+```
+"verify:sidecar":       "node ../../scripts/omp-sidecar.mjs --preflight"
+"verify:sidecar:mac":   "… --preflight --platform darwin"
+"verify:sidecar:win":   "… --preflight --platform win32 --arch x64"
+"verify:sidecar:linux": "… --preflight --platform linux --arch x64"
+pack/dist/dist:mac/dist:win/dist:linux:  … && pnpm run bundle:runtime && pnpm run verify:sidecar* && electron-vite build && electron-builder …
+```
+
+`--preflight` 语义（`scripts/omp-sidecar.mjs`）：
+
+1. 始终先做完整的受控检出校验（`loadManifest` + `validateForkCheckout`）；
+2. 目标是宿主 → 调 `buildSidecar()` 实际构建；
+3. 目标非宿主 → 用**运行时包自己的** `verifyBundledRuntime`（而非第二套实现），`expected` **取自本次发布的受控清单**（ompVersion/patchLevel/baseSha/forkRepository/forkCommit/desktopVersion），任一不符即拒绝；缺 `--arch` 直接报错。
+
+验证（RED/GREEN 与故障注入，均在不调用 electron-builder 的前提下）：
+
+| 用例 | 命令/注入 | 结果 |
+| --- | --- | --- |
+| 覆盖性 | `node --test test/omp-release-gate.test.mjs` | 通过：每个发布命令都含对应的 `verify:sidecar*`，且位于 `bundle:runtime` 之后、`electron-builder` 之前 |
+| GREEN | `--preflight --platform <非宿主> --arch x64 --source <fixture> --manifest <fixture> --out <staged>` | exit 0，`--json` 的 `fork.commit` = fixture HEAD |
+| 缺产物 | `--out <空目录>` | **exit 1**，`does not match the controlled manifest` |
+| 篡改 provenance | 改 staged `binary.sha256` | **exit 1** |
+| 篡改 gate | 在 staged gate 末尾追加内容 | **exit 1**（字节数/摘要不符） |
+| 外来产物 | staged 声明别的 patch level | **exit 1** |
+| 陈旧控制 | fixture 工作树改脏 | **exit 1**（`uncommitted changes`） |
+| 平台错配 | staged 用宿主平台名，目标为非宿主 | **exit 1** |
+| 缺 arch | `--platform <非宿主>`（无 `--arch`） | **exit 1**（`--arch is required`） |
+
+变异 RED：把 `dist:linux` 中的 `pnpm run verify:sidecar:linux &&` 删除后，覆盖性测试失败（见 §9）。
+
+---
+
+## 6. 打包态准入与工具门（问题 3 + 审计项）
+
+* `resolveRuntimeLauncher`（打包态）：唯一候选 `resourcesPath/omp-runtime/{omp|omp.exe}`，`verifyBundledRuntime` 通过才可用；`OMP_DESKTOP_RUNTIME`/PATH/向上扫描均不是候选。
+* `resolveGateExtension`（`engine-runtime.ts`）与 `createOmpSessionBridge.gatePath()`（`omp-session.ts`）：`isPackaged` 时**只**用 `resolveBundledGate()`（同一套 `verifyBundledRuntime`），`resourcesPath` 缺失即 `null`，缺失/符号链接/逃逸/摘要不符即 `null`，**绝不**进入开发搜索。
+* 删除已废弃的 `BUNDLED_GATE_PATH` 常量与 `omp-session.ts` 的重复路径拼接，gate 相对路径只由 `@pi-desktop/omp-runtime` 的 `BUNDLED_GATE_RELATIVE_PATH` 定义一次。
+* provenance 新增 `extensions[]`；gate 的字节数与 SHA-256 启动前校验（问题 3 的“完整性”选项，已实现而非降级为“已知限制”）。
+* `extraResources` 增加 `"filter": ["**/*", "!.gitignore"]`，打包不再复制无关 `.gitignore`；同时断言输出目录的 `.gitignore` 仍被跟踪（干净 checkout 才有构建位置）。
+
+测试证据：`apps/desktop/test/omp-runtime-launcher.test.mjs` 新增/扩展——打包态只从被校验资源解析 gate；`resourcesPath` 缺失（即使 appPath 有 dev gate、PATH 有同名文件、环境变量指向 dev gate）→ `null`；gate 被篡改 → `null`；开发态仍走上向查找。`packages/omp-runtime/src/bundled.test.ts` 覆盖 extensions 缺失/符号链接/未声明/越界/摘要不符/空数组、desktopVersion 不符，以及“信息字段变化不影响接受”的语义测试。
+
+---
+
+## 7. 诊断传播（审计项）
+
+`OmpRuntimeSupervisorOptions.launcherResolutionError`：解析失败原因在构造时即写入 `lastFailure`，并在 `startRuntime()` 失败时与候选列表一起进入 `detail`；`OmpRuntimeAdapter.launcherError` 暴露同一字符串。测试：篡改打包资源后 `createOmpRuntimeAdapter(...)` 的 `launcher === null`、`status().phase === "failed"`、`status().reason === "start-failed"`、`status().detail` 含 `bundled-runtime-invalid` 与 `SHA-256|bytes`。
+
+---
+
+## 8. 真实产物启动（问题 2，要求 D/E）
+
+`packages/omp-runtime/src/bundled-smoke.test.ts`（opt-in：`OMP_SIDECAR_TEST_RESOURCES=<repo>/app/apps/desktop/resources`）：
+
+* 参数链与生产一致：`args: ["--trusted-extension", <Resources>/omp-runtime/extensions/omp-desktop-gate.js]`（生产由 `createDesktopEngineRuntime` 传入同一 flag）。
+* 断言产物来自 bundled resources：`verified.path === <resources>/omp-runtime/<filename>`，gate 路径在 `<resources>/omp-runtime/extensions/` 下，且 shipped gate **自包含**（不含 `from "../…"`）并含 gate 自身标记。
+* 最小 PATH 自包含性：以 `PATH=<空目录>` 运行真实产物，`--version` 输出 `omp/18.3.0`（无 node/bun 可用；本机 `/usr/bin/node`、`/usr/bin/bun` 均不存在）。
+* 真实启动：`idle`、`runtimeVersion=18.3.0`、`protocolVersion=2`，随后 `get_state` 无费用 RPC `success !== false`；诱饵 `XDG_*`/`OMP_PROFILE`/`PI_DESKTOP_DATA_DIR` 零写入，HOME 落在 run root 内；`stop()` 的 `stopped/reaped/cleaned` 均为真、无残留 run 目录。
+* 异常与超时：外部 `kill -9` 进程组后 `stop()` 仍 `cleaned`/`reaped`；`readyTimeoutMs=50` 时 `start()` 以 `ready-timeout` 拒绝、无残留。
+* 篡改 gate：同长度改一字节 → 校验以 `extension … does not match the provenance manifest` 拒绝。
+
+**复现到的真实缺陷与修复（本节最重要的一条）**：
+
+```
+$ <Resources>/omp-runtime/omp --mode rpc-ui --trusted-extension <Resources>/omp-runtime/extensions/omp-desktop-gate.ts
+error: Trusted extension failed to load: Failed to load extension:
+  Cannot find module '../src/session/approval-protocol.ts?mtime=…'
+  imported from <Resources>/omp-runtime/extensions/omp-desktop-gate.ts
+（exit 1）
+```
+
+同一位置换成自包含 bundle 后，同一命令可正常进入模型发现阶段（不再报 extension 加载失败）。这正是“只复制源码”在打包态不可用的证据。
+
+---
+
+## 9. 测试与 RED 证据
+
+### 9.1 计数（本机 Linux x64，Node v24.14.0、Bun 1.4.2）
+
+| 命令 | 结果 |
 | --- | --- |
-| `node docs/scripts/check-locales.mjs` | exit 0：`Verified 79 English/Chinese specification pairs.` |
-| `node docs/scripts/check-docs.mjs` | **exit 1，6 项预存在**（`adr/0301` H1 不以 `ADR` 开头 + `adr/0301`–`0305` 缺索引行）；页数 506 → **507**（新增 ADR 0307），**新增页面零新增问题** |
-| `node scripts/check-t20-matrix-ids.mjs` | exit 0：`MATRIX-ID-OK: B1-B14, C1-C8, D1-D3 each appear exactly once` |
-| `node scripts/check-architecture.mjs` | **exit 1，预存在**：`apps/desktop/electron/main/index.ts is 1550 LOC; maximum is 1500`（本轮未改该文件） |
-| `OMP_T20_GAP_PROBE=1 node scripts/check-omp-plan-goal-gaps.mjs` | **exit 1（预期）**：`SUMMARY: 3 gap(s) open [g1, g2, g3]`；R3 未因本轮动摇 |
-| `git diff --check`（根仓库） | exit 0 |
+| `pnpm --filter @pi-desktop/omp-runtime test`（未设 opt-in 变量） | **23 files / 343 passed / 6 skipped（349）** |
+| `OMP_SIDECAR_TEST_RESOURCES=… npx vitest run src/bundled-smoke.test.ts` | **9 passed**（3 恒开 + 6 真实产物/自包含/篡改/异常/超时） |
+| `env -u SSH_ASKPASS node --test test/*.test.mjs`（`apps/desktop` 全量） | **tests 2925 / pass 2921 / fail 0 / skipped 4** |
+| 其中 `omp-sidecar` 7、`omp-release-gate` 4、`omp-runtime-launcher` 12、`packaging-footprint` 9 | 均 0 fail |
+| `pnpm -C packages/shared run build` / `pnpm -C packages/omp-runtime run build` / `pnpm -C apps/desktop typecheck` | 均 exit 0 |
+| `git diff --check` | exit 0 |
 
-文档更新：新增英文 ADR `app/docs/adr/0307-bundled-omp-sidecar.md` + `docs/adr/README.md` 索引行；spec `app/docs/spec/03-runtime/02-agent-runtime.md` §17 与中文镜像 `app/docs/zh-CN/spec/03-runtime/02-agent-runtime.md` §17；`docs/source-baseline.json` 追加日期化 fork 记录（不改历史）；`docs/04-task-board.md` T20 行与新增日期段落、T21 行注记；`HANDOFF.md` 新增 §0 摘要与状态行、下一阶段入口。中文 ADR 镜像按仓库既有惯例未新增（`docs/zh-CN/adr/` 目前仅 1 份 ADR 有镜像）。
+### 9.2 变异（RED）矩阵
 
----
+| 变异 | 期望判红 | 实测 |
+| --- | --- | --- |
+| 删除 `dist:linux` 的 `verify:sidecar:linux` | 发布覆盖性 | ✖ `every release command runs the sidecar preflight before electron-builder` |
+| `resolveGateExtension` 恢复 `isPackaged && resourcesPath` 落空即开发搜索 | 打包态 gate | ✖ `a packaged build resolves the gate only from verified resources` |
+| 关闭 extension 摘要比较 | gate 完整性 | ✖ `refuses a gate whose content changed, even when the length did not` |
+| 关闭 desktopVersion 校验 | 发布版本钉住 | ✖ `pins the desktop release the artifact was built for` |
+| 适配器不再传 `launcherResolutionError` | 诊断传播 | ✖ `a refused bundled resource keeps its reason instead of a generic missing runtime` |
 
-## 10. 限制与未做（如实记录）
-
-1. **未做真实 electron-builder 打包**：只验证了 `extraResources` 声明、构建产物落入 `resources/omp-runtime/` 与打包态解析逻辑；没有产出安装包，也没有在打包后的应用里启动 sidecar。
-2. **平台**：本机 Linux x64 实跑；macOS/Windows 仅以参数化 fixture 覆盖命名（`omp.exe`）与 platform/arch 不符的拒绝，**不声称**这两个平台的打包通过。
-3. **非逐位可复现**：见 §8；因此「重复构建清单完全一致」在本轮**不成立**，已在 ADR 0307 与本文件记录，未把它写成通过。
-4. **工具门完整性**：`omp-runtime/extensions/omp-desktop-gate.ts` 由构建复制进 Resources，但运行时仍按**存在性**解析（与 M5/T19-A 相同），未纳入 provenance 摘要校验；其完整性依赖应用包自身签名。这是已知限制，不是已实现能力。
-5. **打包含量**：sidecar 约 283 MB，未提交进 git（`.gitignore` 覆盖），也**不应**提交；发布产物与 fork commit 的对应关系由 `provenance.json` 声明并由运行时复核，而不是由发布说明保证。
-6. **未触碰的范围**：R3 未解除、Cursor 产品门未动、T20-B/C/D 未开始、未实现 Plan/Goal 运行时面、未向 can1357 推送、未合并 main、未创建 PR。
-7. **预存在失败**：`check-docs` 6 项、`check-architecture` 1 项，均为起点提交即存在，本轮不做顺带修复。
-8. **`upstream/pi-desktop` 与 `upstream/oh-my-pi` 的本地重建**：本次两个子模块工作树由本机 R4A 检出本地 `git clone` 得到（网络 clone 过慢被终止），HEAD 与该 worktree 的 gitlink 完全一致；`git submodule status` 无 `-` 前缀、`git status --porcelain` 为空。
+五处变异同时施加时各命中且仅命中上述用例（`16 项中 3 失败` + `18 项中 2 失败`），全部还原后 `grep -rn "false &&"` 无残留，两处套件复绿（18/18、32/32）。
 
 ---
 
-## 11. 复核入口
+## 10. R4-3 状态：**未满足（阻塞）**
 
-* 构建：`node app/scripts/omp-sidecar.mjs --check --source <fork checkout>` / `--build`。
-* 真实产物启动：`OMP_SIDECAR_TEST_RESOURCES=<repo>/app/apps/desktop/resources pnpm --filter @pi-desktop/omp-runtime exec vitest run src/bundled-smoke.test.ts`。
-* 桌面全量：`cd app/apps/desktop && env -u SSH_ASKPASS node --test test/*.test.mjs`。
-* fork 坐标：`git ls-remote https://github.com/MisterBowie/oh-my-pi refs/heads/codex/omp-desktop-18.3.0-patch-2`。
-* 相关文档：`app/docs/adr/0307-bundled-omp-sidecar.md`、`app/docs/spec/03-runtime/02-agent-runtime.md` §17、`app/patches/oh-my-pi/manifest.json`、`docs/validation/M5-omp-18-3-fork-audit.md` §10（R4 验收矩阵）。
+R4-3 原文要求「构建脚本输出可核验清单…**重复构建在相同输入下产出相同清单**」。本轮实测：
+
+* 同一 fork commit、同一检出、同一 Bun 1.4.2，独立构建的二进制 SHA-256 依次为 `83bd4a7c…`、`12f4aee5…`、`a0cf7586…`、`8360d6a3…`、`021408a8…`、`076b3531…`（同一提交出现了多个不同值；`cmp` 曾观察到首处差异位于第 81260545 字节）。
+* 清单因此只描述**单次构建**；`--check`/`--preflight` 仍然确定性（校验输入与暂存产物，而非编译器输出）。
+* 唯一可复现的构件是 gate bundle：两次 `bun build` 输出逐位一致（`48001135…`）。
+
+结论：R4-3 的“构建时校验 remote/commit/list”部分已满足；“相同输入产出相同清单”部分**未满足**，作为 M6/T21 的未决阻塞项记录（ADR 0307 Consequences、spec §17、任务板同口径），未写成通过。
+
+---
+
+## 11. 限制与未做
+
+1. **未跑 electron-builder 真实打包**：只验证发布脚本覆盖性、预检行为与 `extraResources` 契约；没有产出安装包，也没有在打包后的应用里启动 sidecar。
+2. **平台**：Linux x64 实跑；macOS/Windows 仅以参数化 fixture 覆盖 `omp.exe` 命名、平台/架构不符、跨目标禁止复用宿主二进制等逻辑，**不声称**这两个平台打包通过。
+3. **R4-3 可复现性未满足**（§10）。
+4. **gate bundle 的确定性**只在同一 Bun 版本、同一源文件下验证过；升级 Bun 后需重新确认。
+5. **未触碰**：R3 未解除、Cursor 产品门未动、T20-B/C/D 未开始、未向 can1357 推送、未合并 main、未建 PR。
+6. **预存在失败**：`check-docs` 6 项、`check-architecture` 1 项（见 §12），本轮不做顺带修复。
+7. 子模块工作树由本机 R4A 检出本地重建（网络 clone 过慢），HEAD 与 gitlink 一致。
+
+---
+
+## 12. 命令、退出码与检查
+
+| 命令 | 结果 |
+| --- | --- |
+| `node scripts/omp-sidecar.mjs --check --source /tmp/r4b/oh-my-pi` | exit 0 |
+| `node scripts/omp-sidecar.mjs --preflight --source /tmp/r4b/oh-my-pi` | exit 0：`built linux/x64` |
+| `env -i PATH=<空目录> <resources>/omp-runtime/omp --version` | `omp/18.3.0`，exit 0 |
+| `node docs/scripts/check-locales.mjs` | exit 0（79 对；§17 中英镜像同结构） |
+| `node docs/scripts/check-docs.mjs` | **exit 1，6 项预存在**（`adr/0301` H1 + `adr/0301–0305` 缺索引行），无新增 |
+| `node scripts/check-t20-matrix-ids.mjs` | exit 0 |
+| `node scripts/check-architecture.mjs` | **exit 1，预存在**（`electron/main/index.ts` 1550 > 1500 LOC） |
+| `OMP_T20_GAP_PROBE=1 node scripts/check-omp-plan-goal-gaps.mjs` | **exit 1（预期）**：`SUMMARY: 3 gap(s) open [g1, g2, g3]`（R3 未动摇） |
+| `git status --short` | 仅本轮应有改动；`resources/omp-runtime/{omp,provenance.json,extensions/}` 被 gitignore（`git add -An` 只加 `.gitignore`） |
+
+复核入口：`node app/scripts/omp-sidecar.mjs --preflight`；`OMP_SIDECAR_TEST_RESOURCES=<repo>/app/apps/desktop/resources pnpm --filter @pi-desktop/omp-runtime exec vitest run src/bundled-smoke.test.ts`；`cd app/apps/desktop && env -u SSH_ASKPASS node --test test/*.test.mjs`；文档见 `app/docs/adr/0307-bundled-omp-sidecar.md`、`app/docs/spec/03-runtime/02-agent-runtime.md` §17、`app/patches/oh-my-pi/manifest.json`。

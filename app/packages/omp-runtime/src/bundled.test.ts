@@ -6,16 +6,18 @@
  * not match this build's pins — or does not match the bytes on disk — must stop
  * the engine rather than run something else (ADR 0307).
  */
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, sep } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
   BUNDLED_EXPECTATION,
+  BUNDLED_GATE_RELATIVE_PATH,
   BUNDLED_PROVENANCE_SCHEMA,
   bundledBinaryFilename,
   normalizeRepositoryUrl,
+  resolveBundledGate,
   sha256File,
   verifyBundledRuntime,
   type BundledExpectation,
@@ -39,10 +41,11 @@ function writeFixture(options: {
   platform?: NodeJS.Platform | string;
   arch?: string;
   binary?: string;
+  gate?: string | null;
   omitManifest?: boolean;
   patch?: (provenance: BundledSidecarProvenance) => unknown;
   executable?: boolean;
-}): { resourcesPath: string; provenance: BundledSidecarProvenance } {
+}): { resourcesPath: string; provenance: BundledSidecarProvenance; gatePath: string } {
   const platform = options.platform ?? "linux";
   const arch = options.arch ?? "x64";
   const resourcesPath = scratch();
@@ -53,6 +56,14 @@ function writeFixture(options: {
   const binary = options.binary ?? "#!/bin/sh\necho omp/18.3.0\n";
   writeFileSync(binaryPath, binary, "utf8");
   if (options.executable !== false) chmodSync(binaryPath, 0o755);
+
+  const gateRelative = BUNDLED_GATE_RELATIVE_PATH.split(sep).join("/");
+  const gatePath = join(dir, ...gateRelative.split("/"));
+  const gate = options.gate === undefined ? "// fixture gate\nexport const gate = true;\n" : options.gate;
+  if (gate !== null) {
+    mkdirSync(dirname(gatePath), { recursive: true });
+    writeFileSync(gatePath, gate, "utf8");
+  }
 
   const provenance: BundledSidecarProvenance = {
     schema: BUNDLED_PROVENANCE_SCHEMA,
@@ -65,7 +76,7 @@ function writeFixture(options: {
     patchLevel: BUNDLED_EXPECTATION.patchLevel,
     capabilities: ["rpc-host-tool-concurrency"],
     ompVersion: BUNDLED_EXPECTATION.ompVersion,
-    desktopVersion: "0.15.2",
+    desktopVersion: BUNDLED_EXPECTATION.desktopVersion,
     platform: String(platform),
     arch,
     binary: {
@@ -73,13 +84,22 @@ function writeFixture(options: {
       bytes: Buffer.byteLength(binary),
       sha256: sha256File(binaryPath),
     },
+    extensions: [
+      {
+        path: gateRelative,
+        // A missing gate still declares a plausible entry, so the refusal under
+        // test is the missing file and not a schema violation.
+        bytes: gate === null ? 1 : Buffer.byteLength(gate),
+        sha256: gate === null ? "0".repeat(64) : sha256File(gatePath),
+      },
+    ],
     build: { tool: "bun", bunVersion: "1.4.2" },
   };
   if (!options.omitManifest) {
     const value = options.patch ? options.patch(structuredClone(provenance)) : provenance;
     writeFileSync(join(dir, "provenance.json"), JSON.stringify(value, null, 2), "utf8");
   }
-  return { resourcesPath, provenance };
+  return { resourcesPath, provenance, gatePath };
 }
 
 function verify(resourcesPath: string, expected: Partial<BundledExpectation> = {}, platform = "linux", arch = "x64") {
@@ -122,10 +142,18 @@ describe("bundled naming and remote normalization", () => {
 
 describe("bundled runtime verification", () => {
   it("accepts a resource tree that matches the manifest", () => {
-    const { resourcesPath, provenance } = writeFixture({});
+    const { resourcesPath, provenance, gatePath } = writeFixture({});
     const verified = verify(resourcesPath);
     expect(verified.path).toBe(join(resourcesPath, "omp-runtime", "omp"));
     expect(verified.provenance).toEqual(provenance);
+    expect(verified.extensions).toEqual([
+      {
+        path: BUNDLED_GATE_RELATIVE_PATH.split(sep).join("/"),
+        absolutePath: gatePath,
+        bytes: provenance.extensions[0].bytes,
+        sha256: sha256File(gatePath),
+      },
+    ]);
   });
 
   it("keeps the default pins the desktop ships", () => {
@@ -224,5 +252,73 @@ describe("bundled runtime verification", () => {
     mkdirSync(join(outside, "omp-runtime"), { recursive: true });
     symlinkSync(join(outside, "omp-runtime"), join(root, "omp-runtime"));
     expect(refusal(root)).toMatch(/must not be a symlink/);
+  });
+});
+
+describe("tool gate and pin verification", () => {
+  it("returns the verified gate through the shared resolver", () => {
+    const { resourcesPath, gatePath } = writeFixture({});
+    expect(resolveBundledGate({ resourcesPath })?.path).toBe(gatePath);
+  });
+
+  it("returns null from the gate resolver when the resource does not verify", () => {
+    const { resourcesPath } = writeFixture({
+      patch: (p) => ({ ...p, binary: { ...p.binary, sha256: "a".repeat(64) } }),
+    });
+    expect(resolveBundledGate({ resourcesPath })).toBeNull();
+  });
+
+  it("refuses a gate whose content changed, even when the length did not", () => {
+    const { resourcesPath, gatePath } = writeFixture({});
+    const swapped = Buffer.from(readFileSync(gatePath));
+    swapped[0] = swapped[0] ^ 0xff;
+    writeFileSync(gatePath, swapped);
+    expect(refusal(resourcesPath)).toMatch(/extension .* does not match the provenance manifest/);
+  });
+
+  it("refuses a missing, symlinked, undeclared or escaping gate", () => {
+    expect(refusal(writeFixture({ gate: null }).resourcesPath)).toMatch(/missing extension/);
+
+    const linked = writeFixture({});
+    const outside = join(scratch(), "gate.ts");
+    writeFileSync(outside, "// outside\n");
+    rmSync(linked.gatePath);
+    symlinkSync(outside, linked.gatePath);
+    expect(refusal(linked.resourcesPath)).toMatch(/must not be a symlink/);
+
+    const escaping = writeFixture({
+      patch: (p) => ({ ...p, extensions: [{ ...p.extensions[0], path: "../outside.ts" }] }),
+    });
+    expect(refusal(escaping.resourcesPath)).toMatch(/not inside the runtime directory/);
+
+    const undeclared = writeFixture({
+      patch: (p) => ({ ...p, extensions: [{ ...p.extensions[0], path: "extensions/other.ts" }] }),
+    });
+    expect(refusal(undeclared.resourcesPath)).toMatch(/missing extension|does not declare/);
+  });
+
+  it("refuses a manifest that declares no extensions at all", () => {
+    const { resourcesPath } = writeFixture({ patch: (p) => ({ ...p, extensions: [] }) });
+    expect(refusal(resourcesPath)).toMatch(/does not match/);
+  });
+
+  it("pins the desktop release the artifact was built for", () => {
+    const { resourcesPath } = writeFixture({ patch: (p) => ({ ...p, desktopVersion: "0.0.1" }) });
+    expect(refusal(resourcesPath)).toMatch(/desktop version is 0\.0\.1/);
+  });
+
+  it("does not claim to verify the informational provenance fields", () => {
+    // fork.tree, capabilities and build.* cannot be re-derived by a packaged
+    // application; they are audit records, so changing them must not change
+    // acceptance. This test is the executable form of that ADR statement.
+    const { resourcesPath } = writeFixture({
+      patch: (p) => ({
+        ...p,
+        fork: { ...p.fork, tree: "0".repeat(40) },
+        capabilities: ["something-else"],
+        build: { tool: "other", bunVersion: "0.0.0" },
+      }),
+    });
+    expect(() => verify(resourcesPath)).not.toThrow();
   });
 });

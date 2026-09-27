@@ -23,14 +23,21 @@
  * checkout rather than a desktop-side reimplementation.
  *
  * Modes:
- *   --check   Validate the manifest and the fork checkout; build nothing.
- *   --build   Validate, compile, copy the artifact and the tool gate into the
- *             output directory, probe the artifact's version, and write
- *             `provenance.json` next to it.
+ *   --check      Validate the manifest and the fork checkout; build nothing.
+ *   --build      Validate, compile, copy the artifact and the tool gate into the
+ *                output directory, probe the artifact's version, and write
+ *                `provenance.json` next to it.
+ *   --preflight  The release gate every packaging command runs. Validates the
+ *                controlled checkout, then makes the artifact for the release
+ *                target current: it builds when the target is this host, and
+ *                otherwise requires an artifact staged for exactly that
+ *                platform/architecture to pass the packaged application's own
+ *                verification. A non-host target never reuses the host binary.
  *
  * Usage:
  *   node scripts/omp-sidecar.mjs --check [--source <dir>] [--json]
  *   node scripts/omp-sidecar.mjs --build [--source <dir>] [--out <dir>] [--json]
+ *   node scripts/omp-sidecar.mjs --preflight [--platform <p>] [--arch <a>] [--source <dir>] [--json]
  *
  * Never writes a credential, and never contacts a model. The output directory
  * is not committed (see `apps/desktop/resources/omp-runtime/.gitignore`).
@@ -54,8 +61,8 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   PatchError,
@@ -75,7 +82,7 @@ const gateSource = join(appRoot, "packages", "omp-runtime", "extensions", "omp-d
 export const PROVENANCE_SCHEMA = "omp-desktop.bundled-sidecar/1";
 
 /** The tool gate's path inside the output directory (mirrors the app's resolver). */
-const GATE_RELATIVE_PATH = join("extensions", "omp-desktop-gate.ts");
+const GATE_RELATIVE_PATH = join("extensions", "omp-desktop-gate.js");
 
 const HASH_CHUNK_BYTES = 1024 * 1024;
 
@@ -268,9 +275,33 @@ export async function buildSidecar(options = {}) {
     cpSync(produced, binaryPath, { force: true, dereference: false });
     chmodSync(binaryPath, 0o755);
     if (!existsSync(gateSource)) throw new PatchError(`the tool gate is missing: ${gateSource}`);
+    // The runtime imports the gate as a module. A plain copy of the source would
+    // still import `../src/...`, which does not exist beside the sidecar in
+    // Resources, and the runtime refuses to start with a gate it cannot load —
+    // measured: "Trusted extension failed to load: Cannot find module
+    // '../src/session/approval-protocol.ts'". So the gate is bundled into one
+    // self-contained file, and the bundle is proven to have no relative imports
+    // left before it is recorded.
     const gatePath = join(out, GATE_RELATIVE_PATH);
+    // The extensions directory is entirely build-owned: clear it first so a
+    // stale file from an earlier build (for example the pre-bundle `.ts` copy)
+    // can never be shipped beside the runtime.
+    rmSync(join(out, "extensions"), { recursive: true, force: true });
     mkdirSync(dirname(gatePath), { recursive: true });
-    cpSync(gateSource, gatePath, { force: true, dereference: false });
+    const gateBuild = await runReaped(
+      bunBinary(),
+      ["build", gateSource, "--target=bun", "--outfile", gatePath],
+      { cwd: runRoot, env, timeoutMs: 300_000 },
+    );
+    if (gateBuild.status !== 0) {
+      const tail = `${gateBuild.stdout}\n${gateBuild.stderr}`.trim().split("\n").slice(-4).join(" | ");
+      throw new PatchError(
+        `the tool gate bundle failed (exit ${gateBuild.status}${gateBuild.timedOut ? ", timed out" : ""}): ${tail}`,
+      );
+    }
+    if (/(?:from|import)\s*\(?\s*["'][.]{1,2}\//.test(readFileSync(gatePath, "utf8"))) {
+      throw new PatchError("the bundled tool gate still contains relative imports; it must be self-contained");
+    }
 
     const probe = await runReaped(binaryPath, ["--version"], {
       cwd: runRoot,
@@ -306,6 +337,16 @@ export async function buildSidecar(options = {}) {
         bytes: statSync(binaryPath).size,
         sha256: sha256OfFile(binaryPath),
       },
+      // The gate is loaded from Resources by `--trusted-extension`, so it is
+      // part of the artifact: recording its digest is what lets the packaged
+      // application refuse a swapped gate instead of trusting its presence.
+      extensions: [
+        {
+          path: GATE_RELATIVE_PATH.split(/[\\/]/).join("/"),
+          bytes: statSync(gatePath).size,
+          sha256: sha256OfFile(gatePath),
+        },
+      ],
       build: {
         tool: "bun",
         ...(bunVersion ? { bunVersion } : {}),
@@ -319,24 +360,111 @@ export async function buildSidecar(options = {}) {
   }
 }
 
+/**
+ * Load the built runtime verifier.
+ *
+ * The preflight must apply exactly the checks a packaged application applies,
+ * so it uses the runtime package's own compiled verifier instead of a second
+ * implementation. `build:deps` (the first step of every release command) builds
+ * it; a missing build is a hard failure rather than a skipped check.
+ */
+async function loadRuntimeVerifier() {
+  const dist = join(appRoot, "packages", "omp-runtime", "dist", "bundled.js");
+  if (!existsSync(dist)) {
+    throw new PatchError(`the runtime verifier is not built (${dist}); run \`pnpm run build:deps\` first`);
+  }
+  return import(pathToFileURL(dist).href);
+}
+
+/**
+ * Prove the staged artifact for one release target.
+ *
+ * Cross-target releases cannot compile here — the sidecar is a native
+ * executable — so a non-host target may only proceed with an artifact that was
+ * staged for exactly that target and that verifies against *the controlled
+ * manifest being released*, not against a compiled-in constant: the artifact's
+ * platform, architecture, digests, patch level, fork commit, base and desktop
+ * version must all agree with the checkout in hand.
+ */
+async function verifyStagedArtifact(outDir, platform, arch, manifest) {
+  if (basename(outDir) !== "omp-runtime") {
+    throw new PatchError(`the runtime directory must be named omp-runtime, got ${outDir}`);
+  }
+  const { verifyBundledRuntime } = await loadRuntimeVerifier();
+  try {
+    return verifyBundledRuntime({
+      resourcesPath: dirname(outDir),
+      platform,
+      arch,
+      expected: {
+        ompVersion: manifest.base.version,
+        patchLevel: manifest.patchLevel,
+        baseSha: manifest.base.sha,
+        forkRepository: manifest.fork.repository,
+        forkCommit: manifest.fork.commit,
+        desktopVersion: desktopVersion(),
+      },
+    });
+  } catch (error) {
+    const detail = typeof error?.detail === "string" ? ` (${error.detail})` : "";
+    throw new PatchError(
+      `the staged bundled runtime for ${platform}/${arch} does not match the controlled manifest: ${error?.message ?? error}${detail}`,
+    );
+  }
+}
+
+/**
+ * The release gate: validate the controlled checkout, then make the artifact
+ * for the release target current.
+ *
+ * Host target: build it here (so a stale or missing artifact can never be
+ * packaged). Non-host target: refuse unless an artifact staged for exactly that
+ * platform and architecture verifies — never reuse the host binary for another
+ * platform, and never fall back to "whatever is in Resources".
+ */
+export async function runPreflight(options = {}) {
+  const { manifest, patchPath } = loadManifest(options.manifestPath ?? defaultManifest);
+  const sourceDir = options.source ?? process.env.OMP_SIDECAR_SOURCE ?? join(repoRoot, "..", "oh-my-pi");
+  const info = validateForkCheckout(sourceDir, manifest, patchPath);
+
+  const platform = options.platform ?? process.platform;
+  const arch = options.arch ?? (platform === process.platform ? process.arch : null);
+  if (arch === null) {
+    throw new PatchError(
+      `--arch is required for a ${platform} release from a ${process.platform} host: a cross-target package needs an artifact staged for that target`,
+    );
+  }
+  const outDir = resolveOutDir(options.out ?? defaultOut, info.source);
+
+  if (platform === process.platform && arch === process.arch) {
+    const built = await buildSidecar({ ...options, source: sourceDir, out: outDir });
+    return { action: "built", platform, arch, out: outDir, provenance: built.provenance };
+  }
+  const verified = await verifyStagedArtifact(outDir, platform, arch, manifest);
+  return { action: "verified", platform, arch, out: outDir, provenance: verified.provenance };
+}
+
 function parseArgs(argv) {
   const options = { mode: null, json: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--check") options.mode = "check";
     else if (arg === "--build") options.mode = "build";
+    else if (arg === "--preflight") options.mode = "preflight";
     else if (arg === "--json") options.json = true;
     else if (arg === "--help" || arg === "-h") options.mode = "help";
-    else if (arg === "--source" || arg === "--out" || arg === "--manifest") {
+    else if (arg === "--source" || arg === "--out" || arg === "--manifest" || arg === "--platform" || arg === "--arch") {
       const value = argv[index + 1];
       if (value === undefined || value.startsWith("-")) throw new PatchError(`${arg} requires a value`);
       index += 1;
       if (arg === "--source") options.source = value;
       else if (arg === "--out") options.out = value;
-      else options.manifestPath = value;
+      else if (arg === "--manifest") options.manifestPath = value;
+      else if (arg === "--platform") options.platform = value;
+      else options.arch = value;
     } else throw new PatchError(`unknown argument: ${arg}`);
   }
-  if (!options.mode) throw new PatchError("expected --check or --build");
+  if (!options.mode) throw new PatchError("expected --check, --build or --preflight");
   return options;
 }
 
@@ -371,6 +499,19 @@ async function main(argv) {
       console.log(
         options.json ? JSON.stringify(report) : `OMP-SIDECAR-OK ${manifest.patchLevel} (fork ${report.forkCommit})`,
       );
+      return 0;
+    }
+    if (options.mode === "preflight") {
+      const result = await runPreflight(options);
+      if (options.json) {
+        console.log(JSON.stringify(result.provenance));
+      } else {
+        console.log(
+          `OMP-SIDECAR-PREFLIGHT ${result.action} ${result.platform}/${result.arch} in ${relative(repoRoot, result.out)}`,
+        );
+        console.log(`  fork commit: ${result.provenance.fork.commit}`);
+        console.log(`  sha256     : ${result.provenance.binary.sha256}`);
+      }
       return 0;
     }
     const result = await buildSidecar(options);

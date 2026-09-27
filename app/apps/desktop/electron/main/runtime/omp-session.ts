@@ -41,7 +41,6 @@ import {
   type ToolPermissionRequest,
   type UiMessage,
 } from "@pi-desktop/shared";
-import { BUNDLED_GATE_PATH } from "./omp-runtime";
 import {
   DESKTOP_STATE_FILE,
   OmpSessionRunner,
@@ -49,6 +48,7 @@ import {
   descriptorRisk,
   findGateExtension,
   readDesktopCapabilityState,
+  resolveBundledGate,
   serializeDesktopCapabilityState,
   writeDesktopCapabilityState,
   type OmpConversionDiagnostics,
@@ -1471,11 +1471,18 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
    */
   let shuttingDown = false;
 
+  /**
+   * The gate this session will load, or null when this build has none.
+   *
+   * A packaged build admits only the verified Resources copy — the same
+   * verification the sidecar went through — and does not search the app path or
+   * the environment when that fails (ADR 0307). A development checkout keeps
+   * the walk-up.
+   */
   function gatePath(): string | null {
-    if (options.isPackaged && options.resourcesPath) {
-      const bundled = join(options.resourcesPath, BUNDLED_GATE_PATH);
-      if (existsSync(bundled)) return bundled;
-      return null;
+    if (options.isPackaged) {
+      if (!options.resourcesPath) return null;
+      return resolveBundledGate({ resourcesPath: options.resourcesPath })?.path ?? null;
     }
     if (!options.launcher) return null;
     return resolveGate(options.appPath);

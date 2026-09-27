@@ -8,6 +8,7 @@ import { register } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
+  APP_VERSION,
   LEGACY_PI_DESKTOP_IDENTITY,
   OMP_RUNTIME_BASE_SHA,
   OMP_RUNTIME_FORK_COMMIT,
@@ -20,9 +21,9 @@ import {
 
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
-const { PINNED_LAUNCHER_PATH, findPinnedLauncher, resolveRuntimeLauncher } = await import(
-  "../electron/main/runtime/omp-runtime.ts"
-);
+const { PINNED_LAUNCHER_PATH, createOmpRuntimeAdapter, findPinnedLauncher, resolveRuntimeLauncher } =
+  await import("../electron/main/runtime/omp-runtime.ts");
+const { resolveGateExtension } = await import("../electron/main/runtime/engine-runtime.ts");
 
 function scratch(label) {
   return mkdtempSync(join(tmpdir(), `omp-launcher-${label}-`));
@@ -37,36 +38,45 @@ function writeExecutable(root, relative, body) {
 }
 
 /**
- * A packaged resource tree that passes verification: a stand-in executable plus
- * the provenance manifest a real build would write for it.
+ * A packaged resource tree that passes verification: a stand-in executable, the
+ * tool gate beside it, and the provenance manifest a real build would write.
  */
-function writeBundledRuntime(resourcesPath) {
+function writeBundledRuntime(resourcesPath, options = {}) {
   const dir = join(resourcesPath, "omp-runtime");
-  mkdirSync(dir, { recursive: true });
+  mkdirSync(join(dir, "extensions"), { recursive: true });
   const binary = writeExecutable(dir, "omp", "#!/bin/sh\necho omp/18.3.0\n");
-  const bytes = readFileSync(binary);
-  const manifest = join(dir, "provenance.json");
-  writeFileSync(
-    manifest,
-    JSON.stringify({
-      schema: "omp-desktop.bundled-sidecar/1",
-      fork: { repository: OMP_RUNTIME_FORK_REPOSITORY, commit: OMP_RUNTIME_FORK_COMMIT },
-      upstreamBase: { sha: OMP_RUNTIME_BASE_SHA, version: OMP_RUNTIME_VERSION },
-      patchLevel: OMP_RUNTIME_PATCH_LEVEL,
-      capabilities: ["rpc-host-tool-concurrency"],
-      ompVersion: OMP_RUNTIME_VERSION,
-      desktopVersion: "0.15.2",
-      platform: process.platform,
-      arch: process.arch,
-      binary: {
-        filename: "omp",
-        bytes: bytes.length,
-        sha256: createHash("sha256").update(bytes).digest("hex"),
+  const gate = join(dir, "extensions", "omp-desktop-gate.js");
+  writeFileSync(gate, "// fixture gate\nexport const gate = true;\n");
+  const digest = (path) => createHash("sha256").update(readFileSync(path)).digest("hex");
+  const manifest = {
+    schema: "omp-desktop.bundled-sidecar/1",
+    fork: { repository: OMP_RUNTIME_FORK_REPOSITORY, commit: OMP_RUNTIME_FORK_COMMIT },
+    upstreamBase: { sha: OMP_RUNTIME_BASE_SHA, version: OMP_RUNTIME_VERSION },
+    patchLevel: OMP_RUNTIME_PATCH_LEVEL,
+    capabilities: ["rpc-host-tool-concurrency"],
+    ompVersion: OMP_RUNTIME_VERSION,
+    desktopVersion: APP_VERSION,
+    platform: process.platform,
+    arch: process.arch,
+    binary: {
+      filename: "omp",
+      bytes: readFileSync(binary).length,
+      sha256: digest(binary),
+    },
+    extensions: [
+      {
+        path: "extensions/omp-desktop-gate.js",
+        bytes: readFileSync(gate).length,
+        sha256: digest(gate),
       },
-      build: { tool: "bun" },
-    }),
-  );
-  return { dir, binary, manifest };
+    ],
+    build: { tool: "bun" },
+  };
+  options.mutateManifest?.(manifest);
+  const manifestPath = join(dir, "provenance.json");
+  writeFileSync(manifestPath, JSON.stringify(manifest));
+  if (options.tamperGate) writeFileSync(gate, options.tamperGate);
+  return { dir, binary, gate, manifestPath };
 }
 
 test("an explicit runtime path wins and is the only candidate considered", () => {
@@ -166,25 +176,33 @@ test("a packaged build ignores every development channel", () => {
 
 test("a packaged build refuses a tampered or absent provenance manifest", () => {
   const cases = {
-    "missing manifest": (layout) => rmSync(layout.manifest),
+    "missing manifest": (layout) => rmSync(layout.manifestPath),
     "tampered hash": (layout) => {
-      const value = JSON.parse(readFileSync(layout.manifest, "utf8"));
+      const value = JSON.parse(readFileSync(layout.manifestPath, "utf8"));
       value.binary.sha256 = "b".repeat(64);
-      writeFileSync(layout.manifest, JSON.stringify(value));
+      writeFileSync(layout.manifestPath, JSON.stringify(value));
     },
     "wrong patch level": (layout) => {
-      const value = JSON.parse(readFileSync(layout.manifest, "utf8"));
+      const value = JSON.parse(readFileSync(layout.manifestPath, "utf8"));
       value.patchLevel = "d49918f+omp-desktop.1";
-      writeFileSync(layout.manifest, JSON.stringify(value));
+      writeFileSync(layout.manifestPath, JSON.stringify(value));
     },
     "wrong fork commit": (layout) => {
-      const value = JSON.parse(readFileSync(layout.manifest, "utf8"));
+      const value = JSON.parse(readFileSync(layout.manifestPath, "utf8"));
       value.fork.commit = "f".repeat(40);
-      writeFileSync(layout.manifest, JSON.stringify(value));
+      writeFileSync(layout.manifestPath, JSON.stringify(value));
+    },
+    "wrong desktop version": (layout) => {
+      const value = JSON.parse(readFileSync(layout.manifestPath, "utf8"));
+      value.desktopVersion = "0.0.1";
+      writeFileSync(layout.manifestPath, JSON.stringify(value));
     },
     "tampered binary": (layout) => {
       writeFileSync(layout.binary, "#!/bin/sh\nexit 1\n");
       chmodSync(layout.binary, 0o755);
+    },
+    "tampered gate": (layout) => {
+      writeFileSync(layout.gate, "// swapped gate\n");
     },
   };
   for (const [label, tamper] of Object.entries(cases)) {
@@ -265,4 +283,76 @@ test("development builds disable automatic updates and the feed is this product'
   assert.match(source, /PRODUCT_IDENTITY\.updateSource/);
   assert.doesNotMatch(source, /vastsa\/PI-Desktop/);
   assert.equal(PRODUCT_IDENTITY.updateSource?.owner, "MisterBowie");
+});
+
+test("a refused bundled resource keeps its reason instead of a generic missing runtime", () => {
+  const root = scratch("diagnosable");
+  try {
+    const layout = writeBundledRuntime(root);
+    writeFileSync(layout.binary, "#!/bin/sh\nexit 1\n");
+    chmodSync(layout.binary, 0o755);
+    const adapter = createOmpRuntimeAdapter({
+      dataRoot: join(root, "data"),
+      isPackaged: true,
+      resourcesPath: root,
+      appPath: root,
+      env: {},
+    });
+    assert.equal(adapter.launcher, null);
+    assert.match(String(adapter.launcherError), /bundled-runtime-invalid/);
+    const status = adapter.status();
+    assert.equal(status.phase, "failed");
+    assert.equal(status.reason, "start-failed");
+    // The operator must see which file disagreed and how, not just "no runtime".
+    assert.match(String(status.detail), /bundled-runtime-invalid/);
+    assert.match(String(status.detail), /SHA-256|bytes/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a packaged build resolves the gate only from verified resources", () => {
+  const root = scratch("gate-packaged");
+  const decoyRoot = scratch("gate-decoy");
+  const pathDecoy = scratch("gate-path");
+  try {
+    // Everything a packaged build must ignore: a development gate reachable by
+    // walking up from the app path, and a same-named file on PATH.
+    const devGate = writeExecutable(
+      decoyRoot,
+      join("app", "packages", "omp-runtime", "extensions", "omp-desktop-gate.ts"),
+      "// dev gate\n",
+    );
+    writeExecutable(pathDecoy, "omp-desktop-gate.ts", "// path gate\n");
+
+    const layout = writeBundledRuntime(root);
+    assert.equal(resolveGateExtension({ isPackaged: true, resourcesPath: root, appPath: decoyRoot }), layout.gate);
+
+    // No resources path: a refusal, never the development search.
+    const previousPath = process.env.PATH;
+    process.env.PATH = `${pathDecoy}:${previousPath ?? ""}`;
+    process.env.OMP_DESKTOP_RUNTIME = devGate;
+    try {
+      assert.equal(resolveGateExtension({ isPackaged: true, resourcesPath: null, appPath: decoyRoot }), null);
+      assert.equal(
+        resolveGateExtension({ isPackaged: true, resourcesPath: join(root, "missing"), appPath: decoyRoot }),
+        null,
+      );
+    } finally {
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+      delete process.env.OMP_DESKTOP_RUNTIME;
+    }
+
+    // A tampered gate is refused even though the development gate exists.
+    writeFileSync(layout.gate, "// swapped gate\n");
+    assert.equal(resolveGateExtension({ isPackaged: true, resourcesPath: root, appPath: decoyRoot }), null);
+
+    // Development keeps the walk-up behaviour it always had.
+    assert.equal(resolveGateExtension({ isPackaged: false, appPath: decoyRoot }), devGate);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(decoyRoot, { recursive: true, force: true });
+    rmSync(pathDecoy, { recursive: true, force: true });
+  }
 });
