@@ -1,12 +1,40 @@
 # M5/T20-R4B：自有 OMP fork + bundled sidecar 的可验证闭环（含复审返修）
 
-更新时间：2026-09-27（第二轮独立复审返修）。桌面分支 `codex/m5-r4b-bundled-sidecar`；首个 R4B 提交 `b25eb60c077deb5b200cf5f5bf6e8a3cddbbf679`，返修提交追加在其上（不 amend、不强推）；第二轮复审返修见 §0.1，追加提交 `53d19ee`、`f9d133e`、`7b3b3de`、`f428940`（+ 本轮文档提交）。
+更新时间：2026-09-27（第三轮独立复审返修）。桌面分支 `codex/m5-r4b-bundled-sidecar`；首个 R4B 提交 `b25eb60c077deb5b200cf5f5bf6e8a3cddbbf679`，返修提交追加在其上（不 amend、不强推）；第二轮复审返修见 §0.1，追加提交 `53d19ee`、`f9d133e`、`7b3b3de`、`f428940`（+ 文档提交 `9bd7e50`）；第三轮独立复审返修见 §0.2（本轮提交随本文件一并追加，不 amend）。
 
-状态：**R4B 部分完成 / 受阻（第一轮复审返修 + 第二轮独立复审返修）。** 第二轮独立复审的 5 项阻塞问题已按「先复现（RED）→ 修复 → 重跑（GREEN）」处理：①规范资源根比较（别名祖先不再误报逃逸）；②发布目标（平台/架构）只解析一次，预检与 electron-builder 使用同一目标；③打包态诊断（`bundled-runtime-invalid` + 具体细节）经生产桥接进入 prompt 与控制操作错误；④测试夹具默认跟随宿主目标；⑤扩展清单边界收紧并升级到 `/2` schema。**但 R4-3 的“可复现”条款仍未满足（见 §10），因此 R4B 不标记为完成。**
+状态：**R4B 部分完成 / 受阻（第一轮复审返修 + 第二轮独立复审返修 + 第三轮独立复审返修）。** 第三轮复审的 6 项问题（F1 发布参数透传、F2 packaging lane 的受控 fork 来源、F3 根 preview workflow 绕行、F4 canonical 路径断言、F5 Windows 夹具文件名、F6 证据更正）均按「先复现（RED）→ 修复 → 重跑（GREEN）」处理，见 §0.2。**但 R4-3 的“可复现”条款仍未满足（见 §10），因此 R4B 不标记为完成。**
 
 **R3 仍为硬阻塞；ADR 0306 的 Cursor 产品门保留；T20-B/C/D 未开始；T20 未完成；T21 未完成；R4-3 未满足。**
 
 非目标：解除 R3、实现 Plan/Goal 运行时面、放宽 Cursor 门、声称 PI parity、向 can1357 推送、跑 electron-builder 真实打包。
+
+**仓库布局事实（本轮如实记录）**：GitHub 只识别仓库根 `.github/workflows/`。本仓库产品源码在 `app/`，因此 `app/.github/workflows/*`（含 `release.yml`、`linux-package.yml`）在当前仓库位置**不会自动触发**——它们是随 `app/` 交付的源码工作流（当 `app/` 作为仓库根时生效）；本仓库当下真正生效的打包工作流只有根 `.github/workflows/mac-preview-package.yml`。两者都被本轮新增的静态测试按同一「固定 fork 来源 + Bun + frozen install + 目标绑定的发布入口」契约锁定。
+
+---
+
+## 0.2 第三轮独立复审返修（RED → GREEN）
+
+第三轮复审在**独立 macOS（Node 24.14.0）**上给出 `3 failed / 25 passed / 6 skipped`（`bundled.test.ts` + `bundled-smoke.test.ts`），失败坐标 `bundled.test.ts:172/195/403` 与 `omp-runtime-launcher.test.mjs:128/329`：实现返回规范路径（`/private/var/...`），断言仍用词法路径（`/var/...`）。本机（Linux x64，无 `/var` 别名）用**别名 TMPDIR**（`/tmp/canon-alias` → `/tmp/canon-real`）复现**同一失败类**：
+
+```
+$ TMPDIR=/tmp/canon-alias npx vitest run src/bundled.test.ts      # 起点 9bd7e50
+ Tests  3 failed | 22 passed (25)        # 172 / 195 / 403，Expected /tmp/canon-alias/... Received /tmp/canon-real/...
+$ TMPDIR=/tmp/canon-alias node --test test/omp-runtime-launcher.test.mjs
+ ...:128  actual '/tmp/canon-real/omp-launcher-packaged-…/omp-runtime/omp'
+          expected '/tmp/canon-alias/omp-launcher-packaged-…/omp-runtime/omp'
+ ...:329  同类（gate 路径）
+```
+
+| # | 复审问题 | 复现（RED） | 修复（GREEN） |
+| --- | --- | --- | --- |
+| 1 | **F1 阻塞**：正式 macOS 签名发布被 wrapper 拒绝 | `node app/scripts/release-package.mjs --platform darwin --arch arm64 -c.mac.forceCodeSigning=true -c.mac.notarize=true` → `RELEASE-PACKAGE-FAIL unknown argument: -c.mac.forceCodeSigning=true`，exit 2 | 只消费自有 target/dir/publish 参数，其余 electron-builder 参数**按原始顺序逐项原样转发**；同一目标维度只允许声明一次（`--x64 --arm64`/`--x64 --arch arm64`/重复 `--platform` 直接拒绝、exit 2 且不 spawn）。`omp-release-gate` 10 passed |
+| 2 | **F2 阻塞**：clean runner 无受控 fork、无 Bun/OMP 依赖 | 新 `packaging-sidecar-source.test.mjs`：4 断言失败（无 fork checkout、无 `OMP_SIDECAR_SOURCE`、无 Bun、无 frozen install） | `release.yml` build matrix 与 `linux-package.yml` 都：checkout `MisterBowie/oh-my-pi` @ manifest `fork.commit`（`fetch-depth: 0`，因为构建要 `git diff <base> HEAD` 与 `git apply --check --reverse`）→ `oven-sh/setup-bun@v2`（`bun-version: "1.4.2"`）→ `bun install --frozen-lockfile` → 作业级 `OMP_SIDECAR_SOURCE`；测试从 manifest 读 repo/commit 自动比较。4 passed |
+| 3 | **F3 阻塞**：本仓库真正生效的 preview workflow 仍绕过 R4B | 新 `preview-workflow.test.mjs`：1 failed（仍 `gh release download v18.2.7 -R can1357/oh-my-pi`、`electron-builder` 后手工注入、复制 `omp-desktop-gate.ts`、`--prepackaged`） | 根 `.github/workflows/mac-preview-package.yml` 改为受控 fork checkout + Bun 1.4.2 + frozen install + `pnpm run dist:mac -- --arm64`（与正式发布同一 `release-package.mjs` 入口，builder 前构建并校验 sidecar）；删除上游下载/打包后注入/`.ts` gate/`--prepackaged`；保留未签名预览、产物重命名与上传。1 passed |
+| 4 | **F4**：macOS canonical 路径断言失败 | macOS 复审机 3 failed（172/195/403）；本机别名 TMPDIR 同形复现 | 夹具改为以 canonical 形式返回根与路径（`realpathSync`），断言期望值天然规范；生产实现的 canonical containment **未回退**。别名 TMPDIR 下 `28 passed / 6 skipped`，launcher `12 passed` |
+| 5 | **F5**：Windows failclosed 夹具硬编码 `omp` | 新增 win32 覆盖用例（stub `process.platform=win32`）：修前 `the fixture must write the Windows name` | `writePackagedRuntime` 与 launcher 夹具都改用生产的 `bundledBinaryFilename(process.platform)`；新增用例证明打包桥接解析 `omp.exe` 且 `launcherError === null`。failclosed 24 passed |
+| 6 | **F6**：证据/状态必须更正 | — | 本文、`docs/04-task-board.md`、`HANDOFF.md`、ADR 0307 §6 与 spec §17（中英）按实际计数与事实更正；未执行的 macOS/Windows 实机与未运行的 clean-runner CI 均未写成通过 |
+
+第三轮修复后的完整计数见 §9.1，命令见 §12.2。
 
 ---
 
@@ -32,6 +60,7 @@ RED/GREEN 计数与命令见 §12.1。真实产物与 protocol/gate 无费用烟
 4. **诊断不再被吞。** 解析失败的原因（`bundled-runtime-invalid: …`）现在通过 `launcherResolutionError` 进入 supervisor，`status()` 从一开始就是 `failed` + 真实原因（含文件名与失败种类），不再退化成 “no runtime executable is configured”。
 5. **provenance 的信任分级被写死并测试。** 启动时**校验**：schema、平台、架构、OMP 版本、patch level、上游 base SHA 与版本、fork 仓库/提交、**desktopVersion**、二进制名、二进制与每个扩展的字节数/SHA-256。**仅记录不校验**：`fork.tree`、`capabilities`、`build.*`（打包应用无法自行推导），ADR 明确禁止把它们说成已验证，并有测试固定该语义。
 6. **R4-3 的“可复现”条款未满足。** 同一提交本轮出现 **4 个不同**的二进制 SHA-256（`83bd4a7c…`、`12f4aee5…`、`a0cf7586…`、`8360d6a3…`、`021408a8…`、`076b3531…` 中的多次独立构建）。任务板与 ADR/spec/本文均按**未满足/阻塞**记录，未写成通过。（gate bundle 本身两次构建逐位一致。）
+7. **发布链路在本轮补齐（第三轮 F1-F3）。** `release-package.mjs` 现在只消费自有的 target/dir/publish 参数，其余 electron-builder 参数**按原序原样转发**（签名 macOS lane 的 `-c.mac.forceCodeSigning=true`/`-c.mac.notarize=true` 不再被拒），同一目标维度只允许声明一次；真正调用 `dist:*` 的每条 lane（`release.yml` build matrix、`linux-package.yml`、根 `mac-preview-package.yml`）都先 checkout 受控 fork 的固定 commit、`setup-bun` 1.4.2、`bun install --frozen-lockfile`，并把 `OMP_SIDECAR_SOURCE` 指向它；本仓库真正生效的根 preview workflow 改为走同一 `dist:mac` → `release-package.mjs` 入口，删除上游发布资产下载、打包后注入与非自包含 `.ts` gate。**未在 clean runner 实跑这些 lane**（§11 第 9 条）。
 
 ---
 
@@ -122,7 +151,11 @@ pack/dist/dist:mac/dist:win/dist:linux:
 2. `win32`/`linux`：固定 x64，显式架构非 x64 直接拒绝；`--x64` 同时传给预检与 electron-builder，两侧契约不分离。
 3. 目标不可用（如非宿主目标缺 `--arch`）→ 在 spawn 任何进程之前失败，退出码 2。
 
-随后：预检（`omp-sidecar.mjs --preflight --platform <p> --arch <a>`）→ 仅当预检成功才运行 `electron-builder <--mac|--win|--linux> [--x64/--arm64] [--dir] --publish never`，保持 PI 「runtime 步骤先于 electron-builder」的顺序。
+随后：预检（`omp-sidecar.mjs --preflight --platform <p> --arch <a>`）→ 仅当预检成功才运行 `electron-builder <--mac|--win|--linux> [--x64/--arm64] [--dir] --publish never <其余参数…>`，保持 PI 「runtime 步骤先于 electron-builder」的顺序。
+
+**参数透传与目标唯一性（第三轮复审 F1）**：`release-package.mjs` 只拥有 target/dir/publish；其余参数（例如固定 PI 在签名 lane 上传入的 `-c.mac.forceCodeSigning=true`、`-c.mac.notarize=true`）**按原始顺序逐项原样**附加到 electron-builder 调用，不使用「只识别当前两个 flag」的脆弱白名单。同一目标维度只允许声明一次：`--x64 --arm64`、`--x64 --arch arm64`、重复的 `--platform`（以及重复 `--publish`）都在 spawn 任何进程之前以退出码 2 拒绝，因此额外参数不可能把预检与打包带到不同目标。
+
+**packaging lane 的输入（第三轮复审 F2/F3）**：真正调用 `dist:*` 的 lane（`release.yml` build matrix、`linux-package.yml`、根 `mac-preview-package.yml`）都在调用发布入口之前：checkout 自有 fork `MisterBowie/oh-my-pi` @ manifest `fork.commit`（`fetch-depth: 0`，因为构建要重新证明 `base..HEAD`）、`setup-bun` 固定 `1.4.2`、在该检出执行 `bun install --frozen-lockfile`，并把作业级 `OMP_SIDECAR_SOURCE` 指向它。`app/apps/desktop/test/packaging-sidecar-source.test.mjs` 与 `preview-workflow.test.mjs` 从 manifest 读取 repo/commit 后自动比较，避免文档式重复值漂移。**未在 clean runner 实跑这些 lane**（见 §11）。
 
 `--preflight` 语义（`scripts/omp-sidecar.mjs`）：
 
@@ -145,6 +178,8 @@ pack/dist/dist:mac/dist:win/dist:linux:
 | 陈旧控制 | fixture 工作树改脏 | **exit 1**（`uncommitted changes`） |
 | 平台错配 | staged 用宿主平台名，目标为非宿主 | **exit 1** |
 | 缺 arch | `--platform <非宿主>`（无 `--arch`） | **exit 1**（`--arch is required`） |
+| 参数透传 | `release-package.mjs --platform darwin --arm64 -c.mac.forceCodeSigning=true -c.mac.notarize=true`；stub spawn 的计划函数 | 通过：两个 `-c.mac.*` 按原序到达 electron-builder；预检仍先执行，预检失败时 builder 不执行 |
+| 目标冲突/重复 | `--x64 --arm64`、`--x64 --arch arm64`、重复 `--platform`、重复 `--publish` | 通过：`must be given once` / `given more than once`，exit 2 且不 spawn |
 
 
 变异 RED：把 `dist:mac` 中的 `node ../../scripts/release-package.mjs` 替换成裸 `electron-builder` 后，覆盖性测试失败（见 §9.2）。
@@ -154,7 +189,7 @@ pack/dist/dist:mac/dist:win/dist:linux:
 ## 6. 打包态准入与工具门（问题 3 + 审计项；第二轮复审后更严）
 
 * `resolveRuntimeLauncher`（打包态）：唯一候选 `resourcesPath/omp-runtime/{omp|omp.exe}`，`verifyBundledRuntime` 通过才可用；`OMP_DESKTOP_RUNTIME`/PATH/向上扫描均不是候选。
-* **规范包含性（第二轮复审问题 1）**：`verifyBundledRuntime` 对 `resourcesPath` 与 `omp-runtime` 都取 `realpathSync` 后再比较，别名祖先（macOS `/var` → `/private/var`、symlink 目录）不再误报 `resolves outside the resources root`；`omp-runtime`、二进制、`provenance.json`、gate 仍以 `lstat` 拒绝符号链接。
+* **规范包含性（第二轮复审问题 1；第三轮 F4 补齐测试侧）**：`verifyBundledRuntime` 对 `resourcesPath` 与 `omp-runtime` 都取 `realpathSync` 后再比较，别名祖先（macOS `/var` → `/private/var`、symlink 目录）不再误报 `resolves outside the resources root`；`omp-runtime`、二进制、`provenance.json`、gate 仍以 `lstat` 拒绝符号链接。第三轮 F4 修正的是**测试夹具**（`bundled.test.ts`、`omp-runtime-launcher.test.mjs`）：夹具改以 canonical 形式返回根与路径（`realpathSync`），因此期望值天然规范；生产实现的 canonical containment 未做任何回退。
 * **扩展清单边界（第二轮复审问题 5）**：扩展路径规范化为相对 POSIX 路径，拒绝 POSIX 绝对路径、Windows 盘符、UNC、空段/`.`/`..` 段与重复项；清单必须**恰好**声明信任工具门（多发扩展需 ADR）；schema 升为 `omp-desktop.bundled-sidecar/2`。
 * `resolveGateExtension`（`engine-runtime.ts`）与 `createOmpSessionBridge`（`omp-session.ts`）：`isPackaged` 时**只**用被校验的 Resources 工具门，`resourcesPath` 缺失/缺失/符号链接/逃逸/摘要不符一律拒绝，**绝不**进入开发搜索。
 * 删除已废弃的 `BUNDLED_GATE_PATH` 常量与 `omp-session.ts` 的重复路径拼接，gate 相对路径只由 `@pi-desktop/omp-runtime` 的 `BUNDLED_GATE_RELATIVE_PATH` 定义一次。
@@ -204,15 +239,16 @@ error: Trusted extension failed to load: Failed to load extension:
 
 ## 9. 测试与 RED 证据
 
-### 9.1 计数（本机 Linux x64，Node v24.14.0、Bun 1.4.2；第二轮复审后）
+### 9.1 计数（本机 Linux x64，Node v24.14.0、Bun 1.4.2；第三轮复审后）
 
 | 命令 | 结果 |
 | --- | --- |
 | `pnpm --filter @pi-desktop/omp-runtime test`（未设 opt-in 变量） | **23 files / 350 passed / 6 skipped（356）** |
-| `OMP_SIDECAR_TEST_RESOURCES=… npx vitest run src/bundled-smoke.test.ts`（`/2` 清单重新构建后） | **9 passed**（3 恒开 + 6 真实产物/自包含/篡改/异常/超时） |
-| `env -u SSH_ASKPASS node --test test/*.test.mjs`（`apps/desktop` 全量） | **tests 2937 / pass 2933 / fail 0 / skipped 4** |
-| 其中 `omp-sidecar` 7、`omp-release-gate` 7、`omp-runtime-launcher` 12、`packaging-footprint` 9、`omp-session-failclosed` 23 | 均 0 fail |
-| `pnpm build:js` / `pnpm -C packages/omp-runtime typecheck` / `pnpm -C apps/desktop typecheck` | 均 exit 0 |
+| `OMP_SIDECAR_TEST_RESOURCES=… npx vitest run src/bundled-smoke.test.ts`（真实产物） | **9 passed**（3 恒开 + 6 真实产物/自包含/篡改/异常/超时） |
+| `env -u SSH_ASKPASS node --test test/*.test.mjs`（`apps/desktop` 全量） | **tests 2945 / pass 2941 / fail 0 / skipped 4** |
+| 其中 `omp-sidecar` 7、`omp-release-gate` 10、`omp-runtime-launcher` 12、`packaging-footprint` 9、`omp-session-failclosed` 24、`packaging-sidecar-source` 3、`preview-workflow` 1 | 均 0 fail |
+| `TMPDIR=<别名>` 重跑 `src/bundled.test.ts`（+ smoke）与 `omp-runtime-launcher.test.mjs` | **28 passed / 6 skipped**；launcher **12 passed** |
+| `pnpm build:js` / `pnpm --filter @pi-desktop/omp-runtime typecheck` / `pnpm --filter @pi-desktop/desktop typecheck` | 均 exit 0 |
 | `git diff --check` | exit 0 |
 
 
@@ -236,6 +272,16 @@ error: Trusted extension failed to load: Failed to load extension:
 | 3 诊断传播 | `omp-session-failclosed.test.mjs`：`errorCode` = `ENGINE_CAPABILITY_UNAVAILABLE` / `NOT_FOUND` | **23 passed** |
 | 4 夹具默认目标 | `-t "defaults the fixture target"`：`Expected "darwin" / Received "linux"`（1 failed / 20 skipped） | `bundled.test.ts` **21 passed** |
 | 5 清单边界 + `/2` | `bundled.test.ts`：**5 failed / 20 passed** | **25 passed**；`omp-runtime` 全套 **350 passed / 6 skipped** |
+
+第三轮（本轮，逐项「先红后绿」，命令见 §12.2）：
+
+| 复审问题 | RED 观察 | GREEN 观察 |
+| --- | --- | --- |
+| 1 F1 参数透传 | `release-package.mjs --platform darwin --arch arm64 -c.mac.forceCodeSigning=true -c.mac.notarize=true` → `RELEASE-PACKAGE-FAIL unknown argument: …`，exit 2 | 转发后的签名参数计划/调用：`omp-release-gate` **10 passed**（含冲突/重复目标拒绝） |
+| 2 F2 workflow 来源 | 新 `packaging-sidecar-source.test.mjs`：**3 failed**（`release.yml` 的 fork checkout、`OMP_SIDECAR_SOURCE`、Bun + frozen install 各一） | 同文件 **3 passed**（Manifest 的 repo/commit 自动比较） |
+| 3 F3 根 preview | 新 `preview-workflow.test.mjs`：**1 failed**（`repository: MisterBowie/oh-my-pi` 不匹配） | **1 passed** |
+| 4 F4 canonical 断言 | 别名 TMPDIR：`bundled.test.ts` **3 failed / 22 passed**（172/195/403）；launcher 128/329 两处 `actual /tmp/canon-real/… expected /tmp/canon-alias/…` | 同一别名 TMPDIR：`28 passed / 6 skipped`；launcher **12 passed**（普通 TMPDIR 同值） |
+| 5 F5 win32 夹具 | 新增 win32 用例：`the fixture must write the Windows name`（1 failed） | `omp-session-failclosed` **24 passed** |
 
 ---
 
@@ -262,7 +308,9 @@ R4-3 原文要求「构建脚本输出可核验清单…**重复构建在相同�
 5. **未触碰**：R3 未解除、Cursor 产品门未动、T20-B/C/D 未开始、未向 can1357 推送、未合并 main、未建 PR。
 6. **预存在失败**：`check-docs` 6 项、`check-architecture` 1 项（见 §12），本轮不做顺带修复。
 7. 子模块工作树由本机 R4A 检出本地重建（网络 clone 过慢），HEAD 与 gitlink 一致。
-8. **上游测试随契约移动**：`apps/desktop/test/window-menu.test.mjs` 原先断言发布脚本里出现 `electron-builder` 字面量；electron-builder 现由 `release-package.mjs` 调用，故该断言改为「`build:host-release` 先于打包入口」，其余断言不变（全量桌面套件 2937/2933/0 fail/4 skip）。
+8. **上游测试随契约移动**：`apps/desktop/test/window-menu.test.mjs` 原先断言发布脚本里出现 `electron-builder` 字面量；electron-builder 现由 `release-package.mjs` 调用，故该断言改为「`build:host-release` 先于打包入口」，其余断言不变（第三轮后全量桌面套件 2945 tests / 2941 pass / 0 fail / 4 skipped）。
+9. **未在 clean runner 实跑 packaging workflows**：F2/F3 的 fork checkout、`OMP_SIDECAR_SOURCE`、固定 Bun、`bun install --frozen-lockfile` 只以**静态测试 + manifest pin 自动比较**锁定（本机无网络与干净 fork 克隆）。真实 sidecar 构建仍在本机 fork 检出（`/tmp/r4b/oh-my-pi`，`3c845eb2…`）验证：`--check`/`--preflight` exit 0，opt-in 无费用 smoke **9 passed**。
+10. **平台实测边界**：F4 的 macOS RED 坐标（`bundled.test.ts:172/195/403`、`omp-runtime-launcher.test.mjs:128/329`）来自独立 macOS 复审机（Node 24.14.0）；本机用**别名 TMPDIR** 复现同一失败类并验证修复，但**未在 macOS 上复跑本轮修复**，留待规划方复跑验收。F5 的 win32 覆盖是 stub `process.platform`，**不是** Windows 实机；打包后的应用仍未启动过（同第 1、2 条）。
 
 ---
 
@@ -293,5 +341,19 @@ R4-3 原文要求「构建脚本输出可核验清单…**重复构建在相同�
 | 3 | `node --test test/omp-session-failclosed.test.mjs`（旧桥接）→ `ENGINE_CAPABILITY_UNAVAILABLE`/`NOT_FOUND` | 同命令 → 23 passed |
 | 4 | `npx vitest run src/bundled.test.ts -t "defaults the fixture target"` → Expected `darwin` / Received `linux` | `npx vitest run src/bundled.test.ts` → 21 passed |
 | 5 | `npx vitest run src/bundled.test.ts` → 5 failed / 20 passed | 同命令 → 25 passed |
+
+### 12.2 第三轮复审的 RED/GREEN 复核命令
+
+RED 均在起点提交 `9bd7e50`（F1/F4 直接跑旧实现；F2/F3/F5 在加入新测试、尚未修复时）复现：
+
+| 复审问题 | RED 命令 | GREEN 命令（本轮） |
+| --- | --- | --- |
+| F1 | `node app/scripts/release-package.mjs --platform darwin --arch arm64 -c.mac.forceCodeSigning=true -c.mac.notarize=true` → `unknown argument: -c.mac.forceCodeSigning=true`，exit 2 | 同命令不再报参数错误（随后进入预检）；`node --test test/omp-release-gate.test.mjs` → 10 passed |
+| F2 | `node --test test/packaging-sidecar-source.test.mjs` → 3 failed | 同命令 → 3 passed |
+| F3 | `node --test test/preview-workflow.test.mjs` → 1 failed | 同命令 → 1 passed |
+| F4 | `TMPDIR=/tmp/canon-alias npx vitest run src/bundled.test.ts` → 3 failed / 22 passed；`TMPDIR=/tmp/canon-alias node --test test/omp-runtime-launcher.test.mjs` → 128、329 两处断言失败 | 同两条命令 → `28 passed / 6 skipped`（含 smoke）与 `12 passed`；普通 TMPDIR 同值 |
+| F5 | `node --test test/omp-session-failclosed.test.mjs` → `the fixture must write the Windows name` | 同命令 → 24 passed |
+
+复核用别名 TMPDIR：`mkdir -p /tmp/canon-real && ln -s /tmp/canon-real /tmp/canon-alias`（模拟 macOS `/var` → `/private/var` 的别名祖先）。
 
 （工作目录：`app/packages/omp-runtime` 运行 vitest；`app/apps/desktop` 运行 node --test。所有 RED 均在起点提交上复现，GREEN 均在修复提交上复跑；计数见 §9.1 与 §12。）

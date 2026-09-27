@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -24,6 +32,7 @@ register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
 const { PINNED_LAUNCHER_PATH, createOmpRuntimeAdapter, findPinnedLauncher, resolveRuntimeLauncher } =
   await import("../electron/main/runtime/omp-runtime.ts");
 const { resolveGateExtension } = await import("../electron/main/runtime/engine-runtime.ts");
+const { bundledBinaryFilename } = await import("../../../packages/omp-runtime/src/bundled.ts");
 
 function scratch(label) {
   return mkdtempSync(join(tmpdir(), `omp-launcher-${label}-`));
@@ -40,11 +49,19 @@ function writeExecutable(root, relative, body) {
 /**
  * A packaged resource tree that passes verification: a stand-in executable, the
  * tool gate beside it, and the provenance manifest a real build would write.
+ *
+ * The tree is written and reported in canonical form (`realpath`) and with the
+ * host platform's executable name, because that is what
+ * `verifyBundledRuntime` resolves and checks: an aliased ancestor (macOS
+ * `/var` → `/private/var`) or a Windows `.exe` name would otherwise turn the
+ * fixture itself into the failure under test.
  */
 function writeBundledRuntime(resourcesPath, options = {}) {
-  const dir = join(resourcesPath, "omp-runtime");
+  const canonicalRoot = realpathSync(resourcesPath);
+  const dir = join(canonicalRoot, "omp-runtime");
+  const filename = bundledBinaryFilename(process.platform);
   mkdirSync(join(dir, "extensions"), { recursive: true });
-  const binary = writeExecutable(dir, "omp", "#!/bin/sh\necho omp/18.3.0\n");
+  const binary = writeExecutable(dir, filename, "#!/bin/sh\necho omp/18.3.0\n");
   const gate = join(dir, "extensions", "omp-desktop-gate.js");
   writeFileSync(gate, "// fixture gate\nexport const gate = true;\n");
   const digest = (path) => createHash("sha256").update(readFileSync(path)).digest("hex");
@@ -59,7 +76,7 @@ function writeBundledRuntime(resourcesPath, options = {}) {
     platform: process.platform,
     arch: process.arch,
     binary: {
-      filename: "omp",
+      filename,
       bytes: readFileSync(binary).length,
       sha256: digest(binary),
     },

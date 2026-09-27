@@ -4,7 +4,7 @@ import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, w
 import { register } from "node:module";
 import { tmpdir } from "node:os";
 import test, { after } from "node:test";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
@@ -31,6 +31,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
 const { createOmpSessionBridge } = await import("../electron/main/runtime/omp-session.ts");
 const { createOmpRuntimeAdapter } = await import("../electron/main/runtime/omp-runtime.ts");
+/** The production name of the packaged executable, so fixtures cannot drift. */
+const { bundledBinaryFilename } = await import("../../../packages/omp-runtime/src/bundled.ts");
 
 const scratch = [];
 after(() => {
@@ -324,11 +326,17 @@ test("F6: a one-shot rename whose runtime cleanup fails is reported as inconsist
 /**
  * A packaged resource tree exactly as `scripts/omp-sidecar.mjs` lays it out,
  * with the digests the provenance manifest must agree with.
+ *
+ * The executable name comes from the production helper, not a literal: the
+ * verifier requires `omp.exe` on Windows, so a fixture that always wrote `omp`
+ * would turn every packaged case into "the Windows binary is missing" instead
+ * of the tamper it names.
  */
 function writePackagedRuntime(resourcesPath) {
   const dir = join(resourcesPath, "omp-runtime");
+  const filename = bundledBinaryFilename(process.platform);
   mkdirSync(join(dir, "extensions"), { recursive: true });
-  const binary = join(dir, "omp");
+  const binary = join(dir, filename);
   writeFileSync(binary, "#!/bin/sh\necho omp/18.3.0\n", { mode: 0o755 });
   chmodSync(binary, 0o755);
   const gate = join(dir, "extensions", "omp-desktop-gate.js");
@@ -347,7 +355,7 @@ function writePackagedRuntime(resourcesPath) {
       desktopVersion: APP_VERSION,
       platform: process.platform,
       arch: process.arch,
-      binary: { filename: "omp", bytes: readFileSync(binary).length, sha256: digest(binary) },
+      binary: { filename, bytes: readFileSync(binary).length, sha256: digest(binary) },
       extensions: [
         { path: "extensions/omp-desktop-gate.js", bytes: readFileSync(gate).length, sha256: digest(gate) },
       ],
@@ -461,6 +469,32 @@ for (const scenario of packagedCases) {
     );
   });
 }
+
+test("P3: a packaged build resolves the platform's own executable name", async () => {
+  // The bundled runtime on Windows is `omp.exe`; the fixture must therefore lay
+  // out — and the manifest must declare — the name the verifier looks for, or
+  // every packaged case would silently be testing "omp.exe is missing" instead
+  // of the tamper it names. The host platform is simulated because the verifier
+  // reads the real one.
+  const original = Object.getOwnPropertyDescriptor(process, "platform");
+  Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+  try {
+    const resources = makeScratch("omp-fc-res-");
+    const layout = writePackagedRuntime(resources);
+    assert.equal(basename(layout.binary), "omp.exe", "the fixture must write the Windows name");
+    assert.equal(
+      JSON.parse(readFileSync(layout.manifestPath, "utf8")).binary.filename,
+      "omp.exe",
+      "the manifest must declare the Windows name",
+    );
+    const { adapter } = packagedBridge(resources);
+    assert.ok(adapter.launcher, `the Windows-named bundled runtime must resolve: ${adapter.launcherError}`);
+    assert.equal(basename(adapter.launcher), "omp.exe");
+    assert.equal(adapter.launcherError, null);
+  } finally {
+    if (original) Object.defineProperty(process, "platform", original);
+  }
+});
 
 test("P3: a packaged launcher refusal carries the adapter's concrete reason", async () => {
   // The gate verifies, but the adapter refused the runtime for a reason of its

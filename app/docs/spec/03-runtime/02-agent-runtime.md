@@ -1908,7 +1908,23 @@ level `62bc57b+omp-desktop.2`, carried by the controlled fork commit recorded in
   that verifies against the controlled manifest being released, and fails closed
   without spawning anything when the architecture is unstated. Windows and Linux
   keep their fixed x64 contract on both sides. The host binary is never reused
-  for another platform.
+  for another platform. Everything else on the command line belongs to
+  electron-builder and is forwarded verbatim, in order: upstream PI-Desktop
+  appends builder configuration through the package script on the signed macOS
+  lane (`-c.mac.forceCodeSigning=true`, `-c.mac.notarize=true`), so refusing
+  unknown arguments would break the signed release, and recognizing only those
+  two flags would break the next one. A target axis may be declared only once:
+  `--x64 --arm64`, `--x64 --arch arm64` or a repeated `--platform` is refused
+  instead of being resolved last-one-wins, so a forwarded argument can never
+  move the preflight and the package onto different targets.
+* **Packaging input.** Every lane that runs a release command prepares the
+  source before it packages: a checkout of the controlled fork at the manifest's
+  fork commit with full history (the build re-proves `base..HEAD`), the pinned
+  Bun, `bun install --frozen-lockfile` in that checkout, and
+  `OMP_SIDECAR_SOURCE` pointing at it. A clean runner that only checked out this
+  repository cannot run `dist:*` at all — the preflight refuses the missing
+  source before it compiles anything — and no lane may download an upstream
+  release asset or inject a runtime after electron-builder has run.
 * **Tool gate.** The runtime loads the gate with `--trusted-extension`, so it
   ships as a self-contained bundle (`omp-runtime/extensions/omp-desktop-gate.js`)
   built from `packages/omp-runtime/extensions/omp-desktop-gate.ts`: a copy of the

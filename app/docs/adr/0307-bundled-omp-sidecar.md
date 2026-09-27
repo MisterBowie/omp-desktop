@@ -12,6 +12,9 @@
   `app/scripts/omp-sidecar.mjs`, `app/packages/omp-runtime/src/bundled.ts`,
   `app/patches/oh-my-pi/manifest.json`,
   `apps/desktop/test/omp-sidecar.test.mjs`,
+  `apps/desktop/test/omp-release-gate.test.mjs`,
+  `apps/desktop/test/packaging-sidecar-source.test.mjs`,
+  `apps/desktop/test/preview-workflow.test.mjs`,
   `packages/omp-runtime/src/bundled.test.ts`,
   `packages/omp-runtime/src/bundled-smoke.test.ts`.
 
@@ -202,12 +205,34 @@ platform-specific artifact:
   `win32`/`linux`) and passes the same platform/architecture to the preflight
   and to electron-builder. It runs electron-builder only after the preflight
   succeeds.
+- **Forwarded, not recognized**: every argument the entry does not own reaches
+  electron-builder verbatim and in order. Upstream PI Desktop puts
+  electron-builder last in each release command, so its workflow appends builder
+  configuration through the package script — `-c.mac.forceCodeSigning=true` and
+  `-c.mac.notarize=true` on the signed macOS lane. Refusing unknown arguments
+  breaks that lane; recognizing only today's two flags breaks the next one. A
+  target axis, by contrast, may be declared only once: `--x64 --arm64`,
+  `--x64 --arch arm64` and a repeated `--platform` are refused rather than
+  resolved last-one-wins, because a duplicated target is the one case where a
+  forwarded argument could move the preflight and the package apart.
+- **Packaging lanes prepare the source**: `.github/workflows/release.yml`,
+  `.github/workflows/linux-package.yml` and the repository-level macOS preview
+  workflow check out `MisterBowie/oh-my-pi` at the manifest's fork commit with
+  full history (the build re-proves `base..HEAD`), install the pinned Bun, run
+  `bun install --frozen-lockfile` in that checkout, and point
+  `OMP_SIDECAR_SOURCE` at it. A preview or release lane that only checks out
+  this repository cannot run `dist:*`, and no lane downloads an upstream release
+  asset or injects a runtime after electron-builder.
 
 `apps/desktop/test/omp-release-gate.test.mjs` asserts each release command
 bundles the runtime before the target-aware entry, checks the extracted target
 selection behaviorally (the preflight and electron-builder receive the same
 platform/architecture; a cross target without an architecture fails without
-spawning), and exercises the preflight refusals with fixture artifacts.
+spawning), and exercises the preflight refusals with fixture artifacts;
+`apps/desktop/test/packaging-sidecar-source.test.mjs` and
+`apps/desktop/test/preview-workflow.test.mjs` hold the packaging lanes to the
+fork, commit, Bun and frozen-install contract, reading the pin from the manifest
+rather than duplicating it.
 
 ## Consequences
 
@@ -220,7 +245,16 @@ spawning), and exercises the preflight refusals with fixture artifacts.
 - The build gains one gate and one manifest; developers must pass `--source`
   (or `OMP_SIDECAR_SOURCE`) pointing at the controlled fork checkout. Packaging
   runs the preflight in-chain, so a release host needs that checkout and a
-  staged artifact for every non-host target it builds.
+  staged artifact for every non-host target it builds; the packaging workflows
+  therefore check the fork out, pin Bun and install its frozen dependencies
+  before they package.
+- **The repository layout decides which workflow runs.** GitHub reads only the
+  workflows at the repository root, and this repository keeps the product under
+  `app/`, so `app/.github/workflows/*` is imported source — it runs when `app/`
+  is the repository root — while `.github/workflows/mac-preview-package.yml` is
+  the workflow that actually executes here. Both are held to the same source,
+  pin and passthrough contract by the tests named above; the app-level
+  `release.yml` is not triggered from this repository's root.
 - **Reproducibility is not achieved.** Builds of the same commit produce
   different binary SHA-256s on this machine (four observed in this round,
   recorded in `docs/validation/M5-bundled-sidecar.md`), so the R4-3 acceptance

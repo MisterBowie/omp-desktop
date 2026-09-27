@@ -88,6 +88,9 @@ jobs:
     env:
       # Tag pushes always sign. workflow_dispatch signs unless explicitly disabled.
       MACOS_SIGN_RELEASE: ${{ github.event_name != 'workflow_dispatch' || inputs.sign_macos == true }}
+      # The bundled sidecar is compiled (host target) or verified (cross target)
+      # from this checkout by scripts/omp-sidecar.mjs, before electron-builder.
+      OMP_SIDECAR_SOURCE: ${{ github.workspace }}/.omp-sidecar-source
     strategy:
       fail-fast: false
       matrix:
@@ -175,6 +178,31 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
+
+      - name: Check out the pinned OMP sidecar fork
+        uses: actions/checkout@v7
+        with:
+          # The bundled sidecar is compiled from the self-maintained fork, not
+          # from this repository and not from an upstream release asset. The
+          # commit is the one patches/oh-my-pi/manifest.json pins, and
+          # scripts/omp-sidecar.mjs refuses any other checkout.
+          repository: MisterBowie/oh-my-pi
+          ref: 3c845eb27f6f7b0a5b182f1868969ced86d10a3d
+          path: .omp-sidecar-source
+          # The build re-proves HEAD == base + patch level with
+          # `git diff <base> HEAD` and `git apply --check --reverse`, so the base
+          # commit object has to be present: a shallow clone is refused.
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          # scripts/omp-sidecar.mjs compiles with Bun and records the version it
+          # used in the provenance manifest.
+          bun-version: "1.4.2"
+
+      - name: Install the pinned OMP fork dependencies
+        working-directory: .omp-sidecar-source
+        run: bun install --frozen-lockfile
 
       - name: Prepare package inputs
         run: |

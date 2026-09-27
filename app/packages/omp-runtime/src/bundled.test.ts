@@ -63,7 +63,12 @@ function writeFixture(options: {
 }): { resourcesPath: string; provenance: BundledSidecarProvenance; gatePath: string } {
   const platform = options.platform ?? process.platform;
   const arch = options.arch ?? process.arch;
-  const resourcesPath = options.root ?? scratch();
+  // The verifier compares canonical paths — macOS reports its temp root as
+  // `/var/...` and resolves it to `/private/var/...` — so the fixture returns
+  // the same canonical root it will be verified at. A fixture that handed back
+  // the lexical spelling would make every expectation built from it wrong on a
+  // host with an aliased ancestor.
+  const resourcesPath = realpathSync(options.root ?? scratch());
   const dir = join(resourcesPath, "omp-runtime");
   mkdirSync(dir, { recursive: true });
   const filename = bundledBinaryFilename(platform);

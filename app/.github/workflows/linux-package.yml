@@ -11,6 +11,10 @@ jobs:
     name: Linux x64 packages
     runs-on: ubuntu-22.04
     timeout-minutes: 60
+    env:
+      # The bundled sidecar is compiled from this checkout by
+      # scripts/omp-sidecar.mjs, before electron-builder.
+      OMP_SIDECAR_SOURCE: ${{ github.workspace }}/.omp-sidecar-source
     defaults:
       run:
         shell: bash
@@ -27,6 +31,25 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
+
+      - name: Check out the pinned OMP sidecar fork
+        uses: actions/checkout@v7
+        with:
+          # The bundled sidecar is compiled from the self-maintained fork at the
+          # commit patches/oh-my-pi/manifest.json pins, with full history so the
+          # build can re-prove HEAD == base + patch level.
+          repository: MisterBowie/oh-my-pi
+          ref: 3c845eb27f6f7b0a5b182f1868969ced86d10a3d
+          path: .omp-sidecar-source
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
+      - name: Install the pinned OMP fork dependencies
+        working-directory: .omp-sidecar-source
+        run: bun install --frozen-lockfile
 
       - name: Prepare package inputs
         # Mirrors release.yml: build host-core with --locked so a drifted

@@ -7,8 +7,12 @@
 # 产品源码位于 app/，所以每一步都显式指定工作目录；本工作流不签名、不公证，
 # 不发布 electron-updater 的 latest*.yml，也不改动版本号。
 #
-# 内置 OMP 运行时：M6/T21 尚未实现，这里按 Linux 预览构建的同一做法手工植入
-# 上游 v18.2.7 官方 `omp-darwin-arm64` 与桌面工具门到 .app/Contents/Resources/omp-runtime/。
+# 内置 OMP 运行时：与正式发布**同一入口**——`pnpm run dist:mac -- --arm64` 链尾的
+# `scripts/release-package.mjs` 先跑 sidecar 预检（从自有 fork 的固定 commit 构建，
+# 并对照 provenance / patch manifest 校验），只有预检通过才调用 electron-builder。
+# 旧的预览做法已删除：下载上游发布资产、在 electron-builder 之后手工注入、
+# 以及复制源码形态的工具门（它以相对 `../src/...` 导入，在 Resources 下无法
+# 加载，运行时拒绝启动）。
 
 name: macOS preview package
 
@@ -29,6 +33,8 @@ jobs:
     env:
       # 未签名预览：不尝试查找 Developer ID，跳过 codesign，但仍产出 dmg/zip。
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      # 受控 sidecar 来源：自有 fork 的检出目录（见下面的 checkout）。
+      OMP_SIDECAR_SOURCE: ${{ github.workspace }}/.omp-sidecar-source
     steps:
       - uses: actions/checkout@v7
 
@@ -45,53 +51,35 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Check out the pinned OMP sidecar fork
+        uses: actions/checkout@v7
+        with:
+          # sidecar 由自有 fork 在清单固定的 commit 上编译；`fetch-depth: 0`
+          # 是必须的：构建要用 `git diff <base> HEAD` 与
+          # `git apply --check --reverse` 重新证明 HEAD == base + patch level。
+          repository: MisterBowie/oh-my-pi
+          ref: 3c845eb27f6f7b0a5b182f1868969ced86d10a3d
+          path: .omp-sidecar-source
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
+      - name: Install the pinned OMP fork dependencies
+        working-directory: .omp-sidecar-source
+        run: bun install --frozen-lockfile
+
       - name: Install dependencies
         working-directory: app
         run: pnpm install --frozen-lockfile
 
-      - name: Build workspace packages
-        working-directory: app
-        run: pnpm --filter '@pi-desktop/desktop^...' --fail-if-no-match build
-
-      - name: Build host-core (release)
-        working-directory: app
-        run: cargo build --release --locked -p host-core
-
-      - name: Build agent-runtime bundle and renderer
+      # dist:mac 自带 build:deps / build:host-release / bundle:runtime /
+      # electron-vite build 与 sidecar 预检，这里不再重复这些步骤，也不在
+      # electron-builder 之后触碰产物。
+      - name: Package unsigned preview (sidecar preflight, then electron-builder)
         working-directory: app/apps/desktop
-        run: |
-          set -euo pipefail
-          pnpm run bundle:runtime
-          pnpm exec electron-vite build
-
-      - name: Package unpacked .app
-        working-directory: app/apps/desktop
-        run: pnpm exec electron-builder --mac --dir --publish never
-
-      - name: Inject pinned OMP runtime
-        working-directory: app/apps/desktop
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          work="$(mktemp -d)"
-          gh release download v18.2.7 -R can1357/oh-my-pi -p omp-darwin-arm64 -p SHA256SUMS.txt -D "$work"
-          (cd "$work" && grep ' omp-darwin-arm64$' SHA256SUMS.txt | shasum -a 256 -c -)
-          chmod +x "$work/omp-darwin-arm64"
-          "$work/omp-darwin-arm64" --version
-          app="release/mac-arm64/OMP Desktop.app/Contents/Resources/omp-runtime"
-          mkdir -p "$app/extensions"
-          cp "$work/omp-darwin-arm64" "$app/omp"
-          cp ../../packages/omp-runtime/extensions/omp-desktop-gate.ts "$app/extensions/"
-          ls -la "$app" "$app/extensions"
-
-      - name: Package dmg and zip
-        working-directory: app/apps/desktop
-        run: |
-          set -euo pipefail
-          pnpm exec electron-builder --mac dmg zip \
-            --prepackaged "release/mac-arm64/OMP Desktop.app" --publish never
-          ls -la release
+        run: pnpm run dist:mac -- --arm64
 
       - name: Stage assets
         working-directory: app/apps/desktop

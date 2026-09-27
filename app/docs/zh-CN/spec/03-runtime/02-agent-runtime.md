@@ -1168,6 +1168,16 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
   把 arm64 sidecar 打进 x64 应用。宿主目标的预检会实际构建产物；跨目标预检拒绝编译，要求存在
   **恰好为该平台/架构**暂存、且相对本次发布的受控清单校验通过的产物，并在架构未声明时在 spawn
   任何进程之前失败。Windows/Linux 两侧都保持固定 x64 契约。绝不把宿主二进制复用到其他平台。
+  命令行上其余参数都属于 electron-builder，按原始顺序逐项原样转发：上游 PI-Desktop 的签名 macOS
+  lane 正是通过 package 脚本追加 builder 配置（`-c.mac.forceCodeSigning=true`、
+  `-c.mac.notarize=true`），所以拒绝未知参数会直接打断签名发布，而只识别当前这两个 flag 的白名单
+  会打断下一个。同一目标维度只能声明一次：`--x64 --arm64`、`--x64 --arch arm64` 或重复的
+  `--platform` 一律拒绝，而不是"后者覆盖"，因此转发参数不可能把预检与打包带到不同目标。
+* **打包输入。** 每条执行发布命令的 lane 都会在打包前准备源码：检出清单所固定的 fork 提交（完整
+  历史，因为构建要重新证明 `base..HEAD`）、安装固定 Bun、在该检出中执行
+  `bun install --frozen-lockfile`，并把 `OMP_SIDECAR_SOURCE` 指向它。只检出本仓库的干净 runner
+  根本无法执行 `dist:*`——预检在编译任何东西之前就拒绝缺失的源码；任何 lane 都不允许下载上游发布
+  资产，也不允许在 electron-builder 之后注入运行时。
 * **工具门。** 运行时用 `--trusted-extension` 加载工具门，因此它以自包含 bundle 的形式发布
   （`omp-runtime/extensions/omp-desktop-gate.js`，由
   `packages/omp-runtime/extensions/omp-desktop-gate.ts` 构建）：直接复制源码仍会 import

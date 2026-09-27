@@ -25,6 +25,17 @@
  *   - win32/linux: fixed x64, matching the shipped preflight aliases and the
  *     release matrix; the same `--x64` is passed to electron-builder so the
  *     package and the sidecar can never disagree.
+ *
+ * Everything else on the command line belongs to electron-builder and is
+ * forwarded verbatim, in the given order. Upstream PI Desktop documents this
+ * contract: its `apps/desktop/package.json` puts electron-builder last in every
+ * release command, so the release workflow appends builder configuration
+ * through the package script — `-c.mac.forceCodeSigning=true` and
+ * `-c.mac.notarize=true` on the signed macOS lane. Refusing those arguments
+ * would break the signed release; recognising only *this* repository's current
+ * two flags would break the next one. The target flags stay owned here (they
+ * decide the preflight as well as the package), so a forwarded argument can
+ * never move one side without the other.
  */
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
@@ -56,25 +67,60 @@ const ARCH_FLAG_TO_ARCH = Object.fromEntries(
 
 const HOST = { platform: process.platform, arch: process.arch };
 
-/** Parse the target flags this entry accepts; throws on anything unknown. */
+/**
+ * Parse the command line.
+ *
+ * Two kinds of argument are recognized:
+ *
+ *   - the target flags this entry owns (`--platform`, `--arch`, the arch
+ *     switches, `--dir`, `--publish`) — they decide the preflight *and*
+ *     electron-builder, so they are parsed once here;
+ *   - everything else, forwarded verbatim to electron-builder in the given
+ *     order (see the header contract).
+ *
+ * A target axis may be declared only once. `--x64 --arm64`, `--x64 --arch
+ * arm64` and `--platform darwin --platform win32` are all refusals rather than
+ * a silent last-one-wins: a duplicated target is exactly the case where the
+ * preflight and the package could end up on different targets.
+ */
 export function parseReleaseArgs(argv) {
-  const options = { platform: null, arch: null, dir: false, publish: null };
+  const options = { platform: null, arch: null, dir: false, publish: null, forwarded: [] };
+  const platformDeclarations = [];
+  const archDeclarations = [];
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--platform" || arg === "--arch" || arg === "--publish") {
       const value = argv[index + 1];
       if (value === undefined || value.startsWith("-")) throw new Error(`${arg} requires a value`);
       index += 1;
-      if (arg === "--platform") options.platform = value;
-      else if (arg === "--arch") options.arch = value;
-      else options.publish = value;
+      if (arg === "--platform") {
+        platformDeclarations.push(`--platform ${value}`);
+        options.platform = value;
+      } else if (arg === "--arch") {
+        archDeclarations.push(`--arch ${value}`);
+        options.arch = value;
+      } else {
+        if (options.publish !== null) throw new Error("--publish given more than once");
+        options.publish = value;
+      }
     } else if (arg === "--dir") {
       options.dir = true;
     } else if (arg in ARCH_FLAG_TO_ARCH) {
+      archDeclarations.push(arg);
       options.arch = ARCH_FLAG_TO_ARCH[arg];
     } else {
-      throw new Error(`unknown argument: ${arg}`);
+      options.forwarded.push(arg);
     }
+  }
+  if (platformDeclarations.length > 1) {
+    throw new Error(
+      `the release platform must be given once; got ${platformDeclarations.join(", ")}`,
+    );
+  }
+  if (archDeclarations.length > 1) {
+    throw new Error(
+      `the release architecture must be given once; got ${archDeclarations.join(", ")}`,
+    );
   }
   return options;
 }
@@ -131,6 +177,7 @@ export function planRelease(argv, host = HOST) {
         ...(parsed.dir ? ["--dir"] : []),
         "--publish",
         parsed.publish ?? "never",
+        ...parsed.forwarded,
       ],
       cwd: DESKTOP_DIR,
     },

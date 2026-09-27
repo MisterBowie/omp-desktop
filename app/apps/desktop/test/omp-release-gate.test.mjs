@@ -295,3 +295,110 @@ test("a cross-target release cannot reuse the host binary", () => {
   assert.equal(noArch.status, 1);
   assert.match(noArch.stderr, /--arch is required/);
 });
+
+/**
+ * The signed macOS lane, verbatim from `release.yml`: the architecture and the
+ * builder configuration the upstream package script forwards to
+ * electron-builder. Refusing these was review finding F1.
+ */
+const SIGNED_MACOS_ARGS = [
+  "--arm64",
+  "-c.mac.forceCodeSigning=true",
+  "-c.mac.notarize=true",
+];
+
+test("the release entry forwards the builder arguments it does not own", () => {
+  const plan = planRelease(["--platform", "darwin", ...SIGNED_MACOS_ARGS], {
+    platform: "darwin",
+    arch: "arm64",
+  });
+  // Handed to electron-builder unchanged and in the given order.
+  assert.deepEqual(plan.builder.args.slice(-2), [
+    "-c.mac.forceCodeSigning=true",
+    "-c.mac.notarize=true",
+  ]);
+  assert.ok(plan.builder.args.includes("--mac"));
+  assert.ok(plan.builder.args.includes("--arm64"));
+  // Forwarding did not cost the entry its own arguments.
+  assert.ok(plan.builder.args.includes("--publish"));
+  assert.ok(plan.builder.args.includes("never"));
+  assert.equal(plan.target.arch, "arm64");
+
+  // Order is preserved relative to each other, whatever else is in between.
+  const interleaved = planRelease(
+    ["--platform", "darwin", "-c.mac.target=default", "--dir", "-c.mac.notarize=true"],
+    { platform: "darwin", arch: "arm64" },
+  );
+  assert.deepEqual(
+    interleaved.builder.args.filter((arg) => arg.startsWith("-c.")),
+    ["-c.mac.target=default", "-c.mac.notarize=true"],
+  );
+  assert.ok(interleaved.builder.args.includes("--dir"));
+});
+
+test("forwarded arguments reach electron-builder only after the preflight passes", () => {
+  const host = { platform: "darwin", arch: "arm64" };
+  const calls = [];
+  const code = runRelease(["--platform", "darwin", ...SIGNED_MACOS_ARGS], {
+    host,
+    spawn: (command, args) => {
+      calls.push({ command, args });
+      return { status: 0 };
+    },
+  });
+  assert.equal(code, 0);
+  assert.equal(calls.length, 2, "one preflight and one electron-builder invocation");
+  assert.match(calls[0].args[0], /omp-sidecar\.mjs$/);
+  assert.equal(calls[0].args[1], "--preflight");
+  assert.equal(calls[0].args[calls[0].args.indexOf("--arch") + 1], "arm64");
+  // The builder arguments arrive, and electron-builder is still the last call.
+  assert.deepEqual(
+    calls[1].args.filter((arg) => arg.startsWith("-c.mac.")),
+    ["-c.mac.forceCodeSigning=true", "-c.mac.notarize=true"],
+  );
+  assert.ok(calls[1].args.includes("--mac"));
+  assert.ok(calls[1].args.includes("--arm64"));
+
+  // A failing preflight still stops the forwarding: electron-builder never runs.
+  const attempted = [];
+  const failed = runRelease(["--platform", "darwin", ...SIGNED_MACOS_ARGS], {
+    host,
+    spawn: (command) => {
+      attempted.push(command);
+      return { status: 1 };
+    },
+  });
+  assert.equal(failed, 1);
+  assert.equal(attempted.length, 1, "electron-builder must not run when the preflight refuses");
+});
+
+test("a conflicting or repeated target is refused instead of silently picked", () => {
+  const host = { platform: "darwin", arch: "arm64" };
+  const conflicts = [
+    ["--platform", "darwin", "--x64", "--arm64"],
+    ["--platform", "darwin", "--x64", "--arch", "arm64"],
+    ["--platform", "darwin", "--arch", "x64", "--arch", "arm64"],
+    ["--platform", "darwin", "--x64", "--x64"],
+    ["--platform", "darwin", "--platform", "darwin"],
+    ["--platform", "darwin", "--publish", "never", "--publish", "always"],
+  ];
+  for (const argv of conflicts) {
+    assert.throws(
+      () => planRelease(argv, host),
+      /must be given once|given more than once/,
+      `${JSON.stringify(argv)} must be refused`,
+    );
+  }
+
+  // The same refusal stops the run before anything is spawned.
+  const calls = [];
+  const code = runRelease(["--platform", "darwin", "--x64", "--arm64"], {
+    host,
+    spawn: (command, args) => {
+      calls.push([command, args]);
+      return { status: 0 };
+    },
+  });
+  assert.equal(code, 2);
+  assert.deepEqual(calls, [], "nothing may be spawned for an ambiguous target");
+});
