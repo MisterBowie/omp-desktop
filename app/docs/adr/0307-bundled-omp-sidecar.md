@@ -1,8 +1,12 @@
 # ADR 0307: The bundled OMP sidecar is a verified build product
 
-- Status: Accepted (M5/T20-R4B). Adds a packaged-runtime admission rule; it does
-  **not** lift the R3 blocker, does not implement Plan/Goal runtime surfaces,
-  and does not change the pinned patch level's semantics (ADR 0305).
+- Status: Accepted (M5/T20-R4B), **partially complete**: the packaged-runtime
+  admission rules below ship and are tested, but the R4-3 acceptance clause
+  "identical inputs produce an identical manifest" is **not satisfied** (the Bun
+  single-file build is not bit-reproducible), so R4B is recorded as
+  partial/blocked rather than complete. Adds a packaged-runtime admission rule;
+  it does **not** lift the R3 blocker, does not implement Plan/Goal runtime
+  surfaces, and does not change the pinned patch level's semantics (ADR 0305).
 - Date: 2026-09-27
 - Evidence: `docs/validation/M5-bundled-sidecar.md`,
   `app/scripts/omp-sidecar.mjs`, `app/packages/omp-runtime/src/bundled.ts`,
@@ -70,18 +74,29 @@ rather than a desktop-side reimplementation.
 ### 2. A provenance manifest the packaged application can re-prove
 
 The build writes `provenance.json` next to the executable:
-`schema` (`omp-desktop.bundled-sidecar/1`), `fork.{repository,commit,tree}`,
+`schema` (`omp-desktop.bundled-sidecar/2`), `fork.{repository,commit,tree}`,
 `upstreamBase.{sha,version}`, `patchLevel`, `capabilities`, `ompVersion`,
 `desktopVersion`, `platform`, `arch`, `binary.{filename,bytes,sha256}`,
 `extensions[]` (`{path,bytes,sha256}`), and `build.{tool,bunVersion}`. Every
 value is read from the validated checkout, the patch manifest, the host, or the
-produced file — none is entered by hand.
+produced file — none is entered by hand. The schema is `/2` rather than a
+redefinition of `/1` because requiring `extensions`/`desktopVersion` changes the
+contract; `/1` documents were never shipped outside this repository and are now
+refused.
 
 **Verified at startup** (a mismatch refuses the runtime): the schema, the
 platform and architecture, the OMP version, the patch level, the upstream base
 SHA and version, the fork repository (normalized) and fork commit, the desktop
 release the artifact was built for, the binary's file name, and the byte count
 and SHA-256 of both the binary and every declared extension.
+
+An extension path is normalized to a relative POSIX path and refused unless it
+is one: no POSIX absolute path, no Windows drive path, no UNC path, and no
+empty/`.`/`..` segment; two spellings of the same file are a duplicate and are
+refused. The manifest must declare **exactly the trusted tool gate** — shipping
+a second extension is a product decision that needs its own ADR, and until one
+exists an extra entry is refused rather than loaded unreviewed.
+
 
 **Recorded, not verified**: `fork.tree`, `capabilities` and `build.*`. A
 packaged application cannot re-derive them — it has no repository and no
@@ -125,6 +140,22 @@ disk. Every refusal is `OmpRuntimeError("bundled-runtime-invalid")`; a packaged
 build with no usable sidecar reports an unavailable engine instead of running
 something else.
 
+Containment is decided in one canonical form: the resources root and
+`omp-runtime` are both resolved with `realpath` before they are compared, so an
+aliased ancestor (macOS resolves the default temp root `/var/...` to
+`/private/var/...`) is not a false escape. The `lstat` refusals are unchanged —
+`omp-runtime`, the binary, the manifest and the gate are still rejected when the
+final component is a symlink, even under a linked ancestor.
+
+The refusal is also *explained*. `resolveBundledGate` answers usable-or-not; the
+session bridge uses `inspectBundledGate`, which preserves the
+`bundled-runtime-invalid` code and the concrete detail (which file disagreed and
+how) and wires it through `requireGate`/`requireLauncher` — including the
+adapter's `launcherError` — into prompt and control-operation errors. A packaged
+build with a tampered binary, manifest or gate therefore reports the reason
+instead of a generic "gate not found", and there is no development fallback on
+that path.
+
 ### 4. Identity and protocol are asserted before a session exists
 
 The existing start path already probes `--version` before spawning and
@@ -144,31 +175,46 @@ build has no repository to read. They are not hand-maintained evidence:
 manifest, and `scripts/omp-sidecar.mjs --check` refuses a checkout that
 disagrees with either.
 
-### 6. Every packaging command runs the preflight
+### 6. Every packaging command picks the target once and runs the preflight
 
-`pack`, `dist`, `dist:mac`, `dist:win` and `dist:linux` each run
-`pnpm run verify:sidecar[:<platform>]` between `bundle:runtime` and
-`electron-vite build`. This mirrors upstream PI Desktop, whose `pack`/`dist*`
-commands build the sidecar bundle in-chain (`bundle:runtime`) before
-`electron-builder`, rather than trusting whatever happens to be on disk; the OMP
-runtime needs a stricter form of the same step because it is a native,
+`pack`, `dist`, `dist:mac`, `dist:win` and `dist:linux` each end in
+`scripts/release-package.mjs`; the entry parses the release target once and uses
+it for both target-sensitive steps, so the sidecar preflight and
+electron-builder can never disagree. This mirrors upstream PI Desktop, whose
+`pack`/`dist*` commands build the sidecar bundle in-chain (`bundle:runtime`)
+before `electron-builder`, rather than trusting whatever happens to be on disk;
+the OMP runtime needs a stricter form of the same step because it is a native,
 platform-specific artifact:
 
-- **Host target**: the preflight builds the sidecar (`--build`), so a missing or
-  stale artifact cannot be packaged.
+- **Host target**: the preflight builds the sidecar, so a missing or stale
+  artifact cannot be packaged.
 - **Non-host target**: it refuses to compile (there is no cross-compiler here)
   and requires an artifact staged for exactly that platform and architecture
   that verifies against *the controlled manifest being released* — a foreign
   patch level, fork commit, base or desktop version is refused. The host binary
   is never reused for another platform, and a cross-target release without an
-  explicit `--arch` is refused instead of defaulting to the host's.
+  explicit architecture is refused before any process is spawned.
+- **One target, two consumers**: `pnpm run dist:mac -- --x64` appends `--x64`
+  only to the last command of the chain, so a mid-chain preflight could not see
+  it (an arm64 Mac would build an arm64 sidecar and package it into an x64 app).
+  The entry is that last command: it derives the architecture from the
+  passthrough (host architecture when a darwin build is native, fixed x64 for
+  `win32`/`linux`) and passes the same platform/architecture to the preflight
+  and to electron-builder. It runs electron-builder only after the preflight
+  succeeds.
 
-`apps/desktop/test/omp-release-gate.test.mjs` asserts each release command still
-runs the right preflight in the right position, and exercises the refusals with
-fixture artifacts.
+`apps/desktop/test/omp-release-gate.test.mjs` asserts each release command
+bundles the runtime before the target-aware entry, checks the extracted target
+selection behaviorally (the preflight and electron-builder receive the same
+platform/architecture; a cross target without an architecture fails without
+spawning), and exercises the preflight refusals with fixture artifacts.
 
 ## Consequences
 
+- **This ADR is partially implemented.** The admission, build, release-target
+  and diagnostics rules below are in force and tested; the R4-3 reproducibility
+  clause is not, so M5/T20-R4B is recorded as partial/blocked in HANDOFF, the
+  task board and the runtime spec rather than complete.
 - A shipped application cannot be pointed at another runtime by an environment
   variable, a stray `omp` on `PATH`, or a directory that happens to look right.
 - The build gains one gate and one manifest; developers must pass `--source`
