@@ -40,7 +40,7 @@ export function mockPathEntries(): string[] {
 }
 
 /** The pinned version the tests claim the mock reports. */
-export const MOCK_VERSION = "18.2.7";
+export const MOCK_VERSION = "18.3.0";
 
 export function makeRoot(label: string): string {
   return mkdtempSync(join(tmpdir(), `omp-runtime-${label}-`));

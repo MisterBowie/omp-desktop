@@ -1,5 +1,5 @@
 /**
- * T19-C probes against the *pinned* OMP 18.2.7 runtime: the desktop skill
+ * T19-C probes against the *pinned* OMP 18.3.0 runtime: the desktop skill
  * catalog and project memory reach the provider-visible system prompt through
  * the trusted gate's `before_agent_start`, skill bodies stay out until the
  * model calls the on-demand `Skill` host tool (whose body then reaches a
@@ -126,7 +126,7 @@ function skillSupervisor({ dataRoot, project, provider, sessionDir }) {
   const supervisor = new OmpRuntimeSupervisor({
     dataRoot,
     launcherPath: LAUNCHER,
-    expectedRuntimeVersion: "18.2.7",
+    expectedRuntimeVersion: "18.3.0",
     sessionDir,
     args: ["--trusted-extension", GATE],
     prepareRun: (paths) => {

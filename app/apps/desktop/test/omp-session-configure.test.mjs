@@ -57,7 +57,7 @@ function harness({ persistImpl, reclaimResult = { ok: true, failures: [] } } = {
     started: 0,
     reclaims: 0,
     setWorkingDirectory() {},
-    status() { return { engine: "omp", phase: this.started > 0 ? "idle" : "stopped", runtimeVersion: this.started > 0 ? "18.2.7" : null, protocolVersion: 2, reason: null, capabilities: {} }; },
+    status() { return { engine: "omp", phase: this.started > 0 ? "idle" : "stopped", runtimeVersion: this.started > 0 ? "18.3.0" : null, protocolVersion: 2, reason: null, capabilities: {} }; },
     async start() { this.started += 1; return this.status(); },
     async stop() { return { stopped: true, reaped: true, cleaned: true, steps: [], errors: [] }; },
     currentRuntime: () => runtime,

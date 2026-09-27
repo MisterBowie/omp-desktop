@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
-  "patchLevel": "d49918f+omp-desktop.1",
+  "patchLevel": "62bc57b+omp-desktop.2",
   "description": "OMP Desktop patch set for the pinned upstream OMP runtime: RPC host-tool scheduling and batch policy, settle-time run termination, and the all-toolCall batch count. Risk reduction only: it does NOT make the sole-batch contract strict — see status.",
   "base": {
     "submodule": "upstream/oh-my-pi",
     "repository": "https://github.com/can1357/oh-my-pi",
-    "sha": "d49918fab2dba3986927f2d46721629ed0f3a02c",
-    "version": "18.2.7"
+    "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+    "version": "18.3.0"
   },
   "patch": {
     "file": "0001-rpc-host-tool-transition-contract.patch",
-    "sha256": "e08ca7fff29bbd03e298f4488888b2692adda1486e3fff80536a31dd8af6fd5c",
-    "bytes": 72978
+    "sha256": "4edbfadff9cc3238ae6bb7c206e7d8e0be33c2190068e6731fdb58e43ec9b545",
+    "bytes": 72910
   },
   "capabilities": [
     "rpc-host-tool-concurrency",
@@ -52,9 +52,25 @@
       "packages/coding-agent/test/rpc-input-frame.test.ts"
     ]
   },
+  "history": [
+    {
+      "patchLevel": "d49918f+omp-desktop.1",
+      "base": {
+        "sha": "d49918fab2dba3986927f2d46721629ed0f3a02c",
+        "version": "18.2.7"
+      },
+      "patch": {
+        "sha256": "e08ca7fff29bbd03e298f4488888b2692adda1486e3fff80536a31dd8af6fd5c",
+        "bytes": 72978
+      },
+      "retired": "2026-09-27",
+      "retiredReason": "T20-R4A migrated the patch set to the new pinned base 62bc57be (omp/18.3.0); the 18.2.7 artifact is kept in git history, not in this tree."
+    }
+  ],
   "notes": [
-    "This is an OMP Desktop-maintained patch level, not upstream OMP support: the runtime remains pinned at d49918f (omp/18.2.7) plus this patch set.",
-    "Rebuild the patch after any source edit with: git -C <checkout> diff > app/patches/oh-my-pi/0001-rpc-host-tool-transition-contract.patch, then refresh patch.sha256 and patch.bytes."
+    "This is an OMP Desktop-maintained patch level, not upstream OMP support: the runtime remains pinned at 62bc57be (omp/18.3.0) plus this patch set.",
+    "Rebuild the patch after any source edit with: git -C <checkout> diff > app/patches/oh-my-pi/0001-rpc-host-tool-transition-contract.patch, then refresh patch.sha256 and patch.bytes.",
+    "The 18.3.0 artifact is the 18.2.7 artifact with exactly one changed context line: the 18.3.0 agent-loop.ts comment reads `wait` where 18.2.7 read `hub wait`. The added and removed line multisets are identical between the two artifacts."
   ],
   "status": {
     "soleBatchContract": "not-strict",

@@ -1,7 +1,7 @@
 /**
  * Real-runtime probes for the run-scoped capability-source boundary (M5/T19-A).
  *
- * Every probe drives the *pinned* OMP 18.2.7 runtime through the product
+ * Every probe drives the *pinned* OMP 18.3.0 runtime through the product
  * supervisor/bridge and asserts observable behavior — files the runtime would
  * load, processes it would spawn, and prompts it would assemble — never source
  * text. The launch arguments are captured from the production constructor
@@ -101,7 +101,7 @@ function boundarySupervisor({ dataRoot, project, provider, prepareExtra, session
   const supervisor = new OmpRuntimeSupervisor({
     dataRoot,
     launcherPath: LAUNCHER,
-    expectedRuntimeVersion: "18.2.7",
+    expectedRuntimeVersion: "18.3.0",
     sessionDir: sessionDir ?? ensureSessionStateDir(dataRoot),
     args,
     extraEnv,

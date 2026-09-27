@@ -23,7 +23,7 @@ import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 
 const mode = process.env.MOCK_OMP_MODE ?? "normal";
-const version = process.env.MOCK_OMP_VERSION ?? "omp/18.2.7";
+const version = process.env.MOCK_OMP_VERSION ?? "omp/18.3.0";
 const logPath = process.env.MOCK_OMP_LOG ?? null;
 const pidFile = process.env.MOCK_OMP_PID_FILE ?? null;
 

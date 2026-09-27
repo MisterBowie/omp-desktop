@@ -1,7 +1,7 @@
 {
   "experiment": "t20-feasibility-patched",
   "runId": null,
-  "startedAt": "2026-09-25T14:29:58.557Z",
+  "startedAt": "2026-09-27T13:20:29.342Z",
   "checks": [
     {
       "description": "s1-mixed-bash-first: process group reaped",
@@ -73,7 +73,7 @@
     {
       "description": "R3-d: abandoning a pending transition call cancels it by targetId",
       "ok": true,
-      "detail": "cancel.targetId=158d8ba9ded64aaf call.id=158d8ba9ded64aaf"
+      "detail": "cancel.targetId=15900ef45e25dffb call.id=15900ef45e25dffb"
     },
     {
       "description": "R3-d: the aborted turn terminates",
@@ -83,7 +83,7 @@
     {
       "description": "R3-d: the session stays observable after the abort",
       "ok": true,
-      "detail": "{\"id\":\"req-b1a27f70\",\"type\":\"response\",\"command\":\"get_state\",\"success\":true,\"data\":{\"model\":{\"id\":\"local-model\",\"name\":\"local-model\",\"api\":\"openai-completions\",\"provider\":\"m1fake\",\"baseUrl\":\"http://12"
+      "detail": "{\"id\":\"req-9d793819\",\"type\":\"response\",\"command\":\"get_state\",\"success\":true,\"data\":{\"model\":{\"id\":\"local-model\",\"name\":\"local-model\",\"api\":\"openai-completions\",\"provider\":\"m1fake\",\"baseUrl\":\"http://12"
     },
     {
       "description": "s7-abort-on-intercept: process group reaped",
@@ -195,22 +195,22 @@
     {
       "description": "R2: the block is a pure append — the prompt text ends with it, and no mode block leaks into the prefix",
       "ok": true,
-      "detail": "[12023,12023,12027]"
+      "detail": "[10272,10272,10276]"
     },
     {
       "description": "R2: UTF-8 bytes satisfy system = prefix + block on every prompt",
       "ok": true,
-      "detail": "prefixBytes=[14431,14431,14435] systemBytes=[14607,16157,16591] blockBytes=[176,1726,2156]"
+      "detail": "prefixBytes=[12644,12644,12648] systemBytes=[12820,14370,14804] blockBytes=[176,1726,2156]"
     },
     {
       "description": "R2: prompts with the same tool catalog keep byte-identical prefixes (the block does not perturb the base)",
       "ok": true,
-      "detail": "prefixBytes=[14431,14431,14435] tools0=read,grep,glob,bash,HostEcho tools1=read,grep,glob,bash,HostEcho"
+      "detail": "prefixBytes=[12644,12644,12648] tools0=read,grep,glob,bash,HostEcho tools1=read,grep,glob,bash,HostEcho"
     },
     {
       "description": "R2: a changed tool catalog changes the base prefix, not the append shape (prompt 3 vs 2)",
       "ok": true,
-      "detail": "prefixBytes2=14435 prefixBytes1=14431"
+      "detail": "prefixBytes2=12648 prefixBytes1=12644"
     },
     {
       "description": "R2: this is byte-parity evidence for the mode block only (source module equality)",
@@ -219,15 +219,15 @@
   ],
   "artifacts": {
     "patched.runtime": {
-      "patchLevel": "d49918f+omp-desktop.1",
-      "baseSha": "d49918fab2dba3986927f2d46721629ed0f3a02c",
+      "patchLevel": "62bc57b+omp-desktop.2",
+      "baseSha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
       "capabilities": [
         "rpc-host-tool-concurrency",
         "rpc-host-tool-sole-batch-policy",
         "agent-tool-result-terminate",
         "rpc-host-tool-result-terminate"
       ],
-      "launcher": "/tmp/omp-patch-LZdRLQ/packages/coding-agent/scripts/omp",
+      "launcher": "/tmp/omp-patch-KYoep9/packages/coding-agent/scripts/omp",
       "carriesPatch": {
         "batchPolicy": true,
         "concurrency": true,
@@ -275,13 +275,13 @@
     },
     "s6.observed": {
       "pendingCall": {
-        "id": "158d8ba9ded64aaf",
+        "id": "15900ef45e25dffb",
         "toolName": "SubmitPlan"
       },
       "hostToolCancel": {
         "type": "host_tool_cancel",
-        "id": "158d8baa93564ab0",
-        "targetId": "158d8ba9ded64aaf"
+        "id": "15900ef511a5dffc",
+        "targetId": "15900ef45e25dffb"
       },
       "agentEndCount": 1,
       "providerRequests": 1,
@@ -610,18 +610,18 @@
         false
       ],
       "systemBytes": [
-        14607,
-        16157,
-        16591
+        12820,
+        14370,
+        14804
       ],
       "prefixBytes": [
-        14431,
-        14431,
-        14435
+        12644,
+        12644,
+        12648
       ]
     }
   },
   "limitations": [],
-  "finishedAt": "2026-09-25T14:30:36.850Z",
+  "finishedAt": "2026-09-27T13:21:11.866Z",
   "ok": true
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * T20-A feasibility spike: can the *fixed* OMP 18.2.7 trusted-extension
+ * T20-A feasibility spike: can the *fixed* OMP 18.3.0 trusted-extension
  * surface + host-tool RPC implement PI's transition-tool contract?
  *
  * The contract under test (from the pinned PI Desktop source, see

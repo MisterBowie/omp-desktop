@@ -1,7 +1,7 @@
 {
   "experiment": "t20-feasibility",
   "runId": null,
-  "startedAt": "2026-09-25T14:26:05.738Z",
+  "startedAt": "2026-09-27T13:19:45.853Z",
   "checks": [
     {
       "description": "s1-mixed-bash-first: process group reaped",
@@ -73,7 +73,7 @@
     {
       "description": "R3-d: abandoning a pending transition call cancels it by targetId",
       "ok": true,
-      "detail": "cancel.targetId=158d8ac504a7c8a3 call.id=158d8ac504a7c8a3"
+      "detail": "cancel.targetId=15900ec4973c0b3d call.id=15900ec4973c0b3d"
     },
     {
       "description": "R3-d: the aborted turn terminates",
@@ -83,7 +83,7 @@
     {
       "description": "R3-d: the session stays observable after the abort",
       "ok": true,
-      "detail": "{\"id\":\"req-a83ef0f7\",\"type\":\"response\",\"command\":\"get_state\",\"success\":true,\"data\":{\"model\":{\"id\":\"local-model\",\"name\":\"local-model\",\"api\":\"openai-completions\",\"provider\":\"m1fake\",\"baseUrl\":\"http://12"
+      "detail": "{\"id\":\"req-252b0bbb\",\"type\":\"response\",\"command\":\"get_state\",\"success\":true,\"data\":{\"model\":{\"id\":\"local-model\",\"name\":\"local-model\",\"api\":\"openai-completions\",\"provider\":\"m1fake\",\"baseUrl\":\"http://12"
     },
     {
       "description": "s7-abort-on-intercept: process group reaped",
@@ -195,22 +195,22 @@
     {
       "description": "R2: the block is a pure append — the prompt text ends with it, and no mode block leaks into the prefix",
       "ok": true,
-      "detail": "[12023,12023,12027]"
+      "detail": "[10272,10272,10276]"
     },
     {
       "description": "R2: UTF-8 bytes satisfy system = prefix + block on every prompt",
       "ok": true,
-      "detail": "prefixBytes=[14431,14431,14435] systemBytes=[14607,16157,16591] blockBytes=[176,1726,2156]"
+      "detail": "prefixBytes=[12644,12644,12648] systemBytes=[12820,14370,14804] blockBytes=[176,1726,2156]"
     },
     {
       "description": "R2: prompts with the same tool catalog keep byte-identical prefixes (the block does not perturb the base)",
       "ok": true,
-      "detail": "prefixBytes=[14431,14431,14435] tools0=read,grep,glob,bash,HostEcho tools1=read,grep,glob,bash,HostEcho"
+      "detail": "prefixBytes=[12644,12644,12648] tools0=read,grep,glob,bash,HostEcho tools1=read,grep,glob,bash,HostEcho"
     },
     {
       "description": "R2: a changed tool catalog changes the base prefix, not the append shape (prompt 3 vs 2)",
       "ok": true,
-      "detail": "prefixBytes2=14435 prefixBytes1=14431"
+      "detail": "prefixBytes2=12648 prefixBytes1=12644"
     },
     {
       "description": "R2: this is byte-parity evidence for the mode block only (source module equality)",
@@ -276,13 +276,13 @@
     },
     "s6.observed": {
       "pendingCall": {
-        "id": "158d8ac504a7c8a3",
+        "id": "15900ec4973c0b3d",
         "toolName": "SubmitPlan"
       },
       "hostToolCancel": {
         "type": "host_tool_cancel",
-        "id": "158d8ac5b8e7c8a4",
-        "targetId": "158d8ac504a7c8a3"
+        "id": "15900ec54abc0b3e",
+        "targetId": "15900ec4973c0b3d"
       },
       "agentEndCount": 1,
       "providerRequests": 1,
@@ -329,7 +329,7 @@
     "s7.observed": {
       "abortEvents": [
         {
-          "at": 1790346383280,
+          "at": 1790515203628,
           "event": "spike_abort_requested",
           "toolName": "SubmitPlan",
           "hadAbort": true
@@ -622,14 +622,14 @@
         false
       ],
       "systemBytes": [
-        14607,
-        16157,
-        16591
+        12820,
+        14370,
+        14804
       ],
       "prefixBytes": [
-        14431,
-        14431,
-        14435
+        12644,
+        12644,
+        12648
       ]
     }
   },
@@ -637,6 +637,6 @@
     "A mixed batch containing a transition tool is the exact case PI's beforeToolCall batch guard exists for; the patched track enforces it (`--patched`).",
     "Abort-on-intercept is the only per-batch lever the fixed surface offers; if it works it is abort semantics, not PI's block-and-continue."
   ],
-  "finishedAt": "2026-09-25T14:26:42.224Z",
+  "finishedAt": "2026-09-27T13:20:22.661Z",
   "ok": false
 }

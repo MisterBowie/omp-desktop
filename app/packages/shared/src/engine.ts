@@ -332,7 +332,7 @@ export const OMP_PROTOCOL_VERSION = 2;
  * package refuses to start a process that reports anything else unless the
  * caller explicitly opts out.
  */
-export const OMP_RUNTIME_VERSION = "18.2.7";
+export const OMP_RUNTIME_VERSION = "18.3.0";
 
 /** One JSONL frame, newline included (`rpc-frame.ts` MAX_RPC_FRAME_BYTES). */
 export const OMP_MAX_FRAME_BYTES = 1024 * 1024;

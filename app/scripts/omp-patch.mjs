@@ -9,9 +9,9 @@
  *
  * Modes:
  *   --check
- *     Validate the manifest (base SHA, expected version, patch checksum) and
- *     prove the patch set applies cleanly to a fresh copy of the pinned
- *     source. Scratch is always removed.
+ *     Validate the manifest (base SHA, expected version, patch level naming,
+ *     patch checksum and byte count) and prove the patch set applies cleanly
+ *     to a fresh copy of the pinned source. Scratch is always removed.
  *   --apply [--out <dir>] [--prepare-build] [--verify]
  *     Produce the patched tree. Without `--out` the tree is a temporary
  *     directory: `--verify` then proves it in place and it is removed again.
@@ -48,6 +48,7 @@ import {
   readdirSync,
   realpathSync,
   rmSync,
+  statSync,
 } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, parse, relative, resolve, sep } from "node:path";
@@ -124,6 +125,7 @@ export function loadManifest(manifestPath = defaultManifest) {
     ["base.version", manifest.base?.version],
     ["patch.file", manifest.patch?.file],
     ["patch.sha256", manifest.patch?.sha256],
+    ["patch.bytes", manifest.patch?.bytes],
   ]) {
     if (typeof value !== "string" && typeof value !== "number") {
       throw new PatchError(`manifest field ${field} is missing`);
@@ -140,6 +142,19 @@ export function loadManifest(manifestPath = defaultManifest) {
   if (!/^[0-9a-f]{40}$/.test(manifest.base.sha)) {
     throw new PatchError(`manifest.base.sha is not a full commit id: ${manifest.base.sha}`);
   }
+  if (!/^[0-9a-f]{7}\+[a-z0-9][a-z0-9.-]*$/.test(manifest.patchLevel)) {
+    throw new PatchError(
+      `manifest.patchLevel is not <base-short-sha>+<marker>: ${JSON.stringify(manifest.patchLevel)}`,
+    );
+  }
+  if (!manifest.patchLevel.startsWith(`${manifest.base.sha.slice(0, 7)}+`)) {
+    throw new PatchError(
+      `manifest.patchLevel ${manifest.patchLevel} does not name base ${manifest.base.sha.slice(0, 7)}`,
+    );
+  }
+  if (!Number.isInteger(manifest.patch.bytes) || manifest.patch.bytes <= 0) {
+    throw new PatchError(`manifest.patch.bytes is not a positive integer: ${JSON.stringify(manifest.patch.bytes)}`);
+  }
 
   const patchesDir = dirname(resolvedManifest);
   const patchPath = resolve(patchesDir, manifest.patch.file);
@@ -152,6 +167,10 @@ export function loadManifest(manifestPath = defaultManifest) {
   const actualSha = sha256File(patchPath);
   if (actualSha !== manifest.patch.sha256) {
     throw new PatchError(`patch checksum mismatch: manifest ${manifest.patch.sha256}, file ${actualSha}`);
+  }
+  const actualBytes = statSync(patchPath).size;
+  if (actualBytes !== manifest.patch.bytes) {
+    throw new PatchError(`patch byte count mismatch: manifest ${manifest.patch.bytes}, file ${actualBytes}`);
   }
   return { manifest, manifestPath: resolvedManifest, patchesDir, patchPath };
 }

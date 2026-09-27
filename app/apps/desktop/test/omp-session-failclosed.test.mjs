@@ -63,7 +63,7 @@ function fakeSupervisor(runtime, { reclaimThrows = false, reclaimStopped = false
     workingDirectory: null,
     setWorkingDirectory(path) { this.workingDirectory = path; },
     status() {
-      return { engine: "omp", phase: this.started > 0 ? "idle" : "stopped", runtimeVersion: this.started > 0 ? "18.2.7" : null, protocolVersion: this.started > 0 ? 2 : null, reason: this.started > 0 ? null : "not-started", capabilities: {} };
+      return { engine: "omp", phase: this.started > 0 ? "idle" : "stopped", runtimeVersion: this.started > 0 ? "18.3.0" : null, protocolVersion: this.started > 0 ? 2 : null, reason: this.started > 0 ? null : "not-started", capabilities: {} };
     },
     async start() { this.started += 1; return this.status(); },
     async stop() { this.stopped.push(1); return { stopped: true, reaped: true, cleaned: true, steps: [], errors: [] }; },

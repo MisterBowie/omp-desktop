@@ -2,7 +2,7 @@
  * T20-A feasibility spike extension.
  *
  * This is an *experiment* extension, not product code and not a gate: it
- * measures what the fixed OMP 18.2.7 trusted-extension surface can actually
+ * measures what the fixed OMP 18.3.0 trusted-extension surface can actually
  * observe and change, so the T20-A rework can state the transition-tool
  * (SubmitPlan/SubmitGoal) contract from evidence instead of assumption.
  *

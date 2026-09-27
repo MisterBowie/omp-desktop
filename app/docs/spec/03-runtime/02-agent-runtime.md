@@ -1748,19 +1748,25 @@ T19-C delivers desktop skills and project memory through the same trusted gate
   added. T20 (Plan/Goal, real-mode propagation, high-privilege tools, child
   stop/`hasUI` policy) stays closed and unclaimed.
 
-## 15. Pinned runtime patch level (M5/T20-R3A, ADR 0305) — risk reduction, R3 not lifted
+## 15. Pinned runtime patch level (M5/T20-R3A; base migrated in M5/T20-R4A, ADR 0305) — risk reduction, R3 not lifted
 
 The runtime source stays at the pinned upstream commit; this project's
 additions to it live in `app/patches/oh-my-pi/` as a numbered patch set
-(`<base-short-sha>+omp-desktop.<n>`, currently `d49918f+omp-desktop.1`) with a
+(`<base-short-sha>+omp-desktop.<n>`, currently `62bc57b+omp-desktop.2`, pinned to
+`62bc57be1b03ef0802a33cf7f5f530e534527531` / `omp/18.3.0`) with a
 manifest that records the base SHA, the expected runtime version, the patch
-checksum and the capability ids. `scripts/omp-patch.mjs` is the only
+level, the patch checksum, byte count and the capability ids.
+`scripts/omp-patch.mjs` is the only
 application path: it validates the manifest against the source checkout, copies
 exactly the tracked tree of the pinned commit into a scratch directory, applies
 the patch, optionally copies the per-worktree dependency payload, optionally
 verifies the result, and removes every scratch it created on every path.
 Packaging (M6/T21) consumes `--apply --out <dir> --prepare-build`; nothing else
 re-implements patch application and the submodule is never edited by hand.
+T20-R4A re-cut the same patch set against the new base: the added and removed
+line multisets are unchanged, and the single hunk that had to be re-anchored is
+the `agent-loop.ts` comment `hub wait` → `wait` (see
+`docs/validation/M5-omp-18-3-patch-migration.md`).
 
 The patch set adds four capabilities the desktop declares on its own host tools,
 none of which names a desktop product:

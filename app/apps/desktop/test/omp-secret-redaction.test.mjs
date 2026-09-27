@@ -48,7 +48,7 @@ test("a synthetic credential only ever lands in the transient models.yml", async
       createSupervisor: () => ({
         setWorkingDirectory: () => undefined,
         status: () => ({ engine: "omp", phase: "stopped", runtimeVersion: null, protocolVersion: null, reason: null, capabilities: {} }),
-        start: async () => ({ engine: "omp", phase: "idle", runtimeVersion: "18.2.7", protocolVersion: 2, reason: null, capabilities: {} }),
+        start: async () => ({ engine: "omp", phase: "idle", runtimeVersion: "18.3.0", protocolVersion: 2, reason: null, capabilities: {} }),
         stop: async () => ({ stopped: true, reaped: true, cleaned: true, steps: [], errors: [] }),
         reclaimAll: async () => [],
         currentRuntime: () => null,

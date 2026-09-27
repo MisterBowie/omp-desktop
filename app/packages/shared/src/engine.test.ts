@@ -118,12 +118,12 @@ describe("session engine references", () => {
 
   it("treats a legacy record as Pi and keeps native handles", () => {
     const ref = sessionEngineRef({
-      runtimeVersion: "18.2.7",
+      runtimeVersion: "18.3.0",
       nativeSessionId: "abc",
       nativeSessionPath: "/tmp/abc.jsonl",
     });
     expect(ref.engine).toBe("pi");
-    expect(ref.runtimeVersion).toBe("18.2.7");
+    expect(ref.runtimeVersion).toBe("18.3.0");
     expect(ref.nativeSessionId).toBe("abc");
     expect(ref.nativeSessionPath).toBe("/tmp/abc.jsonl");
   });
@@ -150,7 +150,7 @@ describe("session engine references", () => {
 
   it("exposes the protocol and version pins the runtime must match", () => {
     expect(OMP_PROTOCOL_VERSION).toBe(2);
-    expect(OMP_RUNTIME_VERSION).toBe("18.2.7");
+    expect(OMP_RUNTIME_VERSION).toBe("18.3.0");
     expect(OMP_MAX_FRAME_BYTES).toBe(1024 * 1024);
     expect(OMP_MAX_REASSEMBLED_FRAME_BYTES).toBe(64 * 1024 * 1024);
     expect(OMP_MAX_REASSEMBLED_FRAME_BYTES).toBeGreaterThan(OMP_MAX_FRAME_BYTES);

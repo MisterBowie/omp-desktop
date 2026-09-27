@@ -1,6 +1,6 @@
 # OMP Desktop 开发交接
 
-更新时间：2026-09-27。当前状态：**M5/T20 受阻（R3 仍为硬阻塞，T20-B 不得开始；本轮 T20-R3D 交付「OMP 18.3 与 nornzach fork / bundled-sidecar 架构审计」——只读审计，不改生产代码/子模块/patch/manifest，R3 与 Cursor 产品门均不变；上一轮 T20-R3C 按用户决定交付「Plan/Goal 不支持 Cursor 模型」的产品门，并经三轮独立复审返修 F1-F7：不变量已下沉到 host-core 的持久化写入门，F5 起改为「每连接 TEMP 触发器」，F7 把升级路径固定为「迁移前清理旧持久残留 → 迁移 → 迁移后安装 TEMP 守卫」）**——T20-A（Plan/Goal 与高权限工具能力门：能力审计、基线红灯诊断与最小实现契约）已完成并经**三轮复审返修 + 一轮纯文档澄清**（R1-R4、F1-F7、F8-F12、F13/F14；分支 `codex/m5-plan-goal-capability-gates`；坐标：审计基线 `2ca256520980aa80bb812730fbad132e9e95f503` → T20-A 初稿 `07de0a725269486c909d36bcccb9d8bb209770de` → R1-R4 `5da616f04c1ec132954785b955c1b20cc17bfc54` → F1-F7 `dd2ec72cbe2dc2d338ce20467da390bb1110601e` → F8-F12 `25e0d4d254ff641df1840cfe2cd767a7e9f00eb1`，证据 `docs/validation/M5-plan-goal-capability-gates.md`）→ **T20-R3A「OMP 过渡工具契约补丁」已完成返修**（分支 `codex/m5-omp-transition-hooks`，基线 `ba7806c0646180b2b40a83fa998f2437295174af`，patch level **`d49918f+omp-desktop.1`**）：补丁提供 loop 层收敛（批次计数对齐 PI 的全部 toolCall、声明 sole 工具的会话关闭工具投机、整批拒绝、terminate 透传、RPC 边界严格校验）与可复现的 patch/应用脚本入口，**但复审 F3 判定严格契约在本层不可实现**——OMP 的 `kCursorExecResolved` 调用在 assistant message 形成前已由 provider/editor bridge 执行（`block-symbols.ts:46-57`、`agent.ts:1491-1497`），其副作用不可撤销，任何 loop 层实现都无法保证「整批零副作用」。**故 R3 仍是硬阻塞，T20-B 不得开始；上一轮「R3 已解除 / T20-B 可以开始」的声明已撤回**（证据与撤回声明：`docs/validation/M5-omp-transition-patch.md`、ADR 0305）。固定子模块 OMP `d49918fab`、PI `0111e306` 未动；**T20-B/C/D 未开始，T20 未完成、未声称**。
+更新时间：2026-09-27。当前状态：**M5/T20 受阻（R3 仍为硬阻塞，T20-B 不得开始；本轮 T20-R4A 完成「过渡契约补丁迁移到 OMP 18.3.0 基线」——`upstream/oh-my-pi` gitlink 升到 `62bc57be1b03ef0802a33cf7f5f530e534527531`（omp/18.3.0）、patch level `62bc57b+omp-desktop.2`、`OMP_RUNTIME_VERSION` 与运行期 mock/夹具同步为 `18.3.0`，R4B bundled sidecar 尚未开始，ADR 0306 的 Cursor 产品门保留，T20-B/C/D 未开始，证据 `docs/validation/M5-omp-18-3-patch-migration.md`；R4A 摘要见下方 §0；上一轮 T20-R3D 交付「OMP 18.3 与 nornzach fork / bundled-sidecar 架构审计」——只读审计，不改生产代码/子模块/patch/manifest，R3 与 Cursor 产品门均不变；上一轮 T20-R3C 按用户决定交付「Plan/Goal 不支持 Cursor 模型」的产品门，并经三轮独立复审返修 F1-F7：不变量已下沉到 host-core 的持久化写入门，F5 起改为「每连接 TEMP 触发器」，F7 把升级路径固定为「迁移前清理旧持久残留 → 迁移 → 迁移后安装 TEMP 守卫」）**——T20-A（Plan/Goal 与高权限工具能力门：能力审计、基线红灯诊断与最小实现契约）已完成并经**三轮复审返修 + 一轮纯文档澄清**（R1-R4、F1-F7、F8-F12、F13/F14；分支 `codex/m5-plan-goal-capability-gates`；坐标：审计基线 `2ca256520980aa80bb812730fbad132e9e95f503` → T20-A 初稿 `07de0a725269486c909d36bcccb9d8bb209770de` → R1-R4 `5da616f04c1ec132954785b955c1b20cc17bfc54` → F1-F7 `dd2ec72cbe2dc2d338ce20467da390bb1110601e` → F8-F12 `25e0d4d254ff641df1840cfe2cd767a7e9f00eb1`，证据 `docs/validation/M5-plan-goal-capability-gates.md`）→ **T20-R3A「OMP 过渡工具契约补丁」已完成返修**（分支 `codex/m5-omp-transition-hooks`，基线 `ba7806c0646180b2b40a83fa998f2437295174af`，patch level **`d49918f+omp-desktop.1`**）：补丁提供 loop 层收敛（批次计数对齐 PI 的全部 toolCall、声明 sole 工具的会话关闭工具投机、整批拒绝、terminate 透传、RPC 边界严格校验）与可复现的 patch/应用脚本入口，**但复审 F3 判定严格契约在本层不可实现**——OMP 的 `kCursorExecResolved` 调用在 assistant message 形成前已由 provider/editor bridge 执行（`block-symbols.ts:46-57`、`agent.ts:1491-1497`），其副作用不可撤销，任何 loop 层实现都无法保证「整批零副作用」。**故 R3 仍是硬阻塞，T20-B 不得开始；上一轮「R3 已解除 / T20-B 可以开始」的声明已撤回**（证据与撤回声明：`docs/validation/M5-omp-transition-patch.md`、ADR 0305）。固定子模块 OMP `d49918fab`、PI `0111e306` 未动；**T20-B/C/D 未开始，T20 未完成、未声称**。
 
 ## 0. M5/T20-R3D 交付摘要（本轮，架构审计）
 
@@ -180,7 +180,7 @@
 | --- | --- |
 | `app/` | 本项目直接管理的产品源码，导入自 PI-Desktop 0.15.2 |
 | `upstream/pi-desktop/` | PI-Desktop 原始源码子模块，固定基线提交 |
-| `upstream/oh-my-pi/` | OMP 18.2.7 源码参考子模块，固定基线提交 |
+| `upstream/oh-my-pi/` | OMP 源码参考子模块，固定基线提交（首次导入 18.2.7；**2026-09-27 / T20-R4A 起为 `62bc57be1b03ef0802a33cf7f5f530e534527531`（omp/18.3.0）**，见 `docs/source-baseline.json` 的 `upgrades`） |
 | `docs/source-baseline.json` | 精确 SHA、工具版本与准备状态 |
 | `docs/00-scope-and-decisions.md` | 范围和技术决策 |
 | `docs/01-source-audit.md` | 本地源码入口、真实协议和兼容性边界 |
@@ -198,7 +198,7 @@
 
 PI-Desktop SHA：`0111e306c120ad5820688d7608cb37bad8fbcc1f`
 
-OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
+OMP SHA：`62bc57be1b03ef0802a33cf7f5f530e534527531`（omp/18.3.0；首次导入值 `d49918fab2dba3986927f2d46721629ed0f3a02c` 记于 `docs/source-baseline.json` 的 `upgrades`）
 
 项目 GitHub 地址：`git@github.com:MisterBowie/omp-desktop.git`，主分支 `main`。根目录直接管理文档和 `app/`，上游参考采用固定提交的子模块。使用 `git clone --recurse-submodules` 或在克隆后运行 `git submodule update --init --recursive`。
 
@@ -264,7 +264,7 @@ OMP SHA：`d49918fab2dba3986927f2d46721629ed0f3a02c`
 
 T17 已通过最终独立复审并验收（验收代码基线 `ab07a888d6afb916561b80e5661ed27aa6be612a`，分支 `codex/m5-subagents`；含真实固定 OMP 端到端验收与 macOS arm64 独立复审，证据见 `docs/validation/M5-subagents.md` §0.15 与 §0.14）。T18 已通过独立复审并验收（验收产品基线 `a35da2f87a745fbedd8f5beb46368607c2f6b72e`，分支 `codex/m5-tool-results`，证据见 `docs/validation/M5-tool-results.md`）。T19-A（运行时能力源隔离、可信网关加载、能力所有权契约）已实现并验证（分支 `codex/m5-capability-sources`，基线 `ff4c1efed63475b9f552ace8a3f28f69b317e176`，证据见 `docs/validation/M5-capability-sources.md`）。T19-B（host-tool RPC）已实现并验证（分支 `codex/m5-host-tool-rpc`，证据见 `docs/validation/M5-host-tool-rpc.md`）。T19-C（桌面技能/记忆/插件用户路径）已实现并验证（分支 `codex/m5-capability-user-paths`，基线 `df49b84`，证据见 `docs/validation/M5-capability-user-paths.md`）。
 
-下一阶段入口：M5/T20 仍受阻（R3 未解除，T20-B/C/D 不得开始）；**本轮 T20-R3D 给出的下一实施阶段最小范围与验收矩阵（建议 T20-R4：18.3 基线/补丁迁移 + bundled sidecar 构建与启动闭环，不含 Plan/Goal 运行时面）见 `docs/validation/M5-omp-18-3-fork-audit.md` §10（R4-1..R4-9）**；其中“自有 fork 的仓库名/归属”与“是否以 18.3 为新基”需用户决策。R3 的解除仍需上游改动、产品层显式禁用 Cursor exec 通道，或用户明确接受语义差异（`docs/validation/M5-omp-transition-patch.md` §8）。仍在关闭的能力：`branch`/`steer`/`followUp`/`compact`、子代理单独停止（固定 OMP 无 per-child stop RPC）、子代理 `hasUI=false` 工具 gating（产品策略）、PI agent 扩展注入，留待对应阶段逐项开放。
+下一阶段入口：M5/T20 仍受阻（R3 未解除，T20-B/C/D 不得开始）。**本轮 T20-R4A 已完成「过渡契约补丁迁移到 OMP 18.3.0 基线」部分**（`upstream/oh-my-pi` gitlink = `62bc57be…`、patch level `62bc57b+omp-desktop.2`、`OMP_RUNTIME_VERSION` 与运行期 mock/夹具 = `18.3.0`；证据 `docs/validation/M5-omp-18-3-patch-migration.md`，对照矩阵见 `docs/validation/M5-omp-18-3-fork-audit.md` §10 的 R4-1/R4-2/R4-7/R4-8）。**T20-R4 的剩余部分是 R4B：bundled sidecar 的构建与启动闭环（R4-3..R4-6、R4-9）——尚未开始**，其中“自有 fork 的仓库名/归属”仍需用户决策，且打包态必须自加「只接受清单校验资源」的门（nornzach 的 `OMP_BUNDLED_OMP`/`OMP_SIDECAR=source`/资源树扫描在 `app.isPackaged` 下同样生效）。R3 的解除仍需上游改动、产品层显式禁用 Cursor exec 通道，或用户明确接受语义差异（`docs/validation/M5-omp-transition-patch.md` §8）。仍在关闭的能力：`branch`/`steer`/`followUp`/`compact`、子代理单独停止（固定 OMP 无 per-child stop RPC）、子代理 `hasUI=false` 工具 gating（产品策略）、PI agent 扩展注入，留待对应阶段逐项开放。
 
 ## 6. 下一轮必须保持的取舍
 

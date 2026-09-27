@@ -57,5 +57,25 @@
   "dependenciesInstalled": false,
   "applicationBuilt": false,
   "runtimeIntegrationTested": false,
-  "paidModelCallsMade": false
+  "paidModelCallsMade": false,
+  "upgrades": [
+    {
+      "date": "2026-09-27",
+      "task": "M5/T20-R4A",
+      "repository": "oh-my-pi",
+      "from": {
+        "commit": "d49918fab2dba3986927f2d46721629ed0f3a02c",
+        "version": "18.2.7",
+        "note": "gitlink recorded at first import"
+      },
+      "to": {
+        "commit": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+        "version": "18.3.0",
+        "ref": "refs/tags/v18.3.0",
+        "url": "https://github.com/can1357/oh-my-pi.git"
+      },
+      "productImpact": "Submodule gitlink moved to the new base; OMP_RUNTIME_VERSION and the runtime mocks/fixtures moved to 18.3.0; patch set re-cut to level 62bc57b+omp-desktop.2. R3 stays blocked and the Cursor product gate (ADR 0306) stays in force; T20-B/C/D not started.",
+      "evidence": "docs/validation/M5-omp-18-3-patch-migration.md"
+    }
+  ]
 }

@@ -67,9 +67,9 @@ describe("launcher resolution", () => {
 describe("version probe", () => {
   it("reads the runtime's version line", async () => {
     const root = scratch();
-    const launcher = executable(root, "version-ok", "#!/bin/sh\necho omp/18.2.7\n");
+    const launcher = executable(root, "version-ok", "#!/bin/sh\necho omp/18.3.0\n");
     const probe = await probeRuntimeVersion({ launcher, env: {}, cwd: root, timeoutMs: 5_000 });
-    expect(probe).toEqual({ version: "18.2.7", reported: "omp/18.2.7", exitCode: 0 });
+    expect(probe).toEqual({ version: "18.3.0", reported: "omp/18.3.0", exitCode: 0 });
   });
 
   it("reports an unreadable answer as no version instead of inventing one", async () => {
@@ -97,10 +97,10 @@ describe("version probe", () => {
   });
 
   it("compares against the pinned version and can be disabled", () => {
-    expect(runtimeVersionMismatch("18.2.7", "18.2.7")).toBeNull();
-    expect(runtimeVersionMismatch(null, "18.2.7")).toEqual({ expected: "18.2.7", reported: null });
-    expect(runtimeVersionMismatch("18.0.0", "18.2.7")).toEqual({
-      expected: "18.2.7",
+    expect(runtimeVersionMismatch("18.3.0", "18.3.0")).toBeNull();
+    expect(runtimeVersionMismatch(null, "18.3.0")).toEqual({ expected: "18.3.0", reported: null });
+    expect(runtimeVersionMismatch("18.0.0", "18.3.0")).toEqual({
+      expected: "18.3.0",
       reported: "18.0.0",
     });
     expect(runtimeVersionMismatch("anything", null)).toBeNull();

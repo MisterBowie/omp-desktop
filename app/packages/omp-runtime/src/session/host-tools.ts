@@ -1,7 +1,7 @@
 /**
  * The desktop's side of the pinned runtime's host-tool bridge (M5/T19-B).
  *
- * The pinned OMP 18.2.7 runtime exposes three frames for host-owned tools
+ * The pinned OMP 18.3.0 runtime exposes three frames for host-owned tools
  * (`modes/rpc/rpc-types.ts`):
  *
  *   - `host_tool_call`  — the agent wants one registered host tool executed.

@@ -149,7 +149,7 @@ function fakeSupervisor(runtime) {
       return {
         engine: "omp",
         phase: this.started > 0 ? "idle" : "stopped",
-        runtimeVersion: this.started > 0 ? "18.2.7" : null,
+        runtimeVersion: this.started > 0 ? "18.3.0" : null,
         protocolVersion: this.started > 0 ? 2 : null,
         reason: this.started > 0 ? null : "not-started",
         capabilities: {},
@@ -427,7 +427,7 @@ test("retains a directory-only debt across stop retries until it is removable", 
     pgid: 4242,
     currentPhase: "idle",
     usable: true,
-    runtimeVersion: "18.2.7",
+    runtimeVersion: "18.3.0",
     protocolVersion: 2,
     write: () => true,
     onFrame(fn) { handlers.add(fn); return () => handlers.delete(fn); },
@@ -445,7 +445,7 @@ test("retains a directory-only debt across stop retries until it is removable", 
     dataRoot: join(root, "data"),
     sessionDir,
     launcherPath: mockLauncher,
-    expectedRuntimeVersion: "18.2.7",
+    expectedRuntimeVersion: "18.3.0",
     prepareRun(paths) { runRoot = paths.runRoot; },
     runtimeFactory: async () => runtime,
   });
@@ -511,7 +511,7 @@ function c1Runtime(nativeId, nativePath, childRunning) {
     pgid: 4242,
     currentPhase: "idle",
     usable: true,
-    runtimeVersion: "18.2.7",
+    runtimeVersion: "18.3.0",
     protocolVersion: 2,
     commands,
     handlers,
@@ -560,7 +560,7 @@ function c1Harness({ childRunning = true } = {}) {
     dataRoot: join(root, "data"),
     sessionDir,
     launcherPath: mockLauncher,
-    expectedRuntimeVersion: "18.2.7",
+    expectedRuntimeVersion: "18.3.0",
     prepareRun(paths) { runRoot = paths.runRoot; },
     runtimeFactory: async () => {
       const runtime = c1Runtime(nativeId, nativePath, childRunning);
@@ -1396,7 +1396,7 @@ function messageRuntime(nativeId, nativePath, ordinal) {
     pgid: 5000 + ordinal,
     currentPhase: "idle",
     usable: true,
-    runtimeVersion: "18.2.7",
+    runtimeVersion: "18.3.0",
     protocolVersion: 2,
     commands,
     handlers,
@@ -1450,7 +1450,7 @@ function messageHarness() {
     dataRoot: join(root, "data"),
     sessionDir,
     launcherPath: mockLauncher,
-    expectedRuntimeVersion: "18.2.7",
+    expectedRuntimeVersion: "18.3.0",
     prepareRun(paths) { runRoot = paths.runRoot; },
     runtimeFactory: async () => {
       const runtime = messageRuntime(nativeId, nativePath, runtimes.length + 1);
@@ -1541,7 +1541,7 @@ function r2Harness() {
     dataRoot: join(root, "data"),
     sessionDir,
     launcherPath: mockLauncher,
-    expectedRuntimeVersion: "18.2.7",
+    expectedRuntimeVersion: "18.3.0",
     prepareRun(paths) { runRoot = paths.runRoot; },
     runtimeFactory: async () => {
       if (state.stopInFlight) state.startsDuringStop += 1;
@@ -1617,7 +1617,7 @@ function gatedRuntime(nativeId, nativePath, gate) {
     pgid: 8000,
     currentPhase: "idle",
     usable: true,
-    runtimeVersion: "18.2.7",
+    runtimeVersion: "18.3.0",
     protocolVersion: 2,
     commands,
     handlers,
@@ -1671,7 +1671,7 @@ function r3Harness(boundary, afterReclaim) {
     dataRoot: join(root, "data"),
     sessionDir,
     launcherPath: mockLauncher,
-    expectedRuntimeVersion: "18.2.7",
+    expectedRuntimeVersion: "18.3.0",
     prepareRun(paths) { runRoot = paths.runRoot; },
     runtimeFactory: async () => {
       const ordinal = runtimes.length + 1;
@@ -1802,7 +1802,7 @@ function d1Harness() {
     dataRoot: join(root, "data"),
     sessionDir,
     launcherPath: mockLauncher,
-    expectedRuntimeVersion: "18.2.7",
+    expectedRuntimeVersion: "18.3.0",
     runtimeFactory: async () => {
       if (state.disposeInFlight) state.startsDuringDispose += 1;
       const runtime = messageRuntime(nativeId, nativePath, runtimes.length + 1);
@@ -2034,7 +2034,7 @@ function shutdownAdmissionHarness() {
         dataRoot: join(root, `data-${id}`),
         sessionDir,
         launcherPath: mockLauncher,
-        expectedRuntimeVersion: "18.2.7",
+        expectedRuntimeVersion: "18.3.0",
         runtimeFactory: async () => {
           const frames = new Set();
           const failures = new Set();
@@ -2044,7 +2044,7 @@ function shutdownAdmissionHarness() {
             pgid: 5454 + runtimes.size,
             currentPhase: "idle",
             usable: true,
-            runtimeVersion: "18.2.7",
+            runtimeVersion: "18.3.0",
             protocolVersion: 2,
             commands: [],
             write() { return this.usable; },
@@ -2189,7 +2189,7 @@ function modelSwitchHarness() {
         dataRoot: join(root, `data-${supervisors.length}`),
         sessionDir,
         launcherPath: mockLauncher,
-        expectedRuntimeVersion: "18.2.7",
+        expectedRuntimeVersion: "18.3.0",
         runtimeFactory: async () => {
           const frames = new Set();
           const failures = new Set();
@@ -2200,7 +2200,7 @@ function modelSwitchHarness() {
             pgid: 6454 + number,
             currentPhase: "idle",
             usable: true,
-            runtimeVersion: "18.2.7",
+            runtimeVersion: "18.3.0",
             protocolVersion: 2,
             frames,
             failures,

@@ -113,7 +113,7 @@ test(
     const supervisor = new OmpRuntimeSupervisor({
       dataRoot,
       launcherPath: LAUNCHER,
-      expectedRuntimeVersion: "18.2.7",
+      expectedRuntimeVersion: "18.3.0",
       sessionDir,
       // `--model` is required for the runtime to forward the child's
       // `subagent_event` frames (discovery alone leaves the child stream
@@ -289,7 +289,7 @@ test(
     const supervisor = new OmpRuntimeSupervisor({
       dataRoot,
       launcherPath: LAUNCHER,
-      expectedRuntimeVersion: "18.2.7",
+      expectedRuntimeVersion: "18.3.0",
       sessionDir,
       args: ["--model", "m1fake/local-model", "--trusted-extension", GATE],
       extraEnv: {
@@ -404,7 +404,7 @@ test(
     const supervisor = new OmpRuntimeSupervisor({
       dataRoot,
       launcherPath: LAUNCHER,
-      expectedRuntimeVersion: "18.2.7",
+      expectedRuntimeVersion: "18.3.0",
       sessionDir,
       args: ["--model", "m1fake/local-model", "--trusted-extension", GATE],
       extraEnv: {

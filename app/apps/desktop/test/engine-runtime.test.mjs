@@ -91,7 +91,7 @@ test("OMP status comes from its runtime, and unshipped capabilities stay closed"
     ompStatus: {
       engine: "omp",
       phase: "idle",
-      runtimeVersion: "18.2.7",
+      runtimeVersion: "18.3.0",
       protocolVersion: 2,
       reason: "not-implemented",
       capabilities: OMP_ENGINE_CAPABILITIES,
@@ -99,7 +99,7 @@ test("OMP status comes from its runtime, and unshipped capabilities stay closed"
   });
   const status = idleOmp.status("omp");
   assert.equal(status.phase, "idle");
-  assert.equal(status.runtimeVersion, "18.2.7");
+  assert.equal(status.runtimeVersion, "18.3.0");
   assert.equal(status.protocolVersion, 2);
   assert.equal(status.reason, "not-implemented");
   // Running is not the same as shipped: only the capabilities M4 implements

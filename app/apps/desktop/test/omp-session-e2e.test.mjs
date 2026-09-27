@@ -121,7 +121,7 @@ test(
     const supervisor = new OmpRuntimeSupervisor({
       dataRoot,
       launcherPath: LAUNCHER,
-      expectedRuntimeVersion: "18.2.7",
+      expectedRuntimeVersion: "18.3.0",
       sessionDir,
       args: ["--trusted-extension", GATE],
       extraEnv: {

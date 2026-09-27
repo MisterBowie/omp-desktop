@@ -94,7 +94,7 @@ function fakeSupervisor(runtime) {
       return {
         engine: "omp",
         phase: this.started > 0 ? "idle" : "stopped",
-        runtimeVersion: this.started > 0 ? "18.2.7" : null,
+        runtimeVersion: this.started > 0 ? "18.3.0" : null,
         protocolVersion: this.started > 0 ? 2 : null,
         reason: this.started > 0 ? null : "not-started",
         capabilities: {},

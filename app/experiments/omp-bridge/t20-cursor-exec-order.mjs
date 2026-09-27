@@ -60,7 +60,7 @@ const argv = process.argv.slice(2);
 const ompIndex = argv.indexOf("--omp");
 const OMP_ROOT = resolve(ompIndex === -1 ? join(REPO_ROOT, "upstream/oh-my-pi") : argv[ompIndex + 1]);
 const AS_JSON = argv.includes("--json");
-const PINNED_OMP_SHA = "d49918fab2dba3986927f2d46721629ed0f3a02c";
+const PINNED_OMP_SHA = "62bc57be1b03ef0802a33cf7f5f530e534527531";
 const shaIndex = argv.indexOf("--expected-sha");
 const EXPECTED_OMP_SHA = shaIndex === -1 ? PINNED_OMP_SHA : argv[shaIndex + 1];
 if (shaIndex !== -1 && !/^[0-9a-f]{40}$/.test(EXPECTED_OMP_SHA ?? "")) {

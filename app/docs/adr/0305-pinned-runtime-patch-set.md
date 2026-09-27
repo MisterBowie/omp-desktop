@@ -1,9 +1,10 @@
 # ADR 0305: A maintainable patch level on the pinned OMP runtime
 
-- Status: Accepted (M5/T20-R3A), **revised after independent review (F3)**. The
+- Status: Accepted (M5/T20-R3A); base re-cut in M5/T20-R4A, **revised after
+  independent review (F3)**. The
   patch-set mechanism stands; the claim that the patch level satisfies PI's
   transition-tool contract does **not** — see "Unresolved (F3)".
-- Date: 2026-09-25 (F3 revision 2026-09-25)
+- Date: 2026-09-25 (F3 revision 2026-09-25; R4A base migration 2026-09-27)
 - Scope: how this project extends the pinned `upstream/oh-my-pi` runtime.
   T20-B/C/D remain declared, not claimed, and **T20-B must not start**: the R3
   blocker is not lifted.
@@ -43,23 +44,31 @@ unpinned one.
 ### 1. The runtime stays pinned; this project maintains a numbered patch level
 
 The submodule stays at its fixed commit and its gitlink never moves for a
-feature. What this project adds lives in `app/patches/oh-my-pi/`:
+feature — it moves only when the pinned baseline itself is upgraded (M5/T20-R4A
+moved it from `d49918fab2dba3986927f2d46721629ed0f3a02c`, `omp/18.2.7`, to
+`62bc57be1b03ef0802a33cf7f5f530e534527531`, `omp/18.3.0`, the
+`v18.3.0` tag of `can1357/oh-my-pi`). What this project adds lives in
+`app/patches/oh-my-pi/`:
 
 - `0001-*.patch` — a plain `git diff` against the pinned commit,
-- `manifest.json` — base SHA, expected runtime version, patch SHA-256 and byte
-  count, the capability ids, and the verification entry points.
+- `manifest.json` — base SHA, expected runtime version, the patch level, patch
+  SHA-256 and byte count, the capability ids, the patch's file list, the
+  verification entry points, and an append-only `history` of retired patch
+  levels.
 
 The patch level is named `<base-short-sha>+omp-desktop.<n>` (currently
-`d49918f+omp-desktop.1`) and is described as **maintained by OMP Desktop**, never
+`62bc57b+omp-desktop.2`; the previous `d49918f+omp-desktop.1` is recorded in
+`manifest.history`) and is described as **maintained by OMP Desktop**, never
 as upstream OMP support for the version. Anything that reports a runtime version
-must keep reporting `omp/18.2.7` plus the patch level from the manifest.
+must keep reporting `omp/18.3.0` plus the patch level from the manifest.
 
 ### 2. `app/scripts/omp-patch.mjs` is the only application path
 
 Developers and packaging never edit the submodule. The script:
 
 - validates the manifest (schema, base SHA against the source `HEAD`, runtime
-  version from `packages/utils/package.json`, patch checksum),
+  version from `packages/utils/package.json`, patch level naming against the
+  base SHA, patch checksum and byte count),
 - refuses a source checkout with uncommitted changes,
 - copies **exactly the tracked tree** of the pinned commit into a scratch
   directory (no `.git`), applies the patch, and proves it fully applied by
@@ -76,6 +85,21 @@ Developers and packaging never edit the submodule. The script:
 
 M6/T21 consumes `--apply --out <dir> --prepare-build` as its build entry point;
 nothing else re-implements patch application.
+
+### 2a. Base migration (M5/T20-R4A, 2026-09-27)
+
+The pinned baseline moved to can1357 `v18.3.0` (`62bc57be…`). The patch set was
+re-cut, not rewritten: comparing the added and removed line multisets of the two
+artifacts shows they are identical, and exactly one context line differs —
+`agent-loop.ts`'s comment reads `wait` where 18.2.7 read `hub wait`, so that
+hunk is re-anchored while the 50 lines it inserts are unchanged. The
+`agent-loop.ts` anchor was the only conflict predicted by the R3D fork audit
+(`docs/validation/M5-omp-18-3-fork-audit.md` §8) and is the only one observed.
+`OMP_RUNTIME_VERSION` and the runtime mocks/fixtures moved to `18.3.0` in the
+same commit so the product's pinned version, the submodule gitlink and the
+manifest cannot disagree. The patch set's *semantics* did not change, so every
+statement in sections 3 and "Unresolved (F3)" still applies, and R3 remains
+blocked. Evidence: `docs/validation/M5-omp-18-3-patch-migration.md`.
 
 ### 3. What the patch level provides (risk reduction, not a strict contract)
 

@@ -58,7 +58,7 @@ function makeHarness({ failFirstReclaims = 0 }) {
       // owns after a failed reclaim; model that so a second prompt fails.
       if (this.started > 0 && !reclaimed) throw new Error("the runtime is running; stop it before changing its working directory");
     },
-    status() { return { engine: "omp", phase: this.started > 0 ? "idle" : "stopped", runtimeVersion: this.started > 0 ? "18.2.7" : null, protocolVersion: 2, reason: null, capabilities: {} }; },
+    status() { return { engine: "omp", phase: this.started > 0 ? "idle" : "stopped", runtimeVersion: this.started > 0 ? "18.3.0" : null, protocolVersion: 2, reason: null, capabilities: {} }; },
     async start() {
       if (!reclaimed) throw new Error("a previous runtime directory could not be reclaimed");
       this.started += 1;

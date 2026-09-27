@@ -22,7 +22,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -74,7 +74,7 @@ function makeSourceFixture() {
   mkdirSync(join(source, "packages", "utils"), { recursive: true });
   mkdirSync(join(source, "src"), { recursive: true });
   writeFileSync(join(source, "packages", "coding-agent", "scripts", "omp"), "#!/usr/bin/env node\n");
-  writeFileSync(join(source, "packages", "utils", "package.json"), JSON.stringify({ version: "18.2.7" }));
+  writeFileSync(join(source, "packages", "utils", "package.json"), JSON.stringify({ version: "18.3.0" }));
   writeFileSync(join(source, "src", "example.ts"), "export const value = 1;\n");
   // A workspace package plus the hoisted relative symlink a build payload
   // carries; `.gitignore` keeps the payload out of the tracked tree.
@@ -89,7 +89,10 @@ function makeSourceFixture() {
   return { root, source, sha: git(source, ["rev-parse", "HEAD"]) };
 }
 
-function writeManifest(root, { sha, patchBody = GOOD_PATCH, sha256, patchFile = "0001-test.patch", version = "18.2.7", schemaVersion = 1 }) {
+function writeManifest(
+  root,
+  { sha, patchBody = GOOD_PATCH, sha256, patchFile = "0001-test.patch", version = "18.3.0", schemaVersion = 1, bytes },
+) {
   const patchesDir = join(root, "patches", "oh-my-pi");
   mkdirSync(patchesDir, { recursive: true });
   const patchPath = join(patchesDir, patchFile);
@@ -99,11 +102,12 @@ function writeManifest(root, { sha, patchBody = GOOD_PATCH, sha256, patchFile = 
     manifestPath,
     JSON.stringify({
       schemaVersion,
-      patchLevel: `${sha.slice(0, 7)}+test.1`,
+      patchLevel: `${sha.slice(0, 7)}+omp-desktop.1`,
       base: { sha, version },
       patch: {
         file: patchFile,
         sha256: sha256 ?? createHash("sha256").update(readFileSync(patchPath)).digest("hex"),
+        bytes: bytes ?? statSync(patchPath).size,
       },
       capabilities: ["test-capability"],
     }),
@@ -135,7 +139,7 @@ test("check applies the patch set to a scratch copy and leaves nothing behind", 
 
   assert.equal(result.status, 0, result.stderr);
   const report = JSON.parse(result.stdout.trim());
-  assert.equal(report.patchLevel, `${fixture.sha.slice(0, 7)}+test.1`);
+  assert.equal(report.patchLevel, `${fixture.sha.slice(0, 7)}+omp-desktop.1`);
   assert.equal(report.baseSha, fixture.sha);
   assert.equal(report.tree, null);
   assert.deepEqual(leftovers(tmp), []);
@@ -203,12 +207,12 @@ test("refuses a source whose version is not the manifest version", () => {
   const fixture = makeSourceFixture();
   const tmp = mkdtempSync(join(tmpdir(), "omp-patch-tmp-"));
   scratch.push(tmp);
-  const manifestPath = writeManifest(fixture.root, { sha: fixture.sha, version: "18.2.6" });
+  const manifestPath = writeManifest(fixture.root, { sha: fixture.sha, version: "18.3.1" });
 
   const result = runScript(["--check", "--manifest", manifestPath, "--source", fixture.source], tmp);
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /source version is 18\.2\.7, manifest expects 18\.2\.6/);
+  assert.match(result.stderr, /source version is 18\.3\.0, manifest expects 18\.3\.1/);
 });
 
 test("refuses a patch whose checksum does not match the manifest", () => {
@@ -221,6 +225,43 @@ test("refuses a patch whose checksum does not match the manifest", () => {
 
   assert.equal(result.status, 1);
   assert.match(result.stderr, /patch checksum mismatch/);
+  assert.deepEqual(leftovers(tmp), []);
+});
+
+test("refuses a patch whose byte count does not match the manifest", () => {
+  const fixture = makeSourceFixture();
+  const tmp = mkdtempSync(join(tmpdir(), "omp-patch-tmp-"));
+  scratch.push(tmp);
+  const manifestPath = writeManifest(fixture.root, { sha: fixture.sha, bytes: 1 });
+
+  const result = runScript(["--check", "--manifest", manifestPath, "--source", fixture.source], tmp);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /patch byte count mismatch: manifest 1, file \d+/);
+  assert.deepEqual(leftovers(tmp), []);
+});
+
+test("refuses a patch level that does not name the manifest base", () => {
+  const fixture = makeSourceFixture();
+  const tmp = mkdtempSync(join(tmpdir(), "omp-patch-tmp-"));
+  scratch.push(tmp);
+  const manifestPath = writeManifest(fixture.root, { sha: fixture.sha });
+  const rewrite = (patchLevel) => {
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    manifest.patchLevel = patchLevel;
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+    return runScript(["--check", "--manifest", manifestPath, "--source", fixture.source], tmp);
+  };
+
+  // A level naming a different base would describe a patch set that does not
+  // belong to the commit the manifest pins.
+  const otherBase = rewrite("0000000+omp-desktop.1");
+  assert.equal(otherBase.status, 1);
+  assert.match(otherBase.stderr, /does not name base [0-9a-f]{7}/);
+
+  const malformed = rewrite(`${fixture.sha.slice(0, 7)}-omp-desktop.1`);
+  assert.equal(malformed.status, 1);
+  assert.match(malformed.stderr, /patchLevel is not <base-short-sha>\+<marker>/);
   assert.deepEqual(leftovers(tmp), []);
 });
 

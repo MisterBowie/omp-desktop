@@ -1,5 +1,5 @@
 /**
- * T19-B probes against the *pinned* OMP 18.2.7 runtime: the three desktop tool
+ * T19-B probes against the *pinned* OMP 18.3.0 runtime: the three desktop tool
  * classes must be registered once per session through `set_host_tools`,
  * execute exactly once when the model calls them, and feed their real results
  * back into the model context — while a cancelled call leaves no late side
@@ -133,7 +133,7 @@ function hostToolSupervisor({ dataRoot, project, provider, sessionDir }) {
   const supervisor = new OmpRuntimeSupervisor({
     dataRoot,
     launcherPath: LAUNCHER,
-    expectedRuntimeVersion: "18.2.7",
+    expectedRuntimeVersion: "18.3.0",
     sessionDir,
     args: ["--trusted-extension", GATE],
     prepareRun: (paths) => {

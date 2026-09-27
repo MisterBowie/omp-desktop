@@ -1,14 +1,14 @@
 {
-  "generatedAt": "2026-09-25T15:24:24.898Z",
+  "generatedAt": "2026-09-27T13:23:40.647Z",
   "runtime": {
-    "ompRoot": "/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi",
-    "ompHead": "d49918fab2dba3986927f2d46721629ed0f3a02c",
-    "expectedOmpSha": "d49918fab2dba3986927f2d46721629ed0f3a02c",
-    "pinnedOmpSha": "d49918fab2dba3986927f2d46721629ed0f3a02c",
+    "ompRoot": "/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi",
+    "ompHead": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+    "expectedOmpSha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+    "pinnedOmpSha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
     "bun": "1.4.2",
     "node": "26.3.0",
     "fileHashes": {
-      "packages/ai/src/providers/cursor.ts": "e72442233d5b2f0d2acc43b8263dec1042d1965c10bd91c59e52fb8d4ade12d1",
+      "packages/ai/src/providers/cursor.ts": "34f5a9636e6577875c10cfe17c4f2fc88d72e7cfe1cb5bcb467aa044d09082c0",
       "packages/coding-agent/src/cursor.ts": "0e02a9d923dc9526684487a94252a193d4b2b353b8dfd7ebf1456976321cb0fc",
       "packages/ai/src/utils/block-symbols.ts": "5d9f39486f98c1cc34f7b7f7a556c3c42eca7bd37f1f0e834b467972d5ff6db1"
     }
@@ -89,7 +89,7 @@
           "toolCallId": "call-sibling-1",
           "args": {
             "command": "touch sibling.txt",
-            "cwd": "/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi"
+            "cwd": "/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi"
           }
         },
         {
@@ -108,7 +108,7 @@
           "frame": "execClientMessage",
           "answer": "shellResult",
           "result": "success",
-          "payload": "{\"$typeName\":\"agent.v1.ShellSuccess\",\"command\":\"touch sibling.txt\",\"workingDirectory\":\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\",\"exitCode\":0,\"signal\":\"\",\"stdout\":\"sibling ran\",\"stderr\":\"\",\"executionTime\":0}"
+          "payload": "{\"$typeName\":\"agent.v1.ShellSuccess\",\"command\":\"touch sibling.txt\",\"workingDirectory\":\"/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi\",\"exitCode\":0,\"signal\":\"\",\"stdout\":\"sibling ran\",\"stderr\":\"\",\"executionTime\":0}"
         },
         {
           "frame": "execClientMessage",
@@ -124,7 +124,7 @@
           "resolved": true,
           "args": {
             "command": "touch sibling.txt",
-            "cwd": "/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi"
+            "cwd": "/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi"
           }
         },
         {
@@ -245,7 +245,7 @@
           "toolCallId": "call-sibling-2",
           "args": {
             "command": "touch sibling.txt",
-            "cwd": "/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi"
+            "cwd": "/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi"
           }
         }
       ],
@@ -260,7 +260,7 @@
           "frame": "execClientMessage",
           "answer": "shellResult",
           "result": "success",
-          "payload": "{\"$typeName\":\"agent.v1.ShellSuccess\",\"command\":\"touch sibling.txt\",\"workingDirectory\":\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\",\"exitCode\":0,\"signal\":\"\",\"stdout\":\"sibling ran\",\"stderr\":\"\",\"executionTime\":0}"
+          "payload": "{\"$typeName\":\"agent.v1.ShellSuccess\",\"command\":\"touch sibling.txt\",\"workingDirectory\":\"/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi\",\"exitCode\":0,\"signal\":\"\",\"stdout\":\"sibling ran\",\"stderr\":\"\",\"executionTime\":0}"
         }
       ],
       "blocks": [
@@ -280,7 +280,7 @@
           "resolved": true,
           "args": {
             "command": "touch sibling.txt",
-            "cwd": "/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi"
+            "cwd": "/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi"
           }
         }
       ],
@@ -440,7 +440,7 @@
           "frame": "execClientMessage",
           "answer": "shellResult",
           "result": "rejected",
-          "payload": "{\"$typeName\":\"agent.v1.ShellRejected\",\"command\":\"touch sibling.txt\",\"workingDirectory\":\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\",\"reason\":\"Tool not available\",\"isReadonly\":false}"
+          "payload": "{\"$typeName\":\"agent.v1.ShellRejected\",\"command\":\"touch sibling.txt\",\"workingDirectory\":\"/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi\",\"reason\":\"Tool not available\",\"isReadonly\":false}"
         }
       ],
       "blocks": [
@@ -450,7 +450,7 @@
           "resolved": true,
           "args": {
             "command": "touch sibling.txt",
-            "cwd": "/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi"
+            "cwd": "/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi"
           }
         }
       ],
@@ -551,7 +551,7 @@
           "frame": "execClientMessage",
           "answer": "shellResult",
           "result": "rejected",
-          "payload": "{\"$typeName\":\"agent.v1.ShellRejected\",\"command\":\"touch sibling.txt\",\"workingDirectory\":\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\",\"reason\":\"Tool not available\",\"isReadonly\":false}"
+          "payload": "{\"$typeName\":\"agent.v1.ShellRejected\",\"command\":\"touch sibling.txt\",\"workingDirectory\":\"/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi\",\"reason\":\"Tool not available\",\"isReadonly\":false}"
         }
       ],
       "blocks": [
@@ -561,7 +561,7 @@
           "resolved": true,
           "args": {
             "command": "touch sibling.txt",
-            "cwd": "/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi"
+            "cwd": "/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi"
           }
         }
       ],
@@ -681,7 +681,7 @@
           "resolved": true,
           "args": {
             "command": "touch sibling.txt",
-            "cwd": "/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi"
+            "cwd": "/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi"
           }
         }
       ],
@@ -696,7 +696,7 @@
           "frame": "execClientMessage",
           "answer": "shellResult",
           "result": "rejected",
-          "payload": "{\"$typeName\":\"agent.v1.ShellRejected\",\"command\":\"touch sibling.txt\",\"workingDirectory\":\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\",\"reason\":\"Tool not available\",\"isReadonly\":false}"
+          "payload": "{\"$typeName\":\"agent.v1.ShellRejected\",\"command\":\"touch sibling.txt\",\"workingDirectory\":\"/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi\",\"reason\":\"Tool not available\",\"isReadonly\":false}"
         }
       ],
       "note": "measured: with no native handlers and no `mcp` handler, plus external handoff, the native sibling executes nothing but is answered `ShellRejected \"Tool not available\"` while its block stays synthesized+resolved; the non-native frame gets the handoff ack described above."
@@ -721,12 +721,12 @@
     {
       "name": "siblingFirst: the server is not told the sibling succeeded",
       "ok": false,
-      "detail": "[{\"frame\":\"execClientMessage\",\"answer\":\"shellResult\",\"result\":\"success\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.ShellSuccess\\\",\\\"command\\\":\\\"touch sibling.txt\\\",\\\"workingDirectory\\\":\\\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\\\",\\\"exitCode\\\":0,\\\"signal\\\":\\\"\\\",\\\"stdout\\\":\\\"sibling ran\\\",\\\"stderr\\\":\\\"\\\",\\\"executionTime\\\":0}\"},{\"frame\":\"execClientMessage\",\"answer\":\"mcpResult\",\"result\":\"success\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.McpSuccess\\\",\\\"content\\\":[{\\\"$typeName\\\":\\\"agent.v1.McpToolResultContentItem\\\",\\\"content\\\":{\\\"case\\\":\\\"text\\\",\\\"value\\\":{\\\"$typeName\\\":\\\"agent.v1.McpTextContent\\\",\\\"text\\\":\\\"plan submitted\\\"}}}],\\\"isError\\\":false}\"}]"
+      "detail": "[{\"frame\":\"execClientMessage\",\"answer\":\"shellResult\",\"result\":\"success\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.ShellSuccess\\\",\\\"command\\\":\\\"touch sibling.txt\\\",\\\"workingDirectory\\\":\\\"/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi\\\",\\\"exitCode\\\":0,\\\"signal\\\":\\\"\\\",\\\"stdout\\\":\\\"sibling ran\\\",\\\"stderr\\\":\\\"\\\",\\\"executionTime\\\":0}\"},{\"frame\":\"execClientMessage\",\"answer\":\"mcpResult\",\"result\":\"success\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.McpSuccess\\\",\\\"content\\\":[{\\\"$typeName\\\":\\\"agent.v1.McpToolResultContentItem\\\",\\\"content\\\":{\\\"case\\\":\\\"text\\\",\\\"value\\\":{\\\"$typeName\\\":\\\"agent.v1.McpTextContent\\\",\\\"text\\\":\\\"plan submitted\\\"}}}],\\\"isError\\\":false}\"}]"
     },
     {
       "name": "siblingFirst: the successful submit cannot end the run (no terminate reaches the loop)",
       "ok": false,
-      "detail": "blocks=[{\"id\":\"call-sibling-1\",\"name\":\"bash\",\"resolved\":true,\"args\":{\"command\":\"touch sibling.txt\",\"cwd\":\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\"}},{\"id\":\"call-submit-1\",\"name\":\"SubmitPlan\",\"resolved\":true,\"args\":{\"title\":\"T\",\"markdown\":\"# Plan\",\"question\":\"Approve?\"}}] results=[{\"toolCallId\":\"call-sibling-1\",\"toolName\":\"bash\",\"isError\":false,\"text\":\"sibling ran\",\"hasTerminate\":false},{\"toolCallId\":\"call-submit-1\",\"toolName\":\"SubmitPlan\",\"isError\":false,\"text\":\"plan submitted\",\"hasTerminate\":false}]"
+      "detail": "blocks=[{\"id\":\"call-sibling-1\",\"name\":\"bash\",\"resolved\":true,\"args\":{\"command\":\"touch sibling.txt\",\"cwd\":\"/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi\"}},{\"id\":\"call-submit-1\",\"name\":\"SubmitPlan\",\"resolved\":true,\"args\":{\"title\":\"T\",\"markdown\":\"# Plan\",\"question\":\"Approve?\"}}] results=[{\"toolCallId\":\"call-sibling-1\",\"toolName\":\"bash\",\"isError\":false,\"text\":\"sibling ran\",\"hasTerminate\":false},{\"toolCallId\":\"call-submit-1\",\"toolName\":\"SubmitPlan\",\"isError\":false,\"text\":\"plan submitted\",\"hasTerminate\":false}]"
     },
     {
       "name": "submitFirst: the sibling in a batch that also holds SubmitPlan executes ZERO times",
@@ -746,12 +746,12 @@
     {
       "name": "submitFirst: the server is not told the sibling succeeded",
       "ok": false,
-      "detail": "[{\"frame\":\"execClientMessage\",\"answer\":\"mcpResult\",\"result\":\"success\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.McpSuccess\\\",\\\"content\\\":[{\\\"$typeName\\\":\\\"agent.v1.McpToolResultContentItem\\\",\\\"content\\\":{\\\"case\\\":\\\"text\\\",\\\"value\\\":{\\\"$typeName\\\":\\\"agent.v1.McpTextContent\\\",\\\"text\\\":\\\"plan submitted\\\"}}}],\\\"isError\\\":false}\"},{\"frame\":\"execClientMessage\",\"answer\":\"shellResult\",\"result\":\"success\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.ShellSuccess\\\",\\\"command\\\":\\\"touch sibling.txt\\\",\\\"workingDirectory\\\":\\\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\\\",\\\"exitCode\\\":0,\\\"signal\\\":\\\"\\\",\\\"stdout\\\":\\\"sibling ran\\\",\\\"stderr\\\":\\\"\\\",\\\"executionTime\\\":0}\"}]"
+      "detail": "[{\"frame\":\"execClientMessage\",\"answer\":\"mcpResult\",\"result\":\"success\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.McpSuccess\\\",\\\"content\\\":[{\\\"$typeName\\\":\\\"agent.v1.McpToolResultContentItem\\\",\\\"content\\\":{\\\"case\\\":\\\"text\\\",\\\"value\\\":{\\\"$typeName\\\":\\\"agent.v1.McpTextContent\\\",\\\"text\\\":\\\"plan submitted\\\"}}}],\\\"isError\\\":false}\"},{\"frame\":\"execClientMessage\",\"answer\":\"shellResult\",\"result\":\"success\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.ShellSuccess\\\",\\\"command\\\":\\\"touch sibling.txt\\\",\\\"workingDirectory\\\":\\\"/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi\\\",\\\"exitCode\\\":0,\\\"signal\\\":\\\"\\\",\\\"stdout\\\":\\\"sibling ran\\\",\\\"stderr\\\":\\\"\\\",\\\"executionTime\\\":0}\"}]"
     },
     {
       "name": "submitFirst: the successful submit cannot end the run (no terminate reaches the loop)",
       "ok": false,
-      "detail": "blocks=[{\"id\":\"call-submit-2\",\"name\":\"SubmitPlan\",\"resolved\":true,\"args\":{\"title\":\"T\",\"markdown\":\"# Plan\",\"question\":\"Approve?\"}},{\"id\":\"call-sibling-2\",\"name\":\"bash\",\"resolved\":true,\"args\":{\"command\":\"touch sibling.txt\",\"cwd\":\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\"}}] results=[{\"toolCallId\":\"call-submit-2\",\"toolName\":\"SubmitPlan\",\"isError\":false,\"text\":\"plan submitted\",\"hasTerminate\":false},{\"toolCallId\":\"call-sibling-2\",\"toolName\":\"bash\",\"isError\":false,\"text\":\"sibling ran\",\"hasTerminate\":false}]"
+      "detail": "blocks=[{\"id\":\"call-submit-2\",\"name\":\"SubmitPlan\",\"resolved\":true,\"args\":{\"title\":\"T\",\"markdown\":\"# Plan\",\"question\":\"Approve?\"}},{\"id\":\"call-sibling-2\",\"name\":\"bash\",\"resolved\":true,\"args\":{\"command\":\"touch sibling.txt\",\"cwd\":\"/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi\"}}] results=[{\"toolCallId\":\"call-submit-2\",\"toolName\":\"SubmitPlan\",\"isError\":false,\"text\":\"plan submitted\",\"hasTerminate\":false},{\"toolCallId\":\"call-sibling-2\",\"toolName\":\"bash\",\"isError\":false,\"text\":\"sibling ran\",\"hasTerminate\":false}]"
     },
     {
       "name": "sole SubmitPlan: the provider leaves the call to the agent loop",
@@ -768,7 +768,7 @@
     {
       "name": "no handlers (candidate): no tool call is answered with a fabricated failure",
       "ok": false,
-      "detail": "[{\"frame\":\"execClientMessage\",\"answer\":\"mcpResult\",\"result\":\"toolNotFound\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.McpToolNotFound\\\",\\\"name\\\":\\\"SubmitPlan\\\",\\\"availableTools\\\":[]}\"},{\"frame\":\"execClientMessage\",\"answer\":\"shellResult\",\"result\":\"rejected\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.ShellRejected\\\",\\\"command\\\":\\\"touch sibling.txt\\\",\\\"workingDirectory\\\":\\\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\\\",\\\"reason\\\":\\\"Tool not available\\\",\\\"isReadonly\\\":false}\"}]"
+      "detail": "[{\"frame\":\"execClientMessage\",\"answer\":\"mcpResult\",\"result\":\"toolNotFound\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.McpToolNotFound\\\",\\\"name\\\":\\\"SubmitPlan\\\",\\\"availableTools\\\":[]}\"},{\"frame\":\"execClientMessage\",\"answer\":\"shellResult\",\"result\":\"rejected\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.ShellRejected\\\",\\\"command\\\":\\\"touch sibling.txt\\\",\\\"workingDirectory\\\":\\\"/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi\\\",\\\"reason\\\":\\\"Tool not available\\\",\\\"isReadonly\\\":false}\"}]"
     },
     {
       "name": "external handoff (candidate): the mcpArgs branch answers a handoff ack without synthesizing, resolving or pairing",
@@ -778,7 +778,7 @@
     {
       "name": "scheme B native (candidate): a native frame without an executor avoids a fabricated failure",
       "ok": false,
-      "detail": "executions=0 wire=[{\"frame\":\"execClientMessage\",\"answer\":\"mcpResult\",\"result\":\"success\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.McpSuccess\\\",\\\"content\\\":[{\\\"$typeName\\\":\\\"agent.v1.McpToolResultContentItem\\\",\\\"content\\\":{\\\"case\\\":\\\"text\\\",\\\"value\\\":{\\\"$typeName\\\":\\\"agent.v1.McpTextContent\\\",\\\"text\\\":\\\"Tool call received and handed off to the external client for execution. Do not retry or call it again; end the turn. The result will be provided in the next request.\\\"}}}],\\\"isError\\\":false}\"},{\"frame\":\"execClientMessage\",\"answer\":\"shellResult\",\"result\":\"rejected\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.ShellRejected\\\",\\\"command\\\":\\\"touch sibling.txt\\\",\\\"workingDirectory\\\":\\\"/home/vv/person/code/omp-desktop-m5-r3-provider/upstream/oh-my-pi\\\",\\\"reason\\\":\\\"Tool not available\\\",\\\"isReadonly\\\":false}\"}]"
+      "detail": "executions=0 wire=[{\"frame\":\"execClientMessage\",\"answer\":\"mcpResult\",\"result\":\"success\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.McpSuccess\\\",\\\"content\\\":[{\\\"$typeName\\\":\\\"agent.v1.McpToolResultContentItem\\\",\\\"content\\\":{\\\"case\\\":\\\"text\\\",\\\"value\\\":{\\\"$typeName\\\":\\\"agent.v1.McpTextContent\\\",\\\"text\\\":\\\"Tool call received and handed off to the external client for execution. Do not retry or call it again; end the turn. The result will be provided in the next request.\\\"}}}],\\\"isError\\\":false}\"},{\"frame\":\"execClientMessage\",\"answer\":\"shellResult\",\"result\":\"rejected\",\"payload\":\"{\\\"$typeName\\\":\\\"agent.v1.ShellRejected\\\",\\\"command\\\":\\\"touch sibling.txt\\\",\\\"workingDirectory\\\":\\\"/home/vv/person/code/omp-desktop-m5-r4/upstream/oh-my-pi\\\",\\\"reason\\\":\\\"Tool not available\\\",\\\"isReadonly\\\":false}\"}]"
     }
   ],
   "summary": {

@@ -1,7 +1,7 @@
 /**
  * Strict validation for the pinned runtime's subagent frames and RPC payloads.
  *
- * The pinned OMP runtime (18.2.7) reports subagents through three event
+ * The pinned OMP runtime (18.3.0) reports subagents through three event
  * families on stdout — `subagent_lifecycle`, `subagent_progress`,
  * `subagent_event` — and answers two read commands: `get_subagents` (a live
  * snapshot of *active* children) and `get_subagent_messages` (a byte-cursor
