@@ -27,6 +27,20 @@ export {
 } from "./isolation.js";
 export { OmpRuntimeError, isFatalTransportError, type OmpRuntimeErrorCode } from "./errors.js";
 export {
+  BUNDLED_EXPECTATION,
+  BUNDLED_PROVENANCE_FILENAME,
+  BUNDLED_PROVENANCE_SCHEMA,
+  BUNDLED_RUNTIME_DIR,
+  BundledProvenanceSchema,
+  bundledBinaryFilename,
+  normalizeRepositoryUrl,
+  sha256File,
+  verifyBundledRuntime,
+  type BundledExpectation,
+  type BundledSidecarProvenance,
+  type BundledVerification,
+} from "./bundled.js";
+export {
   PINNED_LAUNCHER_RELATIVE_PATH,
   PINNED_GATE_RELATIVE_PATH,
   findGateExtension,

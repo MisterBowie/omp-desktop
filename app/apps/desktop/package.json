@@ -24,6 +24,7 @@
     "clean": "node -e \"fs.rmSync('out',{recursive:true,force:true});fs.rmSync('dist',{recursive:true,force:true})\"",
     "build:host-release": "cargo build --release --manifest-path ../../Cargo.toml -p host-core",
     "bundle:runtime": "pnpm -C ../../packages/agent-runtime bundle",
+    "build:sidecar": "node ../../scripts/omp-sidecar.mjs --build",
     "pack": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --dir",
     "dist": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --publish never",
     "dist:mac": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --mac --publish never",
@@ -130,6 +131,10 @@
       {
         "from": "resources/models.dev",
         "to": "models.dev"
+      },
+      {
+        "from": "resources/omp-runtime",
+        "to": "omp-runtime"
       }
     ],
     "mac": {

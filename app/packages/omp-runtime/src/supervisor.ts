@@ -563,7 +563,12 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
       }
 
       this.lastFailure = {
-        reason: code === "version-mismatch" ? "version-mismatch" : "start-failed",
+        reason:
+          code === "version-mismatch"
+            ? "version-mismatch"
+            : code === "protocol-unsupported"
+              ? "protocol-unsupported"
+              : "start-failed",
         detail: (error as Error).message,
       };
       // Nothing of this attempt is alive, so only the directory can be owed.

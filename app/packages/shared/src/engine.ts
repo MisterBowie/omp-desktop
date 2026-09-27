@@ -334,6 +334,23 @@ export const OMP_PROTOCOL_VERSION = 2;
  */
 export const OMP_RUNTIME_VERSION = "18.3.0";
 
+/**
+ * The upstream commit this build's patch set is cut against, the patch level it
+ * carries, and the OMP fork commit whose tree is exactly `base sha + patch
+ * level` (ADR 0305, ADR 0307). These four values are the desktop's own copy of
+ * `app/patches/oh-my-pi/manifest.json`; they are what a packaged build has left
+ * at runtime, because the repository (and that manifest file) is not shipped.
+ *
+ * They are not hand-maintained evidence: `scripts/omp-sidecar.mjs --check`
+ * refuses a fork checkout whose HEAD, remote, version, or patch diff disagrees
+ * with the manifest, and `apps/desktop/test/omp-sidecar.test.mjs` asserts these
+ * constants equal the manifest's `base.sha` / `patchLevel` / `fork.*` values.
+ */
+export const OMP_RUNTIME_BASE_SHA = "62bc57be1b03ef0802a33cf7f5f530e534527531";
+export const OMP_RUNTIME_PATCH_LEVEL = "62bc57b+omp-desktop.2";
+export const OMP_RUNTIME_FORK_REPOSITORY = "https://github.com/MisterBowie/oh-my-pi";
+export const OMP_RUNTIME_FORK_COMMIT = "3c845eb27f6f7b0a5b182f1868969ced86d10a3d";
+
 /** One JSONL frame, newline included (`rpc-frame.ts` MAX_RPC_FRAME_BYTES). */
 export const OMP_MAX_FRAME_BYTES = 1024 * 1024;
 

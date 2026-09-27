@@ -104,6 +104,11 @@ function writeManifest(
       schemaVersion,
       patchLevel: `${sha.slice(0, 7)}+omp-desktop.1`,
       base: { sha, version },
+      fork: {
+        repository: "https://github.com/MisterBowie/oh-my-pi",
+        branch: "fixture",
+        commit: sha,
+      },
       patch: {
         file: patchFile,
         sha256: sha256 ?? createHash("sha256").update(readFileSync(patchPath)).digest("hex"),

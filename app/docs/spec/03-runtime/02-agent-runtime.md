@@ -1877,3 +1877,54 @@ The desktop adds the boundaries a database trigger cannot cover:
 Non-Cursor providers and Cursor models in Agent mode are untouched. R3 itself
 remains blocked and T20-B/C/D remain unstarted: this gate is a precondition for
 that work, not the feature.
+
+## 17. Bundled sidecar build and admission (M5/T20-R4B, ADR 0307)
+
+A packaged build runs exactly one OMP runtime, and that runtime is a build
+product of this project rather than the upstream tag: `omp/18.3.0` plus patch
+level `62bc57b+omp-desktop.2`, carried by the controlled fork commit recorded in
+`app/patches/oh-my-pi/manifest.json`.
+
+* **Build.** `scripts/omp-sidecar.mjs` is the only entry point. It refuses a
+  source checkout whose `origin` is not the manifest's fork repository, whose
+  `HEAD` is not the manifest's fork commit, whose worktree is dirty, whose
+  reported version is not `18.3.0`, or whose diff from the base commit is not the
+  manifest's file list with the controlled patch reverse-applied. The compile is
+  OMP's own Bun single-file build, so the artifact is the executable `omp
+  --version` reports for that commit. The artifact and the tool gate are copied
+  into `apps/desktop/resources/omp-runtime/` (gitignored) and declared in
+  electron-builder `extraResources`.
+* **Provenance.** The build writes `provenance.json` beside the executable:
+  schema `omp-desktop.bundled-sidecar/1`, fork repository/commit/tree, upstream
+  base SHA and version, patch level, capability ids, OMP version, desktop
+  version, platform, architecture, binary file name, byte count and SHA-256, and
+  the build tool and its version. Every value comes from the validated checkout,
+  the patch manifest, the host, or the produced file.
+* **Admission.** A packaged build's only candidate is
+  `process.resourcesPath/omp-runtime/{omp|omp.exe}`; it is used only when the
+  manifest verifies against this build's pins and the binary's byte count and
+  SHA-256 match the file on disk. A missing, symlinked, escaping, malformed,
+  mismatched or tampered resource is refused as
+  `OmpRuntimeError("bundled-runtime-invalid")`. In a packaged build
+  `OMP_DESKTOP_RUNTIME` is not consulted, the app path is not scanned upward, and
+  `PATH` is never a source. Development keeps the explicit override and the
+  pinned-submodule walk-up.
+* **Startup.** The start path probes `--version` before spawning and negotiates
+  protocol v2 after `ready`; a mismatch leaves the engine `failed` with reason
+  `version-mismatch` or `protocol-unsupported` and no capabilities, so no usable
+  session is created. This reuses the M1 handshake rather than adding a second
+  one.
+* **Isolation.** The bundled artifact starts under the same environment policy as
+  the pinned launcher (synthetic HOME, `PI_CODING_AGENT_DIR`, stripped steering
+  variables, proxies and credentials), and stop/reclaim removes its process group
+  and owned run root. Verified against the real compiled binary; see
+  `docs/validation/M5-bundled-sidecar.md`.
+
+The pins this build checks are mirrored in `@pi-desktop/shared`
+(`OMP_RUNTIME_BASE_SHA`, `OMP_RUNTIME_PATCH_LEVEL`, `OMP_RUNTIME_FORK_REPOSITORY`,
+`OMP_RUNTIME_FORK_COMMIT`) because a packaged application has no repository to
+read, and a desktop test asserts they equal the controlled manifest.
+
+Not addressed here: R3 stays blocked and T20-B/C/D stay unstarted, and the
+artifact is not bit-reproducible across builds, so the manifest describes one
+build rather than claiming reproducible bytes.

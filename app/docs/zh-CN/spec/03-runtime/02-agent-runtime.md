@@ -1147,3 +1147,39 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
 
 非 Cursor 提供方与 Agent 模式下的 Cursor 模型不受影响。R3 本身仍未解除、T20-B/C/D 仍未开始：
 本门是这些工作的前置条件，而不是该功能本身。
+
+## 17. bundled sidecar 的构建与准入（M5/T20-R4B，ADR 0307）
+
+打包构建只运行一个 OMP 运行时，而该运行时是本项目的构建产物，而不是上游标签：`omp/18.3.0`
+加上 patch level `62bc57b+omp-desktop.2`，由 `app/patches/oh-my-pi/manifest.json` 记录的自有 fork
+提交承载。
+
+* **构建。** `scripts/omp-sidecar.mjs` 是唯一入口。源码检出的 `origin` 不是清单中的 fork 仓库、
+  `HEAD` 不是清单中的 fork 提交、工作树不干净、上报版本不是 `18.3.0`，或相对基线的差异不等于清单
+  的文件列表（且受控补丁不能反向应用）时，它一律拒绝。编译使用 OMP 自身的 Bun 单文件构建，因此
+  产物就是该提交下 `omp --version` 所报告的可执行文件。产物与工具门被复制到
+  `apps/desktop/resources/omp-runtime/`（已 gitignore），并在 electron-builder 的
+  `extraResources` 中声明。
+* **provenance。** 构建会在可执行文件旁写出 `provenance.json`：schema
+  `omp-desktop.bundled-sidecar/1`、fork 仓库/提交/tree、上游基线 SHA 与版本、patch level、能力
+  id、OMP 版本、桌面版本、平台、架构、二进制文件名、字节数与 SHA-256，以及构建工具及其版本。
+  每个值都来自已校验的检出、补丁清单、本机环境或实际产物。
+* **准入。** 打包构建的唯一候选是
+  `process.resourcesPath/omp-runtime/{omp|omp.exe}`；只有当清单相对本构建的 pins 校验通过、且
+  二进制字节数与 SHA-256 与磁盘文件一致时才使用。缺失、符号链接、逃逸、格式错误、不匹配或被篡改
+  的资源一律以 `OmpRuntimeError("bundled-runtime-invalid")` 拒绝。打包构建下不读取
+  `OMP_DESKTOP_RUNTIME`、不向上扫描 app path，也绝不使用 `PATH`。开发态保留显式覆盖与固定子模块
+  的向上查找。
+* **启动。** 启动路径在 spawn 之前探测 `--version`，并在 `ready` 之后协商协议 v2；不一致时引擎停在
+  `failed`，原因为 `version-mismatch` 或 `protocol-unsupported`，且能力全部关闭，因此不会创建可用
+  会话。这里复用 M1 的握手，而不是新增第二套。
+* **隔离。** bundled 产物与固定启动器使用同一套环境策略（合成 HOME、`PI_CODING_AGENT_DIR`、剥离
+  steering 变量/代理/凭证），stop/reclaim 会回收其进程组与自有的 run root。已用真实编译产物验证，
+  见 `docs/validation/M5-bundled-sidecar.md`。
+
+本构建校验的 pins 镜像在 `@pi-desktop/shared`（`OMP_RUNTIME_BASE_SHA`、
+`OMP_RUNTIME_PATCH_LEVEL`、`OMP_RUNTIME_FORK_REPOSITORY`、`OMP_RUNTIME_FORK_COMMIT`），因为打包
+后的应用没有仓库可读；桌面测试断言它们与受控清单一致。
+
+本文不涉及：R3 仍然阻塞、T20-B/C/D 仍未开始；产物在不同构建之间并非逐位可复现，因此清单描述的是
+单次构建，而不是宣称字节可复现。

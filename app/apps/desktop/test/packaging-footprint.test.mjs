@@ -217,6 +217,14 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
       from: "resources/models.dev",
       to: "models.dev",
     },
+    // The bundled OMP sidecar and its provenance manifest (ADR 0307): a build
+    // product produced by scripts/omp-sidecar.mjs, gitignored, and admitted by
+    // a packaged build only after the manifest verifies. The tool gate is
+    // copied into the same directory by that build.
+    {
+      from: "resources/omp-runtime",
+      to: "omp-runtime",
+    },
   ]);
   assert.doesNotMatch(JSON.stringify(packageJson.build), /node-pty/);
 });

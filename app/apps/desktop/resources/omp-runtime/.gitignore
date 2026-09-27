@@ -1,0 +1,12 @@
+# Output of `pnpm build:sidecar` (scripts/omp-sidecar.mjs). The sidecar is a
+# ~280 MB self-contained executable plus its provenance manifest; both are
+# build products, produced from the pinned OMP fork checkout and recorded in
+# docs/validation/M5-bundled-sidecar.md, and neither is committed.
+#
+# `extensions/omp-desktop-gate.ts` is copied here by the same build so the
+# packaged app loads the gate from Resources rather than from a source tree;
+# the tracked copy lives in packages/omp-runtime/extensions/.
+omp
+omp.exe
+provenance.json
+extensions/

@@ -26,7 +26,13 @@ export type OmpRuntimeErrorCode =
   /** A request was issued while the runtime was shutting down. */
   | "stopping"
   /** A feature this build could not enable (e.g. the subagent subscription). */
-  | "capability-unavailable";
+  | "capability-unavailable"
+  /**
+   * A packaged build's bundled sidecar or its provenance manifest failed
+   * verification: missing, symlinked, escaping, tampered with, or pinned to a
+   * different build than this one (ADR 0307).
+   */
+  | "bundled-runtime-invalid";
 
 export class OmpRuntimeError extends Error {
   readonly code: OmpRuntimeErrorCode;

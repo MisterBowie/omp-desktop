@@ -8,6 +8,13 @@
     "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
     "version": "18.3.0"
   },
+  "fork": {
+    "repository": "https://github.com/MisterBowie/oh-my-pi",
+    "branch": "codex/omp-desktop-18.3.0-patch-2",
+    "commit": "3c845eb27f6f7b0a5b182f1868969ced86d10a3d",
+    "tree": "135ad4b6bc27f58a6220260233e9ff377b14f231",
+    "note": "Self-maintained fork whose HEAD is exactly base.sha + this patch level. `scripts/omp-sidecar.mjs` refuses any other commit; can1357/oh-my-pi stays a read-only upstream."
+  },
   "patch": {
     "file": "0001-rpc-host-tool-transition-contract.patch",
     "sha256": "4edbfadff9cc3238ae6bb7c206e7d8e0be33c2190068e6731fdb58e43ec9b545",

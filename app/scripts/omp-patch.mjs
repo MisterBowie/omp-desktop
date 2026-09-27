@@ -155,6 +155,21 @@ export function loadManifest(manifestPath = defaultManifest) {
   if (!Number.isInteger(manifest.patch.bytes) || manifest.patch.bytes <= 0) {
     throw new PatchError(`manifest.patch.bytes is not a positive integer: ${JSON.stringify(manifest.patch.bytes)}`);
   }
+  for (const [field, value] of [
+    ["fork.repository", manifest.fork?.repository],
+    ["fork.branch", manifest.fork?.branch],
+    ["fork.commit", manifest.fork?.commit],
+  ]) {
+    if (typeof value !== "string" || value.length === 0) {
+      throw new PatchError(`manifest field ${field} is missing`);
+    }
+  }
+  if (!/^[0-9a-f]{40}$/.test(manifest.fork.commit)) {
+    throw new PatchError(`manifest.fork.commit is not a full commit id: ${manifest.fork.commit}`);
+  }
+  if (manifest.fork.tree !== undefined && !/^[0-9a-f]{40}$/.test(manifest.fork.tree)) {
+    throw new PatchError(`manifest.fork.tree is not a full tree id: ${manifest.fork.tree}`);
+  }
 
   const patchesDir = dirname(resolvedManifest);
   const patchPath = resolve(patchesDir, manifest.patch.file);
@@ -402,7 +417,7 @@ function applyPatchSet(tree, patchPath) {
 }
 
 /** Environment for a probe child: isolated config, no credentials, no proxies. */
-function isolatedEnv(runRoot) {
+export function isolatedEnv(runRoot) {
   const env = {};
   for (const key of Object.keys(process.env)) {
     if (STEER_VARS.includes(key) || CREDENTIAL_RE.test(key)) continue;
@@ -510,7 +525,7 @@ export function runReaped(command, args, options = {}) {
   });
 }
 
-function bunBinary() {
+export function bunBinary() {
   const override = process.env.BUN_BINARY;
   if (override) return override;
   const candidate = join(homedir(), ".bun", "bin", "bun");

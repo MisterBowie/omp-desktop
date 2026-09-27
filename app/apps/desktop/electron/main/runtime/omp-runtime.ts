@@ -22,10 +22,14 @@ import { join } from "node:path";
 
 import type { EngineRuntimeStatus } from "@pi-desktop/shared";
 import {
+  BUNDLED_RUNTIME_DIR,
   OmpRuntimeSupervisor,
   PINNED_LAUNCHER_RELATIVE_PATH,
+  bundledBinaryFilename,
   findPinnedLauncher,
   isExecutableAt,
+  verifyBundledRuntime,
+  type BundledSidecarProvenance,
   type OmpReclaimResult,
   type OmpRunPaths,
 } from "@pi-desktop/omp-runtime";
@@ -41,9 +45,6 @@ export const PINNED_LAUNCHER_PATH = PINNED_LAUNCHER_RELATIVE_PATH;
 
 export { findPinnedLauncher };
 
-/** Bundled runtime inside a packaged app's resources (M6). */
-export const BUNDLED_LAUNCHER_PATH = join("omp-runtime", "omp");
-
 /** Bundled tool gate inside a packaged app's resources (the runtime loads it). */
 export const BUNDLED_GATE_PATH = join("omp-runtime", "extensions", "omp-desktop-gate.ts");
 
@@ -54,6 +55,9 @@ export type LauncherResolutionInput = {
   appPath?: string | null;
   /** `process.resourcesPath` for a packaged build. */
   resourcesPath?: string | null;
+  /** Host platform and architecture; parameters so fixtures can vary them. */
+  platform?: NodeJS.Platform;
+  arch?: string;
 };
 
 export type ResolvedLauncher = {
@@ -61,37 +65,82 @@ export type ResolvedLauncher = {
   source: "explicit" | "bundled" | "development" | null;
   /** Every location that was tried, for diagnostics. */
   tried: string[];
+  /** Why no runtime was accepted; a stable, secret-free reason or null. */
+  error?: string | null;
+  /** Build identity of the verified bundled runtime, when one was accepted. */
+  provenance?: BundledSidecarProvenance | null;
 };
 
 /**
  * Resolve the runtime executable, without starting anything.
  *
- * `null` is a legitimate answer: this product has no bundled runtime until M6,
- * and a missing runtime must surface as an unavailable engine rather than as a
- * silent fallback to a globally installed `omp`.
+ * A packaged build and a development checkout answer this differently, and the
+ * difference is enforced here rather than by convention (ADR 0307):
+ *
+ *   - **Packaged**: exactly one candidate, `resourcesPath/omp-runtime/<omp>`,
+ *     admitted only if its provenance manifest verifies against this build's
+ *     pins (`verifyBundledRuntime`). `OMP_DESKTOP_RUNTIME`, a resource tree
+ *     scanned upward, and anything on `PATH` are not candidates at all — the
+ *     old behaviour let an environment variable or a stray directory choose the
+ *     executable of a shipped application.
+ *   - **Development**: an explicit `OMP_DESKTOP_RUNTIME`, else the launcher in
+ *     the pinned reference checkout found by walking up from the app path.
+ *     No `PATH` lookup in either case.
+ *
+ * `null` is a legitimate answer: a build with no usable runtime must surface as
+ * an unavailable engine rather than as a silent fallback.
  */
 export function resolveRuntimeLauncher(input: LauncherResolutionInput): ResolvedLauncher {
   const tried: string[] = [];
+
+  if (input.isPackaged) {
+    if (!input.resourcesPath) {
+      return {
+        path: null,
+        source: null,
+        tried,
+        error: "a packaged build must provide process.resourcesPath",
+      };
+    }
+    const platform = input.platform ?? process.platform;
+    tried.push(
+      `bundled:${join(input.resourcesPath, BUNDLED_RUNTIME_DIR, bundledBinaryFilename(platform))}`,
+    );
+    try {
+      const verified = verifyBundledRuntime({
+        resourcesPath: input.resourcesPath,
+        platform,
+        arch: input.arch ?? process.arch,
+      });
+      return { path: verified.path, source: "bundled", tried, provenance: verified.provenance };
+    } catch (error) {
+      const code = (error as { code?: unknown })?.code;
+      const detail = (error as { detail?: unknown })?.detail;
+      const reason = `${typeof code === "string" ? code : "error"}: ${(error as Error)?.message ?? error}`;
+      return {
+        path: null,
+        source: null,
+        tried,
+        error: typeof detail === "string" && detail.length > 0 ? `${reason} (${detail})` : reason,
+      };
+    }
+  }
+
   const explicit = input.env?.OMP_DESKTOP_RUNTIME?.trim();
   if (explicit) {
     tried.push(`explicit:${explicit}`);
     if (isExecutableAt(explicit)) return { path: explicit, source: "explicit", tried };
     // An explicit path that is unusable is an operator error, not a reason to
     // go looking elsewhere: report it and let the engine show why.
-    return { path: null, source: null, tried };
-  }
-
-  if (input.isPackaged && input.resourcesPath) {
-    const bundled = join(input.resourcesPath, BUNDLED_LAUNCHER_PATH);
-    tried.push(`bundled:${bundled}`);
-    if (isExecutableAt(bundled)) return { path: bundled, source: "bundled", tried };
-    return { path: null, source: null, tried };
+    return { path: null, source: null, tried, error: `explicit:${explicit} is not executable` };
   }
 
   const start = input.appPath ?? process.cwd();
   const dev = findPinnedLauncher(start);
   tried.push(`development:${join(start, PINNED_LAUNCHER_PATH)}`);
-  return dev ? { path: dev, source: "development", tried } : { path: null, source: null, tried };
+  return dev
+    ? { path: dev, source: "development", tried }
+    : { path: null, source: null, tried, error: "no pinned development launcher found" };
 }
 
 export type OmpRuntimeAdapterOptions = LauncherResolutionInput & {
