@@ -312,7 +312,20 @@ test("the signed local macOS lane selects the native runner architecture", () =>
   assert.match(releaseMacScriptSource, /DEFAULT_MAC_ARCH/);
   assert.match(releaseMacScriptSource, /MAC_ARCH="\$\{MAC_ARCH:-\$DEFAULT_MAC_ARCH\}"/);
   assert.match(releaseMacScriptSource, /must match the host/);
-  assert.match(releaseMacScriptSource, /electron-builder --mac "--\$\{MAC_ARCH\}"/);
+  // The lane packages through the release wrapper — the same entry every
+  // dist command ends with — so the bundled-sidecar preflight runs before
+  // electron-builder here too. Calling electron-builder directly from this lane
+  // was fourth-review finding F2.
+  assert.match(
+    releaseMacScriptSource,
+    /pnpm --filter @pi-desktop\/desktop exec node \.\.\/\.\.\/scripts\/release-package\.mjs \\\n\s+--platform darwin "--\$\{MAC_ARCH\}"/,
+    "the local signed macOS lane enters the release wrapper",
+  );
+  assert.doesNotMatch(
+    releaseMacScriptSource,
+    /\bexec electron-builder\b/,
+    "the local signed macOS lane must not call electron-builder around the preflight",
+  );
   assert.match(releaseMacScriptSource, /XingYu Liu \(DUV63RKYTW\)/);
   assert.match(
     releaseMacScriptSource,

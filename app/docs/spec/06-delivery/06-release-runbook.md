@@ -197,6 +197,14 @@ Artifacts land in `apps/desktop/release/` (DMG + ZIP + blockmaps).
 `MAC_ARCH=arm64` or `MAC_ARCH=x64` only when that architecture matches the
 host. This keeps the native Rust host sidecar and Electron package aligned.
 
+The packaging phase goes through `scripts/release-package.mjs` — the same entry
+every `pack`/`dist` command ends with — so the bundled OMP sidecar preflight
+runs before electron-builder on this lane too: a missing or stale
+`apps/desktop/resources/omp-runtime` fails the lane instead of being signed and
+notarized. The lane enters the entry through `pnpm --filter @pi-desktop/desktop
+exec node ../../scripts/release-package.mjs`, which is also what puts the
+desktop package's binaries on PATH for the wrapper.
+
 ### 4.3 GitHub tag and manual workflow
 
 The GitHub Release workflow starts all native platform runners without a

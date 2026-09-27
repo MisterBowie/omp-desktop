@@ -1,14 +1,33 @@
 # M5/T20-R4B：自有 OMP fork + bundled sidecar 的可验证闭环（含复审返修）
 
-更新时间：2026-09-27（第三轮独立复审返修）。桌面分支 `codex/m5-r4b-bundled-sidecar`；首个 R4B 提交 `b25eb60c077deb5b200cf5f5bf6e8a3cddbbf679`，返修提交追加在其上（不 amend、不强推）；第二轮复审返修见 §0.1，追加提交 `53d19ee`、`f9d133e`、`7b3b3de`、`f428940`（+ 文档提交 `9bd7e50`）；第三轮独立复审返修见 §0.2（本轮提交随本文件一并追加，不 amend）。
+更新时间：2026-09-28（第四轮独立复审返修）。桌面分支 `codex/m5-r4b-bundled-sidecar`；首个 R4B 提交 `b25eb60c077deb5b200cf5f5bf6e8a3cddbbf679`，返修提交追加在其上（不 amend、不强推）；第二轮复审返修见 §0.1，追加提交 `53d19ee`、`f9d133e`、`7b3b3de`、`f428940`（+ 文档提交 `9bd7e50`）；第三轮独立复审返修见 §0.2（起点 `956841c`）；**第四轮独立复审返修见 §0.3**（起点仍是 `956841c85acf5e4c9b192ab7f837891416314680`，提交随本文件一并追加，不 amend）。
 
-状态：**R4B 部分完成 / 受阻（第一轮复审返修 + 第二轮独立复审返修 + 第三轮独立复审返修）。** 第三轮复审的 6 项问题（F1 发布参数透传、F2 packaging lane 的受控 fork 来源、F3 根 preview workflow 绕行、F4 canonical 路径断言、F5 Windows 夹具文件名、F6 证据更正）均按「先复现（RED）→ 修复 → 重跑（GREEN）」处理，见 §0.2。**但 R4-3 的“可复现”条款仍未满足（见 §10），因此 R4B 不标记为完成。**
+状态：**R4B 部分完成 / 受阻（第一轮复审返修 + 第二轮独立复审返修 + 第三轮独立复审返修 + 第四轮独立复审返修）。** 第三轮复审的 6 项问题（F1 发布参数透传、F2 packaging lane 的受控 fork 来源、F3 根 preview workflow 绕行、F4 canonical 路径断言、F5 Windows 夹具文件名、F6 证据更正）见 §0.2；**第四轮复审的 2 项问题（F1 平台目标仍可分叉、F2 本地正式签名 lane 绕过 sidecar 预检）** 均按「先复现（RED）→ 修复 → 重跑（GREEN）」处理，见 §0.3。**但 R4-3 的“可复现”条款仍未满足（见 §10），因此 R4B 不标记为完成。**
 
 **R3 仍为硬阻塞；ADR 0306 的 Cursor 产品门保留；T20-B/C/D 未开始；T20 未完成；T21 未完成；R4-3 未满足。**
 
 非目标：解除 R3、实现 Plan/Goal 运行时面、放宽 Cursor 门、声称 PI parity、向 can1357 推送、跑 electron-builder 真实打包。
 
 **仓库布局事实（本轮如实记录）**：GitHub 只识别仓库根 `.github/workflows/`。本仓库产品源码在 `app/`，因此 `app/.github/workflows/*`（含 `release.yml`、`linux-package.yml`）在当前仓库位置**不会自动触发**——它们是随 `app/` 交付的源码工作流（当 `app/` 作为仓库根时生效）；本仓库当下真正生效的打包工作流只有根 `.github/workflows/mac-preview-package.yml`。两者都被本轮新增的静态测试按同一「固定 fork 来源 + Bun + frozen install + 目标绑定的发布入口」契约锁定。
+
+---
+
+## 0.3 第四轮独立复审返修（RED → GREEN）
+
+本轮只修两项已复现问题（F1 平台目标分叉、F2 本地正式签名 lane 绕过 sidecar 预检），**追加提交，不 amend/rebase/强推**；起点 `956841c85acf5e4c9b192ab7f837891416314680`（本地/远端 HEAD 一致、工作树干净）。R4-3 的 Bun 构建非确定性仍按**未解决阻塞项**保留，未触碰。
+
+固定证据先核对（本轮动手前）：PI Desktop 子模块仍为 `0111e306c120ad5820688d7608cb37bad8fbcc1f`；`upstream/pi-desktop/apps/desktop/package.json:27-31` 确认 `electron-builder` 位于 `pack`/`dist`/`dist:mac`/`dist:win`/`dist:linux` 每条命令链**最后**，`upstream/pi-desktop/.github/workflows/release.yml:245-287` 的签名 lane 正是通过 package 脚本追加 `-c.mac.forceCodeSigning=true` 与 `-c.mac.notarize=true`。因此**通用 builder 参数继续原样透传**，而平台/架构属于 wrapper 自己控制的维度。`nornzach/oh-my-pi-gui`（树 SHA `31327996…`）仅作架构对照：自有 fork + 随包 sidecar + `--mode rpc-ui` + 编译期 RPC 类型契约 + 启动协商，明确不回退系统 OMP；但其 `package:*` 只构建 Electron GUI、不自动重建或预检 sidecar（README 要求人工先跑 `build:omp*`），**这个缺口不照搬**——我们的发布门继续强制预检。
+
+| # | 复审问题 | 复现（RED） | 修复（GREEN） |
+| --- | --- | --- | --- |
+| 1 | **F1 平台目标仍可分叉**：`--mac`/`--win`/`--linux` 作为未知参数被透传，预检与 builder 可落在不同平台 | 起点 `956841c`：`planRelease(["--platform","darwin","--arm64","--win"], {platform:"darwin",arch:"arm64"})` → builder argv `--mac --arm64 --publish never --win`（预检只校验 darwin/arm64，electron-builder 会同时构建 win32）；新增回归测试同起点 `node --test test/omp-release-gate.test.mjs` → **2 failed / 9 passed**，坐标 `:407`（`["--mac"]` 下 `--mac` 既被消费又出现在 builder argv）与 `:448`（混合 `--platform darwin --arm64 --win` 未被拒绝） | 平台别名与 `--platform` 归并进同一受控解析：`--mac`/`--macos`/`-m`/`-o`→darwin、`--win`/`--windows`/`-w`→win32、`--linux`/`-l`→linux；重复/同义重复/冲突**以及短开关簇 `-mwl`** 一律在 spawn 前 exit 2 拒绝；平台 target 列表（`--mac dmg`）拒绝而不是静默丢弃；builder argv **恰好一个**平台 flag。`omp-release-gate` **11 passed** |
+| 2 | **F2 本地正式签名 lane 绕过 sidecar preflight**：`release-macos.sh` 让 watchdog 直接跑 `pnpm … exec electron-builder --mac …`，可把缺失/陈旧的 `resources/omp-runtime` 打进签名包 | 起点 `956841c`：重写的 `macos-release-lane.test.mjs`（真实驱动 `scripts/release-macos.sh` + 桩工具）`node --test test/macos-release-lane.test.mjs` → **2 failed**，坐标 `:191`「the lane runs scripts/release-package.mjs」（调用日志里只有 `pnpm … exec electron-builder`，wrapper 从未运行）与 `:273`「a refused preflight must fail the lane」（`PI_FAKE_SIDECAR_EXIT=1` 时 lane 仍 exit 0，因为根本没有预检） | watchdog 内改为 `pnpm --filter @pi-desktop/desktop exec node ../../scripts/release-package.mjs --platform darwin --${MAC_ARCH} --publish never -c.mac.identity=… -c.mac.forceCodeSigning=true -c.mac.notarize=true`：预检先于 electron-builder，预检失败则 builder 不运行，签名 identity/flags 完整到达 builder，bundle inventory → DMG 公证/装订 → 签名校验顺序不变。lane 测试 **2 passed**（本轮在 **Linux** 实跑；`uname` 桩使该文件不再因非 macOS 主机而跳过），`ci-workflow.test.mjs` **14 passed** |
+
+**机制实证（不是文本断言）**：`cd app && pnpm --filter @pi-desktop/desktop exec node ../../scripts/release-package.mjs --platform win32 --arch arm64` → `RELEASE-PACKAGE-FAIL a win32 release is x64-only; refusing the requested arm64`（wrapper 真被执行、模块路径真解析，wrapper 自身 exit 2）；`pnpm --filter @pi-desktop/desktop exec which electron-builder` → `./node_modules/.bin/electron-builder`（wrapper 以裸命令名 spawn 的 builder 在该 cwd + `pnpm exec` 的 PATH 下确实可解析，未假设交互 shell）。
+
+**本轮改动文件**：`app/scripts/release-package.mjs`、`app/scripts/release-macos.sh`、`app/apps/desktop/test/omp-release-gate.test.mjs`、`app/apps/desktop/test/macos-release-lane.test.mjs`、`app/apps/desktop/test/ci-workflow.test.mjs`、`app/docs/adr/0307-bundled-omp-sidecar.md` §6、`app/docs/spec/03-runtime/02-agent-runtime.md` §17（+zh 镜像）、`app/docs/spec/06-delivery/06-release-runbook.md` §4.2（+zh 镜像）、本文/任务板/`HANDOFF.md`。
+
+RED/GREEN 的逐条命令与结果见 §12.3。
 
 ---
 
@@ -135,7 +154,7 @@ gate   : apps/desktop/resources/omp-runtime/extensions/omp-desktop-gate.js   101
 
 ---
 
-## 5. 发布门（问题 1；第二轮复审后改为单一目标解析）
+## 5. 发布门（问题 1；第二/四轮复审后改为单一目标解析）
 
 `apps/desktop/package.json` 脚本（第二轮复审问题 2 修复后）：
 
@@ -154,6 +173,10 @@ pack/dist/dist:mac/dist:win/dist:linux:
 随后：预检（`omp-sidecar.mjs --preflight --platform <p> --arch <a>`）→ 仅当预检成功才运行 `electron-builder <--mac|--win|--linux> [--x64/--arm64] [--dir] --publish never <其余参数…>`，保持 PI 「runtime 步骤先于 electron-builder」的顺序。
 
 **参数透传与目标唯一性（第三轮复审 F1）**：`release-package.mjs` 只拥有 target/dir/publish；其余参数（例如固定 PI 在签名 lane 上传入的 `-c.mac.forceCodeSigning=true`、`-c.mac.notarize=true`）**按原始顺序逐项原样**附加到 electron-builder 调用，不使用「只识别当前两个 flag」的脆弱白名单。同一目标维度只允许声明一次：`--x64 --arm64`、`--x64 --arch arm64`、重复的 `--platform`（以及重复 `--publish`）都在 spawn 任何进程之前以退出码 2 拒绝，因此额外参数不可能把预检与打包带到不同目标。
+
+**平台轴只有一个声明（第四轮复审 F1）**：electron-builder 自己的平台开关是**可加的**——`--mac … --win` 会让它构建两个平台——因此透传它们等于同一个分叉换了个拼写：预检校验 darwin/arm64，打包再产出 win32。`--mac`/`--macos`/`-m`/`-o`→`darwin`、`--win`/`--windows`/`-w`→`win32`、`--linux`/`-l`→`linux` 与 `--platform` 归并进**同一**声明：重复、同义重复（`--mac --macos`）、冲突（`--platform darwin --win`）以及短开关簇（`-mwl`）全部在 spawn 前退出码 2 拒绝；wrapper 生成的 builder argv **恰好一个**平台 flag。平台后跟 target 列表（`--mac dmg`）也拒绝，而不是被静默丢弃或转发到 wrapper 自己选的 flag 旁边——平台维度只负责选平台，产物 target 由 electron-builder 配置决定。
+
+**本地签名 lane 走同一入口（第四轮复审 F2）**：`scripts/release-macos.sh` 的打包阶段改为 watchdog 内 `pnpm --filter @pi-desktop/desktop exec node ../../scripts/release-package.mjs --platform darwin --${MAC_ARCH} --publish never -c.mac.identity=… -c.mac.forceCodeSigning=true -c.mac.notarize=true`，使 bundled-sidecar 预检在 electron-builder 之前运行（缺失/陈旧 `resources/omp-runtime` 不再能进入签名并公证的包）；`pnpm exec` 把 desktop 包的 `node_modules/.bin` 放到 PATH 前部，所以 wrapper 以裸命令名 `electron-builder` spawn 时无需假设交互 shell 的 PATH。bundle inventory → DMG 公证/装订 → 签名校验的顺序保持不变，并由行为测试锁定。
 
 **packaging lane 的输入（第三轮复审 F2/F3）**：真正调用 `dist:*` 的 lane（`release.yml` build matrix、`linux-package.yml`、根 `mac-preview-package.yml`）都在调用发布入口之前：checkout 自有 fork `MisterBowie/oh-my-pi` @ manifest `fork.commit`（`fetch-depth: 0`，因为构建要重新证明 `base..HEAD`）、`setup-bun` 固定 `1.4.2`、在该检出执行 `bun install --frozen-lockfile`，并把作业级 `OMP_SIDECAR_SOURCE` 指向它。`app/apps/desktop/test/packaging-sidecar-source.test.mjs` 与 `preview-workflow.test.mjs` 从 manifest 读取 repo/commit 后自动比较，避免文档式重复值漂移。**未在 clean runner 实跑这些 lane**（见 §11）。
 
@@ -180,6 +203,8 @@ pack/dist/dist:mac/dist:win/dist:linux:
 | 缺 arch | `--platform <非宿主>`（无 `--arch`） | **exit 1**（`--arch is required`） |
 | 参数透传 | `release-package.mjs --platform darwin --arm64 -c.mac.forceCodeSigning=true -c.mac.notarize=true`；stub spawn 的计划函数 | 通过：两个 `-c.mac.*` 按原序到达 electron-builder；预检仍先执行，预检失败时 builder 不执行 |
 | 目标冲突/重复 | `--x64 --arm64`、`--x64 --arch arm64`、重复 `--platform`、重复 `--publish` | 通过：`must be given once` / `given more than once`，exit 2 且不 spawn |
+| 平台开关同轴（第四轮） | `planRelease(["--mac"])` / `["--win","--linux"]` / `["-mwl"]` / `["--platform","darwin","--arm64","--win"]`；`runRelease` + stub spawn | 通过：别名归并为同一平台声明；重复/冲突/簇/目标列表在 spawn 前拒绝（exit 2、spawn 0）；builder argv 恰好一个平台 flag（`omp-release-gate` 11 passed） |
+| 签名 lane 入口（第四轮） | `node --test test/macos-release-lane.test.mjs`（真实 `release-macos.sh` + 真实 wrapper/watchdog/inventory/公证/校验脚本 + 桩工具 + `uname` 桩） | 通过：lane 经 `pnpm --filter @pi-desktop/desktop exec node ../../scripts/release-package.mjs` 进入 wrapper；预检先于 builder、预检失败短路（builder/公证/校验都不运行）、签名参数完整到达 builder、inventory → 公证/装订 → verify 顺序（2 passed） |
 
 
 变异 RED：把 `dist:mac` 中的 `node ../../scripts/release-package.mjs` 替换成裸 `electron-builder` 后，覆盖性测试失败（见 §9.2）。
@@ -239,17 +264,17 @@ error: Trusted extension failed to load: Failed to load extension:
 
 ## 9. 测试与 RED 证据
 
-### 9.1 计数（本机 Linux x64，Node v24.14.0、Bun 1.4.2；第三轮复审后）
+### 9.1 计数（本机 Linux x64，Node v24.14.0、pnpm 10.34.5；第四轮复审后）
 
 | 命令 | 结果 |
 | --- | --- |
-| `pnpm --filter @pi-desktop/omp-runtime test`（未设 opt-in 变量） | **23 files / 350 passed / 6 skipped（356）** |
-| `OMP_SIDECAR_TEST_RESOURCES=… npx vitest run src/bundled-smoke.test.ts`（真实产物） | **9 passed**（3 恒开 + 6 真实产物/自包含/篡改/异常/超时） |
-| `env -u SSH_ASKPASS node --test test/*.test.mjs`（`apps/desktop` 全量） | **tests 2945 / pass 2941 / fail 0 / skipped 4** |
-| 其中 `omp-sidecar` 7、`omp-release-gate` 10、`omp-runtime-launcher` 12、`packaging-footprint` 9、`omp-session-failclosed` 24、`packaging-sidecar-source` 3、`preview-workflow` 1 | 均 0 fail |
-| `TMPDIR=<别名>` 重跑 `src/bundled.test.ts`（+ smoke）与 `omp-runtime-launcher.test.mjs` | **28 passed / 6 skipped**；launcher **12 passed** |
-| `pnpm build:js` / `pnpm --filter @pi-desktop/omp-runtime typecheck` / `pnpm --filter @pi-desktop/desktop typecheck` | 均 exit 0 |
-| `git diff --check` | exit 0 |
+| `pnpm --filter @pi-desktop/omp-runtime test`（未设 opt-in 变量） | **23 files / 350 passed / 6 skipped（356）**（串行重跑；与桌面全套并发时 `src/process.test.ts` 有一次负载型 flaky，见 §12.3） |
+| `OMP_SIDECAR_TEST_RESOURCES=… npx vitest run src/bundled-smoke.test.ts`（真实产物） | **9 passed**（3 恒开 + 6 真实产物/自包含/篡改/异常/超时；第三轮实跑值，本轮未重建产物） |
+| `env -u SSH_ASKPASS node --test test/*.test.mjs`（`apps/desktop` 全量，第四轮） | **tests 2947 / pass 2944 / fail 0 / skipped 3** |
+| 其中 `omp-sidecar` 7、`omp-release-gate` 11、`macos-release-lane` 2、`ci-workflow` 14、`omp-runtime-launcher` 12、`packaging-footprint` 9、`omp-session-failclosed` 24、`packaging-sidecar-source` 3、`preview-workflow` 1 | 均 0 fail（第四轮逐个实跑） |
+| `TMPDIR=<别名>` 重跑 `src/bundled.test.ts`（+ smoke）与 `omp-runtime-launcher.test.mjs` | **28 passed / 6 skipped**；launcher **12 passed**（第三轮实跑值，本轮未复跑） |
+| `pnpm build:js` / `pnpm --filter @pi-desktop/omp-runtime typecheck` / `pnpm --filter @pi-desktop/desktop typecheck` | 均 exit 0（第四轮实跑） |
+| `git diff --check` | exit 0（第四轮实跑） |
 
 
 ### 9.2 变异（RED）矩阵
@@ -283,6 +308,13 @@ error: Trusted extension failed to load: Failed to load extension:
 | 4 F4 canonical 断言 | 别名 TMPDIR：`bundled.test.ts` **3 failed / 22 passed**（172/195/403）；launcher 128/329 两处 `actual /tmp/canon-real/… expected /tmp/canon-alias/…` | 同一别名 TMPDIR：`28 passed / 6 skipped`；launcher **12 passed**（普通 TMPDIR 同值） |
 | 5 F5 win32 夹具 | 新增 win32 用例：`the fixture must write the Windows name`（1 failed） | `omp-session-failclosed` **24 passed** |
 
+第四轮（本轮，逐项「先红后绿」，命令见 §12.3）：
+
+| 复审问题 | RED 观察 | GREEN 观察 |
+| --- | --- | --- |
+| F1 builder 平台开关混入透传 | 起点 `956841c`：`planRelease(["--platform","darwin","--arm64","--win"], …)` → builder argv `--mac --arm64 --publish never --win`；`omp-release-gate` **2 failed / 9 passed**（`:407` `["--mac"]`、`:448` 混合声明） | `omp-release-gate` **11 passed**；同 argv 在 `parseReleaseArgs` 即拒绝（`the release platform must be given once; got --platform darwin, --win`），`runRelease` 解析失败时 exit 2 且 spawn 数 0 |
+| F2 本地签名 lane 绕过预检 | 起点 `956841c`：`macos-release-lane` **2 failed**（`:191` wrapper 从未运行、`:273` 预检失败时 lane 仍 exit 0）；`ci-workflow` **1 failed**（`:319` 旧断言仍是直接调用 electron-builder） | `macos-release-lane` **2 passed**（真实经过 wrapper：预检先于 builder、失败短路、签名参数完整、inventory → 公证/装订 → verify 顺序含 stdout 阶段标记断言）；`ci-workflow` **14 passed** |
+
 ---
 
 ## 10. R4-3 状态：**未满足（阻塞）**
@@ -311,6 +343,7 @@ R4-3 原文要求「构建脚本输出可核验清单…**重复构建在相同�
 8. **上游测试随契约移动**：`apps/desktop/test/window-menu.test.mjs` 原先断言发布脚本里出现 `electron-builder` 字面量；electron-builder 现由 `release-package.mjs` 调用，故该断言改为「`build:host-release` 先于打包入口」，其余断言不变（第三轮后全量桌面套件 2945 tests / 2941 pass / 0 fail / 4 skipped）。
 9. **未在 clean runner 实跑 packaging workflows**：F2/F3 的 fork checkout、`OMP_SIDECAR_SOURCE`、固定 Bun、`bun install --frozen-lockfile` 只以**静态测试 + manifest pin 自动比较**锁定（本机无网络与干净 fork 克隆）。真实 sidecar 构建仍在本机 fork 检出（`/tmp/r4b/oh-my-pi`，`3c845eb2…`）验证：`--check`/`--preflight` exit 0，opt-in 无费用 smoke **9 passed**。
 10. **平台实测边界**：F4 的 macOS RED 坐标（`bundled.test.ts:172/195/403`、`omp-runtime-launcher.test.mjs:128/329`）来自独立 macOS 复审机（Node 24.14.0）；本机用**别名 TMPDIR** 复现同一失败类并验证修复，但**未在 macOS 上复跑本轮修复**，留待规划方复跑验收。F5 的 win32 覆盖是 stub `process.platform`，**不是** Windows 实机；打包后的应用仍未启动过（同第 1、2 条）。
+11. **第四轮的 signed lane 证据在 Linux 上以桩工具实跑**：`macos-release-lane.test.mjs` 用 `uname` 桩模拟 Darwin、用桩 pnpm/electron-builder/codesign/xcrun 驱动真实的 `release-macos.sh` + `release-package.mjs` + watchdog + inventory + 公证/校验脚本，证明的是命令构造、预检先行、失败短路与阶段顺序，**不是**真实 macOS 签名/公证结果；真实 lane 仍需在带证书的 macOS 上实跑（同第 1、2 条）。第四轮**未**执行 `--preflight` 的真实 sidecar 构建（§8 的 9 条 smoke 仍是第三轮产物与计数）。
 
 ---
 
@@ -355,5 +388,19 @@ RED 均在起点提交 `9bd7e50`（F1/F4 直接跑旧实现；F2/F3/F5 在加入
 | F5 | `node --test test/omp-session-failclosed.test.mjs` → `the fixture must write the Windows name` | 同命令 → 24 passed |
 
 复核用别名 TMPDIR：`mkdir -p /tmp/canon-real && ln -s /tmp/canon-real /tmp/canon-alias`（模拟 macOS `/var` → `/private/var` 的别名祖先）。
+
+### 12.3 第四轮复审的 RED/GREEN 复核命令
+
+RED 全部在起点 `956841c` 的独立 worktree（`git worktree add --detach /tmp/r4b-red4 956841c85acf5e4c9b192ab7f837891416314680`）里复现：只把本轮三个测试文件拷进该 worktree，`release-package.mjs`/`release-macos.sh` 保持起点版本（`node_modules` 与 `packages/omp-runtime/dist` 以符号链接复用本机工作区已构建产物），因此每一项判红都只可能来自 F1/F2 本身。
+
+| 复审问题 | RED 命令（起点 `956841c`，worktree） | RED 观察 | GREEN 命令（本轮工作树） | GREEN 观察 |
+| --- | --- | --- | --- | --- |
+| F1 目标分叉 | `node -e "…planRelease(['--platform','darwin','--arm64','--win'], {platform:'darwin',arch:'arm64'})…"` | target `darwin/arm64`，builder argv `--mac --arm64 --publish never --win`（预检一个平台、打包两个平台） | 同命令 | `refused … the release platform must be given once; got --platform darwin, --win` |
+| F1 回归 | `node --test apps/desktop/test/omp-release-gate.test.mjs` | **2 failed / 9 passed**；`:407` `["--mac"]` 下 builder 收到 `['--mac','--mac']`，`:448` 混合声明未被拒绝 | 同命令 | **11 passed / 0 failed** |
+| F2 lane | `node --test apps/desktop/test/macos-release-lane.test.mjs` | **2 failed**；`:191`「the lane runs scripts/release-package.mjs」（调用日志只有 `pnpm … exec electron-builder`）、`:273`「a refused preflight must fail the lane」（lane exit 0） | 同命令 | **2 passed / 0 failed** |
+| F2 CI 断言 | `node --test apps/desktop/test/ci-workflow.test.mjs` | **1 failed / 13 passed**；`:319`「the local signed macOS lane enters the release wrapper」 | 同命令 | **14 passed / 0 failed** |
+| F2 机制（非文本） | — | — | `pnpm --filter @pi-desktop/desktop exec node ../../scripts/release-package.mjs --platform win32 --arch arm64`；`pnpm --filter @pi-desktop/desktop exec which electron-builder` | 前者 `RELEASE-PACKAGE-FAIL a win32 release is x64-only; refusing the requested arm64`（wrapper 真执行、自身 exit 2）；后者 `./node_modules/.bin/electron-builder`（`pnpm exec` 的 cwd = `apps/desktop`，故 `../../scripts/…` 与裸 `electron-builder` 都解析） |
+
+本轮 GREEN 计数（本机 Linux x64，Node v24.14.0、pnpm 10.34.5）：`pnpm build:js` exit 0；`pnpm --filter @pi-desktop/omp-runtime typecheck` exit 0；`pnpm --filter @pi-desktop/desktop typecheck` exit 0；`git diff --check` exit 0；`omp-runtime` 全套 **23 files / 350 passed / 6 skipped**；`apps/desktop` 全套 `env -u SSH_ASKPASS node --test test/*.test.mjs` **2947 tests / 2944 passed / 3 skipped / 0 failed**。桌面全套与 `omp-runtime` 全套并发时曾出现一次 `src/process.test.ts > reports the runtime's stderr as diagnostics only` 判红；该文件单跑与全套串行重跑都通过，且本轮未改动 `packages/omp-runtime` 任何源码——按**负载引起的 flaky** 记录，不写入通过计数之外。
 
 （工作目录：`app/packages/omp-runtime` 运行 vitest；`app/apps/desktop` 运行 node --test。所有 RED 均在起点提交上复现，GREEN 均在修复提交上复跑；计数见 §9.1 与 §12。）

@@ -36,6 +36,24 @@
  * two flags would break the next one. The target flags stay owned here (they
  * decide the preflight as well as the package), so a forwarded argument can
  * never move one side without the other.
+ *
+ * That passthrough has exactly one exception beyond the target flags above:
+ * electron-builder's own platform switches. `--mac`/`--macos`/`-m`/`-o`,
+ * `--win`/`--windows`/`-w` and `--linux`/`-l` are additive in electron-builder
+ * — a second switch builds a second platform — so forwarding them was the same
+ * fork under another spelling: `--platform darwin --arm64 --win` validated
+ * darwin/arm64 in the preflight and then packaged win32 as well. They resolve
+ * through the same single platform declaration as `--platform`. A platform
+ * target list (`--mac dmg`) is refused rather than forwarded: the platform axis
+ * selects the platform only, and the artifact targets live in the
+ * electron-builder config.
+ *
+ * Entry points: the `pack`/`dist`/`dist:*` package scripts append this module
+ * after `electron-vite build`, and the signed local lane
+ * (`scripts/release-macos.sh`) enters it the same way, through `pnpm --filter
+ * @pi-desktop/desktop exec node ../../scripts/release-package.mjs`, so the
+ * electron-builder this module spawns resolves from the workspace instead of
+ * relying on an interactive shell's PATH.
  */
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
@@ -47,6 +65,27 @@ const SIDECAR_SCRIPT = join(APP_ROOT, "scripts", "omp-sidecar.mjs");
 
 /** electron-builder's platform switch for each release platform. */
 export const PLATFORM_FLAGS = { darwin: "--mac", win32: "--win", linux: "--linux" };
+
+/**
+ * Every other spelling electron-builder's CLI accepts for the same platform
+ * switches (`out/builder.js`: `--mac` aliases `-m`, `-o`, `--macos`; `--win`
+ * aliases `-w`, `--windows`; `--linux` aliases `-l`). They are the same axis,
+ * so they cannot be a second way to change the release target.
+ */
+const PLATFORM_SWITCH_ALIASES = {
+  "--mac": "darwin",
+  "-m": "darwin",
+  "-o": "darwin",
+  "--macos": "darwin",
+  "--win": "win32",
+  "-w": "win32",
+  "--windows": "win32",
+  "--linux": "linux",
+  "-l": "linux",
+};
+
+/** yargs bundles short switches (`-mwl`), which selects several platforms. */
+const BUNDLED_PLATFORM_SWITCHES = /^-[mwlo]{2,}$/;
 
 /** electron-builder's architecture switches. */
 export const ARCH_FLAGS = {
@@ -72,16 +111,20 @@ const HOST = { platform: process.platform, arch: process.arch };
  *
  * Two kinds of argument are recognized:
  *
- *   - the target flags this entry owns (`--platform`, `--arch`, the arch
- *     switches, `--dir`, `--publish`) — they decide the preflight *and*
- *     electron-builder, so they are parsed once here;
+ *   - the target flags this entry owns (`--platform`, electron-builder's own
+ *     platform switches, `--arch`, the arch switches, `--dir`, `--publish`) —
+ *     they decide the preflight *and* electron-builder, so they are parsed once
+ *     here;
  *   - everything else, forwarded verbatim to electron-builder in the given
  *     order (see the header contract).
  *
- * A target axis may be declared only once. `--x64 --arm64`, `--x64 --arch
- * arm64` and `--platform darwin --platform win32` are all refusals rather than
- * a silent last-one-wins: a duplicated target is exactly the case where the
- * preflight and the package could end up on different targets.
+ * The platform axis is one declaration however it is spelled: `--platform`
+ * with a value, or one of electron-builder's platform switches. A target axis
+ * may be declared only once. `--x64 --arm64`, `--x64 --arch arm64`,
+ * `--platform darwin --platform win32`, `--mac --platform darwin` and
+ * `--win --linux` are all refusals rather than a silent last-one-wins: a
+ * duplicated target is exactly the case where the preflight and the package
+ * could end up on different targets.
  */
 export function parseReleaseArgs(argv) {
   const options = { platform: null, arch: null, dir: false, publish: null, forwarded: [] };
@@ -89,13 +132,14 @@ export function parseReleaseArgs(argv) {
   const archDeclarations = [];
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+    let platformDeclaration = null;
     if (arg === "--platform" || arg === "--arch" || arg === "--publish") {
       const value = argv[index + 1];
       if (value === undefined || value.startsWith("-")) throw new Error(`${arg} requires a value`);
       index += 1;
       if (arg === "--platform") {
-        platformDeclarations.push(`--platform ${value}`);
         options.platform = value;
+        platformDeclaration = `--platform ${value}`;
       } else if (arg === "--arch") {
         archDeclarations.push(`--arch ${value}`);
         options.arch = value;
@@ -103,6 +147,13 @@ export function parseReleaseArgs(argv) {
         if (options.publish !== null) throw new Error("--publish given more than once");
         options.publish = value;
       }
+    } else if (arg in PLATFORM_SWITCH_ALIASES) {
+      options.platform = PLATFORM_SWITCH_ALIASES[arg];
+      platformDeclaration = arg;
+    } else if (BUNDLED_PLATFORM_SWITCHES.test(arg)) {
+      throw new Error(
+        `the release platform must be given once; ${arg} names more than one platform`,
+      );
     } else if (arg === "--dir") {
       options.dir = true;
     } else if (arg in ARCH_FLAG_TO_ARCH) {
@@ -110,6 +161,17 @@ export function parseReleaseArgs(argv) {
       options.arch = ARCH_FLAG_TO_ARCH[arg];
     } else {
       options.forwarded.push(arg);
+    }
+    if (platformDeclaration !== null) {
+      platformDeclarations.push(platformDeclaration);
+      // electron-builder's platform switches take a target list as their value
+      // (`--mac dmg zip`). The platform axis selects the platform and nothing
+      // else, so a list is refused instead of being dropped or forwarded next
+      // to the flag this entry picks.
+      const next = argv[index + 1];
+      if (next !== undefined && !next.startsWith("-")) {
+        throw new Error(`a platform target list is not supported: ${platformDeclaration} ${next}`);
+      }
     }
   }
   if (platformDeclarations.length > 1) {

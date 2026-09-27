@@ -372,8 +372,58 @@ test("forwarded arguments reach electron-builder only after the preflight passes
   assert.equal(attempted.length, 1, "electron-builder must not run when the preflight refuses");
 });
 
+/**
+ * electron-builder's platform switches. Its CLI declares `--mac`/`--macos`/
+ * `-m`/`-o`, `--win`/`--windows`/`-w` and `--linux`/`-l`, and every one of them
+ * is additive: a second switch builds a second platform. Forwarding any of them
+ * would move electron-builder to a target the preflight never checked, so they
+ * are the platform axis — one declaration, one mapping, refused before spawn.
+ */
+const PLATFORM_SWITCH = /^(?:--(?:mac|macos|win|windows|linux)|-[mwlo])$/;
+
+const DARWIN_HOST = { platform: "darwin", arch: "arm64" };
+
+test("an electron-builder platform switch is the same axis as --platform", () => {
+  const cases = [
+    { argv: ["--mac"], host: DARWIN_HOST, platform: "darwin", arch: "arm64", flag: "--mac" },
+    { argv: ["--macos", "--x64"], host: DARWIN_HOST, platform: "darwin", arch: "x64", flag: "--mac" },
+    { argv: ["-m", "--x64"], host: DARWIN_HOST, platform: "darwin", arch: "x64", flag: "--mac" },
+    { argv: ["-o", "--x64"], host: DARWIN_HOST, platform: "darwin", arch: "x64", flag: "--mac" },
+    { argv: ["--win"], host: { platform: "linux", arch: "x64" }, platform: "win32", arch: "x64", flag: "--win" },
+    { argv: ["--windows"], host: DARWIN_HOST, platform: "win32", arch: "x64", flag: "--win" },
+    { argv: ["-w"], host: DARWIN_HOST, platform: "win32", arch: "x64", flag: "--win" },
+    { argv: ["--linux"], host: DARWIN_HOST, platform: "linux", arch: "x64", flag: "--linux" },
+    { argv: ["-l"], host: DARWIN_HOST, platform: "linux", arch: "x64", flag: "--linux" },
+  ];
+  for (const scenario of cases) {
+    const label = JSON.stringify(scenario.argv);
+    const plan = planRelease(scenario.argv, scenario.host);
+    assert.deepEqual(plan.target, { platform: scenario.platform, arch: scenario.arch }, label);
+    const platformIndex = plan.preflight.args.indexOf("--platform");
+    assert.equal(plan.preflight.args[platformIndex + 1], scenario.platform, label);
+    // Exactly one platform switch reaches electron-builder: the alias is
+    // consumed as the declaration, never forwarded beside the parsed flag.
+    const switches = plan.builder.args.filter((arg) => PLATFORM_SWITCH.test(arg));
+    assert.deepEqual(switches, [scenario.flag], label);
+  }
+
+  // electron-builder's platform switches also accept a target list (`--mac dmg
+  // zip`). The platform axis names the release platform only, so a list is
+  // refused instead of being forwarded next to the flag the wrapper picks.
+  for (const argv of [
+    ["--mac", "dmg"],
+    ["--platform", "darwin", "dmg", "zip"],
+  ]) {
+    assert.throws(
+      () => planRelease(argv, DARWIN_HOST),
+      /target list/,
+      `${JSON.stringify(argv)} must be refused`,
+    );
+  }
+});
+
 test("a conflicting or repeated target is refused instead of silently picked", () => {
-  const host = { platform: "darwin", arch: "arm64" };
+  const host = DARWIN_HOST;
   const conflicts = [
     ["--platform", "darwin", "--x64", "--arm64"],
     ["--platform", "darwin", "--x64", "--arch", "arm64"],
@@ -381,18 +431,30 @@ test("a conflicting or repeated target is refused instead of silently picked", (
     ["--platform", "darwin", "--x64", "--x64"],
     ["--platform", "darwin", "--platform", "darwin"],
     ["--platform", "darwin", "--publish", "never", "--publish", "always"],
+    // The reported fork: a platform declaration plus an additive alias made the
+    // preflight validate darwin/arm64 while electron-builder also built win32.
+    ["--platform", "darwin", "--arm64", "--win"],
+    ["--platform", "darwin", "--win"],
+    ["--win", "--linux"],
+    // The same axis spelled twice, in any of its spellings.
+    ["--mac", "--platform", "darwin"],
+    ["--mac", "--macos"],
+    ["--mac", "--mac"],
+    ["-m", "-w"],
+    // A bundled short cluster names more than one platform.
+    ["-mwl"],
   ];
   for (const argv of conflicts) {
     assert.throws(
       () => planRelease(argv, host),
-      /must be given once|given more than once/,
+      /must be given once|given more than once|more than one platform/,
       `${JSON.stringify(argv)} must be refused`,
     );
   }
 
   // The same refusal stops the run before anything is spawned.
   const calls = [];
-  const code = runRelease(["--platform", "darwin", "--x64", "--arm64"], {
+  const code = runRelease(["--platform", "darwin", "--arm64", "--win"], {
     host,
     spawn: (command, args) => {
       calls.push([command, args]);

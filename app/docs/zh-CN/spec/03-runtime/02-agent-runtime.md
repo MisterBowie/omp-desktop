@@ -1173,6 +1173,14 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
   `-c.mac.notarize=true`），所以拒绝未知参数会直接打断签名发布，而只识别当前这两个 flag 的白名单
   会打断下一个。同一目标维度只能声明一次：`--x64 --arm64`、`--x64 --arch arm64` 或重复的
   `--platform` 一律拒绝，而不是"后者覆盖"，因此转发参数不可能把预检与打包带到不同目标。
+  electron-builder 自带的平台开关属于同一维度：`--mac`/`--macos`/`-m`/`-o`、
+  `--win`/`--windows`/`-w`、`--linux`/`-l` 都归并到这一次平台声明；任何形式的第二次声明
+  （`--mac --macos` 这类同义重复、`--platform darwin --win` 这类冲突、短开关簇 `-mwl`）都在
+  spawn 之前被拒绝；平台 target 列表（`--mac dmg`）同样拒绝而不是转发，因为平台维度只负责选平台。
+  本地签名 lane（`scripts/release-macos.sh`）也通过
+  `pnpm --filter @pi-desktop/desktop exec node ../../scripts/release-package.mjs` 进入同一模块，
+  因此 Developer ID + 公证的本地构建与 `pnpm dist:mac` 一样先跑预检再跑 electron-builder，
+  不再直接调用 electron-builder。
 * **打包输入。** 每条执行发布命令的 lane 都会在打包前准备源码：检出清单所固定的 fork 提交（完整
   历史，因为构建要重新证明 `base..HEAD`）、安装固定 Bun、在该检出中执行
   `bun install --frozen-lockfile`，并把 `OMP_SIDECAR_SOURCE` 指向它。只检出本仓库的干净 runner

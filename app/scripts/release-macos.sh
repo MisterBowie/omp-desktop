@@ -12,6 +12,10 @@
 #   APPLE_TEAM_ID          Apple Developer Team ID (must be DUV63RKYTW)
 #   MAC_ARCH               optional `arm64` or `x64`; must match the host
 #
+# Packaging goes through scripts/release-package.mjs (the bundled-sidecar
+# preflight, then electron-builder), so a signed package cannot carry a missing
+# or stale resources/omp-runtime.
+#
 # Observability: the packaging command runs under
 # scripts/macos-signing-watchdog.mjs, which enables the per-file signing trace
 # (DEBUG=electron-osx-sign*) and the notarization progress
@@ -83,6 +87,13 @@ echo "==> Building the desktop bundles"
 pnpm --filter @pi-desktop/desktop exec electron-vite build
 
 echo "==> Packaging the desktop (Developer ID signed + notarized, $MAC_ARCH)"
+# The packaging phase goes through scripts/release-package.mjs — the same entry
+# every `pack`/`dist` command ends with — so the bundled-sidecar preflight runs
+# before electron-builder on this lane too. Calling electron-builder directly
+# here would let a missing or stale resources/omp-runtime into a signed,
+# notarized package (fourth-review finding F2). `pnpm exec` puts the desktop
+# package's node_modules/.bin ahead on PATH, which is how the wrapper resolves
+# electron-builder without assuming an interactive shell's PATH.
 # `--publish never` keeps a local checkout from publishing to GitHub; the
 # Release workflow owns publication. The watchdog is transparent: it forwards
 # every line, keeps the child's exit code, and only fails on its own timeout.
@@ -92,7 +103,8 @@ echo "==> Packaging the desktop (Developer ID signed + notarized, $MAC_ARCH)"
 # in clear text on a terminal or in a log file.
 DEBUG="${DEBUG:-electron-osx-sign*,electron-notarize*}" \
   node scripts/macos-signing-watchdog.mjs --label "release-macos-${MAC_ARCH}" -- \
-  pnpm --filter @pi-desktop/desktop exec electron-builder --mac "--${MAC_ARCH}" \
+  pnpm --filter @pi-desktop/desktop exec node ../../scripts/release-package.mjs \
+    --platform darwin "--${MAC_ARCH}" \
     --publish never \
     -c.mac.identity="${MAC_SIGNING_IDENTITY}" \
     -c.mac.forceCodeSigning=true \

@@ -171,6 +171,12 @@ scripts/release-macos.sh
 `MAC_ARCH=x64`，但该值必须与主机匹配，以保持 Rust 本机主机和 Electron
 软件包的架构一致。
 
+打包阶段经过 `scripts/release-package.mjs`（与每条 `pack`/`dist` 命令同一个入口），
+因此该 lane 也会在 electron-builder 之前运行 bundled OMP sidecar 预检：缺失或过期的
+`apps/desktop/resources/omp-runtime` 会让 lane 失败，而不是被打进签名并公证的包。
+该 lane 通过 `pnpm --filter @pi-desktop/desktop exec node ../../scripts/release-package.mjs`
+进入该入口，这也是 wrapper 能找到 desktop 包内二进制的原因。
+
 ### 4.3 GitHub 标签和手动工作流程
 
 GitHub Release 工作流程启动所有本机平台运行程序，无需

@@ -215,6 +215,24 @@ platform-specific artifact:
   `--x64 --arch arm64` and a repeated `--platform` are refused rather than
   resolved last-one-wins, because a duplicated target is the one case where a
   forwarded argument could move the preflight and the package apart.
+- **The platform axis has one spelling-agnostic owner**: electron-builder's own
+  platform switches are additive (`--mac … --win` builds both platforms), so
+  forwarding them was the same fork under another spelling — the preflight would
+  validate one platform and electron-builder would package two. `--mac`,
+  `--macos`, `-m`, `-o`, `--win`, `--windows`, `-w`, `--linux` and `-l` resolve
+  through the same single platform declaration as `--platform`; mixing two
+  declarations, including a synonym pair such as `--mac --macos`, and a bundled
+  short cluster such as `-mwl` are refused before anything is spawned. A
+  platform target list (`--mac dmg`) is refused too, because the platform axis
+  selects the platform only and the artifact targets belong in the
+  electron-builder config.
+- **The local signed lane uses the same entry**: `scripts/release-macos.sh`
+  packages through `pnpm --filter @pi-desktop/desktop exec node
+  ../../scripts/release-package.mjs …`, so the Developer ID + notarization lane
+  runs the sidecar preflight before electron-builder exactly like
+  `pnpm dist:mac` instead of calling electron-builder directly. The `pnpm exec`
+  context is what puts the desktop package's binaries on PATH for the wrapper;
+  an interactive shell is never assumed to have them.
 - **Packaging lanes prepare the source**: `.github/workflows/release.yml`,
   `.github/workflows/linux-package.yml` and the repository-level macOS preview
   workflow check out `MisterBowie/oh-my-pi` at the manifest's fork commit with
@@ -228,9 +246,15 @@ platform-specific artifact:
 bundles the runtime before the target-aware entry, checks the extracted target
 selection behaviorally (the preflight and electron-builder receive the same
 platform/architecture; a cross target without an architecture fails without
-spawning), and exercises the preflight refusals with fixture artifacts;
-`apps/desktop/test/packaging-sidecar-source.test.mjs` and
-`apps/desktop/test/preview-workflow.test.mjs` hold the packaging lanes to the
+spawning), refuses a second platform declaration in any spelling — including
+the mixed `--platform darwin --arm64 --win` that used to reach electron-builder
+as a second platform — and exercises the preflight refusals with fixture
+artifacts; `apps/desktop/test/macos-release-lane.test.mjs` drives the real
+`scripts/release-macos.sh` against stub tooling to prove the lane enters the
+wrapper through `pnpm exec`, that the preflight runs before electron-builder
+with the signing flags intact, and that a refused preflight stops the lane
+before anything is packaged; `apps/desktop/test/packaging-sidecar-source.test.mjs`
+and `apps/desktop/test/preview-workflow.test.mjs` hold the packaging lanes to the
 fork, commit, Bun and frozen-install contract, reading the pin from the manifest
 rather than duplicating it.
 

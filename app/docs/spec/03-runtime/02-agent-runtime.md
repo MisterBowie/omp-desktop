@@ -1916,7 +1916,18 @@ level `62bc57b+omp-desktop.2`, carried by the controlled fork commit recorded in
   two flags would break the next one. A target axis may be declared only once:
   `--x64 --arm64`, `--x64 --arch arm64` or a repeated `--platform` is refused
   instead of being resolved last-one-wins, so a forwarded argument can never
-  move the preflight and the package onto different targets.
+  move the preflight and the package onto different targets. electron-builder's
+  own platform switches are the same axis: `--mac`/`--macos`/`-m`/`-o`,
+  `--win`/`--windows`/`-w` and `--linux`/`-l` resolve through that one
+  declaration, any second declaration in any spelling (`--mac --macos`, a mixed
+  `--platform darwin --win`, the bundled short `-mwl`) is refused before
+  anything is spawned, and a platform target list (`--mac dmg`) is refused
+  rather than forwarded, because the platform axis names the platform only. The
+  local signed lane (`scripts/release-macos.sh`) enters the same module through
+  `pnpm --filter @pi-desktop/desktop exec node
+  ../../scripts/release-package.mjs`, so a Developer ID + notarized local build
+  runs the preflight before electron-builder exactly like `pnpm dist:mac`
+  instead of calling electron-builder directly.
 * **Packaging input.** Every lane that runs a release command prepares the
   source before it packages: a checkout of the controlled fork at the manifest's
   fork commit with full history (the build re-proves `base..HEAD`), the pinned
