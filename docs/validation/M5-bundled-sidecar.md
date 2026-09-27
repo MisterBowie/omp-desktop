@@ -476,3 +476,23 @@ RED 在起点 `bf9d075` 的独立 worktree（`git worktree add --detach /tmp/r4b
 | 真实入口（非探针） | — | — | `pnpm --filter @pi-desktop/desktop exec node ../../scripts/release-package.mjs --platform darwin --arm64 --win=portable`；`OMP_SIDECAR_SOURCE=/tmp/r4b/oh-my-pi node scripts/release-package.mjs --platform darwin --arm64 --publish never -c.mac.identity=… -c.mac.forceCodeSigning=true -c.mac.notarize=true` | 前者 `RELEASE-PACKAGE-FAIL a platform target list is not supported: --win=portable`、wrapper exit 2（pnpm 外层 exit 1）；后者参数全部接受并进入 `--preflight --platform darwin --arch arm64`，随后按跨目标语义拒绝（`provenance platform is linux, this host is darwin`，exit 1） |
 
 第五轮 GREEN 计数（本机 Linux x64，Node v24.14.0、pnpm 10.34.5）：`pnpm build:js` exit 0；`pnpm --filter @pi-desktop/omp-runtime typecheck` exit 0；`pnpm --filter @pi-desktop/desktop typecheck` exit 0；`git diff --check` exit 0；`omp-runtime` 全套 **23 files / 350 passed / 6 skipped**；opt-in 真实产物 smoke **9 passed**；`apps/desktop` 全量 `env -u SSH_ASKPASS node --test test/*.test.mjs` **2952 tests / 2949 passed / 3 skipped / 0 failed**。
+
+### 12.5 第六轮复审（Unicode 路径）的 RED/GREEN 复核命令
+
+问题：`app/apps/desktop/test/macos-release-verification.test.mjs` 把 `verifyScript`/`notarizeScript` 保存为 `URL` 对象，6 处 `spawnSync("bash", [...​.pathname])` 传入的是**百分号编码**的路径。仓库路径含非 ASCII 字符时（如 `/Users/vv/Documents/对话/...`），bash 拿到 `/…/%E5%AF%B9%E8%AF%9D/…sh` 而找不到脚本。仓库级症状：正确目录下全量套件为 2952 tests / 2943 pass / **9 fail**，9 个失败全部来自该文件，报 `bash: …/%E5%AF%B9%E8%AF%9D/…sh: No such file or directory`；把同一测试与两个脚本原样放进纯 ASCII 临时目录后 9/9 通过，说明签名/公证脚本实现本身没有问题。
+
+固定 PI 证据（源码事实）：`upstream/pi-desktop/apps/desktop/test/macos-release-verification.test.mjs` 与本仓库该文件逐字一致，因此**同样存在**该缺陷（不以此为由保留）；同仓库其余测试已使用标准库写法，例如 `upstream/pi-desktop/apps/desktop/test/macos-signing-watchdog.test.mjs:13,16` 的 `fileURLToPath(new URL("../../..", import.meta.url))` 与 `macos-signing-diagnostics.test.mjs:13-18` 的两个脚本常量。
+
+本轮修改（仅一个测试文件，未改生产脚本）：引入 `node:url` 的 `fileURLToPath`，两个脚本常量改为 `fileURLToPath(new URL(…, import.meta.url))` 得到的真实路径，6 处 `spawnSync` 直接使用该字符串；不保留任何 `.pathname`，也不手写 `decodeURI`/`decodeURIComponent`。
+
+| 复核项 | 命令 | 观察 |
+| --- | --- | --- |
+| RED（起点 `a797b52` 的文件） | 临时树 `/tmp/r5 对话 review/repo`（编码视图 `/tmp/r5%20%E5%AF%B9%E8%AF%9D%20review/repo`），布局 `apps/desktop/test` + `scripts`；`cd …/apps/desktop && node --test test/macos-release-verification.test.mjs` | **9 fail**；`bash: /tmp/r5%20%E5%AF%B9%E8%AF%9D%20review/repo/scripts/{verify-macos-release,notarize-and-staple-macos-release-dmg}.sh: No such file or directory`；首个断言 `actual 127 / expected 1` |
+| GREEN（本轮文件，同目录） | 同上，拷入本轮文件后重跑 | **tests 9 / pass 9 / fail 0**，exit 0 |
+| 仓库内定向测试 | `cd app/apps/desktop && node --test test/macos-release-verification.test.mjs` | **tests 9 / pass 9 / fail 0 / skipped 0**，exit 0 |
+| 全量桌面套件（本机 Linux x64，Node v24.14.0） | `cd app/apps/desktop && env -u SSH_ASKPASS node --test test/*.test.mjs` | **tests 2952 / pass 2949 / fail 0 / cancelled 0 / skipped 3**，exit 0 |
+| 3 个 skip | 同上（TAP） | 均为 macOS-only：`macOS development bundle rewrites native identity and reuses its cache`、`the injected codesign shim times calls…`、`a failing codesign call is reported as a failure…` |
+| 未清 `SSH_ASKPASS` 时的 1 个红 | `cd app/apps/desktop && node --test test/remote-host-ssh-password.test.mjs` | **13 pass / 1 fail**（`a key-authenticated transport is handed no askpass material`，`'set' !== ''`）；根因是本机 SSH 会话自带的 `SSH_ASKPASS=/usr/bin/false`；`env -u SSH_ASKPASS` 后 **14/14 通过**。与本轮改动无关，属环境变量，不用它计入通过 |
+| diff 卫生 | `git diff --check` | exit 0；变更仅 `app/apps/desktop/test/macos-release-verification.test.mjs` 一个文件 |
+
+状态未变：R4B **部分完成并受 R4-3 阻塞**；R3 仍为硬阻塞；ADR 0306 的 Cursor 产品门保留；T20-B/C/D 未开始；T20 未完成；T21 未完成。本轮未运行真实 electron-builder 打包、clean runner、Windows 实机或真实签名/公证发布。
