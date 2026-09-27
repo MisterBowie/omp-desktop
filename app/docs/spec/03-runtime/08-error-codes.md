@@ -104,7 +104,12 @@ pair at the durable write on its own database connection
 (`crates/host-core/src/plan_goal_guard.rs` — per-connection TEMP triggers, so
 nothing enters the schema and a downgrade inherits nothing), and the desktop's
 session-configure, session-create and prompt boundaries refuse it before any
-runtime work. Neither side ever rewrites the user's mode or model.
+runtime work. On upgrade, a recognized database is swept of the durable triggers
+an earlier build left in it **before** its migration chain and gets the TEMP guard
+**after** it — migrations write the guarded columns, so cleaning up later would
+abort a build-skipping upgrade — and a database this build refuses to recognize
+(unversioned with tables, or newer than `SCHEMA_VERSION`) is left untouched.
+Neither side ever rewrites the user's mode or model.
 
 | code | retriable | meaning |
 |---|---|---|

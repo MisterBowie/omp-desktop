@@ -1830,6 +1830,16 @@ The invariant is enforced by host-core at the durable write, not by the desktop:
   the previous TEMP one (there is no `IF NOT EXISTS`). A write made through a raw
   `sqlite3` connection — a manual edit — is outside the guard and stays the prompt
   gate's job.
+* Upgrade order is fixed too: for a recognized schema, `Database::open` sweeps the
+  two durable names out **before** its migration chain and installs the TEMP guard
+  only **after** it. A historical migration writes the guarded columns on purpose
+  (v7→v8 rewrites `mode = 'chat'` to `'plan'`), so a build that cleaned up after
+  the migrations would abort that upgrade, and an installation jumping from
+  `876fb07` straight to a later release could not open its database. The sweep is
+  exact — the two owned names, durable schema only, no prefix or `LIKE` match — so
+  PI's `messages_*` maintenance triggers and any user trigger are untouched, and a
+  file this build refuses (unversioned with tables, or newer than
+  `SCHEMA_VERSION`) is left exactly as found rather than edited.
 * Identity is the canonical provider id `"cursor"` and the code is
   `PLAN_GOAL_CURSOR_UNSUPPORTED` (spec 08 §3.2b). Both literals live once per
   language and are pinned together by

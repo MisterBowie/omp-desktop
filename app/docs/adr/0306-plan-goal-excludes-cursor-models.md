@@ -1,11 +1,13 @@
 # ADR 0306: Plan/Goal mode excludes Cursor models
 
-- Status: Accepted (M5/T20-R3C), **revised after independent review (F1-F6)**.
+- Status: Accepted (M5/T20-R3C), **revised after independent review (F1-F7)**.
   User-approved product decision; it restricts which combinations any writer may
   persist, and it does **not** resolve R3. F1-F4 moved the enforcement into the
   durable write; F5 scopes the write guard to each database connection as TEMP
   triggers instead of persisting it in the schema, and F6 is the rustfmt pass
-  over that code.
+  over that code. F7 splits the upgrade path into a pre-migration sweep of the
+  durable `876fb07` residual and a post-migration TEMP install, so an upgrade
+  that skips the intermediate release is never blocked by the old guard.
 - Date: 2026-09-25
 - Scope: which (mode, model) combinations a session may hold, and where the
   desktop refuses the invalid ones.
@@ -86,11 +88,26 @@ Three facts shaped the decision:
   knows nothing about this decision inherits nothing. Installing also drops the
   same-named durable triggers commit `876fb07` wrote into `sqlite_master`, so
   upgrading from that build converges on one definition instead of leaving both
-  behind, and a revised definition always replaces the previous TEMP one (no
-  `IF NOT EXISTS` to pin a superseded text). The trade-off is named: a write made
-  through a raw `sqlite3` connection — a manual edit — is outside the guard. That
+  behind (the durable half of that sweep runs before the migration chain — see the
+  upgrade-order bullet), and a revised definition always replaces the previous
+  TEMP one (no `IF NOT EXISTS` to pin a superseded text) instead of being pinned
+  as already present. The trade-off is named: a write made through a raw
+  `sqlite3` connection — a manual edit — is outside the guard. That
   is the same manual-edit path the prompt gate already covers, not a gap this ADR
   claims to close.
+- **Upgrade order is part of the decision.** A recognized schema is swept of the
+  two durable names **before** its migration chain runs, and the TEMP guard is
+  installed **after** it. The old guard refuses writes that land on the pair,
+  while a historical migration writes the guarded columns for its own purposes —
+  v7→v8 rewrites `mode = 'chat'` to `'plan'`
+  (`crates/host-core/src/db/migrations.rs`) — so cleaning up after the migrations
+  would abort the upgrade of any database that holds such a row, and the user
+  would have to run the intermediate release first. Jumping versions must work.
+  The sweep names the two owned triggers exactly, in the durable schema only, so
+  PI's `messages_*` maintenance triggers and any user trigger survive it; and it
+  never runs for a file this build refuses to recognize (unversioned with tables,
+  or newer than `SCHEMA_VERSION`), which is left exactly as found and never
+  edited.
 - **Rows that already hold the pair are tolerated, not legalised.** A database
   that already holds it (a hand edit, or a historical migration from before the
   guard) keeps opening, and unrelated writes to that row still work — but only
@@ -132,11 +149,17 @@ Three facts shaped the decision:
   the write-time judgement a stale caller's pre-read cannot defeat); the guard's
   connection scope (definition only in `sqlite_temp_master`, absent after close,
   re-installed on the next open, the durable `876fb07` residual dropped and
-  replaced, a stale connection definition replaced rather than kept); the
-  predicate's boundary table; IPC behaviour tests for every reachable invalid
-  combination plus both escape paths and the non-Cursor regressions; the
-  cross-language literal parity check; and renderer contracts for the withheld
-  menu entries, the notice, the pre-IPC refusal and the skipped pin.
+  replaced, a stale connection definition replaced rather than kept); the upgrade
+  order end to end through `Database::open` (a v7 file carrying the `876fb07`
+  triggers and a `chat` + Cursor row, which the historical `chat`→`plan` rewrite
+  must survive, with the TEMP guard refusing writes only afterwards); that an
+  unversioned database and one newer than `SCHEMA_VERSION` are refused without
+  their same-named triggers being touched; that only the two owned names are ever
+  removed; the predicate's boundary table; IPC behaviour tests for every reachable
+  invalid combination plus both escape paths and the non-Cursor regressions; the
+  cross-language literal parity check plus the two-phase order; and renderer
+  contracts for the withheld menu entries, the notice, the pre-IPC refusal and the
+  skipped pin.
 - A user whose session carries a `cursor` provider id — or a future user of a
   projectable Cursor transport — sees one clear, localized refusal and can
   continue after a single change of mode or model.

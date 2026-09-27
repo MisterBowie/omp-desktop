@@ -1118,6 +1118,12 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
   任何行为。安装时还会删除提交 `876fb07` 曾写进 `sqlite_master` 的同名持久触发器，使从该版本升级
   只收敛到一份定义；修订后的定义总是替换此前的 TEMP 定义（不使用 `IF NOT EXISTS`）。通过裸
   `sqlite3` 连接（手工编辑）产生的写入不在守卫范围内，仍由派发门兜底。
+* 升级顺序同样固定：对已识别的 schema，`Database::open` 在**迁移链之前**先清掉这两个持久名字，
+  并且只在**迁移链之后**安装 TEMP 守卫。历史迁移会主动写入受守卫列（v7→v8 会把 `mode = 'chat'`
+  改写为 `'plan'`），因此若把清理放到迁移之后，这样的升级会被旧守卫中止——从 `876fb07` 直接跳到
+  更新版本安装的数据库将无法打开。清理是精确的：只针对模块拥有的两个名字、只在持久 schema，不做
+  前缀或 `LIKE` 匹配，因此 PI 的 `messages_*` 维护触发器与用户自己的触发器都不会被删除；本构建
+  拒绝识别的文件（有表但无版本号，或版本高于 `SCHEMA_VERSION`）保持原样、不会被编辑。
 * 身份是规范 provider id `"cursor"`，错误码是 `PLAN_GOAL_CURSOR_UNSUPPORTED`（规格 08 §3.2b）。
   两种语言各自只保留一份字面量，并由
   `apps/desktop/test/plan-goal-cursor-constant-parity.test.mjs` 将其钉在一起；守卫的 SQL 由这些

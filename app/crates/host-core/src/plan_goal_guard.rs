@@ -28,6 +28,12 @@
 //! * The triggers are **TEMP** triggers: they exist only for that connection and
 //!   die with it. Nothing about the guard is persisted, no schema version moves,
 //!   and a downgrade cannot inherit it (see [`install`]).
+//! * The durable remnants commit `876fb07` did write into the file are cleared
+//!   **before** the migration chain and the TEMP guard is installed **after**
+//!   it ([`clear_persistent_residuals`], then [`install`]): migrations write the
+//!   guarded columns — v7→v8 turns `mode = 'chat'` into `'plan'` — so the
+//!   product gate must never constrain a historical migration, and an upgrade
+//!   that skips the intermediate release must still complete.
 //!
 //! What the guard deliberately does **not** do:
 //!
@@ -43,7 +49,7 @@
 //!   per-connection, so a manual edit outside the host writes the pair freely —
 //!   that is the pre-existing-data case above, and the prompt gate covers it.
 
-use crate::db::{Database, Result};
+use crate::db::{Connection, Database, Result};
 
 /// The provider id the pinned runtime uses for Cursor. Detection is an exact
 /// comparison on this id — never a display label, a user-typed vendor hint, or
@@ -58,18 +64,46 @@ pub const CURSOR_PROVIDER_ID: &str = "cursor";
 /// `plan_rpc_err` reports it verbatim on every RPC that can write the pair.
 pub const PLAN_GOAL_CURSOR_UNSUPPORTED: &str = "PLAN_GOAL_CURSOR_UNSUPPORTED";
 
+/// Remove the durable `sessions_refuse_cursor_contract_*` triggers commit
+/// `876fb07` wrote into the file's schema.
+///
+/// `Database::open` calls this **before** the migration chain, for every
+/// recognized schema it opens or migrates on this connection, and installs the
+/// TEMP guard ([`install`]) only **after** that chain. The order is the point:
+/// the old guard refuses writes that land on the refused pair, while migrations
+/// write the guarded columns as a matter of course — v7→v8 rewrites
+/// `mode = 'chat'` to `'plan'` (`crates/host-core/src/db/migrations.rs`) — so a
+/// residual trigger would abort an upgrade over a row the upgrade is supposed to
+/// produce, and a user jumping from `876fb07` to a later build could not upgrade
+/// without running the intermediate release first. Nothing may constrain a
+/// historical migration.
+///
+/// The sweep is exact: the two names this module owns, in the durable schema
+/// only. There is no prefix or `LIKE` match, so unrelated triggers — PI's
+/// `messages_ai`/`messages_ad`/`messages_au` maintenance triggers, a user's own
+/// — are left alone. A file this build refuses (unversioned with tables, or
+/// newer than `SCHEMA_VERSION`) is never cleaned: it is not recognized, so it is
+/// not edited.
+pub(crate) fn clear_persistent_residuals(conn: &Connection) -> Result<()> {
+    conn.execute_batch(&persistent_residual_clear_sql())?;
+    Ok(())
+}
+
 /// Install the write guards on the connection `db` owns. Called once per
-/// `Database::open`, before any writer can reach the table.
+/// `Database::open`, after this open's migration chain and before any writer can
+/// reach the table.
 ///
 /// Both guards are TEMP triggers: they belong to this connection's temp schema
 /// and disappear with it. They never enter `sqlite_master`, so no schema-version
 /// migration is involved and an older binary opening the same file afterwards
 /// inherits no behaviour it does not understand. Installing first drops every
-/// same-named definition the connection or the file may already hold — including
-/// the durable triggers commit `876fb07` wrote into `sqlite_master` — so the
-/// current text always wins. TEMP triggers are connection-scoped state: a write
-/// made through a raw `sqlite3` connection (a manual edit) is outside them, and
-/// stays the desktop prompt gate's job.
+/// same-named definition the connection or the file may already hold — the
+/// durable triggers commit `876fb07` wrote into `sqlite_master` (already cleared
+/// before the migrations by [`clear_persistent_residuals`], kept here as a
+/// defensive sweep) and this connection's previous TEMP one — so the current
+/// text always wins. TEMP triggers are connection-scoped state: a write made
+/// through a raw `sqlite3` connection (a manual edit) is outside them, and stays
+/// the desktop prompt gate's job.
 pub(crate) fn install(db: &Database) -> Result<()> {
     db.conn()
         .execute_batch(&format!("{}{}", clear_sql(), guard_sql()))?;
@@ -84,16 +118,31 @@ const GUARD_TRIGGER_NAMES: [&str; 2] = [
     "sessions_refuse_cursor_contract_au",
 ];
 
-/// `DROP TRIGGER IF EXISTS` for both names in both schemas: the durable ones an
-/// earlier build could have left in `sqlite_master`, and this connection's TEMP
-/// ones. A bare name would resolve to only one of the two.
-fn clear_sql() -> String {
+/// `DROP TRIGGER IF EXISTS` for both owned names in the durable schema: what
+/// [`clear_persistent_residuals`] runs before the migration chain, and the
+/// defensive half of [`install`]'s sweep.
+fn persistent_residual_clear_sql() -> String {
     let mut sql = String::new();
     for name in GUARD_TRIGGER_NAMES {
         sql.push_str(&format!("DROP TRIGGER IF EXISTS main.{name};\n"));
+    }
+    sql
+}
+
+/// `DROP TRIGGER IF EXISTS` for this connection's TEMP definitions.
+fn temp_clear_sql() -> String {
+    let mut sql = String::new();
+    for name in GUARD_TRIGGER_NAMES {
         sql.push_str(&format!("DROP TRIGGER IF EXISTS temp.{name};\n"));
     }
     sql
+}
+
+/// Both schemas: [`install`] and the test-only `uninstall` start from a clean
+/// slate in the file and in the connection. A bare name would resolve to only
+/// one of the two.
+fn clear_sql() -> String {
+    format!("{}{}", persistent_residual_clear_sql(), temp_clear_sql())
 }
 
 /// The guard text, built from the constants so the provider id and the refusal
@@ -157,7 +206,7 @@ pub(crate) fn plant_legacy_contract_cursor_session(db: &Database, id: &str) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::{now_ms, Connection};
+    use crate::db::{now_ms, Connection, SCHEMA_VERSION};
     use rusqlite::params;
 
     /// The persistent trigger text `876fb07` wrote into the durable schema.
@@ -597,5 +646,171 @@ CREATE TRIGGER IF NOT EXISTS sessions_refuse_cursor_contract_au
         assert!(sql.contains(PLAN_GOAL_CURSOR_UNSUPPORTED));
         assert!(sql.contains("new.mode IN ('plan', 'goal')"));
         assert!(sql.contains("BEFORE UPDATE OF mode, provider_id"));
+    }
+
+    /// A file shaped like the v7 database an upgrade skipping `692994c` meets:
+    /// the durable `876fb07` guards sit in `sqlite_master`, a `chat` + Cursor
+    /// session is the row the v7→v8 migration rewrites, and `user_version = 7`
+    /// selects that migration. Built the way `db::tests` builds its v7
+    /// fixtures, so the migration-under-test is the real one.
+    fn legacy_v7_file_with_persistent_guards(path: &std::path::Path) {
+        {
+            let db = Database::open(path).unwrap();
+            insert_session(&db, "legacy-chat-cursor", "chat", Some(CURSOR_PROVIDER_ID)).unwrap();
+            // v7 predates the approval table the v7→v8 migration creates.
+            db.conn()
+                .execute_batch("DROP TABLE plan_approvals;")
+                .unwrap();
+            db.conn().pragma_update(None, "user_version", 7).unwrap();
+        }
+        let raw = Connection::open(path).unwrap();
+        raw.execute_batch(LEGACY_PERSISTENT_GUARD_SQL).unwrap();
+        assert_eq!(guard_trigger_names(&raw, "sqlite_master").len(), 2);
+    }
+
+    fn schema_version(conn: &Connection) -> i64 {
+        conn.query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap()
+    }
+
+    /// F7: the durable guard `876fb07` wrote has to be gone *before* the
+    /// migration chain runs. Migrations legitimately rewrite the guarded
+    /// columns — v7→v8 turns `mode = 'chat'` into `'plan'` (`db/migrations.rs`)
+    /// — so an upgrade from `876fb07` straight to a later build would abort on
+    /// that write while the old trigger is still in place, and the user would
+    /// have to run the intermediate build first. Nothing may constrain the
+    /// migrations; the product gate belongs after them.
+    #[test]
+    fn open_clears_the_legacy_durable_guard_before_migrating() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        legacy_v7_file_with_persistent_guards(&path);
+
+        let db = Database::open(&path).unwrap();
+
+        // The historical rewrite landed on the row the old guard would have
+        // aborted, and the schema reached the current version.
+        let (mode, provider): (String, Option<String>) = db
+            .conn()
+            .query_row(
+                "SELECT mode, provider_id FROM sessions WHERE id = 'legacy-chat-cursor'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            (mode.as_str(), provider.as_deref()),
+            ("plan", Some(CURSOR_PROVIDER_ID))
+        );
+        assert_eq!(schema_version(db.conn()), SCHEMA_VERSION);
+
+        // Only now is the gate installed, and only for this connection: the
+        // durable residual is gone from the file, the pair is refused again,
+        // including the hop from the historical row.
+        assert!(guard_trigger_names(db.conn(), "sqlite_master").is_empty());
+        assert_eq!(
+            guard_trigger_names(db.conn(), "sqlite_temp_master"),
+            vec![
+                "sessions_refuse_cursor_contract_ai".to_string(),
+                "sessions_refuse_cursor_contract_au".to_string(),
+            ]
+        );
+        assert_eq!(
+            insert_session(&db, "new-plan-cursor", "plan", Some(CURSOR_PROVIDER_ID))
+                .unwrap_err()
+                .to_string(),
+            PLAN_GOAL_CURSOR_UNSUPPORTED
+        );
+        assert_eq!(
+            db.conn()
+                .execute(
+                    "UPDATE sessions SET mode = 'goal' WHERE id = 'legacy-chat-cursor'",
+                    [],
+                )
+                .unwrap_err()
+                .to_string(),
+            PLAN_GOAL_CURSOR_UNSUPPORTED
+        );
+    }
+
+    #[test]
+    fn open_refuses_an_unversioned_database_without_clearing_the_guard() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        drop(Database::open(&path).unwrap());
+        {
+            let raw = Connection::open(&path).unwrap();
+            raw.execute_batch(LEGACY_PERSISTENT_GUARD_SQL).unwrap();
+            raw.pragma_update(None, "user_version", 0).unwrap();
+        }
+
+        // A file with tables and no version is not recognized, so this build
+        // must not edit it — not even to remove a trigger it owns elsewhere.
+        let error = Database::open(&path)
+            .err()
+            .expect("an unversioned database must be refused")
+            .to_string();
+        assert!(error.contains("refusing to touch it"), "{error}");
+
+        let raw = Connection::open(&path).unwrap();
+        assert_eq!(schema_version(&raw), 0);
+        assert_eq!(guard_trigger_names(&raw, "sqlite_master").len(), 2);
+        assert!(guard_trigger_names(&raw, "sqlite_temp_master").is_empty());
+    }
+
+    #[test]
+    fn open_refuses_a_newer_schema_without_clearing_the_guard() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        drop(Database::open(&path).unwrap());
+        {
+            let raw = Connection::open(&path).unwrap();
+            raw.execute_batch(LEGACY_PERSISTENT_GUARD_SQL).unwrap();
+            raw.pragma_update(None, "user_version", SCHEMA_VERSION + 1)
+                .unwrap();
+        }
+
+        // A database from a newer build is refused as a whole, before the
+        // residuals of an older one are touched.
+        let error = Database::open(&path)
+            .err()
+            .expect("a newer schema must be refused")
+            .to_string();
+        assert!(error.contains("is newer than supported"), "{error}");
+
+        let raw = Connection::open(&path).unwrap();
+        assert_eq!(schema_version(&raw), SCHEMA_VERSION + 1);
+        assert_eq!(guard_trigger_names(&raw, "sqlite_master").len(), 2);
+        assert!(guard_trigger_names(&raw, "sqlite_temp_master").is_empty());
+    }
+
+    /// Only the two owned names go. PI's own `messages_ai`/`messages_ad`/
+    /// `messages_au` maintenance triggers and anything else someone added are
+    /// not this module's to drop — a prefix or `LIKE` sweep would take them.
+    #[test]
+    fn open_removes_only_the_two_owned_trigger_names() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        drop(Database::open(&path).unwrap());
+        {
+            let raw = Connection::open(&path).unwrap();
+            raw.execute_batch(LEGACY_PERSISTENT_GUARD_SQL).unwrap();
+            raw.execute_batch(
+                "CREATE TRIGGER sessions_refuse_cursor_contract_ai_backup
+                   BEFORE INSERT ON sessions BEGIN SELECT 1; END;",
+            )
+            .unwrap();
+        }
+
+        let db = Database::open(&path).unwrap();
+        assert_eq!(
+            trigger_names(db.conn(), "sqlite_master"),
+            vec![
+                "messages_ad".to_string(),
+                "messages_ai".to_string(),
+                "messages_au".to_string(),
+                "sessions_refuse_cursor_contract_ai_backup".to_string(),
+            ]
+        );
     }
 }

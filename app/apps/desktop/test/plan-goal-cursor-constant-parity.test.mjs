@@ -20,8 +20,9 @@ const { CURSOR_PROVIDER_ID, planGoalCursorRefusal } = await import(
  * the code the desktop's `ErrorCodes` registry declares; the TypeScript
  * predicate refuses the same pair at the IPC boundaries. Nothing in the
  * compiler spans the two, so this test pins the literals, the guard's
- * construction and the trigger's connection scope together — a drift would
- * silently split the invariant instead of failing a build.
+ * construction, the trigger's connection scope and the two-phase order in which
+ * `Database::open` clears the durable residual and installs the TEMP guard — a
+ * drift would silently split the invariant instead of failing a build.
  */
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
@@ -79,4 +80,29 @@ test("the guard SQL is generated from those constants, not retyped", () => {
   // 876fb07 wrote into sqlite_master, and this connection's previous TEMP one.
   assert.match(rustGuard, /DROP TRIGGER IF EXISTS main\.\{name\}/);
   assert.match(rustGuard, /DROP TRIGGER IF EXISTS temp\.\{name\}/);
+});
+
+test("the durable residual is swept before the migrations, the TEMP guard installed after", async () => {
+  // F7: the v7→v8 migration rewrites `mode = 'chat'` to `'plan'` — it writes a
+  // guarded column. A build that only cleaned the 876fb07 residual after the
+  // migration chain aborts that upgrade, so a user jumping from 876fb07 to a
+  // later release cannot open the database at all. The two phases therefore
+  // stay separate objects with a fixed order. The behaviour is proven end to
+  // end by `plan_goal_guard::tests::open_clears_the_legacy_durable_guard_before_migrating`;
+  // this pins the shape so a refactor cannot fold them back together silently.
+  const persistent = /fn persistent_residual_clear_sql\(\) -> String \{([\s\S]*?)\n\}/.exec(rustGuard)?.[1] ?? "";
+  assert.ok(persistent.length > 0, "the durable residual needs its own sweep, separate from the TEMP install");
+  assert.match(persistent, /DROP TRIGGER IF EXISTS main\.\{name\}/);
+  // Durable schema only, and name-exact: no `temp.`, no prefix/`LIKE`/`GLOB`
+  // sweep that could take PI's messages_* maintenance triggers or a user's own.
+  assert.doesNotMatch(persistent, /temp\./);
+  assert.doesNotMatch(persistent, /\bLIKE\b|\bGLOB\b/i);
+
+  const open = await read("../../../crates/host-core/src/db/repositories.rs");
+  const cleanup = open.indexOf("clear_persistent_residuals");
+  const firstMigration = open.indexOf("migrate_v7_to_v8(&conn)");
+  const install = open.indexOf("plan_goal_guard::install");
+  assert.ok(cleanup > 0 && firstMigration > 0 && install > 0, "Database::open must keep both phases");
+  assert.ok(cleanup < firstMigration, "the durable residual must be cleared before the migration chain");
+  assert.ok(firstMigration < install, "the TEMP guard must be installed after the migration chain");
 });

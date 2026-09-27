@@ -86,6 +86,13 @@ pub(crate) fn upsert_project_row(conn: &Connection, raw: &str, touch: bool) -> R
     Ok(Some(id))
 }
 
+/// The refusal for a file written by a build with a newer schema. One message
+/// for both call sites in [`Database::open`] so the pre-check and the
+/// (unreachable) catch-all arm cannot drift.
+fn unsupported_schema_version(version: i64) -> anyhow::Error {
+    anyhow!("database schema version {version} is newer than supported {SCHEMA_VERSION}")
+}
+
 impl Database {
     pub fn open_in_dir(data_dir: &Path) -> Result<Self> {
         Self::open(&data_dir.join("pi.sqlite"))
@@ -95,6 +102,11 @@ impl Database {
     /// fresh file. A pre-v7 file is archived and replaced by a fresh one
     /// (D119 breaking reset — content moved to transcript files, no data
     /// migration); files with an unknown newer schema fail.
+    ///
+    /// A recognized schema is cleaned of the durable Plan/Goal × Cursor
+    /// triggers an earlier build left in it *before* its migration chain runs,
+    /// and gets the per-connection TEMP guard *after* it (M5/T20-R3C, ADR 0306);
+    /// see `crate::plan_goal_guard`.
     pub fn open(path: &Path) -> Result<Self> {
         if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
             std::fs::create_dir_all(parent)?;
@@ -116,19 +128,40 @@ impl Database {
         "#,
         )?;
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        // Both refusals come before anything can touch the file, so a database
+        // this build does not recognize — unversioned but holding tables, or
+        // written by a newer build — is left exactly as found, down to the
+        // triggers an earlier build may have left inside it.
+        if version == 0 {
+            let has_tables: i64 = conn.query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'",
+                [],
+                |r| r.get(0),
+            )?;
+            if has_tables > 0 {
+                return Err(anyhow!(
+                    "database {} has tables but no schema version; refusing to touch it",
+                    path.display()
+                ));
+            }
+        } else if version > SCHEMA_VERSION {
+            return Err(unsupported_schema_version(version));
+        }
+        // A recognized schema this build opens or migrates in place can still
+        // carry the two durable triggers commit `876fb07` wrote into the file
+        // (M5/T20-R3C / ADR 0306). They are cleared *before* the migration chain
+        // runs, never after: a historical migration writes the guarded columns —
+        // v7→v8 rewrites `mode = 'chat'` to `'plan'` — and the old guard would
+        // abort that write for a row the upgrade itself produces, so an upgrade
+        // from `876fb07` straight to this build would be stuck until the user
+        // ran the intermediate release. Only the two exact module-owned names
+        // are dropped. The archived legacy range (1..=6) is rebuilt from scratch
+        // instead of migrated, so its file is left untouched.
+        if (7..=SCHEMA_VERSION).contains(&version) {
+            crate::plan_goal_guard::clear_persistent_residuals(&conn)?;
+        }
         match version {
             0 => {
-                let has_tables: i64 = conn.query_row(
-                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'",
-                    [],
-                    |r| r.get(0),
-                )?;
-                if has_tables > 0 {
-                    return Err(anyhow!(
-                        "database {} has tables but no schema version; refusing to touch it",
-                        path.display()
-                    ));
-                }
                 // auto_vacuum must be set before the first table exists.
                 conn.execute_batch("PRAGMA auto_vacuum = INCREMENTAL;")?;
                 let tx = conn.unchecked_transaction()?;
@@ -194,9 +227,10 @@ impl Database {
             }
             SCHEMA_VERSION => {}
             other => {
-                return Err(anyhow!(
-                    "database schema version {other} is newer than supported {SCHEMA_VERSION}"
-                ));
+                // Unreachable: the version check above already refused anything
+                // newer than `SCHEMA_VERSION`. Kept as a typed refusal so a
+                // future arm added without a pre-check still fails closed.
+                return Err(unsupported_schema_version(other));
             }
         }
         // Each post-match step stamps the version it produces rather than the
