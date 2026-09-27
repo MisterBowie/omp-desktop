@@ -1908,21 +1908,37 @@ level `62bc57b+omp-desktop.2`, carried by the controlled fork commit recorded in
   that verifies against the controlled manifest being released, and fails closed
   without spawning anything when the architecture is unstated. Windows and Linux
   keep their fixed x64 contract on both sides. The host binary is never reused
-  for another platform. Everything else on the command line belongs to
-  electron-builder and is forwarded verbatim, in order: upstream PI-Desktop
-  appends builder configuration through the package script on the signed macOS
-  lane (`-c.mac.forceCodeSigning=true`, `-c.mac.notarize=true`), so refusing
-  unknown arguments would break the signed release, and recognizing only those
-  two flags would break the next one. A target axis may be declared only once:
-  `--x64 --arm64`, `--x64 --arch arm64` or a repeated `--platform` is refused
-  instead of being resolved last-one-wins, so a forwarded argument can never
-  move the preflight and the package onto different targets. electron-builder's
-  own platform switches are the same axis: `--mac`/`--macos`/`-m`/`-o`,
-  `--win`/`--windows`/`-w` and `--linux`/`-l` resolve through that one
-  declaration, any second declaration in any spelling (`--mac --macos`, a mixed
-  `--platform darwin --win`, the bundled short `-mwl`) is refused before
-  anything is spawned, and a platform target list (`--mac dmg`) is refused
-  rather than forwarded, because the platform axis names the platform only. The
+  for another platform. The command line is classified in three buckets. The
+  four axes — platform, architecture, `--dir` and `--publish` — are *owned*:
+  the entry recognizes every spelling the installed electron-builder CLI
+  declares for them (the platform switches `--mac`/`-m`/`-o`/`--macos`/`--m`/`--o`,
+  `--win`/`-w`/`--windows`/`--w` and `--linux`/`-l`/`--l`, with a target list
+  such as `--mac dmg zip` or `--win=portable` refused because the axis names
+  the platform only; the boolean architecture switches, where `=true` and a
+  literal `true` are accepted while `=false`, `--no-<arch>` and other values
+  are refused; `--dir`; and `--publish` with its `-p`/`--p` aliases and the
+  CLI's own value list). Each axis is declared at most once and written by the
+  entry exactly once, so `--x64 --arm64`, `--x64 --arch arm64`, a repeated
+  `--platform`, `--publish never -p always` and `--dir --dir=true` are refused
+  before anything is spawned. Arguments that could replace or stop the package
+  the preflight validated are *refused*: `--prepackaged`/`--pd` make `doPack` a
+  no-op and package an external application
+  (`app-builder-lib/out/platformPackager.js:146`,
+  `out/macPackager.js:268-270`), `--projectDir`/`--project` read another
+  project, `--config`/`-c`/`--c` as a path substitutes an external
+  configuration file, and `--help`/`--version` end the builder before it
+  packages. Dotted config overrides pass only through a *source-neutral
+  allowlist* — `mac.identity`, `mac.forceCodeSigning`, `mac.notarize`, the
+  three the fixed lanes pass (`-c.mac.forceCodeSigning=true` and
+  `-c.mac.notarize=true` from upstream's release workflow,
+  `-c.mac.identity=<name>` on the local Developer ID lane) — because each
+  selects a certificate or a signing/notarization gate and cannot add, move or
+  rename a packaged file; `files`, `extraResources`, `extraFiles`,
+  `directories.app`, `extends` and platform-level equivalents are refused,
+  where "any `-c.*`" would let `-c.extraResources` replace the validated input.
+  Everything else — a token that is not an option electron-builder declares —
+  is *forwarded* verbatim and in order, and the builder's own strict parser
+  rejects an unknown flag instead of the entry silently dropping it. The
   local signed lane (`scripts/release-macos.sh`) enters the same module through
   `pnpm --filter @pi-desktop/desktop exec node
   ../../scripts/release-package.mjs`, so a Developer ID + notarized local build

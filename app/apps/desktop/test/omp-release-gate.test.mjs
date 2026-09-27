@@ -11,6 +11,15 @@
  *
  * The fixtures are tiny git repositories and stand-in artifacts; no compiler and
  * no electron-builder run here.
+ *
+ * A third guarantee covers what the entry lets through. Every option the
+ * installed electron-builder CLI declares is either owned (the four release
+ * axes: platform, architecture, dir, publish), refused (an argument that could
+ * replace or stop the package the preflight validated), or — for the three
+ * signature-phase dotted config overrides the fixed lanes pass — forwarded
+ * verbatim. The entry's tables are compared against the installed CLI's yargs
+ * contract here, so a builder version that declares a new option fails this
+ * suite instead of silently reaching the builder (fifth-review F1/F2).
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -32,9 +41,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = join(here, "..", "..", "..");
 const sidecarScript = join(appRoot, "scripts", "omp-sidecar.mjs");
 const packageJson = JSON.parse(readFileSync(join(here, "..", "package.json"), "utf8"));
-const { planRelease, runRelease } = await import(
-  pathToFileURL(join(appRoot, "scripts", "release-package.mjs")).href
-);
+const { ALLOWED_CONFIG_OVERRIDES, PUBLISH_CHOICES, parseReleaseArgs, planRelease, runRelease } =
+  await import(pathToFileURL(join(appRoot, "scripts", "release-package.mjs")).href);
 
 /** A platform that is never the host, so the cross-target path is exercised. */
 const CROSS_PLATFORM = process.platform === "win32" ? "darwin" : "win32";
@@ -300,6 +308,12 @@ test("a cross-target release cannot reuse the host binary", () => {
  * The signed macOS lane, verbatim from `release.yml`: the architecture and the
  * builder configuration the upstream package script forwards to
  * electron-builder. Refusing these was review finding F1.
+ *
+ * The dotted overrides are a source-neutral allowlist: `mac.identity` selects a
+ * certificate, `mac.forceCodeSigning` and `mac.notarize` are signing-phase
+ * gates. None of them can add, move or rename a packaged file, which is why
+ * they may pass through; every other `-c.*` key is refused before any process
+ * is spawned (fifth-review F2).
  */
 const SIGNED_MACOS_ARGS = [
   "--arm64",
@@ -307,16 +321,19 @@ const SIGNED_MACOS_ARGS = [
   "-c.mac.notarize=true",
 ];
 
-test("the release entry forwards the builder arguments it does not own", () => {
-  const plan = planRelease(["--platform", "darwin", ...SIGNED_MACOS_ARGS], {
+const SIGNATURE_OVERRIDES = [
+  "-c.mac.identity=Developer ID Application: XingYu Liu (DUV63RKYTW)",
+  "-c.mac.forceCodeSigning=true",
+  "-c.mac.notarize=true",
+];
+
+test("the release entry forwards the signature overrides it does not own", () => {
+  const plan = planRelease(["--platform", "darwin", "--arm64", ...SIGNATURE_OVERRIDES], {
     platform: "darwin",
     arch: "arm64",
   });
   // Handed to electron-builder unchanged and in the given order.
-  assert.deepEqual(plan.builder.args.slice(-2), [
-    "-c.mac.forceCodeSigning=true",
-    "-c.mac.notarize=true",
-  ]);
+  assert.deepEqual(plan.builder.args.slice(-SIGNATURE_OVERRIDES.length), SIGNATURE_OVERRIDES);
   assert.ok(plan.builder.args.includes("--mac"));
   assert.ok(plan.builder.args.includes("--arm64"));
   // Forwarding did not cost the entry its own arguments.
@@ -324,16 +341,48 @@ test("the release entry forwards the builder arguments it does not own", () => {
   assert.ok(plan.builder.args.includes("never"));
   assert.equal(plan.target.arch, "arm64");
 
-  // Order is preserved relative to each other, whatever else is in between.
+  // Each override stands on its own, and the equivalent spellings of the config
+  // option are accepted the same way.
+  for (const override of SIGNATURE_OVERRIDES) {
+    const single = planRelease(["--platform", "darwin", override], {
+      platform: "darwin",
+      arch: "arm64",
+    });
+    assert.ok(single.builder.args.includes(override), override);
+  }
   const interleaved = planRelease(
-    ["--platform", "darwin", "-c.mac.target=default", "--dir", "-c.mac.notarize=true"],
+    ["--platform", "darwin", "-c.mac.identity=Local Dev ID", "--dir", "-c.mac.notarize=true"],
     { platform: "darwin", arch: "arm64" },
   );
   assert.deepEqual(
     interleaved.builder.args.filter((arg) => arg.startsWith("-c.")),
-    ["-c.mac.target=default", "-c.mac.notarize=true"],
+    ["-c.mac.identity=Local Dev ID", "-c.mac.notarize=true"],
   );
   assert.ok(interleaved.builder.args.includes("--dir"));
+  const spellings = planRelease(
+    ["--platform", "darwin", "--config.mac.notarize=true", "--c.mac.identity=Local Dev ID"],
+    { platform: "darwin", arch: "arm64" },
+  );
+  assert.deepEqual(spellings.builder.args.slice(-2), [
+    "--config.mac.notarize=true",
+    "--c.mac.identity=Local Dev ID",
+  ]);
+});
+
+test("the config allowlist is exactly the signature overrides the fixed lanes pass", () => {
+  const laneSources = [
+    readFileSync(join(appRoot, "scripts", "release-macos.sh"), "utf8"),
+    readFileSync(join(appRoot, ".github", "workflows", "release.yml"), "utf8"),
+  ];
+  const passed = new Set();
+  for (const source of laneSources) {
+    for (const match of source.matchAll(/-c\.([A-Za-z0-9_.[\]]+)=/g)) passed.add(match[1]);
+  }
+  assert.deepEqual(
+    [...passed].sort(),
+    [...ALLOWED_CONFIG_OVERRIDES].sort(),
+    "the allowlist must be exactly what the signed lanes pass through the package script",
+  );
 });
 
 test("forwarded arguments reach electron-builder only after the preflight passes", () => {
@@ -378,10 +427,40 @@ test("forwarded arguments reach electron-builder only after the preflight passes
  * is additive: a second switch builds a second platform. Forwarding any of them
  * would move electron-builder to a target the preflight never checked, so they
  * are the platform axis — one declaration, one mapping, refused before spawn.
+ * yargs also accepts a single-char alias as a long option (`--m`, `--w`, `--l`,
+ * `--o`) and a target list as the switch's value; both are the same axis.
  */
-const PLATFORM_SWITCH = /^(?:--(?:mac|macos|win|windows|linux)|-[mwlo])$/;
-
+const BUILDER_PLATFORM_FLAGS = ["--mac", "--win", "--linux"];
+const BUILDER_ARCH_FLAGS = ["--x64", "--arm64", "--ia32", "--armv7l", "--universal"];
 const DARWIN_HOST = { platform: "darwin", arch: "arm64" };
+const LINUX_HOST = { platform: "linux", arch: "x64" };
+
+/** Run the release entry with a stub spawn and the console captured, so a refusal never pollutes TAP. */
+function runWithSpy(argv, host = DARWIN_HOST) {
+  const calls = [];
+  const output = [];
+  const code = runRelease(argv, {
+    host,
+    spawn: (command, args) => {
+      calls.push({ command, args });
+      return { status: 0 };
+    },
+    log: (line) => output.push(line),
+    error: (line) => output.push(line),
+  });
+  return { code, calls, output: output.join("\n") };
+}
+
+/**
+ * Assert the entry refused `argv` before spawning anything — neither the sidecar
+ * preflight nor electron-builder — and that the refusal names the argument.
+ */
+function assertRefusedBeforeSpawn(argv, token) {
+  const { code, calls, output } = runWithSpy(argv);
+  assert.equal(code, 2, `${JSON.stringify(argv)} must be refused with exit code 2\n${output}`);
+  assert.equal(calls.length, 0, `${JSON.stringify(argv)} must not spawn anything\n${output}`);
+  assert.ok(output.includes(token), `${JSON.stringify(argv)} must name ${token}\n${output}`);
+}
 
 test("an electron-builder platform switch is the same axis as --platform", () => {
   const cases = [
@@ -389,11 +468,15 @@ test("an electron-builder platform switch is the same axis as --platform", () =>
     { argv: ["--macos", "--x64"], host: DARWIN_HOST, platform: "darwin", arch: "x64", flag: "--mac" },
     { argv: ["-m", "--x64"], host: DARWIN_HOST, platform: "darwin", arch: "x64", flag: "--mac" },
     { argv: ["-o", "--x64"], host: DARWIN_HOST, platform: "darwin", arch: "x64", flag: "--mac" },
+    { argv: ["--m"], host: DARWIN_HOST, platform: "darwin", arch: "arm64", flag: "--mac" },
+    { argv: ["--o", "--arm64"], host: DARWIN_HOST, platform: "darwin", arch: "arm64", flag: "--mac" },
     { argv: ["--win"], host: { platform: "linux", arch: "x64" }, platform: "win32", arch: "x64", flag: "--win" },
     { argv: ["--windows"], host: DARWIN_HOST, platform: "win32", arch: "x64", flag: "--win" },
     { argv: ["-w"], host: DARWIN_HOST, platform: "win32", arch: "x64", flag: "--win" },
+    { argv: ["--w", "--x64"], host: DARWIN_HOST, platform: "win32", arch: "x64", flag: "--win" },
     { argv: ["--linux"], host: DARWIN_HOST, platform: "linux", arch: "x64", flag: "--linux" },
     { argv: ["-l"], host: DARWIN_HOST, platform: "linux", arch: "x64", flag: "--linux" },
+    { argv: ["--l"], host: DARWIN_HOST, platform: "linux", arch: "x64", flag: "--linux" },
   ];
   for (const scenario of cases) {
     const label = JSON.stringify(scenario.argv);
@@ -403,7 +486,7 @@ test("an electron-builder platform switch is the same axis as --platform", () =>
     assert.equal(plan.preflight.args[platformIndex + 1], scenario.platform, label);
     // Exactly one platform switch reaches electron-builder: the alias is
     // consumed as the declaration, never forwarded beside the parsed flag.
-    const switches = plan.builder.args.filter((arg) => PLATFORM_SWITCH.test(arg));
+    const switches = plan.builder.args.filter((arg) => BUILDER_PLATFORM_FLAGS.includes(arg));
     assert.deepEqual(switches, [scenario.flag], label);
   }
 
@@ -422,24 +505,120 @@ test("an electron-builder platform switch is the same axis as --platform", () =>
   }
 });
 
+/**
+ * Every spelling of an owned axis, every negation of it, every repeated
+ * declaration, and every builder argument that could replace or stop the
+ * package the preflight validated. Each one must fail before anything runs, so
+ * the sidecar preflight (which compiles the runtime on a host target) never
+ * starts for a command that cannot produce the artifact its target checked.
+ */
+const REFUSED_ARGUMENTS = [
+  // A platform switch with an attached or following target list beside the
+  // parsed target — the reported fork: the preflight validated darwin/arm64
+  // while electron-builder would also build win32 portable.
+  [["--platform", "darwin", "--arm64", "--win=portable"], "--win=portable"],
+  [["--platform", "darwin", "--mac=dmg"], "--mac=dmg"],
+  [["--platform", "win32", "--windows=portable"], "--windows=portable"],
+  [["--platform", "darwin", "-m=dmg"], "-m=dmg"],
+  [["--platform", "linux", "-l=deb"], "-l=deb"],
+  [["--platform", "darwin", "-w="], "-w="],
+  [["--platform", "darwin", "--mac=false"], "--mac=false"],
+  [["--platform", "darwin", "--m=dmg"], "--m=dmg"],
+  [["--platform", "linux", "--w=portable"], "--w=portable"],
+  [["--platform", "darwin", "--m", "dmg"], "--m"],
+  // Bundled short clusters (`-mwl` builds three platforms) and the single-char
+  // aliases yargs also accepts as long options.
+  [["-mwl"], "-mwl"],
+  [["--platform", "darwin", "-mdmg"], "-mdmg"],
+  [["--platform", "darwin", "-mw"], "-mw"],
+  [["--platform", "darwin", "--macosx"], "--macosx"],
+  [["--platform", "darwin", "--arm64", "--w"], "--w"],
+  [["--platform", "darwin", "--m"], "--m"],
+  [["--win", "--m"], "--m"],
+  [["--no-mac"], "--no-mac"],
+  // The architecture axis: negations, non-true values and repeats.
+  [["--platform", "darwin", "--no-x64"], "--no-x64"],
+  [["--platform", "darwin", "--x64=false"], "--x64=false"],
+  [["--platform", "darwin", "--x64=1"], "--x64=1"],
+  [["--platform", "darwin", "--x64="], "--x64="],
+  [["--platform", "darwin", "--x64", "false"], "--x64"],
+  [["--platform", "darwin", "--x64", "--no-arm64"], "--no-arm64"],
+  [["--platform", "darwin", "--x64", "--x64"], "--x64"],
+  [["--platform", "darwin", "--x64", "--arm64"], "--arm64"],
+  [["--platform", "darwin", "--arch=arm64", "--arch", "x64"], "--arch"],
+  // The dir axis.
+  [["--platform", "darwin", "--dir=false"], "--dir=false"],
+  [["--platform", "darwin", "--no-dir"], "--no-dir"],
+  [["--platform", "darwin", "--dir="], "--dir="],
+  [["--platform", "darwin", "--dir", "false"], "--dir"],
+  [["--platform", "darwin", "--dirx"], "--dirx"],
+  [["--platform", "darwin", "--dir", "--dir=true"], "--dir=true"],
+  // The publish axis, including the reported `--publish never -p always` fork
+  // and the values the installed CLI would reject anyway.
+  [["--platform", "darwin", "--publish", "never", "-p", "always"], "-p"],
+  [["--platform", "darwin", "--publish=never", "--publish=always"], "--publish=always"],
+  [["--platform", "darwin", "-pnever"], "-pnever"],
+  [["--platform", "darwin", "--publish"], "--publish"],
+  [["--platform", "darwin", "--p="], "--p="],
+  [["--platform", "darwin", "--p=draft"], "--p=draft"],
+  [["--platform", "darwin", "--publish", "sometimes"], "--publish"],
+  // `--` would hide every following argument from electron-builder.
+  [["--platform", "darwin", "--", "--win"], "--"],
+  // The packaged input may not be replaced: an external app, another project,
+  // or an external configuration file (fifth-review F2).
+  [["--platform", "darwin", "--prepackaged", "/tmp/foreign.app"], "--prepackaged"],
+  [["--platform", "darwin", "--prepackaged=/tmp/foreign.app"], "--prepackaged="],
+  [["--platform", "darwin", "--pd", "/tmp/foreign.app"], "--pd"],
+  [["--platform", "darwin", "--pd=/tmp/foreign.app"], "--pd="],
+  [["--platform", "darwin", "--no-prepackaged"], "--no-prepackaged"],
+  [["--platform", "darwin", "--projectDir", "/tmp/elsewhere"], "--projectDir"],
+  [["--platform", "darwin", "--project", "/tmp/elsewhere"], "--project"],
+  [["--platform", "darwin", "--projectDir=/tmp/elsewhere"], "--projectDir="],
+  [["--platform", "darwin", "--project-dir", "/tmp/elsewhere"], "--project-dir"],
+  [["--platform", "darwin", "--config", "electron-builder.yml"], "--config"],
+  [["--platform", "darwin", "--config=electron-builder.yml"], "--config="],
+  [["--platform", "darwin", "-c", "electron-builder.yml"], "-c"],
+  [["--platform", "darwin", "-c=electron-builder.yml"], "-c="],
+  [["--platform", "darwin", "--c=some.yml"], "--c=some.yml"],
+  [["--platform", "darwin", "-csome.yml"], "-csome.yml"],
+  [["--platform", "darwin", "--config=mac.identity=X"], "--config=mac.identity=X"],
+  [["--platform", "darwin", "-c.mac.identity"], "-c.mac.identity"],
+  [["--platform", "darwin", "-c.mac.identity", "X"], "-c.mac.identity"],
+  // Dotted overrides that could replace the packaged input — global and
+  // platform-level — are refused by the allowlist, not by a denylist that
+  // would let every unknown key through.
+  [["--platform", "darwin", "-c.files[0].from=x"], "-c.files[0].from=x"],
+  [["--platform", "darwin", "-c.extraResources[0].from=/tmp/x"], "-c.extraResources[0].from"],
+  [["--platform", "darwin", "-c.extraFiles[0].from=/tmp/x"], "-c.extraFiles[0].from"],
+  [["--platform", "darwin", "-c.directories.app=other"], "-c.directories.app=other"],
+  [["--platform", "darwin", "-c.extends=./base.yml"], "-c.extends=./base.yml"],
+  [["--platform", "darwin", "--config.mac.extraResources[0].from=/tmp/x"], "--config.mac.extraResources"],
+  [["--platform", "darwin", "-c.win.extraResources[0].from=/tmp/x"], "-c.win.extraResources"],
+  [["--platform", "darwin", "-c.linux.extraFiles[0].from=/tmp/x"], "-c.linux.extraFiles"],
+  [["--platform", "darwin", "-c.mac.type=dmg"], "-c.mac.type=dmg"],
+  [["--platform", "darwin", "-c.afterSign=./x.mjs"], "-c.afterSign=./x.mjs"],
+  [["--platform", "darwin", "-c.mac.identity.a=X"], "-c.mac.identity.a=X"],
+  // Arguments that would end electron-builder before it packages.
+  [["--platform", "darwin", "--help"], "--help"],
+  [["--platform", "darwin", "--version"], "--version"],
+];
+
+test("every unsupported spelling of an owned axis or a packaging input is refused before spawning", () => {
+  for (const [argv, token] of REFUSED_ARGUMENTS) {
+    assertRefusedBeforeSpawn(argv, token);
+  }
+});
+
 test("a conflicting or repeated target is refused instead of silently picked", () => {
   const host = DARWIN_HOST;
   const conflicts = [
-    ["--platform", "darwin", "--x64", "--arm64"],
-    ["--platform", "darwin", "--x64", "--arch", "arm64"],
-    ["--platform", "darwin", "--arch", "x64", "--arch", "arm64"],
-    ["--platform", "darwin", "--x64", "--x64"],
     ["--platform", "darwin", "--platform", "darwin"],
-    ["--platform", "darwin", "--publish", "never", "--publish", "always"],
-    // The reported fork: a platform declaration plus an additive alias made the
-    // preflight validate darwin/arm64 while electron-builder also built win32.
-    ["--platform", "darwin", "--arm64", "--win"],
     ["--platform", "darwin", "--win"],
     ["--win", "--linux"],
     // The same axis spelled twice, in any of its spellings.
     ["--mac", "--platform", "darwin"],
     ["--mac", "--macos"],
-    ["--mac", "--mac"],
+    ["--mac", "--m"],
     ["-m", "-w"],
     // A bundled short cluster names more than one platform.
     ["-mwl"],
@@ -447,20 +626,181 @@ test("a conflicting or repeated target is refused instead of silently picked", (
   for (const argv of conflicts) {
     assert.throws(
       () => planRelease(argv, host),
-      /must be given once|given more than once|more than one platform/,
+      /must be given once|given more than once|more than one platform|bundle of switches/,
       `${JSON.stringify(argv)} must be refused`,
     );
   }
 
   // The same refusal stops the run before anything is spawned.
-  const calls = [];
-  const code = runRelease(["--platform", "darwin", "--arm64", "--win"], {
-    host,
-    spawn: (command, args) => {
-      calls.push([command, args]);
-      return { status: 0 };
-    },
-  });
+  const { code, calls } = runWithSpy(["--platform", "darwin", "--arm64", "--win"]);
   assert.equal(code, 2);
   assert.deepEqual(calls, [], "nothing may be spawned for an ambiguous target");
+});
+
+test("the entry generates exactly one choice per axis and the same target for both steps", () => {
+  const cases = [
+    {
+      argv: ["--platform", "darwin", "--arm64", "--publish", "never"],
+      host: DARWIN_HOST,
+      head: ["--mac", "--arm64", "--publish", "never"],
+    },
+    {
+      argv: ["--platform=darwin", "--arch=arm64"],
+      host: DARWIN_HOST,
+      head: ["--mac", "--arm64", "--publish", "never"],
+    },
+    {
+      argv: ["--mac=", "--x64=true"],
+      host: DARWIN_HOST,
+      head: ["--mac", "--x64", "--publish", "never"],
+    },
+    {
+      argv: ["--win=", "--dir", "true", "--publish=always"],
+      host: LINUX_HOST,
+      head: ["--win", "--x64", "--dir", "--publish", "always"],
+    },
+    {
+      argv: ["-o", "--arm64", "-p", "onTag"],
+      host: DARWIN_HOST,
+      head: ["--mac", "--arm64", "--publish", "onTag"],
+    },
+    {
+      argv: ["--w", "--x64", "--p", "onTagOrDraft"],
+      host: DARWIN_HOST,
+      head: ["--win", "--x64", "--publish", "onTagOrDraft"],
+    },
+  ];
+  for (const scenario of cases) {
+    const label = JSON.stringify(scenario.argv);
+    const plan = planRelease(scenario.argv, scenario.host);
+    // The entry writes its own axes at the head of the argv, before anything it
+    // forwards, so a forwarded argument can never add a second choice.
+    assert.deepEqual(plan.builder.args.slice(0, scenario.head.length), scenario.head, label);
+    assert.equal(
+      plan.builder.args.filter((arg) => BUILDER_PLATFORM_FLAGS.includes(arg)).length,
+      1,
+      `${label}: exactly one platform switch`,
+    );
+    assert.ok(
+      plan.builder.args.filter((arg) => BUILDER_ARCH_FLAGS.includes(arg)).length <= 1,
+      `${label}: at most one architecture switch`,
+    );
+    assert.equal(
+      plan.builder.args.filter((arg) => arg === "--publish").length,
+      1,
+      `${label}: exactly one normalized --publish`,
+    );
+    assert.ok(
+      plan.builder.args.filter((arg) => arg === "--dir").length <= 1,
+      `${label}: at most one --dir`,
+    );
+    // Both steps read the same target.
+    assert.equal(plan.preflight.args[plan.preflight.args.indexOf("--platform") + 1], plan.target.platform, label);
+    assert.equal(plan.preflight.args[plan.preflight.args.indexOf("--arch") + 1], plan.target.arch, label);
+  }
+});
+
+/**
+ * The entry's tables are a transcription of the installed CLI's yargs contract,
+ * and this test keeps the transcription honest: it builds the parser
+ * electron-builder builds (`electron-builder/out/builder.js`) and fails when a
+ * declared option, alias or publish value is not classified here. A builder
+ * upgrade that adds an option cannot reach the release entry unclassified.
+ */
+test("every option the installed electron-builder CLI declares is classified by the entry", async () => {
+  const builder = await import("electron-builder/out/builder.js");
+  const parser = builder.createYargs();
+  builder.configureBuildCommand(parser);
+  const options = parser.getOptions();
+
+  // How the entry treats each declared name: an owned axis, or refused.
+  const BUILDER_OPTIONS = {
+    mac: "platform", m: "platform", o: "platform", macos: "platform",
+    win: "platform", w: "platform", windows: "platform",
+    linux: "platform", l: "platform",
+    x64: "arch", ia32: "arch", armv7l: "arch", arm64: "arch", universal: "arch",
+    dir: "dir",
+    publish: "publish", p: "publish",
+    prepackaged: "refused", pd: "refused",
+    projectDir: "refused", project: "refused",
+    config: "refused", c: "refused",
+    help: "refused", version: "refused",
+  };
+  // The CLI accepts a canonical name and every alias, and yargs accepts an
+  // alias as a long option too (`--m`, `--pd`, `--c`): the full set is the
+  // declared keys plus every alias value.
+  const declared = [
+    ...new Set([...Object.keys(options.key), ...Object.values(options.alias).flat()]),
+  ].sort();
+  assert.deepEqual(
+    declared.filter((name) => !(name in BUILDER_OPTIONS)),
+    [],
+    "the installed electron-builder declares an option the entry does not classify",
+  );
+  assert.deepEqual(
+    Object.keys(BUILDER_OPTIONS).filter((name) => !declared.includes(name)),
+    [],
+    "the entry classifies an option the installed electron-builder does not declare",
+  );
+
+  // The publish value list is the installed CLI's own choice list.
+  const choices = (options.choices.publish ?? []).filter((choice) => typeof choice === "string");
+  assert.deepEqual(choices.slice().sort(), [...PUBLISH_CHOICES].sort(), "publish choices");
+
+  // Representative argv for the refused names; the others get the bare switch
+  // (with a value for the publish axis).
+  const REFUSED_ARGV = {
+    help: ["--help"],
+    version: ["--version"],
+    prepackaged: ["--prepackaged", "/tmp/foreign.app"],
+    pd: ["--pd", "/tmp/foreign.app"],
+    projectDir: ["--projectDir", "/tmp/elsewhere"],
+    project: ["--project", "/tmp/elsewhere"],
+    config: ["--config", "electron-builder.yml"],
+    c: ["-c", "electron-builder.yml"],
+  };
+  const EXPECTED_PLATFORM_FLAG = {
+    mac: "--mac", m: "--mac", o: "--mac", macos: "--mac",
+    win: "--win", w: "--win", windows: "--win",
+    linux: "--linux", l: "--linux",
+  };
+  for (const name of declared) {
+    const bucket = BUILDER_OPTIONS[name];
+    if (bucket === "refused") {
+      const argv = REFUSED_ARGV[name];
+      assert.ok(argv, `${name} needs a representative spelling`);
+      assertRefusedBeforeSpawn(argv, argv[0]);
+      continue;
+    }
+    const argv = bucket === "publish" ? [`--${name}`, "never"] : [`--${name}`];
+    // The entry consumes the spelling as its own axis: nothing is forwarded,
+    // and where the spelling is already the canonical switch the entry writes
+    // exactly one copy of it.
+    assert.deepEqual(parseReleaseArgs(argv).forwarded, [], `${name} (${bucket}) must be consumed`);
+    const args = planRelease(argv, DARWIN_HOST).builder.args;
+    assert.equal(
+      args.filter((arg) => BUILDER_PLATFORM_FLAGS.includes(arg)).length,
+      1,
+      `${name}: exactly one platform switch`,
+    );
+    if (bucket === "platform") {
+      assert.ok(args.includes(EXPECTED_PLATFORM_FLAG[name]), `${name} selects its platform`);
+    } else if (bucket === "arch") {
+      assert.equal(args.filter((arg) => BUILDER_ARCH_FLAGS.includes(arg)).length, 1, name);
+      assert.ok(args.includes(`--${name}`), `${name} selects its architecture`);
+    } else if (bucket === "dir") {
+      assert.equal(args.filter((arg) => arg === "--dir").length, 1, name);
+    } else {
+      assert.equal(args.filter((arg) => arg === "--publish").length, 1, name);
+      assert.ok(args.includes("never"), `${name} keeps its value`);
+    }
+  }
+});
+
+test("an argument the entry does not recognize is still forwarded verbatim, never guessed at", () => {
+  // The entry classifies every option electron-builder declares; a token that
+  // is not one of them is passed through untouched, so a builder that rejects
+  // it fails the release loudly instead of the entry silently dropping it.
+  const plan = planRelease(["--platform", "linux", "--unknown-builder-flag", "value"], LINUX_HOST);
+  assert.deepEqual(plan.builder.args.slice(-2), ["--unknown-builder-flag", "value"]);
 });

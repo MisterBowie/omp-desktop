@@ -1,14 +1,70 @@
 # M5/T20-R4B：自有 OMP fork + bundled sidecar 的可验证闭环（含复审返修）
 
-更新时间：2026-09-28（第四轮独立复审返修）。桌面分支 `codex/m5-r4b-bundled-sidecar`；首个 R4B 提交 `b25eb60c077deb5b200cf5f5bf6e8a3cddbbf679`，返修提交追加在其上（不 amend、不强推）；第二轮复审返修见 §0.1，追加提交 `53d19ee`、`f9d133e`、`7b3b3de`、`f428940`（+ 文档提交 `9bd7e50`）；第三轮独立复审返修见 §0.2（起点 `956841c`）；**第四轮独立复审返修见 §0.3**（起点仍是 `956841c85acf5e4c9b192ab7f837891416314680`，提交随本文件一并追加，不 amend）。
+更新时间：2026-09-28（第五轮独立复审返修）。桌面分支 `codex/m5-r4b-bundled-sidecar`；首个 R4B 提交 `b25eb60c077deb5b200cf5f5bf6e8a3cddbbf679`，返修提交追加在其上（不 amend、不强推）；第二轮复审返修见 §0.1，追加提交 `53d19ee`、`f9d133e`、`7b3b3de`、`f428940`（+ 文档提交 `9bd7e50`）；第三轮独立复审返修见 §0.2（起点 `956841c`）；第四轮独立复审返修见 §0.3（起点仍是 `956841c85acf5e4c9b192ab7f837891416314680`）；**第五轮独立复审返修见 §0.4**（起点 `bf9d075365008478edd01d04d91c424aa4e93898`，提交随本文件一并追加，不 amend）。
 
-状态：**R4B 部分完成 / 受阻（第一轮复审返修 + 第二轮独立复审返修 + 第三轮独立复审返修 + 第四轮独立复审返修）。** 第三轮复审的 6 项问题（F1 发布参数透传、F2 packaging lane 的受控 fork 来源、F3 根 preview workflow 绕行、F4 canonical 路径断言、F5 Windows 夹具文件名、F6 证据更正）见 §0.2；**第四轮复审的 2 项问题（F1 平台目标仍可分叉、F2 本地正式签名 lane 绕过 sidecar 预检）** 均按「先复现（RED）→ 修复 → 重跑（GREEN）」处理，见 §0.3。**但 R4-3 的“可复现”条款仍未满足（见 §10），因此 R4B 不标记为完成。**
+状态：**R4B 部分完成 / 受阻（第一轮复审返修 + 第二轮独立复审返修 + 第三轮独立复审返修 + 第四轮独立复审返修 + 第五轮独立复审返修）。** 第三轮复审的 6 项问题（F1 发布参数透传、F2 packaging lane 的受控 fork 来源、F3 根 preview workflow 绕行、F4 canonical 路径断言、F5 Windows 夹具文件名、F6 证据更正）见 §0.2；第四轮复审的 2 项问题（F1 平台目标仍可分叉、F2 本地正式签名 lane 绕过 sidecar 预检）见 §0.3；**第五轮复审的 2 项问题（F1 wrapper 自有参数轴未收口、F2 最终打包来源可被 `--prepackaged`/`--projectDir`/`--config.*` 换掉）** 均按「先复现（RED）→ 修复 → 重跑（GREEN）」处理，见 §0.4。**但 R4-3 的“可复现”条款仍未满足（见 §10），因此 R4B 不标记为完成。**
 
 **R3 仍为硬阻塞；ADR 0306 的 Cursor 产品门保留；T20-B/C/D 未开始；T20 未完成；T21 未完成；R4-3 未满足。**
 
 非目标：解除 R3、实现 Plan/Goal 运行时面、放宽 Cursor 门、声称 PI parity、向 can1357 推送、跑 electron-builder 真实打包。
 
 **仓库布局事实（本轮如实记录）**：GitHub 只识别仓库根 `.github/workflows/`。本仓库产品源码在 `app/`，因此 `app/.github/workflows/*`（含 `release.yml`、`linux-package.yml`）在当前仓库位置**不会自动触发**——它们是随 `app/` 交付的源码工作流（当 `app/` 作为仓库根时生效）；本仓库当下真正生效的打包工作流只有根 `.github/workflows/mac-preview-package.yml`。两者都被本轮新增的静态测试按同一「固定 fork 来源 + Bun + frozen install + 目标绑定的发布入口」契约锁定。
+
+---
+
+## 0.4 第五轮独立复审返修（RED → GREEN）
+
+第五轮复审指出两点：①wrapper 虽已声明自己唯一拥有 platform/architecture/dir/publish 四个轴，但只识别了其中一部分拼写，electron-builder/yargs 接受的等价形式仍会漏进 `forwarded`；②wrapper 只校验仓库内 sidecar，而 electron-builder 仍能经 `--prepackaged`/`--projectDir`/`--config[.dotted]` 改换最终打包来源。本轮先复现 RED，再重写 `app/scripts/release-package.mjs` 的参数分类，**追加提交，不 amend/rebase/强推**；起点 `bf9d075365008478edd01d04d91c424aa4e93898`（本地/远端 HEAD 一致、工作树干净、两个固定子模块 gitlink 未动）。
+
+**固定证据（动手前逐条核对，全部来自固定检出与已安装版本）：**
+
+| 证据 | 坐标 | 结论 |
+| --- | --- | --- |
+| PI 发布命令链尾 | `upstream/pi-desktop/apps/desktop/package.json:27-31` | `pack`/`dist`/`dist:mac`/`dist:win`/`dist:linux` 都把 electron-builder 放在命令链**最后**，因此 workflow 的 `-- --<arch> -c.mac.*` 只能落在 builder 上（本仓库 `apps/desktop/package.json:29-33` 同形，链尾是本 wrapper） |
+| PI 正式 macOS lane | `upstream/pi-desktop/.github/workflows/release.yml:245-287` | 追加 `--<arch>`、`-c.mac.forceCodeSigning=true`、`-c.mac.notarize=true`；本仓库本地 lane `scripts/release-macos.sh:109-111` 另加 `-c.mac.identity=…` |
+| 已安装 CLI 的 yargs 契约 | `app/node_modules/electron-builder/out/builder.js` `configureBuildCommand`（electron-builder 26.15.3 / yargs 17.7.3），用一次性只读 Node 探针核实 | 声明 `mac`(别名 `m`,`o`,`macos`)、`linux`(`l`)、`win`(`w`,`windows`)、`x64`,`ia32`,`armv7l`,`arm64`,`universal`、`dir`、`publish`(`p`)、`prepackaged`(`pd`)、`projectDir`(`project`)、`config`(`c`)、`help`、`version`，并以 `.strict()` 拒绝未声明参数 |
+| `prepackaged` 使正常打包被跳过 | `app/node_modules/app-builder-lib/out/platformPackager.js:146`（`prepackaged != null` 时直接 return）、`out/macPackager.js:268-270`（`appPath` 直接用外部路径） | 预检校验的仓库内 sidecar 与最终被打包/签名的输入可以不是同一个应用 |
+
+**只读探针观察到的真实形式（GREEN 分类即按此表，不再靠正则猜测）：**
+
+- 平台：`--mac`/`-m`/`-o`/`--macos`/`--m`/`--o`、`--win`/`-w`/`--windows`/`--w`、`--linux`/`-l`/`--l`；`--win=portable`、`--mac=dmg`、`-m=dmg`、`--w=portable` 等带值形式；`--mac=`/`--m=` 与裸开关等价；`-mdmg`/`-mwl`/`-mw`/`-ow` 是短簇（`-mwl` 会构建三个平台）；`--no-mac` 让 `normalizeOptions` 抛 `type.lastIndexOf is not a function`；`--mac dmg zip`/`--m dmg` 是 target 列表。
+- 架构：`--x64`、`--x64=true`、`--x64 true` 选中 x64；`--x64=false`/`--no-x64`/`--x64=`/`--x64=1` 全都是 **false**（`=1` 也被 yargs 折算成 false）。
+- dir：`--dir`、`--dir=true`、`--dir true` 选中；`--dir=false`/`--dir=`/`--no-dir` 是 false。
+- publish：`--publish never`、`--publish=never`、`-p never`、`-p=never`、`--p=never`；重复声明被 yargs 收集成数组（`--publish never -p always` → `["never","always"]`）。
+- 来源改写：`--prepackaged`/`--pd`（含 `=` 形式）、`--projectDir`/`--project`、`--config`/`-c`/`--c` 的路径形式（字符串路径与 dotted 同时出现会被合成 `extends` 合并）、`-c.files[0].from=x` 之类的 dotted 全局/平台键。
+
+**RED（起点 worktree `git worktree add --detach /tmp/r4b-red5 bf9d075…`，只换入本轮测试与 `packages/omp-runtime/dist` 符号链接，生产代码保持起点版本）：**
+
+| 用例 | 命令 | RED 观察 |
+| --- | --- | --- |
+| 新增测试整文件 | `node --test apps/desktop/test/omp-release-gate.test.mjs` | **6 failed / 10 passed**（`the config allowlist…`、`an electron-builder platform switch…`、`every unsupported spelling…`、`a conflicting or repeated target…`、`the entry generates exactly one choice per axis…`、`every option the installed electron-builder CLI declares…`；起点模块不导出 `ALLOWED_CONFIG_OVERRIDES`/`PUBLISH_CHOICES`） |
+| 平台 target 列表分叉 | `runRelease(["--platform","darwin","--arm64","--win=portable"])` | code **0**、spawn **2**；builder argv `--mac --arm64 --publish never --win=portable`；用 builder 自己的 parser 解析该 argv → targets `mac` + `windows`(portable) |
+| 最终来源被换 | `runRelease(["--platform","darwin","--arm64","--prepackaged","/tmp/foreign.app"])` | code **0**、spawn **2**；builder 解析 → `prepackaged: "/tmp/foreign.app"`（预检只校验仓库内 sidecar） |
+| 发布轴分叉 | `runRelease(["--platform","darwin","--arm64","--publish","never","-p","always"])` | code **0**、spawn **2**；builder 解析 → `publish: ["never","always"]` |
+| 架构轴分叉 | `runRelease(["--platform","darwin","--x64","--no-x64"])` | code **0**、spawn **2**；预检 darwin/x64，builder argv `--mac --x64 --publish never --no-x64`，builder 解析 → `x64: false`（在 arm64 宿主上回落到宿主架构） |
+| 项目目录被换 | `runRelease([…"--projectDir","/tmp/elsewhere"])` | code **0**、spawn **2**；builder 解析 → `projectDir: "/tmp/elsewhere"` |
+| 外部配置被换 | `runRelease([…"-c","/tmp/foreign.yml"])` | code **0**、spawn **2**；builder 解析 → `config: "/tmp/foreign.yml"` |
+| dotted 来源键 | `runRelease([…"-c.files[0].from=/tmp/foreign"])` | code **0**、spawn **2**；builder 解析 → `config: {"files[0]":{"from":"/tmp/foreign"}}` |
+
+**修复（`app/scripts/release-package.mjs` 重写参数分类，三个桶）：**
+
+1. **自有轴**：platform（含 `--m/--o/--w/--l` 这些 yargs 同样接受的别名长写、`=` 空值形式、短簇与 target 列表一律在 spawn 前拒绝）、architecture（`=true` 与 `true` 字面量接受；`=false`/`--no-<arch>`/`=<其它>` 拒绝；重复声明拒绝）、`--dir`（同理）、`--publish`/`-p`/`--p`（空格、`=`、附着值；重复拒绝；取值按已安装 CLI 的 `choices` 校验，`--p=draft` 这类值在预检之前就拒绝）。每个轴 wrapper 自己生成且恰好一次。
+2. **拒绝**：`--prepackaged`/`--pd`、`--projectDir`/`--project`、`--config`/`-c`/`--c` 的路径形式、`--help`/`--version`（会让 builder 不打包就退出）、以及所有 `--no-*`、短簇、近似拼写；每条错误都指名被拒参数。
+3. **source-neutral allowlist + 原样转发**：dotted 配置只接受 `mac.identity`、`mac.forceCodeSigning`、`mac.notarize` 三个签名相位键（追加式 allowlist，而不是"除危险键外全放行"的 denylist），且必须带 `=<value>`；这三个键只选证书或签名/公证闸门，无法增删/搬移被打包的文件。其余既不是 electron-builder 已声明选项、也不在被拒前缀族里的 token 仍按原序原样转发（builder 的 `.strict()` 会拒绝它们，属 fail closed）。
+
+**GREEN 证据（本机 Linux x64、Node v24.14.0）：**
+
+| 用例 | 命令 | GREEN 观察 |
+| --- | --- | --- |
+| 新增测试整文件 | `node --test apps/desktop/test/omp-release-gate.test.mjs` | **16 passed / 0 failed** |
+| 危险组合（同一批探针） | `node /tmp/m5-probe/green-probe5.mjs`（与 RED 同一脚本，只换模块路径） | 七项全部 `code=2`、`spawns=0`，错误分别指名 `--win=portable`、`--prepackaged`、`-p`、`--no-x64`、`--projectDir`、`-c`、`-c.files[0].from=…` |
+| 真实入口（pnpm exec） | `pnpm --filter @pi-desktop/desktop exec node ../../scripts/release-package.mjs --platform darwin --arm64 --win=portable` | `RELEASE-PACKAGE-FAIL a platform target list is not supported: --win=portable`，wrapper exit 2（pnpm 外层报 `Command failed with exit code 2`，其中 pnpm 自身 exit 1） |
+| 签名 lane argv 真跑 | `OMP_SIDECAR_SOURCE=/tmp/r4b/oh-my-pi node scripts/release-package.mjs --platform darwin --arm64 --publish never -c.mac.identity=… -c.mac.forceCodeSigning=true -c.mac.notarize=true` | 参数全部被接受并进入预检：`preflight … --platform darwin --arch arm64`，随后按跨目标语义拒绝（`provenance platform is linux, this host is darwin`，exit 1，属环境性跨目标拒绝） |
+| 契约测试（不靠人工核对） | 同 `omp-release-gate` 内的 `every option the installed electron-builder CLI declares is classified by the entry` | 用**已安装** electron-builder 的 `createYargs()` + `configureBuildCommand()` 读出全部选项/别名（`options.key` ∪ `options.alias`）与 `choices.publish`，逐个比对 wrapper 的归类表：缺项、多余项、别名或 choice 变化都会判红 |
+
+固定 PI 的三项 macOS 签名覆盖逐项与组合都以原顺序、原值进入 builder argv（`omp-release-gate` 的 `the release entry forwards the signature overrides it does not own`），且 `the config allowlist is exactly the signature overrides the fixed lanes pass` 直接从 `scripts/release-macos.sh` 与 `.github/workflows/release.yml` 提取 `-c.<key>=` 并断言集合相等——allowlist 既不会过宽也不会漏掉 lane 实际使用的键。
+
+本轮改动文件：`app/scripts/release-package.mjs`、`app/apps/desktop/test/omp-release-gate.test.mjs`、`app/docs/adr/0307-bundled-omp-sidecar.md` §6、`app/docs/spec/03-runtime/02-agent-runtime.md` §17（+ zh 镜像）、本文、`docs/04-task-board.md`、`HANDOFF.md`。RED/GREEN 的逐条命令与计数见 §12.4。
 
 ---
 
@@ -172,9 +228,11 @@ pack/dist/dist:mac/dist:win/dist:linux:
 
 随后：预检（`omp-sidecar.mjs --preflight --platform <p> --arch <a>`）→ 仅当预检成功才运行 `electron-builder <--mac|--win|--linux> [--x64/--arm64] [--dir] --publish never <其余参数…>`，保持 PI 「runtime 步骤先于 electron-builder」的顺序。
 
-**参数透传与目标唯一性（第三轮复审 F1）**：`release-package.mjs` 只拥有 target/dir/publish；其余参数（例如固定 PI 在签名 lane 上传入的 `-c.mac.forceCodeSigning=true`、`-c.mac.notarize=true`）**按原始顺序逐项原样**附加到 electron-builder 调用，不使用「只识别当前两个 flag」的脆弱白名单。同一目标维度只允许声明一次：`--x64 --arm64`、`--x64 --arch arm64`、重复的 `--platform`（以及重复 `--publish`）都在 spawn 任何进程之前以退出码 2 拒绝，因此额外参数不可能把预检与打包带到不同目标。
+**参数契约（第五轮复审 F1/F2 收口后）**：`release-package.mjs` 拥有 platform/architecture/dir/publish 四个轴，并**按已安装 CLI 的 yargs 契约**（`configureBuildCommand`，证据表见 §0.4）识别它们的全部拼写：平台 `--mac`/`-m`/`-o`/`--macos`/`--m`/`--o`、`--win`/`-w`/`--windows`/`--w`、`--linux`/`-l`/`--l`（含 `=` 取值形式与 `--mac=` 这类"空值等价于裸开关"的形式；短簇 `-mwl`/`-mdmg`、target 列表 `--mac dmg`/`--win=portable` 在 spawn 前拒绝）；架构布尔开关（`=true` 与 `true` 字面量接受；`=false`/`--no-<arch>`/其它取值拒绝）；`--dir`（同理）；`--publish`/`-p`/`--p`（空格、`=`、附着值，取值按已安装 CLI 的 `choices` 校验）。每个轴只允许一次声明，且由 wrapper 自己生成恰好一次：builder argv 恰好一个平台开关、至多一个架构开关、至多一个 `--dir`、一个规范化的 `--publish <value>`，它们排在转发参数之前，因此转发参数不可能追加第二个轴选择（`--x64 --arm64`、`--x64 --arch arm64`、重复 `--platform`/`--publish`、`--publish never -p always`、`--dir --dir=true` 都在 spawn 任何进程之前以退出码 2 拒绝）。**「其余参数全部原样透传」的旧表述已不成立**：不是已声明选项、也不在被拒前缀族里的 token 才原样转发。
 
-**平台轴只有一个声明（第四轮复审 F1）**：electron-builder 自己的平台开关是**可加的**——`--mac … --win` 会让它构建两个平台——因此透传它们等于同一个分叉换了个拼写：预检校验 darwin/arm64，打包再产出 win32。`--mac`/`--macos`/`-m`/`-o`→`darwin`、`--win`/`--windows`/`-w`→`win32`、`--linux`/`-l`→`linux` 与 `--platform` 归并进**同一**声明：重复、同义重复（`--mac --macos`）、冲突（`--platform darwin --win`）以及短开关簇（`-mwl`）全部在 spawn 前退出码 2 拒绝；wrapper 生成的 builder argv **恰好一个**平台 flag。平台后跟 target 列表（`--mac dmg`）也拒绝，而不是被静默丢弃或转发到 wrapper 自己选的 flag 旁边——平台维度只负责选平台，产物 target 由 electron-builder 配置决定。
+**最终打包来源不可替换（第五轮复审 F2）**：`--prepackaged`/`--pd`（`prepackaged != null` 时 `doPack` 直接跳过、改用外部应用）、`--projectDir`/`--project`（换项目）、`--help`/`--version`（不打包就退出），以及 `--config`/`-c`/`--c` 的**路径**形式全部在 spawn 前拒绝。dotted 配置覆盖采用 **source-neutral allowlist**：只有 `mac.identity`、`mac.forceCodeSigning`、`mac.notarize` 三个签名相位键可按 `=<value>` 形式原样转发（固定 PI lane 与本仓库签名 lane 实际用的就是这三个：`upstream/pi-desktop/.github/workflows/release.yml:245-287`、`app/scripts/release-macos.sh:109-111`；测试直接从这两个文件提取 `-c.<key>=` 并断言与 allowlist 集合相等）。`files`、`extraResources`、`extraFiles`、`directories.app`、`extends` 以及平台级同类键（`-c.mac.type=dmg`、`-c.afterSign=…` 等）一律拒绝，而不是"危险键 denylist + 未知键全放行"。
+
+**平台轴只有一个声明（第四轮复审 F1；第五轮补全别名长写）**：electron-builder 自己的平台开关是**可加的**——`--mac … --win` 会让它构建两个平台——因此透传它们等于同一个分叉换了个拼写：预检校验 darwin/arm64，打包再产出 win32。`--mac`/`--macos`/`-m`/`-o`/`--m`/`--o`→`darwin`、`--win`/`--windows`/`-w`/`--w`→`win32`、`--linux`/`-l`/`--l`→`linux` 与 `--platform` 归并进**同一**声明：重复、同义重复（`--mac --macos`、`--mac --m`）、冲突（`--platform darwin --win`）以及短开关簇（`-mwl`）全部在 spawn 前退出码 2 拒绝；wrapper 生成的 builder argv **恰好一个**平台 flag。平台后跟 target 列表（`--mac dmg zip`）或追加 `=` 取值（`--win=portable`）也拒绝，而不是被静默丢弃或转发到 wrapper 自己选的 flag 旁边——平台维度只负责选平台，产物 target 由 electron-builder 配置决定。
 
 **本地签名 lane 走同一入口（第四轮复审 F2）**：`scripts/release-macos.sh` 的打包阶段改为 watchdog 内 `pnpm --filter @pi-desktop/desktop exec node ../../scripts/release-package.mjs --platform darwin --${MAC_ARCH} --publish never -c.mac.identity=… -c.mac.forceCodeSigning=true -c.mac.notarize=true`，使 bundled-sidecar 预检在 electron-builder 之前运行（缺失/陈旧 `resources/omp-runtime` 不再能进入签名并公证的包）；`pnpm exec` 把 desktop 包的 `node_modules/.bin` 放到 PATH 前部，所以 wrapper 以裸命令名 `electron-builder` spawn 时无需假设交互 shell 的 PATH。bundle inventory → DMG 公证/装订 → 签名校验的顺序保持不变，并由行为测试锁定。
 
@@ -264,17 +322,17 @@ error: Trusted extension failed to load: Failed to load extension:
 
 ## 9. 测试与 RED 证据
 
-### 9.1 计数（本机 Linux x64，Node v24.14.0、pnpm 10.34.5；第四轮复审后）
+### 9.1 计数（本机 Linux x64，Node v24.14.0、pnpm 10.34.5；第五轮复审后）
 
 | 命令 | 结果 |
 | --- | --- |
-| `pnpm --filter @pi-desktop/omp-runtime test`（未设 opt-in 变量） | **23 files / 350 passed / 6 skipped（356）**（串行重跑；与桌面全套并发时 `src/process.test.ts` 有一次负载型 flaky，见 §12.3） |
-| `OMP_SIDECAR_TEST_RESOURCES=… npx vitest run src/bundled-smoke.test.ts`（真实产物） | **9 passed**（3 恒开 + 6 真实产物/自包含/篡改/异常/超时；第三轮实跑值，本轮未重建产物） |
-| `env -u SSH_ASKPASS node --test test/*.test.mjs`（`apps/desktop` 全量，第四轮） | **tests 2947 / pass 2944 / fail 0 / skipped 3** |
-| 其中 `omp-sidecar` 7、`omp-release-gate` 11、`macos-release-lane` 2、`ci-workflow` 14、`omp-runtime-launcher` 12、`packaging-footprint` 9、`omp-session-failclosed` 24、`packaging-sidecar-source` 3、`preview-workflow` 1 | 均 0 fail（第四轮逐个实跑） |
-| `TMPDIR=<别名>` 重跑 `src/bundled.test.ts`（+ smoke）与 `omp-runtime-launcher.test.mjs` | **28 passed / 6 skipped**；launcher **12 passed**（第三轮实跑值，本轮未复跑） |
-| `pnpm build:js` / `pnpm --filter @pi-desktop/omp-runtime typecheck` / `pnpm --filter @pi-desktop/desktop typecheck` | 均 exit 0（第四轮实跑） |
-| `git diff --check` | exit 0（第四轮实跑） |
+| `pnpm --filter @pi-desktop/omp-runtime test`（未设 opt-in 变量） | **23 files / 350 passed / 6 skipped（356）**（本轮复跑） |
+| `OMP_SIDECAR_TEST_RESOURCES=… npx vitest run src/bundled-smoke.test.ts`（真实产物） | **9 passed**（本轮复跑；第三轮构建的产物） |
+| `env -u SSH_ASKPASS node --test test/*.test.mjs`（`apps/desktop` 全量，第五轮） | **tests 2952 / pass 2949 / fail 0 / skipped 3** |
+| 其中 `omp-release-gate` 16（第五轮 +5）、`macos-release-lane` 2、`ci-workflow` 14、`omp-sidecar` 7、`omp-runtime-launcher` 12、`packaging-footprint` 9、`omp-session-failclosed` 24、`packaging-sidecar-source` 3、`preview-workflow` 1、`window-menu` 9 | 均 0 fail（第五轮逐个实跑） |
+| `TMPDIR=<别名>` 重跑 `src/bundled.test.ts` 与 `omp-runtime-launcher.test.mjs` | `bundled.test.ts` **25 passed**；launcher **12 passed**（第五轮实跑） |
+| `pnpm build:js` / `pnpm --filter @pi-desktop/omp-runtime typecheck` / `pnpm --filter @pi-desktop/desktop typecheck` | 均 exit 0（第五轮实跑） |
+| `git diff --check` | exit 0（第五轮实跑） |
 
 
 ### 9.2 变异（RED）矩阵
@@ -344,6 +402,8 @@ R4-3 原文要求「构建脚本输出可核验清单…**重复构建在相同�
 9. **未在 clean runner 实跑 packaging workflows**：F2/F3 的 fork checkout、`OMP_SIDECAR_SOURCE`、固定 Bun、`bun install --frozen-lockfile` 只以**静态测试 + manifest pin 自动比较**锁定（本机无网络与干净 fork 克隆）。真实 sidecar 构建仍在本机 fork 检出（`/tmp/r4b/oh-my-pi`，`3c845eb2…`）验证：`--check`/`--preflight` exit 0，opt-in 无费用 smoke **9 passed**。
 10. **平台实测边界**：F4 的 macOS RED 坐标（`bundled.test.ts:172/195/403`、`omp-runtime-launcher.test.mjs:128/329`）来自独立 macOS 复审机（Node 24.14.0）；本机用**别名 TMPDIR** 复现同一失败类并验证修复，但**未在 macOS 上复跑本轮修复**，留待规划方复跑验收。F5 的 win32 覆盖是 stub `process.platform`，**不是** Windows 实机；打包后的应用仍未启动过（同第 1、2 条）。
 11. **第四轮的 signed lane 证据在 Linux 上以桩工具实跑**：`macos-release-lane.test.mjs` 用 `uname` 桩模拟 Darwin、用桩 pnpm/electron-builder/codesign/xcrun 驱动真实的 `release-macos.sh` + `release-package.mjs` + watchdog + inventory + 公证/校验脚本，证明的是命令构造、预检先行、失败短路与阶段顺序，**不是**真实 macOS 签名/公证结果；真实 lane 仍需在带证书的 macOS 上实跑（同第 1、2 条）。第四轮**未**执行 `--preflight` 的真实 sidecar 构建（§8 的 9 条 smoke 仍是第三轮产物与计数）。
+12. **第五轮的口径边界**：本轮验证集中在**参数分类与 spawn 前拒绝**这一层，外加用已安装 electron-builder 的 yargs 契约做静态一致性比对；仍未跑真实 electron-builder 打包、未在 clean runner 实跑 packaging workflows、未在 macOS/Windows 实机验证（同第 1、2、9、11 条）。`--prepackaged` 的“会改用外部应用”结论来自固定版本的源码坐标（`platformPackager.js:146`、`macPackager.js:268-270`），未真机打包验证。
+13. **第五轮未重建 sidecar 产物**：产物仍是第三轮构建值（283559392 B、sha256 `a3807b5e…`），本轮只复跑 opt-in smoke（9 passed）与 `omp-runtime` 全套（350 passed / 6 skipped）；R4-3 的非确定性结论（§10）不变。第五轮的一次性探针脚本（`/tmp/m5-probe/red-probe5.mjs`、`green-probe5.mjs`、yargs 探针）不进入交付，其可复现的等价物是仓库内的 `every option the installed electron-builder CLI declares is classified by the entry` 契约测试。
 
 ---
 
@@ -403,4 +463,16 @@ RED 全部在起点 `956841c` 的独立 worktree（`git worktree add --detach /t
 
 本轮 GREEN 计数（本机 Linux x64，Node v24.14.0、pnpm 10.34.5）：`pnpm build:js` exit 0；`pnpm --filter @pi-desktop/omp-runtime typecheck` exit 0；`pnpm --filter @pi-desktop/desktop typecheck` exit 0；`git diff --check` exit 0；`omp-runtime` 全套 **23 files / 350 passed / 6 skipped**；`apps/desktop` 全套 `env -u SSH_ASKPASS node --test test/*.test.mjs` **2947 tests / 2944 passed / 3 skipped / 0 failed**。桌面全套与 `omp-runtime` 全套并发时曾出现一次 `src/process.test.ts > reports the runtime's stderr as diagnostics only` 判红；该文件单跑与全套串行重跑都通过，且本轮未改动 `packages/omp-runtime` 任何源码——按**负载引起的 flaky** 记录，不写入通过计数之外。
 
-（工作目录：`app/packages/omp-runtime` 运行 vitest；`app/apps/desktop` 运行 node --test。所有 RED 均在起点提交上复现，GREEN 均在修复提交上复跑；计数见 §9.1 与 §12。）
+### 12.4 第五轮复审的 RED/GREEN 复核命令
+
+RED 在起点 `bf9d075` 的独立 worktree（`git worktree add --detach /tmp/r4b-red5 bf9d075365008478edd01d04d91c424aa4e93898`）里复现：只把本轮测试文件拷进该 worktree，并把 `app/node_modules` 与 `app/packages/omp-runtime/dist` 以符号链接指向本机已构建产物；`app/scripts/release-package.mjs` 保持起点版本（sha256 `e4685c901d0d816f23235c6df17714642b1c068f670cea289ac14520b5eb26ab`）。因此每一条判红都只可能来自 F1/F2 本身，而不是环境。
+
+| 复审问题 | RED 命令（起点 worktree） | RED 观察 | GREEN 命令（本轮工作树） | GREEN 观察 |
+| --- | --- | --- | --- | --- |
+| F1/F2 全部新增用例 | `node --test apps/desktop/test/omp-release-gate.test.mjs` | **6 failed / 10 passed**（失败项：`the config allowlist is exactly the signature overrides the fixed lanes pass`、`an electron-builder platform switch is the same axis as --platform`、`every unsupported spelling of an owned axis or a packaging input is refused before spawning`、`a conflicting or repeated target is refused instead of silently picked`、`the entry generates exactly one choice per axis and the same target for both steps`、`every option the installed electron-builder CLI declares is classified by the entry`；第一条失败即 `["--platform","darwin","--arm64","--win=portable"] must be refused with exit code 2`） | 同命令 | **16 passed / 0 failed** |
+| F1 平台/发布/架构轴分叉 | `node /tmp/m5-probe/red-probe5.mjs`（把 RED/GREEN 共用探针指到起点 worktree） | `--win=portable`：code 0、spawn 2、builder targets `mac`+`windows`(portable)；`--publish never -p always`：`publish: ["never","always"]`；`--x64 --no-x64`：预检 darwin/x64 而 builder `x64: false` | `node /tmp/m5-probe/green-probe5.mjs`（同一探针切到本轮工作树） | 七项全部 `code=2`、`spawns=0`，错误分别指名 `--win=portable`、`--prepackaged`、`-p`、`--no-x64`、`--projectDir`、`-c`、`-c.files[0].from=…` |
+| F2 最终来源可被换 | 同上探针（`--prepackaged /tmp/foreign.app`、`--projectDir /tmp/elsewhere`、`-c /tmp/foreign.yml`、`-c.files[0].from=/tmp/foreign`） | 四项均 code 0、spawn 2；builder 自己的 parser 解析出 `prepackaged`/`projectDir`/`config`（含 dotted 合成对象） | 同上 | 四项全部 code 2、spawn 0 |
+| 契约来源 | — | — | `omp-release-gate` 的 `every option the installed electron-builder CLI declares is classified by the entry` | 用已安装 electron-builder 的 `createYargs()` + `configureBuildCommand()` 读出 `options.key` ∪ `options.alias` 与 `choices.publish`，与 wrapper 的归类表/取值表逐项比对；缺项、多项或 choice 变化都会判红 |
+| 真实入口（非探针） | — | — | `pnpm --filter @pi-desktop/desktop exec node ../../scripts/release-package.mjs --platform darwin --arm64 --win=portable`；`OMP_SIDECAR_SOURCE=/tmp/r4b/oh-my-pi node scripts/release-package.mjs --platform darwin --arm64 --publish never -c.mac.identity=… -c.mac.forceCodeSigning=true -c.mac.notarize=true` | 前者 `RELEASE-PACKAGE-FAIL a platform target list is not supported: --win=portable`、wrapper exit 2（pnpm 外层 exit 1）；后者参数全部接受并进入 `--preflight --platform darwin --arch arm64`，随后按跨目标语义拒绝（`provenance platform is linux, this host is darwin`，exit 1） |
+
+第五轮 GREEN 计数（本机 Linux x64，Node v24.14.0、pnpm 10.34.5）：`pnpm build:js` exit 0；`pnpm --filter @pi-desktop/omp-runtime typecheck` exit 0；`pnpm --filter @pi-desktop/desktop typecheck` exit 0；`git diff --check` exit 0；`omp-runtime` 全套 **23 files / 350 passed / 6 skipped**；opt-in 真实产物 smoke **9 passed**；`apps/desktop` 全量 `env -u SSH_ASKPASS node --test test/*.test.mjs` **2952 tests / 2949 passed / 3 skipped / 0 failed**。

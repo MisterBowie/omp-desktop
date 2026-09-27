@@ -205,27 +205,56 @@ platform-specific artifact:
   `win32`/`linux`) and passes the same platform/architecture to the preflight
   and to electron-builder. It runs electron-builder only after the preflight
   succeeds.
-- **Forwarded, not recognized**: every argument the entry does not own reaches
-  electron-builder verbatim and in order. Upstream PI Desktop puts
-  electron-builder last in each release command, so its workflow appends builder
-  configuration through the package script — `-c.mac.forceCodeSigning=true` and
-  `-c.mac.notarize=true` on the signed macOS lane. Refusing unknown arguments
-  breaks that lane; recognizing only today's two flags breaks the next one. A
-  target axis, by contrast, may be declared only once: `--x64 --arm64`,
-  `--x64 --arch arm64` and a repeated `--platform` are refused rather than
-  resolved last-one-wins, because a duplicated target is the one case where a
-  forwarded argument could move the preflight and the package apart.
-- **The platform axis has one spelling-agnostic owner**: electron-builder's own
-  platform switches are additive (`--mac … --win` builds both platforms), so
-  forwarding them was the same fork under another spelling — the preflight would
-  validate one platform and electron-builder would package two. `--mac`,
-  `--macos`, `-m`, `-o`, `--win`, `--windows`, `-w`, `--linux` and `-l` resolve
-  through the same single platform declaration as `--platform`; mixing two
-  declarations, including a synonym pair such as `--mac --macos`, and a bundled
-  short cluster such as `-mwl` are refused before anything is spawned. A
-  platform target list (`--mac dmg`) is refused too, because the platform axis
-  selects the platform only and the artifact targets belong in the
-  electron-builder config.
+- **Owned, refused, forwarded: three buckets, no fourth.** The entry classifies
+  every option the installed electron-builder CLI declares, and the test below
+  reads that declaration set back from the installed package
+  (`out/builder.js` `configureBuildCommand`: `options.key` plus
+  `options.alias`). *Owned* are the four axes. The platform switches are
+  additive in electron-builder, so every spelling is the same axis:
+  `--mac`/`-m`/`-o`/`--macos`/`--m`/`--o`, `--win`/`-w`/`--windows`/`--w`,
+  `--linux`/`-l`/`--l`, with a target list (`--mac dmg zip`, `--win=portable`)
+  refused because the platform axis names the platform only. The boolean
+  architecture switches accept `=true` and a literal `true`; `=false`,
+  `--no-<arch>` and other values are refusals, not declarations. `--dir` works
+  the same way, and `--publish` (with its `-p`/`--p` aliases) takes its value in
+  the space, `=` and attached forms and is checked against the CLI's own choice
+  list. Each axis may be declared at most once and the entry writes it exactly
+  once, so a forwarded argument can never add a second choice:
+  `--x64 --arm64`, `--x64 --arch arm64`, a repeated `--platform`,
+  `--publish never -p always` and `--dir --dir=true` are refused with exit code
+  2 before anything is spawned.
+- **Refused: the packaging input may not be replaced.** `--prepackaged`/`--pd`
+  skip `doPack` and package an external application
+  (`app-builder-lib/out/platformPackager.js:146`,
+  `out/macPackager.js:268-270`), so the sidecar preflight would validate one
+  input while electron-builder packages another; `--projectDir`/`--project`
+  read another project; `--config`/`-c`/`--c` as a *path* substitutes an
+  external configuration file (and a path combined with dotted overrides is
+  merged into an `extends`); `--help`/`--version` end the builder before it
+  packages, which would turn a release into a successful no-op. All of them are
+  refused before any process is spawned.
+- **Dotted config overrides: a source-neutral allowlist, not a denylist.** Only
+  `mac.identity`, `mac.forceCodeSigning` and `mac.notarize` are forwarded —
+  the three the fixed lanes pass (`-c.mac.forceCodeSigning=true` and
+  `-c.mac.notarize=true` in
+  `upstream/pi-desktop/.github/workflows/release.yml:245-287`, plus
+  `-c.mac.identity=<name>` on the local Developer ID lane), each an attached
+  `=<value>`. They select a certificate or a signing/notarization gate and
+  cannot add, move or rename a packaged file. A test extracts the `-c.<key>=`
+  spellings from both lanes and asserts the set equals the allowlist, so it can
+  neither drift wider nor miss a key a lane needs. Every other key — `files`,
+  `extraResources`, `extraFiles`, `directories.app`, `extends`, a
+  platform-level equivalent, `mac.type`, `afterSign` — is refused; an
+  "any `-c.*`" rule would let `-c.extraResources` replace the application the
+  preflight validated.
+- **Forwarded verbatim, in order**: what is neither a declared builder option
+  nor one of the refused spellings. This keeps the signed lane working —
+  upstream PI Desktop puts electron-builder last in every release command
+  (`upstream/pi-desktop/apps/desktop/package.json:27-31`), so the release
+  workflow appends builder configuration through the package script. A token
+  that is not a builder option is passed through untouched, and
+  electron-builder's own `.strict()` rejects it, so an unknown flag fails the
+  release loudly instead of being silently dropped.
 - **The local signed lane uses the same entry**: `scripts/release-macos.sh`
   packages through `pnpm --filter @pi-desktop/desktop exec node
   ../../scripts/release-package.mjs …`, so the Developer ID + notarization lane
@@ -246,10 +275,17 @@ platform-specific artifact:
 bundles the runtime before the target-aware entry, checks the extracted target
 selection behaviorally (the preflight and electron-builder receive the same
 platform/architecture; a cross target without an architecture fails without
-spawning), refuses a second platform declaration in any spelling — including
-the mixed `--platform darwin --arm64 --win` that used to reach electron-builder
-as a second platform — and exercises the preflight refusals with fixture
-artifacts; `apps/desktop/test/macos-release-lane.test.mjs` drives the real
+spawning), and exercises the preflight refusals with fixture artifacts. It also
+holds the argument contract above: a table of refused spellings runs through
+`runRelease` with a stub spawn and asserts the entry's failure code with zero
+spawns (so neither the sidecar preflight nor electron-builder ran) and a
+refusal that names the argument; a normalization test asserts exactly one
+platform switch, at most one architecture switch and one normalized
+`--publish` per release; the three signature overrides are checked verbatim and
+in order, with the allowlist compared against the `-c.<key>=` spellings the two
+signed lanes actually pass; and a contract test reads the installed
+electron-builder's declared options, aliases and publish choices and fails when
+the entry does not classify one of them. `apps/desktop/test/macos-release-lane.test.mjs` drives the real
 `scripts/release-macos.sh` against stub tooling to prove the lane enters the
 wrapper through `pnpm exec`, that the preflight runs before electron-builder
 with the signing flags intact, and that a refused preflight stops the lane

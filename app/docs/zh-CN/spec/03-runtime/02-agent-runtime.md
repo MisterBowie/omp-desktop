@@ -1168,15 +1168,25 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
   把 arm64 sidecar 打进 x64 应用。宿主目标的预检会实际构建产物；跨目标预检拒绝编译，要求存在
   **恰好为该平台/架构**暂存、且相对本次发布的受控清单校验通过的产物，并在架构未声明时在 spawn
   任何进程之前失败。Windows/Linux 两侧都保持固定 x64 契约。绝不把宿主二进制复用到其他平台。
-  命令行上其余参数都属于 electron-builder，按原始顺序逐项原样转发：上游 PI-Desktop 的签名 macOS
-  lane 正是通过 package 脚本追加 builder 配置（`-c.mac.forceCodeSigning=true`、
-  `-c.mac.notarize=true`），所以拒绝未知参数会直接打断签名发布，而只识别当前这两个 flag 的白名单
-  会打断下一个。同一目标维度只能声明一次：`--x64 --arm64`、`--x64 --arch arm64` 或重复的
-  `--platform` 一律拒绝，而不是"后者覆盖"，因此转发参数不可能把预检与打包带到不同目标。
-  electron-builder 自带的平台开关属于同一维度：`--mac`/`--macos`/`-m`/`-o`、
-  `--win`/`--windows`/`-w`、`--linux`/`-l` 都归并到这一次平台声明；任何形式的第二次声明
-  （`--mac --macos` 这类同义重复、`--platform darwin --win` 这类冲突、短开关簇 `-mwl`）都在
-  spawn 之前被拒绝；平台 target 列表（`--mac dmg`）同样拒绝而不是转发，因为平台维度只负责选平台。
+  命令行参数分三类。四个轴——platform、architecture、`--dir`、`--publish`——由本入口**拥有**：
+  它识别已安装 electron-builder CLI 为它们声明的全部拼写（平台开关
+  `--mac`/`-m`/`-o`/`--macos`/`--m`/`--o`、`--win`/`-w`/`--windows`/`--w`、
+  `--linux`/`-l`/`--l`；target 列表 `--mac dmg zip`、`--win=portable` 一律拒绝，因为该维度只负责
+  选平台；架构布尔开关接受 `=true` 与字面量 `true`，拒绝 `=false`、`--no-<arch>` 与其它取值；
+  `--dir` 同理；`--publish` 连同 `-p`/`--p` 别名，取值按 CLI 自己的列表校验）。每个轴至多声明
+  一次、由本入口恰好写出一次，因此 `--x64 --arm64`、`--x64 --arch arm64`、重复 `--platform`、
+  `--publish never -p always`、`--dir --dir=true` 都在 spawn 之前拒绝。会替换或中断预检所校验
+  产物的参数被**拒绝**：`--prepackaged`/`--pd` 让 `doPack` 直接跳过并改为打包外部应用
+  （`app-builder-lib/out/platformPackager.js:146`、`out/macPackager.js:268-270`），
+  `--projectDir`/`--project` 改读别的项目，`--config`/`-c`/`--c` 的路径形式换成外部配置文件，
+  `--help`/`--version` 让 builder 不打包就退出。dotted 配置覆盖只经 **source-neutral
+  allowlist** 通过：`mac.identity`、`mac.forceCodeSigning`、`mac.notarize`（固定 lane 实际用的
+  就是这三个——上游 release workflow 的 `-c.mac.forceCodeSigning=true` 与
+  `-c.mac.notarize=true`、本地 Developer ID lane 的 `-c.mac.identity=<name>`），三者只选证书或
+  签名/公证闸门，无法增删或搬移任何被打包的文件；`files`、`extraResources`、`extraFiles`、
+  `directories.app`、`extends` 及平台级同类键一律拒绝，因为"任意 `-c.*`"会让
+  `-c.extraResources` 换掉已校验的输入。其余 token（不是 electron-builder 已声明选项者）仍按
+  原序**原样转发**，由 builder 自己的严格解析器拒绝未知 flag，而不是被本入口静默丢弃。
   本地签名 lane（`scripts/release-macos.sh`）也通过
   `pnpm --filter @pi-desktop/desktop exec node ../../scripts/release-package.mjs` 进入同一模块，
   因此 Developer ID + 公证的本地构建与 `pnpm dist:mac` 一样先跑预检再跑 electron-builder，
