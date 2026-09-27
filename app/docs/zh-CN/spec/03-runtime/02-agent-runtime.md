@@ -1148,16 +1148,18 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
 非 Cursor 提供方与 Agent 模式下的 Cursor 模型不受影响。R3 本身仍未解除、T20-B/C/D 仍未开始：
 本门是这些工作的前置条件，而不是该功能本身。
 
-## 17. bundled sidecar 的构建与准入（M5/T20-R4B，ADR 0307）
+## 17. bundled sidecar 的构建与准入（M5/T20-R4B；自 M6/T20-R4-3 起为可复现构建，ADR 0307）
 
 打包构建只运行一个 OMP 运行时，而该运行时是本项目的构建产物，而不是上游标签：`omp/18.3.0`
-加上 patch level `62bc57b+omp-desktop.2`，由 `app/patches/oh-my-pi/manifest.json` 记录的自有 fork
+加上 patch level `62bc57b+omp-desktop.3`，由 `app/patches/oh-my-pi/manifest.json` 记录的自有 fork
 提交承载。
 
 * **构建。** `scripts/omp-sidecar.mjs` 是唯一入口。源码检出的 `origin` 不是清单中的 fork 仓库、
   `HEAD` 不是清单中的 fork 提交、工作树不干净、上报版本不是 `18.3.0`，或相对基线的差异不等于清单
   的文件列表（且受控补丁不能反向应用）时，它一律拒绝。编译使用 OMP 自身的 Bun 单文件构建，因此
-  产物就是该提交下 `omp --version` 所报告的可执行文件。产物与工具门被复制到
+  产物就是该提交下 `omp --version` 所报告的可执行文件。入口显式传入编译模式
+  （`scripts/build-binary.ts --bytecode`），自有 fork 拒绝其他任何开关，模式记录在
+  `build.bytecode`。产物与工具门被复制到
   `apps/desktop/resources/omp-runtime/`（已 gitignore；打包复制会用 filter 排除该目录自身的
   `.gitignore`），并在 electron-builder 的 `extraResources` 中声明。
 * **发布门。** `pack`、`dist`、`dist:mac`、`dist:win`、`dist:linux` 都以
@@ -1203,13 +1205,14 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
   导入、先清空构建自有的 `extensions/` 目录（避免旧构建残留被一起发布），并记录工具门的字节数与
   摘要。
 * **provenance。** 构建会在可执行文件旁写出 `provenance.json`：schema
-  `omp-desktop.bundled-sidecar/2`、fork 仓库/提交/tree、上游基线 SHA 与版本、patch level、能力
+  `omp-desktop.bundled-sidecar/3`、fork 仓库/提交/tree、上游基线 SHA 与版本、patch level、能力
   id、OMP 版本、桌面版本、平台、架构、二进制文件名、字节数与 SHA-256、各扩展的路径与其字节数/摘要，
-  以及构建工具及其版本。每个值都来自已校验的检出、补丁清单、本机环境或实际产物。启动时**校验**的是
+  以及构建工具、其版本和所选编译模式（`build.bytecode`）。每个值都来自已校验的检出、补丁清单、
+  本机环境或实际产物。启动时**校验**的是
   schema、平台、架构、OMP 版本、patch level、上游基线 SHA 与版本、fork 仓库与提交、桌面发布版本、
-  二进制名，以及二进制与每个扩展的字节数/摘要；`fork.tree`、`capabilities` 与 `build.*` 是应用
-  无法自行推导的审计记录，绝不作为“已验证”呈现。schema 为 `/2`，因为强制 `extensions`/
-  `desktopVersion` 改变了契约，因此 `/1` 被拒绝而不是被静默重定义。扩展路径会规范化为相对 POSIX
+  二进制名，以及二进制与每个扩展的字节数/摘要；`fork.tree`、`capabilities` 与 `build.*` 的取值
+  是应用无法自行推导的审计记录，绝不作为“已验证”呈现（但它们的形状仍被强制）。schema 为 `/3`，
+  因为强制 `build.bytecode` 改变了契约，因此 `/2` 与 `/1` 被拒绝而不是被静默重定义。扩展路径会规范化为相对 POSIX
   路径，否则拒绝（不得是绝对路径、盘符、UNC、空/`.`/`..` 段或重复项），且清单必须**恰好**声明
   信任工具门——再发一个扩展需要单独的 ADR。
 * **准入。** 打包构建的唯一候选是
@@ -1234,7 +1237,11 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
 `OMP_RUNTIME_PATCH_LEVEL`、`OMP_RUNTIME_FORK_REPOSITORY`、`OMP_RUNTIME_FORK_COMMIT`），因为打包
 后的应用没有仓库可读；桌面测试断言它们与受控清单一致。
 
-本文不涉及：R3 仍然阻塞、T20-B/C/D 仍未开始；产物在不同构建之间并非逐位可复现——本轮同一提交的
-四次构建得到四个不同 SHA-256——因此清单描述的是单次构建，R4-3 验收项中的“可复现”条款**未满足**，
-作为 M6/T21 的未决阻塞项记录，而不是写成已通过。因此 M5/T20-R4B 在 HANDOFF、任务板、ADR 0307 与
-本节中一律记为**部分完成/受阻**，而非完成。
+产物已逐位可复现：同一 fork 提交的两次独立构建得到相同的字节数、SHA-256 与 `provenance.json`，
+因为内嵌的原生插件归档使用固定时间戳写入、且编译模式是显式的。此前的构建间差异来自 `Bun.Archive`
+给归档打上了墙上时钟时间，而不是 bytecode；上游针对
+`--compile --bytecode --splitting` 的修复（oven-sh/bun#42151）覆盖的是本构建未使用的模式。测量、
+对照构建与拒绝证据见 `docs/validation/M6-r4-3-reproducible-sidecar.md`，因此 R4-3 **已满足**。
+
+本文不涉及：R3 仍然阻塞、T20-B/C/D 仍未开始，因此 M5/T20 在 HANDOFF、任务板、ADR 0307 与本节中
+一律记为**部分完成**。

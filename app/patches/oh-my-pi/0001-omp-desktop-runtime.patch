@@ -1121,6 +1121,126 @@ index 6eb6c3d..903021d 100644
  describe("agentLoopContinue with AgentMessage", () => {
  	it("should throw when context has no messages", () => {
  		const context: AgentContext = {
+diff --git a/packages/coding-agent/scripts/build-binary.ts b/packages/coding-agent/scripts/build-binary.ts
+index 28ffeff..473a7c3 100644
+--- a/packages/coding-agent/scripts/build-binary.ts
++++ b/packages/coding-agent/scripts/build-binary.ts
+@@ -40,6 +40,48 @@ export function resolveCrossBuild(value: string | undefined): CrossBuild | null
+ 	}
+ }
+ 
++/** Raised for anything the build-binary command line does not accept. */
++export class BuildBinaryArgsError extends Error {
++	constructor(message: string) {
++		super(message);
++		this.name = "BuildBinaryArgsError";
++	}
++}
++
++/** Switches `build-binary.ts` accepts on the command line. */
++export interface BuildBinaryOptions {
++	/**
++	 * Embed precompiled bytecode; `--no-bytecode` turns it off for callers that
++	 * need two builds of one revision to be bit-identical (see
++	 * `CodingAgentCompileOptions.bytecode`).
++	 */
++	readonly bytecode: boolean;
++}
++
++/**
++ * Parse the build switches, refusing anything else.
++ *
++ * The mode is an explicit, single-valued switch rather than an environment
++ * variable: a release artifact must not change because a variable happened to
++ * be set, and a typo (`--no-bytecod`) must fail the build rather than silently
++ * ship the default.
++ */
++export function parseBuildBinaryArgs(argv: readonly string[]): BuildBinaryOptions {
++	let bytecode = true;
++	let bytecodeGiven = false;
++	for (const arg of argv) {
++		if (arg !== "--bytecode" && arg !== "--no-bytecode") {
++			throw new BuildBinaryArgsError(`Unsupported build-binary argument: ${arg}`);
++		}
++		if (bytecodeGiven) {
++			throw new BuildBinaryArgsError(`Bytecode mode was already given; refusing redundant ${arg}`);
++		}
++		bytecodeGiven = true;
++		bytecode = arg === "--bytecode";
++	}
++	return { bytecode };
++}
++
+ // Transformers.js is an optional, native-heavy dependency that is never bundled
+ // into the binary; the tiny-model worker `bun install`s it into a runtime cache
+ // on first use. The `catalog:` spec cannot be resolved from inside the compiled
+@@ -74,6 +116,7 @@ async function runCommand(
+ }
+ 
+ async function main(): Promise<void> {
++	const options = parseBuildBinaryArgs(Bun.argv.slice(2));
+ 	const crossBuild = resolveCrossBuild(Bun.env.CROSS_TARGET);
+ 	const shouldAdhocSign =
+ 		process.platform === "darwin" &&
+@@ -103,6 +146,7 @@ async function main(): Promise<void> {
+ 				target: crossBuild?.target,
+ 				executablePath: Bun.env.BUN_COMPILE_EXECUTABLE_PATH || undefined,
+ 				skipBuiltinCodesign: shouldAdhocSign,
++				bytecode: options.bytecode,
+ 			});
+ 
+ 			if (shouldAdhocSign) {
+@@ -124,4 +168,17 @@ async function main(): Promise<void> {
+ 	}
+ }
+ 
+-if (import.meta.main) await main();
++if (import.meta.main) {
++	// A refused switch must fail the build loudly: `Bun.argv` errors are
++	// reported with a stable prefix and a distinct exit code so a caller can
++	// tell "this build was invoked wrong" from "the compile itself failed".
++	try {
++		await main();
++	} catch (error) {
++		if (error instanceof BuildBinaryArgsError) {
++			console.error(`OMP-BUILD-ARGS ${error.message}`);
++			process.exit(2);
++		}
++		throw error;
++	}
++}
+diff --git a/packages/coding-agent/scripts/compile-binary.ts b/packages/coding-agent/scripts/compile-binary.ts
+index 0eeda6d..96da91e 100644
+--- a/packages/coding-agent/scripts/compile-binary.ts
++++ b/packages/coding-agent/scripts/compile-binary.ts
+@@ -26,6 +26,18 @@ export interface CodingAgentCompileOptions {
+ 	readonly minifyIdentifiers?: boolean;
+ 	/** Disable Bun's built-in Darwin signing before the caller re-signs. */
+ 	readonly skipBuiltinCodesign?: boolean;
++	/**
++	 * Precompile the bundle to bytecode (default `true`, the release behavior).
++	 *
++	 * Bytecode costs ~52 MB of binary size to skip parsing the bundle at boot.
++	 * It is also the only difference between two builds of the same source:
++	 * Bun 1.4.2 bakes build-local placeholders into the bytecode string table,
++	 * so a caller that needs one bit-identical artifact per source revision —
++	 * `OMP Desktop`'s bundled sidecar — passes `false` explicitly. The switch is
++	 * per-call and never reads the environment, so a stray variable cannot
++	 * change what a release build ships.
++	 */
++	readonly bytecode?: boolean;
+ }
+ 
+ /**
+@@ -51,7 +63,7 @@ export async function compileCodingAgent(options: CodingAgentCompileOptions): Pr
+ 			// `omp --version` 256 ms -> 30 ms on M4 Max (+52 MB binary).
+ 			// Keep import.meta.resolve in bundled dependencies valid under bytecode.
+ 			format: "esm",
+-			bytecode: true,
++			bytecode: options.bytecode ?? true,
+ 			minify: {
+ 				identifiers: options.minifyIdentifiers ?? false,
+ 				keepNames: true,
 diff --git a/packages/coding-agent/src/modes/rpc/host-tools.ts b/packages/coding-agent/src/modes/rpc/host-tools.ts
 index 62be077..84fb74c 100644
 --- a/packages/coding-agent/src/modes/rpc/host-tools.ts
@@ -1368,6 +1488,38 @@ index 062949c..e9cf5e5 100644
  	isError?: boolean;
  }
  
+diff --git a/packages/coding-agent/test/build-binary-bytecode.test.ts b/packages/coding-agent/test/build-binary-bytecode.test.ts
+new file mode 100644
+index 0000000..88142bb
+--- /dev/null
++++ b/packages/coding-agent/test/build-binary-bytecode.test.ts
+@@ -0,0 +1,26 @@
++import { describe, expect, it } from "bun:test";
++import { BuildBinaryArgsError, parseBuildBinaryArgs } from "../scripts/build-binary";
++
++/**
++ * `packages/coding-agent/scripts/build-binary.ts` is the build entry OMP Desktop's
++ * bundled sidecar drives, so its switches are part of a release contract:
++ * precompiled bytecode stays the default (the release behavior and the fast
++ * boot path), turning it off is explicit, and a typo fails the build instead of
++ * silently shipping the default.
++ */
++describe("build-binary bytecode switch", () => {
++	it("keeps bytecode on unless the caller turns it off", () => {
++		expect(parseBuildBinaryArgs([])).toEqual({ bytecode: true });
++		expect(parseBuildBinaryArgs(["--bytecode"])).toEqual({ bytecode: true });
++		expect(parseBuildBinaryArgs(["--no-bytecode"])).toEqual({ bytecode: false });
++	});
++
++	it("refuses an unknown or repeated switch instead of ignoring it", () => {
++		expect(() => parseBuildBinaryArgs(["--no-bytecod"])).toThrow(BuildBinaryArgsError);
++		expect(() => parseBuildBinaryArgs(["--no-bytecod"])).toThrow("Unsupported build-binary argument: --no-bytecod");
++		expect(() => parseBuildBinaryArgs(["--bytecode", "--no-bytecode"])).toThrow(
++			"Bytecode mode was already given; refusing redundant --no-bytecode",
++		);
++		expect(() => parseBuildBinaryArgs(["--no-bytecode", "--no-bytecode"])).toThrow("already given");
++	});
++});
 diff --git a/packages/coding-agent/test/rpc-host-tools.test.ts b/packages/coding-agent/test/rpc-host-tools.test.ts
 index f3c807d..c48f03f 100644
 --- a/packages/coding-agent/test/rpc-host-tools.test.ts
@@ -1718,6 +1870,169 @@ index f3c807d..c48f03f 100644
 +			expect(tools).toMatchObject([{ name: "host_submit", concurrency: "exclusive", batchPolicy: "sole" }]);
 +		} finally {
 +			await client.stop();
++		}
++	});
+ });
+diff --git a/packages/natives/scripts/embed-native.ts b/packages/natives/scripts/embed-native.ts
+index e04c39a..af0f208 100644
+--- a/packages/natives/scripts/embed-native.ts
++++ b/packages/natives/scripts/embed-native.ts
+@@ -8,6 +8,65 @@ const nativeDir = path.join(import.meta.dir, "../native");
+ const archivePrefix = "embedded-addons.";
+ const archiveSuffix = ".tar.gz";
+ 
++/** Byte offset of the ustar header's 12-byte mtime field. */
++const TAR_MTIME_OFFSET = 136;
++/** Length of every ustar header block, and of the numeric mtime field inside it. */
++const TAR_BLOCK_BYTES = 512;
++const TAR_MTIME_LENGTH = 12;
++/** Byte offset and length of the ustar header's size field. */
++const TAR_SIZE_OFFSET = 124;
++const TAR_SIZE_LENGTH = 12;
++/** Byte offset, length, and blanked representation of the ustar header checksum field. */
++const TAR_CHECKSUM_OFFSET = 148;
++const TAR_CHECKSUM_LENGTH = 8;
++const TAR_BLANK = 0x20;
++const TAR_ZERO = 0x30;
++
++/** Octal numeric field of a ustar header block, as a number. */
++function readTarOctal(block: Uint8Array, offset: number, length: number, label: string): number {
++	const raw = Buffer.from(block.subarray(offset, offset + length)).toString("ascii");
++	const text = raw.slice(0, raw.indexOf("\0") === -1 ? raw.length : raw.indexOf("\0")).trim();
++	if (text === "") return 0;
++	if (!/^[0-7]+$/.test(text)) throw new Error(`Embedded addon archive has a non-octal ${label} field: ${raw}`);
++	return Number.parseInt(text, 8);
++}
++
++/**
++ * Build the addon archive with fixed entry timestamps.
++ *
++ * `Bun.Archive` stamps every entry with the time the archive was written — and
++ * checksums the header that carries it — so two embeddings of unchanged addons
++ * produced different `tar.gz` bytes and, because the archive is embedded
++ * verbatim, different binaries. The tar layout is still `Bun.Archive`'s; each
++ * header's mtime is normalized to `0` and its checksum recomputed, which is
++ * what a reproducible archive is. Nothing else reads those fields: the runtime
++ * extractor takes entry names, sizes and payloads only
++ * (`native/loader-state.js`), and the version sentinel decides staleness.
++ */
++async function buildAddonArchive(entries: Record<string, Uint8Array>): Promise<Uint8Array> {
++	const tar = new Uint8Array(await new Bun.Archive(entries).bytes());
++	for (let offset = 0; offset + TAR_BLOCK_BYTES <= tar.length;) {
++		const header = tar.subarray(offset, offset + TAR_BLOCK_BYTES);
++		// Two zero blocks terminate the archive; the first byte being 0 is enough
++		// to stop, exactly as the extractor decides it.
++		if (header[0] === 0) break;
++		const size = readTarOctal(header, TAR_SIZE_OFFSET, TAR_SIZE_LENGTH, "size");
++		header.fill(TAR_ZERO, TAR_MTIME_OFFSET, TAR_MTIME_OFFSET + TAR_MTIME_LENGTH - 1);
++		header[TAR_MTIME_OFFSET + TAR_MTIME_LENGTH - 1] = 0;
++		header.fill(TAR_BLANK, TAR_CHECKSUM_OFFSET, TAR_CHECKSUM_OFFSET + TAR_CHECKSUM_LENGTH);
++		let checksum = 0;
++		for (const byte of header) checksum += byte;
++		const digits = checksum.toString(8).padStart(TAR_CHECKSUM_LENGTH - 2, "0");
++		for (let index = 0; index < digits.length; index += 1) {
++			header[TAR_CHECKSUM_OFFSET + index] = digits.charCodeAt(index);
++		}
++		header[TAR_CHECKSUM_OFFSET + TAR_CHECKSUM_LENGTH - 2] = 0;
++		header[TAR_CHECKSUM_OFFSET + TAR_CHECKSUM_LENGTH - 1] = TAR_BLANK;
++		offset += TAR_BLOCK_BYTES + Math.ceil(size / TAR_BLOCK_BYTES) * TAR_BLOCK_BYTES;
++	}
++	return new Uint8Array(Bun.gzipSync(tar, { level: 9 }));
++}
++
+ const embeddedAddonTypedefs = `/** @typedef {"modern" | "baseline" | "default"} EmbeddedAddonVariant */
+ 
+ /**
+@@ -121,7 +180,7 @@ export async function embedNativeAddon({
+ 		}
+ 		archiveEntries[addon.filename] = bytes;
+ 	}
+-	await Bun.write(archivePath, await new Bun.Archive(archiveEntries, { compress: "gzip", level: 9 }).bytes());
++	await Bun.write(archivePath, await buildAddonArchive(archiveEntries));
+ 
+ 	const files = available
+ 		.map(
+diff --git a/packages/natives/test/embed-native.test.ts b/packages/natives/test/embed-native.test.ts
+index 496fbed..9b41a5d 100644
+--- a/packages/natives/test/embed-native.test.ts
++++ b/packages/natives/test/embed-native.test.ts
+@@ -2,8 +2,35 @@ import { describe, expect, it } from "bun:test";
+ import * as fs from "node:fs/promises";
+ import * as os from "node:os";
+ import * as path from "node:path";
++import { gunzipSync } from "node:zlib";
++import { extractEmbeddedAddonArchive } from "../native/loader-state.js";
+ import { embedNativeAddon } from "../scripts/embed-native";
+ 
++const ARCHIVE_NAME = "embedded-addons.linux-x64.tar.gz";
++const ADDON_NAME = "pi_natives.linux-x64-modern.node";
++const FIXTURE_VERSION = "9.9.9";
++const FIXTURE_ADDON = Buffer.from(`binary__piNativesV9_9_9 payload 0123456789\n`.repeat(32));
++
++/** Embed one addon into a throwaway tree and return the archive it wrote. */
++async function embedFixture(): Promise<{ root: string; nativeDir: string; archive: Uint8Array }> {
++	const root = await fs.mkdtemp(path.join(os.tmpdir(), "pi-natives-embed-"));
++	const nativeDir = path.join(root, "native");
++	await fs.mkdir(nativeDir);
++	await Bun.write(path.join(nativeDir, ADDON_NAME), FIXTURE_ADDON);
++	await embedNativeAddon({
++		targetPlatform: "linux",
++		targetArch: "x64",
++		nativeDir,
++		outputPath: path.join(nativeDir, "embedded-addon.js"),
++		version: FIXTURE_VERSION,
++	});
++	return {
++		root,
++		nativeDir,
++		archive: new Uint8Array(await Bun.file(path.join(nativeDir, ARCHIVE_NAME)).arrayBuffer()),
++	};
++}
++
+ describe("native addon embedding", () => {
+ 	it("rejects a longer release sentinel that starts with the expected version", async () => {
+ 		const root = await fs.mkdtemp(path.join(os.tmpdir(), "pi-natives-embed-"));
+@@ -28,4 +55,43 @@ describe("native addon embedding", () => {
+ 			await fs.rm(root, { recursive: true, force: true });
+ 		}
+ 	});
++
++	it("packages unchanged addons into byte-identical archives", async () => {
++		const first = await embedFixture();
++		const second = await embedFixture();
++		try {
++			expect(first.archive.length).toBeGreaterThan(0);
++			expect(Buffer.from(second.archive).equals(Buffer.from(first.archive))).toBe(true);
++			// The bytes are stable because no entry carries the time the archive
++			// was written: the second is the mtime field of the first ustar block.
++			expect(Buffer.from(gunzipSync(first.archive).subarray(136, 148)).toString("latin1")).toBe("00000000000\0");
++		} finally {
++			await fs.rm(first.root, { recursive: true, force: true });
++			await fs.rm(second.root, { recursive: true, force: true });
++		}
++	});
++
++	it("writes an archive the compiled loader can still extract", async () => {
++		const { root, nativeDir, archive } = await embedFixture();
++		const targetDir = path.join(root, "extracted");
++		try {
++			await fs.mkdir(targetDir);
++			const archivePath = path.join(root, "archive.tar.gz");
++			await Bun.write(archivePath, archive);
++
++			const extracted = extractEmbeddedAddonArchive({
++				archivePath,
++				files: [{ variant: "modern", filename: ADDON_NAME, size: FIXTURE_ADDON.length }],
++				targetDir,
++			});
++
++			expect(extracted).toEqual([path.join(targetDir, ADDON_NAME)]);
++			expect(await Bun.file(path.join(targetDir, ADDON_NAME)).bytes()).toEqual(new Uint8Array(FIXTURE_ADDON));
++			// The embedded module points the loader at the archive beside it.
++			const embeddedModule = await Bun.file(path.join(nativeDir, "embedded-addon.js")).text();
++			expect(embeddedModule).toContain(`../native/${ARCHIVE_NAME}`);
++		} finally {
++			await fs.rm(root, { recursive: true, force: true });
 +		}
 +	});
  });

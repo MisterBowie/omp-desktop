@@ -40,15 +40,25 @@ const patchScript = join(appRoot, "scripts", "omp-patch.mjs");
 const manifestPath = join(appRoot, "patches", "oh-my-pi", "manifest.json");
 
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
-const { validateForkCheckout, normalizeRepositoryUrl: scriptNormalize } = await import(
-  pathToFileURL(sidecarScript)
-);
+const { validateForkCheckout, normalizeRepositoryUrl: scriptNormalize, buildBinaryArgs, SIDECAR_BYTECODE } =
+  await import(pathToFileURL(sidecarScript));
 const { loadManifest } = await import(pathToFileURL(patchScript));
 const { normalizeRepositoryUrl: packageNormalize } = await import(
   "../../../packages/omp-runtime/src/bundled.ts"
 );
 
 process.on("exit", cleanupScratch);
+
+test("the build entry passes an explicit bytecode mode the fork accepts", () => {
+  // The release contract, not an incidental default: the sidecar build names the
+  // compile mode instead of inheriting one, and `build.bytecode` in the
+  // provenance states it, so the two can never disagree silently. The fork's
+  // build entry rejects every other spelling (see its own test), which is what
+  // makes a drift here a build failure rather than a different artifact.
+  assert.deepEqual(buildBinaryArgs(true), ["scripts/build-binary.ts", "--bytecode"]);
+  assert.deepEqual(buildBinaryArgs(false), ["scripts/build-binary.ts", "--no-bytecode"]);
+  assert.equal(SIDECAR_BYTECODE, true);
+});
 
 test("the desktop pins agree with the controlled patch manifest", () => {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));

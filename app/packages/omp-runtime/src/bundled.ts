@@ -23,10 +23,12 @@
  *     never degrades into "close enough".
  *
  * Which fields are *verified* and which are *recorded* is a deliberate line
- * (ADR 0307): `fork.tree`, `capabilities` and `build.*` are provenance/audit
- * records the running application cannot re-derive, so they are informational
- * and are never presented as checked. The trust anchors are the pinned
- * constants plus the digests, not the descriptive fields.
+ * (ADR 0307): `fork.tree`, `capabilities` and the values in `build.*` are
+ * provenance/audit records the running application cannot re-derive, so they
+ * are informational and are never presented as checked — their *shape* is still
+ * enforced, because a manifest that omits the build mode is not a claim this
+ * application can act on. The trust anchors are the pinned constants plus the
+ * digests, not the descriptive fields.
  *
  * `platform`/`arch` are parameters rather than reads of `process`, so the
  * macOS and Windows naming and mismatch paths are testable on any host.
@@ -69,7 +71,7 @@ export const BUNDLED_PROVENANCE_FILENAME = "provenance.json";
 export const BUNDLED_GATE_RELATIVE_PATH = join("extensions", "omp-desktop-gate.js");
 
 /** The only provenance schema this build understands; anything else fails closed. */
-export const BUNDLED_PROVENANCE_SCHEMA = "omp-desktop.bundled-sidecar/2";
+export const BUNDLED_PROVENANCE_SCHEMA = "omp-desktop.bundled-sidecar/3";
 
 /** Read buffer for hashing; the binary is hundreds of megabytes. */
 const HASH_CHUNK_BYTES = 1024 * 1024;
@@ -119,7 +121,16 @@ export type BundledSidecarProvenance = {
    * digest before use, so a swapped gate cannot ride on a valid binary.
    */
   extensions: Array<{ path: string; bytes: number; sha256: string }>;
-  build: { tool: string; bunVersion?: string };
+  build: {
+    tool: string;
+    bunVersion?: string;
+    /**
+     * Whether the compiled binary carries precompiled bytecode. Required, so a
+     * manifest always states the one build mode that changes the artifact's
+     * bytes, together with the Bun version that produced them.
+     */
+    bytecode: boolean;
+  };
 };
 
 const DIGEST = Type.String({ pattern: "^[0-9a-f]{64}$" });
@@ -159,6 +170,9 @@ export const BundledProvenanceSchema = Type.Object({
   build: Type.Object({
     tool: Type.String(),
     bunVersion: Type.Optional(Type.String()),
+    // Shape-checked like every other field: a manifest that does not state the
+    // compile mode it was built with is refused rather than assumed.
+    bytecode: Type.Boolean(),
   }),
 });
 

@@ -96,6 +96,31 @@
       },
       "productImpact": "Bundled sidecar source coordinate: the fork branch is the only build source admitted by scripts/omp-sidecar.mjs, which fails closed on remote, commit, dirty tree, version, file set, or patch mismatch. The submodule gitlink is unchanged. R3 stays blocked, the Cursor product gate (ADR 0306) stays in force, and T20-B/C/D are not started.",
       "evidence": "docs/validation/M5-bundled-sidecar.md"
+    },
+    {
+      "date": "2026-09-28",
+      "task": "M6/T20-R4-3",
+      "repository": "MisterBowie/oh-my-pi",
+      "from": {
+        "branch": "codex/omp-desktop-18.3.0-patch-2",
+        "commit": "3c845eb27f6f7b0a5b182f1868969ced86d10a3d",
+        "tree": "135ad4b6bc27f58a6220260233e9ff377b14f231",
+        "patchLevel": "62bc57b+omp-desktop.2"
+      },
+      "to": {
+        "repository": "https://github.com/MisterBowie/oh-my-pi",
+        "branch": "codex/omp-desktop-18.3.0-patch-3",
+        "commit": "6b5017bc297a357e88287763ef701b87775737c8",
+        "tree": "60a39b244a362f78d6547c41aa6913787936fedf",
+        "baseCommit": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+        "baseVersion": "18.3.0",
+        "patchLevel": "62bc57b+omp-desktop.3",
+        "patchFile": "app/patches/oh-my-pi/0001-omp-desktop-runtime.patch",
+        "patchSha256": "27b19f192d0a973c5872e178e1d0bcf842fb5dcaade807a7486323679082e343",
+        "patchBytes": 86789
+      },
+      "productImpact": "Same upstream base (62bc57be / omp 18.3.0); the patch set gains the deterministic native-addon archive and the explicit bytecode build switch, which closes the R4-3 reproducibility clause. The provenance schema moves to omp-desktop.bundled-sidecar/3 (build.bytecode required) and @pi-desktop/shared's patch-level/fork-commit pins move to this fork commit. R3 stays blocked, the Cursor product gate (ADR 0306) stays in force, T20-B/C/D not started, T21 not complete.",
+      "evidence": "docs/validation/M6-r4-3-reproducible-sidecar.md"
     }
   ]
 }

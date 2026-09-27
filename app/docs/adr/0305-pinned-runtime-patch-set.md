@@ -10,7 +10,7 @@
   blocker is not lifted.
 - Evidence: `docs/validation/M5-omp-transition-patch.md`,
   `app/patches/oh-my-pi/manifest.json`,
-  `app/patches/oh-my-pi/0001-rpc-host-tool-transition-contract.patch`,
+  `app/patches/oh-my-pi/0001-omp-desktop-runtime.patch`,
   `app/scripts/omp-patch.mjs`,
   `apps/desktop/test/omp-patch.test.mjs`,
   `experiments/omp-bridge/t20-feasibility.mjs`.
@@ -57,8 +57,8 @@ moved it from `d49918fab2dba3986927f2d46721629ed0f3a02c`, `omp/18.2.7`, to
   levels.
 
 The patch level is named `<base-short-sha>+omp-desktop.<n>` (currently
-`62bc57b+omp-desktop.2`; the previous `d49918f+omp-desktop.1` is recorded in
-`manifest.history`) and is described as **maintained by OMP Desktop**, never
+`62bc57b+omp-desktop.3`; `62bc57b+omp-desktop.2` and `d49918f+omp-desktop.1` are
+recorded in `manifest.history`) and is described as **maintained by OMP Desktop**, never
 as upstream OMP support for the version. Anything that reports a runtime version
 must keep reporting `omp/18.3.0` plus the patch level from the manifest.
 

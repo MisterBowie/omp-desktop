@@ -113,7 +113,7 @@ function writeFixture(options: {
         sha256: gate === null ? "0".repeat(64) : sha256File(gatePath),
       },
     ],
-    build: { tool: "bun", bunVersion: "1.4.2" },
+    build: { tool: "bun", bunVersion: "1.4.2", bytecode: true },
   };
   if (!options.omitManifest) {
     const value = options.patch ? options.patch(structuredClone(provenance)) : provenance;
@@ -188,11 +188,12 @@ describe("bundled runtime verification", () => {
 
   it("keeps the default pins the desktop ships", () => {
     expect(BUNDLED_EXPECTATION.ompVersion).toBe("18.3.0");
-    expect(BUNDLED_EXPECTATION.patchLevel).toBe("62bc57b+omp-desktop.2");
+    expect(BUNDLED_EXPECTATION.patchLevel).toBe("62bc57b+omp-desktop.3");
     expect(BUNDLED_EXPECTATION.forkCommit).toMatch(/^[0-9a-f]{40}$/);
-    // The schema changed when `extensions`/`desktopVersion` became required, so
-    // it is a new version rather than a silent redefinition of /1.
-    expect(BUNDLED_PROVENANCE_SCHEMA).toBe("omp-desktop.bundled-sidecar/2");
+    // The schema changed when `extensions`/`desktopVersion` became required, and
+    // again when `build.bytecode` did, so it is a new version rather than a
+    // silent redefinition of /1 or /2.
+    expect(BUNDLED_PROVENANCE_SCHEMA).toBe("omp-desktop.bundled-sidecar/3");
   });
 
   it("accepts a Windows layout with its own file name", () => {
@@ -494,11 +495,26 @@ describe("tool gate and pin verification", () => {
     expect(refusal(resourcesPath)).toMatch(/exactly the tool gate/);
   });
 
-  it("refuses the superseded /1 provenance schema", () => {
+  it("refuses the superseded provenance schemas", () => {
     const { resourcesPath } = writeFixture({
       patch: (p) => ({ ...p, schema: "omp-desktop.bundled-sidecar/1" }),
     });
     expect(refusal(resourcesPath)).toMatch(/schema is omp-desktop\.bundled-sidecar\/1/);
+
+    const superseded = writeFixture({
+      patch: (p) => ({ ...p, schema: "omp-desktop.bundled-sidecar/2" }),
+    });
+    expect(refusal(superseded.resourcesPath)).toMatch(/schema is omp-desktop\.bundled-sidecar\/2/);
+  });
+
+  it("refuses a manifest that does not state the build mode", () => {
+    const missing = writeFixture({
+      patch: (p) => ({ ...p, build: { tool: "bun", bunVersion: "1.4.2" } }),
+    });
+    expect(refusal(missing.resourcesPath)).toMatch(/does not match omp-desktop\.bundled-sidecar\/3/);
+
+    const wrongType = writeFixture({ patch: (p) => ({ ...p, build: { ...p.build, bytecode: "yes" } }) });
+    expect(refusal(wrongType.resourcesPath)).toMatch(/does not match omp-desktop\.bundled-sidecar\/3/);
   });
 
   it("pins the desktop release the artifact was built for", () => {
@@ -515,7 +531,7 @@ describe("tool gate and pin verification", () => {
         ...p,
         fork: { ...p.fork, tree: "0".repeat(40) },
         capabilities: ["something-else"],
-        build: { tool: "other", bunVersion: "0.0.0" },
+        build: { tool: "other", bunVersion: "0.0.0", bytecode: false },
       }),
     });
     expect(() => verify(resourcesPath)).not.toThrow();

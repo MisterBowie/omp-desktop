@@ -58,7 +58,7 @@ jobs:
           # 是必须的：构建要用 `git diff <base> HEAD` 与
           # `git apply --check --reverse` 重新证明 HEAD == base + patch level。
           repository: MisterBowie/oh-my-pi
-          ref: 3c845eb27f6f7b0a5b182f1868969ced86d10a3d
+          ref: 6b5017bc297a357e88287763ef701b87775737c8
           path: .omp-sidecar-source
           fetch-depth: 0
 

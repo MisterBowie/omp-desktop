@@ -1752,7 +1752,7 @@ T19-C delivers desktop skills and project memory through the same trusted gate
 
 The runtime source stays at the pinned upstream commit; this project's
 additions to it live in `app/patches/oh-my-pi/` as a numbered patch set
-(`<base-short-sha>+omp-desktop.<n>`, currently `62bc57b+omp-desktop.2`, pinned to
+(`<base-short-sha>+omp-desktop.<n>`, currently `62bc57b+omp-desktop.3`, pinned to
 `62bc57be1b03ef0802a33cf7f5f530e534527531` / `omp/18.3.0`) with a
 manifest that records the base SHA, the expected runtime version, the patch
 level, the patch checksum, byte count and the capability ids.
@@ -1878,11 +1878,11 @@ Non-Cursor providers and Cursor models in Agent mode are untouched. R3 itself
 remains blocked and T20-B/C/D remain unstarted: this gate is a precondition for
 that work, not the feature.
 
-## 17. Bundled sidecar build and admission (M5/T20-R4B, ADR 0307)
+## 17. Bundled sidecar build and admission (M5/T20-R4B; reproducible builds since M6/T20-R4-3, ADR 0307)
 
 A packaged build runs exactly one OMP runtime, and that runtime is a build
 product of this project rather than the upstream tag: `omp/18.3.0` plus patch
-level `62bc57b+omp-desktop.2`, carried by the controlled fork commit recorded in
+level `62bc57b+omp-desktop.3`, carried by the controlled fork commit recorded in
 `app/patches/oh-my-pi/manifest.json`.
 
 * **Build.** `scripts/omp-sidecar.mjs` is the only entry point. It refuses a
@@ -1891,7 +1891,10 @@ level `62bc57b+omp-desktop.2`, carried by the controlled fork commit recorded in
   reported version is not `18.3.0`, or whose diff from the base commit is not the
   manifest's file list with the controlled patch reverse-applied. The compile is
   OMP's own Bun single-file build, so the artifact is the executable `omp
-  --version` reports for that commit. The artifact and the tool gate are copied
+  --version` reports for that commit. The entry passes the compile mode
+  explicitly (`scripts/build-binary.ts --bytecode`), and the controlled fork
+  refuses any other switch; the mode is recorded as `build.bytecode`. The
+  artifact and the tool gate are copied
   into `apps/desktop/resources/omp-runtime/` (gitignored; the packaged copy
   filters the directory's own `.gitignore` out) and declared in electron-builder
   `extraResources`.
@@ -1960,18 +1963,19 @@ level `62bc57b+omp-desktop.2`, carried by the controlled fork commit recorded in
   imports left, clears the build-owned `extensions/` directory first, and records
   the gate's byte count and digest.
 * **Provenance.** The build writes `provenance.json` beside the executable:
-  schema `omp-desktop.bundled-sidecar/2`, fork repository/commit/tree, upstream
+  schema `omp-desktop.bundled-sidecar/3`, fork repository/commit/tree, upstream
   base SHA and version, patch level, capability ids, OMP version, desktop
   version, platform, architecture, binary file name, byte count and SHA-256,
   the extensions' paths with their byte counts and digests, and the build tool
-  and its version. Every value comes from the validated checkout, the patch
-  manifest, the host, or the produced file. Verified at startup are the schema,
-  platform, architecture, OMP version, patch level, upstream base SHA and
-  version, fork repository and commit, desktop release, binary name, and the
-  digests/byte counts of the binary and of every extension; `fork.tree`,
-  `capabilities` and `build.*` are audit records the application cannot
-  re-derive and are never presented as verified. The schema is `/2` because
-  requiring `extensions`/`desktopVersion` changes the contract, so `/1` is
+  with its version and the compile mode it selected (`build.bytecode`). Every
+  value comes from the validated checkout, the patch manifest, the host, or the
+  produced file. Verified at startup are the schema, platform, architecture, OMP
+  version, patch level, upstream base SHA and version, fork repository and
+  commit, desktop release, binary name, and the digests/byte counts of the
+  binary and of every extension; `fork.tree`, `capabilities` and the values in
+  `build.*` are audit records the application cannot re-derive and are never
+  presented as verified, though their shape is enforced. The schema is `/3`
+  because requiring `build.bytecode` changes the contract, so `/2` and `/1` are
   refused rather than silently redefined. Extension paths are normalized to
   relative POSIX paths and refused otherwise (no absolute, drive, UNC,
   empty/`.`/`..` segment, or duplicate), and the manifest must declare exactly
@@ -2011,10 +2015,15 @@ The pins this build checks are mirrored in `@pi-desktop/shared`
 `OMP_RUNTIME_FORK_COMMIT`) because a packaged application has no repository to
 read, and a desktop test asserts they equal the controlled manifest.
 
-Not addressed here: R3 stays blocked and T20-B/C/D stay unstarted, and the
-artifact is not bit-reproducible across builds — four builds of the same commit
-produced four different SHA-256s in this round — so the manifest describes one
-build and the reproducibility clause of the R4-3 acceptance item is **not
-satisfied**; it is carried as an open blocker for M6/T21 rather than reported as
-green. M5/T20-R4B is therefore recorded as **partially complete/blocked** in
-HANDOFF, the task board, ADR 0307 and this section — not complete.
+The artifact is bit-reproducible: two independent builds of the same fork commit
+produce the same byte count, SHA-256 and `provenance.json`, because the embedded
+native-addon archive is written with fixed timestamps and the compile mode is
+explicit. The earlier build-to-build difference came from `Bun.Archive` stamping
+that archive with the wall clock, not from bytecode; the upstream
+`--compile --bytecode --splitting` fix (oven-sh/bun#42151) covers a mode this
+build does not use. Measurements, control builds and the refusal evidence are in
+`docs/validation/M6-r4-3-reproducible-sidecar.md`, so R4-3 is **satisfied**.
+
+Not addressed here: R3 stays blocked and T20-B/C/D stay unstarted, so M5/T20
+remains **partially complete** in HANDOFF, the task board, ADR 0307 and this
+section.

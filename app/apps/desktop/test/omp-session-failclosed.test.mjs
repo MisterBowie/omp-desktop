@@ -346,7 +346,7 @@ function writePackagedRuntime(resourcesPath) {
   writeFileSync(
     manifestPath,
     JSON.stringify({
-      schema: "omp-desktop.bundled-sidecar/2",
+      schema: "omp-desktop.bundled-sidecar/3",
       fork: { repository: OMP_RUNTIME_FORK_REPOSITORY, commit: OMP_RUNTIME_FORK_COMMIT },
       upstreamBase: { sha: OMP_RUNTIME_BASE_SHA, version: OMP_RUNTIME_VERSION },
       patchLevel: OMP_RUNTIME_PATCH_LEVEL,
@@ -359,7 +359,7 @@ function writePackagedRuntime(resourcesPath) {
       extensions: [
         { path: "extensions/omp-desktop-gate.js", bytes: readFileSync(gate).length, sha256: digest(gate) },
       ],
-      build: { tool: "bun" },
+      build: { tool: "bun", bytecode: true },
     }),
   );
   return { dir, binary, gate, manifestPath };

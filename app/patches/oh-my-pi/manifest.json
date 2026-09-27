@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "patchLevel": "62bc57b+omp-desktop.2",
-  "description": "OMP Desktop patch set for the pinned upstream OMP runtime: RPC host-tool scheduling and batch policy, settle-time run termination, and the all-toolCall batch count. Risk reduction only: it does NOT make the sole-batch contract strict — see status.",
+  "patchLevel": "62bc57b+omp-desktop.3",
+  "description": "OMP Desktop patch set for the pinned upstream OMP runtime: RPC host-tool scheduling and batch policy, settle-time run termination, the all-toolCall batch count, a deterministic native-addon archive, and an explicit bytecode switch on the build entry. Risk reduction and release-build reproducibility only: it does NOT make the sole-batch contract strict — see status.",
   "base": {
     "submodule": "upstream/oh-my-pi",
     "repository": "https://github.com/can1357/oh-my-pi",
@@ -10,21 +10,23 @@
   },
   "fork": {
     "repository": "https://github.com/MisterBowie/oh-my-pi",
-    "branch": "codex/omp-desktop-18.3.0-patch-2",
-    "commit": "3c845eb27f6f7b0a5b182f1868969ced86d10a3d",
-    "tree": "135ad4b6bc27f58a6220260233e9ff377b14f231",
+    "branch": "codex/omp-desktop-18.3.0-patch-3",
+    "commit": "6b5017bc297a357e88287763ef701b87775737c8",
+    "tree": "60a39b244a362f78d6547c41aa6913787936fedf",
     "note": "Self-maintained fork whose HEAD is exactly base.sha + this patch level. `scripts/omp-sidecar.mjs` refuses any other commit; can1357/oh-my-pi stays a read-only upstream."
   },
   "patch": {
-    "file": "0001-rpc-host-tool-transition-contract.patch",
-    "sha256": "4edbfadff9cc3238ae6bb7c206e7d8e0be33c2190068e6731fdb58e43ec9b545",
-    "bytes": 72910
+    "file": "0001-omp-desktop-runtime.patch",
+    "sha256": "27b19f192d0a973c5872e178e1d0bcf842fb5dcaade807a7486323679082e343",
+    "bytes": 86789
   },
   "capabilities": [
     "rpc-host-tool-concurrency",
     "rpc-host-tool-sole-batch-policy",
     "agent-tool-result-terminate",
-    "rpc-host-tool-result-terminate"
+    "rpc-host-tool-result-terminate",
+    "reproducible-sidecar-build",
+    "explicit-bytecode-build-mode"
   ],
   "files": [
     "docs/rpc.md",
@@ -32,18 +34,24 @@
     "packages/agent/src/telemetry.ts",
     "packages/agent/src/types.ts",
     "packages/agent/test/agent-loop.test.ts",
+    "packages/coding-agent/scripts/build-binary.ts",
+    "packages/coding-agent/scripts/compile-binary.ts",
     "packages/coding-agent/src/modes/rpc/host-tools.ts",
     "packages/coding-agent/src/modes/rpc/rpc-client.ts",
     "packages/coding-agent/src/modes/rpc/rpc-mode.ts",
     "packages/coding-agent/src/modes/rpc/rpc-types.ts",
-    "packages/coding-agent/test/rpc-host-tools.test.ts"
+    "packages/coding-agent/test/build-binary-bytecode.test.ts",
+    "packages/coding-agent/test/rpc-host-tools.test.ts",
+    "packages/natives/scripts/embed-native.ts",
+    "packages/natives/test/embed-native.test.ts"
   ],
   "contract": {
     "concurrencyField": "RpcHostToolDefinition.concurrency",
     "batchPolicyField": "RpcHostToolDefinition.batchPolicy",
     "terminateField": "AgentToolResult.terminate",
     "invalidDeclaration": "set_host_tools request is rejected; the value never degrades to the default",
-    "invalidDeclarationDetail": "RpcHostToolDefinition.concurrency/batchPolicy values outside their union throw in normalizeHostToolPolicy, which the set_host_tools command and the host-tool adapter both call"
+    "invalidDeclarationDetail": "RpcHostToolDefinition.concurrency/batchPolicy values outside their union throw in normalizeHostToolPolicy, which the set_host_tools command and the host-tool adapter both call",
+    "bytecodeBuildEntry": "packages/coding-agent/scripts/build-binary.ts accepts exactly `--bytecode`/`--no-bytecode` (default on, one declaration, anything else exits 2); `compileCodingAgent` takes it as the typed option `CodingAgentCompileOptions.bytecode`, never from the environment"
   },
   "verification": {
     "patchCheck": "node scripts/omp-patch.mjs --check",
@@ -57,9 +65,27 @@
       "packages/agent/test/agent-loop.test.ts",
       "packages/coding-agent/test/rpc-host-tools.test.ts",
       "packages/coding-agent/test/rpc-input-frame.test.ts"
+    ],
+    "reproducibilitySuites": [
+      "packages/natives/test/embed-native.test.ts",
+      "packages/coding-agent/test/build-binary-bytecode.test.ts"
     ]
   },
   "history": [
+    {
+      "patchLevel": "62bc57b+omp-desktop.2",
+      "base": {
+        "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+        "version": "18.3.0"
+      },
+      "patch": {
+        "file": "0001-rpc-host-tool-transition-contract.patch",
+        "sha256": "4edbfadff9cc3238ae6bb7c206e7d8e0be33c2190068e6731fdb58e43ec9b545",
+        "bytes": 72910
+      },
+      "retired": "2026-09-28",
+      "retiredReason": "T20-R4-3 added the deterministic native-addon archive and the explicit bytecode build switch, which changed the patched tree; the .2 artifact and its file name are kept in git history, not in this tree."
+    },
     {
       "patchLevel": "d49918f+omp-desktop.1",
       "base": {
@@ -76,8 +102,11 @@
   ],
   "notes": [
     "This is an OMP Desktop-maintained patch level, not upstream OMP support: the runtime remains pinned at 62bc57be (omp/18.3.0) plus this patch set.",
-    "Rebuild the patch after any source edit with: git -C <checkout> diff > app/patches/oh-my-pi/0001-rpc-host-tool-transition-contract.patch, then refresh patch.sha256 and patch.bytes.",
-    "The 18.3.0 artifact is the 18.2.7 artifact with exactly one changed context line: the 18.3.0 agent-loop.ts comment reads `wait` where 18.2.7 read `hub wait`. The added and removed line multisets are identical between the two artifacts."
+    "Rebuild the patch after any source edit with: git -C <checkout> diff <base.sha> <fork.commit> > app/patches/oh-my-pi/0001-omp-desktop-runtime.patch, then refresh patch.sha256 and patch.bytes.",
+    "The patch file was renamed from 0001-rpc-host-tool-transition-contract.patch at .3, when it stopped being only the RPC contract; the current-state documents are updated, the dated validation records keep the name they were written with.",
+    "The 18.3.0 artifact is the 18.2.7 artifact with exactly one changed context line: the 18.3.0 agent-loop.ts comment reads `wait` where 18.2.7 read `hub wait`. The added and removed line multisets are identical between the two artifacts.",
+    "reproducible-sidecar-build: embed-native.ts writes the embedded addon tar.gz with fixed entry timestamps and a recomputed header checksum, because Bun.Archive stamps each entry with the current time. Without it, two builds of one fork commit produced different binaries — measured at T20-R4-3 on Bun 1.4.2 (first difference at byte 81260680).",
+    "explicit-bytecode-build-mode: bytecode stays on by default (upstream release behavior and the fast boot path). The desktop sidecar build passes `--bytecode` explicitly and records it as `build.bytecode` in the provenance manifest; measured reproducibility holds for bytecode on and off once the archive is deterministic."
   ],
   "status": {
     "soleBatchContract": "not-strict",

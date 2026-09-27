@@ -1,14 +1,17 @@
 # ADR 0307: The bundled OMP sidecar is a verified build product
 
-- Status: Accepted (M5/T20-R4B), **partially complete**: the packaged-runtime
-  admission rules below ship and are tested, but the R4-3 acceptance clause
-  "identical inputs produce an identical manifest" is **not satisfied** (the Bun
-  single-file build is not bit-reproducible), so R4B is recorded as
-  partial/blocked rather than complete. Adds a packaged-runtime admission rule;
-  it does **not** lift the R3 blocker, does not implement Plan/Goal runtime
-  surfaces, and does not change the pinned patch level's semantics (ADR 0305).
-- Date: 2026-09-27
+- Status: Accepted (M5/T20-R4B; R4-3 closed by M6/T20-R4-3). The packaged-runtime
+  admission rules below ship and are tested, and the R4-3 acceptance clause
+  "identical inputs produce an identical manifest" **is satisfied** since the
+  embedded native-addon archive became deterministic (measured on Bun 1.4.2; see
+  `docs/validation/M6-r4-3-reproducible-sidecar.md`). It adds a
+  packaged-runtime admission rule; it does **not** lift the R3 blocker, does not
+  implement Plan/Goal runtime surfaces, and does not change the pinned patch
+  level's semantics (ADR 0305) — the patch level moved to
+  `62bc57b+omp-desktop.3` for the reproducibility work only.
+- Date: 2026-09-27 (accepted), 2026-09-28 (R4-3 closed)
 - Evidence: `docs/validation/M5-bundled-sidecar.md`,
+  `docs/validation/M6-r4-3-reproducible-sidecar.md`,
   `app/scripts/omp-sidecar.mjs`, `app/packages/omp-runtime/src/bundled.ts`,
   `app/patches/oh-my-pi/manifest.json`,
   `apps/desktop/test/omp-sidecar.test.mjs`,
@@ -45,7 +48,7 @@ ADR rather than a convention:
 
 2. **The runtime this product ships is not the upstream tag.** It is
    `omp/18.3.0` plus the patch level maintained in
-   `app/patches/oh-my-pi/manifest.json` (`62bc57b+omp-desktop.2`), carried by a
+   `app/patches/oh-my-pi/manifest.json` (`62bc57b+omp-desktop.3`), carried by a
    self-maintained fork commit. A packaged build therefore has to be able to say
    *which* runtime it shipped, and refuse a resource tree that says something
    else.
@@ -72,20 +75,36 @@ refuses to compile unless the source checkout is the controlled fork:
 
 The compile itself is OMP's own `packages/coding-agent/scripts/build-binary.ts`
 (Bun single-file compile), so the artifact is the official one for that commit
-rather than a desktop-side reimplementation.
+rather than a desktop-side reimplementation. Two controlled fork changes make
+that compile reproducible, and they are the only reason the patch level carries
+build code at all (see `docs/validation/M6-r4-3-reproducible-sidecar.md`):
+
+- `packages/natives/scripts/embed-native.ts` writes the embedded native-addon
+  `tar.gz` with fixed entry timestamps and a recomputed header checksum.
+  `Bun.Archive` stamps each entry with the wall clock, so two embeddings of the
+  same addons differed — and the archive is embedded verbatim, so the whole
+  binary differed.
+- `packages/coding-agent/scripts/{build-binary,compile-binary}.ts` take the
+  bytecode mode as an explicit switch and a typed option, with the upstream
+  default (bytecode on) unchanged and any other argument failing the build with
+  exit 2. This entry passes `--bytecode` explicitly, so the artifact's build mode
+  is a property of the release contract instead of an inherited default, and it
+  is recorded in the manifest's `build` block.
 
 ### 2. A provenance manifest the packaged application can re-prove
 
 The build writes `provenance.json` next to the executable:
-`schema` (`omp-desktop.bundled-sidecar/2`), `fork.{repository,commit,tree}`,
+`schema` (`omp-desktop.bundled-sidecar/3`), `fork.{repository,commit,tree}`,
 `upstreamBase.{sha,version}`, `patchLevel`, `capabilities`, `ompVersion`,
 `desktopVersion`, `platform`, `arch`, `binary.{filename,bytes,sha256}`,
-`extensions[]` (`{path,bytes,sha256}`), and `build.{tool,bunVersion}`. Every
-value is read from the validated checkout, the patch manifest, the host, or the
-produced file — none is entered by hand. The schema is `/2` rather than a
-redefinition of `/1` because requiring `extensions`/`desktopVersion` changes the
-contract; `/1` documents were never shipped outside this repository and are now
-refused.
+`extensions[]` (`{path,bytes,sha256}`), and
+`build.{tool,bunVersion,bytecode}`. Every value is read from the validated
+checkout, the patch manifest, the host, or the produced file — none is entered by
+hand. The schema is `/3` rather than a redefinition of `/2`: `build.bytecode` is
+required now, because a manifest that does not state the one compile mode that
+changes the artifact's bytes cannot be checked against the build that produced
+it. `/2` (which added the required `extensions`/`desktopVersion`) and `/1` are
+refused; none of them was ever shipped outside this repository.
 
 **Verified at startup** (a mismatch refuses the runtime): the schema, the
 platform and architecture, the OMP version, the patch level, the upstream base
@@ -101,10 +120,12 @@ a second extension is a product decision that needs its own ADR, and until one
 exists an extra entry is refused rather than loaded unreviewed.
 
 
-**Recorded, not verified**: `fork.tree`, `capabilities` and `build.*`. A
-packaged application cannot re-derive them — it has no repository and no
-compiler — so they are audit/provenance information and must never be presented
-as checked. The trust anchors are the pins plus the digests.
+**Recorded, not verified**: `fork.tree`, `capabilities` and the values in
+`build.*`. A packaged application cannot re-derive them — it has no repository
+and no compiler — so they are audit/provenance information and must never be
+presented as checked. Their *shape* is still enforced (a manifest without
+`build.bytecode` is refused), because a claim the application cannot read is
+worse than no claim at all. The trust anchors are the pins plus the digests.
 
 Both land in the application's Resources at the fixed location
 `omp-runtime/{omp|omp.exe, provenance.json, extensions/}`; the built files are
@@ -315,13 +336,18 @@ rather than duplicating it.
   the workflow that actually executes here. Both are held to the same source,
   pin and passthrough contract by the tests named above; the app-level
   `release.yml` is not triggered from this repository's root.
-- **Reproducibility is not achieved.** Builds of the same commit produce
-  different binary SHA-256s on this machine (four observed in this round,
-  recorded in `docs/validation/M5-bundled-sidecar.md`), so the R4-3 acceptance
-  clause "identical inputs produce an identical manifest" is **not satisfied**
-  and is carried as an open, blocking item for M6/T21 rather than reported as
-  green. `--check`/`--preflight` remain deterministic: they validate inputs and
-  staged artifacts, not compiler output.
+- **Reproducibility is achieved and measured.** Two independent builds of the
+  same fork commit on the same host produce the same byte count, the same
+  SHA-256 and the same `provenance.json` (`cmp` and `diff -u` both exit 0), and
+  both artifacts pass the packaged runtime smoke. The cause of the earlier
+  build-to-build difference was not bytecode: it was `Bun.Archive` stamping the
+  embedded native-addon archive with the wall clock, which moved the archive's
+  bytes and, with it, the bunfs asset name and parts of the bytecode string
+  table. Bun 1.4.2's bytecode output is reproducible for this build, and the
+  upstream bundler fix for `--compile --bytecode --splitting`
+  (oven-sh/bun#42151, merged 2026-09-11, unreleased) addresses a mode this build
+  does not use — `splitting` is off. Evidence, including the control builds with
+  bytecode on and off: `docs/validation/M6-r4-3-reproducible-sidecar.md`.
 - Verification costs one hash of the binary at boot (~0.13 s for 280 MB) plus
   one hash of each extension; it only runs in packaged builds.
 - The tool gate is bundled, digest-recorded and verified like the binary; its

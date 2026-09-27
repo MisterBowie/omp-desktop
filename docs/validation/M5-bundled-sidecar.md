@@ -375,7 +375,12 @@ error: Trusted extension failed to load: Failed to load extension:
 
 ---
 
-## 10. R4-3 状态：**未满足（阻塞）**
+## 10. R4-3 状态：**未满足（阻塞）** → 2026-09-28 由 M6/T20-R4-3 **闭合**
+
+> 2026-09-28 更新：本节结论保留为当时事实。R4-3 的可复现条款已在
+> `docs/validation/M6-r4-3-reproducible-sidecar.md` 中闭合：根因是 `Bun.Archive` 把墙钟时间写进
+> 内嵌的原生插件归档（不是 bytecode）；修复后同一 fork commit 的两次独立构建得到相同字节数、相同
+> SHA-256 与相同 `provenance.json`（`cmp` 与 `diff -u` 均 exit 0）。下面记录的是修复前的实测。
 
 R4-3 原文要求「构建脚本输出可核验清单…**重复构建在相同输入下产出相同清单**」。本轮实测：
 

@@ -138,7 +138,7 @@ export function stageArtifact(
   const gate = join(outDir, gateRelative);
   writeFileSync(gate, FIXTURE_GATE);
   const provenance = {
-    schema: "omp-desktop.bundled-sidecar/2",
+    schema: "omp-desktop.bundled-sidecar/3",
     fork: {
       repository: OMP_RUNTIME_FORK_REPOSITORY,
       commit: forkCommit ?? OMP_RUNTIME_FORK_COMMIT,
@@ -153,7 +153,7 @@ export function stageArtifact(
     arch,
     binary: { filename, bytes: statSync(binary).size, sha256: digestOfFile(binary) },
     extensions: [{ path: gateRelative, bytes: statSync(gate).size, sha256: digestOfFile(gate) }],
-    build: { tool: "bun" },
+    build: { tool: "bun", bytecode: true },
   };
   mutateProvenance?.(provenance);
   writeFileSync(join(outDir, "provenance.json"), `${JSON.stringify(provenance, null, 2)}\n`);

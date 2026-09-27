@@ -79,7 +79,32 @@ const defaultOut = join(appRoot, "apps", "desktop", "resources", "omp-runtime");
 const gateSource = join(appRoot, "packages", "omp-runtime", "extensions", "omp-desktop-gate.ts");
 
 /** The only provenance schema this entry point writes. */
-export const PROVENANCE_SCHEMA = "omp-desktop.bundled-sidecar/2";
+export const PROVENANCE_SCHEMA = "omp-desktop.bundled-sidecar/3";
+
+/**
+ * Precompiled bytecode stays on for the shipped sidecar.
+ *
+ * It is the upstream release behavior and the fast boot path (`--version`
+ * 256 ms -> 30 ms), and it is *not* what made earlier builds differ: once the
+ * native-addon archive was made deterministic, builds of one fork commit with
+ * bytecode on are bit-identical — while with the archive left alone they differ
+ * with bytecode on and off alike (control builds in
+ * `docs/validation/M6-r4-3-reproducible-sidecar.md`). The mode is still stated
+ * explicitly instead of inherited from a default, so the artifact's build mode
+ * is a property of this entry, and `build.bytecode` records it.
+ */
+export const SIDECAR_BYTECODE = true;
+
+/**
+ * The fork build entry's switches for one compile mode.
+ *
+ * The fork's `build-binary.ts` accepts exactly `--bytecode`/`--no-bytecode` and
+ * refuses anything else, so a spelling drift fails the build instead of
+ * silently shipping the default.
+ */
+export function buildBinaryArgs(bytecode) {
+  return ["scripts/build-binary.ts", bytecode ? "--bytecode" : "--no-bytecode"];
+}
 
 /** The tool gate's path inside the output directory (mirrors the app's resolver). */
 const GATE_RELATIVE_PATH = join("extensions", "omp-desktop-gate.js");
@@ -253,7 +278,7 @@ export async function buildSidecar(options = {}) {
   const runRoot = mkdtempSync(join(tmpdir(), "omp-sidecar-"));
   try {
     const env = isolatedEnv(runRoot);
-    const build = await runReaped(bunBinary(), ["scripts/build-binary.ts"], {
+    const build = await runReaped(bunBinary(), buildBinaryArgs(SIDECAR_BYTECODE), {
       cwd: packageDir,
       env,
       timeoutMs: 1_800_000,
@@ -350,6 +375,10 @@ export async function buildSidecar(options = {}) {
       build: {
         tool: "bun",
         ...(bunVersion ? { bunVersion } : {}),
+        // The compile mode that changes the artifact's bytes, recorded beside
+        // the Bun version that produced them: a manifest without it cannot say
+        // what was built.
+        bytecode: SIDECAR_BYTECODE,
       },
     };
 

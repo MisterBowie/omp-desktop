@@ -66,7 +66,7 @@ function writeBundledRuntime(resourcesPath, options = {}) {
   writeFileSync(gate, "// fixture gate\nexport const gate = true;\n");
   const digest = (path) => createHash("sha256").update(readFileSync(path)).digest("hex");
   const manifest = {
-    schema: "omp-desktop.bundled-sidecar/2",
+    schema: "omp-desktop.bundled-sidecar/3",
     fork: { repository: OMP_RUNTIME_FORK_REPOSITORY, commit: OMP_RUNTIME_FORK_COMMIT },
     upstreamBase: { sha: OMP_RUNTIME_BASE_SHA, version: OMP_RUNTIME_VERSION },
     patchLevel: OMP_RUNTIME_PATCH_LEVEL,
@@ -87,7 +87,7 @@ function writeBundledRuntime(resourcesPath, options = {}) {
         sha256: digest(gate),
       },
     ],
-    build: { tool: "bun" },
+    build: { tool: "bun", bytecode: true },
   };
   options.mutateManifest?.(manifest);
   const manifestPath = join(dir, "provenance.json");
