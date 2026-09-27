@@ -242,6 +242,18 @@ test("the preflight refuses a missing, tampered or foreign staged artifact", () 
   assert.equal(foreignRun.status, 1);
   assert.match(foreignRun.stderr, /patch level|does not match the controlled manifest/);
 
+  // An artifact written under the superseded provenance schema is refused.
+  const oldSchema = join(scratch("old-schema"), "omp-runtime");
+  stageArtifact(oldSchema, {
+    ...release.artifactOptions,
+    mutateProvenance: (provenance) => {
+      provenance.schema = "omp-desktop.bundled-sidecar/1";
+    },
+  });
+  const oldSchemaRun = call(oldSchema);
+  assert.equal(oldSchemaRun.status, 1);
+  assert.match(oldSchemaRun.stderr, /schema/);
+
   // Untouched artifact plus a dirty checkout: the control itself is validated.
   const dirtyOut = join(scratch("dirty"), "omp-runtime");
   stageArtifact(dirtyOut, release.artifactOptions);

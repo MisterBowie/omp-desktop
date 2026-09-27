@@ -79,7 +79,7 @@ const defaultOut = join(appRoot, "apps", "desktop", "resources", "omp-runtime");
 const gateSource = join(appRoot, "packages", "omp-runtime", "extensions", "omp-desktop-gate.ts");
 
 /** The only provenance schema this entry point writes. */
-export const PROVENANCE_SCHEMA = "omp-desktop.bundled-sidecar/1";
+export const PROVENANCE_SCHEMA = "omp-desktop.bundled-sidecar/2";
 
 /** The tool gate's path inside the output directory (mirrors the app's resolver). */
 const GATE_RELATIVE_PATH = join("extensions", "omp-desktop-gate.js");

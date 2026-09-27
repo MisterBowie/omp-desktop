@@ -138,7 +138,7 @@ export function stageArtifact(
   const gate = join(outDir, gateRelative);
   writeFileSync(gate, FIXTURE_GATE);
   const provenance = {
-    schema: "omp-desktop.bundled-sidecar/1",
+    schema: "omp-desktop.bundled-sidecar/2",
     fork: {
       repository: OMP_RUNTIME_FORK_REPOSITORY,
       commit: forkCommit ?? OMP_RUNTIME_FORK_COMMIT,

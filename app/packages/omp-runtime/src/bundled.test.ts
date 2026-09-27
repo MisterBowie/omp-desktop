@@ -185,6 +185,9 @@ describe("bundled runtime verification", () => {
     expect(BUNDLED_EXPECTATION.ompVersion).toBe("18.3.0");
     expect(BUNDLED_EXPECTATION.patchLevel).toBe("62bc57b+omp-desktop.2");
     expect(BUNDLED_EXPECTATION.forkCommit).toMatch(/^[0-9a-f]{40}$/);
+    // The schema changed when `extensions`/`desktopVersion` became required, so
+    // it is a new version rather than a silent redefinition of /1.
+    expect(BUNDLED_PROVENANCE_SCHEMA).toBe("omp-desktop.bundled-sidecar/2");
   });
 
   it("accepts a Windows layout with its own file name", () => {
@@ -428,7 +431,7 @@ describe("tool gate and pin verification", () => {
     const escaping = writeFixture({
       patch: (p) => ({ ...p, extensions: [{ ...p.extensions[0], path: "../outside.ts" }] }),
     });
-    expect(refusal(escaping.resourcesPath)).toMatch(/not inside the runtime directory/);
+    expect(refusal(escaping.resourcesPath)).toMatch(/not a relative path inside the runtime directory/);
 
     const undeclared = writeFixture({
       patch: (p) => ({ ...p, extensions: [{ ...p.extensions[0], path: "extensions/other.ts" }] }),
@@ -439,6 +442,58 @@ describe("tool gate and pin verification", () => {
   it("refuses a manifest that declares no extensions at all", () => {
     const { resourcesPath } = writeFixture({ patch: (p) => ({ ...p, extensions: [] }) });
     expect(refusal(resourcesPath)).toMatch(/does not match/);
+  });
+
+  it("refuses absolute, drive, UNC, and non-normalized extension paths", () => {
+    const cases: Array<[string, string]> = [
+      ["/tmp/omp-desktop-gate.js", "POSIX absolute path"],
+      ["C:\\extensions\\omp-desktop-gate.js", "Windows drive path"],
+      ["C:/extensions/omp-desktop-gate.js", "Windows drive path, forward slashes"],
+      ["\\\\server\\share\\omp-desktop-gate.js", "UNC path"],
+      ["./extensions/omp-desktop-gate.js", "leading dot segment"],
+      ["extensions/./omp-desktop-gate.js", "inner dot segment"],
+      ["extensions/omp-desktop-gate.js/", "trailing separator"],
+      ["extensions//omp-desktop-gate.js", "empty segment"],
+      ["", "empty path"],
+    ];
+    for (const [path, label] of cases) {
+      const { resourcesPath } = writeFixture({
+        patch: (p) => ({ ...p, extensions: [{ ...p.extensions[0], path }] }),
+      });
+      expect(refusal(resourcesPath), label).toMatch(/not a relative path/);
+    }
+  });
+
+  it("refuses duplicate normalized extension declarations", () => {
+    const { resourcesPath } = writeFixture({
+      patch: (p) => ({ ...p, extensions: [p.extensions[0], { ...p.extensions[0] }] }),
+    });
+    expect(refusal(resourcesPath)).toMatch(/duplicate extension path/);
+  });
+
+  it("requires exactly the tool gate and no other shipped extension", () => {
+    const { resourcesPath, provenance } = writeFixture({});
+    const dir = join(resourcesPath, "omp-runtime");
+    const binary = join(dir, provenance.binary.filename);
+    const manifestPath = join(dir, "provenance.json");
+    const value = JSON.parse(readFileSync(manifestPath, "utf8"));
+    // A second, valid entry (the binary itself) must still be refused: the
+    // manifest's extension set is the trusted gate and nothing else, unless an
+    // ADR defines another shipped extension.
+    value.extensions.push({
+      path: provenance.binary.filename,
+      bytes: readFileSync(binary).length,
+      sha256: sha256File(binary),
+    });
+    writeFileSync(manifestPath, JSON.stringify(value));
+    expect(refusal(resourcesPath)).toMatch(/exactly the tool gate/);
+  });
+
+  it("refuses the superseded /1 provenance schema", () => {
+    const { resourcesPath } = writeFixture({
+      patch: (p) => ({ ...p, schema: "omp-desktop.bundled-sidecar/1" }),
+    });
+    expect(refusal(resourcesPath)).toMatch(/schema is omp-desktop\.bundled-sidecar\/1/);
   });
 
   it("pins the desktop release the artifact was built for", () => {

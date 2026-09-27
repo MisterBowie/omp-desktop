@@ -69,7 +69,7 @@ export const BUNDLED_PROVENANCE_FILENAME = "provenance.json";
 export const BUNDLED_GATE_RELATIVE_PATH = join("extensions", "omp-desktop-gate.js");
 
 /** The only provenance schema this build understands; anything else fails closed. */
-export const BUNDLED_PROVENANCE_SCHEMA = "omp-desktop.bundled-sidecar/1";
+export const BUNDLED_PROVENANCE_SCHEMA = "omp-desktop.bundled-sidecar/2";
 
 /** Read buffer for hashing; the binary is hundreds of megabytes. */
 const HASH_CHUNK_BYTES = 1024 * 1024;
@@ -202,6 +202,24 @@ function refuse(detail: string): never {
     "the bundled OMP runtime is not usable",
     detail,
   );
+}
+
+/**
+ * Normalize an extension path to a relative POSIX path inside the runtime
+ * directory, or `null` when it is not one.
+ *
+ * The manifest claims where the runtime loads a module from, so the accepted
+ * forms are deliberately narrow: no absolute path (POSIX, a Windows drive, or a
+ * UNC share), no empty/`.`/`..` segment, and no spelling that could name the
+ * same file twice.
+ */
+function normalizeExtensionPath(raw: string): string | null {
+  if (raw.length === 0) return null;
+  if (raw.startsWith("/") || raw.startsWith("\\")) return null;
+  if (/^[A-Za-z]:/.test(raw)) return null;
+  const parts = raw.split(/[\\/]/);
+  if (parts.some((part) => part.length === 0 || part === "." || part === "..")) return null;
+  return parts.join("/");
 }
 
 /** SHA-256 of a file, read in bounded chunks so a large binary is not buffered whole. */
@@ -340,12 +358,17 @@ export function verifyBundledRuntime(options: {
   // be inside it, be plain files, and match the digest the build recorded —
   // otherwise a valid binary could carry a swapped tool gate.
   const extensions: BundledVerification["extensions"] = [];
+  const seenExtensionPaths = new Set<string>();
   for (const extension of provenance.extensions) {
-    const relative = extension.path.split(/[\\/]/).filter((part) => part.length > 0);
-    if (relative.length === 0 || relative.includes("..")) {
-      refuse(`extension path is not inside the runtime directory: ${extension.path}`);
+    const relative = normalizeExtensionPath(extension.path);
+    if (relative === null) {
+      refuse(`extension path is not a relative path inside the runtime directory: ${extension.path}`);
     }
-    const extensionPath = join(canonicalDir, ...relative);
+    if (seenExtensionPaths.has(relative)) {
+      refuse(`duplicate extension path in the provenance manifest: ${relative}`);
+    }
+    seenExtensionPaths.add(relative);
+    const extensionPath = join(canonicalDir, ...relative.split("/"));
     const extensionRoot = canonicalDir.endsWith(sep) ? canonicalDir : canonicalDir + sep;
     if (!extensionPath.startsWith(extensionRoot)) {
       refuse(`extension path escapes the runtime directory: ${extension.path}`);
@@ -361,15 +384,22 @@ export function verifyBundledRuntime(options: {
       refuse(`extension ${extension.path} does not match the provenance manifest`);
     }
     extensions.push({
-      path: relative.join("/"),
+      path: relative,
       absolutePath: extensionPath,
       bytes: extensionStats.size,
       sha256: extension.sha256,
     });
   }
   const gatePath = BUNDLED_GATE_RELATIVE_PATH.split(sep).join("/");
-  if (!extensions.some((extension) => extension.path === gatePath)) {
-    refuse(`the provenance manifest does not declare ${BUNDLED_GATE_RELATIVE_PATH}`);
+  // The manifest declares the trusted gate and nothing else. A second shipped
+  // extension is a product decision that needs its own ADR; until one exists an
+  // extra entry is refused rather than loaded unreviewed.
+  if (extensions.length !== 1 || extensions[0].path !== gatePath) {
+    refuse(
+      `the provenance manifest must declare exactly the tool gate (${gatePath}); it declares ${
+        extensions.map((extension) => extension.path).join(", ") || "nothing"
+      }`,
+    );
   }
 
   return { path: binaryPath, provenance, extensions };

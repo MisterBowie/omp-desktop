@@ -338,7 +338,7 @@ function writePackagedRuntime(resourcesPath) {
   writeFileSync(
     manifestPath,
     JSON.stringify({
-      schema: "omp-desktop.bundled-sidecar/1",
+      schema: "omp-desktop.bundled-sidecar/2",
       fork: { repository: OMP_RUNTIME_FORK_REPOSITORY, commit: OMP_RUNTIME_FORK_COMMIT },
       upstreamBase: { sha: OMP_RUNTIME_BASE_SHA, version: OMP_RUNTIME_VERSION },
       patchLevel: OMP_RUNTIME_PATCH_LEVEL,
