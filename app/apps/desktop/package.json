@@ -26,14 +26,11 @@
     "bundle:runtime": "pnpm -C ../../packages/agent-runtime bundle",
     "build:sidecar": "node ../../scripts/omp-sidecar.mjs --build",
     "verify:sidecar": "node ../../scripts/omp-sidecar.mjs --preflight",
-    "verify:sidecar:mac": "node ../../scripts/omp-sidecar.mjs --preflight --platform darwin",
-    "verify:sidecar:win": "node ../../scripts/omp-sidecar.mjs --preflight --platform win32 --arch x64",
-    "verify:sidecar:linux": "node ../../scripts/omp-sidecar.mjs --preflight --platform linux --arch x64",
-    "pack": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run verify:sidecar && electron-vite build && electron-builder --dir",
-    "dist": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run verify:sidecar && electron-vite build && electron-builder --publish never",
-    "dist:mac": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run verify:sidecar:mac && electron-vite build && electron-builder --mac --publish never",
-    "dist:win": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run verify:sidecar:win && electron-vite build && electron-builder --win --publish never",
-    "dist:linux": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run verify:sidecar:linux && electron-vite build && electron-builder --linux --publish never"
+    "pack": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/release-package.mjs --dir",
+    "dist": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/release-package.mjs --publish never",
+    "dist:mac": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/release-package.mjs --platform darwin --publish never",
+    "dist:win": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/release-package.mjs --platform win32 --publish never",
+    "dist:linux": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/release-package.mjs --platform linux --publish never"
   },
   "dependencies": {
     "electron-updater": "^6.8.9"

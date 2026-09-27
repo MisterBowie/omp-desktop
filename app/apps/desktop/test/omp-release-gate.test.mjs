@@ -17,7 +17,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   FIXTURE_VERSION,
@@ -32,6 +32,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = join(here, "..", "..", "..");
 const sidecarScript = join(appRoot, "scripts", "omp-sidecar.mjs");
 const packageJson = JSON.parse(readFileSync(join(here, "..", "package.json"), "utf8"));
+const { planRelease, runRelease } = await import(
+  pathToFileURL(join(appRoot, "scripts", "release-package.mjs")).href
+);
 
 /** A platform that is never the host, so the cross-target path is exercised. */
 const CROSS_PLATFORM = process.platform === "win32" ? "darwin" : "win32";
@@ -75,42 +78,122 @@ function preflightArgs({ fixture, manifestPath }, out) {
   ];
 }
 
-test("every release command runs the sidecar preflight before electron-builder", () => {
+test("every release command bundles the runtime, then runs the target-aware packaging step", () => {
   const steps = {
-    pack: "verify:sidecar",
-    dist: "verify:sidecar",
-    "dist:mac": "verify:sidecar:mac",
-    "dist:win": "verify:sidecar:win",
-    "dist:linux": "verify:sidecar:linux",
+    pack: null,
+    dist: null,
+    "dist:mac": "darwin",
+    "dist:win": "win32",
+    "dist:linux": "linux",
   };
-  for (const [script, step] of Object.entries(steps)) {
+  for (const [script, platform] of Object.entries(steps)) {
     const command = packageJson.scripts[script];
     assert.ok(command, `${script} must exist`);
-    const preflight = command.indexOf(`pnpm run ${step} &&`);
-    assert.ok(preflight > 0, `${script} must run ${step}`);
+    const bundle = command.indexOf("bundle:runtime");
+    const wrapper = command.indexOf("release-package.mjs");
+    assert.ok(bundle > 0, `${script} must bundle the runtime`);
+    assert.ok(wrapper > 0, `${script} must run scripts/release-package.mjs`);
     assert.ok(
-      command.indexOf("bundle:runtime") < preflight,
-      `${script}: the preflight must follow bundle:runtime`,
+      bundle < wrapper,
+      `${script}: the runtime step (bundle:runtime) must precede the packaging step`,
     );
-    assert.ok(
-      preflight < command.indexOf("electron-builder"),
-      `${script}: the preflight must precede electron-builder`,
-    );
+    if (platform) {
+      assert.ok(
+        command.includes(`--platform ${platform}`),
+        `${script} must name the release platform`,
+      );
+    }
+    // The architecture is decided by the wrapper from the CLI passthrough, so
+    // the package script must not pin one and let the preflight and
+    // electron-builder disagree.
+    assert.doesNotMatch(command, /--(?:x64|arm64|ia32|armv7l)\b/, `${script} must not pin an architecture`);
   }
-  // The steps themselves are the preflight, with the target each release builds.
-  assert.equal(packageJson.scripts["verify:sidecar"], "node ../../scripts/omp-sidecar.mjs --preflight");
-  assert.equal(
-    packageJson.scripts["verify:sidecar:mac"],
-    "node ../../scripts/omp-sidecar.mjs --preflight --platform darwin",
-  );
-  assert.equal(
-    packageJson.scripts["verify:sidecar:win"],
-    "node ../../scripts/omp-sidecar.mjs --preflight --platform win32 --arch x64",
-  );
-  assert.equal(
-    packageJson.scripts["verify:sidecar:linux"],
-    "node ../../scripts/omp-sidecar.mjs --preflight --platform linux --arch x64",
-  );
+});
+
+test("the preflight and electron-builder are given the same platform and architecture", () => {
+  const cases = [
+    // An arm64 mac asked for x64: the preflight must build/verify x64, not the
+    // host's arm64, and electron-builder must package x64.
+    { argv: ["--platform", "darwin", "--x64"], host: { platform: "darwin", arch: "arm64" }, platform: "darwin", arch: "x64", builderArch: "--x64" },
+    { argv: ["--platform", "darwin", "--arm64"], host: { platform: "darwin", arch: "arm64" }, platform: "darwin", arch: "arm64", builderArch: "--arm64" },
+    // No arch: a mac release follows the native runner.
+    { argv: ["--platform", "darwin"], host: { platform: "darwin", arch: "arm64" }, platform: "darwin", arch: "arm64", builderArch: null },
+    // Host default (pack/dist without a platform): Linux keeps the fixed x64
+    // contract, so electron-builder gets --x64 too.
+    { argv: [], host: { platform: "linux", arch: "x64" }, platform: "linux", arch: "x64", builderArch: "--x64" },
+    // Windows and Linux keep the fixed x64 contract.
+    { argv: ["--platform", "win32"], host: { platform: "linux", arch: "x64" }, platform: "win32", arch: "x64", builderArch: "--x64" },
+    { argv: ["--platform", "linux"], host: { platform: "darwin", arch: "arm64" }, platform: "linux", arch: "x64", builderArch: "--x64" },
+  ];
+  for (const scenario of cases) {
+    const plan = planRelease(scenario.argv, scenario.host);
+    const platformIndex = plan.preflight.args.indexOf("--platform");
+    const archIndex = plan.preflight.args.indexOf("--arch");
+    assert.equal(plan.preflight.args[platformIndex + 1], scenario.platform, JSON.stringify(scenario.argv));
+    assert.equal(plan.preflight.args[archIndex + 1], scenario.arch, JSON.stringify(scenario.argv));
+    assert.equal(plan.target.arch, scenario.arch);
+    if (scenario.builderArch) {
+      assert.ok(
+        plan.builder.args.includes(scenario.builderArch),
+        `${JSON.stringify(scenario.argv)}: electron-builder must select ${scenario.builderArch}`,
+      );
+    } else {
+      assert.ok(
+        !plan.builder.args.some((arg) => /^--(?:x64|arm64|ia32|armv7l|universal)$/.test(arg)),
+        `${JSON.stringify(scenario.argv)}: a host-arch mac release must not pin the package target`,
+      );
+    }
+    assert.ok(plan.builder.args.includes("--publish"), "electron-builder must never self-publish");
+    assert.ok(plan.builder.args.includes("never"), "electron-builder must never self-publish");
+  }
+});
+
+test("a cross-target release without an explicit architecture fails closed before building", () => {
+  const host = { platform: "linux", arch: "x64" };
+  assert.throws(() => planRelease(["--platform", "darwin"], host), /arch/);
+
+  const calls = [];
+  const code = runRelease(["--platform", "darwin"], {
+    host,
+    spawn: (command, args) => {
+      calls.push([command, args]);
+      return { status: 0 };
+    },
+  });
+  assert.notEqual(code, 0, "a cross-target release without an arch must fail");
+  assert.deepEqual(calls, [], "nothing may be spawned when the target is not usable");
+});
+
+test("the packaging step runs the preflight before electron-builder and stops on failure", () => {
+  const host = { platform: "linux", arch: "x64" };
+  const calls = [];
+  const code = runRelease(["--platform", "win32"], {
+    host,
+    spawn: (command, args) => {
+      calls.push({ command, args });
+      return { status: 0 };
+    },
+  });
+  assert.equal(code, 0);
+  assert.equal(calls.length, 2, "one preflight and one electron-builder invocation");
+  assert.match(calls[0].args[0], /omp-sidecar\.mjs$/);
+  assert.equal(calls[0].args[1], "--preflight");
+  assert.equal(calls[0].args[calls[0].args.indexOf("--arch") + 1], "x64");
+  assert.ok(calls[1].args.includes("--win"));
+  assert.ok(calls[1].args.includes("--x64"), "electron-builder must receive the same architecture");
+  assert.ok(calls[1].args.includes("--publish"));
+  assert.ok(calls[1].args.includes("never"));
+
+  const attempted = [];
+  const failed = runRelease(["--platform", "win32"], {
+    host,
+    spawn: (command) => {
+      attempted.push(command);
+      return { status: 1 };
+    },
+  });
+  assert.equal(failed, 1);
+  assert.equal(attempted.length, 1, "electron-builder must not run when the preflight refuses");
 });
 
 test("the preflight admits a staged cross-target artifact built from the same control", () => {
