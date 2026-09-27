@@ -47,6 +47,7 @@ import {
   OmpRuntimeError,
   descriptorRisk,
   findGateExtension,
+  inspectBundledGate,
   readDesktopCapabilityState,
   resolveBundledGate,
   serializeDesktopCapabilityState,
@@ -111,6 +112,14 @@ export type OmpSessionBridgeOptions = {
   launcher: string | null;
   isPackaged: boolean;
   resourcesPath?: string | null;
+  /**
+   * Why a packaged build's bundled runtime was refused (the adapter's
+   * `launcherError`). Carried so a packaged prompt/control operation reports
+   * the concrete `bundled-runtime-invalid` reason — a tampered digest, a
+   * missing gate — instead of a generic "no runtime executable". Absent or
+   * null in development, where the message stays the operator-facing one.
+   */
+  launcherError?: string | null;
   /** Start of the development walk-up for the gate extension. */
   appPath: string;
   emitAgentEvent: (envelope: AgentEventEnvelope) => void;
@@ -1489,6 +1498,29 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
   }
 
   function requireGate(): string {
+    if (options.isPackaged) {
+      // A packaged build has one gate and one verification. On a refusal the
+      // concrete reason must reach the caller — which file disagreed and how —
+      // rather than being flattened into "could not be found", so an operator
+      // (and the prompt that failed) can tell a missing resource from a
+      // tampered one.
+      const inspection = options.resourcesPath
+        ? inspectBundledGate({ resourcesPath: options.resourcesPath })
+        : {
+            ok: false as const,
+            code: "bundled-runtime-invalid" as const,
+            detail: "a packaged build must provide process.resourcesPath",
+          };
+      if (!inspection.ok) {
+        throw Object.assign(
+          new Error(
+            `the bundled OMP tool gate is not usable (${inspection.code}): ${inspection.detail}`,
+          ),
+          { errorCode: inspection.code },
+        );
+      }
+      return inspection.path;
+    }
     const gate = gatePath();
     if (!gate) {
       throw Object.assign(
@@ -1500,12 +1532,19 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
   }
 
   function requireLauncher(): void {
-    if (!options.launcher) {
+    if (options.launcher) return;
+    // A packaged build with no runtime has to explain itself: the adapter's
+    // resolution error already names the file and the failure kind.
+    if (options.isPackaged && options.launcherError) {
       throw Object.assign(
-        new Error("this build has no OMP runtime executable; run from a checkout or set OMP_DESKTOP_RUNTIME"),
-        { errorCode: "NOT_FOUND" },
+        new Error(`the bundled OMP runtime is not usable: ${options.launcherError}`),
+        { errorCode: "bundled-runtime-invalid" },
       );
     }
+    throw Object.assign(
+      new Error("this build has no OMP runtime executable; run from a checkout or set OMP_DESKTOP_RUNTIME"),
+      { errorCode: "NOT_FOUND" },
+    );
   }
 
   /** Get or create the per-session entry, refusing a project change. */

@@ -1,20 +1,36 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { register } from "node:module";
 import { tmpdir } from "node:os";
 import test, { after } from "node:test";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import {
+  APP_VERSION,
+  OMP_RUNTIME_BASE_SHA,
+  OMP_RUNTIME_FORK_COMMIT,
+  OMP_RUNTIME_FORK_REPOSITORY,
+  OMP_RUNTIME_PATCH_LEVEL,
+  OMP_RUNTIME_VERSION,
+} from "@pi-desktop/shared";
+
 /**
  * R1/R5/R7 regression tests for the OMP session registry, over the product
  * bridge (not a detached pure function): restore-path validation, shutdown
  * observability and three-state rename are all exercised through
  * `createOmpSessionBridge` with a scripted fake runtime.
+ *
+ * The packaged-runtime tests at the bottom exercise the same bridge the
+ * production wiring builds (`wireOmpSessions`): an unusable bundled resource
+ * must surface its `bundled-runtime-invalid` reason and concrete detail through
+ * prompt and control-operation refusals, not a generic "gate not found".
  */
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
 const { createOmpSessionBridge } = await import("../electron/main/runtime/omp-session.ts");
+const { createOmpRuntimeAdapter } = await import("../electron/main/runtime/omp-runtime.ts");
 
 const scratch = [];
 after(() => {
@@ -303,4 +319,173 @@ test("F6: a one-shot rename whose runtime cleanup fails is reported as inconsist
   assert.equal(outcome.ok, false, "a leaked runtime must fail the rename");
   assert.equal(outcome.inconsistent, true);
   assert.match(outcome.reason ?? "", /could not be reclaimed/);
+});
+
+/**
+ * A packaged resource tree exactly as `scripts/omp-sidecar.mjs` lays it out,
+ * with the digests the provenance manifest must agree with.
+ */
+function writePackagedRuntime(resourcesPath) {
+  const dir = join(resourcesPath, "omp-runtime");
+  mkdirSync(join(dir, "extensions"), { recursive: true });
+  const binary = join(dir, "omp");
+  writeFileSync(binary, "#!/bin/sh\necho omp/18.3.0\n", { mode: 0o755 });
+  chmodSync(binary, 0o755);
+  const gate = join(dir, "extensions", "omp-desktop-gate.js");
+  writeFileSync(gate, "// fixture gate\nexport const gate = true;\n");
+  const digest = (path) => createHash("sha256").update(readFileSync(path)).digest("hex");
+  const manifestPath = join(dir, "provenance.json");
+  writeFileSync(
+    manifestPath,
+    JSON.stringify({
+      schema: "omp-desktop.bundled-sidecar/1",
+      fork: { repository: OMP_RUNTIME_FORK_REPOSITORY, commit: OMP_RUNTIME_FORK_COMMIT },
+      upstreamBase: { sha: OMP_RUNTIME_BASE_SHA, version: OMP_RUNTIME_VERSION },
+      patchLevel: OMP_RUNTIME_PATCH_LEVEL,
+      capabilities: ["rpc-host-tool-concurrency"],
+      ompVersion: OMP_RUNTIME_VERSION,
+      desktopVersion: APP_VERSION,
+      platform: process.platform,
+      arch: process.arch,
+      binary: { filename: "omp", bytes: readFileSync(binary).length, sha256: digest(binary) },
+      extensions: [
+        { path: "extensions/omp-desktop-gate.js", bytes: readFileSync(gate).length, sha256: digest(gate) },
+      ],
+      build: { tool: "bun" },
+    }),
+  );
+  return { dir, binary, gate, manifestPath };
+}
+
+/**
+ * The bridge the production wiring builds, with the adapter resolving the
+ * bundled runtime exactly as `wireOmpSessions` does.
+ */
+function packagedBridge(resourcesPath, bridgeOptions = {}) {
+  const adapter = createOmpRuntimeAdapter({
+    dataRoot: makeScratch("omp-fc-data-"),
+    isPackaged: true,
+    resourcesPath,
+    appPath: "/repo/app",
+    env: {},
+    supervisorFactory: () => fakeSupervisor(new FakeRuntime()),
+  });
+  const bridge = createOmpSessionBridge({
+    createSupervisor: () => fakeSupervisor(new FakeRuntime()),
+    launcher: adapter.launcher,
+    launcherError: adapter.launcherError,
+    isPackaged: true,
+    resourcesPath,
+    appPath: "/repo/app",
+    sessionDir: makeScratch("omp-fc-packaged-"),
+    emitAgentEvent: () => undefined,
+    logger: { app: () => undefined },
+    ...bridgeOptions,
+  });
+  return { adapter, bridge };
+}
+
+const packagedCases = [
+  {
+    name: "a missing binary",
+    tamper: (layout) => rmSync(layout.binary),
+    detail: /missing the bundled omp/,
+  },
+  {
+    name: "a tampered binary",
+    tamper: (layout) => {
+      writeFileSync(layout.binary, "#!/bin/sh\nexit 1\n");
+      chmodSync(layout.binary, 0o755);
+    },
+    detail: /binary is|SHA-256/,
+  },
+  {
+    name: "a tampered manifest",
+    tamper: (layout) => {
+      const value = JSON.parse(readFileSync(layout.manifestPath, "utf8"));
+      value.binary.sha256 = "b".repeat(64);
+      writeFileSync(layout.manifestPath, JSON.stringify(value));
+    },
+    detail: /SHA-256/,
+  },
+  {
+    name: "a tampered gate",
+    // Same length, one flipped byte: the refusal under test is the digest, not
+    // the byte count.
+    tamper: (layout) => {
+      const swapped = Buffer.from(readFileSync(layout.gate));
+      swapped[0] = swapped[0] ^ 0xff;
+      writeFileSync(layout.gate, swapped);
+    },
+    detail: /extension .* does not match the provenance manifest/,
+  },
+];
+
+for (const scenario of packagedCases) {
+  test(`P3: a packaged prompt reports the bundled-runtime-invalid reason for ${scenario.name}`, async () => {
+    const resources = makeScratch("omp-fc-res-");
+    const layout = writePackagedRuntime(resources);
+    // A development gate exists at the app path: a packaged refusal must never
+    // fall back to it.
+    const appPath = makeScratch("omp-fc-app-");
+    mkdirSync(join(appPath, "packages", "omp-runtime", "extensions"), { recursive: true });
+    writeFileSync(
+      join(appPath, "packages", "omp-runtime", "extensions", "omp-desktop-gate.ts"),
+      "// dev gate\n",
+    );
+    scenario.tamper(layout);
+    const { bridge } = packagedBridge(resources, { appPath });
+    await assert.rejects(
+      () => bridge.prompt({ sessionId: "s1", content: "hi", projectPath: makeScratch("omp-fc-project-") }),
+      (error) => {
+        assert.equal(error.errorCode, "bundled-runtime-invalid", error.message);
+        assert.match(error.message, /bundled-runtime-invalid/);
+        assert.match(error.message, scenario.detail);
+        return true;
+      },
+    );
+  });
+
+  test(`P3: a packaged control operation reports the same reason for ${scenario.name}`, async () => {
+    const resources = makeScratch("omp-fc-res-");
+    const layout = writePackagedRuntime(resources);
+    scenario.tamper(layout);
+    const { bridge } = packagedBridge(resources);
+    await assert.rejects(
+      () => bridge.rename("s1", "new name", { projectPath: makeScratch("omp-fc-project-") }),
+      (error) => {
+        assert.equal(error.errorCode, "bundled-runtime-invalid", error.message);
+        assert.match(error.message, scenario.detail);
+        return true;
+      },
+    );
+  });
+}
+
+test("P3: a packaged launcher refusal carries the adapter's concrete reason", async () => {
+  // The gate verifies, but the adapter refused the runtime for a reason of its
+  // own; the bridge must not flatten that into a generic launcher message.
+  const resources = makeScratch("omp-fc-res-");
+  writePackagedRuntime(resources);
+  const reason =
+    "bundled-runtime-invalid: the bundled OMP runtime is not usable (the bundled omp is not executable)";
+  const bridge = createOmpSessionBridge({
+    createSupervisor: () => fakeSupervisor(new FakeRuntime()),
+    launcher: null,
+    launcherError: reason,
+    isPackaged: true,
+    resourcesPath: resources,
+    appPath: "/repo/app",
+    sessionDir: makeScratch("omp-fc-packaged-"),
+    emitAgentEvent: () => undefined,
+    logger: { app: () => undefined },
+  });
+  await assert.rejects(
+    () => bridge.prompt({ sessionId: "s1", content: "hi", projectPath: makeScratch("omp-fc-project-") }),
+    (error) => {
+      assert.equal(error.errorCode, "bundled-runtime-invalid");
+      assert.match(error.message, /not executable/);
+      return true;
+    },
+  );
 });

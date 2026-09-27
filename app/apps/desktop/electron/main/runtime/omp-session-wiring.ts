@@ -153,6 +153,7 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
 
   const bridge = createOmpSessionBridge({
     launcher: engineRuntime.ompRuntime.launcher,
+    launcherError: engineRuntime.ompRuntime.launcherError,
     isPackaged: deps.isPackaged,
     resourcesPath: deps.resourcesPath ?? null,
     appPath: deps.appPath,
