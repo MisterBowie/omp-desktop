@@ -1,0 +1,3 @@
+PASS boot-probe — app v0.15.2, host protocol 11, 6 native menu groups on darwin
+PASS E2E-SESSION-list-refresh-keeps-desktop-responsive — {"refreshCount":8,"returnedCount":800,"complete":true,"capabilitiesConsistent":true,"listDurationsMs":[29.600000023841858,33.19999998807907,37.10000002384186,40.69999998807907,43.5,47,49.89999997615814,52.799999952316284],"heartbeatDurationsMs":[0.699999988079071,28.899999976158142],"seededCount":800,"distinctModels":13,"mainTicks":6,"maxMainGapMs":28.225417000000107}
+PASS E2E-PROJECT-delete-removes-project-and-owned-sessions — projectRemove IPC round-trip through the sandboxed preload {removed:false, sessionsRemoved:0}

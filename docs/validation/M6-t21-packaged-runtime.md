@@ -12,6 +12,13 @@ electron-builder 的 unpacked 应用，并对其中 `Resources/omp-runtime` 的 
 > 失败、验收清理会吞掉回收失败并删除所有权记录、§1/§2 文档混写参考实现与真实命令、证据链接指向未
 > 提交文件。修复只触及验收入口、其回归测试、spec 文字与本记录/证据；产品运行时与权限路径未改。
 
+> 2026-10-01 最后一轮独立复审返修（本记录 §12、§13）：①gate 负对照的匹配仍是子串匹配，
+> `<缺失路径>.another-file` 这样的同名前缀**不同**文件会被误接收；现要求在该路径自身的边界上精确
+> 点名，并新增同名前缀拒绝回归（RED → GREEN）；②`git diff --check` 在 `bec20b21..6ee99ecb` 上确实
+> 失败（RED 记录 4 行、回退补丁 2 行尾空格），现按"原始字节确定性 gzip + 归一化显示副本"归档，
+> 补丁只保留可应用的 `.diff.gz`；③复审侧 macOS arm64 实测证据按原始字节归档到 `mac-review/`（§13，
+> 属复审机实测，不是本工作区的结论）。同样只改验收入口、其回归、spec 文字与证据。
+
 - 工作树：`/home/vv/person/code/omp-desktop-m6-t21`，分支 `codex/m6-t21-packaged-runtime`，
   基线 `da75c653d119918e9426c75c50e73f73d3e49784`（M6/T20-R4-3 复审返修末次提交；T21-A 首稿
   `bec20b214bee792b656d85aab5469e459b96eccc`，本轮复审返修在其后追加提交，不 amend / rebase /
@@ -152,8 +159,9 @@ gate 控制与受检回收路径，均 exit 0）。关键字段（首轮与重�
 
 - **常驻（无需真实产物，7 条）**：不给 `--resources`、未知参数、路径不存在、路径不是目录、目录不是
   electron-builder 输出——全部非零退出（`2`），且不打印 `PACKAGED-RUNTIME-OK`；另有 5 条经注入的
-  supervisor 双（class seam）驱动失败路径：gate 负对照**只**接受命名该缺失路径的真实拒绝（命名别的
-  文件、ready 超时、竟然启动成功都被拒），gate 控制运行回收失败会上报所有权，回收不完整或抛异常时
+  supervisor 双（class seam）驱动失败路径：gate 负对照**只**接受在**该路径自身边界上**精确点名该缺失
+  路径的真实拒绝（同名前缀的 `<缺失路径>.another-file`、命名别的文件、ready 超时、竟然启动成功都被
+  拒），gate 控制运行回收失败会上报所有权，回收不完整或抛异常时
   验收根不被删除，只有回收干净才删除，较早步骤保留的所有权会扣住根目录。未设 `OMP_T21_RESOURCES`
   时其余 8 条显式 skip，**skip 不是通过**；入口本身在没给路径时也绝不报成功。
 - **opt-in（`OMP_T21_RESOURCES=<真实 Resources>`，15 条）**：
@@ -169,8 +177,11 @@ gate 控制与受检回收路径，均 exit 0）。关键字段（首轮与重�
 | 运行未开始 + 回收不完整（注入 supervisor） | 验收失败、报告 `retained at <accept root>` 与该 run 的所有权；根目录**保留**；6 个启动环境变量全部恢复原值 |
 | 运行未开始 + 回收干净（注入 supervisor） | 验收失败（不返回 OK），回收干净后临时根被删除；环境同样恢复 |
 
-本轮实测（复审返修后）：设 `OMP_T21_RESOURCES` 时 **15 tests / 15 pass / 0 fail / exit 0**
-（`regression-repair.txt`）；不设时 **7 pass / 8 skipped**（`regression-repair-always-on.txt`）。
+本轮实测（最后一轮复审返修后）：设 `OMP_T21_RESOURCES` 时 **15 tests / 15 pass / 0 fail / exit 0**
+（`regression-repair2.txt`）；不设时 **7 pass / 8 skipped**（`regression-repair2-always-on.txt`）；
+首轮返修时的对应证据为 `regression-repair.txt` / `regression-repair-always-on.txt`。同名前缀负例
+（`<缺失路径>.another-file`）在修复前被误接收：修复前该套件 **1 failed / 6 passed / 8 skipped**、
+exit 1（`repair-red-gate-path/regression-red.txt`，原始字节见同名 `.txt.gz`）。
 夹具只对二进制用硬链接（同文件系统）且篡改前先复制，从不写穿到被测资源（§7.2 记录了修复前的一次
 真实 RED）。注入的 supervisor 双只在测试中替换 class，验收自身的生产路径不变。
 
@@ -189,9 +200,10 @@ real   : START_OK  {"phase":"idle","runtimeVersion":"18.3.0","protocolVersion":2
 即：该运行时对不可加载的 `--trusted-extension` **拒绝启动**，所以本阶段的成功启动只能是**真实
 加载了已校验工具门**的结果。验收入口把这条负对照固化为运行的一部分（`gateLoadControl: refused`），
 且要求精确匹配：失败的 `detail`（运行时 stderr 尾部，`errors.ts` 的 `OmpRuntimeError.detail`）中必须
-包含 `Trusted extension must be an existing module file: <本次缺失的绝对路径>`；任何其他启动失败
-（超时、启动器缺失、原生加载失败、以别的路径被拒）都让入口以 exit 1 失败并打印观察到的原因，绝不把
-"启动失败"本身当作门被加载的证据（§11.1）。
+有一行以 `Trusted extension must be an existing module file: <本次缺失的绝对路径>` **在该路径自身的
+边界上结束**——同名前缀的 `<缺失路径>.another-file` 是另一个文件，不算点名该门（§12.1）；任何其他
+启动失败（超时、启动器缺失、原生加载失败、以别的路径被拒）都让入口以 exit 1 失败并打印观察到的
+原因，绝不把"启动失败"本身当作门被加载的证据（§11.1）。
 
 ## 7. 过程中的发现与返修（均只影响本轮新增的测试/操作，未改产品行为）
 
@@ -237,11 +249,12 @@ NODE_PATH`（8.3 事实：`buildOmpRuntimeEnv` 只从启动环境白名单携带
 | `pnpm install --frozen-lockfile`（`app/`） | exit 0（808 包复用本地 store；Electron 43.6.0 取缓存） |
 | `cargo build --release --locked -p host-core`（`app/`；**链外单独命令**，2026-10-01 返修重跑） | exit 0（`cargo-locked.txt`；`target/release/pi-desktop-host-core` sha256 bf21f8a8… 与 `inventory.txt` 一致） |
 | `OMP_SIDECAR_SOURCE=… pnpm run pack`（`app/`） | exit 0（约 37 s；预检 built linux/x64；electron-builder `--linux --x64 --dir`；链内 `build:host-release` 不含 `--locked`，见 `pack.txt`） |
-| `node app/scripts/verify-packaged-runtime.mjs --resources <unpacked resources>` | exit 0（`acceptance-unpacked.txt`；返修后重跑 `acceptance-unpacked-repair.txt` 亦 exit 0） |
-| `node app/scripts/verify-packaged-runtime.mjs --resources '<stage 空格/中文>'` | exit 0（`acceptance-staged.txt`；返修后重跑 `acceptance-staged-repair.txt` 亦 exit 0） |
-| `OMP_T21_RESOURCES=<真实 resources> node --test test/packaged-runtime-verify.test.mjs`（`app/apps/desktop`；返修后） | **15/15 pass**、exit 0（`regression-repair.txt`；返修前 8/8 见 `regression.txt`） |
-| `node --test test/packaged-runtime-verify.test.mjs`（不设 opt-in；返修后） | **7 pass / 8 skipped**、exit 0（`regression-repair-always-on.txt`；返修前 2 pass / 6 skipped） |
-| RED 回归：同一测试对语义回退夹具（`repair-red/`） | **4 failed / 3 passed / 8 skipped**、exit 1（`repair-red/regression-red.txt`；回退 diff 见 `repair-red/semantic-revert.diff`） |
+| `node app/scripts/verify-packaged-runtime.mjs --resources <unpacked resources>` | exit 0（`acceptance-unpacked.txt`；返修后重跑 `acceptance-unpacked-repair.txt`，最后一轮返修后重跑 `acceptance-unpacked-repair2.txt` — 三者均 exit 0） |
+| `node app/scripts/verify-packaged-runtime.mjs --resources '<stage 空格/中文>'` | exit 0（`acceptance-staged.txt`；返修后重跑 `acceptance-staged-repair.txt`，最后一轮返修后重跑 `acceptance-staged-repair2.txt` — 三者均 exit 0） |
+| `OMP_T21_RESOURCES=<真实 resources> node --test test/packaged-runtime-verify.test.mjs`（`app/apps/desktop`） | **15/15 pass**、exit 0（最后一轮返修后 `regression-repair2.txt`；首轮返修后 `regression-repair.txt`；返修前 8/8 见 `regression.txt`） |
+| `node --test test/packaged-runtime-verify.test.mjs`（不设 opt-in） | **7 pass / 8 skipped**、exit 0（最后一轮返修后 `regression-repair2-always-on.txt`；首轮返修后 `regression-repair-always-on.txt`；返修前 2 pass / 6 skipped） |
+| RED 回归（第一轮返修的语义回退夹具，`repair-red/`） | **4 failed / 3 passed / 8 skipped**、exit 1（原始输出 `repair-red/regression-red.txt.gz`，可读副本 `regression-red.txt`；回退补丁 `repair-red/semantic-revert.diff.gz`，`git apply --check -p0` exit 0） |
+| RED 回归（最后一轮返修：同名前缀不同路径，`repair-red-gate-path/`） | **1 failed / 6 passed / 8 skipped**、exit 1（原始输出 `repair-red-gate-path/regression-red.txt.gz`，可读副本 `regression-red.txt`） |
 | `OMP_SIDECAR_TEST_RESOURCES='<stage>' npx vitest run packages/omp-runtime/src/bundled-smoke.test.ts`（`app/`） | 9 passed、exit 0（`bundled-smoke.txt`；含无 bun/node 的 `--version`、诱饵零写入、异常死亡/永不 ready 回收） |
 | `node --test test/omp-runtime-launcher.test.mjs`（`app/apps/desktop`） | 12 pass / exit 0（打包态只从已校验的 `resourcesPath` 解析运行时与工具门、不读 `OMP_DESKTOP_RUNTIME`/不扫 app path/不查 `PATH` 的既有契约，本工作树在初始化固定子模块后实跑） |
 
@@ -253,7 +266,10 @@ NODE_PATH`（8.3 事实：`buildOmpRuntimeEnv` 只从启动环境白名单携带
 
 - **GUI / 实际安装包启动**：本机无 Xvfb/xvfb-run，本轮验收是无头运行时边界，不启动 Electron 窗口；
   安装包内打开项目、发消息、工具、停止、恢复属 T22/T24。
-- **macOS arm64**：本机 Linux x64，未构建/未运行 dmg/zip，也未做代码签名/公证。
+- **macOS arm64**：本机 Linux x64，**未**构建/未运行 dmg/zip，也未做代码签名/公证；独立复审侧在
+  macOS arm64 实机上的 unsigned/unpacked `pack` 与原生 `.app` 启动证据已按原始字节归档于
+  `mac-review/`（§13），但那是复审机实测，**不是**本工作区的构建结果、也不构成本阶段对 macOS 的
+  支持声明（T22/T23）。
 - **本地离线整个应用**：验收的运行时链路无网络（模型目录指向关闭端口、`get_state` 无提供方），但
   未验证"整机断网启动整个应用"。
 - **Windows / 其他架构**：无实机；入口的 Windows 差异（二进制名 `omp.exe`、无 `/proc` 时子进程环境
@@ -263,9 +279,10 @@ NODE_PATH`（8.3 事实：`buildOmpRuntimeEnv` 只从启动环境白名单携带
 
 ## 10. 状态
 
-- **T21-A 完成，并已按 2026-10-01 独立复审返修**（本文档 + `app/scripts/verify-packaged-runtime.mjs`
+- **T21-A 完成，并已按 2026-10-01 两轮独立复审返修**（本文档 + `app/scripts/verify-packaged-runtime.mjs`
   + `apps/desktop/test/packaged-runtime-verify.test.mjs` + spec §17 中英镜像 + 证据目录
-  `docs/validation/M6-t21-packaged-runtime/`，含 `repair-red/`）。T21 本身仍为**进行中**：T21-B
+  `docs/validation/M6-t21-packaged-runtime/`，含 `repair-red/`、`repair-red-gate-path/`、
+  `mac-review/`）。T21 本身仍为**进行中**：T21-B
   及之后的 macOS 安装产物、跨平台固定等仍待做；T22/T23/T24 未开始。
 - 交接：`HANDOFF.md`、`docs/04-task-board.md` 已同步；下一阶段入口为 T22（品牌、更新源、许可证及
   macOS 安装产物）与 T21 剩余部分，等待本机独立复审。
@@ -286,9 +303,11 @@ Electron 侧、RPC/权限路径）未改，fork、pins、打包配置保持。
 - **RED/GREEN**：新增回归用 class 参数 seam 注入 supervisor 双（真实错误形状与真实缺失路径）。
   在语义回退夹具上 `the gate control accepts only the refusal that names the missing gate` 因
   "Missing expected rejection" 失败（另有 3 条清理相关用例失败，共 4 failed / 3 passed / 8 skipped，
-  `repair-red/regression-red.txt`，回退 diff `repair-red/semantic-revert.diff`）；修复后同一套件
+  `repair-red/regression-red.txt.gz`，可读副本 `repair-red/regression-red.txt`；回退补丁
+  `repair-red/semantic-revert.diff.gz`）；修复后同一套件
   opt-in **15/15**，真实 Linux 产物（unpacked 与含空格/中文暂存路径）两次运行均 exit 0 且
-  `gateLoadControl: refused`（`acceptance-*-repair.txt`）。
+  `gateLoadControl: refused`（`acceptance-*-repair.txt`）。该轮修复仍是子串匹配，因而还会接受
+  同名前缀的不同路径（`<缺失路径>.another-file`）——该缺口已由最后一轮返修补齐（§12.1）。
 
 ### 11.2 验收清理失败被吞掉并删除所有权记录
 
@@ -327,4 +346,105 @@ Electron 侧、RPC/权限路径）未改，fork、pins、打包配置保持。
   `cargo-locked.txt`、`regression-repair*.txt`、`acceptance-*-repair.txt`、`repair-red/`。本记录
   引用的全部证据文件均已随本提交进入 git（`git ls-files docs/validation/M6-t21-packaged-runtime/`
   可核对）。`pack.txt` 的转录止于 electron-builder `searching for node modules` 阶段，完成判定以
-  exit 0 与 `inventory.txt` 的产物摘要为准（未重新打包，不伪造缺失日志）。
+  exit 0 与 `inventory.txt` 的产物摘要为准（未重新打包，不伪造缺失日志）。第一轮返修的 RED 证据在
+  最后一轮被重新归档：原始字节改为确定性 gzip（`repair-red/*.gz`），可读副本只做行尾空白归一化
+  （§12.2）。
+
+## 12. 2026-10-01 最后一轮独立复审返修（两项）
+
+两项发现同样只影响验收入口、其回归、spec 文字与证据；产品运行时（`packages/omp-runtime`、Electron
+侧、RPC/权限路径）、fork、pins、打包配置未改。
+
+### 12.1 gate 负对照把"点名"当作子串匹配
+
+- **发现**：`expectGateRefusal` 用 `detail.includes("<refusal>: <缺失路径>")` 判定，因此
+  `error: Trusted extension must be an existing module file: <缺失路径>.another-file` 也会被接收——
+  它命名的是**另一个文件**，与本次 `--trusted-extension` 无关。用 supervisor class seam 已在本机
+  复现该误接收。
+- **修复**：新增 `namesMissingGate()`（与 `expectGateRefusal` 同文件）：把 `detail` 按行切分，只
+  接受某一行在 `Trusted extension must be an existing module file: ` 之后**恰好以该缺失路径结束**
+  （允许行尾 `\r`）；字面比较、不用正则，路径元字符不会把匹配放宽为前缀搜索。真实错误格式（运行时
+  stderr 尾部）正是单行 `… file: <path>` 加随后的堆栈，因此"行内剩余部分 == 该路径"就是完整边界。
+- **RED/GREEN**：在已有 gate-control 用例中新增同名前缀断言（`${missing}.another-file` 也必须被
+  拒）。修复前该套件 **1 failed / 6 passed / 8 skipped**、exit 1，失败即新断言
+  `AssertionError: Missing expected rejection`（RED harness 用 HEAD `6ee99ecb` 的入口原样 + 带新断言
+  的测试文件；原始输出 `repair-red-gate-path/regression-red.txt.gz`，可读副本 `regression-red.txt`，
+  复现与摘要见该目录 `README.md`）。修复后：常驻 **7 pass / 8 skipped**、opt-in（真实 Resources）
+  **15/15**，两个真实 Linux 资源树（unpacked 与含空格/中文暂存路径）重跑均 exit 0 且
+  `gateLoadControl: refused`（`regression-repair2*.txt`、`acceptance-*-repair2.txt`，字段见 §8）。
+
+### 12.2 提交内容的 `--check` 证据必须来自提交本身
+
+- **发现（本机复核的 RED）**：`git diff bec20b214bee792b656d85aab5469e459b96eccc HEAD --check`
+  实际 **exit 2**：`repair-red/regression-red.txt` 4 行、`repair-red/semantic-revert.diff` 2 行尾随
+  空白。上一轮只在提交后的 clean 工作树跑 `git diff --check`，那只比较工作树与索引/HEAD 的差异，
+  **不能**证明已提交内容通过。
+- **修复（保留原始字节，不用归一化副本替代证据）**：两份原始捕获改存为确定性 gzip（`gzip -n -9`：
+  不带原始文件名、`mtime` 0；同一输入两次压缩逐字节相同，已用 `cmp` 复核）——
+  `repair-red/regression-red.txt.gz` 与 `repair-red/semantic-revert.diff.gz`。解压后 SHA-256 分别为
+  `4360e51441053788e58ce1d7f43f342b8456e91565630cbf2c3b6fbf305f814a` 与
+  `0516a82c4f54fab1fc5962011f334971dd6d5d5c52a08df280d193d29296c1c1`，与它们在 `6ee99ecb` 的
+  Git blob 逐字节一致（`gunzip -c <f>.gz | sha256sum` 与 `git show 6ee99ecb:<path> | sha256sum`
+  相等，另用 `git hash-object` 复核）。
+- **显示与补丁**：`repair-red/regression-red.txt` 是归一化**可读副本**（仅去掉行尾空格/制表符，并在
+  文件头注明"原始输出见 `.txt.gz`"）；回退**补丁只保留** `.diff.gz`，不保留任何去掉 diff 正文空白
+  的版本——原文件的两处"空白行"是 diff 正文（一处上下文空行、一处新增空行），归一化会让补丁不可
+  应用。解压方法：`gunzip -c semantic-revert.diff.gz > /tmp/semantic-revert.diff`，对 `6ee99ecb` 的
+  `app/scripts/verify-packaged-runtime.mjs` 运行 `git apply --check -p0` exit 0；应用后得到回退语义
+  （文件 sha256 `f367d37b50b95f9bea0e073a5609d3069b02aacfe7e76e0eb49486b356cf857c`、
+  `15 insertions(+), 59 deletions(-)`），方法记录在 `repair-red/README.md`。
+- 本轮新增的 RED 输出按同一约定归档：`.txt.gz` 存原始字节、`.txt` 为可读副本（该输出本身无行尾
+  空白，两份逐字节相同，已用 `cmp` 确认）。Mac 归档中唯一触发 `diff --check` 的
+  `mac-review/sidecar-smoke.txt`（文件尾多一个空行）同样处理：原始字节见
+  `mac-review/sidecar-smoke.txt.gz`，`README.md` 记录摘要与差异（§13）。
+
+### 12.3 最终空白检查（实际执行结果）
+
+- `git diff --cached --check`（暂存差异）→ **exit 0**（未加宽泛忽略规则；`core.whitespace` 未设置，
+  本轮未新增任何 `.gitattributes` 空白豁免——`app/.gitattributes` 里既有的
+  `patches/oh-my-pi/*.patch -whitespace` 来自 M5/T20-R3A 的 `474408d`，只作用于补丁构件，本轮未触碰）。
+- `git diff bec20b214bee792b656d85aab5469e459b96eccc HEAD --check`（基线到最终代码状态）→
+  **exit 0**（提交后以最终 `HEAD` 实跑；本项修复前对 `6ee99ecb` 的实跑结果是 exit 2、上述 7 处
+  空白）。
+
+## 13. 独立复审侧 macOS arm64 证据归档（`mac-review/`，属复审机实测）
+
+> 本节证据由独立复审者在 macOS arm64 实机上取得并上传（`/tmp/omp-t21-mac-review-evidence-20261001/`）；
+> 本工作区只做**原始字节归档**到 `docs/validation/M6-t21-packaged-runtime/mac-review/`（与源目录
+> 逐字节一致），**不**把它计入本 Linux 会话的实测结论，也不改变 §9 的未做清单。逐文件摘要与说明见
+> 该目录 `README.md`。
+
+- **产物与身份**：首稿 `bec20b214bee792b656d85aab5469e459b96eccc` 的 `pack` 产出真实
+  `app/apps/desktop/release/mac-arm64/OMP Desktop.app`（unsigned/unpacked，约 500 MB）；`ditto`
+  完整拷到 `/private/tmp/omp-t21 Mac 打包验收/OMP Desktop.app`。`review-inventory.json` 记录
+  `installerBuilt`/`codeSigned`/`notarized` 均为 false，以及各构件字节数/SHA-256：
+  `Contents/Resources/omp-runtime/omp` 216435968 B / `501cc225…`、工具门 9897 B / `89c2d844…`、
+  `app.asar` 20495298 B / `e6173140…`、`Contents/MacOS/OMP Desktop` 33968 B / `b8aab981…`。
+- **构建**：`pack-bec20b21.txt` —— Node 24.14.0 / Bun 1.4.2、桌面 Rust stable 1.98.1（不改全局
+  默认）、Electron 43.6.0；`CSC_IDENTITY_AUTO_DISCOVERY=false RUSTUP_TOOLCHAIN=stable
+  OMP_SIDECAR_SOURCE=/private/tmp/omp-fork-r4-3-review-20260928 pnpm --filter @pi-desktop/desktop run
+  pack` **exit 0**；无签名/公证、无 DMG、未发布。`sidecar-build.txt` 为该产物的 provenance
+  （schema `/3`、`platform darwin`、`arch arm64`、`build.bytecode`）。
+- **sidecar smoke**：`sidecar-smoke.txt` —— fork `6226f805…` 使用**自己的**冻结依赖与精确 native
+  leaf（`@oh-my-pi/pi-natives-darwin-arm64@18.3.0`）构建，**9 passed**；复审说明：第一次试编译误用
+  上游 `node_modules` 符号链接导致 native 归档为空（7 pass / 2 fail），那是复审环境错误、不是产品
+  修改，旧二进制不作为通过证据。
+- **打包资源验收**：`acceptance-unpacked-bec20b21.json`（首稿产物目录）与
+  `acceptance-staged-6ee99ecb.json`（`ditto` 拷贝到含空格/中文路径的 `…/OMP Desktop.app/Contents/
+  Resources`，入口为 `6ee99ecb`）均 exit 0：`runtimeVersion 18.3.0`、`protocolVersion 2`、
+  `getState`、`gateLoadControl: refused`、`stopped/reaped/cleaned` 全真、`leftoverRuns 0`。macOS 无
+  `/proc`，故 `child.readable=false`（"子进程环境不可读"是该宿主的缺省分支，**不是** Linux 式 OS
+  环境读取证明；PATH 由生产 supervisor 注入这一事实另由本机的 Linux `/proc` 证据支撑）。
+- **回归**：`regression-6ee99ecb.txt` —— 复审机在 `6ee99ecb` 上以真实 `Resources` 跑
+  `node --test test/packaged-runtime-verify.test.mjs`：**15 passed / 0 failed / 0 skipped**。
+- **原生 .app 启动（复审侧临时 harness）**：`packaged-boot-harness.mjs` + `packaged-boot.txt` ——
+  借鉴现有 PI `scripts/e2e-electron-boot.mjs`，仅把可执行文件换为打包的
+  `OMP Desktop.app/Contents/MacOS/OMP Desktop`：argv=[]、cwd=临时 profile（仓库外）、
+  `HOME`/`PI_DESKTOP_DATA_DIR`=临时 profile、PATH=空目录、`NODE_PATH` 空、rendererURL 空。实际
+  `app.asar`/preload/host-core IPC 运行后 **exit 0**：boot-probe `0.15.2` / host protocol 11 / 6 个
+  原生菜单组（darwin）；800 个合成会话下 8 次 refresh 全部完成且响应指标通过；`projectRemove` IPC
+  的 empty-target 边界通过；临时 profile 自动删除。harness 保留复审机绝对路径，**只是证据**，不是
+  跨平台产品入口。
+- **边界**：这是 **Pi/默认 host IPC** 启动证明，不是 OMP 对话/工具 UI 烟测，没有真实提供方请求、
+  没有模型花费；完整 installer、签名/公证、OMP 消息/工具/停止/恢复 UI、整机离线与 clean runner
+  仍待做（§9 不变，T21 未完成）。

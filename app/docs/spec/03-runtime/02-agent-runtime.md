@@ -2028,8 +2028,10 @@ level `62bc57b+omp-desktop.3`, carried by the controlled fork commit recorded in
   empty PATH, the run-root HOME and the absence of `NODE_PATH`, redirects and
   credentials are asserted as facts. A non-existent trusted extension must keep
   the runtime from becoming usable, and it must be *that* refusal: the failure
-  detail must name the missing path ("Trusted extension must be an existing
-  module file: `<path>`"). A timeout, a launcher or native-load failure, a
+  detail must name the missing path at its own boundary ("Trusted extension must
+  be an existing module file: `<path>`", and a longer path that merely shares
+  the prefix — `<path>.another-file` — names a different file and does not
+  qualify). A timeout, a launcher or native-load failure, a
   refusal naming another path, or a runtime that starts anyway leaves the gate's
   load unproven and fails the entry with the observed reason; that is what makes
   a successful start evidence of a *loaded* gate. Disposal is checked, not
@@ -2044,7 +2046,8 @@ level `62bc57b+omp-desktop.3`, carried by the controlled fork commit recorded in
   installer acceptance inside the real application remains T22/T23 work. A
   desktop regression suite (`apps/desktop/test/packaged-runtime-verify.test.mjs`)
   holds the entry to that contract: argument and path refusals always; the gate
-  control (only the refusal naming the missing path is accepted, an unrelated
+  control (only the refusal naming exactly the missing path, at its own
+  boundary, is accepted — a same-prefix longer path does not count; an unrelated
   failure is not) and the reclamation-failure paths through an injected
   supervisor class always; and — when `OMP_T21_RESOURCES` names a real
   `Resources` tree — a swapped gate, a binary whose bytes no longer match, a

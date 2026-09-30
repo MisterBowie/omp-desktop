@@ -1241,8 +1241,9 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
   达 `idle`、版本为 pins 中的版本、协商协议 v2、完成无提供方的 `get_state`、诱饵目录零写入，并以
   进程组已回收、run root 已删除结束；在宿主可读取子进程环境处（Linux `/proc`），空 PATH、run root
   内的 HOME 以及 `NODE_PATH`/重定向/凭证的缺席都被作为事实断言。不存在的 trusted extension 必须
-  让运行时无法变为可用，而且必须是**该**拒绝——失败 `detail` 必须点名该缺失路径
-  （"Trusted extension must be an existing module file: `<path>`"）；超时、启动器/原生加载失败、
+  让运行时无法变为可用，而且必须是**该**拒绝——失败 `detail` 必须在该路径**自身的边界上**点名该缺失
+  路径（"Trusted extension must be an existing module file: `<path>`"；仅共享前缀的更长路径
+  `<path>.another-file` 命名的是另一个文件，不算）；超时、启动器/原生加载失败、
   命名了别的路径的拒绝、或竟然启动成功，都让门是否被加载无法成立，入口以观察到原因失败。这正是
   "启动成功即工具门确实被加载"的依据。回收被检查而不是假定：入口启动过的每个 run 都必须先被回收，
   才会删除自己的临时根；进程组或目录无法回收的 run 保留其根与 supervisor 的所有权记录，入口报告
@@ -1250,7 +1251,8 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
   `--verify-only` 在校验后即停。该入口绝不校验隐式路径，拒绝与失败都以非零退出。它无头地验收打包
   构建的运行时边界，不是 GUI 启动；真实应用内的安装包验收仍属 T22/T23。桌面回归套件
   （`apps/desktop/test/packaged-runtime-verify.test.mjs`）把它固定在该契约上：参数与路径拒绝始终
-  运行；工具门控制（只接受点名该缺失路径的拒绝，无关失败不被接受）与回收失败路径通过注入的
+  运行；工具门控制（只接受在**该路径自身边界上**精确点名该缺失路径的拒绝，同名前缀的更长路径不算；
+  无关失败不被接受）与回收失败路径通过注入的
   supervisor class 始终运行；当 `OMP_T21_RESOURCES` 指向真实 `Resources` 树时，再验证被掉包的
   工具门、字节不再匹配的二进制、缺失的二进制、其他平台/架构、伪造的 patch level 或 schema，以及
   "运行未启动"时的保留根/环境恢复行为（opt-in；skip 不等于通过）。

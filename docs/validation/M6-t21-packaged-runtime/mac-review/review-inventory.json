@@ -1,0 +1,94 @@
+{
+  "testedDesktopCommit": "bec20b214bee792b656d85aab5469e459b96eccc",
+  "latestAcceptanceCommit": "6ee99ecbef036cc4203060466df69c847b403427",
+  "platform": "darwin",
+  "arch": "arm64",
+  "unsignedUnpackedApp": "/private/tmp/omp-t21 Mac 打包验收/OMP Desktop.app",
+  "installerBuilt": false,
+  "codeSigned": false,
+  "notarized": false,
+  "artifacts": [
+    {
+      "path": "Contents/MacOS/OMP Desktop",
+      "bytes": 33968,
+      "sha256": "b8aab981d48e2a380ac15fe2881812b914ac48a81a2c3c3cc7d294fdde90ffe6"
+    },
+    {
+      "path": "Contents/Resources/bin/pi-desktop-host-core",
+      "bytes": 10591088,
+      "sha256": "9637156097afc19da6b40a3aa30e95d883a8c8b98d94138faeeade425f7a2ee4"
+    },
+    {
+      "path": "Contents/Resources/agent-runtime/sidecar.js",
+      "bytes": 15682796,
+      "sha256": "28a3dbdf210110fdf4be4f43a2c13aea8df631907d857ab792202c6af3b1fc24"
+    },
+    {
+      "path": "Contents/Resources/app.asar",
+      "bytes": 20495298,
+      "sha256": "e61731401d2a1c602a3043d63c57ec0be55b10fd9e8ef26e4340d4dc3a2aff8e"
+    },
+    {
+      "path": "Contents/Resources/omp-runtime/omp",
+      "bytes": 216435968,
+      "sha256": "501cc225533d70045d1272697c64bdf672eb86650eb32d3a523b0808311c437a"
+    },
+    {
+      "path": "Contents/Resources/omp-runtime/extensions/omp-desktop-gate.js",
+      "bytes": 9897,
+      "sha256": "89c2d84451e9b9403afc2169501bbb7a25c42eef607c9c8e88d6d71abed1963c"
+    },
+    {
+      "path": "Contents/Resources/omp-runtime/provenance.json",
+      "bytes": 1141,
+      "sha256": "2d4896a19d067496a9658abc76fa13129b20e20fbd6a6ba2b0558b42bcf5398b"
+    }
+  ],
+  "rawEvidence": [
+    {
+      "file": "acceptance-staged-6ee99ecb.json",
+      "bytes": 971,
+      "sha256": "7ff23b24cbbd5aca71c5d6f88d6bd81e55367004071f75ff467803fb073ad2f6"
+    },
+    {
+      "file": "acceptance-staged-bec20b21.json",
+      "bytes": 971,
+      "sha256": "7ff23b24cbbd5aca71c5d6f88d6bd81e55367004071f75ff467803fb073ad2f6"
+    },
+    {
+      "file": "acceptance-unpacked-bec20b21.json",
+      "bytes": 1121,
+      "sha256": "ce0436d64b0ed188c7f5c0d85806e8de77d46b0177793575a986f5ce44dce6ad"
+    },
+    {
+      "file": "pack-bec20b21.txt",
+      "bytes": 17727,
+      "sha256": "4b96b8b3ecc011b072d2b4b219071177c5e970a36ba10e9fee83777006e38fed"
+    },
+    {
+      "file": "packaged-boot-harness.mjs",
+      "bytes": 5621,
+      "sha256": "ac3b2ba195c93dc4741ec09e644213fa218539d3083b5e5f3734eb7eb4d850db"
+    },
+    {
+      "file": "packaged-boot.txt",
+      "bytes": 669,
+      "sha256": "e437403a051e256d93084b808aedd100f4d466fae3e68102d44818c23e9554a6"
+    },
+    {
+      "file": "regression-6ee99ecb.txt",
+      "bytes": 1261,
+      "sha256": "a6abd41190aedd799b8eeda5bb955bb0b6ea3cfb986e56bd663aeab6c20c7111"
+    },
+    {
+      "file": "sidecar-build.txt",
+      "bytes": 944,
+      "sha256": "135c6c7917c003dfc430fc1de25b47bf42ccae075c5bb8014bab6b695bcc52c3"
+    },
+    {
+      "file": "sidecar-smoke.txt",
+      "bytes": 262,
+      "sha256": "fbe7b9bbba62ce3ad99d46b652c9facdae3d423b0a2e53df3f3934eda02313b2"
+    }
+  ]
+}

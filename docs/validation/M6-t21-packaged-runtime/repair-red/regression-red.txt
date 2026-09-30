@@ -1,3 +1,13 @@
+# DISPLAY COPY — readable transcription, not the byte-exact capture.
+# Trailing spaces/tabs are stripped from every line of the output below; nothing
+# else is changed. The byte-exact output is `regression-red.txt.gz` (deterministic
+# gzip: mtime 0, no original file name; decompress with `gunzip -c
+# regression-red.txt.gz`), and the revert patch is `semantic-revert.diff.gz`
+# (same recipe; decompress before `git apply`). Decompressed SHA-256:
+#   regression-red.txt    4360e51441053788e58ce1d7f43f342b8456e91565630cbf2c3b6fbf305f814a
+#   semantic-revert.diff  0516a82c4f54fab1fc5962011f334971dd6d5d5c52a08df280d193d29296c1c1
+# Both digests equal the Git blobs this archive replaced at 6ee99ecb, where
+# `git diff --check` flagged four / two trailing-whitespace lines respectively.
 # M6/T21-A review repair — RED: new regressions against the pre-repair semantics
 # harness: /tmp/omp-t21-repair-red (semantic revert of the two fixed hunks; see semantic-revert.diff)
 # harness file = shipped entry with: expectGateRefusal's strict refusal check replaced by the old catch-all,
@@ -60,9 +70,9 @@ test at apps/desktop/test/packaged-runtime-verify.test.mjs:187:1
 test at apps/desktop/test/packaged-runtime-verify.test.mjs:217:1
 ✖ the acceptance root survives a reclamation that cannot complete (0.378172ms)
   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
-  
+
   true !== false
-  
+
       at TestContext.<anonymous> (file:///tmp/omp-t21-repair-red/apps/desktop/test/packaged-runtime-verify.test.mjs:227:10)
       at async Test.run (node:internal/test_runner/test:1125:7)
       at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
@@ -77,9 +87,9 @@ test at apps/desktop/test/packaged-runtime-verify.test.mjs:217:1
 test at apps/desktop/test/packaged-runtime-verify.test.mjs:252:1
 ✖ an ownership held by an earlier step withholds the acceptance root (0.201848ms)
   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
-  
+
   true !== false
-  
+
       at TestContext.<anonymous> (file:///tmp/omp-t21-repair-red/apps/desktop/test/packaged-runtime-verify.test.mjs:259:10)
       at async Test.run (node:internal/test_runner/test:1125:7)
       at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {

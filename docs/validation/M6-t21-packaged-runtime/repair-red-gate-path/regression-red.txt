@@ -1,0 +1,45 @@
+# M6/T21-A review repair RED — the gate control accepted a refusal naming '<missing>.another-file'
+# harness: /tmp/omp-t21-gate-red — shipped entry at HEAD 6ee99ecb, unchanged
+#   verify-packaged-runtime.mjs sha256 1ae7161c1dce674f17304ee38fdc5ae5a1bd628c61f005246751418e16b59692
+#   test file: the repair working tree copy with the new same-prefix assertion
+# command: node --test test/packaged-runtime-verify.test.mjs (cwd: app/apps/desktop)
+✔ the entry never verifies an implicit path (31.596858ms)
+✔ a missing, non-directory, or non-packaged resources path is refused (46.111468ms)
+✖ the gate control accepts only the refusal that names the missing gate (1.485467ms)
+✔ a gate control run that cannot be reclaimed is reported with its ownership (0.327329ms)
+✔ the acceptance root survives a reclamation that cannot complete (0.191738ms)
+✔ a complete reclamation removes the acceptance root (0.138451ms)
+✔ an ownership held by an earlier step withholds the acceptance root (0.128169ms)
+﹣ accepts the real packaged runtime resources (0.039029ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ refuses a swapped tool gate (0.047801ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ refuses a binary whose bytes no longer match the manifest (0.093829ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ refuses a resources tree with no runtime binary (0.042683ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ refuses a runtime built for another platform or architecture (0.029615ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ refuses a manifest that is not the pinned one (0.041505ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ a failed acceptance retains an unreclaimable root and restores the environment (0.031446ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ a failed acceptance deletes only a root whose runs were all reclaimed (0.018443ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+ℹ tests 15
+ℹ suites 0
+ℹ pass 6
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 8
+ℹ todo 0
+ℹ duration_ms 116.194894
+
+✖ failing tests:
+
+test at test/packaged-runtime-verify.test.mjs:135:1
+✖ the gate control accepts only the refusal that names the missing gate (1.485467ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///tmp/omp-t21-gate-red/app/apps/desktop/test/packaged-runtime-verify.test.mjs:167:3)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /not rejected by the missing gate/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+# exit=1

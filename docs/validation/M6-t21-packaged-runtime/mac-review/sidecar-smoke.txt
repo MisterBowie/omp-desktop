@@ -1,0 +1,8 @@
+
+ RUN  v4.1.10 /Users/vv/Documents/对话/omp-desktop-review-m5-r4b/app/packages/omp-runtime
+
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  02:37:23
+   Duration  9.11s (transform 374ms, setup 0ms, import 846ms, tests 8.17s, environment 0ms)

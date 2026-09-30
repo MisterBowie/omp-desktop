@@ -160,6 +160,22 @@ test("the gate control accepts only the refusal that names the missing gate", as
     /not rejected by the missing gate/,
   );
 
+  // A refusal whose path merely *starts with* the missing gate's path —
+  // `<missing>.another-file` — names a different file, so it must not satisfy
+  // the control: a prefix is not the gate. Only the full path, at its own
+  // boundary, proves the runtime refused *this* argument.
+  await assert.rejects(
+    entryModule.expectGateRefusal(
+      fakeSupervisor({
+        start: () => {
+          throw gateStartFailure(`${missing}.another-file`);
+        },
+      }),
+      gateControlOptions(root, missing),
+    ),
+    /not rejected by the missing gate/,
+  );
+
   // Neither does an unrelated start failure: a timeout must not be mistaken
   // for the gate being load-bearing.
   await assert.rejects(

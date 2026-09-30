@@ -318,13 +318,35 @@ export async function releaseAcceptanceRoot(supervisor, root, options = {}) {
 }
 
 /**
+ * Whether a failure detail is the runtime's own unloadable-gate refusal naming
+ * exactly `missingGatePath` and nothing else.
+ *
+ * The runtime prints the refusal as one line — `… file: <path>` — followed by
+ * its stack trace, so the path is accepted only when that line ends at the
+ * path's own end: a longer path that merely starts with it
+ * (`<path>.another-file`) names a different file and must not satisfy the
+ * control. The comparison is literal, so path metacharacters cannot broaden
+ * the match into a prefix search.
+ */
+function namesMissingGate(detail, missingGatePath) {
+  const marker = `${TRUSTED_EXTENSION_REFUSAL}: `;
+  return detail.split("\n").some((line) => {
+    const at = line.indexOf(marker);
+    if (at < 0) return false;
+    const named = line.slice(at + marker.length);
+    return named === missingGatePath || (named.endsWith("\r") && named.slice(0, -1) === missingGatePath);
+  });
+}
+
+/**
  * Prove the gate argument is load-bearing before trusting the positive run.
  *
  * The compiled runtime refuses a `--trusted-extension` path that is not an
  * existing module file — it exits 1 with "Trusted extension must be an existing
  * module file: <path>" in the failure's `detail` — instead of starting
- * unguarded. Requiring exactly that refusal, naming exactly the missing path,
- * is what makes "the packaged runtime reached idle with the gate argument" a
+ * unguarded. Requiring exactly that refusal, naming exactly the missing path —
+ * at its own boundary, so `<path>.another-file` does not qualify — is what
+ * makes "the packaged runtime reached idle with the gate argument" a
  * statement about a loaded gate rather than about an ignored argument. Every
  * other negative control — a ready timeout, a launcher or native-load failure,
  * a runtime that starts anyway, a refusal naming a different file — leaves the
@@ -376,9 +398,9 @@ export async function expectGateRefusal(OmpRuntimeSupervisor, options) {
   }
   const detail = typeof observed?.detail === "string" ? observed.detail : "";
   const expected = `${TRUSTED_EXTENSION_REFUSAL}: ${options.missingGatePath}`;
-  if (!detail.includes(expected)) {
+  if (!namesMissingGate(detail, options.missingGatePath)) {
     refuse(
-      `the gate-load control was not rejected by the missing gate: expected the runtime to refuse "${expected}", observed ${describeFailure(observed)}${detail ? ` (${excerpt(detail)})` : " with no detail"}`,
+      `the gate-load control was not rejected by the missing gate: expected the runtime to refuse "${expected}", naming that path exactly, observed ${describeFailure(observed)}${detail ? ` (${excerpt(detail)})` : " with no detail"}`,
       1,
     );
   }
