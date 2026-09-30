@@ -1,0 +1,27 @@
+--- /home/vv/person/code/omp-desktop-m5-r4b/docs/validation/M6-r4-3-sidecar-provenance/depth-red/gate-shallow.js	2026-10-01 01:48:41.069181144 +0800
++++ /home/vv/person/code/omp-desktop-m5-r4b/docs/validation/M6-r4-3-sidecar-provenance/depth-red/gate-deep.js	2026-10-01 01:48:41.077945893 +0800
+@@ -1,5 +1,5 @@
+ // @bun
+-// ../../../../home/vv/person/code/omp-desktop-m5-r4b/app/packages/omp-runtime/src/session/approval-protocol.ts
++// ../../../../../../../home/vv/person/code/omp-desktop-m5-r4b/app/packages/omp-runtime/src/session/approval-protocol.ts
+ var OMP_APPROVAL_OPTIONS = [
+   "Allow once",
+   "Allow for this session",
+@@ -11,7 +11,7 @@
+   return JSON.stringify(descriptor);
+ }
+ 
+-// ../../../../home/vv/person/code/omp-desktop-m5-r4b/app/packages/omp-runtime/src/desktop-state.ts
++// ../../../../../../../home/vv/person/code/omp-desktop-m5-r4b/app/packages/omp-runtime/src/desktop-state.ts
+ import { lstatSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "fs";
+ var DESKTOP_STATE_VERSION = 1;
+ var MAX_DESKTOP_STATE_BYTES = 512 * 1024;
+@@ -118,7 +118,7 @@
+ `) : undefined;
+ }
+ 
+-// ../../../../home/vv/person/code/omp-desktop-m5-r4b/app/packages/omp-runtime/extensions/omp-desktop-gate.ts
++// ../../../../../../../home/vv/person/code/omp-desktop-m5-r4b/app/packages/omp-runtime/extensions/omp-desktop-gate.ts
+ var DEFAULT_GATED_TOOLS = "write,edit,apply_patch,bash,eval";
+ function riskForTool(toolName) {
+   if (toolName.startsWith("plugin_"))

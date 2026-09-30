@@ -1203,7 +1203,9 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
   `packages/omp-runtime/extensions/omp-desktop-gate.ts` 构建）：直接复制源码仍会 import
   `../src/...`，而该路径在 sidecar 旁并不存在，运行时会拒绝启动。构建会证明 bundle 不再含相对
   导入、先清空构建自有的 `extensions/` 目录（避免旧构建残留被一起发布），并记录工具门的字节数与
-  摘要。
+  摘要。工具门从其自身源码目录编译，而不是从瞬时的运行根：Bun 按构建 cwd 写出每个模块的路径注释，
+  cwd 随 `TMPDIR` 变化会让同一源码产出不同的工具门字节与不同的 provenance 摘要。一条回归测试经
+  本入口在不同深度的临时根下构建，并要求工具门字节与完整清单相等。
 * **provenance。** 构建会在可执行文件旁写出 `provenance.json`：schema
   `omp-desktop.bundled-sidecar/3`、fork 仓库/提交/tree、上游基线 SHA 与版本、patch level、能力
   id、OMP 版本、桌面版本、平台、架构、二进制文件名、字节数与 SHA-256、各扩展的路径与其字节数/摘要，
@@ -1238,8 +1240,9 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
 后的应用没有仓库可读；桌面测试断言它们与受控清单一致。
 
 产物已逐位可复现：同一 fork 提交的两次独立构建得到相同的字节数、SHA-256 与 `provenance.json`，
-因为内嵌的原生插件归档使用固定时间戳写入、且编译模式是显式的。此前的构建间差异来自 `Bun.Archive`
-给归档打上了墙上时钟时间，而不是 bytecode；上游针对
+因为内嵌的原生插件归档使用固定时间戳写入、编译模式是显式的，且工具门从其自身源码目录编译、其字节
+不随瞬时运行根变化；在不同深度的 `TMPDIR` 根下两次构建的二进制、工具门与完整清单一致。此前的
+构建间差异来自 `Bun.Archive` 给归档打上了墙上时钟时间，而不是 bytecode；上游针对
 `--compile --bytecode --splitting` 的修复（oven-sh/bun#42151）覆盖的是本构建未使用的模式。测量、
 对照构建与拒绝证据见 `docs/validation/M6-r4-3-reproducible-sidecar.md`，因此 R4-3 **已满足**。
 

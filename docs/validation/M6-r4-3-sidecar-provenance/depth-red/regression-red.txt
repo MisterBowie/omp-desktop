@@ -1,0 +1,86 @@
+✖ the tool gate bundle is identical under temporary roots of different depth (126.343471ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 380.228929
+
+✖ failing tests:
+
+test at test/omp-sidecar.test.mjs:233:1
+✖ the tool gate bundle is identical under temporary roots of different depth (126.343471ms)
+  AssertionError [ERR_ASSERTION]: the gate bundle must not depend on the run root
+  + actual - expected
+  ... Skipped lines
+  
+  + Buffer(10157) [Uint8Array] [
+  - Buffer(10130) [Uint8Array] [
+      47,
+      47,
+      32,
+      64,
+      98,
+  ...
+      47,
+  +   46,
+  +   46,
+  +   47,
+  +   46,
+  +   46,
+  +   47,
+  +   46,
+  +   46,
+  +   47,
+      104,
+      111,
+      109,
+      101,
+      47,
+  ...
+      47,
+  +   46,
+  +   46,
+  +   47,
+  +   46,
+  +   46,
+  +   47,
+  +   46,
+  +   46,
+  +   47,
+      104,
+      111,
+      109,
+      101,
+      47,
+  ...
+      47,
+  +   46,
+  +   46,
+  +   47,
+  +   46,
+  +   46,
+  +   47,
+  +   46,
+  +   46,
+  +   47,
+      104,
+      111,
+      109,
+      101,
+      47,
+  
+      at TestContext.<anonymous> (file:///home/vv/person/code/omp-desktop-m5-r4b/app/apps/desktop/test/omp-sidecar.test.mjs:267:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: <Buffer 2f 2f 20 40 62 75 6e 0a 2f 2f 20 2e 2e 2f 2e 2e 2f 2e 2e 2f 2e 2e 2f 2e 2e 2f 2e 2e 2f 2e 2e 2f 68 6f 6d 65 2f 76 76 2f 70 65 72 73 6f 6e 2f 63 6f 64 ... 10107 more bytes>,
+    expected: <Buffer 2f 2f 20 40 62 75 6e 0a 2f 2f 20 2e 2e 2f 2e 2e 2f 2e 2e 2f 2e 2e 2f 68 6f 6d 65 2f 76 76 2f 70 65 72 73 6f 6e 2f 63 6f 64 65 2f 6f 6d 70 2d 64 65 73 ... 10080 more bytes>,
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

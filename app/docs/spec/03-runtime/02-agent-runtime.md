@@ -1961,7 +1961,12 @@ level `62bc57b+omp-desktop.3`, carried by the controlled fork commit recorded in
   source would still import `../src/...`, which does not exist beside the sidecar,
   and the runtime refuses to start. The build proves the bundle has no relative
   imports left, clears the build-owned `extensions/` directory first, and records
-  the gate's byte count and digest.
+  the gate's byte count and digest. The bundle is compiled from the gate's own
+  source directory rather than from a transient run root: Bun writes each
+  module's path comment relative to the build cwd, and a `TMPDIR`-dependent cwd
+  made the same source produce different gate bytes and a different provenance
+  digest. A regression test builds through this entry under temporary roots of
+  different depth and requires the gate bytes and the full manifest to be equal.
 * **Provenance.** The build writes `provenance.json` beside the executable:
   schema `omp-desktop.bundled-sidecar/3`, fork repository/commit/tree, upstream
   base SHA and version, patch level, capability ids, OMP version, desktop
@@ -2017,8 +2022,11 @@ read, and a desktop test asserts they equal the controlled manifest.
 
 The artifact is bit-reproducible: two independent builds of the same fork commit
 produce the same byte count, SHA-256 and `provenance.json`, because the embedded
-native-addon archive is written with fixed timestamps and the compile mode is
-explicit. The earlier build-to-build difference came from `Bun.Archive` stamping
+native-addon archive is written with fixed timestamps, the compile mode is
+explicit, and the tool gate is bundled from its own source directory so its bytes
+do not follow the transient run root. Two builds under `TMPDIR` roots of
+different depth then agree on the binary, the gate and the full provenance
+manifest. The earlier build-to-build difference came from `Bun.Archive` stamping
 that archive with the wall clock, not from bytecode; the upstream
 `--compile --bytecode --splitting` fix (oven-sh/bun#42151) covers a mode this
 build does not use. Measurements, control builds and the refusal evidence are in

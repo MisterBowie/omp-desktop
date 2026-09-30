@@ -142,7 +142,12 @@ artifact). The build therefore bundles the gate into one self-contained file
 (`extensions/omp-desktop-gate.js`), proves it retains no relative imports,
 clears the build-owned `extensions/` directory first so a stale file from an
 earlier build cannot be shipped, and records its digest — which the desktop then
-verifies with the same rules as the binary.
+verifies with the same rules as the binary. It is compiled from the gate's own
+directory, not from the transient `mkdtemp` run root: Bun writes each module's
+path comment relative to the build cwd, so a `TMPDIR`-dependent cwd changed the
+same source's gate bytes and digest. A regression test builds through the entry
+under temporary roots of different depth and requires equal gate bytes and an
+equal manifest.
 
 ### 3. A packaged build admits exactly one runtime, and verifies it
 
@@ -337,9 +342,12 @@ rather than duplicating it.
   pin and passthrough contract by the tests named above; the app-level
   `release.yml` is not triggered from this repository's root.
 - **Reproducibility is achieved and measured.** Two independent builds of the
-  same fork commit on the same host produce the same byte count, the same
-  SHA-256 and the same `provenance.json` (`cmp` and `diff -u` both exit 0), and
-  both artifacts pass the packaged runtime smoke. The cause of the earlier
+  same fork commit on the same host — under output directories and `TMPDIR`
+  roots of different depth — produce the same byte count, the same SHA-256 and
+  the same `provenance.json` (`cmp` and `diff -u` both exit 0), and both
+  artifacts pass the packaged runtime smoke. The tool gate is included: it is
+  bundled from its own source directory, so a transient run root cannot change
+  its bytes. The cause of the earlier
   build-to-build difference was not bytecode: it was `Bun.Archive` stamping the
   embedded native-addon archive with the wall clock, which moved the archive's
   bytes and, with it, the bunfs asset name and parts of the bytecode string

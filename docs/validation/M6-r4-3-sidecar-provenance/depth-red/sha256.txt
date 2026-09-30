@@ -1,0 +1,17 @@
+# unfixed gate build: cwd was the transient mkdtemp run root, the same
+# command the production build ran (bun build <gate> --target=bun --outfile).
+$ cd /tmp/r43exp/shallow/omp-sidecar-AAAAAAAA && bun build <gate source> --target=bun --outfile gate-shallow.js
+$ cd /tmp/r43exp/deep/one/two/three/omp-sidecar-BBBBBBBB && bun build <gate source> --target=bun --outfile gate-deep.js
+
+f6a10e7b549897bb8c1be0a391c911518eb63ca69589e35d7d189dc6cca65b26  /home/vv/person/code/omp-desktop-m5-r4b/docs/validation/M6-r4-3-sidecar-provenance/depth-red/gate-shallow.js
+8340b5b154f3a12fb077dc7d356e943610f69bdd37d451604ec048d83f59a3a8  /home/vv/person/code/omp-desktop-m5-r4b/docs/validation/M6-r4-3-sidecar-provenance/depth-red/gate-deep.js
+bytes: 10130 / 10157
+
+$ cmp gate-shallow.js gate-deep.js
+cmp exit 1 (the bundles differ)
+
+$ diff -u gate-shallow.js gate-deep.js
+(only the three module path comments differ; see gate.diff.txt)
+
+# Production-path RED: regression-red.txt is the failing regression test,
+# which builds through the real CLI under two TMPDIR depths.

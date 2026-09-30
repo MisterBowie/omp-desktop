@@ -1,2 +1,2 @@
-$ diff -u green/build-a.provenance.json green/build-b.provenance.json
+$ diff -u /tmp/r43g/out-a/provenance.json /tmp/r43g/out-b/provenance.json
 (no output above; diff exit 0)

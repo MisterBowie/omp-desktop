@@ -17,6 +17,11 @@ sidecar 与相同的 provenance 清单**，同时保留 remote/commit 的 fail-c
   显式 `git -c core.abbrev=7` 重生成，桌面 pins/工作流/证据随之更新。被取代的坐标（fork `6b5017bc…`、
   sha256 `27b19f19…`、86789 字节）只作为历史保留在 git 与 2026-09-28 的坐标记录中；与旧提交绑定的
   测量（§2 RED、§3 对照）按其原始提交标注，§5-§7 的验收/校验/计数已在本轮新坐标上重跑。
+- 2026-10-01 第二次独立复审返修（工具门输出确定性，§9）：gate 编译 cwd 从瞬时 `mkdtemp` 运行根固定为
+  工具门自身目录，新增跨 TMPDIR 深度的生产路径回归；两次真实构建（不同输出目录、不同深度 TMPDIR）的
+  二进制与工具门 `cmp` exit 0、完整 provenance `diff -u` exit 0。工具门摘要由 10112 B/`bb110256…`
+  变为 9897 B/`89c2d844…`（二进制仍为 283997664 B/`f69ee0b2…`）；修复前的深度敏感观测保留为日期化
+  RED（§9.1 与 `.../depth-red/`）。
 - 环境：Linux x64、Node v24.14.0、pnpm 10.34.5、**Bun 1.4.2**、git 2.x；网络经
   `http://127.0.0.1:7897`（任务书给的 `:7890` 未监听，与上一轮审计一致）
 - fork 检出：`/home/vv/person/code/omp-fork-m6/oh-my-pi`（`origin` = 受控 fork；基座对象取自
@@ -126,41 +131,44 @@ B: …/$bunfs/root/embedded-addons.linux-x64.tar-6vvy
 | `apps/desktop/test/{omp-sidecar,omp-runtime-launcher,omp-session-failclosed}.test.mjs`、`test/helpers/omp-fork-fixture.mjs`、`packages/omp-runtime/src/bundled.test.ts` | 夹具升到 `/3` 并带 `build.bytecode`；新增用例：`/2` 与缺 `build.bytecode`（或类型错误）的清单被拒；桌面入口把模式映射为 fork 接受的两种拼写且发布模式为 `bytecode=true` |
 | `.github/workflows/mac-preview-package.yml`、`app/.github/workflows/{release,linux-package}.yml` | fork checkout 的 `ref` 更新为新 fork commit（由 `packaging-sidecar-source.test.mjs` / `preview-workflow.test.mjs` 与清单自动比对） |
 
-## 5. GREEN：逐位可复现（2026-10-01 复审返修后在 `6226f80…` 上重跑）
+## 5. GREEN：逐位可复现（2026-10-01 第二次复审返修后在 `6226f80…` 上重跑，见 §9）
 
 原始证据（两次构建的完整清单、`diff -u`、`sha256sum`/`cmp`、差异区段统计与对照构建记录）保存在
-`docs/validation/M6-r4-3-sidecar-provenance/`，按构建原样保留、不做手工编辑。
+`docs/validation/M6-r4-3-sidecar-provenance/`，按构建原样保留、不做手工编辑。两次构建的输出目录与
+TMPDIR 根都不同、深度不同：
 
 ```
-node app/scripts/omp-sidecar.mjs --build --source /home/vv/person/code/omp-fork-m6/oh-my-pi --out /tmp/r43f/green-a
-node app/scripts/omp-sidecar.mjs --build --source /home/vv/person/code/omp-fork-m6/oh-my-pi --out /tmp/r43f/green-b
+TMPDIR=/tmp/r43g/tmp-a        node app/scripts/omp-sidecar.mjs --build --source /home/vv/person/code/omp-fork-m6/oh-my-pi --out /tmp/r43g/out-a
+TMPDIR=/tmp/r43g/tmp-b/x/y/z  node app/scripts/omp-sidecar.mjs --build --source /home/vv/person/code/omp-fork-m6/oh-my-pi --out /tmp/r43g/out-b
 ```
 
 | 验收点 | 结果 |
 | --- | --- |
 | 二进制 SHA-256 | 两者均 `f69ee0b283691bf449e10734775995057cf7b89f4c68bfb077defaeaa7ffe02d` |
 | 二进制字节数 | 两者均 283997664 |
-| `cmp green-a/omp green-b/omp` | **exit 0**（无任何差异） |
-| `diff -u green-a/provenance.json green-b/provenance.json` | **exit 0** |
-| 工具门 | 两者均 10112 B、`bb110256984d6588108bd9e656ea3a874e0e81a8d9eb5655d2df129c2505b3f7` |
-| 默认输出目录构建（`app/apps/desktop/resources/omp-runtime`） | exit 0，同一 SHA-256（283997664 B） |
+| `cmp out-a/omp out-b/omp` | **exit 0**（无任何差异） |
+| 工具门 | 两者均 9897 B、`89c2d84451e9b9403afc2169501bbb7a25c42eef607c9c8e88d6d71abed1963c` |
+| `cmp out-a/extensions/omp-desktop-gate.js out-b/extensions/omp-desktop-gate.js` | **exit 0** |
+| `diff -u out-a/provenance.json out-b/provenance.json` | **exit 0** |
 | provenance 形态 | `schema /3`、`fork.commit 6226f80…`、tree `5249cb0…`、`patchLevel 62bc57b+omp-desktop.3`、`build {tool: bun, bunVersion: 1.4.2, bytecode: true}`；patch 构件的 sha256/字节数（`ad63ced9…`、87190）由 `manifest.json` + `omp-patch.mjs --check` 证明（provenance schema `/3` 携带 `patchLevel`，不携带 patch digest） |
-| 最小 PATH 启动 | `env -i PATH=<空目录> green-{a,b}/omp --version` → 均 `omp/18.3.0`，exit 0 |
-| 真实运行时 smoke（opt-in） | `OMP_SIDECAR_TEST_RESOURCES=/tmp/r43f/stage npx vitest run packages/omp-runtime/src/bundled-smoke.test.ts` → **9 passed**：自包含工具门、无 bun/node 亦可运行、`idle`/`runtimeVersion 18.3.0`/`protocolVersion 2`、`get_state` 无费用 RPC、诱饵变量零写入、`stop()` 的 `stopped/reaped/cleaned` 均为真且无残留、篡改工具门被拒、异常死亡与永不 ready 均被回收 |
+| 退出码/耗时 | 两次构建均 exit 0（各约 13 s，本机 Bun 1.4.2、热缓存） |
+| 真实运行时 smoke（opt-in） | `OMP_SIDECAR_TEST_RESOURCES=/tmp/r43g/stage npx vitest run packages/omp-runtime/src/bundled-smoke.test.ts` → **9 passed / exit 0**：自包含工具门、无 bun/node 亦可运行、`idle`/`runtimeVersion 18.3.0`/`protocolVersion 2`、`get_state` 无费用 RPC、诱饵变量零写入、`stop()` 的 `stopped/reaped/cleaned` 均为真且无残留、篡改工具门被拒、异常死亡与永不 ready 均被回收 |
 
-与上一轮坐标的关系：新提交的两次构建与 `6b5017bc…` 的 green 记录逐位相同（二进制与工具门摘要一致），
-因为本轮 fork 变更只有注释、注释不进入编译产物；`provenance.json` 的 `fork.commit`/`tree` 已指向
-`6226f80…`，旧坐标只保留在 git 历史与 2026-09-28 的记录中。本轮另测得一个环境敏感项：工具门 bundle 的
-按模块路径注释相对构建 cwd 写出，而 sidecar 的构建 cwd 是 `os.tmpdir()` 下的 mkdtemp；把 TMPDIR 换成深
-两层的目录后二进制不变、工具门变为 10130 B / `f6a10e7b…`（同一源码、同一 Bun 1.4.2）。记录中的两次
-green 均使用默认 `/tmp`；这不改变 R4-3 的结论（同一构建环境下逐位可复现），但把“构建环境”明确为输入的
-一部分，属于未修的残留限制（见 §8）。
+与上一轮的关系：二进制摘要与 `6b5017bc…`/`6226f80…` 的 green 记录逐位相同（fork 注释与编译 cwd 都不
+进入二进制产物）；工具门摘要从 10112 B/`bb110256…` 变为 9897 B/`89c2d844…`，因为本轮把 gate build 的
+cwd 从瞬时运行根固定为工具门自身目录（§9.2）。此前观测到的深度敏感（10112 → 10130 B）作为日期化 RED
+保留在 §9.1 与 `.../depth-red/`。清单完整性（`build.bytecode` 必填，`/2`、`/1` 拒绝）不变。本节的等价性
+范围是同一 fork commit、同一检出配置、同一 Bun 1.4.2、同一目标平台/架构（Linux x64）；不宣称跨工具链
+版本或跨目标平台的字节等价。
 
 清单完整性（要求：清单必须表达影响字节的构建模式）：`build` 现在同时记录固定 Bun 版本与编译模式，
 `build.bytecode` 是**必填**字段，缺少或类型错误的清单会被 `verifyBundledRuntime` 以
 `bundled-runtime-invalid` 拒绝（RED：把 schema 放宽为可选后，该用例立即判红）。
 
 ## 6. patch 集合与 fail-closed 校验（2026-10-01 复审返修后重跑）
+
+> 2026-10-01 第二次复审返修未改 fork、补丁构件、manifest pins 或 packaging workflow；本节只作为上一轮的
+> 日期化证据保留，本轮复跑了 `node scripts/omp-patch.mjs --check`（exit 0，见 §7）。
 
 | 检查 | 命令 | 结果 |
 | --- | --- | --- |
@@ -179,35 +187,35 @@ green 均使用默认 `/tmp`；这不改变 R4-3 的结论（同一构建环境�
 
 打包态准入、gate 摘要、版本/协议断言、隔离与进程回收行为均未改动，沿用 R4B 已验收的规则。
 
-## 7. 测试计数与命令（2026-10-01 复审返修后重跑；Linux x64，Node v24.14.0，Bun 1.4.2）
+## 7. 测试计数与命令（2026-10-01 第二次复审返修后重跑；Linux x64，Node v24.14.0，Bun 1.4.2）
 
 | 命令 | 结果 |
 | --- | --- |
-| fork：`bun test packages/natives/test/embed-native.test.ts packages/coding-agent/test/build-binary-bytecode.test.ts` | 5 pass / 0 fail |
-| fork：R4A 目标三套件（`agent-loop`、`rpc-host-tools`、`rpc-input-frame`） | 177 pass / 0 fail |
-| fork：`packages/natives` 全套 `bun test` | 134 pass / 0 fail（18 文件） |
-| fork：`packages/natives` / `packages/coding-agent` 的 `bun run check:types` | 均 exit 0 |
-| 打补丁树（`/tmp/r43f/patched-tree`）内新测试 | 5 pass / 0 fail |
+| fork：`bun test packages/natives/test/embed-native.test.ts packages/coding-agent/test/build-binary-bytecode.test.ts` 等 | **上轮实跑**（5 pass、R4A 三套件 177 pass、natives 全套 134 pass / 18 文件、两包 `check:types` exit 0、打补丁树内新测试 5 pass）；本轮无 fork/补丁变更，按约定未重跑 |
 | 桌面：`pnpm --filter @pi-desktop/omp-runtime test` | 23 files / **351 passed** / 6 skipped |
-| 桌面：`OMP_SIDECAR_TEST_RESOURCES=/tmp/r43f/stage npx vitest run packages/omp-runtime/src/bundled-smoke.test.ts` | **9 passed** |
-| 桌面：`node --test apps/desktop/test/{omp-sidecar,omp-runtime-launcher,omp-session-failclosed,ci-workflow,packaging-sidecar-source,macos-release-verification}.test.mjs`（`app/`） | **70 tests / 70 pass / 0 fail** |
-| 桌面：`env -u SSH_ASKPASS node --test test/*.test.mjs`（`app/apps/desktop`） | **2953 tests / 2950 pass / 0 fail / 3 skipped** |
+| 桌面：`OMP_SIDECAR_TEST_RESOURCES=/tmp/r43g/stage npx vitest run packages/omp-runtime/src/bundled-smoke.test.ts` | **9 passed / exit 0** |
+| 桌面：`node --test apps/desktop/test/{omp-sidecar,omp-runtime-launcher,omp-session-failclosed,ci-workflow,packaging-sidecar-source,macos-release-verification}.test.mjs`（`app/`） | **71 tests / 71 pass / 0 fail**（含新增跨 TMPDIR 深度回归） |
+| 桌面：`env -u SSH_ASKPASS node --test test/*.test.mjs`（`app/apps/desktop`） | **2954 tests / 2951 pass / 0 fail / 3 skipped / exit 0** |
 | `pnpm build:js`、`--filter @pi-desktop/{shared,omp-runtime,desktop} typecheck` | 全 exit 0 |
-| `node app/scripts/omp-patch.mjs --check`（仓库根） | exit 0 |
+| `node app/scripts/omp-patch.mjs --check`（仓库根） | exit 0（本轮另实测：`--check` 通过，fork/patch 未改） |
 | `git diff --check` | exit 0 |
+| `node scripts/check-release-docs.mjs`（`app/`） | exit 0（与 0.15.2 对齐） |
 | `node docs/scripts/check-docs.mjs`（`app/`） | exit 1，**6 项预存在**（`adr/0301` H1 + `adr/0301–0305` 缺索引行），507 页，无新增 |
 | `node docs/scripts/check-locales.mjs`（`app/`） | exit 0（79 对；§17 中英镜像同结构） |
 | `node scripts/check-t20-matrix-ids.mjs`（`app/`） | exit 0 |
 | `node scripts/check-architecture.mjs`（`app/`） | exit 1（**预存在**：`apps/desktop/electron/main/index.ts` 1550 LOC > 1500；`New TS/TSX files checked: 0`，本轮无新增超限） |
 | `OMP_T20_GAP_PROBE=1 node scripts/check-omp-plan-goal-gaps.mjs`（`app/`） | exit 1（**预期**）：`SUMMARY: 3 gap(s) open [g1, g2, g3]` —— R3 未动摇 |
 
-RED/GREEN 的判红判绿对照（2026-09-28 实现的原始测量）：`embed-native` 确定性用例在未修复实现上判红
-（收到 `15256271510 ` 而非 `00000000000\0`）；桌面“清单未声明构建模式”用例在把 schema 放宽为可选后
-判红；改动前的 `build-binary.ts` 对 `--no-bytecod` 静默继续构建（exit 0），改动后 exit 2 并指名参数。
+RED/GREEN 的判红判绿对照：本轮新增回归在未修复实现上判红（两次工具门 Buffer 不等，§9.1），修复后
+9 pass；`embed-native` 确定性用例在未修复实现上判红（收到 `15256271510 ` 而非 `00000000000\0`）；桌面
+“清单未声明构建模式”用例在把 schema 放宽为可选后判红；改动前的 `build-binary.ts` 对 `--no-bytecod` 静默
+继续构建（exit 0），改动后 exit 2 并指名参数。
 
 ## 8. 状态更新与仍有限制
 
-- R4-3 **已满足**（2026-09-28 首次闭合，2026-10-01 复审返修在 `6226f80…` 上重跑、结论不变）：
+- R4-3 **已满足**（2026-09-28 首次闭合；2026-10-01 第一次复审返修在 `6226f80…` 上重跑、结论不变；
+  同日第二次返修把工具门的构建上下文固定为源码目录，并在不同 TMPDIR 深度/不同输出目录下重跑全部
+  构建验收，见 §9）：
   `docs/validation/M5-bundled-sidecar.md` §10 的未决阻塞项在本节被日期化闭合，历史结论保留原样；
   ADR 0307、spec §17（中英）与任务板同步更新。
 - **未动摇**：R3 仍阻塞、ADR 0306 的 Cursor 产品门保留、T20-B/C/D 未开始、**T20/T21 均未完成**、
@@ -215,10 +223,103 @@ RED/GREEN 的判红判绿对照（2026-09-28 实现的原始测量）：`embed-n
 - 限制：仅在 Linux x64 实跑；未跑 electron-builder 真实打包、未做 macOS/Windows 实机、未在 clean
   runner 实跑 packaging workflows（仍由静态契约测试 + manifest pin 比对锁定）；RED 用的 fork 检出是
   本机重建（基座对象来自固定子模块对象库，fork 增量经代理取回）。
-- 未修的环境敏感项（2026-10-01 实测）：工具门 bundle 由 `bun build` 生成，其按模块的路径注释相对构建
-  cwd 写出，而 sidecar 的构建 cwd 是 `os.tmpdir()` 下的 mkdtemp；同一 TMPDIR 深度下逐位一致，深两层会
-  改变工具门字节（10112 → 10130 B、`f6a10e7b…`），二进制不受影响。修法（如把 gate build 的 cwd 固定为
-  检出或包目录）属于后续变更，本轮复审返修不改 `omp-sidecar.mjs` 行为。
+- 工具门的环境敏感项已由 2026-10-01 第二次复审返修修复（§9）：gate build 的 cwd 固定为工具门自身
+  目录，同一源码不再随 TMPDIR 深度或检出位置改变字节；修复前的 10112 → 10130 B 观测保留为日期化 RED
+  （§9.1 与 `.../depth-red/`）。
 - 依赖事实：PR 42151 已并入 Bun main 但**未进入 release**（最新 1.4.2）；本构建未使用
   `--splitting`。若将来升级 Bun 后 bytecode 输出形态变化，需按 §3.2 的对照实验重新测量，再决定是否
   改用 `--no-bytecode`（该入口已在 fork 中提供并测试，fail closed）。
+
+---
+
+## 9. 2026-10-01 第二次独立复审返修：工具门构建上下文固定（R4-3 输出确定性边界）
+
+独立复审在 macOS（Bun 1.4.2）上用同一份 gate 源码复现：不同 `TMPDIR` 深度下工具门字节与 SHA-256 不同，
+diff 只有模块路径注释；把编译 cwd 换成 gate 源码目录后两次都得 9897 B/同一 SHA-256（复审机数值）。其
+结论是：只通过默认 `TMPDIR` 的重复构建对“可复现构建”边界来说太窄。本轮按该要求复现、修复并重跑验收。
+
+### 9.0 与 PI Desktop 的对照（避免错误宣称）
+
+复核 `upstream/pi-desktop` @ `0111e306`：`packages/agent-runtime/package.json` 的 `bundle` 用 esbuild、
+以包目录为上下文（相对路径 `src/sidecar.ts` → `dist-bundle/sidecar.js`）；
+`packages/agent-runtime/src/extensions/bundle.test.ts` 的两个 describe（E2E-245 与 packaged sidecar
+loader）都在 `mkdtemp` 工作目录里构建 bundle 并从仓库外的目录加载 TS 扩展，但没有重复构建、跨
+TMPDIR 或哈希一致性断言。PI 没有与本项相同的 OMP Bun gate 构建器，因此**不能**把 PI 写成已有
+重复哈希测试；本项检查在 OMP lane 才必要。
+
+### 9.1 RED（生产路径与字节级复现，均在 `d1a73205` 的未修复实现上）
+
+- 生产路径：新增回归用例经真实 CLI 两次构建（仅 TMPDIR 深度不同，见 §9.3）→ `node --test
+  apps/desktop/test/omp-sidecar.test.mjs` **1 failed / exit 1**，`AssertionError: the gate bundle must
+  not depend on the run root`（两份工具门 Buffer `deepStrictEqual` 不等）；原始输出
+  `docs/validation/M6-r4-3-sidecar-provenance/depth-red/regression-red.txt`。
+- 字节级：与生产相同的 gate 命令（`bun build <gate> --target=bun --outfile …`，cwd 为 `mkdtemp` 运行
+  根）在两组不同深度的运行根下得到 10130 B/`f6a10e7b…` 与 10157 B/`8340b5b1…`；`cmp` exit 1，
+  `diff -u` 只有三处模块路径注释（`../…` 前缀层级不同）。原始 bundle、sha256 与 diff 见
+  `.../depth-red/`。此前 2026-09-28 观测的 10112 → 10130 B 保留在 §5/§8 的历史文本中。
+- 根因：Bun 为每个模块写出相对构建 cwd 的路径注释；未修复实现的 cwd 是 `mkdtemp(os.tmpdir())`，于是
+  注释（进而字节与摘要）随 TMPDIR 深度变化，也会泄漏检出绝对路径。
+
+### 9.2 修复（只改编译上下文）
+
+`app/scripts/omp-sidecar.mjs` 新增 `gateContext = dirname(gateSource)`，gate 编译改为
+`cwd: gateContext`（工具门自身目录），并注明原因。未改动：`isolatedEnv(runRoot)`（HOME/XDG/profile
+隔离）、runRoot 内的运行时探针、watchdog/reaping/清理、权限行为与全部 fail-closed 校验；运行期会话
+cwd、bytecode 模式（`SIDECAR_BYTECODE=true`）、loader 回退、provenance schema `/3`、受控 fork 均不变。
+稳定上下文使注释固定为 `../src/…` 与 `omp-desktop-gate.ts`：
+
+| 编译 | cwd | 字节 | SHA-256 |
+| --- | --- | --- | --- |
+| 同一目录两次 | `app/packages/omp-runtime/extensions` | 9897 / 9897 | `89c2d844…` / `89c2d844…` |
+| 复制到 `/tmp/r43fix/relocated/deeper/pkg/omp-runtime/extensions` 后编译 | 该副本的 extensions 目录 | 9897 | `89c2d844…` |
+
+即字节不再依赖运行根深度，也不再依赖检出被放在哪里。
+
+### 9.3 回归测试（新增，走生产路径；无 283 MB 编译）
+
+`apps/desktop/test/omp-sidecar.test.mjs` 新增
+`the tool gate bundle is identical under temporary roots of different depth`：夹具（tiny git 检出 +
+可用的 `build-binary.ts` 假二进制，仍由真实 Bun 执行）经真实 CLI `--build` 两次，`TMPDIR` 指向浅/深
+两棵根、输出目录不同；断言两次工具门的**实际字节**与**完整 provenance** 相等，并断言工具门仍是
+自包含 bundle（无相对导入）。夹具在 `apps/desktop/test/helpers/omp-fork-fixture.mjs` 中升级：假
+build entry 写出一个 `--version` 如真实 sidecar 的极小可执行文件（`dist/` 已 gitignore，后续构建仍
+看到干净树），因此每个用例只编译真实工具门，不编译真二进制。
+
+- RED（未修复）：1 failed（§9.1）；GREEN（修复后）：该文件 **9 pass / 0 fail**（用例耗时 110.8 ms）。
+- Bun 缺失时用例以显式原因 skip（app 的 CI unit-test 作业不安装 Bun）；本机 Bun 1.4.2 实测运行。
+
+### 9.4 两次完整真实构建（CLI；输出目录与 TMPDIR 根都不同、深度不同）
+
+```
+TMPDIR=/tmp/r43g/tmp-a        node app/scripts/omp-sidecar.mjs --build --source /home/vv/person/code/omp-fork-m6/oh-my-pi --out /tmp/r43g/out-a --json
+TMPDIR=/tmp/r43g/tmp-b/x/y/z  node app/scripts/omp-sidecar.mjs --build --source /home/vv/person/code/omp-fork-m6/oh-my-pi --out /tmp/r43g/out-b --json
+```
+
+| 项目 | out-a | out-b |
+| --- | --- | --- |
+| 退出码 | 0 | 0 |
+| 二进制 | 283997664 B、`f69ee0b2…` | 283997664 B、`f69ee0b2…` |
+| 工具门 | 9897 B、`89c2d844…` | 9897 B、`89c2d844…` |
+
+`cmp out-a/omp out-b/omp` **exit 0**；`cmp` 两份工具门 **exit 0**；`diff -u` 两份完整 provenance
+**exit 0**（原始输出在 `.../green/`，含两条构建命令的 TMPDIR 根）。fork commit `6226f80…`、tree
+`5249cb0…`、patch level `62bc57b+omp-desktop.3`、Bun 1.4.2、bytecode 模式均与原记录一致；二进制逐位
+不变说明该修复只影响工具门。
+
+### 9.5 新产物上的真实 smoke（无付费模型）
+
+```
+OMP_SIDECAR_TEST_RESOURCES=/tmp/r43g/stage npx vitest run packages/omp-runtime/src/bundled-smoke.test.ts
+→ 1 file passed, 9 tests passed, exit 0
+```
+
+即 §5 表格中的 9 项：自包含工具门、无 bun/node 亦可运行、`idle`/`runtimeVersion 18.3.0`/protocol v2、
+`get_state` 无费用 RPC、诱饵变量零写入、`stop()` 的 `stopped/reaped/cleaned` 与零残留、篡改工具门被拒、
+异常死亡回收、永不 ready 清理。
+
+### 9.6 范围与限制
+
+本修复不宣称跨工具链版本（Bun 升级后需按 §3.2 重新测量）或跨目标平台（仅 Linux x64 实跑）的字节
+等价；未跑 electron-builder 真实打包、macOS/Windows 实机与 clean-runner packaging workflows，未调用
+真实付费模型。R3 仍为硬阻塞、ADR 0306 的 Cursor 产品门保留、T20-B/C/D 未开始、T20/T21 未完成；fork
+与 patch 构件未改动。

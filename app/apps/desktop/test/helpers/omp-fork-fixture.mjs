@@ -59,6 +59,13 @@ export function digestOfFile(path) {
 /**
  * A minimal OMP-shaped checkout whose HEAD is `base + one patch`, with a
  * manifest that describes exactly that. Returns `{ root, manifest, patchPath }`.
+ *
+ * The checkout carries a working stand-in for OMP's build entry: the real one
+ * compiles a ~283 MB single-file binary, while this one writes a tiny
+ * executable that answers `--version` exactly as the real sidecar does. That
+ * lets the production build path run end to end (the tool gate is still bundled
+ * by the real Bun) without a multi-minute compile. `dist/` is gitignored so a
+ * follow-up build still finds a clean tree.
  */
 export function fixtureRepo({ remote = "git@github.com:MisterBowie/oh-my-pi.git" } = {}) {
   const root = scratch("repo");
@@ -70,7 +77,17 @@ export function fixtureRepo({ remote = "git@github.com:MisterBowie/oh-my-pi.git"
   mkdirSync(join(root, "packages", "coding-agent", "scripts"), { recursive: true });
   mkdirSync(join(root, "src"), { recursive: true });
   writeFileSync(join(root, "packages", "utils", "package.json"), JSON.stringify({ version: FIXTURE_VERSION }));
-  writeFileSync(join(root, "packages", "coding-agent", "scripts", "build-binary.ts"), "// fixture build entry\n");
+  writeFileSync(
+    join(root, "packages", "coding-agent", "scripts", "build-binary.ts"),
+    [
+      'import { chmodSync, mkdirSync, writeFileSync } from "node:fs";',
+      'mkdirSync("dist", { recursive: true });',
+      `writeFileSync("dist/omp", "#!/bin/sh\\necho omp/${FIXTURE_VERSION}\\n");`,
+      'chmodSync("dist/omp", 0o755);',
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(join(root, ".gitignore"), "dist/\n");
   writeFileSync(join(root, "src", "tool.ts"), "export const value = 'base';\n");
   git(["add", "-A"], root);
   git(["commit", "-q", "-m", "base"], root);

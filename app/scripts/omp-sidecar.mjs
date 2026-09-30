@@ -78,6 +78,19 @@ const defaultManifest = join(appRoot, "patches", "oh-my-pi", "manifest.json");
 const defaultOut = join(appRoot, "apps", "desktop", "resources", "omp-runtime");
 const gateSource = join(appRoot, "packages", "omp-runtime", "extensions", "omp-desktop-gate.ts");
 
+/**
+ * The stable compilation context for the gate bundle.
+ *
+ * Bun writes each bundled module's path comment relative to the build cwd, so
+ * compiling from the transient `mkdtemp` run root made the gate's bytes — and
+ * with them its provenance digest — depend on the `TMPDIR` depth, and would
+ * leak the checkout's absolute path as well. The gate's own directory is a
+ * checkout-relative context: the comments come out as `../src/...` and
+ * `omp-desktop-gate.ts` for any checkout location or run root, so the bundle
+ * and its digest are a function of the controlled source alone.
+ */
+const gateContext = dirname(gateSource);
+
 /** The only provenance schema this entry point writes. */
 export const PROVENANCE_SCHEMA = "omp-desktop.bundled-sidecar/3";
 
@@ -316,7 +329,9 @@ export async function buildSidecar(options = {}) {
     const gateBuild = await runReaped(
       bunBinary(),
       ["build", gateSource, "--target=bun", "--outfile", gatePath],
-      { cwd: runRoot, env, timeoutMs: 300_000 },
+      // Bundle from the gate's own directory, never the transient run root:
+      // Bun's module path comments follow the build cwd (see `gateContext`).
+      { cwd: gateContext, env, timeoutMs: 300_000 },
     );
     if (gateBuild.status !== 0) {
       const tail = `${gateBuild.stdout}\n${gateBuild.stderr}`.trim().split("\n").slice(-4).join(" | ");

@@ -7,11 +7,13 @@
  * commit, with a dirty tree, with a version or file set that disagrees with the
  * controlled patch manifest, or whose patch is not the applied one, must be
  * refused before any compiler runs. The synthetic fixtures are tiny git
- * repositories, so nothing here needs the real fork checkout or a build.
+ * repositories, so nothing here needs the real fork checkout; the one test that
+ * runs a build uses the fixture's tiny stand-in binary and bundles the real
+ * tool gate with the real Bun.
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { register } from "node:module";
@@ -30,6 +32,7 @@ import {
   cleanupScratch,
   fixtureRepo,
   git,
+  scratch,
   writeFixtureManifest,
 } from "./helpers/omp-fork-fixture.mjs";
 
@@ -42,7 +45,7 @@ const manifestPath = join(appRoot, "patches", "oh-my-pi", "manifest.json");
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
 const { validateForkCheckout, normalizeRepositoryUrl: scriptNormalize, buildBinaryArgs, SIDECAR_BYTECODE } =
   await import(pathToFileURL(sidecarScript));
-const { loadManifest } = await import(pathToFileURL(patchScript));
+const { bunBinary, loadManifest } = await import(pathToFileURL(patchScript));
 const { normalizeRepositoryUrl: packageNormalize } = await import(
   "../../../packages/omp-runtime/src/bundled.ts"
 );
@@ -215,3 +218,60 @@ test("the patch manifest refuses a malformed fork block", () => {
     /fork\.tree is not a full tree id/,
   );
 });
+
+/**
+ * Outcome determinism for the one compile in this build that goes through a
+ * bundler: Bun writes each module's path comment relative to the build cwd, so
+ * the gate's bytes — and its provenance digest — must not depend on the
+ * transient `mkdtemp` run root, whose depth follows `TMPDIR`. Two real builds
+ * under run roots of different depth must land on identical gate bytes and an
+ * identical provenance manifest; the heavy binary is the fixture's stand-in,
+ * the gate bundle is the real one.
+ */
+const bunProbe = spawnSync(bunBinary(), ["--version"], { encoding: "utf8" });
+
+test(
+  "the tool gate bundle is identical under temporary roots of different depth",
+  {
+    skip:
+      bunProbe.status === 0
+        ? false
+        : `Bun is required to bundle the tool gate (install Bun 1.4.2 or set BUN_BINARY): ${(bunProbe.error?.message ?? bunProbe.stderr ?? "").trim()}`,
+    timeout: 180_000,
+  },
+  () => {
+    const fixture = fixtureRepo();
+    const manifestPath = writeFixtureManifest(fixture);
+    const root = scratch("depth");
+    const shallowTmp = join(root, "shallow");
+    const deepTmp = join(root, "deep", "one", "two", "three");
+    mkdirSync(shallowTmp, { recursive: true });
+    mkdirSync(deepTmp, { recursive: true });
+
+    const buildUnder = (tmp, label) => {
+      const out = join(root, label);
+      const run = spawnSync(
+        process.execPath,
+        [sidecarScript, "--build", "--source", fixture.root, "--manifest", manifestPath, "--out", out, "--json"],
+        { encoding: "utf8", env: { ...process.env, TMPDIR: tmp } },
+      );
+      assert.equal(run.status, 0, `${label}: ${run.stderr}`);
+      return {
+        provenance: JSON.parse(run.stdout),
+        gate: readFileSync(join(out, "extensions", "omp-desktop-gate.js")),
+      };
+    };
+
+    const shallow = buildUnder(shallowTmp, "shallow");
+    const deep = buildUnder(deepTmp, "deep");
+    assert.deepEqual(deep.gate, shallow.gate, "the gate bundle must not depend on the run root");
+    assert.deepEqual(
+      deep.provenance,
+      shallow.provenance,
+      "the provenance manifest must not depend on the run root",
+    );
+    // The gate is loaded from Resources, where nothing can resolve a relative
+    // import beside it: the bundle must stay self-contained.
+    assert.doesNotMatch(shallow.gate.toString("utf8"), /(?:from|import)\s*\(?\s*["'][.]{1,2}\//);
+  },
+);
