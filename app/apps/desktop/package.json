@@ -26,6 +26,7 @@
     "bundle:runtime": "pnpm -C ../../packages/agent-runtime bundle",
     "build:sidecar": "node ../../scripts/omp-sidecar.mjs --build",
     "verify:sidecar": "node ../../scripts/omp-sidecar.mjs --preflight",
+    "verify:packaged-runtime": "node ../../scripts/verify-packaged-runtime.mjs",
     "pack": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/release-package.mjs --dir",
     "dist": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/release-package.mjs --publish never",
     "dist:mac": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/release-package.mjs --platform darwin --publish never",

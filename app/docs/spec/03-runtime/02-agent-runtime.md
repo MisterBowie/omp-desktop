@@ -1878,7 +1878,7 @@ Non-Cursor providers and Cursor models in Agent mode are untouched. R3 itself
 remains blocked and T20-B/C/D remain unstarted: this gate is a precondition for
 that work, not the feature.
 
-## 17. Bundled sidecar build and admission (M5/T20-R4B; reproducible builds since M6/T20-R4-3, ADR 0307)
+## 17. Bundled sidecar build and admission (M5/T20-R4B; reproducible builds since M6/T20-R4-3; packaged-resource acceptance since M6/T21-A, ADR 0307)
 
 A packaged build runs exactly one OMP runtime, and that runtime is a build
 product of this project rather than the upstream tag: `omp/18.3.0` plus patch
@@ -2014,6 +2014,30 @@ level `62bc57b+omp-desktop.3`, carried by the controlled fork commit recorded in
   variables, proxies and credentials), and stop/reclaim removes its process group
   and owned run root. Verified against the real compiled binary; see
   `docs/validation/M5-bundled-sidecar.md`.
+* **Packaged-resource acceptance.** `scripts/verify-packaged-runtime.mjs` takes
+  the electron-builder output — a packaged application's `Resources` directory —
+  and drives it through the production modules rather than a second
+  implementation: `verifyBundledRuntime`, then the verified binary and the
+  verified gate through `OmpRuntimeSupervisor` with the desktop's own
+  `--trusted-extension` argument chain, the child's PATH reduced to one empty
+  directory, and a launching environment that carries a `NODE_PATH`, discovery
+  redirects and a credential. The run must reach `idle` at the pinned version,
+  negotiate protocol v2, answer a provider-free `get_state`, keep the decoy
+  directories untouched, and stop with its process group reaped and its run root
+  removed; where the host exposes the child's environment (Linux `/proc`), the
+  empty PATH, the run-root HOME and the absence of `NODE_PATH`, redirects and
+  credentials are asserted as facts. A non-existent trusted extension must keep
+  the runtime from becoming usable (it refuses such a path), which is what makes
+  a successful start evidence of a *loaded* gate. `--verify-only` stops after
+  the verifier. The entry never verifies an implicit path, and both a refusal
+  and a failure exit non-zero. It accepts the runtime boundary of a packaged
+  build headlessly; it is not a GUI launch, and the installer acceptance inside
+  the real application remains T22/T23 work. A desktop regression suite
+  (`apps/desktop/test/packaged-runtime-verify.test.mjs`) holds the entry to that
+  contract: argument and path refusals always, and — when `OMP_T21_RESOURCES`
+  names a real `Resources` tree — a swapped gate, a binary whose bytes no longer
+  match, a missing binary, another platform/architecture, and a forged patch
+  level or schema (opt-in; a skip is not a pass).
 
 The pins this build checks are mirrored in `@pi-desktop/shared`
 (`OMP_RUNTIME_BASE_SHA`, `OMP_RUNTIME_PATCH_LEVEL`, `OMP_RUNTIME_FORK_REPOSITORY`,

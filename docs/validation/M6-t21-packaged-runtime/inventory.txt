@@ -1,0 +1,32 @@
+# T21-A artifact inventory (Linux x64, 2026-09-30T18:28:22Z)
+# electron-builder output: app/apps/desktop/release/linux-unpacked
+
+## command
+OMP_SIDECAR_SOURCE=/home/vv/person/code/omp-fork-m6/oh-my-pi pnpm run pack   # cwd app/   -> exit 0
+
+## versions
+node      v24.14.0
+pnpm      10.34.5
+bun       1.4.2
+cargo     cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+rustc     rustc 1.95.0 (59807616e 2026-04-14)
+electron  43.6.0
+electron-builder 26.15.3
+kernel    Linux 7.0.0-34-generic x86_64 GNU/Linux
+
+## digests
+f69ee0b283691bf449e10734775995057cf7b89f4c68bfb077defaeaa7ffe02d  app/apps/desktop/release/linux-unpacked/resources/omp-runtime/omp
+89c2d84451e9b9403afc2169501bbb7a25c42eef607c9c8e88d6d71abed1963c  app/apps/desktop/release/linux-unpacked/resources/omp-runtime/extensions/omp-desktop-gate.js
+f69ee0b283691bf449e10734775995057cf7b89f4c68bfb077defaeaa7ffe02d  app/apps/desktop/resources/omp-runtime/omp
+89c2d84451e9b9403afc2169501bbb7a25c42eef607c9c8e88d6d71abed1963c  app/apps/desktop/resources/omp-runtime/extensions/omp-desktop-gate.js
+bf21f8a81d49b33f68fcfedee04f238fcb2e1e303b1e54f0ccd7c2e8307fff9f  app/target/release/pi-desktop-host-core
+28a3dbdf210110fdf4be4f43a2c13aea8df631907d857ab792202c6af3b1fc24  app/apps/desktop/release/linux-unpacked/resources/agent-runtime/sidecar.js
+e61731401d2a1c602a3043d63c57ec0be55b10fd9e8ef26e4340d4dc3a2aff8e  app/apps/desktop/release/linux-unpacked/resources/app.asar
+
+## sizes
+598M	app/apps/desktop/release/linux-unpacked
+
+## staged copy
+/tmp/omp-t21 打包验收 空格/资源 (cp -a of the packaged resources; 324M)
+324M	app/apps/desktop/release/linux-unpacked/resources
+271M	app/apps/desktop/resources/omp-runtime   # 预检暂存目录（gitignored 构建产物）

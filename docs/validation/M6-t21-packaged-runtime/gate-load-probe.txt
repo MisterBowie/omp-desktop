@@ -1,0 +1,6 @@
+=== missing trusted extension (negative control) ===
+START_FAIL {"code":"not-started","message":"OMP runtime exited (code 1, signal null)","detail":"627736 |       let resolvedPath;\n627737 |       let stat;\n627738 |       try {\n627739 |         resolvedPath = fsSync2.realpathSync.native(trustedPath);\n627740 |         stat = fsSync2.statSync(resolvedPath);\n627741 |         throw new Error(`Trusted extension must be an existing module file: ${trustedPath}`);\n                       ^\nerror: Trusted extension must be an existing module file: /home/vv/person/code/omp-desktop-m6-t21/app/apps/desktop/release/linux-unpacked/resources/omp-runtime/extensions/does-not-exist.js\n      at <anonymous> (/$bunfs/root/omp:627741:15)\n      at map (1:11)\n      at buildSessionOptions (/$bunfs/root/omp:627734:54)\n\n"}
+RECLAIM []
+=== real trusted extension (control) ===
+START_OK {"engine":"omp","phase":"idle","runtimeVersion":"18.3.0","protocolVersion":2,"reason":null,"capabilities":{"prompt":true,"stop":true,"resume":true,"branch":false,"steer":false,"followUp":false,"modelSwitch":true,"structuredQuestions":true,"toolApproval":true,"subagentEvents":true}}
+RECLAIM [{"stopped":true,"reaped":true,"cleaned":true,"steps":["abort acknowledged","closed stdin","exited after stdin closed","group empty","run root removed"],"errors":[]}]

@@ -1,0 +1,14 @@
+# command: OMP_SIDECAR_TEST_RESOURCES='<stage>' npx vitest run packages/omp-runtime/src/bundled-smoke.test.ts   (cwd app)
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "strict-peer-dependencies". This will stop working in the next major version of npm.
+npm warn Unknown project config "auto-install-peers". This will stop working in the next major version of npm.
+
+ RUN  v4.1.10 /home/vv/person/code/omp-desktop-m6-t21/app
+
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  02:27:29
+   Duration  5.07s (transform 264ms, setup 0ms, import 431ms, tests 4.58s, environment 0ms)
+
+SMOKE_EXIT=0

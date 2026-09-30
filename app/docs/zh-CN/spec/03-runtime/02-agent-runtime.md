@@ -1148,7 +1148,7 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
 非 Cursor 提供方与 Agent 模式下的 Cursor 模型不受影响。R3 本身仍未解除、T20-B/C/D 仍未开始：
 本门是这些工作的前置条件，而不是该功能本身。
 
-## 17. bundled sidecar 的构建与准入（M5/T20-R4B；自 M6/T20-R4-3 起为可复现构建，ADR 0307）
+## 17. bundled sidecar 的构建与准入（M5/T20-R4B；自 M6/T20-R4-3 起为可复现构建；自 M6/T21-A 起含打包资源验收，ADR 0307）
 
 打包构建只运行一个 OMP 运行时，而该运行时是本项目的构建产物，而不是上游标签：`omp/18.3.0`
 加上 patch level `62bc57b+omp-desktop.3`，由 `app/patches/oh-my-pi/manifest.json` 记录的自有 fork
@@ -1234,6 +1234,20 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
 * **隔离。** bundled 产物与固定启动器使用同一套环境策略（合成 HOME、`PI_CODING_AGENT_DIR`、剥离
   steering 变量/代理/凭证），stop/reclaim 会回收其进程组与自有的 run root。已用真实编译产物验证，
   见 `docs/validation/M5-bundled-sidecar.md`。
+* **打包资源验收。** `scripts/verify-packaged-runtime.mjs` 接受 electron-builder 的真实产物——打包
+  应用的 `Resources` 目录——并用生产模块而不是第二套实现来驱动它：先 `verifyBundledRuntime`，再把
+  已校验的二进制与工具门经 `OmpRuntimeSupervisor` 用桌面自身的 `--trusted-extension` 参数链启动，
+  子进程 PATH 收缩为一个空目录，启动环境里带有 `NODE_PATH`、发现重定向变量与一份凭证。运行必须到
+  达 `idle`、版本为 pins 中的版本、协商协议 v2、完成无提供方的 `get_state`、诱饵目录零写入，并以
+  进程组已回收、run root 已删除结束；在宿主可读取子进程环境处（Linux `/proc`），空 PATH、run root
+  内的 HOME 以及 `NODE_PATH`/重定向/凭证的缺席都被作为事实断言。不存在的 trusted extension 必须
+  让运行时无法变为可用（它会拒绝该路径），这正是"启动成功即工具门确实被加载"的依据。
+  `--verify-only` 在校验后即停。该入口绝不校验隐式路径，拒绝与失败都以非零退出。它无头地验收打包
+  构建的运行时边界，不是 GUI 启动；真实应用内的安装包验收仍属 T22/T23。桌面回归套件
+  （`apps/desktop/test/packaged-runtime-verify.test.mjs`）把它固定在该契约上：参数与路径拒绝始终
+  运行；当 `OMP_T21_RESOURCES` 指向真实 `Resources` 树时，再验证被掉包的工具门、字节不再匹配的
+  二进制、缺失的二进制、其他平台/架构，以及伪造的 patch level 或 schema（opt-in；skip 不等于
+  通过）。
 
 本构建校验的 pins 镜像在 `@pi-desktop/shared`（`OMP_RUNTIME_BASE_SHA`、
 `OMP_RUNTIME_PATCH_LEVEL`、`OMP_RUNTIME_FORK_REPOSITORY`、`OMP_RUNTIME_FORK_COMMIT`），因为打包

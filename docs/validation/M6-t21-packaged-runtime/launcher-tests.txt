@@ -1,0 +1,22 @@
+# command: node --test test/omp-runtime-launcher.test.mjs   (cwd app/apps/desktop)
+✔ an explicit runtime path wins and is the only candidate considered (0.805861ms)
+✔ an unusable explicit path is an error, not a reason to search elsewhere (0.380256ms)
+✔ a packaged build admits only a resource that matches its provenance (2.174769ms)
+✔ a packaged build ignores every development channel (0.49503ms)
+✔ a packaged build refuses a tampered or absent provenance manifest (4.344844ms)
+✔ an unpackaged build finds the pinned submodule launcher by walking up (0.356781ms)
+✔ this worktree resolves its own pinned launcher (0.093079ms)
+✔ the product identity is independent of the fork it came from (0.166823ms)
+✔ the data-directory resolver never lands on the fork's directory (2.510157ms)
+✔ development builds disable automatic updates and the feed is this product's (0.27888ms)
+✔ a refused bundled resource keeps its reason instead of a generic missing runtime (0.761051ms)
+✔ a packaged build resolves the gate only from verified resources (1.004857ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 260.701078
+# exit=0
