@@ -18,6 +18,7 @@ import { spawnSync } from "node:child_process";
 import {
   closeSync,
   copyFileSync,
+  existsSync,
   linkSync,
   mkdirSync,
   mkdtempSync,
@@ -32,11 +33,12 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = join(here, "..", "..", "..");
 const entry = join(appRoot, "scripts", "verify-packaged-runtime.mjs");
+const entryModule = await import(pathToFileURL(entry).href);
 
 const created = [];
 function scratch(label) {
@@ -78,6 +80,189 @@ test("a missing, non-directory, or non-packaged resources path is refused", () =
   assert.equal(empty.status, 2);
   assert.match(empty.stderr, /has no omp-runtime\//);
   assert.doesNotMatch(empty.stdout, /PACKAGED-RUNTIME-OK/);
+});
+
+/**
+ * A supervisor-shaped double for the entry's failure paths.
+ *
+ * The acceptance needs a constructor, `start()`, `reclaimAll()` and — for
+ * ownership reporting — `runRoot()`/`pendingCleanup`. The doubles let the
+ * regression drive "the runtime never starts" and "a run cannot be reclaimed"
+ * deterministically, without a real unkillable process.
+ */
+function fakeSupervisor(behaviour = {}) {
+  return class FakeSupervisor {
+    constructor(options) {
+      this.options = options;
+      this.kept = [];
+      behaviour.construct?.(this, options);
+    }
+    runRoot() {
+      return this.kept.length > 0 ? this.kept[0].runRoot : null;
+    }
+    get pendingCleanup() {
+      return this.kept;
+    }
+    async start() {
+      if (behaviour.start) return behaviour.start(this);
+      return { phase: "idle", runtimeVersion: "18.3.0", protocolVersion: 2 };
+    }
+    async reclaimAll() {
+      if (behaviour.reclaimAll) return behaviour.reclaimAll(this);
+      return [];
+    }
+  };
+}
+
+/** The failure the compiled runtime raises before `ready` for an unloadable gate. */
+function gateStartFailure(path) {
+  return Object.assign(new Error("OMP runtime exited (code 1, signal null)"), {
+    code: "not-started",
+    detail: `error: Trusted extension must be an existing module file: ${path}\n      at <anonymous> (/$bunfs/root/omp:1:15)\n`,
+  });
+}
+
+function gateControlOptions(root, missingGatePath) {
+  return {
+    dataRoot: join(root, "gate-control"),
+    launcherPath: join(root, "omp"),
+    expectedRuntimeVersion: "18.3.0",
+    missingGatePath,
+    emptyPathDir: root,
+  };
+}
+
+test("the gate control accepts only the refusal that names the missing gate", async () => {
+  const root = scratch("gate-control");
+  const missing = join(root, "does-not-exist.js");
+
+  // The runtime's own refusal, naming exactly the missing path, is the one
+  // observation that proves the gate argument is load-bearing.
+  await entryModule.expectGateRefusal(
+    fakeSupervisor({
+      start: () => {
+        throw gateStartFailure(missing);
+      },
+    }),
+    gateControlOptions(root, missing),
+  );
+
+  // A refusal naming another file proves nothing about this gate.
+  await assert.rejects(
+    entryModule.expectGateRefusal(
+      fakeSupervisor({
+        start: () => {
+          throw gateStartFailure(join(root, "another-file.js"));
+        },
+      }),
+      gateControlOptions(root, missing),
+    ),
+    /not rejected by the missing gate/,
+  );
+
+  // Neither does an unrelated start failure: a timeout must not be mistaken
+  // for the gate being load-bearing.
+  await assert.rejects(
+    entryModule.expectGateRefusal(
+      fakeSupervisor({
+        start: () => {
+          throw Object.assign(new Error("the runtime did not become ready"), {
+            code: "ready-timeout",
+            detail: "no ready frame arrived",
+          });
+        },
+      }),
+      gateControlOptions(root, missing),
+    ),
+    /not rejected by the missing gate/,
+  );
+
+  // And a runtime that starts with the missing gate disproves the control.
+  await assert.rejects(
+    entryModule.expectGateRefusal(fakeSupervisor(), gateControlOptions(root, missing)),
+    /accepted the non-existent trusted extension/,
+  );
+});
+
+test("a gate control run that cannot be reclaimed is reported with its ownership", async () => {
+  const root = scratch("gate-control-retained");
+  const missing = join(root, "does-not-exist.js");
+  const runRoot = join(root, "gate-control", "omp-runtime", "run-stuck");
+  const RetainedSupervisor = fakeSupervisor({
+    start: () => {
+      throw gateStartFailure(missing);
+    },
+    reclaimAll(self) {
+      self.kept.push({ runRoot, pid: 4242, pgid: 4242, reaped: true });
+      return [{ stopped: false, reaped: true, cleaned: false, steps: [], errors: [`could not remove ${runRoot}`] }];
+    },
+  });
+
+  await assert.rejects(
+    entryModule.expectGateRefusal(RetainedSupervisor, gateControlOptions(root, missing)),
+    (error) => {
+      assert.match(error.message, /could not be reclaimed/);
+      assert.match(error.message, /run-stuck/);
+      assert.equal(
+        error.acceptanceRetention?.ownership?.some((line) => line.includes("run-stuck")),
+        true,
+        "the retained ownership must travel on the error",
+      );
+      return true;
+    },
+  );
+  assert.equal(existsSync(root), true, "the control root must be retained for a retry");
+});
+
+test("the acceptance root survives a reclamation that cannot complete", async () => {
+  const root = scratch("release-incomplete");
+  const runRoot = join(root, "data", "omp-runtime", "run-stuck");
+  const IncompleteSupervisor = fakeSupervisor({
+    reclaimAll(self) {
+      self.kept.push({ runRoot, pid: 7, pgid: 7, reaped: true });
+      return [{ stopped: false, reaped: true, cleaned: false, steps: [], errors: [`could not remove ${runRoot}`] }];
+    },
+  });
+  const release = await entryModule.releaseAcceptanceRoot(new IncompleteSupervisor({}), root);
+  assert.equal(release.ok, false);
+  assert.equal(release.retainedRoot, root);
+  assert.match(release.reason, /reclamation is incomplete/);
+  assert.match(release.ownership.join(" "), /run-stuck/);
+  assert.equal(existsSync(root), true, "an incomplete reclamation must not delete the root");
+
+  const ThrowingSupervisor = fakeSupervisor({
+    reclaimAll() {
+      throw new Error("process tree termination failed");
+    },
+  });
+  const thrown = await entryModule.releaseAcceptanceRoot(new ThrowingSupervisor({}), root);
+  assert.equal(thrown.ok, false);
+  assert.match(thrown.reason, /reclaimAll threw/);
+  assert.equal(existsSync(root), true, "a thrown reclamation must not delete the root");
+});
+
+test("a complete reclamation removes the acceptance root", async () => {
+  const root = scratch("release-clean");
+  const CleanSupervisor = fakeSupervisor();
+  const release = await entryModule.releaseAcceptanceRoot(new CleanSupervisor({}), root);
+  assert.equal(release.ok, true);
+  assert.equal(existsSync(root), false);
+});
+
+test("an ownership held by an earlier step withholds the acceptance root", async () => {
+  const root = scratch("release-held");
+  const CleanSupervisor = fakeSupervisor();
+  const release = await entryModule.releaseAcceptanceRoot(new CleanSupervisor({}), root, {
+    heldReason: "the gate-load control retained its run root",
+    heldOwnership: [`${join(root, "run-stuck")} (pid 9, pgid 9, process group reaped: true)`],
+  });
+  assert.equal(release.ok, false);
+  assert.equal(release.retainedRoot, root);
+  assert.equal(existsSync(root), true);
+  assert.equal(
+    release.ownership.some((line) => line.includes("run-stuck")),
+    true,
+  );
 });
 
 const ARTIFACT_ROOT = process.env.OMP_T21_RESOURCES ?? null;
@@ -232,4 +417,94 @@ test("refuses a manifest that is not the pinned one", { skip: skipWithoutArtifac
   const schemaRun = runEntry(["--resources", wrongSchema, "--verify-only"]);
   assert.equal(schemaRun.status, 1);
   assert.match(schemaRun.stderr, /provenance schema is .*, expected/);
+});
+
+/** The launching variables `runAcceptance` overrides; each must be restored. */
+const INHERITED_KEYS = [
+  "NODE_PATH",
+  "XDG_CONFIG_HOME",
+  "XDG_DATA_HOME",
+  "OMP_PROFILE",
+  "PI_DESKTOP_DATA_DIR",
+  "ANTHROPIC_API_KEY",
+];
+
+function snapshotEnv(keys) {
+  return new Map(keys.map((key) => [key, process.env[key]]));
+}
+
+function restoreEnv(snapshot) {
+  for (const [key, value] of snapshot) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+}
+
+test("a failed acceptance retains an unreclaimable root and restores the environment", { skip: skipWithoutArtifact }, async () => {
+  const snapshot = snapshotEnv(INHERITED_KEYS);
+  let acceptRoot = null;
+  const foreignRunRoot = join(tmpdir(), "omp-t21-repair-retained-run");
+  const RetainedSupervisor = fakeSupervisor({
+    construct(self, options) {
+      acceptRoot = dirname(options.dataRoot);
+    },
+    start: () => {
+      throw new Error("the runtime never became usable");
+    },
+    reclaimAll(self) {
+      self.kept.push({ runRoot: foreignRunRoot, pid: 4711, pgid: 4711, reaped: true });
+      return [
+        { stopped: false, reaped: true, cleaned: false, steps: [], errors: [`could not remove ${foreignRunRoot}`] },
+      ];
+    },
+  });
+  process.env.NODE_PATH = "/sentinel/node-path";
+  process.env.ANTHROPIC_API_KEY = "sentinel-key";
+  const expectedEnv = snapshotEnv(INHERITED_KEYS);
+  try {
+    await assert.rejects(
+      entryModule.runAcceptance(ARTIFACT_ROOT, { supervisorClass: RetainedSupervisor }),
+      (error) => {
+        assert.match(error.message, /the runtime never became usable/);
+        assert.match(error.message, /retained at/);
+        assert.match(error.message, /omp-t21-repair-retained-run/);
+        return true;
+      },
+    );
+    assert.equal(existsSync(acceptRoot), true, "an unreclaimable run must keep the acceptance root");
+    for (const key of INHERITED_KEYS) {
+      const value = expectedEnv.get(key);
+      if (value === undefined) assert.equal(Object.hasOwn(process.env, key), false, `${key} must be restored`);
+      else assert.equal(process.env[key], value, `${key} must be restored`);
+    }
+  } finally {
+    restoreEnv(snapshot);
+    if (acceptRoot) rmSync(acceptRoot, { recursive: true, force: true });
+  }
+});
+
+test("a failed acceptance deletes only a root whose runs were all reclaimed", { skip: skipWithoutArtifact }, async () => {
+  const snapshot = snapshotEnv(INHERITED_KEYS);
+  let acceptRoot = null;
+  const CleanSupervisor = fakeSupervisor({
+    construct(self, options) {
+      acceptRoot = dirname(options.dataRoot);
+    },
+    start: () => {
+      throw new Error("the runtime never became usable");
+    },
+  });
+  const expectedEnv = snapshotEnv(INHERITED_KEYS);
+  try {
+    await assert.rejects(entryModule.runAcceptance(ARTIFACT_ROOT, { supervisorClass: CleanSupervisor }));
+    assert.equal(existsSync(acceptRoot), false, "a clean reclamation disposes of the scratch root");
+    for (const key of INHERITED_KEYS) {
+      const value = expectedEnv.get(key);
+      if (value === undefined) assert.equal(Object.hasOwn(process.env, key), false, `${key} must be restored`);
+      else assert.equal(process.env[key], value, `${key} must be restored`);
+    }
+  } finally {
+    restoreEnv(snapshot);
+    if (acceptRoot) rmSync(acceptRoot, { recursive: true, force: true });
+  }
 });

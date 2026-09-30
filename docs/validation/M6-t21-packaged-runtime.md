@@ -8,9 +8,14 @@ electron-builder 的 unpacked 应用，并对其中 `Resources/omp-runtime` 的 
 写入）。T21 仍为**进行中**：本阶段**不是** macOS 安装包验收、**不是** GUI 启动、**不是** Windows
 或其他架构证据。
 
+> 2026-10-01 独立复审返修（本记录 §11）：四项发现已修复并重跑——工具门负对照此前会接受任意启动
+> 失败、验收清理会吞掉回收失败并删除所有权记录、§1/§2 文档混写参考实现与真实命令、证据链接指向未
+> 提交文件。修复只触及验收入口、其回归测试、spec 文字与本记录/证据；产品运行时与权限路径未改。
+
 - 工作树：`/home/vv/person/code/omp-desktop-m6-t21`，分支 `codex/m6-t21-packaged-runtime`，
-  基线 `da75c653d119918e9426c75c50e73f73d3e49784`（M6/T20-R4-3 复审返修末次提交；不 amend /
-  rebase / 强推）
+  基线 `da75c653d119918e9426c75c50e73f73d3e49784`（M6/T20-R4-3 复审返修末次提交；T21-A 首稿
+  `bec20b214bee792b656d85aab5469e459b96eccc`，本轮复审返修在其后追加提交，不 amend / rebase /
+  强推）
 - 环境：Linux x64（kernel `7.0.0-34-generic`）、Node v24.14.0、pnpm 10.34.5、**Bun 1.4.2**、
   cargo/rustc 1.95.0、Electron 43.6.0、electron-builder 26.15.3；本机**无** Xvfb / xvfb-run
   （GUI 启动不在本阶段范围）
@@ -29,15 +34,17 @@ electron-builder 的 unpacked 应用，并对其中 `Resources/omp-runtime` 的 
 
 | 证据源 | 事实（本轮观察） | 对 T21-A 的含义 |
 | --- | --- | --- |
-| PI `upstream/pi-desktop` @ `0111e306` | 实测 `apps/desktop/package.json` 的 `pack` 链为 `build:deps && build:host-release && bundle:runtime && electron-vite build && electron-builder --dir`（`dist:mac/win/linux` 同形，仅改平台开关与 `--publish`）；`packages/agent-runtime/package.json` 的 `bundle` 用 esbuild 产出 `dist-bundle/sidecar.js`（`--platform=node --format=esm --define:PI_BUNDLED_NODE=true`）并链式写出 `{"type":"module"}`。`apps/desktop/test/agent-runtime-bundle-package.test.mjs` 文件头自述只断言 bundle 脚本契约与 extraResources 映射、**不运行完整 esbuild、更不启动产物**；`release-asar.test.mjs` 是 asar 修复的源码级断言；`packaging-footprint.test.mjs` 是配置契约；`scripts/e2e-electron-boot.mjs` 是 dev 启动。 | PI 侧没有"实际安装包内 OMP 运行时启动"的等价验收，不能把上述测试冒充 T21-A 证据。本轮复用 PI 的 **extraResources 目录拷贝**思路，但验证对象换成 OMP sidecar。 |
-| OMP `upstream/oh-my-pi` @ `62bc57be` | `packages/coding-agent/scripts/build-binary.ts`（Bun 单文件编译，`--bytecode`/`--no-bytecode` 显式开关）、`packages/natives/scripts/embed-native.ts`（固定时间戳的原生插件归档）与 natives README 是产物来源；本项目的受控 fork 就在这两个文件上做了 patch-3 改动。 | 真实产物必须由该入口编译；本项目不另写编译器。 |
+| PI `upstream/pi-desktop` @ `0111e306` | 实测 `apps/desktop/package.json` 的 `pack` 链为 `build:deps && build:host-release && bundle:runtime && electron-vite build && electron-builder --dir`（`dist:mac/win/linux` 同形，仅改平台开关与 `--publish`）；`packages/agent-runtime/package.json` 的 `bundle` 用 esbuild 产出 `dist-bundle/sidecar.js`（`--platform=node --format=esm --define:PI_BUNDLED_NODE=true`）并链式写出 `{"type":"module"}`。`apps/desktop/test/agent-runtime-bundle-package.test.mjs` 文件头自述只断言 bundle 脚本契约与 extraResources 映射、**不运行完整 esbuild、更不启动产物**；`release-asar.test.mjs` 用临时夹具对 `scripts/export-linux-asar.mjs` 的 `exportLinuxAsar` 做行为测试（导出 Linux 的 `app.asar` 资产、缺文件时报错）——它既不是 asar 修复的源码级断言，也不运行打包产物；`packaging-footprint.test.mjs` 是配置契约；`scripts/e2e-electron-boot.mjs` 是 dev 启动。 | PI 侧没有"实际安装包内 OMP 运行时启动"的等价验收，不能把上述测试冒充 T21-A 证据。本轮复用 PI 的 **extraResources 目录拷贝**思路，但验证对象换成 OMP sidecar。 |
+| OMP `upstream/oh-my-pi` @ `62bc57be` | `packages/coding-agent/scripts/build-binary.ts` 是上游的 Bun 单文件编译入口，`compile-binary.ts` 在该提交**硬编码** `bytecode: true`（没有命令行开关）；`packages/natives/scripts/embed-native.ts` 在该提交生成内嵌原生插件归档，但**不固定时间戳**。 | 真实产物必须由该入口编译；本项目不另写编译器。上游本身不提供本阶段所需的可复现性开关。 |
+| 受控 fork `MisterBowie/oh-my-pi` @ `6226f805`（patch-3） | 在 `build-binary.ts` 增加严格的 `--bytecode`/`--no-bytecode` 解析（未知/重复开关打印 `OMP-BUILD-ARGS` 并 exit 2），`compile-binary.ts` 增加 `bytecode` 选项（默认仍为上游的 `true`）；`embed-native.ts` 新增 `buildAddonArchive()`（固定每个 ustar 头的 mtime 并重算校验和）。sidecar 显式传 `--bytecode`，并把模式写入 provenance 的 `build.bytecode`。 | 本阶段的可复现字节与 `build.bytecode` 记录都来自 fork 的 patch-3，**不能归因给上游 `62bc57be`**。 |
 | 当前产品 | `app/scripts/omp-sidecar.mjs`（`--check`/`--build`/`--preflight`）产出二进制 + `provenance.json` + 工具门；`app/scripts/release-package.mjs` 是 `pack`/`dist*` 链尾唯一入口，把同一目标交给预检与 electron-builder；`packages/omp-runtime/src/bundled.ts` 的 `verifyBundledRuntime`/`resolveBundledGate` 是打包态唯一准入；`OmpRuntimeSupervisor` 负责启动、隔离、停止与回收；Electron 侧 `resolveRuntimeLauncher` + `resolveGateExtension` 在 `isPackaged` 下**只**接受 `resourcesPath/omp-runtime/...`。 | T21-A 的验收入口直接复用这些生产模块，不写第二套 provenance/隔离/回收实现。 |
 
 ---
 
 ## 2. 真实打包路径与产物（任务要求 1）
 
-命令与退出码（原始小日志：`pack.log`、`inventory.txt`）：
+命令与退出码（原始小日志：`pack.txt`、`inventory.txt`；`pack.txt` 是该次运行的 stdout 实录，转录止于
+electron-builder 的 `searching for node modules` 阶段，产物完整性与摘要以 `inventory.txt` 为准）：
 
 ```
 cd app
@@ -46,9 +53,12 @@ OMP_SIDECAR_SOURCE=/home/vv/person/code/omp-fork-m6/oh-my-pi pnpm run pack
 ```
 
 `pack` 链依次执行 `build:deps`（工作区 JS）→ `build:host-release`
-（`cargo build --release --locked -p host-core`，单跑 exit 0，约 38 s）→ `bundle:runtime`
-（`packages/agent-runtime/dist-bundle/sidecar.js`，esbuild）→ `electron-vite build` →
-`release-package.mjs --dir`，后者先跑 sidecar 预检再跑 electron-builder：
+（该 package script 原样为 `cargo build --release --manifest-path ../../Cargo.toml -p host-core`，
+**不含** `--locked`；`pack.txt` 显示它复用了此前单独构建的缓存，`Finished ... in 0.03s`）→
+`bundle:runtime`（`packages/agent-runtime/dist-bundle/sidecar.js`，esbuild）→ `electron-vite build` →
+`release-package.mjs --dir`，后者先跑 sidecar 预检再跑 electron-builder。**锁文件校验不在 pack 链内**：
+它是链外单独命令 `cargo build --release --locked -p host-core`（2026-10-01 复审返修时重跑 exit 0，
+产物 sha256 与 `inventory.txt` 一致，见 `cargo-locked.txt`）：
 
 ```
 OMP-SIDECAR-PREFLIGHT built linux/x64 in app/apps/desktop/resources/omp-runtime
@@ -96,11 +106,19 @@ RELEASE-PACKAGE linux/x64: electron-builder --linux --x64 --dir --publish never
   `stopped/reaped/cleaned` 全为真、无残留 `run-*`；在宿主可读处（Linux `/proc/<pid>/environ`）再
   直接断言子进程 `PATH` 等于那个空目录、`HOME` 在 run root 内，且 `NODE_PATH`、重定向变量与
   `ANTHROPIC_API_KEY` 均不在子进程环境中。
-- 工具门加载的负对照：用同一监督器把 `--trusted-extension` 指向同目录下不存在的文件，启动**必须
-  失败**（编译产物在该路径不可加载时以 exit 1 退出，见 §6），因此"带门启动成功"是"门确实被加载"
-  的证据，而不是"参数被忽略"。
+- 工具门加载的负对照：用同一监督器把 `--trusted-extension` 指向同目录下不存在的文件，启动**必须以该
+  missing gate 被拒**——失败必须带有运行时自己的 `Trusted extension must be an existing module
+  file: <该缺失路径>`（失败对象的 `detail` 字段，见 §6）；超时、启动器/原生加载失败、命名了别的
+  路径的拒绝、或竟然启动成功，都令入口以 exit 1 失败并报告观察到的原因。因此"带门启动成功"是
+  "门确实被加载"的证据，而不是"参数被忽略"或"恰好启动失败"。
+- 回收被检查而不是假定：`stop()` 与 gate 控制运行的 `reclaimAll()` 的结果和异常全部检查；只有进程组
+  reaped、run root 已删除后才会删除验收根目录。未能回收的 run 保留其目录与 supervisor 的所有权记录
+  （`runRoot`/pid/pgid），入口报告保留位置并以非零退出，不写第二套 kill 逻辑。启动环境
+  （`NODE_PATH`、XDG、`OMP_PROFILE`、`PI_DESKTOP_DATA_DIR`、`ANTHROPIC_API_KEY`）在任何退出路径
+  （含验收失败、回收失败、根目录删除失败）都会被恢复。
 - `--verify-only` 只做校验（供篡改/错架构快速检查）；`--json` 输出机器可读报告。退出码：参数或输入
-  契约问题 `2`，校验/启动/往返/回收失败 `1`；**从不校验隐式路径**，不给路径即非零退出。
+  契约问题 `2`，校验/启动/往返/工具门控制/回收失败 `1`；**从不校验隐式路径**，不给路径即非零退出。
+  未回收干净的 run 绝不报成功。
 - 它不是 GUI 启动：不启动 Electron 进程/窗口，不发 prompt，不接触 provider。
 
 ## 4. 真实验收执行（任务要求 3）
@@ -113,28 +131,32 @@ cp -a app/apps/desktop/release/linux-unpacked/resources "$STAGE"
 node app/scripts/verify-packaged-runtime.mjs --resources "$STAGE" --json     # exit 0
 ```
 
-证据：`acceptance-staged.txt`（同时保留 `acceptance-unpacked.txt`——直接对仓库内
-`release/linux-unpacked/resources` 的同一条命令，也 exit 0）。关键字段：
+证据：`acceptance-staged.txt` 与 `acceptance-unpacked.txt`（首轮），以及复审返修后的重跑
+`acceptance-staged-repair.txt`、`acceptance-unpacked-repair.txt`（同样的命令与判定，走新的严格
+gate 控制与受检回收路径，均 exit 0）。关键字段（首轮与重跑一致）：
 
 | 验收点 | 结果 |
 | --- | --- |
 | 身份 | 运行二进制 = `$STAGE/omp-runtime/omp`；`runtimeVersion 18.3.0`；`protocolVersion 2`；无提供方 `get_state` 成功 |
-| 工具门 | 路径与摘要来自清单校验：9897 B / `89c2d844…`；负对照按预期被拒（§6） |
+| 工具门 | 路径与摘要来自清单校验：9897 B / `89c2d844…`；负对照以该 missing gate 被拒（§6） |
 | 子进程 PATH | `/tmp/omp-packaged-accept-*/empty-path`（唯一成员；父进程 PATH 未继承） |
 | 子进程 HOME | `/tmp/omp-packaged-accept-*/data/omp-runtime/run-*/home`（run root 内，非用户 HOME） |
 | 不继承 | `NODE_PATH`、`XDG_CONFIG_HOME`/`XDG_DATA_HOME`、`OMP_PROFILE`、`PI_DESKTOP_DATA_DIR`、`ANTHROPIC_API_KEY` 全部缺席（Linux `/proc` 直读） |
 | 隔离副作用 | XDG/`PI_DESKTOP_DATA_DIR` 诱饵目录零写入；`OMP_PROFILE` 诱饵只剩预置 canary；`NODE_PATH` 诱饵零写入 |
-| 停止/回收 | `stopped=true reaped=true cleaned=true`；残留 run 目录 0；验收自身的 accept root 在 finally 中删除 |
+| 停止/回收 | `stopped=true reaped=true cleaned=true`；残留 run 目录 0；验收自身的 accept root 仅在回收干净后删除（两次返修重跑后 `/tmp/omp-packaged-accept-*` 残留为 0） |
 | 资源未被改写 | 验收（与随后的篡改回归）之后，暂存副本的 `omp`/工具门摘要仍为 `f69ee0b2…`/`89c2d844…` |
 
 ## 5. 拒绝回归（任务要求 4）
 
 `app/apps/desktop/test/packaged-runtime-verify.test.mjs`（随 `node --test test/*.test.mjs` 常驻）：
 
-- **常驻（无需真实产物）**：不给 `--resources`、未知参数、路径不存在、路径不是目录、目录不是
-  electron-builder 输出——全部非零退出（`2`），且不打印 `PACKAGED-RUNTIME-OK`。未设
-  `OMP_T21_RESOURCES` 时其余 6 条显式 skip，**skip 不是通过**；入口本身在没给路径时也绝不报成功。
-- **opt-in（`OMP_T21_RESOURCES=<真实 Resources>`）**：
+- **常驻（无需真实产物，7 条）**：不给 `--resources`、未知参数、路径不存在、路径不是目录、目录不是
+  electron-builder 输出——全部非零退出（`2`），且不打印 `PACKAGED-RUNTIME-OK`；另有 5 条经注入的
+  supervisor 双（class seam）驱动失败路径：gate 负对照**只**接受命名该缺失路径的真实拒绝（命名别的
+  文件、ready 超时、竟然启动成功都被拒），gate 控制运行回收失败会上报所有权，回收不完整或抛异常时
+  验收根不被删除，只有回收干净才删除，较早步骤保留的所有权会扣住根目录。未设 `OMP_T21_RESOURCES`
+  时其余 8 条显式 skip，**skip 不是通过**；入口本身在没给路径时也绝不报成功。
+- **opt-in（`OMP_T21_RESOURCES=<真实 Resources>`，15 条）**：
 
 | 场景 | 结果 |
 | --- | --- |
@@ -144,10 +166,13 @@ node app/scripts/verify-packaged-runtime.mjs --resources "$STAGE" --json     # e
 | 二进制缺失 | exit 1：`missing the bundled omp` |
 | 清单声明的平台/架构不是本机（伪造 `platform`/`arch`） | exit 1：`provenance platform is …, this host is …` / `provenance arch is …, this host is …` |
 | 伪造 `patchLevel` / 旧 schema `/2` | exit 1：`provenance patch level is …, this build pins …` / `provenance schema is …, expected …` |
+| 运行未开始 + 回收不完整（注入 supervisor） | 验收失败、报告 `retained at <accept root>` 与该 run 的所有权；根目录**保留**；6 个启动环境变量全部恢复原值 |
+| 运行未开始 + 回收干净（注入 supervisor） | 验收失败（不返回 OK），回收干净后临时根被删除；环境同样恢复 |
 
-本轮实测：设 `OMP_T21_RESOURCES` 时 **8 tests / 8 pass / 0 fail / exit 0**（`regression.txt`）；
-不设时 **2 pass / 6 skipped**。夹具只对二进制用硬链接（同文件系统）且篡改前先复制，从不写穿到
-被测资源（§7.2 记录了修复前的一次真实 RED）。
+本轮实测（复审返修后）：设 `OMP_T21_RESOURCES` 时 **15 tests / 15 pass / 0 fail / exit 0**
+（`regression-repair.txt`）；不设时 **7 pass / 8 skipped**（`regression-repair-always-on.txt`）。
+夹具只对二进制用硬链接（同文件系统）且篡改前先复制，从不写穿到被测资源（§7.2 记录了修复前的一次
+真实 RED）。注入的 supervisor 双只在测试中替换 class，验收自身的生产路径不变。
 
 ## 6. 工具门确实被加载（负对照）
 
@@ -162,7 +187,11 @@ real   : START_OK  {"phase":"idle","runtimeVersion":"18.3.0","protocolVersion":2
 ```
 
 即：该运行时对不可加载的 `--trusted-extension` **拒绝启动**，所以本阶段的成功启动只能是**真实
-加载了已校验工具门**的结果。验收入口把这条负对照固化为运行的一部分（`gateLoadControl: refused`）。
+加载了已校验工具门**的结果。验收入口把这条负对照固化为运行的一部分（`gateLoadControl: refused`），
+且要求精确匹配：失败的 `detail`（运行时 stderr 尾部，`errors.ts` 的 `OmpRuntimeError.detail`）中必须
+包含 `Trusted extension must be an existing module file: <本次缺失的绝对路径>`；任何其他启动失败
+（超时、启动器缺失、原生加载失败、以别的路径被拒）都让入口以 exit 1 失败并打印观察到的原因，绝不把
+"启动失败"本身当作门被加载的证据（§11.1）。
 
 ## 7. 过程中的发现与返修（均只影响本轮新增的测试/操作，未改产品行为）
 
@@ -206,18 +235,19 @@ NODE_PATH`（8.3 事实：`buildOmpRuntimeEnv` 只从启动环境白名单携带
 | 命令（cwd） | 结果 |
 | --- | --- |
 | `pnpm install --frozen-lockfile`（`app/`） | exit 0（808 包复用本地 store；Electron 43.6.0 取缓存） |
-| `cargo build --release --locked -p host-core`（`app/`） | exit 0（约 38 s；`target/release/pi-desktop-host-core` bf21f8a8…） |
-| `OMP_SIDECAR_SOURCE=… pnpm run pack`（`app/`） | exit 0（约 37 s；预检 built linux/x64；electron-builder `--linux --x64 --dir`） |
-| `node app/scripts/verify-packaged-runtime.mjs --resources <unpacked resources>` | exit 0（`acceptance-unpacked.txt`） |
-| `node app/scripts/verify-packaged-runtime.mjs --resources '<stage 空格/中文>'` | exit 0（`acceptance-staged.txt`） |
-| `OMP_T21_RESOURCES='<stage>' node --test test/packaged-runtime-verify.test.mjs`（`app/apps/desktop`） | 8/8 pass、exit 0（`regression.txt`） |
-| `node --test test/packaged-runtime-verify.test.mjs`（不设 opt-in） | 2 pass / 6 skipped、exit 0 |
+| `cargo build --release --locked -p host-core`（`app/`；**链外单独命令**，2026-10-01 返修重跑） | exit 0（`cargo-locked.txt`；`target/release/pi-desktop-host-core` sha256 bf21f8a8… 与 `inventory.txt` 一致） |
+| `OMP_SIDECAR_SOURCE=… pnpm run pack`（`app/`） | exit 0（约 37 s；预检 built linux/x64；electron-builder `--linux --x64 --dir`；链内 `build:host-release` 不含 `--locked`，见 `pack.txt`） |
+| `node app/scripts/verify-packaged-runtime.mjs --resources <unpacked resources>` | exit 0（`acceptance-unpacked.txt`；返修后重跑 `acceptance-unpacked-repair.txt` 亦 exit 0） |
+| `node app/scripts/verify-packaged-runtime.mjs --resources '<stage 空格/中文>'` | exit 0（`acceptance-staged.txt`；返修后重跑 `acceptance-staged-repair.txt` 亦 exit 0） |
+| `OMP_T21_RESOURCES=<真实 resources> node --test test/packaged-runtime-verify.test.mjs`（`app/apps/desktop`；返修后） | **15/15 pass**、exit 0（`regression-repair.txt`；返修前 8/8 见 `regression.txt`） |
+| `node --test test/packaged-runtime-verify.test.mjs`（不设 opt-in；返修后） | **7 pass / 8 skipped**、exit 0（`regression-repair-always-on.txt`；返修前 2 pass / 6 skipped） |
+| RED 回归：同一测试对语义回退夹具（`repair-red/`） | **4 failed / 3 passed / 8 skipped**、exit 1（`repair-red/regression-red.txt`；回退 diff 见 `repair-red/semantic-revert.diff`） |
 | `OMP_SIDECAR_TEST_RESOURCES='<stage>' npx vitest run packages/omp-runtime/src/bundled-smoke.test.ts`（`app/`） | 9 passed、exit 0（`bundled-smoke.txt`；含无 bun/node 的 `--version`、诱饵零写入、异常死亡/永不 ready 回收） |
 | `node --test test/omp-runtime-launcher.test.mjs`（`app/apps/desktop`） | 12 pass / exit 0（打包态只从已校验的 `resourcesPath` 解析运行时与工具门、不读 `OMP_DESKTOP_RUNTIME`/不扫 app path/不查 `PATH` 的既有契约，本工作树在初始化固定子模块后实跑） |
 
 未机械重跑：`apps/desktop` 全量、`@pi-desktop/omp-runtime` 全套、`apps/desktop` 全量 E2E——本阶段
-改动面是**新增脚本 + 新增测试文件 + 规格文字**，未改生产运行时代码；相关既有套件（launcher 契约、
-opt-in smoke）已按上述命令实跑。
+改动面是**新增脚本 + 新增测试文件 + 规格文字 + 本轮复审返修**（只改验收入口、其回归、spec 与本
+记录），未改生产运行时代码；相关既有套件（launcher 契约、opt-in smoke）已按上述命令实跑。
 
 ## 9. 明确未做（不得用本记录替代的证据）
 
@@ -233,9 +263,68 @@ opt-in smoke）已按上述命令实跑。
 
 ## 10. 状态
 
-- **T21-A 完成**（本文档 + `app/scripts/verify-packaged-runtime.mjs` +
-  `apps/desktop/test/packaged-runtime-verify.test.mjs` + spec §17 中英镜像 + 证据目录
-  `docs/validation/M6-t21-packaged-runtime/`）。T21 本身仍为**进行中**：T21-B 及之后的
-  macOS 安装产物、跨平台固定等仍待做；T22/T23/T24 未开始。
+- **T21-A 完成，并已按 2026-10-01 独立复审返修**（本文档 + `app/scripts/verify-packaged-runtime.mjs`
+  + `apps/desktop/test/packaged-runtime-verify.test.mjs` + spec §17 中英镜像 + 证据目录
+  `docs/validation/M6-t21-packaged-runtime/`，含 `repair-red/`）。T21 本身仍为**进行中**：T21-B
+  及之后的 macOS 安装产物、跨平台固定等仍待做；T22/T23/T24 未开始。
 - 交接：`HANDOFF.md`、`docs/04-task-board.md` 已同步；下一阶段入口为 T22（品牌、更新源、许可证及
   macOS 安装产物）与 T21 剩余部分，等待本机独立复审。
+
+## 11. 2026-10-01 独立复审返修（四项）
+
+四项发现全部只影响**验收入口、其回归、spec 文字与本记录/证据**；产品运行时（`packages/omp-runtime`、
+Electron 侧、RPC/权限路径）未改，fork、pins、打包配置保持。
+
+### 11.1 工具门负对照此前会接受任意启动失败
+
+- **发现**：`expectGateRefusal` 旧实现 `catch { refused = true }`，把超时、native 加载失败、启动器
+  失败都当作"门确实被拒"，于是负对照可以在与 gate 无关的失败上"通过"。
+- **修复**：失败必须来自该 missing gate——`detail`（运行时 stderr 尾部）中必须包含
+  `Trusted extension must be an existing module file: <本次缺失的绝对路径>`；命名别的路径的拒绝、
+  超时等其他失败、乃至竟然启动成功，都让入口以 exit 1 失败并打印观察到的 `code`/`message`/`detail`
+  摘要。gate 控制运行本身也纳入受检回收（§11.2）。
+- **RED/GREEN**：新增回归用 class 参数 seam 注入 supervisor 双（真实错误形状与真实缺失路径）。
+  在语义回退夹具上 `the gate control accepts only the refusal that names the missing gate` 因
+  "Missing expected rejection" 失败（另有 3 条清理相关用例失败，共 4 failed / 3 passed / 8 skipped，
+  `repair-red/regression-red.txt`，回退 diff `repair-red/semantic-revert.diff`）；修复后同一套件
+  opt-in **15/15**，真实 Linux 产物（unpacked 与含空格/中文暂存路径）两次运行均 exit 0 且
+  `gateLoadControl: refused`（`acceptance-*-repair.txt`）。
+
+### 11.2 验收清理失败被吞掉并删除所有权记录
+
+- **发现**：两处 `reclaimAll().catch(() => undefined)` 忽略回收失败，外层 finally 无条件
+  `rmSync(acceptRoot)`——即使有 run 未回收也会删掉验收根，且导出函数在异常/删除失败时可能留下被
+  临时覆盖的 `process.env`。
+- **修复**：新增 `releaseAcceptanceRoot()`：检查 `reclaimAll()` 的结果与异常（`stopped`/`reaped`/
+  `cleaned` 三者齐全才算干净，复用 supervisor 协议，不写第二套 kill 逻辑）；未回收干净的 run 保留
+  其 run root 与 supervisor 所有权记录（`pendingCleanup` 的 runRoot/pid/pgid），入口报告保留位置并
+  非零退出；只有回收干净才删除验收根。gate 控制运行保留的所有权经错误的 `acceptanceRetention`
+  传给外层，同样扣住验收根。启动环境在验收失败、回收失败、删除失败等所有路径上恢复。
+- **RED/GREEN**：`the acceptance root survives a reclamation that cannot complete`、
+  `an ownership held by an earlier step withholds the acceptance root` 与 gate 控制保留用例在语义
+  回退夹具上失败（同上 RED 日志）；修复后用 supervisor 双 + 真实产物验证：`retained at` 报告含具体
+  run 路径、目录保留、6 个环境变量恢复；回收干净时目录删除且验收仍以非零退出（不返回 OK）。真实
+  Linux 产物两次重跑 `stopped=true reaped=true cleaned=true`、残留 run 目录 0、`/tmp/omp-packaged-
+  accept-*` 残留 0。
+
+### 11.3 文档把参考实现和真实命令写混
+
+- §1 的 OMP 行已拆分：上游 `62bc57be` 只有 Bun 单文件编译与 `compile-binary.ts` 中硬编码
+  `bytecode: true`、以及不固定时间戳的归档生成；命令行 `--bytecode`/`--no-bytecode` 开关、固定
+  mtime 并重算校验和的 `buildAddonArchive()` 与 provenance 的 `build.bytecode` 均归因给受控 fork
+  `6226f805`（patch-3）。
+- PI 行已修正：`release-asar.test.mjs` 是临时夹具中对 `exportLinuxAsar` 的行为测试，不是 asar 修复
+  的源码级断言，也不运行打包产物。
+- §2/§8 已区分两条命令：`pack` 链内的 `build:host-release` 原样为
+  `cargo build --release --manifest-path ../../Cargo.toml -p host-core`（不含 `--locked`，`pack.txt`
+  显示复用了缓存）；`--locked` 是链外单独执行的 `cargo build --release --locked -p host-core`
+  （2026-10-01 重跑 exit 0，`cargo-locked.txt`），不写成链内已保证锁文件。
+
+### 11.4 证据链接指向未提交文件
+
+- `pack.log` 从未被 git 跟踪（根 `.gitignore` 的 `*.log`），文档却引用它。已保留脱敏后的原始输出为
+  `pack.txt`（真实 stdout 实录、未手写、未篡改），并修正 §2/HANDOFF 的引用；新增证据
+  `cargo-locked.txt`、`regression-repair*.txt`、`acceptance-*-repair.txt`、`repair-red/`。本记录
+  引用的全部证据文件均已随本提交进入 git（`git ls-files docs/validation/M6-t21-packaged-runtime/`
+  可核对）。`pack.txt` 的转录止于 electron-builder `searching for node modules` 阶段，完成判定以
+  exit 0 与 `inventory.txt` 的产物摘要为准（未重新打包，不伪造缺失日志）。

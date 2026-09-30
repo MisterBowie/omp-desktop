@@ -19,7 +19,18 @@
  *      run root;
  *   3. the run must reach `idle` at the version this build pins, negotiate
  *      protocol v2, answer a provider-free `get_state`, and stop with its
- *      process group reaped and its run root cleaned.
+ *      process group reaped and its run root cleaned;
+ *   4. a negative control proves the gate argument is load-bearing: with the
+ *      same launcher, a `--trusted-extension` path that does not exist must be
+ *      refused, and it must be *that* refusal — the runtime's own unloadable-
+ *      extension failure naming that missing path. A ready timeout, a launcher
+ *      or native-load failure, or a runtime that starts anyway leaves the
+ *      gate's load unproven and fails the entry with the observed reason;
+ *   5. disposal is checked, not assumed: every run this entry started must be
+ *      stopped, reaped and removed before its scratch root is deleted. A run
+ *      that could not be disposed of keeps its root and the supervisor's
+ *      ownership record; the entry reports the retained location and exits
+ *      non-zero instead of erasing the evidence a retry needs.
  *
  * What this entry is not: a GUI launch. It starts no Electron process and no
  * window, sends no prompt, and contacts no provider — the model catalog written
@@ -35,8 +46,10 @@
  * after the verifier and is the fast path for tamper/mismatch checks.
  *
  * Exit codes: 2 when the command line or the resources tree is not usable as
- * packaged Resources; 1 when verification, startup, the protocol round trip or
- * reclamation fails. Both are non-zero: a missing path never reports success.
+ * packaged Resources; 1 when verification, startup, the protocol round trip,
+ * the gate control, or reclamation/removal of an owned run fails. Both are
+ * non-zero: a missing path never reports success, and neither does an
+ * unreclaimed run.
  */
 import {
   existsSync,
@@ -199,16 +212,129 @@ function expect(condition, message) {
   if (!condition) refuse(message, 1);
 }
 
+/** The message the compiled runtime prints for a trusted extension it cannot load. */
+const TRUSTED_EXTENSION_REFUSAL = "Trusted extension must be an existing module file";
+
+/** One line of an error's message, for reports; never carries a stack. */
+function describeError(error) {
+  const message = (error instanceof Error ? error.message : String(error ?? "")).split("\n", 1)[0].trim();
+  return message.length > 0 ? message : "no message";
+}
+
+/** An error's code plus its first message line, when it has one. */
+function describeFailure(error) {
+  const code = typeof error?.code === "string" ? `${error.code}: ` : "";
+  return `${code}${describeError(error)}`;
+}
+
+/** First line of a detail blob, bounded so a report stays readable. */
+function excerpt(text, limit = 200) {
+  const first = String(text).split("\n", 1)[0].trim();
+  return first.length > limit ? `${first.slice(0, limit)}…` : first;
+}
+
+/**
+ * Ownership a supervisor still owes, as report lines.
+ *
+ * `pendingCleanup` is the supervisor's own record of runs it could not dispose
+ * of (`runRoot`, pid, pgid); `runRoot()` covers a run it still owns in memory.
+ */
+function describeOwnedRuns(supervisor) {
+  const owned = [];
+  if (Array.isArray(supervisor?.pendingCleanup)) {
+    for (const run of supervisor.pendingCleanup) {
+      owned.push(`${run.runRoot} (pid ${run.pid}, pgid ${run.pgid}, process group reaped: ${run.reaped})`);
+    }
+  }
+  if (typeof supervisor?.runRoot === "function") {
+    const current = supervisor.runRoot();
+    if (typeof current === "string" && current.length > 0 && !owned.some((line) => line.startsWith(`${current} `))) {
+      owned.push(current);
+    }
+  }
+  return owned;
+}
+
+/** `; owned runs retained: …` for a report, or nothing when there are none. */
+function formatOwnership(ownership) {
+  return ownership.length > 0 ? `; owned runs retained: ${ownership.join(" | ")}` : "";
+}
+
+/** Remove the acceptance's own scratch root, reporting a removal that failed. */
+function removeAcceptanceRoot(root) {
+  try {
+    rmSync(root, { recursive: true, force: true });
+  } catch (error) {
+    return {
+      ok: false,
+      retainedRoot: root,
+      reason: `the acceptance root could not be removed: ${describeError(error)}`,
+      ownership: [],
+    };
+  }
+  return { ok: true, retainedRoot: null, reason: null, ownership: [] };
+}
+
+/**
+ * Reclaim every run the acceptance owns, then remove its scratch root.
+ *
+ * The root may be deleted only once nothing is owed: a run whose process group
+ * or directory could not be disposed of keeps its root and the supervisor's
+ * ownership record, because deleting them would erase the only handle a retry
+ * has. The caller receives that failure — the retained location and the owned
+ * runs — and must not report success.
+ *
+ * `options.heldReason`/`options.heldOwnership` carry an ownership retained by
+ * an earlier step (the gate-load control) that this supervisor does not know
+ * about; they withhold the root as well.
+ */
+export async function releaseAcceptanceRoot(supervisor, root, options = {}) {
+  const heldReason = typeof options.heldReason === "string" ? options.heldReason : null;
+  const heldOwnership = Array.isArray(options.heldOwnership) ? options.heldOwnership : [];
+  let results = [];
+  let failure = null;
+  try {
+    results = await supervisor.reclaimAll();
+  } catch (error) {
+    failure = `reclaimAll threw: ${describeError(error)}`;
+  }
+  const incomplete = results.filter((result) => !(result.stopped && result.reaped && result.cleaned));
+  if (failure !== null || incomplete.length > 0 || heldReason !== null) {
+    const reason =
+      failure ??
+      (incomplete.length > 0
+        ? `reclamation is incomplete: ${incomplete
+            .map((result) => result.errors.join("; ") || "stopped/reaped/cleaned were not all true")
+            .join(" | ")}`
+        : heldReason);
+    return {
+      ok: false,
+      retainedRoot: root,
+      reason,
+      ownership: [...describeOwnedRuns(supervisor), ...heldOwnership],
+    };
+  }
+  return removeAcceptanceRoot(root);
+}
+
 /**
  * Prove the gate argument is load-bearing before trusting the positive run.
  *
  * The compiled runtime refuses a `--trusted-extension` path that is not an
- * existing module file (it exits with "Trusted extension must be an existing
- * module file: <path>") instead of starting unguarded. Requiring that refusal
+ * existing module file — it exits 1 with "Trusted extension must be an existing
+ * module file: <path>" in the failure's `detail` — instead of starting
+ * unguarded. Requiring exactly that refusal, naming exactly the missing path,
  * is what makes "the packaged runtime reached idle with the gate argument" a
- * statement about a loaded gate rather than about an ignored argument.
+ * statement about a loaded gate rather than about an ignored argument. Every
+ * other negative control — a ready timeout, a launcher or native-load failure,
+ * a runtime that starts anyway, a refusal naming a different file — leaves the
+ * gate's load unproven and fails the acceptance with the observed reason.
+ *
+ * The control run is reclaimed like the acceptance run: a run that cannot be
+ * disposed of keeps its root and its ownership record, carried on the thrown
+ * error as `acceptanceRetention` so the caller keeps the acceptance root.
  */
-async function expectGateRefusal(OmpRuntimeSupervisor, options) {
+export async function expectGateRefusal(OmpRuntimeSupervisor, options) {
   const control = new OmpRuntimeSupervisor({
     dataRoot: options.dataRoot,
     launcherPath: options.launcherPath,
@@ -221,18 +347,41 @@ async function expectGateRefusal(OmpRuntimeSupervisor, options) {
     terminationGraceMs: 10_000,
     prepareRun: (paths) => writeModelCatalog(paths.agentDir),
   });
-  let refused = false;
+  let observed = null;
+  let started = false;
   try {
     await control.start();
-  } catch {
-    refused = true;
-  } finally {
-    await control.reclaimAll().catch(() => undefined);
+    started = true;
+  } catch (error) {
+    observed = error;
   }
-  expect(
-    refused,
-    `the runtime accepted the non-existent trusted extension ${options.missingGatePath}; the gate argument is not load-bearing`,
-  );
+
+  const release = await releaseAcceptanceRoot(control, options.dataRoot);
+  if (!release.ok) {
+    const error = new AcceptanceError(
+      `the gate-load control run could not be reclaimed: ${release.reason}${formatOwnership(release.ownership)}`,
+      1,
+    );
+    error.acceptanceRetention = {
+      reason: `the gate-load control retained its run root: ${release.reason}`,
+      ownership: release.ownership,
+    };
+    throw error;
+  }
+  if (started) {
+    refuse(
+      `the runtime accepted the non-existent trusted extension ${options.missingGatePath}; the gate argument is not load-bearing`,
+      1,
+    );
+  }
+  const detail = typeof observed?.detail === "string" ? observed.detail : "";
+  const expected = `${TRUSTED_EXTENSION_REFUSAL}: ${options.missingGatePath}`;
+  if (!detail.includes(expected)) {
+    refuse(
+      `the gate-load control was not rejected by the missing gate: expected the runtime to refuse "${expected}", observed ${describeFailure(observed)}${detail ? ` (${excerpt(detail)})` : " with no detail"}`,
+      1,
+    );
+  }
 }
 
 /**
@@ -256,21 +405,46 @@ export async function verifyResources(resources) {
   return { verified, gate, pin: bundled.BUNDLED_EXPECTATION };
 }
 
+/** Apply the launching environment the acceptance simulates, remembering what it replaced. */
+function applyInheritedEnv(savedEnv, values) {
+  for (const [key, value] of Object.entries(values)) {
+    savedEnv.set(key, process.env[key]);
+    process.env[key] = value;
+  }
+}
+
+/** Put the launching environment back; every path out of `runAcceptance` uses this. */
+function restoreInheritedEnv(savedEnv) {
+  for (const [key, value] of savedEnv) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+}
+
 /**
  * Start the verified runtime through the production supervisor and prove the
  * packaged boundary: pinned version, protocol v2, a provider-free RPC, the
  * isolated child environment and a clean stop.
+ *
+ * The envelope owns two facts beyond the run itself. The launching environment
+ * it overrides is restored on every path out, including a failed run and a
+ * failed removal. And the scratch root is deleted only after reclamation
+ * completes: a run that could not be disposed of keeps its root and ownership
+ * record, and the entry fails with the retained location instead of erasing
+ * them. `options.supervisorClass` is the regression suite's seam for driving
+ * those failure paths — a runtime that never starts, a reclamation that cannot
+ * complete — without a real unkillable process; the acceptance itself always
+ * uses the production supervisor.
  */
-export async function runAcceptance(resources) {
+export async function runAcceptance(resources, options = {}) {
   const { supervisor: supervisorModule } = await loadRuntimeModules();
   const { verified, gate, pin } = await verifyResources(resources);
-  const { OmpRuntimeSupervisor, RUN_ROOT_PREFIX } = supervisorModule;
+  const { RUN_ROOT_PREFIX } = supervisorModule;
+  const SupervisorClass = options.supervisorClass ?? supervisorModule.OmpRuntimeSupervisor;
 
   const acceptRoot = mkdtempSync(join(tmpdir(), "omp-packaged-accept-"));
   const dataRoot = join(acceptRoot, "data");
-  mkdirSync(dataRoot, { recursive: true });
   const emptyPathDir = join(acceptRoot, "empty-path");
-  mkdirSync(emptyPathDir, { recursive: true });
   // Decoys at the paths a child would reach if the isolation variables were
   // forwarded instead of dropped: nothing here may be created or written.
   const decoys = join(acceptRoot, "decoy-user");
@@ -278,10 +452,6 @@ export async function runAcceptance(resources) {
   const profileDecoy = join(decoys, "omp-profile");
   const dataRootDecoy = join(decoys, "pi-desktop");
   const nodePathDecoy = join(decoys, "node_modules");
-  for (const dir of [xdgDecoy, profileDecoy, dataRootDecoy, nodePathDecoy]) {
-    mkdirSync(dir, { recursive: true });
-  }
-  writeFileSync(join(profileDecoy, "canary"), "must not be touched\n");
 
   // The launching environment this acceptance simulates: a NODE_PATH, the
   // discovery-redirecting variables and a credential, exactly as a developer
@@ -297,30 +467,37 @@ export async function runAcceptance(resources) {
     ANTHROPIC_API_KEY: "must-not-reach-the-child",
   };
   const savedEnv = new Map();
-  for (const [key, value] of Object.entries(inheritedDecoys)) {
-    savedEnv.set(key, process.env[key]);
-    process.env[key] = value;
-  }
 
   const seen = { home: null, configRoot: null };
-  const supervisor = new OmpRuntimeSupervisor({
-    dataRoot,
-    launcherPath: verified.path,
-    expectedRuntimeVersion: pin.ompVersion,
-    args: ["--trusted-extension", gate.absolutePath],
-    pathEntries: [emptyPathDir],
-    readyTimeoutMs: 120_000,
-    requestTimeoutMs: 30_000,
-    selfExitMs: 5_000,
-    terminationGraceMs: 10_000,
-    prepareRun: (paths) => {
-      seen.home = paths.home;
-      seen.configRoot = paths.configRoot;
-      writeModelCatalog(paths.agentDir);
-    },
-  });
-
+  let supervisor = null;
+  let report = null;
+  let failure = null;
   try {
+    mkdirSync(dataRoot, { recursive: true });
+    mkdirSync(emptyPathDir, { recursive: true });
+    for (const dir of [xdgDecoy, profileDecoy, dataRootDecoy, nodePathDecoy]) {
+      mkdirSync(dir, { recursive: true });
+    }
+    writeFileSync(join(profileDecoy, "canary"), "must not be touched\n");
+    applyInheritedEnv(savedEnv, inheritedDecoys);
+
+    supervisor = new SupervisorClass({
+      dataRoot,
+      launcherPath: verified.path,
+      expectedRuntimeVersion: pin.ompVersion,
+      args: ["--trusted-extension", gate.absolutePath],
+      pathEntries: [emptyPathDir],
+      readyTimeoutMs: 120_000,
+      requestTimeoutMs: 30_000,
+      selfExitMs: 5_000,
+      terminationGraceMs: 10_000,
+      prepareRun: (paths) => {
+        seen.home = paths.home;
+        seen.configRoot = paths.configRoot;
+        writeModelCatalog(paths.agentDir);
+      },
+    });
+
     const status = await supervisor.start();
     expect(status.phase === "idle", `the packaged runtime did not reach idle (phase ${status.phase})`);
     expect(
@@ -345,7 +522,7 @@ export async function runAcceptance(resources) {
     // The gate's load is real, not assumed: a `--trusted-extension` path the
     // runtime cannot load must keep it from becoming usable, so the positive
     // run above can only have reached `idle` with the verified gate loaded.
-    await expectGateRefusal(OmpRuntimeSupervisor, {
+    await expectGateRefusal(SupervisorClass, {
       dataRoot: join(acceptRoot, "gate-control"),
       launcherPath: verified.path,
       expectedRuntimeVersion: pin.ompVersion,
@@ -390,7 +567,7 @@ export async function runAcceptance(resources) {
       expect(child.inheritsCredentials === false, "the child inherited a credential-shaped variable");
     }
 
-    return {
+    report = {
       mode: "run",
       resources,
       binary: {
@@ -416,14 +593,41 @@ export async function runAcceptance(resources) {
         child,
       },
     };
-  } finally {
-    await supervisor.reclaimAll().catch(() => undefined);
-    rmSync(acceptRoot, { recursive: true, force: true });
-    for (const [key, value] of savedEnv) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
+  } catch (error) {
+    failure = error;
   }
+
+  // The root is withheld whenever a run could not be disposed of: the run root
+  // and the ownership record are what a retry needs, and the entry must report
+  // the retained location instead of erasing them.
+  let release;
+  try {
+    const retention = failure?.acceptanceRetention ?? null;
+    release = supervisor
+      ? await releaseAcceptanceRoot(supervisor, acceptRoot, {
+          heldReason: retention?.reason ?? null,
+          heldOwnership: retention?.ownership ?? [],
+        })
+      : removeAcceptanceRoot(acceptRoot);
+  } finally {
+    restoreInheritedEnv(savedEnv);
+  }
+
+  if (failure) {
+    if (!release.ok) {
+      const retained = `; the acceptance root was retained at ${release.retainedRoot}: ${release.reason}${formatOwnership(release.ownership)}`;
+      if (failure instanceof Error) failure.message = `${failure.message}${retained}`;
+      else failure = new AcceptanceError(`${String(failure)}${retained}`, 1);
+    }
+    throw failure;
+  }
+  if (!release.ok) {
+    refuse(
+      `the acceptance could not release its owned root (retained at ${release.retainedRoot}): ${release.reason}${formatOwnership(release.ownership)}`,
+      1,
+    );
+  }
+  return report;
 }
 
 function formatReport(report) {

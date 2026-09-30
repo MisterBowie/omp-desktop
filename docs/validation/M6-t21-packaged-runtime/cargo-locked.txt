@@ -1,0 +1,6 @@
+# command: cargo build --release --locked -p host-core   (cwd app/; NOT part of the pack chain)
+    Finished `release` profile [optimized] target(s) in 0.03s
+exit=0
+
+# binary sha256:
+bf21f8a81d49b33f68fcfedee04f238fcb2e1e303b1e54f0ccd7c2e8307fff9f  target/release/pi-desktop-host-core

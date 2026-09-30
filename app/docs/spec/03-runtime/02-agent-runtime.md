@@ -2027,17 +2027,30 @@ level `62bc57b+omp-desktop.3`, carried by the controlled fork commit recorded in
   removed; where the host exposes the child's environment (Linux `/proc`), the
   empty PATH, the run-root HOME and the absence of `NODE_PATH`, redirects and
   credentials are asserted as facts. A non-existent trusted extension must keep
-  the runtime from becoming usable (it refuses such a path), which is what makes
-  a successful start evidence of a *loaded* gate. `--verify-only` stops after
-  the verifier. The entry never verifies an implicit path, and both a refusal
-  and a failure exit non-zero. It accepts the runtime boundary of a packaged
-  build headlessly; it is not a GUI launch, and the installer acceptance inside
-  the real application remains T22/T23 work. A desktop regression suite
-  (`apps/desktop/test/packaged-runtime-verify.test.mjs`) holds the entry to that
-  contract: argument and path refusals always, and — when `OMP_T21_RESOURCES`
-  names a real `Resources` tree — a swapped gate, a binary whose bytes no longer
-  match, a missing binary, another platform/architecture, and a forged patch
-  level or schema (opt-in; a skip is not a pass).
+  the runtime from becoming usable, and it must be *that* refusal: the failure
+  detail must name the missing path ("Trusted extension must be an existing
+  module file: `<path>`"). A timeout, a launcher or native-load failure, a
+  refusal naming another path, or a runtime that starts anyway leaves the gate's
+  load unproven and fails the entry with the observed reason; that is what makes
+  a successful start evidence of a *loaded* gate. Disposal is checked, not
+  assumed: every run the entry started is reclaimed before its own scratch root
+  is deleted, a run whose process group or directory cannot be disposed of keeps
+  its root and the supervisor's ownership record, and the entry reports the
+  retained location and exits non-zero; the launching environment it overrode is
+  restored on every path out, including a failed run and a failed removal.
+  `--verify-only` stops after the verifier. The entry never verifies an implicit
+  path, and both a refusal and a failure exit non-zero. It accepts the runtime
+  boundary of a packaged build headlessly; it is not a GUI launch, and the
+  installer acceptance inside the real application remains T22/T23 work. A
+  desktop regression suite (`apps/desktop/test/packaged-runtime-verify.test.mjs`)
+  holds the entry to that contract: argument and path refusals always; the gate
+  control (only the refusal naming the missing path is accepted, an unrelated
+  failure is not) and the reclamation-failure paths through an injected
+  supervisor class always; and — when `OMP_T21_RESOURCES` names a real
+  `Resources` tree — a swapped gate, a binary whose bytes no longer match, a
+  missing binary, another platform/architecture, a forged patch level or schema,
+  and the retained-root/environment-restore behavior with a runtime that never
+  starts (opt-in; a skip is not a pass).
 
 The pins this build checks are mirrored in `@pi-desktop/shared`
 (`OMP_RUNTIME_BASE_SHA`, `OMP_RUNTIME_PATCH_LEVEL`, `OMP_RUNTIME_FORK_REPOSITORY`,

@@ -1,0 +1,25 @@
+# command: OMP_T21_RESOURCES=<real unpacked resources> node --test test/packaged-runtime-verify.test.mjs
+✔ the entry never verifies an implicit path (32.525105ms)
+✔ a missing, non-directory, or non-packaged resources path is refused (50.14241ms)
+✔ the gate control accepts only the refusal that names the missing gate (3.927668ms)
+✔ a gate control run that cannot be reclaimed is reported with its ownership (0.294615ms)
+✔ the acceptance root survives a reclamation that cannot complete (0.203329ms)
+✔ a complete reclamation removes the acceptance root (0.130197ms)
+✔ an ownership held by an earlier step withholds the acceptance root (0.12921ms)
+✔ accepts the real packaged runtime resources (262.061843ms)
+✔ refuses a swapped tool gate (266.448865ms)
+✔ refuses a binary whose bytes no longer match the manifest (346.408825ms)
+✔ refuses a resources tree with no runtime binary (134.738145ms)
+✔ refuses a runtime built for another platform or architecture (267.256499ms)
+✔ refuses a manifest that is not the pinned one (276.036359ms)
+✔ a failed acceptance retains an unreclaimable root and restores the environment (250.017881ms)
+✔ a failed acceptance deletes only a root whose runs were all reclaimed (129.087156ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2060.77484
+exit=0

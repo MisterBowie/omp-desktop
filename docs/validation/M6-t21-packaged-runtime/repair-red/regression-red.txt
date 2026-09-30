@@ -1,0 +1,93 @@
+# M6/T21-A review repair — RED: new regressions against the pre-repair semantics
+# harness: /tmp/omp-t21-repair-red (semantic revert of the two fixed hunks; see semantic-revert.diff)
+# harness file = shipped entry with: expectGateRefusal's strict refusal check replaced by the old catch-all,
+#   releaseAcceptanceRoot replaced by reclaimAll().catch(()=>undefined) + unconditional rmSync.
+# command: node --test apps/desktop/test/packaged-runtime-verify.test.mjs
+
+✔ the entry never verifies an implicit path (30.871601ms)
+✔ a missing, non-directory, or non-packaged resources path is refused (47.348034ms)
+✖ the gate control accepts only the refusal that names the missing gate (0.706188ms)
+✖ a gate control run that cannot be reclaimed is reported with its ownership (0.229242ms)
+✖ the acceptance root survives a reclamation that cannot complete (0.378172ms)
+✔ a complete reclamation removes the acceptance root (0.141292ms)
+✖ an ownership held by an earlier step withholds the acceptance root (0.201848ms)
+﹣ accepts the real packaged runtime resources (0.043481ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ refuses a swapped tool gate (0.04507ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ refuses a binary whose bytes no longer match the manifest (0.077494ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ refuses a resources tree with no runtime binary (0.040296ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ refuses a runtime built for another platform or architecture (0.029374ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ refuses a manifest that is not the pinned one (0.023768ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ a failed acceptance retains an unreclaimable root and restores the environment (0.051411ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ a failed acceptance deletes only a root whose runs were all reclaimed (0.038915ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+ℹ tests 15
+ℹ suites 0
+ℹ pass 3
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 8
+ℹ todo 0
+ℹ duration_ms 115.293049
+
+✖ failing tests:
+
+test at apps/desktop/test/packaged-runtime-verify.test.mjs:135:1
+✖ the gate control accepts only the refusal that names the missing gate (0.706188ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///tmp/omp-t21-repair-red/apps/desktop/test/packaged-runtime-verify.test.mjs:151:3)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /not rejected by the missing gate/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at apps/desktop/test/packaged-runtime-verify.test.mjs:187:1
+✖ a gate control run that cannot be reclaimed is reported with its ownership (0.229242ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///tmp/omp-t21-repair-red/apps/desktop/test/packaged-runtime-verify.test.mjs:201:3)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at apps/desktop/test/packaged-runtime-verify.test.mjs:217:1
+✖ the acceptance root survives a reclamation that cannot complete (0.378172ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///tmp/omp-t21-repair-red/apps/desktop/test/packaged-runtime-verify.test.mjs:227:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at apps/desktop/test/packaged-runtime-verify.test.mjs:252:1
+✖ an ownership held by an earlier step withholds the acceptance root (0.201848ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///tmp/omp-t21-repair-red/apps/desktop/test/packaged-runtime-verify.test.mjs:259:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+exit=1
