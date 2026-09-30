@@ -286,7 +286,15 @@ build entry 写出一个 `--version` 如真实 sidecar 的极小可执行文件�
 看到干净树），因此每个用例只编译真实工具门，不编译真二进制。
 
 - RED（未修复）：1 failed（§9.1）；GREEN（修复后）：该文件 **9 pass / 0 fail**（用例耗时 110.8 ms）。
-- Bun 缺失时用例以显式原因 skip（app 的 CI unit-test 作业不安装 Bun）；本机 Bun 1.4.2 实测运行。
+- 用例有两个互相独立的 skip 原因：①Bun 缺失（app 的 CI unit-test 作业不安装 Bun）；②**win32**——夹具
+  的 `build-binary.ts` 写出并被 `--build` 实际执行的 `#!/bin/sh` 假二进制，Windows 上必然不能执行，
+  因此该回归显式 skip 于 win32，原因写明「Windows 原生等价验证留待 T23」。两者同时成立时都记录；
+  **skip 是范围边界，不是 Windows 支持证据**。本机（Linux x64）实测命令 `node --test
+  apps/desktop/test/omp-sidecar.test.mjs`（`app/`，Node v24.14.0 / Bun 1.4.2）**exit 0，9 pass /
+  0 fail / 0 skipped**，新用例实际执行（约 114 ms）。
+- macOS arm64 的独立复审（拉回 `6ea1057a`）已在 macOS 实机实跑完整桌面套件 **2954/2954 pass、0 fail /
+  0 skip**（含真实 Bun gate 编译回归），确认稳定 cwd 修复生效；该结果来自复审侧实机，不是本工作区
+  Linux 运行的计数。
 
 ### 9.4 两次完整真实构建（CLI；输出目录与 TMPDIR 根都不同、深度不同）
 
@@ -321,5 +329,6 @@ OMP_SIDECAR_TEST_RESOURCES=/tmp/r43g/stage npx vitest run packages/omp-runtime/s
 
 本修复不宣称跨工具链版本（Bun 升级后需按 §3.2 重新测量）或跨目标平台（仅 Linux x64 实跑）的字节
 等价；未跑 electron-builder 真实打包、macOS/Windows 实机与 clean-runner packaging workflows，未调用
-真实付费模型。R3 仍为硬阻塞、ADR 0306 的 Cursor 产品门保留、T20-B/C/D 未开始、T20/T21 未完成；fork
-与 patch 构件未改动。
+真实付费模型。gate 深度回归与其夹具 `--build` 路径同样只覆盖 POSIX 宿主：win32 上该用例显式 skip，
+Windows 原生等价验证留待 T23（未在 Windows 实机运行，不宣称 Windows 支持）。R3 仍为硬阻塞、ADR 0306
+的 Cursor 产品门保留、T20-B/C/D 未开始、T20/T21 未完成；fork 与 patch 构件未改动。

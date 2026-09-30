@@ -227,16 +227,27 @@ test("the patch manifest refuses a malformed fork block", () => {
  * under run roots of different depth must land on identical gate bytes and an
  * identical provenance manifest; the heavy binary is the fixture's stand-in,
  * the gate bundle is the real one.
+ *
+ * Scope: the fixture's stand-in binary is a `#!/bin/sh` script that the build
+ * path executes, so this regression currently covers POSIX hosts only. Windows
+ * needs a native equivalent, which is deferred to T23 — the win32 skip below is
+ * a scope boundary, not evidence of Windows support.
  */
 const bunProbe = spawnSync(bunBinary(), ["--version"], { encoding: "utf8" });
+
+// Two independent reasons this regression cannot execute here. Either one
+// skips the case with its own reason; both are reported when both hold.
+const gateDepthSkips = [
+  process.platform === "win32" &&
+    "the fixture's build entry writes a POSIX /bin/sh stand-in binary; native Windows verification is deferred to T23",
+  bunProbe.status !== 0 &&
+    `Bun is required to bundle the tool gate (install Bun 1.4.2 or set BUN_BINARY): ${(bunProbe.error?.message ?? bunProbe.stderr ?? "").trim()}`,
+].filter(Boolean);
 
 test(
   "the tool gate bundle is identical under temporary roots of different depth",
   {
-    skip:
-      bunProbe.status === 0
-        ? false
-        : `Bun is required to bundle the tool gate (install Bun 1.4.2 or set BUN_BINARY): ${(bunProbe.error?.message ?? bunProbe.stderr ?? "").trim()}`,
+    skip: gateDepthSkips.length > 0 ? gateDepthSkips.join(" | ") : false,
     timeout: 180_000,
   },
   () => {
