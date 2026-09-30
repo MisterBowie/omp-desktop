@@ -2,8 +2,8 @@
   "schema": "omp-desktop.bundled-sidecar/3",
   "fork": {
     "repository": "https://github.com/MisterBowie/oh-my-pi",
-    "commit": "6b5017bc297a357e88287763ef701b87775737c8",
-    "tree": "60a39b244a362f78d6547c41aa6913787936fedf"
+    "commit": "6226f805e92654344de04def413fa5cb91cb16b9",
+    "tree": "5249cb07059b009e890bece6f7d59daeb1cb94f6"
   },
   "upstreamBase": {
     "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",

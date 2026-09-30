@@ -121,6 +121,34 @@
       },
       "productImpact": "Same upstream base (62bc57be / omp 18.3.0); the patch set gains the deterministic native-addon archive and the explicit bytecode build switch, which closes the R4-3 reproducibility clause. The provenance schema moves to omp-desktop.bundled-sidecar/3 (build.bytecode required) and @pi-desktop/shared's patch-level/fork-commit pins move to this fork commit. R3 stays blocked, the Cursor product gate (ADR 0306) stays in force, T20-B/C/D not started, T21 not complete.",
       "evidence": "docs/validation/M6-r4-3-reproducible-sidecar.md"
+    },
+    {
+      "date": "2026-10-01",
+      "task": "M6/T20-R4-3 independent-review repair",
+      "repository": "MisterBowie/oh-my-pi",
+      "from": {
+        "branch": "codex/omp-desktop-18.3.0-patch-3",
+        "commit": "6b5017bc297a357e88287763ef701b87775737c8",
+        "tree": "60a39b244a362f78d6547c41aa6913787936fedf",
+        "patchLevel": "62bc57b+omp-desktop.3",
+        "patchSha256": "27b19f192d0a973c5872e178e1d0bcf842fb5dcaade807a7486323679082e343",
+        "patchBytes": 86789
+      },
+      "to": {
+        "repository": "https://github.com/MisterBowie/oh-my-pi",
+        "branch": "codex/omp-desktop-18.3.0-patch-3",
+        "commit": "6226f805e92654344de04def413fa5cb91cb16b9",
+        "tree": "5249cb07059b009e890bece6f7d59daeb1cb94f6",
+        "baseCommit": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+        "baseVersion": "18.3.0",
+        "patchLevel": "62bc57b+omp-desktop.3",
+        "patchFile": "app/patches/oh-my-pi/0001-omp-desktop-runtime.patch",
+        "patchSha256": "ad63ced9f7488ff088194754b4902732e1e7ebd0bdfa10a7926b3c5dc1beeaa9",
+        "patchBytes": 87190,
+        "note": "comment-only correction of the bytecode documentation in compile-binary.ts/build-binary.ts; same 15-file patch set, no runtime or build behavior change, and the rebuild command now states the explicit git -c core.abbrev=7"
+      },
+      "productImpact": "Independent-review repair only: the two bytecode comments that contradicted the measured cause (wall-clock mtimes written by Bun.Archive into the embedded native-addon archive) now state that bytecode stays the release/desktop default, that --no-bytecode is an opt-out/control mode rather than a reproducibility prerequisite, and that archive timestamp normalization is what makes same-input builds bit-identical. The desktop pins, packaging workflow refs, patch digest/bytes and the R4-3 evidence move to the new fork commit. R3 stays blocked, the Cursor product gate (ADR 0306) stays in force, T20-B/C/D not started, T21 not complete.",
+      "evidence": "docs/validation/M6-r4-3-reproducible-sidecar.md"
     }
   ]
 }

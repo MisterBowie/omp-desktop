@@ -1122,10 +1122,10 @@ index 6eb6c3d..903021d 100644
  	it("should throw when context has no messages", () => {
  		const context: AgentContext = {
 diff --git a/packages/coding-agent/scripts/build-binary.ts b/packages/coding-agent/scripts/build-binary.ts
-index 28ffeff..473a7c3 100644
+index 28ffeff..6c32765 100644
 --- a/packages/coding-agent/scripts/build-binary.ts
 +++ b/packages/coding-agent/scripts/build-binary.ts
-@@ -40,6 +40,48 @@ export function resolveCrossBuild(value: string | undefined): CrossBuild | null
+@@ -40,6 +40,51 @@ export function resolveCrossBuild(value: string | undefined): CrossBuild | null
  	}
  }
  
@@ -1140,8 +1140,11 @@ index 28ffeff..473a7c3 100644
 +/** Switches `build-binary.ts` accepts on the command line. */
 +export interface BuildBinaryOptions {
 +	/**
-+	 * Embed precompiled bytecode; `--no-bytecode` turns it off for callers that
-+	 * need two builds of one revision to be bit-identical (see
++	 * Embed precompiled bytecode (default `true`, the release behavior and the
++	 * `OMP Desktop` sidecar mode). `--no-bytecode` is an explicit
++	 * opt-out/control/diagnostic mode, and reproducibility does not require it:
++	 * the deterministic native-addon archive is what makes two builds of one
++	 * revision bit-identical, with bytecode either way (see
 +	 * `CodingAgentCompileOptions.bytecode`).
 +	 */
 +	readonly bytecode: boolean;
@@ -1174,7 +1177,7 @@ index 28ffeff..473a7c3 100644
  // Transformers.js is an optional, native-heavy dependency that is never bundled
  // into the binary; the tiny-model worker `bun install`s it into a runtime cache
  // on first use. The `catalog:` spec cannot be resolved from inside the compiled
-@@ -74,6 +116,7 @@ async function runCommand(
+@@ -74,6 +119,7 @@ async function runCommand(
  }
  
  async function main(): Promise<void> {
@@ -1182,7 +1185,7 @@ index 28ffeff..473a7c3 100644
  	const crossBuild = resolveCrossBuild(Bun.env.CROSS_TARGET);
  	const shouldAdhocSign =
  		process.platform === "darwin" &&
-@@ -103,6 +146,7 @@ async function main(): Promise<void> {
+@@ -103,6 +149,7 @@ async function main(): Promise<void> {
  				target: crossBuild?.target,
  				executablePath: Bun.env.BUN_COMPILE_EXECUTABLE_PATH || undefined,
  				skipBuiltinCodesign: shouldAdhocSign,
@@ -1190,7 +1193,7 @@ index 28ffeff..473a7c3 100644
  			});
  
  			if (shouldAdhocSign) {
-@@ -124,4 +168,17 @@ async function main(): Promise<void> {
+@@ -124,4 +171,17 @@ async function main(): Promise<void> {
  	}
  }
  
@@ -1210,29 +1213,32 @@ index 28ffeff..473a7c3 100644
 +	}
 +}
 diff --git a/packages/coding-agent/scripts/compile-binary.ts b/packages/coding-agent/scripts/compile-binary.ts
-index 0eeda6d..96da91e 100644
+index 0eeda6d..bdb5715 100644
 --- a/packages/coding-agent/scripts/compile-binary.ts
 +++ b/packages/coding-agent/scripts/compile-binary.ts
-@@ -26,6 +26,18 @@ export interface CodingAgentCompileOptions {
+@@ -26,6 +26,21 @@ export interface CodingAgentCompileOptions {
  	readonly minifyIdentifiers?: boolean;
  	/** Disable Bun's built-in Darwin signing before the caller re-signs. */
  	readonly skipBuiltinCodesign?: boolean;
 +	/**
-+	 * Precompile the bundle to bytecode (default `true`, the release behavior).
++	 * Precompile the bundle to bytecode (default `true`, the release behavior
++	 * and the `OMP Desktop` sidecar mode).
 +	 *
 +	 * Bytecode costs ~52 MB of binary size to skip parsing the bundle at boot.
-+	 * It is also the only difference between two builds of the same source:
-+	 * Bun 1.4.2 bakes build-local placeholders into the bytecode string table,
-+	 * so a caller that needs one bit-identical artifact per source revision —
-+	 * `OMP Desktop`'s bundled sidecar — passes `false` explicitly. The switch is
-+	 * per-call and never reads the environment, so a stray variable cannot
-+	 * change what a release build ships.
++	 * It is not what makes two builds of one source differ: same-input builds
++	 * are bit-identical with bytecode on and off once the embedded native-addon
++	 * archive is deterministic (`packages/natives/scripts/embed-native.ts`;
++	 * measured on Bun 1.4.2 at OMP Desktop's T20-R4-3). The switch is per-call
++	 * and never reads the environment, so the selected mode is explicit and
++	 * auditable, and a stray variable cannot change what a release build ships;
++	 * `false` is an explicit opt-out/control/diagnostic mode, not a prerequisite
++	 * for reproducible output.
 +	 */
 +	readonly bytecode?: boolean;
  }
  
  /**
-@@ -51,7 +63,7 @@ export async function compileCodingAgent(options: CodingAgentCompileOptions): Pr
+@@ -51,7 +66,7 @@ export async function compileCodingAgent(options: CodingAgentCompileOptions): Pr
  			// `omp --version` 256 ms -> 30 ms on M4 Max (+52 MB binary).
  			// Keep import.meta.resolve in bundled dependencies valid under bytecode.
  			format: "esm",

@@ -11,14 +11,14 @@
   "fork": {
     "repository": "https://github.com/MisterBowie/oh-my-pi",
     "branch": "codex/omp-desktop-18.3.0-patch-3",
-    "commit": "6b5017bc297a357e88287763ef701b87775737c8",
-    "tree": "60a39b244a362f78d6547c41aa6913787936fedf",
+    "commit": "6226f805e92654344de04def413fa5cb91cb16b9",
+    "tree": "5249cb07059b009e890bece6f7d59daeb1cb94f6",
     "note": "Self-maintained fork whose HEAD is exactly base.sha + this patch level. `scripts/omp-sidecar.mjs` refuses any other commit; can1357/oh-my-pi stays a read-only upstream."
   },
   "patch": {
     "file": "0001-omp-desktop-runtime.patch",
-    "sha256": "27b19f192d0a973c5872e178e1d0bcf842fb5dcaade807a7486323679082e343",
-    "bytes": 86789
+    "sha256": "ad63ced9f7488ff088194754b4902732e1e7ebd0bdfa10a7926b3c5dc1beeaa9",
+    "bytes": 87190
   },
   "capabilities": [
     "rpc-host-tool-concurrency",
@@ -102,11 +102,12 @@
   ],
   "notes": [
     "This is an OMP Desktop-maintained patch level, not upstream OMP support: the runtime remains pinned at 62bc57be (omp/18.3.0) plus this patch set.",
-    "Rebuild the patch after any source edit with: git -C <checkout> diff <base.sha> <fork.commit> > app/patches/oh-my-pi/0001-omp-desktop-runtime.patch, then refresh patch.sha256 and patch.bytes.",
+    "Rebuild the patch after any source edit with: git -C <checkout> -c core.abbrev=7 diff <base.sha> <fork.commit> > app/patches/oh-my-pi/0001-omp-desktop-runtime.patch, then refresh patch.sha256 and patch.bytes. The explicit core.abbrev=7 pins the index lines to 7 hex digits: a machine-level core.abbrev would otherwise change the patch bytes while preserving semantics, so the artifact could not be reproduced byte-for-byte elsewhere.",
     "The patch file was renamed from 0001-rpc-host-tool-transition-contract.patch at .3, when it stopped being only the RPC contract; the current-state documents are updated, the dated validation records keep the name they were written with.",
     "The 18.3.0 artifact is the 18.2.7 artifact with exactly one changed context line: the 18.3.0 agent-loop.ts comment reads `wait` where 18.2.7 read `hub wait`. The added and removed line multisets are identical between the two artifacts.",
     "reproducible-sidecar-build: embed-native.ts writes the embedded addon tar.gz with fixed entry timestamps and a recomputed header checksum, because Bun.Archive stamps each entry with the current time. Without it, two builds of one fork commit produced different binaries — measured at T20-R4-3 on Bun 1.4.2 (first difference at byte 81260680).",
-    "explicit-bytecode-build-mode: bytecode stays on by default (upstream release behavior and the fast boot path). The desktop sidecar build passes `--bytecode` explicitly and records it as `build.bytecode` in the provenance manifest; measured reproducibility holds for bytecode on and off once the archive is deterministic."
+    "explicit-bytecode-build-mode: bytecode stays on by default (upstream release behavior and the fast boot path). The desktop sidecar build passes `--bytecode` explicitly and records it as `build.bytecode` in the provenance manifest; measured reproducibility holds for bytecode on and off once the archive is deterministic.",
+    "The .3 patch artifact was regenerated on 2026-10-01 after a comment-only correction of the bytecode documentation in compile-binary.ts and build-binary.ts (fork commit 6226f80…; the superseded fork commit 6b5017bc… and its artifact stay in git history and in the dated R4-3 record). No file in the patch set was added or removed, and no runtime/build behavior changed."
   ],
   "status": {
     "soleBatchContract": "not-strict",

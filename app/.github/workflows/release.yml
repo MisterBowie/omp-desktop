@@ -187,7 +187,7 @@ jobs:
           # commit is the one patches/oh-my-pi/manifest.json pins, and
           # scripts/omp-sidecar.mjs refuses any other checkout.
           repository: MisterBowie/oh-my-pi
-          ref: 6b5017bc297a357e88287763ef701b87775737c8
+          ref: 6226f805e92654344de04def413fa5cb91cb16b9
           path: .omp-sidecar-source
           # The build re-proves HEAD == base + patch level with
           # `git diff <base> HEAD` and `git apply --check --reverse`, so the base
