@@ -42,6 +42,10 @@ function bindingFor(mode) {
     thinkingLevel: () => null,
     dispatchable: () => true,
     modeForTurn: () => mode,
+    nativeSessionId: () => "native-owner",
+    enterMode: async () => {
+      throw new Error("the fixture does not wire mode transitions");
+    },
   };
 }
 

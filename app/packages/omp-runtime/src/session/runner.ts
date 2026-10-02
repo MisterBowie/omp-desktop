@@ -48,6 +48,7 @@ import {
 } from "./subagents.js";
 import { classifyUiRequest } from "./ui-requests.js";
 import { parseStartRefusalNotice, type OmpStartRefusal } from "./start-refusal.js";
+import { parseTurnFailureNotice, type OmpTurnFailure } from "./turn-failure.js";
 import {
   mintTurnToken,
   OMP_TURN_COMMAND,
@@ -303,6 +304,10 @@ export class OmpSessionRunner {
   private startRefusals = 0;
   /** Structured start refusals ignored as late, duplicate, foreign or unbound. */
   private ignoredStartRefusals = 0;
+  /** Structured mid-turn transition failures that closed a started generation. */
+  private turnFailures = 0;
+  /** Structured mid-turn transition failures ignored as late, duplicate, foreign or unbound. */
+  private ignoredTurnFailures = 0;
   /** Turn fences acknowledged by the runtime (one per armed generation). */
   private turnFences = 0;
   /**
@@ -444,6 +449,8 @@ export class OmpSessionRunner {
     lateFrames: number;
     startRefusals: number;
     ignoredStartRefusals: number;
+    turnFailures: number;
+    ignoredTurnFailures: number;
     turnFences: number;
     ignoredTurnAcks: number;
     conversion: ReturnType<OmpEventConverter["snapshot"]>;
@@ -457,6 +464,8 @@ export class OmpSessionRunner {
       lateFrames: this.lateFrames,
       startRefusals: this.startRefusals,
       ignoredStartRefusals: this.ignoredStartRefusals,
+      turnFailures: this.turnFailures,
+      ignoredTurnFailures: this.ignoredTurnFailures,
       turnFences: this.turnFences,
       ignoredTurnAcks: this.ignoredTurnAcks,
       conversion: this.converter.snapshot(),
@@ -1199,6 +1208,11 @@ export class OmpSessionRunner {
         this.handleStartRefusal(refusal);
         return;
       }
+      const failure = parseTurnFailureNotice(frame);
+      if (failure) {
+        this.handleTurnFailure(failure);
+        return;
+      }
       const classified = classifyUiRequest(frame);
       if (!classified) return;
       if (classified.kind === "approval" || classified.kind === "question") {
@@ -1417,6 +1431,50 @@ export class OmpSessionRunner {
       // The runtime emitted no terminal agent event for the aborted start, so
       // the desktop needs this one even though the refused turn never
       // presented a dialog.
+      whenCardsPresented: false,
+    });
+  }
+
+  /**
+   * Honor one structured mid-turn failure from the desktop gate (M5/T20-D).
+   *
+   * A failed host-confirmed mode transition aborts the live run, but a plain
+   * `agent_end` would be read as a *completed* turn. This descriptor is the
+   * formal signal that the started generation failed: it must name the native
+   * session this entry owns, carry the turn token this run armed through the
+   * fence, and arrive while the run is live and running (a run already being
+   * stopped is closed by the stop path instead; a delegate's signal names its
+   * own native id and is ignored). Anything else is counted and ignored, so a
+   * duplicate, a stale descriptor from an earlier generation (an older token),
+   * or a replay can never close a newer generation. The close emits one
+   * terminal `error` envelope and announces the turn end as `error`, so the
+   * bridge settles the durable host turn as failed and the next prompt
+   * recovers from the authoritative host row.
+   */
+  private handleTurnFailure(failure: OmpTurnFailure): void {
+    const expected = this.nativeSessionIdentity?.() ?? null;
+    const run = this.run;
+    if (
+      expected === null ||
+      failure.sessionId !== expected ||
+      this.state !== "running" ||
+      !run ||
+      !run.fenceArmed ||
+      failure.turnToken !== run.turnToken
+    ) {
+      this.ignoredTurnFailures += 1;
+      return;
+    }
+    this.turnFailures += 1;
+    this.closeGeneration(run.generation, "the desktop failed the turn after a mode transition error", {
+      error: appError("OMP_RUNTIME_TURN_FAILED", failure.reason, {
+        failureId: failure.failureId,
+        code: failure.code,
+        at: failure.at,
+      }),
+      // The runtime was aborted inside the tool result handler, so the turn
+      // already presented its rows; the desktop still needs the terminal error
+      // to settle the durable host turn as failed.
       whenCardsPresented: false,
     });
   }

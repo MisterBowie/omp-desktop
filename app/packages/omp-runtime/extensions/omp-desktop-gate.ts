@@ -151,6 +151,20 @@ import {
   decodeTurnAdmission,
   type OmpTurnAdmission,
 } from "../src/session/turn-admission.ts";
+import {
+  decodeModeTransitionDetails,
+  enterKindForToolName,
+  OMP_ENTER_TOOL_NAMES,
+  type OmpModeTransition,
+  type OmpModeTransitionKind,
+} from "../src/session/mode-transition.ts";
+import {
+  encodeTurnFailure,
+  OMP_TURN_FAILURE_KIND,
+  OMP_TURN_FAILURE_VERSION,
+  type OmpTurnFailure,
+  type OmpTurnFailureCode,
+} from "../src/session/turn-failure.ts";
 import { requiresExternalPathPermission } from "../src/session/tool-paths.ts";
 
 /**
@@ -340,6 +354,22 @@ export interface ToolCallEvent {
 }
 
 /**
+ * The settled-result slice the `tool_result` handler reads (M5/T20-D): the
+ * call identity, the model-visible content, the structured `details` the
+ * desktop adapter attached and the error flag the wrapper computed. The
+ * handler leaves the result untouched (returns `undefined`).
+ */
+export interface ToolResultEventSlice {
+  type: "tool_result";
+  toolCallId: string;
+  toolName: string;
+  input: Record<string, unknown>;
+  content: unknown;
+  details: unknown;
+  isError: boolean;
+}
+
+/**
  * The public session facts the ownership decision reads. All four members are
  * part of the pinned runtime's public `ReadonlySessionManager` pick
  * (`getSessionId` / `getCwd` / `getSessionFile` / `getHeader`); a host that
@@ -358,6 +388,14 @@ interface ToolCallContext {
   cwd?: string;
   sessionManager?: SessionManagerFacts;
   hasUI?: boolean | (() => boolean);
+  /**
+   * The runtime's abort channel (`ExtensionContext.abort`), available on the
+   * `tool_call`/`tool_result` and lifecycle contexts the pinned runtime builds.
+   * The gate uses it to stop a turn whose mode transition could not be applied
+   * consistently (M5/T20-D); a context without it can refuse but never abort,
+   * which the fail-closed paths report rather than hide.
+   */
+  abort?: () => void;
 }
 
 /**
@@ -411,6 +449,14 @@ export interface ExtensionAPI {
     handler: (event: { type: "agent_end"; willContinue?: boolean }, ctx: ToolCallContext) => unknown,
   ): void;
   /**
+   * A settled tool result, emitted by the runtime's tool wrapper for every
+   * executed call (M5/T20-D). The handler is awaited before the result reaches
+   * the agent loop, so it is the trusted place to apply a host-confirmed mode
+   * transition carried on the result's `details` — after the tool ran, before
+   * the next provider request.
+   */
+  on(event: "tool_result", handler: (event: ToolResultEventSlice, ctx: ToolCallContext) => unknown): void;
+  /**
    * Register the desktop's internal turn-boundary command (the runtime's
    * public `pi.registerCommand`). Optional so an embedder without the command
    * API still loads the gate for its other policies; the runner refuses to
@@ -428,6 +474,13 @@ export interface ExtensionAPI {
   getActiveTools?: () => string[];
   /** Replace the active-tool selection (the extension API's `setActiveToolsByName`). */
   setActiveTools?: (names: string[]) => Promise<void> | void;
+  /**
+   * Replace the live per-turn system prompt (the fork's
+   * `ExtensionAPI.setTurnSystemPrompt`, patched in at level `.5`). The host
+   * and the runtime report its absence instead of silently keeping the old
+   * prompt, which is what the transition's fail-closed path relies on.
+   */
+  setTurnSystemPrompt?: (prompt: string[]) => Promise<void> | void;
   logger?: { warn?(message: string, meta?: unknown): void; info?(message: string, meta?: unknown): void };
 }
 
@@ -787,7 +840,19 @@ export type StartRefusalVerdict = {
 
 /** The gate's verdict for one `before_agent_start`. */
 export type BeforeAgentStartDecision =
-  | { kind: "inject"; state: DesktopCapabilityState; systemPrompt: string[] }
+  | {
+      kind: "inject";
+      state: DesktopCapabilityState;
+      systemPrompt: string[];
+      /**
+       * The capability block (skills/memory) that was appended, or `null` when
+       * none was. Exposed so the live admission can cache the exact prompt
+       * parts a later mid-turn transition must preserve (M5/T20-D): base stays
+       * the runtime's own, the capability block appears once, and only the mode
+       * block changes.
+       */
+      capability: string | null;
+    }
   | { kind: "skip" }
   | ({ kind: "refuse" } & StartRefusalVerdict);
 
@@ -835,7 +900,7 @@ export function beforeAgentStartPolicy(
     const capability = desktopCapabilityPrompt(read.state);
     if (capability) systemPrompt.push(capability);
     systemPrompt.push(read.state.modeBlock);
-    return { kind: "inject", state: read.state, systemPrompt };
+    return { kind: "inject", state: read.state, systemPrompt, capability: capability ?? null };
   }
   // The mandatory channel only binds the interactive session that owns it. A
   // delegate session runs with the no-op UI context; its reads are `foreign`
@@ -1058,7 +1123,31 @@ type AdmittedTurn = {
    * chain is resolved against this value.
    */
   ownerSessionFile: string | undefined;
+  /**
+   * The mid-turn contract mode this record was moved into by a host-confirmed
+   * `EnterPlanMode`/`EnterGoalMode` (M5/T20-D), or undefined while the record
+   * still carries its prompt-time mode. A transitioned record is replaced by a
+   * *new* record (same token, new snapshot) and the previous one is retired
+   * with its delegate bindings, so a delegate that started under the
+   * prompt-time mode can never decide under the transitioned policy. At most
+   * one transition per record: the mode is Agent-only and the transitioned
+   * catalogue no longer advertises either Enter tool.
+   */
+  transitioned?: OmpModeTransitionKind;
 };
+
+/**
+ * The prompt parts the gate injected for the live turn: the runtime's own base
+ * parts (never re-derived), the capability block (skills/memory) when one was
+ * injected, and the current mode block. A mid-turn transition rebuilds the
+ * live prompt from these parts — base and capability stay byte-identical and
+ * appear exactly once each, and only the last block (the mode block) changes —
+ * instead of reading anything mutable.
+ */
+let injectedPromptParts: { base: string[]; capability: string | null; modeBlock: string } | null = null;
+
+/** Monotonic id for structured turn-failure descriptors (diagnostics only). */
+let turnFailureSequence = 0;
 
 let admittedTurn: AdmittedTurn | null = null;
 
@@ -1122,6 +1211,67 @@ const refusedDelegates = new Set<string>();
 function retireDelegateBindings(): void {
   for (const sessionId of delegateBindings.keys()) refusedDelegates.add(sessionId);
   delegateBindings.clear();
+}
+
+/**
+ * Retire the live admission wholesale: the record, the cached prompt parts it
+ * produced, and every delegate binding that referenced it. Called wherever the
+ * record ends — the next fence, a refused start, a terminal turn, a failed
+ * transition — so nothing can borrow a finished or superseded policy.
+ */
+function retireAdmittedTurn(): void {
+  admittedTurn = null;
+  injectedPromptParts = null;
+  retireDelegateBindings();
+}
+
+/**
+ * Why a host-confirmed transition record cannot move the live admission, or
+ * `null` when it may. Pure over the record and the live facts, so the gate
+ * handler and its tests cannot disagree about the ownership rules.
+ *
+ * The checks are the runtime-side half of the authorisation. The other half is
+ * the host's own `plans.enter` validator: it requires the durable mode to be
+ * Agent, a live durable turn, no queued/running execution and a CAS mode
+ * write. Together they bind the transition to this native session, this live
+ * generation (the fence token the runtime installed for the very run emitting
+ * the result), this exact tool call, and the Agent -> contract direction.
+ */
+export function modeTransitionProblem(
+  transition: OmpModeTransition,
+  live: {
+    /** The native session the live admission belongs to, or null without a record. */
+    nativeSessionId: string | null;
+    /** The session the `tool_result` event was emitted for. */
+    firingSessionId: string | undefined;
+    /** The token the runner armed for the live generation. */
+    turnToken: string | null;
+    /** The live admission record's own facts. */
+    record: { token: string | null; started: boolean; mode: DesktopRuntimeMode; transitioned?: OmpModeTransitionKind } | null;
+    /** The tool name the result was emitted for. */
+    toolName: string;
+    /** The tool call id the result was emitted for. */
+    toolCallId: string;
+  },
+): string | null {
+  const record = live.record;
+  if (record === null || live.nativeSessionId === null) return "no live admission exists for this process";
+  if (live.turnToken === null) return "no turn fence is armed";
+  if (record.token === null || record.token !== live.turnToken) return "the admission does not belong to the live generation";
+  if (!record.started) return "the admitted turn has not started";
+  if (record.transitioned !== undefined) return `the turn already transitioned to ${record.transitioned}`;
+  if (live.firingSessionId === undefined || live.firingSessionId !== live.nativeSessionId) {
+    return "the result was not emitted by the admitted session";
+  }
+  if (transition.sessionId !== live.nativeSessionId) return "the record names a different native session";
+  if (live.toolName !== OMP_ENTER_TOOL_NAMES[transition.kind]) {
+    return `the ${transition.kind} transition is not the tool that produced this result`;
+  }
+  if (transition.toolCallId !== live.toolCallId) return "the record does not name this tool call";
+  if (record.mode !== "agent" || transition.expectedMode !== "agent") {
+    return `the turn is in ${record.mode} mode, not agent`;
+  }
+  return null;
 }
 
 /**
@@ -1319,11 +1469,14 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
         // missing acknowledgment, and a late call then fails closed instead of
         // borrowing the previous turn's policy).
         turnToken = command.token;
-        admittedTurn = null;
-        // Every active delegate binding belongs to the record retired above:
-        // its sessions are remembered as refused, so they can never be
-        // re-pointed at this new admission.
-        retireDelegateBindings();
+        // Any well-formed handshake replaces the process's record, and it is
+        // cleared *before* the payload is decoded: an undecodable payload must
+        // leave no admission at all (the runner refuses the prompt for the
+        // missing acknowledgment, and a late call then fails closed instead of
+        // borrowing the previous turn's policy). Every active delegate binding
+        // belongs to the record retired here: its sessions are remembered as
+        // refused, so they can never be re-pointed at this new admission.
+        retireAdmittedTurn();
         let admission: OmpTurnAdmission | null = null;
         if (command.admission !== null) {
           admission = decodeTurnAdmission(command.admission);
@@ -1408,8 +1561,7 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
     // late callback cannot decide under a policy for a turn that was aborted.
     // The bindings that referenced it are dropped with it.
     if (admittedTurn && admittedTurn.token === turnToken) {
-      admittedTurn = null;
-      retireDelegateBindings();
+      retireAdmittedTurn();
     }
     if (typeof context.abort === "function") {
       try {
@@ -1423,6 +1575,181 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
     // protected from inside this process. Never pretend the refusal happened.
     pi.logger?.warn?.("desktop gate refused an agent start but the runtime exposes no abort", decision.reason);
   };
+
+  /**
+   * Fail one *started* turn: the runtime's own abort path *and* the structured
+   * notify the desktop runner consumes (M5/T20-D).
+   *
+   * `ctx.abort()` stops the loop, but the plain `agent_end` it produces would
+   * be read by the runner as a completed turn, misreporting a failed mode
+   * transition as success. The notify carries the versioned turn-failure
+   * descriptor (`session/turn-failure.ts`) so the runner closes exactly this
+   * generation as failed — one terminal error envelope and an `error`
+   * turn-end announcement — and the bridge settles the durable host turn as
+   * failed. The admission is retired here: the turn is over, and a late
+   * callback must not decide under a policy for an aborted turn.
+   */
+  const failStartedTurn = (
+    context: ToolCallContext,
+    code: OmpTurnFailureCode,
+    reason: string,
+  ): void => {
+    const at = Date.now();
+    const failure: OmpTurnFailure = {
+      v: OMP_TURN_FAILURE_VERSION,
+      kind: OMP_TURN_FAILURE_KIND,
+      sessionId: sessionIdOf(context) ?? null,
+      turnToken,
+      code,
+      reason,
+      failureId: `omp-turn-failure-${at}-${turnFailureSequence++}`,
+      at,
+    };
+    if (typeof context.ui?.notify === "function") {
+      try {
+        context.ui.notify(encodeTurnFailure(failure), "error");
+      } catch (error) {
+        pi.logger?.warn?.("desktop gate could not deliver the turn failure", String(error));
+      }
+    } else {
+      pi.logger?.warn?.("desktop gate failed a turn but the context exposes no notify", reason);
+    }
+    if (admittedTurn && admittedTurn.token === turnToken) {
+      retireAdmittedTurn();
+    }
+    if (typeof context.abort === "function") {
+      try {
+        context.abort();
+        return;
+      } catch (error) {
+        pi.logger?.warn?.("desktop gate could not abort a failed turn", String(error));
+      }
+    }
+    pi.logger?.warn?.("desktop gate failed a turn but the runtime exposes no abort", reason);
+  };
+
+  /**
+   * Apply one host-confirmed contract-mode transition (M5/T20-D).
+   *
+   * The desktop adapter attaches the record to the Enter tool's settled result
+   * (`session/mode-transition.ts`). This handler is the runtime-side half of
+   * the authorisation: it validates the record against the live admission (the
+   * owning session, the fence token of the very run that emitted the result,
+   * the exact tool-call id, the Agent-only direction, single use) and then
+   * moves the three pieces of live state the next provider request reads —
+   * the system prompt (base and capability preserved byte-identically, only
+   * the mode block replaced), the tool catalogue (the contract clamp for the
+   * new mode; the new submit tool must already be registered, which the
+   * desktop's mid-turn `set_host_tools` did) and the decision policy (a new
+   * admission record; the previous record's delegate bindings are retired so
+   * a delegate that started under the prompt-time mode can never decide under
+   * the transitioned policy).
+   *
+   * Failure is never silently ignored:
+   *
+   *   - an Enter tool result that claims success without a valid record, a
+   *     record that fails attribution, and a record that reports the desktop
+   *     could not prepare the transition all fail the turn through
+   *     {@link failStartedTurn};
+   *   - a prompt replacement or clamp that throws after the host committed
+   *     fails the turn the same way, so the rest of the run cannot continue as
+   *     Agent under a host row that already says Plan/Goal. The durable host
+   *     fact stays, and the next prompt rebuilds from it.
+   *
+   * An ordinary host refusal (a failed `plans.enter`: wrong mode, stale turn,
+   * a pending execution) arrives as an error result *without* a record; that
+   * is a correctable tool error and no transition is attempted.
+   */
+  pi.on("tool_result", async (event, context) => {
+    const kind = enterKindForToolName(event.toolName);
+    if (kind === null) return undefined;
+    const transition = decodeModeTransitionDetails(event.details);
+    if (transition === null) {
+      if (event.isError !== true) {
+        failStartedTurn(
+          context,
+          "transition-invalid",
+          `${event.toolName} settled without a valid mode transition record`,
+        );
+      }
+      return undefined;
+    }
+    const current = admittedTurn;
+    const problem = modeTransitionProblem(transition, {
+      nativeSessionId: current?.nativeSessionId ?? null,
+      firingSessionId: sessionIdOf(context),
+      turnToken,
+      record:
+        current === null
+          ? null
+          : {
+              token: current.token,
+              started: current.started,
+              mode: current.snapshot.mode,
+              ...(current.transitioned !== undefined ? { transitioned: current.transitioned } : {}),
+            },
+      toolName: event.toolName,
+      toolCallId: event.toolCallId,
+    });
+    if (problem !== null || transition.kind !== kind) {
+      failStartedTurn(
+        context,
+        "transition-invalid",
+        `${event.toolName}: ${problem ?? "the record kind does not match the tool"}`,
+      );
+      return undefined;
+    }
+    if (transition.state === "failed") {
+      failStartedTurn(context, "transition-apply-failed", `${event.toolName}: ${transition.reason}`);
+      return undefined;
+    }
+    const parts = injectedPromptParts;
+    if (parts === null || current === null) {
+      failStartedTurn(
+        context,
+        "transition-apply-failed",
+        "the gate has no prepared system prompt to rebuild the transitioned turn",
+      );
+      return undefined;
+    }
+    try {
+      if (typeof pi.setTurnSystemPrompt !== "function") {
+        throw new Error("the runtime exposes no live system-prompt API");
+      }
+      // Base and capability stay byte-identical and exactly once each; only
+      // the mode block (always last) changes.
+      const prompt = [
+        ...parts.base,
+        ...(parts.capability === null ? [] : [parts.capability]),
+        transition.modeBlock,
+      ];
+      await pi.setTurnSystemPrompt(prompt);
+      // Replace the record wholesale before the clamp: every later decision
+      // reads the transitioned snapshot, and the previous record's delegate
+      // bindings are retired with it.
+      admittedTurn = {
+        ...current,
+        snapshot: {
+          mode: transition.kind,
+          permissionMode: current.snapshot.permissionMode,
+          hostTools: transition.hostTools,
+        },
+        transitioned: transition.kind,
+      };
+      retireDelegateBindings();
+      injectedPromptParts = { ...parts, modeBlock: transition.modeBlock };
+      const clamped = await applyContractToolClamp(pi, clamp, admittedTurn.snapshot);
+      if (!clamped.ok) throw new Error(clamped.reason);
+    } catch (error) {
+      retireAdmittedTurn();
+      failStartedTurn(
+        context,
+        "transition-apply-failed",
+        `the gate could not apply the ${kind} transition: ${String(error)}`,
+      );
+    }
+    return undefined;
+  });
 
   /**
    * Decide one call (M5/T20-C review repair).
@@ -1525,8 +1852,7 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
     if (!admittedTurn || event.willContinue === true) return;
     const sessionId = sessionIdOf(context);
     if (sessionId !== undefined && sessionId === admittedTurn.nativeSessionId) {
-      admittedTurn = null;
-      retireDelegateBindings();
+      retireAdmittedTurn();
     }
   });
   // A delegate session's own start is its earliest ownership signal: the
@@ -1560,6 +1886,34 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
       if (decision.kind === "skip") return undefined;
       const sessionId = context.sessionManager?.getSessionId?.() ?? null;
       if (admittedTurn && admittedTurn.source === "fence" && sessionId === admittedTurn.nativeSessionId) {
+        // A continuation within the same live turn whose contract was already
+        // moved by a host-confirmed transition (M5/T20-D). The run-scoped file
+        // still describes the prompt-time mode — expected, because nothing may
+        // rewrite it mid-turn — so the record, not the file, is the authority:
+        // the injection is rebuilt from the cached parts with the transitioned
+        // mode block and the clamp re-applied for the transitioned snapshot.
+        if (
+          admittedTurn.transitioned !== undefined &&
+          injectedPromptParts !== null &&
+          decision.state.sessionId === admittedTurn.nativeSessionId
+        ) {
+          const clampedTransitioned = await applyContractToolClamp(pi, clamp, admittedTurn.snapshot);
+          if (!clampedTransitioned.ok) {
+            refuseStart(context, {
+              code: "clamp-unavailable",
+              reason: clampedTransitioned.reason,
+              sessionId,
+            });
+            return undefined;
+          }
+          return {
+            systemPrompt: [
+              ...injectedPromptParts.base,
+              ...(injectedPromptParts.capability === null ? [] : [injectedPromptParts.capability]),
+              injectedPromptParts.modeBlock,
+            ],
+          };
+        }
         // The desktop's payload is the policy. The file must still describe
         // the same session and the same mode/permission mode: a file modified
         // between the bridge's write and this start is a tampered channel and
@@ -1621,6 +1975,14 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
         });
         return undefined;
       }
+      // Cache the exact parts this injection produced: a host-confirmed
+      // mid-turn transition rebuilds the live prompt from them, so base and
+      // capability cannot be re-derived (or duplicated) by a second code path.
+      injectedPromptParts = {
+        base: [...event.systemPrompt],
+        capability: decision.capability,
+        modeBlock: decision.state.modeBlock,
+      };
       return { systemPrompt: decision.systemPrompt };
     } catch (error) {
       // The handler must not silently degrade: an unexpected failure while a

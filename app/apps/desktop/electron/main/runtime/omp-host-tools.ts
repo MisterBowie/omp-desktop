@@ -61,6 +61,11 @@
  */
 import {
   boundHostToolContent,
+  encodeModeTransitionDetails,
+  OMP_ENTER_TOOL_NAMES,
+  OMP_MODE_TRANSITION_EXPECTED_MODE,
+  OMP_MODE_TRANSITION_VERSION,
+  type DesktopHostToolPolicy,
   type DesktopRuntimeMode,
   type OmpHostToolCall,
   type OmpHostToolContentBlock,
@@ -68,6 +73,8 @@ import {
   type OmpHostToolExecutor,
   type OmpHostToolOutcome,
   type OmpHostToolRun,
+  type OmpModeTransition,
+  type OmpModeTransitionKind,
 } from "@pi-desktop/omp-runtime";
 import type { RegisteredPluginSkill, RegisteredPluginTool } from "../plugin-runtime";
 import type { UserMcpToolDescriptor } from "../user-mcp";
@@ -93,13 +100,21 @@ export type OmpHostToolAdapterDeps = {
   /** PI's activation-scope predicate; the same one `session-launch.ts` uses. */
   pluginActiveInProject(pluginId: string, projectPath: string | null | undefined): boolean;
   /**
-   * The host's Plan/Goal submission endpoint (`plans.submit` RPC). The
-   * executor passes only the binding's durable identity — desktop session id,
-   * host turn id and the frame's real tool-call id — never a model-supplied
-   * value. Absent means the submit tools cannot run: a call fails closed
-   * instead of pretending a submission was accepted.
+   * The host's Plan/Goal entry and submission endpoints (`plans.enter` /
+   * `plans.submit` RPC). The executor passes only the binding's durable
+   * identity — desktop session id, host turn id and the frame's real tool-call
+   * id — never a model-supplied value. Absent means the Enter/submit tools
+   * cannot run: a call fails closed instead of pretending the host accepted
+   * it.
    */
   plans?: {
+    enter(input: {
+      sessionId: string;
+      /** Durable host turn id from the run binding, never the live generation. */
+      turnId: string;
+      toolCallId: string;
+      kind: DesktopSubmitKind;
+    }): Promise<unknown>;
     submit(input: {
       sessionId: string;
       /** Durable host turn id from the run binding, never the live generation. */
@@ -144,23 +159,25 @@ export type OmpHostToolPlansHost = {
 };
 
 /**
- * The host's Plan/Goal submission endpoint (`plans.submit`) as the adapter
- * consumes it. The executor supplies the durable identity from the run
- * binding; this closure only reaches the host RPC, and `plans.submit` itself
- * enforces the kind / durable-mode / live-turn / single-pending rules.
+ * The host's Plan/Goal entry and submission endpoints as the adapter consumes
+ * them. The executor supplies the durable identity from the run binding; these
+ * closures only reach the host RPC, and the host's own validators enforce the
+ * durable-mode, live-turn, single-pending and CAS rules.
  * Exported so the E2E wires the production implementation.
  */
-export function createHostPlansSubmit(
+export function createHostPlansEndpoints(
   host: () => OmpHostToolPlansHost | null,
 ): NonNullable<OmpHostToolAdapterDeps["plans"]> {
+  const client = (): OmpHostToolPlansHost => {
+    const connected = host();
+    if (!connected) {
+      throw Object.assign(new Error("host unavailable"), { errorCode: "HOST_UNAVAILABLE" });
+    }
+    return connected;
+  };
   return {
-    submit: async (input) => {
-      const client = host();
-      if (!client) {
-        throw Object.assign(new Error("host unavailable"), { errorCode: "HOST_UNAVAILABLE" });
-      }
-      return client.call("plans.submit", input);
-    },
+    enter: async (input) => client().call("plans.enter", input),
+    submit: async (input) => client().call("plans.submit", input),
   };
 }
 
@@ -197,6 +214,29 @@ export type OmpHostToolBinding = {
    * the call to the entry's live turn.
    */
   modeForTurn(turnId: string): DesktopRuntimeMode | null;
+  /**
+   * The runtime's own native session identity (the OMP session id the fence
+   * admission is bound to), or null while the runtime has not established it.
+   * The mid-turn mode transition record is validated against the admitted
+   * native session, so the adapter must name that identity, never the desktop
+   * session id.
+   */
+  nativeSessionId(): string | null;
+  /**
+   * Prepare the live turn for a host-confirmed `Agent -> Plan|Goal` transition
+   * (M5/T20-D), after `plans.enter` committed the durable mode. The bridge:
+   * records the new mode for this exact live turn (`modeForTurn`), re-registers
+   * the desktop host tools for the new mode (the Enter tools leave the
+   * catalogue; the new mode's submit tool appears) and returns the exact
+   * `composeModeSystemPrompt(kind, "")` block plus the new policy table for
+   * the trusted gate. A rejection means the transition could not be prepared:
+   * the adapter reports it as a failed transition, and the gate stops the
+   * inconsistent turn instead of continuing as Agent under a Plan/Goal row.
+   */
+  enterMode(
+    run: OmpHostToolRun,
+    kind: OmpModeTransitionKind,
+  ): Promise<{ modeBlock: string; hostTools: DesktopHostToolPolicy[] }>;
 };
 
 export type OmpHostToolAdapter = {
@@ -336,6 +376,46 @@ export function desktopSubmitToolCatalogEntry(kind: DesktopSubmitKind): OmpHostT
     // PI's risk table classifies the submit tools Low; the declaration rides
     // the run-scoped policy table so the card/risk lookup never guesses from
     // the name.
+    risk: "low",
+    planSafeActions: [],
+    origin: "desktop",
+  };
+}
+
+/**
+ * The model-side mode-entry tools, exactly PI's `ENTER_TOOL_NAMES` and
+ * `buildEnterModeTool` contract (`agent-runtime/src/runtime.ts`): both are
+ * Agent-only, take no arguments (`Type.Object({})`), and are declared `sole`
+ * (the only tool call of their assistant message) — but, unlike the submit
+ * tools, a settled result does **not** terminate: PI's Enter commits the
+ * durable mode and the same turn continues with the new prompt and catalogue.
+ *
+ * The bridge adds both entries to an Agent-mode catalogue only; the contract
+ * modes expose their own submit tool instead, and the trusted gate's clamp
+ * keeps exactly the mode's catalogue.
+ */
+export const DESKTOP_ENTER_TOOL_KINDS: readonly OmpModeTransitionKind[] = ["plan", "goal"];
+
+/** The definition the bridge registers for `EnterPlanMode`/`EnterGoalMode`. */
+export function desktopEnterToolCatalogEntry(kind: OmpModeTransitionKind): OmpHostToolCatalogEntry {
+  const name = OMP_ENTER_TOOL_NAMES[kind];
+  const definition: OmpHostToolDefinition = {
+    name,
+    description:
+      kind === "plan"
+        ? "Switch this same agent into Plan mode after the host confirms the durable session transition. Use when the user wants to agree on the implementation steps before any change is made."
+        : "Switch this same agent into Goal mode after the host confirms the durable session transition. Use when the user states an outcome and wants you to agree on the goal and its acceptance criteria, then reach it autonomously.",
+    parameters: { type: "object", properties: {} },
+    loadMode: "essential",
+    concurrency: "exclusive",
+    batchPolicy: "sole",
+    terminateOnSettle: false,
+  };
+  return {
+    definition,
+    // PI's risk table classifies both entries Low; the declaration rides the
+    // run-scoped policy table so the card/risk lookup never guesses from the
+    // name.
     risk: "low",
     planSafeActions: [],
     origin: "desktop",
@@ -588,6 +668,161 @@ export function createOmpHostToolAdapter(deps: OmpHostToolAdapterDeps): OmpHostT
         });
       }
     };
+    /**
+     * Serve one Agent -> Plan/Goal entry through the host's own `plans.enter`.
+     *
+     * The host is authoritative: its CAS requires the durable mode to be
+     * Agent, a live running turn with exactly the bound id, and no
+     * queued/running execution; the reply names the resulting planning state.
+     * Only then does the desktop prepare the runtime side (mode recorded for
+     * this live turn, catalogue re-registered for the new mode) and return the
+     * transition record the trusted gate applies.
+     *
+     * Once the host has committed, a run that can no longer be prepared — a
+     * stop raced the commit, or the desktop-side preparation failed — must not
+     * be reported as a successful entry either: it returns the record with
+     * `state: "failed"`, and the gate stops the turn. The next prompt rebuilds
+     * from the durable host row.
+     */
+    const runEnter = async (
+      call: OmpHostToolCall,
+      run: OmpHostToolRun,
+      signal: AbortSignal,
+      kind: OmpModeTransitionKind,
+      mode: DesktopRuntimeMode,
+    ): Promise<OmpHostToolOutcome> => {
+      assertDispatchable(run, signal);
+      const name = OMP_ENTER_TOOL_NAMES[kind];
+      const label = kind === "plan" ? "Plan" : "Goal";
+      if (mode !== "agent") {
+        return outcomeFor({
+          content: [{ type: "text", text: `${name} is available only in Agent mode` }],
+          isError: true,
+        });
+      }
+      // The record identifies the durable turn the host validated; without a
+      // bound host turn there is nothing to validate against.
+      const hostTurnId = run.hostTurnId;
+      if (!hostTurnId) {
+        return outcomeFor({
+          content: [
+            { type: "text", text: `${name} has no durable host turn bound to this run; refusing to enter ${label} mode` },
+          ],
+          isError: true,
+        });
+      }
+      if (!deps.plans?.enter) {
+        return outcomeFor({ content: [{ type: "text", text: `${name} is not wired in this build` }], isError: true });
+      }
+      const nativeSessionId = binding.nativeSessionId();
+      if (!nativeSessionId) {
+        return outcomeFor({
+          content: [
+            { type: "text", text: `${name} has no established native session; refusing to enter ${label} mode` },
+          ],
+          isError: true,
+        });
+      }
+      const at = Date.now();
+      // A committed transition the desktop could not prepare. The record is
+      // the only channel that tells the gate to stop the inconsistent turn;
+      // its own encoder ceiling can only fail for a pathological catalogue,
+      // in which case the error result still stops the model from pretending
+      // the entry succeeded (no record => the gate fails the turn).
+      const failedOutcome = (reason: string): OmpHostToolOutcome => {
+        let details: Record<string, OmpModeTransition> | undefined;
+        try {
+          details = encodeModeTransitionDetails({
+            v: OMP_MODE_TRANSITION_VERSION,
+            kind,
+            state: "failed",
+            sessionId: nativeSessionId,
+            liveTurnId: run.turnId,
+            hostTurnId,
+            toolCallId: call.toolCallId,
+            expectedMode: OMP_MODE_TRANSITION_EXPECTED_MODE,
+            reason: reason.slice(0, 2000) || "the desktop could not prepare the mode transition",
+            at,
+          });
+        } catch {
+          details = undefined;
+        }
+        return {
+          content: [{ type: "text", text: `${label} mode could not be entered: ${reason}` }],
+          isError: true,
+          ...(details ? { details } : {}),
+        };
+      };
+      try {
+        const result = await deps.plans.enter({
+          sessionId: binding.sessionId,
+          turnId: hostTurnId,
+          toolCallId: call.toolCallId,
+          kind,
+        });
+        if (!isEnterPlanResult(result, kind)) {
+          return outcomeFor({
+            content: [{ type: "text", text: `${name} returned an invalid transition result.` }],
+            isError: true,
+          });
+        }
+      } catch (error) {
+        // The host refused: wrong durable mode, stale turn, an active
+        // execution. This is a correctable tool error with no transition.
+        return outcomeFor({
+          content: [{ type: "text", text: `${name} was refused: ${planSubmitErrorCode(error)}` }],
+          isError: true,
+        });
+      }
+      // The host committed the durable mode. Everything below is the desktop's
+      // preparation of the live turn, and any failure from here stops it.
+      if (signal.aborted || !binding.dispatchable(run.turnId)) {
+        return failedOutcome("the run stopped while the host committed the mode transition");
+      }
+      let prepared: { modeBlock: string; hostTools: DesktopHostToolPolicy[] };
+      try {
+        prepared = await binding.enterMode(run, kind);
+      } catch (error) {
+        return failedOutcome(
+          `the desktop could not prepare the transitioned turn: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      // The preparation awaits the runtime's own catalogue registration: a
+      // stop that landed during it must not be reported as a ready transition.
+      if (signal.aborted || !binding.dispatchable(run.turnId)) {
+        return failedOutcome("the run stopped while the desktop prepared the mode transition");
+      }
+      let details: Record<string, OmpModeTransition>;
+      try {
+        details = encodeModeTransitionDetails({
+          v: OMP_MODE_TRANSITION_VERSION,
+          kind,
+          state: "ready",
+          sessionId: nativeSessionId,
+          liveTurnId: run.turnId,
+          hostTurnId,
+          toolCallId: call.toolCallId,
+          expectedMode: OMP_MODE_TRANSITION_EXPECTED_MODE,
+          modeBlock: prepared.modeBlock,
+          hostTools: prepared.hostTools,
+          at,
+        });
+      } catch (error) {
+        return failedOutcome(error instanceof Error ? error.message : String(error));
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text:
+              kind === "plan"
+                ? "Plan mode is active. Inspect the workspace, formulate the plan, then call SubmitPlan for approval."
+                : "Goal mode is active. Clarify the outcome and how it will be verified, then call SubmitGoal for approval.",
+          },
+        ],
+        details,
+      };
+    };
     return {
       async execute(call: OmpHostToolCall, run: OmpHostToolRun, signal: AbortSignal): Promise<OmpHostToolOutcome> {
         try {
@@ -620,6 +855,20 @@ export function createOmpHostToolAdapter(deps: OmpHostToolAdapterDeps): OmpHostT
                 : null;
           if (submitKind !== null) {
             return await runSubmit(call, run, signal, submitKind, mode);
+          }
+          // The Enter tools run before the plugin/MCP branches too: their
+          // identity comes only from the run binding (durable session/turn +
+          // the frame's real tool-callId), and a call in a contract mode or
+          // without a durable turn fails closed instead of reaching
+          // `plans.enter`.
+          const enterKind =
+            call.toolName === OMP_ENTER_TOOL_NAMES.plan
+              ? "plan"
+              : call.toolName === OMP_ENTER_TOOL_NAMES.goal
+                ? "goal"
+                : null;
+          if (enterKind !== null) {
+            return await runEnter(call, run, signal, enterKind, mode);
           }
           if (call.toolName.startsWith("mcp_")) {
             // Last synchronous gate before entering the MCP call path: the Pi
@@ -836,10 +1085,26 @@ function isPendingProposalResult(value: unknown): boolean {
 }
 
 /**
- * The host error code carried by a failed `plans.submit` RPC. The host
- * transport puts it in `data.errorCode` (Pi contract) and some paths attach it
- * to the error itself; anything unrecognized reports the generic failure code
- * rather than an empty message.
+ * True when a `plans.enter` reply carries PI's committed transition: the
+ * host's own `ok`, the resulting `planning` state (the only state an
+ * `Agent -> Plan|Goal` entry can produce, because the CAS refuses a session
+ * with a queued/running execution) and the kind that was requested. A reply
+ * missing any of them is not a transition the desktop can build on, so it is
+ * reported to the model as invalid instead of being treated as success.
+ */
+function isEnterPlanResult(value: unknown, kind: DesktopSubmitKind): boolean {
+  if (!value || typeof value !== "object") return false;
+  const ok = "ok" in value ? value.ok : undefined;
+  const state = "state" in value ? value.state : undefined;
+  const reported = "kind" in value ? value.kind : undefined;
+  return ok === true && state === "planning" && reported === kind;
+}
+
+/**
+ * The host error code carried by a failed `plans.submit`/`plans.enter` RPC.
+ * The host transport puts it in `data.errorCode` (Pi contract) and some paths
+ * attach it to the error itself; anything unrecognized reports the generic
+ * failure code rather than an empty message.
  */
 function planSubmitErrorCode(error: unknown): string {
   if (error && typeof error === "object") {

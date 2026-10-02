@@ -62,6 +62,10 @@ function binding(overrides = {}) {
     thinkingLevel: () => null,
     dispatchable: () => true,
     modeForTurn: () => "agent",
+    nativeSessionId: () => "native-owner",
+    enterMode: async () => {
+      throw new Error("the fixture does not wire mode transitions");
+    },
     ...overrides,
   };
 }

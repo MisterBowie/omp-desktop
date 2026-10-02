@@ -1,3 +1,24 @@
+diff --git a/docs/extensions.md b/docs/extensions.md
+index 8e85d7c..b3bdb3a 100644
+--- a/docs/extensions.md
++++ b/docs/extensions.md
+@@ -119,6 +119,7 @@ Core methods:
+ - `setLabel`, `getFlag`
+ - `sendMessage`, `sendUserMessage`, `appendEntry`, `exec`
+ - `getActiveTools`, `getAllTools`, `setActiveTools`
++- `setTurnSystemPrompt` (optional; hosts that do not provide it reject the call)
+ - `getCommands`
+ - `getSessionName`, `setSessionName`
+ - `setModel`, `getThinkingLevel`, `setThinkingLevel`
+@@ -129,6 +130,8 @@ Core methods:
+ 
+ `ExtensionAPI` methods retain their extension binding when destructured or passed as callbacks.
+ 
++`setTurnSystemPrompt(prompt)` replaces the live per-turn system prompt for the current run: every provider request from that point on — including requests after further tool calls in the same run — uses the replacement, because the agent loop re-reads the live prompt before each model call. It is the mid-run counterpart of the `before_agent_start` `systemPrompt` override and is dropped together with that override when the next prompt is prepared. It requires a non-empty array of strings and refuses anything else without touching the live prompt.
++
+ `getServiceTiers()` returns a detached snapshot of the session's live per-family tier map. `setServiceTier(family, tier)` changes one family for subsequent requests; pass `undefined` to clear that session override. OpenAI accepts `auto`, `default`, `flex`, `scale`, or `priority`; Anthropic accepts `priority`; Google accepts `flex` or `priority`. Changes made while a response is streaming do not alter that in-flight request.
+ 
+ ### Provider registration
 diff --git a/docs/rpc.md b/docs/rpc.md
 index 49a7454..fd6badd 100644
 --- a/docs/rpc.md
@@ -1578,6 +1599,102 @@ index 0eeda6d..bdb5715 100644
  			minify: {
  				identifiers: options.minifyIdentifiers ?? false,
  				keepNames: true,
+diff --git a/packages/coding-agent/src/extensibility/extensions/loader.ts b/packages/coding-agent/src/extensibility/extensions/loader.ts
+index e277e6d..906425e 100644
+--- a/packages/coding-agent/src/extensibility/extensions/loader.ts
++++ b/packages/coding-agent/src/extensibility/extensions/loader.ts
+@@ -324,6 +324,25 @@ class ConcreteExtensionAPI implements ExtensionAPI, IExtensionRuntime {
+ 		return this.runtime.setActiveTools(toolNames);
+ 	}
+ 
++	/**
++	 * Replace the live per-turn system prompt. A host that does not provide the
++	 * action refuses the call; silently keeping the old prompt would let a
++	 * caller believe a contract change it never got.
++	 */
++	setTurnSystemPrompt(prompt: string[]): Promise<void> {
++		const action = this.runtime.setTurnSystemPrompt;
++		if (typeof action !== "function") {
++			return Promise.reject(new Error("this host does not support replacing the live system prompt"));
++		}
++		try {
++			return Promise.resolve(action(prompt));
++		} catch (error) {
++			// A refusing host throws synchronously; the action's contract is a
++			// rejection, so the caller can always await it.
++			return Promise.reject(error instanceof Error ? error : new Error(String(error)));
++		}
++	}
++
+ 	getCommands() {
+ 		return this.runtime.getCommands();
+ 	}
+diff --git a/packages/coding-agent/src/extensibility/extensions/runner.ts b/packages/coding-agent/src/extensibility/extensions/runner.ts
+index 1be4ecd..b9c8bcd 100644
+--- a/packages/coding-agent/src/extensibility/extensions/runner.ts
++++ b/packages/coding-agent/src/extensibility/extensions/runner.ts
+@@ -98,6 +98,11 @@ function throwUnsupportedServiceTierAction(): never {
+ 	throw new Error("This extension host does not support service-tier actions");
+ }
+ 
++/** A host that never provided the optional live prompt action must refuse it, not no-op. */
++function throwUnsupportedTurnSystemPromptAction(): never {
++	throw new Error("This extension host does not support replacing the live system prompt");
++}
++
+ export function testSetExtensionHandlerTimeoutMs(timeoutMs: number): void {
+ 	extensionHandlerTimeoutMs = timeoutMs;
+ }
+@@ -686,6 +691,7 @@ export class ExtensionRunner {
+ 		this.runtime.setThinkingLevel = actions.setThinkingLevel;
+ 		this.runtime.getServiceTiers = actions.getServiceTiers ?? throwUnsupportedServiceTierAction;
+ 		this.runtime.setServiceTier = actions.setServiceTier ?? throwUnsupportedServiceTierAction;
++		this.runtime.setTurnSystemPrompt = actions.setTurnSystemPrompt ?? throwUnsupportedTurnSystemPromptAction;
+ 		this.runtime.getSessionName = actions.getSessionName;
+ 		this.runtime.setSessionName = actions.setSessionName;
+ 		this.runtime.registerProvider = (name, config, sourceId) => {
+diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packages/coding-agent/src/extensibility/extensions/types.ts
+index 1ce7ddd..b5c05b1 100644
+--- a/packages/coding-agent/src/extensibility/extensions/types.ts
++++ b/packages/coding-agent/src/extensibility/extensions/types.ts
+@@ -1460,6 +1460,23 @@ export interface ExtensionAPI {
+ 	/** Set the active tools by name. */
+ 	setActiveTools(toolNames: string[]): Promise<void>;
+ 
++	/**
++	 * Replace the live per-turn system prompt.
++	 *
++	 * The replacement is applied to the current run: every provider request
++	 * from here on — including requests that follow further tool calls in the
++	 * same run — uses it, because the agent loop re-reads the live prompt
++	 * before each model call. It is the mid-run counterpart of the
++	 * `before_agent_start` `systemPrompt` override and is dropped with that
++	 * override at the next prompt preparation, so a later turn is governed by
++	 * its own preparation again.
++	 *
++	 * Requires a non-empty array of strings; anything else is refused without
++	 * changing the live prompt. Hosts that do not provide this action reject
++	 * the call instead of silently keeping the old prompt.
++	 */
++	setTurnSystemPrompt?(prompt: string[]): Promise<void>;
++
+ 	/** Get available slash commands in the current session. */
+ 	getCommands(): SlashCommandInfo[];
+ 
+@@ -1714,6 +1731,13 @@ export interface ExtensionActions {
+ 	getActiveTools: GetActiveToolsHandler;
+ 	getAllTools: GetAllToolsHandler;
+ 	setActiveTools: SetActiveToolsHandler;
++	/**
++	 * Replace the live per-turn system prompt (see
++	 * {@link ExtensionAPI.setTurnSystemPrompt}). Optional: hosts that do not
++	 * support mid-run prompt replacement leave it undefined and the API
++	 * refuses the call rather than pretending it succeeded.
++	 */
++	setTurnSystemPrompt?: (prompt: string[]) => Promise<void>;
+ 	getCommands: GetCommandsHandler;
+ 	setModel: SetModelHandler;
+ 	getThinkingLevel: GetThinkingLevelHandler;
 diff --git a/packages/coding-agent/src/modes/rpc/host-tools.ts b/packages/coding-agent/src/modes/rpc/host-tools.ts
 index 62be077..4536eac 100644
 --- a/packages/coding-agent/src/modes/rpc/host-tools.ts
@@ -1844,6 +1961,194 @@ index 062949c..323a953 100644
  	isError?: boolean;
  }
  
+diff --git a/packages/coding-agent/src/modes/runtime-init.ts b/packages/coding-agent/src/modes/runtime-init.ts
+index 8d27338..5e02d32 100644
+--- a/packages/coding-agent/src/modes/runtime-init.ts
++++ b/packages/coding-agent/src/modes/runtime-init.ts
+@@ -105,6 +105,12 @@ export async function initializeExtensions(session: AgentSession, options: Initi
+ 			getActiveTools: () => session.getEnabledToolNames(),
+ 			getAllTools: () => session.getAllToolInfos(),
+ 			setActiveTools: (toolNames: string[]) => session.setActiveToolsByName(toolNames),
++			// The mid-run counterpart of the `before_agent_start` override
++			// (M5/T20-D): a trusted host that already committed a contract-mode
++			// transition can make the live run's remaining provider requests use
++			// the new prompt. The session validates the array and keeps the
++			// override until the run ends.
++			setTurnSystemPrompt: async (prompt: string[]) => session.setTurnSystemPrompt(prompt),
+ 			getCommands: () => getSessionSlashCommands(session),
+ 			setModel: model => runExtensionSetModel(session, model),
+ 			getThinkingLevel: () => session.thinkingLevel,
+diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
+index 398a2ec..42b5722 100644
+--- a/packages/coding-agent/src/session/agent-session.ts
++++ b/packages/coding-agent/src/session/agent-session.ts
+@@ -5432,6 +5432,24 @@ export class AgentSession {
+ 		return this.agent.state.systemPrompt;
+ 	}
+ 
++	/**
++	 * Replace the live per-turn system prompt (extension
++	 * `setTurnSystemPrompt`).
++	 *
++	 * Unlike a raw `agent.setSystemPrompt`, this registers the replacement as
++	 * the turn's own override: a base-prompt rebuild inside the same turn keeps
++	 * it, every provider request of the run re-reads it, and the next prompt
++	 * preparation drops it. That is what lets a trusted host change an
++	 * already-running turn's contract (for example a host-confirmed
++	 * Agent -> Plan/Goal transition) without restarting the run.
++	 */
++	setTurnSystemPrompt(prompt: string[]): void {
++		if (!Array.isArray(prompt) || prompt.length === 0 || prompt.some(part => typeof part !== "string")) {
++			throw new TypeError("setTurnSystemPrompt requires a non-empty array of system-prompt strings");
++		}
++		this.#tools.setTurnSystemPromptOverride([...prompt]);
++	}
++
+ 	/** Marks streamed text as committed or buffered for turn-recovery replay decisions. */
+ 	setTextOutputCommitted(committed: boolean): void {
+ 		this.#textOutputCommitted = committed;
+diff --git a/packages/coding-agent/test/agent-session-turn-system-prompt.test.ts b/packages/coding-agent/test/agent-session-turn-system-prompt.test.ts
+new file mode 100644
+index 0000000..40ad50b
+--- /dev/null
++++ b/packages/coding-agent/test/agent-session-turn-system-prompt.test.ts
+@@ -0,0 +1,136 @@
++import { afterEach, describe, expect, it } from "bun:test";
++import { type } from "@oh-my-pi/omptype";
++import { Agent, type AgentTool } from "@oh-my-pi/pi-agent-core";
++import type { Model } from "@oh-my-pi/pi-ai";
++import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
++import { buildModel } from "@oh-my-pi/pi-catalog/build";
++import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
++import type { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions";
++import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
++import { convertToLlm } from "@oh-my-pi/pi-coding-agent/session/messages";
++import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
++
++// Contract (M5/T20-D): `setTurnSystemPrompt` replaces the live system prompt
++// for the REST of the running turn. The agent loop re-reads the live prompt
++// before every model call, so a replacement installed while a tool executes
++// must reach the very next provider request of the same run — that is what a
++// host-confirmed mode transition needs. The replacement is dropped with the
++// turn's own override at the next prompt preparation.
++
++const BASE = "BASE-SYSTEM-PROMPT";
++const TURN_OVERRIDE = "TURN-OVERRIDE-FROM-A-TOOL";
++
++function createModel(): Model<"openai-responses"> {
++	return buildModel({
++		id: "mock",
++		name: "mock",
++		api: "openai-responses",
++		provider: "openai",
++		baseUrl: "https://example.invalid",
++		reasoning: false,
++		input: ["text"],
++		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
++		contextWindow: 8192,
++		maxTokens: 2048,
++	});
++}
++
++describe("AgentSession setTurnSystemPrompt", () => {
++	let session: AgentSession | undefined;
++
++	afterEach(async () => {
++		if (session) {
++			await session.dispose();
++			session = undefined;
++		}
++	});
++
++	/**
++	 * One scripted run: the model calls `probe`, the probe's `execute` installs
++	 * {@link TURN_OVERRIDE} through the session, and the second provider request
++	 * must already see it. `systemPrompts` records every request's prompt.
++	 */
++	function createSession(): { session: AgentSession; systemPrompts: string[][] } {
++		const mock = createMockModel({
++			responses: [{ content: [{ type: "toolCall", name: "probe", arguments: {} }] }, { content: ["done"] }],
++		});
++		const systemPrompts: string[][] = [];
++		const probe: AgentTool = {
++			name: "probe",
++			label: "probe",
++			description: "Installs a mid-run system prompt replacement.",
++			parameters: type({}),
++			execute: async () => {
++				session?.setTurnSystemPrompt([TURN_OVERRIDE]);
++				return { content: [{ type: "text" as const, text: "probe ran" }] };
++			},
++		};
++		const agent = new Agent({
++			getApiKey: () => "test-key",
++			initialState: {
++				model: createModel(),
++				systemPrompt: [BASE],
++				tools: [probe],
++				messages: [],
++			},
++			convertToLlm,
++			streamFn: (model, context, streamOptions) => {
++				systemPrompts.push([...(context.systemPrompt ?? [])]);
++				return mock.stream(model, context, streamOptions);
++			},
++		});
++
++		session = new AgentSession({
++			agent,
++			sessionManager: SessionManager.inMemory(),
++			settings: Settings.isolated({ "compaction.enabled": false, "todo.enabled": false }),
++			modelRegistry: { getApiKey: async () => "test-key" } as never,
++			toolRegistry: new Map([[probe.name, probe]]),
++			builtInToolNames: [],
++			extensionRunner: {
++				hasHandlers: () => false,
++				emitBeforeAgentStart: async () => undefined,
++				emit: async () => undefined,
++			} as unknown as ExtensionRunner,
++			rebuildSystemPrompt: async () => ({ systemPrompt: [BASE] }),
++		});
++		return { session, systemPrompts };
++	}
++
++	it("reaches the next provider request of the same run", async () => {
++		const { session: active, systemPrompts } = createSession();
++
++		await active.prompt("hello");
++		await active.waitForIdle();
++
++		expect(systemPrompts).toHaveLength(2);
++		expect(systemPrompts[0]).toEqual([BASE]);
++		// The replacement was installed while the tool was running, after the
++		// first request and before the second.
++		expect(systemPrompts[1]).toEqual([TURN_OVERRIDE]);
++	});
++
++	it("is dropped when the next prompt is prepared", async () => {
++		const { session: active, systemPrompts } = createSession();
++
++		await active.prompt("hello");
++		await active.waitForIdle();
++		await active.prompt("again");
++		await active.waitForIdle();
++
++		// The second prompt makes exactly one request (the scripted turns'
++		// last response repeats); its preparation cleared the previous turn's
++		// override, so the replacement cannot leak forward.
++		expect(systemPrompts).toHaveLength(3);
++		expect(systemPrompts[2]).toEqual([BASE]);
++	});
++
++	it("refuses anything that is not a non-empty string array", () => {
++		const { session: active } = createSession();
++
++		expect(() => active.setTurnSystemPrompt([])).toThrow(TypeError);
++		expect(() => active.setTurnSystemPrompt("not-an-array" as unknown as string[])).toThrow(TypeError);
++		expect(() => active.setTurnSystemPrompt([BASE, 7 as unknown as string])).toThrow(TypeError);
++		expect(active.systemPrompt).toEqual([BASE]);
++	});
++});
 diff --git a/packages/coding-agent/test/build-binary-bytecode.test.ts b/packages/coding-agent/test/build-binary-bytecode.test.ts
 new file mode 100644
 index 0000000..88142bb
@@ -1876,6 +2181,93 @@ index 0000000..88142bb
 +		expect(() => parseBuildBinaryArgs(["--no-bytecode", "--no-bytecode"])).toThrow("already given");
 +	});
 +});
+diff --git a/packages/coding-agent/test/extensions-runner.test.ts b/packages/coding-agent/test/extensions-runner.test.ts
+index f4aa58d..6d6717d 100644
+--- a/packages/coding-agent/test/extensions-runner.test.ts
++++ b/packages/coding-agent/test/extensions-runner.test.ts
+@@ -24,6 +24,7 @@ import {
+ } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
+ import type {
+ 	Extension,
++	ExtensionAPI,
+ 	ExtensionError,
+ 	ExtensionServiceTier,
+ 	ExtensionUIContext,
+@@ -207,6 +208,74 @@ describe("ExtensionRunner", () => {
+ 		expect(compact).toHaveBeenCalledWith("preserve current task");
+ 	});
+ 
++	it("forwards the optional live system-prompt action to the extension API", async () => {
++		// Contract (M5/T20-D): a trusted host that provided the action must reach
++		// it through the extension API; a host that did not must refuse the call
++		// rather than silently keeping the old prompt.
++		fs.writeFileSync(
++			path.join(extensionsDir, "capture-live-prompt.ts"),
++			`export default function(pi) {
++				globalThis.__capturedLivePromptApi = pi;
++			}`,
++		);
++		const result = await loadTestExtensions();
++		const runner = new ExtensionRunner(
++			result.extensions,
++			result.runtime,
++			tempDir.path(),
++			sessionManager,
++			modelRegistry,
++		);
++		const seen: string[][] = [];
++		const actions = {
++			sendMessage: () => {},
++			sendUserMessage: () => {},
++			appendEntry: () => {},
++			setLabel: () => {},
++			getActiveTools: () => [],
++			getAllTools: () => [],
++			setActiveTools: async () => {},
++			setTurnSystemPrompt: async (prompt: string[]) => {
++				seen.push(prompt);
++			},
++			getCommands: () => [],
++			setModel: async () => false,
++			getThinkingLevel: () => undefined,
++			setThinkingLevel: () => {},
++			getSessionName: () => undefined,
++			setSessionName: async () => {},
++		};
++		const contextActions = {
++			getModel: () => undefined,
++			isIdle: () => true,
++			abort: () => {},
++			hasPendingMessages: () => false,
++			shutdown: () => {},
++			getContextUsage: () => undefined,
++			compact: async () => {},
++			getSystemPrompt: () => [],
++		};
++		const captured = globalThis as { __capturedLivePromptApi?: ExtensionAPI };
++		try {
++			runner.initialize(actions, contextActions, undefined, undefined, "rpc");
++			const pi = captured.__capturedLivePromptApi;
++			expect(pi).toBeDefined();
++			await pi?.setTurnSystemPrompt?.(["LIVE-PROMPT"]);
++			expect(seen).toEqual([["LIVE-PROMPT"]]);
++
++			// A host without the action (the interface marks it optional) refuses
++			// the call; it never degrades to "the old prompt stays".
++			const { setTurnSystemPrompt: _omitted, ...withoutAction } = actions;
++			runner.initialize(withoutAction, contextActions, undefined, undefined, "rpc");
++			await expect(pi?.setTurnSystemPrompt?.(["ignored"])).rejects.toThrow(
++				/does not support replacing the live system prompt/,
++			);
++			expect(seen).toEqual([["LIVE-PROMPT"]]);
++		} finally {
++			delete captured.__capturedLivePromptApi;
++		}
++	});
++
+ 	describe("shortcut conflicts", () => {
+ 		it("warns when extension shortcut conflicts with built-in", async () => {
+ 			const extCode = `
 diff --git a/packages/coding-agent/test/rpc-host-tools.test.ts b/packages/coding-agent/test/rpc-host-tools.test.ts
 index f3c807d..b367d78 100644
 --- a/packages/coding-agent/test/rpc-host-tools.test.ts

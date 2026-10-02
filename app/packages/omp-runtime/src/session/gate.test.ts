@@ -281,17 +281,19 @@ describe("registration", () => {
       },
     };
     ompDesktopGate(pi);
-    // The gate registers five policies: the tool_call approval gate, the
+    // The gate registers six policies: the tool_call approval gate, the
     // before_agent_start capability injection (M5/T19-C), the two agent
-    // lifecycle notifications that arm and retire the admitted turn, and the
+    // lifecycle notifications that arm and retire the admitted turn, the
     // session_start notification that binds a delegate session to its owning
-    // admission (M5/T20-C review repairs).
+    // admission (M5/T20-C review repairs), and the tool_result handler that
+    // applies a host-confirmed mode transition (M5/T20-D).
     expect(registeredEvents.sort()).toEqual([
       "agent_end",
       "agent_start",
       "before_agent_start",
       "session_start",
       "tool_call",
+      "tool_result",
     ]);
     expect(toolCallHandlers).toHaveLength(1);
     const blocked = await toolCallHandlers[0]!(EVENT, { ...CONTEXT, hasUI: false, ui: undefined });

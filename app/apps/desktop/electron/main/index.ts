@@ -102,7 +102,7 @@ import { registerNotificationIpc } from "./ipc/notification-ipc";
 import { registerSessionIpc } from "./ipc/session-ipc";
 import { createDesktopEngineRuntimeForApp } from "./runtime/engine-runtime";
 import { wireOmpSessions } from "./runtime/omp-session-wiring";
-import { createOmpHostToolAdapter, createHostPlansSubmit } from "./runtime/omp-host-tools";
+import { createOmpHostToolAdapter, createHostPlansEndpoints } from "./runtime/omp-host-tools";
 import { createOmpDesktopCapabilities } from "./runtime/omp-desktop-capabilities";
 import { loadBuiltinSkillBody } from "./builtin-skills";
 import { registerSettingsIpc } from "./ipc/settings-ipc";
@@ -1276,7 +1276,7 @@ const ompSessions = wireOmpSessions({
     // supplies the durable identity from the run binding; this closure only
     // reaches the host RPC, and `plans.submit` itself enforces the kind /
     // mode / live-turn / single-pending rules.
-    plans: createHostPlansSubmit(() => host),
+    plans: createHostPlansEndpoints(() => host),
     // The on-demand Skill path (M5/T19-C) reads bodies live with the exact
     // PI precedence: builtin first, then the user's own (scope re-checked),
     // then the plugin's — the same readers the Pi sidecar's local tool uses.

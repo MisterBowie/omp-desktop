@@ -33,6 +33,10 @@ const BINDING = {
   thinkingLevel: () => null,
   dispatchable: () => true,
   modeForTurn: () => "agent",
+  nativeSessionId: () => "native-owner",
+  enterMode: async () => {
+    throw new Error("the fixture does not wire mode transitions");
+  },
 };
 
 function skillCall(args) {

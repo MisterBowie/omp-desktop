@@ -25,6 +25,15 @@ export type GateHarnessOptions = {
   cwd?: string;
   /** The owning session file the context reports (`getSessionFile`), when a test needs the parentage check. */
   ownerFile?: string;
+  /** The live active-tool selection the runtime starts with (default: the legacy fixture list). */
+  activeTools?: string[];
+  /**
+   * Whether the runtime exposes the fork's live system-prompt action
+   * (`setTurnSystemPrompt`, patch level `.5`). Default `true`; `false` models a
+   * host without it, which the transition path must treat as a failure instead
+   * of silently keeping the old prompt.
+   */
+  liveSystemPrompt?: boolean;
 };
 
 export type GateHandlerHarness = {
@@ -54,6 +63,12 @@ export type GateHandlerHarness = {
     event: ToolCallEvent,
     context?: Record<string, unknown>,
   ): Promise<{ block?: boolean; reason?: string } | undefined>;
+  /** Drive the registered `tool_result` handler. */
+  toolResult(event: GateToolResultEvent, context?: Record<string, unknown>): Promise<unknown>;
+  /** Active-tool selections the gate applied, in order. */
+  toolSelections: string[][];
+  /** Live system-prompt replacements the gate applied, in order. */
+  systemPromptReplacements: string[][];
   /** Dialogs the gate raised, in order. */
   dialogs: Array<{ title: string; items: Array<{ label: string; description?: string }> }>;
   /** Notifications the gate emitted, in order. */
@@ -76,6 +91,17 @@ export type GateDelegateFacts = {
   parentFile?: string;
   /** The ISO creation time its header declares (`getHeader().timestamp`). */
   createdAt?: string;
+};
+
+/** The settled-result slice the gate's `tool_result` handler reads. */
+export type GateToolResultEvent = {
+  type: "tool_result";
+  toolCallId: string;
+  toolName: string;
+  input?: Record<string, unknown>;
+  content?: unknown;
+  details?: unknown;
+  isError?: boolean;
 };
 
 export type GateTurnInput = {
@@ -109,7 +135,9 @@ export function createGateHandlerHarness(options: GateHarnessOptions = {}): Gate
   const commands = new Map<string, (args: string, context: unknown) => unknown>();
   const dialogs: GateHandlerHarness["dialogs"] = [];
   const notices: GateHandlerHarness["notices"] = [];
-  const active = ["read", "write", "edit", "bash", "ask", "new_context"];
+  const active = options.activeTools ?? ["read", "write", "edit", "bash", "ask", "new_context"];
+  const toolSelections: string[][] = [];
+  const systemPromptReplacements: string[][] = [];
   let aborted = 0;
   let answer: string | undefined = OMP_APPROVAL_OPTIONS[2];
 
@@ -124,7 +152,16 @@ export function createGateHandlerHarness(options: GateHarnessOptions = {}): Gate
       commands.set(name, definition.handler);
     }) as ExtensionAPI["registerCommand"],
     getActiveTools: () => [...active],
-    setActiveTools: async () => undefined,
+    setActiveTools: async (names: string[]) => {
+      toolSelections.push([...names]);
+    },
+    ...(options.liveSystemPrompt === false
+      ? {}
+      : {
+          setTurnSystemPrompt: async (prompt: string[]) => {
+            systemPromptReplacements.push([...prompt]);
+          },
+        }),
     logger: { warn: () => undefined },
   };
   ompDesktopGate(pi);
@@ -219,6 +256,9 @@ export function createGateHandlerHarness(options: GateHarnessOptions = {}): Gate
       ),
     toolCall: async (event, ctx) =>
       (await run("tool_call", event, ctx ?? context)) as { block?: boolean; reason?: string } | undefined,
+    toolResult: (event, ctx) => run("tool_result", event, ctx ?? context),
+    toolSelections,
+    systemPromptReplacements,
     dialogs,
     notices,
     aborted: () => aborted,

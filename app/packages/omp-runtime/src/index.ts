@@ -261,3 +261,26 @@ export {
   encodeTurnAdmission,
   type OmpTurnAdmission,
 } from "./session/turn-admission.js";
+export {
+  OMP_ENTER_TOOL_NAMES,
+  OMP_MODE_TRANSITION_EXPECTED_MODE,
+  OMP_MODE_TRANSITION_KEY,
+  OMP_MODE_TRANSITION_KINDS,
+  OMP_MODE_TRANSITION_MAX_BYTES,
+  OMP_MODE_TRANSITION_VERSION,
+  decodeModeTransitionDetails,
+  encodeModeTransitionDetails,
+  enterKindForToolName,
+  enterToolNameForKind,
+  type OmpModeTransition,
+  type OmpModeTransitionKind,
+} from "./session/mode-transition.js";
+export {
+  OMP_TURN_FAILURE_CODES,
+  OMP_TURN_FAILURE_KIND,
+  OMP_TURN_FAILURE_VERSION,
+  encodeTurnFailure,
+  parseTurnFailureNotice,
+  type OmpTurnFailure,
+  type OmpTurnFailureCode,
+} from "./session/turn-failure.js";

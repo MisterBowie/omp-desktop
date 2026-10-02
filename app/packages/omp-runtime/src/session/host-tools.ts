@@ -125,6 +125,16 @@ export type OmpHostToolOutcome = {
   content: OmpHostToolContentBlock[];
   /** True marks a failed execution (surface as a tool error, not a result). */
   isError?: boolean;
+  /**
+   * In-process metadata carried on the result (never model-visible text): the
+   * pinned runtime keeps `details` on the result and the trusted extension
+   * `tool_result` hook reads it. The desktop's mode transition uses it as the
+   * authoritative, tool-call-scoped authorisation record
+   * (`session/mode-transition.ts`); anything attached here is still bounded by
+   * the caller's own schema, because the frame line limit applies to the whole
+   * frame.
+   */
+  details?: unknown;
 };
 
 /** The desktop's execution seam: run one call with the run's identity. */
@@ -515,7 +525,10 @@ export class OmpHostToolCalls {
     this.write({
       type: "host_tool_result",
       id,
-      result: { content: boundHostToolContent(outcome.content) },
+      result: {
+        content: boundHostToolContent(outcome.content),
+        ...(outcome.details === undefined ? {} : { details: outcome.details }),
+      },
       ...(outcome.isError === true ? { isError: true } : {}),
     });
   }

@@ -23,6 +23,11 @@
  *      (artifact path + exact markdown), flips the session to agent mode,
  *      completes the execution row, and never replays (a second drain and a
  *      concurrent double-dispatch add no prompt).
+ *
+ * The final tests cover M5/T20-D's model-side mode entry on the same fixture:
+ * `EnterPlanMode`/`EnterGoalMode` switch the live turn (system prompt, tool
+ * catalogue and execution policy) before the next provider request, the same
+ * turn can then submit, and a mixed batch is rejected whole with zero effect.
  */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -36,6 +41,7 @@ import test from "node:test";
 
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
+const { shellQuote } = await import("./helpers/omp-e2e-process.mjs");
 
 const { FakeProvider } = await import("../../../experiments/omp-bridge/lib/provider.mjs");
 const { writeModelsConfig } = await import("../../../experiments/omp-bridge/lib/models-config.mjs");
@@ -49,7 +55,7 @@ const {
 } = await import("../../../packages/omp-runtime/src/index.ts");
 const { turnCommandToken } = await import("../../../packages/omp-runtime/src/session/turn-fence.ts");
 const { createOmpSessionBridge } = await import("../electron/main/runtime/omp-session.ts");
-const { createOmpHostToolAdapter, createHostPlansSubmit } = await import(
+const { createOmpHostToolAdapter, createHostPlansEndpoints } = await import(
   "../electron/main/runtime/omp-host-tools.ts"
 );
 const { createOmpHostTurnLifecycle, resolveEffectivePermissionMode } = await import(
@@ -203,6 +209,7 @@ async function buildBridge({
   onTurnEnd = () => {},
   hostTurns = null,
   runtimeFactory = null,
+  pluginTools = [],
 }) {
   const sessionDir = ensureSessionStateDir(dataRoot);
   // One supervisor per session, exactly like the production wiring: a shared
@@ -235,7 +242,7 @@ async function buildBridge({
 
   const hostTools = createOmpHostToolAdapter({
     plugins: {
-      getTools: () => [],
+      getTools: () => pluginTools,
       getSkills: () => [],
       loadSkillBody: () => {
         throw new Error("no plugin skills in this fixture");
@@ -243,7 +250,7 @@ async function buildBridge({
     },
     userMcp: { toolsForProject: async () => [], callTool: async () => "" },
     pluginActiveInProject: () => true,
-    plans: createHostPlansSubmit(() => host),
+    plans: createHostPlansEndpoints(() => host),
   });
 
   const bridge = createOmpSessionBridge({
@@ -1181,5 +1188,385 @@ test(
     assert.equal(turns(refusedSession)[0].status, "completed", "only the submit turn exists and it is settled");
     await runtimes[0].drainApprovedPlanExecutions();
     assert.equal(providerCount(), beforeRefused, "an interrupted execution never replays");
+  },
+);
+
+
+/** The system text the provider received on one recorded request. */
+function systemTextOf(request) {
+  const system = (request?.body?.messages ?? []).filter((message) => message.role === "system");
+  return system
+    .map((message) =>
+      typeof message.content === "string"
+        ? message.content
+        : (message.content ?? []).map((part) => part?.text ?? "").join(""),
+    )
+    .join("\n");
+}
+
+/** The tool names one recorded request advertised. */
+function toolNamesOf(request) {
+  return (request?.body?.tools ?? [])
+    .map((tool) => tool?.function?.name ?? tool?.name)
+    .filter((name) => typeof name === "string");
+}
+
+/** Recorded provider POST requests, in order. */
+function postRequests(provider) {
+  return provider.requests.filter((request) => request.method === "POST");
+}
+
+/** Wait until one recorded envelope matches, returning it (or null on timeout). */
+async function waitForEntry(entries, predicate, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const found = entries.find(predicate);
+    if (found) return found;
+    if (Date.now() > deadline) return null;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+/** One fake plugin tool the adapter catalog can expose, tracking executions. */
+function fakePluginTool(pluginRuns, { fullName, planSafeActions }) {
+  return {
+    pluginId: "demo",
+    fullName,
+    description: `${fullName} fixture`,
+    schema: { type: "object", properties: { action: { type: "string" } } },
+    risk: planSafeActions.length > 0 ? "low" : "medium",
+    planSafeActions,
+    execute: async (args) => {
+      pluginRuns.push({ tool: fullName, args });
+      return { content: [{ type: "text", text: `${fullName} ran` }] };
+    },
+  };
+}
+
+/** The plan block the desktop composer produces, for E2E prompt assertions. */
+const PLAN_BLOCK_PREFIX = "You are operating in Plan mode";
+const GOAL_BLOCK_PREFIX = "You are operating in Goal mode";
+const AGENT_BLOCK_PREFIX = "You are operating in Agent mode";
+
+test(
+  "T20-D model-side mode entry: EnterPlanMode switches the same live turn, then SubmitPlan ends it",
+  { timeout: 600_000, skip: READY ? false : "host-core binary or patched runtime not available" },
+  async () => {
+    const project = makeScratch("t20d-enter-plan-project-");
+    const dataRoot = makeScratch("t20d-enter-plan-data-");
+    const provider = await FakeProvider.start({ model: "local-model" });
+    scratch.push({ close: () => provider.close?.() });
+    const host = await startHost(dataRoot);
+    const notes = join(project, "notes.txt");
+    const blockedWrite = join(project, "plan-write.txt");
+    const bashMarker = join(project, "plan-bash.txt");
+    writeFileSync(notes, "hello from the workspace\n");
+    const pluginRuns = [];
+    const pluginTools = [
+      fakePluginTool(pluginRuns, { fullName: "plugin_demo_readonly", planSafeActions: ["inspect"] }),
+      fakePluginTool(pluginRuns, { fullName: "plugin_demo_mutate", planSafeActions: [] }),
+    ];
+    const sessionId = await createSession(host, {
+      title: "enter plan",
+      projectPath: project,
+      mode: "agent",
+      permissionMode: "ask",
+    });
+    const events = [];
+    const { bridge } = await buildBridge({ host, dataRoot, project, provider, events, pluginTools });
+
+    provider.script([
+      {
+        text: "entering plan mode",
+        finish: "tool_calls",
+        toolCalls: [{ id: "call_enter_plan", name: "EnterPlanMode", args: {} }],
+      },
+      {
+        text: "inspecting the workspace and probing the contract",
+        finish: "tool_calls",
+        toolCalls: [
+          { id: "call_read", name: "read", args: { path: notes } },
+          { id: "call_readonly_plugin", name: "plugin_demo_readonly", args: { action: "inspect" } },
+          { id: "call_write", name: "write", args: { path: blockedWrite, content: "must not land\n" } },
+          { id: "call_mutate_plugin", name: "plugin_demo_mutate", args: { action: "write" } },
+        ],
+      },
+      {
+        text: "running a check through the Plan permission mode",
+        finish: "tool_calls",
+        toolCalls: [
+          { id: "call_bash", name: "bash", args: { command: `printf plan-bash > ${shellQuote(bashMarker)}` } },
+        ],
+      },
+      {
+        text: "submitting the plan",
+        finish: "tool_calls",
+        toolCalls: [{ id: "call_submit_plan", name: "SubmitPlan", args: submitArgs() }],
+      },
+      { text: "this turn must never run", finish: "tool_calls", toolCalls: [{ id: "never", name: "bash", args: { command: "true" } }] },
+    ]);
+
+    const first = await promptThrough(host, bridge, sessionId, "switch to plan and prepare the plan");
+    assert.equal(first.accepted, true);
+    assert.ok(first.hostTurnId, "the admitted prompt is bound to a durable host turn");
+
+    // The Plan+ask Bash call raises a real desktop approval; answering it is
+    // the production decision path, never a fixture bypass.
+    const approval = await waitForEntry(
+      events,
+      (entry) => entry.event.type === "tool_permission_request" && entry.event.request.toolCallId === "call_bash",
+    );
+    assert.ok(
+      approval,
+      `the Plan+ask Bash call must raise an approval; timeline: ${events.map((entry) => entry.event.type).join(", ")}; errors: ${JSON.stringify(
+        events.filter((entry) => entry.event.type === "error").map((entry) => entry.event.error),
+      )}`,
+    );
+    assert.equal(approval.event.request.risk, "high");
+    const decision = bridge.resolvePermission(approval.event.request.requestId, "allow-once");
+    assert.equal(decision.ok, true);
+
+    assert.equal(await waitFor(() => bridge.status(sessionId).isRunning === false), true, "the turn must settle");
+
+    const requests = postRequests(provider);
+    assert.equal(requests.length, 4, "enter, probe batch, approved bash, submit");
+
+    // --- the Agent request advertised the two entry tools ------------------
+    const agentTools = toolNamesOf(requests[0]);
+    assert.ok(agentTools.includes("EnterPlanMode"), `Agent must advertise EnterPlanMode: ${agentTools.join(", ")}`);
+    assert.ok(agentTools.includes("EnterGoalMode"), `Agent must advertise EnterGoalMode: ${agentTools.join(", ")}`);
+    assert.ok(!agentTools.includes("SubmitPlan"), "Agent must not advertise a submit tool");
+    assert.match(systemTextOf(requests[0]), new RegExp(AGENT_BLOCK_PREFIX));
+
+    // --- the next request of the SAME run is the Plan contract -------------
+    const planRequest = requests[1];
+    assert.match(systemTextOf(planRequest), new RegExp(PLAN_BLOCK_PREFIX));
+    assert.doesNotMatch(systemTextOf(planRequest), new RegExp(AGENT_BLOCK_PREFIX));
+    assert.doesNotMatch(systemTextOf(planRequest), new RegExp(GOAL_BLOCK_PREFIX));
+    const planTools = toolNamesOf(planRequest);
+    assert.ok(planTools.includes("SubmitPlan"), `Plan must advertise SubmitPlan: ${planTools.join(", ")}`);
+    assert.ok(!planTools.includes("EnterPlanMode"), "EnterPlanMode must leave the catalogue");
+    assert.ok(!planTools.includes("EnterGoalMode"), "EnterGoalMode must leave the catalogue");
+    assert.ok(!planTools.includes("SubmitGoal"), "the other kind's submit tool stays out");
+    for (const excluded of ["write", "edit", "apply_patch", "task", "eval"]) {
+      assert.ok(!planTools.includes(excluded), `${excluded} must not be advertised in Plan mode`);
+    }
+    assert.ok(planTools.includes("read") && planTools.includes("bash"), "the read-only core stays");
+
+    // --- the contract-excluded calls did not execute ------------------------
+    assert.equal(existsSync(blockedWrite), false, "the write attempt must not create the file");
+    assert.deepEqual(
+      pluginRuns.filter((run) => run.tool === "plugin_demo_mutate"),
+      [],
+      "the undeclared plugin tool never executes",
+    );
+    assert.deepEqual(
+      pluginRuns.filter((run) => run.tool === "plugin_demo_readonly"),
+      [{ tool: "plugin_demo_readonly", args: { action: "inspect" } }],
+      "the plan-safe plugin tool executes through the transitioned turn",
+    );
+    const toolEnds = events.filter((entry) => entry.event.type === "tool_end");
+    const writeEnd = toolEnds.find((entry) => entry.event.toolCallId === "call_write");
+    const mutateEnd = toolEnds.find((entry) => entry.event.toolCallId === "call_mutate_plugin");
+    assert.ok(writeEnd, "the write call settles with a result");
+    assert.ok(mutateEnd, "the plugin call settles with a result");
+    const callBlocked = (entry) => JSON.stringify(entry.event.result ?? entry.event).match(/not found|DISABLED_IN_PLAN|not available/);
+    assert.ok(
+      callBlocked(writeEnd),
+      `the write call must be refused by the Plan contract: ${JSON.stringify(writeEnd.event).slice(0, 400)}`,
+    );
+    assert.ok(
+      callBlocked(mutateEnd),
+      `the plugin call must be refused by the Plan contract: ${JSON.stringify(mutateEnd.event).slice(0, 400)}`,
+    );
+    // The approved Bash call really ran, under the Plan mode's permission mode.
+    assert.equal(existsSync(bashMarker), true, "the approved Plan-mode Bash command must run");
+    assert.equal(readFileSync(bashMarker, "utf8"), "plan-bash");
+
+    // --- the host row is the durable fact, and SubmitPlan produced the artifact
+    const { session } = await host.call("session.get", { id: sessionId });
+    assert.equal(session.mode, "plan", "the host committed the durable mode");
+    const pending = await host.call("plans.pending", { sessionId });
+    assert.equal(pending.plans.length, 1, "exactly one pending proposal");
+    const proposal = pending.plans[0];
+    assert.equal(proposal.kind, "plan");
+    assert.equal(proposal.title, submitArgs().title);
+    const artifactPath = join(project, proposal.artifact.relativePath);
+    assert.equal(existsSync(artifactPath), true, "the immutable artifact exists");
+    const bytes = readFileSync(artifactPath);
+    assert.equal(bytes.toString("utf8"), submitArgs().markdown);
+    assert.equal(sha256(bytes), proposal.artifact.sha256);
+    assert.equal(bytes.length, proposal.artifact.sizeBytes);
+
+    // The submit ended the run; no provider request followed it.
+    const submitIndex = requests.findIndex((request) =>
+      JSON.stringify(request.body?.messages ?? "").includes("call_submit_plan"),
+    );
+    assert.equal(submitIndex, -1, "the submit call is not sent back as context after termination");
+  },
+);
+
+test(
+  "T20-D model-side mode entry: EnterGoalMode switches to Goal and SubmitGoal publishes the goal artifact",
+  { timeout: 600_000, skip: READY ? false : "host-core binary or patched runtime not available" },
+  async () => {
+    const project = makeScratch("t20d-enter-goal-project-");
+    const dataRoot = makeScratch("t20d-enter-goal-data-");
+    const provider = await FakeProvider.start({ model: "local-model" });
+    scratch.push({ close: () => provider.close?.() });
+    const host = await startHost(dataRoot);
+    const sessionId = await createSession(host, {
+      title: "enter goal",
+      projectPath: project,
+      mode: "agent",
+      permissionMode: "auto",
+    });
+    const events = [];
+    const { bridge } = await buildBridge({ host, dataRoot, project, provider, events });
+
+    const goalArgs = {
+      title: "Goal E2E",
+      markdown: "# Goal\n\nShip it.\n\n## Acceptance criteria\n- tests pass\n",
+      question: "Approve this goal?",
+    };
+    provider.script([
+      {
+        text: "entering goal mode",
+        finish: "tool_calls",
+        toolCalls: [{ id: "call_enter_goal", name: "EnterGoalMode", args: {} }],
+      },
+      {
+        text: "mis-submitting the other kind",
+        finish: "tool_calls",
+        toolCalls: [{ id: "call_wrong_submit", name: "SubmitPlan", args: submitArgs() }],
+      },
+      {
+        text: "submitting the goal",
+        finish: "tool_calls",
+        toolCalls: [{ id: "call_submit_goal", name: "SubmitGoal", args: goalArgs }],
+      },
+      { text: "never", finish: "stop" },
+    ]);
+
+    const first = await promptThrough(host, bridge, sessionId, "state the goal");
+    assert.equal(first.accepted, true);
+    assert.equal(await waitFor(() => bridge.status(sessionId).isRunning === false), true);
+    const requests = postRequests(provider);
+    assert.equal(
+      requests.length,
+      3,
+      `enter, wrong-kind submit attempt, goal submit; errors: ${JSON.stringify(
+        events.filter((entry) => entry.event.type === "error").map((entry) => entry.event.error),
+      )}`,
+    );
+    const goalRequest = requests[1];
+    assert.match(systemTextOf(goalRequest), new RegExp(GOAL_BLOCK_PREFIX));
+    assert.doesNotMatch(systemTextOf(goalRequest), new RegExp(PLAN_BLOCK_PREFIX));
+    const goalTools = toolNamesOf(goalRequest);
+    assert.ok(goalTools.includes("SubmitGoal"));
+    assert.ok(!goalTools.includes("SubmitPlan"));
+    assert.ok(!goalTools.includes("EnterGoalMode"));
+
+    // The wrong-kind submission was refused before the host (no pending row
+    // for a plan), and the correct one created exactly one goal row.
+    const pending = await host.call("plans.pending", { sessionId });
+    assert.equal(pending.plans.length, 1);
+    assert.equal(pending.plans[0].kind, "goal");
+    assert.equal(pending.plans[0].title, goalArgs.title);
+    const artifactPath = join(project, pending.plans[0].artifact.relativePath);
+    assert.equal(existsSync(artifactPath), true);
+    assert.equal(readFileSync(artifactPath, "utf8"), goalArgs.markdown);
+    const { session } = await host.call("session.get", { id: sessionId });
+    assert.equal(session.mode, "goal");
+
+    const wrongKindEnd = events.find(
+      (entry) => entry.event.type === "tool_end" && entry.event.toolCallId === "call_wrong_submit",
+    );
+    assert.ok(wrongKindEnd, "the wrong-kind submit settles");
+    // The wrong kind cannot reach the host: the Goal catalogue does not carry
+    // `SubmitPlan` (the clamp removed it), so the call settles as a tool error.
+    // The gate's own wrong-kind denial (`PLAN_KIND_MISMATCH`) is the second
+    // layer and is pinned by the unit and gate suites; here the observable
+    // contract is that no plan row was created.
+    assert.match(JSON.stringify(wrongKindEnd.event.result), /not found|PLAN_KIND_MISMATCH/);
+  },
+);
+
+test(
+  "T20-D model-side mode entry: a mixed Enter batch is rejected whole, then a sole retry enters",
+  { timeout: 600_000, skip: READY ? false : "host-core binary or patched runtime not available" },
+  async () => {
+    const project = makeScratch("t20d-enter-mixed-project-");
+    const dataRoot = makeScratch("t20d-enter-mixed-data-");
+    const provider = await FakeProvider.start({ model: "local-model" });
+    scratch.push({ close: () => provider.close?.() });
+    const host = await startHost(dataRoot);
+    const siblingMarker = join(project, "mixed-sibling.txt");
+    const sessionId = await createSession(host, {
+      title: "mixed enter batch",
+      projectPath: project,
+      mode: "agent",
+      permissionMode: "auto",
+    });
+    const events = [];
+    const { bridge } = await buildBridge({ host, dataRoot, project, provider, events });
+
+    provider.script([
+      {
+        text: "trying a mixed batch",
+        finish: "tool_calls",
+        toolCalls: [
+          { id: "call_mixed_enter", name: "EnterPlanMode", args: {} },
+          { id: "call_mixed_bash", name: "bash", args: { command: `touch ${shellQuote(siblingMarker)}` } },
+        ],
+      },
+      {
+        text: "retrying alone",
+        finish: "tool_calls",
+        toolCalls: [{ id: "call_sole_enter", name: "EnterPlanMode", args: {} }],
+      },
+      {
+        text: "submitting",
+        finish: "tool_calls",
+        toolCalls: [{ id: "call_submit_after_retry", name: "SubmitPlan", args: submitArgs() }],
+      },
+      { text: "never", finish: "stop" },
+    ]);
+
+    const first = await promptThrough(host, bridge, sessionId, "enter plan");
+    assert.equal(first.accepted, true);
+    assert.equal(await waitFor(() => bridge.status(sessionId).isRunning === false), true);
+
+    // The mixed batch had zero effect: no sibling side effect, no durable
+    // mode change, no host call, no tool start.
+    assert.equal(existsSync(siblingMarker), false, "the sibling command must not run");
+    assert.equal(
+      events.some(
+        (entry) => entry.event.type === "tool_start" && entry.event.toolCallId === "call_mixed_bash",
+      ),
+      false,
+      "a rejected batch emits no tool_execution_start",
+    );
+    const mixedEnterEnd = events.find(
+      (entry) => entry.event.type === "tool_end" && entry.event.toolCallId === "call_mixed_enter",
+    );
+    assert.ok(mixedEnterEnd, "the rejected Enter call settles with a blocked result");
+    assert.match(JSON.stringify(mixedEnterEnd.event.result), /only tool call/);
+
+    // The sole retry then entered Plan and the run submitted normally.
+    const requests = postRequests(provider);
+    assert.equal(
+      requests.length,
+      3,
+      `mixed batch, sole retry, submit; errors: ${JSON.stringify(
+        events.filter((entry) => entry.event.type === "error").map((entry) => entry.event.error),
+      )}`,
+    );
+    assert.match(systemTextOf(requests[2]), new RegExp(PLAN_BLOCK_PREFIX));
+    const pending = await host.call("plans.pending", { sessionId });
+    assert.equal(pending.plans.length, 1);
+    const { session } = await host.call("session.get", { id: sessionId });
+    assert.equal(session.mode, "plan");
+    assert.equal(events.filter((entry) => entry.event.type === "tool_start" && entry.event.toolCallId === "call_sole_enter").length, 1);
   },
 );

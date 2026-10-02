@@ -73,7 +73,14 @@ import {
   type SubagentListEntry,
 } from "@pi-desktop/omp-runtime";
 import { composeModeSystemPrompt } from "@pi-desktop/agent-runtime";
-import { desktopSkillToolDefinition, desktopSubmitToolCatalogEntry, type OmpHostToolCatalogEntry } from "./omp-host-tools";
+import {
+  DESKTOP_ENTER_TOOL_KINDS,
+  desktopEnterToolCatalogEntry,
+  desktopSkillToolDefinition,
+  desktopSubmitToolCatalogEntry,
+  type OmpHostToolBinding,
+  type OmpHostToolCatalogEntry,
+} from "./omp-host-tools";
 
 export type OmpSessionBridgeLogger = {
   app(
@@ -278,42 +285,12 @@ export type OmpRuntimePolicySnapshot = {
  */
 export type OmpHostToolProvider = {
   catalog(projectPath: string): Promise<OmpHostToolCatalogEntry[]>;
-  executor(binding: {
-    sessionId: string;
-    projectPath: string;
-    /**
-     * Live model key, read at each execution — never a construction snapshot.
-     * (A model change rebuilds the entry, but the getter keeps the contract
-     * honest regardless of how the entry lifecycle evolves.)
-     */
-    modelKey(): string | null;
-    /**
-     * Live thinking level, read at each execution. The configure() thinking-
-     * only path mutates the entry's binding in place on the same entry
-     * (`entry.binding.thinkingLevel = level` after a successful persist), and
-     * the Pi host reads the current level at execution time too
-     * (`host.ts` session.get), so a snapshot taken at construction would hand
-     * plugins a stale level forever.
-     */
-    thinkingLevel(): string | null;
-    /**
-     * The OMP turn-dispatch gate the adapter re-checks at its last
-     * synchronous dispatch point. The bridge supplies it as a closure over
-     * its own entry, so it reads the live runner state at execution time —
-     * even when the executor was built before the runner existed. The Pi
-     * predicate is deliberately not used: OMP turns never enter the Pi turn
-     * registry (`activeTurns`), so it would refuse every call.
-     */
-    dispatchable(turnId: string): boolean;
-    /**
-     * The session's operating mode for the turn that owns the call (M5/T20-C),
-     * or null when no policy was admitted for that turn. The adapter passes the
-     * real mode into plugin execution (the PI `planSafeActions` guard runs on
-     * it) and refuses user MCP tools outside Agent; a null answer refuses the
-     * call. Read after `dispatchable()` has bound the call to the live turn.
-     */
-    modeForTurn(turnId: string): DesktopRuntimeMode | null;
-  }): OmpHostToolExecutor;
+  /**
+   * The executor binding contract lives with the adapter (`OmpHostToolBinding`),
+   * so the bridge and the adapter cannot drift about which identity, mode and
+   * transition hooks an execution is scoped to.
+   */
+  executor(binding: OmpHostToolBinding): OmpHostToolExecutor;
 };
 
 /**
@@ -838,6 +815,13 @@ class SessionEntry {
    */
   private lastPromptMode: DesktopRuntimeMode | null = null;
   /**
+   * Whether the last prompt's run-scoped state carried a skill catalogue. A
+   * mid-turn mode transition re-registers the host tools with the same choice
+   * (M5/T20-D): the `Skill` tool's presence is a property of the turn's
+   * capability snapshot, not of the transition.
+   */
+  private lastSkillsPresent = false;
+  /**
    * Single-flight process rebuild for {@link lastPromptMode}: concurrent
    * prompts for one entry share one restart, and a prompt that arrives while
    * the restart is in flight waits for it rather than starting a second.
@@ -954,6 +938,52 @@ class SessionEntry {
       // answers null and the adapter refuses the call.
       modeForTurn: (turnId) =>
         this.admittedTurnPolicy?.turnId === turnId ? this.admittedTurnPolicy.mode : null,
+      // The OMP-native session identity the fence admission is bound to: the
+      // transition record must name it (the gate validates the record against
+      // the admitted native session), never the desktop session id.
+      nativeSessionId: () => this.nativeSessionId,
+      // A host-confirmed Agent -> Plan|Goal transition (M5/T20-D). The durable
+      // mode is already committed by the host (`plans.enter`); this records it
+      // for the live turn, re-registers the desktop catalogue for the new mode
+      // (the Enter tools leave, the new mode's submit tool appears) and hands
+      // the adapter the exact mode block and policy table the trusted gate
+      // needs. A rejection leaves the durable fact in place and is reported as
+      // a failed transition: the gate then stops the turn instead of letting
+      // it continue under the old contract.
+      enterMode: async (run, kind) => {
+        const admitted = this.admittedTurnPolicy;
+        if (!admitted || admitted.turnId !== run.turnId) {
+          throw new Error(`no admitted turn ${run.turnId} exists for the ${kind} transition`);
+        }
+        if (admitted.mode !== "agent") {
+          throw new Error(`turn ${run.turnId} is in ${admitted.mode} mode; ${kind} cannot be entered`);
+        }
+        if (this.closed) {
+          throw new Error("the session was disposed during the mode transition");
+        }
+        // The durable host mode changed: record it before any await, so a host
+        // tool that follows (a submit attempt, a plugin execution) is judged
+        // under the new mode even when the catalogue registration below fails
+        // and the gate stops the turn.
+        admitted.mode = kind;
+        const runner = this.runner;
+        if (!runner) throw new Error("the runtime runner is gone");
+        // The same assembly the prompt performs for a contract-mode catalogue:
+        // the live plugin/MCP catalog plus the new mode's submit tool. The
+        // Enter tools are deliberately absent — they are Agent-only.
+        const pluginCatalog = this.hostTools ? await this.hostTools.catalog(this.projectDirectory) : [];
+        const catalog: OmpHostToolCatalogEntry[] = [...pluginCatalog, desktopSubmitToolCatalogEntry(kind)];
+        await this.registerHostTools(runner, this.lastSkillsPresent === true, catalog);
+        return {
+          modeBlock: composeModeSystemPrompt(kind, ""),
+          hostTools: catalog.map((entry) => ({
+            name: entry.definition.name,
+            risk: entry.risk,
+            planSafeActions: [...entry.planSafeActions],
+            origin: entry.origin,
+          })),
+        };
+      },
     });
     this.contextId = randomUUID();
   }
@@ -1382,15 +1412,25 @@ class SessionEntry {
     // the policy table in the run-scoped state, so the tools the model can
     // call and the gate's risk/plan-safe view can never describe different
     // catalogs. A catalog failure refuses the prompt (the host tools are part
-    // of the contract this phase must keep honest). A contract mode's submit
-    // tool (PI's `SUBMIT_TOOL_NAMES`) is appended here — the only place the
-    // catalog is assembled — so Plan exposes exactly `SubmitPlan` and Goal
-    // exactly `SubmitGoal`, and Agent exposes neither.
+    // of the contract this phase must keep honest). The mode's own additions
+    // (PI's `SUBMIT_TOOL_NAMES` and `ENTER_TOOL_NAMES`) are appended below —
+    // the only place the catalog is assembled — so Plan exposes exactly
+    // `SubmitPlan`, Goal exactly `SubmitGoal`, and Agent exactly the two
+    // model-side mode-entry tools.
     const pluginCatalog = this.hostTools ? await this.hostTools.catalog(this.projectDirectory) : [];
+    // The catalog for this prompt's mode. A contract mode exposes exactly its
+    // own submit tool; Agent exposes the two model-side mode-entry tools
+    // (PI's `rebuildToolCatalog` adds them to the Agent catalogue and neither
+    // to a contract mode). Both additions happen here — the only place the
+    // catalogue is assembled — so the runtime registration, the run-scoped
+    // policy table and the gate's clamp can never describe different
+    // catalogues.
     const catalog =
       policy && (policy.mode === "plan" || policy.mode === "goal")
         ? [...pluginCatalog, desktopSubmitToolCatalogEntry(policy.mode)]
-        : pluginCatalog;
+        : policy
+          ? [...pluginCatalog, ...DESKTOP_ENTER_TOOL_KINDS.map((kind) => desktopEnterToolCatalogEntry(kind))]
+          : pluginCatalog;
     // The session's mode, effective permission mode, mode block, skill
     // catalog, project memory and host-tool policy are refreshed into the
     // run-scoped state file before every prompt, the way the Pi host re-reads
@@ -1402,6 +1442,7 @@ class SessionEntry {
     // self-validate them refuses the prompt instead of running it unclamped.
     const runtimeState = await this.refreshDesktopState(catalog, policy);
     if (policy) this.lastPromptMode = policy.mode;
+    this.lastSkillsPresent = runtimeState.skillsPresent;
     // The session's desktop tools are (re)registered before every prompt, the
     // way the Pi host reassembles its catalog per launch: a changed catalog —
     // a plugin installed/unloaded, a scope edit, an MCP change, a changed
