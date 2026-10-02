@@ -1954,10 +1954,15 @@ session's grant lifetime, ADR 0309 §6):
   casually associated with a newer turn. When the public surface exposes
   session files, the delegate's declared parentage chain
   (`getHeader().parentSession` up through the recorded intermediate sessions)
-  must reach the admission's owning session file; a chain that does not
-  resolve to it is refused. No-UI fails closed exactly where the decision
-  would have asked — Low/`auto`/grant calls of a *bound* delegate still pass
-  without elevation.
+  must reach the admission's owning session file, and **every intermediate
+  hop must itself be bound to the exact admission record being claimed**
+  (record identity, not a token): a hop owned by a retired or
+  other-generation admission, or one never attributed (a delayed start, an
+  unresolved chain), refuses the whole chain, so a freshly created descendant
+  of a retired child cannot bridge into the live turn. A chain that does not
+  resolve to the owning file is refused as before. No-UI fails closed exactly
+  where the decision would have asked — Low/`auto`/grant calls of a *bound*
+  delegate still pass without elevation.
 - **Card coherence**: the approval descriptor carries `risk`, `mode`,
   `permissionMode` and the decision reason from the same policy object, so
   the card and the enforced decision cannot disagree.

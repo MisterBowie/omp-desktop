@@ -1,0 +1,65 @@
+# RED check for the M5/T20-C third-review ancestry repair (R5)
+# procedure: temporarily restore the pre-repair gate revision from HEAD^ while keeping the new tests,
+#            run the targeted vitest file, then restore the fixed gate from /tmp/r5-gate-fixed.ts
+# pre-repair gate revision: e0d03cd70d5717ca24a14e49cb80e8decf80d217:app/packages/omp-runtime/extensions/omp-desktop-gate.ts
+# pre-repair gate sha256: 1d776661ed0faf4a34b17b81dd1c99f1d325a1774893049c6a2a856766d6201b
+# fixed gate sha256:      7a912e232655476a5fa756de88308e03708d1784a76b5bac3db5431e7347cd6f
+# fixed gate committed at: 30ff735a0ebde879ebb7dac6651119d6f3685c56
+
+
+ RUN  v4.1.10 /home/vv/person/code/omp-desktop-m5-t20-c/app/packages/omp-runtime
+
+ ❯ src/session/gate-delegate-ownership.test.ts (9 tests | 2 failed) 13ms
+     × refuses a fresh descendant that would bridge a retired intermediate into the new admission (third review, 7 steps) 4ms
+     × makes the ancestry requirement sticky, multi-hop and unattributable-safe 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/gate-delegate-ownership.test.ts > delegate admission ownership > refuses a fresh descendant that would bridge a retired intermediate into the new admission (third review, 7 steps)
+AssertionError: expected undefined to match object { block: true, …(1) }
+
+- Expected:
+{
+  "block": true,
+  "reason": StringMatching /policy is unavailable/,
+}
+
++ Received:
+undefined
+
+ ❯ src/session/gate-delegate-ownership.test.ts:307:52
+    305|     });
+    306|     await childStart(h, grandchildA);
+    307|     expect((await h.toolCall(WRITE, grandchildA))).toMatchObject({
+       |                                                    ^
+    308|       block: true,
+    309|       reason: expect.stringMatching(/policy is unavailable/),
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/session/gate-delegate-ownership.test.ts > delegate admission ownership > makes the ancestry requirement sticky, multi-hop and unattributable-safe
+AssertionError: expected undefined to be true // Object.is equality
+
+- Expected:
+true
+
++ Received:
+undefined
+
+ ❯ src/session/gate-delegate-ownership.test.ts:350:63
+    348|     });
+    349|     await childStart(h, staleDescendant);
+    350|     expect((await h.toolCall(WRITE, staleDescendant))?.block).toBe(tru…
+       |                                                               ^
+    351|
+    352|     // An unknown intermediate (never observed) fails closed too.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 7 passed (9)
+   Start at  02:50:32
+   Duration  162ms (transform 67ms, setup 0ms, import 83ms, tests 13ms, environment 0ms)
+
+EXIT=1

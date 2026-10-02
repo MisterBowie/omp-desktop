@@ -273,7 +273,10 @@ patched for it:
   wall clock it was armed. A delegate's declared parentage — its header's
   `parentSession`, walked up through the parent links the gate recorded for
   intermediate delegates — must reach that file when both sides expose file
-  identity; a chain that resolves to a different session is refused.
+  identity, and every intermediate hop must itself carry the exact admission
+  record being claimed (§7.3); a chain that resolves to a different session,
+  or through a retired, other-generation or unattributed intermediate, is
+  refused.
 - **Delayed starts are never adopted.** A delegate session whose public
   header shows it was created before the live admission was armed (a delayed
   start, a parked/revived worker, a pre-existing session file) is recorded as
@@ -330,3 +333,56 @@ a child to a current-turn spawn intent emitted by every spawn path, or have
 the runtime expose the parent session/agent identity on the child's context.
 Until then, refusing is the honest fail-closed answer, and this ADR records it
 rather than claiming universal delegate support.
+
+### 7.3 Third review repair (2026-10-03): every ancestry hop must belong to the same admission
+
+The §7 parentage check resolved a delegate's declared parent chain to the
+admission's owning session file, but the recorded file links were
+generation-blind: `delegateParents` stored only file→parent edges and was
+retained across admissions. The reviewing root drove the gate's registered
+callbacks again (real state serialization and fence/admission codec; no
+provider or tool body) and showed the gap at step 6 of 7: childA is bound
+under parent turn A (ask) and retired when A ends; parent turn B (auto) then
+installs its admission; a **freshly created** grandchild of the retired
+childA — new session id, new session file, public header `parentSession` =
+childA's file, creation timestamp later than B — was allowed, because walking
+childA's recorded parent link reached the same owning session file and its
+freshness check passed against B. The old child itself, an unobserved child
+and a foreign chain all refused correctly; a fresh child and a fresh
+grandchild of the *current* turn's child were allowed (6/7). The requirement
+was already the one §7 states — a delegate cannot borrow an earlier, newer or
+foreign admission — and the nested-chain implementation had not carried it
+through the intermediate hops.
+
+The repair makes the ancestry rule exact (`extensions/omp-desktop-gate.ts`,
+`bindDelegate` / `delegateDescendsFrom`): the gate records each observed
+delegate file's declared parent **and the admission record the session was
+bound to** (`delegateLineage`). A link starts unattributed and is attributed
+exactly once, on that session's first successful binding; a re-observation of
+an already bound session never re-points it, and a retired binding keeps its
+original record reference. Resolution now requires **every** hop of the walk
+to carry the very admission record being bound (identity, not token): a hop
+bound to a retired or other-generation record, or never attributed (a delayed
+start, an unresolved chain), fails closed exactly like an unknown
+intermediate. Direct children are unaffected — their declared parent *is* the
+owning session file — a descendant of the current turn's child still binds
+through an intermediate bound to the same record, and deeper legitimate
+nesting works while every hop carries that record. An intermediate that was
+itself refused (its header predates its admission) permanently blocks its
+descendants, and a later, more permissive admission never revives a chain
+whose intermediate belonged to a retired record.
+
+Evidence: `session/gate-delegate-ownership.test.ts` now pins the root's
+7-step sequence (childA under A/ask refused at the no-UI ask; childA refused
+after A's terminal end and under B/auto; childB allowed; unobserved child
+refused; grandchild of retired childA refused; grandchild of childB allowed)
+plus boundaries (a descendant of an unattributed stale intermediate, an
+unknown intermediate, multi-hop legitimate nesting, re-observation of a
+retired chain under a later admission, and a fresh descendant of that chain)
+through the same controlled registered-handler layer; the shipped artifact is
+covered by the extended Bun-bundle probe in `omp-sidecar.test.mjs`, which
+runs the same sequence inside the compiled gate. This remains a
+registered-handler counterexample and its fix, not a native cross-generation
+scheduling exploit: no provider request or tool body runs in the probe, and
+the earlier held-child fixture's failure to reach generation B stays a
+statement about that fixture only (§7 evidence note).

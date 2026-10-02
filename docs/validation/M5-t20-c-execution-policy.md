@@ -113,6 +113,42 @@ RED/GREEN 报告与日志字节保持原样（未规范化空白）。
 
 
 
+## 0.3 第三次复审返修（2026-10-03，R5 祖先准入）
+
+根第三次复审（候选 `e0d03cd7`；结论 `third-review-summary-e0d03cd7.json`）确认原 4 项直接子任务代际反例
+4/4、真实授权隔离/同回合文件变更/真实 PluginRuntime 子进程、B1 终态/恢复与清单 46/46 全部通过，仅剩 R5：
+新加的嵌套父链实现没有把既有的"不能借用更早/更新/foreign 准入"要求落实到中间祖先。根脚本
+`registered-delegate-lineage-review.mjs`（真实 gate 注册回调、真实 state/fence/准入编解码，并为 context
+提供公开 `getSessionFile`/`getHeader`；不执行 provider 或工具体）7 步中 6 通过、1 失败：①childA 在父代
+A（ask）下绑定并拒绝；②A 终止后 childA 拒绝；③B（auto）准入后 childA 仍拒绝；④B 下全新 childB 放行；
+⑤无生命周期观察的 unknown 子拒绝；**⑥B 已准入后新创建、header `parentSession` = 已退休 childA 文件、
+时间戳晚于 B 的 grandchildA 被放行**（借用了 B）；⑦B 的 childB 下新 grandchildB 阳性对照放行。源码
+原因：`delegateParents` 只存 file→parent 且跨准入保留，`delegateDescendsFrom` 只要求能走到同一 owner
+会话文件；A/B 属同一原生父会话，旧 childA 链因此仍能走到该文件，新后代的时间戳又通过新鲜度检查，
+于是被绑定到 B。
+
+返修（`extensions/omp-desktop-gate.ts`；仍只用公开接口，不触私有字段、不 monkeypatch、不改 pin）：
+`delegateLineage` 取代 `delegateParents`——每个被观察的委托文件记录 `{parentFile, admission}`，`admission`
+初值为 `null`（被观察但未归属），只在该会话**首次成功绑定**时一次性写入那份准入记录本体；已绑定会话的
+后续生命周期事件绝不重写它（header 的 `parentSession` 在会话创建时固定），退役绑定保留原记录引用。
+`delegateDescendsFrom` 逐跳要求 `link.admission === 正在被绑定的准入记录`（记录身份比较，不是 token）：
+中间跳属于已退役/别代记录、或从未归属（延迟启动、链未解析）时，与未知中间跳一样 fail closed；时间戳
+新鲜度不再是嵌套链的唯一门槛。直接子代理不受影响（其声明的父就是 owner 文件）；当前回合 child 的后代
+仍可沿绑定到同一记录的本体中间跳解析；更深的合法嵌套只要每跳都指向同一记录即可。既有
+`delegateBindings`/`refusedDelegates` 语义不变：绑定仍只在其自身启动时一次作出，退役后仍粘性拒绝；
+未归属中间跳的新后代同样永久拒绝。
+
+**证据层（如实）**：这是"登记回调层反例 + 同层修复"，不是原生跨代调度漏洞复现——脚本与便携化测试都不
+执行 provider 或工具体；原生 held-child 夹具不能推进到代 B 的限制保持原样，本轮不重跑它、也不把它当作
+"安全"结论（ADR 0309 §7.3）。便携化回归：`gate-delegate-ownership.test.ts` 新增根脚本同序的 7 步用例与
+边界用例（未归属 stale 中间跳的新后代、未知中间跳、child→grandchild→great-grandchild 多跳阳性、下一
+准入下重观察旧链后新后代仍拒绝、新回合直接子放行），并保留全部原有直接子任务/父链/legacy 夹具用例；
+`omp-sidecar.test.mjs` 的编译产物探针扩为同样 7 步（childA 在 ask/终态/auto 三态、childB、unknown、
+grandchildA 拒绝、grandchildB 允许）。**RED（仅把 gate 文件临时还原为修复前 HEAD 版本、新测试不动）：
+`gate-delegate-ownership.test.ts` 2 failed / 7 passed——7 步用例在 grandchildA 处失败，边界用例在
+stale 中间跳的新后代处失败（该例在修复前同样可借道）；修复后 9/9 通过、整套 31 files/471 passed/6
+skipped。** RED/GREEN 原始日志见 §6。
+
 ## 1. 实现
 
 ### 1.1 单一策略快照 → 一张决策表
@@ -185,7 +221,7 @@ RED/GREEN 报告与日志字节保持原样（未规范化空白）。
 | C1 | 合约硬拒绝：Write/Edit/apply_patch/未知/`mcp_*`/无声明插件在**所有** permissionMode 与 legacy `allow` 下 block；合约许可集合正确 | gate 单元 `gate-permissions.test.ts`（plan/goal × ask/accept-edits/auto × 9 工具 + allow/grants/外部路径组合；拒绝码逐类）；编译产物探针 `omp-sidecar.test.mjs`（Bun 打包的真实 gate：plan Write block、无卡）；生产 E2E 以目录层如实标注隐藏工具的 not-found（不冒充 gate 拒绝） | 全绿 |
 | C2 | Bash 无命令分类：inherit→默认、ask→卡、accept-edits→卡、auto→放行、Plan+auto 放行 | gate 单元（`ls` 与 `rm -rf /` 决策逐项相同）；生产 E2E（Agent+ask 批准后真实写文件；Plan+auto 真实写文件；Plan+ask 拒绝后零副作用） | 全绿 |
 | C3 | 插件：无声明合约拒绝；有声明逐 action 允许/拒绝；`ctx.mode` = 真实模式 | 真实 `PluginRuntime` 子进程测试 `omp-plugin-plan-safe.test.mjs`（agent→`"mode":"agent"`；plan+`inspect` 允许、`write` 拒绝、无声明拒绝；goal 拒绝；未知回合拒绝；MCP plan 拒绝且 `callTool` 零调用）；生产 E2E（plan+auto 下 `plugin_demo_inspect` 实际执行并记录 `ctx.mode="plan"`） | 全绿 |
-| C4 | 子代理 `hasUI=false`：合约模式 fail closed、Agent 语义不提高权限、且只依据其启动时绑定的那份准入（不借用更早/更新/他会话准入） | gate 单元（委托快照 + plan/goal 硬拒绝 + no-UI fail closed）；**代际归属回归** `gate-delegate-ownership.test.ts`（A 下绑定→A 中拒绝→A 终止拒绝→B 下仍拒绝、B 下新子放行；session_start 单独即可绑定、不复指向、过期 header 永久拒绝、父链检查/嵌套链、无观察者 fail closed、legacy 夹具缓存不变）；编译产物探针（同一子会话 ask→auto 三次均 block）；生产 E2E（agent+ask 子代理 write → 无 UI block、文件不存在；agent+auto 子代理 write → 恰好一次；真实子会话 header `parentSession`=所属会话文件、创建时间在父代首次 provider 请求之后） | 全绿 |
+| C4 | 子代理 `hasUI=false`：合约模式 fail closed、Agent 语义不提高权限、且只依据其启动时绑定的那份准入（不借用更早/更新/他会话准入；嵌套链的每个中间祖先也必须属于同一准入记录） | gate 单元（委托快照 + plan/goal 硬拒绝 + no-UI fail closed）；**代际归属回归** `gate-delegate-ownership.test.ts`（A 下绑定→A 中拒绝→A 终止拒绝→B 下仍拒绝、B 下新子放行；session_start 单独即可绑定、不复指向、过期 header 永久拒绝、父链检查/嵌套链、无观察者 fail closed、legacy 夹具缓存不变；第三次返修新增根脚本同序 7 步嵌套链与边界：退休中间祖先的新后代拒绝、未归属 stale 中间跳的新后代拒绝、未知中间跳拒绝、多跳合法嵌套、下一准入下重观察旧链后仍拒绝、新回合直接子放行）；编译产物探针（同一子会话 ask→auto 三态 + childB/grandchildB 允许 + grandchildA 拒绝）；生产 E2E（agent+ask 子代理 write → 无 UI block、文件不存在；agent+auto 子代理 write → 恰好一次；真实子会话 header `parentSession`=所属会话文件、创建时间在父代首次 provider 请求之后） | 全绿 |
 | C5 | browser/computer/eval：Agent+auto 放行、ask/accept-edits 弹卡、Plan/Goal 硬拒绝 | gate 单元（三种模式 × 三种 permissionMode × 三个名字；卡 risk=medium）；默认 gated 名单断言 | 全绿 |
 | C6 | 四条有效权限模式：inherit 桌面侧解析、gate 只读结果；ask/accept-edits/auto 行为 | B1 生产 E2E（`inherit`→默认 `accept-edits`→`auto` 的逐轮解析与描述符消费，本阶段更新为 ask 弹卡断言语义）；gate 单元（快照 verbatim 消费）；wiring 单元沿用 | 全绿（B1 E2E 1 passed） |
 | C7 | 风险保真：plugin 声明/缺失→medium、未知→medium、`mcp_*=low`（仅非合约）、BrowserPreview=medium 且合约许可 | gate 单元（`nativeRiskForTool` 逐名、策略表优先、mcp 在 plan 下即使 `auto`/`allow` 也硬拒绝、BrowserPreview 合约 ask 弹卡/auto 放行）；生产 E2E（plugin 声明 medium 卡、MCP Low 零卡执行） | 全绿 |
@@ -222,18 +258,20 @@ RED/GREEN 报告与日志字节保持原样（未规范化空白）。
 `omp-desktop-gate.js`，子进程驱动 handler；plan Write block、plan Bash 卡字段、agent MCP 零卡、
 缺状态 policy-unavailable）证明。
 
-## 4. 验证命令与计数（第二次返修后重跑；Linux x64 / Node v24.14.0 / Bun 1.4.2）
+## 4. 验证命令与计数（第三次返修后重跑；Linux x64 / Node v24.14.0 / Bun 1.4.2）
 
 | 命令 | 结果 | exit | 原始日志 |
 | --- | --- | --- | --- |
-| `pnpm -C packages/omp-runtime test` | **31 files / 469 passed / 6 skipped**（第二次返修 +1 file/+9：`gate-delegate-ownership.test.ts` 7 例、gate-admission +1、gate-permissions 代际改写 +1） | 0 | `omp-runtime-vitest-repair2.txt` |
-| `node --test test/*.test.mjs`（`apps/desktop` 全量，`env -u SSH_ASKPASS`） | **2984 tests / 2973 pass / 0 fail / 11 skipped** | 0 | `desktop-suite-repair2.txt` |
-| `node --test test/omp-execution-policy-e2e.test.mjs`（第二次返修新增真实子会话 header 归属/新鲜度断言） | **1 passed**（12.1s） | 0 | `c-execution-policy-e2e-repair2.txt` |
-| `node --test test/omp-runtime-state-e2e.test.mjs test/omp-session-turn-fence-e2e.test.mjs test/omp-plugin-plan-safe.test.mjs`（B1 生产回归、fence-Stop 反例、真实 PluginRuntime 子进程） | **4 passed** | 0 | `b1-fence-plugin-repair2.txt` |
-| `node --test test/omp-sidecar.test.mjs`（真实 Bun 打包产物；新增同一子会话的代际归属探针） | **10 passed / 0 fail** | 0 | `compiled-gate-repair2.txt` |
-| `pnpm build:js` / `pnpm typecheck` / `pnpm lint` | 全绿 | 0 / 0 / 0 | `build-typecheck-lint-repair2.txt` |
-| 证据清单自校验（§6） | 父清单 28 条与子清单 10 条全部匹配且全部受 Git 跟踪（自引用已移除） | 0 | `manifest-verify-repair2.txt` |
+| `node_modules/.bin/vitest run src/session/gate-delegate-ownership.test.ts`（RED：仅把 gate 文件临时还原为修复前 HEAD 版本，新测试不变） | **2 failed / 7 passed**（7 步用例在 grandchildA 处失败；边界用例在 stale 中间跳的新后代处失败） | 1 | `gate-delegate-ownership-red-repair3.txt` |
+| `pnpm -C packages/omp-runtime test` | **31 files / 471 passed / 6 skipped**（第三次返修 +2 例） | 0 | `omp-runtime-vitest-repair3.txt` |
+| `node --test test/omp-execution-policy-e2e.test.mjs`（C 真实 child ask/auto + 真实子会话 header） | **1 passed**（13.0s） | 0 | `c-execution-policy-e2e-repair3.txt` |
+| `node --test test/omp-runtime-state-e2e.test.mjs test/omp-session-turn-fence-e2e.test.mjs test/omp-plugin-plan-safe.test.mjs`（B1 生产回归、fence-Stop 反例、真实 PluginRuntime 子进程） | **4 passed** | 0 | `b1-fence-plugin-repair3.txt` |
+| `node --test test/omp-sidecar.test.mjs`（真实 Bun 打包产物；探针扩为 7 步嵌套链） | **10 passed / 0 fail** | 0 | `compiled-gate-repair3.txt` |
+| `node --test test/omp-session-bridge.test.mjs test/omp-host-tool-bridge.test.mjs test/omp-subagent-bridge.test.mjs`（受影响桥接套件：grant 记账、宿主工具模式、子代理投影） | **76 passed / 0 fail** | 0 | `desktop-bridges-repair3.txt` |
+| `pnpm build:js` / `pnpm typecheck` / `pnpm lint` | 全绿 | 0 / 0 / 0 | `build-typecheck-lint-repair3.txt` |
+| 证据清单自校验（§6） | 子清单排除自身、父清单单一列表；逐条 sha256 匹配 + 全部受 Git 跟踪 | 0 | `manifest-verify-repair3.txt` |
 
+历史（第二次返修后，`e0d03cd7`，保留不改）：omp-runtime 31 files / 469 passed / 6 skipped；desktop 全量 2984 / 2973 / 0 / 11；C E2E 1 passed；B1+plugin 4 passed；sidecar 10 passed；build/typecheck/lint 全绿；清单 46/46 —— 见 `*-repair2.txt`（本节旧表）。
 历史（R1/R2 返修后，`4d532524`，保留不改）：omp-runtime 30 files / 460 passed / 6 skipped；desktop 2984 / 2973 / 0 / 11；C E2E 1 passed；B1+plugin 4 passed；T17-T19 定向 122 passed；build/typecheck/lint 全绿 —— 见 `*-repair.txt`。
 更早（首稿 `fc0fb298`）：omp-runtime 27 files / 437 passed；desktop 2983 / 2972 / 0 / 11；C E2E 1 passed；编译产物 gate 探针 10 passed —— 见 `*-c.txt`。
 
@@ -248,11 +286,14 @@ RED/GREEN 报告与日志字节保持原样（未规范化空白）。
 - 隐藏工具的 gate 层硬拒绝只在单元与编译产物层证明；生产层是目录夹取（如实标注，不冒充）。
 - **委托归属**：委托只在其自身启动时绑定到的那份准入下裁决（进程级记录、随 fence 安装、`agent_start`
   武装、终止 `agent_end`/stop/拒绝退役）；未观察到启动、绑定已被退役/替换、父链不达所属会话文件、
-  或 header 显示创建早于本准入的委托一律 fail closed。**不声称**能区分合法 revived/parked worker 与
-  延迟启动——公开接口对两者给出相同的旧 header，因此两者在受控调用上一律拒绝（恢复它需要的形式化
-  生成信号见 ADR 0309 §7.2）。**不声称**原生跨代调度不可达：根复审早先扣住真实子响应的夹具因父回合
-  保持非 idle 而未走到代 B，那只是该夹具的事实（固定运行时把未抑制的运行中子代理保持为
-  `willContinue`），不作为所有延迟回调/parked worker/生命周期边界的证明；本阶段不做原生跨代 E2E 声称。
+  header 显示创建早于本准入，或**嵌套链的任一中间祖先不属于正在被主张的那份准入记录本体**（已退役/
+  别代/从未归属）的委托一律 fail closed（第三次返修补齐；该要求不缩小任何 §7 已放行的正例，只拒绝
+  祖先可证明属于别代的后代）。**不声称**能区分合法 revived/parked worker 与延迟启动——公开接口对两者
+  给出相同的旧 header，因此两者在受控调用上一律拒绝（恢复它需要的形式化生成信号见 ADR 0309 §7.2）。
+  **不声称**原生跨代调度不可达：根复审早先扣住真实子响应的夹具因父回合保持非 idle 而未走到代 B，
+  那只是该夹具的事实（固定运行时把未抑制的运行中子代理保持为 `willContinue`），不作为所有延迟回调/
+  parked worker/生命周期边界的证明；本阶段不做原生跨代 E2E 声称，R5 同样是登记回调层反例与同层修复
+  （脚本与便携化测试都不执行 provider/工具体，ADR 0309 §7.3）。
 - fence 回执的 SHA-256 是同一受信运行时进程内 runner 与 gate 之间的应用自有一致性校验，**不是**对桌面端
   的密码学认证，也不如此声称（ADR 0309 §7.1、spec 中英同步）。
 - fence 安装准入后、`agent_start` 之前被 Stop/拒绝的窄窗口内记录保持未被武装，任何调用 fail closed；

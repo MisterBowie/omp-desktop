@@ -1,0 +1,19 @@
+✔ the build entry passes an explicit bytecode mode the fork accepts (1.397485ms)
+✔ the desktop pins agree with the controlled patch manifest (0.412156ms)
+✔ the build entry and the runtime package normalize remotes identically (0.458242ms)
+✔ a checkout whose HEAD is the manifest's fork commit and patch verifies (48.132467ms)
+✔ an SSH remote is accepted for an HTTPS manifest entry (46.842334ms)
+✔ the wrong remote, commit, cleanliness, version, file set, or patch is refused (200.68648ms)
+✔ --check runs the same gate as a process, exiting non-zero on refusal (161.915973ms)
+✔ the patch manifest refuses a malformed fork block (28.488112ms)
+✔ the tool gate bundle is identical under temporary roots of different depth (132.153072ms)
+✔ the bundled tool gate carries the execution-time decision table (188.005994ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1245.656923
+EXIT=0
