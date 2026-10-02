@@ -1,0 +1,68 @@
+{
+  "candidate": "bff27e11363d3a60b59265ff91d2fb3d814b574a",
+  "decision": "B1 behavior accepted; minor raw-evidence whitespace packaging follow-up assigned to next C stage",
+  "source": {
+    "remoteHead": "bff27e11363d3a60b59265ff91d2fb3d814b574a",
+    "githubRef": "bff27e11363d3a60b59265ff91d2fb3d814b574a",
+    "localHead": "bff27e11363d3a60b59265ff91d2fb3d814b574a",
+    "clean": true
+  },
+  "validation": {
+    "runtime": {
+      "files": 25,
+      "passed": 404,
+      "skipped": 6,
+      "exit": 0
+    },
+    "desktopTargeted": {
+      "passed": 53,
+      "skipped": 0,
+      "exit": 0
+    },
+    "productionStopAndRecovery": "both stop boundaries provider0, exactly one aborted end, idle; recovery provider1 completed same nativeId; control provider1; all cleanup true",
+    "oldRefusalGenerationAndSerializedStop": "passed",
+    "stateFailureAndCatalog": "all checked, passed",
+    "trackedEvidenceHashes": 17,
+    "productionDiffCheck": 0,
+    "fullCandidateDiffCheck": 2
+  },
+  "followUp": {
+    "scope": "archive only",
+    "files": [
+      "repair3-red/bridge-test-red.txt",
+      "repair3-red/e2e-test-red.txt"
+    ],
+    "detail": "4 trailing whitespace lines in byte-exact RED logs. Preserve original bytes in deterministic gzip and keep original decoded digests. Correct final-diff check claim after archive fix; no B1 product defect remains."
+  },
+  "next": "T20-C fresh session/worktree; B2/D and major-stage three-platform packages remain pending",
+  "evidence": [
+    {
+      "file": "start-refusal-generation-bff27e11.json",
+      "sha256": "5628ce0b036e1dac54f8a66ec11e1a84e73e48790d627106fa57eae69690dcfb"
+    },
+    {
+      "file": "production-fence-stop-recovery-bff27e11.json",
+      "sha256": "d4dbfeae3dfa946c96c180df99d6772e10475fbd20ffef745c180a071654d13f"
+    },
+    {
+      "file": "production-state-failure-probe-bff27e11.json",
+      "sha256": "4041420595ce034e9257956825d9af79d914d95a4ec4fff946af8290be2f5aec"
+    },
+    {
+      "file": "repair3-evidence-bff27e11.json",
+      "sha256": "ace621c1ab6b08dfacecda937946a6acf9248995cacd71f007251314a8ddb953"
+    },
+    {
+      "file": "build-runtime-bff27e11-escalated.txt",
+      "sha256": "9229d9a9f605597573b31d838653196b11bafdafb729928270ef6a93592d963a"
+    },
+    {
+      "file": "runtime-tests-bff27e11.txt",
+      "sha256": "cbe55d67e58eb09fc75712cb30178eea0f125c0055307d2adb1d13c36e02fc86"
+    },
+    {
+      "file": "desktop-targeted-bff27e11.txt",
+      "sha256": "cfc067a1b059c545d196957a77d8f02b50d383a10ce1ecc34b8b122df997b2d6"
+    }
+  ]
+}

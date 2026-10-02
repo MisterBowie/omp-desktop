@@ -1,0 +1,324 @@
+{
+  "desktopCommit": "bff27e11363d3a60b59265ff91d2fb3d814b574a",
+  "layer": "actual patched OMP + production bridge/runner/gate + local FakeProvider; public runtimeFactory seam only invokes user stop immediately after real command discovery or turn binding is submitted; no RPC frames or responses delayed/forged/reordered",
+  "results": [
+    {
+      "strategy": "control",
+      "rpc": [
+        {
+          "type": "new_session"
+        },
+        {
+          "type": "get_state"
+        },
+        {
+          "type": "set_subagent_subscription"
+        },
+        {
+          "type": "get_available_commands"
+        },
+        {
+          "type": "prompt",
+          "control": true,
+          "message": "[turn binding]"
+        },
+        {
+          "type": "prompt",
+          "control": false,
+          "message": "user prompt cancelled before the fence completed"
+        }
+      ],
+      "events": [
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "message_start",
+        "message_update",
+        "message_end",
+        "turn_end",
+        "agent_end"
+      ],
+      "ends": [
+        {
+          "sessionId": "fence-stop-review",
+          "turnId": "omp-turn:fence-stop-review:f24a6ae0-b166-4c54-ae0b-ae9a9b8fb952:1",
+          "reason": "completed"
+        }
+      ],
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:fence-stop-review:f24a6ae0-b166-4c54-ae0b-ae9a9b8fb952:1"
+      },
+      "providerRequests": 1,
+      "finalState": "idle",
+      "firstTurnEvents": [
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "message_start",
+        "message_update",
+        "message_end",
+        "turn_end",
+        "agent_end"
+      ],
+      "firstTurnEnds": [
+        {
+          "sessionId": "fence-stop-review",
+          "turnId": "omp-turn:fence-stop-review:f24a6ae0-b166-4c54-ae0b-ae9a9b8fb952:1",
+          "reason": "completed"
+        }
+      ],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "finalStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      }
+    },
+    {
+      "strategy": "stop-on-command-discovery",
+      "rpc": [
+        {
+          "type": "new_session"
+        },
+        {
+          "type": "get_state"
+        },
+        {
+          "type": "set_subagent_subscription"
+        },
+        {
+          "type": "get_available_commands"
+        },
+        {
+          "type": "abort"
+        },
+        {
+          "type": "get_subagents"
+        },
+        {
+          "type": "get_available_commands"
+        },
+        {
+          "type": "prompt",
+          "control": true,
+          "message": "[turn binding]"
+        },
+        {
+          "type": "prompt",
+          "control": false,
+          "message": "next genuine prompt after stop"
+        }
+      ],
+      "events": [
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "message_start",
+        "message_update",
+        "message_end",
+        "turn_end",
+        "agent_end"
+      ],
+      "ends": [
+        {
+          "sessionId": "fence-stop-review",
+          "turnId": "omp-turn:fence-stop-review:00af0e97-589e-4209-b9a4-f80eb1659c72:1",
+          "reason": "aborted"
+        },
+        {
+          "sessionId": "fence-stop-review",
+          "turnId": "omp-turn:fence-stop-review:00af0e97-589e-4209-b9a4-f80eb1659c72:2",
+          "reason": "completed"
+        }
+      ],
+      "providerAtStopRequest": 0,
+      "nativeIdAtStopRequest": "01a0fd64-970b-7009-852b-b0f6e1727bb4",
+      "stateAtStopRequest": "stopping",
+      "prompt": {
+        "error": "the run was stopped while the prompt was being prepared"
+      },
+      "stop": {
+        "aborted": true,
+        "abortBashSent": false,
+        "converged": true,
+        "toreDown": false,
+        "steps": [
+          "abort acknowledged",
+          "turn converged"
+        ],
+        "errors": []
+      },
+      "providerRequests": 0,
+      "finalState": "idle",
+      "firstTurnEvents": [],
+      "firstTurnEnds": [
+        {
+          "sessionId": "fence-stop-review",
+          "turnId": "omp-turn:fence-stop-review:00af0e97-589e-4209-b9a4-f80eb1659c72:1",
+          "reason": "aborted"
+        }
+      ],
+      "passed": true,
+      "recovery": {
+        "prompt": {
+          "accepted": true,
+          "turnId": "omp-turn:fence-stop-review:00af0e97-589e-4209-b9a4-f80eb1659c72:2"
+        },
+        "providerRequests": 1,
+        "state": "idle",
+        "sameNativeId": true,
+        "ends": [
+          {
+            "sessionId": "fence-stop-review",
+            "turnId": "omp-turn:fence-stop-review:00af0e97-589e-4209-b9a4-f80eb1659c72:2",
+            "reason": "completed"
+          }
+        ]
+      },
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "finalStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      }
+    },
+    {
+      "strategy": "stop-on-turn-binding",
+      "rpc": [
+        {
+          "type": "new_session"
+        },
+        {
+          "type": "get_state"
+        },
+        {
+          "type": "set_subagent_subscription"
+        },
+        {
+          "type": "get_available_commands"
+        },
+        {
+          "type": "prompt",
+          "control": true,
+          "message": "[turn binding]"
+        },
+        {
+          "type": "abort"
+        },
+        {
+          "type": "get_subagents"
+        },
+        {
+          "type": "prompt",
+          "control": true,
+          "message": "[turn binding]"
+        },
+        {
+          "type": "prompt",
+          "control": false,
+          "message": "next genuine prompt after stop"
+        }
+      ],
+      "events": [
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "message_start",
+        "message_update",
+        "message_end",
+        "turn_end",
+        "agent_end"
+      ],
+      "ends": [
+        {
+          "sessionId": "fence-stop-review",
+          "turnId": "omp-turn:fence-stop-review:98d7e295-ea21-4709-8a28-d9253900d3ce:1",
+          "reason": "aborted"
+        },
+        {
+          "sessionId": "fence-stop-review",
+          "turnId": "omp-turn:fence-stop-review:98d7e295-ea21-4709-8a28-d9253900d3ce:2",
+          "reason": "completed"
+        }
+      ],
+      "providerAtStopRequest": 0,
+      "nativeIdAtStopRequest": "01a0fd64-9fb4-7693-9d79-5cbf067f700a",
+      "stateAtStopRequest": "stopping",
+      "prompt": {
+        "error": "the run was stopped while the prompt was being prepared"
+      },
+      "stop": {
+        "aborted": true,
+        "abortBashSent": false,
+        "converged": true,
+        "toreDown": false,
+        "steps": [
+          "abort acknowledged",
+          "turn converged"
+        ],
+        "errors": []
+      },
+      "providerRequests": 0,
+      "finalState": "idle",
+      "firstTurnEvents": [],
+      "firstTurnEnds": [
+        {
+          "sessionId": "fence-stop-review",
+          "turnId": "omp-turn:fence-stop-review:98d7e295-ea21-4709-8a28-d9253900d3ce:1",
+          "reason": "aborted"
+        }
+      ],
+      "passed": true,
+      "recovery": {
+        "prompt": {
+          "accepted": true,
+          "turnId": "omp-turn:fence-stop-review:98d7e295-ea21-4709-8a28-d9253900d3ce:2"
+        },
+        "providerRequests": 1,
+        "state": "idle",
+        "sameNativeId": true,
+        "ends": [
+          {
+            "sessionId": "fence-stop-review",
+            "turnId": "omp-turn:fence-stop-review:98d7e295-ea21-4709-8a28-d9253900d3ce:2",
+            "reason": "completed"
+          }
+        ]
+      },
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "finalStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      }
+    }
+  ],
+  "passed": true
+}

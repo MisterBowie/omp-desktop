@@ -1,0 +1,117 @@
+{
+  "desktopCommit": "bff27e11363d3a60b59265ff91d2fb3d814b574a",
+  "layer": "production runner/codec with scripted formal RPC frames; no runtime process/provider",
+  "results": [
+    {
+      "case": "old-and-unseen-refusal-during-next-awaiting-start",
+      "first": {
+        "accepted": true,
+        "turnId": "omp-turn:desktop-parent:1",
+        "generation": 1
+      },
+      "firstState": "idle",
+      "firstEnds": [
+        {
+          "sessionId": "desktop-parent",
+          "turnId": "omp-turn:desktop-parent:1",
+          "reason": "error"
+        }
+      ],
+      "second": {
+        "accepted": true,
+        "turnId": "omp-turn:desktop-parent:2",
+        "generation": 2
+      },
+      "afterExactReplay": "running",
+      "afterUnseenOld": "running",
+      "afterForeign": "running",
+      "endsBeforeGenuineNew": [
+        {
+          "sessionId": "desktop-parent",
+          "turnId": "omp-turn:desktop-parent:1",
+          "reason": "error"
+        }
+      ],
+      "afterGenuineNew": "idle",
+      "ends": [
+        {
+          "sessionId": "desktop-parent",
+          "turnId": "omp-turn:desktop-parent:1",
+          "reason": "error"
+        },
+        {
+          "sessionId": "desktop-parent",
+          "turnId": "omp-turn:desktop-parent:2",
+          "reason": "error"
+        }
+      ],
+      "passed": true,
+      "diagnostics": {
+        "lateFrames": 0,
+        "startRefusals": 2,
+        "ignoredStartRefusals": 3,
+        "turnFences": 2,
+        "ignoredTurnAcks": 0,
+        "conversion": {
+          "unmappedFrames": {},
+          "toolResultMessages": {},
+          "droppedParts": {},
+          "notes": []
+        },
+        "uiRecords": [],
+        "state": "idle",
+        "malformedSubagentFrames": 0,
+        "subagentDiagnostics": {
+          "malformedFrames": 0,
+          "orphanEvents": 0,
+          "orphanProgress": 0,
+          "unknownParentCalls": 0
+        },
+        "hostTools": {
+          "pending": 0,
+          "executed": 0,
+          "cancelled": 0,
+          "duplicates": 0,
+          "unknownCancels": 0,
+          "noRun": 0,
+          "malformed": 0,
+          "lateCompletions": 0,
+          "rememberedIds": 0,
+          "trackedGenerations": 0
+        }
+      }
+    },
+    {
+      "case": "stop-during-delayed-command-discovery",
+      "transportOrdering": "ordinary RPC commands serialized as fixed OMP RpcInputDispatcher; abort before agent_start emits no agent_end",
+      "stateAtStopRequest": "stopping",
+      "realPromptsAtStopRequest": 0,
+      "promptOutcome": {
+        "error": "the run was stopped while the prompt was being prepared"
+      },
+      "stop": {
+        "aborted": true,
+        "abortBashSent": false,
+        "converged": true,
+        "toreDown": false,
+        "steps": [
+          "abort acknowledged",
+          "turn converged"
+        ],
+        "errors": []
+      },
+      "realPromptsAfterStopRequest": 0,
+      "commandsAfterStopRequest": [],
+      "stateAtEnd": "idle",
+      "ends": [
+        {
+          "sessionId": "desktop-parent",
+          "turnId": "omp-turn:desktop-parent:1",
+          "reason": "aborted"
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "passed": true
+}

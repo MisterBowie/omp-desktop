@@ -1,0 +1,125 @@
+{
+  "commit": "bff27e11363d3a60b59265ff91d2fb3d814b574a",
+  "checks": [
+    {
+      "path": "docs/validation/M5-t20-b1-runtime-state/omp-runtime-vitest-repair3.txt",
+      "matches": true,
+      "tracked": true,
+      "expected": "eb9dd67f61f125427bba762f6bbd52dd9a1dc479943c6d14ec83f00f9a25e5be",
+      "actual": "eb9dd67f61f125427bba762f6bbd52dd9a1dc479943c6d14ec83f00f9a25e5be"
+    },
+    {
+      "path": "docs/validation/M5-t20-b1-runtime-state/b1-e2e-repair3.txt",
+      "matches": true,
+      "tracked": true,
+      "expected": "f40d3b516a1c957f480dd65cd2a8429ae5e7fef068855322eca3af368799a4ff",
+      "actual": "f40d3b516a1c957f480dd65cd2a8429ae5e7fef068855322eca3af368799a4ff"
+    },
+    {
+      "path": "docs/validation/M5-t20-b1-runtime-state/turn-fence-stop-e2e-repair3.txt",
+      "matches": true,
+      "tracked": true,
+      "expected": "c03cf968b87129851199657e379abcddf7d15f3616ed03a88837ddccf593659a",
+      "actual": "c03cf968b87129851199657e379abcddf7d15f3616ed03a88837ddccf593659a"
+    },
+    {
+      "path": "docs/validation/M5-t20-b1-runtime-state/runtime-e2e-repair3.txt",
+      "matches": true,
+      "tracked": true,
+      "expected": "5118c5df6569fee2f44d7731c175939b25c2bf9066069c56e30b0a123896ab4a",
+      "actual": "5118c5df6569fee2f44d7731c175939b25c2bf9066069c56e30b0a123896ab4a"
+    },
+    {
+      "path": "docs/validation/M5-t20-b1-runtime-state/desktop-suite-repair3.txt",
+      "matches": true,
+      "tracked": true,
+      "expected": "7def3556fe63641ae9235b330b103e968381892cf40ad1046482c32c9a1b5c57",
+      "actual": "7def3556fe63641ae9235b330b103e968381892cf40ad1046482c32c9a1b5c57"
+    },
+    {
+      "path": "docs/validation/M5-t20-b1-runtime-state/build-typecheck-lint-repair3.txt",
+      "matches": true,
+      "tracked": true,
+      "expected": "9b084b7f3aaa48f4f78180711c7c9491602ef1e48d77439fa3d09446af57e513",
+      "actual": "9b084b7f3aaa48f4f78180711c7c9491602ef1e48d77439fa3d09446af57e513"
+    },
+    {
+      "path": "docs/validation/M5-t20-b1-runtime-state/checks-repair3.txt",
+      "matches": true,
+      "tracked": true,
+      "expected": "53c15e9478e62cd93fa63f7266eea2e348945eef8314940848b2da15adfbf543",
+      "actual": "53c15e9478e62cd93fa63f7266eea2e348945eef8314940848b2da15adfbf543"
+    },
+    {
+      "path": "docs/validation/M5-t20-b1-runtime-state/repair3-red/README.md",
+      "matches": true,
+      "tracked": true,
+      "expected": "d7d07bae185caf1a4f3f79ab74014f93da02c29dd8db20f2b8659f27b6e99b81",
+      "actual": "d7d07bae185caf1a4f3f79ab74014f93da02c29dd8db20f2b8659f27b6e99b81"
+    },
+    {
+      "path": "docs/validation/M5-t20-b1-runtime-state/repair3-red/bridge-test-red.txt",
+      "matches": true,
+      "tracked": true,
+      "expected": "975875e11cde84effff37a58444d64b668a679a2c86b055aabd7963f53a2512e",
+      "actual": "975875e11cde84effff37a58444d64b668a679a2c86b055aabd7963f53a2512e"
+    },
+    {
+      "path": "docs/validation/M5-t20-b1-runtime-state/repair3-red/e2e-test-red.txt",
+      "matches": true,
+      "tracked": true,
+      "expected": "ddb5a4829a70961bcc22bcb0e170b5a213139843266144263727c2cab4fc6d24",
+      "actual": "ddb5a4829a70961bcc22bcb0e170b5a213139843266144263727c2cab4fc6d24"
+    },
+    {
+      "path": "docs/validation/M5-t20-b1-runtime-state/repair3-red/production-fence-stop-race-50e4f6ee.json",
+      "matches": true,
+      "tracked": true,
+      "expected": "f1b9c3265485e456fd6d49f4561d9ed014e807fb29ebcbf50963b367e4bcfa10",
+      "actual": "f1b9c3265485e456fd6d49f4561d9ed014e807fb29ebcbf50963b367e4bcfa10"
+    },
+    {
+      "path": "docs/validation/M5-t20-b1-runtime-state/repair3-red/production-fence-stop-race-probe.mjs",
+      "matches": true,
+      "tracked": true,
+      "expected": "9994eb53af0358636808f6e56bf514d57365238e57e96798c5ca7cca24d32473",
+      "actual": "9994eb53af0358636808f6e56bf514d57365238e57e96798c5ca7cca24d32473"
+    },
+    {
+      "path": "docs/validation/M5-t20-b1-runtime-state/repair3-red/production-state-failure-probe-50e4f6ee.json",
+      "matches": true,
+      "tracked": true,
+      "expected": "b53c0046ab16af0d72150ad91cb479bb546269b5aab360fccd83c00546511cc8",
+      "actual": "b53c0046ab16af0d72150ad91cb479bb546269b5aab360fccd83c00546511cc8"
+    },
+    {
+      "path": "docs/validation/M5-t20-b1-runtime-state/repair3-red/runner-tests-red.txt",
+      "matches": true,
+      "tracked": true,
+      "expected": "83ed30b501167ea88c1627cb8cc8763bbfd908be3621f0f80c6d4349766e56b5",
+      "actual": "83ed30b501167ea88c1627cb8cc8763bbfd908be3621f0f80c6d4349766e56b5"
+    },
+    {
+      "path": "docs/validation/M5-t20-b1-runtime-state/repair3-red/start-refusal-generation-50e4f6ee.json",
+      "matches": true,
+      "tracked": true,
+      "expected": "7d31a3650a4118b2c5c7ff80ee8397ba6ea8f6359b4bbe07a7eda399ae60abea",
+      "actual": "7d31a3650a4118b2c5c7ff80ee8397ba6ea8f6359b4bbe07a7eda399ae60abea"
+    },
+    {
+      "path": "docs/validation/M5-t20-b1-runtime-state/repair3-red/start-refusal-generation-review.mjs",
+      "matches": true,
+      "tracked": true,
+      "expected": "3fd6cd483d0ca55b4a1429154905af179a01f74aee0ce848363bdee6e3ac91be",
+      "actual": "3fd6cd483d0ca55b4a1429154905af179a01f74aee0ce848363bdee6e3ac91be"
+    },
+    {
+      "path": "docs/validation/M5-t20-b1-runtime-state/repair3-red/third-review-summary-7fa4be02.json",
+      "matches": true,
+      "tracked": true,
+      "expected": "96231633551f3569feaf1183e65d091cee936293f4444af7dc8b0a51db151021",
+      "actual": "96231633551f3569feaf1183e65d091cee936293f4444af7dc8b0a51db151021"
+    }
+  ],
+  "passed": true
+}
