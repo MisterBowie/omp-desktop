@@ -281,7 +281,7 @@ bridge.prompt
 | 真实运行时套件组（start-handler 语义 / session / subagent / skill-path / host-tool / persistence / concurrent-approval / capability-source） | **24 passed** | 0 | `runtime-e2e-repair2.txt` |
 | `node --test test/omp-sidecar.test.mjs`（真实 Bun 编译 gate、不同 TMPDIR 深度同字节） | **9 passed** | 0 | `compiled-gate-sidecar-repair2.txt` |
 | `pnpm build:js` / `pnpm -r --if-present typecheck` / `pnpm lint` | 全绿 | 0 / 0 / 0 | `build-typecheck-lint-repair2.txt` |
-| matrix ids / gap 探针 / omp-patch / release-docs / agent-policy / locales / check-docs / `git diff --check` | `MATRIX-ID-OK` / `GAP-RETIRED g1` + `2 open [g2,g3]` / `OMP-PATCH-OK 62bc57b+omp-desktop.3` / 对齐 0.15.2 / 通过 / 79 对 / **6 项预存在**（508 页）/ 干净 | 0 / **1（预期）** / 0 / 0 / 0 / 0 / **1（预存在）** / 0 | `checks-repair2.txt` |
+| matrix ids / gap 探针 / omp-patch / release-docs / agent-policy / locales / check-docs / `git diff --check` | `MATRIX-ID-OK` / `GAP-RETIRED g1` + `2 gap(s) open [g2, g3]` / `OMP-PATCH-OK 62bc57b+omp-desktop.3` / 对齐 0.15.2 / 通过 / 79 对 / **6 项预存在**（508 页）/ 干净 | 0 / **1（预期）** / 0 / 0 / 0 / 0 / **1（预存在）** / 0 | `checks-repair2.txt` |
 
 未跑：host-core / cargo / 283MB 打包（本轮未改 Rust、未改 patch 构件/manifest/pins）。仅 Linux x64。
 
