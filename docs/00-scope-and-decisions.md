@@ -70,6 +70,15 @@
 | D06 | 部分:模型目录与配置已验证受控注入且不读用户全局配置;系统密钥存储命名留待 M4/T22 | E07 |
 | D07 | 已定:rpc 与 rpc-ui 的能力差异已实测(仅 rpc-ui 提供 `ask` 工具);ACP/SDK 仅源码比对,未做运行时结论 | E10 |
 
+### 2026-10-02 用户范围决定：排除 Cursor + Plan/Goal
+
+2026-10-02 用户明确指示"先排除 Cursor + Plan/Goal"，本计划据此修正范围解释：
+
+- **Cursor + Plan/Goal 标为不支持且拒绝**：ADR 0306 的 host-core 持久写入守卫、Main 进程 `sessionConfigure`/`sessionCreate`/`agentPrompt` 写入前拒绝、派发门与渲染层预防全部保留并继续生效；**不移除任何既有门或回归，也不全局禁用 Cursor**（Agent 模式下的 Cursor 模型保持可用）。
+- **非 Cursor、工具派发由已补丁 agent loop 裁决的受支持 HTTP 模型路线仍在范围内**，且必须满足 PI 严格契约（提交工具独占全部 `toolCall` 批次的计数、混合批次兄弟零副作用、`sole` 目录关闭投机、终支 terminate 且无后续 provider 步）；不得降级为"尽量阻断"或缩小批次计数。
+- **这是范围调整，不是上游能力变化**：Cursor 通道的严格 RED（R3B 实测 0/12）继续有效，仅表示该组合被范围排除，不宣称已修复或已通过。桌面模型投影不含 `cursor-agent` 传输，产品当前不调用 Cursor。
+- **T20 仍未完成、Plan/Goal 未实现**：现存缺口 g1/g2/g3 与 T20-B/C/D 矩阵（B1-B14/C1-C8/D1-D3）未实现，`plan`/`goal` 能力保持关闭。下一阶段拆分（T20-B1 运行域 mode/policy 状态与目录 → T20-C 执行时权限 → T20-B2 提交/审批/派发 → T20-D 整体验收与能力开放）与可观察验收见 `docs/validation/M5-t20-non-cursor-scope.md`。
+
 ## 6. 许可证与品牌
 
 PI-Desktop 采用 LGPL-3.0；OMP 主项目采用 MIT，附带的第三方组件另有声明。对外分发时保留版权、许可证及相应源码提供等义务，按实际组合方式核对。商业使用与完全闭源不是同一个问题。

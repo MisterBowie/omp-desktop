@@ -8,7 +8,8 @@
   over that code. F7 splits the upgrade path into a pre-migration sweep of the
   durable `876fb07` residual and a post-migration TEMP install, so an upgrade
   that skips the intermediate release is never blocked by the old guard.
-- Date: 2026-09-25
+  Confirmed as the product's current scope on 2026-10-02 (see "Current scope").
+- Date: 2026-09-25 (current-scope confirmation 2026-10-02)
 - Scope: which (mode, model) combinations a session may hold, and where the
   desktop refuses the invalid ones.
 - Evidence: `docs/validation/M5-cursor-plan-goal-gate.md`,
@@ -135,6 +136,24 @@ Three facts shaped the decision:
   the repair.
 - **Not gated:** Cursor models in Agent mode, and every non-Cursor provider in
   Plan/Goal mode.
+
+## Current scope (2026-10-02)
+
+On 2026-10-02 the user confirmed this exclusion as the product's **current
+scope**, not a temporary blocker: Cursor + Plan/Goal is unsupported and refused.
+The decision keeps every boundary described above in force — the host-core
+durable-write guard, the Main-process refusals at `sessionConfigure` /
+`sessionCreate` / `agentPrompt`, and the renderer prevention — and it does not
+globally disable Cursor: Cursor models in Agent mode remain available, and every
+non-Cursor provider in Plan/Goal mode is unaffected by this gate.
+
+The non-Cursor Plan/Goal route stays in scope, but it is **not implemented yet**:
+T20-B/C/D are still unstarted, the runtime-domain mode/policy channel and the
+contract-level hard refusals come first, and the `plan`/`goal` capabilities stay
+closed until T20-D. R3's findings and the 0/12 strict-contract measurement
+continue to describe the excluded Cursor combination only, exactly as recorded in
+`docs/validation/M5-omp-transition-patch.md` §9/§10 and
+`docs/validation/M5-t20-non-cursor-scope.md`.
 
 ## Consequences
 

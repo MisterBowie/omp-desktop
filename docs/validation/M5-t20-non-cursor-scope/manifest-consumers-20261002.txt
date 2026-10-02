@@ -1,0 +1,21 @@
+✔ the build entry passes an explicit bytecode mode the fork accepts (0.751431ms)
+✔ the desktop pins agree with the controlled patch manifest (0.242714ms)
+✔ the build entry and the runtime package normalize remotes identically (0.24052ms)
+✔ a checkout whose HEAD is the manifest's fork commit and patch verifies (35.518808ms)
+✔ an SSH remote is accepted for an HTTPS manifest entry (33.196445ms)
+✔ the wrong remote, commit, cleanliness, version, file set, or patch is refused (174.641112ms)
+✔ --check runs the same gate as a process, exiting non-zero on refusal (119.031625ms)
+✔ the patch manifest refuses a malformed fork block (24.623176ms)
+✔ the tool gate bundle is identical under temporary roots of different depth (113.301495ms)
+✔ every packaging lane checks out the pinned fork the manifest names (0.650986ms)
+✔ every packaging lane points OMP_SIDECAR_SOURCE at that checkout (0.12465ms)
+✔ every packaging lane installs the pinned Bun and frozen fork dependencies (0.226951ms)
+✔ the preview packages through the product release entry, not an injected binary (5.406537ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 755.298819

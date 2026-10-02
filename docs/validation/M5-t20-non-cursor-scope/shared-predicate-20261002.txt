@@ -1,0 +1,9 @@
+# normalized copy: one trailing blank line removed at EOF; raw bytes preserved in shared-predicate-20261002.txt.gz (sha256 761b96b72337c0088ff8ab267d249703629c31a3afe31896765c820405e4dd7f; original .txt sha256 7525b49be0738b03520b0728483f658d09b432d31211c8a8bc98c4dec617e453)
+
+ RUN  v4.1.10 /home/vv/person/code/omp-desktop-m5-t20-scope/app/packages/shared
+
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  21:01:46
+   Duration  477ms (transform 209ms, setup 0ms, import 254ms, tests 9ms, environment 0ms)

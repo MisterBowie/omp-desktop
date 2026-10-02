@@ -1,0 +1,26 @@
+✔ the Cursor provider id is one literal across Rust and TypeScript (0.504256ms)
+✔ the refusal code is one literal across Rust, TypeScript and the registry (0.100256ms)
+✔ the guard SQL is generated from those constants, not retyped (0.15962ms)
+✔ the durable residual is swept before the migrations, the TEMP guard installed after (1.701121ms)
+✔ a persisted Plan session bound to Cursor is refused before any runtime work (1.821272ms)
+✔ a persisted Goal session bound to Cursor is refused on the OMP path too (0.148912ms)
+✔ Agent mode with the Cursor provider still prompts (0.298049ms)
+✔ Plan mode on a normal provider still dispatches (0.378041ms)
+✔ providers that only resemble Cursor are not refused (0.761325ms)
+✔ entering Plan or Goal on a Cursor-bound session is refused without a write (0.729181ms)
+✔ binding the Cursor provider while Plan is active is refused without a write (0.127347ms)
+✔ a model change that carries no mode is judged against the stored mode (0.119854ms)
+✔ both escape paths stay open and non-Cursor sessions are unchanged (0.241093ms)
+✔ creating a session cannot persist the refused pair (0.223017ms)
+✔ the refusal code is registered once and localized (0.447477ms)
+✔ the model menu withholds the Cursor provider in Plan and Goal mode (0.134282ms)
+✔ the renderer writer refuses the pair before it reaches IPC (0.124714ms)
+✔ an invalid model pin is skipped with the reason instead of forking local state (0.062567ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 643.233462

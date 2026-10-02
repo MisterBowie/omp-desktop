@@ -2,6 +2,8 @@
 
 更新时间：2026-09-25。状态：**R3 仍为硬阻塞（独立复审 F3 确认），T20-B 不得开始。** 本轮（复审返修轮）撤回了上一提交中"R3 已解除 / T20-B 可以开始"的结论，并把已完成的补丁收敛为**风险收敛**（loop 可控路径），而不是 PI 兼容性声明。分支 `codex/m5-omp-transition-hooks`；返修基线 `a78cec6df4572031365e8ea6a4237ca8db04ab20`；本文件描述返修后的最终状态。固定子模块：OMP `d49918fab2dba3986927f2d46721629ed0f3a02c`（omp/18.2.7）、PI `0111e306c120ad5820688d7608cb37bad8fbcc1f`，gitlink 与工作树均未改动。
 
+> **2026-10-02 范围说明（链接 `docs/validation/M5-t20-non-cursor-scope.md`）**：用户于 2026-10-02 将 **Cursor + Plan/Goal 移出范围（不支持且拒绝，ADR 0306 门保留）**。本文 §1-§4 与 §9/§10 的结论继续有效，但只描述**该组合**：非 Cursor 提供方不产生 `kCursorExecResolved` 预执行块，因此"由已补丁 loop 裁决的受支持 HTTP 模型路线"保留在范围内，且仍按严格契约验收（全部 `toolCall` 计数、sole 批次整批拒绝、结算终止）；不得据此缩小批次计数或降级为"尽量阻断"。本文件的历史 RED 逐字保留。
+
 **第二轮独立复审返修（F6-F9，基线 `474408de2b2bdb538f5b2249d71398b8537e1fed`）**：只修本阶段脚本与证据，补丁 artifact 与 manifest 未改动（`sha256 e08ca7ff…fd8`、72978 字节，与 manifest 一致，见 §5）。R3 仍是硬阻塞、T20-B 仍不得开始；脚本测试面从 17 项增至 **24 项**（§6.1）。
 
 **第三轮返修（macOS 复审的测试面跨平台修正，基线 `81ab2ce41faea2e2c62aab41431ea651a4b341e3`）**：macOS 独立复审实跑 `node --test apps/desktop/test/omp-patch.test.mjs` 得 **22/24**——F6 的 6 个正常 CLI 路径与 F7 的 `--source` symlink 攻击用例**全部通过**（生产修复在 macOS 上有效），失败的恰是第二轮新增的**两个测试自身的夹具/平台假设缺陷**（逐行可达性分析见 §6.2）：①夹具别名用词法拼写与 canonical 组件比较，被 macOS `tmpdir()` 前缀自身的 `/var -> /private/var` 改写击穿；②对**悬空**的根级符号链接（macOS `/.VolumeIcon.icns`）直接调用 `canonicalizeAncestor`，而该形状在生产中不可达。本轮只改测试与本文档；生产脚本、补丁 artifact、manifest 均未改动。修正后的结果已由独立复审在本机 macOS 实跑确认（见下段与 §5/§7）。

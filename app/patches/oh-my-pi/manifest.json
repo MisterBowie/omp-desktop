@@ -119,6 +119,11 @@
     "retractedClaims": [
       "R3 lifted",
       "T20-B may start"
-    ]
+    ],
+    "scopeNote": {
+      "date": "2026-10-02",
+      "note": "Scope explanation only; it does not change patchLevel, the patch artifact, pins, capability ids or build outputs, and it does not turn the global not-strict fact into a general strict claim. The user excluded the Cursor + Plan/Goal combination from product scope on 2026-10-02: it is unsupported and refused by the ADR 0306 gate, so the F3 blocker above now describes that excluded combination. Non-Cursor providers do not produce the pre-executed blocks, so the non-Cursor route whose dispatch is decided by the patched loop stays in scope and is still held to the strict contract (all-toolCall counting, sole batches, settle-time termination). T20-B/C/D remain unstarted.",
+      "record": "docs/validation/M5-t20-non-cursor-scope.md"
+    }
   }
 }

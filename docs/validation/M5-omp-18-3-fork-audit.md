@@ -4,6 +4,8 @@
 
 状态：**审计完成（只读源码 + 确定性对比 + `git apply --check` 迁移分析）。本轮不改生产代码、不改两个固定子模块的 gitlink/内容、不改 patch artifact 与 manifest；R3 仍为硬阻塞，Cursor 产品门（ADR 0306）保留，T20 未完成、未声称。**
 
+> **2026-10-02 范围说明（链接 `docs/validation/M5-t20-non-cursor-scope.md`）**：用户于 2026-10-02 将 **Cursor + Plan/Goal 移出范围（不支持且拒绝）**；本文档"R3 硬阻塞 / 不得用 OMP 原生 Plan/Goal 冒充 PI parity / 不得删除 Cursor 产品门"的结论继续有效，非 Cursor 路线按新记录的 §4 拆分继续推进。本文档其余事实与证据保持历史原样。
+
 复审返修（独立复审 F1-F6，2026-09-27）：argv 表述、内置 sidecar 解析（`OMP_BUNDLED_OMP`/资源树扫描无 `app.isPackaged` 门）、bundled sidecar 的构建来源可归因性、符号级证据强度、`prepareToolCallDispatch` 与投机的时序、补丁迁移成本按目标分档——六项均已回到固定源码逐条核对后改写（核对命令与观察见 §12.1）。
 
 本轮只新增本文档，并按真实状态最小更新 `docs/04-task-board.md` 与 `HANDOFF.md`。

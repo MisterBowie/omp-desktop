@@ -1,0 +1,47 @@
+== check-t20-matrix-ids.mjs ==
+error: cd: i/o error: No such file or directory (os error 2)
+MATRIX-ID-OK: B1-B14, C1-C8, D1-D3 each appear exactly once
+exit=0
+
+== check-omp-plan-goal-gaps.mjs (default) ==
+SKIP: T20-A gap diagnostic not enabled (set OMP_T20_GAP_PROBE=1 to run it)
+exit=0
+
+== check-omp-plan-goal-gaps.mjs (OMP_T20_GAP_PROBE=1) ==
+GAP-OPEN g1 (owner: T20-B) session mode/permissionMode persist to the host DB only; no OMP prompt/tool path reads them [evidence: pinned prompt command has no mode/systemPrompt/tools key: true; state mode-ish fields: none; engine seams referencing the mode composer: none; gate reads the validated state (T19-C skills/memory only, not mode): true; retirement: T20-B behavior test (B2/B13) replaces this check; g1 never auto-closes]
+GAP-OPEN g2 (owner: T20-C) the host-tool adapter executes every plugin tool with a hardcoded mode 'agent'; the session's durable mode never reaches plugin execution [evidence: omp-host-tools.ts hardcoded execution-context mode literal present: true]
+GAP-OPEN g3 (owner: T20-B) an approved Plan/Goal execution for an OMP session is refused before claiming; the queued row stays queued and nothing runs on the OMP engine [evidence: runtime/plans.ts refuseOutsidePiRuntime("plan execution") present: true]
+VERDICT g4: pinned rpc-ui RpcCommand union has 45 commands: negotiate_protocol, prompt, steer, follow_up, abort, abort_and_prompt, new_session, get_state, set_fast_mode, get_available_commands, get_entries, get_tree, set_todos, set_host_tools, set_host_uri_schemes, set_subagent_subscription, get_subagents, get_subagent_messages, set_model, cycle_model, get_available_models, set_thinking_level, cycle_thinking_level, get_available_thinking_levels, set_steering_mode, set_follow_up_mode, set_interrupt_mode, compact, set_auto_compaction, set_auto_retry, abort_retry, bash, abort_bash, get_session_stats, export_html, switch_session, branch, get_branch_messages, get_last_assistant_text, set_session_name, handoff, get_messages, get_messages_page, get_login_providers, login
+VERDICT g4: no plan/goal/permission/approval command exists in the pinned rpc-ui surface (rpc-ui = rpc + tool-UI context; see the validation document)
+SUMMARY: 3 gap(s) open [g1, g2, g3]
+exit=1
+
+== check-docs.mjs ==
+
+ADR catalog:
+  - adr/0301-omp-session-surface.md: H1 must start with "ADR", found "0301 — The OMP conversation surface: events, dialogs and stopping"
+
+ADR index:
+  - adr/0301-omp-session-surface.md: missing from the adr/README.md index
+  - adr/0302-omp-session-persistence-and-runtime-registry.md: missing from the adr/README.md index
+  - adr/0303-omp-subagent-surfacing.md: missing from the adr/README.md index
+  - adr/0304-omp-capability-source-ownership.md: missing from the adr/README.md index
+  - adr/0305-pinned-runtime-patch-set.md: missing from the adr/README.md index
+
+Notes (not failures):
+  - adr/0239-session-collaboration-messages.md: no "Consequences" section, which adr/README.md lists in the format
+  - adr/0240-independent-session-discovery-and-navigable-projections.md: no "Consequences" section, which adr/README.md lists in the format
+  - adr/floating-annotation-index.md: no "Consequences" section, which adr/README.md lists in the format
+  - adr/image-generation-capability.md: no "Consequences" section, which adr/README.md lists in the format
+  - adr/subagent-model-fallback.md: no "Consequences" section, which adr/README.md lists in the format
+
+6 documentation problem(s) across 507 pages.
+exit=1
+
+== check-locales.mjs ==
+Verified 79 English/Chinese specification pairs.
+exit=0
+
+== check-release-docs.mjs ==
+Release documentation is aligned with 0.15.2 (0.15.x line).
+exit=0

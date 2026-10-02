@@ -4,10 +4,14 @@
   independent review (F3)**. The
   patch-set mechanism stands; the claim that the patch level satisfies PI's
   transition-tool contract does **not** — see "Unresolved (F3)".
-- Date: 2026-09-25 (F3 revision 2026-09-25; R4A base migration 2026-09-27)
+- Date: 2026-09-25 (F3 revision 2026-09-25; R4A base migration 2026-09-27;
+  scope revision 2026-10-02)
 - Scope: how this project extends the pinned `upstream/oh-my-pi` runtime.
-  T20-B/C/D remain declared, not claimed, and **T20-B must not start**: the R3
-  blocker is not lifted.
+  T20-B/C/D remain declared, not claimed. The R3 blocker is not lifted **for the
+  Cursor + Plan/Goal combination**, which the user excluded from product scope on
+  2026-10-02 (unsupported and refused; ADR 0306). The non-Cursor route whose
+  dispatch is decided by the patched loop is in scope under the strict contract;
+  see "Scope revision (2026-10-02)".
 - Evidence: `docs/validation/M5-omp-transition-patch.md`,
   `app/patches/oh-my-pi/manifest.json`,
   `app/patches/oh-my-pi/0001-omp-desktop-runtime.patch`,
@@ -152,6 +156,39 @@ Consequences:
   before the assistant message is complete, a product decision to remove those
   channels (Cursor exec channel / tool speculation) from sessions that declare
   sole-batch tools, or an explicitly user-accepted semantic difference.
+
+## Scope revision (2026-10-02): the Cursor combination is excluded, the contract is not relaxed
+
+On 2026-10-02 the user placed **Cursor + Plan/Goal out of product scope**: the
+combination is unsupported and refused by the ADR 0306 gate, while Cursor in
+Agent mode stays available and no existing gate or regression is removed. This is
+a scope decision, not an upstream capability change: the R3 findings above — and
+the 0/12 strict-contract measurement against the real Cursor exec dispatcher
+(`docs/validation/M5-omp-transition-patch.md` §9/§10) — keep their historical
+value as the fact that describes the excluded combination.
+
+The exclusion does not relax the contract for the route that remains in scope.
+Non-Cursor providers do not produce the `kCursorExecResolved` pre-executed blocks,
+so for a non-Cursor session whose dispatch is decided by the patched loop the
+same strict contract is the acceptance bar, not a best effort:
+
+- a `sole`-declared transition tool must be the only `toolCall` block of the
+  assistant message, counted over every block (the patch's all-`toolCall`
+  count), and a mixed batch is rejected whole with zero side effects for every
+  sibling;
+- speculation is off for a provider call whose active tool set advertises a
+  sole-declared tool;
+- a terminal submission ends the run before the next provider step, success and
+  error branches alike.
+
+That list is what the T20-B/C/D rows of
+`docs/validation/M5-plan-goal-capability-gates.md` §7 verify; the loop-controlled
+part of it was re-measured on the current base 2026-10-02
+(`62bc57be` + `62bc57b+omp-desktop.3`, patched scratch tree, fake provider) and is
+recorded in `docs/validation/M5-t20-non-cursor-scope.md`. Host approval, exactly
+-once dispatch and restart-no-replay remain unimplemented and are owned by
+T20-B/C/D; T20 is not complete and the `plan`/`goal` capabilities stay closed
+until T20-D.
 
 ## Consequences
 
