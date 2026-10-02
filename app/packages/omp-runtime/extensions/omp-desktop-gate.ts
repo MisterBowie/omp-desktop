@@ -36,26 +36,51 @@
  *      policy, and a mutable state failure during execution cannot turn a
  *      contract refusal into an approval.
  *
- * When the run-scoped state is readable, calls are decided with PI's
+ * Which policy a call is decided with (M5/T20-C review repair):
+ *
+ *   - The **admitted turn** is the one and only policy owner. It is installed
+ *     by the fence — the desktop's admission payload for the exact turn token
+ *     (`turn-admission.ts`) — or, for a host that drives the gate without a
+ *     payload, by the first validated `before_agent_start` read of a fenced
+ *     turn. It is armed by `agent_start`, replaced by the next fence, and
+ *     retired on a terminal `agent_end` or a start refusal.
+ *   - Every call of the turn — the owning session's own calls and its
+ *     delegates (`hasUI=false`) — decides from that immutable snapshot. The
+ *     mutable run-scoped file is never re-read for policy, so a tool body that
+ *     rewrites it mid-turn can neither relax the permission mode nor swap the
+ *     risk/catalog/safeActions table.
+ *   - A record whose turn never started, a foreign interactive session, and
+ *     (with the mandatory channel on) a process with no record at all fail
+ *     closed. A fixture that never enabled the channel keeps the legacy
+ *     disk-driven behavior.
+ *
+ * When a policy snapshot is available, calls are decided with PI's
  * execution-time order (M5/T20-C, §1.3.1): contract modes hard-deny every tool
  * outside PI's allowlist (plus declared plan-safe plugin tools) before risk,
  * `auto`, grants, external paths or this gate's legacy fixture switch can
  * matter; explicit external paths allow under `auto`/grant and ask otherwise;
  * Low risk allows; `auto` allows; `accept-edits` auto-accepts only Write/Edit;
- * a session grant allows; everything else asks.
+ * a session grant allows; everything else asks. For an owned admission the
+ * legacy `OMP_DESKTOP_GATE_MODE` switch is ignored entirely (it may not allow
+ * or deny outside that order), and `OMP_DESKTOP_GATE_TOOLS` may only add
+ * native names to the product's gated set, never shrink it.
  *
  * Environment (set by the desktop when it starts the runtime):
- *   - `OMP_DESKTOP_GATE_TOOLS` — comma-separated native tool names (default
- *     below). Desktop host tools (`plugin_*`, `mcp_*`, M5/T19-B) are gated
- *     unconditionally and can only be opted out through
- *     `OMP_DESKTOP_GATE_MODE` — a host tool is a desktop-side capability and
- *     must never execute without the desktop's own approval first.
+ *   - `OMP_DESKTOP_GATE_TOOLS` — comma-separated native tool names added to
+ *     the product's default gated set (below) for the legacy, un-admitted
+ *     path; for an admitted turn the effective set is the default plus these
+ *     names, so the switch can only widen the policy. Desktop host tools
+ *     (`plugin_*`, `mcp_*`, M5/T19-B) are gated unconditionally and can only
+ *     be opted out through `OMP_DESKTOP_GATE_MODE` — a host tool is a
+ *     desktop-side capability and must never execute without the desktop's
+ *     own approval first.
  *   - `OMP_DESKTOP_GATE_TIMEOUT_MS` — dialog deadline (default 120000).
  *   - `OMP_DESKTOP_GATE_MODE` — `ask` (default), `deny` (block everything
  *     gated without asking: unattended runs), or `allow`. A fixture-only
- *     switch: the production launcher never writes it, and it is subordinate
- *     to the contract hard deny and the state-driven decision table — `allow`
- *     cannot resurrect a contract-denied tool (M5/T20-C).
+ *     switch: the production launcher never writes it, it is subordinate to
+ *     the contract hard deny, and it is ignored entirely for an owned
+ *     admission (M5/T20-C review repair) — `allow` can neither resurrect a
+ *     contract-denied tool nor approve around the admitted mode.
  *   - `OMP_DESKTOP_STATE_REQUIRED` — `1` when the launcher enabled the
  *     mandatory mode/policy channel for this run (the supervisor's
  *     `desktopStateRequired`, `0`/absent otherwise). Fixed at spawn; it is
@@ -79,10 +104,12 @@
  *     channel off; a fixture that never enabled it says so explicitly.
  *
  * The gate also registers the desktop's internal turn-boundary command
- * (`/<OMP_TURN_COMMAND> <token>`, see `session/turn-fence.ts`). The runner
- * invokes it through the formal RPC `prompt` path before every admitted turn;
- * it is consumed locally before any provider request, acknowledges itself
- * through `notify`, and its token is echoed by every start refusal so a
+ * (`/<OMP_TURN_COMMAND> <token> [<encoded admission>]`, see
+ * `session/turn-fence.ts`). The runner invokes it through the formal RPC
+ * `prompt` path before every admitted turn; it is consumed locally before any
+ * provider request, installs the turn's admission (when the handshake carries
+ * one) and acknowledges itself through `notify` with the admission's digest,
+ * and its token is echoed by every start refusal so a
  * replayed descriptor from an earlier generation can never close a newer one.
  */
 import {
@@ -110,9 +137,14 @@ import {
 } from "../src/session/start-refusal.ts";
 import {
   encodeTurnAck,
-  isTurnToken,
   OMP_TURN_COMMAND,
+  turnCommandArgs,
 } from "../src/session/turn-fence.ts";
+import {
+  admissionDigest,
+  decodeTurnAdmission,
+  type OmpTurnAdmission,
+} from "../src/session/turn-admission.ts";
 import { requiresExternalPathPermission } from "../src/session/tool-paths.ts";
 
 /**
@@ -274,7 +306,7 @@ interface UIContext {
   notify?(message: string, type?: "info" | "warning" | "error"): void;
 }
 
-interface ToolCallEvent {
+export interface ToolCallEvent {
   type: "tool_call";
   toolCallId: string;
   toolName: string;
@@ -296,6 +328,18 @@ export interface ExtensionAPI {
       event: BeforeAgentStartEventSlice,
       ctx: BeforeAgentStartContextSlice,
     ) => { systemPrompt: string[] } | undefined | Promise<{ systemPrompt: string[] } | undefined>,
+  ): void;
+  /**
+   * The runtime's agent lifecycle notifications (M5/T20-C review repair):
+   * `agent_start` arms the admitted turn (a policy whose turn never actually
+   * started decides nothing), and a terminal `agent_end` retires it so a late
+   * callback cannot borrow a finished turn's policy. A scheduled continuation
+   * (`willContinue`) keeps the admission.
+   */
+  on(event: "agent_start", handler: (event: { type: "agent_start" }, ctx: ToolCallContext) => unknown): void;
+  on(
+    event: "agent_end",
+    handler: (event: { type: "agent_end"; willContinue?: boolean }, ctx: ToolCallContext) => unknown,
   ): void;
   /**
    * Register the desktop's internal turn-boundary command (the runtime's
@@ -512,6 +556,14 @@ export async function decideToolCall(
      * the same durable policy PI's host reads for a subagent call.
      */
     snapshot?: ToolCallPolicySnapshot;
+    /**
+     * True when the snapshot came from the admitted turn (the fence payload
+     * or the first validated read of a fenced turn). An owned snapshot is the
+     * product's policy: the legacy `OMP_DESKTOP_GATE_MODE` fixture switch,
+     * which could otherwise allow or deny outside PI's decision order, is
+     * ignored for it.
+     */
+    owned?: boolean;
     /** The mandatory channel is on but no usable policy exists: fail closed. */
     policyUnavailable?: boolean;
   },
@@ -552,10 +604,14 @@ export async function decideToolCall(
     if (!controlled && !external) {
       return { block: false, route: contract ? "contract-allow" : "not-gated" };
     }
-    // The legacy fixture switch stays subordinate to the contract deny above.
-    if (policy.mode === "allow") return { block: false, route: "mode-allow" };
-    if (policy.mode === "deny") {
-      return { block: true, reason: "tool calls are denied in this run", route: "mode-deny" };
+    // The legacy fixture switch stays subordinate to the contract deny above,
+    // and never applies to an owned admission: an ambient switch may not
+    // allow or deny around the policy the desktop session admitted.
+    if (!policy.owned) {
+      if (policy.mode === "allow") return { block: false, route: "mode-allow" };
+      if (policy.mode === "deny") {
+        return { block: true, reason: "tool calls are denied in this run", route: "mode-deny" };
+      }
     }
     const risk = toolRiskForCall(event.toolName, snapshot.hostTools);
     if (external) {
@@ -861,17 +917,56 @@ export async function applyContractToolClamp(
 }
 
 /**
- * The last validated policy snapshot for the interactive session this runtime
- * process serves (M5/T20-C).
+ * One admitted turn's immutable policy ownership (M5/T20-C review repair).
+ *
+ * Exactly one record is live per runtime process, because a process serves
+ * exactly one desktop session. It is installed by the authenticated turn
+ * fence — the desktop's admission payload from `turn-admission.ts` — or, for
+ * a host that drives the gate without a payload, by the first validated
+ * `before_agent_start` read of the run-scoped state. Every `tool_call`
+ * afterwards decides from this record, never from the mutable state file, so a
+ * tool body that rewrites the file mid-turn can neither relax the policy nor
+ * change the risk/catalog/safeActions the decision uses.
+ *
+ * Ownership rules:
+ *   - `started` is set by `agent_start` for the record's own native session:
+ *     a fence whose turn never actually started (a handshake whose prompt was
+ *     stopped or refused before dispatch) decides nothing.
+ *   - the owning session's calls and its delegates (`hasUI=false`) decide
+ *     under the record; a *foreign* interactive session is refused rather
+ *     than lent another session's policy.
+ *   - the record is replaced wholesale by the next fence and cleared on
+ *     terminal `agent_end` (unless the runtime scheduled a continuation) and
+ *     on a start refusal, so a late callback can never borrow an earlier
+ *     turn's policy.
  *
  * Module-level, not per-registration: a delegate session (`task`/`eval`
  * subagent) builds its own extension runner in the same process and
  * re-invokes this factory, and its `tool_call` handler must see the owning
- * session's policy — a per-runner closure would answer "unavailable" for
- * every delegated call. Written only from an `owned` read (or the gate's own
- * `before_agent_start` injection) and stamped with the state file's own
- * `writtenAt`, so the delegate fallback can never outlive the state age bound
- * and a later admitted turn always overwrites an earlier one.
+ * session's record — a per-runner closure would answer "unavailable" for
+ * every delegated call.
+ */
+type AdmittedTurn = {
+  /** The fence token the admission was installed for (null: no fence armed). */
+  token: string | null;
+  /** The native session the admission belongs to. */
+  nativeSessionId: string;
+  snapshot: ToolCallPolicySnapshot;
+  /** Deliberate scoped grants, seeded from the desktop and extended in-turn. */
+  grants: Set<string>;
+  /** `fence`: desktop payload; `disk`: first validated state read of the turn. */
+  source: "fence" | "disk";
+  /** True once `agent_start` fired for the owning session. */
+  started: boolean;
+};
+
+let admittedTurn: AdmittedTurn | null = null;
+
+/**
+ * The last validated policy snapshot for the *legacy* (unfenced, payload-less)
+ * fixture path, where a delegate's call falls back to the owning session's
+ * freshest read. Produced-path decisions never read this: they use
+ * {@link admittedTurn}. Age-bounded for the fixture path exactly as before.
  */
 let policyCache: { state: DesktopCapabilityState } | null = null;
 
@@ -879,6 +974,14 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
     ?.env;
   const gated = parseGatedTools(env?.OMP_DESKTOP_GATE_TOOLS);
+  /**
+   * The owned-turn gated set: the product's default names plus any names a
+   * fixture adds. The legacy `OMP_DESKTOP_GATE_TOOLS` switch may only *grow*
+   * the product set — a fixture (or an ambient environment) that names a
+   * smaller list, or nothing at all, can never shrink the policy the desktop
+   * session admitted (M5/T20-C review repair).
+   */
+  const ownedGated = new Set<string>([...parseGatedTools(undefined), ...gated]);
   const mode = (env?.OMP_DESKTOP_GATE_MODE ?? "ask").trim() as "ask" | "deny" | "allow";
   const timeoutMs = Number(env?.OMP_DESKTOP_GATE_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
   const sessionAllowed = new Set<string>();
@@ -901,22 +1004,62 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
    * Registered first so it exists before the runner ever queries the available
    * commands. The runtime's own command dispatch consumes it before any
    * provider loop starts (`#tryExecuteExtensionCommand`), so the handshake
-   * never reaches the provider, the transcript or the tool catalogue. A
-   * malformed argument is ignored without an acknowledgment — the runner then
-   * refuses the prompt before submitting it, which is the fail-closed answer.
+   * never reaches the provider, the transcript or the tool catalogue.
+   *
+   * The handshake replaces the process's admitted turn wholesale: the desktop
+   * payload (when present and valid) becomes the immutable policy for the new
+   * token, and a token-only handshake clears any earlier admission so a new
+   * turn can never borrow the previous one's policy. A malformed argument, or
+   * a malformed/oversized payload, is refused without an acknowledgment — the
+   * runner then refuses the prompt before submitting it, which is the
+   * fail-closed answer.
    */
   if (typeof pi.registerCommand === "function") {
     pi.registerCommand(OMP_TURN_COMMAND, {
       description: "internal desktop turn boundary (reserved; not a user command)",
       handler: (args, context) => {
-        const token = typeof args === "string" ? args.trim() : "";
-        if (!isTurnToken(token)) {
-          pi.logger?.warn?.("the desktop turn-boundary command received a malformed token");
+        const command = turnCommandArgs(args);
+        if (!command) {
+          pi.logger?.warn?.("the desktop turn-boundary command received a malformed argument");
           return;
         }
-        turnToken = token;
+        // Any well-formed handshake replaces the process's record, and it is
+        // cleared *before* the payload is decoded: an undecodable payload must
+        // leave no admission at all (the runner refuses the prompt for the
+        // missing acknowledgment, and a late call then fails closed instead of
+        // borrowing the previous turn's policy).
+        turnToken = command.token;
+        admittedTurn = null;
+        let admission: OmpTurnAdmission | null = null;
+        if (command.admission !== null) {
+          admission = decodeTurnAdmission(command.admission);
+          if (!admission) {
+            pi.logger?.warn?.("the desktop turn-boundary command received a malformed policy admission");
+            return;
+          }
+        }
+        admittedTurn = admission
+          ? {
+              token: command.token,
+              nativeSessionId: admission.nativeSessionId,
+              snapshot: {
+                mode: admission.mode,
+                permissionMode: admission.permissionMode,
+                hostTools: admission.hostTools,
+              },
+              grants: new Set(admission.grants),
+              source: "fence",
+              started: false,
+            }
+          : null;
         try {
-          context.ui?.notify?.(encodeTurnAck(token), "info");
+          context.ui?.notify?.(
+            encodeTurnAck(
+              command.token,
+              command.admission === null ? null : admissionDigest(command.admission),
+            ),
+            "info",
+          );
         } catch (error) {
           pi.logger?.warn?.("the desktop gate could not acknowledge the turn boundary", String(error));
         }
@@ -962,6 +1105,9 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
     } else {
       pi.logger?.warn?.("desktop gate refused an agent start but the context exposes no notify", decision.reason);
     }
+    // The refused turn never started: its admission is retired here, so a
+    // late callback cannot decide under a policy for a turn that was aborted.
+    if (admittedTurn && admittedTurn.token === turnToken) admittedTurn = null;
     if (typeof context.abort === "function") {
       try {
         context.abort();
@@ -976,51 +1122,96 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
   };
 
   /**
-   * Decide one call from the run-scoped state (M5/T20-C). The owning session
-   * reads its own file; a delegate (no UI) falls back to the process-wide
-   * snapshot of the owning session — PI's host decides subagent calls under
-   * the parent's durable policy — while the mandatory channel with no usable
-   * policy blocks every call.
+   * Decide one call (M5/T20-C review repair).
+   *
+   * A live admission decides every call of its turn: the owning session's own
+   * calls and its delegates (`hasUI=false`) both read the immutable snapshot
+   * installed by the fence — the mutable state file is never consulted for
+   * policy, so a file rewritten by a tool body mid-turn cannot relax the
+   * decision. A record whose turn never started, or a foreign interactive
+   * session, is refused rather than lent a policy. Without a record the
+   * mandatory channel fails closed, and a fixture that never enabled it keeps
+   * the legacy disk-driven behavior (including the delegate cache).
    */
   pi.on("tool_call", async (event, context) => {
     const now = Date.now();
     const required = isDesktopStateRequired(env?.OMP_DESKTOP_STATE_REQUIRED);
     let snapshot: ToolCallPolicySnapshot | undefined;
+    let grants = sessionAllowed;
+    let owned = false;
     let policyUnavailable = false;
-    try {
-      const read = readDesktopStateForSession(env?.OMP_DESKTOP_STATE, now, sessionIdOf(context));
-      if (read.kind === "owned") {
-        policyCache = { state: read.state };
-        snapshot = read.state;
-      } else if (read.kind === "invalid") {
-        // The state claims this session but fails validation: its policy is
-        // unknown, and "unknown" must never become Agent by default.
-        policyUnavailable = required;
-      } else if (required) {
-        if (hasUi(context)) {
-          policyUnavailable = true;
-        } else {
+    const admitted = admittedTurn;
+    if (admitted) {
+      const sessionId = sessionIdOf(context);
+      const owner = sessionId !== undefined && sessionId === admitted.nativeSessionId;
+      // A delegate (no UI) runs under the parent session's admitted policy,
+      // exactly as PI's host decides subagent calls; any other session is
+      // foreign and is refused.
+      const delegate = !hasUi(context);
+      if (!admitted.started) {
+        policyUnavailable = true;
+      } else if (owner || delegate) {
+        snapshot = admitted.snapshot;
+        grants = admitted.grants;
+        owned = true;
+      } else {
+        policyUnavailable = true;
+      }
+    } else if (required) {
+      // The mandatory channel is on and no admission exists for this process:
+      // there is no policy to decide with. The mutable file is never re-read
+      // here — a turn with no admitted record must fail closed rather than
+      // adopt a file that could have been rewritten (M5/T20-C review repair).
+      policyUnavailable = true;
+    } else {
+      // Legacy fixture path (the channel was explicitly disabled): the
+      // pre-repair disk read, including the delegate cache.
+      try {
+        const read = readDesktopStateForSession(env?.OMP_DESKTOP_STATE, now, sessionIdOf(context));
+        if (read.kind === "owned") {
+          policyCache = { state: read.state };
+          snapshot = read.state;
+        } else if (!hasUi(context)) {
           const cached =
             policyCache && now - policyCache.state.writtenAt <= MAX_DESKTOP_STATE_AGE_MS
               ? policyCache.state
               : undefined;
           if (cached) snapshot = cached;
-          else policyUnavailable = true;
         }
+      } catch {
+        // A fixture read failure on the legacy path decides with no snapshot.
       }
-    } catch {
-      policyUnavailable = required;
     }
     const verdict = await decideToolCall(event, context, {
-      gated,
+      gated: owned ? ownedGated : gated,
       mode: mode === "deny" || mode === "allow" ? mode : "ask",
       timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS,
-      sessionAllowed,
+      sessionAllowed: grants,
+      ...(owned ? { owned: true } : {}),
       ...(snapshot ? { snapshot } : {}),
       ...(policyUnavailable ? { policyUnavailable: true } : {}),
     });
     if (!verdict.block) return undefined;
     return { block: true, reason: verdict.reason ?? "denied" };
+  });
+
+  // The admitted turn's ownership window: armed by the runtime's own
+  // `agent_start` for the owning native session, retired on a terminal
+  // `agent_end` (a scheduled continuation keeps it). A delegate's own
+  // lifecycle events name the child session and never touch the record.
+  pi.on("agent_start", (_event, context) => {
+    if (!admittedTurn) return;
+    const sessionId = sessionIdOf(context);
+    if (sessionId !== undefined && sessionId === admittedTurn.nativeSessionId) {
+      admittedTurn.started = true;
+    }
+  });
+  pi.on("agent_end", (event, context) => {
+    if (!admittedTurn || event.willContinue === true) return;
+    const sessionId = sessionIdOf(context);
+    if (sessionId !== undefined && sessionId === admittedTurn.nativeSessionId) {
+      admittedTurn = null;
+    }
   });
 
   // Desktop skills, project memory and the mode block enter the provider-visible
@@ -1040,10 +1231,59 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
         return undefined;
       }
       if (decision.kind === "skip") return undefined;
-      // The same owned snapshot the prompt was admitted under becomes the
-      // fallback policy for this process's delegate sessions (M5/T20-C).
-      policyCache = { state: decision.state };
-      const clamped = await applyContractToolClamp(pi, clamp, decision.state);
+      const sessionId = context.sessionManager?.getSessionId?.() ?? null;
+      if (admittedTurn && admittedTurn.source === "fence" && sessionId === admittedTurn.nativeSessionId) {
+        // The desktop's payload is the policy. The file must still describe
+        // the same session and the same mode/permission mode: a file modified
+        // between the bridge's write and this start is a tampered channel and
+        // refuses the turn rather than injecting or clamping a different
+        // policy.
+        if (
+          decision.state.sessionId !== admittedTurn.nativeSessionId ||
+          decision.state.mode !== admittedTurn.snapshot.mode ||
+          decision.state.permissionMode !== admittedTurn.snapshot.permissionMode
+        ) {
+          refuseStart(context, {
+            code: "state-mismatch",
+            reason:
+              "the run-scoped desktop state does not match the admitted policy (session, mode or permission mode changed after admission)",
+            sessionId,
+          });
+          return undefined;
+        }
+      } else if (admittedTurn && admittedTurn.source === "fence" && admittedTurn.token === turnToken) {
+        // A fenced admission exists and this start is not its owning session:
+        // refuse rather than adopt a different session's file as the policy.
+        refuseStart(context, {
+          code: "state-foreign",
+          reason: `the admitted turn belongs to native session ${JSON.stringify(admittedTurn.nativeSessionId)}, not this start`,
+          sessionId,
+        });
+        return undefined;
+      } else if (
+        !admittedTurn ||
+        admittedTurn.token !== turnToken ||
+        admittedTurn.nativeSessionId !== decision.state.sessionId
+      ) {
+        // No payload for this turn: the first validated read of the fenced
+        // turn becomes its admission, frozen for the rest of the turn. A
+        // later read within the same turn (a queued batch or continuation)
+        // reuses it instead of re-adopting a possibly rewritten file.
+        admittedTurn = {
+          token: turnToken,
+          nativeSessionId: decision.state.sessionId,
+          snapshot: {
+            mode: decision.state.mode,
+            permissionMode: decision.state.permissionMode,
+            hostTools: decision.state.hostTools,
+          },
+          grants: new Set(),
+          source: "disk",
+          started: false,
+        };
+      }
+      const admitted = admittedTurn;
+      const clamped = await applyContractToolClamp(pi, clamp, admitted ? admitted.snapshot : decision.state);
       if (!clamped.ok) {
         refuseStart(context, {
           code: "clamp-unavailable",

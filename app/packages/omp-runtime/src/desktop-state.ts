@@ -220,7 +220,7 @@ export function isValidDesktopSkillMeta(entry: unknown): entry is DesktopSkillMe
   );
 }
 
-function isHostToolPolicy(entry: unknown): entry is DesktopHostToolPolicy {
+export function isHostToolPolicy(entry: unknown): entry is DesktopHostToolPolicy {
   if (entry === null || typeof entry !== "object" || Array.isArray(entry)) return false;
   const tool = entry as Record<string, unknown>;
   if (

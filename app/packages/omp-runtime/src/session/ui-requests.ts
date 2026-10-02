@@ -35,6 +35,7 @@ import type { Risk } from "@pi-desktop/shared";
 import {
   OMP_APPROVAL_ALLOW_LABEL,
   OMP_APPROVAL_DENY_LABEL,
+  OMP_APPROVAL_OPTIONS,
   isNativeApprovalOptions,
   parseApprovalDescriptor,
   type OmpApprovalDescriptor,
@@ -390,9 +391,16 @@ export function responseFor(
     return {
       type: "extension_ui_response",
       id: request.frameId,
-      // A session-scoped allow is the same value on the wire: the gate keeps
-      // the scope, because only the runtime's process can remember it.
-      value: decision === "deny" ? OMP_APPROVAL_DENY_LABEL : OMP_APPROVAL_ALLOW_LABEL,
+      // The wire carries the exact option the user picked: the gate grants the
+      // session scope only when it receives `OMP_APPROVAL_OPTIONS[1]`
+      // ("Allow for this session"), so collapsing allow-session onto
+      // allow-once would silently downgrade the decision (M5/T20-C repair).
+      value:
+        decision === "deny"
+          ? OMP_APPROVAL_DENY_LABEL
+          : decision === "allow-session"
+            ? OMP_APPROVAL_OPTIONS[1]
+            : OMP_APPROVAL_ALLOW_LABEL,
     };
   }
   if (request.kind === "question") {

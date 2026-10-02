@@ -45,6 +45,7 @@ const { createOmpHostToolAdapter } = await import("../electron/main/runtime/omp-
 const { composeModeSystemPrompt } = await import("../../../packages/agent-runtime/src/mode-prompts.ts");
 const { parseApprovalDescriptor } = await import("../../../packages/omp-runtime/src/session/approval-protocol.ts");
 const { requestSystemText } = await import("./helpers/mode-prompt-assertions.mjs");
+const { shellQuote } = await import("./helpers/omp-e2e-process.mjs");
 
 const GATE = findGateExtension(here);
 const WITNESS = join(here, "fixtures", "omp-runtime-state-witness.ts");
@@ -277,13 +278,23 @@ test(
       pluginActiveInProject: () => true,
     });
 
+    /**
+     * Test-side interaction hook for turns with more than one card: the
+     * production bridge stays untouched, and the scenario decides each card as
+     * it is surfaced. Null when the scenario uses `promptAndWait`.
+     */
+    const interactions = { onEnvelope: null };
+
     const { bridge } = wireOmpSessions({
       dataRoot,
       host: () => fakeHost,
       engineRuntime,
       isPackaged: false,
       appPath: here,
-      emitAgentEvent: (envelope) => envelopes.push(envelope),
+      emitAgentEvent: (envelope) => {
+        envelopes.push(envelope);
+        interactions.onEnvelope?.(envelope);
+      },
       hostTools,
     });
     t.after(() => bridge.dispose("t20c e2e finished").catch(() => undefined));
@@ -293,12 +304,13 @@ test(
 
     const promptAndWait = async (label, content, script, expectText, options = {}) => {
       provider.script(script);
+      const sessionId = options.sessionId ?? SESSION;
       const before = envelopes.length;
       const sliceOf = () => envelopes.slice(before);
-      const session = hostSessions.get(SESSION);
+      const session = hostSessions.get(sessionId);
       const ref = session.engineRef;
       const started = await bridge.prompt({
-        sessionId: SESSION,
+        sessionId,
         content,
         projectPath: project,
         providerId: PROJECT_PROVIDER,
@@ -666,5 +678,221 @@ test(
     const card12 = p12.card;
     assert.equal(card12.risk, "high");
     assert.equal(existsSync(deniedMarker), false, "a denied Plan Bash call must not execute");
+
+    // --- 10. A real allow-session decision is remembered for the desktop ----
+    //         session: across the next prompt and across the B1 runtime
+    //         replacement (Plan → Agent), never for another session, and it
+    //         drops when the session's grants are cleared explicitly.
+    const OTHER_SESSION = "session-c-other";
+    hostSessions.set(OTHER_SESSION, {
+      id: OTHER_SESSION,
+      mode: "agent",
+      // Explicit ask: the app default was raised to auto earlier in the file,
+      // and this control must card exactly like the granted session would
+      // without its grant.
+      permissionMode: "ask",
+      providerId: PROJECT_PROVIDER,
+      modelId: PROJECT_MODEL,
+      projectPath: project,
+      engineRef: null,
+    });
+    assert.equal((await bridge.configure(SESSION, { mode: "plan", permissionMode: "ask" })).ok, true);
+    const grantMarker = marker("grant-marker.txt");
+    const grantScript = (id) => [
+      { text: "running", finish: "tool_calls", toolCalls: [{ id, name: "bash", args: { command: `printf "granted\\n" >> ${grantMarker}` } }] },
+      { text: `grant ${id} finished`, finish: "stop" },
+    ];
+
+    const g1 = await promptAndWait("plan-grant-first", "run the command", grantScript("c_grant_1"), "grant c_grant_1 finished", {
+      answer: "allow-session",
+    });
+    assert.equal(g1.card.toolName, "bash", "the first Plan/ask Bash must card");
+    assert.deepEqual(bridge.listSessionGrants(SESSION), ["bash"], "the decision must be recorded as a session grant");
+    assert.equal(readFileSync(grantMarker, "utf8"), "granted\n");
+
+    const g2 = await promptAndWait("plan-grant-second", "run the command again", grantScript("c_grant_2"), "grant c_grant_2 finished");
+    assert.equal(
+      g2.slice.some((entry) => entry.event.type === "tool_permission_request"),
+      false,
+      "the granted tool must not card again in the same session",
+    );
+    assert.equal(readFileSync(grantMarker, "utf8"), "granted\ngranted\n");
+
+    // Plan → Agent rebuilds the runtime process (B1): the grant is desktop
+    // main-process state and must survive the replacement.
+    assert.equal((await bridge.configure(SESSION, { mode: "agent", permissionMode: "ask" })).ok, true);
+    const g3 = await promptAndWait("agent-grant-after-rebuild", "run the command after the rebuild", grantScript("c_grant_3"), "grant c_grant_3 finished");
+    assert.equal(
+      g3.slice.some((entry) => entry.event.type === "tool_permission_request"),
+      false,
+      "the grant must survive the same-session runtime replacement",
+    );
+    assert.equal(readFileSync(grantMarker, "utf8"), "granted\ngranted\ngranted\n");
+
+    // Another desktop session shares no grant: its Bash cards.
+    const otherMarker = marker("other-grant-marker.txt");
+    const o1 = await promptAndWait(
+      "other-session-cards",
+      "run the command in the other session",
+      [
+        { text: "running", finish: "tool_calls", toolCalls: [{ id: "c_other_1", name: "bash", args: { command: `printf "other\\n" > ${otherMarker}` } }] },
+        { text: "other session finished", finish: "stop" },
+      ],
+      "other session finished",
+      { sessionId: OTHER_SESSION, answer: "deny" },
+    );
+    assert.equal(o1.card.toolName, "bash", "another session must not inherit the grant");
+    assert.equal(existsSync(otherMarker), false, "the other session's denied call must not execute");
+    assert.deepEqual(bridge.listSessionGrants(OTHER_SESSION), []);
+
+    // The explicit clear path (the bridge counterpart of PI's
+    // `permissions.clearSessionGrants`) drops the memory.
+    bridge.clearSessionGrants(SESSION);
+    assert.deepEqual(bridge.listSessionGrants(SESSION), []);
+    const g4 = await promptAndWait(
+      "after-explicit-clear",
+      "run the command after the clear",
+      grantScript("c_grant_4"),
+      "grant c_grant_4 finished",
+      { answer: "deny" },
+    );
+    assert.equal(g4.card.toolName, "bash", "a cleared grant must card again");
+    assert.equal(readFileSync(grantMarker, "utf8"), "granted\ngranted\ngranted\n");
+
+    // --- 11. A tool body rewriting the run-scoped state cannot relax the ----
+    //         admitted turn, and the next prompt resolves the settings anew.
+    assert.equal((await bridge.configure(SESSION, { mode: "plan", permissionMode: "ask" })).ok, true);
+    const runTurnWithCards = async (label, content, script, decisions) => {
+      provider.script(script);
+      const before = envelopes.length;
+      const requestsBefore = provider.requests.length;
+      const sliceOf = () => envelopes.slice(before);
+      const cards = [];
+      interactions.onEnvelope = (envelope) => {
+        if (envelope.event.type !== "tool_permission_request") return;
+        const request = envelope.event.request;
+        const decision = decisions[cards.length] ?? "deny";
+        cards.push({ toolName: request.toolName, decision });
+        queueMicrotask(() => bridge.resolvePermission(request.requestId, decision));
+      };
+      try {
+        const session = hostSessions.get(SESSION);
+        const ref = session.engineRef;
+        const started = await bridge.prompt({
+          sessionId: SESSION,
+          content,
+          projectPath: project,
+          providerId: PROJECT_PROVIDER,
+          modelId: PROJECT_MODEL,
+          thinkingLevel: null,
+          nativeSessionId: ref?.nativeSessionId ?? null,
+          nativeSessionPath: ref?.nativeSessionPath ?? null,
+          adapterVersion: ref?.adapterVersion ?? null,
+          runtimeVersion: ref?.runtimeVersion ?? null,
+        });
+        assert.equal(started.accepted, true, `${label}: the prompt must be accepted`);
+        const done = await waitFor(
+          () =>
+            sliceOf().some((entry) => entry.event.type === "agent_end") &&
+            sliceOf().some(
+              (entry) => entry.event.type === "message_end" && JSON.stringify(entry.event.message).includes(label),
+            ),
+        );
+        assert.equal(done, true, `${label}: turn did not settle; timeline ${envelopeTimeline(sliceOf())}`);
+        return { cards, slice: sliceOf(), requests: provider.requests.slice(requestsBefore) };
+      } finally {
+        interactions.onEnvelope = null;
+      }
+    };
+
+    const mutationTurn = async (mutate) => {
+      const sentinel = marker(mutate ? "sentinel-mutated.txt" : "sentinel-control.txt");
+      writeFileSync(sentinel, "untouched\n");
+      const firstCommand = mutate
+        ? `${shellQuote(process.execPath)} -e ${shellQuote(
+            'const fs=require("node:fs");const p=process.env.OMP_DESKTOP_STATE;if(!p)throw new Error("missing owned state env");const s=JSON.parse(fs.readFileSync(p,"utf8"));if(s.mode!=="plan"||s.permissionMode!=="ask")throw new Error("unexpected initial policy");s.permissionMode="auto";fs.writeFileSync(p,JSON.stringify(s));console.log("MUTATION-OK");',
+          )}`
+        : `printf "control-first\\n"`;
+      const outcome = await runTurnWithCards(
+        mutate ? "mutation turn done" : "control turn done",
+        mutate ? "run the mutating command" : "run the control command",
+        [
+          { text: "first", finish: "tool_calls", toolCalls: [{ id: `c_${mutate}_1`, name: "bash", args: { command: firstCommand } }] },
+          { text: "second", finish: "tool_calls", toolCalls: [{ id: `c_${mutate}_2`, name: "bash", args: { command: `printf "unauthorized\\n" > ${sentinel}` } }] },
+          { text: mutate ? "mutation turn done" : "control turn done", finish: "stop" },
+        ],
+        // The first real Bash is approved once; every later card is denied.
+        ["allow-once", "deny"],
+      );
+      assert.equal(outcome.cards.length, 2, `${mutate ? "mutation" : "control"}: exactly the two Bash cards`);
+      assert.equal(outcome.cards[0].decision, "allow-once");
+      assert.equal(outcome.cards[1].decision, "deny", "the second Bash must ask again");
+      assert.equal(readFileSync(sentinel, "utf8"), "untouched\n", "the denied second Bash must not run");
+      const requestTextAll = outcome.requests.map(requestText).join("\n");
+      assert.match(requestTextAll, /MUTATION-OK|control-first/, "the first Bash actually ran");
+      assert.match(requestTextAll, /denied by user/, "the model must see the denial of the second call");
+
+      // The next prompt rewrites the run-scoped state from the host row
+      // (Plan/ask): the on-disk mutation is not a settings change.
+      const next = await runTurnWithCards(
+        "next prompt after mutation",
+        "run once more",
+        [
+          { text: "next", finish: "tool_calls", toolCalls: [{ id: `c_${mutate}_3`, name: "bash", args: { command: `printf "next\\n" >> ${sentinel}` } }] },
+          { text: "next prompt after mutation", finish: "stop" },
+        ],
+        ["deny"],
+      );
+      assert.equal(next.cards.length, 1, "the next prompt must resolve Plan/ask again and card");
+      assert.equal(readFileSync(sentinel, "utf8"), "untouched\n");
+      return outcome;
+    };
+
+    await mutationTurn(false);
+    await mutationTurn(true);
+
+    // --- 12. The review's canonical native write cases on the real body: ----
+    //         Agent × ask deny/allow, auto and accept-edits, asserting both
+    //         the card count and the file effect of the real `write` tool.
+    const writeMarker = marker("write-modes.txt");
+    const writeScript = (id, text) => [
+      { text: "writing", finish: "tool_calls", toolCalls: [{ id, name: "write", args: { path: writeMarker, content: `${text}\n` } }] },
+      { text: `write ${id} finished`, finish: "stop" },
+    ];
+    assert.equal((await bridge.configure(SESSION, { mode: "agent", permissionMode: "ask" })).ok, true);
+    const wDeny = await promptAndWait("agent-write-ask-deny", "write once", writeScript("c_w_deny", "denied"), "write c_w_deny finished", {
+      answer: "deny",
+    });
+    assert.equal(wDeny.card.risk, "high");
+    assert.equal(existsSync(writeMarker), false, "a denied Agent/ask write must not run");
+
+    const wAllow = await promptAndWait("agent-write-ask-allow", "write once", writeScript("c_w_allow", "allowed"), "write c_w_allow finished", {
+      answer: "allow-once",
+    });
+    assert.equal(readFileSync(writeMarker, "utf8"), "allowed\n", "the approved write must run exactly once");
+
+    assert.equal((await bridge.configure(SESSION, { permissionMode: "auto" })).ok, true);
+    const wAuto = await promptAndWait("agent-write-auto", "write once in auto", writeScript("c_w_auto", "auto"), "write c_w_auto finished");
+    assert.equal(
+      wAuto.slice.some((entry) => entry.event.type === "tool_permission_request"),
+      false,
+      "Agent/auto must allow the write without a card",
+    );
+    // `write` replaces the file: the auto call's content is the whole file.
+    assert.equal(readFileSync(writeMarker, "utf8"), "auto\n");
+
+    assert.equal((await bridge.configure(SESSION, { permissionMode: "accept-edits" })).ok, true);
+    const wAccept = await promptAndWait(
+      "agent-write-accept-edits",
+      "write once under accept-edits",
+      writeScript("c_w_accept", "accept"),
+      "write c_w_accept finished",
+    );
+    assert.equal(
+      wAccept.slice.some((entry) => entry.event.type === "tool_permission_request"),
+      false,
+      "accept-edits must auto-accept the write",
+    );
+    assert.equal(readFileSync(writeMarker, "utf8"), "accept\n");
   },
 );

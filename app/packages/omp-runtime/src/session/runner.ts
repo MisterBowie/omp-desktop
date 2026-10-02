@@ -56,6 +56,11 @@ import {
   type OmpTurnAck,
 } from "./turn-fence.js";
 import {
+  admissionDigest,
+  encodeTurnAdmission,
+  type OmpTurnAdmission,
+} from "./turn-admission.js";
+import {
   OmpUiRequests,
   type OmpUiDecision,
   type OmpUiRequest,
@@ -206,6 +211,14 @@ type RunRecord = {
    * installed. Before that point no refusal can be attributed to this run.
    */
   fenceArmed: boolean;
+  /**
+   * The desktop session's policy admission for this turn (M5/T20-C review
+   * repair), installed in the runtime together with the token. Null for a
+   * caller that has no admission to send (a fixture-driven runtime); the
+   * wired bridge always sends one, and the gate then decides every call from
+   * this immutable snapshot instead of the mutable run-scoped file.
+   */
+  admission: OmpTurnAdmission | null;
 };
 
 const DEFAULT_CONVERGE_TIMEOUT_MS = 10_000;
@@ -282,7 +295,11 @@ export class OmpSessionRunner {
    * a prompt is admitted only while the runner is idle, and the fence is armed
    * before the prompt is submitted.
    */
-  private pendingTurnAck: { token: string; settle: (ok: boolean) => void } | null = null;
+  private pendingTurnAck: {
+    token: string;
+    digest: string | null;
+    settle: (ok: boolean) => void;
+  } | null = null;
   /**
    * True once the runtime advertised the turn-boundary command as an extension
    * command. The check is cached for the runner's lifetime: the trusted gate
@@ -577,7 +594,10 @@ export class OmpSessionRunner {
    * loop at a time, so a second prompt would be answered into the turn the user
    * just cancelled.
    */
-  async prompt(message: string): Promise<{ accepted: boolean; turnId: string; generation: number }> {
+  async prompt(
+    message: string,
+    options: { admission?: OmpTurnAdmission } = {},
+  ): Promise<{ accepted: boolean; turnId: string; generation: number }> {
     this.throwIfDisposed();
     if (this.pendingReclaim) {
       throw new OmpRuntimeError(
@@ -625,6 +645,7 @@ export class OmpSessionRunner {
       started: false,
       turnToken: mintTurnToken(),
       fenceArmed: false,
+      admission: options.admission ?? null,
     };
     this.run = run;
     this.state = "running";
@@ -764,11 +785,32 @@ export class OmpSessionRunner {
       this.turnCommandAdvertised = true;
     }
     if (!this.isCurrentRun(run)) throw this.refuseCanceledPreparation(run);
-    const waiter = this.expectTurnAck(run.turnToken);
+    // The admission is encoded and digested once, before the wait is armed:
+    // the gate echoes the digest of the exact argument it installed, so a
+    // handshake that never carried this policy can never acknowledge it.
+    let encoded: string | null = null;
+    let digest: string | null = null;
+    if (run.admission) {
+      try {
+        encoded = encodeTurnAdmission(run.admission);
+      } catch (error) {
+        throw new OmpRuntimeError(
+          "not-started",
+          `the turn admission could not be encoded: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      digest = admissionDigest(encoded);
+    }
+    const waiter = this.expectTurnAck(run.turnToken, digest);
     let response: { success?: boolean; error?: string; data?: unknown };
     try {
       response = await this.runtime.request(
-        { type: "prompt", message: turnCommandMessage(run.turnToken) },
+        {
+          type: "prompt",
+          message: encoded === null
+            ? turnCommandMessage(run.turnToken)
+            : turnCommandMessage(run.turnToken, encoded),
+        },
         { timeoutMs: this.turnFenceTimeoutMs },
       );
     } catch (error) {
@@ -805,8 +847,16 @@ export class OmpSessionRunner {
    * Wait for the gate's acknowledgment of one token, bounded by
    * `turnFenceTimeoutMs`. The waiter is installed before the handshake is
    * sent, so a synchronous delivery on the frame stream cannot be missed.
+   *
+   * The acknowledgment must carry exactly the admission digest this run sent
+   * (`null` for a handshake without one): an acknowledgment for the right
+   * token but a different policy cannot settle the wait, so the prompt is
+   * never submitted against a policy the gate did not install.
    */
-  private expectTurnAck(token: string): { acknowledged: Promise<boolean>; cancel: () => void } {
+  private expectTurnAck(
+    token: string,
+    digest: string | null,
+  ): { acknowledged: Promise<boolean>; cancel: () => void } {
     let resolveAck: (ok: boolean) => void = () => undefined;
     const acknowledged = new Promise<boolean>((resolve) => {
       resolveAck = resolve;
@@ -820,6 +870,7 @@ export class OmpSessionRunner {
     }, this.turnFenceTimeoutMs);
     const pending = {
       token,
+      digest,
       settle: (ok: boolean) => {
         clearTimeout(timer);
         if (this.pendingTurnAck === pending) this.pendingTurnAck = null;
@@ -833,7 +884,7 @@ export class OmpSessionRunner {
   /** Settle one fence acknowledgment; anything else is counted and dropped. */
   private handleTurnAck(ack: OmpTurnAck): void {
     const pending = this.pendingTurnAck;
-    if (pending && pending.token === ack.token) {
+    if (pending && pending.token === ack.token && pending.digest === ack.admissionDigest) {
       pending.settle(true);
       return;
     }

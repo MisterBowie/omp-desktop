@@ -6,7 +6,7 @@
  */
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import {
@@ -188,5 +188,19 @@ describe("requiresExternalPathPermission", () => {
     expect(
       requiresExternalPathPermission(workspace, scratchRoot, "read", { path: join(scratchRoot, "new.txt") }),
     ).toBe(false);
+  });
+
+  it("treats a relative escape as external and a plain relative path as internal", () => {
+    // PI joins relative paths to the workspace before containment, so
+    // `../outside` is an external path and needs the permission step; the
+    // former "a relative path can never be external" claim was wrong.
+    const workspace = makeDir("t20c-paths-relws-");
+    const outside = makeDir("t20c-paths-relout-");
+    writeFileSync(join(outside, "secret.txt"), "x");
+    const escape = join("..", outside.split(sep).pop(), "secret.txt");
+    expect(requiresExternalPathPermission(workspace, null, "read", { path: escape })).toBe(true);
+    expect(requiresExternalPathPermission(workspace, null, "write", { path: "../escape.txt" })).toBe(true);
+    writeFileSync(join(workspace, "local.txt"), "x");
+    expect(requiresExternalPathPermission(workspace, null, "read", { path: join("sub", "..", "local.txt") })).toBe(false);
   });
 });

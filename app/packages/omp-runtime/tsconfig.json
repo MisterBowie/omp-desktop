@@ -9,6 +9,11 @@
   },
   "include": ["src/**/*"],
   // Test-only modules: vitest loads them through source, they must not ship.
-  "exclude": ["src/**/*.test.ts", "src/test-harness.ts", "src/session/turn-fence-testkit.ts"],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/test-harness.ts",
+    "src/session/turn-fence-testkit.ts",
+    "src/session/gate-handler-testkit.ts"
+  ],
   "references": [{ "path": "../shared" }]
 }

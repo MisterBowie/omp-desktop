@@ -38,6 +38,7 @@ import {
   type ToolCallPolicySnapshot,
 } from "../../extensions/omp-desktop-gate.ts";
 import ompDesktopGate from "../../extensions/omp-desktop-gate.ts";
+import { mintTurnToken, OMP_TURN_COMMAND } from "./turn-fence.js";
 
 const scratch = [];
 
@@ -558,7 +559,7 @@ describe("shared policy values", () => {
   });
 });
 
-describe("registered handler: state ownership and the delegate snapshot", () => {
+describe("registered handler: admitted-turn ownership and the delegate policy", () => {
   const savedEnv = { ...process.env };
   afterEach(() => {
     for (const key of [DESKTOP_STATE_ENV, DESKTOP_STATE_REQUIRED_ENV]) {
@@ -573,11 +574,14 @@ describe("registered handler: state ownership and the delegate snapshot", () => 
     mkdirSync(runRoot, { recursive: true });
     const statePath = join(runRoot, DESKTOP_STATE_FILE);
     const handlers = new Map();
+    const commands = new Map();
     const gatePi = {
       on: (event, handler) => {
         handlers.set(event, handler);
       },
-      registerCommand: () => undefined,
+      registerCommand: (name, definition) => {
+        commands.set(name, definition.handler);
+      },
       getActiveTools: () => [],
       setActiveTools: async () => undefined,
       logger: { warn: () => undefined },
@@ -594,59 +598,112 @@ describe("registered handler: state ownership and the delegate snapshot", () => 
         ),
       );
     };
-    return { statePath, writeState, call: (event, context) => handlers.get("tool_call")(event, context) };
+    const run = (event, payload, context) => handlers.get(event)?.(payload, context);
+    return {
+      statePath,
+      writeState,
+      call: (event, context) => run("tool_call", event, context),
+      // One admitted turn without a desktop payload: a fresh fence token is
+      // armed, then the first validated read of the fenced turn becomes its
+      // frozen admission (the payload-less host shape the canonical gate
+      // fixtures drive). The token is what makes each call a *new* turn.
+      beginTurn: async (context) => {
+        const command = commands.get(OMP_TURN_COMMAND);
+        command(mintTurnToken(), context);
+        await run("before_agent_start", { type: "before_agent_start", systemPrompt: ["native"] }, context);
+        run("agent_start", { type: "agent_start" }, context);
+      },
+      endTurn: (context) => run("agent_end", { type: "agent_end" }, context),
+    };
   }
 
-  it("decides an interactive call from the owned state file", async () => {
+  it("freezes the first validated read for the turn, and a rewrite mid-turn does not move the decision", async () => {
     const world = makeWorld();
-    const { writeState, call } = gateHarness(world);
+    const { writeState, call, beginTurn, endTurn } = gateHarness(world);
     const writeEvent = { ...EVENT, toolName: "write", input: { path: join(world.project, "a.txt"), content: "x" } };
     writeState("omp-session-1", "agent", "auto");
-    const { context, cards } = cardContext(world);
-    expect(await call(writeEvent, context)).toBeUndefined();
-    expect(cards.length).toBe(0);
+    await beginTurn(world.context);
+    const auto = cardContext(world);
+    expect(await call(writeEvent, auto.context)).toBeUndefined();
+    expect(auto.cards.length).toBe(0);
+
+    // Same turn, the file is rewritten to ask: the admission still says auto.
     writeState("omp-session-1", "agent", "ask");
-    const { context: askContext, cards: askCards } = cardContext(world);
-    expect(await call(writeEvent, askContext)).toBeUndefined();
-    expect(askCards.length).toBe(1);
-    const { context: denyContext } = cardContext(world, OMP_APPROVAL_OPTIONS[2]);
-    expect(await call(writeEvent, denyContext)).toMatchObject({ block: true });
+    const frozen = cardContext(world);
+    expect(await call(writeEvent, frozen.context)).toBeUndefined();
+    expect(frozen.cards.length).toBe(0);
+
+    // The next admitted turn resolves the new setting and cards again.
+    endTurn(world.context);
+    await beginTurn(world.context);
+    const ask = cardContext(world);
+    expect(await call(writeEvent, ask.context)).toBeUndefined();
+    expect(ask.cards.length).toBe(1);
+    const denied = cardContext(world, OMP_APPROVAL_OPTIONS[2]);
+    expect(await call(writeEvent, denied.context)).toMatchObject({ block: true });
   });
 
-  it("fails every call closed when the mandatory state is missing, invalid or foreign", async () => {
+  it("fails every call closed while the mandatory channel has no admitted record", async () => {
     const world = makeWorld();
-    const { statePath, writeState, call } = gateHarness(world);
+    const { statePath, writeState, call, beginTurn, endTurn } = gateHarness(world);
     const read = { ...EVENT, toolName: "read", input: { path: join(world.project, "inside.txt") } };
+    // The admitted record is process-scoped by design (a delegate runner must
+    // see the owning session's turn), so retire the previous test's turn first.
+    endTurn(world.context);
+    // No fence and no start yet: nothing may decide from the mutable file.
+    writeState("omp-session-1", "agent", "auto");
     expect(await call(read, world.context)).toMatchObject({
       block: true,
       reason: expect.stringMatching(/policy is unavailable/),
     });
+
+    // A malformed owned file refuses the start; the refused turn admits
+    // nothing, so calls stay closed.
     writeFileSync(statePath, "{not json");
-    expect(await call(read, world.context)).toMatchObject({ block: true });
+    await beginTurn(world.context);
+    expect(await call(read, world.context)).toMatchObject({
+      block: true,
+      reason: expect.stringMatching(/policy is unavailable/),
+    });
+
+    // A valid file that names another session is never lent to this one.
     writeState("other-session", "agent", "auto");
-    expect(await call(read, world.context)).toMatchObject({ block: true });
+    await beginTurn(world.context);
+    expect(await call(read, world.context)).toMatchObject({
+      block: true,
+      reason: expect.stringMatching(/policy is unavailable/),
+    });
   });
 
-  it("lets a delegate use the parent's last snapshot, never a card, and never a stale one", async () => {
+  it("decides a delegate under the owning turn's admitted policy, never a card, never another turn's", async () => {
     const world = makeWorld();
-    const { writeState, call } = gateHarness(world);
+    const { writeState, call, beginTurn, endTurn } = gateHarness(world);
     const writeEvent = { ...EVENT, toolName: "write", input: { path: join(world.project, "a.txt"), content: "x" } };
     const delegate = { cwd: world.project, sessionManager: { getSessionId: () => "omp-child-1" }, hasUI: false };
-    const parentRead = { ...EVENT, toolName: "read", input: { path: join(world.project, "inside.txt") } };
+
     writeState("omp-session-1", "agent", "ask");
-    await call(parentRead, world.context);
+    await beginTurn(world.context);
     expect(await call(writeEvent, delegate)).toMatchObject({
       block: true,
       reason: expect.stringMatching(/no interactive UI/),
     });
+    // The file says auto now, but the admitted turn is the authority.
     writeState("omp-session-1", "agent", "auto");
-    await call(parentRead, world.context);
+    expect(await call(writeEvent, delegate)).toMatchObject({ block: true });
+
+    // The next admitted turn is auto; the delegate follows it without a card.
+    endTurn(world.context);
+    await beginTurn(world.context);
     expect(await call(writeEvent, delegate)).toBeUndefined();
+
+    // A contract turn hard-denies the same write for the delegate.
+    endTurn(world.context);
     writeState("omp-session-1", "plan", "auto");
-    await call(parentRead, world.context);
+    await beginTurn(world.context);
     expect(await call(writeEvent, delegate)).toMatchObject({ block: true, reason: /WRITE_DISABLED_IN_PLAN/ });
-    vi.useFakeTimers();
-    vi.setSystemTime(Date.now() + MAX_DESKTOP_STATE_AGE_MS + 1);
+
+    // A retired turn leaves no policy to borrow.
+    endTurn(world.context);
     expect(await call(writeEvent, delegate)).toMatchObject({
       block: true,
       reason: expect.stringMatching(/policy is unavailable/),

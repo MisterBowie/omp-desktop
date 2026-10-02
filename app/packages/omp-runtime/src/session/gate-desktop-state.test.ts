@@ -514,9 +514,10 @@ describe("registered handlers", () => {
     const token = "0123456789abcdef0123456789abcdef";
     handler!(token, notifyContext);
     expect(parseTurnAckNotice({ type: "extension_ui_request", id: "ack-1", method: "notify", message: notifications[0]?.message })).toEqual({
-      v: 1,
+      v: 2,
       kind: "omp-desktop-turn-ack",
       token,
+      admissionDigest: null,
     });
     expect(notifications[0]?.type).toBe("info");
 

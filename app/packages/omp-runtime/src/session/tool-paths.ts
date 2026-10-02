@@ -234,7 +234,14 @@ export const PATH_TOOL_NAMES: Record<string, true> = {
  * `Read|Glob|Grep|Write|Edit` with an explicit `path` outside both the
  * workspace and the scratch root needs the external-path permission step.
  * Scratch paths are recognized lexically before the lazy scratch directory
- * exists; a relative path can never be external.
+ * exists.
+ *
+ * A relative path is joined to the workspace before containment is decided —
+ * exactly as PI's resolver does — so a relative path is *not* automatically
+ * internal: `../outside/file` resolves outside and takes the external branch,
+ * while `inside/file` resolves inside and does not. (An earlier comment here
+ * claimed relative paths can never be external; that was wrong and this
+ * behavior is pinned by `tool-paths.test.ts`.)
  */
 export function requiresExternalPathPermission(
   workspacePath: string | null | undefined,

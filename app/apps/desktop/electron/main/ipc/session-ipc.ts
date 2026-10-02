@@ -134,6 +134,8 @@ export type SessionIpcDependencies = {
       config: { mode?: string | null; providerId?: string | null; modelId?: string | null; thinkingLevel?: string | null; permissionMode?: string | null },
     ): Promise<{ ok: boolean; reason?: string; inconsistent?: boolean }>;
     disposeSession(sessionId: string, reason?: string): Promise<{ ok: boolean; failures: Array<{ sessionId: string; detail: string }> }>;
+    /** Drop the session's scoped tool grants (used when the session is deleted). */
+    clearSessionGrants?(sessionId: string): void;
   } | null;
 };
 
@@ -407,6 +409,12 @@ export function registerSessionIpc({
           { errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE },
         );
       }
+      // The session is leaving the product: its scoped grants are dropped with
+      // it (the bridge counterpart of PI `permissions.clearSessionGrants`), so
+      // a later session reusing this row's identity cannot inherit approvals.
+      // Only after the reclaim succeeded: a failed delete keeps the session —
+      // and its grants — intact.
+      ompSessions.clearSessionGrants?.(id);
     }
     const res = await host.call<{ ok?: boolean }>("session.delete", { id });
     await persistenceOutbox.dropSession(id);

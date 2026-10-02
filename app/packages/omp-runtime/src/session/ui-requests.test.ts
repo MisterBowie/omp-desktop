@@ -253,6 +253,41 @@ describe("approval decisions", () => {
   });
 });
 
+describe("approval wire decisions", () => {
+  it("sends the exact gate option the user picked, including the session scope", () => {
+    // The gate grants the session scope only when it receives
+    // `OMP_APPROVAL_OPTIONS[1]`; collapsing allow-session onto the allow-once
+    // label silently downgraded a real "Allow for this session" decision
+    // (M5/T20-C review repair, R1). The runtime's own prompt has no session
+    // scope, so there allow-session still means Approve.
+    const { requests, written } = harness();
+    for (const [id, decision] of [
+      ["ui-once", "allow-once"],
+      ["ui-session", "allow-session"],
+      ["ui-deny", "deny"],
+    ] as const) {
+      requests.observe(gateApprovalFrame(id));
+      expect(requests.resolve(id, decision)).toMatchObject({ ok: true });
+    }
+    expect(written).toEqual([
+      { type: "extension_ui_response", id: "ui-once", value: OMP_APPROVAL_OPTIONS[0] },
+      { type: "extension_ui_response", id: "ui-session", value: OMP_APPROVAL_OPTIONS[1] },
+      { type: "extension_ui_response", id: "ui-deny", value: OMP_APPROVAL_OPTIONS[2] },
+    ]);
+
+    const native = harness();
+    native.requests.observe({
+      type: "extension_ui_request",
+      id: "native-1",
+      method: "select",
+      title: "Approve?",
+      options: ["Approve", "Deny"],
+    });
+    expect(native.requests.resolve("native-1", "allow-session")).toMatchObject({ ok: true });
+    expect(native.written[0]).toMatchObject({ value: "Approve" });
+  });
+});
+
 describe("question answers", () => {
   it("answers a select with the chosen option", () => {
     const { requests, written } = harness();

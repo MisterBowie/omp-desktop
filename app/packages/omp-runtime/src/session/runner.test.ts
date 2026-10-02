@@ -11,8 +11,9 @@ import type { AgentEventEnvelope } from "@pi-desktop/shared";
 import { OmpRuntimeError } from "../errors.js";
 import type { OmpFrame } from "../protocol.js";
 import { OmpSessionRunner, type OmpSessionRuntime } from "./runner.js";
-import { encodeTurnAck, OMP_TURN_COMMAND, turnCommandToken } from "./turn-fence.js";
+import { encodeTurnAck, OMP_TURN_COMMAND, parseTurnCommand, turnCommandToken } from "./turn-fence.js";
 import { serveTurnFenceCommand } from "./turn-fence-testkit.js";
+import { admissionDigest, encodeTurnAdmission, type OmpTurnAdmission } from "./turn-admission.js";
 import type { OmpUiRecord } from "./ui-requests.js";
 import { encodeApprovalDescriptor, OMP_APPROVAL_OPTIONS } from "./approval-protocol.js";
 
@@ -350,6 +351,76 @@ describe("structured start refusals", () => {
     expect(recorded.map((command) => command.type)).toEqual(["get_available_commands", "prompt", "prompt"]);
     expect(turnCommandToken(recorded[1]?.message)).toMatch(/^[0-9a-f]{32}$/);
     expect(recorded[2]?.message).toBe("user content");
+    runner.dispose();
+  });
+
+  it("installs the admitted policy with the token and requires the matching digest acknowledgment", async () => {
+    const handshakes: string[] = [];
+    const prompts: string[] = [];
+    const handlers = new Set<(frame: OmpFrame) => void>();
+    let digestBehaviour: "wrong" | "right" = "wrong";
+    const runtime: OmpSessionRuntime = {
+      pid: 4242,
+      usable: true,
+      write: () => true,
+      onFrame(handler) {
+        handlers.add(handler);
+        return () => handlers.delete(handler);
+      },
+      onFailure: () => () => {},
+      async request(command) {
+        if (command.type === "get_available_commands") {
+          return { success: true, data: { commands: [{ name: OMP_TURN_COMMAND, source: "extension" }] } };
+        }
+        if (command.type === "prompt") {
+          prompts.push(String(command.message));
+          const parsed = parseTurnCommand(command.message);
+          if (parsed) {
+            if (parsed.admission !== null) handshakes.push(parsed.admission);
+            const message = encodeTurnAck(
+              parsed.token,
+              parsed.admission !== null && digestBehaviour === "right"
+                ? admissionDigest(parsed.admission)
+                : "0".repeat(64),
+            );
+            for (const handler of handlers) {
+              handler({ type: "extension_ui_request", id: "ack", method: "notify", message } as OmpFrame);
+            }
+          }
+        }
+        return { success: true };
+      },
+    };
+    const runner = new OmpSessionRunner({
+      sessionId: "omp-admission",
+      runtime,
+      emit: () => undefined,
+      nativeSessionIdentity: () => NATIVE,
+      turnFenceTimeoutMs: 150,
+    });
+    const admission: OmpTurnAdmission = {
+      v: 1,
+      nativeSessionId: NATIVE,
+      mode: "plan",
+      permissionMode: "ask",
+      hostTools: [],
+      grants: ["bash"],
+    };
+
+    // A right-token/wrong-policy acknowledgment must not settle the fence: the
+    // prompt is refused instead of being submitted against a policy the gate
+    // did not install.
+    await expect(runner.prompt("blocked user content", { admission })).rejects.toMatchObject({
+      code: "request-timeout",
+    });
+    expect(parseTurnCommand(prompts[0])?.admission).toBe(encodeTurnAdmission(admission));
+    expect(prompts.some((message) => message === "blocked user content")).toBe(false);
+
+    // The exact digest acknowledges the handshake, and the prompt follows.
+    digestBehaviour = "right";
+    await runner.prompt("user content", { admission });
+    expect(handshakes).toEqual([encodeTurnAdmission(admission), encodeTurnAdmission(admission)]);
+    expect(prompts.at(-1)).toBe("user content");
     runner.dispose();
   });
 

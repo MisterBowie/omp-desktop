@@ -252,3 +252,12 @@ export {
   type OmpApprovalDescriptor,
   type OmpApprovalRisk,
 } from "./session/approval-protocol.js";
+export {
+  MAX_TURN_ADMISSION_CHARS,
+  MAX_TURN_ADMISSION_GRANTS,
+  OMP_TURN_ADMISSION_VERSION,
+  admissionDigest,
+  decodeTurnAdmission,
+  encodeTurnAdmission,
+  type OmpTurnAdmission,
+} from "./session/turn-admission.js";

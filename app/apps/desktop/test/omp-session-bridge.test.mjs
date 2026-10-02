@@ -335,6 +335,54 @@ test("surfaces a gate approval as a permission request and answers it once", asy
   assert.equal(bridge.hasPendingRequest("ui-1"), false);
 });
 
+test("mints a session grant only from a delivered allow-session, and clears it explicitly", async () => {
+  const { bridge, runtime, envelopes } = bridgeHarness();
+  const project = makeProject();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "write a file", projectPath: project });
+
+  // allow-once is not a grant.
+  runtime.push(APPROVAL_FRAME);
+  assert.equal(bridge.resolvePermission("ui-1", "allow-once").ok, true);
+  assert.deepEqual(bridge.listSessionGrants(OMP_SESSION), []);
+
+  // allow-session grants the gate descriptor's tool, and the wire carries the
+  // gate's own session option — the only label the gate grants on.
+  runtime.push({ ...APPROVAL_FRAME, id: "ui-2" });
+  assert.equal(bridge.resolvePermission("ui-2", "allow-session").ok, true);
+  assert.deepEqual(bridge.listSessionGrants(OMP_SESSION), ["write"]);
+  assert.deepEqual(runtime.written.at(-1), {
+    type: "extension_ui_response",
+    id: "ui-2",
+    value: "Allow for this session",
+  });
+
+  // A duplicate resolution is refused and cannot mint or replay anything.
+  runtime.push({ ...APPROVAL_FRAME, id: "ui-3" });
+  assert.equal(bridge.resolvePermission("ui-3", "allow-session").ok, true);
+  assert.equal(bridge.resolvePermission("ui-3", "allow-session").ok, false);
+  assert.deepEqual(bridge.listSessionGrants(OMP_SESSION), ["write"]);
+
+  // The runtime's own approval prompt (no gate descriptor) has no session
+  // scope: allow-session answers it but mints nothing.
+  runtime.push({ type: "extension_ui_request", id: "ui-native", method: "select", title: "Approve?", options: ["Approve", "Deny"] });
+  assert.equal(bridge.resolvePermission("ui-native", "allow-session").ok, true);
+  assert.deepEqual(bridge.listSessionGrants(OMP_SESSION), ["write"]);
+
+  // A cancelled dialog mints nothing.
+  runtime.push({ ...APPROVAL_FRAME, id: "ui-4" });
+  const stopped = bridge.stop(OMP_SESSION);
+  setTimeout(() => runtime.push({ type: "agent_end", messages: [] }), 5);
+  await stopped;
+  assert.equal(bridge.resolvePermission("ui-4", "allow-session").ok, false);
+  assert.deepEqual(bridge.listSessionGrants(OMP_SESSION), ["write"]);
+
+  // Grants are per desktop session; clearing drops exactly one record.
+  assert.deepEqual(bridge.listSessionGrants("another-session"), []);
+  bridge.clearSessionGrants(OMP_SESSION);
+  assert.deepEqual(bridge.listSessionGrants(OMP_SESSION), []);
+  assert.equal(envelopes.length > 0, true);
+});
+
 test("an approval is answered under the session the bridge stored for it", async () => {
   const { bridge, runtime, envelopes } = bridgeHarness();
   const project = makeProject();

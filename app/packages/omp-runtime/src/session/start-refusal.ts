@@ -54,14 +54,18 @@ export const OMP_START_REFUSAL_VERSION = 2;
  * Why the gate refused the turn. `state-missing` covers every unattributable
  * state file (deleted, truncated, oversized, unparseable identity);
  * `state-invalid` an owned file that fails the schema; `state-foreign` a valid
- * file that names another native session; `clamp-unavailable` a runtime that
- * exposes no tool-selection API; `gate-error` an unexpected handler failure
- * while this session owned the state.
+ * file that names another native session (or a start that does not match the
+ * admitted turn's session); `state-mismatch` an owned file whose session,
+ * mode or permission mode disagrees with the policy admission the fence
+ * installed for this turn (M5/T20-C review repair); `clamp-unavailable` a
+ * runtime that exposes no tool-selection API; `gate-error` an unexpected
+ * handler failure while this session owned the state.
  */
 export const OMP_START_REFUSAL_CODES = [
   "state-missing",
   "state-invalid",
   "state-foreign",
+  "state-mismatch",
   "clamp-unavailable",
   "gate-error",
 ] as const;

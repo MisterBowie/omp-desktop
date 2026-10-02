@@ -66,6 +66,7 @@ import {
   type OmpRuntimeSupervisor,
   type OmpSessionRuntime,
   type OmpStopOutcome,
+  type OmpTurnAdmission,
   type OmpUiDecision,
   type OmpUiRecord,
   type OmpUiRequest,
@@ -641,6 +642,10 @@ export type OmpSessionBridge = {
   ): Promise<{ cursor: { fromByte: number; nextByte: number; reset: boolean }; messages: UiMessage[] }>;
   /** Always refuses: the pinned runtime has no per-child stop command. */
   stopSubagent(sessionId: string, subagentId: string): SubagentStopResult;
+  /** Drop a desktop session's scoped grants (PI `permissions.clearSessionGrants`). */
+  clearSessionGrants(sessionId: string): void;
+  /** The granted tool names for one session right now (diagnostics). */
+  listSessionGrants(sessionId: string): string[];
   disposeSession(sessionId: string, reason?: string): Promise<OmpDisposeResult>;
   /** Reclaim every session's runtime; used by application shutdown. */
   dispose(reason?: string): Promise<OmpDisposeResult>;
@@ -713,6 +718,15 @@ class SessionEntry {
    * self-validated.
    */
   private readonly sessionPolicy: OmpSessionPolicyProvider | undefined;
+  /**
+   * The desktop session's deliberate scoped grants (M5/T20-C review repair),
+   * owned by the bridge registry (PI's `AppState.session_grants`). Read when
+   * building a turn admission, extended by an answered "Allow for this
+   * session" decision, and retired with the native identity or the session.
+   */
+  private readonly sessionGrants: () => ReadonlySet<string>;
+  /** Tell the registry which native identity this entry is bound to. */
+  private readonly noteNativeSession: (nativeSessionId: string | null) => void;
   /** The (runner, native session, catalog) triple the tools were last registered for. */
   private hostToolsRegisteredRunner: OmpSessionRunner | null = null;
   private hostToolsRegisteredSession: string | null = null;
@@ -814,6 +828,8 @@ class SessionEntry {
     hostTools?: OmpHostToolProvider;
     capabilities?: OmpCapabilityProvider;
     sessionPolicy?: OmpSessionPolicyProvider;
+    sessionGrants: () => ReadonlySet<string>;
+    noteNativeSession: (nativeSessionId: string | null) => void;
     onTurnEnd?: OmpSessionBridgeOptions["onTurnEnd"];
   }) {
     this.sessionId = deps.sessionId;
@@ -829,6 +845,8 @@ class SessionEntry {
     this.hostTools = deps.hostTools;
     this.capabilities = deps.capabilities;
     this.sessionPolicy = deps.sessionPolicy;
+    this.sessionGrants = deps.sessionGrants;
+    this.noteNativeSession = deps.noteNativeSession;
     this.onTurnEnd = deps.onTurnEnd;
     // The executor is bound once: the project directory and model binding are
     // fixed for the entry's lifetime, so the bound executor can never reach
@@ -919,6 +937,9 @@ class SessionEntry {
   closeAdmission(): void {
     this.closed = true;
     this.stopEpoch += 1;
+    // A disposed/reclaimed entry has no admitted turn: no host-tool execution
+    // may resolve a mode through a policy the entry no longer owns.
+    this.admittedTurnPolicy = null;
   }
 
   /**
@@ -1135,6 +1156,11 @@ class SessionEntry {
       this.runtimeVersion = this.supervisor.status().runtimeVersion;
       this.nativeSessionBound = true;
       this.nativeSessionRunner = this.runner;
+      // Grants belong to the native session that minted them: binding a
+      // different identity retires the old grants instead of lending them to
+      // the successor (PI's grants are per desktop session; ours additionally
+      // refuse to cross a native-identity replacement).
+      this.noteNativeSession(this.nativeSessionId);
       return;
     }
 
@@ -1166,6 +1192,7 @@ class SessionEntry {
     this.runtimeVersion = this.supervisor.status().runtimeVersion;
     this.nativeSessionBound = true;
     this.nativeSessionRunner = this.runner;
+    this.noteNativeSession(this.nativeSessionId);
     await this.persistNativeSession?.({
       sessionId: this.sessionId,
       nativeSessionId: sessionId,
@@ -1300,11 +1327,27 @@ class SessionEntry {
     if (this.stopEpoch !== epoch) {
       throw new OmpRuntimeError("stopping", "a stop was requested while the prompt was being prepared");
     }
-    const started = await runner.prompt(content);
-    // The admitted turn's policy is the only operating mode a host-tool
-    // execution may read (M5/T20-C). A later prompt overwrites it; a stale,
-    // delegate or unknown turn fails the adapter's turn-bound lookup instead
-    // of borrowing another turn's policy.
+    // The turn admission is the policy half of the run-scoped state: the same
+    // mode, effective permission mode and host-tool policy table, plus the
+    // session's deliberate grants. It rides the fence handshake and becomes
+    // the gate's only decision input for this turn (M5/T20-C review repair):
+    // the mutable state file can no longer be re-read mid-turn to relax the
+    // policy, and the desktop session's grants survive a runtime replacement
+    // without ever being written to disk. The admitted turn's policy is also
+    // the only operating mode a host-tool execution may read.
+    this.admittedTurnPolicy = null;
+    const admission: OmpTurnAdmission | undefined =
+      policy && this.nativeSessionId
+        ? {
+            v: 1,
+            nativeSessionId: this.nativeSessionId,
+            mode: policy.mode,
+            permissionMode: policy.permissionMode,
+            hostTools: runtimeState.hostTools,
+            grants: [...this.sessionGrants()],
+          }
+        : undefined;
+    const started = await runner.prompt(content, admission ? { admission } : {});
     this.admittedTurnPolicy =
       started.accepted && policy ? { turnId: started.turnId, mode: policy.mode } : null;
     return { accepted: started.accepted, turnId: started.turnId };
@@ -1445,8 +1488,8 @@ class SessionEntry {
   private async refreshDesktopState(
     catalog: OmpHostToolCatalogEntry[],
     policy: { mode: DesktopRuntimeMode; permissionMode: DesktopPermissionMode } | null,
-  ): Promise<{ skillsPresent: boolean }> {
-    if (!policy || !this.sessionPolicy) return { skillsPresent: false };
+  ): Promise<{ skillsPresent: boolean; hostTools: DesktopHostToolPolicy[] }> {
+    if (!policy || !this.sessionPolicy) return { skillsPresent: false, hostTools: [] };
     const runRoot = this.supervisor.runRoot();
     if (!runRoot || !this.nativeSessionId) {
       throw this.stateRefusal(
@@ -1542,7 +1585,10 @@ class SessionEntry {
         "the desktop runtime state failed self-validation; refusing to prompt with state the gate would reject",
       );
     }
-    return { skillsPresent: verified.skills.length > 0 };
+    // The validated table is also the policy half of the turn admission the
+    // prompt carries (M5/T20-C review repair): one assembly feeds both the
+    // file the gate injects from and the payload it decides with.
+    return { skillsPresent: verified.skills.length > 0, hostTools: verified.hostTools };
   }
 
   /**
@@ -1677,8 +1723,10 @@ class SessionEntry {
     // produced a runner yet. Bump the epoch first (synchronously) so a prompt
     // that is mid-startup/mid-restore sees it and refuses to submit; then await
     // any in-flight build so the runtime it started is owned rather than left
-    // to a late completion.
+    // to a late completion. The admitted turn's policy dies with the turn: a
+    // late host-tool execution must not resolve a mode through it.
     this.stopEpoch += 1;
+    this.admittedTurnPolicy = null;
     if (this.runnerBuild) await this.runnerBuild.catch(() => undefined);
     if (this.nativeSessionBuild) await this.nativeSessionBuild.catch(() => undefined);
     if (!this.runner) {
@@ -1750,6 +1798,35 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
   const runnerFactory = options.runnerFactory ?? ((runnerOptions) => new OmpSessionRunner(runnerOptions));
 
   const entries = new Map<string, SessionEntry>();
+  /**
+   * The desktop session's deliberate scoped grants (M5/T20-C review repair),
+   * the desktop's counterpart of PI's in-memory `AppState.session_grants`.
+   *
+   * Minted in exactly one place — an answered "Allow for this session"
+   * decision that the runner actually delivered (`resolvePermission` returns
+   * `ok`) — and re-sent to the gate on every turn admission, so the grant
+   * survives a same-session runtime replacement (the B1 Plan → Agent rebuild)
+   * without ever being written to disk. A record is tagged with the native
+   * session that minted it and is dropped when a different native identity is
+   * bound; deleting the session clears it explicitly. Grants are never shared
+   * across desktop sessions.
+   */
+  const sessionGrants = new Map<string, { nativeSessionId: string; tools: Set<string> }>();
+  const NO_GRANTS: ReadonlySet<string> = new Set<string>();
+
+  /** The scoped grants usable for a session's current native identity. */
+  function grantsFor(sessionId: string, nativeSessionId: string | null): ReadonlySet<string> {
+    const record = sessionGrants.get(sessionId);
+    if (!record || !nativeSessionId || record.nativeSessionId !== nativeSessionId) return NO_GRANTS;
+    return record.tools;
+  }
+
+  /** Drop grants minted for a retired native identity (never lent forward). */
+  function noteNativeSession(sessionId: string, nativeSessionId: string | null): void {
+    const record = sessionGrants.get(sessionId);
+    if (record && record.nativeSessionId !== nativeSessionId) sessionGrants.delete(sessionId);
+  }
+
   /**
    * True once application shutdown begins. A new session must not be created
    * after the shutdown sweep has taken its snapshot, or its runtime would
@@ -1883,6 +1960,10 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       ...(options.hostTools ? { hostTools: options.hostTools } : {}),
       ...(options.capabilities ? { capabilities: options.capabilities } : {}),
       ...(options.sessionPolicy ? { sessionPolicy: options.sessionPolicy } : {}),
+      // Read live: the admission is built after the native session is bound,
+      // and the native identity decides which grant record applies.
+      sessionGrants: () => grantsFor(spec.sessionId, entries.get(spec.sessionId)?.nativeSessionId ?? null),
+      noteNativeSession: (nativeSessionId) => noteNativeSession(spec.sessionId, nativeSessionId),
       ...(options.onTurnEnd ? { onTurnEnd: options.onTurnEnd } : {}),
     });
     entries.set(spec.sessionId, entry);
@@ -2203,6 +2284,30 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       if (!result.ok) {
         return { ok: false, reason: result.reason === "stale" ? "stale" : result.reason === "duplicate" ? "duplicate" : "refused", detail: result.detail ?? "the runtime refused the decision" };
       }
+      // The one place a session grant is minted. The decision is recorded only
+      // after the runtime actually accepted the write for a live gate approval
+      // (a cancelled, stale, failed-send or duplicated resolution returns
+      // `ok: false` above and mints nothing), and the tool name is the gate's
+      // own descriptor — never re-derived from the card text. The gate has
+      // already granted the current turn in-process; this record is what
+      // carries the scope into the session's next admission, including one
+      // after the runtime process is replaced.
+      if (
+        decision === "allow-session" &&
+        pending.request.kind === "approval" &&
+        pending.request.source === "gate"
+      ) {
+        const toolName = pending.request.descriptor?.toolName;
+        const nativeSessionId = entry.nativeSessionId;
+        if (toolName && nativeSessionId) {
+          let record = sessionGrants.get(entry.sessionId);
+          if (!record || record.nativeSessionId !== nativeSessionId) {
+            record = { nativeSessionId, tools: new Set() };
+            sessionGrants.set(entry.sessionId, record);
+          }
+          record.tools.add(toolName);
+        }
+      }
       return { ok: true, outcome: "answered" };
     }
     // Not a live approval: a question, an already-answered id, or unknown.
@@ -2469,6 +2574,24 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     };
   }
 
+  /**
+   * Drop every scoped grant a desktop session currently holds.
+   *
+   * The product calls this where the session leaves the product (delete); it
+   * mirrors PI's `permissions.clearSessionGrants`. Archiving reclaims the
+   * runtime but keeps the session row and its native identity, so it keeps the
+   * grants (PI keeps them across a configured session), and a native-identity
+   * replacement drops them automatically.
+   */
+  function clearSessionGrants(sessionId: string): void {
+    sessionGrants.delete(sessionId);
+  }
+
+  /** The granted tool names for one session right now (diagnostics/tests). */
+  function listSessionGrants(sessionId: string): string[] {
+    return [...grantsFor(sessionId, entries.get(sessionId)?.nativeSessionId ?? null)];
+  }
+
   return {
     gatePath,
     prompt,
@@ -2487,6 +2610,8 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     listSubagents,
     readSubagentTranscript,
     stopSubagent,
+    clearSessionGrants,
+    listSessionGrants,
     disposeSession,
     dispose,
     diagnostics,

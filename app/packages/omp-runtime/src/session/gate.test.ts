@@ -281,9 +281,16 @@ describe("registration", () => {
       },
     };
     ompDesktopGate(pi);
-    // The gate registers exactly the two policies: the tool_call approval gate
-    // and the before_agent_start capability injection (M5/T19-C).
-    expect(registeredEvents.sort()).toEqual(["before_agent_start", "tool_call"]);
+    // The gate registers four policies: the tool_call approval gate, the
+    // before_agent_start capability injection (M5/T19-C) and the two agent
+    // lifecycle notifications that arm and retire the admitted turn
+    // (M5/T20-C review repair).
+    expect(registeredEvents.sort()).toEqual([
+      "agent_end",
+      "agent_start",
+      "before_agent_start",
+      "tool_call",
+    ]);
     expect(toolCallHandlers).toHaveLength(1);
     const blocked = await toolCallHandlers[0]!(EVENT, { ...CONTEXT, hasUI: false, ui: undefined });
     expect(blocked).toMatchObject({ block: true });
