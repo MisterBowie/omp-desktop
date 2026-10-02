@@ -1,0 +1,200 @@
+/**
+ * RED probe driver (M5/T20-D-Enter baseline, NOT product code).
+ *
+ * Captures, against the real fixed patched runtime + real host + FakeProvider:
+ *   1. the Agent-mode tool catalogue the model is offered (no Enter tools);
+ *   2. the trusted extension API surface (no live system-prompt action);
+ *   3. what a mid-turn `setActiveTools` changes: the next provider request's
+ *      tool list — while the system prompt stays exactly the same.
+ */
+import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { register } from "node:module";
+
+const here = dirname(fileURLToPath(import.meta.url));
+register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
+
+const { FakeProvider } = await import("../../../experiments/omp-bridge/lib/provider.mjs");
+const { writeModelsConfig } = await import("../../../experiments/omp-bridge/lib/models-config.mjs");
+const { preparePatchedTree } = await import("../../../scripts/omp-patch.mjs");
+const { OmpRuntimeSupervisor, ensureSessionStateDir } = await import(
+  "../../../packages/omp-runtime/src/index.ts"
+);
+const { createOmpSessionBridge } = await import("../electron/main/runtime/omp-session.ts");
+const { createOmpHostToolAdapter, createHostPlansSubmit } = await import(
+  "../electron/main/runtime/omp-host-tools.ts"
+);
+const { createOmpHostTurnLifecycle, resolveEffectivePermissionMode } = await import(
+  "../electron/main/runtime/omp-session-wiring.ts"
+);
+const { HostProcess } = await import("@pi-desktop/host-runtime");
+const { ENGINE_ADAPTER_VERSION } = await import("@pi-desktop/shared");
+
+const PROBE = join(here, "zz-baseline-probe-gate.ts");
+const PROBE_OUT = join(here, "zz-baseline-probe-out.jsonl");
+const scratch = [];
+function makeScratch(prefix) {
+  const path = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
+  scratch.push(path);
+  return path;
+}
+function waitFor(predicate, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs;
+  return new Promise((resolve) => {
+    const tick = () => {
+      if (predicate()) return resolve(true);
+      if (Date.now() > deadline) return resolve(false);
+      setTimeout(tick, 50);
+    };
+    tick();
+  });
+}
+function postRequests(provider) {
+  return provider.requests.filter((request) => request.method === "POST");
+}
+function toolNamesOf(request) {
+  return (request?.body?.tools ?? []).map((tool) => tool?.function?.name ?? tool?.name).filter(Boolean);
+}
+function systemTextOf(request) {
+  const system = (request?.body?.messages ?? []).filter((message) => message.role === "system");
+  return system
+    .map((message) =>
+      typeof message.content === "string" ? message.content : (message.content ?? []).map((part) => part?.text ?? "").join(""),
+    )
+    .join("\n");
+}
+
+const hostBinary = process.env.PI_DESKTOP_HOST_BIN;
+if (!hostBinary) throw new Error("PI_DESKTOP_HOST_BIN must point at the already-built host-core binary");
+const prepared = await preparePatchedTree({ prepareBuild: true, keep: true });
+scratch.push({ cleanup: prepared.cleanup });
+const launcher = join(prepared.tree, "packages", "coding-agent", "scripts", "omp");
+const project = makeScratch("t20d-baseline-project-");
+const dataRoot = makeScratch("t20d-baseline-data-");
+const provider = await FakeProvider.start({ model: "local-model" });
+scratch.push({ close: () => provider.close?.() });
+const host = new HostProcess({ binaryPath: hostBinary, dataDir: dataRoot, onStderr: () => undefined });
+await host.handshake();
+scratch.push({ close: () => host.dispose?.() });
+
+try {
+  const created = await host.call("session.create", {
+    title: "baseline catalogue probe",
+    engine: "omp",
+    mode: "agent",
+    projectPath: project,
+    providerId: "m1fake",
+    modelId: "local-model",
+  });
+  const sessionId = created.session.id;
+  await host.call("session.configure", { id: sessionId, mode: "agent", permissionMode: "auto" });
+
+  const sessionDir = ensureSessionStateDir(dataRoot);
+  const supervisor = new OmpRuntimeSupervisor({
+    desktopStateRequired: true,
+    dataRoot,
+    launcherPath: launcher,
+    expectedRuntimeVersion: "18.3.0",
+    sessionDir,
+    args: ["--trusted-extension", PROBE],
+    extraEnv: { OMP_T20D_PROBE_OUT: PROBE_OUT },
+    prepareRun: (paths) => writeModelsConfig(paths.agentDir, { baseUrl: provider.baseUrl, modelId: "local-model" }),
+    readyTimeoutMs: 60_000,
+  });
+  supervisor.setWorkingDirectory(project);
+  scratch.push({ close: () => supervisor.reclaimAll().catch(() => undefined) });
+
+  const bridge = createOmpSessionBridge({
+    createSupervisor: () => supervisor,
+    launcher,
+    isPackaged: false,
+    appPath: here,
+    sessionDir,
+    gateResolver: () => PROBE,
+    emitAgentEvent: () => undefined,
+    logger: { app: () => undefined },
+    sessionPolicy: {
+      policy: async (id) => {
+        const { session } = await host.call("session.get", { id });
+        return session
+          ? { mode: session.mode, permissionMode: resolveEffectivePermissionMode(session.permissionMode, "ask") }
+          : null;
+      },
+    },
+    hostTurns: createOmpHostTurnLifecycle(() => host),
+    hostTools: createOmpHostToolAdapter({
+      plugins: { getTools: () => [], getSkills: () => [], loadSkillBody: () => ({ id: "x", name: "x", body: "x" }) },
+      userMcp: { toolsForProject: async () => [], callTool: async () => "" },
+      pluginActiveInProject: () => true,
+      plans: createHostPlansSubmit(() => host),
+    }),
+    persistNativeSession: async (info) => {
+      await host.call("session.bindEngine", {
+        id: info.sessionId,
+        adapterVersion: ENGINE_ADAPTER_VERSION,
+        runtimeVersion: info.runtimeVersion,
+        nativeSessionId: info.nativeSessionId,
+        nativeSessionPath: info.nativeSessionPath,
+      });
+    },
+  });
+
+  provider.script([
+    {
+      text: "probing with one bash call",
+      finish: "tool_calls",
+      toolCalls: [{ id: "call_probe_bash", name: "bash", args: { command: "true" } }],
+    },
+    { text: "done", finish: "stop" },
+  ]);
+  const { session } = await host.call("session.get", { id: sessionId });
+  const accepted = await bridge.prompt({
+    sessionId,
+    content: "baseline probe",
+    projectPath: session.projectPath,
+    providerId: session.providerId,
+    modelId: session.modelId,
+    thinkingLevel: session.thinkingLevel,
+  });
+  if (!accepted.accepted) throw new Error("the probe prompt was refused");
+  const settled = await waitFor(() => bridge.status(sessionId).isRunning === false);
+  if (!settled) throw new Error("the probe turn did not settle");
+
+  const requests = postRequests(provider);
+  const probeRecords = readFileSync(PROBE_OUT, "utf8")
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+  const first = requests[0];
+  const second = requests[1];
+  const firstSystem = systemTextOf(first);
+  const secondSystem = systemTextOf(second);
+  console.log(
+    JSON.stringify(
+      {
+        probe: "M5/T20-D-Enter baseline (commit 2d96fa1e8bf3848021d1f265c0a258a9c455ef4c)",
+        providerRequests: requests.length,
+        request1Tools: toolNamesOf(first),
+        request1HasEnterPlanMode: toolNamesOf(first).includes("EnterPlanMode"),
+        request1HasEnterGoalMode: toolNamesOf(first).includes("EnterGoalMode"),
+        request2Tools: toolNamesOf(second),
+        systemPromptUnchanged: firstSystem === secondSystem,
+        systemPromptHasAgentBlock: /Agent mode/.test(secondSystem),
+        probeRecords,
+      },
+      null,
+      2,
+    ),
+  );
+} finally {
+  for (const entry of scratch.splice(0).reverse()) {
+    if (typeof entry === "function") await entry();
+    else if (entry && typeof entry.cleanup === "function") await entry.cleanup();
+    else if (entry && typeof entry.close === "function") await entry.close();
+    else if (typeof entry === "string") rmSync(entry, { recursive: true, force: true });
+  }
+  rmSync(PROBE_OUT, { force: true });
+}

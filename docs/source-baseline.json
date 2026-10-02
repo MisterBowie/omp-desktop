@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "recordedDate": "2026-09-21",
   "timezone": "Asia/Shanghai",
-  "workspace": "/Users/vv/Documents/对话/omp-desktop",
+  "workspace": "/Users/vv/Documents/\u5bf9\u8bdd/omp-desktop",
   "implementationStatus": "planning-only",
   "repositories": [
     {
@@ -177,6 +177,34 @@
       },
       "productImpact": "Same upstream base (62bc57be / omp 18.3.0). The desktop pins move to patchLevel 62bc57b+omp-desktop.4 / fork 512370a1, and @pi-desktop/shared's patch-level/fork-commit constants plus the bundled expectation move with them. The .3 artifact and fork coordinates stay in the manifest history. The Cursor product gate (ADR 0306) stays in force; T20-B2 implements the non-Cursor submit/approval/dispatch loop and does not open the plan/goal capabilities (T20-D).",
       "evidence": "docs/validation/M5-t20-b2-submit-approval.md"
+    },
+    {
+      "date": "2026-10-03",
+      "task": "M5/T20-D-Enter",
+      "repository": "MisterBowie/oh-my-pi",
+      "from": {
+        "branch": "codex/omp-desktop-18.3.0-patch-4",
+        "commit": "512370a1b177cf45e4d12781104506ea372fb8a9",
+        "tree": "78886eaf82d4145521369b9e734cfff53f53fb54",
+        "patchLevel": "62bc57b+omp-desktop.4",
+        "patchSha256": "d6d30785389a2ffc84bdff8ac72a4cea27c2abc50e14d709397f23dd2362882f",
+        "patchBytes": 101113
+      },
+      "to": {
+        "repository": "https://github.com/MisterBowie/oh-my-pi",
+        "branch": "codex/omp-desktop-18.3.0-patch-5",
+        "commit": "36483311dfff67be7504f591974df93fc512a45a",
+        "tree": "7ba57b6d06fb8fe7e3f6352c67692e56cf39c3cd",
+        "baseCommit": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+        "baseVersion": "18.3.0",
+        "patchLevel": "62bc57b+omp-desktop.5",
+        "patchFile": "app/patches/oh-my-pi/0001-omp-desktop-runtime.patch",
+        "patchSha256": "645242861412c8f2810cab397824413129ccbd5e5b7a94ca70caf0e76795895b",
+        "patchBytes": 118548,
+        "note": "adds the optional ExtensionAPI.setTurnSystemPrompt action (AgentSession.setTurnSystemPrompt, forwarded by ExtensionRunner.initialize) so a trusted host with a host-confirmed mid-turn contract change (M5/T20-D-Enter: Agent -> Plan/Goal) can move the live run's system prompt before the next provider request; the action is optional, absent from every other ExtensionActions host, and ordinary runs are unchanged"
+      },
+      "productImpact": "Same upstream base (62bc57be / omp 18.3.0). The desktop pins move to patchLevel 62bc57b+omp-desktop.5 / fork 3648331, and @pi-desktop/shared's patch-level/fork-commit expectations plus the bundled-sidecar manifest move with them. The .4 artifact and fork coordinates stay in the manifest history. The Cursor product gate (ADR 0306) stays in force; the plan/goal engine capabilities remain closed (T20-D).",
+      "evidence": "docs/validation/M5-t20-d-mode-entry.md"
     }
   ]
 }

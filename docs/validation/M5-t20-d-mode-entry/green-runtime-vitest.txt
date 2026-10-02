@@ -1,0 +1,15 @@
+$ pnpm --filter @pi-desktop/omp-runtime test
+
+> @pi-desktop/omp-runtime@0.15.2 test /home/vv/person/code/omp-desktop-m5-t20-d-enter/app/packages/omp-runtime
+> vitest run
+
+
+ RUN  v4.1.10 /home/vv/person/code/omp-desktop-m5-t20-d-enter/app/packages/omp-runtime
+
+
+ Test Files  33 passed (33)
+      Tests  495 passed | 6 skipped (501)
+   Start at  05:39:28
+   Duration  17.76s (transform 7.34s, setup 0ms, import 14.72s, tests 49.91s, environment 3ms)
+
+EXIT=0

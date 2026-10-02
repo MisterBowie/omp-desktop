@@ -1,0 +1,8 @@
+$ bun test packages/agent/test/agent-loop.test.ts packages/coding-agent/test/rpc-host-tools.test.ts packages/coding-agent/test/rpc-input-frame.test.ts packages/coding-agent/test/agent-session-turn-system-prompt.test.ts packages/coding-agent/test/agent-session-before-agent-start-prompt-override.test.ts packages/coding-agent/test/extensions-runner.test.ts
+bun test v1.4.2 (744846f84)
+
+ 277 pass
+ 0 fail
+ 1015 expect() calls
+Ran 277 tests across 6 files. [3.98s]
+EXIT=0

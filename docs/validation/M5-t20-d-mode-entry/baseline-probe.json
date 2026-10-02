@@ -1,0 +1,62 @@
+{
+  "probe": "M5/T20-D-Enter baseline (commit 2d96fa1e8bf3848021d1f265c0a258a9c455ef4c)",
+  "providerRequests": 2,
+  "request1Tools": [
+    "read",
+    "bash",
+    "edit",
+    "ask",
+    "eval",
+    "glob",
+    "grep",
+    "task",
+    "wait",
+    "todo",
+    "web_search",
+    "write"
+  ],
+  "request1HasEnterPlanMode": false,
+  "request1HasEnterGoalMode": false,
+  "request2Tools": [
+    "read"
+  ],
+  "systemPromptUnchanged": true,
+  "systemPromptHasAgentBlock": true,
+  "probeRecords": [
+    {
+      "at": "before_agent_start",
+      "setTurnSystemPrompt": "undefined",
+      "setSystemPrompt": "undefined",
+      "setActiveTools": "function",
+      "getActiveTools": "function",
+      "systemPromptParts": 3
+    },
+    {
+      "at": "tool_result",
+      "toolName": "bash",
+      "toolsBefore": [
+        "read",
+        "bash",
+        "edit",
+        "ask",
+        "eval",
+        "glob",
+        "grep",
+        "task",
+        "wait",
+        "todo",
+        "web_search",
+        "write",
+        "ast_edit",
+        "debug",
+        "lsp"
+      ]
+    },
+    {
+      "at": "after_setActiveTools",
+      "tools": [
+        "read"
+      ]
+    }
+  ]
+}

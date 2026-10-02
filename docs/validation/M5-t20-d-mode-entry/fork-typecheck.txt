@@ -1,0 +1,2 @@
+$ tsgo -p packages/coding-agent/tsconfig.json --noEmit
+EXIT=0

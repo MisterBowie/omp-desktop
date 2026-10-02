@@ -1,0 +1,49 @@
+/**
+ * RED probe extension (M5/T20-D-Enter baseline, NOT product code).
+ *
+ * Wraps the baseline trusted gate and records two facts about the pre-change
+ * runtime: the extension API surface a trusted extension actually sees, and
+ * what a mid-turn `setActiveTools` does to the next provider request.
+ */
+import { appendFileSync } from "node:fs";
+import gate from "../../../packages/omp-runtime/extensions/omp-desktop-gate.ts";
+
+type Pi = {
+  on(event: string, handler: (event: any, ctx: any) => unknown): void;
+  getActiveTools?(): string[];
+  setActiveTools?(names: string[]): Promise<void> | void;
+  setTurnSystemPrompt?(prompt: string[]): Promise<void> | void;
+  setSystemPrompt?(prompt: string[]): Promise<void> | void;
+  logger?: { warn?(message: string, meta?: unknown): void };
+};
+
+const out = process.env.OMP_T20D_PROBE_OUT;
+
+function record(entry: Record<string, unknown>): void {
+  if (!out) return;
+  appendFileSync(out, `${JSON.stringify(entry)}\n`);
+}
+
+export default function probeGate(pi: Pi): void {
+  gate(pi as never);
+  pi.on("before_agent_start", (event: any) => {
+    record({
+      at: "before_agent_start",
+      setTurnSystemPrompt: typeof pi.setTurnSystemPrompt,
+      setSystemPrompt: typeof pi.setSystemPrompt,
+      setActiveTools: typeof pi.setActiveTools,
+      getActiveTools: typeof pi.getActiveTools,
+      systemPromptParts: Array.isArray(event?.systemPrompt) ? event.systemPrompt.length : null,
+    });
+    return undefined;
+  });
+  pi.on("tool_result", async (event: any) => {
+    if (event?.toolName === "bash" && event?.toolCallId === "call_probe_bash") {
+      const before = pi.getActiveTools?.() ?? [];
+      record({ at: "tool_result", toolName: event.toolName, toolsBefore: before });
+      await pi.setActiveTools?.(["read"]);
+      record({ at: "after_setActiveTools", tools: pi.getActiveTools?.() ?? [] });
+    }
+    return undefined;
+  });
+}

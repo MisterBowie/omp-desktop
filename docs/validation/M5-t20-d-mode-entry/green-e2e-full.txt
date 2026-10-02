@@ -1,0 +1,22 @@
+$ node --test apps/desktop/test/omp-plan-submit-e2e.test.mjs
+(node:1806552) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ T20-B2 plan submission (patched): valid, schema-rejected, mixed-batch, duplicate and revision (3566.092947ms)
+✔ T20-B2 mixed batch [bash, SubmitPlan] is rejected whole, does not terminate, and ordinary tools still run (3210.254565ms)
+✔ T20-B2 approval dispatch: queued execution runs in OMP with the approved instruction, exactly once (4797.056176ms)
+✔ T20-B2 rejected approval never executes, and a restart does not replay a queued one (4801.15781ms)
+✔ T20-B2 Stop during the durable host begin refuses the prompt before it is sent, settles its row aborted, and the next turn recovers (3316.933916ms)
+✔ T20-B2 a real terminal delivered before the prompt response still closes its own durable host turn (6350.840355ms)
+✔ T20-B2 an approved execution settles from a terminal that beats the dispatch prompt return, and a refused begin interrupts it (7833.670021ms)
+✔ T20-D model-side mode entry: EnterPlanMode switches the same live turn, then SubmitPlan ends it (2759.748425ms)
+✔ T20-D model-side mode entry: EnterGoalMode switches to Goal and SubmitGoal publishes the goal artifact (2649.144726ms)
+✔ T20-D model-side mode entry: a mixed Enter batch is rejected whole, then a sole retry enters (3243.565707ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 59224.149146
+EXIT=0

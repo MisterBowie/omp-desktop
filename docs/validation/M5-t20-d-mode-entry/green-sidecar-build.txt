@@ -1,0 +1,6 @@
+$ node scripts/omp-sidecar.mjs --build --source /home/vv/person/code/omp-fork-t20-d-enter
+OMP-SIDECAR-BUILT omp in app/apps/desktop/resources/omp-runtime
+  sha256     : f6111efdd9f60f8ab831da0d6292e37868e89dd163af46103780fd83924f560c
+  bytes      : 244295136
+  fork commit: 36483311dfff67be7504f591974df93fc512a45a
+EXIT=0
