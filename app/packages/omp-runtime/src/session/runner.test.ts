@@ -11,7 +11,7 @@ import type { AgentEventEnvelope } from "@pi-desktop/shared";
 import { OmpRuntimeError } from "../errors.js";
 import type { OmpFrame } from "../protocol.js";
 import { OmpSessionRunner, type OmpSessionRuntime } from "./runner.js";
-import { encodeTurnAck, turnCommandToken } from "./turn-fence.js";
+import { encodeTurnAck, OMP_TURN_COMMAND, turnCommandToken } from "./turn-fence.js";
 import { serveTurnFenceCommand } from "./turn-fence-testkit.js";
 import type { OmpUiRecord } from "./ui-requests.js";
 import { encodeApprovalDescriptor, OMP_APPROVAL_OPTIONS } from "./approval-protocol.js";
@@ -1075,5 +1075,196 @@ describe("stop owns the prompt gate for its whole span", () => {
     expect(runner.status().currentTurnId).toBe(second.turnId);
     expect(commands).toEqual(["prompt", "abort", "get_subagents", "prompt"]);
     runner.dispose();
+  });
+});
+
+describe("a stop cancels the turn-fence preparation (third repair)", () => {
+  /** A deferred value the test resolves at a controlled moment. */
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((yes) => { resolve = yes; });
+    return { promise, resolve };
+  }
+
+  /**
+   * A runtime that records every command and lets the test hold one boundary
+   * of the fence preparation: the command-discovery answer, the handshake
+   * response, or the gate's acknowledgment (which the shipped gate sends
+   * asynchronously through the frame stream).
+   */
+  function fenceRuntime(options: { hold?: "discovery" | "handshake-response" | "ack" } = {}) {
+    const handlers = new Set<(frame: OmpFrame) => void>();
+    const commands: Array<Record<string, unknown>> = [];
+    const entered = deferred<null>();
+    const release = deferred<null>();
+    let handshakes = 0;
+    const emit = (frame: Record<string, unknown>) => {
+      for (const handler of [...handlers]) handler(frame as OmpFrame);
+    };
+    const runtime: OmpSessionRuntime = {
+      pid: 4242,
+      usable: true,
+      write: () => true,
+      onFrame(handler) {
+        handlers.add(handler);
+        return () => handlers.delete(handler);
+      },
+      onFailure: () => () => {},
+      async request(command) {
+        commands.push(command as Record<string, unknown>);
+        if (command.type === "get_available_commands") {
+          if (options.hold === "discovery") {
+            entered.resolve(null);
+            await release.promise;
+          }
+          return { success: true, data: { commands: [{ name: OMP_TURN_COMMAND, source: "extension" }] } };
+        }
+        if (command.type === "prompt") {
+          const token = turnCommandToken(command.message);
+          if (token) {
+            handshakes += 1;
+            const id = `ack-${handshakes}`;
+            const emitAck = () =>
+              emit({ type: "extension_ui_request", id, method: "notify", message: encodeTurnAck(token) });
+            if (options.hold === "handshake-response") {
+              entered.resolve(null);
+              await release.promise;
+            }
+            if (options.hold === "ack") {
+              entered.resolve(null);
+              void release.promise.then(emitAck);
+            } else {
+              emitAck();
+            }
+            return { success: true };
+          }
+        }
+        if (command.type === "get_subagents") return { success: true, data: { subagents: [] } };
+        return { success: true };
+      },
+    };
+    return { runtime, commands, entered, release };
+  }
+
+  function fenceRunner(runtime: OmpSessionRuntime, turns: Array<{ turnId: string; reason: string }>) {
+    return new OmpSessionRunner({
+      sessionId: "omp-fence-stop",
+      runtime,
+      emit: () => undefined,
+      onTurnEnd: (info) => turns.push(info),
+      convergeTimeoutMs: 200,
+      abortTimeoutMs: 100,
+      turnFenceTimeoutMs: 300,
+    });
+  }
+
+  const kinds = (commands: Array<Record<string, unknown>>) =>
+    commands.map((command) =>
+      command.type === "prompt" && turnCommandToken(command.message) ? "handshake" : String(command.type),
+    );
+
+  it("refuses the prompt when a stop arrives during command discovery", async () => {
+    const turns: Array<{ turnId: string; reason: string }> = [];
+    const { runtime, commands, entered, release } = fenceRuntime({ hold: "discovery" });
+    const runner = fenceRunner(runtime, turns);
+
+    const prompt = runner.prompt("must never be sent");
+    await entered.promise;
+    expect(runner.runState()).toBe("running");
+    const stop = runner.stop();
+    expect(runner.runState()).toBe("stopping");
+    release.resolve(null);
+
+    await expect(prompt).rejects.toMatchObject({ code: "stopping" });
+    const outcome = await stop;
+    expect(outcome).toMatchObject({ aborted: true, converged: true, toreDown: false });
+    // The canceled generation installed no fence and submitted no user
+    // content: only the discovery, the stop's abort and its child snapshot
+    // ever reached the runtime.
+    expect(kinds(commands)).toEqual(["get_available_commands", "abort", "get_subagents"]);
+    expect(runner.runState()).toBe("idle");
+    expect(turns).toEqual([{ sessionId: "omp-fence-stop", turnId: "omp-turn:omp-fence-stop:1", reason: "aborted" }]);
+    expect(runner.diagnostics()).toMatchObject({ turnFences: 0 });
+
+    // The stop closed the generation it cancelled; a retry has nothing to own,
+    // and the next genuine prompt is admitted with a fresh fence.
+    expect((await runner.stop()).steps).toEqual(["nothing running"]);
+    const next = await runner.prompt("the real turn");
+    expect(next.generation).toBe(2);
+    expect(kinds(commands)).toEqual([
+      "get_available_commands",
+      "abort",
+      "get_subagents",
+      "get_available_commands",
+      "handshake",
+      "prompt",
+    ]);
+    expect(commands.at(-1)?.message).toBe("the real turn");
+    expect(runner.diagnostics()).toMatchObject({ turnFences: 1 });
+    runner.dispose();
+  });
+
+  it("refuses the prompt when a stop arrives while the handshake response is pending", async () => {
+    const turns: Array<{ turnId: string; reason: string }> = [];
+    const { runtime, commands, entered, release } = fenceRuntime({ hold: "handshake-response" });
+    const runner = fenceRunner(runtime, turns);
+
+    const prompt = runner.prompt("must never be sent");
+    await entered.promise;
+    const stop = runner.stop();
+    release.resolve(null);
+
+    await expect(prompt).rejects.toMatchObject({ code: "stopping" });
+    await stop;
+    // The handshake was in flight when the stop landed, but the runner refuses
+    // to install the fence or submit the user prompt afterwards.
+    expect(kinds(commands)).toEqual(["get_available_commands", "handshake", "abort", "get_subagents"]);
+    expect(runner.runState()).toBe("idle");
+    expect(turns).toEqual([{ sessionId: "omp-fence-stop", turnId: "omp-turn:omp-fence-stop:1", reason: "aborted" }]);
+    expect(runner.diagnostics()).toMatchObject({ turnFences: 0 });
+  });
+
+  it("refuses the prompt when a stop cancels the wait for the acknowledgment", async () => {
+    const turns: Array<{ turnId: string; reason: string }> = [];
+    const { runtime, commands, entered, release } = fenceRuntime({ hold: "ack" });
+    const runner = fenceRunner(runtime, turns);
+
+    const prompt = runner.prompt("must never be sent");
+    await entered.promise;
+    // The gate has not acknowledged yet: the stop must cancel the wait itself
+    // rather than let the fence deadline (300 ms) expire.
+    const stop = runner.stop();
+    await expect(prompt).rejects.toMatchObject({ code: "stopping" });
+    await stop;
+    expect(kinds(commands)).toEqual(["get_available_commands", "handshake", "abort", "get_subagents"]);
+    expect(runner.runState()).toBe("idle");
+
+    // The late acknowledgment arrives after the generation was closed: it is
+    // counted and ignored, never arming a stale fence.
+    release.resolve(null);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(runner.diagnostics()).toMatchObject({ turnFences: 0, ignoredTurnAcks: 1 });
+
+    // The next prompt arms its own fence; a stale acknowledgment has no effect.
+    await runner.prompt("the real turn");
+    expect(runner.diagnostics()).toMatchObject({ turnFences: 1 });
+    runner.dispose();
+  });
+
+  it("refuses the prompt and announces one aborted turn when the runner is disposed while preparing", async () => {
+    const turns: Array<{ turnId: string; reason: string }> = [];
+    const { runtime, commands, entered, release } = fenceRuntime({ hold: "discovery" });
+    const runner = fenceRunner(runtime, turns);
+
+    const prompt = runner.prompt("must never be sent");
+    await entered.promise;
+    runner.dispose("third repair test teardown");
+    release.resolve(null);
+
+    await expect(prompt).rejects.toMatchObject({ code: "stopping" });
+    expect(kinds(commands)).toEqual(["get_available_commands"]);
+    expect(turns).toEqual([{ sessionId: "omp-fence-stop", turnId: "omp-turn:omp-fence-stop:1", reason: "aborted" }]);
+    expect(runner.runState()).toBe("idle");
   });
 });

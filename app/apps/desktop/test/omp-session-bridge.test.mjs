@@ -28,6 +28,9 @@ const { createOmpSessionBridge } = await import("../electron/main/runtime/omp-se
 const { serveTurnFenceCommand } = await import(
   "../../../packages/omp-runtime/src/session/turn-fence-testkit.ts"
 );
+const { encodeTurnAck, turnCommandToken } = await import(
+  "../../../packages/omp-runtime/src/session/turn-fence.ts"
+);
 const {
   clearSessionPermissions,
   enqueuePermission,
@@ -1784,6 +1787,192 @@ test("dispose during startup or restore cancels the pending prompt and reclaims"
     } finally {
       release.resolve();
       await bridge.dispose("r3 dispose cleanup").catch(() => undefined);
+      await supervisor.reclaimAll().catch(() => undefined);
+    }
+  }
+});
+
+/**
+ * A runtime that serves the turn fence except for one boundary the test holds:
+ * the command-discovery answer (`discovery`) or the gate's acknowledgment
+ * (`ack`), so a stop can be issued while the runner is preparing a prompt.
+ */
+function fenceGateRuntime(nativeId, nativePath, boundary) {
+  const handlers = new Set();
+  const commands = [];
+  const entered = deferred();
+  const release = deferred();
+  let handshakes = 0;
+  const emit = (frame) => {
+    for (const fn of [...handlers]) fn(frame);
+  };
+  return {
+    pid: 9400,
+    pgid: 9400,
+    currentPhase: "idle",
+    usable: true,
+    runtimeVersion: "18.3.0",
+    protocolVersion: 2,
+    commands,
+    entered,
+    release,
+    emit,
+    write() {
+      return true;
+    },
+    onFrame(fn) {
+      handlers.add(fn);
+      return () => handlers.delete(fn);
+    },
+    onFailure() {
+      return () => {};
+    },
+    async stop() {
+      this.usable = false;
+      return { reaped: true, escalated: "none", steps: [], errors: [], abortAcknowledged: true };
+    },
+    async request(command) {
+      if (command.type === "get_available_commands") {
+        if (boundary === "discovery") {
+          entered.resolve();
+          await release.promise;
+        }
+        return { success: true, data: { commands: [{ name: "omp-desktop-turn", source: "extension" }] } };
+      }
+      if (command.type === "prompt") {
+        const token = turnCommandToken(command.message);
+        if (token) {
+          handshakes += 1;
+          const ack = {
+            type: "extension_ui_request",
+            id: `ack-${handshakes}`,
+            method: "notify",
+            message: encodeTurnAck(token),
+          };
+          if (boundary === "ack") {
+            entered.resolve();
+            void release.promise.then(() => emit(ack));
+          } else {
+            emit(ack);
+          }
+          return { success: true };
+        }
+        commands.push("prompt");
+        return { success: true };
+      }
+      commands.push(command.type);
+      if (command.type === "new_session" || command.type === "switch_session") {
+        return { success: true, data: { cancelled: false } };
+      }
+      if (command.type === "get_state") {
+        return { success: true, data: { sessionId: nativeId, sessionFile: nativePath } };
+      }
+      if (command.type === "get_subagents") return { success: true, data: { subagents: [] } };
+      // The pinned runtime emits no `agent_end` for an abort before the agent
+      // started; this fake models that measured behavior exactly.
+      return { success: true, data: { cancelled: false } };
+    },
+  };
+}
+
+test("stop during turn-fence preparation cancels the pending prompt and leaves the session idle", async () => {
+  for (const boundary of ["discovery", "ack"]) {
+    const root = mkdtempSync(join(tmpdir(), "omp-bridge-fence-stop-"));
+    scratch.push(root);
+    const project = join(root, "project");
+    const sessionDir = join(root, "sessions");
+    mkdirSync(project);
+    mkdirSync(sessionDir);
+    const nativeId = `native-fence-${boundary}`;
+    const nativePath = join(sessionDir, "native.jsonl");
+    writeFileSync(nativePath, `${JSON.stringify({ type: "session", id: nativeId, cwd: project, timestamp: "2026-09-24T00:00:00Z" })}\n`);
+    const runtime = fenceGateRuntime(nativeId, nativePath, boundary);
+    const turns = [];
+    const mockLauncher = join(here, "..", "..", "..", "packages", "omp-runtime", "test", "mock-omp.mjs");
+    const supervisor = new OmpRuntimeSupervisor({
+      dataRoot: join(root, "data"),
+      sessionDir,
+      launcherPath: mockLauncher,
+      expectedRuntimeVersion: "18.3.0",
+      runtimeFactory: async () => runtime,
+    });
+    const bridge = createOmpSessionBridge({
+      createSupervisor: () => supervisor,
+      launcher: mockLauncher,
+      isPackaged: false,
+      appPath: here,
+      sessionDir,
+      gateResolver: () => join(here, "..", "..", "..", "packages", "omp-runtime", "extensions", "omp-desktop-gate.ts"),
+      emitAgentEvent: () => {},
+      onTurnEnd: (info) => turns.push(info),
+      // Bound the wait on the held boundary so a regression fails fast.
+      runnerFactory: (options) =>
+        new OmpSessionRunner({ ...options, convergeTimeoutMs: 200, abortTimeoutMs: 100, turnFenceTimeoutMs: 300 }),
+    });
+    try {
+      const pendingPrompt = bridge
+        .prompt({
+          sessionId: "fence-stop",
+          content: "must be cancelled by the stop",
+          projectPath: project,
+          nativeSessionId: nativeId,
+          nativeSessionPath: nativePath,
+        })
+        .then((result) => result, (error) => ({ refused: true, code: error.code ?? error.errorCode, message: error.message }));
+
+      await runtime.entered.promise;
+      const pendingStop = bridge.stop("fence-stop");
+      let stopSettledBeforeRelease = false;
+      pendingStop.then(() => {
+        stopSettledBeforeRelease = true;
+      });
+      if (boundary === "discovery") {
+        // The stop owns the pending discovery rather than reporting "nothing
+        // running" while the runner still holds a live generation.
+        for (let turn = 0; turn < 20; turn += 1) await Promise.resolve();
+        assert.equal(stopSettledBeforeRelease, false, "stop must own the pending discovery, not return early");
+      }
+      runtime.release.resolve();
+      const [prompt, stop] = await Promise.all([pendingPrompt, pendingStop]);
+
+      assert.equal(prompt.refused, true, `the pending prompt must be cancelled on ${boundary}`);
+      assert.equal(prompt.code, "stopping");
+      assert.equal(stop.toreDown, false, "a converged stop keeps the live process");
+      assert.equal(stop.converged, true, "the canceled generation closes so the stop converges");
+      assert.equal(bridge.status("fence-stop").state, "idle");
+      assert.equal(bridge.status("fence-stop").isRunning, false);
+      // The canceled prompt never reached the runtime as user content, and the
+      // canceled turn ended exactly once, as aborted.
+      assert.equal(runtime.commands.includes("prompt"), false, "the canceled prompt must not be submitted");
+      assert.deepEqual(
+        turns.map((entry) => entry.reason),
+        ["aborted"],
+        "the canceled turn announces exactly one aborted end",
+      );
+      // A second stop has nothing to own.
+      assert.deepEqual((await bridge.stop("fence-stop")).steps, ["nothing running"]);
+
+      // The next genuine prompt is admitted over the same runtime and native
+      // identity, with its own fence.
+      const recovered = await bridge.prompt({
+        sessionId: "fence-stop",
+        content: "the recovered turn",
+        projectPath: project,
+        nativeSessionId: nativeId,
+        nativeSessionPath: nativePath,
+      });
+      assert.equal(recovered.accepted, true);
+      assert.equal(runtime.commands.includes("prompt"), true, "the recovered prompt is submitted");
+      assert.equal(turns.length, 1, "the recovered turn is still running: no premature terminal");
+      runtime.emit({ type: "agent_start" });
+      runtime.emit({ type: "agent_end", messages: [] });
+      assert.deepEqual(
+        turns.map((entry) => entry.reason),
+        ["aborted", "completed"],
+      );
+    } finally {
+      runtime.release.resolve();
+      await bridge.dispose("fence stop cleanup").catch(() => undefined);
       await supervisor.reclaimAll().catch(() => undefined);
     }
   }

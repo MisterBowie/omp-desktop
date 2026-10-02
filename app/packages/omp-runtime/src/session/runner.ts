@@ -612,7 +612,10 @@ export class OmpSessionRunner {
     const turnId = this.contextId
       ? `omp-turn:${this.sessionId}:${this.contextId}:${generation}`
       : `omp-turn:${this.sessionId}:${generation}`;
-    this.run = {
+    // The admitted generation this call owns for its whole span: the async
+    // preparation below revalidates against this record, never against
+    // whatever `this.run` happens to be by the time an await resumes.
+    const run: RunRecord = {
       generation,
       turnId,
       promptMessage: message,
@@ -623,6 +626,7 @@ export class OmpSessionRunner {
       turnToken: mintTurnToken(),
       fenceArmed: false,
     };
+    this.run = run;
     this.state = "running";
     try {
       // Bind this generation before the prompt reaches the runtime: the token
@@ -630,6 +634,13 @@ export class OmpSessionRunner {
       // through its own notify channel, so a start refusal produced for this
       // turn is distinguishable from a replayed one (see `turn-fence.ts`).
       await this.armTurnFence();
+      // Revalidate immediately before user content is written. The fence's
+      // awaits are the only gap between admission and submission, and the
+      // runtime's own `abort` cannot cancel a command that has not been
+      // dispatched yet: a stop that landed during preparation must refuse this
+      // prompt instead of submitting it after the abort. Nothing can interleave
+      // between this synchronous check and the write below.
+      if (!this.isCurrentRun(run)) throw this.refuseCanceledPreparation(run);
       const response = await this.runtime.request({ type: "prompt", message }, { timeoutMs: 30_000 });
       if (response.success === false) {
         throw new OmpRuntimeError(
@@ -639,20 +650,73 @@ export class OmpSessionRunner {
       }
       return { accepted: true, turnId, generation };
     } catch (error) {
-      // The run never started, so anything it raised on the way is unanswerable:
-      // close the generation (cancelling its dialogs exactly once) and leave the
-      // runner idle before the original failure reaches the caller.
-      this.closeGeneration(generation, "the prompt was refused by the runtime", {
-        error: appError(
-          `OMP_${(error as OmpRuntimeError)?.code
-            ? String((error as OmpRuntimeError).code).toUpperCase().replace(/-/g, "_")
-            : "PROMPT_FAILED"}`,
-          error instanceof Error ? error.message : String(error),
-        ),
-        whenCardsPresented: true,
-      });
+      if (this.isCurrentRun(run)) {
+        // The run never started, so anything it raised on the way is
+        // unanswerable: close the generation (cancelling its dialogs exactly
+        // once) and leave the runner idle before the original failure reaches
+        // the caller.
+        this.closeGeneration(generation, "the prompt was refused by the runtime", {
+          error: appError(
+            `OMP_${(error as OmpRuntimeError)?.code
+              ? String((error as OmpRuntimeError).code).toUpperCase().replace(/-/g, "_")
+              : "PROMPT_FAILED"}`,
+            error instanceof Error ? error.message : String(error),
+          ),
+          whenCardsPresented: true,
+        });
+      } else {
+        // A stop or dispose cancelled this generation while its failure was in
+        // flight: that path owns the close (as `aborted`, exactly once). When
+        // the run is still this runner's to close, it is closed here so the
+        // stop's convergence sees it at once instead of waiting for its
+        // deadline; a generation another path already closed, or a
+        // replacement, is never touched.
+        this.closeCancelledRun(run, "the run was stopped");
+      }
       throw error;
     }
+  }
+
+  /**
+   * True while this exact run still owns the right to submit content.
+   *
+   * A stop moves the runner to `stopping` synchronously — before its first
+   * await — and a dispose clears the run; both cancel the admitted generation.
+   * Either can land while the preparation awaits the runtime (command
+   * discovery, the handshake response, the acknowledgment), where the
+   * runtime's own `abort` cannot reach a prompt that has not been dispatched
+   * yet. The preparation therefore re-checks this after every await and
+   * immediately before it writes user content.
+   */
+  private isCurrentRun(run: RunRecord): boolean {
+    return this.state === "running" && this.run === run;
+  }
+
+  /**
+   * Close a generation a stop or dispose cancelled, when it is still this
+   * runner's to close.
+   *
+   * The close is `aborted` — the reason the stop owns — and it is what lets
+   * the stop converge instead of waiting out its window and tearing the
+   * process down. A generation already closed by the other path (dispose, a
+   * teardown) and a replacement generation are both left untouched.
+   */
+  private closeCancelledRun(run: RunRecord, reason: string): void {
+    if (this.run !== run) return;
+    this.cancelOpenDialogs(reason);
+    this.closeRun(run.generation, "aborted");
+  }
+
+  /**
+   * Refuse a preparation whose generation a stop or a dispose cancelled.
+   *
+   * The canceled generation is closed first (see `closeCancelledRun`), then
+   * the caller receives a typed `stopping` refusal: the prompt it was
+   * preparing must not be submitted.
+   */
+  private refuseCanceledPreparation(run: RunRecord): OmpRuntimeError {
+    this.closeCancelledRun(run, "the run was stopped");
+    return new OmpRuntimeError("stopping", "the run was stopped while the prompt was being prepared");
   }
 
   /**
@@ -674,6 +738,10 @@ export class OmpSessionRunner {
         { type: "get_available_commands" },
         { timeoutMs: this.turnFenceTimeoutMs },
       );
+      // A stop or dispose that landed while the answer was in flight cancelled
+      // this generation: it is closed before anything is cached, sent or
+      // armed, so the late continuation cannot touch runtime or run state.
+      if (!this.isCurrentRun(run)) throw this.refuseCanceledPreparation(run);
       if (response.success === false) {
         throw new OmpRuntimeError(
           "not-started",
@@ -695,28 +763,40 @@ export class OmpSessionRunner {
       }
       this.turnCommandAdvertised = true;
     }
+    if (!this.isCurrentRun(run)) throw this.refuseCanceledPreparation(run);
     const waiter = this.expectTurnAck(run.turnToken);
+    let response: { success?: boolean; error?: string; data?: unknown };
     try {
-      const response = await this.runtime.request(
+      response = await this.runtime.request(
         { type: "prompt", message: turnCommandMessage(run.turnToken) },
         { timeoutMs: this.turnFenceTimeoutMs },
       );
-      if (response.success === false) {
-        throw new OmpRuntimeError(
-          "not-started",
-          `the runtime refused the desktop turn-boundary command: ${response.error ?? "unknown error"}`,
-        );
-      }
     } catch (error) {
       waiter.cancel();
+      if (!this.isCurrentRun(run)) throw this.refuseCanceledPreparation(run);
       throw error;
     }
+    if (!this.isCurrentRun(run)) {
+      waiter.cancel();
+      throw this.refuseCanceledPreparation(run);
+    }
+    if (response.success === false) {
+      waiter.cancel();
+      throw new OmpRuntimeError(
+        "not-started",
+        `the runtime refused the desktop turn-boundary command: ${response.error ?? "unknown error"}`,
+      );
+    }
     if (!(await waiter.acknowledged)) {
+      // A stop settles the wait (see `performStop`) rather than letting the
+      // fence deadline expire; the canceled generation is refused, never armed.
+      if (!this.isCurrentRun(run)) throw this.refuseCanceledPreparation(run);
       throw new OmpRuntimeError(
         "request-timeout",
         "the runtime did not acknowledge the desktop turn-boundary handshake; refusing to prompt with an unbound turn",
       );
     }
+    if (!this.isCurrentRun(run)) throw this.refuseCanceledPreparation(run);
     run.fenceArmed = true;
     this.turnFences += 1;
   }
@@ -839,6 +919,11 @@ export class OmpSessionRunner {
       return { aborted: false, abortBashSent: false, converged: true, toreDown: false, steps: ["nothing running"], errors };
     }
     this.state = "stopping";
+    // A preparation still waiting on the fence's acknowledgment is cancelled
+    // by the same stop: settling the wait lets the late continuation observe
+    // the cancellation at once (and it can never arm the fence afterwards)
+    // instead of holding the stop open until the fence deadline.
+    this.pendingTurnAck?.settle(false);
     // Fail closed first: every open dialog is answered "cancelled", so a tool
     // waiting on a user who is now stopping cannot be left mid-decision.
     const cancelled = this.cancelOpenDialogs("the run was stopped");
