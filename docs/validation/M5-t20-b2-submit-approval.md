@@ -3,6 +3,7 @@
 更新时间：2026-10-03。状态：**实现完成、待独立复审**；T20 未完成、`plan`/`goal` 能力键保持关闭、T20-D 未开始。设计：ADR 0310（`app/docs/adr/0310-omp-plan-submit-approval-and-dispatch.md`）；补丁级 `.4`（ADR 0305 修订）。证据目录：本文件同名目录（原始日志 + `SHA256SUMS.txt`）。
 
 - 分支：`codex/m5-t20-b2-approval`（追加提交，不 amend/rebase/强推，不发布、不合 main）
+- 上一阶段：M5/T20-C 的最终原始提交 `9491016062e36a2967cf3db74d2a4990421d9d30` 已由根独立验收（`omp-t20-c-review-20261003/c-acceptance-94910160.json`，归档 `/tmp/omp-t20-b2-root-handoff-20261003/`），本轮从该提交开始
 - 基线：`9491016062e36a2967cf3db74d2a4990421d9d30`（C 的根已接受最终原始提交）
 - 工作树：`/home/vv/person/code/omp-desktop-m5-t20-b2`；固定子模块 OMP `62bc57be1b03ef0802a33cf7f5f530e534527531`（未改）、PI `0111e306c120ad5820688d7608cb37bad8fbcc1f`（未改）
 - 受控补丁级：**`62bc57b+omp-desktop.4`**，fork `MisterBowie/oh-my-pi` 分支 `codex/omp-desktop-18.3.0-patch-4`，commit `512370a1b177cf45e4d12781104506ea372fb8a9`，tree `78886eaf82d4145521369b9e734cfff53f53fb54`，patch `0001-omp-desktop-runtime.patch` 101113 B / sha256 `d6d30785389a2ffc84bdff8ac72a4cea27c2abc50e14d709397f23dd2362882f`（15 文件）
