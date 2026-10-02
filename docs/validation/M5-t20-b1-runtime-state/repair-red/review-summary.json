@@ -1,0 +1,30 @@
+{
+  "desktopCommit": "11bc5657565bbf6fbcceb3a2d95ed56e65c2548b",
+  "baseline": "27d5c88a1334b32dbd8c8ac17a6c262e81a8df32",
+  "review": "changes-required",
+  "positiveChecks": {
+    "buildJs": 0,
+    "runtime": {
+      "pass": 370,
+      "skip": 6,
+      "exit": 0
+    },
+    "desktopTargeted": {
+      "pass": 44,
+      "skip": 0,
+      "exit": 0
+    }
+  },
+  "failures": [
+    "F1 missing/malformed owner state sends provider request",
+    "F2 invalid owner state blocks request but strands running generation until disposal",
+    "F3 new unsafe plugin registered in Plan is absent after Agent with unchanged catalog",
+    "F4 Agent restore promotes ast_edit/debug/lsp from deferred to top-level"
+  ],
+  "probeFile": "production-state-failure-probe.json",
+  "probeNote": "turnEnds in original raw report holds final array: aborted for owned-invalid is emitted by final dispose; state/eventTypes/retry are snapshots before cleanup",
+  "allProbeCleanupSucceeded": true,
+  "archiveHashes": "17 hashes match original candidate report; gzip raw hashes match",
+  "patchPinsUnchanged": true,
+  "diffCheckExit": 0
+}

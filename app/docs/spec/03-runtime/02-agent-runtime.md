@@ -1732,23 +1732,58 @@ contract tool catalog (evidence: `docs/validation/M5-capability-user-paths.md`,
   whose state entry declares a non-empty `planSafeActions` list — `write`,
   `edit`, `apply_patch`, unknown tools, user MCP tools and undeclared plugin
   tools never enter it, and Pi's `BrowserPreview` is never fabricated because
-  the pinned runtime ships no such tool. Returning to `agent` restores the
-  pre-clamp enabled selection united with anything the runtime auto-activated
-  while clamped, so no stale clamp survives and no user-disabled tool is
-  resurrected; an unchanged selection makes no call, so a stable prompt costs
-  one start attempt and a real change at most the runtime's single policy
-  retry. Subagent sessions get nothing (Pi delegates never receive project
-  memory, skills or a mode block) and keep their own catalog.
-- **Fail-closed refusal**: a file that claims the firing session but fails
-  validation makes the gate refuse the turn through the runtime's own
-  `ctx.abort()` — a thrown handler error is *not* protection (the pinned
-  extension runner logs it and still delivers the prompt; measured in
-  `apps/desktop/test/omp-start-handler-semantics.test.mjs`). A missing or
-  unattributable file injects nothing: the T19-C best-effort behavior for
-  sessions with no desktop state channel. The gate's `tool_call` approval
-  descriptor additionally carries the effective permission mode when the
-  owning state is readable, so the resolved policy is observably consumed
-  (T20-C replaces this with the execution-time decision table).
+  the pinned runtime ships no such tool. An unchanged selection makes no
+  call, so a stable prompt costs one start attempt and a real change at most
+  the runtime's single policy retry.
+- **Leaving a contract mode rebuilds the runtime process** (M5/T20-B1
+  review repair). The pinned extension surface exposes only
+  `getActiveTools`/`getAllTools`/`setActiveTools` (`setActiveToolPresentation`,
+  which restores the exact top-level vs `xd://` partition, is a session method
+  the interactive controller and the SDK call directly — not an extension
+  API, and the RPC command union has no presentation command). Restoring a
+  selection through `setActiveToolsByName` pins every restored name
+  top-level, so a same-process return to Agent would promote the
+  `xd://`-deferred builtins (`ast_edit`/`debug`/`lsp`) and could not see a
+  plugin registered while the clamp was live. On the contract → `agent`
+  transition the bridge therefore reclaims the runtime and lets the next
+  prompt start a fresh process, which re-applies the runtime's own default
+  presentation (native top-level + deferred partition) and re-registers the
+  current host-tool catalog over the same persisted native session
+  (`switch_session`), same project, same model projection, with the
+  generation/message seeds carried across the replacement: history is
+  restored, nothing is replayed, the persisted identity is unchanged, and a
+  removed or disabled catalog tool is never revived. A reclaim failure
+  refuses the prompt instead of running in the pinned presentation. The
+  gate's own Agent restore path stays as the same-process fallback: it
+  restores the pre-clamp enabled selection plus the names the clamp observed
+  and removed, filtering catalog-managed names against the catalog *current
+  at that prompt* and native names against the pre-clamp selection — no
+  `getAllTools` "enable everything", no resurrection of removed/disabled
+  tools.
+- **Fail-closed refusal has a terminal signal**: the bridge marks the channel
+  mandatory for every run it wires (`desktop-state.required` next to the
+  state file). An interactive session whose state is missing, unreadable,
+  oversized, identity-less, foreign or out-of-schema must not run as an
+  unclamped Agent turn: the gate calls `ctx.abort()` (measured: zero provider
+  requests) **and** emits the versioned refusal descriptor through the
+  runtime's own `notify` extension-UI channel (`session/start-refusal.ts`).
+  The runner honors that descriptor only when it names the native session the
+  entry owns and the awaiting run has not emitted `agent_start`; it then
+  closes exactly that generation with one `error` envelope
+  (`OMP_RUNTIME_STATE_REFUSED`) and one `turnEnd` (`error`), cancelling any
+  open dialogs/host calls and returning to idle, so the desktop never keeps
+  the turn running and the next repaired prompt works. A delegate session
+  (`hasUI=false`; `task`/`eval` subagents initialize their extension runner
+  with the no-op UI context) keeps zero injection and is never refused by the
+  channel. Without the marker (a fixture that never enabled the channel) the
+  T19-C degradation stands: no state, no injection. A thrown handler error is
+  *not* protection (the pinned extension runner logs it and still delivers
+  the prompt; measured in
+  `apps/desktop/test/omp-start-handler-semantics.test.mjs`). The gate's
+  `tool_call` approval descriptor additionally carries the effective
+  permission mode when the owning state is readable, so the resolved policy
+  is observably consumed (T20-C replaces this with the execution-time
+  decision table).
 - **On-demand `Skill` path**: the bridge registers a host tool named `Skill`
   (exact Pi description and `{ id }` schema, `loadMode: "essential"`) only
   when the desktop catalog is non-empty — the Pi registration gate. The
@@ -1765,10 +1800,14 @@ contract tool catalog (evidence: `docs/validation/M5-capability-user-paths.md`,
   read-only load raises no approval.
 - **Fail-closed decision**: a host read failure follows Pi's best-effort
   memory behavior (no memory block; a failed `skills.active` drops only the
-  user skills); a malformed catalog line is dropped with a warning. A
-  missing or unattributable state file injects nothing; a file owned by the
-  firing session that fails validation refuses the turn (`ctx.abort()`), and
-  any mandatory mode/policy failure refuses the prompt before submission — a
+  user skills); a malformed catalog line is dropped with a warning. With the
+  mandatory marker, a missing/unattributable/foreign/invalid state refuses
+  the interactive session's turn through `ctx.abort()` + the structured
+  refusal notify (zero provider requests, one terminal error and turn end),
+  while a delegate (`hasUI=false`) keeps the zero-injection skip; without the
+  marker, a missing or unattributable state file injects nothing, and a file
+  owned by the firing session that fails validation still refuses the turn.
+  Any mandatory mode/policy failure refuses the prompt before submission — a
   stale catalog, mode or policy can never reach a provider request.
 - **User path**: Settings, the project-memory editor, skill management,
   plugin enable/scope controls and the composer slash-skill path already

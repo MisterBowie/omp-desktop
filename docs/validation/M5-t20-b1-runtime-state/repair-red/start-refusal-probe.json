@@ -1,0 +1,94 @@
+{
+  "runtimeBase": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+  "transport": "local FakeProvider; no external model",
+  "results": [
+    {
+      "strategy": "control",
+      "providerRequests": 1,
+      "promptResponse": {
+        "id": "req-e592dcaa",
+        "type": "response",
+        "command": "prompt",
+        "success": true
+      },
+      "observable": true,
+      "frameTypes": [
+        "ready",
+        "extension_ui_request",
+        "advisor_cost_changed",
+        "available_commands_update",
+        "response",
+        "response",
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "message_start",
+        "message_update",
+        "message_update",
+        "message_update",
+        "message_end",
+        "turn_end",
+        "extension_ui_request",
+        "agent_end",
+        "response"
+      ],
+      "cleanup": true
+    },
+    {
+      "strategy": "throw",
+      "providerRequests": 1,
+      "promptResponse": {
+        "id": "req-c516f5df",
+        "type": "response",
+        "command": "prompt",
+        "success": true
+      },
+      "observable": true,
+      "frameTypes": [
+        "ready",
+        "extension_ui_request",
+        "advisor_cost_changed",
+        "available_commands_update",
+        "response",
+        "response",
+        "extension_error",
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "message_start",
+        "message_update",
+        "message_update",
+        "message_update",
+        "message_end",
+        "turn_end",
+        "extension_ui_request",
+        "agent_end",
+        "response"
+      ],
+      "cleanup": true
+    },
+    {
+      "strategy": "abort",
+      "providerRequests": 0,
+      "promptResponse": {
+        "id": "req-809aab8b",
+        "type": "response",
+        "command": "prompt",
+        "success": true
+      },
+      "observable": true,
+      "frameTypes": [
+        "ready",
+        "extension_ui_request",
+        "advisor_cost_changed",
+        "available_commands_update",
+        "response",
+        "response",
+        "response"
+      ],
+      "cleanup": true
+    }
+  ]
+}

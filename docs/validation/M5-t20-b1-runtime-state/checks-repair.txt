@@ -1,0 +1,112 @@
+== check-t20-matrix-ids
+MATRIX-ID-OK: B1-B14, C1-C8, D1-D3 each appear exactly once
+exit=0
+== gap probe
+GAP-RETIRED g1 (owner: T20-B) mode and effective permission mode ride the run-scoped state into the prompt, the contract clamp and the host-tool policy table [evidence: replaced by behavior tests apps/desktop/test/omp-runtime-state-e2e.test.mjs, apps/desktop/test/omp-skill-path-bridge.test.mjs, packages/omp-runtime/src/desktop-state.test.ts, packages/omp-runtime/src/session/gate-desktop-state.test.ts; run: node --test apps/desktop/test/omp-runtime-state-e2e.test.mjs (real patched runtime + local fake provider) and pnpm -C packages/omp-runtime test; static diagnostics cannot prove the data flow (F8), so this probe does not check symbols]
+GAP-OPEN g2 (owner: T20-C) the host-tool adapter executes every plugin tool with a hardcoded mode 'agent'; the session's durable mode never reaches plugin execution [evidence: omp-host-tools.ts hardcoded execution-context mode literal present: true]
+GAP-OPEN g3 (owner: T20-B) an approved Plan/Goal execution for an OMP session is refused before claiming; the queued row stays queued and nothing runs on the OMP engine [evidence: runtime/plans.ts refuseOutsidePiRuntime("plan execution") present: true]
+VERDICT g4: pinned rpc-ui RpcCommand union has 45 commands: negotiate_protocol, prompt, steer, follow_up, abort, abort_and_prompt, new_session, get_state, set_fast_mode, get_available_commands, get_entries, get_tree, set_todos, set_host_tools, set_host_uri_schemes, set_subagent_subscription, get_subagents, get_subagent_messages, set_model, cycle_model, get_available_models, set_thinking_level, cycle_thinking_level, get_available_thinking_levels, set_steering_mode, set_follow_up_mode, set_interrupt_mode, compact, set_auto_compaction, set_auto_retry, abort_retry, bash, abort_bash, get_session_stats, export_html, switch_session, branch, get_branch_messages, get_last_assistant_text, set_session_name, handoff, get_messages, get_messages_page, get_login_providers, login
+VERDICT g4: no plan/goal/permission/approval command exists in the pinned rpc-ui surface (rpc-ui = rpc + tool-UI context; see the validation document)
+SUMMARY: 2 gap(s) open [g2, g3]
+exit=1
+== omp-patch --check
+OMP-PATCH-OK 62bc57b+omp-desktop.3 (base 62bc57be1b03ef0802a33cf7f5f530e534527531)
+  patch      : app/patches/oh-my-pi/0001-omp-desktop-runtime.patch (sha256 ad63ced9f7488ff088194754b4902732e1e7ebd0bdfa10a7926b3c5dc1beeaa9)
+  capabilities: rpc-host-tool-concurrency, rpc-host-tool-sole-batch-policy, agent-tool-result-terminate, rpc-host-tool-result-terminate, reproducible-sidecar-build, explicit-bytecode-build-mode
+  tracked files copied: 7673
+exit=0
+== check-release-docs
+
+> pi-desktop@0.15.2 check:release-docs /home/vv/person/code/omp-desktop-m5-t20-b1/app
+> node scripts/check-release-docs.mjs
+
+Release documentation is aligned with 0.15.2 (0.15.x line).
+exit=0
+== check-agent-policy
+
+> pi-desktop@0.15.2 check:agent-policy /home/vv/person/code/omp-desktop-m5-t20-b1/app
+> node scripts/check-agent-policy-sync.mjs
+
+Agent policy sync check passed (AGENTS.md ↔ CLAUDE.md).
+exit=0
+== check-locales
+
+> @pi-desktop/docs@0.15.2 check:locales /home/vv/person/code/omp-desktop-m5-t20-b1/app/docs
+> node scripts/check-locales.mjs
+
+Verified 79 English/Chinese specification pairs.
+exit=0
+== check-docs
+
+ADR catalog:
+  - adr/0301-omp-session-surface.md: H1 must start with "ADR", found "0301 — The OMP conversation surface: events, dialogs and stopping"
+
+ADR index:
+  - adr/0301-omp-session-surface.md: missing from the adr/README.md index
+  - adr/0302-omp-session-persistence-and-runtime-registry.md: missing from the adr/README.md index
+  - adr/0303-omp-subagent-surfacing.md: missing from the adr/README.md index
+  - adr/0304-omp-capability-source-ownership.md: missing from the adr/README.md index
+  - adr/0305-pinned-runtime-patch-set.md: missing from the adr/README.md index
+
+Notes (not failures):
+  - adr/0239-session-collaboration-messages.md: no "Consequences" section, which adr/README.md lists in the format
+  - adr/0240-independent-session-discovery-and-navigable-projections.md: no "Consequences" section, which adr/README.md lists in the format
+  - adr/floating-annotation-index.md: no "Consequences" section, which adr/README.md lists in the format
+  - adr/image-generation-capability.md: no "Consequences" section, which adr/README.md lists in the format
+  - adr/subagent-model-fallback.md: no "Consequences" section, which adr/README.md lists in the format
+
+6 documentation problem(s) across 508 pages.
+exit=1
+== check-architecture
+Architecture metrics
+Source files: 1423
+Total LOC: 417341
+
+Largest 30 source files
+  crates/host-core/src/rpc/mod.rs (8882 LOC)
+  packages/agent-runtime/src/runtime.test.ts (8705 LOC)
+  packages/agent-runtime/src/runtime.ts (7858 LOC)
+  crates/host-core/src/sessions.rs (7178 LOC)
+  apps/desktop/electron/main/plugin-runtime.ts (5694 LOC)
+  crates/host-core/src/tools/mod.rs (4435 LOC)
+  packages/shared/src/changelog.ts (2489 LOC)
+  apps/desktop/electron/main/runtime/omp-session.ts (2469 LOC)
+  apps/desktop/src/components/Sidebar.tsx (2430 LOC)
+  apps/desktop/test/omp-session-bridge.test.mjs (2339 LOC)
+  packages/i18n/src/locales/en/index.ts (2224 LOC)
+  packages/i18n/src/locales/ko/index.ts (2217 LOC)
+  packages/i18n/src/locales/tr/index.ts (2217 LOC)
+  crates/host-core/src/plugins/tests.rs (2186 LOC)
+  packages/i18n/src/locales/zh-CN/index.ts (2181 LOC)
+  packages/i18n/src/locales/zh-TW/index.ts (2179 LOC)
+  packages/i18n/src/locales/de/index.ts (2177 LOC)
+  packages/i18n/src/locales/es/index.ts (2177 LOC)
+  packages/i18n/src/locales/fr/index.ts (2177 LOC)
+  packages/plugin-sdk/src/index.ts (2066 LOC)
+  apps/desktop/electron/main/bootstrap/window.ts (1992 LOC)
+  crates/host-core/src/transcripts.rs (1982 LOC)
+  scripts/e2e-three-column-layout.mjs (1783 LOC)
+  scripts/e2e-plan-ui.mjs (1751 LOC)
+  apps/desktop/resources/plugins/pi.file-manager/main.js (1741 LOC)
+  crates/host-core/src/db/tests.rs (1643 LOC)
+  apps/desktop/electron/main/index.ts (1550 LOC)
+  apps/desktop/src/lib/api.ts (1511 LOC)
+  crates/host-core/src/plugin_sessions.rs (1459 LOC)
+  crates/host-core/src/providers/tests.rs (1366 LOC)
+
+LOC thresholds
+  >500: 196
+  >1000: 46
+  >2000: 20
+
+Enforced limits
+  apps/desktop/electron/main/index.ts: 1550 / 1500
+  apps/desktop/src/stores/app-store.ts: 755 / 1000
+  New TS/TSX limit: 800 LOC
+  Rust limit: 1000 LOC
+  Rust exemptions: 9
+  New TS/TSX files checked: 0
+
+Architecture check failed
+  apps/desktop/electron/main/index.ts is 1550 LOC; maximum is 1500
+exit=1

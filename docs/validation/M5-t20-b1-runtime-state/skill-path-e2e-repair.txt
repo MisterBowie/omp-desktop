@@ -1,0 +1,14 @@
+✔ the desktop catalog and project memory reach the system prompt; skill bodies stay out (1894.030866ms)
+✔ the model loads a skill body through the Skill host tool exactly once, unapproved (1899.893317ms)
+✔ memory edits and removal reach the next prompt; nothing is duplicated into the transcript (2011.33253ms)
+✔ a plugin unloaded between catalog and execution fails closed with the PI error (3509.852584ms)
+✔ an OMP-native project skill stays discoverable beside the desktop catalog (1915.26509ms)
+✔ a planted symlink cannot redirect the state write; spaces/non-ASCII paths work; dispose removes the state (1903.62581ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13559.634558

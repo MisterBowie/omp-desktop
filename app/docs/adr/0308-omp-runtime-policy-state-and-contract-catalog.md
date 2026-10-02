@@ -1,6 +1,6 @@
 # ADR 0308: OMP runtime mode/policy state, the mode block, and the contract tool catalog
 
-- Status: Accepted (M5/T20-B1)
+- Status: Accepted (M5/T20-B1; 2026-10-02 review repair amends §2/§3)
 - Date: 2026-10-02
 - Scope: M5/T20-B1 (the run-scoped runtime state v2, the gate's mode-block
   append and contract-mode tool clamp, the effective permission mode, and the
@@ -11,6 +11,8 @@
   channel with a mandatory half), ADR 0301 (the gate's tool surface).
 - Evidence: `docs/validation/M5-t20-b1-runtime-state.md`,
   `packages/omp-runtime/src/desktop-state.ts`,
+  `packages/omp-runtime/src/session/start-refusal.ts`,
+  `packages/omp-runtime/src/session/runner.ts`,
   `packages/omp-runtime/extensions/omp-desktop-gate.ts`,
   `apps/desktop/electron/main/runtime/omp-session.ts`,
   `apps/desktop/electron/main/runtime/omp-session-wiring.ts`,
@@ -95,32 +97,63 @@ The gate's `before_agent_start` handler, for the owning session only:
   and then the mode block, in that order — the mode block is last, matching
   PI's `base + mode block` position; a policy retry re-runs the handler
   against the fresh base, so the block is appended exactly once;
-- in `plan`/`goal`, selects exactly `CONTRACT_NATIVE_TOOLS ∩ live active` plus
+- `plan`/`goal`, selects exactly `CONTRACT_NATIVE_TOOLS ∩ live active` plus
   plugin host tools whose state entry has a non-empty `planSafeActions`, in
   the runtime's current order, via `setActiveTools`. `write`/`edit`/
   `apply_patch`/unknown tools, user MCP tools and undeclared plugin tools
   never enter the contract catalog; PI's `BrowserPreview` is **not** invented
   because the pinned runtime ships no such tool;
-- on return to `agent`, restores the pre-clamp enabled selection united with
-  whatever the runtime auto-activated while the clamp was live, so no stale
-  clamp survives and no user-disabled tool is resurrected. The extension
-  surface exposes only `setActiveToolsByName`, so an explicit selection pins
-  previously `xd://`-discoverable builtins top-level; this is the same effect
-  OMP's own interactive Plan mode has when it restores
-  `#goalModePreviousTools`, and it is recorded rather than papered over;
+- on return to `agent` in the same process, restores the pre-clamp enabled
+  selection plus every name the clamp observed and removed, with
+  catalog-managed names filtered against the catalog current at that prompt
+  and native names against the pre-clamp selection — no `getAllTools`
+  "enable everything", no resurrection of a removed/disabled tool;
 - an unchanged selection makes no call — a stable prompt costs one start
   attempt, a real change costs at most the runtime's single policy retry.
 
-### 3. Fail-closed refusal is `ctx.abort()`, not a throw
+### 2a. Leaving a contract mode rebuilds the runtime process (review repair)
+
+The extension surface exposes only `getActiveTools`/`getAllTools`/
+`setActiveTools`; `setActiveToolPresentation` (which restores the exact
+top-level vs `xd://` partition) is a session method the interactive controller
+and the SDK call directly, and the RPC command union has no presentation
+command. A same-process restore through `setActiveToolsByName` pins every
+restored name top-level (promoting `ast_edit`/`debug`/`lsp`) and cannot see a
+plugin that was registered while the clamp was live. Therefore the bridge
+detects the contract-mode → `agent` transition from the last prompt's mode and
+reclaims the runtime; the next prompt starts a fresh process that re-applies
+the runtime's own default presentation and re-registers the current host-tool
+catalog over the same persisted native session (`switch_session`), same
+project, same model projection. Generation/message-id seeds carry across the
+replacement, so turn/message ids never collide; history is restored, nothing
+is replayed and the persisted identity is unchanged. A reclaim failure refuses
+the prompt rather than running in the pinned presentation.
+
+### 3. Fail-closed refusal is `ctx.abort()` plus a structured notify
 
 A state file that claims the firing session but fails validation makes the
 gate refuse the turn through the runtime's own `ctx.abort()` (measured: zero
 provider requests, prompt not delivered). A thrown handler error is *not*
 protection: the extension runner logs it and continues (measured: the provider
-request is still delivered), so the gate never relies on throws. A file owned
-by another session (a subagent delegate) or an unattributable file gets
-nothing: no injection, no clamp — delegates keep their own catalog and never
-receive desktop mode/skills/memory.
+request is still delivered), so the gate never relies on throws.
+
+Because an aborted `before_agent_start` emits no `agent_start`/`agent_end`,
+the gate also emits a versioned refusal descriptor through the runtime's own
+`notify` extension-UI channel. The runner honors it only when the descriptor
+names the native session the entry owns and the awaiting generation has not
+emitted `agent_start`; it then closes exactly that generation with one
+`error` envelope (`OMP_RUNTIME_STATE_REFUSED`) and one `turnEnd` (`error`),
+cancelling open dialogs/host calls and returning to idle. Duplicate, late,
+foreign-session and delegate signals are counted and ignored, so no newer
+generation can be closed by a stale one.
+
+The bridge also marks the channel mandatory (`desktop-state.required` next to
+the state file) for every run it wires: from then on *every* non-owned read
+(missing, unreadable, oversized, identity-less, foreign, out-of-schema)
+refuses the interactive session's turn. A delegate (`hasUI=false`; `task`/
+`eval` subagents initialize their extension runner with the no-op UI context)
+keeps the zero-injection skip and is never refused. A fixture that never
+enabled the channel keeps the T19-C degradation: no state, no injection.
 
 ### 4. Policy travels with the catalog fingerprint; the card carries the mode
 
@@ -133,6 +166,10 @@ execution-time decision table; the field stays for diagnostics).
 
 ## Consequences
 
+- Leaving Plan/Goal costs one runtime restart per transition (seconds, no
+  history loss). This is the only in-tree-safe route while the pinned runtime
+  exposes no presentation restore to extensions; if a future pin exposes it,
+  the rebuild can be replaced by an exact re-application and this ADR amended.
 - T20-C can build PI's §1.3.1 decision table from validated data (state
   policy table + effective mode) instead of name-prefix guesses; this ADR does
   not implement that table and does not claim it.

@@ -1098,11 +1098,24 @@ T19-C 的 `desktop-state.json` 升级为 schema v2：除技能/记忆外，每�
 Agent 继续）；技能/记忆仍为 PI 式 best-effort。gate 在 `before_agent_start` 先追加能力块、最后
 追加 mode 块（纯追加、恰一次、单一 system），并在 Plan/Goal 用 `setActiveTools` 夹取 PI 合约目录
 （`read/glob/grep/bash/ask/new_context` ∩ 实际存在，加上声明了非空 planSafeActions 的插件工具；
-Write/Edit/未知/用户 MCP/未声明插件永不进入；不虚构 PI 的 BrowserPreview）；回到 Agent 恢复夹取
-前的选择并保留夹取期间自动激活的工具，不复活用户禁用的工具。声称属于本会话但校验失败的状态文件用
-运行时正式的 `ctx.abort()` 拒绝该回合（实测：provider 零请求；而抛异常会被扩展运行器吞掉、提示词
-仍会投递，因此不作为保护手段）；子代理会话零注入。风险/安全动作随目录指纹一起刷新；审批描述符
-携带有效权限模式作为可观察的消费路径。T20-C/B2/D 仍未开始。
+Write/Edit/未知/用户 MCP/未声明插件永不进入；不虚构 PI 的 BrowserPreview）。
+
+2026-10-02 复审返修补齐四条失效语义：①**强制通道标记**——bridge 每次写状态时同时写
+`desktop-state.required`；有标记时，交互会话任何"非 owned 且有效"的状态（缺失/不可读/超限/无
+identity/他会话/未知 schema）都必须拒绝回合（零 provider 请求），只有委托会话（`hasUI=false`，
+`task`/`eval` 子代理的扩展运行器没有 UI 上下文）保持零注入跳过；无标记的夹具明确退化。②**拒绝
+终态**——`ctx.abort()` 之外，gate 通过运行时正式的 `notify` 通道发出带版本的结构化拒绝描述符；
+runner 只在描述符命中本 entry 的 native session 且当前代尚未 `agent_start` 时关闭该代：恰一次
+`error`（`OMP_RUNTIME_STATE_REFUSED`）+ 恰一次 `turnEnd(error)`，关闭 dialogs/hostcalls 并回到
+idle，迟到/重复/他会话/子代理信号不关闭新代；下一提示词（状态修复后）正常。③**离开合约模式重建
+运行时进程**——扩展面只暴露按名选择的 `setActiveTools`（会把它恢复的名字钉在顶层），没有
+presentation 恢复 API（`setActiveToolPresentation` 非扩展接口，RPC 也无该命令），因此 Plan/Goal →
+Agent 时 bridge 回收进程、下一次提示词在同一持久 native 会话（`switch_session`）、同一项目/模型
+投影上重建默认呈现（native 顶层 + `xd://` 延迟分区）并重注册宿主目录，seeds 跨替换延续、无重放、
+身份不变、被移除/禁用的工具不复活；回收失败则拒绝提示词。gate 自身的 Agent 恢复路径保留为同进程
+回退：恢复夹取前选择 + 夹取期间被移除的名字，目录类名字按**当时**目录过滤、native 名字按夹取前
+选择过滤，不用 `getAllTools` 全开。④子代理仍零注入、审批描述符仍携带有效权限模式。T20-C/B2/D
+仍未开始。
 
 ### Provider certificate trust（issue #714）
 
