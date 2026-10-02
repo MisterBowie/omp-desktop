@@ -116,11 +116,26 @@ if (HOST_BINARY && GATE && UNPATCHED) {
   PATCHED_LAUNCHER = join(prepared.tree, "packages", "coding-agent", "scripts", "omp");
 }
 
-test.after(() => {
+test.after(async () => {
+  // Cleanup is awaited in creation order's reverse: a supervised runtime must
+  // be stopped (and its process group reclaimed) *before* its directories are
+  // removed, or a late write recreates part of the tree and the hook leaves a
+  // leak behind. Failures are collected and reported as one error — a
+  // swallowed reclaim failure would hide exactly the leak this hook exists to
+  // prevent (root review repair: the product E2E used to leave its data dirs
+  // behind).
+  const failures = [];
   for (const entry of scratch.splice(0).reverse()) {
-    if (entry && typeof entry.cleanup === "function") entry.cleanup();
-    else if (entry && typeof entry.close === "function") entry.close();
-    else if (typeof entry === "string") rmSync(entry, { recursive: true, force: true });
+    try {
+      if (entry && typeof entry.cleanup === "function") await entry.cleanup();
+      else if (entry && typeof entry.close === "function") await entry.close();
+      else if (typeof entry === "string") rmSync(entry, { recursive: true, force: true });
+    } catch (error) {
+      failures.push(error);
+    }
+  }
+  if (failures.length > 0) {
+    throw new AggregateError(failures, "the B2 E2E fixture could not reclaim everything it created");
   }
 });
 

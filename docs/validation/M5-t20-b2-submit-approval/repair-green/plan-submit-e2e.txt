@@ -1,12 +1,12 @@
-(node:1707149) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:1712527) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-✔ T20-B2 plan submission (patched): valid, schema-rejected, mixed-batch, duplicate and revision (3428.864391ms)
-✔ T20-B2 mixed batch [bash, SubmitPlan] is rejected whole, does not terminate, and ordinary tools still run (3120.944027ms)
-✔ T20-B2 approval dispatch: queued execution runs in OMP with the approved instruction, exactly once (5160.042548ms)
-✔ T20-B2 rejected approval never executes, and a restart does not replay a queued one (3496.888673ms)
-✔ T20-B2 Stop during the durable host begin refuses the prompt before it is sent, settles its row aborted, and the next turn recovers (3130.537363ms)
-✔ T20-B2 a real terminal delivered before the prompt response still closes its own durable host turn (6244.432788ms)
-✔ T20-B2 an approved execution settles from a terminal that beats the dispatch prompt return, and a refused begin interrupts it (7818.958562ms)
+✔ T20-B2 plan submission (patched): valid, schema-rejected, mixed-batch, duplicate and revision (3099.556354ms)
+✔ T20-B2 mixed batch [bash, SubmitPlan] is rejected whole, does not terminate, and ordinary tools still run (2585.286389ms)
+✔ T20-B2 approval dispatch: queued execution runs in OMP with the approved instruction, exactly once (4754.620335ms)
+✔ T20-B2 rejected approval never executes, and a restart does not replay a queued one (3892.733767ms)
+✔ T20-B2 Stop during the durable host begin refuses the prompt before it is sent, settles its row aborted, and the next turn recovers (2593.329446ms)
+✔ T20-B2 a real terminal delivered before the prompt response still closes its own durable host turn (5742.864379ms)
+✔ T20-B2 an approved execution settles from a terminal that beats the dispatch prompt return, and a refused begin interrupts it (7238.525573ms)
 ℹ tests 7
 ℹ suites 0
 ℹ pass 7
@@ -14,5 +14,5 @@
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 37690.412761
+ℹ duration_ms 42586.673014
 EXIT:0

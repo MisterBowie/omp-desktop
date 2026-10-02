@@ -78,13 +78,14 @@ B2 改变了两处可观察形状，相关既有测试按新行为更新：
 
 - `omp-plan-submit-e2e.test.mjs` 扩为 **7 用例**，新增三个控制性顺序回归（每个含正对照与真实 provider 计数/durable row/terminal 身份/进程与目录回收断言）：①Stop during durable begin（拒绝 `stopping`、provider 0、row 恰一次 aborted、同 native 恢复）；②terminal before prompt response（control + held 两轮；row completed、公告 id == row id、下一轮恢复）；③dispatch hold（双 dispatcher 共享 host CAS、早到终态结算 completed、不重放）+ refused begin（`interrupted`、provider 0、无遗留 turn）。
 - `omp-runtime` 单测新增 2 例：`runner.test.ts` 与 `turn-end.test.ts` 各一（FakeRuntime 只扣住真实 prompt 应答、先推真实 `agent_end`，断言公告携带 run 的 hostTurnId）。
+- **夹具回收（随返修一并修复）**：产品 E2E 的 `test.after` 原来对每个 entry 的 cleanup/close fire-and-forget，随即删除目录——受监管 runtime 仍存活时会把 data 目录写回，留下 `t20b2-*-data-*` 残骸（本机复现：单用例运行新增 1 个；同族残骸自首稿起累计）。现改为按逆序 `await` 每项（先回收 runtime 进程组、再删目录），并把任何回收失败聚合为 `AggregateError` 使文件判失败；修复后同一单用例复跑新增 **0** 个残留，全量 7 用例同样零残留。
 
 ### 5.4 修复后验证（Linux x64 / Node v24.14.0 / Bun 1.4.2；原始日志 `repair-green/`）
 
 | 检查 | 结果 | 日志 |
 | --- | --- | --- |
 | 移植根脚本 R1/R2/R3（对修复后 commit） | 三脚本 `passed: true`（control + 负例全过） | `repair-green/host-turn-*.json`、`approved-terminal-order-*.json` |
-| `node --test apps/desktop/test/omp-plan-submit-e2e.test.mjs` | **7 passed / 0 failed，exit 0** | `repair-green/plan-submit-e2e.txt` |
+| `node --test apps/desktop/test/omp-plan-submit-e2e.test.mjs` | **7 passed / 0 failed，exit 0**；`test.after` 逐项 await 回收后 scratch 目录新增 **0** | `repair-green/plan-submit-e2e.txt` |
 | 受影响 desktop 套件（24 文件：B2 E2E/单元、drain、artifact、approval settings、host-tool adapter/bridge/e2e、bridge/failclosed/turn-fence/runtime-state/execution-policy/session e2e、M4 configure/delete/ownership/ipc、launcher、patch、sidecar、release gate） | **252 passed / 0 failed，exit 0** | `repair-green/desktop-affected.txt` |
 | `pnpm --filter @pi-desktop/omp-runtime test`（vitest） | **31 files / 476 passed / 6 skipped，exit 0** | `repair-green/omp-runtime-vitest.txt` |
 | `pnpm build:js` / `pnpm typecheck` / `pnpm lint` | 全部 exit 0 | `repair-green/{build-js,typecheck,lint}.txt` |
