@@ -30,6 +30,9 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
 const { createOmpSessionBridge } = await import("../electron/main/runtime/omp-session.ts");
+const { serveTurnFenceCommand } = await import(
+  "../../../packages/omp-runtime/src/session/turn-fence-testkit.ts"
+);
 const { createOmpRuntimeAdapter } = await import("../electron/main/runtime/omp-runtime.ts");
 /** The production name of the packaged executable, so fixtures cannot drift. */
 const { bundledBinaryFilename } = await import("../../../packages/omp-runtime/src/bundled.ts");
@@ -63,6 +66,8 @@ class FakeRuntime {
   write() { return true; }
   push(frame) { for (const h of [...this.#frames]) h(frame); }
   async request(command) {
+    const fence = serveTurnFenceCommand(command, (frame) => this.push(frame));
+    if (fence) return fence;
     this.commands.push(command.type);
     const scripted = this.responses.get(command.type);
     if (scripted) return typeof scripted === "function" ? scripted(command) : scripted;

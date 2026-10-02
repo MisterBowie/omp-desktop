@@ -17,7 +17,7 @@ import { spawn } from "node:child_process";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { DESKTOP_STATE_ENV, DESKTOP_STATE_FILE } from "./desktop-state.js";
+import { DESKTOP_STATE_ENV, DESKTOP_STATE_FILE, DESKTOP_STATE_REQUIRED_ENV } from "./desktop-state.js";
 import { OmpRuntimeSupervisor } from "./supervisor.js";
 import type { OmpSpawnOptions } from "./process.js";
 import {
@@ -124,5 +124,25 @@ describe("desktop-capability state wiring", () => {
     expect(result).toMatchObject({ stopped: true, reaped: true, cleaned: true });
     expect(existsSync(statePath)).toBe(false);
     expect(supervisor.runRoot()).toBeNull();
+  });
+
+  it("enables the mandatory channel at spawn by default", async () => {
+    const captured: OmpSpawnOptions[] = [];
+    const { supervisor } = supervisorFor(captured, {
+      // An ambient or embedder value must never decide this: the option does.
+      extraEnv: { [DESKTOP_STATE_REQUIRED_ENV]: "0" },
+    });
+    await supervisor.start();
+    expect(captured[0]!.env?.[DESKTOP_STATE_REQUIRED_ENV]).toBe("1");
+  });
+
+  it("opts a standalone fixture out only through the explicit option", async () => {
+    const captured: OmpSpawnOptions[] = [];
+    const { supervisor } = supervisorFor(captured, {
+      desktopStateRequired: false,
+      extraEnv: { [DESKTOP_STATE_REQUIRED_ENV]: "1" },
+    });
+    await supervisor.start();
+    expect(captured[0]!.env?.[DESKTOP_STATE_REQUIRED_ENV]).toBe("0");
   });
 });

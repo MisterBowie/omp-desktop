@@ -209,6 +209,12 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
     createSupervisor: (spec: OmpSessionRuntimeSpec) =>
       engineRuntime.ompRuntime.createSupervisor({
         sessionDir,
+        // This bridge always wires a session policy and writes a valid state
+        // before every prompt, so the runtime carries the mandatory channel:
+        // the gate refuses a turn whose state cannot be read back as
+        // owned-and-valid instead of running it unclamped. The switch is
+        // launch-scoped — a deleted state file can never disable it.
+        desktopStateRequired: true,
         // The pinned runtime only forwards a child's `subagent_event` frames
         // when its model is selected explicitly (`--model provider/model`);
         // discovery from `models.yml` alone leaves the child's event stream

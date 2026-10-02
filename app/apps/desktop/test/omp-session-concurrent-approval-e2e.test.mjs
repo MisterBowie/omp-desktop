@@ -71,6 +71,10 @@ test(
     const envelopes = [];
     const makeSupervisor = (spec) =>
       new OmpRuntimeSupervisor({
+      // This fixture loads the real gate but never writes a run-scoped state:
+      // it opts out of the mandatory channel explicitly rather than letting a
+      // missing file mean "disabled".
+      desktopStateRequired: false,
         dataRoot,
         launcherPath: LAUNCHER,
         expectedRuntimeVersion: "18.3.0",

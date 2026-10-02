@@ -28,6 +28,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
 const { createOmpSessionBridge } = await import("../electron/main/runtime/omp-session.ts");
+const { serveTurnFenceCommand } = await import(
+  "../../../packages/omp-runtime/src/session/turn-fence-testkit.ts"
+);
 const { OmpSessionRunner } = await import("../../../packages/omp-runtime/src/session/runner.ts");
 const { DESKTOP_STATE_FILE } = await import("../../../packages/omp-runtime/src/desktop-state.ts");
 const { composeModeSystemPrompt } = await import("../../../packages/agent-runtime/src/mode-prompts.ts");
@@ -59,6 +62,10 @@ class FakeRuntime {
   }
 
   async request(command) {
+    // The turn fence is answered transparently and never logged: the command
+    // sequences asserted in this file describe the desktop's own protocol.
+    const fence = serveTurnFenceCommand(command, (frame) => this.push(frame));
+    if (fence) return fence;
     this.commands.push(command);
     if (command.type === "set_host_tools") {
       return { success: true, data: { toolNames: command.tools.map((tool) => tool.name) } };

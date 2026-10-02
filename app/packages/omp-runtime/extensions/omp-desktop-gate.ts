@@ -36,21 +36,34 @@
  *   - `OMP_DESKTOP_GATE_TIMEOUT_MS` — dialog deadline (default 120000).
  *   - `OMP_DESKTOP_GATE_MODE` — `ask` (default), `deny` (block everything
  *     gated without asking: unattended runs), or `allow`.
+ *   - `OMP_DESKTOP_STATE_REQUIRED` — `1` when the launcher enabled the
+ *     mandatory mode/policy channel for this run (the supervisor's
+ *     `desktopStateRequired`, `0`/absent otherwise). Fixed at spawn; it is
+ *     never inferred from the mutable state file.
  *   - `OMP_DESKTOP_STATE` — the run-scoped desktop runtime state
  *     (M5/T19-C skills+memory; M5/T20-B1 mode/policy). Its
  *     `before_agent_start` handler appends the PI-identical skill-catalog and
  *     project-memory blocks plus the production `composeModeSystemPrompt(mode,
  *     "")` output to the runtime's system prompt when the file is fresh,
  *     valid and owned by the firing session; in Plan/Goal it also clamps the
- *     active tool set to the PI contract catalog. The owning bridge marks the
- *     channel mandatory with `desktop-state.required` next to the state file;
- *     from then on a file that is missing, unreadable or fails validation
- *     refuses the interactive session's turn (`ctx.abort()` plus a structured
- *     `notify` — a thrown handler error is logged and swallowed by the
- *     extension runner and would NOT protect the turn), while a delegate
- *     session (no UI) keeps the zero-injection skip a real subagent needs.
- *     Without the marker (fixtures that never enabled the channel) the old
- *     explicit degradation stands: no state, no injection.
+ *     active tool set to the PI contract catalog. The owning bridge launches
+ *     the runtime with the mandatory channel enabled
+ *     (`OMP_DESKTOP_STATE_REQUIRED=1`, the supervisor's
+ *     `desktopStateRequired` option); from then on a file that is missing,
+ *     unreadable or fails validation refuses the interactive session's turn
+ *     (`ctx.abort()` plus a structured `notify` — a thrown handler error is
+ *     logged and swallowed by the extension runner and would NOT protect the
+ *     turn), while a delegate session (no UI) keeps the zero-injection skip a
+ *     real subagent needs. The switch is fixed at spawn, so deleting the
+ *     state file (or anything else in the mutable run root) can never turn the
+ *     channel off; a fixture that never enabled it says so explicitly.
+ *
+ * The gate also registers the desktop's internal turn-boundary command
+ * (`/<OMP_TURN_COMMAND> <token>`, see `session/turn-fence.ts`). The runner
+ * invokes it through the formal RPC `prompt` path before every admitted turn;
+ * it is consumed locally before any provider request, acknowledges itself
+ * through `notify`, and its token is echoed by every start refusal so a
+ * replayed descriptor from an earlier generation can never close a newer one.
  */
 import {
   OMP_APPROVAL_OPTIONS,
@@ -74,6 +87,11 @@ import {
   type OmpStartRefusal,
   type OmpStartRefusalCode,
 } from "../src/session/start-refusal.ts";
+import {
+  encodeTurnAck,
+  isTurnToken,
+  OMP_TURN_COMMAND,
+} from "../src/session/turn-fence.ts";
 
 const DEFAULT_GATED_TOOLS = "write,edit,apply_patch,bash,eval";
 
@@ -191,6 +209,20 @@ export interface ExtensionAPI {
       event: BeforeAgentStartEventSlice,
       ctx: BeforeAgentStartContextSlice,
     ) => { systemPrompt: string[] } | undefined | Promise<{ systemPrompt: string[] } | undefined>,
+  ): void;
+  /**
+   * Register the desktop's internal turn-boundary command (the runtime's
+   * public `pi.registerCommand`). Optional so an embedder without the command
+   * API still loads the gate for its other policies; the runner refuses to
+   * prompt when the command is not advertised, so a missing registration can
+   * never degrade into an unbound turn.
+   */
+  registerCommand?(
+    name: string,
+    options: {
+      description?: string;
+      handler: (args: string, ctx: BeginAgentStartContextSlice) => unknown;
+    },
   ): void;
   /** Live active-tool selection (the extension API's `session.getEnabledToolNames`). */
   getActiveTools?: () => string[];
@@ -420,13 +452,14 @@ export type BeforeAgentStartDecision =
  *     injected and no tool set is touched (PI's delegates never receive
  *     project memory, skills or mode blocks either);
  *   - a file that claims this session but fails validation → `refuse` (this
- *     was already true without the marker: continuing would silently run a
- *     Plan/Goal intent as an unclamped Agent turn);
- *   - with the mandatory marker (`desktop-state.required`) and an interactive
- *     context (`hasUI` not false): every read that is not `owned` refuses —
- *     deleted, truncated, oversized, identity-less, foreign and out-of-schema
- *     states alike. The channel was enabled by the bridge for this run, so
- *     "cannot read the state" is an anomaly, not "the channel is off".
+ *     was already true without the mandatory channel: continuing would
+ *     silently run a Plan/Goal intent as an unclamped Agent turn);
+ *   - with the mandatory channel enabled (`OMP_DESKTOP_STATE_REQUIRED=1` at
+ *     spawn) and an interactive context (`hasUI` not false): every read that
+ *     is not `owned` refuses — deleted, truncated, oversized, identity-less,
+ *     foreign and out-of-schema states alike. The channel was enabled by the
+ *     launcher for this run, so "cannot read the state" is an anomaly, not
+ *     "the channel is off".
  */
 export function beforeAgentStartPolicy(
   event: BeforeAgentStartEventSlice,
@@ -617,6 +650,49 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
   let refusalSequence = 0;
 
   /**
+   * The turn token installed by the runner's fence for the admitted turn.
+   *
+   * It is process memory, not a file: a state file that is deleted, truncated
+   * or replaced can never change it, and a refusal always echoes the token of
+   * the turn the runner most recently armed. `null` until the first handshake,
+   * which a conforming runner always performs before submitting a prompt.
+   */
+  let turnToken: string | null = null;
+
+  /**
+   * The desktop's internal turn-boundary command.
+   *
+   * Registered first so it exists before the runner ever queries the available
+   * commands. The runtime's own command dispatch consumes it before any
+   * provider loop starts (`#tryExecuteExtensionCommand`), so the handshake
+   * never reaches the provider, the transcript or the tool catalogue. A
+   * malformed argument is ignored without an acknowledgment — the runner then
+   * refuses the prompt before submitting it, which is the fail-closed answer.
+   */
+  if (typeof pi.registerCommand === "function") {
+    pi.registerCommand(OMP_TURN_COMMAND, {
+      description: "internal desktop turn boundary (reserved; not a user command)",
+      handler: (args, context) => {
+        const token = typeof args === "string" ? args.trim() : "";
+        if (!isTurnToken(token)) {
+          pi.logger?.warn?.("the desktop turn-boundary command received a malformed token");
+          return;
+        }
+        turnToken = token;
+        try {
+          context.ui?.notify?.(encodeTurnAck(token), "info");
+        } catch (error) {
+          pi.logger?.warn?.("the desktop gate could not acknowledge the turn boundary", String(error));
+        }
+      },
+    });
+  } else {
+    pi.logger?.warn?.(
+      "the runtime exposes no extension command API; the desktop turn fence cannot be armed",
+    );
+  }
+
+  /**
    * Refuse one agent start: the runtime's own abort path *and* the structured
    * notify the desktop runner consumes.
    *
@@ -635,6 +711,7 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
       v: OMP_START_REFUSAL_VERSION,
       kind: OMP_START_REFUSAL_KIND,
       sessionId: decision.sessionId,
+      turnToken,
       code: decision.code,
       reason: decision.reason,
       refusalId: `omp-refusal-${at}-${refusalSequence++}`,
@@ -695,7 +772,7 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
     const statePath = env?.OMP_DESKTOP_STATE;
     try {
       const decision = beforeAgentStartPolicy(event, context, statePath, Date.now(), {
-        required: isDesktopStateRequired(statePath),
+        required: isDesktopStateRequired(env?.OMP_DESKTOP_STATE_REQUIRED),
       });
       if (decision.kind === "refuse") {
         refuseStart(context, decision);

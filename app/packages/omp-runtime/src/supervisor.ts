@@ -33,7 +33,7 @@ import {
 
 import { OmpRuntimeError } from "./errors.js";
 import { CONFIG_OVERLAY_FILE, writeSourceIsolationOverlay } from "./config-overlay.js";
-import { DESKTOP_STATE_ENV, DESKTOP_STATE_FILE } from "./desktop-state.js";
+import { DESKTOP_STATE_ENV, DESKTOP_STATE_FILE, DESKTOP_STATE_REQUIRED_ENV } from "./desktop-state.js";
 import {
   buildOmpRuntimeEnv,
   isPathInside,
@@ -93,6 +93,20 @@ export type OmpRuntimeSupervisorOptions = {
   launcherResolutionError?: string | null;
   /** Version this build pins; `null` disables the check. */
   expectedRuntimeVersion?: string | null;
+  /**
+   * Whether this run carries the mandatory desktop mode/policy channel
+   * (M5/T20-B1). When on, the shipped gate refuses an interactive turn whose
+   * run-scoped state cannot be read back as owned-and-valid, instead of
+   * silently running it without its mode block and tool clamp.
+   *
+   * The switch is fixed at spawn (`OMP_DESKTOP_STATE_REQUIRED=1|0`), so
+   * deleting, truncating or replacing anything inside the mutable run root can
+   * never disable the channel. The production bridge always passes `true`; a
+   * standalone fixture that never configures the channel opts out explicitly
+   * with `false`. Defaults to `true`: a run that was not opted out keeps the
+   * fail-closed semantics whenever the gate is loaded.
+   */
+  desktopStateRequired?: boolean;
   /** PATH entries published to the child; defaults to the launcher's runtime. */
   pathEntries?: readonly string[];
   /** Working directory of the runtime process; defaults to the run root. */
@@ -464,6 +478,13 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
     // is built, so neither a static constructor argument nor an embedder's
     // `extraEnv` can redirect it outside the owned run root.
     env[DESKTOP_STATE_ENV] = desktopState;
+    // The mandatory-channel switch is launch-scoped for the same reason: it
+    // tells the gate that this run cannot silently continue without its state,
+    // and it must not be possible to turn that off by deleting or corrupting
+    // anything inside the mutable run root. It is always written explicitly
+    // (never inherited from the ambient environment), so a run that never
+    // configured the channel opts out with `0` rather than by absence.
+    env[DESKTOP_STATE_REQUIRED_ENV] = this.options.desktopStateRequired === false ? "0" : "1";
     const paths: OmpRunPaths = {
       runRoot,
       home,

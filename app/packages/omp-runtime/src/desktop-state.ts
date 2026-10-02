@@ -55,14 +55,23 @@ export const DESKTOP_STATE_FILE = "desktop-state.json";
 export const DESKTOP_STATE_ENV = "OMP_DESKTOP_STATE";
 
 /**
- * Marker file the owning bridge writes next to the state file when this run
- * carries the mandatory mode/policy channel (M5/T20-B1). It survives a state
- * file that is deleted, truncated or replaced: the gate uses it to tell "the
- * channel is off" (a fixture without a session policy) from "the channel is
- * on but its state is missing or unreadable", which must refuse the turn
- * instead of silently running it as an unclamped Agent turn.
+ * The launch-scoped switch that marks this run as carrying the mandatory
+ * mode/policy channel (M5/T20-B1). The supervisor sets it to `"1"` at spawn
+ * (`OmpRuntimeSupervisor` option `desktopStateRequired`), so enablement is
+ * fixed for the runtime's whole lifetime and cannot be turned off by deleting,
+ * corrupting or replacing anything inside the mutable run root — the second
+ * review's `delete-channel-files` counterexample (delete the state file *and*
+ * the old marker file, then run unclamped) is exactly what this replaces.
+ * A fixture that never enables the channel says so explicitly (the option is
+ * `false`); a configured production bridge never infers "disabled" from a
+ * missing or unreadable state file.
  */
-export const DESKTOP_STATE_REQUIRED_FILE = "desktop-state.required";
+export const DESKTOP_STATE_REQUIRED_ENV = "OMP_DESKTOP_STATE_REQUIRED";
+
+/** True when the launch-scoped switch was explicitly set to `"1"`. */
+export function isDesktopStateRequired(value: string | undefined | null): boolean {
+  return value === "1";
+}
 
 /** The state-file schema version this build reads and writes. */
 export const DESKTOP_STATE_VERSION = 2;
@@ -235,33 +244,6 @@ function isHostToolPolicy(entry: unknown): entry is DesktopHostToolPolicy {
   // otherwise is not the desktop's own write.
   if (tool.origin === "user-mcp" && tool.planSafeActions.length > 0) return false;
   return true;
-}
-
-/**
- * Mark one run root as carrying the mandatory mode/policy channel.
- *
- * Called by the bridge that assembles and writes the state before every
- * prompt; a run without this marker is a fixture that never enabled the
- * channel and keeps the explicit "no state, no injection" degradation. A
- * marker write that fails is a refusal (the caller must not prompt with a
- * channel whose mandatory semantics cannot be guaranteed).
- */
-export function markDesktopStateRequired(statePath: string): void {
-  writeFileSync(join(dirname(statePath), DESKTOP_STATE_REQUIRED_FILE), "1\n", { encoding: "utf8", mode: 0o600 });
-}
-
-/**
- * True when the owning bridge marked the state channel mandatory for this
- * run. The marker is checked as a regular file: a directory or an unreadable
- * entry at that path is not a claim of the channel.
- */
-export function isDesktopStateRequired(statePath: string | undefined | null): boolean {
-  if (!statePath) return false;
-  try {
-    return statSync(join(dirname(statePath), DESKTOP_STATE_REQUIRED_FILE)).isFile();
-  } catch {
-    return false;
-  }
 }
 
 /** True when `path` is a readable regular file within the size ceiling. */

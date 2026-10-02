@@ -11,6 +11,8 @@ import type { AgentEventEnvelope } from "@pi-desktop/shared";
 import { OmpRuntimeError } from "../errors.js";
 import type { OmpFrame } from "../protocol.js";
 import { OmpSessionRunner, type OmpSessionRuntime } from "./runner.js";
+import { encodeTurnAck, turnCommandToken } from "./turn-fence.js";
+import { serveTurnFenceCommand } from "./turn-fence-testkit.js";
 import type { OmpUiRecord } from "./ui-requests.js";
 import { encodeApprovalDescriptor, OMP_APPROVAL_OPTIONS } from "./approval-protocol.js";
 
@@ -35,7 +37,17 @@ class FakeRuntime implements OmpSessionRuntime {
   promptResponse: { success?: boolean; error?: string } | undefined;
   promptFailure: Error | undefined;
 
-  async request(command: OmpFrame): Promise<{ success?: boolean; error?: string }> {
+  /** Tokens the fake accepted through the fence, oldest first. */
+  readonly handshakes: string[] = [];
+
+  async request(command: OmpFrame): Promise<{ success?: boolean; error?: string; data?: unknown }> {
+    // The turn fence is answered transparently and not logged: the command
+    // sequences asserted across this file describe the desktop's own protocol
+    // (and the dedicated fence tests use a recording runtime instead).
+    const fence = serveTurnFenceCommand(command, (frame) => this.push(frame), (token) =>
+      this.handshakes.push(token),
+    );
+    if (fence) return fence;
     this.commands.push(String(command.type));
     if (command.type === "prompt") {
       this.onPrompt?.();
@@ -157,15 +169,21 @@ describe("prompting", () => {
 describe("structured start refusals", () => {
   const NATIVE = "native-1";
 
-  function refusalFrame(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  /**
+   * One refusal descriptor. `turnToken` is explicit: the fence exists so that
+   * only the token installed for the live generation may close it, so these
+   * tests build stale descriptors from earlier handshakes too.
+   */
+  function refusalFrame(turnToken: string | null, overrides: Record<string, unknown> = {}): Record<string, unknown> {
     return {
       type: "extension_ui_request",
       id: "ui-refusal",
       method: "notify",
       message: JSON.stringify({
-        v: 1,
+        v: 2,
         kind: "omp-desktop-start-refusal",
         sessionId: NATIVE,
+        turnToken,
         code: "state-missing",
         reason: "the desktop runtime state for this session is missing or unreadable",
         refusalId: "refusal-1",
@@ -175,80 +193,272 @@ describe("structured start refusals", () => {
     };
   }
 
-  it("closes the awaiting generation exactly once with one error and one turn end", async () => {
+  const errorsOf = (envelopes: AgentEventEnvelope[]) =>
+    envelopes.filter((entry) => entry.event.type === "error");
+
+  it("closes the awaiting generation exactly once and rejects every replayed descriptor", async () => {
     const turns: Array<{ sessionId: string; turnId: string; reason: string }> = [];
     const { runtime, envelopes, runner } = harness({
       nativeSessionIdentity: () => NATIVE,
       onTurnEnd: (info) => turns.push(info),
     });
-    const started = await runner.prompt("one");
-    runtime.push(refusalFrame());
+
+    const first = await runner.prompt("one");
+    expect(runtime.handshakes).toHaveLength(1);
+    const firstToken = runtime.handshakes[0]!;
+    const firstRefusal = refusalFrame(firstToken);
+    runtime.push(firstRefusal);
     expect(runner.runState()).toBe("idle");
     expect(runner.status().isRunning).toBe(false);
-    const errors = envelopes.filter((entry) => entry.event.type === "error");
-    expect(errors).toHaveLength(1);
-    expect(errors[0]).toMatchObject({
+    expect(errorsOf(envelopes)).toHaveLength(1);
+    expect(errorsOf(envelopes)[0]).toMatchObject({
       sessionId: "omp-1",
-      turnId: started.turnId,
+      turnId: first.turnId,
       event: { error: { code: "OMP_RUNTIME_STATE_REFUSED" } },
     });
-    expect(turns).toEqual([{ sessionId: "omp-1", turnId: started.turnId, reason: "error" }]);
-    expect(runner.diagnostics()).toMatchObject({ startRefusals: 1, ignoredStartRefusals: 0 });
+    expect(turns).toEqual([{ sessionId: "omp-1", turnId: first.turnId, reason: "error" }]);
+    expect(runner.diagnostics()).toMatchObject({ startRefusals: 1, ignoredStartRefusals: 0, turnFences: 1 });
 
-    // A duplicate delivery arrives with no run in flight: counted, never a
-    // second terminal event.
-    runtime.push(refusalFrame({ refusalId: "refusal-2" }));
-    expect(envelopes.filter((entry) => entry.event.type === "error")).toHaveLength(1);
-    expect(runner.diagnostics()).toMatchObject({ ignoredStartRefusals: 1 });
+    // The exact same descriptor while idle: counted, never a second terminal.
+    runtime.push(firstRefusal);
+    expect(errorsOf(envelopes)).toHaveLength(1);
+    expect(turns).toHaveLength(1);
+    expect(runner.diagnostics()).toMatchObject({ startRefusals: 1, ignoredStartRefusals: 1 });
 
-    // The refused session is immediately promptable again.
+    // The next generation is admitted and awaits its start: replaying the
+    // FIRST generation's exact descriptor must not close it.
     const second = await runner.prompt("two");
-    expect(second.accepted).toBe(true);
-    runtime.push({ type: "agent_end", messages: [] });
-    expect(turns).toHaveLength(2);
-    expect(turns[1]?.reason).toBe("completed");
+    expect(runtime.handshakes).toHaveLength(2);
+    const secondToken = runtime.handshakes[1]!;
+    expect(secondToken).not.toBe(firstToken);
+    runtime.push(firstRefusal);
+    expect(runner.runState()).toBe("running");
+    expect(errorsOf(envelopes)).toHaveLength(1);
+    expect(turns).toHaveLength(1);
+
+    // A genuine refusal for this generation still closes exactly this turn.
+    runtime.push(refusalFrame(secondToken, { refusalId: "refusal-2" }));
+    expect(runner.runState()).toBe("idle");
+    expect(errorsOf(envelopes)).toHaveLength(2);
+    expect(errorsOf(envelopes)[1]).toMatchObject({
+      turnId: second.turnId,
+      event: { error: { code: "OMP_RUNTIME_STATE_REFUSED" } },
+    });
+    expect(turns).toEqual([
+      { sessionId: "omp-1", turnId: first.turnId, reason: "error" },
+      { sessionId: "omp-1", turnId: second.turnId, reason: "error" },
+    ]);
+    expect(runner.diagnostics()).toMatchObject({ startRefusals: 2, ignoredStartRefusals: 2, turnFences: 2 });
   });
 
-  it("ignores a refusal for another native session, a started run, and no run at all", async () => {
+  it("ignores a wrong token, another session, a started run, and no run at all", async () => {
     const turns: Array<{ sessionId: string; turnId: string; reason: string }> = [];
     const { runtime, envelopes, runner } = harness({
       nativeSessionIdentity: () => NATIVE,
       onTurnEnd: (info) => turns.push(info),
     });
 
-    // No run in flight: nothing to close.
-    runtime.push(refusalFrame());
+    // No run in flight: nothing to close, not even a well-formed descriptor.
+    runtime.push(refusalFrame("0".repeat(32)));
     expect(envelopes).toHaveLength(0);
     expect(runner.runState()).toBe("idle");
 
-    // Another session's identity while a run is awaiting start: ignored.
-    await runner.prompt("one");
-    runtime.push(refusalFrame({ sessionId: "delegate-native" }));
+    const started = await runner.prompt("one");
+    const token = runtime.handshakes[0]!;
+    // A well-formed but wrong token, and a descriptor without one: ignored.
+    runtime.push(refusalFrame("f".repeat(32)));
+    runtime.push(refusalFrame(null, { refusalId: "no-token" }));
+    // Another native session with the right token: ignored.
+    runtime.push(refusalFrame(token, { sessionId: "delegate-native" }));
     expect(runner.runState()).toBe("running");
     expect(envelopes).toHaveLength(0);
 
     // The run has emitted `agent_start`: a refusal cannot legitimately belong
     // to it any more, so it must not close the turn.
     runtime.push({ type: "agent_start" });
-    runtime.push(refusalFrame({ sessionId: NATIVE, refusalId: "late-1" }));
+    runtime.push(refusalFrame(token, { refusalId: "late-1" }));
     expect(runner.runState()).toBe("running");
-    expect(envelopes.filter((entry) => entry.event.type === "error")).toHaveLength(0);
+    expect(errorsOf(envelopes)).toHaveLength(0);
     runtime.push({ type: "message_start", message: { role: "assistant", content: [{ type: "text", text: "ok" }] } });
     runtime.push({ type: "agent_end", messages: [] });
-    expect(turns).toEqual([{ sessionId: "omp-1", turnId: "omp-turn:omp-1:1", reason: "completed" }]);
-    expect(runner.diagnostics()).toMatchObject({ startRefusals: 0, ignoredStartRefusals: 3 });
+    expect(turns).toEqual([{ sessionId: "omp-1", turnId: started.turnId, reason: "completed" }]);
+    expect(runner.diagnostics()).toMatchObject({
+      startRefusals: 0,
+      ignoredStartRefusals: 5,
+      turnFences: 1,
+    });
   });
 
-  it("ignores a refusal shaped like a user notification or a malformed descriptor", async () => {
+  it("ignores a user notification, a first-repair descriptor, and a malformed message", async () => {
     const { runtime, envelopes, runner } = harness({ nativeSessionIdentity: () => NATIVE });
     await runner.prompt("one");
+    const token = runtime.handshakes[0]!;
     runtime.push({ type: "extension_ui_request", id: "n-1", method: "notify", message: "hello from a plugin" });
-    runtime.push({ ...refusalFrame(), message: "{not json" });
-    runtime.push(refusalFrame({ v: 2 }));
+    runtime.push(refusalFrame(token, { v: 1 }));
+    runtime.push({ type: "extension_ui_request", id: "n-2", method: "notify", message: "{not json" });
+    runtime.push(refusalFrame(token, { turnToken: "not-a-token" }));
     expect(runner.runState()).toBe("running");
     expect(envelopes).toHaveLength(0);
     runtime.push({ type: "agent_end", messages: [] });
     expect(runner.runState()).toBe("idle");
+    // None of these frames is even a decodable refusal descriptor, so none is
+    // attributed; they follow the ordinary notification path instead.
+    expect(runner.diagnostics()).toMatchObject({ startRefusals: 0, ignoredStartRefusals: 0, turnFences: 1 });
+  });
+
+  it("installs the token through the runtime's own prompt command before the user prompt", async () => {
+    const recorded: Array<Record<string, unknown>> = [];
+    const handlers = new Set<(frame: OmpFrame) => void>();
+    const runtime: OmpSessionRuntime = {
+      pid: 4242,
+      usable: true,
+      write: () => true,
+      onFrame(handler) {
+        handlers.add(handler);
+        return () => handlers.delete(handler);
+      },
+      onFailure: () => () => {},
+      async request(command) {
+        recorded.push(command as Record<string, unknown>);
+        if (command.type === "get_available_commands") {
+          return {
+            success: true,
+            data: { commands: [{ name: "omp-desktop-turn", source: "extension" }] },
+          };
+        }
+        const token = turnCommandToken(command.message);
+        if (token) {
+          for (const handler of handlers) {
+            handler({
+              type: "extension_ui_request",
+              id: "ack",
+              method: "notify",
+              message: encodeTurnAck(token),
+            } as OmpFrame);
+          }
+        }
+        return { success: true };
+      },
+    };
+    const runner = new OmpSessionRunner({
+      sessionId: "omp-wire",
+      runtime,
+      emit: () => undefined,
+      nativeSessionIdentity: () => NATIVE,
+    });
+    await runner.prompt("user content");
+    expect(recorded.map((command) => command.type)).toEqual(["get_available_commands", "prompt", "prompt"]);
+    expect(turnCommandToken(recorded[1]?.message)).toMatch(/^[0-9a-f]{32}$/);
+    expect(recorded[2]?.message).toBe("user content");
+    runner.dispose();
+  });
+
+  it("refuses the prompt before submission when the runtime does not advertise the command", async () => {
+    const sent: string[] = [];
+    const envelopes: AgentEventEnvelope[] = [];
+    const turns: Array<{ sessionId: string; turnId: string; reason: string }> = [];
+    const runtime: OmpSessionRuntime = {
+      pid: 4242,
+      usable: true,
+      write: () => true,
+      onFrame: () => () => {},
+      onFailure: () => () => {},
+      async request(command) {
+        sent.push(String(command.type));
+        return { success: true, data: { commands: [{ name: "some-other-command", source: "extension" }] } };
+      },
+    };
+    const runner = new OmpSessionRunner({
+      sessionId: "omp-unfenced",
+      runtime,
+      emit: (envelope) => envelopes.push(envelope),
+      onTurnEnd: (info) => turns.push(info),
+      nativeSessionIdentity: () => NATIVE,
+    });
+    await expect(runner.prompt("never sent")).rejects.toMatchObject({ code: "capability-unavailable" });
+    // The user's prompt was never sent: a runtime that does not know the
+    // handshake would have forwarded it to the provider as a user turn.
+    expect(sent).toEqual(["get_available_commands"]);
+    expect(runner.runState()).toBe("idle");
+    // The run never started and no dialog was presented: the caller received
+    // the failure from `prompt` itself, so no terminal transcript event is
+    // fabricated. The turn-end announcement still fires exactly once.
+    expect(errorsOf(envelopes)).toHaveLength(0);
+    expect(turns).toEqual([{ sessionId: "omp-unfenced", turnId: "omp-turn:omp-unfenced:1", reason: "error" }]);
+  });
+
+  it("refuses the prompt before submission when the handshake is not acknowledged", async () => {
+    const sent: string[] = [];
+    const envelopes: AgentEventEnvelope[] = [];
+    const runtime: OmpSessionRuntime = {
+      pid: 4242,
+      usable: true,
+      write: () => true,
+      onFrame: () => () => {},
+      onFailure: () => () => {},
+      async request(command) {
+        sent.push(String(command.type));
+        if (command.type === "get_available_commands") {
+          return { success: true, data: { commands: [{ name: "omp-desktop-turn", source: "extension" }] } };
+        }
+        // The handshake is consumed but never acknowledged.
+        return { success: true };
+      },
+    };
+    const runner = new OmpSessionRunner({
+      sessionId: "omp-silent",
+      runtime,
+      emit: (envelope) => envelopes.push(envelope),
+      nativeSessionIdentity: () => NATIVE,
+      turnFenceTimeoutMs: 50,
+    });
+    await expect(runner.prompt("never sent")).rejects.toMatchObject({ code: "request-timeout" });
+    expect(sent).toEqual(["get_available_commands", "prompt"]);
+    expect(runner.runState()).toBe("idle");
+    expect(errorsOf(envelopes)).toHaveLength(0);
+    expect(runner.diagnostics()).toMatchObject({ turnFences: 0, ignoredTurnAcks: 1 });
+  });
+
+  it("never closes a generation after the runner was disposed", async () => {
+    const turns: Array<{ sessionId: string; turnId: string; reason: string }> = [];
+    const { runtime, envelopes, runner } = harness({
+      nativeSessionIdentity: () => NATIVE,
+      onTurnEnd: (info) => turns.push(info),
+    });
+    await runner.prompt("one");
+    const token = runtime.handshakes[0]!;
+    runner.dispose("test teardown");
+    runtime.push(refusalFrame(token));
+    expect(envelopes).toHaveLength(0);
+    expect(turns).toEqual([{ sessionId: "omp-1", turnId: "omp-turn:omp-1:1", reason: "aborted" }]);
+    expect(runner.diagnostics()).toMatchObject({ startRefusals: 0 });
+  });
+
+  it("ignores a refusal whose generation the stop already retired", async () => {
+    const turns: Array<{ sessionId: string; turnId: string; reason: string }> = [];
+    const { runtime, envelopes, runner } = harness({
+      nativeSessionIdentity: () => NATIVE,
+      onTurnEnd: (info) => turns.push(info),
+      teardown: async () => ({ reaped: true, cleaned: true }),
+    });
+    await runner.prompt("one");
+    const token = runtime.handshakes[0]!;
+    // The stop aborts the run (agent_end) and then owns the lifecycle; the
+    // run is closed before the refusal can arrive.
+    const stop = runner.stop();
+    runtime.push({ type: "agent_end", messages: [] });
+    await stop;
+    runtime.push(refusalFrame(token));
+    expect(envelopes.filter((entry) => entry.event.type === "error")).toHaveLength(0);
+    expect(turns).toEqual([{ sessionId: "omp-1", turnId: "omp-turn:omp-1:1", reason: "aborted" }]);
+    expect(runner.diagnostics()).toMatchObject({ startRefusals: 0, ignoredStartRefusals: 1 });
+
+    // The next prompt arms a fresh fence and can be refused normally.
+    const second = await runner.prompt("two");
+    const secondToken = runtime.handshakes[1]!;
+    expect(secondToken).not.toBe(token);
+    runtime.push(refusalFrame(secondToken, { refusalId: "refusal-2" }));
+    expect(turns.at(-1)).toEqual({ sessionId: "omp-1", turnId: second.turnId, reason: "error" });
   });
 });
 
@@ -404,6 +614,19 @@ describe("transport failure", () => {
       type: "error",
       error: { code: "OMP_TRANSPORT_FAILED", message: "stdout closed" },
     });
+  });
+
+  it("adds no second terminal when the failure arrives after the run already closed", async () => {
+    // The bridge's contract-mode rebuild stops the runtime *after* the last
+    // turn completed: closing the transport then must not attach an error to a
+    // turn the desktop already saw finish.
+    const { runtime, envelopes, runner } = harness();
+    await runner.prompt("hello");
+    runtime.push({ type: "agent_end", messages: [] });
+    const settled = envelopes.length;
+    runtime.fail(new OmpRuntimeError("stopping", "the runtime transport is closed"));
+    expect(runner.runState()).toBe("idle");
+    expect(envelopes).toHaveLength(settled);
   });
 });
 
@@ -732,6 +955,10 @@ describe("stop owns the prompt gate for its whole span", () => {
       onFrame(handler) { handlers.add(handler); return () => handlers.delete(handler); },
       onFailure: () => () => {},
       async request(command) {
+        const fence = serveTurnFenceCommand(command, (frame) => {
+          for (const handler of handlers) handler(frame as OmpFrame);
+        });
+        if (fence) return fence;
         commands.push(String(command.type));
         if (command.type === "abort") {
           // The runtime converges while the runner waits: `agent_end` closes the

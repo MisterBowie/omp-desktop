@@ -30,7 +30,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   DESKTOP_STATE_FILE,
-  DESKTOP_STATE_REQUIRED_FILE,
+  DESKTOP_STATE_REQUIRED_ENV,
   MAX_DESKTOP_STATE_AGE_MS,
   MAX_DESKTOP_STATE_BYTES,
   MAX_DESKTOP_STATE_HOST_TOOLS,
@@ -47,7 +47,6 @@ import {
   desktopMemoryPrompt,
   desktopSkillsPrompt,
   isDesktopStateRequired,
-  markDesktopStateRequired,
   readDesktopCapabilityState,
   readDesktopStateForSession,
   readDesktopStateSessionId,
@@ -442,28 +441,24 @@ describe("ownership-aware read", () => {
   });
 });
 
-describe("mandatory-channel marker", () => {
-  it("is absent until the owning bridge writes it, next to the state file", () => {
-    const dir = makeDir();
-    const path = join(dir, DESKTOP_STATE_FILE);
-    expect(isDesktopStateRequired(path)).toBe(false);
-    markDesktopStateRequired(path);
-    expect(isDesktopStateRequired(path)).toBe(true);
-    expect(existsSync(join(dir, DESKTOP_STATE_REQUIRED_FILE))).toBe(true);
-    // Writing the state does not clear the marker.
-    writeDesktopCapabilityState(path, stateOf());
-    expect(isDesktopStateRequired(path)).toBe(true);
+describe("mandatory-channel switch", () => {
+  it("follows only the launch-scoped value exactly \"1\"", () => {
+    expect(isDesktopStateRequired("1")).toBe(true);
+    for (const value of ["0", "", "yes", "true", "1\n", " 1", undefined, null]) {
+      expect(isDesktopStateRequired(value)).toBe(false);
+    }
   });
 
-  it("does not claim the channel for an absent path, a directory, or a deleted run root", () => {
-    expect(isDesktopStateRequired(undefined)).toBe(false);
-    expect(isDesktopStateRequired(null)).toBe(false);
+  it("is not a file: the state writer leaves no companion channel file behind", () => {
     const dir = makeDir();
     const path = join(dir, DESKTOP_STATE_FILE);
-    mkdirSync(join(dir, DESKTOP_STATE_REQUIRED_FILE));
-    expect(isDesktopStateRequired(path)).toBe(false);
-    rmSync(dir, { recursive: true, force: true });
-    expect(isDesktopStateRequired(path)).toBe(false);
+    // The writer creates exactly the state file (the temporary rename source
+    // is already gone): no second channel file exists whose deletion could
+    // switch the mandatory semantics off.
+    writeDesktopCapabilityState(path, stateOf());
+    expect(readdirSync(dir)).toEqual([DESKTOP_STATE_FILE]);
+    rmSync(path, { force: true });
+    expect(readdirSync(dir)).toEqual([]);
   });
 });
 

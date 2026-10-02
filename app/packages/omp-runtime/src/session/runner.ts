@@ -49,6 +49,13 @@ import {
 import { classifyUiRequest } from "./ui-requests.js";
 import { parseStartRefusalNotice, type OmpStartRefusal } from "./start-refusal.js";
 import {
+  mintTurnToken,
+  OMP_TURN_COMMAND,
+  parseTurnAckNotice,
+  turnCommandMessage,
+  type OmpTurnAck,
+} from "./turn-fence.js";
+import {
   OmpUiRequests,
   type OmpUiDecision,
   type OmpUiRequest,
@@ -149,6 +156,11 @@ export type OmpSessionRunnerOptions = {
   /** How long to wait for `abort` itself to be answered. */
   abortTimeoutMs?: number;
   /**
+   * How long to wait for the runtime to answer the turn-boundary handshake
+   * (availability query plus acknowledgment) before the prompt is refused.
+   */
+  turnFenceTimeoutMs?: number;
+  /**
    * The desktop's host-tool executor (M5/T19-B). When set, `host_tool_call`
    * frames are served through it — executed at most once, cancelled by
    * `host_tool_cancel`/stop/dispose/transport failure, and answered with a
@@ -182,10 +194,23 @@ type RunRecord = {
    * that arrives after this flag is set is late and must not close the run.
    */
   started: boolean;
+  /**
+   * The turn token installed in the runtime for this generation (the turn
+   * fence). Every structured start refusal must echo it; a descriptor that
+   * carries any other token — a duplicate, or an unseen delayed descriptor
+   * from an earlier generation — is ignored.
+   */
+  turnToken: string;
+  /**
+   * True once the runtime acknowledged the handshake, proving the token is
+   * installed. Before that point no refusal can be attributed to this run.
+   */
+  fenceArmed: boolean;
 };
 
 const DEFAULT_CONVERGE_TIMEOUT_MS = 10_000;
 const DEFAULT_ABORT_TIMEOUT_MS = 5_000;
+const DEFAULT_TURN_FENCE_TIMEOUT_MS = 10_000;
 
 export class OmpSessionRunner {
   private readonly sessionId: string;
@@ -201,6 +226,7 @@ export class OmpSessionRunner {
   private readonly now: () => number;
   private readonly convergeTimeoutMs: number;
   private readonly abortTimeoutMs: number;
+  private readonly turnFenceTimeoutMs: number;
   private readonly nativeSessionIdentity: OmpSessionRunnerOptions["nativeSessionIdentity"];
 
   private readonly converter: OmpEventConverter;
@@ -242,8 +268,27 @@ export class OmpSessionRunner {
   private lateFrames = 0;
   /** Structured start refusals that closed the awaiting generation. */
   private startRefusals = 0;
-  /** Structured start refusals ignored as late, duplicate or foreign. */
+  /** Structured start refusals ignored as late, duplicate, foreign or unbound. */
   private ignoredStartRefusals = 0;
+  /** Turn fences acknowledged by the runtime (one per armed generation). */
+  private turnFences = 0;
+  /**
+   * Fence acknowledgments that matched no pending handshake — a late or stale
+   * acknowledgment, or a handshake whose own deadline elapsed first.
+   */
+  private ignoredTurnAcks = 0;
+  /**
+   * The one handshake this runner is currently waiting on. At most one exists:
+   * a prompt is admitted only while the runner is idle, and the fence is armed
+   * before the prompt is submitted.
+   */
+  private pendingTurnAck: { token: string; settle: (ok: boolean) => void } | null = null;
+  /**
+   * True once the runtime advertised the turn-boundary command as an extension
+   * command. The check is cached for the runner's lifetime: the trusted gate
+   * registers the command at load and cannot unregister it.
+   */
+  private turnCommandAdvertised = false;
   private readonly waiters = new Set<() => void>();
   private disposed: { code: string; message: string } | null = null;
   /** Single-flight stop: concurrent callers share one attempt, so a racing stop
@@ -271,6 +316,7 @@ export class OmpSessionRunner {
     this.now = options.now ?? Date.now;
     this.convergeTimeoutMs = options.convergeTimeoutMs ?? DEFAULT_CONVERGE_TIMEOUT_MS;
     this.abortTimeoutMs = options.abortTimeoutMs ?? DEFAULT_ABORT_TIMEOUT_MS;
+    this.turnFenceTimeoutMs = options.turnFenceTimeoutMs ?? DEFAULT_TURN_FENCE_TIMEOUT_MS;
     this.nativeSessionIdentity = options.nativeSessionIdentity;
     this.converter = new OmpEventConverter({
       sessionId: this.sessionId,
@@ -361,6 +407,8 @@ export class OmpSessionRunner {
     lateFrames: number;
     startRefusals: number;
     ignoredStartRefusals: number;
+    turnFences: number;
+    ignoredTurnAcks: number;
     conversion: ReturnType<OmpEventConverter["snapshot"]>;
     uiRecords: readonly OmpUiRecord[];
     state: OmpRunState;
@@ -372,6 +420,8 @@ export class OmpSessionRunner {
       lateFrames: this.lateFrames,
       startRefusals: this.startRefusals,
       ignoredStartRefusals: this.ignoredStartRefusals,
+      turnFences: this.turnFences,
+      ignoredTurnAcks: this.ignoredTurnAcks,
       conversion: this.converter.snapshot(),
       uiRecords: this.ui.records(),
       state: this.state,
@@ -570,9 +620,16 @@ export class OmpSessionRunner {
       bashOpen: false,
       settled: false,
       started: false,
+      turnToken: mintTurnToken(),
+      fenceArmed: false,
     };
     this.state = "running";
     try {
+      // Bind this generation before the prompt reaches the runtime: the token
+      // is installed through the runtime's own command path and acknowledged
+      // through its own notify channel, so a start refusal produced for this
+      // turn is distinguishable from a replayed one (see `turn-fence.ts`).
+      await this.armTurnFence();
       const response = await this.runtime.request({ type: "prompt", message }, { timeoutMs: 30_000 });
       if (response.success === false) {
         throw new OmpRuntimeError(
@@ -596,6 +653,111 @@ export class OmpSessionRunner {
       });
       throw error;
     }
+  }
+
+  /**
+   * Install this generation's turn token in the runtime.
+   *
+   * The command is verified to be advertised *before* it is used: a runtime
+   * that does not know it would forward the raw handshake text to the provider
+   * as a user prompt, so the prompt is refused instead (fail before provider).
+   * The handshake itself is a locally-handled extension command — the runtime
+   * consumes it before any provider loop — and the gate acknowledges it
+   * through the runtime's own `notify` channel. Only after that acknowledgment
+   * is the generation allowed to be closed by a start refusal.
+   */
+  private async armTurnFence(): Promise<void> {
+    const run = this.run;
+    if (!run) return;
+    if (!this.turnCommandAdvertised) {
+      const response = await this.runtime.request(
+        { type: "get_available_commands" },
+        { timeoutMs: this.turnFenceTimeoutMs },
+      );
+      if (response.success === false) {
+        throw new OmpRuntimeError(
+          "not-started",
+          `the runtime refused get_available_commands: ${response.error ?? "unknown error"}`,
+        );
+      }
+      const advertised = parseAdvertisedCommands(response.data);
+      if (!advertised) {
+        throw new OmpRuntimeError(
+          "transport-failed",
+          "get_available_commands returned a malformed command list",
+        );
+      }
+      if (!advertised.some((command) => command.name === OMP_TURN_COMMAND && command.source === "extension")) {
+        throw new OmpRuntimeError(
+          "capability-unavailable",
+          `the runtime does not advertise the desktop turn-boundary command /${OMP_TURN_COMMAND}; refusing to prompt without a bound turn`,
+        );
+      }
+      this.turnCommandAdvertised = true;
+    }
+    const waiter = this.expectTurnAck(run.turnToken);
+    try {
+      const response = await this.runtime.request(
+        { type: "prompt", message: turnCommandMessage(run.turnToken) },
+        { timeoutMs: this.turnFenceTimeoutMs },
+      );
+      if (response.success === false) {
+        throw new OmpRuntimeError(
+          "not-started",
+          `the runtime refused the desktop turn-boundary command: ${response.error ?? "unknown error"}`,
+        );
+      }
+    } catch (error) {
+      waiter.cancel();
+      throw error;
+    }
+    if (!(await waiter.acknowledged)) {
+      throw new OmpRuntimeError(
+        "request-timeout",
+        "the runtime did not acknowledge the desktop turn-boundary handshake; refusing to prompt with an unbound turn",
+      );
+    }
+    run.fenceArmed = true;
+    this.turnFences += 1;
+  }
+
+  /**
+   * Wait for the gate's acknowledgment of one token, bounded by
+   * `turnFenceTimeoutMs`. The waiter is installed before the handshake is
+   * sent, so a synchronous delivery on the frame stream cannot be missed.
+   */
+  private expectTurnAck(token: string): { acknowledged: Promise<boolean>; cancel: () => void } {
+    let resolveAck: (ok: boolean) => void = () => undefined;
+    const acknowledged = new Promise<boolean>((resolve) => {
+      resolveAck = resolve;
+    });
+    const timer = setTimeout(() => {
+      if (this.pendingTurnAck?.token === token) {
+        this.pendingTurnAck = null;
+        this.ignoredTurnAcks += 1;
+        resolveAck(false);
+      }
+    }, this.turnFenceTimeoutMs);
+    const pending = {
+      token,
+      settle: (ok: boolean) => {
+        clearTimeout(timer);
+        if (this.pendingTurnAck === pending) this.pendingTurnAck = null;
+        resolveAck(ok);
+      },
+    };
+    this.pendingTurnAck = pending;
+    return { acknowledged, cancel: () => pending.settle(false) };
+  }
+
+  /** Settle one fence acknowledgment; anything else is counted and dropped. */
+  private handleTurnAck(ack: OmpTurnAck): void {
+    const pending = this.pendingTurnAck;
+    if (pending && pending.token === ack.token) {
+      pending.settle(true);
+      return;
+    }
+    this.ignoredTurnAcks += 1;
   }
 
   /**
@@ -870,6 +1032,11 @@ export class OmpSessionRunner {
 
   private onFrame(frame: OmpFrame): void {
     if (frame.type === "extension_ui_request") {
+      const ack = parseTurnAckNotice(frame);
+      if (ack) {
+        this.handleTurnAck(ack);
+        return;
+      }
       const refusal = parseStartRefusalNotice(frame);
       if (refusal) {
         this.handleStartRefusal(refusal);
@@ -1053,28 +1220,33 @@ export class OmpSessionRunner {
    * The gate's `before_agent_start` handler runs before the provider request,
    * so a genuine refusal can only describe the generation currently awaiting
    * its start. Attribution is therefore: the descriptor must name the native
-   * session this entry owns, and the live run must not have emitted
-   * `agent_start` yet. Anything else is counted and ignored — a delegate's
-   * refusal (its own native id), a duplicate delivery, or a signal that lost
-   * the race with the start must never close a newer generation. The run
-   * lifecycle closes a generation at most once, and the terminal error
-   * envelope carries the refused turn's own id, so the desktop clears exactly
-   * that turn instead of leaving it running.
+   * session this entry owns, carry the turn token this run armed through the
+   * fence, the fence must be acknowledged, and the live run must not have
+   * emitted `agent_start` yet. Anything else is counted and ignored — a
+   * delegate's refusal (its own native id), a duplicate delivery, an unseen
+   * delayed descriptor from an earlier generation (an older token), or a
+   * signal that lost the race with the start must never close a newer
+   * generation. The run lifecycle closes a generation at most once, and the
+   * terminal error envelope carries the refused turn's own id, so the desktop
+   * clears exactly that turn instead of leaving it running.
    */
   private handleStartRefusal(refusal: OmpStartRefusal): void {
     const expected = this.nativeSessionIdentity?.() ?? null;
+    const run = this.run;
     if (
       expected === null ||
       refusal.sessionId !== expected ||
       this.state !== "running" ||
-      !this.run ||
-      this.run.started
+      !run ||
+      run.started ||
+      !run.fenceArmed ||
+      refusal.turnToken !== run.turnToken
     ) {
       this.ignoredStartRefusals += 1;
       return;
     }
     this.startRefusals += 1;
-    this.closeGeneration(this.run.generation, "the desktop runtime state refused the turn", {
+    this.closeGeneration(run.generation, "the desktop runtime state refused the turn", {
       error: appError("OMP_RUNTIME_STATE_REFUSED", refusal.reason, {
         refusalId: refusal.refusalId,
         code: refusal.code,
@@ -1166,7 +1338,12 @@ export class OmpSessionRunner {
     const presented = this.generationsWithDialogs.delete(generation);
     const open = this.ui.open();
     if (open.length > 0) this.cancelOpenDialogs(reason);
-    if (failure && (!failure.whenCardsPresented || presented)) {
+    // A generation that already ended is never told twice. The terminal error
+    // exists to withdraw a run the desktop can still see; a transport failure
+    // that arrives while the bridge reclaims the runtime for a rebuild already
+    // describes a *closed* run, and emitting an error there would attach a
+    // second terminal to a turn the desktop reported as completed.
+    if (failure && generation > this.lastClosedGeneration && (!failure.whenCardsPresented || presented)) {
       // The run's dialogs are gone, so the desktop needs the terminal event that
       // withdraws them; the failure itself is reported either way by the caller
       // that received the exception.
@@ -1189,6 +1366,10 @@ export class OmpSessionRunner {
     if (this.run && this.run.generation !== generation) return;
     const closed = this.run !== null;
     const turnId = this.run?.turnId;
+    // A handshake still waiting for its acknowledgment cannot outlive the run
+    // it belongs to: settling it false makes `armTurnFence` fail closed
+    // instead of holding the prompt open until the fence timeout.
+    this.pendingTurnAck?.settle(false);
     this.lastClosedGeneration = Math.max(this.lastClosedGeneration, generation);
     this.state = "idle";
     this.run = null;
@@ -1298,4 +1479,27 @@ function describe(error: unknown): string {
 /** A non-empty string value, or undefined. */
 function stringField(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+/**
+ * The command list `get_available_commands` must return for the turn fence: a
+ * bounded array of entries with a non-empty name and a source. Anything else
+ * is a malformed response, which fails the fence closed rather than guessing
+ * that the handshake command is registered.
+ */
+function parseAdvertisedCommands(data: unknown): Array<{ name: string; source: string }> | null {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return null;
+  if (!("commands" in data)) return null;
+  const commands = data.commands;
+  if (!Array.isArray(commands) || commands.length > 512) return null;
+  const parsed: Array<{ name: string; source: string }> = [];
+  for (const entry of commands) {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return null;
+    if (!("name" in entry) || !("source" in entry)) return null;
+    const { name, source } = entry;
+    if (typeof name !== "string" || name.length === 0) return null;
+    if (typeof source !== "string") return null;
+    parsed.push({ name, source });
+  }
+  return parsed;
 }

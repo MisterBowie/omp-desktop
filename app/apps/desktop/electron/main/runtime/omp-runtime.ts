@@ -188,6 +188,14 @@ export type OmpRuntimeAdapter = {
     extraEnv?: NodeJS.ProcessEnv;
     /** `provider/model` to pass as `--model`; subagent event forwarding requires it. */
     modelSelector?: string | null;
+    /**
+     * Whether this session's runtime must carry the mandatory mode/policy
+     * channel (M5/T20-B1). The wired bridge always passes `true`; a fixture
+     * that never writes a run-scoped state opts out with `false`. The switch
+     * becomes `OMP_DESKTOP_STATE_REQUIRED` in the child and is fixed for the
+     * runtime's lifetime (see `OmpRuntimeSupervisorOptions`).
+     */
+    desktopStateRequired?: boolean;
   }): OmpRuntimeSupervisor;
 };
 
@@ -224,6 +232,9 @@ export function createOmpRuntimeAdapter(
       ...(createOptions.sessionDir ? { sessionDir: createOptions.sessionDir } : {}),
       ...(createOptions.prepareRun ? { prepareRun: createOptions.prepareRun } : {}),
       ...(createOptions.extraEnv ? { extraEnv: createOptions.extraEnv } : {}),
+      ...(createOptions.desktopStateRequired !== undefined
+        ? { desktopStateRequired: createOptions.desktopStateRequired }
+        : {}),
     });
   };
 

@@ -17,10 +17,13 @@ import {
   type OmpStartRefusal,
 } from "./start-refusal.js";
 
+const TURN_TOKEN = "0123456789abcdef0123456789abcdef";
+
 const refusal: OmpStartRefusal = {
   v: OMP_START_REFUSAL_VERSION,
   kind: OMP_START_REFUSAL_KIND,
   sessionId: "native-1",
+  turnToken: TURN_TOKEN,
   code: "state-missing",
   reason: "the desktop runtime state for this session is missing or unreadable",
   refusalId: "refusal-1",
@@ -39,13 +42,15 @@ function wire(overrides: Record<string, unknown> = {}): string {
 describe("start refusal wire contract", () => {
   it("round-trips exactly what the gate writes, over the notify frame", () => {
     expect(parseStartRefusalNotice(notice(encodeStartRefusal(refusal)))).toEqual(refusal);
-    // A null session id is valid on the wire (the runner then refuses to
-    // attribute it) and every refusal code is accepted.
+    // A null session id and a null turn token are valid on the wire (the
+    // runner then refuses to attribute the descriptor at all), and every
+    // refusal code is accepted.
     for (const code of OMP_START_REFUSAL_CODES) {
       const decoded = parseStartRefusalNotice(notice(wire({ code })));
       expect(decoded?.code).toBe(code);
     }
     expect(parseStartRefusalNotice(notice(wire({ sessionId: null })))?.sessionId).toBeNull();
+    expect(parseStartRefusalNotice(notice(wire({ turnToken: null })))?.turnToken).toBeNull();
   });
 
   it("rejects every frame that is not this exact descriptor", () => {
@@ -59,10 +64,17 @@ describe("start refusal wire contract", () => {
       { type: "extension_ui_request", id: "ui", method: "notify", message: "hello from a plugin" },
       { type: "extension_ui_request", id: "ui", method: "notify", message: "{not json" },
       notice(wire({ kind: "something-else" })),
-      notice(wire({ v: 2 })),
+      // The first-repair descriptor (v1) carried no generation binding and can
+      // never close a turn again.
+      notice(wire({ v: 1 })),
+      notice(wire({ v: 3 })),
       notice(wire({ code: "who-knows" })),
       notice(wire({ sessionId: 42 })),
       notice(wire({ sessionId: "" })),
+      notice(wire({ turnToken: "not-a-token" })),
+      notice(wire({ turnToken: 42 })),
+      notice(wire({ turnToken: TURN_TOKEN.toUpperCase() })),
+      notice(wire({ turnToken: "0".repeat(31) })),
       notice(wire({ reason: "" })),
       notice(wire({ reason: "x".repeat(2001) })),
       notice(wire({ refusalId: "" })),
@@ -71,6 +83,10 @@ describe("start refusal wire contract", () => {
       notice(JSON.stringify(null)),
       notice("x".repeat(9000)),
     ];
+    // A descriptor that omits the token is not this version's shape either.
+    const missingToken = { ...refusal } as Record<string, unknown>;
+    delete missingToken.turnToken;
+    cases.push(notice(JSON.stringify(missingToken)));
     for (const frame of cases) {
       expect(parseStartRefusalNotice(frame)).toBeNull();
     }

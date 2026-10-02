@@ -25,6 +25,9 @@ const { IPC } = protocol;
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
 const { createOmpSessionBridge } = await import("../electron/main/runtime/omp-session.ts");
+const { serveTurnFenceCommand } = await import(
+  "../../../packages/omp-runtime/src/session/turn-fence-testkit.ts"
+);
 const {
   clearSessionPermissions,
   enqueuePermission,
@@ -78,6 +81,10 @@ class FakeRuntime {
   stateResponse = undefined;
 
   async request(command) {
+    // The turn fence is answered transparently and never logged: the command
+    // sequences asserted in this file describe the desktop's own protocol.
+    const fence = serveTurnFenceCommand(command, (frame) => this.push(frame));
+    if (fence) return fence;
     this.commands.push(command.type);
     if (command.type === "prompt") {
       this.onPrompt?.();
@@ -434,6 +441,10 @@ test("retains a directory-only debt across stop retries until it is removable", 
     onFailure: () => () => {},
     async stop() { this.usable = false; return { reaped: true, escalated: "none", steps: [], errors: [], abortAcknowledged: true }; },
     async request(command) {
+      const fence = serveTurnFenceCommand(command, (frame) => {
+        for (const fn of handlers) fn(frame);
+      });
+      if (fence) return fence;
       if (command.type === "get_state") return { success: true, data: { sessionId: "native-debt", sessionFile: nativePath } };
       if (command.type === "get_subagents") return { success: true, data: { subagents: [{ id: "child", index: 0, agent: "task", agentSource: "bundled", status: "running", lastUpdate: 1, parentToolCallId: "task-1" }] } };
       if (command.type === "abort") for (const fn of handlers) fn({ type: "agent_end", isTerminal: true });
@@ -523,6 +534,10 @@ function c1Runtime(nativeId, nativePath, childRunning) {
       return { reaped: true, escalated: "none", steps: [], errors: [], abortAcknowledged: true };
     },
     async request(command) {
+      const fence = serveTurnFenceCommand(command, (frame) => {
+        for (const fn of handlers) fn(frame);
+      });
+      if (fence) return fence;
       commands.push(command.type);
       if (command.type === "get_state") return { success: true, data: { sessionId: nativeId, sessionFile: nativePath } };
       if (command.type === "get_subagents") {
@@ -1410,6 +1425,8 @@ function messageRuntime(nativeId, nativePath, ordinal) {
       return { reaped: true, escalated: "none", steps: [], errors: [], abortAcknowledged: true };
     },
     async request(command) {
+      const fence = serveTurnFenceCommand(command, this.emit);
+      if (fence) return fence;
       commands.push(command.type);
       if (!this.usable) throw new Error("request used a retired runtime");
       if (command.type === "new_session" || command.type === "switch_session") bound = true;
@@ -1630,6 +1647,10 @@ function gatedRuntime(nativeId, nativePath, gate) {
       return { reaped: true, escalated: "none", steps: [], errors: [], abortAcknowledged: true };
     },
     async request(command) {
+      const fence = serveTurnFenceCommand(command, (frame) => {
+        for (const fn of handlers) fn(frame);
+      });
+      if (fence) return fence;
       commands.push(command.type);
       if (!this.usable) throw new Error("request used a retired runtime");
       if (command.type === "switch_session") {
@@ -2059,6 +2080,8 @@ function shutdownAdmissionHarness() {
               return { reaped: true, escalated: "none", steps: [], errors: [], abortAcknowledged: true };
             },
             async request(command) {
+              const fence = serveTurnFenceCommand(command, this.emit);
+              if (fence) return fence;
               this.commands.push(command.type);
               if (!this.usable) throw new Error("request used a retired runtime");
               if (command.type === "switch_session") {
@@ -2215,6 +2238,8 @@ function modelSwitchHarness() {
               return { reaped: true, escalated: "none", steps: [], errors: [], abortAcknowledged: true };
             },
             async request(command) {
+              const fence = serveTurnFenceCommand(command, this.emit);
+              if (fence) return fence;
               this.commands.push(command.type);
               if (!this.usable) throw new Error("request used a retired runtime");
               if (command.type === "switch_session") {

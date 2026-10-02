@@ -29,7 +29,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   DESKTOP_STATE_FILE,
   MAX_DESKTOP_STATE_AGE_MS,
-  markDesktopStateRequired,
   serializeDesktopCapabilityState,
 } from "../desktop-state.js";
 import ompDesktopGate, {
@@ -40,6 +39,7 @@ import ompDesktopGate, {
 } from "../../extensions/omp-desktop-gate.ts";
 import { parseApprovalDescriptor } from "../session/approval-protocol.js";
 import { parseStartRefusalNotice } from "../session/start-refusal.js";
+import { OMP_TURN_COMMAND, parseTurnAckNotice } from "../session/turn-fence.js";
 
 const created: string[] = [];
 afterEach(() => {
@@ -47,6 +47,7 @@ afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
   }
   delete process.env.OMP_DESKTOP_STATE;
+  delete process.env.OMP_DESKTOP_STATE_REQUIRED;
 });
 
 function stateDir(): string {
@@ -174,7 +175,6 @@ describe("before_agent_start policy decision", () => {
     // all "missing/unreadable" on the mandatory channel — never a silent
     // Agent turn.
     const deleted = writeState();
-    markDesktopStateRequired(deleted);
     rmSync(deleted);
     expect(beforeAgentStartPolicy({ systemPrompt: [...BASE_PROMPT] }, interactive(), deleted, NOW, required)).toMatchObject({
       kind: "refuse",
@@ -183,7 +183,6 @@ describe("before_agent_start policy decision", () => {
 
     for (const corrupt of ["{", "x".repeat(600 * 1024)]) {
       const path = writeState();
-      markDesktopStateRequired(path);
       writeFileSync(path, corrupt);
       expect(beforeAgentStartPolicy({ systemPrompt: [...BASE_PROMPT] }, interactive(), path, NOW, required)).toMatchObject({
         kind: "refuse",
@@ -192,7 +191,6 @@ describe("before_agent_start policy decision", () => {
     }
 
     const noIdentity = writeState();
-    markDesktopStateRequired(noIdentity);
     writeFileSync(noIdentity, JSON.stringify({ v: 2, mode: "plan", writtenAt: NOW }));
     expect(beforeAgentStartPolicy({ systemPrompt: [...BASE_PROMPT] }, interactive(), noIdentity, NOW, required)).toMatchObject({
       kind: "refuse",
@@ -200,7 +198,6 @@ describe("before_agent_start policy decision", () => {
     });
 
     const unknownSchema = writeState();
-    markDesktopStateRequired(unknownSchema);
     writeFileSync(unknownSchema, JSON.stringify({ v: 1, sessionId: OWNING_SESSION, mode: "plan", writtenAt: NOW }));
     expect(beforeAgentStartPolicy({ systemPrompt: [...BASE_PROMPT] }, interactive(), unknownSchema, NOW, required)).toMatchObject({
       kind: "refuse",
@@ -208,7 +205,6 @@ describe("before_agent_start policy decision", () => {
     });
 
     const foreign = writeState({ sessionId: "some-other-native" });
-    markDesktopStateRequired(foreign);
     expect(beforeAgentStartPolicy({ systemPrompt: [...BASE_PROMPT] }, interactive(), foreign, NOW, required)).toMatchObject({
       kind: "refuse",
       code: "state-foreign",
@@ -217,7 +213,6 @@ describe("before_agent_start policy decision", () => {
 
   it("keeps the delegate zero-injection skip on a mandatory channel (hasUI=false)", () => {
     const path = writeState(); // valid, owned by the parent native session
-    markDesktopStateRequired(path);
     const delegate = { ...context("delegate-native"), hasUI: false };
     const required = { required: true };
     expect(beforeAgentStartPolicy({ systemPrompt: [...BASE_PROMPT] }, delegate, path, NOW, required).kind).toBe("skip");
@@ -381,10 +376,11 @@ describe("registered handlers", () => {
   type Captured = {
     toolCall?: (event: unknown, context: unknown) => Promise<unknown>;
     beforeAgentStart?: (event: unknown, context: unknown) => Promise<unknown>;
+    commands: Map<string, (args: string, context: unknown) => unknown>;
   };
 
   function fakeGate() {
-    const captured: Captured = {};
+    const captured: Captured = { commands: new Map() };
     const active = ["read", "write", "bash", "ask"];
     const setCalls: string[][] = [];
     const api: ExtensionAPI = {
@@ -392,6 +388,9 @@ describe("registered handlers", () => {
         if (event === "tool_call") captured.toolCall = handler as Captured["toolCall"];
         if (event === "before_agent_start") captured.beforeAgentStart = handler as Captured["beforeAgentStart"];
       }) as ExtensionAPI["on"],
+      registerCommand: ((name: string, options: { handler: (args: string, context: unknown) => unknown }) => {
+        captured.commands.set(name, options.handler);
+      }) as ExtensionAPI["registerCommand"],
       getActiveTools: () => [...active],
       setActiveTools: async (names: string[]) => {
         setCalls.push([...names]);
@@ -462,9 +461,9 @@ describe("registered handlers", () => {
 
   it("refuses a deleted mandatory state in the registered handler, but never a delegate", async () => {
     const path = writeState({}, Date.now());
-    markDesktopStateRequired(path);
     rmSync(path);
     process.env.OMP_DESKTOP_STATE = path;
+    process.env.OMP_DESKTOP_STATE_REQUIRED = "1";
     const { api, captured } = fakeGate();
     ompDesktopGate(api);
     let aborted = 0;
@@ -496,6 +495,80 @@ describe("registered handlers", () => {
     );
     expect(delegate).toBeUndefined();
     expect(aborted).toBe(1);
+  });
+
+  it("installs the turn token through the registered command and echoes it in the refusal", async () => {
+    const path = writeState({}, Date.now());
+    process.env.OMP_DESKTOP_STATE = path;
+    process.env.OMP_DESKTOP_STATE_REQUIRED = "1";
+    const { api, captured } = fakeGate();
+    ompDesktopGate(api);
+    const notifications: Array<{ message: string; type?: string }> = [];
+    const notifyContext = {
+      ...context(),
+      hasUI: true,
+      ui: { notify: (message: string, type?: string) => notifications.push({ message, type }) },
+    };
+    const handler = captured.commands.get(OMP_TURN_COMMAND);
+    expect(typeof handler).toBe("function");
+    const token = "0123456789abcdef0123456789abcdef";
+    handler!(token, notifyContext);
+    expect(parseTurnAckNotice({ type: "extension_ui_request", id: "ack-1", method: "notify", message: notifications[0]?.message })).toEqual({
+      v: 1,
+      kind: "omp-desktop-turn-ack",
+      token,
+    });
+    expect(notifications[0]?.type).toBe("info");
+
+    // A malformed argument installs nothing and is not acknowledged: the
+    // runner then refuses the prompt before submitting it.
+    handler!("not-a-token", notifyContext);
+    expect(notifications).toHaveLength(1);
+
+    // The turn the token was installed for refuses with that exact token.
+    rmSync(path);
+    let aborted = 0;
+    const result = await captured.beforeAgentStart!(
+      { type: "before_agent_start", systemPrompt: [...BASE_PROMPT] },
+      { ...notifyContext, abort: () => { aborted += 1; } },
+    );
+    expect(result).toBeUndefined();
+    expect(aborted).toBe(1);
+    const refusal = parseStartRefusalNotice({
+      type: "extension_ui_request",
+      id: "frame-1",
+      method: "notify",
+      message: notifications.at(-1)?.message,
+    });
+    expect(refusal).toMatchObject({ sessionId: OWNING_SESSION, code: "state-missing", turnToken: token });
+  });
+
+  it("leaves the refusal unbound when no handshake preceded the turn", async () => {
+    const path = writeState({}, Date.now());
+    rmSync(path);
+    process.env.OMP_DESKTOP_STATE = path;
+    process.env.OMP_DESKTOP_STATE_REQUIRED = "1";
+    const { api, captured } = fakeGate();
+    ompDesktopGate(api);
+    const notifications: string[] = [];
+    await captured.beforeAgentStart!(
+      { type: "before_agent_start", systemPrompt: [...BASE_PROMPT] },
+      {
+        ...context(),
+        hasUI: true,
+        abort: () => undefined,
+        ui: { notify: (message: string) => notifications.push(message) },
+      },
+    );
+    const refusal = parseStartRefusalNotice({
+      type: "extension_ui_request",
+      id: "frame-1",
+      method: "notify",
+      message: notifications[0],
+    });
+    // `turnToken: null` is valid on the wire and can never match a live
+    // generation, so a refusal produced without a fence closes nothing.
+    expect(refusal).toMatchObject({ code: "state-missing", turnToken: null });
   });
 
   it("carries the effective permission mode into the approval descriptor from the owned state", async () => {

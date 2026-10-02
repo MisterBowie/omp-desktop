@@ -305,6 +305,9 @@ test(
             launcherPath: LAUNCHER,
             expectedRuntimeVersion: "18.3.0",
             sessionDir: dir,
+            // Production shape: the wired bridge always passes `true`, and the
+            // switch is launch-scoped so deleting state files cannot disable it.
+            desktopStateRequired: true,
             args: [
               ...(modelSelector ? ["--model", modelSelector] : []),
               ...trusted.flatMap((extension) => ["--trusted-extension", extension]),
@@ -921,13 +924,15 @@ test(
       `a fresh runtime must start from the unclamped baseline in one attempt; attempts=${restartWitness.length}`,
     );
 
-    // --- Phase 9: F1/F2 counterexamples. The refusal probe session has its
-    // `desktop-state.required` marker set (its bridge carries a session
-    // policy), so every state the gate cannot read as owned-and-valid must
-    // refuse the turn: zero provider requests, exactly one observable terminal
-    // error carrying the refused turn id, exactly one turn end, the runner
-    // back to idle, and the session promptable again once the state is
-    // repaired. ---------------------------------------------------------------
+    // --- Phase 9: F1/F2 counterexamples. The refusal probe session runs with
+    // the mandatory channel enabled at launch (its bridge carries a session
+    // policy and the supervisor sets `OMP_DESKTOP_STATE_REQUIRED=1`), so every
+    // state the gate cannot read as owned-and-valid must refuse the turn: zero
+    // provider requests, exactly one observable terminal error carrying the
+    // refused turn id, exactly one turn end, the runner back to idle, and the
+    // session promptable again once the state is repaired. Deleting the state
+    // file — and the retired marker path with it — must not change any of
+    // that: the switch is launch-scoped, not a file. -------------------------
     const refusalTimeline = () => envelopeTimeline(refusalEnvelopes);
     const postRequests = () => provider.requests.filter((request) => request.method === "POST");
     const refusalRequest = async (content) => {
@@ -993,8 +998,17 @@ test(
       assert.equal(postRequests().length, requestsBefore, `${label}: zero provider requests`);
       const applied = mutatorEntries().at(-1);
       assert.equal(applied?.action, action, `${label}: the mutator must have applied ${action}`);
-      assert.equal(applied?.outcome, action === "delete" ? "deleted" : action, `${label}: mutator outcome`);
+      assert.equal(
+        applied?.outcome,
+        action === "delete" || action === "delete-channel-files" ? "deleted" : action,
+        `${label}: mutator outcome`,
+      );
       assert.equal(applied?.hasUI, true, `${label}: the mutating context is the interactive parent`);
+      assert.equal(
+        applied?.envRequired,
+        "1",
+        `${label}: the launch-scoped mandatory switch must be set in the runtime process`,
+      );
     };
     const expectNormalTurn = async (label, action) => {
       writeFileSync(mutatorControl, JSON.stringify({ action }));
@@ -1027,25 +1041,45 @@ test(
         action === "none" ? "none" : action,
         `${label}: the mutator outcome`,
       );
+      assert.equal(
+        mutatorEntries().at(-1)?.envRequired,
+        "1",
+        `${label}: the launch-scoped mandatory switch must be set in the runtime process`,
+      );
     };
 
-    // The very FIRST prompt of the probe session is the deleted-state
-    // counterexample: the bridge wrote the state, the mutator removed it, the
-    // gate must refuse rather than run an unclamped Agent turn.
-    await expectRefusal("refusal-first-delete", "delete");
+    // The very FIRST prompt of the probe session loses the state file AND the
+    // retired marker path: the launch-scoped switch keeps the channel on, so
+    // the gate must refuse rather than run an unclamped Agent turn.
+    await expectRefusal("refusal-first-delete-channel", "delete-channel-files");
     await expectNormalTurn("refusal-recover-1", "none");
+    // The same simultaneous loss on a later turn of the same session.
+    await expectRefusal("refusal-subsequent-delete-channel", "delete-channel-files");
+    await expectNormalTurn("refusal-recover-2", "none");
     await expectRefusal("refusal-malformed", "malformed");
     await expectRefusal("refusal-oversize", "oversize");
-    await expectNormalTurn("refusal-recover-2", "none");
+    await expectNormalTurn("refusal-recover-3", "none");
     await expectRefusal("refusal-unknown-schema", "unknown-schema");
     await expectRefusal("refusal-identity-missing", "identity-missing");
     // F2: a parseable state whose owner is correct but whose mode is invalid —
     // the old gate aborted with no terminal signal and stranded the turn.
     await expectRefusal("refusal-owned-invalid", "owned-invalid");
-    await expectNormalTurn("refusal-recover-3", "none");
-    // Negative control: a forged refusal naming another native session, with
-    // the state left valid, must not close the awaiting turn.
+    await expectNormalTurn("refusal-recover-4", "none");
+    // Negative controls: forged refusals must not close the awaiting turn. One
+    // names another native session; the other names this session with no turn
+    // token — exactly the descriptor the pre-fence attribution honored.
     await expectNormalTurn("refusal-foreign-notify", "foreign-notify");
+    await expectNormalTurn("refusal-forged-own-session-notify", "forged-own-session-notify");
+
+    // Stop/rebuild: leaving a contract mode reclaims this session's runtime
+    // process and retires its runner, so the next prompt starts a fresh gate.
+    // The fence must be re-armed there and a real refusal must still close
+    // exactly that generation.
+    hostSessions.get(REFUSAL_SESSION).mode = "plan";
+    await expectNormalTurn("refusal-plan-clamp", "none");
+    hostSessions.get(REFUSAL_SESSION).mode = "agent";
+    await expectRefusal("refusal-after-rebuild", "delete-channel-files");
+    await expectNormalTurn("refusal-after-rebuild-recover", "none");
 
     // No prompt ever needed the third start attempt (which would raise
     // `AgentStartPolicyChangedError`), and no turn id was ever reused across

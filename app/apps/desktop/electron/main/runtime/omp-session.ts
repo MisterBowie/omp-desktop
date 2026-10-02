@@ -51,7 +51,6 @@ import {
   findGateExtension,
   inspectBundledGate,
   isValidDesktopSkillMeta,
-  markDesktopStateRequired,
   readDesktopCapabilityState,
   resolveBundledGate,
   serializeDesktopCapabilityState,
@@ -1400,8 +1399,10 @@ class SessionEntry {
    * The mandatory half — mode, the production `composeModeSystemPrompt(mode,
    * "")` block, and the effective permission mode read from the host session
    * row — must be assembled exactly once and persisted atomically (alias-safe,
-   * 0600) into the run root, together with the mandatory-channel marker that
-   * tells the gate this run cannot silently run without its state. Any failure
+   * 0600) into the run root. The run itself was launched with the mandatory
+   * channel enabled (`desktopStateRequired` at the supervisor), so the gate
+   * refuses the turn whenever this state cannot be read back; the write is
+   * what makes that refusal disappear. Any failure
    * on that half refuses the prompt before submission: there is no tombstone
    * and no Agent fallback, because a Plan/Goal intent must never silently run
    * as an unclamped Agent turn with a stale state file. The skills/memory half
@@ -1467,11 +1468,6 @@ class SessionEntry {
     }));
     const statePath = join(runRoot, DESKTOP_STATE_FILE);
     try {
-      // The marker first: once it exists, the gate refuses this session's turn
-      // whenever the state cannot be read back as owned and valid. A marker
-      // that cannot be written must refuse the prompt too — otherwise the run
-      // would silently fall back to "no state, no injection".
-      markDesktopStateRequired(statePath);
       writeDesktopCapabilityState(
         statePath,
         serializeDesktopCapabilityState(

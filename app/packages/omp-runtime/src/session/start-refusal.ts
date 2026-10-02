@@ -22,24 +22,33 @@
  *     notification or any other extension's message parses to `null`;
  *   - `sessionId` must equal the native session id of the runtime the runner
  *     owns (a delegate's or another session's refusal is ignored);
- *   - a run must be in flight and must not have emitted `agent_start` yet (a
- *     refusal can only be produced before the provider request; a redundant
- *     or late signal must never close a newer generation);
+ *   - `turnToken` must equal the token the runner installed for the admitted
+ *     generation through the turn fence (`turn-fence.ts`) before the prompt
+ *     was submitted. A duplicate delivery and an unseen delayed descriptor
+ *     from an earlier generation both carry the earlier token and are
+ *     ignored, so a replayed frame can never close a newer generation;
+ *   - a run must be in flight, its fence armed, and it must not have emitted
+ *     `agent_start` yet (a refusal can only be produced before the provider
+ *     request; a redundant or late signal must never close a newer
+ *     generation);
  *   - the run lifecycle closes a generation at most once (`closeGeneration`),
  *     so a duplicated delivery cannot produce a second terminal event.
  *
  * `refusalId` exists for diagnostics: it is unique per refusal invocation, so
- * a refusal and the error envelope it produced can be correlated in logs. It
- * is deliberately *not* trusted as an ownership token — the frame ordering on
- * the one stdout pipe plus the runner's "one prompt at a time" admission are
- * what make the attribution replay-free.
+ * a refusal and the error envelope it produced can be correlated in logs — it
+ * is never an ownership token. `v: 2` added `turnToken`; a `v: 1` descriptor
+ * (the first-repair shape, which had no generation binding) parses to `null`
+ * and can never close a turn.
  */
+import { isTurnToken } from "./turn-fence.js";
 
-/** The descriptor kind that marks a desktop start refusal. */
+/**
+ * The descriptor kind that marks a desktop start refusal.
+ */
 export const OMP_START_REFUSAL_KIND = "omp-desktop-start-refusal";
 
-/** The descriptor version this build writes and reads. */
-export const OMP_START_REFUSAL_VERSION = 1;
+/** The descriptor version this build writes and reads (v2 added `turnToken`). */
+export const OMP_START_REFUSAL_VERSION = 2;
 
 /**
  * Why the gate refused the turn. `state-missing` covers every unattributable
@@ -64,6 +73,12 @@ export type OmpStartRefusal = {
   kind: typeof OMP_START_REFUSAL_KIND;
   /** The firing native session id, or null when the context exposed none. */
   sessionId: string | null;
+  /**
+   * The turn token installed by the runner's fence for this turn, or null
+   * when no handshake preceded the turn (the gate was never armed). Only an
+   * exact match with the live generation's token can close a turn.
+   */
+  turnToken: string | null;
   code: OmpStartRefusalCode;
   reason: string;
   /** Unique per refusal invocation (diagnostics only, not an ownership token). */
@@ -118,6 +133,12 @@ export function parseStartRefusalNotice(frame: unknown): OmpStartRefusal | null 
     return null;
   }
   if (
+    descriptor.turnToken !== null &&
+    (typeof descriptor.turnToken !== "string" || !isTurnToken(descriptor.turnToken))
+  ) {
+    return null;
+  }
+  if (
     typeof descriptor.code !== "string" ||
     !(OMP_START_REFUSAL_CODES as readonly string[]).includes(descriptor.code)
   ) {
@@ -142,6 +163,7 @@ export function parseStartRefusalNotice(frame: unknown): OmpStartRefusal | null 
     v: OMP_START_REFUSAL_VERSION,
     kind: OMP_START_REFUSAL_KIND,
     sessionId,
+    turnToken: descriptor.turnToken as string | null,
     code: descriptor.code as OmpStartRefusalCode,
     reason: descriptor.reason,
     refusalId: descriptor.refusalId,

@@ -18,6 +18,7 @@ import type { AgentEventEnvelope } from "@pi-desktop/shared";
 import { OmpRuntimeError } from "../errors.js";
 import type { OmpFrame } from "../protocol.js";
 import { OmpSessionRunner, type OmpSessionRuntime } from "./runner.js";
+import { serveTurnFenceCommand } from "./turn-fence-testkit.js";
 
 type TurnEnd = { sessionId: string; turnId: string; reason: "completed" | "aborted" | "error" };
 
@@ -34,7 +35,9 @@ class FakeRuntime implements OmpSessionRuntime {
     return this.usable;
   }
 
-  async request(command: OmpFrame): Promise<{ success?: boolean; error?: string }> {
+  async request(command: OmpFrame): Promise<{ success?: boolean; error?: string; data?: unknown }> {
+    const fence = serveTurnFenceCommand(command, (frame) => this.push(frame));
+    if (fence) return fence;
     this.commands.push(String(command.type));
     if (command.type === "prompt") {
       if (this.promptFailure) throw this.promptFailure;

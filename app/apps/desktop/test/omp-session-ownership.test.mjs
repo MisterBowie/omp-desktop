@@ -14,6 +14,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
 const { createOmpSessionBridge } = await import("../electron/main/runtime/omp-session.ts");
+const { serveTurnFenceCommand } = await import(
+  "../../../packages/omp-runtime/src/session/turn-fence-testkit.ts"
+);
 
 const scratch = [];
 after(() => {
@@ -36,6 +39,8 @@ class FakeRuntime {
   write() { return true; }
   push(f) { for (const h of [...this.#frames]) h(f); }
   async request(command) {
+    const fence = serveTurnFenceCommand(command, (frame) => this.push(frame));
+    if (fence) return fence;
     this.commands.push(command.type);
     if (command.type === "prompt") return { success: true };
     if (command.type === "new_session") return { success: true, data: { cancelled: false } };

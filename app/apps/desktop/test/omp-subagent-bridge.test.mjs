@@ -28,6 +28,9 @@ const { IPC } = protocol;
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
 const { createOmpSessionBridge } = await import("../electron/main/runtime/omp-session.ts");
+const { serveTurnFenceCommand } = await import(
+  "../../../packages/omp-runtime/src/session/turn-fence-testkit.ts"
+);
 const { registerAgentIpc } = await import("../electron/main/ipc/agent-ipc.ts");
 const { createEngineRouter } = await import("../electron/main/runtime/engine-router.ts");
 
@@ -60,6 +63,10 @@ class SubagentRuntime {
   refuseSubscription = false;
 
   async request(command) {
+    const fence = serveTurnFenceCommand(command, (frame) => {
+      for (const handler of this.frames) handler(frame);
+    });
+    if (fence) return fence;
     this.commands.push(command.type);
     if (command.type === "set_subagent_subscription") {
       if (this.refuseSubscription) return { success: false, error: "subscription refused" };
