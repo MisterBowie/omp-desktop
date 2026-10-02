@@ -377,9 +377,9 @@ test(
     );
 
     const statePath = join(root, "desktop-state.json");
-    const writeState = (mode, permissionMode, hostTools) =>
+    const writeState = (path, mode, permissionMode, hostTools) =>
       writeFileSync(
-        statePath,
+        path,
         JSON.stringify({
           v: 2,
           sessionId: "omp-sidecar-session",
@@ -406,7 +406,7 @@ test(
     };
 
     // Plan hard deny: the shipped gate blocks Write before any card.
-    writeState("plan", "ask", []);
+    writeState(statePath, "plan", "ask", []);
     const denied = probe(
       statePath,
       { type: "tool_call", toolCallId: "c1", toolName: "write", input: { path: join(root, "x.txt"), content: "x" } },
@@ -430,7 +430,7 @@ test(
     assert.equal(bash.cards[0].permissionMode, "ask");
 
     // Agent + Low user MCP: no card in the shipped artifact either.
-    writeState("agent", "ask", [
+    writeState(statePath, "agent", "ask", [
       { name: "mcp_alpha_lookup", risk: "low", planSafeActions: [], origin: "user-mcp" },
     ]);
     const mcp = probe(
@@ -449,5 +449,100 @@ test(
     );
     assert.equal(missing.verdict?.block, true);
     assert.match(missing.verdict?.reason ?? "", /policy is unavailable/);
+
+    // Delegate ownership survives bundling (M5/T20-C second review repair): a
+    // child that started under the ask admission is bound to it and refused
+    // once it is replaced by the auto admission, while the shipped artifact
+    // still carries the fence, the lifecycle handlers and the ownership rule.
+    const stateAutoPath = join(root, "desktop-state-auto.json");
+    writeState(stateAutoPath, "agent", "auto", []);
+    const delegateProbePath = join(root, "gate-delegate-probe.mjs");
+    writeFileSync(
+      delegateProbePath,
+      [
+        'import { readFileSync } from "node:fs";',
+        "const [gatePath, stateAskPath, stateAutoPath, contextJson] = process.argv.slice(2);",
+        'process.env.OMP_DESKTOP_STATE = stateAskPath;',
+        'process.env.OMP_DESKTOP_STATE_REQUIRED = "1";',
+        "delete process.env.OMP_DESKTOP_GATE_MODE;",
+        "delete process.env.OMP_DESKTOP_GATE_TOOLS;",
+        "const gate = await import(gatePath);",
+        "const handlers = new Map();",
+        "const commands = new Map();",
+        "gate.default({",
+        "  on: (event, handler) => handlers.set(event, handler),",
+        "  registerCommand: (name, definition) => commands.set(name, definition.handler),",
+        "  getActiveTools: () => [],",
+        "  setActiveTools: async () => undefined,",
+        "  logger: { warn: () => undefined },",
+        "});",
+        "const raw = JSON.parse(contextJson);",
+        "const parent = {",
+        "  cwd: raw.cwd,",
+        "  hasUI: true,",
+        "  sessionManager: { getSessionId: () => raw.owner, getCwd: () => raw.cwd },",
+        "  abort: () => undefined,",
+        "  ui: { notify: () => undefined, select: async () => undefined },",
+        "};",
+        "const child = {",
+        "  cwd: raw.cwd,",
+        "  hasUI: false,",
+        "  sessionManager: { getSessionId: () => raw.child, getCwd: () => raw.cwd },",
+        "  abort: () => undefined,",
+        "  ui: undefined,",
+        "};",
+        "const run = (event, payload, ctx) => handlers.get(event)(payload, ctx);",
+        "const fence = (statePath, token) => {",
+        '  const state = JSON.parse(readFileSync(statePath, "utf8"));',
+        "  const admission = Buffer.from(JSON.stringify({",
+        "    v: 1,",
+        "    nativeSessionId: state.sessionId,",
+        "    mode: state.mode,",
+        "    permissionMode: state.permissionMode,",
+        "    hostTools: state.hostTools,",
+        "    grants: [],",
+        '  }), "utf8").toString("base64url");',
+        '  commands.get("omp-desktop-turn")(`${token} ${admission}`, parent);',
+        "};",
+        'const event = { type: "tool_call", toolCallId: "c-child", toolName: "write", input: { path: "untouched.txt", content: "x" } };',
+        "const rows = [];",
+        "process.env.OMP_DESKTOP_STATE = stateAskPath;",
+        'fence(stateAskPath, "a".repeat(32));',
+        'await run("before_agent_start", { type: "before_agent_start", systemPrompt: ["native"] }, parent);',
+        'run("agent_start", { type: "agent_start" }, parent);',
+        'await run("session_start", { type: "session_start" }, child);',
+        'rows.push({ name: "child-under-ask", verdict: (await run("tool_call", event, child)) ?? null });',
+        'run("agent_end", { type: "agent_end" }, parent);',
+        'rows.push({ name: "child-after-terminal", verdict: (await run("tool_call", event, child)) ?? null });',
+        "process.env.OMP_DESKTOP_STATE = stateAutoPath;",
+        'fence(stateAutoPath, "b".repeat(32));',
+        'await run("before_agent_start", { type: "before_agent_start", systemPrompt: ["native"] }, parent);',
+        'run("agent_start", { type: "agent_start" }, parent);',
+        'rows.push({ name: "child-after-auto-admission", verdict: (await run("tool_call", event, child)) ?? null });',
+        'process.stdout.write(JSON.stringify({ rows }));',
+      ].join("\n"),
+      "utf8",
+    );
+    const delegateRun = spawnSync(
+      process.execPath,
+      [
+        delegateProbePath,
+        gatePath,
+        statePath,
+        stateAutoPath,
+        JSON.stringify({ cwd: root, owner: "omp-sidecar-session", child: "omp-sidecar-child" }),
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(delegateRun.status, 0, `the delegate probe must exit 0: ${delegateRun.stderr}`);
+    const delegateRows = JSON.parse(delegateRun.stdout).rows;
+    assert.deepEqual(
+      delegateRows.map((row) => row.name),
+      ["child-under-ask", "child-after-terminal", "child-after-auto-admission"],
+    );
+    assert.match(delegateRows[0].verdict?.reason ?? "", /no interactive UI/);
+    assert.match(delegateRows[1].verdict?.reason ?? "", /policy is unavailable/);
+    assert.match(delegateRows[2].verdict?.reason ?? "", /policy is unavailable/);
+    for (const row of delegateRows) assert.equal(row.verdict?.block, true, `${row.name} must block`);
   },
 );

@@ -123,6 +123,7 @@ function sourceSeam(rel) {
     "apps/desktop/test/omp-plugin-plan-safe.test.mjs",
     "apps/desktop/test/omp-execution-policy-e2e.test.mjs",
     "packages/omp-runtime/src/session/gate-permissions.test.ts",
+    "packages/omp-runtime/src/session/gate-delegate-ownership.test.ts",
     "packages/omp-runtime/src/session/tool-paths.test.ts",
   ];
   const missing = behaviorTests.filter((rel) => !existsSync(join(appRoot, rel)));

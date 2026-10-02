@@ -614,6 +614,8 @@ describe("registered handler: admitted-turn ownership and the delegate policy", 
         run("agent_start", { type: "agent_start" }, context);
       },
       endTurn: (context) => run("agent_end", { type: "agent_end" }, context),
+      /** A delegate session's own start: where it is bound to the live admission. */
+      startDelegate: (context) => run("session_start", { type: "session_start" }, context),
     };
   }
 
@@ -675,36 +677,69 @@ describe("registered handler: admitted-turn ownership and the delegate policy", 
     });
   });
 
-  it("decides a delegate under the owning turn's admitted policy, never a card, never another turn's", async () => {
+  it("binds a delegate to the turn it started under, and never lends it a later turn's policy", async () => {
     const world = makeWorld();
-    const { writeState, call, beginTurn, endTurn } = gateHarness(world);
+    const { writeState, call, beginTurn, endTurn, startDelegate } = gateHarness(world);
     const writeEvent = { ...EVENT, toolName: "write", input: { path: join(world.project, "a.txt"), content: "x" } };
-    const delegate = { cwd: world.project, sessionManager: { getSessionId: () => "omp-child-1" }, hasUI: false };
+    const delegate = (id) => ({
+      cwd: world.project,
+      sessionManager: { getSessionId: () => id, getCwd: () => world.project },
+      hasUI: false,
+    });
 
+    // Turn A: ask. The delegate starts under it and is bound to its record.
     writeState("omp-session-1", "agent", "ask");
     await beginTurn(world.context);
-    expect(await call(writeEvent, delegate)).toMatchObject({
+    const childA = delegate("omp-child-a");
+    await startDelegate(childA);
+    expect(await call(writeEvent, childA)).toMatchObject({
       block: true,
       reason: expect.stringMatching(/no interactive UI/),
     });
     // The file says auto now, but the admitted turn is the authority.
     writeState("omp-session-1", "agent", "auto");
-    expect(await call(writeEvent, delegate)).toMatchObject({ block: true });
+    expect(await call(writeEvent, childA)).toMatchObject({ block: true });
 
-    // The next admitted turn is auto; the delegate follows it without a card.
+    // Turn B: auto. The child that started under A must not inherit it.
     endTurn(world.context);
     await beginTurn(world.context);
-    expect(await call(writeEvent, delegate)).toBeUndefined();
+    expect(await call(writeEvent, childA)).toMatchObject({
+      block: true,
+      reason: expect.stringMatching(/policy is unavailable/),
+    });
+    // A delegate that starts under B is decided by B: auto allows, no card.
+    const childB = delegate("omp-child-b");
+    await startDelegate(childB);
+    expect(await call(writeEvent, childB)).toBeUndefined();
 
-    // A contract turn hard-denies the same write for the delegate.
+    // A contract turn hard-denies the write for the delegate bound to it.
     endTurn(world.context);
     writeState("omp-session-1", "plan", "auto");
     await beginTurn(world.context);
-    expect(await call(writeEvent, delegate)).toMatchObject({ block: true, reason: /WRITE_DISABLED_IN_PLAN/ });
+    const childC = delegate("omp-child-c");
+    await startDelegate(childC);
+    expect(await call(writeEvent, childC)).toMatchObject({ block: true, reason: /WRITE_DISABLED_IN_PLAN/ });
 
     // A retired turn leaves no policy to borrow.
     endTurn(world.context);
-    expect(await call(writeEvent, delegate)).toMatchObject({
+    expect(await call(writeEvent, childC)).toMatchObject({
+      block: true,
+      reason: expect.stringMatching(/policy is unavailable/),
+    });
+  });
+
+  it("refuses a no-UI context that never started under the admitted turn", async () => {
+    const world = makeWorld();
+    const { writeState, call, beginTurn } = gateHarness(world);
+    const writeEvent = { ...EVENT, toolName: "write", input: { path: join(world.project, "a.txt"), content: "x" } };
+    writeState("omp-session-1", "agent", "auto");
+    await beginTurn(world.context);
+    const unobserved = {
+      cwd: world.project,
+      sessionManager: { getSessionId: () => "omp-child-unseen", getCwd: () => world.project },
+      hasUI: false,
+    };
+    expect(await call(writeEvent, unobserved)).toMatchObject({
       block: true,
       reason: expect.stringMatching(/policy is unavailable/),
     });

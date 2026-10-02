@@ -171,7 +171,7 @@ describe("admitted-turn policy ownership", () => {
     expect(h.dialogs).toHaveLength(0);
   });
 
-  it("refuses a foreign interactive session and serves a delegate under the parent record", async () => {
+  it("refuses a foreign interactive session and decides a bound delegate under the parent record", async () => {
     const path = writeState();
     process.env.OMP_DESKTOP_STATE = path;
     process.env.OMP_DESKTOP_STATE_REQUIRED = "1";
@@ -189,15 +189,31 @@ describe("admitted-turn policy ownership", () => {
     expect(h.dialogs).toHaveLength(0);
 
     // A delegate (hasUI=false) is decided under the owning session's admitted
-    // policy: Plan/ask Bash asks, and with no UI it fails closed exactly there.
-    const delegate = await h.toolCall(BASH, {
-      cwd: "/tmp/project",
-      hasUI: false,
-      ui: undefined,
-      sessionManager: { getSessionId: () => "native-child", getCwd: () => "/tmp/project" },
-    });
-    expect(delegate?.block).toBe(true);
-    expect(delegate?.reason).toMatch(/no interactive UI/);
+    // policy — but only after its own start bound it to that admission
+    // (M5/T20-C second repair): Plan/ask Bash asks, and with no UI it fails
+    // closed exactly there.
+    const delegate = h.delegateContext("native-child");
+    await h.lifecycle("session_start", delegate);
+    const bound = await h.toolCall(BASH, delegate);
+    expect(bound?.block).toBe(true);
+    expect(bound?.reason).toMatch(/no interactive UI/);
+  });
+
+  it("fails closed for a delegate that was never bound to an admission", async () => {
+    const path = writeState();
+    process.env.OMP_DESKTOP_STATE = path;
+    process.env.OMP_DESKTOP_STATE_REQUIRED = "1";
+    const h = createGateHandlerHarness({ sessionId: OWNER });
+    h.arm(TOKEN_A, admission({ mode: "agent", permissionMode: "auto" }));
+    await h.beforeAgentStart();
+    h.agentStart();
+
+    // No lifecycle event ever named this session: the live admission is never
+    // lent to an unknown no-UI context, so even an `auto` call is refused.
+    const unobserved = await h.toolCall(BASH, h.delegateContext("native-unseen"));
+    expect(unobserved?.block).toBe(true);
+    expect(unobserved?.reason).toMatch(/policy is unavailable/);
+    expect(h.dialogs).toHaveLength(0);
   });
 
   it("retires the record on a terminal agent_end but keeps it across a scheduled continuation", async () => {

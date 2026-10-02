@@ -159,7 +159,15 @@ describe("independent review decision matrix (ported)", () => {
       expect(h.aborted()).toBe(0);
       h.agentStart();
       h.answerWith(OMP_APPROVAL_OPTIONS[2]);
-      const context = testCase.hasUI === false ? h.delegateContext() : h.context;
+      let context: Record<string, unknown> = h.context;
+      if (testCase.hasUI === false) {
+        // The product shape for a delegate: it starts (its own lifecycle) and is
+        // bound to the admission before any of its calls arrive.
+        context = h.delegateContext();
+        await h.lifecycle("session_start", context);
+        await h.lifecycle("before_agent_start", context);
+        await h.lifecycle("agent_start", context);
+      }
       const verdict = await h.toolCall(
         { type: "tool_call", toolCallId: `call-${testCase.name}`, toolName: testCase.tool, input: testCase.input },
         context,

@@ -21,7 +21,16 @@
  *     the gate never saw the call (no gate refusal is claimed for these).
  */
 import assert from "node:assert/strict";
-import { createWriteStream, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  createWriteStream,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { register } from "node:module";
 import { spawn } from "node:child_process";
 import { homedir, tmpdir } from "node:os";
@@ -554,6 +563,7 @@ test(
     });
     {
       const before = envelopes.length;
+      const scenario7Start = Date.now();
       const ref = hostSessions.get(SESSION).engineRef;
       const started = await bridge.prompt({
         sessionId: SESSION,
@@ -578,6 +588,53 @@ test(
         true,
         "an auto-mode delegate write must execute exactly once",
       );
+
+      // Binding evidence (M5/T20-C second review repair): the ownership rule
+      // reads the child session's *public* file/header facts. Record what the
+      // real runtime exposed for this delegation — the child declares its
+      // parent as the owning session's file, and its header was created after
+      // the parent's first provider request, i.e. inside this admitted turn
+      // (the fence is armed before that request, so the child cannot predate
+      // the admission the freshness guard compares against).
+      const parentFile = hostSessions.get(SESSION).engineRef?.nativeSessionPath;
+      assert.equal(typeof parentFile === "string" && existsSync(parentFile), true, "the parent native session file must exist");
+      const artifactsDir = parentFile.slice(0, -".jsonl".length);
+      const childHeaders = readdirSync(artifactsDir)
+        .filter((name) => name.endsWith(".jsonl"))
+        .map((name) => {
+          // The file opens with a fixed-size title slot; the session header is
+          // the entry whose `type` is "session".
+          const entries = readFileSync(join(artifactsDir, name), "utf8")
+            .split("\n")
+            .filter((line) => line.trim().length > 0)
+            .map((line) => JSON.parse(line));
+          return { name, header: entries.find((entry) => entry.type === "session") };
+        });
+      assert.equal(childHeaders.length > 0, true, `the delegated child sessions must persist under ${artifactsDir}`);
+      for (const { name, header } of childHeaders) {
+        assert.ok(header, `child ${name} must contain a session header entry`);
+        assert.equal(
+          header.parentSession,
+          parentFile,
+          `child ${name} must declare the owning session file; header=${JSON.stringify(header)}`,
+        );
+        assert.equal(Number.isFinite(Date.parse(header.timestamp)), true, `child ${name} must carry a parseable creation timestamp`);
+      }
+      const parentRequest = provider.requests
+        .filter((request) => request.at >= scenario7Start && !firstUserText(request).includes(childAutoMarkerText))
+        .sort((left, right) => left.at - right.at)[0];
+      assert.ok(parentRequest, "the parent request of the auto delegation must be recorded");
+      // The child of *this* turn: created after the parent's first provider
+      // request, which itself follows the fence that installed the admission.
+      const createdThisTurn = childHeaders.filter(({ header }) => Date.parse(header.timestamp) >= scenario7Start);
+      assert.equal(createdThisTurn.length > 0, true, "the delegation must create its own child session");
+      for (const { name, header } of createdThisTurn) {
+        assert.equal(
+          Date.parse(header.timestamp) >= parentRequest.at,
+          true,
+          `child ${name} must be created inside the admitted turn (${header.timestamp} vs ${new Date(parentRequest.at).toISOString()})`,
+        );
+      }
     }
 
     // --- 8. Plan/auto: contract catalog + Bash auto + plugin ctx.mode --------

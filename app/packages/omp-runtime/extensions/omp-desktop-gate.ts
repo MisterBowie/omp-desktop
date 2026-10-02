@@ -36,7 +36,7 @@
  *      policy, and a mutable state failure during execution cannot turn a
  *      contract refusal into an approval.
  *
- * Which policy a call is decided with (M5/T20-C review repair):
+ * Which policy a call is decided with (M5/T20-C review repairs):
  *
  *   - The **admitted turn** is the one and only policy owner. It is installed
  *     by the fence — the desktop's admission payload for the exact turn token
@@ -44,15 +44,21 @@
  *     payload, by the first validated `before_agent_start` read of a fenced
  *     turn. It is armed by `agent_start`, replaced by the next fence, and
  *     retired on a terminal `agent_end` or a start refusal.
- *   - Every call of the turn — the owning session's own calls and its
- *     delegates (`hasUI=false`) — decides from that immutable snapshot. The
- *     mutable run-scoped file is never re-read for policy, so a tool body that
- *     rewrites it mid-turn can neither relax the permission mode nor swap the
- *     risk/catalog/safeActions table.
- *   - A record whose turn never started, a foreign interactive session, and
- *     (with the mandatory channel on) a process with no record at all fail
- *     closed. A fixture that never enabled the channel keeps the legacy
- *     disk-driven behavior.
+ *   - The owning session's own calls and its **delegates** (`hasUI=false`)
+ *     decide from that immutable snapshot. A delegate is *bound* to the exact
+ *     admission record it started under — at its own `session_start`,
+ *     `before_agent_start` or `agent_start` — and only while that record is
+ *     still the live, started admission; a delegate that was never observed,
+ *     one whose public session header shows it predates the admission, or one
+ *     bound to a retired/replaced admission is refused rather than lent the
+ *     live turn's policy (`bindDelegate`). The mutable run-scoped file is
+ *     never re-read for policy, so a tool body that rewrites it mid-turn can
+ *     neither relax the permission mode nor swap the risk/catalog/safeActions
+ *     table.
+ *   - A record whose turn never started, a foreign interactive session, an
+ *     unbound delegate, and (with the mandatory channel on) a process with no
+ *     record at all fail closed. A fixture that never enabled the channel
+ *     keeps the legacy disk-driven behavior.
  *
  * When a policy snapshot is available, calls are decided with PI's
  * execution-time order (M5/T20-C, §1.3.1): contract modes hard-deny every tool
@@ -313,15 +319,58 @@ export interface ToolCallEvent {
   input: Record<string, unknown>;
 }
 
+/**
+ * The public session facts the ownership decision reads. All four members are
+ * part of the pinned runtime's public `ReadonlySessionManager` pick
+ * (`getSessionId` / `getCwd` / `getSessionFile` / `getHeader`); a host that
+ * exposes none of the file members simply provides no parentage evidence, and
+ * the binding falls back to its lifecycle rules.
+ */
+type SessionManagerFacts = {
+  getSessionId?: () => string;
+  getCwd?: () => string;
+  getSessionFile?: () => string | undefined;
+  getHeader?: () => unknown;
+};
+
 interface ToolCallContext {
   ui?: UIContext;
   cwd?: string;
-  sessionManager?: { getSessionId?: () => string; getCwd?: () => string };
+  sessionManager?: SessionManagerFacts;
   hasUI?: boolean | (() => boolean);
 }
 
+/**
+ * The UI surface a lifecycle context can carry: the interactive one, the
+ * notify-only slice `before_agent_start` exposes, or none at all.
+ */
+type LifecycleUiSlice =
+  | UIContext
+  | { notify?: (message: string, type?: "info" | "warning" | "error") => void }
+  | null;
+
+/**
+ * A context a delegate's own lifecycle event (or the turn-boundary command)
+ * carries. Identical to {@link ToolCallContext} apart from tolerating the
+ * `before_agent_start` slice's `null` session manager and notify-only UI.
+ */
+type DelegateLifecycleContext = {
+  ui?: LifecycleUiSlice;
+  cwd?: string;
+  sessionManager?: SessionManagerFacts | null;
+  hasUI?: boolean | (() => boolean);
+};
+
 export interface ExtensionAPI {
   on(event: "tool_call", handler: (event: ToolCallEvent, ctx: ToolCallContext) => unknown): void;
+  /**
+   * A session's own start, emitted by the pinned runtime once the session's
+   * extension runner is initialized (`agent-session`/`task/executor.ts`
+   * `extensionRunner.emit({ type: "session_start" })`). A delegate session
+   * (`hasUI=false`) is bound to its owning admission here — its creation is
+   * the earliest legitimate ownership signal the public surface offers.
+   */
+  on(event: "session_start", handler: (event: { type: "session_start" }, ctx: DelegateLifecycleContext) => unknown): void;
   on(
     event: "before_agent_start",
     handler: (
@@ -361,6 +410,14 @@ export interface ExtensionAPI {
   setActiveTools?: (names: string[]) => Promise<void> | void;
   logger?: { warn?(message: string, meta?: unknown): void; info?(message: string, meta?: unknown): void };
 }
+
+/**
+ * The extension-command context the runtime's `createCommandContext()` hands a
+ * registered command: the same session-bearing context the lifecycle events
+ * carry, which is why the turn-boundary handler can read the owning session's
+ * file for the admission.
+ */
+type BeginAgentStartContextSlice = DelegateLifecycleContext;
 
 /** One-line, human-readable action summary for the dialog title. */
 export function approvalTitle(event: ToolCallEvent): string {
@@ -437,7 +494,7 @@ export function buildApprovalDialog(
   };
 }
 
-function sessionIdOf(context: ToolCallContext): string | undefined {
+function sessionIdOf(context: DelegateLifecycleContext): string | undefined {
   try {
     return context.sessionManager?.getSessionId?.();
   } catch {
@@ -453,7 +510,7 @@ function cwdOf(context: ToolCallContext): string | undefined {
   }
 }
 
-function hasUi(context: ToolCallContext): boolean {
+function hasUi(context: DelegateLifecycleContext): boolean {
   const flag = context.hasUI;
   if (typeof flag === "function") {
     try {
@@ -463,7 +520,8 @@ function hasUi(context: ToolCallContext): boolean {
     }
   }
   if (typeof flag === "boolean") return flag;
-  return typeof context.ui?.select === "function";
+  const ui = context.ui;
+  return ui !== null && ui !== undefined && "select" in ui && typeof ui.select === "function";
 }
 
 /** The run-scoped policy subset one gate decision consumes. */
@@ -932,9 +990,14 @@ export async function applyContractToolClamp(
  *   - `started` is set by `agent_start` for the record's own native session:
  *     a fence whose turn never actually started (a handshake whose prompt was
  *     stopped or refused before dispatch) decides nothing.
- *   - the owning session's calls and its delegates (`hasUI=false`) decide
- *     under the record; a *foreign* interactive session is refused rather
- *     than lent another session's policy.
+ *   - the owning session's calls decide under the record; a *foreign*
+ *     interactive session is refused rather than lent another session's
+ *     policy.
+ *   - a delegate (`hasUI=false`) decides under the record only when it was
+ *     explicitly bound to it at its own lifecycle start (`bindDelegate`):
+ *     a child that started under this record keeps this association, and once
+ *     the record is retired or replaced the child is refused — it never
+ *     inherits a newer admission.
  *   - the record is replaced wholesale by the next fence and cleared on
  *     terminal `agent_end` (unless the runtime scheduled a continuation) and
  *     on a start refusal, so a late callback can never borrow an earlier
@@ -958,9 +1021,63 @@ type AdmittedTurn = {
   source: "fence" | "disk";
   /** True once `agent_start` fired for the owning session. */
   started: boolean;
+  /** Wall clock at installation: a delegate session created before this cannot be attributed to it. */
+  armedAt: number;
+  /**
+   * The owning session's file as the public surface reported it when the
+   * admission was armed (`ReadonlySessionManager.getSessionFile`), or
+   * undefined when the surface exposes none. A delegate's declared parentage
+   * chain is resolved against this value.
+   */
+  ownerSessionFile: string | undefined;
 };
 
 let admittedTurn: AdmittedTurn | null = null;
+
+/**
+ * Delegate session id → the exact admission record it started under
+ * (M5/T20-C second review repair).
+ *
+ * A delegate's calls are decided by the *record it was bound to*, referenced
+ * by identity — never by whatever admission happens to be module-global when
+ * the call arrives. A binding is written once, at the delegate's first
+ * legitimate lifecycle event while its owning admission is live and started,
+ * and is never re-pointed: once that record is retired (a terminal
+ * `agent_end`, a start refusal) or replaced by the next fence, the delegate
+ * fails closed even while a newer admission is live.
+ */
+const delegateBindings = new Map<string, AdmittedTurn>();
+
+/**
+ * Observed delegate session files → the session file they declare as parent
+ * (`ReadonlySessionManager.getHeader().parentSession`). The recorded links let
+ * a nested delegate (a child of a child) resolve its chain up to the
+ * admission's owning session file.
+ */
+const delegateParents = new Map<string, string>();
+
+/**
+ * Delegate sessions that must never decide under any admission in this
+ * process, whatever the live turn is. A session lands here when
+ *
+ *   - its public header showed it was created before the admission it was
+ *     first observed under was armed (a delayed start, a parked/revived
+ *     worker): it must not be casually associated with a newer turn; or
+ *   - its binding was retired with its admission (the next fence, a start
+ *     refusal): a child that started under A keeps A's association and is
+ *     refused from then on instead of inheriting B.
+ */
+const refusedDelegates = new Set<string>();
+
+/**
+ * Retire every active delegate binding with the admission it belongs to:
+ * each bound session is remembered as refused, so the same session can never
+ * be re-pointed at the admission that replaces it.
+ */
+function retireDelegateBindings(): void {
+  for (const sessionId of delegateBindings.keys()) refusedDelegates.add(sessionId);
+  delegateBindings.clear();
+}
 
 /**
  * The last validated policy snapshot for the *legacy* (unfenced, payload-less)
@@ -969,6 +1086,114 @@ let admittedTurn: AdmittedTurn | null = null;
  * {@link admittedTurn}. Age-bounded for the fixture path exactly as before.
  */
 let policyCache: { state: DesktopCapabilityState } | null = null;
+
+/**
+ * The public session facts a delegate ownership decision reads, each validated
+ * at the boundary: the pinned `ReadonlySessionManager` returns a real header
+ * object, but this module only trusts primitives it checked itself.
+ */
+type DelegateSessionFacts = {
+  file: string | undefined;
+  parentFile: string | undefined;
+  createdAt: number | undefined;
+};
+
+function delegateSessionFactsOf(context: DelegateLifecycleContext): DelegateSessionFacts {
+  let file: string | undefined;
+  try {
+    const reported = context.sessionManager?.getSessionFile?.();
+    if (typeof reported === "string" && reported.length > 0) file = reported;
+  } catch {
+    file = undefined;
+  }
+  let parentFile: string | undefined;
+  let createdAt: number | undefined;
+  try {
+    const header = context.sessionManager?.getHeader?.();
+    if (header !== null && typeof header === "object") {
+      if ("parentSession" in header) {
+        const parent = header.parentSession;
+        if (typeof parent === "string" && parent.length > 0) parentFile = parent;
+      }
+      if ("timestamp" in header) {
+        const timestamp = header.timestamp;
+        if (typeof timestamp === "string") {
+          const parsed = Date.parse(timestamp);
+          if (Number.isFinite(parsed)) createdAt = parsed;
+        }
+      }
+    }
+  } catch {
+    parentFile = undefined;
+    createdAt = undefined;
+  }
+  return { file, parentFile, createdAt };
+}
+
+/**
+ * Does this delegate's declared parentage reach the admission's owning session
+ * file? `undefined` means the surface exposes no parentage to check (a fixture
+ * context without a session file), `false` means it affirmatively does not
+ * resolve — a parent chain that stops before the owner, or one that never
+ * reaches it.
+ */
+function delegateDescendsFrom(context: DelegateLifecycleContext, admission: AdmittedTurn): boolean | undefined {
+  const owner = admission.ownerSessionFile;
+  const parent = delegateSessionFactsOf(context).parentFile;
+  if (owner === undefined || parent === undefined) return undefined;
+  let current = parent;
+  const seen = new Set<string>();
+  for (let hops = 0; hops < 32; hops += 1) {
+    if (current === owner) return true;
+    if (seen.has(current)) return false;
+    seen.add(current);
+    const next = delegateParents.get(current);
+    if (next === undefined) return false;
+    current = next;
+  }
+  return false;
+}
+
+/**
+ * Bind one delegate (no-UI) session to the admission it started under
+ * (M5/T20-C second review repair).
+ *
+ * Evaluated at the delegate's own lifecycle events — `session_start`,
+ * `before_agent_start`, `agent_start` — while its owning admission is live and
+ * started. It is never a moving lookup at tool-call time: the binding stores
+ * the admission record itself, so a later fence can replace the live admission
+ * without lending its policy to this delegate.
+ *
+ * Fail-closed rules:
+ *   - no live, started admission: nothing to bind;
+ *   - the session has no id on this surface: nothing to key a binding by;
+ *   - the first binding wins (an already-bound delegate is never re-pointed);
+ *   - the public header shows the session was created before the admission was
+ *     armed: recorded as permanently unattributable — a delayed start must not
+ *     adopt a newer turn;
+ *   - a declared parentage chain that does not resolve to the admission's
+ *     owning session file: not bound.
+ */
+function bindDelegate(context: DelegateLifecycleContext): void {
+  if (hasUi(context)) return;
+  const sessionId = sessionIdOf(context);
+  if (sessionId === undefined) return;
+  const facts = delegateSessionFactsOf(context);
+  // Record the parentage link even when this delegate is not (yet) bindable:
+  // a nested delegate's chain needs its intermediate recorded.
+  if (facts.file !== undefined && facts.parentFile !== undefined) {
+    delegateParents.set(facts.file, facts.parentFile);
+  }
+  if (delegateBindings.has(sessionId) || refusedDelegates.has(sessionId)) return;
+  const admitted = admittedTurn;
+  if (!admitted || !admitted.started || sessionId === admitted.nativeSessionId) return;
+  if (facts.createdAt !== undefined && facts.createdAt < admitted.armedAt) {
+    refusedDelegates.add(sessionId);
+    return;
+  }
+  if (delegateDescendsFrom(context, admitted) === false) return;
+  delegateBindings.set(sessionId, admitted);
+}
 
 export default function ompDesktopGate(pi: ExtensionAPI): void {
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
@@ -1030,6 +1255,10 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
         // borrowing the previous turn's policy).
         turnToken = command.token;
         admittedTurn = null;
+        // Every active delegate binding belongs to the record retired above:
+        // its sessions are remembered as refused, so they can never be
+        // re-pointed at this new admission.
+        retireDelegateBindings();
         let admission: OmpTurnAdmission | null = null;
         if (command.admission !== null) {
           admission = decodeTurnAdmission(command.admission);
@@ -1050,6 +1279,11 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
               grants: new Set(admission.grants),
               source: "fence",
               started: false,
+              armedAt: Date.now(),
+              // The owning session's own file, as the public surface reports it
+              // at the moment the admission is installed: the reference a
+              // delegate's declared parentage chain must resolve to.
+              ownerSessionFile: delegateSessionFactsOf(context).file,
             }
           : null;
         try {
@@ -1107,7 +1341,11 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
     }
     // The refused turn never started: its admission is retired here, so a
     // late callback cannot decide under a policy for a turn that was aborted.
-    if (admittedTurn && admittedTurn.token === turnToken) admittedTurn = null;
+    // The bindings that referenced it are dropped with it.
+    if (admittedTurn && admittedTurn.token === turnToken) {
+      admittedTurn = null;
+      retireDelegateBindings();
+    }
     if (typeof context.abort === "function") {
       try {
         context.abort();
@@ -1144,16 +1382,26 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
     if (admitted) {
       const sessionId = sessionIdOf(context);
       const owner = sessionId !== undefined && sessionId === admitted.nativeSessionId;
-      // A delegate (no UI) runs under the parent session's admitted policy,
-      // exactly as PI's host decides subagent calls; any other session is
-      // foreign and is refused.
-      const delegate = !hasUi(context);
       if (!admitted.started) {
         policyUnavailable = true;
-      } else if (owner || delegate) {
+      } else if (owner) {
         snapshot = admitted.snapshot;
         grants = admitted.grants;
         owned = true;
+      } else if (!hasUi(context)) {
+        // A delegate decides only under the exact admission it was bound to at
+        // its own lifecycle start (`bindDelegate`). An unbound delegate — never
+        // observed, or observed with header evidence that its session predates
+        // this turn — and one bound to a retired or replaced admission both fail
+        // closed; the live turn's policy is never lent to it.
+        const binding = sessionId !== undefined ? delegateBindings.get(sessionId) : undefined;
+        if (binding !== undefined && binding === admitted) {
+          snapshot = admitted.snapshot;
+          grants = admitted.grants;
+          owned = true;
+        } else {
+          policyUnavailable = true;
+        }
       } else {
         policyUnavailable = true;
       }
@@ -1198,8 +1446,10 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
   // The admitted turn's ownership window: armed by the runtime's own
   // `agent_start` for the owning native session, retired on a terminal
   // `agent_end` (a scheduled continuation keeps it). A delegate's own
-  // lifecycle events name the child session and never touch the record.
+  // lifecycle events name the child session, never touch the record, and are
+  // where that child is bound to its owning admission (M5/T20-C second repair).
   pi.on("agent_start", (_event, context) => {
+    bindDelegate(context);
     if (!admittedTurn) return;
     const sessionId = sessionIdOf(context);
     if (sessionId !== undefined && sessionId === admittedTurn.nativeSessionId) {
@@ -1211,7 +1461,15 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
     const sessionId = sessionIdOf(context);
     if (sessionId !== undefined && sessionId === admittedTurn.nativeSessionId) {
       admittedTurn = null;
+      retireDelegateBindings();
     }
+  });
+  // A delegate session's own start is its earliest ownership signal: the
+  // runtime emits it from the extension runner the child session builds for
+  // itself, with the child's own session manager (`hasUI=false`), so that is
+  // where the child is bound to the admission it started under.
+  pi.on("session_start", (_event, context) => {
+    bindDelegate(context);
   });
 
   // Desktop skills, project memory and the mode block enter the provider-visible
@@ -1221,6 +1479,10 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
   // state is invalid, or — with the mandatory marker — missing/unreadable);
   // the handler never throws into the agent start.
   pi.on("before_agent_start", async (event, context) => {
+    // A delegate's own start is a legitimate ownership signal too (and the
+    // first one a fixture context without a session file exposes): bind it to
+    // the live admission before the policy decision below can skip the start.
+    bindDelegate(context);
     const statePath = env?.OMP_DESKTOP_STATE;
     try {
       const decision = beforeAgentStartPolicy(event, context, statePath, Date.now(), {
@@ -1280,6 +1542,8 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
           grants: new Set(),
           source: "disk",
           started: false,
+          armedAt: Date.now(),
+          ownerSessionFile: delegateSessionFactsOf(context).file,
         };
       }
       const admitted = admittedTurn;

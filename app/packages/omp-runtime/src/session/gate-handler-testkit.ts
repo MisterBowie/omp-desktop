@@ -23,6 +23,8 @@ export type GateHarnessOptions = {
   sessionId?: string;
   /** The context's working directory (the external-path workspace root). */
   cwd?: string;
+  /** The owning session file the context reports (`getSessionFile`), when a test needs the parentage check. */
+  ownerFile?: string;
 };
 
 export type GateHandlerHarness = {
@@ -30,8 +32,8 @@ export type GateHandlerHarness = {
   context: Record<string, unknown>;
   /** A context for another interactive session. */
   foreignContext(sessionId?: string): Record<string, unknown>;
-  /** A delegate context (`hasUI=false`). */
-  delegateContext(sessionId?: string): Record<string, unknown>;
+  /** A delegate context (`hasUI=false`), optionally exposing session-file facts. */
+  delegateContext(sessionId?: string, facts?: GateDelegateFacts): Record<string, unknown>;
   /** Arm the fence with a token and (optionally) an admission payload. */
   arm(token: string, admission?: OmpTurnAdmission): void;
   /** Arm with raw argument text (to exercise malformed handshakes). */
@@ -39,6 +41,15 @@ export type GateHandlerHarness = {
   beforeAgentStart(context?: Record<string, unknown>): Promise<{ systemPrompt: string[] } | undefined>;
   agentStart(sessionId?: string): void;
   agentEnd(sessionId?: string, willContinue?: boolean): void;
+  /**
+   * Drive one event for an explicit context — how a delegate's own start
+   * (`session_start`, `before_agent_start`, `agent_start`) reaches the gate.
+   */
+  lifecycle(
+    event: "session_start" | "before_agent_start" | "agent_start" | "agent_end",
+    context: Record<string, unknown>,
+    payload?: Record<string, unknown>,
+  ): Promise<unknown>;
   toolCall(
     event: ToolCallEvent,
     context?: Record<string, unknown>,
@@ -51,6 +62,20 @@ export type GateHandlerHarness = {
   aborted: () => number;
   /** Answer subsequent dialogs with this option (undefined: dismiss). */
   answerWith(option: string | undefined): void;
+};
+
+/**
+ * The public session facts a delegate context exposes. Undefined members are
+ * simply absent from the context, exactly like a host whose session manager
+ * does not publish that member.
+ */
+export type GateDelegateFacts = {
+  /** The session file the context reports (`ReadonlySessionManager.getSessionFile`). */
+  file?: string;
+  /** The parent session file its header declares (`getHeader().parentSession`). */
+  parentFile?: string;
+  /** The ISO creation time its header declares (`getHeader().timestamp`). */
+  createdAt?: string;
 };
 
 export type GateTurnInput = {
@@ -108,7 +133,11 @@ export function createGateHandlerHarness(options: GateHarnessOptions = {}): Gate
   const contextFor = (sessionId: string): Record<string, unknown> => ({
     cwd,
     hasUI: true,
-    sessionManager: { getSessionId: () => sessionId, getCwd: () => cwd },
+    sessionManager: {
+      getSessionId: () => sessionId,
+      getCwd: () => cwd,
+      ...(options.ownerFile !== undefined ? { getSessionFile: () => options.ownerFile } : {}),
+    },
     abort: () => {
       aborted += 1;
     },
@@ -132,11 +161,23 @@ export function createGateHandlerHarness(options: GateHarnessOptions = {}): Gate
   return {
     context,
     foreignContext: (sessionId = "omp-elsewhere") => contextFor(sessionId),
-    delegateContext: (sessionId = "omp-child-1") => ({
+    delegateContext: (sessionId = "omp-child-1", facts = {}) => ({
       cwd,
       hasUI: false,
       ui: undefined,
-      sessionManager: { getSessionId: () => sessionId, getCwd: () => cwd },
+      sessionManager: {
+        getSessionId: () => sessionId,
+        getCwd: () => cwd,
+        ...(facts.file !== undefined ? { getSessionFile: () => facts.file } : {}),
+        ...(facts.parentFile !== undefined || facts.createdAt !== undefined
+          ? {
+              getHeader: () => ({
+                ...(facts.parentFile !== undefined ? { parentSession: facts.parentFile } : {}),
+                ...(facts.createdAt !== undefined ? { timestamp: facts.createdAt } : {}),
+              }),
+            }
+          : {}),
+      },
     }),
     arm: (token, admission) => {
       const handler = commands.get(OMP_TURN_COMMAND);
@@ -167,6 +208,15 @@ export function createGateHandlerHarness(options: GateHarnessOptions = {}): Gate
         );
       }
     },
+    lifecycle: (event, ctx, payload) =>
+      run(
+        event,
+        payload ??
+          (event === "before_agent_start"
+            ? { type: event, systemPrompt: ["native child prompt"] }
+            : { type: event }),
+        ctx,
+      ),
     toolCall: async (event, ctx) =>
       (await run("tool_call", event, ctx ?? context)) as { block?: boolean; reason?: string } | undefined,
     dialogs,
