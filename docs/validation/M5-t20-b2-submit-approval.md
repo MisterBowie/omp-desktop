@@ -26,8 +26,8 @@
 | fork `bun test packages/coding-agent/test/rpc-host-tools.test.ts packages/coding-agent/test/rpc-input-frame.test.ts`（新增 `terminateOnSettle` 声明/非法值/边界 null 用例） | **28 passed / 0 failed** | `fork-rpc-host-tools.txt` |
 | fork `bun test packages/natives/test/embed-native.test.ts packages/coding-agent/test/build-binary-bytecode.test.ts`（可复现构建载荷不回退） | **5 passed / 0 failed** | `fork-reproducibility.txt` |
 | 真实 fixed patched OMP（`.4` 源码树）+ 生产 bridge/gate/host-tool adapter + 真实 host-core（隔离 `pi.sqlite`）+ 本地 FakeProvider：`node --test apps/desktop/test/omp-plan-submit-e2e.test.mjs` | **4 passed / 0 failed**（有效提交=provider 1 + 工件 sha/size/字节/新旧不可覆盖；schema 缺字段=terminate 且 host 0 调用、无兄弟副作用；`[bash, SubmitPlan]` 整批零副作用、不终止、普通工具随后执行；重复 pending 拒绝、reject→重提；批准派发恰一次 prompt（双派发竞争）、指令含工件路径与完整 Markdown、completed 不重放；重启后 queued 行被 boot maintenance 置 interrupted、drain 不执行） | `plan-submit-e2e.txt` |
-| **RED 对照**：`OMP_B2_UNPATCHED=1` 同一 E2E 抗未打补丁子模块（`62bc57be`） | **fail**：提交成功后的回合 30 s 内不结算（base 运行时忽略宿主结果 terminate 并继续）——补丁 `.4` 即缺口闭合证据 | `plan-submit-e2e-unpatched-red.txt` |
-| `pnpm test`（`app/packages/omp-runtime`，含 gate 提交工具/夹取/决策与注册字段回归） | **31 files / 474 passed / 6 skipped** | `omp-runtime-vitest.txt` |
+| **RED 对照**：`OMP_B2_UNPATCHED=1` 同一 E2E 抗未打补丁子模块（`62bc57be`） | **fail**：提交成功后的回合 30 s 内不结算（base 运行时忽略宿主结果 terminate 并继续）——补丁 `.4` 即缺口闭合证据 | `plan-submit-e2e-unpatched-red.txt`（归一化可读副本）+ `.gz`（原始字节；raw sha256 `80919b9a…`） |
+| `pnpm test`（`app/packages/omp-runtime`，含 gate 提交工具/夹取/决策与注册字段回归） | **31 files / 474 passed / 6 skipped** | `omp-runtime-vitest.txt`（归一化可读副本）+ `omp-runtime-vitest.txt.gz`（原始字节，`gzip -n -9`；raw sha256 `87f8fff9…`） |
 | 受影响 desktop 套件（drain 5、提交单元 5、artifact 契约、bridge/failclosed/launcher/sidecar/patch/packaging、plan-approval-settings） | **144 passed / 0 failed** | `desktop-affected.txt` |
 | 真实 OMP 回归：`omp-session-e2e.test.mjs` + `omp-host-tool-e2e.test.mjs`（未改行为路径） | **7 passed / 0 failed** | `real-omp-regression.txt` |
 | `cargo test -p host-core --locked plans::`（复用受控 target 缓存；未改 Rust） | **20 passed / 0 failed**（restart 打断、CAS、artifact 防覆盖/symlink、kind roundtrip 等） | `hostcore-plans.txt` |

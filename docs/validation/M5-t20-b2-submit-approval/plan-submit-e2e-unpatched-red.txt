@@ -1,3 +1,9 @@
+# Normalized readable copy. Raw stdout bytes live in plan-submit-e2e-unpatched-red.txt.gz
+# (deterministic gzip -n -9). The raw log ends with a blank line or
+# carries trailing whitespace inside the captured assertion text, which
+# `git diff --check` rejects; this copy strips trailing whitespace only.
+# raw sha256: 80919b9a7cbf0ef4678c5165507c04574b316f075b807bbdf0446728e1d2b9f4
+
 (node:1644922) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
 ✖ T20-B2 plan submission (unpatched RED): valid, schema-rejected, mixed-batch, duplicate and revision (33658.861595ms)
@@ -15,9 +21,9 @@
 test at apps/desktop/test/omp-plan-submit-e2e.test.mjs:324:1
 ✖ T20-B2 plan submission (unpatched RED): valid, schema-rejected, mixed-batch, duplicate and revision (33658.861595ms)
   AssertionError [ERR_ASSERTION]: the submit turn must settle
-  
+
   false !== true
-  
+
       at TestContext.<anonymous> (file:///home/vv/person/code/omp-desktop-m5-t20-b2/app/apps/desktop/test/omp-plan-submit-e2e.test.mjs:370:12)
       at async Test.run (node:internal/test_runner/test:1125:7)
       at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {

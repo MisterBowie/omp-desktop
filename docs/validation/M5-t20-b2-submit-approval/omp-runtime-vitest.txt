@@ -1,3 +1,9 @@
+# Normalized readable copy. Raw stdout bytes live in omp-runtime-vitest.txt.gz
+# (deterministic gzip -n -9). The raw log ends with a blank line or
+# carries trailing whitespace inside the captured assertion text, which
+# `git diff --check` rejects; this copy strips trailing whitespace only.
+# raw sha256: 87f8fff9a23a2d6212b166fb54f58e8227e50bbc89b9d80b1810300e08dbf3f8
+
 
 > @pi-desktop/omp-runtime@0.15.2 test /home/vv/person/code/omp-desktop-m5-t20-b2/app/packages/omp-runtime
 > vitest run
@@ -10,4 +16,3 @@
       Tests  474 passed | 6 skipped (480)
    Start at  03:41:38
    Duration  17.36s (transform 4.96s, setup 0ms, import 10.57s, tests 48.85s, environment 3ms)
-
