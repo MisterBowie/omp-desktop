@@ -1,0 +1,186 @@
+(node:1709617) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  "candidate": "d07d4f95f55a9d3aaa7da9eaadc9cd8fdf3e41f0",
+  "hostSha256": "aefac26cd7f0d381b46134b6bbcb9ef4732ff1b81aec35744b4ce0e096bfd066",
+  "layer": "production bridge/production host-turn lifecycle/actual HostProcess SQLite/patched OMP/local FakeProvider; public runtimeFactory seam holds only the real user-prompt response Promise until an actual terminal frame arrives; no frame/result forging; not an unmodified transport-timing proof",
+  "cases": [
+    {
+      "strategy": "control",
+      "ends": [
+        {
+          "sessionId": "cbbac36d-782a-4942-9c11-3916daecdf5c",
+          "turnId": "omp-turn:cbbac36d-782a-4942-9c11-3916daecdf5c:e282de6a-e4e8-4a4b-b904-b3bf0da0cdef:1",
+          "hostTurnId": "ec51a0e8-b8ca-4609-b0b1-d5087cf9aa15",
+          "reason": "completed"
+        }
+      ],
+      "begins": [
+        "ec51a0e8-b8ca-4609-b0b1-d5087cf9aa15"
+      ],
+      "durableEnds": [
+        {
+          "sessionId": "cbbac36d-782a-4942-9c11-3916daecdf5c",
+          "turnId": "ec51a0e8-b8ca-4609-b0b1-d5087cf9aa15",
+          "status": "completed"
+        }
+      ],
+      "hostExited": true,
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:cbbac36d-782a-4942-9c11-3916daecdf5c:e282de6a-e4e8-4a4b-b904-b3bf0da0cdef:1",
+        "hostTurnId": "ec51a0e8-b8ca-4609-b0b1-d5087cf9aa15"
+      },
+      "initialProviderRequests": 1,
+      "initialRows": [
+        {
+          "id": "ec51a0e8-b8ca-4609-b0b1-d5087cf9aa15",
+          "status": "completed"
+        }
+      ],
+      "initialEnds": [
+        {
+          "sessionId": "cbbac36d-782a-4942-9c11-3916daecdf5c",
+          "turnId": "omp-turn:cbbac36d-782a-4942-9c11-3916daecdf5c:e282de6a-e4e8-4a4b-b904-b3bf0da0cdef:1",
+          "hostTurnId": "ec51a0e8-b8ca-4609-b0b1-d5087cf9aa15",
+          "reason": "completed"
+        }
+      ],
+      "initialDurableEnds": [
+        {
+          "sessionId": "cbbac36d-782a-4942-9c11-3916daecdf5c",
+          "turnId": "ec51a0e8-b8ca-4609-b0b1-d5087cf9aa15",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "runtimeStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      },
+      "scratchRemoved": true
+    },
+    {
+      "strategy": "terminal-before-prompt-promise-delivery",
+      "ends": [
+        {
+          "sessionId": "0c62c560-bed2-47de-afbd-2901eb265a9e",
+          "turnId": "omp-turn:0c62c560-bed2-47de-afbd-2901eb265a9e:5f23c940-d341-41e5-bb9f-8efce31e2217:1",
+          "hostTurnId": "1141fb8e-db95-49db-b2f6-35cb1bc1ce8c",
+          "reason": "completed"
+        },
+        {
+          "sessionId": "0c62c560-bed2-47de-afbd-2901eb265a9e",
+          "turnId": "omp-turn:0c62c560-bed2-47de-afbd-2901eb265a9e:5f23c940-d341-41e5-bb9f-8efce31e2217:2",
+          "hostTurnId": "569e7294-bcce-46ab-a341-49b8ac3adc86",
+          "reason": "completed"
+        }
+      ],
+      "begins": [
+        "1141fb8e-db95-49db-b2f6-35cb1bc1ce8c",
+        "569e7294-bcce-46ab-a341-49b8ac3adc86"
+      ],
+      "durableEnds": [
+        {
+          "sessionId": "0c62c560-bed2-47de-afbd-2901eb265a9e",
+          "turnId": "1141fb8e-db95-49db-b2f6-35cb1bc1ce8c",
+          "status": "completed"
+        },
+        {
+          "sessionId": "0c62c560-bed2-47de-afbd-2901eb265a9e",
+          "turnId": "569e7294-bcce-46ab-a341-49b8ac3adc86",
+          "status": "completed"
+        }
+      ],
+      "hostExited": true,
+      "heldUserPrompt": true,
+      "actualTerminalFrame": true,
+      "realPromptResponse": {
+        "id": "req-d3d5ad6a",
+        "type": "response",
+        "command": "prompt",
+        "success": true
+      },
+      "endsBeforePromptReturn": [
+        {
+          "sessionId": "0c62c560-bed2-47de-afbd-2901eb265a9e",
+          "turnId": "omp-turn:0c62c560-bed2-47de-afbd-2901eb265a9e:5f23c940-d341-41e5-bb9f-8efce31e2217:1",
+          "hostTurnId": "1141fb8e-db95-49db-b2f6-35cb1bc1ce8c",
+          "reason": "completed"
+        }
+      ],
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:0c62c560-bed2-47de-afbd-2901eb265a9e:5f23c940-d341-41e5-bb9f-8efce31e2217:1",
+        "hostTurnId": "1141fb8e-db95-49db-b2f6-35cb1bc1ce8c"
+      },
+      "initialProviderRequests": 1,
+      "initialRows": [
+        {
+          "id": "1141fb8e-db95-49db-b2f6-35cb1bc1ce8c",
+          "status": "completed"
+        }
+      ],
+      "initialEnds": [
+        {
+          "sessionId": "0c62c560-bed2-47de-afbd-2901eb265a9e",
+          "turnId": "omp-turn:0c62c560-bed2-47de-afbd-2901eb265a9e:5f23c940-d341-41e5-bb9f-8efce31e2217:1",
+          "hostTurnId": "1141fb8e-db95-49db-b2f6-35cb1bc1ce8c",
+          "reason": "completed"
+        }
+      ],
+      "initialDurableEnds": [
+        {
+          "sessionId": "0c62c560-bed2-47de-afbd-2901eb265a9e",
+          "turnId": "1141fb8e-db95-49db-b2f6-35cb1bc1ce8c",
+          "status": "completed"
+        }
+      ],
+      "recovery": {
+        "prompt": {
+          "accepted": true,
+          "turnId": "omp-turn:0c62c560-bed2-47de-afbd-2901eb265a9e:5f23c940-d341-41e5-bb9f-8efce31e2217:2",
+          "hostTurnId": "569e7294-bcce-46ab-a341-49b8ac3adc86"
+        },
+        "providerRequests": 1,
+        "rows": [
+          {
+            "id": "1141fb8e-db95-49db-b2f6-35cb1bc1ce8c",
+            "status": "completed"
+          },
+          {
+            "id": "569e7294-bcce-46ab-a341-49b8ac3adc86",
+            "status": "completed"
+          }
+        ]
+      },
+      "messageCount": 0,
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "runtimeStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      },
+      "scratchRemoved": true
+    }
+  ],
+  "passed": true
+}

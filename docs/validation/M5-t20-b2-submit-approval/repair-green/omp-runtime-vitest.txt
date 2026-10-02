@@ -1,0 +1,9 @@
+
+ RUN  v4.1.10 /home/vv/person/code/omp-desktop-m5-t20-b2/app/packages/omp-runtime
+
+
+ Test Files  31 passed (31)
+      Tests  476 passed | 6 skipped (482)
+   Start at  04:37:03
+   Duration  17.38s (transform 5.24s, setup 0ms, import 11.03s, tests 48.98s, environment 3ms)
+

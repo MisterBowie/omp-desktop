@@ -1,0 +1,116 @@
+(node:1709959) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  "candidate": "d07d4f95f55a9d3aaa7da9eaadc9cd8fdf3e41f0",
+  "layer": "actual host SQLite/production bridge/lifecycle/adapter/Main plan dispatcher/patched OMP/local FakeProvider; getOmpSessions public seam holds actual prompt result until actual onTurnEnd; controlled response delivery, not unmodified native timing",
+  "cases": [
+    {
+      "kind": "plan",
+      "permission": "auto",
+      "wired": true,
+      "hold": false,
+      "permissionCards": [],
+      "ends": [
+        {
+          "sessionId": "e8250983-c387-41ac-8b11-967d14aaa1da",
+          "turnId": "omp-turn:e8250983-c387-41ac-8b11-967d14aaa1da:9749547b-40e5-4baf-a2f4-57126ed60f8c:1",
+          "hostTurnId": "99a3a10a-7f3d-417e-808e-b0f1d3035838",
+          "reason": "completed"
+        },
+        {
+          "sessionId": "e8250983-c387-41ac-8b11-967d14aaa1da",
+          "turnId": "omp-turn:e8250983-c387-41ac-8b11-967d14aaa1da:9749547b-40e5-4baf-a2f4-57126ed60f8c:2",
+          "hostTurnId": "fea2be5d-bb9b-487f-83f3-243c9ccf9f9e",
+          "reason": "completed"
+        }
+      ],
+      "submitRequests": 1,
+      "executionId": "9dc66bc2-dcd0-47c6-a95a-813f8b504628",
+      "executionRequests": 2,
+      "waitCompleted": true,
+      "executionRow": {
+        "status": "approved",
+        "execution_state": "completed",
+        "error_code": null
+      },
+      "turns": [
+        {
+          "id": "99a3a10a-7f3d-417e-808e-b0f1d3035838",
+          "status": "completed"
+        },
+        {
+          "id": "fea2be5d-bb9b-487f-83f3-243c9ccf9f9e",
+          "status": "completed"
+        }
+      ],
+      "queued": [],
+      "messageCount": 0,
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "plan",
+      "permission": "auto",
+      "wired": true,
+      "hold": true,
+      "permissionCards": [],
+      "ends": [
+        {
+          "sessionId": "5e1c7906-13be-44bd-bbb7-8be37c5f5d84",
+          "turnId": "omp-turn:5e1c7906-13be-44bd-bbb7-8be37c5f5d84:d0d34522-cdbd-460c-94e7-75cdaef2a1b2:1",
+          "hostTurnId": "0125fa48-e44e-4bb9-8822-68de2daa368d",
+          "reason": "completed"
+        },
+        {
+          "sessionId": "5e1c7906-13be-44bd-bbb7-8be37c5f5d84",
+          "turnId": "omp-turn:5e1c7906-13be-44bd-bbb7-8be37c5f5d84:d0d34522-cdbd-460c-94e7-75cdaef2a1b2:2",
+          "hostTurnId": "de3852c2-d1b9-4ea9-b77f-0a72cfafc337",
+          "reason": "completed"
+        }
+      ],
+      "submitRequests": 1,
+      "executionId": "44d0f89d-a827-4837-a077-2907b2268cfc",
+      "actualEndBeforeDispatchPromptReturn": {
+        "sessionId": "5e1c7906-13be-44bd-bbb7-8be37c5f5d84",
+        "turnId": "omp-turn:5e1c7906-13be-44bd-bbb7-8be37c5f5d84:d0d34522-cdbd-460c-94e7-75cdaef2a1b2:2",
+        "hostTurnId": "de3852c2-d1b9-4ea9-b77f-0a72cfafc337",
+        "reason": "completed"
+      },
+      "executionRequests": 2,
+      "waitCompleted": true,
+      "executionRow": {
+        "status": "approved",
+        "execution_state": "completed",
+        "error_code": null
+      },
+      "turns": [
+        {
+          "id": "0125fa48-e44e-4bb9-8822-68de2daa368d",
+          "status": "completed"
+        },
+        {
+          "id": "de3852c2-d1b9-4ea9-b77f-0a72cfafc337",
+          "status": "completed"
+        }
+      ],
+      "queued": [],
+      "messageCount": 0,
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    }
+  ],
+  "finalCleanupErrors": [],
+  "passed": true
+}

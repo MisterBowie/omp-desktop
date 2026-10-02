@@ -1,0 +1,334 @@
+✔ M5/T20-C end-to-end: PI execution-time permissions on the patched runtime (27610.18828ms)
+✔ the catalog maps plugin agent tools to plugin_* names with verbatim schema and description (1.960642ms)
+✔ the catalog carries the declared risk and plan-safe actions, never a name-based guess (0.212084ms)
+✔ user MCP tools are Low risk with no plan-safe actions, and their own origin (0.280535ms)
+✔ the desktop forwards a description verbatim; the runtime's own trim is OMP's (0.107404ms)
+✔ plugins inactive for the project are invisible to its catalog (0.114941ms)
+✔ a duplicate tool name fails the catalog closed instead of overwriting (0.935313ms)
+✔ an undeliverable definition fails the catalog closed and names the tool (0.202115ms)
+✔ the executor runs a plugin tool with the bound session identity and arguments (0.698732ms)
+✔ the executor reads the live thinking level at each execution, never a stale snapshot (0.332298ms)
+✔ the executor refuses a plugin tool that is no longer loaded or no longer active (0.801584ms)
+✔ a turn that is no longer dispatchable never starts a plugin tool (0.229499ms)
+✔ a turn that is no longer dispatchable never starts an MCP call (0.208452ms)
+✔ an already-aborted signal never starts a plugin tool (0.204935ms)
+✔ the executor honours the abort signal for a plugin tool (0.208036ms)
+✔ an mcp_* call routes through the user MCP runtime against the bound project (0.264203ms)
+✔ a throwing user MCP client surfaces as an executor failure with the code's text (0.187919ms)
+✔ an AgentToolResult-shaped plugin value with inner isError becomes an outer failure (0.134016ms)
+✔ MCP image blocks pass through faithfully as OMP ImageContent (0.132529ms)
+✔ an over-budget MCP image pair keeps the first image verbatim plus the marker (6.003592ms)
+✔ non-text blocks and structuredContent are preserved as deterministic text beside text blocks (0.675288ms)
+✔ a huge multibyte result is bounded on its serialized content and marked truncated (26.921108ms)
+✔ a result full of JSON escapes is bounded on its serialized bytes, not its raw text (86.956601ms)
+✔ a plain string result that fits is returned untouched (0.2904ms)
+✔ an over-budget multi-block result keeps its head and marks the cut exactly (23.077231ms)
+✔ the truncation marker itself is budgeted when a later block no longer fits (48.343664ms)
+✔ a whitespace-only tool name fails the catalog closed, like the pinned runtime (0.312626ms)
+✔ a plugin's details/useless keys ride along as text, never mapped onto OMP metadata (0.307574ms)
+✔ toast drain and delivery run after a plugin tool and never change its result (0.257503ms)
+✔ a throwing toast delivery never changes a successful tool result (0.158645ms)
+✔ a throwing toast drain never changes a successful tool result (0.120862ms)
+✔ an executor bound to one project never reaches another project's scoped tools (0.113023ms)
+✔ the bridge registers the project's catalog through set_host_tools before the first prompt (17.755108ms)
+✔ a catalog change between turns re-registers the new tool set on the same runner (2.089027ms)
+✔ a tool removed from the catalog is removed from the next registration too (1.877152ms)
+✔ a registration whose echoed names differ from the request fails the prompt closed (4.188389ms)
+✔ a runtime refusal of set_host_tools fails the prompt closed (1.069206ms)
+✔ a host_tool_call during a prompt is executed exactly once and its result written (4.806432ms)
+✔ two sessions on different projects get different catalogs and cannot share them (2.234082ms)
+✔ a host_tool_call with no active run is answered isError and never executed (1.614055ms)
+✔ a normal agent_end announces the turn completed exactly once (3.167973ms)
+✔ a stop whose run settles with agent_end announces aborted, never completed (1.812712ms)
+✔ a stop whose run is torn down announces aborted exactly once (202.695553ms)
+✔ a transport failure announces error exactly once (1.375531ms)
+✔ a dispose with a live turn announces aborted exactly once (0.967502ms)
+✔ the entry's dispatch gate reads the live runner state (200.639793ms)
+✔ the executor binding reads the live thinking level after an online configure (1.027314ms)
+✔ a failed thinking persist keeps the binding on the old level (0.57105ms)
+✔ plugin agent tool executes exactly once and its result reaches the model (2930.768189ms)
+✔ a denied plugin tool executes zero times and its denial reaches the model (2486.093641ms)
+✔ desktop user MCP tool executes exactly once against the real server (5814.181717ms)
+✔ plugin-declared MCP tool executes exactly once under its plugin_* name (6728.332239ms)
+✔ a cancelled host tool leaves no late side effect in the model context (3335.24732ms)
+✔ a project MCP decoy is still never loaded by native discovery while desktop tools run (5342.492571ms)
+✔ check applies the patch set to a scratch copy and leaves nothing behind (151.583514ms)
+✔ apply writes the patched tree to the requested directory only (116.912673ms)
+✔ copies the build payload with workspace symlinks left relative to the tree (75.357567ms)
+✔ refuses a source whose HEAD is not the manifest base (64.402339ms)
+✔ refuses a source whose version is not the manifest version (59.841561ms)
+✔ refuses a patch whose checksum does not match the manifest (60.451341ms)
+✔ refuses a patch whose byte count does not match the manifest (70.860723ms)
+✔ refuses a patch level that does not name the manifest base (82.484114ms)
+✔ refuses a patch that does not apply to the base (73.965575ms)
+✔ refuses an existing non-empty target and a symlinked target (117.672791ms)
+✔ refuses a target inside the source checkout or holding the repository (155.847823ms)
+✔ canonicalizes --source, so an --out inside the real checkout is still refused (207.242427ms)
+✔ refuses a target reached through a symlinked parent and never writes or deletes the link target (114.229952ms)
+✔ trusts only root-owned aliases directly below the filesystem root (0.331702ms)
+✔ canonicalizes the ancestor chain through a trusted alias and still refuses deeper links (1.39241ms)
+✔ follows the aliases the platform ships directly below the filesystem root (0.439756ms)
+✔ creates a missing nested target and accepts an existing empty one (131.223522ms)
+✔ rejects a flag whose value is missing instead of silently applying to a temp tree (132.500739ms)
+✔ rejects a flag whose value is another flag instead of using it as a path (129.550774ms)
+✔ rejects an unsupported manifest schema version (44.095266ms)
+✔ refuses a manifest whose patch escapes the patch directory (32.180914ms)
+✔ rejects unusable argument combinations without touching anything (108.753077ms)
+✔ reaps the whole process group when a verification child times out (1556.139076ms)
+✔ never signals a degenerate process-group target (0.215512ms)
+✔ reports a spawn failure at once, with no timer left armed (1.831856ms)
+✔ never prints inherited credential values (46.49829ms)
+(node:1696712) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ T20-B2 plan submission (patched): valid, schema-rejected, mixed-batch, duplicate and revision (6320.309668ms)
+✔ T20-B2 mixed batch [bash, SubmitPlan] is rejected whole, does not terminate, and ordinary tools still run (3383.441646ms)
+✔ T20-B2 approval dispatch: queued execution runs in OMP with the approved instruction, exactly once (8409.843571ms)
+✔ T20-B2 rejected approval never executes, and a restart does not replay a queued one (6483.714968ms)
+✔ T20-B2 Stop during the durable host begin refuses the prompt before it is sent, settles its row aborted, and the next turn recovers (3258.64259ms)
+✔ T20-B2 a real terminal delivered before the prompt response still closes its own durable host turn (6381.488009ms)
+✔ T20-B2 an approved execution settles from a terminal that beats the dispatch prompt return, and a refused begin interrupts it (7499.234243ms)
+✔ submit catalog entries carry the PI name/schema and the sole+terminate policy (1.851028ms)
+✔ submits through the host with the durable identity from the run binding (1.510762ms)
+✔ refuses a wrong-kind call and a call without a durable host turn (0.335838ms)
+✔ refuses empty arguments and a missing host wiring before any host call (0.447536ms)
+✔ surfaces the host error code and rejects a malformed proposal reply (0.634329ms)
+RELEASE-PACKAGE-FAIL --arch is required for a darwin release from a linux host: a cross-target package needs an artifact staged for that target
+RELEASE-PACKAGE win32/x64: preflight /home/vv/.nvm/versions/node/v24.14.0/bin/node /home/vv/person/code/omp-desktop-m5-t20-b2/app/scripts/omp-sidecar.mjs --preflight --platform win32 --arch x64
+RELEASE-PACKAGE win32/x64: electron-builder --win --x64 --publish never
+RELEASE-PACKAGE win32/x64: preflight /home/vv/.nvm/versions/node/v24.14.0/bin/node /home/vv/person/code/omp-desktop-m5-t20-b2/app/scripts/omp-sidecar.mjs --preflight --platform win32 --arch x64
+RELEASE-PACKAGE darwin/arm64: preflight /home/vv/.nvm/versions/node/v24.14.0/bin/node /home/vv/person/code/omp-desktop-m5-t20-b2/app/scripts/omp-sidecar.mjs --preflight --platform darwin --arch arm64
+RELEASE-PACKAGE darwin/arm64: electron-builder --mac --arm64 --publish never -c.mac.forceCodeSigning=true -c.mac.notarize=true
+RELEASE-PACKAGE darwin/arm64: preflight /home/vv/.nvm/versions/node/v24.14.0/bin/node /home/vv/person/code/omp-desktop-m5-t20-b2/app/scripts/omp-sidecar.mjs --preflight --platform darwin --arch arm64
+✔ every release command bundles the runtime, then runs the target-aware packaging step (1.320959ms)
+✔ the preflight and electron-builder are given the same platform and architecture (1.186874ms)
+✔ a cross-target release without an explicit architecture fails closed before building (1.830715ms)
+✔ the packaging step runs the preflight before electron-builder and stops on failure (1.574981ms)
+✔ the preflight admits a staged cross-target artifact built from the same control (450.832681ms)
+✔ the preflight refuses a missing, tampered or foreign staged artifact (1536.692897ms)
+✔ a cross-target release cannot reuse the host binary (278.92916ms)
+✔ the release entry forwards the signature overrides it does not own (0.6291ms)
+✔ the config allowlist is exactly the signature overrides the fixed lanes pass (0.455089ms)
+✔ forwarded arguments reach electron-builder only after the preflight passes (0.607838ms)
+✔ an electron-builder platform switch is the same axis as --platform (0.569779ms)
+✔ every unsupported spelling of an owned axis or a packaging input is refused before spawning (1.403078ms)
+✔ a conflicting or repeated target is refused instead of silently picked (0.358003ms)
+✔ the entry generates exactly one choice per axis and the same target for both steps (0.195848ms)
+✔ every option the installed electron-builder CLI declares is classified by the entry (217.39453ms)
+✔ an argument the entry does not recognize is still forwarded verbatim, never guessed at (0.073792ms)
+✔ an explicit runtime path wins and is the only candidate considered (1.912193ms)
+✔ an unusable explicit path is an error, not a reason to search elsewhere (1.020499ms)
+✔ a packaged build admits only a resource that matches its provenance (7.139034ms)
+✔ a packaged build ignores every development channel (1.062635ms)
+✔ a packaged build refuses a tampered or absent provenance manifest (10.467989ms)
+✔ an unpackaged build finds the pinned submodule launcher by walking up (0.927253ms)
+✔ this worktree resolves its own pinned launcher (0.202978ms)
+✔ the product identity is independent of the fork it came from (0.282738ms)
+✔ the data-directory resolver never lands on the fork's directory (6.155824ms)
+✔ development builds disable automatic updates and the feed is this product's (0.74295ms)
+✔ a refused bundled resource keeps its reason instead of a generic missing runtime (2.784915ms)
+✔ a packaged build resolves the gate only from verified resources (5.008941ms)
+✔ M5/T20-B1 end-to-end: production mode/policy state and contract catalog on the patched runtime (30210.591894ms)
+✔ refuses to prompt when this build has no gate extension (2.413113ms)
+✔ refuses to prompt when this build has no runtime executable (0.596294ms)
+✔ starts the runtime once and streams the run under one turn id (6.21054ms)
+✔ runs two OMP sessions on independent runtimes (1.000222ms)
+✔ surfaces a gate approval as a permission request and answers it once (1.66467ms)
+✔ mints a session grant only from a delivered allow-session, and clears it explicitly (13.294356ms)
+✔ an approval is answered under the session the bridge stored for it (0.852156ms)
+✔ surfaces a runtime question through the ask card and returns the chosen option (0.821236ms)
+✔ stopping cancels the dialogs the runtime is blocked on (6.324296ms)
+✔ dispose cancels dialogs and reclaims the runtime (1.342554ms)
+✔ retains a directory-only debt across stop retries until it is removable (5.894183ms)
+✔ reclaims a dead runtime and rebuilds it for the next prompt in the same session (3.655303ms)
+✔ an immediate successful teardown still lets the next prompt rebuild (2.592617ms)
+✔ a converged protocol stop reuses the live runtime (0.958111ms)
+✔ pending cleanup refuses the next prompt without starting a second runtime (1.309185ms)
+✔ the retired runtime's handlers are detached and old frames do not reach the replacement (1.769939ms)
+✔ a dispose that cannot reclaim keeps the session's ownership, not a second runtime (1.422118ms)
+✔ reports a transport failure as one typed error, not a hung turn (0.984066ms)
+✔ an OMP prompt reaches the bridge without touching the Pi runtime (1.943522ms)
+✔ an OMP session's status comes from the runtime that owns it (0.63944ms)
+✔ binds the session's project directory before the runtime starts (0.40725ms)
+✔ refuses an empty or relative project directory without starting anything (0.388217ms)
+✔ refuses a different project directory for a runtime already bound to one (0.531224ms)
+✔ a question's id cannot be consumed through the permission path (0.447258ms)
+✔ an approval's id cannot be consumed through the ask path (0.63479ms)
+✔ an answer that names another session is refused (0.507614ms)
+✔ a duplicate decision, or one after a stop, never writes a second frame (6.683388ms)
+✔ a skipped question is failed closed instead of leaving the runtime waiting (1.08939ms)
+✔ an answer the runtime's select cannot carry is failed closed too (0.666536ms)
+✔ a confirmation answers yes/no and a dismissal is a cancellation (0.807905ms)
+✔ a dialog raised by an earlier run cannot be answered into the next one (2.166367ms)
+✔ a late reply after a transport failure or a dispose writes nothing (1.720437ms)
+✔ the runtime retracting a dialog clears it in the bridge as well (0.606251ms)
+✔ stopping another session leaves this one's dialogs, state and wire untouched (0.665944ms)
+✔ a refused prompt closes its dialog and tells the renderer the turn ended (1.607539ms)
+✔ a thrown prompt request keeps its own error and still ends the turn (1.291691ms)
+✔ replacement runtimes keep every reply visible with distinct ids (3.218077ms)
+✔ a prompt racing a stop is refused and never starts a second runtime mid-teardown (1.477934ms)
+✔ stop during startup or restore cancels the pending prompt and leaves the session idle (5.312563ms)
+✔ dispose during startup or restore cancels the pending prompt and reclaims (2.304613ms)
+✔ stop during turn-fence preparation cancels the pending prompt and leaves the session idle (6.098622ms)
+✔ two concurrent prompts share one runtime and only one starts a run (0.813487ms)
+✔ a prompt racing disposeSession's completion window is refused and leaves no orphan (1.910166ms)
+✔ a prompt racing application shutdown's completion window is refused and leaves no orphan (1.628827ms)
+✔ a new session racing whole-bridge shutdown is refused before it starts a runtime (1.539118ms)
+✔ a prompt racing a startup or restore stop is refused, not submitted after the stop reports nothing running (7.412262ms)
+✔ concurrent stop and dispose overlap without reopening admission (1.622705ms)
+✔ whole-bridge shutdown refuses an existing session before any cleanup await (2.754622ms)
+✔ whole-bridge shutdown invalidates a prompt still preparing before it submits (1.446891ms)
+✔ a model change reconfigures without reusing the earlier reply's live ids (2.393412ms)
+✔ a disposed and reopened session mints fresh live ids without colliding (1.430855ms)
+✔ a recreated bridge mints live ids that do not collide with a retained reply (1.176806ms)
+✔ H3: sessionConfigure carries inconsistent through the IPC error (1.996433ms)
+✔ J2: rename fails closed when an OMP session has no wired runtime (0.466186ms)
+✔ J2: configure fails closed when an OMP session has no wired runtime (0.276823ms)
+✔ H3: delete fails closed when an OMP session has no wired runtime (0.339578ms)
+✔ H3: archive fails closed when an OMP session has no wired runtime (0.530355ms)
+✔ G1: a model change reclaims the old runtime before persisting the new binding (5.761338ms)
+✔ G1: a failed reclaim leaves the host untouched (2.465134ms)
+✔ G1: a failed host persist on thinking reverts the runtime and reports a clean failure (2.021813ms)
+✔ G1: a failed thinking revert is reported as inconsistent (1.233726ms)
+✔ G1: mode and permissionMode are persisted through the single host call (1.202662ms)
+✔ F2: delete resolves the engine and reclaims the OMP runtime before deleting the row (1.914082ms)
+✔ F2: delete refuses a failed reclaim and never writes the host row (0.69561ms)
+✔ F2: archive reclaims only the target OMP runtime and unarchive is a no-op (0.290647ms)
+✔ F2: archive throws on a failed reclaim instead of reporting ok:true (0.434728ms)
+✔ F2: a non-OMP delete skips the OMP reclaim path (0.381018ms)
+E2E timeline (61 events):
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 agent_start
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 turn_start
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_start
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_end
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_start
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_update
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_end
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 tool_start call_read
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 tool_end call_read
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 turn_end
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 turn_start
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_start
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_update
+- tool_permission_request
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_end
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 tool_start call_write_1
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 tool_end call_write_1
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 turn_end
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 turn_start
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_start
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_update
+- tool_permission_request
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_end
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 tool_start call_write_2
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 tool_update call_write_2
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 tool_end call_write_2
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 turn_end
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 turn_start
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_start
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_update
+- tool_permission_request
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_end
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 tool_start call_tests
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 tool_update call_tests
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 tool_update call_tests
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 tool_update call_tests
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 tool_end call_tests
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 turn_end
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 turn_start
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_start
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_update
+- tool_permission_request
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_end
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 tool_start call_long
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 tool_end call_long
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 tool_update call_long
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 turn_end
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 turn_start
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_start
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 message_end
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 turn_end
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:1 agent_end
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:2 agent_start
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:2 turn_start
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:2 message_start
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:2 message_end
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:2 message_start
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:2 message_update
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:2 message_end
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:2 turn_end
+omp-turn:e2e-omp-session:27638c5e-8b4f-4bca-abc2-be053c15fad4:2 agent_end
+E2E tool ends: call_read:ok, call_write_1:error, call_write_2:ok, call_tests:ok, call_long:error
+E2E approvals: call_write_1/high, call_write_2/high, call_tests/high, call_long/high
+✔ M3 end-to-end: read, deny, approve once, run tests, stop a long task (2790.629957ms)
+✔ R1: refuses a restore whose path is outside the session directory (3.320742ms)
+✔ R1: refuses a restore whose path is a symlink (0.710776ms)
+✔ R1: refuses a restore whose path is a directory or missing (0.841604ms)
+✔ R1: refuses a restore whose file header id disagrees with the reference (0.710013ms)
+✔ R1: refuses a restore with an unsupported adapter or a downgraded runtime version (0.703343ms)
+✔ R1: refuses a restore when the runtime opens a different native session (0.731491ms)
+✔ R5: dispose reports a reclaim that returned stopped:false (3.403133ms)
+✔ R5: dispose continues past a thrown reclaim and reports both sessions (1.614572ms)
+✔ R7: rename works for a not-yet-prompted session by briefly restoring and cleaning up (1.049224ms)
+✔ F1: refuses a restore whose intermediate directory is a symlink escaping the session dir (0.478398ms)
+✔ F1: refuses a restore whose get_state reports no sessionFile (0.645905ms)
+✔ F1: refuses a restore whose get_state reports the same id at a different path (0.617307ms)
+✔ F6: a failed host persist on rename reverts an empty prior title and reports the fork (0.675221ms)
+✔ F6: a one-shot rename whose runtime cleanup fails is reported as inconsistent (0.479461ms)
+✔ P3: a packaged prompt reports the bundled-runtime-invalid reason for a missing binary (1.989778ms)
+✔ P3: a packaged control operation reports the same reason for a missing binary (0.760351ms)
+✔ P3: a packaged prompt reports the bundled-runtime-invalid reason for a tampered binary (2.854756ms)
+✔ P3: a packaged control operation reports the same reason for a tampered binary (1.454286ms)
+✔ P3: a packaged prompt reports the bundled-runtime-invalid reason for a tampered manifest (1.177215ms)
+✔ P3: a packaged control operation reports the same reason for a tampered manifest (1.377454ms)
+✔ P3: a packaged prompt reports the bundled-runtime-invalid reason for a tampered gate (1.84883ms)
+✔ P3: a packaged control operation reports the same reason for a tampered gate (2.167293ms)
+✔ P3: a packaged build resolves the platform's own executable name (1.310415ms)
+✔ P3: a packaged launcher refusal carries the adapter's concrete reason (1.043981ms)
+✔ J4: moveProject refuses an OMP session and never mutates the host (2.244816ms)
+✔ J4: moveProject keeps the Pi path unchanged (0.502707ms)
+✔ J4: replaceMessages refuses an OMP session and never mutates the host (0.304318ms)
+✔ J4: replaceMessages keeps the Pi path unchanged (0.372158ms)
+✔ J4: saveRevision refuses an OMP session and never mutates the host (0.377486ms)
+✔ J4: listRevisions refuses an OMP session and never reads the host (0.216116ms)
+✔ J4: activateRevision refuses an OMP session and never mutates the host (0.242663ms)
+✔ J4: Pi revision reads and activations are unchanged (0.327239ms)
+✔ J1: registerIpcHandlers wraps a configure refusal so error.details.inconsistent === true (2.550046ms)
+✔ J1: a clean configure success still flows through the wrapper as an ok Result (0.418026ms)
+✔ J1: renderer api.configureSession rejects with the caught Error carrying error.details.inconsistent === true (0.802199ms)
+✔ F3: a configure refusal keeps its code and its { errorCode, mode, providerId } details (1.073035ms)
+✔ F3: a create refusal keeps its code and details through the wrapper too (0.554049ms)
+✔ F3: the renderer receives the same code and details on the caught Error (0.552871ms)
+✔ H1: a failed reclaim retains the entry and a second dispose retries the same supervisor (4.324781ms)
+✔ H1: a prompt after a failed reclaim does not create a second runtime (1.363578ms)
+✔ M5/T20-B1 third repair: a stop during turn-fence preparation never submits the canceled prompt (13595.897319ms)
+✔ the build entry passes an explicit bytecode mode the fork accepts (1.220043ms)
+✔ the desktop pins agree with the controlled patch manifest (0.512331ms)
+✔ the build entry and the runtime package normalize remotes identically (0.434006ms)
+✔ a checkout whose HEAD is the manifest's fork commit and patch verifies (71.031379ms)
+✔ an SSH remote is accepted for an HTTPS manifest entry (63.008426ms)
+✔ the wrong remote, commit, cleanliness, version, file set, or patch is refused (369.374678ms)
+✔ --check runs the same gate as a process, exiting non-zero on refusal (178.00481ms)
+✔ the patch manifest refuses a malformed fork block (27.606837ms)
+✔ the tool gate bundle is identical under temporary roots of different depth (137.835744ms)
+✔ the bundled tool gate carries the execution-time decision table (235.846243ms)
+✔ plan approval exposes only the artifact and remembers the selected mode (1.487129ms)
+✔ approval card omits validity details while the pending gate stays actionable (0.818925ms)
+✔ terminal execution snapshots are represented and do not gate a later prompt (0.559385ms)
+✔ command-shell settings are catalog-driven and use the existing save flow (0.379709ms)
+✔ approval and shell surfaces have locale-backed responsive copy (1.603568ms)
+✔ Plan and Goal artifact runtime uses the terminating submit contract (40.399087ms)
+✔ Electron retains the stable Plan IPC names and protocol v11 (12.995843ms)
+✔ a session the engine gate refuses is skipped before any claim (2.499211ms)
+✔ a queued execution for an OMP session is skipped before any claim when the OMP runtime is not wired (0.715265ms)
+✔ a queued execution for an OMP session claims once and prompts the bridge, never the Pi sidecar (0.581069ms)
+✔ a queued execution for a Pi session still dispatches (0.525047ms)
+✔ a composition without the engine gate claims nothing (0.260891ms)
+ℹ tests 252
+ℹ suites 0
+ℹ pass 252
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 48358.529189
+EXIT:0
