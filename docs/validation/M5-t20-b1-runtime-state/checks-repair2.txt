@@ -1,0 +1,24 @@
+### matrix ids
+MATRIX-ID-OK: B1-B14, C1-C8, D1-D3 each appear exactly once
+exit=0
+### gap probe
+gap exit=1
+VERDICT g4: no plan/goal/permission/approval command exists in the pinned rpc-ui surface (rpc-ui = rpc + tool-UI context; see the validation document)
+SUMMARY: 2 gap(s) open [g2, g3]
+### omp patch
+exit=0
+OMP-PATCH-OK 62bc57b+omp-desktop.3 (base 62bc57be1b03ef0802a33cf7f5f530e534527531)
+### release docs
+Release documentation is aligned with 0.15.2 (0.15.x line).
+exit=0
+### agent policy
+Agent policy sync check passed (AGENTS.md ↔ CLAUDE.md).
+exit=0
+### locales
+exit=0
+Verified 79 English/Chinese specification pairs.
+### check-docs
+exit=1
+6 documentation problem(s) across 508 pages.
+### git diff --check
+exit=0

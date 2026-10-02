@@ -1,0 +1,105 @@
+{
+  "desktopCommit": "064c738ad585b8429a2d0d42d08719596a46f5cc",
+  "layer": "production runner with scripted formal RPC frames; no runtime process/provider",
+  "first": {
+    "accepted": true,
+    "turnId": "omp-turn:desktop-parent:1",
+    "generation": 1
+  },
+  "firstState": "idle",
+  "firstEnds": [
+    {
+      "sessionId": "desktop-parent",
+      "turnId": "omp-turn:desktop-parent:1",
+      "reason": "error"
+    }
+  ],
+  "second": {
+    "accepted": true,
+    "turnId": "omp-turn:desktop-parent:2",
+    "generation": 2
+  },
+  "beforeReplayState": "running",
+  "afterReplayState": "idle",
+  "replayedNoticeClosedNewGeneration": true,
+  "terminalErrors": [
+    {
+      "sessionId": "desktop-parent",
+      "turnId": "omp-turn:desktop-parent:1",
+      "ts": 100,
+      "event": {
+        "type": "error",
+        "error": {
+          "code": "OMP_RUNTIME_STATE_REFUSED",
+          "message": "old generation state invalid",
+          "details": {
+            "refusalId": "old-refusal-id",
+            "code": "state-invalid",
+            "at": 100
+          }
+        }
+      }
+    },
+    {
+      "sessionId": "desktop-parent",
+      "turnId": "omp-turn:desktop-parent:2",
+      "ts": 200,
+      "event": {
+        "type": "error",
+        "error": {
+          "code": "OMP_RUNTIME_STATE_REFUSED",
+          "message": "old generation state invalid",
+          "details": {
+            "refusalId": "old-refusal-id",
+            "code": "state-invalid",
+            "at": 100
+          }
+        }
+      }
+    }
+  ],
+  "ends": [
+    {
+      "sessionId": "desktop-parent",
+      "turnId": "omp-turn:desktop-parent:1",
+      "reason": "error"
+    },
+    {
+      "sessionId": "desktop-parent",
+      "turnId": "omp-turn:desktop-parent:2",
+      "reason": "error"
+    }
+  ],
+  "diagnostics": {
+    "lateFrames": 0,
+    "startRefusals": 2,
+    "ignoredStartRefusals": 0,
+    "conversion": {
+      "unmappedFrames": {},
+      "toolResultMessages": {},
+      "droppedParts": {},
+      "notes": []
+    },
+    "uiRecords": [],
+    "state": "idle",
+    "malformedSubagentFrames": 0,
+    "subagentDiagnostics": {
+      "malformedFrames": 0,
+      "orphanEvents": 0,
+      "orphanProgress": 0,
+      "unknownParentCalls": 0
+    },
+    "hostTools": {
+      "pending": 0,
+      "executed": 0,
+      "cancelled": 0,
+      "duplicates": 0,
+      "unknownCancels": 0,
+      "noRun": 0,
+      "malformed": 0,
+      "lateCompletions": 0,
+      "rememberedIds": 0,
+      "trackedGenerations": 0
+    }
+  }
+}

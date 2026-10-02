@@ -1100,14 +1100,21 @@ Agent 继续）；技能/记忆仍为 PI 式 best-effort。gate 在 `before_agen
 （`read/glob/grep/bash/ask/new_context` ∩ 实际存在，加上声明了非空 planSafeActions 的插件工具；
 Write/Edit/未知/用户 MCP/未声明插件永不进入；不虚构 PI 的 BrowserPreview）。
 
-2026-10-02 复审返修补齐四条失效语义：①**强制通道标记**——bridge 每次写状态时同时写
-`desktop-state.required`；有标记时，交互会话任何"非 owned 且有效"的状态（缺失/不可读/超限/无
-identity/他会话/未知 schema）都必须拒绝回合（零 provider 请求），只有委托会话（`hasUI=false`，
-`task`/`eval` 子代理的扩展运行器没有 UI 上下文）保持零注入跳过；无标记的夹具明确退化。②**拒绝
-终态**——`ctx.abort()` 之外，gate 通过运行时正式的 `notify` 通道发出带版本的结构化拒绝描述符；
-runner 只在描述符命中本 entry 的 native session 且当前代尚未 `agent_start` 时关闭该代：恰一次
-`error`（`OMP_RUNTIME_STATE_REFUSED`）+ 恰一次 `turnEnd(error)`，关闭 dialogs/hostcalls 并回到
-idle，迟到/重复/他会话/子代理信号不关闭新代；下一提示词（状态修复后）正常。③**离开合约模式重建
+2026-10-02 复审返修补齐四条失效语义：①**强制通道在启动时确定**——supervisor 以显式
+`desktopStateRequired`（生产 wiring 恒为 `true`，未配置该通道的夹具显式传 `false`）在 spawn 时写
+`OMP_DESKTOP_STATE_REQUIRED=1|0`；开关随进程生命周期固定，删除/篡改运行根内任何文件都不能把它关掉。
+开关开启时，交互会话任何"非 owned 且有效"的状态（缺失/不可读/超限/无 identity/他会话/未知 schema）
+都必须拒绝回合（零 provider 请求），只有委托会话（`hasUI=false`，`task`/`eval` 子代理的扩展运行器
+没有 UI 上下文）保持零注入跳过；关闭时夹具明确退化。②**拒绝终态与回合绑定**——除 `ctx.abort()` 外，
+gate 通过运行时正式的 `notify` 通道发出带版本的结构化拒绝描述符（`v: 2`）。每次提交通道前，runner
+先铸造随机 32 位十六进制 **turn token**，用 `get_available_commands` 确认受信 gate 注册了内部命令
+`/omp-desktop-turn`（未注册则说明该运行时会把握手文本当用户提示词送给 provider，因而在提交前拒绝），
+再经正式 RPC `prompt` 路径发送握手（由 `#tryExecuteExtensionCommand` 在 provider 循环前本地消费，
+不进入 provider/transcript/工具目录），并等待 gate 经 `notify` 发回的版本化确认；拒绝描述符必须命中
+本 entry 的 native session 且携带该代 token、fence 已确认、当前代尚未 `agent_start`，才关闭该代：恰
+一次 `error`（`OMP_RUNTIME_STATE_REFUSED`）+ 恰一次 `turnEnd(error)`，关闭 dialogs/hostcalls 并回到
+idle。重复投递、上一代的迟到描述符（旧 token）、他会话/子代理信号只计数不关闭；`v: 1`（无 token）不再
+可解析。命令缺失、握手被拒或未确认会在发送用户提示词之前失败。③**离开合约模式重建
 运行时进程**——扩展面只暴露按名选择的 `setActiveTools`（会把它恢复的名字钉在顶层），没有
 presentation 恢复 API（`setActiveToolPresentation` 非扩展接口，RPC 也无该命令），因此 Plan/Goal →
 Agent 时 bridge 回收进程、下一次提示词在同一持久 native 会话（`switch_session`）、同一项目/模型

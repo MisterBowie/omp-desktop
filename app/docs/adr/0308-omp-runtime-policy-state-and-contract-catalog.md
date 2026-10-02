@@ -1,10 +1,12 @@
 # ADR 0308: OMP runtime mode/policy state, the mode block, and the contract tool catalog
 
-- Status: Accepted (M5/T20-B1; 2026-10-02 review repair amends §2/§3)
+- Status: Accepted (M5/T20-B1; 2026-10-02 first review repair amends §2/§3;
+  second review repair amends §3)
 - Date: 2026-10-02
 - Scope: M5/T20-B1 (the run-scoped runtime state v2, the gate's mode-block
-  append and contract-mode tool clamp, the effective permission mode, and the
-  host-tool risk/plan-safe policy table). T20-C (execution-time permission
+  append and contract-mode tool clamp, the effective permission mode, the
+  host-tool risk/plan-safe policy table, the launch-scoped mandatory channel
+  and the token-bound turn fence). T20-C (execution-time permission
   enforcement), T20-B2 (submit/approve/dispatch), and T20-D (capability
   opening) remain declared, not claimed.
 - Amends: ADR 0304 §5 (the run-scoped state becomes a runtime *policy*
@@ -12,6 +14,7 @@
 - Evidence: `docs/validation/M5-t20-b1-runtime-state.md`,
   `packages/omp-runtime/src/desktop-state.ts`,
   `packages/omp-runtime/src/session/start-refusal.ts`,
+  `packages/omp-runtime/src/session/turn-fence.ts`,
   `packages/omp-runtime/src/session/runner.ts`,
   `packages/omp-runtime/extensions/omp-desktop-gate.ts`,
   `apps/desktop/electron/main/runtime/omp-session.ts`,
@@ -129,7 +132,7 @@ replacement, so turn/message ids never collide; history is restored, nothing
 is replayed and the persisted identity is unchanged. A reclaim failure refuses
 the prompt rather than running in the pinned presentation.
 
-### 3. Fail-closed refusal is `ctx.abort()` plus a structured notify
+### 3. Fail-closed refusal: launch-scoped mandatory channel + bound turn
 
 A state file that claims the firing session but fails validation makes the
 gate refuse the turn through the runtime's own `ctx.abort()` (measured: zero
@@ -139,21 +142,54 @@ request is still delivered), so the gate never relies on throws.
 
 Because an aborted `before_agent_start` emits no `agent_start`/`agent_end`,
 the gate also emits a versioned refusal descriptor through the runtime's own
-`notify` extension-UI channel. The runner honors it only when the descriptor
-names the native session the entry owns and the awaiting generation has not
-emitted `agent_start`; it then closes exactly that generation with one
-`error` envelope (`OMP_RUNTIME_STATE_REFUSED`) and one `turnEnd` (`error`),
-cancelling open dialogs/host calls and returning to idle. Duplicate, late,
-foreign-session and delegate signals are counted and ignored, so no newer
-generation can be closed by a stale one.
+`notify` extension-UI channel. The runner then closes exactly the generation
+it was produced for: one `error` envelope (`OMP_RUNTIME_STATE_REFUSED`) and
+one `turnEnd` (`error`), cancelling open dialogs/host calls and returning to
+idle.
 
-The bridge also marks the channel mandatory (`desktop-state.required` next to
-the state file) for every run it wires: from then on *every* non-owned read
-(missing, unreadable, oversized, identity-less, foreign, out-of-schema)
-refuses the interactive session's turn. A delegate (`hasUI=false`; `task`/
-`eval` subagents initialize their extension runner with the no-op UI context)
-keeps the zero-injection skip and is never refused. A fixture that never
-enabled the channel keeps the T19-C degradation: no state, no injection.
+The mandatory channel is enabled **at launch**, never inferred from a file:
+the supervisor sets `OMP_DESKTOP_STATE_REQUIRED=1|0` from its explicit
+`desktopStateRequired` option (the wired production bridge always passes
+`true`; a fixture that never writes state opts out with `false`), so deleting,
+truncating or replacing anything inside the mutable run root can never switch
+the channel off. With the switch on, *every* non-owned read (missing,
+unreadable, oversized, identity-less, foreign, out-of-schema) refuses the
+interactive session's turn. A delegate (`hasUI=false`; `task`/`eval`
+subagents initialize their extension runner with the no-op UI context) keeps
+the zero-injection skip and is never refused.
+
+### 3a. The refusal is bound to the admitted turn (second review repair)
+
+Session identity alone cannot bind a refusal: two generations of the same
+native session share it, so an exact replayed descriptor from an earlier
+generation would close a newer, awaiting-start one. The desktop therefore
+installs a **turn token** inside the runtime process before every prompt
+(`session/turn-fence.ts`):
+
+1. the runner mints a random 32-hex token for the admitted generation;
+2. it verifies through `get_available_commands` that the trusted gate
+   registered the internal command `/omp-desktop-turn` as an extension command
+   (a runtime that does not advertise it would forward the raw handshake text
+   to the provider, so the prompt is refused before submission);
+3. it sends the handshake through the formal RPC `prompt` path; the runtime's
+   `#tryExecuteExtensionCommand` consumes it before any provider loop (so the
+   message never reaches the provider, the transcript or the tool catalogue)
+   and the gate answers with a versioned acknowledgment descriptor over
+   `notify`;
+4. only after that acknowledgment does the runner submit the real prompt, and
+   only then can a refusal close the generation;
+5. every refusal echoes the installed token, and the runner accepts one only
+   when `turnToken` equals the live generation's token, the fence is armed and
+   the run has not emitted `agent_start`. Duplicates, unseen delayed
+   descriptors from earlier generations (older tokens), foreign sessions and
+   delegates are counted and ignored; a `v: 1` descriptor (the first-repair
+   shape without a token) no longer parses.
+
+A missing command, a malformed command list, a refused handshake or a missing
+acknowledgment fails the prompt before the user prompt is sent (the caller
+receives the failure; no provider request is made). The command is registered
+by the trusted gate only and is documented as reserved; the model can never
+issue it, and an ordinary user notification parses to `null`.
 
 ### 4. Policy travels with the catalog fingerprint; the card carries the mode
 

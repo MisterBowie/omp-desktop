@@ -1,6 +1,6 @@
 # M5/T20-B1：生产 mode/policy 状态与合约工具目录 —— 验证记录
 
-更新时间：2026-10-02。状态：**T20-B1 首稿未通过独立复审（F1-F4 生产反例，见 §9）；本记录所在提交完成返修并通过针对性验证，等待复审；T20 整体仍未完成（T20-C / T20-B2 / T20-D 未开始，`plan`/`goal` 能力保持关闭）**。
+更新时间：2026-10-02。状态：**T20-B1 首稿未通过独立复审（F1-F4，见 §9）；首轮返修提交（`064c738a`）通过 F1-F4 复核但被第二次独立复审判 R1-R3（见 §10），第二次返修已完成并通过本机针对性/全量验证，等待复审确认；T20 整体仍未完成（T20-C / T20-B2 / T20-D 未开始，`plan`/`goal` 能力保持关闭）**。
 
 - 分支：`codex/m5-t20-b1-runtime-state`，基线 `27d5c88a1334b32dbd8c8ac17a6c262e81a8df32`（追加提交，不 amend/rebase/强推，不创建 PR、不发布）；**产出提交（代码/测试/文档首稿）`7ecf8c8b31e25c7d3d367888051645a3cdecf6a0`**，本记录随后的补记提交只追加该坐标。
 - 工作树：`/home/vv/person/code/omp-desktop-m5-t20-b1`；固定子模块：OMP `62bc57be1b03ef0802a33cf7f5f530e534527531`（omp/18.3.0）、PI `0111e306c120ad5820688d7608cb37bad8fbcc1f`；patch level `62bc57b+omp-desktop.3`（fork commit `6226f805e92654344de04def413fa5cb91cb16b9`，本阶段**未改**）。
@@ -13,7 +13,7 @@
 - 运行范围状态 schema v2（`<runRoot>/desktop-state.json`）：`mode`、生产 `composeModeSystemPrompt(mode, "")` 块、**已解析**的有效 `permissionMode`、每宿主工具 `{name, risk, planSafeActions, origin}` 策略表 + T19-C 的技能/记忆；单一写者（bridge，每 prompt 一次组装）、单一读者（gate）。
 - 策略半部分**强制**：宿主行读取、枚举校验、compose、原子写入或同契约自校验任一失败都在提交前拒绝 prompt（无 tombstone、无按 Agent 继续）；技能/记忆仍为 PI 式 best-effort（失败→空 capability 部分、撤回 `Skill` 工具；非法技能行按 PI 语义丢弃并告警）。
 - gate 在 `before_agent_start`：能力块（技能→记忆，字节不变）之后**最后**追加 mode 块（纯追加、恰一次、单 system）；Plan/Goal 用真实 extension API `setActiveTools` 夹取 PI 合约目录（`read/glob/grep/bash/ask/new_context` ∩ 实际存在 + 非空 `planSafeActions` 的插件工具；Write/Edit/apply_patch/未知/用户 MCP/未声明插件永不进入；**不虚构** PI 的 BrowserPreview）；回 Agent 恢复夹取前选择并保留夹取期间自动激活的工具。
-- 失效语义（2026-10-02 返修后，见 §9）：bridge 在有 `sessionPolicy` 时同时写强制通道标记 `desktop-state.required`；有标记时，交互会话任何"非 owned 且有效"的状态（缺失/不可读/超限/无 identity/他会话/未知 schema）都由 gate 用运行时正式的 `ctx.abort()` **加**结构化 `notify` 拒绝该回合（零 provider 请求、恰一次 `error(OMP_RUNTIME_STATE_REFUSED)` + 恰一次 `turnEnd(error)`、runner 回到 idle、状态修复后下一 prompt 正常）；委托会话（`hasUI=false`，实测）保持零注入跳过；无标记的纯夹具明确退化（缺失→零注入）。子代理（其他 native identity）零模式/技能/记忆注入。
+- 失效语义（2026-10-02 第二次复审返修后，见 §10；§9 为首轮返修历史记录）：强制通道开关**在启动时**由 supervisor 以 `desktopStateRequired`（生产 wiring 恒 `true`，未写状态的夹具显式 `false`）写成 `OMP_DESKTOP_STATE_REQUIRED=1|0`，随进程生命周期固定——删除/篡改运行根内任何文件都不可能把它关掉（第一次返修的 `desktop-state.required` 文件标记已删除，其写入路径的 symlink 覆盖缺陷随之消失）；开关开启时，交互会话任何"非 owned 且有效"的状态（缺失/不可读/超限/无 identity/他会话/未知 schema）都由 gate 用运行时正式的 `ctx.abort()` **加**结构化 `notify` 拒绝该回合（零 provider 请求、恰一次 `error(OMP_RUNTIME_STATE_REFUSED)` + 恰一次 `turnEnd(error)`、runner 回到 idle、状态修复后下一 prompt 正常）；委托会话（`hasUI=false`，实测）保持零注入跳过。拒绝与**本次已准入回合**绑定：runner 在每次 prompt 前经 `get_available_commands` 确认 gate 注册了内部命令 `/omp-desktop-turn`，再用正式 RPC `prompt` 安装随机 turn token、等待 gate 经 `notify` 的版本化确认，拒绝描述符（`v: 2`）必须命中本 native session 且携带该 token、fence 已确认、当前代未 `agent_start` 才关闭该代——重复投递与上一代的迟到描述符（旧 token）只计数不关闭；命令缺失/握手未确认在用户 prompt 提交前失败。子代理（其他 native identity）零模式/技能/记忆注入。
 - 离开 Plan/Goal 回 Agent 时 bridge 重建运行时进程（扩展面只暴露按名选择的 `setActiveTools`、没有 presentation 恢复 API）：同一持久 native 会话 `switch_session`、同项目/模型、seeds 延续、无重放、身份不变、移除/禁用不复活；gate 的同进程恢复路径按"夹取前选择 + 夹取期间被移除的名字"恢复，目录类名字按当时目录过滤，不用 `getAllTools` 全开。
 - 风险/安全动作随目录指纹刷新（名称/schema 不变也会重新注册）；gate 的审批描述符新增可选 `permissionMode`，作为有效策略被真实消费的可观察路径。
 
@@ -33,22 +33,25 @@ bridge.prompt
   ├─ refreshDesktopState(catalog, policy)      ── 强制策略 + best-effort 能力
   │     ├─ composeModeSystemPrompt(mode,"")
   │     ├─ 技能/记忆（失败→空，不回滚策略）
-  │     ├─ markDesktopStateRequired（强制通道标记）
   │     ├─ writeDesktopCapabilityState(原子同目录 0600 替换, alias-safe)
   │     └─ readDesktopCapabilityState 自校验（字段级比对；失败→拒绝 prompt）
   ├─ registerHostTools(runner, skillsPresent, catalog)  ── 指纹含 risk/safeActions/origin
   └─ runner.prompt
+        ├─ get_available_commands：必须列出 gate 注册的 /omp-desktop-turn（缺失→提交前拒绝）
+        ├─ 正式 RPC prompt 安装本代 turn token → 等 gate notify 版本化确认（未确认→提交前拒绝）
+        │     （命令由 #tryExecuteExtensionCommand 在 provider 循环前本地消费）
+        └─ 提交用户 prompt
         │
-        ▼  runtime 进程（trusted gate）
+        ▼  runtime 进程（trusted gate；OMP_DESKTOP_STATE_REQUIRED 启动时固定）
   before_agent_start:
     readDesktopStateForSession
       ├─ owned  → [native base, capability?, modeBlock]（append-only, block 最后）
       │           + Plan/Goal: setActiveTools(contract ⊆ live)；Agent: 恢复/无操作
       ├─ foreign → 委托：零注入、零 clamp（hasUI=false）；交互+强制通道：拒绝
-      ├─ absent  → 无标记：零注入（通道未启用）；有标记且交互：拒绝
+      ├─ absent  → 通道关闭：零注入；开启且交互：拒绝
       └─ invalid → ctx.abort() + notify 结构化拒绝（无 provider 请求）
-    runner: notify 命中本 native 会话且当前代未 agent_start → 恰一次
-            error(OMP_RUNTIME_STATE_REFUSED) + turnEnd(error)，回到 idle
+    runner: 拒绝必须命中本 native 会话 + 本代 token + fence 已确认 + 未 agent_start
+            → 恰一次 error(OMP_RUNTIME_STATE_REFUSED) + turnEnd(error)，回到 idle
   tool_call:
     owned 状态可读时，审批描述符携带有效 permissionMode（T20-C 的消费前置）
 ```
@@ -245,3 +248,61 @@ bridge.prompt
 | `checks-repair.txt` | 矩阵 lint / gap 探针（g1 退场 + g2/g3 open，exit 1）/ omp-patch / release-docs / agent-policy / locales 79 对 / check-docs（6 预存在）/ check-architecture（1 预存在）输出与 exit | `836fb0eed90864ce08c63ae21aff028483d03240e6bb16309c1ca83155131c4c` |
 
 （SHA-256 在同一提交内计算；`repair-red/` 为复审侧原始字节，未做归一化。`omp-runtime-vitest-repair.txt` 为去掉 EOF 空行的可读副本，原始字节存于同目录 `.gz`。）
+
+## 10. 2026-10-02 第二次独立复审返修（R1-R3；RED 原样归档 `repair2-red/`，GREEN 追加）
+
+### 10.1 判定与 RED（原样归档，未编辑）
+
+第二次独立复审（Mac arm64 / Node v24.14.0 / Bun 1.4.2，基线 `064c738ad585b8429a2d0d42d08719596a46f5cc`，即 §9 首轮返修提交）确认首轮 F1-F4 的真实补丁 OMP + 生产 bridge/gate + 本地 FakeProvider 组合 GREEN、owned 进程/scratch 全部回收，但判 `changes-required` 三条：
+
+| 编号 | 反例（原证据，字节未编辑） |
+| --- | --- |
+| R1 | `repair2-red/production-state-failure-probe-064c738a.json` 策略 `delete-channel-files`：bridge 写入有效状态后、gate 读取前同时删除 `desktop-state.json` 与 `desktop-state.required`；真实生产 gate 仍发出 **providerRequests=1** 并以正常 agent 事件/completed turnEnd 收尾——可变文件缺失把强制通道降级为可选（与 F1 同一不变量） |
+| R2 | 同脚本策略 `required-marker-symlink-write`：真实 `markDesktopStateRequired` 跟随符号链接，把外部目标从 `ORIGINAL` 改写成 `1\n`（`desktop-state.ts:249` 的普通 `writeFileSync`；原有状态 writer 的别名防护没有覆盖这条新写入路径） |
+| R3 | `repair2-red/start-refusal-replay-064c738a.json`：真生产 runner/codec + 脚本化正式 RPC 帧（复审明确声明这是 runner 层负例，不是真实 OMP 进程重放 stdout）；第 1 代被精确合法拒绝后在 idle 结束，第 2 代被接受但尚未 `agent_start` 时重放同一旧描述符 → `beforeReplayState=running`、`afterReplayState=idle`、**`replayedNoticeClosedNewGeneration=true`**（旧归属只匹配 native 身份 + 未 start，没有代号绑定） |
+
+### 10.2 返修内容（生产坐标）
+
+| 反例 | 返修 | 坐标 |
+| --- | --- | --- |
+| R1 | 强制通道改为**启动域开关**：`OmpRuntimeSupervisorOptions.desktopStateRequired`（生产 wiring 恒 `true`；未写状态的夹具显式 `false`）在 spawn 时把 `OMP_DESKTOP_STATE_REQUIRED=1|0` **显式**写进子进程 env（永远覆盖 ambient/`extraEnv`），gate 只从 env 读；文件系统缺失/不可读/被替换不再影响开关。第一次返修的 `desktop-state.required` 文件、`markDesktopStateRequired` 与基于 `stat`/路径的 `isDesktopStateRequired(path)` 整体删除 | `desktop-state.ts`（`DESKTOP_STATE_REQUIRED_ENV` + 值语义判定）、`supervisor.ts`（选项 + spawn env）、`omp-runtime.ts`（adapter `createSupervisor` 透传）、`omp-session-wiring.ts`（恒 `true`）、`omp-session.ts`（不再写标记）、`omp-desktop-gate.ts`（`env?.OMP_DESKTOP_STATE_REQUIRED`） |
+| R2 | 标记写入路径删除后，生产通道上不再有任何"直接 `writeFileSync` 到可变路径"的写入；仅剩的状态写入保持既有原子/no-follow/alias-safe 语义（同目录唯一临时文件 `wx` 0600 + rename；symlink/hardlink 只被替换为条目、绝不跟随改写其别名目标；失败保留旧文件、无残留临时文件）。新增用例断言 writer 在该目录只留下状态文件本身（不存在第二个可删除的通道文件） | `desktop-state.ts`（writer 未改）、`desktop-state.test.ts` |
+| R3 | 新增 turn-fence 协议（`session/turn-fence.ts`）：每次准入回合 runner 铸造随机 32-hex token；先用正式 RPC `get_available_commands` 确认受信 gate 以 `source=extension` 注册了内部命令 `/omp-desktop-turn`（缺失/列表畸形 → 在提交用户 prompt 之前拒绝，握手文本绝不流入 provider），再经正式 RPC `prompt` 安装 token 并等待 gate 经 `notify` 的版本化 ack（`v:1`/kind/token）；拒绝描述符升到 `v: 2` 并携带 `turnToken`，runner 要求 native 身份 + fence 已确认 + `turnToken === 本代 token` + 未 `agent_start` 才关闭该代——旧 token 的重复投递、上一代迟到描述符、错误/`null` token、他会话、stop 退役/已 dispose 一律只计数。顺带修复同批暴露的相邻缺陷：**已关闭的代号不再被 transport 失败补发第二个终态**（合约模式重建 reclaim 时会触发，会在已完成回合上多挂一个 error） | `session/turn-fence.ts`、`session/start-refusal.ts`（v2 + `turnToken`）、`session/runner.ts`（`armTurnFence`/`expectTurnAck`/`handleTurnAck`/归属条件/诊断 `turnFences`/`ignoredTurnAcks`/`closeGeneration` 守卫）、`extensions/omp-desktop-gate.ts`（`registerCommand` + token 存储 + ack + 描述符） |
+
+实现依据（返修前核对固定源码 + 本机实测）：固定 runtime 的扩展 API 公开 `registerCommand`（`extensibility/extensions/types.ts:1371`；`extensions/loader.ts:234` 落库）；`agent-session.ts` 的 `#dispatchPrompt` 在 provider 循环**之前**执行注册命令（`#tryExecuteExtensionCommand`，~7092 行）；RPC `prompt` 分发在 `modes/rpc/rpc-mode.ts`（~1187 行）；`get_available_commands` 返回 extension 来源命令（`slash-commands/available-commands.ts`）。本机独立探针实测：`available.ours=[{name:"omp-desktop-turn",source:"extension"}]`、握手 prompt → `providerDelta=0` 且 `promptResultFrames=[{type:"prompt_result",agentInvoked:false}]`、ack notify 命中 token、随后真实 prompt `providerDelta=1` 且 `agent_start/agent_end` 正常（探针为开发辅助，tracked 证据为下表测试）。
+
+### 10.3 GREEN 计数与证据（2026-10-02，Linux x64 / Node v24.14.0 / Bun 1.4.2；全部本地 FakeProvider，无付费/远程模型）
+
+| 命令 | 结果 | exit | 原始日志 |
+| --- | --- | --- | --- |
+| `pnpm -C packages/omp-runtime test` | 25 files / **400 passed / 6 skipped**（+16：turn-fence 线协议、runner 归属矩阵、gate 命令/token、supervisor/env、malformed v1/v2 等） | 0 | `omp-runtime-vitest-repair2.txt` |
+| `node --test test/omp-runtime-state-e2e.test.mjs`（真实补丁树 + 生产 wiring/gate + FakeProvider + mutator/witness 夹具） | **1 passed**（15.6s）：P1-P8 全保；第 9 阶段改为 ①首个 prompt 同时删除状态文件与旧标记路径 → 拒绝（零 provider）②恢复 ③同会话后续回合再次同时删除 → 拒绝 ④malformed/oversize → 拒绝 + 恢复 ⑤unknown-schema/identity-missing/owned-invalid → 拒绝 + 恢复 ⑥`foreign-notify` 与 `forged-own-session-notify`（本会话 id + `turnToken:null`，旧归属会误关闭）负对照正常完成 ⑦Plan 夹取后回 Agent 的进程重建（stop/reclaim + retire runner）→ 全新 gate 重新武装 fence → 重建后真实拒绝 + 恢复；全程 provider 请求精确计数、恰一 error/turnEnd、身份/历史无重放、attempts ≤2 | 0 | `b1-e2e-repair2.txt` |
+| `node --test test/*.test.mjs`（`apps/desktop` 全量） | **2977 tests / 2966 pass / 0 fail / 11 skipped** | 0 | `desktop-suite-repair2.txt` |
+| 真实运行时套件组（start-handler 语义 / session / subagent / skill-path / host-tool / persistence / concurrent-approval / capability-source） | **24 passed** | 0 | `runtime-e2e-repair2.txt` |
+| `node --test test/omp-sidecar.test.mjs`（真实 Bun 编译 gate、不同 TMPDIR 深度同字节） | **9 passed** | 0 | `compiled-gate-sidecar-repair2.txt` |
+| `pnpm build:js` / `pnpm -r --if-present typecheck` / `pnpm lint` | 全绿 | 0 / 0 / 0 | `build-typecheck-lint-repair2.txt` |
+| matrix ids / gap 探针 / omp-patch / release-docs / agent-policy / locales / check-docs / `git diff --check` | `MATRIX-ID-OK` / `GAP-RETIRED g1` + `2 open [g2,g3]` / `OMP-PATCH-OK 62bc57b+omp-desktop.3` / 对齐 0.15.2 / 通过 / 79 对 / **6 项预存在**（508 页）/ 干净 | 0 / **1（预期）** / 0 / 0 / 0 / 0 / **1（预存在）** / 0 | `checks-repair2.txt` |
+
+未跑：host-core / cargo / 283MB 打包（本轮未改 Rust、未改 patch 构件/manifest/pins）。仅 Linux x64。
+
+### 10.4 验证层次与不声称
+
+- **R1**：单元（supervisor 默认 `1`、显式 opt-out 写 `0`、`extraEnv` 无法翻转；gate 的 required 只由值决定；`desktop-state.test.ts` 的"无伴随通道文件"）+ 生产 E2E（首/后续回合同时删除通道文件仍拒绝、零 provider、修复后恢复）。
+- **R2**：标记写入路径已删除；原有状态 writer 对抗性用例（symlink/hardlink/目录/不可写目录/无残留）全绿 + 新增"writer 只留状态文件"断言；复审脚本在自有临时目录内的行为已作为 RED 归档（未编辑）。
+- **R3**：runner 层负例矩阵（精确重复：idle 与下一代 awaiting-start；上一代迟到描述符；错误 token；`null` token；他会话；`agent_start` 后；stop 退役后；dispose 后；无 run；下一代真拒绝仍只关该代；缺命令/未 ack 在提交前失败且不发送用户 prompt）+ 生产层（真实拒绝/恢复、Plan→Agent 重建后的真实拒绝、伪造描述符负对照）。
+- **不声称**：真实 OMP 进程不会在 stdout 上重放帧（复审脚本本身即 runner 层负例）；本修复证明的是"任何非本代 token 的拒绝描述符都不关闭本代"，涵盖未来一切延迟/重复投递。用户键入保留命令名（`/omp-desktop-turn <32hex>`）会被运行时按扩展命令本地消费（与任何扩展命令同语义，无用户可见输出）；桌面自身每次 prompt 先安装新 token，产品路径不受影响——该名称按内部保留命令处理并已文档化。
+
+### 10.5 返修证据文件（`docs/validation/M5-t20-b1-runtime-state/`）
+
+| 文件 | 内容 | SHA-256 |
+| --- | --- | --- |
+| `omp-runtime-vitest-repair2.txt` | 包 vitest 原始输出（25 files / 400 passed / 6 skipped，exit 0） | `6cb0f74dbb7011a2794fc9d6d76b28443774d5d40f9ae636995bce5dfaf90e8f` |
+| `b1-e2e-repair2.txt` | B1 生产 E2E 单跑（1 passed / exit 0） | `0a2459aa954a51b64c21254482cd10b7e8b849ab01e515e508b347030178484f` |
+| `desktop-suite-repair2.txt` | desktop 全量原始输出（2977/2966/0/11，EXIT=0） | `8109daf657d05f4aadc6eef5c2a5ae2ff9be3b3504c649d6d720e813cb985d82` |
+| `runtime-e2e-repair2.txt` | 真实运行时套件组（24 passed / EXIT=0） | `13394cedecb416602c0dc99832679e45b16041c1687beeaa1146ad6051b1fc25` |
+| `compiled-gate-sidecar-repair2.txt` | 真实 Bun 编译 gate 套件（9 passed / EXIT=0） | `4d9210ff0c125b82978c8c7c482cfceacec7de72423a8895ef2b5ca2024cfd00` |
+| `build-typecheck-lint-repair2.txt` | build:js / 全仓 typecheck / lint（exit 0/0/0） | `a964ae2f6bc517d38eae3b161f4910d6ea4d10d9aaa21a1cefcd9245c14fbf96` |
+| `checks-repair2.txt` | 矩阵 lint / gap 探针（exit 1 预期）/ omp-patch / release-docs / agent-policy / locales 79 对 / check-docs（6 预存在，exit 1）/ `git diff --check` | `496f7f0d023a8e3e1a429972a4e1f7770c94eb7db5c48c4b1c8992d7d4f8707e` |
+| `repair2-red/*` | 第二次复审原始 RED（summary/probe/replay）+ `SHA256SUMS.txt` + `README.md`（说明与哈希） | 见 `repair2-red/SHA256SUMS.txt` 与 §10.1 |
+
+（`repair2-evidence-sha256.txt` 为上述 7 个日志的 `sha256sum` 汇总，未做归一化；所有日志为对应命令的原始 stdout/stderr 直接落盘。）

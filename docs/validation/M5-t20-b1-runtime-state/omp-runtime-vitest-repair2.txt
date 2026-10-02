@@ -1,0 +1,15 @@
+### omp-runtime vitest
+
+> @pi-desktop/omp-runtime@0.15.2 test /home/vv/person/code/omp-desktop-m5-t20-b1/app/packages/omp-runtime
+> vitest run
+
+
+ RUN  v4.1.10 /home/vv/person/code/omp-desktop-m5-t20-b1/app/packages/omp-runtime
+
+
+ Test Files  25 passed (25)
+      Tests  400 passed | 6 skipped (406)
+   Start at  23:29:58
+   Duration  17.38s (transform 4.18s, setup 0ms, import 9.64s, tests 48.72s, environment 2ms)
+
+exit=0

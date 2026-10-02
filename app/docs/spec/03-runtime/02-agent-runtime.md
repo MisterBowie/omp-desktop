@@ -1760,27 +1760,45 @@ contract tool catalog (evidence: `docs/validation/M5-capability-user-paths.md`,
   at that prompt* and native names against the pre-clamp selection — no
   `getAllTools` "enable everything", no resurrection of removed/disabled
   tools.
-- **Fail-closed refusal has a terminal signal**: the bridge marks the channel
-  mandatory for every run it wires (`desktop-state.required` next to the
-  state file). An interactive session whose state is missing, unreadable,
-  oversized, identity-less, foreign or out-of-schema must not run as an
-  unclamped Agent turn: the gate calls `ctx.abort()` (measured: zero provider
-  requests) **and** emits the versioned refusal descriptor through the
-  runtime's own `notify` extension-UI channel (`session/start-refusal.ts`).
-  The runner honors that descriptor only when it names the native session the
-  entry owns and the awaiting run has not emitted `agent_start`; it then
-  closes exactly that generation with one `error` envelope
+- **Fail-closed refusal has a terminal signal**: the mandatory channel is
+  enabled at launch, never inferred from a file — the supervisor sets
+  `OMP_DESKTOP_STATE_REQUIRED=1|0` from its explicit `desktopStateRequired`
+  option (the wired production bridge always passes `true`; a fixture that
+  never writes a run-scoped state opts out with `false`), so deleting,
+  truncating or replacing anything inside the mutable run root can never
+  switch the channel off. An interactive session whose state is missing,
+  unreadable, oversized, identity-less, foreign or out-of-schema must not run
+  as an unclamped Agent turn: the gate calls `ctx.abort()` (measured: zero
+  provider requests) **and** emits the versioned refusal descriptor through
+  the runtime's own `notify` extension-UI channel
+  (`session/start-refusal.ts`, `v: 2`). The descriptor is bound to the
+  admitted turn: before every prompt the runner installs a random 32-hex
+  **turn token** in the runtime process
+  (`session/turn-fence.ts`) — it verifies through `get_available_commands`
+  that the trusted gate registered the internal `/omp-desktop-turn`
+  extension command (a runtime that does not advertise it would forward the
+  raw handshake to the provider, so the prompt is refused before
+  submission), sends the handshake through the formal RPC `prompt` path
+  (consumed by `#tryExecuteExtensionCommand` before any provider loop, never
+  visible to the provider, the transcript or the tool catalogue), and waits
+  for the gate's versioned acknowledgment over `notify`. A refusal is honored
+  only when it names the native session the entry owns, carries that exact
+  token, the fence is armed and the run has not emitted `agent_start`; it
+  then closes exactly that generation with one `error` envelope
   (`OMP_RUNTIME_STATE_REFUSED`) and one `turnEnd` (`error`), cancelling any
-  open dialogs/host calls and returning to idle, so the desktop never keeps
-  the turn running and the next repaired prompt works. A delegate session
-  (`hasUI=false`; `task`/`eval` subagents initialize their extension runner
-  with the no-op UI context) keeps zero injection and is never refused by the
-  channel. Without the marker (a fixture that never enabled the channel) the
-  T19-C degradation stands: no state, no injection. A thrown handler error is
-  *not* protection (the pinned extension runner logs it and still delivers
-  the prompt; measured in
-  `apps/desktop/test/omp-start-handler-semantics.test.mjs`). The gate's
-  `tool_call` approval descriptor additionally carries the effective
+  open dialogs/host calls and returning to idle. Duplicates, unseen delayed
+  descriptors from earlier generations (older tokens), foreign sessions and
+  delegates are counted and ignored, and a `v: 1` descriptor (no token) no
+  longer parses, so a replayed frame can never close a newer generation. A
+  missing command, refused handshake or missing acknowledgment fails the
+  prompt before the user prompt is sent. A delegate session (`hasUI=false`;
+  `task`/`eval` subagents initialize their extension runner with the no-op UI
+  context) keeps zero injection and is never refused by the channel. With the
+  switch off (a fixture that never enabled the channel) the T19-C degradation
+  stands: no state, no injection. A thrown handler error is *not* protection
+  (the pinned extension runner logs it and still delivers the prompt;
+  measured in `apps/desktop/test/omp-start-handler-semantics.test.mjs`). The
+  gate's `tool_call` approval descriptor additionally carries the effective
   permission mode when the owning state is readable, so the resolved policy
   is observably consumed (T20-C replaces this with the execution-time
   decision table).
@@ -1801,14 +1819,15 @@ contract tool catalog (evidence: `docs/validation/M5-capability-user-paths.md`,
 - **Fail-closed decision**: a host read failure follows Pi's best-effort
   memory behavior (no memory block; a failed `skills.active` drops only the
   user skills); a malformed catalog line is dropped with a warning. With the
-  mandatory marker, a missing/unattributable/foreign/invalid state refuses
-  the interactive session's turn through `ctx.abort()` + the structured
-  refusal notify (zero provider requests, one terminal error and turn end),
-  while a delegate (`hasUI=false`) keeps the zero-injection skip; without the
-  marker, a missing or unattributable state file injects nothing, and a file
-  owned by the firing session that fails validation still refuses the turn.
-  Any mandatory mode/policy failure refuses the prompt before submission — a
-  stale catalog, mode or policy can never reach a provider request.
+  launch-scoped switch on, a missing/unattributable/foreign/invalid state
+  refuses the interactive session's turn through `ctx.abort()` + the
+  token-bound structured refusal notify (zero provider requests, one terminal
+  error and turn end), while a delegate (`hasUI=false`) keeps the
+  zero-injection skip; with the switch off, a missing or unattributable state
+  file injects nothing, and a file owned by the firing session that fails
+  validation still refuses the turn. Any mandatory mode/policy failure
+  refuses the prompt before submission — a stale catalog, mode or policy can
+  never reach a provider request.
 - **User path**: Settings, the project-memory editor, skill management,
   plugin enable/scope controls and the composer slash-skill path already
   write through the stores this loader reads; `/skill-id` routes to the

@@ -1,0 +1,45 @@
+{
+  "commit": "064c738ad585b8429a2d0d42d08719596a46f5cc",
+  "decision": "changes-required",
+  "originalF1F4": "independent targeted probes pass with corrected terminal snapshots",
+  "findings": [
+    {
+      "id": "R1",
+      "layer": "actual fixed patched OMP + production bridge/gate + local FakeProvider",
+      "failure": "deleting state and marker sends one unclamped provider request"
+    },
+    {
+      "id": "R2",
+      "layer": "real production marker writer with temporary owned files",
+      "failure": "symlink marker overwrites alias target"
+    },
+    {
+      "id": "R3",
+      "layer": "real production runner/codec with scripted formal RPC frames",
+      "failure": "old exact refusal replay closes new generation awaiting agent_start"
+    }
+  ],
+  "buildExit": 0,
+  "files": {
+    "production-state-failure-probe-064c738a.json": {
+      "bytes": 12582,
+      "sha256": "ff19d737a4793356823ad678f3427a78ed09a444595412e4b36a0acd00a1009d"
+    },
+    "production-state-failure-probe.mjs": {
+      "bytes": 10148,
+      "sha256": "0c774a73a0dd2e952fe2ee8d14d9892beae79e3fa91ab778efecd1c9189b45c6"
+    },
+    "start-refusal-replay-064c738a.json": {
+      "bytes": 2490,
+      "sha256": "e4a25b94cd5e01d53a631e08cadd33a75fba5d79af34aea3b66103b39659f4d8"
+    },
+    "start-refusal-replay-probe.mjs": {
+      "bytes": 2494,
+      "sha256": "5e013f5a2f1a3e4b3bcfef2a493aafbabf51f469618b34de31dde959ed89de9e"
+    },
+    "build-js-064c738a.txt": {
+      "bytes": 19822,
+      "sha256": "e188a5e282dd52d5d374841b359739bfd1404effef3b136e17fb639819b5c046"
+    }
+  }
+}
