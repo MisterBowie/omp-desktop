@@ -997,7 +997,10 @@ export async function applyContractToolClamp(
  *     explicitly bound to it at its own lifecycle start (`bindDelegate`):
  *     a child that started under this record keeps this association, and once
  *     the record is retired or replaced the child is refused — it never
- *     inherits a newer admission.
+ *     inherits a newer admission. A nested delegate must reach the owning
+ *     session file through intermediates that are themselves bound to this
+ *     very record; an ancestry hop owned by a retired/other admission, or
+ *     never attributed, fails closed (third review repair).
  *   - the record is replaced wholesale by the next fence and cleared on
  *     terminal `agent_end` (unless the runtime scheduled a continuation) and
  *     on a start refusal, so a late callback can never borrow an earlier
@@ -1049,12 +1052,29 @@ let admittedTurn: AdmittedTurn | null = null;
 const delegateBindings = new Map<string, AdmittedTurn>();
 
 /**
- * Observed delegate session files → the session file they declare as parent
- * (`ReadonlySessionManager.getHeader().parentSession`). The recorded links let
- * a nested delegate (a child of a child) resolve its chain up to the
- * admission's owning session file.
+ * One observed delegate session file → the parent file its header declares
+ * (`ReadonlySessionManager.getHeader().parentSession`) and the exact admission
+ * record the session was bound to.
+ *
+ * `admission` is `null` while the session is observed but not attributed: a
+ * delayed start, a chain that did not resolve, or a binding retired with its
+ * admission. The recorded identity is what lets a nested delegate (a child of
+ * a child) resolve a chain in which **every** intermediate hop belongs to the
+ * very admission record the new delegate is being bound to — a fresh
+ * descendant of a retired child can never bridge into the live turn
+ * (M5/T20-C third review repair).
+ *
+ * Keyed by the file the public surface reports, because that is how a child's
+ * header names its parent. A link is written once — `parentSession` is fixed
+ * at session creation — and a later lifecycle event of the same session never
+ * re-attributes it.
  */
-const delegateParents = new Map<string, string>();
+type DelegateLineageLink = {
+  parentFile: string;
+  admission: AdmittedTurn | null;
+};
+
+const delegateLineage = new Map<string, DelegateLineageLink>();
 
 /**
  * Delegate sessions that must never decide under any admission in this
@@ -1132,10 +1152,17 @@ function delegateSessionFactsOf(context: DelegateLifecycleContext): DelegateSess
 
 /**
  * Does this delegate's declared parentage reach the admission's owning session
- * file? `undefined` means the surface exposes no parentage to check (a fixture
+ * file *through sessions that all belong to this very admission record*?
+ *
+ * `undefined` means the surface exposes no parentage to check (a fixture
  * context without a session file), `false` means it affirmatively does not
- * resolve — a parent chain that stops before the owner, or one that never
- * reaches it.
+ * resolve: a parent chain that stops before the owner, one that never reaches
+ * it, one with an unknown intermediate, or one whose intermediate hop was
+ * bound to a different (retired or other-generation) admission record or to
+ * none at all. Requiring the exact record identity at every hop — not merely
+ * that some chain of recorded files arrives at the same owner file — is what
+ * stops a freshly created descendant of a retired delegate from bridging into
+ * the live turn (M5/T20-C third review repair).
  */
 function delegateDescendsFrom(context: DelegateLifecycleContext, admission: AdmittedTurn): boolean | undefined {
   const owner = admission.ownerSessionFile;
@@ -1147,9 +1174,10 @@ function delegateDescendsFrom(context: DelegateLifecycleContext, admission: Admi
     if (current === owner) return true;
     if (seen.has(current)) return false;
     seen.add(current);
-    const next = delegateParents.get(current);
-    if (next === undefined) return false;
-    current = next;
+    const link = delegateLineage.get(current);
+    if (link === undefined) return false;
+    if (link.admission !== admission) return false;
+    current = link.parentFile;
   }
   return false;
 }
@@ -1172,17 +1200,24 @@ function delegateDescendsFrom(context: DelegateLifecycleContext, admission: Admi
  *     armed: recorded as permanently unattributable — a delayed start must not
  *     adopt a newer turn;
  *   - a declared parentage chain that does not resolve to the admission's
- *     owning session file: not bound.
+ *     owning session file, or that passes through an intermediate bound to a
+ *     different admission record (retired, other generation) or to none at
+ *     all: not bound (M5/T20-C third review repair).
  */
 function bindDelegate(context: DelegateLifecycleContext): void {
   if (hasUi(context)) return;
   const sessionId = sessionIdOf(context);
   if (sessionId === undefined) return;
   const facts = delegateSessionFactsOf(context);
-  // Record the parentage link even when this delegate is not (yet) bindable:
-  // a nested delegate's chain needs its intermediate recorded.
-  if (facts.file !== undefined && facts.parentFile !== undefined) {
-    delegateParents.set(facts.file, facts.parentFile);
+  // Record the declared parentage link even when this delegate is not (yet)
+  // bindable: a nested delegate's chain needs its intermediate recorded. The
+  // link is written once (the header's `parentSession` is fixed at session
+  // creation) and starts unattributed; the successful binding below is what
+  // attributes it to an admission record, exactly once.
+  let link = facts.file !== undefined ? delegateLineage.get(facts.file) : undefined;
+  if (facts.file !== undefined && facts.parentFile !== undefined && link === undefined) {
+    link = { parentFile: facts.parentFile, admission: null };
+    delegateLineage.set(facts.file, link);
   }
   if (delegateBindings.has(sessionId) || refusedDelegates.has(sessionId)) return;
   const admitted = admittedTurn;
@@ -1192,6 +1227,11 @@ function bindDelegate(context: DelegateLifecycleContext): void {
     return;
   }
   if (delegateDescendsFrom(context, admitted) === false) return;
+  // This file already belongs to a different admission record (or was never
+  // attributed): never re-point it at the live one. A re-observation of an
+  // already bound session returned above, so this only guards file reuse.
+  if (link !== undefined && link.admission !== null && link.admission !== admitted) return;
+  if (link !== undefined) link.admission = admitted;
   delegateBindings.set(sessionId, admitted);
 }
 

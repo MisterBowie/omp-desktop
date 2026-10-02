@@ -248,4 +248,163 @@ describe("delegate admission ownership", () => {
     expect(verdict?.block).toBe(true);
     expect(verdict?.reason).toMatch(/no interactive UI/);
   });
+
+  it("refuses a fresh descendant that would bridge a retired intermediate into the new admission (third review, 7 steps)", async () => {
+    const { root, statePath, ownerFile } = world();
+    process.env.OMP_DESKTOP_STATE = statePath;
+    process.env.OMP_DESKTOP_STATE_REQUIRED = "1";
+    delete process.env.OMP_DESKTOP_GATE_MODE;
+    delete process.env.OMP_DESKTOP_GATE_TOOLS;
+    const h = createGateHandlerHarness({ sessionId: OWNER, ownerFile });
+    const childAFile = join(root, "lineage-child-a.jsonl");
+    const childBFile = join(root, "lineage-child-b.jsonl");
+    const now = () => new Date().toISOString();
+
+    // 1. Parent A (ask), childA bound under it: its write fails closed where
+    //    the decision would have asked.
+    await admit(h, TOKEN_A, statePath, "ask");
+    const childA = h.delegateContext("child-native-lineage-a", {
+      file: childAFile,
+      parentFile: ownerFile,
+      createdAt: now(),
+    });
+    await childStart(h, childA);
+    expect((await h.toolCall(WRITE, childA))?.reason).toMatch(/no interactive UI/);
+
+    // 2. A's terminal end retires the admission and childA's binding.
+    h.agentEnd();
+    expect((await h.toolCall(WRITE, childA))?.reason).toMatch(/policy is unavailable/);
+
+    // 3. Parent B (auto) is live: childA must not inherit it.
+    await admit(h, TOKEN_B, statePath, "auto");
+    expect((await h.toolCall(WRITE, childA))?.reason).toMatch(/policy is unavailable/);
+
+    // 4. A fresh direct child of B is decided by B.
+    const childB = h.delegateContext("child-native-lineage-b", {
+      file: childBFile,
+      parentFile: ownerFile,
+      createdAt: now(),
+    });
+    await childStart(h, childB);
+    expect(await h.toolCall(WRITE, childB)).toBeUndefined();
+
+    // 5. A child never observed under any live admission fails closed.
+    expect((await h.toolCall(WRITE, h.delegateContext("child-native-lineage-never")))).toMatchObject({
+      block: true,
+      reason: expect.stringMatching(/policy is unavailable/),
+    });
+
+    // 6. A freshly created descendant of retired childA declares the retired
+    //    child's file as parent and is newer than B — the chain must still be
+    //    refused: its intermediate hop belongs to the retired record, not to
+    //    the admission being claimed.
+    const grandchildA = h.delegateContext("grandchild-native-lineage-a", {
+      file: join(root, "lineage-grandchild-a.jsonl"),
+      parentFile: childAFile,
+      createdAt: now(),
+    });
+    await childStart(h, grandchildA);
+    expect((await h.toolCall(WRITE, grandchildA))).toMatchObject({
+      block: true,
+      reason: expect.stringMatching(/policy is unavailable/),
+    });
+
+    // 7. Positive control: a descendant of the current child resolves through
+    //    an intermediate bound to the very same admission.
+    const grandchildB = h.delegateContext("grandchild-native-lineage-b", {
+      file: join(root, "lineage-grandchild-b.jsonl"),
+      parentFile: childBFile,
+      createdAt: now(),
+    });
+    await childStart(h, grandchildB);
+    expect(await h.toolCall(WRITE, grandchildB)).toBeUndefined();
+    expect(h.dialogs).toHaveLength(0);
+  });
+
+  it("makes the ancestry requirement sticky, multi-hop and unattributable-safe", async () => {
+    const { root, statePath, ownerFile } = world();
+    process.env.OMP_DESKTOP_STATE = statePath;
+    process.env.OMP_DESKTOP_STATE_REQUIRED = "1";
+    delete process.env.OMP_DESKTOP_GATE_MODE;
+    delete process.env.OMP_DESKTOP_GATE_TOOLS;
+    const h = createGateHandlerHarness({ sessionId: OWNER, ownerFile });
+    const now = () => new Date().toISOString();
+    await admit(h, TOKEN_A, statePath, "auto");
+
+    // An intermediate whose header predates the admission is refused and
+    // recorded unattributed; a fresh descendant of it cannot use it as a hop.
+    const staleFile = join(root, "boundary-stale.jsonl");
+    const stale = h.delegateContext("child-native-boundary-stale", {
+      file: staleFile,
+      parentFile: ownerFile,
+      createdAt: new Date(Date.now() - 60_000).toISOString(),
+    });
+    await childStart(h, stale);
+    expect((await h.toolCall(WRITE, stale))?.block).toBe(true);
+    const staleDescendant = h.delegateContext("grandchild-native-boundary-stale", {
+      file: join(root, "boundary-stale-descendant.jsonl"),
+      parentFile: staleFile,
+      createdAt: now(),
+    });
+    await childStart(h, staleDescendant);
+    expect((await h.toolCall(WRITE, staleDescendant))?.block).toBe(true);
+
+    // An unknown intermediate (never observed) fails closed too.
+    const unknownDescendant = h.delegateContext("grandchild-native-boundary-unknown", {
+      file: join(root, "boundary-unknown-descendant.jsonl"),
+      parentFile: join(root, "boundary-ghost.jsonl"),
+      createdAt: now(),
+    });
+    await childStart(h, unknownDescendant);
+    expect((await h.toolCall(WRITE, unknownDescendant))?.block).toBe(true);
+
+    // Legitimate multi-hop nesting: child → grandchild → great-grandchild,
+    // every intermediate bound to the same admission.
+    const childFile = join(root, "boundary-child.jsonl");
+    const grandchildFile = join(root, "boundary-grandchild.jsonl");
+    const child = h.delegateContext("child-native-boundary-deep", {
+      file: childFile,
+      parentFile: ownerFile,
+      createdAt: now(),
+    });
+    await childStart(h, child);
+    const grandchild = h.delegateContext("grandchild-native-boundary-deep", {
+      file: grandchildFile,
+      parentFile: childFile,
+      createdAt: now(),
+    });
+    await childStart(h, grandchild);
+    const greatGrandchild = h.delegateContext("great-grandchild-native-boundary-deep", {
+      file: join(root, "boundary-great-grandchild.jsonl"),
+      parentFile: grandchildFile,
+      createdAt: now(),
+    });
+    await childStart(h, greatGrandchild);
+    expect(await h.toolCall(WRITE, greatGrandchild)).toBeUndefined();
+
+    // Re-observing the intermediates under the next admission must not
+    // re-attribute their links: the retired chain stays refused for a fresh
+    // descendant, while a direct child of the new turn is allowed.
+    h.agentEnd();
+    await admit(h, TOKEN_B, statePath, "auto");
+    await h.lifecycle("session_start", child);
+    await h.lifecycle("session_start", grandchild);
+    const lateDescendant = h.delegateContext("late-native-boundary-deep", {
+      file: join(root, "boundary-late-descendant.jsonl"),
+      parentFile: grandchildFile,
+      createdAt: now(),
+    });
+    await childStart(h, lateDescendant);
+    expect((await h.toolCall(WRITE, lateDescendant))).toMatchObject({
+      block: true,
+      reason: expect.stringMatching(/policy is unavailable/),
+    });
+    const freshDirect = h.delegateContext("child-native-boundary-fresh", {
+      file: join(root, "boundary-fresh.jsonl"),
+      parentFile: ownerFile,
+      createdAt: now(),
+    });
+    await childStart(h, freshDirect);
+    expect(await h.toolCall(WRITE, freshDirect)).toBeUndefined();
+  });
 });

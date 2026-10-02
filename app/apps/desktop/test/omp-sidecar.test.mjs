@@ -450,10 +450,10 @@ test(
     assert.equal(missing.verdict?.block, true);
     assert.match(missing.verdict?.reason ?? "", /policy is unavailable/);
 
-    // Delegate ownership survives bundling (M5/T20-C second review repair): a
-    // child that started under the ask admission is bound to it and refused
-    // once it is replaced by the auto admission, while the shipped artifact
-    // still carries the fence, the lifecycle handlers and the ownership rule.
+    // Delegate ownership survives bundling (M5/T20-C second review repair),
+    // including the third-review ancestry rule: a fresh descendant of a
+    // retired intermediate delegate must not bridge into the newer admission,
+    // while a descendant of the current turn's child is still allowed.
     const stateAutoPath = join(root, "desktop-state-auto.json");
     writeState(stateAutoPath, "agent", "auto", []);
     const delegateProbePath = join(root, "gate-delegate-probe.mjs");
@@ -477,21 +477,29 @@ test(
         "  logger: { warn: () => undefined },",
         "});",
         "const raw = JSON.parse(contextJson);",
-        "const parent = {",
+        "const ownerFile = raw.cwd + \"/compiled-owner-session.jsonl\";",
+        "const contextFor = (sessionId, ui, facts) => ({",
         "  cwd: raw.cwd,",
-        "  hasUI: true,",
-        "  sessionManager: { getSessionId: () => raw.owner, getCwd: () => raw.cwd },",
+        "  hasUI: ui,",
+        "  sessionManager: {",
+        "    getSessionId: () => sessionId,",
+        "    getCwd: () => raw.cwd,",
+        "    getSessionFile: () => facts.file,",
+        "    getHeader: () => ({",
+        "      parentSession: facts.parentFile,",
+        "      timestamp: facts.createdAt,",
+        "    }),",
+        "  },",
         "  abort: () => undefined,",
-        "  ui: { notify: () => undefined, select: async () => undefined },",
-        "};",
-        "const child = {",
-        "  cwd: raw.cwd,",
-        "  hasUI: false,",
-        "  sessionManager: { getSessionId: () => raw.child, getCwd: () => raw.cwd },",
-        "  abort: () => undefined,",
-        "  ui: undefined,",
-        "};",
+        "  ui: ui ? { notify: () => undefined, select: async () => undefined } : undefined,",
+        "});",
+        "const parent = contextFor(raw.owner, true, { file: ownerFile });",
+        "const delegate = (sessionId, file, parentFile) => contextFor(sessionId, false, { file, parentFile, createdAt: new Date().toISOString() });",
         "const run = (event, payload, ctx) => handlers.get(event)(payload, ctx);",
+        "const start = async (ctx) => {",
+        '  await run("before_agent_start", { type: "before_agent_start", systemPrompt: ["native"] }, ctx);',
+        '  run("agent_start", { type: "agent_start" }, ctx);',
+        "};",
         "const fence = (statePath, token) => {",
         '  const state = JSON.parse(readFileSync(statePath, "utf8"));',
         "  const admission = Buffer.from(JSON.stringify({",
@@ -506,19 +514,33 @@ test(
         "};",
         'const event = { type: "tool_call", toolCallId: "c-child", toolName: "write", input: { path: "untouched.txt", content: "x" } };',
         "const rows = [];",
+        "const check = async (name, ctx) => {",
+        '  const verdict = (await run("tool_call", event, ctx)) ?? null;',
+        "  rows.push({ name, verdict });",
+        "};",
+        'const never = contextFor("compiled-never", false, {});',
         "process.env.OMP_DESKTOP_STATE = stateAskPath;",
         'fence(stateAskPath, "a".repeat(32));',
-        'await run("before_agent_start", { type: "before_agent_start", systemPrompt: ["native"] }, parent);',
-        'run("agent_start", { type: "agent_start" }, parent);',
-        'await run("session_start", { type: "session_start" }, child);',
-        'rows.push({ name: "child-under-ask", verdict: (await run("tool_call", event, child)) ?? null });',
+        "await start(parent);",
+        'const childA = delegate("compiled-child-a", raw.cwd + "/compiled-child-a.jsonl", ownerFile);',
+        "await start(childA);",
+        'await check("child-a-under-ask", childA);',
         'run("agent_end", { type: "agent_end" }, parent);',
-        'rows.push({ name: "child-after-terminal", verdict: (await run("tool_call", event, child)) ?? null });',
+        'await check("child-a-after-terminal", childA);',
         "process.env.OMP_DESKTOP_STATE = stateAutoPath;",
         'fence(stateAutoPath, "b".repeat(32));',
-        'await run("before_agent_start", { type: "before_agent_start", systemPrompt: ["native"] }, parent);',
-        'run("agent_start", { type: "agent_start" }, parent);',
-        'rows.push({ name: "child-after-auto-admission", verdict: (await run("tool_call", event, child)) ?? null });',
+        "await start(parent);",
+        'await check("child-a-under-auto", childA);',
+        'const childB = delegate("compiled-child-b", raw.cwd + "/compiled-child-b.jsonl", ownerFile);',
+        "await start(childB);",
+        'await check("child-b-under-auto", childB);',
+        'await check("unobserved-child", never);',
+        'const grandchildA = delegate("compiled-grandchild-a", raw.cwd + "/compiled-grandchild-a.jsonl", raw.cwd + "/compiled-child-a.jsonl");',
+        "await start(grandchildA);",
+        'await check("grandchild-of-retired-a", grandchildA);',
+        'const grandchildB = delegate("compiled-grandchild-b", raw.cwd + "/compiled-grandchild-b.jsonl", raw.cwd + "/compiled-child-b.jsonl");',
+        "await start(grandchildB);",
+        'await check("grandchild-of-current-b", grandchildB);',
         'process.stdout.write(JSON.stringify({ rows }));',
       ].join("\n"),
       "utf8",
@@ -530,7 +552,7 @@ test(
         gatePath,
         statePath,
         stateAutoPath,
-        JSON.stringify({ cwd: root, owner: "omp-sidecar-session", child: "omp-sidecar-child" }),
+        JSON.stringify({ cwd: root, owner: "omp-sidecar-session" }),
       ],
       { encoding: "utf8" },
     );
@@ -538,11 +560,28 @@ test(
     const delegateRows = JSON.parse(delegateRun.stdout).rows;
     assert.deepEqual(
       delegateRows.map((row) => row.name),
-      ["child-under-ask", "child-after-terminal", "child-after-auto-admission"],
+      [
+        "child-a-under-ask",
+        "child-a-after-terminal",
+        "child-a-under-auto",
+        "child-b-under-auto",
+        "unobserved-child",
+        "grandchild-of-retired-a",
+        "grandchild-of-current-b",
+      ],
     );
-    assert.match(delegateRows[0].verdict?.reason ?? "", /no interactive UI/);
-    assert.match(delegateRows[1].verdict?.reason ?? "", /policy is unavailable/);
-    assert.match(delegateRows[2].verdict?.reason ?? "", /policy is unavailable/);
-    for (const row of delegateRows) assert.equal(row.verdict?.block, true, `${row.name} must block`);
+    const delegateVerdict = (name) => delegateRows.find((row) => row.name === name)?.verdict ?? null;
+    assert.match(delegateVerdict("child-a-under-ask")?.reason ?? "", /no interactive UI/);
+    for (const refused of [
+      "child-a-after-terminal",
+      "child-a-under-auto",
+      "unobserved-child",
+      "grandchild-of-retired-a",
+    ]) {
+      assert.equal(delegateVerdict(refused)?.block, true, `${refused} must block`);
+      assert.match(delegateVerdict(refused)?.reason ?? "", /policy is unavailable/);
+    }
+    assert.equal(delegateVerdict("child-b-under-auto"), null, "a child of the current turn must be allowed");
+    assert.equal(delegateVerdict("grandchild-of-current-b"), null, "a nested child of the current turn must be allowed");
   },
 );
