@@ -10,8 +10,8 @@
 | 文件 | 内容 | SHA-256 |
 | --- | --- | --- |
 | `b1-acceptance-bff27e11.json` | 根复审判定：候选 SHA、remote/GitHub/local 一致性、clean、验证计数与证据清单、follow-up（archive only） | `f34618eb81669d7c3433cedf211e43cb3db60cba60fac0397eb47d3792e1182d` |
-| `build-runtime-bff27e11-escalated.txt` | 复审机 `@pi-desktop/omp-runtime` 构建（tsc）原始输出 | `9229d9a9f605597573b31d838653196b11bafdafb729928270ef6a93592d963a` |
-| `runtime-tests-bff27e11.txt` | 复审机 omp-runtime vitest：25 files / **404 passed / 6 skipped**（exit 0，17.91s） | `cbe55d67e58eb09fc75712cb30178eea0f125c0055307d2adb1d13c36e02fc86` |
+| `build-runtime-bff27e11-escalated.txt.gz` | 复审机 `@pi-desktop/omp-runtime` 构建（tsc）原始输出（字节原样 gzip，见下方说明；解码后摘要 `9229d9a9f605597573b31d838653196b11bafdafb729928270ef6a93592d963a`） | `c8215b0da41452105f392ac9d0402b57a923f8950ff3409f8e03f909b88eedc2` |
+| `runtime-tests-bff27e11.txt.gz` | 复审机 omp-runtime vitest：25 files / **404 passed / 6 skipped**（exit 0，17.91s；字节原样 gzip；解码后摘要 `cbe55d67e58eb09fc75712cb30178eea0f125c0055307d2adb1d13c36e02fc86`） | `d387e0ac417eac560c9352cd4b4c73102c83f29a576f2e080f144255f2fd1b15` |
 | `desktop-targeted-bff27e11.txt` | 复审机定向 desktop 套件（bridge+B1+fence E2E，**53 passed**，含 B1 生产 E2E 41.6s） | `cfc067a1b059c545d196957a77d8f02b50d383a10ce1ecc34b8b122df997b2d6` |
 | `production-fence-stop-recovery-bff27e11.json` | 复审机生产探针：Stop 两个边界 provider0/恰一 aborted/idle；恢复 provider1 completed 同一 native 身份；control provider1 | `d4dbfeae3dfa946c96c180df99d6772e10475fbd20ffef745c180a071654d13f` |
 | `production-state-failure-probe-bff27e11.json` | 复审机生产状态失效探针：invalid/missing/both-files-removed → provider0/error/idle/retry；Agent 目录恢复 | `4041420595ce034e9257956825d9af79d914d95a4ec4fff946af8290be2f5aec` |
@@ -20,3 +20,9 @@
 
 `SHA256SUMS.txt` 覆盖本目录全部文件（含本 README）。上述摘要与
 `b1-acceptance-bff27e11.json` 内 `evidence` 清单一致；复制后再次逐字节比较通过。
+
+两份 `.txt.gz` 与 `repair3-red/` 使用同一归档约定（2026-10-03 追加）：`build-runtime-…escalated.txt` 与
+`runtime-tests-…txt` 的原字节以 `\n\n` 结尾（复审机日志的原始空行），跟踪明文会触发 `git diff --check`
+的 "new blank line at EOF"；因此改为**确定性 gzip**（`gzip.compress(raw, compresslevel=9, mtime=0)`，
+头部无原始文件名、`MTIME=0`，`.gz` 字节只是原字节的纯函数），跟踪明文删除。复制时逐字节与
+`/tmp/omp-t20-c-root-handoff-20261003/` 原件相等，`gzip.decompress` 后逐字节等于原件；解码摘要见上表。

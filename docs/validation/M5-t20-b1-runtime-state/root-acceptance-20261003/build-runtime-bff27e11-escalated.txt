@@ -1,4 +1,0 @@
-
-> @pi-desktop/omp-runtime@0.15.2 build /Users/vv/Documents/对话/omp-desktop-review-m5-r4b/app/packages/omp-runtime
-> tsc -p tsconfig.json
-
