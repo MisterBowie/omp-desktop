@@ -4,7 +4,7 @@
 本阶段只实现执行时权限与模式传播（矩阵 C1-C8），不注册 `SubmitPlan`/`SubmitGoal`、不接通审批/派发（B4-B9/B2 仍开放）、不改 Pi-only 审批派发、不发布包、不合并 main。
 
 - 分支 `codex/m5-t20-c-execution-policy`；基线 `bff27e11363d3a60b59265ff91d2fb3d814b574a`（B1 独立验收提交；根复审证据已归档在 `M5-t20-b1-runtime-state/root-acceptance-20261003/`）。
-- 归档整理提交 `95023d5`（RED 日志确定性 gzip；详见 B1 记录 §12）与 `02bf603`（根复审验收证据归档）；**实现提交 `a7d0291bf500918e754b6a7e9870e3b8961d4e71`**（追加提交，不 amend/rebase/强推）。
+- 归档整理提交 `95023d5`（RED 日志确定性 gzip；详见 B1 记录 §12）与 `02bf603`（根复审验收证据归档）；**实现提交 `a7d0291bf500918e754b6a7e9870e3b8961d4e71`（代码/测试/脚本），文档与证据提交 `6d15d32`**（追加提交，不 amend/rebase/强推）。
 - 环境：Linux x64；Node v24.14.0（nvm 24.14.0 bin）；Bun 1.4.2；固定子模块 OMP `62bc57be1b03ef0802a33cf7f5f530e534527531`（omp/18.3.0，patch `.3`）、PI `0111e306c120ad5820688d7608cb37bad8fbcc1f`。
 - 全部运行使用**本地 FakeProvider / 固定已补丁 OMP 运行时 / 生产 wiring**，未调用任何付费或远程模型；未重跑 Rust host-core 606、未做 283 MB 打包（本阶段未改 Rust、patch 构件、pins/manifest）。
 
