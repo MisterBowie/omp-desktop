@@ -16,10 +16,13 @@
 
   原始 stdout：`r1-green.txt` / `r2-green.txt` / `r3-green.txt`。
 
-- 同一 commit 的定向验证原始日志：
+- 定向验证原始日志（`desktop-affected.txt`/`omp-runtime-vitest.txt`/`build-js.txt`/
+  `typecheck.txt`/`lint.txt`/`diff-check.txt` 在实现 commit `d07d4f95` 的内容上运行；
+  `plan-submit-e2e.txt` 在最终提交 `71e4f89f` 上重跑——两者之间只有测试夹具的
+  回收修复与证据/文档提交，产品代码为同一实现 commit）：
   - `plan-submit-e2e.txt`：产品 E2E **7 passed / 0 failed，exit 0**（含
     Stop-during-begin、terminal-before-response、dispatch-hold+begin-refused
-    三个新回归）。
+    三个新回归；`test.after` 逐项 await 回收后 scratch 目录零残留）。
   - `desktop-affected.txt`：受影响 desktop 套件（24 文件）**252 passed /
     0 failed，exit 0**。
   - `omp-runtime-vitest.txt`：**31 files / 476 passed / 6 skipped，exit 0**。
