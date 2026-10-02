@@ -1,0 +1,13 @@
+✔ a plugin tool executes under the admitted turn's real mode and per-action guard (25.837024ms)
+✔ user MCP tools are refused outside Agent mode before any remote call (0.245928ms)
+✔ M5/T20-B1 end-to-end: production mode/policy state and contract catalog on the patched runtime (16091.0894ms)
+✔ M5/T20-B1 third repair: a stop during turn-fence preparation never submits the canceled prompt (8802.080817ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16590.372875
+EXIT=0

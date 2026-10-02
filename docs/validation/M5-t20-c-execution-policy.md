@@ -1,6 +1,6 @@
 # M5/T20-C：执行时权限决策与插件真实模式 —— 验证记录
 
-更新时间：2026-10-03。状态：**T20-C 实现完成（独立复审 R1/R2 返修后）、待根复审；T20 未完成、Plan/Goal 未实现、`plan`/`goal` 能力保持关闭。**
+更新时间：2026-10-03。状态：**T20-C 实现完成（独立复审 R1/R2 返修 + 第二次复审 R3/R4 返修后）、待根复审；T20 未完成、Plan/Goal 未实现、`plan`/`goal` 能力保持关闭。**
 本阶段只实现执行时权限与模式传播（矩阵 C1-C8），不注册 `SubmitPlan`/`SubmitGoal`、不接通审批/派发（B4-B9/B2 仍开放）、不改 Pi-only 审批派发、不发布包、不合并 main。
 
 - 分支 `codex/m5-t20-c-execution-policy`；基线 `bff27e11363d3a60b59265ff91d2fb3d814b574a`（B1 独立验收提交；根复审证据已归档在 `M5-t20-b1-runtime-state/root-acceptance-20261003/`）。
@@ -57,6 +57,62 @@
 
 
 
+## 0.2 第二次复审返修（2026-10-03，R3 委托准入归属 / R4 证据清单）
+
+根复审在 `4d532524` 上判 **changes-required**，只剩两条（R1/R2 已 5/5、2/2 复核通过）：R3 委托准入
+归属未完成、R4 证据清单自哈希不一致。原始报告与复现脚本在
+`/tmp/omp-t20-c-second-root-review-20261003/`（根机；本工作区未运行其 macOS 脚本；其要点已摘录在
+本节，不假装是本工作区产物）。
+
+**R3（登记层反例，非原生调度漏洞复现）**：根脚本 `registered-delegate-generation-review.mjs` 驱动真实
+gate 的已注册回调、真实状态序列化与真实 fence/准入编解码，构造一个稳定子上下文（`hasUI=false`、自有
+native 身份），在父代 A（Agent/ask）下启动它，记录 3/4：①A/ask 下子写入被 no-UI block（有效对照）；
+②A 终止后迟到写入被拒（有效对照）；③**同一个旧子写入在父代 B（Agent/auto）被准入后被放行**（不通过）；
+④B 下新子被放行（阳性对照）。此前 `production-delegate-turn-fc0fb298.json` 想扣住真实子代理的 provider
+响应再推进父代，父回合保持非 idle，未走到代 B——该夹具**不确定**，既不是漏洞复现也不是通用隔离证明。
+
+返修（`extensions/omp-desktop-gate.ts` `bindDelegate`；只用公开接口：生命周期事件、命令上下文
+`createCommandContext().sessionManager`、公开 `ReadonlySessionManager` 的 `getSessionId`/
+`getSessionFile`/`getHeader`）：
+
+1. **委托在自身启动时绑定到那份准入**：`session_start` / `before_agent_start` / `agent_start` 中任一
+   首次到达且当时存在"存活且已武装"的准入记录时，把该**记录本体**（不是 token 查询）写入以子会话 id
+   为键的绑定；首次绑定生效，绝不重新指向。记录被替换（下一次 fence）或退役（终止 `agent_end`、
+   启动拒绝）后，绑定过的子会话一律 `policy-unavailable`，不再借用新回合。
+2. **归属文件在 fence 时捕获**：准入记录保存所属会话在命令上下文里公开的会话文件
+   （`getSessionFile()`）与武装时刻。委托声明的父链（自身 header 的 `parentSession`，沿 gate 记录的
+   中间委托父链上溯，链上界 32 跳）在双方都暴露文件身份时必须抵达该文件；解析到别的会话一律拒绝。
+3. **延迟启动绝不"顺手"归入新回合**：子会话 header 显示其创建早于当前准入被武装时（延迟启动、
+   parked/revived worker、复用旧会话文件），该会话被永久记为拒绝，既不被绑定到更新的回合，也不因后续
+   更宽松的准入复活。该判定只在接口暴露可解析 header 时生效；无 header 的夹具上下文按生命周期规则绑定。
+4. **退役是粘性的**：终止 `agent_end`、启动拒绝与下一次 fence 都会退役受影响的绑定并把这些会话记入
+   永久拒绝集；仅在其准入退役后才被观察到的委托没有可依据的记录，fail closed。
+5. **合法子代理不受损**：在当前回合内启动的子代理照旧被绑定并按其准入裁决（ask+无 UI 在审批处
+   fail closed；auto/Low/grant 放行；Plan/Goal 硬拒绝与目录夹取不变）。生产 E2E 追加断言真实子会话的
+   持久 header：两个真实子会话都声明 `parentSession` = 所属会话文件，且本回合的子会话创建时间晚于父代
+   本回合首次 provider 请求（该请求在 fence 之后），即新鲜度判定确实接受真实子代理。
+6. **不再声称摘要本身是密码学认证**：fence 回执的 SHA-256 是同一受信运行时进程内 runner 与 gate 之间的
+   **应用自有一致性校验**（证明 gate 安装的正是 runner 发出的那份参数），不是对桌面端的认证/签名；
+   ADR 0309 §7.1、spec 中英同步更正。
+
+**R3 证据分层（如实）**：代数规则（旧子在 A 下被拒、A 终止后被拒、B 下仍被拒；B 下新子放行）由
+`packages/omp-runtime/src/session/gate-delegate-ownership.test.ts` 经**真实注册回调 + 真实状态序列化 +
+真实准入编解码**（与根复审同一控制层）固定；打包产物侧由 `omp-sidecar.test.mjs` 新增的真实 Bun 打包
+gate 子进程探针固定（同一子会话在 ask→自动准入序列下三次均 block，理由分别为 no-UI 与 policy-unavailable）。
+跨代**原生调度**仍未证明：扣住真实子响应推进父代的做法不可达（固定运行时把未抑制的运行中子代理保持为
+`willContinue`，`agent-session.ts` `#hasPendingAsyncWake`/settle），该事实只解释那一个夹具，**不推广**
+为所有延迟回调、resumed/parked worker 或生命周期边界——本阶段不做原生跨代 E2E 声称。已知保守边界：
+合法 revived/parked worker 的会话文件保留原始创建时间，公开接口无法把它与"延迟启动"区分，因此其受控
+调用 fail closed（ADR 0309 §7.2 记录了恢复它所需的形式化信号设计）。
+
+**R4（证据清单）**：根 `archive-check-4d532524.json` 校验父清单全部 28 条：27 匹配、1 不匹配——
+`root-review-20261003/SHA256SUMS.txt` 把自身哈希写进列表（自引用恒不匹配），父清单又内嵌同一段。
+返修见 §6：子清单不再包含自身，父清单改为**单一 sha256sum 兼容列表**（相对路径含子目录前缀），
+两个清单的基准目录在文档与 README 中写明；逐条以记录基准验证"文件受 Git 跟踪 + 摘要匹配"。根原始
+RED/GREEN 报告与日志字节保持原样（未规范化空白）。
+
+
+
 ## 1. 实现
 
 ### 1.1 单一策略快照 → 一张决策表
@@ -109,9 +165,9 @@
   `{name, description, risk, schema}`，丢掉了 `planSafeActions`——host 侧注册表与 guard 读的是该字段，导致
   子进程声明的 plan-safe 列表永远到不了 guard、合约模式下插件工具永远不可用。现按声明转发
   （`planSafeActions !== undefined` 时带上）；该文件与固定 PI 上游逐字节相同，属 fork 修复，已在 ADR 0309 记录。
-- 委托（`hasUI=false`）在**所属回合的被准入记录**下裁决（复审返修前是"进程级最近一次文件读取"）；记录缺失、
-  已退役（stop/终止回合/拒绝）或属于他会话时一律 `policy-unavailable`，绝不借用更早回合或他会话的策略；
-  不弹卡、不注入、不提权。
+- 委托（`hasUI=false`）在**其自身启动时绑定到的那份被准入记录**下裁决（见 §0.2）；绑定缺失、记录已退役
+  或被替换、父链不指向所属会话文件、header 显示创建早于本准入时一律 `policy-unavailable`，绝不借用更早、
+  更新或他会话的策略；不弹卡、不注入、不提权。
 
 ### 1.5 与 B1 的兼容性变更（有意为之，均已记录）
 
@@ -129,7 +185,7 @@
 | C1 | 合约硬拒绝：Write/Edit/apply_patch/未知/`mcp_*`/无声明插件在**所有** permissionMode 与 legacy `allow` 下 block；合约许可集合正确 | gate 单元 `gate-permissions.test.ts`（plan/goal × ask/accept-edits/auto × 9 工具 + allow/grants/外部路径组合；拒绝码逐类）；编译产物探针 `omp-sidecar.test.mjs`（Bun 打包的真实 gate：plan Write block、无卡）；生产 E2E 以目录层如实标注隐藏工具的 not-found（不冒充 gate 拒绝） | 全绿 |
 | C2 | Bash 无命令分类：inherit→默认、ask→卡、accept-edits→卡、auto→放行、Plan+auto 放行 | gate 单元（`ls` 与 `rm -rf /` 决策逐项相同）；生产 E2E（Agent+ask 批准后真实写文件；Plan+auto 真实写文件；Plan+ask 拒绝后零副作用） | 全绿 |
 | C3 | 插件：无声明合约拒绝；有声明逐 action 允许/拒绝；`ctx.mode` = 真实模式 | 真实 `PluginRuntime` 子进程测试 `omp-plugin-plan-safe.test.mjs`（agent→`"mode":"agent"`；plan+`inspect` 允许、`write` 拒绝、无声明拒绝；goal 拒绝；未知回合拒绝；MCP plan 拒绝且 `callTool` 零调用）；生产 E2E（plan+auto 下 `plugin_demo_inspect` 实际执行并记录 `ctx.mode="plan"`） | 全绿 |
-| C4 | 子代理 `hasUI=false`：合约模式 fail closed、Agent 语义不提高权限 | gate 单元（委托快照 + plan/goal 硬拒绝 + no-UI fail closed）；注册层测试（委托缓存/年龄界/无缓存 block）；生产 E2E（agent+ask 子代理 write → 无 UI block、文件不存在；agent+auto 子代理 write → 恰好一次） | 全绿 |
+| C4 | 子代理 `hasUI=false`：合约模式 fail closed、Agent 语义不提高权限、且只依据其启动时绑定的那份准入（不借用更早/更新/他会话准入） | gate 单元（委托快照 + plan/goal 硬拒绝 + no-UI fail closed）；**代际归属回归** `gate-delegate-ownership.test.ts`（A 下绑定→A 中拒绝→A 终止拒绝→B 下仍拒绝、B 下新子放行；session_start 单独即可绑定、不复指向、过期 header 永久拒绝、父链检查/嵌套链、无观察者 fail closed、legacy 夹具缓存不变）；编译产物探针（同一子会话 ask→auto 三次均 block）；生产 E2E（agent+ask 子代理 write → 无 UI block、文件不存在；agent+auto 子代理 write → 恰好一次；真实子会话 header `parentSession`=所属会话文件、创建时间在父代首次 provider 请求之后） | 全绿 |
 | C5 | browser/computer/eval：Agent+auto 放行、ask/accept-edits 弹卡、Plan/Goal 硬拒绝 | gate 单元（三种模式 × 三种 permissionMode × 三个名字；卡 risk=medium）；默认 gated 名单断言 | 全绿 |
 | C6 | 四条有效权限模式：inherit 桌面侧解析、gate 只读结果；ask/accept-edits/auto 行为 | B1 生产 E2E（`inherit`→默认 `accept-edits`→`auto` 的逐轮解析与描述符消费，本阶段更新为 ask 弹卡断言语义）；gate 单元（快照 verbatim 消费）；wiring 单元沿用 | 全绿（B1 E2E 1 passed） |
 | C7 | 风险保真：plugin 声明/缺失→medium、未知→medium、`mcp_*=low`（仅非合约）、BrowserPreview=medium 且合约许可 | gate 单元（`nativeRiskForTool` 逐名、策略表优先、mcp 在 plan 下即使 `auto`/`allow` 也硬拒绝、BrowserPreview 合约 ask 弹卡/auto 放行）；生产 E2E（plugin 声明 medium 卡、MCP Low 零卡执行） | 全绿 |
@@ -144,7 +200,10 @@
 3. Agent+ask：`bash printf … > marker` → 卡（risk=high）→ 批准 → 文件恰好写入一次；描述符实测
    `{mode:"agent", permissionMode:"ask"}`；4. Agent+ask：项目外 `read` → 卡（reason=external path）→ 拒绝 →
    后续请求无外部内容；5. default 改 `auto`（`inherit` 解析）→ 同一外部读**零卡**且内容回到模型；
-6/7. 子代理（`hasUI=false`）：ask 下 write 被 no-UI block（模型收到理由、文件不存在）；auto 下同 write 恰好一次；
+6/7. 子代理（`hasUI=false`，第二次返修后先经自身生命周期绑定到当前准入）：ask 下 write 被 no-UI block
+   （模型收到理由、文件不存在）；auto 下同 write 恰好一次；场景 7 另断言真实子会话的持久 header——
+   两个真实子会话都声明 `parentSession` = 所属会话文件，本回合子会话的创建时间晚于父代本回合首次
+   provider 请求（该请求在 fence 之后），即归属链与新鲜度判定在真实运行时确有其据；
 8. Plan+auto：隐藏的 `write` 尝试 → 目录层 `Tool write not found`、零副作用、**不声称 gate 拒绝**；
    `bash` 无卡执行；`plugin_demo_inspect` 无卡执行且 `ctx.mode="plan"`；隐藏 MCP 尝试同样目录层；
 9. Plan+ask：`bash` 弹卡 → 拒绝 → 零副作用；
@@ -163,20 +222,20 @@
 `omp-desktop-gate.js`，子进程驱动 handler；plan Write block、plan Bash 卡字段、agent MCP 零卡、
 缺状态 policy-unavailable）证明。
 
-## 4. 验证命令与计数（复审返修后重跑；Linux x64 / Node v24.14.0 / Bun 1.4.2）
+## 4. 验证命令与计数（第二次返修后重跑；Linux x64 / Node v24.14.0 / Bun 1.4.2）
 
 | 命令 | 结果 | exit | 原始日志 |
 | --- | --- | --- | --- |
-| `pnpm -C packages/omp-runtime test` | **30 files / 460 passed / 6 skipped**（+23：turn-admission 5、gate-admission 12、gate-review-matrix 2、runner 回执 1、ui-requests/其它更新） | 0 | `omp-runtime-vitest-repair.txt` |
-| `node --test test/*.test.mjs`（`apps/desktop` 全量，`env -u SSH_ASKPASS`） | **2984 tests / 2973 pass / 0 fail / 11 skipped**（+1：bridge grant 记账/清除） | 0 | `desktop-suite-repair.txt` |
-| `node --test test/omp-execution-policy-e2e.test.mjs`（场景 10/11/12 新增：grant 生命周期、回合内 mutation、canonical native write 模式） | **1 passed**（12.1s） | 0 | `c-execution-policy-e2e-repair.txt` |
-| `node --test test/omp-runtime-state-e2e.test.mjs test/omp-session-turn-fence-e2e.test.mjs test/omp-plugin-plan-safe.test.mjs`（B1 生产回归、fence-Stop 反例、真实 PluginRuntime 子进程） | **4 passed** | 0 | `b1-fence-plugin-repair.txt` |
-| T17-T19 定向回归（subagent e2e/bridge/read、tool-results(+render)、skill-path e2e/bridge/adapter、capability-source e2e/boundary、sidecar 编译产物探针、patch） | **122 passed / 0 failed** | 0 | `t17-t19-regression-repair.txt` |
-| `pnpm build:js` / `pnpm typecheck` / `pnpm lint` | 全绿 | 0 / 0 / 0 | `build-typecheck-lint-repair.txt` |
-| matrix ids / gap 探针 / omp-patch / release-docs / agent-policy / locales / check-docs | `MATRIX-ID-OK` / `GAP-RETIRED g1`+`g2`+`g3 open`（**exit 1 预期**）/ `OMP-PATCH-OK 62bc57b+omp-desktop.3` / 0.15.2 / 通过 / **79 对** / **6 项预存在**（509 页，exit 1 预存在） | 0 / **1（预期）** / 0 / 0 / 0 / 0 / **1（预存在）** | `checks-repair.txt` |
-| `git diff --check <C 基线>..<返修 HEAD>`（完整提交区间，非仅工作区） | 干净（见 §6 尾部提交坐标） | 0 | `checks-repair.txt` |
+| `pnpm -C packages/omp-runtime test` | **31 files / 469 passed / 6 skipped**（第二次返修 +1 file/+9：`gate-delegate-ownership.test.ts` 7 例、gate-admission +1、gate-permissions 代际改写 +1） | 0 | `omp-runtime-vitest-repair2.txt` |
+| `node --test test/*.test.mjs`（`apps/desktop` 全量，`env -u SSH_ASKPASS`） | **2984 tests / 2973 pass / 0 fail / 11 skipped** | 0 | `desktop-suite-repair2.txt` |
+| `node --test test/omp-execution-policy-e2e.test.mjs`（第二次返修新增真实子会话 header 归属/新鲜度断言） | **1 passed**（12.1s） | 0 | `c-execution-policy-e2e-repair2.txt` |
+| `node --test test/omp-runtime-state-e2e.test.mjs test/omp-session-turn-fence-e2e.test.mjs test/omp-plugin-plan-safe.test.mjs`（B1 生产回归、fence-Stop 反例、真实 PluginRuntime 子进程） | **4 passed** | 0 | `b1-fence-plugin-repair2.txt` |
+| `node --test test/omp-sidecar.test.mjs`（真实 Bun 打包产物；新增同一子会话的代际归属探针） | **10 passed / 0 fail** | 0 | `compiled-gate-repair2.txt` |
+| `pnpm build:js` / `pnpm typecheck` / `pnpm lint` | 全绿 | 0 / 0 / 0 | `build-typecheck-lint-repair2.txt` |
+| 证据清单自校验（§6） | 父清单 28 条与子清单 10 条全部匹配且全部受 Git 跟踪（自引用已移除） | 0 | `manifest-verify-repair2.txt` |
 
-历史（返修前，`fc0fb298` 上的接受基线，保留不改）：omp-runtime 27 files / 437 passed / 6 skipped；desktop 2983 / 2972 / 0 / 11；C E2E 1 passed；B1 E2E 1 passed；plugin-plan-safe 2 passed；编译产物 gate 探针 10 passed；T17-T19 定向 70 passed —— 见同名 `*-c.txt`/`*-repair` 之外的文件。
+历史（R1/R2 返修后，`4d532524`，保留不改）：omp-runtime 30 files / 460 passed / 6 skipped；desktop 2984 / 2973 / 0 / 11；C E2E 1 passed；B1+plugin 4 passed；T17-T19 定向 122 passed；build/typecheck/lint 全绿 —— 见 `*-repair.txt`。
+更早（首稿 `fc0fb298`）：omp-runtime 27 files / 437 passed；desktop 2983 / 2972 / 0 / 11；C E2E 1 passed；编译产物 gate 探针 10 passed —— 见 `*-c.txt`。
 
 未跑：Rust host-core（本轮未改 Rust/构件/pins）、283 MB sidecar 打包（本阶段不发布）、macOS/Windows 实机（根复审的 macOS 原始报告已归档但不由本工作区重跑）。
 
@@ -187,25 +246,42 @@
 - R3（Cursor exec channel 的批次零副作用）仍是既有范围外硬阻塞事实；本阶段不触碰。
 - 未验证真实 OMP 在 stdout 上重放帧；未验证 macOS/Windows；未调用真实模型。
 - 隐藏工具的 gate 层硬拒绝只在单元与编译产物层证明；生产层是目录夹取（如实标注，不冒充）。
-- 委托快照是"所属回合的被准入记录"（进程级、随 `agent_start` 武装、终止 `agent_end`/stop/拒绝退役）；
-  子代理在父回合结束后的迟到调用没有记录可用，会 fail closed（比 B1 的文件通道更严）。仍不声称能区分
-  "detached 子代理的调用属于哪一代"：若父回合之后又有新提示词被准入，子代理调用会按该**新准入**裁决
-  （同一桌面会话、用户显式准入的策略），本阶段将此如实记为边界。
+- **委托归属**：委托只在其自身启动时绑定到的那份准入下裁决（进程级记录、随 fence 安装、`agent_start`
+  武装、终止 `agent_end`/stop/拒绝退役）；未观察到启动、绑定已被退役/替换、父链不达所属会话文件、
+  或 header 显示创建早于本准入的委托一律 fail closed。**不声称**能区分合法 revived/parked worker 与
+  延迟启动——公开接口对两者给出相同的旧 header，因此两者在受控调用上一律拒绝（恢复它需要的形式化
+  生成信号见 ADR 0309 §7.2）。**不声称**原生跨代调度不可达：根复审早先扣住真实子响应的夹具因父回合
+  保持非 idle 而未走到代 B，那只是该夹具的事实（固定运行时把未抑制的运行中子代理保持为
+  `willContinue`），不作为所有延迟回调/parked worker/生命周期边界的证明；本阶段不做原生跨代 E2E 声称。
+- fence 回执的 SHA-256 是同一受信运行时进程内 runner 与 gate 之间的应用自有一致性校验，**不是**对桌面端
+  的密码学认证，也不如此声称（ADR 0309 §7.1、spec 中英同步）。
 - fence 安装准入后、`agent_start` 之前被 Stop/拒绝的窄窗口内记录保持未被武装，任何调用 fail closed；
   但"命令已送达而回执丢失"这种异常下 gate 会短暂持有一份不会被使用的准入，下一次握手整体替换它。
 
 ## 6. 证据文件
 
-`docs/validation/M5-t20-c-execution-policy/` 下：返修前证据 `*-c.txt`（保持原样）与返修后证据
-`omp-runtime-vitest-repair.txt`、`desktop-suite-repair.txt`、`c-execution-policy-e2e-repair.txt`、
-`b1-fence-plugin-repair.txt`、`t17-t19-regression-repair.txt`、`build-typecheck-lint-repair.txt`、
-`checks-repair.txt`；`root-review-20261003/` 逐字节保存根复审提交的 R1/R2 原始报告、脚本与总结（其自身
-`SHA256SUMS.txt` 与 README 说明来源），本工作区未在 macOS 上运行它们。所有本工作区日志为对应命令原始
-stdout/stderr 直接落盘（无尾部空白，未编辑字节）并追加 `EXIT=`；`SHA256SUMS.txt` 覆盖本目录全部证据
-文件并附根复审子目录清单。
+`docs/validation/M5-t20-c-execution-policy/` 下：首稿证据 `*-c.txt`、R1/R2 返修证据 `*-repair.txt`、
+第二次返修证据 `*-repair2.txt`（`omp-runtime-vitest-repair2.txt`、`desktop-suite-repair2.txt`、
+`c-execution-policy-e2e-repair2.txt`、`b1-fence-plugin-repair2.txt`、`compiled-gate-repair2.txt`、
+`build-typecheck-lint-repair2.txt`、`checks-repair2.txt`、`manifest-verify-repair2.txt`）；
+`root-review-20261003/` 逐字节保存根复审提交的 R1/R2 原始报告、脚本与总结（本工作区未在 macOS 上运行它们）。
+所有本工作区日志为对应命令原始 stdout/stderr 直接落盘（未编辑字节）并追加 `EXIT=`。
 
-### 6.1 提交坐标（返修）
+**清单基准（R4 返修）**：
 
-- 返修代码/测试提交 `34d2ffa`（父提交 `fc0fb29`，8 位缩写；完整 SHA 见 `git log`），文档/证据提交 `6d26530`；
-  随后一个仅证据/坐标的提交记录完整区间 `git diff --check bff27e1..HEAD` 的结果（`EXIT=0`），本工作区未
-  amend/rebase/强推。远端分支 `codex/m5-t20-c-execution-policy`。
+- 子清单 `root-review-20261003/SHA256SUMS.txt` 以**该子目录**为基准（`cd` 进去即可
+  `sha256sum -c SHA256SUMS.txt`），只列本目录中除自身以外的 11 个文件——自引用条目已移除，根复审先前
+  观察到的"自身哈希不匹配"即由此消失。
+- 父清单 `SHA256SUMS.txt` 是**单一 sha256sum 兼容列表**（无 `---` 分节、无内嵌同名段），以
+  **本证据目录**为基准，用显式相对路径（含 `root-review-20261003/…` 前缀）收录 35 个文件：本目录
+  全部文件（除父清单自身与 `manifest-verify-repair2.txt` 这份校验日志——清单无法收录自身哈希）以及
+  子目录全部 12 个文件（含子清单自身，其摘要稳定是因为子清单不再自引用）。
+- 逐条独立校验（原始输出见 `manifest-verify-repair2.txt`）：两个基准下 `sha256sum -c` 全部 OK；
+  所列文件全部受 Git 跟踪（按各自基准目录解析路径）；父清单条目集合与磁盘文件集合**逐一相等**；
+  根复审原始报告/脚本与其归档提交 `6d26530` 的 Git blob 逐位相同（未规范化空白）。
+
+### 6.1 提交坐标（第二次返修）
+
+- 代码/测试提交与文档/证据提交见本节末尾的坐标行（本工作区只追加，不 amend/rebase/强推）；远端分支
+  `codex/m5-t20-c-execution-policy`。完整区间 `git diff --check bff27e1..HEAD` 结果记录在
+  `checks-repair2.txt` 与后续坐标提交中。

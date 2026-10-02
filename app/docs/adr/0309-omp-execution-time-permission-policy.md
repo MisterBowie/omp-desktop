@@ -123,11 +123,11 @@ never reach the guard.
   interactive session blocks every call (`policy-unavailable`) — a mutable
   state failure during execution can never turn a contract refusal into an
   approval, and "cannot read the policy" is never silently Agent.
-- A delegate (`hasUI=false`, real subagents) uses the owning session's last
-  validated snapshot while it is within the existing state age bound (PI
-  decides subagent calls under the parent's durable policy); with no fresh
-  snapshot it blocks. Delegates never get a card, and `auto` allows them just
-  as it allows the parent — no mode/skill/memory injection or elevation.
+- A delegate (`hasUI=false`, a real subagent) is bound to the exact admission
+  it started under and decides only while that record is still the live,
+  started admission (§7). Delegates never get a card, and `auto` allows a
+  *bound* delegate just as it allows the parent — no mode/skill/memory
+  injection or elevation.
 - The approval descriptor carries `risk`, `mode`, `permissionMode` and the
   decision reason from the same policy object; the dialog and the enforced
   decision cannot disagree.
@@ -195,15 +195,18 @@ introduces one **turn admission**: the desktop-owned `{mode, permissionMode,
 hostTools, grants}` snapshot, encoded (`turn-admission.ts`) and installed with
 the turn token through the existing fence handshake; the acknowledgment echoes
 its digest, so the runner only submits the prompt after the gate holds exactly
-that policy.
+that policy. The digest is an app-owned consistency check between the runner
+and the gate inside the one trusted runtime process; it is not, and is not
+claimed to be, cryptographic authentication of the desktop (see §7).
 
 - **One owner.** Every call of the turn — the owning session's own calls and
-  its delegates (`hasUI=false`, PI's subagent-under-parent-policy semantics) —
-  decides from the admitted record. The mutable state file is never re-read
-  for policy on the product path; a file rewritten mid-turn cannot relax the
-  mode, nor swap the risk/plan-safe table. A record whose turn never started,
-  a foreign interactive session, and (with the mandatory channel on) a process
-  with no record all fail closed.
+  its delegates (`hasUI=false`, PI's subagent-under-parent-policy semantics,
+  bound per §7) — decides from the admitted record. The mutable state file is
+  never re-read for policy on the product path; a file rewritten mid-turn
+  cannot relax the mode, nor swap the risk/plan-safe table. A record whose
+  turn never started, a foreign interactive session, an unbound or retired
+  delegate, and (with the mandatory channel on) a process with no record all
+  fail closed.
 - **Ownership window.** `agent_start` arms the record, a terminal `agent_end`
   retires it (a scheduled continuation keeps it), and a start refusal clears
   it, so a late callback cannot borrow a stopped/refused/finished turn's
@@ -235,3 +238,95 @@ that policy.
   aliases are realpath-resolved afterwards, and the review's canonical-path
   variants pass unchanged. No symlink/relative-escape containment was
   weakened.
+
+## 7. Second review repair (2026-10-03): delegate admission ownership
+
+The §6.2 record still decided a delegate by *"any `hasUI=false` context uses
+the process's current admission"*. The reviewing root drove the gate's real
+registered callbacks, state serializer and fence/admission codec and showed the
+consequence: a child that started under parent turn A (ask) was correctly
+blocked under A and after A's terminal end, but the **same old child was then
+allowed** once a newer parent turn B (auto) installed its admission — the old
+child inherited a policy it never started under. No provider or tool body ran
+in that probe; it is a registered-handler counterexample, not a reproduced
+native scheduling exploit. The requirement was already explicit and is now
+enforced: a delegated context cannot borrow an earlier, newer or foreign
+admission.
+
+The repair (`extensions/omp-desktop-gate.ts`, `bindDelegate`) makes ownership
+explicit and fail-closed. All of it reads public interfaces only — the
+extension lifecycle events (`session_start`, `before_agent_start`,
+`agent_start`, `agent_end`), the command context
+(`createCommandContext().sessionManager`) and the public
+`ReadonlySessionManager` members `getSessionId` / `getSessionFile` /
+`getHeader`; no private runtime field is touched and no runtime code is
+patched for it:
+
+- **Binding at the delegate's own start.** A no-UI session is bound, once, to
+  the admission record that is live and started when its own first lifecycle
+  event arrives. The binding stores the record itself, not a token: a later
+  fence replaces the live admission, and the delegate then fails closed
+  instead of deciding under the new one. The first binding wins; the session
+  is never re-pointed.
+- **The owning file is captured at the fence.** The admission records the
+  owning session's file (`getSessionFile()` of the command context) and the
+  wall clock it was armed. A delegate's declared parentage — its header's
+  `parentSession`, walked up through the parent links the gate recorded for
+  intermediate delegates — must reach that file when both sides expose file
+  identity; a chain that resolves to a different session is refused.
+- **Delayed starts are never adopted.** A delegate session whose public
+  header shows it was created before the live admission was armed (a delayed
+  start, a parked/revived worker, a pre-existing session file) is recorded as
+  refused for the process's lifetime: it is neither bound to the newer turn
+  nor revived by a later, more permissive admission. The check only applies
+  where the surface exposes a parseable header; a fixture context without one
+  is bound by its lifecycle events alone.
+- **Retirement is sticky.** A terminal `agent_end`, a start refusal and the
+  next fence all retire the bindings that referenced the retired record, and
+  those sessions stay refused. A delegate observed only after its admission
+  was retired has no record to decide under and fails closed
+  (`policy-unavailable`).
+- **Legitimate children keep working.** A child that starts inside the live
+  turn is bound and decided exactly as before: ask + no UI fails closed at the
+  approval, `auto`/Low/grant calls pass, Plan/Goal hard denials and the
+  catalog clamp are unchanged. The production E2E asserts the real child's
+  persisted header: both real children declare `parentSession` = the owning
+  session's file, and the child of the current turn was created after the
+  parent's first provider request (which itself follows the fence), i.e. the
+  freshness guard accepts genuine children.
+- **Evidence layers.** The generation rule (old child refused after A, after
+  A's terminal end and under B; fresh child under B allowed) is pinned by
+  `session/gate-delegate-ownership.test.ts` through the real registered
+  handlers, state serializer and admission codec — the same controlled layer
+  the reviewer used — and, for the shipped artifact, by the Bun-bundled gate
+  probe in `omp-sidecar.test.mjs`. Cross-generation *native* scheduling
+  remains undemonstrated: an earlier probe that tried to hold a real child's
+  provider response while advancing the parent never reached generation B
+  because the pinned runtime keeps an unsuppressed running child's turn alive
+  (`agent-session.ts` `#hasPendingAsyncWake`/settle) — that fixture alone
+  proves nothing about parked, revived or otherwise delayed callbacks, so no
+  native cross-generation claim is made.
+
+### 7.1 The digest is a consistency check, not authentication
+
+The fence acknowledgment's SHA-256 proves that the gate installed the exact
+argument the runner sent; both ends are the app's own code inside one trusted
+runtime process. It is a deterministic consistency check between two app-owned
+components — not a signature, not an attestation that the desktop is the
+writer, and it does not authenticate across a process/user boundary.
+
+### 7.2 Known limitation and the design it would need
+
+The public surface cannot distinguish a *legitimately revived* worker session
+(a parked child re-opened under the current turn, whose session file keeps its
+original creation time) from a *delayed start* of an earlier generation: both
+present an old header at their first observation. The repair resolves that
+ambiguity conservatively — both fail closed for gated calls. Restoring revival
+would need a formal spawn-correlation signal the pinned surface does not
+provide today: `before_subagent_spawn` fires only for `task`/`eval`
+`runStructuredSubagent` dispatches (not for the `eval` agent bridge, not for
+lifecycle revivals) and carries no child identity; a future repair should bind
+a child to a current-turn spawn intent emitted by every spawn path, or have
+the runtime expose the parent session/agent identity on the child's context.
+Until then, refusing is the honest fail-closed answer, and this ADR records it
+rather than claiming universal delegate support.

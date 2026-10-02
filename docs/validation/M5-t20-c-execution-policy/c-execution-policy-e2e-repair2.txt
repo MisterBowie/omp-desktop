@@ -1,0 +1,10 @@
+✔ M5/T20-C end-to-end: PI execution-time permissions on the patched runtime (12365.121136ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12796.981597
+EXIT=0

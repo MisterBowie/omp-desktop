@@ -1871,12 +1871,18 @@ session's grant lifetime, ADR 0309 §6):
   grants, encoded by `session/turn-admission.ts` — through the existing
   `/omp-desktop-turn` handshake; the gate installs it only for that token and
   acknowledges with the SHA-256 of the exact argument, so the user prompt is
-  submitted only once the gate provably holds that policy. Every call of the
-  turn — the owning session's own calls and its delegates (`hasUI=false`,
-  PI's subagent-under-parent-policy semantics) — decides from that immutable
-  record; the mutable run-scoped file is the *content* channel (mode block,
-  skills, memory, mandatory-presence proof) and is never re-read for policy
-  on the product path, so a tool body rewriting `permissionMode` mid-prompt
+  submitted only once the gate holds that policy. The digest is an
+  *app-owned consistency check* between the runner and the gate in the same
+  trusted runtime process — it is not cryptographic authentication of the
+  desktop and does not claim to be one: the handshake travels the runtime's
+  own local command channel, and a writer that can already issue prompts in
+  this process is outside the boundary the admission defends. Every call of
+  the turn — the owning session's own calls and its delegates (`hasUI=false`,
+  PI's subagent-under-parent-policy semantics, bound as described below) —
+  decides from that immutable record; the mutable run-scoped file is the
+  *content* channel (mode block, skills, memory, mandatory-presence proof)
+  and is never re-read for policy on the product path, so a tool body
+  rewriting `permissionMode` mid-prompt
   cannot relax the rest of the turn. `agent_start` arms the record, a
   terminal `agent_end` retires it (scheduled continuations keep it) and a
   start refusal clears it; a record whose turn never started, a foreign
@@ -1936,12 +1942,22 @@ session's grant lifetime, ADR 0309 §6):
   channel.
 - **Delegates and failure**: with the mandatory channel on, an unreadable,
   foreign or invalid state for the interactive session blocks every call
-  (`policy-unavailable`); a delegate (`hasUI=false`) decides under the owning
-  turn's admitted record (PI decides subagent calls under the parent's
-  durable policy) and is refused when that record is absent, retired or
-  foreign — no earlier turn's or another session's policy is ever lent;
-  no-UI fails closed exactly where the decision would have asked —
-  Low/`auto`/grant calls still pass without elevation.
+  (`policy-unavailable`); a delegate session (`hasUI=false`, a real subagent)
+  is decided only under the **exact admission it started under** — it is
+  *bound* at its own `session_start` / `before_agent_start` / `agent_start`
+  while that admission is live and started, and once that record is retired
+  (a terminal `agent_end`, a start refusal) or replaced by the next fence the
+  delegate is refused, never lent the newer turn's policy. A delegate that
+  was never observed under a live admission fails closed, and so does one
+  whose own session header shows it was created before the admission was
+  armed (a delayed start, a parked/revived worker) — a delayed start is never
+  casually associated with a newer turn. When the public surface exposes
+  session files, the delegate's declared parentage chain
+  (`getHeader().parentSession` up through the recorded intermediate sessions)
+  must reach the admission's owning session file; a chain that does not
+  resolve to it is refused. No-UI fails closed exactly where the decision
+  would have asked — Low/`auto`/grant calls of a *bound* delegate still pass
+  without elevation.
 - **Card coherence**: the approval descriptor carries `risk`, `mode`,
   `permissionMode` and the decision reason from the same policy object, so
   the card and the enforced decision cannot disagree.

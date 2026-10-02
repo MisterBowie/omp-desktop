@@ -1,0 +1,88 @@
+M5/T20-C second repair (R4): evidence manifest verification
+Date: 2026-10-02T18:26:11Z  Host: Linux 7.0.0-34-generic x86_64
+
+Each list is a plain sha256sum-compatible list; its base directory is stated below.
+Self-inclusion is removed: no list contains an entry for itself.
+The parent list also excludes manifest-verify-repair2.txt (this log; a manifest cannot list its own hash).
+Excluded by construction: docs/validation/M5-t20-c-execution-policy/SHA256SUMS.txt (the list itself),
+docs/validation/M5-t20-c-execution-policy/manifest-verify-repair2.txt (this log),
+docs/validation/M5-t20-c-execution-policy/root-review-20261003/SHA256SUMS.txt (listed in the parent, not in itself).
+
+## base: docs/validation/M5-t20-c-execution-policy/root-review-20261003/  (11 entries)
+README.md: OK
+first-review-summary-fc0fb298.json: OK
+gate-policy-extended-review.mjs: OK
+gate-policy-review.mjs: OK
+production-native-policy-review.mjs: OK
+production-session-grant-fc0fb298.json: OK
+production-session-grant-fc0fb298.txt: OK
+production-session-grant-review.mjs: OK
+production-turn-policy-fc0fb298.json: OK
+production-turn-policy-fc0fb298.txt: OK
+production-turn-policy-review.mjs: OK
+EXIT=0
+
+## base: docs/validation/M5-t20-c-execution-policy/  (35 entries, incl. root-review-20261003/SHA256SUMS.txt)
+b1-fence-plugin-repair.txt: OK
+b1-fence-plugin-repair2.txt: OK
+b1-runtime-state-e2e.txt: OK
+build-typecheck-lint-repair.txt: OK
+build-typecheck-lint-repair2.txt: OK
+build-typecheck-lint.txt: OK
+c-execution-policy-e2e-repair.txt: OK
+c-execution-policy-e2e-repair2.txt: OK
+c-execution-policy-e2e.txt: OK
+checks-repair.txt: OK
+checks-repair2.txt: OK
+checks.txt: OK
+compiled-gate-repair2.txt: OK
+compiled-gate-sidecar.txt: OK
+desktop-suite-c.txt: OK
+desktop-suite-repair.txt: OK
+desktop-suite-repair2.txt: OK
+omp-runtime-vitest-c.txt: OK
+omp-runtime-vitest-repair.txt: OK
+omp-runtime-vitest-repair2.txt: OK
+plugin-plan-safe.txt: OK
+t17-t19-regression-repair.txt: OK
+t17-t19-regression.txt: OK
+root-review-20261003/README.md: OK
+root-review-20261003/SHA256SUMS.txt: OK
+root-review-20261003/first-review-summary-fc0fb298.json: OK
+root-review-20261003/gate-policy-extended-review.mjs: OK
+root-review-20261003/gate-policy-review.mjs: OK
+root-review-20261003/production-native-policy-review.mjs: OK
+root-review-20261003/production-session-grant-fc0fb298.json: OK
+root-review-20261003/production-session-grant-fc0fb298.txt: OK
+root-review-20261003/production-session-grant-review.mjs: OK
+root-review-20261003/production-turn-policy-fc0fb298.json: OK
+root-review-20261003/production-turn-policy-fc0fb298.txt: OK
+root-review-20261003/production-turn-policy-review.mjs: OK
+EXIT=0
+
+## every listed file is tracked (paths resolved from each list's base directory)
+# parent list:
+EXIT=0
+# sub list:
+EXIT=0
+
+## listed entries vs files on disk (base: docs/validation/M5-t20-c-execution-policy/)
+# files covered by the parent list: 35
+# disk files excluding the two excluded lists: 35
+SET-EQUAL
+EXIT=0
+
+## the two lists carry no section markers (single plain list each)
+parent '^---' lines: 0  sub '^---' lines: 0
+
+## root raw reports are byte-identical to the commit that archived them (no normalization)
+root-review-20261003/production-session-grant-fc0fb298.json blob=cfafd4ef2a4e16b484b24e150bc5ff8d1cea18f6 now=cfafd4ef2a4e16b484b24e150bc5ff8d1cea18f6 same=yes
+root-review-20261003/production-session-grant-fc0fb298.txt blob=cfafd4ef2a4e16b484b24e150bc5ff8d1cea18f6 now=cfafd4ef2a4e16b484b24e150bc5ff8d1cea18f6 same=yes
+root-review-20261003/production-turn-policy-fc0fb298.json blob=4f95778cc7d6849c130287ca5ced6891e8f34314 now=4f95778cc7d6849c130287ca5ced6891e8f34314 same=yes
+root-review-20261003/production-turn-policy-fc0fb298.txt blob=4f95778cc7d6849c130287ca5ced6891e8f34314 now=4f95778cc7d6849c130287ca5ced6891e8f34314 same=yes
+root-review-20261003/first-review-summary-fc0fb298.json blob=5202ac370ab58648001b9a1c5370bc3c92755c26 now=5202ac370ab58648001b9a1c5370bc3c92755c26 same=yes
+root-review-20261003/gate-policy-review.mjs blob=aada7dfde40e473ea2e05ce934c821a855c26c6c now=aada7dfde40e473ea2e05ce934c821a855c26c6c same=yes
+root-review-20261003/gate-policy-extended-review.mjs blob=2e69a4a5654717f6d81a75d274a86bf19f1aa711 now=2e69a4a5654717f6d81a75d274a86bf19f1aa711 same=yes
+root-review-20261003/production-native-policy-review.mjs blob=e109c45937061d28a5cf7eb9defbc0272f8fafad now=e109c45937061d28a5cf7eb9defbc0272f8fafad same=yes
+root-review-20261003/production-session-grant-review.mjs blob=612ef1d3db22a7625e740259472c8c4fdd8ab1a8 now=612ef1d3db22a7625e740259472c8c4fdd8ab1a8 same=yes
+root-review-20261003/production-turn-policy-review.mjs blob=b1fc2da1ddc55947a7cbfcf9e793471a7d0453c7 now=b1fc2da1ddc55947a7cbfcf9e793471a7d0453c7 same=yes

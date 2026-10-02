@@ -22,3 +22,12 @@ extended 边界）、`gate-admission.test.ts`、`turn-admission.test.ts`、`ui-r
 `apps/desktop/test/omp-execution-policy-e2e.test.mjs` 场景 10/11（真实 native body 的 grant 生命周期与
 回合内文件 mutation 反例）。原始 20/20 的 `production-native-policy` 与 `gate-policy` canonical 变体
 所观察到的行为在返修后仍然通过（同一边界，见本目录上级验证记录的计数）。
+
+## 清单基准（2026-10-03 第二次复审返修，R4）
+
+`SHA256SUMS.txt`（本文件所在目录为基准，可直接 `sha256sum -c SHA256SUMS.txt`）只列出本目录中**除自身
+以外**的文件——自引用条目恒不匹配，已被移除。上级目录的
+`../SHA256SUMS.txt` 是单一 sha256sum 兼容列表（基准为该上级目录），以 `root-review-20261003/…` 相对
+路径收录本目录每个文件（含本清单自身），因此本清单一旦变更，其上级条目需同步重算。两个清单覆盖的文件
+都必须是 Git 跟踪文件，且摘要按各自基准目录逐条校验通过；见上级验证记录 §6 与
+`manifest-verify-repair2.txt` 的原始输出。

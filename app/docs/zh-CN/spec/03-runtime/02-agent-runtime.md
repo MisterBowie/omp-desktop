@@ -1137,8 +1137,10 @@ risk+planSafeActions）；复审返修（ADR 0309 §6）把策略来源收紧为
 - **每提示词一份被准入策略**：runner 在每次提示词前用既有 `/omp-desktop-turn` 握手同时安装新的 turn
   token 与桌面策略准入（会话 `mode`、有效 `permissionMode`、宿主工具 `{risk, planSafeActions,
   origin}` 表与会话 grants，由 `session/turn-admission.ts` 编码）；gate 只为该 token 安装该准入，并以
-  所安装参数原文的 SHA-256 回执，runner 只有在回执匹配后才提交用户提示词。该回合的每个调用——所属
-  会话自身调用与其委托（`hasUI=false`，即 PI 的"子代理按父会话持久策略裁决"语义）——都只依据这份不可变
+  所安装参数原文的 SHA-256 回执，runner 只有在回执匹配后才提交用户提示词。该回执是同一受信运行时进程内
+  runner 与 gate 之间的**应用自有一致性校验**，不是对桌面端的密码学认证，也不如此声称：握手走运行时自身
+  的本地命令通道，能在该进程内发起提示词的写入方本就在该准入的防护边界之外。该回合的每个调用——所属
+  会话自身调用与其委托（`hasUI=false`，须先按下方"委托与失败"绑定到本回合）——都只依据这份不可变
   记录决策；运行域状态文件降为**内容通道**（mode 块、技能、记忆与强制存在性证明），产品路径不再为
   策略回读它，因此工具体在同一提示词内改写 `permissionMode` 不能让本回合的后续调用放宽。`agent_start`
   武装记录、终止性 `agent_end` 退役（计划内续跑保留）、启动拒绝清空；未真正启动的记录、他会话交互
@@ -1175,9 +1177,14 @@ risk+planSafeActions）；复审返修（ADR 0309 §6）把策略来源收紧为
   工具在非 agent 模式于适配器边界拒绝；插件子进程 API 现在把 `planSafeActions` 转发给
   `agent.registerTool`（修复上游 child 未转发、guard 恒见空列表的缺口）。
 - **委托与失败**：强制通道开启时，状态不可读/他会话/非法的交互会话每个调用都 block
-  （`policy-unavailable`）；委托会话（`hasUI=false`）依据所属回合的被准入记录裁决（PI 的子代理调用
-  同样按父会话持久策略裁决），记录缺失、已退役或属于他会话时拒绝——绝不借用更早回合或他会话的策略；
-  无 UI 只在"本就需要交互"处 fail closed，Low/`auto`/grant 调用照常通过、无提权。
+  （`policy-unavailable`）；委托会话（`hasUI=false`，真实子代理）**只依据其启动时所绑定的那一份准入**
+  裁决——在自身 `session_start` / `before_agent_start` / `agent_start` 且该准入仍存活、已武装时完成绑定；
+  该记录一旦退役（终止性 `agent_end`、启动拒绝）或被下一次 fence 整体替换，委托即被拒绝，绝不借用
+  更新的回合策略。从未在任何存活准入下被观察到的委托 fail closed；自身会话头显示其创建早于该准入被
+  武装的委托（延迟启动、parked/revived worker）同样拒绝——延迟启动绝不"顺手"归入更新的回合。当公开
+  接口暴露会话文件时，委托声明的父链（`getHeader().parentSession` 沿已记录中间会话上溯）必须抵达该
+  准入的所属会话文件；无法抵达的链一律拒绝。无 UI 只在"本就需要交互"处 fail closed——**已绑定**委托的
+  Low/`auto`/grant 调用照常通过、无提权。
 - **卡片一致**：审批描述符的风险、mode、permissionMode 与理由都来自同一个策略对象。
 - **证据分层**：gate 层合约硬拒绝（含被 B1 目录夹取隐藏的工具）由 gate 单元测试与真实 Bun 打包的
   产物探针证明；生产 E2E 在真实已补丁运行时上覆盖可达决策，并把隐藏工具尝试如实标为目录层
