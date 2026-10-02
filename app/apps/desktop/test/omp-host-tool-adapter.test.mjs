@@ -61,6 +61,7 @@ function binding(overrides = {}) {
     modelKey: () => null,
     thinkingLevel: () => null,
     dispatchable: () => true,
+    modeForTurn: () => "agent",
     ...overrides,
   };
 }

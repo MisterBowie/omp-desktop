@@ -61,6 +61,7 @@
  */
 import {
   boundHostToolContent,
+  type DesktopRuntimeMode,
   type OmpHostToolCall,
   type OmpHostToolContentBlock,
   type OmpHostToolDefinition,
@@ -136,6 +137,17 @@ export type OmpHostToolBinding = {
    * dispatch.
    */
   dispatchable(turnId: string): boolean;
+  /**
+   * The session's operating mode for the turn that owns this call (M5/T20-C),
+   * or null when no policy was admitted for that turn. The plugin execution
+   * context receives this exact value — never a hardcoded "agent" — and the
+   * PI plugin-runtime guard enforces the per-action `planSafeActions`
+   * restriction with it; user MCP tools are refused outside Agent mode. A
+   * null answer refuses the call: an execution without a known mode could be
+   * a Plan/Goal action running as Agent. Read after `dispatchable` has bound
+   * the call to the entry's live turn.
+   */
+  modeForTurn(turnId: string): DesktopRuntimeMode | null;
 };
 
 export type OmpHostToolAdapter = {
@@ -359,6 +371,19 @@ export function createOmpHostToolAdapter(deps: OmpHostToolAdapterDeps): OmpHostT
           if (call.toolName === DESKTOP_SKILL_TOOL_NAME) {
             return await runSkillLoad(call, run, signal);
           }
+          // The turn's real operating mode gates every host-tool dispatch
+          // below (M5/T20-C). It comes from the policy the bridge admitted
+          // this turn under; an unknown turn fails closed instead of
+          // executing under a defaulted mode.
+          const mode = binding.modeForTurn(run.turnId);
+          if (mode === null) {
+            throw Object.assign(
+              new Error(
+                `no admitted session policy exists for turn ${run.turnId}; refusing to execute ${call.toolName}`,
+              ),
+              { errorCode: "PERMISSION_DENIED" },
+            );
+          }
           if (call.toolName.startsWith("mcp_")) {
             // Last synchronous gate before entering the MCP call path: the Pi
             // host has no turn gate on its user-MCP branch (`host.ts` calls
@@ -374,6 +399,18 @@ export function createOmpHostToolAdapter(deps: OmpHostToolAdapterDeps): OmpHostT
             // completion — the remote side effect is never claimed prevented
             // or retracted.
             assertDispatchable(run, signal);
+            // PI host-core denies every `mcp_*` tool in the contract modes
+            // before the Electron plugin bridge ever sees it; the adapter
+            // repeats the denial at its own dispatch boundary so a call that
+            // somehow bypassed the gate can never run.
+            if (mode !== "agent") {
+              throw Object.assign(
+                new Error(
+                  `TOOL_DISABLED_IN_PLAN: user MCP tool ${call.toolName} is not available in ${mode} mode`,
+                ),
+                { errorCode: "PERMISSION_DENIED" },
+              );
+            }
             // `callTool` re-checks the server scope, the connection state and the
             // latest tool list before dispatching — the same re-checks the Pi
             // path relies on. A protocol-level error (`isError` on the
@@ -398,13 +435,16 @@ export function createOmpHostToolAdapter(deps: OmpHostToolAdapterDeps): OmpHostT
           // The binding's model/thinking values are live getters: a configure()
           // that changed the thinking level on this same entry must be visible
           // to the very next execution, never a stale construction snapshot.
+          // `mode` is the *real* mode of the admitted turn (M5/T20-C): the
+          // PI plugin-runtime guard enforces the declared `planSafeActions`
+          // restriction with it, and the plugin child receives it verbatim.
           const modelKey = binding.modelKey();
           const thinkingLevel = binding.thinkingLevel();
           const result = await tool.execute(call.arguments, {
             sessionId: binding.sessionId,
             turnId: run.turnId,
             signal,
-            mode: "agent",
+            mode,
             ...(modelKey ? { modelKey } : {}),
             ...(thinkingLevel ? { thinkingLevel } : {}),
           });

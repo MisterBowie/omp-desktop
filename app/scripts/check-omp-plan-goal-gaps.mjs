@@ -24,7 +24,9 @@
  * `packages/omp-runtime/src/desktop-state.test.ts`,
  * `packages/omp-runtime/src/session/gate-desktop-state.test.ts`); the probe no
  * longer matches symbols (F8: static symbols cannot prove a data flow), and
- * only checks that those replacement tests exist. g2/g3 stay open.
+ * only checks that those replacement tests exist. g2 was RETIRED the same way
+ * to the T20-C behavior tests (the probe no longer matches the removed
+ * hardcoded-mode literal); g3 stays open.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -97,22 +99,46 @@ function sourceSeam(rel) {
 }
 
 // ---------------------------------------------------------------------------
-// g2 (owner: T20-C) — plugin execution hardcodes mode "agent"
+// g2 (owner: T20-C) — RETIRED to behavior tests (2026-10-03, T20-C)
+//
+// History: this check matched the hardcoded `mode: "agent"` literal in the
+// host-tool executor. T20-C replaced it with the admitted turn's real mode
+// (`modeForTurn`), added the per-action `planSafeActions` enforcement through
+// the real plugin registry, and retired this diagnostic to the behavior tests
+// below, which execute the production seam for real:
+//
+//   node --test apps/desktop/test/omp-plugin-plan-safe.test.mjs
+//     (real PluginRuntime child: ctx.mode observed by plugin execution,
+//      per-action allow/deny, MCP contract refusal)
+//   node --test apps/desktop/test/omp-execution-policy-e2e.test.mjs
+//     (real patched OMP + production wiring/gate + fake provider)
+//   pnpm -C packages/omp-runtime test gate-permissions tool-paths
+//
+// The probe keeps ONE mechanical invariant — the replacement tests must
+// exist — and otherwise reports the retirement with the exact commands. It
+// must never be turned back into a symbol-presence check.
 // ---------------------------------------------------------------------------
 {
-  const hostToolsSource = sourceSeam("apps/desktop/electron/main/runtime/omp-host-tools.ts");
-  // The literal must sit at the plugin-execution context (the executor's
-  // `tool.execute(call.arguments, { ... mode: "agent" ... })`), not in prose.
-  const hardcoded = /tool\.execute\(call\.arguments,\s*\{[\s\S]{0,200}?mode:\s*"agent"/.test(
-    hostToolsSource,
-  );
-  report(
-    "g2",
-    "T20-C",
-    hardcoded,
-    "the host-tool adapter executes every plugin tool with a hardcoded mode 'agent'; the session's durable mode never reaches plugin execution",
-    `omp-host-tools.ts hardcoded execution-context mode literal present: ${hardcoded}`,
-  );
+  const behaviorTests = [
+    "apps/desktop/test/omp-plugin-plan-safe.test.mjs",
+    "apps/desktop/test/omp-execution-policy-e2e.test.mjs",
+    "packages/omp-runtime/src/session/gate-permissions.test.ts",
+    "packages/omp-runtime/src/session/tool-paths.test.ts",
+  ];
+  const missing = behaviorTests.filter((rel) => !existsSync(join(appRoot, rel)));
+  if (missing.length > 0) {
+    report(
+      "g2",
+      "T20-C",
+      true,
+      "the g2 behavior tests that replaced this diagnostic are missing; plugin mode propagation and the execution-time decision table have no executable evidence",
+      `missing: ${missing.join(", ")}; restore the T20-C behavior tests instead of reviving the hardcoded-literal check`,
+    );
+  } else {
+    console.log(
+      `GAP-RETIRED g2 (owner: T20-C) plugin execution receives the admitted turn's real mode and the execution-time decision table enforces the contract/permission semantics [evidence: replaced by behavior tests ${behaviorTests.join(", ")}; run: node --test apps/desktop/test/omp-plugin-plan-safe.test.mjs apps/desktop/test/omp-execution-policy-e2e.test.mjs and pnpm -C packages/omp-runtime test gate-permissions tool-paths; a literal check cannot prove the policy data flow, so this probe does not match symbols]`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

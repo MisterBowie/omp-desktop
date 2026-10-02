@@ -32,6 +32,7 @@ const BINDING = {
   modelKey: () => null,
   thinkingLevel: () => null,
   dispatchable: () => true,
+  modeForTurn: () => "agent",
 };
 
 function skillCall(args) {

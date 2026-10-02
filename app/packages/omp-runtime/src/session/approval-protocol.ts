@@ -59,6 +59,14 @@ export type OmpApprovalRisk = "low" | "medium" | "high";
 export const OMP_APPROVAL_PERMISSION_MODES = ["ask", "accept-edits", "auto"] as const;
 export type OmpApprovalPermissionMode = (typeof OMP_APPROVAL_PERMISSION_MODES)[number];
 
+/**
+ * The operating modes on the wire, mirroring `DesktopRuntimeMode`. The
+ * descriptor carries the mode the decision table ran under (M5/T20-C) so the
+ * desktop's card and the decision can be checked against the same policy.
+ */
+export const OMP_APPROVAL_RUNTIME_MODES = ["agent", "plan", "goal"] as const;
+export type OmpApprovalRuntimeMode = (typeof OMP_APPROVAL_RUNTIME_MODES)[number];
+
 /** Structured description of one pending tool call, encoded into the dialog. */
 export type OmpApprovalDescriptor = {
   v: number;
@@ -73,6 +81,12 @@ export type OmpApprovalDescriptor = {
   argsPreview: unknown;
   /** Working directory of the call, when the hook exposes it. */
   cwd?: string;
+  /**
+   * The operating mode the execution-time decision ran under (M5/T20-C),
+   * read from the same run-scoped state snapshot that produced the decision
+   * (contract hard-deny, contract allowlist, risk and permission mode).
+   */
+  mode?: OmpApprovalRuntimeMode;
   /**
    * The session's effective permission mode as read from the run-scoped
    * desktop state, when that state was present and owned by the session
@@ -121,6 +135,9 @@ export function parseApprovalDescriptor(text: unknown): OmpApprovalDescriptor | 
   const permissionMode = (OMP_APPROVAL_PERMISSION_MODES as readonly unknown[]).includes(record.permissionMode)
     ? (record.permissionMode as OmpApprovalPermissionMode)
     : undefined;
+  const mode = (OMP_APPROVAL_RUNTIME_MODES as readonly unknown[]).includes(record.mode)
+    ? (record.mode as OmpApprovalRuntimeMode)
+    : undefined;
   return {
     v: OMP_APPROVAL_VERSION,
     kind: OMP_APPROVAL_KIND,
@@ -131,6 +148,7 @@ export function parseApprovalDescriptor(text: unknown): OmpApprovalDescriptor | 
     reason: typeof record.reason === "string" ? record.reason : "",
     argsPreview: record.argsPreview,
     ...(typeof record.cwd === "string" ? { cwd: record.cwd } : {}),
+    ...(mode ? { mode } : {}),
     ...(permissionMode ? { permissionMode } : {}),
   };
 }

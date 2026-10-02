@@ -740,6 +740,11 @@ test(
     runtimeHandle.onFrame((frame) => {
       if (frame && frame.type === "extension_ui_request") dialogs.push(frame);
     });
+    // The descriptor-consumption probe needs an interactive decision: under
+    // Agent+auto (the previous prompt's resolved mode) a Write is auto-allowed
+    // by PI's table and raises no card (M5/T20-C), so the mode is pinned to
+    // `ask` here while phase 4 already proved the `auto` inheritance.
+    hostSettings.defaultPermissionMode = "ask";
     const writeCall = { id: "call_write_1", name: "write", args: { path: guardedPath, content: "written by b1\n" } };
     provider.script([
       { text: "writing the guarded file", finish: "tool_calls", toolCalls: [writeCall] },
@@ -775,7 +780,8 @@ test(
     );
     assert.ok(approvalFrame, "the real gate must raise the approval dialog");
     const descriptor = parseApprovalDescriptor(approvalFrame.optionDetails?.[0]?.description);
-    assert.equal(descriptor?.permissionMode, "auto", "the gate must consume the resolved effective permission mode");
+    assert.equal(descriptor?.permissionMode, "ask", "the gate must consume the resolved effective permission mode");
+    assert.equal(descriptor?.mode, "agent", "the descriptor must carry the runtime mode the decision ran under");
     assert.equal(descriptor?.toolName, "write");
     // The rebuilt Agent table must be the fresh baseline with the unchanged
     // catalog: nothing duplicated, nothing stale, the plan-added plugin

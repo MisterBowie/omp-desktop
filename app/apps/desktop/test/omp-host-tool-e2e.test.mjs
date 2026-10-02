@@ -46,6 +46,14 @@ try {
 const LAUNCHER = findPinnedLauncher(here);
 const GATE = findGateExtension(here);
 
+/**
+ * The run-scoped policy provider every bridge in this file wires (M5/T20-C).
+ * Host-tool executions read the admitted turn's mode, so the fixture supplies
+ * the same agent/ask policy the production wiring reads from the host row; the
+ * gate then asks for each plugin/MCP tool exactly as before.
+ */
+const SESSION_POLICY = { policy: async () => ({ mode: "agent", permissionMode: "ask" }) };
+
 /** Every temporary thing this file creates, removed in `after`. */
 const scratch = [];
 
@@ -293,6 +301,7 @@ test(
     const supervisor = hostToolSupervisor({ dataRoot, project, provider, sessionDir });
     const bridge = createOmpSessionBridge({
       createSupervisor: () => supervisor,
+      sessionPolicy: SESSION_POLICY,
       launcher: LAUNCHER,
       isPackaged: false,
       appPath: here,
@@ -377,6 +386,7 @@ test(
     const supervisor = hostToolSupervisor({ dataRoot, project, provider, sessionDir });
     const bridge = createOmpSessionBridge({
       createSupervisor: () => supervisor,
+      sessionPolicy: SESSION_POLICY,
       launcher: LAUNCHER,
       isPackaged: false,
       appPath: here,
@@ -449,6 +459,7 @@ test(
     const supervisor = hostToolSupervisor({ dataRoot, project, provider, sessionDir });
     const bridge = createOmpSessionBridge({
       createSupervisor: () => supervisor,
+      sessionPolicy: SESSION_POLICY,
       launcher: LAUNCHER,
       isPackaged: false,
       appPath: here,
@@ -469,7 +480,10 @@ test(
         ),
       );
       assert.equal(answered, true, `the turn must complete; timeline:\n${envelopeTimeline(envelopes)}`);
-      assert.ok(approvals.length >= 1, "the gate must ask before the MCP tool runs");
+      // PI host-core classifies `mcp_*` as Low: Agent mode auto-allows it, so
+      // no card is raised (M5/T20-C, C7). The plugin test above proves the
+      // card still appears for a Medium-declared plugin tool.
+      assert.equal(approvals.length, 0, "a Low-risk user MCP tool must not raise an approval card in Agent");
       assert.equal(readFileSync(stub.callFile, "utf8").length, 1, "the MCP server must serve exactly one call");
       assertToolResultCanary(provider, `${canary}:ping`, "user MCP tool");
     } finally {
@@ -550,6 +564,7 @@ test(
     const supervisor = hostToolSupervisor({ dataRoot, project, provider, sessionDir });
     const bridge = createOmpSessionBridge({
       createSupervisor: () => supervisor,
+      sessionPolicy: SESSION_POLICY,
       launcher: LAUNCHER,
       isPackaged: false,
       appPath: here,
@@ -635,6 +650,7 @@ test(
     const supervisor = hostToolSupervisor({ dataRoot, project, provider, sessionDir });
     const bridge = createOmpSessionBridge({
       createSupervisor: () => supervisor,
+      sessionPolicy: SESSION_POLICY,
       launcher: LAUNCHER,
       isPackaged: false,
       appPath: here,
@@ -749,6 +765,7 @@ test(
     const supervisor = hostToolSupervisor({ dataRoot, project, provider, sessionDir });
     const bridge = createOmpSessionBridge({
       createSupervisor: () => supervisor,
+      sessionPolicy: SESSION_POLICY,
       launcher: LAUNCHER,
       isPackaged: false,
       appPath: here,

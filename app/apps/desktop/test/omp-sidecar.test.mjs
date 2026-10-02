@@ -49,6 +49,9 @@ const { bunBinary, loadManifest } = await import(pathToFileURL(patchScript));
 const { normalizeRepositoryUrl: packageNormalize } = await import(
   "../../../packages/omp-runtime/src/bundled.ts"
 );
+const { OMP_APPROVAL_OPTIONS } = await import(
+  "../../../packages/omp-runtime/src/session/approval-protocol.ts"
+);
 
 process.on("exit", cleanupScratch);
 
@@ -284,5 +287,144 @@ test(
     // The gate is loaded from Resources, where nothing can resolve a relative
     // import beside it: the bundle must stay self-contained.
     assert.doesNotMatch(shallow.gate.toString("utf8"), /(?:from|import)\s*\(?\s*["'][.]{1,2}\//);
+  },
+);
+
+/**
+ * The shipped artifact, not the TS source: bundle the real gate with the real
+ * Bun and drive its `tool_call` handler in a child process, exactly as the
+ * runtime loads it from Resources. This proves the execution-time decision
+ * table (M5/T20-C) survives bundling — the unit tests alone cannot show that
+ * the compiled artifact carries it.
+ */
+test(
+  "the bundled tool gate carries the execution-time decision table",
+  {
+    skip: gateDepthSkips.length > 0 ? gateDepthSkips.join(" | ") : false,
+    timeout: 180_000,
+  },
+  () => {
+    const fixture = fixtureRepo();
+    const fixtureManifest = writeFixtureManifest(fixture);
+    const root = scratch("gate-behavior");
+    const out = join(root, "out");
+    const build = spawnSync(
+      process.execPath,
+      [sidecarScript, "--build", "--source", fixture.root, "--manifest", fixtureManifest, "--out", out, "--json"],
+      { encoding: "utf8", env: { ...process.env } },
+    );
+    assert.equal(build.status, 0, `the gate build must succeed: ${build.stderr}`);
+    const gatePath = join(out, "extensions", "omp-desktop-gate.js");
+    assert.ok(readFileSync(gatePath, "utf8").length > 0, "the bundle must exist");
+
+    const probePath = join(root, "gate-probe.mjs");
+    writeFileSync(
+      probePath,
+      [
+        'import { readFileSync } from "node:fs";',
+        "const [gatePath, statePath, eventJson, contextJson, answer, mode] = process.argv.slice(2);",
+        'if (statePath !== "-") process.env.OMP_DESKTOP_STATE = statePath;',
+        'process.env.OMP_DESKTOP_STATE_REQUIRED = "1";',
+        "const gate = await import(gatePath);",
+        "const handlers = new Map();",
+        "const cards = [];",
+        "gate.default({",
+        "  on: (event, handler) => handlers.set(event, handler),",
+        "  registerCommand: () => undefined,",
+        "  getActiveTools: () => [],",
+        "  setActiveTools: async () => undefined,",
+        "  logger: { warn: () => undefined },",
+        "});",
+        "const raw = JSON.parse(contextJson);",
+        "const context = {",
+        "  cwd: raw.cwd,",
+        "  hasUI: raw.hasUI,",
+        "  sessionManager: { getSessionId: () => raw.sessionId, getCwd: () => raw.cwd },",
+        "  ui: {",
+        "    select: async (_title, items) => {",
+        "      cards.push(items[0]?.description ? JSON.parse(items[0].description) : null);",
+        "      return answer;",
+        "    },",
+        "  },",
+        "};",
+        "const verdict = await handlers.get(\"tool_call\")(JSON.parse(eventJson), context);",
+        'process.stdout.write(JSON.stringify({ verdict: verdict ?? null, cards }));',
+      ].join("\n"),
+      "utf8",
+    );
+
+    const statePath = join(root, "desktop-state.json");
+    const writeState = (mode, permissionMode, hostTools) =>
+      writeFileSync(
+        statePath,
+        JSON.stringify({
+          v: 2,
+          sessionId: "omp-sidecar-session",
+          writtenAt: Date.now(),
+          mode,
+          modeBlock: `block:${mode}`,
+          permissionMode,
+          memory: null,
+          skills: [],
+          hostTools,
+        }),
+        "utf8",
+      );
+    const context = JSON.stringify({
+      cwd: root,
+      sessionId: "omp-sidecar-session",
+      hasUI: true,
+    });
+    const probe = (state, event, answer) => {
+      const args = [probePath, gatePath, state, JSON.stringify(event), context, answer];
+      const run = spawnSync(process.execPath, args, { encoding: "utf8" });
+      assert.equal(run.status, 0, `the probe must exit 0: ${run.stderr}`);
+      return JSON.parse(run.stdout);
+    };
+
+    // Plan hard deny: the shipped gate blocks Write before any card.
+    writeState("plan", "ask", []);
+    const denied = probe(
+      statePath,
+      { type: "tool_call", toolCallId: "c1", toolName: "write", input: { path: join(root, "x.txt"), content: "x" } },
+      OMP_APPROVAL_OPTIONS[0],
+    );
+    assert.equal(denied.verdict?.block, true);
+    assert.match(denied.verdict?.reason ?? "", /WRITE_DISABLED_IN_PLAN/);
+    assert.equal(denied.cards.length, 0, "the contract deny must precede the card");
+
+    // Plan + ask + allowed Bash: a card whose policy values come from the
+    // shipped state snapshot.
+    const bash = probe(
+      statePath,
+      { type: "tool_call", toolCallId: "c2", toolName: "bash", input: { command: "true" } },
+      OMP_APPROVAL_OPTIONS[0],
+    );
+    assert.equal(bash.verdict, null);
+    assert.equal(bash.cards.length, 1);
+    assert.equal(bash.cards[0].risk, "high");
+    assert.equal(bash.cards[0].mode, "plan");
+    assert.equal(bash.cards[0].permissionMode, "ask");
+
+    // Agent + Low user MCP: no card in the shipped artifact either.
+    writeState("agent", "ask", [
+      { name: "mcp_alpha_lookup", risk: "low", planSafeActions: [], origin: "user-mcp" },
+    ]);
+    const mcp = probe(
+      statePath,
+      { type: "tool_call", toolCallId: "c3", toolName: "mcp_alpha_lookup", input: {} },
+      OMP_APPROVAL_OPTIONS[2],
+    );
+    assert.equal(mcp.verdict, null);
+    assert.equal(mcp.cards.length, 0);
+
+    // The mandatory channel without a readable state: every call fails closed.
+    const missing = probe(
+      "-",
+      { type: "tool_call", toolCallId: "c4", toolName: "read", input: {} },
+      OMP_APPROVAL_OPTIONS[0],
+    );
+    assert.equal(missing.verdict?.block, true);
+    assert.match(missing.verdict?.reason ?? "", /policy is unavailable/);
   },
 );

@@ -43,7 +43,12 @@ function policy(overrides: Partial<Parameters<typeof decideToolCall>[2]> = {}) {
 
 describe("what the gate sends", () => {
   it("carries a descriptor the desktop reads as an approval", () => {
-    const dialog = buildApprovalDialog(EVENT, CONTEXT, 1_000);
+    const dialog = buildApprovalDialog(EVENT, CONTEXT, 1_000, {
+      risk: "high",
+      reason: "approval required (high risk, ask mode)",
+      mode: "agent",
+      permissionMode: "ask",
+    });
     expect(dialog.options).toEqual([...OMP_APPROVAL_OPTIONS]);
     // Mirror `requestRpcSelect` exactly: labels come from the items, and a
     // non-empty description becomes `optionDetails[index]`.
@@ -72,18 +77,21 @@ describe("what the gate sends", () => {
   });
 
   it("preserves the arguments exactly as the hook received them", () => {
-    const dialog = buildApprovalDialog(EVENT, CONTEXT, 1_000);
+    const dialog = buildApprovalDialog(EVENT, CONTEXT, 1_000, { risk: "high", reason: "approval required" });
     const descriptor = JSON.parse(dialog.items[0]!.description!);
     expect(descriptor.argsPreview).toEqual(EVENT.input);
   });
 
   it("summarises the target for the user without using it for decisions", () => {
-    expect(buildApprovalDialog(EVENT, CONTEXT, 1_000).title).toBe("write: /tmp/project/guarded.txt");
+    expect(
+      buildApprovalDialog(EVENT, CONTEXT, 1_000, { risk: "high", reason: "approval required" }).title,
+    ).toBe("write: /tmp/project/guarded.txt");
     expect(
       buildApprovalDialog(
         { ...EVENT, toolName: "bash", input: { command: "rm -rf /tmp/x" } },
         CONTEXT,
         1_000,
+        { risk: "high", reason: "approval required" },
       ).title,
     ).toBe("bash: rm -rf /tmp/x");
   });
@@ -179,39 +187,34 @@ describe("decisions", () => {
     expect(mcp).toMatchObject({ block: true, route: "deny" });
   });
 
-  it("asks for a host tool before execution and reports the conservative risk", async () => {
+  it("asks for a host tool before execution and cards the decision's own risk", async () => {
     let asked: string | undefined;
+    let descriptor: { risk?: string; mode?: string; permissionMode?: string } | undefined;
     const verdict = await decideToolCall(
       { ...EVENT, toolName: "plugin_demo_echo", input: { text: "hi" } },
       {
         ...CONTEXT,
         ui: {
-          select: async (title: string) => {
+          select: async (title: string, items: Array<{ description?: string }>) => {
             asked = title;
+            descriptor = JSON.parse(items[0]!.description!) as typeof descriptor;
             return OMP_APPROVAL_OPTIONS[0];
           },
         },
       },
-      policy(),
+      policy({
+        snapshot: {
+          mode: "agent",
+          permissionMode: "ask",
+          hostTools: [
+            { name: "plugin_demo_echo", risk: "high", planSafeActions: [], origin: "plugin" },
+          ],
+        },
+      }),
     );
     expect(verdict).toMatchObject({ block: false, route: "allow-once" });
     expect(asked).toMatch(/plugin_demo_echo/);
-
-    const pluginDialog = buildApprovalDialog(
-      { ...EVENT, toolName: "plugin_demo_echo", input: { text: "hi" } },
-      CONTEXT,
-      1_000,
-    );
-    const pluginDescriptor = JSON.parse(pluginDialog.items[0]!.description!) as { risk?: string };
-    expect(pluginDescriptor.risk).toBe("high");
-
-    const mcpDialog = buildApprovalDialog(
-      { ...EVENT, toolName: "mcp_stub_ping", input: {} },
-      CONTEXT,
-      1_000,
-    );
-    const mcpDescriptor = JSON.parse(mcpDialog.items[0]!.description!) as { risk?: string };
-    expect(mcpDescriptor.risk).toBe("medium");
+    expect(descriptor).toMatchObject({ risk: "high", mode: "agent", permissionMode: "ask" });
   });
 
   it("host tools honour deny mode and allow mode like native tools", async () => {
@@ -252,7 +255,16 @@ describe("decisions", () => {
 
 describe("policy parsing", () => {
   it("defaults to the dangerous tools and honours an explicit list", () => {
-    expect([...parseGatedTools(undefined)]).toEqual(["write", "edit", "apply_patch", "bash", "eval"]);
+    expect([...parseGatedTools(undefined)]).toEqual([
+      "write",
+      "edit",
+      "apply_patch",
+      "bash",
+      "eval",
+      "browser",
+      "computer",
+      "browserpreview",
+    ]);
     expect([...parseGatedTools(" write , bash ")]).toEqual(["write", "bash"]);
     expect([...parseGatedTools("")]).toEqual([]);
   });

@@ -19,13 +19,30 @@
  *
  * Fail-closed rules, in order of how often they matter:
  *
- *   1. No UI available (a subagent session, a headless run) → block. The
- *      desktop's interaction design cannot answer from inside the runtime's own
- *      process; pretending otherwise would execute the call unapproved.
+ *   1. The decision needs an interaction and no UI is available (a subagent
+ *      session, a headless run) → block. The desktop's interaction design
+ *      cannot answer from inside the runtime's own process; pretending
+ *      otherwise would execute the call unapproved. A call the effective
+ *      policy allows without interaction (Low risk, `auto`, an eligible
+ *      session grant) still passes — no-UI fails closed exactly where PI's
+ *      host would have to ask (M5/T20-C).
  *   2. The dialog returned `undefined` (cancel, timeout, disconnected desktop)
  *      → block.
  *   3. The hook threw → block with the error text; it never falls through to
  *      "allow".
+ *   4. The mandatory state channel is on but no owned, valid policy exists for
+ *      an interactive session (or a delegate has no fresh parent snapshot) →
+ *      block every call. "Cannot read the policy" is never silently an Agent
+ *      policy, and a mutable state failure during execution cannot turn a
+ *      contract refusal into an approval.
+ *
+ * When the run-scoped state is readable, calls are decided with PI's
+ * execution-time order (M5/T20-C, §1.3.1): contract modes hard-deny every tool
+ * outside PI's allowlist (plus declared plan-safe plugin tools) before risk,
+ * `auto`, grants, external paths or this gate's legacy fixture switch can
+ * matter; explicit external paths allow under `auto`/grant and ask otherwise;
+ * Low risk allows; `auto` allows; `accept-edits` auto-accepts only Write/Edit;
+ * a session grant allows; everything else asks.
  *
  * Environment (set by the desktop when it starts the runtime):
  *   - `OMP_DESKTOP_GATE_TOOLS` — comma-separated native tool names (default
@@ -35,7 +52,10 @@
  *     must never execute without the desktop's own approval first.
  *   - `OMP_DESKTOP_GATE_TIMEOUT_MS` — dialog deadline (default 120000).
  *   - `OMP_DESKTOP_GATE_MODE` — `ask` (default), `deny` (block everything
- *     gated without asking: unattended runs), or `allow`.
+ *     gated without asking: unattended runs), or `allow`. A fixture-only
+ *     switch: the production launcher never writes it, and it is subordinate
+ *     to the contract hard deny and the state-driven decision table — `allow`
+ *     cannot resurrect a contract-denied tool (M5/T20-C).
  *   - `OMP_DESKTOP_STATE_REQUIRED` — `1` when the launcher enabled the
  *     mandatory mode/policy channel for this run (the supervisor's
  *     `desktopStateRequired`, `0`/absent otherwise). Fixed at spawn; it is
@@ -75,10 +95,11 @@ import {
 import {
   desktopCapabilityPrompt,
   isDesktopStateRequired,
+  MAX_DESKTOP_STATE_AGE_MS,
   readDesktopStateForSession,
   type DesktopCapabilityState,
   type DesktopHostToolPolicy,
-  type DesktopPermissionMode,
+  type DesktopRuntimeMode,
 } from "../src/desktop-state.ts";
 import {
   encodeStartRefusal,
@@ -92,8 +113,16 @@ import {
   isTurnToken,
   OMP_TURN_COMMAND,
 } from "../src/session/turn-fence.ts";
+import { requiresExternalPathPermission } from "../src/session/tool-paths.ts";
 
-const DEFAULT_GATED_TOOLS = "write,edit,apply_patch,bash,eval";
+/**
+ * The native tools the gate controls by default. `browser`/`computer`/
+ * `browserpreview` are PI-unknown (Medium) capabilities the decision table
+ * must card in ask/accept-edits and allow under auto (M5/T20-C, C5/C7);
+ * `browserpreview` never exists in this runtime, so gating it is inert here —
+ * it is listed so the PI contract name is judged, not defaulted.
+ */
+const DEFAULT_GATED_TOOLS = "write,edit,apply_patch,bash,eval,browser,computer,browserpreview";
 
 /**
  * The native tools PI's contract modes allow, restricted to names this
@@ -114,43 +143,101 @@ export const CONTRACT_MODE_NATIVE_TOOLS: readonly string[] = [
 ];
 
 /**
- * Risk for the card, decided by this gate's own policy.
- *
- * The desktop's permission card shows a risk level; the runtime does not
- * report one, and inferring it from arguments would be guesswork, so the split
- * is by tool: anything that can change a file, spawn a process or drive a
- * browser is high, read-only tools are low, everything else in between.
- *
- * Desktop host tools (M5/T19-B) are always controlled here, before any
- * execution, and their declared Pi risk cannot cross the pinned protocol:
- * plugin tools are therefore shown as `high` — the conservative upper bound,
- * so a high-risk plugin can never be downgraded — while user MCP tools are
- * `medium`, matching the Pi host's fixed MCP classification. (A low- or
- * medium-declared plugin sees a stricter high prompt this phase; that
- * limitation is recorded in ADR 0304 / the T19-B validation.) The per-tool
- * declared risk does travel to the gate in the run-scoped state policy table
- * (M5/T20-B1) for the execution-time decision table (T20-C); the card split
- * here is unchanged this phase.
+ * The native risk mapping, exactly PI's `tool_risk_with_declared` for the
+ * names this runtime ships: `Read`/`Glob`/`Grep` (and PI's
+ * `ScheduledTaskList`) are Low, `Write`/`Edit`/`Bash` (and PI's
+ * `GenerateImages`) are High, and everything PI's table does not name —
+ * including OMP-only tools such as `apply_patch`, `eval`, `browser` and
+ * `computer` — is Medium. The gate never guesses a higher or lower class from
+ * a name prefix; host tools get their declared risk from the run-scoped
+ * policy table instead (M5/T20-C).
  */
-export function riskForTool(toolName: string): OmpApprovalRisk {
-  if (toolName.startsWith("plugin_")) return "high";
-  if (toolName.startsWith("mcp_")) return "medium";
-  switch (toolName) {
-    case "write":
-    case "edit":
-    case "apply_patch":
-    case "bash":
-    case "eval":
-    case "browser":
-    case "computer":
-      return "high";
-    case "read":
-    case "grep":
-    case "glob":
-      return "low";
-    default:
-      return "medium";
+const NATIVE_LOW_RISK: Record<string, true> = {
+  read: true,
+  glob: true,
+  grep: true,
+  scheduledtasklist: true,
+};
+const NATIVE_HIGH_RISK: Record<string, true> = {
+  write: true,
+  edit: true,
+  bash: true,
+  generateimages: true,
+};
+
+export function nativeRiskForTool(toolName: string): OmpApprovalRisk {
+  const name = toolName.toLowerCase();
+  if (NATIVE_LOW_RISK[name] === true) return "low";
+  if (NATIVE_HIGH_RISK[name] === true) return "high";
+  return "medium";
+}
+
+/**
+ * The risk the execution-time decision table and the approval card share for
+ * one call: the declared plugin risk from the run-scoped policy table
+ * (missing/unregistered plugin declarations are Medium, PI's default), PI's
+ * fixed Low for user MCP tools, and the native mapping above for everything
+ * else. The card never re-derives a different number than the decision.
+ */
+export function toolRiskForCall(
+  toolName: string,
+  hostTools: readonly DesktopHostToolPolicy[],
+): OmpApprovalRisk {
+  const declared = hostTools.find((tool) => tool.name === toolName);
+  if (declared) return declared.risk;
+  if (toolName.startsWith("plugin_")) return "medium";
+  if (toolName.startsWith("mcp_")) return "low";
+  return nativeRiskForTool(toolName);
+}
+
+/**
+ * PI's `plan_mode_allows` translated to this runtime's tool names. `ask` is
+ * this runtime's non-mutating question tool — PI's contract has no model
+ * tool for questions because the host owns that channel, and denying it
+ * would leave a Plan/Goal turn unable to ask the user anything. `new_context`
+ * is sidecar-side and never reaches this gate; `BrowserPreview` has no OMP
+ * counterpart and nothing here fabricates one. Both PI-only names stay in the
+ * set so a call that somehow arrives is judged by the PI contract instead of
+ * being misclassified as an unknown tool.
+ */
+const CONTRACT_MODE_ALLOWED: Record<string, true> = {
+  read: true,
+  glob: true,
+  grep: true,
+  bash: true,
+  ask: true,
+  browserpreview: true,
+  new_context: true,
+};
+
+/**
+ * True when a contract mode (Plan/Goal) may execute this tool: a PI-allowed
+ * native name, or a plugin tool whose forwarded declaration carries a
+ * non-empty `planSafeActions` list (PI ADR 0211). The per-action restriction
+ * of such a plugin tool is enforced at execution by the PI plugin-runtime
+ * guard with the turn's real mode (M5/T20-C). User MCP tools and plugin tools
+ * without a declaration are never contract-allowed.
+ */
+export function contractAllowsTool(
+  toolName: string,
+  hostTools: readonly DesktopHostToolPolicy[],
+): boolean {
+  if (CONTRACT_MODE_ALLOWED[toolName.toLowerCase()] === true) return true;
+  const declared = hostTools.find((tool) => tool.name === toolName);
+  return (
+    declared !== undefined && declared.origin === "plugin" && declared.planSafeActions.length > 0
+  );
+}
+
+/** The PI rejection code and message for one contract-denied call. */
+function contractDenyReason(toolName: string, mode: DesktopRuntimeMode): string {
+  const name = toolName.toLowerCase();
+  if (name === "write") return `WRITE_DISABLED_IN_PLAN: Write is disabled in ${mode} mode`;
+  if (name === "edit") return `EDIT_DISABLED_IN_PLAN: Edit is disabled in ${mode} mode`;
+  if (toolName.startsWith("plugin_")) {
+    return `PLUGIN_DISABLED_IN_PLAN: plugin tool ${toolName} is not available in ${mode} mode`;
   }
+  return `TOOL_DISABLED_IN_PLAN: ${toolName} is not available in ${mode} mode`;
 }
 
 /**
@@ -265,13 +352,20 @@ export function approvalTitle(event: ToolCallEvent): string {
  * Returns the labels (what the user picks) and the items (what the runtime
  * turns into labels plus per-option details). The descriptor rides on the first
  * item's description, which is how the desktop learns which tool call, in which
- * session, this dialog is about.
+ * session, this dialog is about. Risk, reason, mode and permission mode all
+ * come from the same decision that produced the card — the desktop never
+ * re-derives a different risk or mode for the same call.
  */
 export function buildApprovalDialog(
   event: ToolCallEvent,
   context: ToolCallContext,
   timeoutMs: number,
-  permissionMode?: OmpApprovalPermissionMode,
+  policy: {
+    risk: OmpApprovalRisk;
+    reason: string;
+    mode?: DesktopRuntimeMode;
+    permissionMode?: OmpApprovalPermissionMode;
+  },
 ): { title: string; items: Array<{ label: string; description?: string }>; options: string[]; dialogOptions: DialogOptions } {
   const descriptor: OmpApprovalDescriptor = {
     v: 1,
@@ -279,11 +373,12 @@ export function buildApprovalDialog(
     ...(sessionIdOf(context) ? { sessionId: sessionIdOf(context)! } : {}),
     toolCallId: event.toolCallId,
     toolName: event.toolName,
-    risk: riskForTool(event.toolName),
-    reason: approvalTitle(event),
+    risk: policy.risk,
+    reason: policy.reason,
     argsPreview: event.input,
     ...(cwdOf(context) ? { cwd: cwdOf(context)! } : {}),
-    ...(permissionMode ? { permissionMode } : {}),
+    ...(policy.mode ? { mode: policy.mode } : {}),
+    ...(policy.permissionMode ? { permissionMode: policy.permissionMode } : {}),
   };
   const items = [
     { label: OMP_APPROVAL_OPTIONS[0], description: encodeApprovalDescriptor(descriptor) },
@@ -327,32 +422,26 @@ function hasUi(context: ToolCallContext): boolean {
   return typeof context.ui?.select === "function";
 }
 
+/** The run-scoped policy subset one gate decision consumes. */
+export type ToolCallPolicySnapshot = Pick<
+  DesktopCapabilityState,
+  "mode" | "permissionMode" | "hostTools"
+>;
+
+export type ToolCallVerdict = { block: boolean; reason?: string; route: string };
+
 /**
- * Decide one call. Exported so the decision table can be tested without a
- * running runtime; the extension below is a thin registration over it.
+ * Raise the desktop's approval dialog for one controlled call and map the
+ * answer to a decision. Risk, reason, mode and permission mode all come from
+ * the caller's decision, so the card and the enforced policy can never
+ * disagree.
  */
-export async function decideToolCall(
+async function raiseApproval(
   event: ToolCallEvent,
   context: ToolCallContext,
-  policy: {
-    gated: ReadonlySet<string>;
-    mode: "ask" | "deny" | "allow";
-    timeoutMs: number;
-    sessionAllowed: Set<string>;
-    /** The effective permission mode from the run-scoped state, when readable. */
-    permissionMode?: DesktopPermissionMode;
-  },
-): Promise<{ block: boolean; reason?: string; route: string }> {
-  // Desktop host tools are controlled unconditionally: the name list only
-  // tunes the native tools, and a host tool must never slip past on a name.
-  if (!policy.gated.has(event.toolName) && !isHostToolName(event.toolName)) {
-    return { block: false, route: "not-gated" };
-  }
-  if (policy.mode === "allow") return { block: false, route: "mode-allow" };
-  if (policy.mode === "deny") {
-    return { block: true, reason: "tool calls are denied in this run", route: "mode-deny" };
-  }
-  if (policy.sessionAllowed.has(event.toolName)) return { block: false, route: "session-allow" };
+  policy: { timeoutMs: number; sessionAllowed: Set<string>; snapshot?: ToolCallPolicySnapshot },
+  decision: { risk: OmpApprovalRisk; reason: string },
+): Promise<ToolCallVerdict> {
   if (!hasUi(context) || !context.ui?.select) {
     return {
       block: true,
@@ -360,7 +449,13 @@ export async function decideToolCall(
       route: "no-ui",
     };
   }
-  const dialog = buildApprovalDialog(event, context, policy.timeoutMs, policy.permissionMode);
+  const dialog = buildApprovalDialog(event, context, policy.timeoutMs, {
+    risk: decision.risk,
+    reason: decision.reason,
+    ...(policy.snapshot
+      ? { mode: policy.snapshot.mode, permissionMode: policy.snapshot.permissionMode }
+      : {}),
+  });
   let choice: string | undefined;
   try {
     choice = await context.ui.select(dialog.title, dialog.items, dialog.dialogOptions);
@@ -381,6 +476,132 @@ export async function decideToolCall(
     reason: choice === undefined ? "denied by user (no answer)" : `denied by user (${choice})`,
     route: "deny",
   };
+}
+
+/**
+ * Decide one call with PI's execution-time decision order (M5/T20-C, PI
+ * `permissions.rs` §1.3.1), using the run-scoped snapshot the desktop wrote
+ * for this prompt:
+ *
+ *   1. a contract mode (Plan/Goal) hard-denies every tool outside PI's
+ *      allowlist (plus plugin tools with a non-empty `planSafeActions`
+ *      declaration) before risk, auto, grants, external paths or the legacy
+ *      fixture switch can matter;
+ *   2. external explicit paths: `auto` allows, a session grant allows, every
+ *      other mode needs the card;
+ *   3. Low risk allows, `auto` allows, `accept-edits` auto-accepts only
+ *      Write/Edit; a session grant allows; everything else asks;
+ *   4. no interactive UI fails closed exactly when the decision needs the
+ *      interaction — an `auto` or Low call still passes.
+ *
+ * Without the mandatory channel (a fixture that never enabled it) the legacy
+ * path is preserved: only the configured native names and desktop host tools
+ * are controlled, and the card carries the PI default risk.
+ */
+export async function decideToolCall(
+  event: ToolCallEvent,
+  context: ToolCallContext,
+  policy: {
+    gated: ReadonlySet<string>;
+    mode: "ask" | "deny" | "allow";
+    timeoutMs: number;
+    sessionAllowed: Set<string>;
+    /**
+     * The policy snapshot owned by the call's session — or, for a delegate
+     * (no UI) call, the parent session's last validated snapshot, which is
+     * the same durable policy PI's host reads for a subagent call.
+     */
+    snapshot?: ToolCallPolicySnapshot;
+    /** The mandatory channel is on but no usable policy exists: fail closed. */
+    policyUnavailable?: boolean;
+  },
+): Promise<ToolCallVerdict> {
+  if (policy.policyUnavailable) {
+    return {
+      block: true,
+      reason:
+        "the desktop runtime policy is unavailable; refusing the call without its mode and permission mode",
+      route: "policy-unavailable",
+    };
+  }
+  const snapshot = policy.snapshot;
+  if (snapshot) {
+    const contract = snapshot.mode === "plan" || snapshot.mode === "goal";
+    if (contract && !contractAllowsTool(event.toolName, snapshot.hostTools)) {
+      return {
+        block: true,
+        reason: contractDenyReason(event.toolName, snapshot.mode),
+        route: "contract-deny",
+      };
+    }
+    // Gated membership accepts the PI capitalizations as well (`Read`,
+    // `Bash`, `BrowserPreview`): the runtime dispatches lowercase names, but
+    // the PI contract names must be judged by the same table, never defaulted.
+    const controlled =
+      policy.gated.has(event.toolName) ||
+      policy.gated.has(event.toolName.toLowerCase()) ||
+      isHostToolName(event.toolName);
+    const external = requiresExternalPathPermission(
+      cwdOf(context) ?? null,
+      null,
+      event.toolName,
+      event.input,
+    );
+    // A contract-allowed read-only call (or an Agent call outside the
+    // controlled set) does not need a decision of its own.
+    if (!controlled && !external) {
+      return { block: false, route: contract ? "contract-allow" : "not-gated" };
+    }
+    // The legacy fixture switch stays subordinate to the contract deny above.
+    if (policy.mode === "allow") return { block: false, route: "mode-allow" };
+    if (policy.mode === "deny") {
+      return { block: true, reason: "tool calls are denied in this run", route: "mode-deny" };
+    }
+    const risk = toolRiskForCall(event.toolName, snapshot.hostTools);
+    if (external) {
+      if (snapshot.permissionMode === "auto") return { block: false, route: "external-allow" };
+      if (policy.sessionAllowed.has(event.toolName)) {
+        return { block: false, route: "external-grant" };
+      }
+      return raiseApproval(
+        event,
+        context,
+        { ...policy, snapshot },
+        { risk, reason: `external path requires approval (${snapshot.permissionMode} mode)` },
+      );
+    }
+    if (risk === "low") return { block: false, route: "low-risk" };
+    if (snapshot.permissionMode === "auto") return { block: false, route: "auto-allow" };
+    if (
+      snapshot.permissionMode === "accept-edits" &&
+      (event.toolName.toLowerCase() === "write" || event.toolName.toLowerCase() === "edit")
+    ) {
+      return { block: false, route: "accept-edits-allow" };
+    }
+    if (policy.sessionAllowed.has(event.toolName)) return { block: false, route: "session-grant" };
+    return raiseApproval(
+      event,
+      context,
+      { ...policy, snapshot },
+      { risk, reason: `approval required (${risk} risk, ${snapshot.permissionMode} mode)` },
+    );
+  }
+  // No run-scoped snapshot: the legacy fixture path. Desktop host tools are
+  // controlled unconditionally; native tools only through the configured name
+  // list.
+  if (!policy.gated.has(event.toolName) && !isHostToolName(event.toolName)) {
+    return { block: false, route: "not-gated" };
+  }
+  if (policy.mode === "allow") return { block: false, route: "mode-allow" };
+  if (policy.mode === "deny") {
+    return { block: true, reason: "tool calls are denied in this run", route: "mode-deny" };
+  }
+  if (policy.sessionAllowed.has(event.toolName)) return { block: false, route: "session-allow" };
+  const risk = toolRiskForCall(event.toolName, []);
+  return raiseApproval(event, context, policy, {
+    risk,
+    reason: `approval required (${risk} risk, legacy ask)`,
+  });
 }
 
 /** Parse the gated-tool list; an empty list gates nothing (explicit opt-out). */
@@ -639,6 +860,21 @@ export async function applyContractToolClamp(
   return { ok: true, changed: true, active: allowed };
 }
 
+/**
+ * The last validated policy snapshot for the interactive session this runtime
+ * process serves (M5/T20-C).
+ *
+ * Module-level, not per-registration: a delegate session (`task`/`eval`
+ * subagent) builds its own extension runner in the same process and
+ * re-invokes this factory, and its `tool_call` handler must see the owning
+ * session's policy — a per-runner closure would answer "unavailable" for
+ * every delegated call. Written only from an `owned` read (or the gate's own
+ * `before_agent_start` injection) and stamped with the state file's own
+ * `writtenAt`, so the delegate fallback can never outlive the state age bound
+ * and a later admitted turn always overwrites an earlier one.
+ */
+let policyCache: { state: DesktopCapabilityState } | null = null;
+
 export default function ompDesktopGate(pi: ExtensionAPI): void {
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
     ?.env;
@@ -739,24 +975,49 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
     pi.logger?.warn?.("desktop gate refused an agent start but the runtime exposes no abort", decision.reason);
   };
 
+  /**
+   * Decide one call from the run-scoped state (M5/T20-C). The owning session
+   * reads its own file; a delegate (no UI) falls back to the process-wide
+   * snapshot of the owning session — PI's host decides subagent calls under
+   * the parent's durable policy — while the mandatory channel with no usable
+   * policy blocks every call.
+   */
   pi.on("tool_call", async (event, context) => {
-    let permissionMode: DesktopPermissionMode | undefined;
+    const now = Date.now();
+    const required = isDesktopStateRequired(env?.OMP_DESKTOP_STATE_REQUIRED);
+    let snapshot: ToolCallPolicySnapshot | undefined;
+    let policyUnavailable = false;
     try {
-      const read = readDesktopStateForSession(
-        env?.OMP_DESKTOP_STATE,
-        Date.now(),
-        sessionIdOf(context),
-      );
-      if (read.kind === "owned") permissionMode = read.state.permissionMode;
+      const read = readDesktopStateForSession(env?.OMP_DESKTOP_STATE, now, sessionIdOf(context));
+      if (read.kind === "owned") {
+        policyCache = { state: read.state };
+        snapshot = read.state;
+      } else if (read.kind === "invalid") {
+        // The state claims this session but fails validation: its policy is
+        // unknown, and "unknown" must never become Agent by default.
+        policyUnavailable = required;
+      } else if (required) {
+        if (hasUi(context)) {
+          policyUnavailable = true;
+        } else {
+          const cached =
+            policyCache && now - policyCache.state.writtenAt <= MAX_DESKTOP_STATE_AGE_MS
+              ? policyCache.state
+              : undefined;
+          if (cached) snapshot = cached;
+          else policyUnavailable = true;
+        }
+      }
     } catch {
-      permissionMode = undefined;
+      policyUnavailable = required;
     }
     const verdict = await decideToolCall(event, context, {
       gated,
       mode: mode === "deny" || mode === "allow" ? mode : "ask",
       timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS,
       sessionAllowed,
-      ...(permissionMode ? { permissionMode } : {}),
+      ...(snapshot ? { snapshot } : {}),
+      ...(policyUnavailable ? { policyUnavailable: true } : {}),
     });
     if (!verdict.block) return undefined;
     return { block: true, reason: verdict.reason ?? "denied" };
@@ -779,6 +1040,9 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
         return undefined;
       }
       if (decision.kind === "skip") return undefined;
+      // The same owned snapshot the prompt was admitted under becomes the
+      // fallback policy for this process's delegate sessions (M5/T20-C).
+      policyCache = { state: decision.state };
       const clamped = await applyContractToolClamp(pi, clamp, decision.state);
       if (!clamped.ok) {
         refuseStart(context, {

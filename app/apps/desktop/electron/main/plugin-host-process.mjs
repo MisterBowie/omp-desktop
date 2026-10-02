@@ -289,6 +289,11 @@ function buildApi() {
               description: tool.description,
               risk: tool.risk,
               schema: tool.schema,
+              // PI's host registry reads `descriptor.planSafeActions` when it
+              // builds the per-action Plan/Goal guard (ADR 0211); without this
+              // forward a plugin's declaration never leaves the child process
+              // and the guard would always see an empty list (M5/T20-C).
+              ...(tool.planSafeActions !== undefined ? { planSafeActions: tool.planSafeActions } : {}),
             },
           ]);
         } catch (error) {

@@ -588,13 +588,17 @@ describe("registered handlers", () => {
       },
     };
     const verdict = await captured.toolCall!(
-      { type: "tool_call", toolCallId: "call-1", toolName: "write", input: { path: "/tmp/x" } },
+      // A contract-allowed tool: `write` is hard-denied in Plan (M5/T20-C),
+      // while Bash still cards under accept-edits, which is the mode the
+      // descriptor must report.
+      { type: "tool_call", toolCallId: "call-1", toolName: "bash", input: { command: "true" } },
       toolContext,
     );
     expect(verdict).toBeUndefined();
     const descriptor = parseApprovalDescriptor(dialogItems[0]?.description);
     expect(descriptor?.permissionMode).toBe("accept-edits");
-    expect(descriptor?.toolName).toBe("write");
+    expect(descriptor?.mode).toBe("plan");
+    expect(descriptor?.toolName).toBe("bash");
   });
 
   it("omits the permission mode in the descriptor when no owned state is readable", async () => {

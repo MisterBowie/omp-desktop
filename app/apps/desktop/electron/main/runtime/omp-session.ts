@@ -276,6 +276,14 @@ export type OmpHostToolProvider = {
      * registry (`activeTurns`), so it would refuse every call.
      */
     dispatchable(turnId: string): boolean;
+    /**
+     * The session's operating mode for the turn that owns the call (M5/T20-C),
+     * or null when no policy was admitted for that turn. The adapter passes the
+     * real mode into plugin execution (the PI `planSafeActions` guard runs on
+     * it) and refuses user MCP tools outside Agent; a null answer refuses the
+     * call. Read after `dispatchable()` has bound the call to the live turn.
+     */
+    modeForTurn(turnId: string): DesktopRuntimeMode | null;
   }): OmpHostToolExecutor;
 };
 
@@ -709,6 +717,14 @@ class SessionEntry {
   private hostToolsRegisteredRunner: OmpSessionRunner | null = null;
   private hostToolsRegisteredSession: string | null = null;
   private hostToolsRegisteredFingerprint: string | null = null;
+  /**
+   * The mode of the most recently admitted prompt, keyed by its turn id
+   * (M5/T20-C). Host-tool executions read it through the executor binding's
+   * `modeForTurn`; a turn that is not this one — a delegate session's own
+   * turn, a stale frame — gets null and the adapter refuses, so no execution
+   * can run under a policy that was never admitted for it.
+   */
+  private admittedTurnPolicy: { turnId: string; mode: DesktopRuntimeMode } | null = null;
   /** The desktop's `session:turnEnded` announcement, and its once-per-turn guard. */
   private readonly onTurnEnd: OmpSessionBridgeOptions["onTurnEnd"];
   private readonly announcedTurnEnds = new Set<string>();
@@ -837,6 +853,13 @@ class SessionEntry {
         if (!runner || runner.isStopping() || runner.runState() !== "running") return false;
         return runner.status().currentTurnId === turnId;
       },
+      // Turn-bound by construction (M5/T20-C): only the admission this entry
+      // recorded for that exact turn id can supply a mode. The adapter checks
+      // `dispatchable` immediately before, and this lookup is the second,
+      // independent ownership re-check — a delegate turn or a retired run
+      // answers null and the adapter refuses the call.
+      modeForTurn: (turnId) =>
+        this.admittedTurnPolicy?.turnId === turnId ? this.admittedTurnPolicy.mode : null,
     });
     this.contextId = randomUUID();
   }
@@ -1278,6 +1301,12 @@ class SessionEntry {
       throw new OmpRuntimeError("stopping", "a stop was requested while the prompt was being prepared");
     }
     const started = await runner.prompt(content);
+    // The admitted turn's policy is the only operating mode a host-tool
+    // execution may read (M5/T20-C). A later prompt overwrites it; a stale,
+    // delegate or unknown turn fails the adapter's turn-bound lookup instead
+    // of borrowing another turn's policy.
+    this.admittedTurnPolicy =
+      started.accepted && policy ? { turnId: started.turnId, mode: policy.mode } : null;
     return { accepted: started.accepted, turnId: started.turnId };
   }
 
