@@ -2,7 +2,7 @@
 
 更新时间：2026-10-02。状态：**T20-B1 完成；T20 整体仍未完成（T20-C / T20-B2 / T20-D 未开始，`plan`/`goal` 能力保持关闭）**。
 
-- 分支：`codex/m5-t20-b1-runtime-state`，基线 `27d5c88a1334b32dbd8c8ac17a6c262e81a8df32`（追加提交，不 amend/rebase/强推，不创建 PR、不发布）。
+- 分支：`codex/m5-t20-b1-runtime-state`，基线 `27d5c88a1334b32dbd8c8ac17a6c262e81a8df32`（追加提交，不 amend/rebase/强推，不创建 PR、不发布）；**产出提交（代码/测试/文档首稿）`7ecf8c8b31e25c7d3d367888051645a3cdecf6a0`**，本记录随后的补记提交只追加该坐标。
 - 工作树：`/home/vv/person/code/omp-desktop-m5-t20-b1`；固定子模块：OMP `62bc57be1b03ef0802a33cf7f5f530e534527531`（omp/18.3.0）、PI `0111e306c120ad5820688d7608cb37bad8fbcc1f`；patch level `62bc57b+omp-desktop.3`（fork commit `6226f805e92654344de04def413fa5cb91cb16b9`，本阶段**未改**）。
 - 环境：Linux x64；Node v24.14.0；Bun 1.4.2（`/home/vv/.bun/bin`）；rustc 1.95.0。所有运行使用本地 FakeProvider 与固定/已补丁 OMP 源码，无付费/远程模型调用。
 
