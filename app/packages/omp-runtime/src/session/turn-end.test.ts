@@ -12,15 +12,21 @@
  *   - a dispose with a live turn closes "aborted";
  *   - a throwing announcement callback never blocks the close or the fan-out.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { AgentEventEnvelope } from "@pi-desktop/shared";
 import { OmpRuntimeError } from "../errors.js";
 import type { OmpFrame } from "../protocol.js";
 import { OmpSessionRunner, type OmpSessionRuntime } from "./runner.js";
+import { turnCommandToken } from "./turn-fence.js";
 import { serveTurnFenceCommand } from "./turn-fence-testkit.js";
 
-type TurnEnd = { sessionId: string; turnId: string; reason: "completed" | "aborted" | "error" };
+type TurnEnd = {
+  sessionId: string;
+  turnId: string;
+  reason: "completed" | "aborted" | "error";
+  hostTurnId: string | null;
+};
 
 class FakeRuntime implements OmpSessionRuntime {
   readonly pid = 4242;
@@ -106,8 +112,37 @@ describe("turn-end announcements", () => {
     await settle();
 
     expect(turns).toEqual([
-      { sessionId: "omp-1", turnId: started.turnId, reason: "completed" },
+      { sessionId: "omp-1", turnId: started.turnId, reason: "completed", hostTurnId: null },
     ]);
+  });
+
+  it("reports the run's durable host turn id when the terminal beats the prompt response", async () => {
+    const { runtime, turns, runner } = harness();
+    // Hold only the user prompt response (never the fence handshake): the
+    // runtime acknowledges prompts immediately and a real `agent_end` may be
+    // emitted first (rpc.md), so the announcement must read the id from the
+    // run record rather than from the caller's resolved promise.
+    const originalRequest = runtime.request.bind(runtime);
+    const held = Promise.withResolvers<void>();
+    let heldPrompt = false;
+    runtime.request = async (command) => {
+      if (command.type === "prompt" && !turnCommandToken(String(command.message))) {
+        heldPrompt = true;
+        await held.promise;
+      }
+      return originalRequest(command);
+    };
+    const started = runner.prompt("hello", { hostTurnId: "host-turn-9" });
+    await vi.waitFor(() => expect(heldPrompt).toBe(true));
+    runtime.push({ type: "agent_start" });
+    runtime.push({ type: "agent_end", messages: [] });
+    runtime.push({ type: "agent_end", messages: [] });
+    await settle();
+    expect(turns).toEqual([
+      { sessionId: "omp-1", turnId: "omp-turn:omp-1:1", reason: "completed", hostTurnId: "host-turn-9" },
+    ]);
+    held.resolve();
+    await expect(started).resolves.toMatchObject({ accepted: true, hostTurnId: "host-turn-9" });
   });
 
   it("a converter error mid-run is not a turn end and the run continues", async () => {

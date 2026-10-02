@@ -1,8 +1,12 @@
 # ADR 0310: OMP Plan/Goal submission, approval and dispatch
 
-- Status: Accepted (M5/T20-B2; 2026-10-03); **pending the root's independent
-  acceptance**. The `plan`/`goal` capability keys stay closed and T20-D remains
-  declared, not claimed.
+- Status: Accepted (M5/T20-B2; 2026-10-03); the root's first independent review
+  returned **changes-required** (R1-R3 production ordering races + R4 E2E proof
+  gap), the repair is implemented (§5) and **pending the root's
+  re-verification**. `@pi-desktop/shared` has no `plan`/`goal` capability keys
+  today and `ComposerToolbar` takes no engine/capability input, so missing keys
+  cannot demonstrate a UI gate: the engine-gated capability/UI acceptance stays
+  T20-D and is not claimed here.
 - Date: 2026-10-03
 - Scope: M5/T20-B2 — the submit tools, their settle-time termination, the
   durable host turn identity for OMP prompts, and the approved-execution
@@ -164,6 +168,54 @@ the resolve transaction, the host transaction flips `mode=agent` +
 `permissionMode` and queues the execution, the existing `plans.changed`
 notification drives the existing `PlanApprovalBar`, and the same dispatch path
 runs. No second approval queue or storage is introduced.
+
+### 5. Review repair (2026-10-03)
+
+The root's independent review (candidate `148cfcc7`) found three production
+ordering races in the desktop binding/dispatch layer plus one E2E proof gap.
+The review scripts were ported to this host (environment paths only) and
+reproduced RED on the unmodified candidate; after the fix they pass GREEN. Raw
+reports and scripts: `docs/validation/M5-t20-b2-submit-approval/repair-red/`
+and `.../repair-green/`. The fork, the patch level and the pinned submodules
+did not change.
+
+- **Durable-id announcement (R2).** The runner's turn-end callback reports the
+  `hostTurnId` recorded on the closing run (read before the run record is
+  cleared). A real `agent_end` may be emitted before the prompt response is
+  delivered (`docs/rpc.md` states the response acknowledges acceptance, not
+  completion); the announcement now names the correct durable turn anyway. The
+  bridge matches the current host turn by exact live id or exact durable id,
+  settles it once (`settledHostTurns`, monotonic runner generation guard),
+  never revives it when the prompt's response arrives later, and a late or
+  duplicate terminal for an older generation cannot close the new one.
+- **Stop during the durable begin (R1).** `prompt` re-checks `closed`/
+  `stopEpoch` after `hostTurns.begin` resolves and before any user content is
+  written: a stop or dispose that landed in that window settles the real row
+  exactly once as `aborted` and refuses with `stopping` — the prompt is never
+  marked aborted while still being sent, no provider request is made, and the
+  next prompt on the same native identity recovers normally. A begin that fails
+  under a concurrent stop is classified as the stop, not as a host failure.
+- **Dispatch binding (R3).** `OmpPromptInput.onHostTurnBound` is invoked once
+  the durable row exists and the stop re-check has passed, immediately before
+  the runner may deliver any terminal; `dispatchApprovedPlanToOmp` records the
+  execution↔host-turn mapping there instead of after `bridge.prompt` returns.
+  A terminal that beats the prompt's return settles the right execution; a
+  start refusal (`begin` failure or a refused prompt) finalizes it as
+  `interrupted` with no provider request. The mapping stays keyed by the exact
+  durable turn id (a late event from an earlier turn can never finish a later
+  execution), and a finished execution's identity is not re-added after its
+  terminal. The bridge remains the single `beginTurn` owner; the Pi path is
+  unchanged.
+- **E2E proof (R4).** The product E2E composes the production
+  `onTurnEnd → settleOmpTurnEnd` link (the failure mode the root demonstrated
+  with a missing-link control) and asserts the durable
+  `plan_approvals.execution_state` directly — completed for a normal dispatch
+  and interrupted for a refused start or a restart — instead of treating an
+  empty queue as completion. Three controlled-order regressions were added with
+  positive controls and real provider counters, durable rows, terminal
+  identities and cleanup assertions: Stop during the durable begin; terminal
+  before the prompt response; dispatch terminal before the prompt return plus
+  a refused-begin case.
 
 ## Consequences
 

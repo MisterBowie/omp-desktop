@@ -577,10 +577,12 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
  * user entry uses, so the durable host turn is opened exactly once and the
  * session's admitted policy (mode `agent`, the permission mode the approval
  * selected) reaches the runtime. A CAS loser, or a row the host already marked
- * interrupted/completed, never prompts. The execution is settled when the
- * bridge announces that host turn's end (`index.ts`), keyed by the durable
- * host turn id recorded here, so a later turn on the same session can never
- * finish the wrong execution.
+ * interrupted/completed, never prompts. The execution is bound to the durable
+ * host turn through `onHostTurnBound` — the moment the row exists, before the
+ * runner can deliver any terminal — and settled when the bridge announces that
+ * host turn's end (`index.ts`), keyed by the exact durable id, so a terminal
+ * that races the prompt response still settles this execution and a later turn
+ * on the same session can never finish the wrong one.
  */
 async function dispatchApprovedPlanToOmp(
   initial: PlanExecution,
@@ -639,6 +641,24 @@ async function dispatchApprovedPlanToOmp(
       }>("session.getEngineRef", { id: execution.sessionId })
       .then((response) => response.engineRef ?? null)
       .catch(() => null);
+    // Bind the execution to its durable host turn while the row is being
+    // created — before the runner can deliver any terminal for it
+    // (M5/T20-B2 review repair). The bridge reports the id through this
+    // callback because a real `agent_end` may arrive before `bridge.prompt`
+    // resolves; registering only after the await would let that terminal
+    // settle nothing and leave the execution row running forever. The
+    // registration stays keyed by the exact `hostTurnId`, so a late event
+    // from an earlier turn can never finish this execution.
+    let boundHostTurnId: string | null = null;
+    const bindExecutionToHostTurn = (hostTurnId: string): void => {
+      boundHostTurnId = hostTurnId;
+      approvedExecutionIdsBySession.set(execution.sessionId, execution.id);
+      approvedExecutionTurns.set(execution.id, {
+        sessionId: execution.sessionId,
+        turnId: hostTurnId,
+      });
+      startedApprovedExecutions.add(execution.id);
+    };
     const started = await omp.prompt({
       sessionId: execution.sessionId,
       content: approvedPlanInstruction(execution),
@@ -653,16 +673,19 @@ async function dispatchApprovedPlanToOmp(
       nativeSessionPath: engineRef?.nativeSessionPath ?? null,
       adapterVersion: engineRef?.adapterVersion ?? null,
       runtimeVersion: engineRef?.runtimeVersion ?? null,
+      onHostTurnBound: bindExecutionToHostTurn,
     });
     if (started.accepted !== true || !started.hostTurnId) {
       throw new Error("approved plan execution was not accepted");
     }
-    approvedExecutionIdsBySession.set(execution.sessionId, execution.id);
-    approvedExecutionTurns.set(execution.id, {
-      sessionId: execution.sessionId,
-      turnId: started.hostTurnId,
-    });
-    startedApprovedExecutions.add(execution.id);
+    // A bridge without a host-turn lifecycle never invokes the callback;
+    // register from the returned id so that wiring still settles by identity.
+    // When the callback did fire, the registration already happened before
+    // any terminal, and a terminal may have settled (and cleared) it — the
+    // stale id is never re-added over a finished execution.
+    if (boundHostTurnId === null) {
+      bindExecutionToHostTurn(started.hostTurnId);
+    }
     logger.app("runtime", "info", "approved plan execution started", {
       sessionId: execution.sessionId,
       data: { executionId: execution.id, turnId: started.hostTurnId },

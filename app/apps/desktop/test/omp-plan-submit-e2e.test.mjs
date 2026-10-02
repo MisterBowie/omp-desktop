@@ -42,10 +42,12 @@ const { writeModelsConfig } = await import("../../../experiments/omp-bridge/lib/
 const { preparePatchedTree } = await import("../../../scripts/omp-patch.mjs");
 const {
   OmpRuntimeSupervisor,
+  OmpRuntimeProcess,
   ensureSessionStateDir,
   findGateExtension,
   findPinnedLauncher,
 } = await import("../../../packages/omp-runtime/src/index.ts");
+const { turnCommandToken } = await import("../../../packages/omp-runtime/src/session/turn-fence.ts");
 const { createOmpSessionBridge } = await import("../electron/main/runtime/omp-session.ts");
 const { createOmpHostToolAdapter, createHostPlansSubmit } = await import(
   "../electron/main/runtime/omp-host-tools.ts"
@@ -177,7 +179,16 @@ async function promptThrough(host, bridge, sessionId, content) {
   });
 }
 
-async function buildBridge({ host, dataRoot, project, provider, events = [] }) {
+async function buildBridge({
+  host,
+  dataRoot,
+  project,
+  provider,
+  events = [],
+  onTurnEnd = () => {},
+  hostTurns = null,
+  runtimeFactory = null,
+}) {
   const sessionDir = ensureSessionStateDir(dataRoot);
   // One supervisor per session, exactly like the production wiring: a shared
   // supervisor would refuse a second session's working directory while the
@@ -199,6 +210,7 @@ async function buildBridge({ host, dataRoot, project, provider, events = [] }) {
         writeModelsConfig(paths.agentDir, { baseUrl: provider.baseUrl, modelId: "local-model" });
       },
       readyTimeoutMs: 60_000,
+      ...(runtimeFactory ? { runtimeFactory } : {}),
     });
     supervisor.setWorkingDirectory(project);
     scratch.push({ close: () => supervisor.reclaimAll().catch(() => undefined) });
@@ -227,6 +239,7 @@ async function buildBridge({ host, dataRoot, project, provider, events = [] }) {
     sessionDir,
     gateResolver: () => GATE,
     emitAgentEvent: (envelope) => events.push(envelope),
+    onTurnEnd,
     logger: { app: () => undefined },
     sessionPolicy: {
       policy: async (sessionId) => {
@@ -238,7 +251,7 @@ async function buildBridge({ host, dataRoot, project, provider, events = [] }) {
         };
       },
     },
-    hostTurns: createOmpHostTurnLifecycle(() => host),
+    hostTurns: hostTurns ?? createOmpHostTurnLifecycle(() => host),
     hostTools,
     persistNativeSession: async (info) => {
       await host.call("session.bindEngine", {
@@ -308,6 +321,22 @@ function buildPlanRuntime({ host, bridge }) {
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+/**
+ * Read one execution's durable row straight from the real database (host-core
+ * owns SQLite; the product reads it through `plans.*`). The assertion target is
+ * the durable terminal state itself, never a proxy such as an empty queue.
+ */
+function readExecutionRow(dataRoot, executionId) {
+  const db = new DatabaseSync(join(dataRoot, "pi.sqlite"), { readOnly: true });
+  try {
+    return db
+      .prepare("SELECT status, execution_state, error_code FROM plan_approvals WHERE execution_id = ?")
+      .get(executionId);
+  } finally {
+    db.close();
+  }
 }
 
 function submitArgs(overrides = {}) {
@@ -553,8 +582,19 @@ test(
       projectPath: project,
       mode: "plan",
     });
-    const { bridge } = await buildBridge({ host, dataRoot, project, provider });
-    const planRuntime = buildPlanRuntime({ host, bridge });
+    // The production composition (`index.ts`): the bridge's turn-end
+    // announcement is what settles an approved OMP execution, keyed by the
+    // durable host turn. The negative control for a missing link is a
+    // separate case below; here the real wiring is exercised.
+    let planRuntime = null;
+    const { bridge } = await buildBridge({
+      host,
+      dataRoot,
+      project,
+      provider,
+      onTurnEnd: (info) => planRuntime?.settleOmpTurnEnd(info),
+    });
+    planRuntime = buildPlanRuntime({ host, bridge });
 
     // Submit the plan through the runtime, then approve it in the real DB.
     provider.script([
@@ -612,7 +652,13 @@ test(
     assert.match(instructionBody, /E2E approval plan/);
     assert.match(instructionBody, new RegExp(proposal.artifact.relativePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 
-    // The execution row completed and is not replayable.
+    // The execution row itself completed — read from the real database, never
+    // inferred from an empty queue (a running row is not queued either).
+    assert.equal(
+      await waitFor(() => readExecutionRow(dataRoot, execution.id)?.execution_state === "completed", 10_000),
+      true,
+      "the durable execution row must be completed, not left running",
+    );
     const executions = (await host.call("plans.queuedExecutions", { sessionId })).executions;
     assert.equal(executions.length, 0, "no queued execution remains");
     await planRuntime.drainApprovedPlanExecutions();
@@ -711,5 +757,414 @@ test(
     } finally {
       db.close();
     }
+  },
+);
+
+/** Read one session's durable turn rows (read-only; host-core owns SQLite). */
+function readTurnRows(dataRoot, sessionId) {
+  const db = new DatabaseSync(join(dataRoot, "pi.sqlite"), { readOnly: true });
+  try {
+    return db
+      .prepare("SELECT id, status FROM turns WHERE session_id = ? ORDER BY rowid")
+      .all(sessionId)
+      .map((row) => ({ ...row }));
+  } finally {
+    db.close();
+  }
+}
+
+test(
+  "T20-B2 Stop during the durable host begin refuses the prompt before it is sent, settles its row aborted, and the next turn recovers",
+  { timeout: 600_000, skip: READY ? false : "host-core binary or patched runtime not available" },
+  async () => {
+    const project = makeScratch("t20b2-stop-begin-project-");
+    const dataRoot = makeScratch("t20b2-stop-begin-data-");
+    const provider = await FakeProvider.start({ model: "local-model" });
+    scratch.push({ close: () => provider.close?.() });
+    const host = await startHost(dataRoot);
+    const sessionId = await createSession(host, {
+      title: "stop during begin",
+      projectPath: project,
+      mode: "agent",
+    });
+
+    // Controlled public seam: the begin hook creates the real durable row,
+    // then performs and awaits the real user Stop, and only then delivers the
+    // real id — the async window a Stop can really land in.
+    const durableEnds = [];
+    const turnEnds = [];
+    const lifecycle = createOmpHostTurnLifecycle(() => host);
+    let stopOutcome = null;
+    let stopArmed = false;
+    let triggered = false;
+    let bridge = null;
+    const built = await buildBridge({
+      host,
+      dataRoot,
+      project,
+      provider,
+      onTurnEnd: (info) => turnEnds.push(info),
+      hostTurns: {
+        begin: async (input) => {
+          const id = await lifecycle.begin(input);
+          // The controlled boundary fires only for the negative attempt; the
+          // control turn below must complete through the same seam untouched.
+          if (stopArmed && !triggered) {
+            triggered = true;
+            stopOutcome = await bridge.stop(sessionId);
+          }
+          return id;
+        },
+        end: async (input) => {
+          durableEnds.push({ ...input });
+          return lifecycle.end(input);
+        },
+      },
+    });
+    bridge = built.bridge;
+    const turns = () => readTurnRows(dataRoot, sessionId);
+    const providerCount = () => provider.requests.filter((request) => request.method === "POST").length;
+
+    // Positive control on the same fixture: a normal turn completes.
+    provider.script([{ text: "control done", finish: "stop" }]);
+    const control = await promptThrough(host, bridge, sessionId, "control turn");
+    assert.equal(control.accepted, true);
+    assert.equal(await waitFor(() => bridge.status(sessionId).isRunning === false), true);
+    assert.equal(providerCount(), 1);
+    assert.equal(turns().length, 1);
+    assert.equal(turns()[0].status, "completed");
+    assert.equal(control.hostTurnId, turns()[0].id, "the prompt result names the durable row it opened");
+
+    // Negative: the Stop lands while the begin is in flight. No user content
+    // may be written, and the already-created row must settle aborted once.
+    const before = providerCount();
+    stopArmed = true;
+    await assert.rejects(
+      () => promptThrough(host, bridge, sessionId, "must not reach the provider"),
+      (error) => (error?.code ?? error?.errorCode) === "stopping",
+    );
+    assert.equal(await waitFor(() => bridge.status(sessionId).isRunning === false), true);
+    assert.equal(await waitFor(() => turns().every((row) => row.status !== "running")), true);
+    assert.equal(providerCount(), before, "the refused prompt must never reach the provider");
+    assert.equal(turns().length, 2);
+    assert.equal(turns()[1].status, "aborted", "the row created by the refused prompt settles aborted");
+    assert.equal(
+      durableEnds.filter((end) => end.turnId === turns()[1].id).length,
+      1,
+      "the aborted row settles exactly once",
+    );
+    assert.equal(stopOutcome?.converged, true);
+
+    // Recovery on the same native identity: the cancelled generation must not
+    // poison the next prompt.
+    const { session: recoveredSession } = await host.call("session.get", { id: sessionId });
+    const engineRef = (await host.call("session.getEngineRef", { id: sessionId })).engineRef;
+    assert.ok(engineRef?.nativeSessionId, "the control turn persisted a native identity");
+    provider.script([{ text: "recovered", finish: "stop" }]);
+    const recovery = await bridge.prompt({
+      sessionId,
+      content: "genuine recovery after Stop",
+      projectPath: project,
+      providerId: recoveredSession.providerId,
+      modelId: recoveredSession.modelId,
+      thinkingLevel: recoveredSession.thinkingLevel,
+      nativeSessionId: engineRef.nativeSessionId,
+      nativeSessionPath: engineRef.nativeSessionPath,
+      adapterVersion: engineRef.adapterVersion,
+      runtimeVersion: engineRef.runtimeVersion,
+    });
+    assert.equal(recovery.accepted, true);
+    assert.equal(await waitFor(() => bridge.status(sessionId).isRunning === false), true);
+    assert.equal(providerCount(), before + 1);
+    assert.equal(turns().length, 3);
+    assert.equal(turns()[2].status, "completed");
+    const engineRefAfter = (await host.call("session.getEngineRef", { id: sessionId })).engineRef;
+    assert.equal(engineRefAfter.nativeSessionId, engineRef.nativeSessionId, "recovery keeps the same native session");
+  },
+);
+
+test(
+  "T20-B2 a real terminal delivered before the prompt response still closes its own durable host turn",
+  { timeout: 600_000, skip: READY ? false : "host-core binary or patched runtime not available" },
+  async () => {
+    const run = async (strategy) => {
+      const project = makeScratch(`t20b2-terminal-order-${strategy}-project-`);
+      const dataRoot = makeScratch(`t20b2-terminal-order-${strategy}-data-`);
+      const provider = await FakeProvider.start({ model: "local-model" });
+      scratch.push({ close: () => provider.close?.() });
+      const host = await startHost(dataRoot);
+      const sessionId = await createSession(host, {
+        title: `terminal order ${strategy}`,
+        projectPath: project,
+        mode: "agent",
+      });
+
+      // Controlled public seam: hold only the real user-prompt response until
+      // the actual terminal frame arrives; no frame, result or row is forged.
+      let terminalSeen = false;
+      let heldPrompt = false;
+      const runtimeFactory = async (options) => {
+        const actual = await OmpRuntimeProcess.start(options);
+        actual.onFrame((frame) => {
+          if (frame.type === "agent_end" && frame.isTerminal !== false) terminalSeen = true;
+        });
+        return new Proxy(actual, {
+          get(target, key) {
+            if (key === "request") {
+              return (command, requestOptions) => {
+                const shouldHold =
+                  strategy !== "control" &&
+                  !heldPrompt &&
+                  command.type === "prompt" &&
+                  !turnCommandToken(command.message);
+                if (shouldHold) heldPrompt = true;
+                const pending = target.request(command, requestOptions);
+                if (!shouldHold) return pending;
+                return pending.then(async (response) => {
+                  assert.equal(
+                    await waitFor(() => terminalSeen === true, 30_000),
+                    true,
+                    "the real terminal frame must have arrived before the held response is delivered",
+                  );
+                  return response;
+                });
+              };
+            }
+            const value = Reflect.get(target, key, target);
+            return typeof value === "function" ? value.bind(target) : value;
+          },
+        });
+      };
+
+      const ends = [];
+      const { bridge } = await buildBridge({
+        host,
+        dataRoot,
+        project,
+        provider,
+        runtimeFactory,
+        onTurnEnd: (info) => ends.push(info),
+      });
+      const turns = () => readTurnRows(dataRoot, sessionId);
+      const providerCount = () => provider.requests.filter((request) => request.method === "POST").length;
+
+      provider.script([{ text: "REAL-INITIAL", finish: "stop" }]);
+      const prompt = await promptThrough(host, bridge, sessionId, `initial ${strategy}`);
+      assert.equal(await waitFor(() => bridge.status(sessionId).isRunning === false), true);
+      assert.equal(prompt.accepted, true);
+      assert.equal(providerCount(), 1);
+      assert.equal(turns().length, 1);
+      assert.equal(
+        turns()[0].status,
+        "completed",
+        "the terminal must close its own durable row even when it precedes the prompt response",
+      );
+      assert.equal(prompt.hostTurnId, turns()[0].id);
+      assert.equal(ends.length, 1);
+      assert.equal(ends[0].hostTurnId, turns()[0].id, "the announcement carries the run's own durable id");
+      assert.equal(ends[0].reason, "completed");
+      if (strategy !== "control") {
+        assert.equal(heldPrompt, true, "the controlled seam must have held the real prompt response");
+      }
+
+      // The next prompt on the same native identity must run normally.
+      const { session: recoveredSession } = await host.call("session.get", { id: sessionId });
+      const engineRef = (await host.call("session.getEngineRef", { id: sessionId })).engineRef;
+      provider.script([{ text: "REAL-RECOVERY", finish: "stop" }]);
+      const recovery = await bridge.prompt({
+        sessionId,
+        content: "genuine next prompt",
+        projectPath: project,
+        providerId: recoveredSession.providerId,
+        modelId: recoveredSession.modelId,
+        thinkingLevel: recoveredSession.thinkingLevel,
+        nativeSessionId: engineRef?.nativeSessionId ?? null,
+        nativeSessionPath: engineRef?.nativeSessionPath ?? null,
+        adapterVersion: engineRef?.adapterVersion ?? null,
+        runtimeVersion: engineRef?.runtimeVersion ?? null,
+      });
+      assert.equal(recovery.accepted, true);
+      assert.equal(await waitFor(() => bridge.status(sessionId).isRunning === false), true);
+      assert.equal(providerCount(), 2);
+      assert.equal(turns().length, 2);
+      assert.equal(turns()[1].status, "completed");
+      assert.equal(ends.length, 2);
+      assert.equal(ends[1].hostTurnId, turns()[1].id);
+      return { dataRoot, sessionId };
+    };
+
+    await run("control");
+    await run("terminal-before-prompt-response-delivery");
+  },
+);
+
+test(
+  "T20-B2 an approved execution settles from a terminal that beats the dispatch prompt return, and a refused begin interrupts it",
+  { timeout: 600_000, skip: READY ? false : "host-core binary or patched runtime not available" },
+  async () => {
+    const project = makeScratch("t20b2-dispatch-order-project-");
+    const dataRoot = makeScratch("t20b2-dispatch-order-data-");
+    const provider = await FakeProvider.start({ model: "local-model" });
+    scratch.push({ close: () => provider.close?.() });
+    const host = await startHost(dataRoot);
+
+    // Controlled begin seam: the dispatch case lets the real row/id through;
+    // the refusal case makes the next begin fail before any row exists.
+    let failNextBegin = false;
+    const lifecycle = createOmpHostTurnLifecycle(() => host);
+    const ends = [];
+    let planRuntime = null;
+    let holdDispatchPrompt = false;
+    let endBeforeDispatchReturn = null;
+    const built = await buildBridge({
+      host,
+      dataRoot,
+      project,
+      provider,
+      onTurnEnd: (info) => {
+        ends.push(info);
+        planRuntime?.settleOmpTurnEnd(info);
+      },
+      hostTurns: {
+        begin: async (input) => {
+          if (failNextBegin) {
+            failNextBegin = false;
+            throw new Error("controlled begin refusal");
+          }
+          return lifecycle.begin(input);
+        },
+        end: async (input) => lifecycle.end(input),
+      },
+    });
+    const bridge = built.bridge;
+    // The composition seam: the dispatch caller's view of the real
+    // `bridge.prompt` result is held until the real terminal with the correct
+    // durable id has been delivered — no terminal, result or row is forged.
+    const dispatchBridge = new Proxy(bridge, {
+      get(target, key) {
+        if (key === "prompt") {
+          return async (input) => {
+            const actual = await target.prompt(input);
+            if (holdDispatchPrompt) {
+              assert.equal(
+                await waitFor(() => ends.some((end) => end.hostTurnId === actual.hostTurnId), 30_000),
+                true,
+                "the real terminal must arrive while the dispatch prompt result is still held",
+              );
+              endBeforeDispatchReturn = structuredClone(
+                ends.find((end) => end.hostTurnId === actual.hostTurnId),
+              );
+            }
+            return actual;
+          };
+        }
+        const value = Reflect.get(target, key, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    // Two real dispatch instances: the shared host CAS, not one in-memory set,
+    // arbitrates which may prompt.
+    const runtimes = [
+      buildPlanRuntime({ host, bridge: dispatchBridge }),
+      buildPlanRuntime({ host, bridge: dispatchBridge }),
+    ];
+    planRuntime = runtimes[0];
+    const turns = (sessionId) => readTurnRows(dataRoot, sessionId);
+    const providerCount = () => provider.requests.filter((request) => request.method === "POST").length;
+
+    const submitAndApprove = async (sessionId) => {
+      provider.script([
+        {
+          text: "submitting",
+          finish: "tool_calls",
+          toolCalls: [{ id: `call_submit_${sessionId}`, name: "SubmitPlan", args: submitArgs() }],
+        },
+        { text: "never", finish: "stop" },
+      ]);
+      await promptThrough(host, bridge, sessionId, "plan it");
+      assert.equal(await waitFor(() => bridge.status(sessionId).isRunning === false), true);
+      const proposal = (await host.call("plans.pending", { sessionId })).plans[0];
+      assert.ok(proposal);
+      const resolved = await host.call("plans.resolve", {
+        proposalId: proposal.id,
+        sessionId,
+        turnId: proposal.turnId,
+        toolCallId: proposal.toolCallId,
+        action: "approve",
+        version: proposal.version,
+        targetPermissionMode: "auto",
+      });
+      assert.equal(resolved.execution.state, "queued");
+      return resolved.execution;
+    };
+
+    // --- held dispatch: the terminal arrives before the prompt return -------
+    const heldSession = await createSession(host, {
+      title: "held dispatch",
+      projectPath: project,
+      mode: "plan",
+    });
+    const heldExecution = await submitAndApprove(heldSession);
+    provider.script([
+      {
+        toolCalls: [
+          { id: "held-approved-bash", name: "bash", args: { command: "printf approved > approved-marker.txt" } },
+        ],
+        finish: "tool_calls",
+      },
+      { text: "approved execution complete", finish: "stop" },
+    ]);
+    const beforeHeld = providerCount();
+    holdDispatchPrompt = true;
+    await Promise.all(runtimes.map((runtime) => runtime.dispatchApprovedPlan(heldExecution)));
+    assert.equal(
+      await waitFor(() => readExecutionRow(dataRoot, heldExecution.id)?.execution_state === "completed"),
+      true,
+      "the execution must complete from the early terminal, not stay running",
+    );
+    assert.equal(providerCount(), beforeHeld + 2, "one tool round plus the final text");
+    assert.equal(existsSync(join(project, "approved-marker.txt")), true);
+    assert.equal(endBeforeDispatchReturn?.reason, "completed");
+    assert.equal(endBeforeDispatchReturn?.sessionId, heldSession);
+    assert.equal(turns(heldSession).every((row) => row.status === "completed"), true);
+    assert.equal(turns(heldSession).length, 2, "submit turn plus execution turn");
+    assert.equal(
+      endBeforeDispatchReturn?.hostTurnId,
+      turns(heldSession)[1]?.id,
+      "the early terminal names the execution's own durable turn",
+    );
+    // The execution's durable host turn is the one the early terminal named.
+    assert.equal(
+      readExecutionRow(dataRoot, heldExecution.id)?.execution_state,
+      "completed",
+      "the durable terminal state itself",
+    );
+    const queuedHeld = (await host.call("plans.queuedExecutions", { sessionId: heldSession })).executions;
+    assert.equal(queuedHeld.length, 0);
+    await runtimes[0].drainApprovedPlanExecutions();
+    await runtimes[1].dispatchApprovedPlan(heldExecution);
+    assert.equal(providerCount(), beforeHeld + 2, "a completed execution never replays");
+    holdDispatchPrompt = false;
+
+    // --- refused begin: the execution is interrupted before any provider ----
+    const refusedSession = await createSession(host, {
+      title: "refused begin",
+      projectPath: project,
+      mode: "plan",
+    });
+    const refusedExecution = await submitAndApprove(refusedSession);
+    const beforeRefused = providerCount();
+    failNextBegin = true;
+    await Promise.all(runtimes.map((runtime) => runtime.dispatchApprovedPlan(refusedExecution)));
+    assert.equal(
+      await waitFor(() => readExecutionRow(dataRoot, refusedExecution.id)?.execution_state === "interrupted"),
+      true,
+      "a refused durable begin must leave the execution interrupted, never running",
+    );
+    assert.equal(providerCount(), beforeRefused, "a refused begin must not reach the provider");
+    assert.equal(turns(refusedSession).length, 1, "no durable turn row is left behind by the refusal");
+    assert.equal(turns(refusedSession)[0].status, "completed", "only the submit turn exists and it is settled");
+    await runtimes[0].drainApprovedPlanExecutions();
+    assert.equal(providerCount(), beforeRefused, "an interrupted execution never replays");
   },
 );

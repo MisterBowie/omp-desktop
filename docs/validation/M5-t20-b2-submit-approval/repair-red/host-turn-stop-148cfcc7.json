@@ -1,0 +1,193 @@
+{
+  "candidate": "148cfcc78e3d8a093877cba2050cb40363e5b9ba",
+  "hostSha256": "aefac26cd7f0d381b46134b6bbcb9ef4732ff1b81aec35744b4ce0e096bfd066",
+  "layer": "production bridge/production host-turn lifecycle/actual HostProcess SQLite/patched OMP/local FakeProvider; controlled public lifecycle seam delivers a real begin id after real Stop completes; not an unmodified transport-timing proof",
+  "cases": [
+    {
+      "strategy": "control",
+      "ends": [
+        {
+          "sessionId": "0b71da40-d452-4b1c-a499-0278dc44a517",
+          "turnId": "omp-turn:0b71da40-d452-4b1c-a499-0278dc44a517:eac1b1a0-1bbd-490d-b2ef-422a0ac0d224:1",
+          "hostTurnId": "fbbb7b95-4295-41a4-8838-68aae0dbb52b",
+          "reason": "completed"
+        }
+      ],
+      "begins": [
+        "fbbb7b95-4295-41a4-8838-68aae0dbb52b"
+      ],
+      "durableEnds": [
+        {
+          "sessionId": "0b71da40-d452-4b1c-a499-0278dc44a517",
+          "turnId": "fbbb7b95-4295-41a4-8838-68aae0dbb52b",
+          "status": "completed"
+        }
+      ],
+      "hostExited": true,
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:0b71da40-d452-4b1c-a499-0278dc44a517:eac1b1a0-1bbd-490d-b2ef-422a0ac0d224:1",
+        "hostTurnId": "fbbb7b95-4295-41a4-8838-68aae0dbb52b"
+      },
+      "initialProviderRequests": 1,
+      "initialRows": [
+        {
+          "id": "fbbb7b95-4295-41a4-8838-68aae0dbb52b",
+          "status": "completed"
+        }
+      ],
+      "initialEnds": [
+        {
+          "sessionId": "0b71da40-d452-4b1c-a499-0278dc44a517",
+          "turnId": "omp-turn:0b71da40-d452-4b1c-a499-0278dc44a517:eac1b1a0-1bbd-490d-b2ef-422a0ac0d224:1",
+          "hostTurnId": "fbbb7b95-4295-41a4-8838-68aae0dbb52b",
+          "reason": "completed"
+        }
+      ],
+      "initialDurableEnds": [
+        {
+          "sessionId": "0b71da40-d452-4b1c-a499-0278dc44a517",
+          "turnId": "fbbb7b95-4295-41a4-8838-68aae0dbb52b",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "runtimeStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      },
+      "scratchRemoved": true
+    },
+    {
+      "strategy": "stop-before-begin-id-delivery",
+      "ends": [
+        {
+          "sessionId": "3ac1d8b1-34ff-4252-8228-968b58435096",
+          "turnId": "omp-turn:3ac1d8b1-34ff-4252-8228-968b58435096:80c9209a-e6ae-4e70-846f-dc3651051511:1",
+          "hostTurnId": "e21b8baa-76e8-489a-80cf-56a21d048871",
+          "reason": "completed"
+        },
+        {
+          "sessionId": "3ac1d8b1-34ff-4252-8228-968b58435096",
+          "turnId": "omp-turn:3ac1d8b1-34ff-4252-8228-968b58435096:80c9209a-e6ae-4e70-846f-dc3651051511:2",
+          "hostTurnId": "6b811c1c-1cde-4135-a897-cc4a324f979f",
+          "reason": "completed"
+        }
+      ],
+      "begins": [
+        "e21b8baa-76e8-489a-80cf-56a21d048871",
+        "6b811c1c-1cde-4135-a897-cc4a324f979f"
+      ],
+      "durableEnds": [
+        {
+          "sessionId": "3ac1d8b1-34ff-4252-8228-968b58435096",
+          "turnId": "e21b8baa-76e8-489a-80cf-56a21d048871",
+          "status": "completed"
+        },
+        {
+          "sessionId": "3ac1d8b1-34ff-4252-8228-968b58435096",
+          "turnId": "6b811c1c-1cde-4135-a897-cc4a324f979f",
+          "status": "completed"
+        }
+      ],
+      "hostExited": true,
+      "providerAtStop": 0,
+      "rowsAtStop": [
+        {
+          "id": "e21b8baa-76e8-489a-80cf-56a21d048871",
+          "status": "running"
+        }
+      ],
+      "nativeAtStop": "01a0fe4d-bfa8-7094-8cf5-cd991d06ddb4",
+      "stop": {
+        "aborted": false,
+        "abortBashSent": false,
+        "converged": true,
+        "toreDown": false,
+        "steps": [
+          "nothing running"
+        ],
+        "errors": []
+      },
+      "rowsAfterStopBeforeIdDelivery": [
+        {
+          "id": "e21b8baa-76e8-489a-80cf-56a21d048871",
+          "status": "running"
+        }
+      ],
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:3ac1d8b1-34ff-4252-8228-968b58435096:80c9209a-e6ae-4e70-846f-dc3651051511:1",
+        "hostTurnId": "e21b8baa-76e8-489a-80cf-56a21d048871"
+      },
+      "initialProviderRequests": 1,
+      "initialRows": [
+        {
+          "id": "e21b8baa-76e8-489a-80cf-56a21d048871",
+          "status": "completed"
+        }
+      ],
+      "initialEnds": [
+        {
+          "sessionId": "3ac1d8b1-34ff-4252-8228-968b58435096",
+          "turnId": "omp-turn:3ac1d8b1-34ff-4252-8228-968b58435096:80c9209a-e6ae-4e70-846f-dc3651051511:1",
+          "hostTurnId": "e21b8baa-76e8-489a-80cf-56a21d048871",
+          "reason": "completed"
+        }
+      ],
+      "initialDurableEnds": [
+        {
+          "sessionId": "3ac1d8b1-34ff-4252-8228-968b58435096",
+          "turnId": "e21b8baa-76e8-489a-80cf-56a21d048871",
+          "status": "completed"
+        }
+      ],
+      "recovery": {
+        "prompt": {
+          "accepted": true,
+          "turnId": "omp-turn:3ac1d8b1-34ff-4252-8228-968b58435096:80c9209a-e6ae-4e70-846f-dc3651051511:2",
+          "hostTurnId": "6b811c1c-1cde-4135-a897-cc4a324f979f"
+        },
+        "providerRequests": 1,
+        "rows": [
+          {
+            "id": "e21b8baa-76e8-489a-80cf-56a21d048871",
+            "status": "completed"
+          },
+          {
+            "id": "6b811c1c-1cde-4135-a897-cc4a324f979f",
+            "status": "completed"
+          }
+        ],
+        "sameNativeId": true
+      },
+      "passed": false,
+      "error": "AssertionError [ERR_ASSERTION]: Stop during begin must cancel the pending prompt\n\n1 !== 0\n\n    at file:///tmp/omp-t20-b2-repair-review/host-turn-stop-review.mjs:88:47",
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "runtimeStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      },
+      "scratchRemoved": true
+    }
+  ],
+  "passed": false
+}

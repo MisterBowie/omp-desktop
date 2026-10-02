@@ -1,0 +1,114 @@
+{
+  "candidate": "148cfcc78e3d8a093877cba2050cb40363e5b9ba",
+  "fork": {
+    "repository": "https://github.com/MisterBowie/oh-my-pi",
+    "branch": "codex/omp-desktop-18.3.0-patch-4",
+    "commit": "512370a1b177cf45e4d12781104506ea372fb8a9",
+    "tree": "78886eaf82d4145521369b9e734cfff53f53fb54",
+    "note": "Self-maintained fork whose HEAD is exactly base.sha + this patch level. `scripts/omp-sidecar.mjs` refuses any other commit; can1357/oh-my-pi stays a read-only upstream."
+  },
+  "patch": {
+    "file": "0001-omp-desktop-runtime.patch",
+    "sha256": "d6d30785389a2ffc84bdff8ac72a4cea27c2abc50e14d709397f23dd2362882f",
+    "bytes": 101113
+  },
+  "runtimeEvidenceReusable": true,
+  "files": [
+    {
+      "name": "app-checks.txt",
+      "sha256": "47c03eba21423ecbb747481e871cf3df9d583120407b01ca23aa3eae522e00c4",
+      "bytes": 4671
+    },
+    {
+      "name": "build-typecheck-lint.txt",
+      "sha256": "991b6f75126ce5b1e433c45987e0610c9c816a3e601bcf7a0fd611764ad53021",
+      "bytes": 1185
+    },
+    {
+      "name": "desktop-affected.txt",
+      "sha256": "7a37eceb4a476035bd59d421022f85fd032ce498dae7a9529e9227101662b6e0",
+      "bytes": 12581
+    },
+    {
+      "name": "desktop-full.txt",
+      "sha256": "277cc6006c80880f4e083c069d0f85294be12aa72e4bee94c4e50c0285a958d3",
+      "bytes": 254856
+    },
+    {
+      "name": "fork-agent-loop.txt",
+      "sha256": "b177856a294298fae80a706a6090ae2a18ef16de7520a21d3be0ef9cf55b1c81",
+      "bytes": 104
+    },
+    {
+      "name": "fork-reproducibility.txt",
+      "sha256": "7bb4bf7b540f80297ba08a70ef2069bb3c2aeb14b05af66cf20811c14a6efd5a",
+      "bytes": 102
+    },
+    {
+      "name": "fork-rpc-host-tools.txt",
+      "sha256": "4d2041498471be9756a67ba82a9a6f5ebbe30bbe8ea0e7d548cba2ea45f12e89",
+      "bytes": 106
+    },
+    {
+      "name": "hostcore-plans.txt",
+      "sha256": "a66b6bf5bb4ecdd9de9b6caae36ab018b0c9bef2fb5dd82e1728b2498aa7decd",
+      "bytes": 2020
+    },
+    {
+      "name": "omp-runtime-vitest.txt",
+      "sha256": "a85ed3e16856aeb9c10aed6ba97a488956553ff16ef126c96b88c7890f0ae1b1",
+      "bytes": 765
+    },
+    {
+      "name": "omp-runtime-vitest.txt.gz",
+      "sha256": "5621b940126574fd1e09ce84d72fde8801154ec20b8f6e271aeedf1bb8d26eb5",
+      "bytes": 253
+    },
+    {
+      "name": "patch-sidecar-check.txt",
+      "sha256": "152b7a56d2d223290f3f6a35d2a5269cab6a4a22a3d17bfa50ab2b5f59a2bcae",
+      "bytes": 703
+    },
+    {
+      "name": "patched-e2e-regression.txt",
+      "sha256": "5344e0b2d3781d717d302ed5f64019beba06015bca791e0c2d33776bd03a27e3",
+      "bytes": 328
+    },
+    {
+      "name": "plan-submit-e2e-unpatched-red.txt",
+      "sha256": "fabe65a8ccfe8bef15243160487900ec0522373287b4b243cdc95a160359ff39",
+      "bytes": 1516
+    },
+    {
+      "name": "plan-submit-e2e-unpatched-red.txt.gz",
+      "sha256": "97fc32b4520069478a1d7f23e592b46baab0d3c3e2b8e906a0b8a8582c43f9f4",
+      "bytes": 625
+    },
+    {
+      "name": "plan-submit-e2e.txt",
+      "sha256": "605cc9bf11d9e888c149c66f34f8813f618d958ef21a7d4156474334d85baab7",
+      "bytes": 750
+    },
+    {
+      "name": "real-omp-regression.txt",
+      "sha256": "5a62d9c56be776ec9d3a65264143ad60263515946476bac440be23670181f52c",
+      "bytes": 5565
+    },
+    {
+      "name": "sidecar-build-provenance.txt",
+      "sha256": "fa3177c7dc6afb168fcfcff95235e54154ac266062a0748cdda04990f225542f",
+      "bytes": 3383
+    }
+  ],
+  "rawGzip": [
+    {
+      "name": "omp-runtime-vitest.txt.gz",
+      "uncompressedSha256": "87f8fff9a23a2d6212b166fb54f58e8227e50bbc89b9d80b1810300e08dbf3f8"
+    },
+    {
+      "name": "plan-submit-e2e-unpatched-red.txt.gz",
+      "uncompressedSha256": "80919b9a7cbf0ef4678c5165507c04574b316f075b807bbdf0446728e1d2b9f4"
+    }
+  ],
+  "fixedSubmodules": "62bc57be1b03ef0802a33cf7f5f530e534527531 upstream/oh-my-pi (62bc57be)\n 0111e306c120ad5820688d7608cb37bad8fbcc1f upstream/pi-desktop (0111e306)"
+}

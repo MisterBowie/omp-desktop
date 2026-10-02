@@ -1,0 +1,154 @@
+{
+  "candidate": "148cfcc78e3d8a093877cba2050cb40363e5b9ba",
+  "hostSha256": "9637156097afc19da6b40a3aa30e95d883a8c8b98d94138faeeade425f7a2ee4",
+  "layer": "production bridge/production host-turn lifecycle/actual HostProcess SQLite/patched OMP/local FakeProvider; public runtimeFactory seam holds only the real user-prompt response Promise until an actual terminal frame arrives; no frame/result forging; not an unmodified transport-timing proof",
+  "cases": [
+    {
+      "strategy": "control",
+      "ends": [
+        {
+          "sessionId": "3d7f3668-056e-4d10-bc3c-0152ed62d386",
+          "turnId": "omp-turn:3d7f3668-056e-4d10-bc3c-0152ed62d386:3b2a62ca-7c32-4591-bd9f-783f395743c2:1",
+          "hostTurnId": "36b233cd-7f69-447b-b614-ffaa984b58b6",
+          "reason": "completed"
+        }
+      ],
+      "begins": [
+        "36b233cd-7f69-447b-b614-ffaa984b58b6"
+      ],
+      "durableEnds": [
+        {
+          "sessionId": "3d7f3668-056e-4d10-bc3c-0152ed62d386",
+          "turnId": "36b233cd-7f69-447b-b614-ffaa984b58b6",
+          "status": "completed"
+        }
+      ],
+      "hostExited": true,
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:3d7f3668-056e-4d10-bc3c-0152ed62d386:3b2a62ca-7c32-4591-bd9f-783f395743c2:1",
+        "hostTurnId": "36b233cd-7f69-447b-b614-ffaa984b58b6"
+      },
+      "initialProviderRequests": 1,
+      "initialRows": [
+        {
+          "id": "36b233cd-7f69-447b-b614-ffaa984b58b6",
+          "status": "completed"
+        }
+      ],
+      "initialEnds": [
+        {
+          "sessionId": "3d7f3668-056e-4d10-bc3c-0152ed62d386",
+          "turnId": "omp-turn:3d7f3668-056e-4d10-bc3c-0152ed62d386:3b2a62ca-7c32-4591-bd9f-783f395743c2:1",
+          "hostTurnId": "36b233cd-7f69-447b-b614-ffaa984b58b6",
+          "reason": "completed"
+        }
+      ],
+      "initialDurableEnds": [
+        {
+          "sessionId": "3d7f3668-056e-4d10-bc3c-0152ed62d386",
+          "turnId": "36b233cd-7f69-447b-b614-ffaa984b58b6",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "runtimeStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      },
+      "scratchRemoved": true
+    },
+    {
+      "strategy": "terminal-before-prompt-promise-delivery",
+      "ends": [
+        {
+          "sessionId": "2b92118e-b7c8-4222-a7e0-87aaaa0de066",
+          "turnId": "omp-turn:2b92118e-b7c8-4222-a7e0-87aaaa0de066:9420c87c-125e-45de-9d2f-f63a9f1cc965:1",
+          "hostTurnId": null,
+          "reason": "completed"
+        }
+      ],
+      "begins": [
+        "801c9381-d6d2-457f-807e-53d430a98061"
+      ],
+      "durableEnds": [],
+      "hostExited": true,
+      "heldUserPrompt": true,
+      "actualTerminalFrame": true,
+      "realPromptResponse": {
+        "id": "req-cb067a5d",
+        "type": "response",
+        "command": "prompt",
+        "success": true
+      },
+      "endsBeforePromptReturn": [
+        {
+          "sessionId": "2b92118e-b7c8-4222-a7e0-87aaaa0de066",
+          "turnId": "omp-turn:2b92118e-b7c8-4222-a7e0-87aaaa0de066:9420c87c-125e-45de-9d2f-f63a9f1cc965:1",
+          "hostTurnId": null,
+          "reason": "completed"
+        }
+      ],
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:2b92118e-b7c8-4222-a7e0-87aaaa0de066:9420c87c-125e-45de-9d2f-f63a9f1cc965:1",
+        "hostTurnId": "801c9381-d6d2-457f-807e-53d430a98061"
+      },
+      "settlementWaitError": "review wait expired",
+      "initialProviderRequests": 1,
+      "initialRows": [
+        {
+          "id": "801c9381-d6d2-457f-807e-53d430a98061",
+          "status": "running"
+        }
+      ],
+      "initialEnds": [
+        {
+          "sessionId": "2b92118e-b7c8-4222-a7e0-87aaaa0de066",
+          "turnId": "omp-turn:2b92118e-b7c8-4222-a7e0-87aaaa0de066:9420c87c-125e-45de-9d2f-f63a9f1cc965:1",
+          "hostTurnId": null,
+          "reason": "completed"
+        }
+      ],
+      "initialDurableEnds": [],
+      "recovery": {
+        "error": "the durable host turn could not be started: AGENT_BUSY",
+        "errorCode": "OMP_HOST_TURN_FAILED",
+        "providerRequests": 0,
+        "rows": [
+          {
+            "id": "801c9381-d6d2-457f-807e-53d430a98061",
+            "status": "running"
+          }
+        ]
+      },
+      "passed": false,
+      "error": "AssertionError [ERR_ASSERTION]: real terminal event must close its own durable host turn even before prompt Promise delivery\n+ actual - expected\n\n+ 'running'\n- 'completed'\n\n    at file:///Users/vv/Documents/%E5%AF%B9%E8%AF%9D/omp-t20-b2-review-20261003/host-turn-terminal-order-review.mjs:90:50\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "runtimeStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      },
+      "scratchRemoved": true
+    }
+  ],
+  "passed": false
+}

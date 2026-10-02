@@ -1,6 +1,8 @@
 # M5/T20-B2：非 Cursor 的 Plan/Goal 提交、审批与批准执行 —— 验证记录
 
-更新时间：2026-10-03。状态：**实现完成、待独立复审**；T20 未完成、`plan`/`goal` 能力键保持关闭、T20-D 未开始。设计：ADR 0310（`app/docs/adr/0310-omp-plan-submit-approval-and-dispatch.md`）；补丁级 `.4`（ADR 0305 修订）。证据目录：本文件同名目录（原始日志 + `SHA256SUMS.txt`）。
+更新时间：2026-10-03。状态：**首轮独立复审判 changes-required（R1-R3 + R4 证据缺口），返修完成、待根复验**；T20 未完成、T20-D 未开始。设计：ADR 0310（`app/docs/adr/0310-omp-plan-submit-approval-and-dispatch.md`）；补丁级 `.4`（ADR 0305 修订）。证据目录：本文件同名目录（原始日志 + `SHA256SUMS.txt`，返修 RED/GREEN 见 `repair-red/`、`repair-green/`）。
+
+> 术语更正（复审要求）：本阶段**不声称** `plan`/`goal` 能力键“保持关闭”构成 UI 门禁证据——`@pi-desktop/shared` 的 `EngineCapability` 当前根本没有这两个键，`ComposerToolbar` 也无 engine/capability 输入，键缺失无法证明 UI 已隐藏或禁用。能力键与 UI 按引擎门禁的整体验收留 T20-D，本阶段未证明。
 
 - 分支：`codex/m5-t20-b2-approval`（追加提交，不 amend/rebase/强推，不发布、不合 main）
 - 上一阶段：M5/T20-C 的最终原始提交 `9491016062e36a2967cf3db74d2a4990421d9d30` 已由根独立验收（`omp-t20-c-review-20261003/c-acceptance-94910160.json`，归档 `/tmp/omp-t20-b2-root-handoff-20261003/`），本轮从该提交开始
@@ -52,7 +54,44 @@ B2 改变了两处可观察形状，相关既有测试按新行为更新：
 
 - **全量 desktop（最终）**：`env -u SSH_ASKPASS PI_DESKTOP_HOST_BIN=<host-core> node --test test/*.test.mjs` → **2995 tests / 2984 pass / 0 fail / 11 skipped，exit 0**（`desktop-full.txt`；含 B2 新增的 11 项）。本机 `SSH_ASKPASS=/usr/bin/false` 是环境泄漏，会让 `remote-host-ssh-password.test.mjs` 的「key 认证不应继承 askpass」断言失败；去掉该环境变量后 14/14 通过——环境问题，不是产品行为（未改产品）。
 - **B1/C 真实运行时 E2E 复核**：`patched-e2e-regression.txt` → 2 passed / 0 failed（B1 15.9s、C 11.8s）。两者夹具补上了宿主 `session.beginTurn`/`session.endTurn`，并断言每个回合都结算自己的持久回合（§3 变更 1/3）。
-- **未跑/不声称**：`plan`/`goal` 能力键与 UI 入口未开放（T20-D 整矩阵）；未发 release/tag、未合 main；三平台（macOS arm64 / Windows x64 / Linux x64）真实安装包按用户目标在 M5 整体验收后交付，本轮只有 Linux x64 本机证据；未跑 Windows/macOS 实机；未用真实外部模型；未调用 Cursor 服务；Cursor + Plan/Goal 仍拒绝（ADR 0306 未改）。
+- **未跑/不声称**：`plan`/`goal` 能力键与 UI 按引擎门禁的整体验收留 T20-D（见文首术语更正；键缺失不能证明 UI 隐藏/禁用）；未发 release/tag、未合 main；三平台（macOS arm64 / Windows x64 / Linux x64）真实安装包按用户目标在 M5 整体验收后交付，本轮只有 Linux x64 本机证据；未跑 Windows/macOS 实机；未用真实外部模型；未调用 Cursor 服务；Cursor + Plan/Goal 仍拒绝（ADR 0306 未改）。
 - **真实外部模型**：无。E2E 的 provider 是本地 FakeProvider；宿主是真实 host-core + 真实数据库（`node:sqlite` 只读核对重启后 `plan_approvals.execution_state = interrupted`）。
 - **已知边界（如实记录）**：Goal 延续定时器未实现（批准的 Goal 是一个 agent 回合，与 Pi 路径一致）；`settleOmpTurnEnd` 的结算发生在 runner 同步 close 触发的异步 host RPC 中（fire-and-forget + 一次重试 + 日志），下一提示词等待该 promise —— 若 host 持续不可用，`beginTurn` 会以 `AGENT_BUSY` fail closed 而非静默继续。
 - **补丁 `.4` 的第二方产物**：Linux x64 sidecar 284001760 B/`47a30f08…`（provenance `patchLevel 62bc57b+omp-desktop.4`）；该产物与 `.3` 的旧二进制不同，manifest/坐标已同步更新（`app/patches/oh-my-pi/manifest.json`、`@pi-desktop/shared` 常量、`docs/source-baseline.json`、两个 workflow 的 ref）。
+
+## 5. 首轮独立复审返修（2026-10-03，同一分支追加提交）
+
+根复审（候选 `148cfcc78e3d8a093877cba2050cb40363e5b9ba`，报告 `/tmp/omp-t20-b2-first-root-review-20261003/`）判 changes-required：R1-R3 三条生产竞态 + R4 产品 E2E 的终态证明缺口，全部在桌面绑定/派发层；fork、补丁级与固定子模块未改。
+
+### 5.1 RED 复现（Linux x64，本机）
+
+根脚本只替换环境路径后移植到本机（断言/seam/注释不变，脚本头注明；不是 macOS 命令实跑）。对未修改的 `148cfcc7` 重跑，结果与根报告一致：control 全过，三条负例失败——R1 provider 1 ≠ 0、R2 durable row `running` ≠ `completed`、R3 execution `running` ≠ `completed`。原始报告/stdout 与根原件的字节副本：`repair-red/`（含 `root-originals/`，`sha256sum -c` 17/17 OK）。证明层与根一致：真实 HostProcess/SQLite + 生产 bridge/host-turn lifecycle/runner/plan dispatcher + patched `.4` OMP + 本地 FakeProvider，均通过公开 seam 控制真实异步边界，不伪造 frame/结果/DB 行、不是未修改传输自然时序证明。
+
+### 5.2 修复
+
+1. **R2**：runner 的 turn-end 公告携带本 run 记录的 `hostTurnId`（`closeRun` 在清空记录前读取，`signalTurnEnd` 原样上报）；bridge 按 live id 或**精确** durable id 匹配当前 host turn 并恰一次结算，prompt 应答晚到不再复活已结算代号；迟到/重复终态不关闭新代。
+2. **R1**：`omp-session.ts` 的 `prompt` 在 `hostTurns.begin` 返回后、任何用户内容写入前重查 `closed`/`stopEpoch`——命中即把已创建的真实 row 恰一次结算为 `aborted` 并抛 `stopping`；begin 在 stop 竞争下失败也归类为 `stopping`。
+3. **R3**：新增 `OmpPromptInput.onHostTurnBound(hostTurnId)`，bridge 在 row 存在且 stop 复核通过后、runner 之前同步回调；`plans.dispatchApprovedPlanToOmp` 在回调内以精确 hostTurnId 登记 execution 绑定（不再等 `await omp.prompt`）；无 host-turn 生命周期的组合保留 prompt 返回后的幂等兜底，回调已触发时终态结算后不再重新登记。唯一 host begin 所有者、host queued→running CAS、Pi 路径不变。
+4. **R4**：产品 E2E 的 bridge 接受 `onTurnEnd` 并按生产 `index.ts` 接线到 `settleOmpTurnEnd`，派发用例直接读真实 `plan_approvals.execution_state` 断言 `completed`/`interrupted`（不再以空队列替代）。
+
+### 5.3 新增回归
+
+- `omp-plan-submit-e2e.test.mjs` 扩为 **7 用例**，新增三个控制性顺序回归（每个含正对照与真实 provider 计数/durable row/terminal 身份/进程与目录回收断言）：①Stop during durable begin（拒绝 `stopping`、provider 0、row 恰一次 aborted、同 native 恢复）；②terminal before prompt response（control + held 两轮；row completed、公告 id == row id、下一轮恢复）；③dispatch hold（双 dispatcher 共享 host CAS、早到终态结算 completed、不重放）+ refused begin（`interrupted`、provider 0、无遗留 turn）。
+- `omp-runtime` 单测新增 2 例：`runner.test.ts` 与 `turn-end.test.ts` 各一（FakeRuntime 只扣住真实 prompt 应答、先推真实 `agent_end`，断言公告携带 run 的 hostTurnId）。
+
+### 5.4 修复后验证（Linux x64 / Node v24.14.0 / Bun 1.4.2；原始日志 `repair-green/`）
+
+| 检查 | 结果 | 日志 |
+| --- | --- | --- |
+| 移植根脚本 R1/R2/R3（对修复后 commit） | 三脚本 `passed: true`（control + 负例全过） | `repair-green/host-turn-*.json`、`approved-terminal-order-*.json` |
+| `node --test apps/desktop/test/omp-plan-submit-e2e.test.mjs` | **7 passed / 0 failed，exit 0** | `repair-green/plan-submit-e2e.txt` |
+| 受影响 desktop 套件（24 文件：B2 E2E/单元、drain、artifact、approval settings、host-tool adapter/bridge/e2e、bridge/failclosed/turn-fence/runtime-state/execution-policy/session e2e、M4 configure/delete/ownership/ipc、launcher、patch、sidecar、release gate） | **252 passed / 0 failed，exit 0** | `repair-green/desktop-affected.txt` |
+| `pnpm --filter @pi-desktop/omp-runtime test`（vitest） | **31 files / 476 passed / 6 skipped，exit 0** | `repair-green/omp-runtime-vitest.txt` |
+| `pnpm build:js` / `pnpm typecheck` / `pnpm lint` | 全部 exit 0 | `repair-green/{build-js,typecheck,lint}.txt` |
+| `git diff --check`（工作树）+ `git diff --cached --check` | 空输出，exit 0 | `repair-green/diff-check.txt` |
+
+### 5.5 限制（不夸大）
+
+- 三个移植脚本的负例是公开 seam 的控制性异步边界（begin 回调内执行并等待真实 Stop；runtimeFactory 只扣真实应答至真实 terminal frame；dispatch 组合只延迟真实结果交付），不是未修改传输的自然调度证明；R1/R3 的接口证据只在 bridge/dispatch 的公开类型与应用组合，无私有字段、无伪造 event、无伪造 DB 行。
+- 仅 Linux x64 本机；未跑 Windows/macOS 实机；未用真实外部模型；fork `512370a1`、patch `.4`、固定子模块均未变；未重建 sidecar（未改 runtime/gate 构建输入）。
+- `settleOmpTurnEnd` 的结算仍是 runner 同步 close 触发的异步 host RPC（既有边界，见 §4）。

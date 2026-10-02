@@ -363,6 +363,17 @@ export type OmpPromptInput = {
   nativeSessionPath?: string | null;
   adapterVersion?: number | null;
   runtimeVersion?: string | null;
+  /**
+   * Called once with the durable host turn id after its row exists and the
+   * stop/dispose re-check has passed, immediately before the prompt is handed
+   * to the runner (M5/T20-B2 review repair). A caller that must settle
+   * something from the turn's terminal — the approved-execution dispatcher —
+   * binds its own record here, because a real `agent_end` may arrive before
+   * the prompt response that carries the id back to the caller. A callback
+   * that throws settles nothing and refuses the prompt: the row never stays
+   * running behind a caller that failed to record it.
+   */
+  onHostTurnBound?: (hostTurnId: string) => void;
 };
 
 export type OmpRenameResult = { ok: boolean; reason?: string; inconsistent?: boolean };
@@ -1091,8 +1102,15 @@ class SessionEntry {
       // on the optional plugin announcement. Ordinary envelopes are never
       // inspected for terminal state — a converter error mid-run is not a
       // turn end, and a prompt failure may close a run without any envelope.
-      onTurnEnd: (info: { sessionId: string; turnId: string; reason: "completed" | "aborted" | "error" }) =>
-        this.announceTurnEnded(info.turnId, info.reason),
+      // The run's own durable id rides the announcement (M5/T20-B2 review
+      // repair): a terminal delivered before the prompt response still names
+      // the host turn it belongs to.
+      onTurnEnd: (info: {
+        sessionId: string;
+        turnId: string;
+        reason: "completed" | "aborted" | "error";
+        hostTurnId: string | null;
+      }) => this.announceTurnEnded(info.turnId, info.reason, info.hostTurnId),
       emit: (envelope) => this.emitAgentEvent(envelope),
       onUiRequest: (request, info) => this.surfaceUiRequest(request, info.sessionId, info.generation),
       onUiClosed: (requestId, reason) => {
@@ -1339,7 +1357,12 @@ class SessionEntry {
    * synchronously, and this re-checks it immediately before submission, so a
    * stop that raced a startup/restore cannot let the prompt land afterwards.
    */
-  async prompt(gate: string, spec: OmpSessionRuntimeSpec, content: string): Promise<OmpPromptResult> {
+  async prompt(
+    gate: string,
+    spec: OmpSessionRuntimeSpec,
+    content: string,
+    onHostTurnBound?: (hostTurnId: string) => void,
+  ): Promise<OmpPromptResult> {
     this.assertOpen();
     const epoch = this.stopEpoch;
     // The mode is read before anything starts: it decides whether this prompt
@@ -1440,6 +1463,12 @@ class SessionEntry {
         hostTurnId = typeof begun === "string" && begun.trim() ? begun.trim() : null;
         if (!hostTurnId) throw new Error("session.beginTurn returned no turn id");
       } catch (error) {
+        // A stop/dispose that landed while the begin was in flight owns the
+        // refusal: the row was not created (or is not this prompt's to keep),
+        // so it is reported as the stop it is, not as a host failure.
+        if (this.closed || this.stopEpoch !== epoch) {
+          throw new OmpRuntimeError("stopping", "a stop was requested while the prompt was being prepared");
+        }
         throw Object.assign(
           new Error(
             `the durable host turn could not be started: ${error instanceof Error ? error.message : String(error)}`,
@@ -1448,6 +1477,34 @@ class SessionEntry {
         );
       }
       this.hostTurn = { hostTurnId, liveTurnId: null };
+      // The begin's await is the last window in which a stop/dispose can slip
+      // past the pre-begin check (M5/T20-B2 review repair): the row exists
+      // now, so it is settled as aborted exactly once and the user prompt is
+      // never written — not marked aborted while still being sent.
+      if (this.closed || this.stopEpoch !== epoch) {
+        this.hostTurn = null;
+        this.endHostTurn(hostTurnId, "aborted");
+        throw new OmpRuntimeError("stopping", "a stop was requested while the prompt was being prepared");
+      }
+      // Bind the caller to the durable id before the runner can deliver any
+      // terminal for it (M5/T20-B2 review repair, approved-execution
+      // dispatch). The callback is the dispatcher's registration point; a
+      // throwing callback refuses the prompt and settles the row as an error
+      // rather than leaving a running row behind.
+      if (onHostTurnBound) {
+        try {
+          onHostTurnBound(hostTurnId);
+        } catch (error) {
+          this.hostTurn = null;
+          this.endHostTurn(hostTurnId, "error");
+          throw Object.assign(
+            new Error(
+              `the host-turn binding callback failed: ${error instanceof Error ? error.message : String(error)}`,
+            ),
+            { errorCode: "OMP_HOST_TURN_FAILED" },
+          );
+        }
+      }
     }
     let started: { accepted: boolean; turnId: string; hostTurnId: string | null };
     try {
@@ -1850,15 +1907,29 @@ class SessionEntry {
    * bounded cache could forget an old turn and let a replayed terminal
    * announce twice. The set is released wholesale when the entry is disposed.
    */
-  private announceTurnEnded(turnId: string, reason: "completed" | "aborted" | "error"): void {
-    // The runner closed exactly one generation; its live id identifies the
-    // host turn that generation was bound to. Settling the durable row happens
-    // here — the single host-turn settle point — even when no plugin
-    // announcement is wired. A generation whose host turn was already settled
-    // by the prompt-failure path (or that never had one) matches nothing.
+  private announceTurnEnded(
+    turnId: string,
+    reason: "completed" | "aborted" | "error",
+    boundHostTurnId: string | null = null,
+  ): void {
+    // The runner closed exactly one generation; the durable id its run was
+    // created with identifies the host turn that generation belongs to. The
+    // live-id match stays for runs whose binding was assigned after the
+    // prompt response, while the durable-id match covers the real ordering
+    // in which `agent_end` arrives before that response is delivered
+    // (M5/T20-B2 review repair) — both are exact identities, so a late event
+    // from an old generation never matches the new turn's row. Settling the
+    // durable row happens here — the single host-turn settle point — even
+    // when no plugin announcement is wired. A generation whose host turn was
+    // already settled by the prompt-failure path (or that never had one)
+    // matches nothing.
     const hostTurn = this.hostTurn;
     let hostTurnId: string | null = null;
-    if (hostTurn && hostTurn.liveTurnId === turnId) {
+    if (
+      hostTurn &&
+      (hostTurn.liveTurnId === turnId ||
+        (boundHostTurnId !== null && hostTurn.hostTurnId === boundHostTurnId))
+    ) {
       hostTurnId = hostTurn.hostTurnId;
       this.hostTurn = null;
       this.endHostTurn(hostTurnId, reason);
@@ -2159,7 +2230,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       runtimeVersion: input.runtimeVersion ?? null,
     };
     const entry = entryFor(spec);
-    return entry.prompt(gate, spec, input.content);
+    return entry.prompt(gate, spec, input.content, input.onHostTurnBound);
   }
 
   /** The runtime handle for a session's runner (fails loudly if absent). */

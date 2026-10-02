@@ -1,0 +1,29 @@
+(node:75760) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ T20-B2 plan submission (patched): valid, schema-rejected, mixed-batch, duplicate and revision (7315.12775ms)
+✔ T20-B2 mixed batch [bash, SubmitPlan] is rejected whole, does not terminate, and ordinary tools still run (2884.678292ms)
+✔ T20-B2 approval dispatch: queued execution runs in OMP with the approved instruction, exactly once (5385.121792ms)
+✔ T20-B2 rejected approval never executes, and a restart does not replay a queued one (3633.872833ms)
+✔ submit catalog entries carry the PI name/schema and the sole+terminate policy (1.353584ms)
+✔ submits through the host with the durable identity from the run binding (0.753291ms)
+✔ refuses a wrong-kind call and a call without a durable host turn (0.132042ms)
+✔ refuses empty arguments and a missing host wiring before any host call (0.282416ms)
+✔ surfaces the host error code and rejects a malformed proposal reply (0.322458ms)
+✔ plan approval exposes only the artifact and remembers the selected mode (0.700625ms)
+✔ approval card omits validity details while the pending gate stays actionable (0.509583ms)
+✔ terminal execution snapshots are represented and do not gate a later prompt (0.604375ms)
+✔ command-shell settings are catalog-driven and use the existing save flow (0.231167ms)
+✔ approval and shell surfaces have locale-backed responsive copy (0.987417ms)
+✔ a session the engine gate refuses is skipped before any claim (1.465084ms)
+✔ a queued execution for an OMP session is skipped before any claim when the OMP runtime is not wired (0.323625ms)
+✔ a queued execution for an OMP session claims once and prompts the bridge, never the Pi sidecar (0.275125ms)
+✔ a queued execution for a Pi session still dispatches (0.251375ms)
+✔ a composition without the engine gate claims nothing (0.148583ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 42584.12875

@@ -1,0 +1,116 @@
+(node:1213) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  "candidate": "148cfcc78e3d8a093877cba2050cb40363e5b9ba",
+  "layer": "actual host SQLite/production bridge/lifecycle/adapter/Main plan dispatcher/patched OMP/local FakeProvider; getOmpSessions public seam holds actual prompt result until actual onTurnEnd; controlled response delivery, not unmodified native timing",
+  "cases": [
+    {
+      "kind": "plan",
+      "permission": "auto",
+      "wired": true,
+      "hold": false,
+      "permissionCards": [],
+      "ends": [
+        {
+          "sessionId": "e3823d59-08b3-48c5-8bb5-a9b4d54620da",
+          "turnId": "omp-turn:e3823d59-08b3-48c5-8bb5-a9b4d54620da:b4b91f20-5d0f-4466-a282-ac8a1370541d:1",
+          "hostTurnId": "73916e8e-3b18-45ba-b708-dfbac561a76b",
+          "reason": "completed"
+        },
+        {
+          "sessionId": "e3823d59-08b3-48c5-8bb5-a9b4d54620da",
+          "turnId": "omp-turn:e3823d59-08b3-48c5-8bb5-a9b4d54620da:b4b91f20-5d0f-4466-a282-ac8a1370541d:2",
+          "hostTurnId": "7ef81388-a37d-4799-bd5f-4bc6eacafd75",
+          "reason": "completed"
+        }
+      ],
+      "submitRequests": 1,
+      "executionId": "7e835f2e-6fcd-4e73-8a26-a774bf2553a3",
+      "executionRequests": 2,
+      "waitCompleted": true,
+      "executionRow": {
+        "status": "approved",
+        "execution_state": "completed",
+        "error_code": null
+      },
+      "turns": [
+        {
+          "id": "73916e8e-3b18-45ba-b708-dfbac561a76b",
+          "status": "completed"
+        },
+        {
+          "id": "7ef81388-a37d-4799-bd5f-4bc6eacafd75",
+          "status": "completed"
+        }
+      ],
+      "queued": [],
+      "messageCount": 0,
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "plan",
+      "permission": "auto",
+      "wired": true,
+      "hold": true,
+      "permissionCards": [],
+      "ends": [
+        {
+          "sessionId": "8e28e72f-9ea6-42f3-9830-4b5aeeb97c62",
+          "turnId": "omp-turn:8e28e72f-9ea6-42f3-9830-4b5aeeb97c62:2d83a1ff-3bd8-4d96-b259-a77c318af155:1",
+          "hostTurnId": "a7744ed2-7565-482c-be63-acfbad57d7c3",
+          "reason": "completed"
+        },
+        {
+          "sessionId": "8e28e72f-9ea6-42f3-9830-4b5aeeb97c62",
+          "turnId": "omp-turn:8e28e72f-9ea6-42f3-9830-4b5aeeb97c62:2d83a1ff-3bd8-4d96-b259-a77c318af155:2",
+          "hostTurnId": "ab2b1387-1b65-4bad-ae2a-2d80c57cbd5d",
+          "reason": "completed"
+        }
+      ],
+      "submitRequests": 1,
+      "executionId": "b9b477e8-553b-4825-9e4d-fa49616b9f04",
+      "actualEndBeforeDispatchPromptReturn": {
+        "sessionId": "8e28e72f-9ea6-42f3-9830-4b5aeeb97c62",
+        "turnId": "omp-turn:8e28e72f-9ea6-42f3-9830-4b5aeeb97c62:2d83a1ff-3bd8-4d96-b259-a77c318af155:2",
+        "hostTurnId": "ab2b1387-1b65-4bad-ae2a-2d80c57cbd5d",
+        "reason": "completed"
+      },
+      "executionRequests": 2,
+      "waitCompleted": false,
+      "executionRow": {
+        "status": "approved",
+        "execution_state": "running",
+        "error_code": null
+      },
+      "turns": [
+        {
+          "id": "a7744ed2-7565-482c-be63-acfbad57d7c3",
+          "status": "completed"
+        },
+        {
+          "id": "ab2b1387-1b65-4bad-ae2a-2d80c57cbd5d",
+          "status": "completed"
+        }
+      ],
+      "queued": [],
+      "passed": false,
+      "error": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n+ actual - expected\n\n+ 'running'\n- 'completed'\n\n    at file:///Users/vv/Documents/%E5%AF%B9%E8%AF%9D/omp-t20-b2-review-20261003/approved-terminal-order-review.mjs:367:14\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    }
+  ],
+  "finalCleanupErrors": [],
+  "passed": false
+}

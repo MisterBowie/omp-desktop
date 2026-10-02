@@ -182,8 +182,21 @@ export type OmpSessionRunnerOptions = {
    * stopping) or a dispose with a live turn, `error` for a prompt or
    * transport failure. The callback is isolated: a throwing announcement
    * must not block the run close or the event fan-out.
+   *
+   * `hostTurnId` is the durable host turn this run was bound to at prompt
+   * time (null when none was bound), reported from the run record itself.
+   * A real terminal can arrive before the prompt request's response — the
+   * RPC acknowledges the prompt immediately and `agent_end` may be emitted
+   * before or after that response — so the id the run was created with is
+   * the only attribution that cannot depend on when the caller's promise
+   * happened to resolve.
    */
-  onTurnEnd?: (info: { sessionId: string; turnId: string; reason: "completed" | "aborted" | "error" }) => void;
+  onTurnEnd?: (info: {
+    sessionId: string;
+    turnId: string;
+    reason: "completed" | "aborted" | "error";
+    hostTurnId: string | null;
+  }) => void;
 };
 
 type RunRecord = {
@@ -1515,6 +1528,11 @@ export class OmpSessionRunner {
     if (this.run && this.run.generation !== generation) return;
     const closed = this.run !== null;
     const turnId = this.run?.turnId;
+    // The durable host turn this run was created with (M5/T20-B2 review
+    // repair): read before the record is cleared, so the announcement carries
+    // the run's own binding even when the terminal arrives before the prompt
+    // request's response was delivered.
+    const hostTurnId = this.run?.hostTurnId ?? null;
     // A handshake still waiting for its acknowledgment cannot outlive the run
     // it belongs to: settling it false makes `armTurnFence` fail closed
     // instead of holding the prompt open until the fence timeout.
@@ -1530,7 +1548,7 @@ export class OmpSessionRunner {
     // arrives after this point has no owning run and fails closed instead.
     this.hostTools.cancelAll("the run ended");
     this.hostTools.closeGeneration(generation);
-    if (closed && turnId) this.signalTurnEnd(generation, turnId, reason);
+    if (closed && turnId) this.signalTurnEnd(generation, turnId, reason, hostTurnId);
     this.wakeWaiters();
   }
 
@@ -1542,11 +1560,16 @@ export class OmpSessionRunner {
    * never pass it. The callback is isolated — a throwing announcement must not
    * block the run close or the event fan-out.
    */
-  private signalTurnEnd(generation: number, turnId: string, reason: "completed" | "aborted" | "error"): void {
+  private signalTurnEnd(
+    generation: number,
+    turnId: string,
+    reason: "completed" | "aborted" | "error",
+    hostTurnId: string | null,
+  ): void {
     if (!this.onTurnEnd || generation <= this.lastTurnEndGeneration) return;
     this.lastTurnEndGeneration = generation;
     try {
-      this.onTurnEnd({ sessionId: this.sessionId, turnId, reason });
+      this.onTurnEnd({ sessionId: this.sessionId, turnId, reason, hostTurnId });
     } catch {
       // The announcement is advisory: its failure is swallowed so the close
       // path and the renderer's event fan-out are never held up by it.

@@ -5,7 +5,7 @@
  * does — write, request, emit frames — so these tests exercise the runner the
  * desktop will use, not a stand-in for it.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { AgentEventEnvelope } from "@pi-desktop/shared";
 import { OmpRuntimeError } from "../errors.js";
@@ -89,7 +89,12 @@ function harness(
     onUiClosed?: (requestId: string, reason: string) => void;
     onUiRecord?: (record: OmpUiRecord) => void;
     nativeSessionIdentity?: () => string | null | undefined;
-    onTurnEnd?: (info: { sessionId: string; turnId: string; reason: "completed" | "aborted" | "error" }) => void;
+    onTurnEnd?: (info: {
+      sessionId: string;
+      turnId: string;
+      reason: "completed" | "aborted" | "error";
+      hostTurnId: string | null;
+    }) => void;
   } = {},
 ) {
   const runtime = new FakeRuntime();
@@ -165,6 +170,44 @@ describe("prompting", () => {
     await expect(runner.prompt("x")).rejects.toMatchObject({ code: "not-started" });
     expect(runner.status().isRunning).toBe(false);
   });
+
+  it("carries the run's durable host turn id when the terminal beats the prompt response", async () => {
+    const turns: Array<{
+      sessionId: string;
+      turnId: string;
+      reason: string;
+      hostTurnId: string | null;
+    }> = [];
+    const { runtime, runner } = harness({ onTurnEnd: (info) => turns.push(info) });
+    // Hold only the user prompt response: the runtime acknowledges prompts
+    // immediately, and `agent_end` may legitimately win that race (rpc.md).
+    // The fence handshake is served transparently and must not be held.
+    const originalRequest = runtime.request.bind(runtime);
+    const held = Promise.withResolvers<void>();
+    runtime.request = async (command) => {
+      if (command.type === "prompt" && !turnCommandToken(String(command.message))) {
+        await held.promise;
+      }
+      return originalRequest(command);
+    };
+    const startedPromise = runner.prompt("hello", { hostTurnId: "host-turn-7" });
+    await vi.waitFor(() => expect(runtime.handshakes).toHaveLength(1));
+    runtime.push({ type: "agent_start" });
+    runtime.push({ type: "agent_end", messages: [] });
+    // The terminal names the durable turn from the run record itself, not
+    // from whichever id the caller's promise eventually resolved with.
+    expect(turns).toEqual([
+      {
+        sessionId: "omp-1",
+        turnId: "omp-turn:omp-1:1",
+        reason: "completed",
+        hostTurnId: "host-turn-7",
+      },
+    ]);
+    held.resolve();
+    const started = await startedPromise;
+    expect(started).toMatchObject({ accepted: true, hostTurnId: "host-turn-7" });
+  });
 });
 
 describe("structured start refusals", () => {
@@ -217,7 +260,7 @@ describe("structured start refusals", () => {
       turnId: first.turnId,
       event: { error: { code: "OMP_RUNTIME_STATE_REFUSED" } },
     });
-    expect(turns).toEqual([{ sessionId: "omp-1", turnId: first.turnId, reason: "error" }]);
+    expect(turns).toEqual([{ sessionId: "omp-1", turnId: first.turnId, reason: "error", hostTurnId: null }]);
     expect(runner.diagnostics()).toMatchObject({ startRefusals: 1, ignoredStartRefusals: 0, turnFences: 1 });
 
     // The exact same descriptor while idle: counted, never a second terminal.
@@ -246,8 +289,8 @@ describe("structured start refusals", () => {
       event: { error: { code: "OMP_RUNTIME_STATE_REFUSED" } },
     });
     expect(turns).toEqual([
-      { sessionId: "omp-1", turnId: first.turnId, reason: "error" },
-      { sessionId: "omp-1", turnId: second.turnId, reason: "error" },
+      { sessionId: "omp-1", turnId: first.turnId, reason: "error", hostTurnId: null },
+      { sessionId: "omp-1", turnId: second.turnId, reason: "error", hostTurnId: null },
     ]);
     expect(runner.diagnostics()).toMatchObject({ startRefusals: 2, ignoredStartRefusals: 2, turnFences: 2 });
   });
@@ -282,7 +325,7 @@ describe("structured start refusals", () => {
     expect(errorsOf(envelopes)).toHaveLength(0);
     runtime.push({ type: "message_start", message: { role: "assistant", content: [{ type: "text", text: "ok" }] } });
     runtime.push({ type: "agent_end", messages: [] });
-    expect(turns).toEqual([{ sessionId: "omp-1", turnId: started.turnId, reason: "completed" }]);
+    expect(turns).toEqual([{ sessionId: "omp-1", turnId: started.turnId, reason: "completed", hostTurnId: null }]);
     expect(runner.diagnostics()).toMatchObject({
       startRefusals: 0,
       ignoredStartRefusals: 5,
@@ -455,7 +498,7 @@ describe("structured start refusals", () => {
     // the failure from `prompt` itself, so no terminal transcript event is
     // fabricated. The turn-end announcement still fires exactly once.
     expect(errorsOf(envelopes)).toHaveLength(0);
-    expect(turns).toEqual([{ sessionId: "omp-unfenced", turnId: "omp-turn:omp-unfenced:1", reason: "error" }]);
+    expect(turns).toEqual([{ sessionId: "omp-unfenced", turnId: "omp-turn:omp-unfenced:1", reason: "error", hostTurnId: null }]);
   });
 
   it("refuses the prompt before submission when the handshake is not acknowledged", async () => {
@@ -501,7 +544,7 @@ describe("structured start refusals", () => {
     runner.dispose("test teardown");
     runtime.push(refusalFrame(token));
     expect(envelopes).toHaveLength(0);
-    expect(turns).toEqual([{ sessionId: "omp-1", turnId: "omp-turn:omp-1:1", reason: "aborted" }]);
+    expect(turns).toEqual([{ sessionId: "omp-1", turnId: "omp-turn:omp-1:1", reason: "aborted", hostTurnId: null }]);
     expect(runner.diagnostics()).toMatchObject({ startRefusals: 0 });
   });
 
@@ -521,7 +564,7 @@ describe("structured start refusals", () => {
     await stop;
     runtime.push(refusalFrame(token));
     expect(envelopes.filter((entry) => entry.event.type === "error")).toHaveLength(0);
-    expect(turns).toEqual([{ sessionId: "omp-1", turnId: "omp-turn:omp-1:1", reason: "aborted" }]);
+    expect(turns).toEqual([{ sessionId: "omp-1", turnId: "omp-turn:omp-1:1", reason: "aborted", hostTurnId: null }]);
     expect(runner.diagnostics()).toMatchObject({ startRefusals: 0, ignoredStartRefusals: 1 });
 
     // The next prompt arms a fresh fence and can be refused normally.
@@ -529,7 +572,7 @@ describe("structured start refusals", () => {
     const secondToken = runtime.handshakes[1]!;
     expect(secondToken).not.toBe(token);
     runtime.push(refusalFrame(secondToken, { refusalId: "refusal-2" }));
-    expect(turns.at(-1)).toEqual({ sessionId: "omp-1", turnId: second.turnId, reason: "error" });
+    expect(turns.at(-1)).toEqual({ sessionId: "omp-1", turnId: second.turnId, reason: "error", hostTurnId: null });
   });
 });
 
@@ -1254,7 +1297,7 @@ describe("a stop cancels the turn-fence preparation (third repair)", () => {
     // ever reached the runtime.
     expect(kinds(commands)).toEqual(["get_available_commands", "abort", "get_subagents"]);
     expect(runner.runState()).toBe("idle");
-    expect(turns).toEqual([{ sessionId: "omp-fence-stop", turnId: "omp-turn:omp-fence-stop:1", reason: "aborted" }]);
+    expect(turns).toEqual([{ sessionId: "omp-fence-stop", turnId: "omp-turn:omp-fence-stop:1", reason: "aborted", hostTurnId: null }]);
     expect(runner.diagnostics()).toMatchObject({ turnFences: 0 });
 
     // The stop closed the generation it cancelled; a retry has nothing to own,
@@ -1291,7 +1334,7 @@ describe("a stop cancels the turn-fence preparation (third repair)", () => {
     // to install the fence or submit the user prompt afterwards.
     expect(kinds(commands)).toEqual(["get_available_commands", "handshake", "abort", "get_subagents"]);
     expect(runner.runState()).toBe("idle");
-    expect(turns).toEqual([{ sessionId: "omp-fence-stop", turnId: "omp-turn:omp-fence-stop:1", reason: "aborted" }]);
+    expect(turns).toEqual([{ sessionId: "omp-fence-stop", turnId: "omp-turn:omp-fence-stop:1", reason: "aborted", hostTurnId: null }]);
     expect(runner.diagnostics()).toMatchObject({ turnFences: 0 });
   });
 
@@ -1335,7 +1378,7 @@ describe("a stop cancels the turn-fence preparation (third repair)", () => {
 
     await expect(prompt).rejects.toMatchObject({ code: "stopping" });
     expect(kinds(commands)).toEqual(["get_available_commands"]);
-    expect(turns).toEqual([{ sessionId: "omp-fence-stop", turnId: "omp-turn:omp-fence-stop:1", reason: "aborted" }]);
+    expect(turns).toEqual([{ sessionId: "omp-fence-stop", turnId: "omp-turn:omp-fence-stop:1", reason: "aborted", hostTurnId: null }]);
     expect(runner.runState()).toBe("idle");
   });
 });

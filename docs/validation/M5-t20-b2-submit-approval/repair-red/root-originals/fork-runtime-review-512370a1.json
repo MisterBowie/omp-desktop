@@ -1,0 +1,66 @@
+{
+  "at": "2026-10-02T19:40:39.961932+00:00",
+  "fork": {
+    "repository": "https://github.com/MisterBowie/oh-my-pi",
+    "branch": "codex/omp-desktop-18.3.0-patch-4",
+    "commit": "512370a1b177cf45e4d12781104506ea372fb8a9",
+    "tree": "78886eaf82d4145521369b9e734cfff53f53fb54",
+    "note": "Self-maintained fork whose HEAD is exactly base.sha + this patch level. `scripts/omp-sidecar.mjs` refuses any other commit; can1357/oh-my-pi stays a read-only upstream."
+  },
+  "patch": {
+    "file": "omp-t20-b2-fork-512370a.patch",
+    "sha256": "d6d30785389a2ffc84bdff8ac72a4cea27c2abc50e14d709397f23dd2362882f",
+    "bytes": 101113
+  },
+  "originalCommitAndRegeneratedPatchVerified": true,
+  "rpcBehaviorCasesPassed": 14,
+  "coreSuites": {
+    "version": "18.3.0",
+    "testsSummary": "168 pass, 0 fail, Ran 168 tests across 2 files. [4.98s]"
+  },
+  "allRpcProcessesReaped": true,
+  "scope": "Independent runtime source/RPC behavior only, using exact imported fork commit with an external root-owned review manifest. Not final product manifest, bundled sidecar, desktop Submit/approval/Main dispatch, Stop lifecycle, B2 acceptance, or three-platform package acceptance.",
+  "next": "Verify final desktop patch/pin matches this exact fork and bytes; reuse these runtime checks if unchanged. Build/review actual product and run host-turn-stop plus real Main/OMP/DB integration.",
+  "files": [
+    {
+      "file": "fork-512370a-source-verification.json",
+      "sha256": "4bd73066f25d8f3065dd690148cda0a40fea6b29a22643381ec1839e8132286a",
+      "bytes": 829
+    },
+    {
+      "file": "settle-policy-rpc-review.mjs",
+      "sha256": "ef2a6fa1457bbcfa9727a7ed7485587d4dafdf1777b3a55b4e98630fb548fc11",
+      "bytes": 8269
+    },
+    {
+      "file": "settle-policy-rpc-fork-512370a1.json",
+      "sha256": "3258a2449b33e4f5e9834710847742e8116712ec43e33e7af746e1aa7871205d",
+      "bytes": 19875
+    },
+    {
+      "file": "settle-policy-rpc-fork-512370a1.txt",
+      "sha256": "3258a2449b33e4f5e9834710847742e8116712ec43e33e7af746e1aa7871205d",
+      "bytes": 19875
+    },
+    {
+      "file": "settle-policy-boundaries-review.mjs",
+      "sha256": "2799119951a2c1ad2deb83b5754c7dad633d1f100a4c73e24569fb1f52e548b2",
+      "bytes": 8351
+    },
+    {
+      "file": "settle-policy-boundaries-fork-512370a1.json",
+      "sha256": "1f786ae76fcd1b63125bb81186c9fed3626047c728b9a2d89fef452a4b3a6a06",
+      "bytes": 6733
+    },
+    {
+      "file": "settle-policy-boundaries-fork-512370a1.txt",
+      "sha256": "1f786ae76fcd1b63125bb81186c9fed3626047c728b9a2d89fef452a4b3a6a06",
+      "bytes": 6733
+    },
+    {
+      "file": "fork-core-suites-512370a1.txt",
+      "sha256": "d55afd4ae4aa5d6476aa12a59a05fe9882e1863444ad8d05be9a21bdc96ea84d",
+      "bytes": 762
+    }
+  ]
+}

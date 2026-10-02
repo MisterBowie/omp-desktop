@@ -1,0 +1,140 @@
+{
+  "at": "2026-10-02T20:24:00.263908+00:00",
+  "candidate": "148cfcc78e3d8a093877cba2050cb40363e5b9ba",
+  "decision": "changes-required",
+  "baseline": "9491016062e36a2967cf3db74d2a4990421d9d30",
+  "githubRefVerified": true,
+  "remoteDesktopClean": true,
+  "remoteForkClean": true,
+  "fork": "512370a1b177cf45e4d12781104506ea372fb8a9",
+  "firstSession": {
+    "id": "01a0fe02-bb6a-777c-bd3b-397378f50008",
+    "runnerPid": 1573638,
+    "live": false,
+    "exit": 0
+  },
+  "local": {
+    "cleanDetached": true,
+    "productSourceEdited": false,
+    "buildJs": 0,
+    "targetedTests": {
+      "pass": 19,
+      "fail": 0,
+      "skip": 0
+    },
+    "allReviewProcessesEnded": true
+  },
+  "findings": [
+    {
+      "id": "R1",
+      "result": "RED",
+      "scope": "bridge Stop during real durable begin awaits; provider 0 at Stop then 1; must be refused/aborted; next prompt currently recovers",
+      "evidence": "host-turn-stop-148cfcc7.json"
+    },
+    {
+      "id": "R2",
+      "result": "RED",
+      "scope": "real terminal before real runner prompt result delivery; hostTurnId null, durable row running, next prompt AGENT_BUSY",
+      "evidence": "host-turn-terminal-order-148cfcc7.json"
+    },
+    {
+      "id": "R3",
+      "result": "RED",
+      "scope": "real terminal before Main dispatch receives real bridge prompt result; durable turns completed but execution running",
+      "evidence": "approved-terminal-order-148cfcc7.json"
+    },
+    {
+      "id": "R4",
+      "result": "coverage-gap",
+      "scope": "shipping E2E missing actual settlement composition; empty queued list is not completed execution",
+      "evidence": "production-approval-148cfcc7.json"
+    }
+  ],
+  "proofBoundaries": "R1-R3 controlled public async composition boundaries, real host/OMP/FakeProvider, not claims of unmodified transport scheduling. Production approval is Main/bridge/DB, not RendererIPC. R4 negative control intentionally omits a fixture link that production index does have.",
+  "positiveCoverage": {
+    "approvalCases": 5,
+    "planPermissions": [
+      "ask",
+      "accept-edits",
+      "auto"
+    ],
+    "goalPermissions": [
+      "auto"
+    ],
+    "independentDispatcherCAS": true,
+    "artifactSha": true,
+    "realBashPermission": true,
+    "hostMessages": 0,
+    "cleanupVerified": true,
+    "forkRPCReused": 14,
+    "forkCoreTestsReused": 168,
+    "candidateEvidenceHashFiles": 17
+  },
+  "scope": "Cursor+Plan/Goal excluded; ADR0306 gate retained; D not started; full M5 then three-platform actual GitHub packages",
+  "files": {
+    "host-turn-stop-review.mjs": {
+      "sha256": "df21096cf122ef9af3e8b056d784eb3e8849e738fd83eb413d7290655415f830",
+      "bytes": 8587
+    },
+    "host-turn-stop-148cfcc7.json": {
+      "sha256": "c759f8957b13664725c6abfec0b79d414ac92abf856119180fb0639b2db4610a",
+      "bytes": 6183
+    },
+    "host-turn-stop-148cfcc7.txt": {
+      "sha256": "a681bf54f22cd74872d17e59a57cb2ad148f41b57716153bb87f626a98573b49",
+      "bytes": 6352
+    },
+    "host-turn-terminal-order-review.mjs": {
+      "sha256": "edc804358de2ce0f206bebe8bf47b384126c5bca881ea339cc526f09ac2c949b",
+      "bytes": 9087
+    },
+    "host-turn-terminal-order-148cfcc7.json": {
+      "sha256": "3d648bc931477e7fd1f13e3a4e913a81ec203cfa287e6c5e22a622475da9ddc6",
+      "bytes": 5187
+    },
+    "host-turn-terminal-order-148cfcc7.txt": {
+      "sha256": "d2522f17e2c7c33f69337ac361b5915af1a51e062587ec6f3e551b09455fd245",
+      "bytes": 5356
+    },
+    "production-approval-review.mjs": {
+      "sha256": "443f7a04d75517b4e6bf0fa601e1c50625a3fe3c5ea937a2f07207f2849215f0",
+      "bytes": 21012
+    },
+    "production-approval-148cfcc7.json": {
+      "sha256": "2e6bfe3773f1e3e9fc7cbd22bd9c74b3797fb280f0958d08e5e4bd49e1d53e75",
+      "bytes": 7887
+    },
+    "production-approval-148cfcc7.txt": {
+      "sha256": "b418f22928c52cf89f394e5f8edd4a90c30b2bdd56549ed779542efbf37e05ed",
+      "bytes": 8056
+    },
+    "approved-terminal-order-review.mjs": {
+      "sha256": "032ff62f8691ac0b1411d74e3db79b926660d7193fea2b490fa2ec25cb141535",
+      "bytes": 20210
+    },
+    "approved-terminal-order-148cfcc7.json": {
+      "sha256": "ac683eb791f369f98ac0cd5129a6eea880f37a1e5bbdade108ecfebc5a29a42b",
+      "bytes": 3970
+    },
+    "approved-terminal-order-148cfcc7.txt": {
+      "sha256": "970ae2649eb90a4be61ffb85ca643ce302a7165af82075e767475c72a8eb5702",
+      "bytes": 4138
+    },
+    "candidate-source-evidence-148cfcc7.json": {
+      "sha256": "d4cf1b1ecba1444410ce362adcab6dc1593a626bcc20e47c4c1378381f14f64c",
+      "bytes": 3887
+    },
+    "fork-runtime-review-512370a1.json": {
+      "sha256": "f7f4c13ddb43a9efb21478ce918d0cce3bc0e65c81347568c61724be81a81458",
+      "bytes": 2760
+    },
+    "build-js-148cfcc7.txt": {
+      "sha256": "1bbd08403764f8ece1396eb834a11b250701ee14c70119215e8fdf6e54fbb1a9",
+      "bytes": 19822
+    },
+    "desktop-b2-targeted-148cfcc7.txt": {
+      "sha256": "f949214e8ff8fd295d49800591437c2d38ac6a8f97ca8e9c3551be0c2a7b53a5",
+      "bytes": 2082
+    }
+  }
+}

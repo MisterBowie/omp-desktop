@@ -1,0 +1,195 @@
+(node:75612) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  "candidate": "148cfcc78e3d8a093877cba2050cb40363e5b9ba",
+  "hostSha256": "9637156097afc19da6b40a3aa30e95d883a8c8b98d94138faeeade425f7a2ee4",
+  "layer": "production bridge/production host-turn lifecycle/actual HostProcess SQLite/patched OMP/local FakeProvider; controlled public lifecycle seam delivers a real begin id after real Stop completes; not an unmodified transport-timing proof",
+  "cases": [
+    {
+      "strategy": "control",
+      "ends": [
+        {
+          "sessionId": "0166dd30-881b-456d-bf81-9fd8fb0f9433",
+          "turnId": "omp-turn:0166dd30-881b-456d-bf81-9fd8fb0f9433:55c393e2-6b8c-4e5a-959e-e37f8f03b8ed:1",
+          "hostTurnId": "391cebab-7fc5-4298-aa20-8e905e08675b",
+          "reason": "completed"
+        }
+      ],
+      "begins": [
+        "391cebab-7fc5-4298-aa20-8e905e08675b"
+      ],
+      "durableEnds": [
+        {
+          "sessionId": "0166dd30-881b-456d-bf81-9fd8fb0f9433",
+          "turnId": "391cebab-7fc5-4298-aa20-8e905e08675b",
+          "status": "completed"
+        }
+      ],
+      "hostExited": true,
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:0166dd30-881b-456d-bf81-9fd8fb0f9433:55c393e2-6b8c-4e5a-959e-e37f8f03b8ed:1",
+        "hostTurnId": "391cebab-7fc5-4298-aa20-8e905e08675b"
+      },
+      "initialProviderRequests": 1,
+      "initialRows": [
+        {
+          "id": "391cebab-7fc5-4298-aa20-8e905e08675b",
+          "status": "completed"
+        }
+      ],
+      "initialEnds": [
+        {
+          "sessionId": "0166dd30-881b-456d-bf81-9fd8fb0f9433",
+          "turnId": "omp-turn:0166dd30-881b-456d-bf81-9fd8fb0f9433:55c393e2-6b8c-4e5a-959e-e37f8f03b8ed:1",
+          "hostTurnId": "391cebab-7fc5-4298-aa20-8e905e08675b",
+          "reason": "completed"
+        }
+      ],
+      "initialDurableEnds": [
+        {
+          "sessionId": "0166dd30-881b-456d-bf81-9fd8fb0f9433",
+          "turnId": "391cebab-7fc5-4298-aa20-8e905e08675b",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "runtimeStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      },
+      "scratchRemoved": true
+    },
+    {
+      "strategy": "stop-before-begin-id-delivery",
+      "ends": [
+        {
+          "sessionId": "7bb65a0e-d921-41ae-8e77-e3a790578717",
+          "turnId": "omp-turn:7bb65a0e-d921-41ae-8e77-e3a790578717:82c085ad-a201-40f5-b70f-a62a3413862a:1",
+          "hostTurnId": "d7647371-4deb-443b-b075-7a525865ba21",
+          "reason": "completed"
+        },
+        {
+          "sessionId": "7bb65a0e-d921-41ae-8e77-e3a790578717",
+          "turnId": "omp-turn:7bb65a0e-d921-41ae-8e77-e3a790578717:82c085ad-a201-40f5-b70f-a62a3413862a:2",
+          "hostTurnId": "8259c8e4-f41c-454d-b8ae-c7ddc34f6f81",
+          "reason": "completed"
+        }
+      ],
+      "begins": [
+        "d7647371-4deb-443b-b075-7a525865ba21",
+        "8259c8e4-f41c-454d-b8ae-c7ddc34f6f81"
+      ],
+      "durableEnds": [
+        {
+          "sessionId": "7bb65a0e-d921-41ae-8e77-e3a790578717",
+          "turnId": "d7647371-4deb-443b-b075-7a525865ba21",
+          "status": "completed"
+        },
+        {
+          "sessionId": "7bb65a0e-d921-41ae-8e77-e3a790578717",
+          "turnId": "8259c8e4-f41c-454d-b8ae-c7ddc34f6f81",
+          "status": "completed"
+        }
+      ],
+      "hostExited": true,
+      "providerAtStop": 0,
+      "rowsAtStop": [
+        {
+          "id": "d7647371-4deb-443b-b075-7a525865ba21",
+          "status": "running"
+        }
+      ],
+      "nativeAtStop": "01a0fe38-f2d1-71db-8c61-43429984be80",
+      "stop": {
+        "aborted": false,
+        "abortBashSent": false,
+        "converged": true,
+        "toreDown": false,
+        "steps": [
+          "nothing running"
+        ],
+        "errors": []
+      },
+      "rowsAfterStopBeforeIdDelivery": [
+        {
+          "id": "d7647371-4deb-443b-b075-7a525865ba21",
+          "status": "running"
+        }
+      ],
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:7bb65a0e-d921-41ae-8e77-e3a790578717:82c085ad-a201-40f5-b70f-a62a3413862a:1",
+        "hostTurnId": "d7647371-4deb-443b-b075-7a525865ba21"
+      },
+      "initialProviderRequests": 1,
+      "initialRows": [
+        {
+          "id": "d7647371-4deb-443b-b075-7a525865ba21",
+          "status": "completed"
+        }
+      ],
+      "initialEnds": [
+        {
+          "sessionId": "7bb65a0e-d921-41ae-8e77-e3a790578717",
+          "turnId": "omp-turn:7bb65a0e-d921-41ae-8e77-e3a790578717:82c085ad-a201-40f5-b70f-a62a3413862a:1",
+          "hostTurnId": "d7647371-4deb-443b-b075-7a525865ba21",
+          "reason": "completed"
+        }
+      ],
+      "initialDurableEnds": [
+        {
+          "sessionId": "7bb65a0e-d921-41ae-8e77-e3a790578717",
+          "turnId": "d7647371-4deb-443b-b075-7a525865ba21",
+          "status": "completed"
+        }
+      ],
+      "recovery": {
+        "prompt": {
+          "accepted": true,
+          "turnId": "omp-turn:7bb65a0e-d921-41ae-8e77-e3a790578717:82c085ad-a201-40f5-b70f-a62a3413862a:2",
+          "hostTurnId": "8259c8e4-f41c-454d-b8ae-c7ddc34f6f81"
+        },
+        "providerRequests": 1,
+        "rows": [
+          {
+            "id": "d7647371-4deb-443b-b075-7a525865ba21",
+            "status": "completed"
+          },
+          {
+            "id": "8259c8e4-f41c-454d-b8ae-c7ddc34f6f81",
+            "status": "completed"
+          }
+        ],
+        "sameNativeId": true
+      },
+      "passed": false,
+      "error": "AssertionError [ERR_ASSERTION]: Stop during begin must cancel the pending prompt\n\n1 !== 0\n\n    at file:///Users/vv/Documents/%E5%AF%B9%E8%AF%9D/omp-t20-b2-review-20261003/host-turn-stop-review.mjs:84:47",
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "runtimeStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      },
+      "scratchRemoved": true
+    }
+  ],
+  "passed": false
+}

@@ -1,0 +1,270 @@
+(node:83249) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  "candidate": "148cfcc78e3d8a093877cba2050cb40363e5b9ba",
+  "layer": "actual host SQLite/production bridge/lifecycle/adapter/Main plan dispatcher/patched OMP/local FakeProvider; permission decisions through real bridge API; no renderer IPC in this fixture",
+  "cases": [
+    {
+      "kind": "plan",
+      "permission": "auto",
+      "wired": false,
+      "permissionCards": [],
+      "ends": [
+        {
+          "sessionId": "f7251cc0-e4bf-4021-a4bf-f8290d8cc3c2",
+          "turnId": "omp-turn:f7251cc0-e4bf-4021-a4bf-f8290d8cc3c2:b84248ec-0933-431c-86f2-0f49cd05eef6:1",
+          "hostTurnId": "95b69209-71ed-43c9-a487-95393c3e3c69",
+          "reason": "completed"
+        },
+        {
+          "sessionId": "f7251cc0-e4bf-4021-a4bf-f8290d8cc3c2",
+          "turnId": "omp-turn:f7251cc0-e4bf-4021-a4bf-f8290d8cc3c2:b84248ec-0933-431c-86f2-0f49cd05eef6:2",
+          "hostTurnId": "2ea7cd90-0045-415f-a438-54f645ce58c2",
+          "reason": "completed"
+        }
+      ],
+      "submitRequests": 1,
+      "executionId": "4c6b007e-355c-4959-98ac-7e8192d3b61e",
+      "executionRequests": 2,
+      "executionRow": {
+        "status": "approved",
+        "execution_state": "running",
+        "error_code": null
+      },
+      "turns": [
+        {
+          "id": "95b69209-71ed-43c9-a487-95393c3e3c69",
+          "status": "completed"
+        },
+        {
+          "id": "2ea7cd90-0045-415f-a438-54f645ce58c2",
+          "status": "completed"
+        }
+      ],
+      "queued": [],
+      "messageCount": 0,
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "plan",
+      "permission": "ask",
+      "wired": true,
+      "permissionCards": [
+        {
+          "toolName": "bash",
+          "risk": "high",
+          "markerBeforeAnswer": false,
+          "resolution": {
+            "ok": true,
+            "outcome": "answered"
+          }
+        }
+      ],
+      "ends": [
+        {
+          "sessionId": "338f921a-b0f2-4356-a777-3335d8408497",
+          "turnId": "omp-turn:338f921a-b0f2-4356-a777-3335d8408497:3c6dd4fa-d66d-4090-8f00-9290aea8277f:1",
+          "hostTurnId": "eaf492e3-6468-4204-9a87-695384d2a371",
+          "reason": "completed"
+        },
+        {
+          "sessionId": "338f921a-b0f2-4356-a777-3335d8408497",
+          "turnId": "omp-turn:338f921a-b0f2-4356-a777-3335d8408497:3c6dd4fa-d66d-4090-8f00-9290aea8277f:2",
+          "hostTurnId": "96093643-ac87-4f23-960d-d4c8e5dac83c",
+          "reason": "completed"
+        }
+      ],
+      "submitRequests": 1,
+      "executionId": "1090beab-5e8c-4265-a6e6-481afa7ac16d",
+      "executionRequests": 2,
+      "executionRow": {
+        "status": "approved",
+        "execution_state": "completed",
+        "error_code": null
+      },
+      "turns": [
+        {
+          "id": "eaf492e3-6468-4204-9a87-695384d2a371",
+          "status": "completed"
+        },
+        {
+          "id": "96093643-ac87-4f23-960d-d4c8e5dac83c",
+          "status": "completed"
+        }
+      ],
+      "queued": [],
+      "messageCount": 0,
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "plan",
+      "permission": "accept-edits",
+      "wired": true,
+      "permissionCards": [
+        {
+          "toolName": "bash",
+          "risk": "high",
+          "markerBeforeAnswer": false,
+          "resolution": {
+            "ok": true,
+            "outcome": "answered"
+          }
+        }
+      ],
+      "ends": [
+        {
+          "sessionId": "dd060c94-66a5-49de-acdb-bea9a46a4a2d",
+          "turnId": "omp-turn:dd060c94-66a5-49de-acdb-bea9a46a4a2d:8d1ee2ad-5722-4682-bd93-d001e4e2c7f4:1",
+          "hostTurnId": "cd52e5b5-da5e-4281-857a-f239603a8a26",
+          "reason": "completed"
+        },
+        {
+          "sessionId": "dd060c94-66a5-49de-acdb-bea9a46a4a2d",
+          "turnId": "omp-turn:dd060c94-66a5-49de-acdb-bea9a46a4a2d:8d1ee2ad-5722-4682-bd93-d001e4e2c7f4:2",
+          "hostTurnId": "11354de9-7716-492c-8d31-d1541c4d691c",
+          "reason": "completed"
+        }
+      ],
+      "submitRequests": 1,
+      "executionId": "9924284a-08bb-4766-ac6b-c2d42a11fbd0",
+      "executionRequests": 2,
+      "executionRow": {
+        "status": "approved",
+        "execution_state": "completed",
+        "error_code": null
+      },
+      "turns": [
+        {
+          "id": "cd52e5b5-da5e-4281-857a-f239603a8a26",
+          "status": "completed"
+        },
+        {
+          "id": "11354de9-7716-492c-8d31-d1541c4d691c",
+          "status": "completed"
+        }
+      ],
+      "queued": [],
+      "messageCount": 0,
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "plan",
+      "permission": "auto",
+      "wired": true,
+      "permissionCards": [],
+      "ends": [
+        {
+          "sessionId": "22f9a6a4-b300-4f18-97e9-19ba22ee71da",
+          "turnId": "omp-turn:22f9a6a4-b300-4f18-97e9-19ba22ee71da:2bd66bf3-902a-4cce-95e2-c95906e0fe4f:1",
+          "hostTurnId": "30fc6376-2246-48e0-ac64-f2707266fb72",
+          "reason": "completed"
+        },
+        {
+          "sessionId": "22f9a6a4-b300-4f18-97e9-19ba22ee71da",
+          "turnId": "omp-turn:22f9a6a4-b300-4f18-97e9-19ba22ee71da:2bd66bf3-902a-4cce-95e2-c95906e0fe4f:2",
+          "hostTurnId": "11797768-5f27-4bcf-9d99-d0a435225235",
+          "reason": "completed"
+        }
+      ],
+      "submitRequests": 1,
+      "executionId": "c55caec5-ab29-4877-9cba-f439d86d38e7",
+      "executionRequests": 2,
+      "executionRow": {
+        "status": "approved",
+        "execution_state": "completed",
+        "error_code": null
+      },
+      "turns": [
+        {
+          "id": "30fc6376-2246-48e0-ac64-f2707266fb72",
+          "status": "completed"
+        },
+        {
+          "id": "11797768-5f27-4bcf-9d99-d0a435225235",
+          "status": "completed"
+        }
+      ],
+      "queued": [],
+      "messageCount": 0,
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "goal",
+      "permission": "auto",
+      "wired": true,
+      "permissionCards": [],
+      "ends": [
+        {
+          "sessionId": "f69042e4-9a07-46d4-99fc-150798e4e59e",
+          "turnId": "omp-turn:f69042e4-9a07-46d4-99fc-150798e4e59e:fb8fc5f2-6a0d-494e-ac79-7bbca0048607:1",
+          "hostTurnId": "7fe321d4-ae5f-44f9-971b-f11d22fd6157",
+          "reason": "completed"
+        },
+        {
+          "sessionId": "f69042e4-9a07-46d4-99fc-150798e4e59e",
+          "turnId": "omp-turn:f69042e4-9a07-46d4-99fc-150798e4e59e:fb8fc5f2-6a0d-494e-ac79-7bbca0048607:2",
+          "hostTurnId": "2d721cef-b8ad-4199-9fd2-bdaddf326875",
+          "reason": "completed"
+        }
+      ],
+      "submitRequests": 1,
+      "executionId": "8b0514cd-460a-4417-8501-81211430f63a",
+      "executionRequests": 2,
+      "executionRow": {
+        "status": "approved",
+        "execution_state": "completed",
+        "error_code": null
+      },
+      "turns": [
+        {
+          "id": "7fe321d4-ae5f-44f9-971b-f11d22fd6157",
+          "status": "completed"
+        },
+        {
+          "id": "2d721cef-b8ad-4199-9fd2-bdaddf326875",
+          "status": "completed"
+        }
+      ],
+      "queued": [],
+      "messageCount": 0,
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    }
+  ],
+  "finalCleanupErrors": [],
+  "passed": true
+}
