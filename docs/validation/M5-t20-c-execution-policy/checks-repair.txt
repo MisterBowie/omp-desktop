@@ -32,3 +32,6 @@ Verified 79 English/Chinese specification pairs.
 
 ## git diff --check bff27e1..34d2ffa (code+test repair commit, complete range)
 EXIT=0
+
+## git diff --check bff27e1..HEAD (complete repair range, docs/evidence commit included)
+EXIT=0

@@ -203,3 +203,9 @@
 `SHA256SUMS.txt` 与 README 说明来源），本工作区未在 macOS 上运行它们。所有本工作区日志为对应命令原始
 stdout/stderr 直接落盘（无尾部空白，未编辑字节）并追加 `EXIT=`；`SHA256SUMS.txt` 覆盖本目录全部证据
 文件并附根复审子目录清单。
+
+### 6.1 提交坐标（返修）
+
+- 返修代码/测试提交 `34d2ffa`（父提交 `fc0fb29`，8 位缩写；完整 SHA 见 `git log`），文档/证据提交 `6d26530`；
+  随后一个仅证据/坐标的提交记录完整区间 `git diff --check bff27e1..HEAD` 的结果（`EXIT=0`），本工作区未
+  amend/rebase/强推。远端分支 `codex/m5-t20-c-execution-policy`。
