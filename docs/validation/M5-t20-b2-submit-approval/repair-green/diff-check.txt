@@ -1,2 +1,5 @@
-diff-check:0
-diff-cached:0
+$ git diff --check
+exit:0
+
+$ git diff --HEAD --check
+exit:0
