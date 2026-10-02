@@ -1,0 +1,9 @@
+✔ before_agent_start: ctx.abort refuses the prompt and a throwing handler does not (15682.649394ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15963.520472

@@ -77,25 +77,65 @@ test("the catalog maps plugin agent tools to plugin_* names with verbatim schema
   ];
   const { catalog } = adapter({ tools });
 
-  const definitions = await catalog("/repo");
+  const entries = await catalog("/repo");
   assert.deepEqual(
-    definitions.map((definition) => definition.name),
+    entries.map((entry) => entry.definition.name),
     ["plugin_demo_echo", "plugin_demo_mcp_tool"],
   );
-  assert.equal(definitions[0].description, "Echo text back to the model");
-  assert.deepEqual(definitions[0].parameters, tools[0].schema, "the schema must pass through verbatim");
-  assert.equal(definitions[0].loadMode, "essential", "desktop tools must be exposed as top-level tools");
+  assert.equal(entries[0].definition.description, "Echo text back to the model");
+  assert.deepEqual(entries[0].definition.parameters, tools[0].schema, "the schema must pass through verbatim");
+  assert.equal(entries[0].definition.loadMode, "essential", "desktop tools must be exposed as top-level tools");
+  // The policy half rides the same assembly: an undeclared plugin risk is PI's
+  // medium default and an undeclared plan-safe list is empty, and every entry
+  // names the registry it came from.
+  assert.deepEqual(
+    entries.map((entry) => ({ risk: entry.risk, planSafeActions: entry.planSafeActions, origin: entry.origin })),
+    [
+      { risk: "medium", planSafeActions: [], origin: "plugin" },
+      { risk: "medium", planSafeActions: [], origin: "plugin" },
+    ],
+  );
+});
+
+test("the catalog carries the declared risk and plan-safe actions, never a name-based guess", async () => {
+  const tools = [
+    pluginTool({ risk: "low", planSafeActions: ["inspect", "read"] }),
+    pluginTool({ fullName: "plugin_demo_raw", name: "raw", risk: "nonsense", planSafeActions: undefined }),
+  ];
+  const entries = await adapter({ tools }).catalog("/repo");
+  assert.deepEqual(entries[0].risk, "low");
+  assert.deepEqual(entries[0].planSafeActions, ["inspect", "read"]);
+  assert.equal(entries[1].risk, "medium", "an illegal declaration falls back to PI's medium");
+  assert.deepEqual(entries[1].planSafeActions, []);
+});
+
+test("user MCP tools are Low risk with no plan-safe actions, and their own origin", async () => {
+  const provider = createOmpHostToolAdapter({
+    plugins: { getTools: () => [] },
+    userMcp: {
+      toolsForProject: async () => [
+        { fullName: "mcp_alpha_lookup", serverId: "alpha", toolName: "lookup", description: "Lookup", schema: { type: "object" } },
+      ],
+      callTool: async () => ({}),
+    },
+    pluginActiveInProject: () => true,
+  });
+  const entries = await provider.catalog("/repo");
+  assert.deepEqual(
+    entries.map((entry) => ({ name: entry.definition.name, risk: entry.risk, planSafeActions: entry.planSafeActions, origin: entry.origin })),
+    [{ name: "mcp_alpha_lookup", risk: "low", planSafeActions: [], origin: "user-mcp" }],
+  );
 });
 
 test("the desktop forwards a description verbatim; the runtime's own trim is OMP's", async () => {
   const { catalog } = adapter({
     tools: [pluginTool({ description: "  Spaced description  " })],
   });
-  const definitions = await catalog("/repo");
+  const entries = await catalog("/repo");
   // The desktop never normalizes a description — the pinned runtime's
   // `normalizeHostToolDefinitions` trims it at registration, which is OMP's
   // own behavior and not re-implemented here.
-  assert.equal(definitions[0].description, "  Spaced description  ");
+  assert.equal(entries[0].definition.description, "  Spaced description  ");
 });
 
 test("plugins inactive for the project are invisible to its catalog", async () => {
@@ -105,8 +145,8 @@ test("plugins inactive for the project are invisible to its catalog", async () =
     activeInProject: (pluginId) => pluginId === "demo",
   });
 
-  const definitions = await catalog("/repo");
-  assert.deepEqual(definitions.map((definition) => definition.name), ["plugin_demo_echo"]);
+  const entries = await catalog("/repo");
+  assert.deepEqual(entries.map((entry) => entry.definition.name), ["plugin_demo_echo"]);
 });
 
 test("a duplicate tool name fails the catalog closed instead of overwriting", async () => {

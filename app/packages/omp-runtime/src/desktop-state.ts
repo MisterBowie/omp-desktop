@@ -1,14 +1,22 @@
 /**
- * The run-scoped desktop-capability state (M5/T19-C).
+ * The run-scoped desktop runtime state (M5/T19-C skills/memory; M5/T20-B1
+ * mode/policy).
  *
- * The desktop owns PI-Desktop's skills and project memory. Before every OMP
- * prompt the bridge assembles the live catalog (builtin skills, active plugin
- * skills, active user skills — metadata only, PI `session-launch.ts` order)
- * and the bound project's memory (host-core `project.group.context`, legacy
- * fallback, PI best-effort semantics) and writes them to one state file inside
- * the run root. The trusted gate reads that file inside its
- * `before_agent_start` handler and appends the PI-identical catalog/memory
- * blocks to the runtime's system prompt — never replacing it.
+ * The desktop owns PI-Desktop's skills, project memory, the session's
+ * operating mode and effective permission mode, and the risk/plan-safe policy
+ * of every desktop host tool. Before every OMP prompt the bridge assembles the
+ * live catalog (builtin skills, active plugin skills, active user skills —
+ * metadata only, PI `session-launch.ts` order), the bound project's memory
+ * (host-core `project.group.context`, legacy fallback, PI best-effort
+ * semantics), the current session policy (host `sessions.mode` /
+ * `permission_mode` with `inherit` resolved to the app default, PI
+ * `session_collaboration/permissions.rs` semantics) and the tool policy table
+ * of the catalog registered for this prompt. It writes all of it to one state
+ * file inside the run root. The trusted gate reads that file inside its
+ * `before_agent_start` handler, appends the PI-identical catalog/memory blocks
+ * and the production `composeModeSystemPrompt(mode, "")` output to the
+ * runtime's system prompt — never replacing it — and clamps the active tool
+ * set to the PI contract catalog in Plan/Goal modes.
  *
  * The file is the only desktop-to-gate channel for this data, so it is:
  *
@@ -22,25 +30,32 @@
  *     final path is replaced as an entry, never followed or rewritten through
  *     its other name;
  *   - **bounded**: a size ceiling, per-field length ceilings, a skill-count
- *     ceiling and a freshness window; a state file that violates any of them
- *     is treated as absent (fail closed — no injection, the native prompt is
- *     untouched);
- *   - **credential-free**: only the owning session id, a timestamp, skill
- *     metadata and memory text may enter it.
+ *     ceiling, a host-tool-count ceiling and a freshness window; a state file
+ *     that violates any of them is treated as absent (fail closed — no
+ *     injection, the native prompt is untouched);
+ *   - **credential-free**: only the owning session id, a timestamp, the
+ *     mode/mode-block, the effective permission mode, skill metadata, memory
+ *     text and host-tool risk policy may enter it.
+ *
+ * Schema changes are versioned: this build reads and writes only `v: 2`.
+ * Version 1 (the T19-C capabilities-only shape) is refused exactly like any
+ * other out-of-schema file, and the gate's owner probe (`DESKTOP_STATE_VERSION`
+ * mismatch with a matching session id) turns that refusal into a failed turn
+ * instead of a silent Agent-mode run.
  */
 import type { Stats } from "node:fs";
 import { lstatSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { basename, dirname, join } from "node:path";
 
-/** File name of the run-scoped desktop-capability state inside each run root. */
+/** File name of the run-scoped desktop runtime state inside each run root. */
 export const DESKTOP_STATE_FILE = "desktop-state.json";
 
 /** The environment variable the supervisor points at the state file. */
 export const DESKTOP_STATE_ENV = "OMP_DESKTOP_STATE";
 
 /** The state-file schema version this build reads and writes. */
-export const DESKTOP_STATE_VERSION = 1;
+export const DESKTOP_STATE_VERSION = 2;
 
 /** A state file larger than this is malformed by definition. */
 export const MAX_DESKTOP_STATE_BYTES = 512 * 1024;
@@ -56,18 +71,60 @@ export const MAX_DESKTOP_STATE_AGE_MS = 10 * 60_000;
 /** At most this many skill entries may ride in one state file. */
 export const MAX_DESKTOP_STATE_SKILLS = 1024;
 
+/** At most this many host-tool policy entries may ride in one state file. */
+export const MAX_DESKTOP_STATE_HOST_TOOLS = 1024;
+
 /** Per-field ceilings the gate enforces; bounded catalog lines stay short. */
 export const MAX_SKILL_ID_CHARS = 256;
 export const MAX_SKILL_NAME_CHARS = 512;
 export const MAX_SKILL_DESCRIPTION_CHARS = 512;
 /** Project memory is already capped by host-core (32 KiB); the gate re-checks. */
 export const MAX_MEMORY_CHARS = 64 * 1024;
+/** The composer output for one mode is ~2 KiB; the ceiling is slack, not a target. */
+export const MAX_MODE_BLOCK_CHARS = 16 * 1024;
+/** A host tool full name is `<plugin>_<tool>` / `mcp_<server>_<tool>`. */
+export const MAX_HOST_TOOL_NAME_CHARS = 512;
+/** One tool's declared plan-safe action list. */
+export const MAX_PLAN_SAFE_ACTIONS = 64;
+export const MAX_PLAN_SAFE_ACTION_CHARS = 128;
 
 /** One skill catalog entry: id/name/description only — bodies stay on demand. */
 export type DesktopSkillMeta = {
   id: string;
   name: string;
   description: string;
+};
+
+/** The operating modes the OMP runtime may run under, mirroring PI. */
+export const DESKTOP_RUNTIME_MODES = ["agent", "plan", "goal"] as const;
+export type DesktopRuntimeMode = (typeof DESKTOP_RUNTIME_MODES)[number];
+
+/** The effective permission modes, after `inherit` has been resolved. */
+export const DESKTOP_PERMISSION_MODES = ["ask", "accept-edits", "auto"] as const;
+export type DesktopPermissionMode = (typeof DESKTOP_PERMISSION_MODES)[number];
+
+/** Risk levels, mirroring the desktop's `Risk` union and OMP's card contract. */
+export const DESKTOP_HOST_TOOL_RISKS = ["low", "medium", "high"] as const;
+export type DesktopHostToolRisk = (typeof DESKTOP_HOST_TOOL_RISKS)[number];
+
+/**
+ * Which desktop registry served one host tool. This is provenance, never a
+ * name-prefix guess: plugin tools (including plugin-declared MCP tools) come
+ * from the plugin registry, user MCP tools from the user MCP runtime.
+ */
+export const DESKTOP_HOST_TOOL_ORIGINS = ["plugin", "user-mcp"] as const;
+export type DesktopHostToolOrigin = (typeof DESKTOP_HOST_TOOL_ORIGINS)[number];
+
+/**
+ * One host tool's desktop policy. `planSafeActions` is the declared plan-safe
+ * action list (PI ADR 0211); it is only meaningful for `plugin` origins, and
+ * a non-empty list is what makes the tool visible in the PI contract catalog.
+ */
+export type DesktopHostToolPolicy = {
+  name: string;
+  risk: DesktopHostToolRisk;
+  planSafeActions: string[];
+  origin: DesktopHostToolOrigin;
 };
 
 /** The parsed, validated contents of one state file. */
@@ -77,22 +134,139 @@ export type DesktopCapabilityState = {
   sessionId: string;
   /** Epoch milliseconds of the write; the gate rejects stale state. */
   writtenAt: number;
+  /** The session's operating mode at prompt time. */
+  mode: DesktopRuntimeMode;
+  /** `composeModeSystemPrompt(mode, "")` output — the exact block to append. */
+  modeBlock: string;
+  /** The effective permission mode (`inherit` already resolved). */
+  permissionMode: DesktopPermissionMode;
   /** Trimmed project memory, or null when the project has none. */
   memory: string | null;
   /** The desktop skill catalog (builtin, plugin, user — in that order). */
   skills: DesktopSkillMeta[];
+  /** Risk/plan-safe policy for every host tool registered for this prompt. */
+  hostTools: DesktopHostToolPolicy[];
 };
 
 /**
  * The desktop-facing snapshot one state write carries. `memory` is optional
  * the way Pi's project memory is: absent means "no memory read" (or a
- * best-effort read that failed) and injects nothing.
+ * best-effort read that failed) and injects nothing. Mode, mode block and
+ * permission mode are mandatory: a prompt is refused before it is submitted
+ * when they cannot be assembled.
  */
 export type DesktopCapabilitySnapshot = {
   sessionId: string;
+  mode: DesktopRuntimeMode;
+  modeBlock: string;
+  permissionMode: DesktopPermissionMode;
   memory?: string | null;
   skills: DesktopSkillMeta[];
+  hostTools: DesktopHostToolPolicy[];
 };
+
+/**
+ * The verdict of one ownership-aware read.
+ *
+ * The gate needs a distinction the strict reader alone cannot express: a state
+ * file that belongs to the firing session but fails validation must refuse the
+ * turn (a Plan/Goal intent must never silently run as Agent), while a file
+ * that belongs to a *different* session is a subagent delegate and gets
+ * nothing, and an unreadable or absent file cannot be attributed at all.
+ */
+export type DesktopStateRead =
+  | { kind: "owned"; state: DesktopCapabilityState }
+  | { kind: "foreign" }
+  | { kind: "absent" }
+  | { kind: "invalid"; sessionId: string };
+
+/**
+ * Validate one capability-provider skill line against the state schema. The
+ * bridge drops invalid lines (PI's own skill loading is best-effort, and a
+ * bad catalog line must not poison the mandatory mode/policy half); the gate
+ * re-validates the whole file back.
+ */
+export function isValidDesktopSkillMeta(entry: unknown): entry is DesktopSkillMeta {
+  if (entry === null || typeof entry !== "object" || Array.isArray(entry)) return false;
+  const skill = entry as Record<string, unknown>;
+  return (
+    typeof skill.id === "string" &&
+    skill.id.length > 0 &&
+    skill.id.length <= MAX_SKILL_ID_CHARS &&
+    typeof skill.name === "string" &&
+    skill.name.length > 0 &&
+    skill.name.length <= MAX_SKILL_NAME_CHARS &&
+    typeof skill.description === "string" &&
+    skill.description.length <= MAX_SKILL_DESCRIPTION_CHARS
+  );
+}
+
+function isHostToolPolicy(entry: unknown): entry is DesktopHostToolPolicy {
+  if (entry === null || typeof entry !== "object" || Array.isArray(entry)) return false;
+  const tool = entry as Record<string, unknown>;
+  if (
+    typeof tool.name !== "string" ||
+    tool.name.length === 0 ||
+    tool.name.length > MAX_HOST_TOOL_NAME_CHARS
+  ) {
+    return false;
+  }
+  if (!(DESKTOP_HOST_TOOL_RISKS as readonly unknown[]).includes(tool.risk)) return false;
+  if (!(DESKTOP_HOST_TOOL_ORIGINS as readonly unknown[]).includes(tool.origin)) return false;
+  if (!Array.isArray(tool.planSafeActions) || tool.planSafeActions.length > MAX_PLAN_SAFE_ACTIONS) {
+    return false;
+  }
+  for (const action of tool.planSafeActions) {
+    if (typeof action !== "string" || action.length === 0 || action.length > MAX_PLAN_SAFE_ACTION_CHARS) {
+      return false;
+    }
+  }
+  // The user MCP registry never declares plan-safe actions; a file that claims
+  // otherwise is not the desktop's own write.
+  if (tool.origin === "user-mcp" && tool.planSafeActions.length > 0) return false;
+  return true;
+}
+
+/** True when `path` is a readable regular file within the size ceiling. */
+function boundedFile(path: string | undefined | null): { stats: Stats } | null {
+  if (!path) return null;
+  let stats: Stats;
+  try {
+    // `lstat` refuses a planted symlink at the final path; `stat` confirms a
+    // regular file. The file lives in the owned run root (0600, exclusively
+    // created), so both checks are defense in depth, not the only boundary.
+    if (lstatSync(path).isSymbolicLink()) return null;
+    stats = statSync(path);
+  } catch {
+    return null;
+  }
+  if (!stats.isFile() || stats.size > MAX_DESKTOP_STATE_BYTES) return null;
+  return { stats };
+}
+
+/**
+ * Read the session id this state file claims, ignoring every other field.
+ *
+ * This is the ownership probe behind {@link readDesktopStateForSession}: it
+ * answers "does this file claim the firing session?" even when the rest of the
+ * file is out of schema, which is what lets the gate refuse an owned-but-broken
+ * state instead of running the turn uncontrolled. It is deliberately lenient
+ * and never used as a validation substitute — a `null` answer means "not
+ * attributable" (missing, unreadable, oversized, not an object, no usable id).
+ */
+export function readDesktopStateSessionId(path: string | undefined | null): string | null {
+  if (!boundedFile(path)) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path!, "utf8"));
+  } catch {
+    return null;
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const sessionId = (parsed as Record<string, unknown>).sessionId;
+  if (typeof sessionId !== "string" || sessionId.length === 0 || sessionId.length > 512) return null;
+  return sessionId;
+}
 
 /**
  * Read and validate one state file, or return null when it is missing,
@@ -109,21 +283,10 @@ export function readDesktopCapabilityState(
   path: string | undefined | null,
   now: number,
 ): DesktopCapabilityState | null {
-  if (!path) return null;
-  let stats: Stats;
-  try {
-    // `lstat` refuses a planted symlink at the final path; `stat` confirms a
-    // regular file. The file lives in the owned run root (0600, exclusively
-    // created), so both checks are defense in depth, not the only boundary.
-    if (lstatSync(path).isSymbolicLink()) return null;
-    stats = statSync(path);
-  } catch {
-    return null;
-  }
-  if (!stats.isFile() || stats.size > MAX_DESKTOP_STATE_BYTES) return null;
+  if (!boundedFile(path)) return null;
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, "utf8"));
+    parsed = JSON.parse(readFileSync(path!, "utf8"));
   } catch {
     return null;
   }
@@ -141,32 +304,65 @@ export function readDesktopCapabilityState(
   // one turn's injection — fail closed, never stale.
   if (state.writtenAt > now) return null;
   if (now - state.writtenAt > MAX_DESKTOP_STATE_AGE_MS) return null;
+  if (!(DESKTOP_RUNTIME_MODES as readonly unknown[]).includes(state.mode)) return null;
+  if (
+    typeof state.modeBlock !== "string" ||
+    state.modeBlock.length === 0 ||
+    state.modeBlock.length > MAX_MODE_BLOCK_CHARS
+  ) {
+    return null;
+  }
+  if (!(DESKTOP_PERMISSION_MODES as readonly unknown[]).includes(state.permissionMode)) return null;
   if (state.memory !== null && (typeof state.memory !== "string" || state.memory.length > MAX_MEMORY_CHARS)) {
     return null;
   }
   if (!Array.isArray(state.skills) || state.skills.length > MAX_DESKTOP_STATE_SKILLS) return null;
-  const skills: DesktopSkillMeta[] = [];
-  for (const entry of state.skills) {
-    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) return null;
-    const skill = entry as Record<string, unknown>;
-    if (typeof skill.id !== "string" || skill.id.length === 0 || skill.id.length > MAX_SKILL_ID_CHARS) {
-      return null;
-    }
-    if (typeof skill.name !== "string" || skill.name.length === 0 || skill.name.length > MAX_SKILL_NAME_CHARS) {
-      return null;
-    }
-    if (typeof skill.description !== "string" || skill.description.length > MAX_SKILL_DESCRIPTION_CHARS) {
-      return null;
-    }
-    skills.push({ id: skill.id, name: skill.name, description: skill.description });
+  if (!state.skills.every(isValidDesktopSkillMeta)) return null;
+  if (!Array.isArray(state.hostTools) || state.hostTools.length > MAX_DESKTOP_STATE_HOST_TOOLS) return null;
+  if (!state.hostTools.every(isHostToolPolicy)) return null;
+  const names = new Set<string>();
+  for (const tool of state.hostTools as DesktopHostToolPolicy[]) {
+    if (names.has(tool.name)) return null;
+    names.add(tool.name);
   }
   return {
     v: DESKTOP_STATE_VERSION,
     sessionId: state.sessionId,
     writtenAt: state.writtenAt,
+    mode: state.mode as DesktopRuntimeMode,
+    modeBlock: state.modeBlock,
+    permissionMode: state.permissionMode as DesktopPermissionMode,
     memory: state.memory,
-    skills,
+    skills: state.skills as DesktopSkillMeta[],
+    hostTools: state.hostTools as DesktopHostToolPolicy[],
   };
+}
+
+/**
+ * Ownership-aware read for the gate's `before_agent_start` handler.
+ *
+ * - `owned`   — valid state written for `sessionId`; inject and clamp.
+ * - `foreign` — the file claims a different session (a subagent delegate
+ *               sharing the process): inject nothing, change no tool set.
+ * - `invalid` — the file claims `sessionId` but fails validation (out of
+ *               schema, stale, oversized, malformed): the owning session's
+ *               prompt must be refused rather than silently run as Agent.
+ * - `absent`  — no attributable file at all (missing, unreadable, or no
+ *               usable session id): no injection; the channel is not active.
+ */
+export function readDesktopStateForSession(
+  path: string | undefined | null,
+  now: number,
+  sessionId: string | undefined | null,
+): DesktopStateRead {
+  const state = readDesktopCapabilityState(path, now);
+  if (state) {
+    if (sessionId && state.sessionId === sessionId) return { kind: "owned", state };
+    return { kind: "foreign" };
+  }
+  const owner = readDesktopStateSessionId(path);
+  if (!owner || !sessionId || owner !== sessionId) return { kind: "absent" };
+  return { kind: "invalid", sessionId: owner };
 }
 
 /**
@@ -207,9 +403,10 @@ export function desktopMemoryPrompt(content: string | null | undefined): string 
 }
 
 /**
- * The single block the gate appends to the runtime's system prompt: the skill
- * catalog first, then project memory (the same relative order Pi keeps — the
- * catalog in the base prompt, memory after the instruction chain).
+ * The single block the gate appends for the capability half of the state: the
+ * skill catalog first, then project memory (the same relative order Pi keeps —
+ * the catalog in the base prompt, memory after the instruction chain). The
+ * mode block is a separate, later part; see the gate's injection.
  */
 export function desktopCapabilityPrompt(state: Pick<DesktopCapabilityState, "skills" | "memory">): string | undefined {
   const parts = [desktopSkillsPrompt(state.skills), desktopMemoryPrompt(state.memory)].filter(
@@ -230,8 +427,12 @@ export function serializeDesktopCapabilityState(
     v: DESKTOP_STATE_VERSION,
     sessionId: snapshot.sessionId,
     writtenAt: now,
+    mode: snapshot.mode,
+    modeBlock: snapshot.modeBlock,
+    permissionMode: snapshot.permissionMode,
     memory: typeof snapshot.memory === "string" && snapshot.memory.trim() ? snapshot.memory.trim() : null,
     skills: snapshot.skills,
+    hostTools: snapshot.hostTools,
   });
 }
 

@@ -1,0 +1,17 @@
+=== cargo fmt --check
+fmt exit=0
+=== cargo clippy -p host-core --all-targets --locked
+warning: useless use of `format!`
+   --> crates/host-core/src/user_skills.rs:921:53
+    |
+921 |                 let fallback_path = source_dir.join(format!("{name}"));
+    |                                                     ^^^^^^^^^^^^^^^^^ help: consider using `.to_string()`: `name.to_string()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#useless_format
+    = note: `#[warn(clippy::useless_format)]` on by default
+
+warning: `host-core` (bin "pi-desktop-host-core") generated 1 warning (run `cargo clippy --fix --bin "pi-desktop-host-core" -p host-core -- ` to apply 1 suggestion)
+    Checking host-core v0.15.2 (/home/vv/person/code/omp-desktop-m5-t20-b1/app/crates/host-core)
+warning: `host-core` (bin "pi-desktop-host-core" test) generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.54s
+clippy exit=0

@@ -126,7 +126,15 @@ function hostToolsFixture({ toolsByProject = {} } = {}) {
     hostTools: {
       catalog: async (projectPath) => {
         catalogsRequested.push(projectPath);
-        return toolsByProject[projectPath] ?? [];
+        // The fixture stores wire definitions; the bridge's seam carries the
+        // definition plus its desktop policy (T20-B1). A neutral plugin policy
+        // keeps these T19-B assertions focused on registration/execution.
+        return (toolsByProject[projectPath] ?? []).map((definition) => ({
+          definition,
+          risk: "medium",
+          planSafeActions: [],
+          origin: "plugin",
+        }));
       },
       executor: (binding) => {
         bindings.push(binding);

@@ -206,7 +206,13 @@ function skillProvider({ host, plugins, activeUserSkills = async () => [] }) {
         activeUserSkills,
       })
     : null;
-  return { capabilities, hostTools: adapter };
+  // The mandatory half of the run-scoped state (M5/T20-B1): the seam this
+  // probe would carry from the host session row. The default is Agent/ask so
+  // the T19-C assertions below run under the mode the product opens with.
+  const sessionPolicy = {
+    policy: async () => ({ mode: "agent", permissionMode: "ask" }),
+  };
+  return { capabilities, hostTools: adapter, sessionPolicy };
 }
 
 function systemMessages(provider) {
@@ -258,7 +264,7 @@ test(
     const envelopes = [];
     const sessionDir = ensureSessionStateDir(dataRoot);
     const supervisor = skillSupervisor({ dataRoot, project, provider, sessionDir });
-    const { capabilities, hostTools } = skillProvider({ host, plugins: skill.plugins });
+    const { capabilities, hostTools, sessionPolicy } = skillProvider({ host, plugins: skill.plugins });
     const bridge = createOmpSessionBridge({
       createSupervisor: () => supervisor,
       launcher: LAUNCHER,
@@ -270,6 +276,7 @@ test(
       gateResolver: () => GATE,
       ...(capabilities ? { capabilities } : {}),
       ...(hostTools ? { hostTools } : {}),
+      ...(sessionPolicy ? { sessionPolicy } : {}),
     });
     cleanup.push(() => bridge.dispose("e2e finished").catch(() => undefined));
 
@@ -330,7 +337,7 @@ test(
     const envelopes = [];
     const sessionDir = ensureSessionStateDir(dataRoot);
     const supervisor = skillSupervisor({ dataRoot, project, provider, sessionDir });
-    const { capabilities, hostTools } = skillProvider({ host, plugins: skill.plugins });
+    const { capabilities, hostTools, sessionPolicy } = skillProvider({ host, plugins: skill.plugins });
     const bridge = createOmpSessionBridge({
       createSupervisor: () => supervisor,
       launcher: LAUNCHER,
@@ -342,6 +349,7 @@ test(
       gateResolver: () => GATE,
       ...(capabilities ? { capabilities } : {}),
       ...(hostTools ? { hostTools } : {}),
+      ...(sessionPolicy ? { sessionPolicy } : {}),
     });
     cleanup.push(() => bridge.dispose("e2e finished").catch(() => undefined));
 
@@ -394,7 +402,7 @@ test(
     const envelopes = [];
     const sessionDir = ensureSessionStateDir(dataRoot);
     const supervisor = skillSupervisor({ dataRoot, project, provider, sessionDir });
-    const { capabilities, hostTools } = skillProvider({ host, plugins: skill.plugins });
+    const { capabilities, hostTools, sessionPolicy } = skillProvider({ host, plugins: skill.plugins });
     const bridge = createOmpSessionBridge({
       createSupervisor: () => supervisor,
       launcher: LAUNCHER,
@@ -406,6 +414,7 @@ test(
       gateResolver: () => GATE,
       ...(capabilities ? { capabilities } : {}),
       ...(hostTools ? { hostTools } : {}),
+      ...(sessionPolicy ? { sessionPolicy } : {}),
     });
     cleanup.push(() => bridge.dispose("e2e finished").catch(() => undefined));
 
@@ -485,7 +494,7 @@ test(
     const envelopes = [];
     const sessionDir = ensureSessionStateDir(dataRoot);
     const supervisor = skillSupervisor({ dataRoot, project, provider, sessionDir });
-    const { capabilities, hostTools } = skillProvider({ host, plugins: skill.plugins });
+    const { capabilities, hostTools, sessionPolicy } = skillProvider({ host, plugins: skill.plugins });
     const bridge = createOmpSessionBridge({
       createSupervisor: () => supervisor,
       launcher: LAUNCHER,
@@ -497,6 +506,7 @@ test(
       gateResolver: () => GATE,
       ...(capabilities ? { capabilities } : {}),
       ...(hostTools ? { hostTools } : {}),
+      ...(sessionPolicy ? { sessionPolicy } : {}),
     });
     cleanup.push(() => bridge.dispose("e2e finished").catch(() => undefined));
 
@@ -556,7 +566,7 @@ test(
     const envelopes = [];
     const sessionDir = ensureSessionStateDir(dataRoot);
     const supervisor = skillSupervisor({ dataRoot, project, provider, sessionDir });
-    const { capabilities, hostTools } = skillProvider({ host, plugins: skill.plugins });
+    const { capabilities, hostTools, sessionPolicy } = skillProvider({ host, plugins: skill.plugins });
     const bridge = createOmpSessionBridge({
       createSupervisor: () => supervisor,
       launcher: LAUNCHER,
@@ -568,6 +578,7 @@ test(
       gateResolver: () => GATE,
       ...(capabilities ? { capabilities } : {}),
       ...(hostTools ? { hostTools } : {}),
+      ...(sessionPolicy ? { sessionPolicy } : {}),
     });
     cleanup.push(() => bridge.dispose("e2e finished").catch(() => undefined));
 
@@ -626,7 +637,7 @@ test(
     const envelopes = [];
     const sessionDir = ensureSessionStateDir(dataRoot);
     const supervisor = skillSupervisor({ dataRoot, project, provider, sessionDir });
-    const { capabilities, hostTools } = skillProvider({ host, plugins: skill.plugins });
+    const { capabilities, hostTools, sessionPolicy } = skillProvider({ host, plugins: skill.plugins });
     const bridge = createOmpSessionBridge({
       createSupervisor: () => supervisor,
       launcher: LAUNCHER,
@@ -638,6 +649,7 @@ test(
       gateResolver: () => GATE,
       ...(capabilities ? { capabilities } : {}),
       ...(hostTools ? { hostTools } : {}),
+      ...(sessionPolicy ? { sessionPolicy } : {}),
     });
     cleanup.push(() => bridge.dispose("e2e finished").catch(() => undefined));
 

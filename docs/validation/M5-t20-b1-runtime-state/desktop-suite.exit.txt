@@ -1,0 +1,5 @@
+desktop-suite exit=0
+b1-e2e exit=0
+semantics exit=0
+b14 exit=0
+sidecar exit=0

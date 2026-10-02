@@ -1,0 +1,14 @@
+# 归一化说明（M5/T20-B1）：本文件是原始输出的可读副本，仅去掉了 EOF 的空白/空行；
+# 原始字节保存在 omp-runtime-vitest.txt.gz（确定性 gzip -n -9），原始文件 sha256 0461c3d96637f831bb532d3b0998c1604f0fe6993a781e270d0c4c31235d8afc。
+
+> @pi-desktop/omp-runtime@0.15.2 test /home/vv/person/code/omp-desktop-m5-t20-b1/app/packages/omp-runtime
+> vitest run
+
+
+ RUN  v4.1.10 /home/vv/person/code/omp-desktop-m5-t20-b1/app/packages/omp-runtime
+
+
+ Test Files  23 passed (23)
+      Tests  370 passed | 6 skipped (376)
+   Start at  21:58:17
+   Duration  17.27s (transform 4.50s, setup 0ms, import 9.68s, tests 46.50s, environment 2ms)

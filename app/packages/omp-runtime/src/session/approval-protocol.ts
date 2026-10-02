@@ -51,6 +51,14 @@ export const OMP_NATIVE_APPROVAL_OPTIONS: readonly string[] = ["Approve", "Deny"
 /** Risk levels, mirroring the desktop's `Risk` union. */
 export type OmpApprovalRisk = "low" | "medium" | "high";
 
+/**
+ * The effective permission modes, mirroring the host's resolved
+ * `GlobalPermissionMode` (`inherit` is resolved desktop-side before the state
+ * is written; the gate only ever reads one of these three).
+ */
+export const OMP_APPROVAL_PERMISSION_MODES = ["ask", "accept-edits", "auto"] as const;
+export type OmpApprovalPermissionMode = (typeof OMP_APPROVAL_PERMISSION_MODES)[number];
+
 /** Structured description of one pending tool call, encoded into the dialog. */
 export type OmpApprovalDescriptor = {
   v: number;
@@ -65,6 +73,13 @@ export type OmpApprovalDescriptor = {
   argsPreview: unknown;
   /** Working directory of the call, when the hook exposes it. */
   cwd?: string;
+  /**
+   * The session's effective permission mode as read from the run-scoped
+   * desktop state, when that state was present and owned by the session
+   * (M5/T20-B1). This is the consumption proof that the resolved policy
+   * reaches the gate; the execution-time decision table is T20-C.
+   */
+  permissionMode?: OmpApprovalPermissionMode;
 };
 
 /** Our gate's dialog for one approval: what it sends and how it reads an answer. */
@@ -103,6 +118,9 @@ export function parseApprovalDescriptor(text: unknown): OmpApprovalDescriptor | 
   if (typeof record.toolName !== "string" || record.toolName.length === 0) return null;
   const risk = record.risk;
   if (risk !== "low" && risk !== "medium" && risk !== "high") return null;
+  const permissionMode = (OMP_APPROVAL_PERMISSION_MODES as readonly unknown[]).includes(record.permissionMode)
+    ? (record.permissionMode as OmpApprovalPermissionMode)
+    : undefined;
   return {
     v: OMP_APPROVAL_VERSION,
     kind: OMP_APPROVAL_KIND,
@@ -113,6 +131,7 @@ export function parseApprovalDescriptor(text: unknown): OmpApprovalDescriptor | 
     reason: typeof record.reason === "string" ? record.reason : "",
     argsPreview: record.argsPreview,
     ...(typeof record.cwd === "string" ? { cwd: record.cwd } : {}),
+    ...(permissionMode ? { permissionMode } : {}),
   };
 }
 

@@ -140,9 +140,39 @@ export type OmpHostToolBinding = {
 
 export type OmpHostToolAdapter = {
   /** The session's tool catalog for one project (never shared across projects). */
-  catalog(projectPath: string): Promise<OmpHostToolDefinition[]>;
+  catalog(projectPath: string): Promise<OmpHostToolCatalogEntry[]>;
   /** An executor bound to one session/project, with live re-checks. */
   executor(binding: OmpHostToolBinding): OmpHostToolExecutor;
+};
+
+/**
+ * Which desktop registry served one host tool. Provenance is taken from the
+ * registry that produced the entry, never from the name prefix: plugin tools
+ * (including plugin-declared MCP tools) come from the plugin registry, user
+ * MCP tools from the user MCP runtime.
+ */
+export type OmpHostToolOrigin = "plugin" | "user-mcp";
+
+/**
+ * One catalog entry: the wire definition the runtime registers, plus the
+ * desktop policy that rides the run-scoped state (M5/T20-B1) — the declared
+ * PI risk, the plan-safe actions that make a plugin tool contract-visible, and
+ * the origin registry. The policy is part of the catalog fingerprint, so a
+ * risk or plan-safe-action change re-registers even when names and schemas are
+ * unchanged.
+ */
+export type OmpHostToolCatalogEntry = {
+  definition: OmpHostToolDefinition;
+  /**
+   * PI risk for this tool: the plugin's declared `low|medium|high`, `medium`
+   * when the declaration is missing or invalid (PI's default), and `low` for
+   * user MCP tools (PI host-core classifies `mcp_*` as Low). A name prefix
+   * never decides this field.
+   */
+  risk: "low" | "medium" | "high";
+  /** Declared plan-safe actions; only a plugin declaration can be non-empty. */
+  planSafeActions: string[];
+  origin: OmpHostToolOrigin;
 };
 
 const FALLBACK_SCHEMA = { type: "object", properties: {} } as const;
@@ -194,35 +224,56 @@ type OutcomeBlock = { type: "text"; text: string } | { type: "image"; data: stri
  * Assemble and expose the desktop's host tools for OMP sessions.
  */
 export function createOmpHostToolAdapter(deps: OmpHostToolAdapterDeps): OmpHostToolAdapter {
-  async function catalog(projectPath: string): Promise<OmpHostToolDefinition[]> {
+  async function catalog(projectPath: string): Promise<OmpHostToolCatalogEntry[]> {
     // The same assembly `session-launch.ts` performs for the Pi sidecar: the
     // live plugin registry filtered by activation scope, plus every user MCP
     // tool active in this project (which `toolsForProject` already scopes).
-    const pluginTools = deps.plugins
+    const pluginEntries = deps.plugins
       .getTools()
       .filter((tool) => deps.pluginActiveInProject(tool.pluginId, projectPath))
-      .map((tool) => ({
-        name: tool.fullName,
-        description: tool.description,
-        parameters: tool.schema ?? FALLBACK_SCHEMA,
+      .map((tool): OmpHostToolCatalogEntry => ({
+        definition: toDefinition({
+          name: tool.fullName,
+          description: tool.description,
+          parameters: tool.schema ?? FALLBACK_SCHEMA,
+        }),
+        // PI forwards a declared risk only when it is one of the three legal
+        // values and otherwise leaves it to the host's default (medium); the
+        // same rule lands the default here. The declaration is read from the
+        // registry entry, never inferred from the name.
+        risk:
+          tool.risk === "low" || tool.risk === "medium" || tool.risk === "high"
+            ? tool.risk
+            : ("medium" as const),
+        // Registration validated the list (PI ADR 0211); an omitted list is
+        // empty, and empty keeps the tool out of the contract catalog.
+        planSafeActions: tool.planSafeActions ? [...tool.planSafeActions] : [],
+        origin: "plugin" as const,
       }));
     const userMcpTools = await deps.userMcp.toolsForProject(projectPath);
-    const definitions = [
-      ...pluginTools,
+    const entries: OmpHostToolCatalogEntry[] = [
+      ...pluginEntries,
       ...userMcpTools.map((tool) => ({
-        name: tool.fullName,
-        description: tool.description,
-        parameters: tool.schema ?? FALLBACK_SCHEMA,
+        definition: toDefinition({
+          name: tool.fullName,
+          description: tool.description,
+          parameters: tool.schema ?? FALLBACK_SCHEMA,
+        }),
+        // PI host-core classifies user MCP tools as Low, but that only decides
+        // the card in Agent mode; it never overrides the contract hard-deny.
+        risk: "low" as const,
+        planSafeActions: [] as string[],
+        origin: "user-mcp" as const,
       })),
-    ].map(toDefinition);
+    ];
     const seen = new Set<string>();
-    for (const definition of definitions) {
-      if (seen.has(definition.name)) {
-        throw new Error(`duplicate host tool name in the desktop catalog: ${definition.name}`);
+    for (const entry of entries) {
+      if (seen.has(entry.definition.name)) {
+        throw new Error(`duplicate host tool name in the desktop catalog: ${entry.definition.name}`);
       }
-      seen.add(definition.name);
+      seen.add(entry.definition.name);
     }
-    return definitions;
+    return entries;
   }
 
   function executor(binding: OmpHostToolBinding): OmpHostToolExecutor {

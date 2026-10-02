@@ -1682,8 +1682,10 @@ RPC (evidence: `docs/validation/M5-host-tool-rpc.md`, ADR 0304 §4):
   serialized `content` JSON (≤ 768 KiB), keeping the frame under the 1 MiB
   line limit and preserving the head of an over-budget result.
 
-T19-C delivers desktop skills and project memory through the same trusted gate
-(evidence: `docs/validation/M5-capability-user-paths.md`, ADR 0304 §5):
+T19-C delivers desktop skills and project memory through the same trusted gate;
+M5/T20-B1 extends that channel with the runtime mode/policy half and the
+contract tool catalog (evidence: `docs/validation/M5-capability-user-paths.md`,
+`docs/validation/M5-t20-b1-runtime-state.md`, ADR 0304 §5, ADR 0308):
 
 - **Single loader**: `omp-desktop-capabilities.ts` assembles one snapshot per
   prompt with the exact Pi sources, ordering and metadata — builtin skills,
@@ -1691,7 +1693,7 @@ T19-C delivers desktop skills and project memory through the same trusted gate
   user skills (id/name/description only), plus project memory read through
   `project.group.context` with the legacy `project.memory.get` fallback,
   best-effort exactly where Pi is best-effort.
-- **Run-scoped state**: the supervisor points the child's
+- **Run-scoped state (v2)**: the supervisor points the child's
   `OMP_DESKTOP_STATE` at `<runRoot>/desktop-state.json` (decided at start,
   so neither a static argument nor `extraEnv` can redirect it). The bridge
   rewrites the state before every prompt with an atomic replacement (unique
@@ -1699,26 +1701,54 @@ T19-C delivers desktop skills and project memory through the same trusted gate
   the final path — a planted symlink or hard link is swapped as an entry,
   never followed, and a failed write preserves the previous file with no
   stranded temporary file) — bounded, credential-free, removed with the run
-  root — so edits, removals, scope changes and unloads are visible on the
-  very next prompt. After the write, the bridge re-reads the on-disk file
-  with the same `readDesktopCapabilityState` contract the gate uses and
-  confirms the owning session, deciding tool presence from the validated
-  state only. A failed snapshot or write, or a failed self-validation, first
-  installs an empty tombstone so the previous turn's state can never reach
-  the gate; if even the tombstone cannot be written, the prompt is refused
-  before submission. Failure logs carry only a presence-only classification
-  (`Error` instance or not, code-shaped property present or not) — never
-  error text, error property values, stacks or state content.
-- **Gate injection**: a `before_agent_start` handler validates the state
-  (regular file, size, schema, freshness ≤ 10 min, rejected future write
-  times, owning-session match) and returns
-  `{ systemPrompt: [...event.systemPrompt, block] }` — an append that
-  never replaces the native prompt, rules, context files or the native
-  `<skills>`/`skill://` catalog. The block is the exact Pi
-  `pluginSkillsPrompt` + `projectMemoryPrompt` text. Any failed read or
-  validation returns no override: the turn proceeds with the native prompt
-  intact, and the approval gate is untouched. Subagent sessions get nothing
-  (Pi delegates never receive project memory).
+  root — so mode/permission changes, catalog edits, removals, scope changes
+  and unloads are visible on the very next prompt. Schema v2 has a mandatory
+  policy half — the session `mode` read from the host row, the exact
+  `composeModeSystemPrompt(mode, "")` output, the **effective**
+  `permissionMode` (`inherit` resolved against the app's current
+  `defaultPermissionMode`, else `ask`) and a per-host-tool
+  `{name, risk, planSafeActions, origin}` policy table from the same catalog
+  assembly that feeds `set_host_tools` — and the T19-C best-effort
+  capability half (skills/memory). After the write, the bridge re-reads the
+  on-disk file with the same `readDesktopCapabilityState` contract the gate
+  uses, compares it field-by-field with the snapshot and confirms the owning
+  session; a failed host read, an unknown enum, a compose failure, a failed
+  write or a failed self-validation refuses the prompt *before submission*
+  (no tombstone, no Agent fallback), while a failed capability snapshot only
+  empties the capability half. Failure logs carry only a presence-only
+  classification (`Error` instance or not, code-shaped property present or
+  not) — never error text, error property values, stacks or state content.
+- **Gate injection and the contract clamp**: a `before_agent_start` handler
+  validates the state (regular file, size, schema v2, freshness ≤ 10 min,
+  rejected future write times, owning-session match). For the owning session
+  it returns `{ systemPrompt: [...event.systemPrompt, capability?, modeBlock] }`
+  — the capability block (exact Pi `pluginSkillsPrompt` + `projectMemoryPrompt`
+  text) first and the mode block last, matching Pi's base + mode-block
+  position, never replacing the native prompt, rules, context files or the
+  native `<skills>`/`skill://` catalog. In `plan`/`goal` it additionally
+  clamps the live active-tool selection to the Pi contract catalog through
+  `setActiveTools`: the allowed native names (`read`, `glob`, `grep`, `bash`,
+  `ask`, `new_context`) intersected with the live set, plus plugin host tools
+  whose state entry declares a non-empty `planSafeActions` list — `write`,
+  `edit`, `apply_patch`, unknown tools, user MCP tools and undeclared plugin
+  tools never enter it, and Pi's `BrowserPreview` is never fabricated because
+  the pinned runtime ships no such tool. Returning to `agent` restores the
+  pre-clamp enabled selection united with anything the runtime auto-activated
+  while clamped, so no stale clamp survives and no user-disabled tool is
+  resurrected; an unchanged selection makes no call, so a stable prompt costs
+  one start attempt and a real change at most the runtime's single policy
+  retry. Subagent sessions get nothing (Pi delegates never receive project
+  memory, skills or a mode block) and keep their own catalog.
+- **Fail-closed refusal**: a file that claims the firing session but fails
+  validation makes the gate refuse the turn through the runtime's own
+  `ctx.abort()` — a thrown handler error is *not* protection (the pinned
+  extension runner logs it and still delivers the prompt; measured in
+  `apps/desktop/test/omp-start-handler-semantics.test.mjs`). A missing or
+  unattributable file injects nothing: the T19-C best-effort behavior for
+  sessions with no desktop state channel. The gate's `tool_call` approval
+  descriptor additionally carries the effective permission mode when the
+  owning state is readable, so the resolved policy is observably consumed
+  (T20-C replaces this with the execution-time decision table).
 - **On-demand `Skill` path**: the bridge registers a host tool named `Skill`
   (exact Pi description and `{ id }` schema, `loadMode: "essential"`) only
   when the desktop catalog is non-empty — the Pi registration gate. The
@@ -1735,18 +1765,21 @@ T19-C delivers desktop skills and project memory through the same trusted gate
   read-only load raises no approval.
 - **Fail-closed decision**: a host read failure follows Pi's best-effort
   memory behavior (no memory block; a failed `skills.active` drops only the
-  user skills); a missing, malformed, oversized, stale or future-dated state
-  injects nothing. A failed snapshot or state write invalidates the previous
-  state with an empty tombstone (withdrawing the `Skill` tool too), and a
-  tombstone that cannot be written fails the prompt before submission — a
-  stale catalog or memory can never reach a provider request.
+  user skills); a malformed catalog line is dropped with a warning. A
+  missing or unattributable state file injects nothing; a file owned by the
+  firing session that fails validation refuses the turn (`ctx.abort()`), and
+  any mandatory mode/policy failure refuses the prompt before submission — a
+  stale catalog, mode or policy can never reach a provider request.
 - **User path**: Settings, the project-memory editor, skill management,
   plugin enable/scope controls and the composer slash-skill path already
   write through the stores this loader reads; `/skill-id` routes to the
   `Skill` tool. OMP-native project skills stay discoverable and loadable
   through `skill://` beside the desktop catalog. No new or decorative UI was
-  added. T20 (Plan/Goal, real-mode propagation, high-privilege tools, child
-  stop/`hasUI` policy) stays closed and unclaimed.
+  added. M5/T20-B1 (runtime mode/policy state, the mode block and the
+  contract tool clamp) is implemented; T20-C (execution-time permission
+  enforcement and real plugin execution mode), T20-B2 (submit/approve/
+  dispatch) and T20-D (capability opening) stay closed and unclaimed, and
+  `plan`/`goal` capabilities remain off.
 
 ## 15. Pinned runtime patch level (M5/T20-R3A; base migrated in M5/T20-R4A, ADR 0305) — risk reduction, R3 not lifted
 

@@ -36,25 +36,51 @@
  *   - `OMP_DESKTOP_GATE_TIMEOUT_MS` — dialog deadline (default 120000).
  *   - `OMP_DESKTOP_GATE_MODE` — `ask` (default), `deny` (block everything
  *     gated without asking: unattended runs), or `allow`.
- *   - `OMP_DESKTOP_STATE` — the run-scoped desktop-capability state file
- *     (M5/T19-C). Its `before_agent_start` handler appends the PI-identical
- *     skill-catalog and project-memory blocks to the runtime's system prompt
- *     when the file is fresh, valid and owned by the firing session; any
- *     other case injects nothing and never replaces the native prompt.
+ *   - `OMP_DESKTOP_STATE` — the run-scoped desktop runtime state
+ *     (M5/T19-C skills+memory; M5/T20-B1 mode/policy). Its
+ *     `before_agent_start` handler appends the PI-identical skill-catalog and
+ *     project-memory blocks plus the production `composeModeSystemPrompt(mode,
+ *     "")` output to the runtime's system prompt when the file is fresh,
+ *     valid and owned by the firing session; in Plan/Goal it also clamps the
+ *     active tool set to the PI contract catalog. A file that claims the
+ *     firing session but fails validation refuses the turn (`ctx.abort()`,
+ *     the runtime's own formal stop path — a thrown handler error is logged
+ *     and swallowed by the extension runner and would NOT protect the turn).
  */
 import {
   OMP_APPROVAL_OPTIONS,
   encodeApprovalDescriptor,
   type OmpApprovalDescriptor,
+  type OmpApprovalPermissionMode,
   type OmpApprovalRisk,
 } from "../src/session/approval-protocol.ts";
 import {
   desktopCapabilityPrompt,
-  readDesktopCapabilityState,
+  readDesktopStateForSession,
   type DesktopCapabilityState,
+  type DesktopHostToolPolicy,
+  type DesktopPermissionMode,
 } from "../src/desktop-state.ts";
 
 const DEFAULT_GATED_TOOLS = "write,edit,apply_patch,bash,eval";
+
+/**
+ * The native tools PI's contract modes allow, restricted to names this
+ * runtime actually ships (`read`, `glob`, `grep`, `bash`, `ask`,
+ * `new_context`). PI's `BrowserPreview` has no OMP counterpart — it is never
+ * fabricated here — and every entry is still filtered against the live active
+ * set before it is selected: a tool this session does not have is not made to
+ * appear. OMP names that PI's contract excludes (`write`, `edit`, `eval`,
+ * `task`, `todo`, `web_search`, …) and every user MCP tool stay out.
+ */
+export const CONTRACT_MODE_NATIVE_TOOLS: readonly string[] = [
+  "read",
+  "grep",
+  "glob",
+  "bash",
+  "ask",
+  "new_context",
+];
 
 /**
  * Risk for the card, decided by this gate's own policy.
@@ -70,7 +96,10 @@ const DEFAULT_GATED_TOOLS = "write,edit,apply_patch,bash,eval";
  * so a high-risk plugin can never be downgraded — while user MCP tools are
  * `medium`, matching the Pi host's fixed MCP classification. (A low- or
  * medium-declared plugin sees a stricter high prompt this phase; that
- * limitation is recorded in ADR 0304 / the T19-B validation.)
+ * limitation is recorded in ADR 0304 / the T19-B validation.) The per-tool
+ * declared risk does travel to the gate in the run-scoped state policy table
+ * (M5/T20-B1) for the execution-time decision table (T20-C); the card split
+ * here is unchanged this phase.
  */
 export function riskForTool(toolName: string): OmpApprovalRisk {
   if (toolName.startsWith("plugin_")) return "high";
@@ -150,6 +179,10 @@ export interface ExtensionAPI {
       ctx: BeforeAgentStartContextSlice,
     ) => { systemPrompt: string[] } | undefined | Promise<{ systemPrompt: string[] } | undefined>,
   ): void;
+  /** Live active-tool selection (the extension API's `session.getEnabledToolNames`). */
+  getActiveTools?: () => string[];
+  /** Replace the active-tool selection (the extension API's `setActiveToolsByName`). */
+  setActiveTools?: (names: string[]) => Promise<void> | void;
   logger?: { warn?(message: string, meta?: unknown): void; info?(message: string, meta?: unknown): void };
 }
 
@@ -193,6 +226,7 @@ export function buildApprovalDialog(
   event: ToolCallEvent,
   context: ToolCallContext,
   timeoutMs: number,
+  permissionMode?: OmpApprovalPermissionMode,
 ): { title: string; items: Array<{ label: string; description?: string }>; options: string[]; dialogOptions: DialogOptions } {
   const descriptor: OmpApprovalDescriptor = {
     v: 1,
@@ -204,6 +238,7 @@ export function buildApprovalDialog(
     reason: approvalTitle(event),
     argsPreview: event.input,
     ...(cwdOf(context) ? { cwd: cwdOf(context)! } : {}),
+    ...(permissionMode ? { permissionMode } : {}),
   };
   const items = [
     { label: OMP_APPROVAL_OPTIONS[0], description: encodeApprovalDescriptor(descriptor) },
@@ -259,6 +294,8 @@ export async function decideToolCall(
     mode: "ask" | "deny" | "allow";
     timeoutMs: number;
     sessionAllowed: Set<string>;
+    /** The effective permission mode from the run-scoped state, when readable. */
+    permissionMode?: DesktopPermissionMode;
   },
 ): Promise<{ block: boolean; reason?: string; route: string }> {
   // Desktop host tools are controlled unconditionally: the name list only
@@ -278,7 +315,7 @@ export async function decideToolCall(
       route: "no-ui",
     };
   }
-  const dialog = buildApprovalDialog(event, context, policy.timeoutMs);
+  const dialog = buildApprovalDialog(event, context, policy.timeoutMs, policy.permissionMode);
   let choice: string | undefined;
   try {
     choice = await context.ui.select(dialog.title, dialog.items, dialog.dialogOptions);
@@ -317,45 +354,140 @@ export type BeforeAgentStartEventSlice = {
   systemPrompt: string[];
 };
 
-/** The session identity the injection handler compares against the state. */
+/** The session identity and stop channel the injection handler reads. */
 export type BeforeAgentStartContextSlice = {
   sessionManager?: { getSessionId?: () => string } | null;
+  /**
+   * Abort the current agent operation (the pinned runtime's
+   * `ExtensionContext.abort` → `session.abort({ reason: USER_INTERRUPT_LABEL })`).
+   * This is the only formal way a `before_agent_start` handler can refuse a
+   * turn: a thrown handler error is caught by the extension runner, logged and
+   * swallowed, and the provider request would still be delivered.
+   */
+  abort?: () => void;
 };
+
+/** The gate's verdict for one `before_agent_start`. */
+export type BeforeAgentStartDecision =
+  | { kind: "inject"; state: DesktopCapabilityState; systemPrompt: string[] }
+  | { kind: "skip" }
+  | { kind: "refuse"; reason: string };
 
 /**
  * Decide the `before_agent_start` answer for one state file.
  *
- * Returns `{ systemPrompt: [...event.systemPrompt, block] }` — an append that
- * never replaces or drops the runtime's native prompt parts — when the state
- * file is fresh, valid, owned by the firing session and carries at least one
- * block. Every other case (missing, malformed, oversized, stale, wrong
- * session, empty catalog and memory) returns undefined: nothing is injected
- * and the turn proceeds with the native prompt untouched. The desktop skill
- * catalog and project memory are best-effort injections, exactly where Pi is
- * best-effort; they never weaken the approval gate, which is a separate
- * `tool_call` policy in this same module.
+ * Returns an injection that appends the capability block (skills then memory,
+ * byte-identical to the T19-C behavior) and then the mode block, both after
+ * every native part — never replacing or dropping them. The mode block is
+ * `composeModeSystemPrompt(mode, "")`'s exact output, written by the desktop
+ * and validated back here, so no PI default base or OMP base is ever copied
+ * into the state.
+ *
+ * Every other case is explicit:
+ *   - a file owned by another session (a subagent delegate) or an absent file
+ *     → `skip`: nothing is injected and no tool set is touched (Pi's delegates
+ *     never receive project memory, skills or mode blocks either);
+ *   - a file that claims this session but fails validation → `refuse`: the
+ *     turn must be aborted, because continuing would silently run a Plan/Goal
+ *     intent as an unclamped Agent turn.
  */
-export function beforeAgentStartInjection(
+export function beforeAgentStartPolicy(
   event: BeforeAgentStartEventSlice,
   context: BeforeAgentStartContextSlice,
   statePath: string | undefined | null,
   now: number,
-): { systemPrompt: string[] } | undefined {
-  const state = readDesktopCapabilityState(statePath, now);
-  if (!state) return undefined;
+): BeforeAgentStartDecision {
   let sessionId: string | undefined;
   try {
     sessionId = context.sessionManager?.getSessionId?.();
   } catch {
-    return undefined;
+    sessionId = undefined;
   }
-  // Only the session the bridge wrote the state for may read it: a subagent
-  // session sharing the process sees the same file but a different identity
-  // and gets nothing (Pi's delegates never receive project memory either).
-  if (!sessionId || sessionId !== state.sessionId) return undefined;
-  const block = desktopCapabilityPrompt(state);
-  if (!block) return undefined;
-  return { systemPrompt: [...event.systemPrompt, block] };
+  const read = readDesktopStateForSession(statePath, now, sessionId);
+  if (read.kind === "absent" || read.kind === "foreign") return { kind: "skip" };
+  if (read.kind === "invalid") {
+    return {
+      kind: "refuse",
+      reason: "the desktop runtime state for this session is missing or invalid; refusing to run the turn without its mode and policy",
+    };
+  }
+  const systemPrompt = [...event.systemPrompt];
+  const capability = desktopCapabilityPrompt(read.state);
+  if (capability) systemPrompt.push(capability);
+  systemPrompt.push(read.state.modeBlock);
+  return { kind: "inject", state: read.state, systemPrompt };
+}
+
+/**
+ * The tool names a contract mode (Plan/Goal) may keep active, in the order the
+ * runtime currently has them: the allowed native names plus every desktop
+ * plugin tool that declares a non-empty plan-safe action list (PI ADR 0211).
+ * User MCP tools and undeclared plugin tools are never contract-visible, and
+ * nothing outside the live active set is invented.
+ */
+export function contractActiveToolNames(
+  state: Pick<DesktopCapabilityState, "hostTools">,
+  activeNames: readonly string[],
+): string[] {
+  const allowed = new Set<string>(CONTRACT_MODE_NATIVE_TOOLS);
+  for (const tool of state.hostTools as DesktopHostToolPolicy[]) {
+    if (tool.origin === "plugin" && tool.planSafeActions.length > 0) allowed.add(tool.name);
+  }
+  return activeNames.filter((name) => allowed.has(name));
+}
+
+/** The gate's cross-prompt clamp memory: the pre-contract selection and whether a clamp is live. */
+export type ContractClampState = { applied: boolean; before: string[] };
+
+export type ContractClampResult =
+  | { ok: true; changed: boolean; active: string[] }
+  | { ok: false; reason: string };
+
+/**
+ * Enforce the mode's tool contract on the runtime's active-tool selection.
+ *
+ * Contract modes select exactly {@link contractActiveToolNames}; returning to
+ * Agent restores the selection captured before the first clamp, unioned with
+ * anything the runtime auto-activated while the clamp was live (a host tool
+ * registered for this prompt), so no user-disabled tool is resurrected and no
+ * stale clamp survives. An unchanged selection is left untouched — that is
+ * what keeps a stable prompt at one start attempt, while a real change costs
+ * at most the runtime's one policy retry.
+ *
+ * Exported so the selection state machine is testable without a runtime; the
+ * registered handler is a thin caller.
+ */
+export async function applyContractToolClamp(
+  api: Pick<ExtensionAPI, "getActiveTools" | "setActiveTools">,
+  clamp: ContractClampState,
+  state: Pick<DesktopCapabilityState, "mode" | "hostTools">,
+): Promise<ContractClampResult> {
+  if (state.mode === "agent") {
+    if (!clamp.applied) return { ok: true, changed: false, active: api.getActiveTools?.() ?? [] };
+    if (typeof api.setActiveTools !== "function") {
+      return { ok: false, reason: "the runtime exposes no tool-selection API to restore the pre-Plan selection" };
+    }
+    const active = api.getActiveTools?.() ?? [];
+    const restore = [...clamp.before, ...active.filter((name) => !clamp.before.includes(name))];
+    clamp.applied = false;
+    clamp.before = [];
+    await api.setActiveTools(restore);
+    return { ok: true, changed: true, active: restore };
+  }
+  if (typeof api.getActiveTools !== "function" || typeof api.setActiveTools !== "function") {
+    return { ok: false, reason: "the runtime exposes no tool-selection API to enforce the contract catalog" };
+  }
+  const active = api.getActiveTools();
+  if (!clamp.applied) {
+    clamp.before = [...active];
+    clamp.applied = true;
+  }
+  const allowed = contractActiveToolNames(state, active);
+  if (active.length === allowed.length && active.every((name, index) => name === allowed[index])) {
+    return { ok: true, changed: false, active };
+  }
+  await api.setActiveTools(allowed);
+  return { ok: true, changed: true, active: allowed };
 }
 
 export default function ompDesktopGate(pi: ExtensionAPI): void {
@@ -365,25 +497,77 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
   const mode = (env?.OMP_DESKTOP_GATE_MODE ?? "ask").trim() as "ask" | "deny" | "allow";
   const timeoutMs = Number(env?.OMP_DESKTOP_GATE_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
   const sessionAllowed = new Set<string>();
+  const clamp: ContractClampState = { applied: false, before: [] };
+
+  /** Refuse one agent start through the runtime's own abort path. */
+  const refuseStart = (context: BeforeAgentStartContextSlice, reason: string): void => {
+    if (typeof context.abort === "function") {
+      try {
+        context.abort();
+        return;
+      } catch (error) {
+        pi.logger?.warn?.("desktop gate could not abort a refused agent start", String(error));
+      }
+    }
+    // The pinned runtime always provides abort; a host that does not cannot be
+    // protected from inside this process. Never pretend the refusal happened.
+    pi.logger?.warn?.("desktop gate refused an agent start but the runtime exposes no abort", reason);
+  };
 
   pi.on("tool_call", async (event, context) => {
+    let permissionMode: DesktopPermissionMode | undefined;
+    try {
+      const read = readDesktopStateForSession(
+        env?.OMP_DESKTOP_STATE,
+        Date.now(),
+        sessionIdOf(context),
+      );
+      if (read.kind === "owned") permissionMode = read.state.permissionMode;
+    } catch {
+      permissionMode = undefined;
+    }
     const verdict = await decideToolCall(event, context, {
       gated,
       mode: mode === "deny" || mode === "allow" ? mode : "ask",
       timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS,
       sessionAllowed,
+      ...(permissionMode ? { permissionMode } : {}),
     });
     if (!verdict.block) return undefined;
     return { block: true, reason: verdict.reason ?? "denied" };
   });
 
-  // Desktop skills and project memory enter the provider-visible system
-  // prompt here, and nowhere else. A failed read injects nothing; the handler
-  // never throws into the agent start.
+  // Desktop skills, project memory and the mode block enter the provider-visible
+  // system prompt here, and nowhere else; the mode's tool contract is clamped
+  // in the same handler, before the runtime commits the start. A failed read
+  // injects nothing (a delegate session) or refuses the turn (the owner's
+  // state is invalid); the handler never throws into the agent start.
   pi.on("before_agent_start", async (event, context) => {
     try {
-      return beforeAgentStartInjection(event, context, env?.OMP_DESKTOP_STATE, Date.now());
-    } catch {
+      const decision = beforeAgentStartPolicy(event, context, env?.OMP_DESKTOP_STATE, Date.now());
+      if (decision.kind === "refuse") {
+        refuseStart(context, decision.reason);
+        return undefined;
+      }
+      if (decision.kind === "skip") return undefined;
+      const clamped = await applyContractToolClamp(pi, clamp, decision.state);
+      if (!clamped.ok) {
+        refuseStart(context, clamped.reason);
+        return undefined;
+      }
+      return { systemPrompt: decision.systemPrompt };
+    } catch (error) {
+      // The handler must not silently degrade: an unexpected failure while a
+      // state file is owned by this session refuses the turn, and otherwise
+      // falls back to "no injection" (the native prompt ships untouched).
+      try {
+        const read = readDesktopStateForSession(env?.OMP_DESKTOP_STATE, Date.now(), context.sessionManager?.getSessionId?.());
+        if (read.kind === "owned" || read.kind === "invalid") {
+          refuseStart(context, `desktop gate failed while applying the runtime state: ${String(error)}`);
+        }
+      } catch {
+        // The probe itself failed; nothing attributable to refuse.
+      }
       return undefined;
     }
   });

@@ -1088,6 +1088,22 @@ sidecar 序列化针对相同标准化路径的 IPC/`sequential` 调用
 跟踪差距（MVP 后积压）：更丰富的系统提示组成 (§7) 和
 provider/model 目录发现超出当前有线路径。
 
+### 运行范围状态 v2 与合约工具目录（M5/T20-B1，ADR 0308）
+
+T19-C 的 `desktop-state.json` 升级为 schema v2：除技能/记忆外，每提示词还写入必填的会话
+`mode`、生产 `composeModeSystemPrompt(mode, "")` 块、**已解析**的有效 `permissionMode`
+（`inherit` 按 host-core 语义解析为应用当前 `defaultPermissionMode`，否则 `ask`）以及本次注册
+目录的每宿主工具 `{name, risk, planSafeActions, origin}` 策略表。策略半部分是强制的：宿主行
+读取、枚举校验、compose、写入或自校验任一失败都会在提交前拒绝提示词（不再有 tombstone、也不会按
+Agent 继续）；技能/记忆仍为 PI 式 best-effort。gate 在 `before_agent_start` 先追加能力块、最后
+追加 mode 块（纯追加、恰一次、单一 system），并在 Plan/Goal 用 `setActiveTools` 夹取 PI 合约目录
+（`read/glob/grep/bash/ask/new_context` ∩ 实际存在，加上声明了非空 planSafeActions 的插件工具；
+Write/Edit/未知/用户 MCP/未声明插件永不进入；不虚构 PI 的 BrowserPreview）；回到 Agent 恢复夹取
+前的选择并保留夹取期间自动激活的工具，不复活用户禁用的工具。声称属于本会话但校验失败的状态文件用
+运行时正式的 `ctx.abort()` 拒绝该回合（实测：provider 零请求；而抛异常会被扩展运行器吞掉、提示词
+仍会投递，因此不作为保护手段）；子代理会话零注入。风险/安全动作随目录指纹一起刷新；审批描述符
+携带有效权限模式作为可观察的消费路径。T20-C/B2/D 仍未开始。
+
 ### Provider certificate trust（issue #714）
 
 桌面 sidecar 使用 Node 的 `--use-system-ca` 启动，同时保留内置根证书和继承的

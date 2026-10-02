@@ -1,0 +1,15 @@
+# 归一化说明（M5/T20-B1）：本文件是原始输出的可读副本，仅去掉了 EOF 的空白/空行；
+# 原始字节保存在 b14-red/counterexample.diff.gz（确定性 gzip -n -9），原始文件 sha256 26415589c6d7787abc2befac3dc18ffd40cd2f5eaa5e9ac377bfa78eea82f120。
+--- /tmp/omp-gate-good.ts	2026-10-02 21:57:50.406752081 +0800
++++ packages/omp-runtime/extensions/omp-desktop-gate.ts	2026-10-02 21:57:53.400937809 +0800
+@@ -415,6 +415,11 @@
+   const capability = desktopCapabilityPrompt(read.state);
+   if (capability) systemPrompt.push(capability);
+   systemPrompt.push(read.state.modeBlock);
++  // B14 RED counterexample (temporary, not committed): append the PI default
++  // base as a second block exactly as a wrong implementation might.
++  systemPrompt.push(
++    "You are PI-Desktop, a local-first coding agent. Prefer concise, actionable answers. Use tools when they help.",
++  );
+   return { kind: "inject", state: read.state, systemPrompt };
+ }

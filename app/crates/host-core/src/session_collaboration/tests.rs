@@ -449,3 +449,64 @@ fn a_claim_that_loses_the_race_returns_conflict_and_rolls_back() {
     assert_eq!(turn_count(&db, &child), 0);
     assert_eq!(get(&db, &message.id).unwrap().unwrap().status, "queued");
 }
+
+#[test]
+fn configure_persists_mode_and_permission_mode_and_effective_mode_resolves_inherit() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+    let id = sessions::create_session_with_options(
+        &db,
+        sessions::SessionCreateOptions {
+            title: Some("Inherit".into()),
+            mode: Some("agent".into()),
+            permission_mode: Some("inherit".into()),
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .id;
+
+    // No app default yet: PI falls back to ask (never to a widening mode).
+    assert_eq!(permissions::effective_mode(&db, &id).unwrap(), "ask");
+
+    // One configure call persists both fields together.
+    sessions::configure_session_with_thinking(
+        &db,
+        &id,
+        "plan",
+        None,
+        None,
+        None,
+        Some("accept-edits"),
+    )
+    .unwrap();
+    assert_eq!(
+        sessions::session_mode(&db, &id).unwrap().as_deref(),
+        Some("plan")
+    );
+    assert_eq!(
+        sessions::session_permission_mode(&db, &id)
+            .unwrap()
+            .as_deref(),
+        Some("accept-edits")
+    );
+    assert_eq!(
+        permissions::effective_mode(&db, &id).unwrap(),
+        "accept-edits"
+    );
+
+    // Back to inherit: the app's *current* default decides, and a default that
+    // is itself inherit/invalid falls back to ask exactly like the desktop
+    // bridge mirrors.
+    sessions::configure_session_with_thinking(&db, &id, "agent", None, None, None, Some("inherit"))
+        .unwrap();
+    db.set_setting("app", &json!({ "defaultPermissionMode": "auto" }))
+        .unwrap();
+    assert_eq!(permissions::effective_mode(&db, &id).unwrap(), "auto");
+    db.set_setting("app", &json!({ "defaultPermissionMode": "inherit" }))
+        .unwrap();
+    assert_eq!(permissions::effective_mode(&db, &id).unwrap(), "ask");
+    db.set_setting("app", &json!({ "defaultPermissionMode": "yolo" }))
+        .unwrap();
+    assert_eq!(permissions::effective_mode(&db, &id).unwrap(), "ask");
+}

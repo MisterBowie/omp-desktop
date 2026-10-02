@@ -1,13 +1,21 @@
 /**
- * T19-C probes: the session bridge must refresh the run-scoped
- * desktop-capability state before every prompt (the single file the trusted
- * gate reads), and register the on-demand `Skill` host tool exactly when the
- * desktop catalog is non-empty — never when the state could not be written.
+ * M5/T19-C + T20-B1 probes: the session bridge must refresh the run-scoped
+ * desktop runtime state before every prompt (the single file the trusted gate
+ * reads) — the mandatory mode/mode-block/effective-permission policy plus the
+ * PI-best-effort skill catalog and project memory and the host-tool policy
+ * table — and register the on-demand `Skill` host tool exactly when the
+ * desktop catalog is non-empty.
  *
- * These probes run against the bridge as it exists on the T19-C baseline
- * (`df49b84`): the capabilities option is passed as a plain field the baseline
- * bridge ignores, so every assertion below fails on real, observable behavior
- * — no state file is written, no `Skill` tool is registered.
+ * The B1 contract these probes pin:
+ *   - state is written once per prompt, 0600, naming the owning native session;
+ *   - mode and effective permission mode are read from the session policy
+ *     provider every prompt and a failure to read/validate/write/self-validate
+ *     them refuses the prompt before the runtime sees anything;
+ *   - skills/memory are best-effort: a failed or malformed snapshot becomes an
+ *     empty capability part while the mode/policy half stays exact;
+ *   - the host-tool policy table (risk/planSafeActions/origin) rides the same
+ *     catalog assembly and its changes participate in the registration
+ *     fingerprint.
  */
 import assert from "node:assert/strict";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -21,13 +29,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
 const { createOmpSessionBridge } = await import("../electron/main/runtime/omp-session.ts");
 const { OmpSessionRunner } = await import("../../../packages/omp-runtime/src/session/runner.ts");
-let DESKTOP_STATE_FILE = "desktop-state.json";
-try {
-  ({ DESKTOP_STATE_FILE } = await import("../../../packages/omp-runtime/src/desktop-state.ts"));
-} catch {
-  // The T19-C baseline lacks the module; the probes still run and fail on the
-  // absent state write, using the file name the implementation will use.
-}
+const { DESKTOP_STATE_FILE } = await import("../../../packages/omp-runtime/src/desktop-state.ts");
+const { composeModeSystemPrompt } = await import("../../../packages/agent-runtime/src/mode-prompts.ts");
 
 /** Every temporary directory this file creates, removed in `after`. */
 const scratch = [];
@@ -113,19 +116,25 @@ function fakeSupervisor(runtime, runRoot) {
 }
 
 /**
- * A harness with a mutable capabilities snapshot, a real temp run root per
- * session, and a host-tools provider that records its catalog requests.
+ * A harness with a mutable capabilities snapshot, a mutable session policy, a
+ * real temp run root per session, and a host-tools provider that records its
+ * catalog requests.
  */
-function skillBridgeHarness({ skills = [], memory, perSession = {} } = {}) {
+function skillBridgeHarness({ skills = [], memory, perSession = {}, policy, hostToolsByProject = {} } = {}) {
   const live = { skills, memory };
   const snapshots = [];
   const catalogRequests = [];
+  const policyReads = [];
   const warnings = [];
+  const livePolicy = policy ?? {};
   const provider = {
     snapshots,
     catalogRequests,
+    policyReads,
     warnings,
     live,
+    livePolicy,
+    hostToolsByProject,
     capabilities: {
       snapshot: async (projectPath) => {
         const source = perSession[projectPath] ?? live;
@@ -134,10 +143,19 @@ function skillBridgeHarness({ skills = [], memory, perSession = {} } = {}) {
         return snapshot;
       },
     },
+    sessionPolicy: {
+      policy: async (sessionId) => {
+        policyReads.push(sessionId);
+        const current = livePolicy[sessionId] ?? { mode: "agent", permissionMode: "ask" };
+        if (current.throw) throw new Error("host policy read failed");
+        if (current.missing) return null;
+        return { mode: current.mode ?? "agent", permissionMode: current.permissionMode ?? "ask" };
+      },
+    },
     hostTools: {
       catalog: async (projectPath) => {
         catalogRequests.push(projectPath);
-        return [];
+        return hostToolsByProject[projectPath] ?? [];
       },
       executor: () => ({
         execute: async () => ({ content: [{ type: "text", text: "ok" }] }),
@@ -179,7 +197,8 @@ function skillBridgeHarness({ skills = [], memory, perSession = {} } = {}) {
       },
     },
     gateResolver: () => "/repo/app/packages/omp-runtime/extensions/omp-desktop-gate.ts",
-    ...provider.capabilities ? { capabilities: provider.capabilities } : {},
+    capabilities: provider.capabilities,
+    sessionPolicy: provider.sessionPolicy,
     hostTools: provider.hostTools,
   });
   return {
@@ -200,22 +219,28 @@ function stateFileOf(harness, sessionId) {
   return { runRoot, path: join(runRoot, DESKTOP_STATE_FILE) };
 }
 
-test("the bridge writes the run-scoped state before the first prompt", async () => {
+test("the bridge writes the v2 run-scoped state before the first prompt", async () => {
   const project = makeProject();
   const harness = skillBridgeHarness({
     skills: [{ id: "demo.hello/release-notes", name: "Release notes", description: "Draft release notes." }],
     memory: "Use the staging database.",
+    policy: { "session-omp": { mode: "plan", permissionMode: "accept-edits" } },
   });
-  const { bridge, snapshots } = harness;
+  const { bridge, snapshots, policyReads } = harness;
   await bridge.prompt({ sessionId: "session-omp", content: "hello", projectPath: project });
   const runtime = harness.runtime;
 
   assert.equal(snapshots.length, 1, "the snapshot must be assembled once per prompt");
+  assert.deepEqual(policyReads, ["session-omp"], "the host policy must be read once per prompt");
   const { path } = stateFileOf(harness, "session-omp");
   const raw = readFileSync(path, "utf8");
   const state = JSON.parse(raw);
   assert.equal(state.sessionId, "native-id", "the state must name the owning native session");
   assert.equal(typeof state.writtenAt, "number", "the state must carry its write time");
+  assert.equal(state.v, 2, "the state must carry the current schema version");
+  assert.equal(state.mode, "plan");
+  assert.equal(state.modeBlock, composeModeSystemPrompt("plan", ""), "the block must be the production composer output");
+  assert.equal(state.permissionMode, "accept-edits", "the effective permission mode rides the same snapshot");
   assert.equal(state.memory, "Use the staging database.");
   assert.deepEqual(state.skills, [{ id: "demo.hello/release-notes", name: "Release notes", description: "Draft release notes." }]);
   const mode = statSync(path).mode & 0o777;
@@ -224,6 +249,28 @@ test("the bridge writes the run-scoped state before the first prompt", async () 
   const commands = runtime.commands;
   const prompt = commands.find((command) => command.type === "prompt");
   assert.ok(prompt, "the prompt must run after the state refresh");
+});
+
+test("the mode block follows a host mode change on the very next prompt", async () => {
+  const project = makeProject();
+  const harness = skillBridgeHarness({
+    skills: [],
+    policy: { "session-omp": { mode: "agent", permissionMode: "ask" } },
+  });
+  const { bridge } = harness;
+  await bridge.prompt({ sessionId: "session-omp", content: "hello", projectPath: project });
+  const { path } = stateFileOf(harness, "session-omp");
+  assert.equal(JSON.parse(readFileSync(path, "utf8")).modeBlock, composeModeSystemPrompt("agent", ""));
+
+  harness.livePolicy["session-omp"] = { mode: "goal", permissionMode: "auto" };
+  harness.runtime.push({ type: "agent_end", messages: [] });
+  await new Promise((resolve) => setImmediate(resolve));
+  await bridge.prompt({ sessionId: "session-omp", content: "again", projectPath: project });
+  const rewritten = JSON.parse(readFileSync(path, "utf8"));
+  assert.equal(rewritten.mode, "goal");
+  assert.equal(rewritten.modeBlock, composeModeSystemPrompt("goal", ""));
+  assert.equal(rewritten.permissionMode, "auto");
+  assert.ok(!readFileSync(path, "utf8").includes(composeModeSystemPrompt("agent", "")), "the old block must not linger");
 });
 
 test("the Skill host tool rides the catalog exactly when the desktop catalog is non-empty", async () => {
@@ -257,34 +304,35 @@ test("the Skill host tool rides the catalog exactly when the desktop catalog is 
   assert.ok(readFileSync(path, "utf8").includes("demo.hello/release-notes"));
 });
 
-test("memory and skill edits reach the rewritten state on the next prompt", async () => {
+test("a policy read failure, a missing row or an unknown policy refuses the prompt before submission", async () => {
   const project = makeProject();
-  const harness = skillBridgeHarness({ skills: [], memory: "first notes" });
-  const { bridge } = harness;
-  await bridge.prompt({ sessionId: "session-omp", content: "hello", projectPath: project });
-  const runtime = harness.runtime;
-  const { path } = stateFileOf(harness, "session-omp");
-  assert.ok(readFileSync(path, "utf8").includes("first notes"));
-
-  harness.live.memory = "second notes";
-  runtime.push({ type: "agent_end", messages: [] });
-  await new Promise((resolve) => setImmediate(resolve));
-  await bridge.prompt({ sessionId: "session-omp", content: "again", projectPath: project });
-  const rewritten = readFileSync(path, "utf8");
-  assert.ok(rewritten.includes("second notes"), "the edit must be visible on the next prompt");
-  assert.ok(!rewritten.includes("first notes"), "the old memory must not linger in the state");
+  for (const broken of [{ throw: true }, { missing: true }, { mode: "chat" }, { permissionMode: "inherit" }]) {
+    const harness = skillBridgeHarness({ skills: [], policy: { "session-omp": broken } });
+    const { bridge, warnings } = harness;
+    await assert.rejects(
+      () => bridge.prompt({ sessionId: "session-omp", content: "hello", projectPath: project }),
+      (error) => error?.errorCode === "OMP_CAPABILITY_STATE_FAILED",
+      `policy ${JSON.stringify(broken)} must refuse the prompt`,
+    );
+    assert.equal(
+      harness.runtime.commands.some((command) => command.type === "prompt"),
+      false,
+      "no prompt may reach the runtime without a validated policy",
+    );
+    assert.ok(warnings.length >= 1, "the failure must be logged");
+  }
 });
 
-test("a state write failure fails the prompt closed when no tombstone can be written", async () => {
+test("a state write failure refuses the prompt before submission", async () => {
   const project = makeProject();
   const harness = skillBridgeHarness({
     skills: [{ id: "demo.hello/release-notes", name: "Release notes", description: "" }],
   });
   const { bridge, warnings } = harness;
   // Make the run root unwritable after the bridge builds it: the state
-  // writer's exclusive create fails, and with no way to make a stale state
-  // invisible the prompt must fail before reaching the runtime — the gate
-  // would otherwise read whatever previous state the run root still held.
+  // writer's exclusive create fails, and the prompt must fail before reaching
+  // the runtime — the gate would otherwise read whatever previous state the
+  // run root still held.
   const runRoot = mkdtempSync(join(tmpdir(), "omp-skill-bridge-runroot-"));
   scratch.push(runRoot);
   harness.runRootsBySession.set("session-omp", runRoot);
@@ -292,13 +340,13 @@ test("a state write failure fails the prompt closed when no tombstone can be wri
   try {
     await assert.rejects(
       () => bridge.prompt({ sessionId: "session-omp", content: "hello", projectPath: project }),
-      (error) => /capability state|stale state|state could not/i.test(String(error?.message ?? error)),
+      (error) => error?.errorCode === "OMP_CAPABILITY_STATE_FAILED" && /could not be written/i.test(String(error?.message)),
     );
     const runtime = harness.runtime;
     assert.equal(
       runtime.commands.some((command) => command.type === "prompt"),
       false,
-      "no prompt may reach the runtime while a stale state could still be read",
+      "no prompt may reach the runtime while the state could not be written",
     );
     assert.equal(
       runtime.commands.some((command) => command.type === "set_host_tools"),
@@ -311,11 +359,12 @@ test("a state write failure fails the prompt closed when no tombstone can be wri
   }
 });
 
-test("a snapshot failure after a successful turn installs an empty tombstone, never the stale state", async () => {
+test("a capability snapshot failure keeps the exact mode/policy and only empties the capability part", async () => {
   const project = makeProject();
   const harness = skillBridgeHarness({
     skills: [{ id: "demo.hello/release-notes", name: "Release notes", description: "Draft release notes." }],
     memory: "first-turn memory",
+    policy: { "session-omp": { mode: "plan", permissionMode: "auto" } },
   });
   const { bridge, warnings } = harness;
   await bridge.prompt({ sessionId: "session-omp", content: "hello", projectPath: project });
@@ -323,11 +372,10 @@ test("a snapshot failure after a successful turn installs an empty tombstone, ne
   const { path } = stateFileOf(harness, "session-omp");
   const first = JSON.parse(readFileSync(path, "utf8"));
   assert.equal(first.memory, "first-turn memory");
-  assert.deepEqual(first.skills, [{ id: "demo.hello/release-notes", name: "Release notes", description: "Draft release notes." }]);
 
-  // The second turn's snapshot fails. The previous state must not survive:
-  // the bridge installs an empty tombstone so the gate can only read "no
-  // catalog, no memory" — never the first turn's content.
+  // The second turn's snapshot fails. The previous state must not survive,
+  // but the mode/policy half must stay exact — the prompt keeps the PI
+  // best-effort experience.
   runtime.push({ type: "agent_end", messages: [] });
   await new Promise((resolve) => setImmediate(resolve));
   harness.capabilities.snapshot = async () => {
@@ -337,7 +385,10 @@ test("a snapshot failure after a successful turn installs an empty tombstone, ne
   assert.equal(second.accepted, true, "a snapshot failure keeps the PI best-effort prompt experience");
 
   const after = JSON.parse(readFileSync(path, "utf8"));
-  assert.equal(after.sessionId, "native-id", "the tombstone must still name the owning session");
+  assert.equal(after.sessionId, "native-id");
+  assert.equal(after.mode, "plan", "the mode must survive a capability failure");
+  assert.equal(after.modeBlock, composeModeSystemPrompt("plan", ""));
+  assert.equal(after.permissionMode, "auto", "the effective permission mode must survive a capability failure");
   assert.deepEqual(after.skills, [], "the stale catalog must be gone");
   assert.equal(after.memory, null, "the stale memory must be gone");
   assert.ok(!readFileSync(path, "utf8").includes("first-turn memory"), "no stale memory text may remain");
@@ -346,70 +397,72 @@ test("a snapshot failure after a successful turn installs an empty tombstone, ne
   const lastRegistration = registrations[registrations.length - 1];
   assert.ok(
     !lastRegistration.tools.some((tool) => tool.name === "Skill"),
-    "the Skill tool must be withdrawn with the invalidated catalog",
+    "the Skill tool must be withdrawn with the emptied catalog",
   );
   assert.ok(warnings.some((entry) => /snapshot failed/i.test(entry.message)), "the snapshot failure must be logged");
 });
 
-test("when the stale state cannot be invalidated, the prompt fails before submission", async () => {
+test("a malformed skill entry degrades to a smaller catalog instead of poisoning the state", async () => {
   const project = makeProject();
   const harness = skillBridgeHarness({
-    skills: [{ id: "demo.hello/release-notes", name: "Release notes", description: "" }],
-    memory: "first-turn memory",
+    skills: [
+      { id: "", name: "Gate rejects empty ids", description: "" },
+      { id: "keep-me", name: "Keep", description: "" },
+    ],
   });
-  const { bridge } = harness;
-  await bridge.prompt({ sessionId: "session-omp", content: "hello", projectPath: project });
-  const runtime = harness.runtime;
-  const { path, runRoot } = stateFileOf(harness, "session-omp");
-  assert.ok(readFileSync(path, "utf8").includes("first-turn memory"), "the first turn must have written state");
-
-  // The second snapshot fails AND the run root is unwritable, so the
-  // tombstone cannot replace the stale file: the prompt must be refused
-  // before the runtime can read the old state.
-  runtime.push({ type: "agent_end", messages: [] });
-  await new Promise((resolve) => setImmediate(resolve));
-  harness.capabilities.snapshot = async () => {
-    throw new Error("host unavailable");
-  };
-  chmodSync(runRoot, 0o500);
-  try {
-    await assert.rejects(
-      () => bridge.prompt({ sessionId: "session-omp", content: "again", projectPath: project }),
-      (error) => /stale state|could not be invalidated|refusing to prompt/i.test(String(error?.message ?? error)),
-    );
-    const prompts = runtime.commands.filter((command) => command.type === "prompt");
-    assert.equal(prompts.length, 1, "only the first turn's prompt may have reached the runtime");
-  } finally {
-    chmodSync(runRoot, 0o700);
-  }
-});
-
-test("a fresh state the gate would reject never decides the Skill tool", async () => {
-  const project = makeProject();
-  // A non-empty snapshot whose content the gate contract rejects (an empty
-  // skill id): writing it succeeds, but the gate would read null and inject
-  // no catalog. The bridge must re-validate the on-disk state with the same
-  // contract before deciding tool presence — never from the raw snapshot.
-  const harness = skillBridgeHarness({
-    skills: [{ id: "", name: "Gate rejects empty ids", description: "" }],
-  });
-  const { bridge } = harness;
-  const second = await bridge.prompt({ sessionId: "session-omp", content: "hello", projectPath: project });
-  assert.equal(second.accepted, true, "the prompt keeps the PI best-effort experience");
+  const { bridge, warnings } = harness;
+  const accepted = await bridge.prompt({ sessionId: "session-omp", content: "hello", projectPath: project });
+  assert.equal(accepted.accepted, true, "a bad catalog line is best-effort, not a refused prompt");
 
   const runtime = harness.runtime;
   const registrations = runtime.commands.filter((command) => command.type === "set_host_tools");
   assert.equal(registrations.length, 1);
   assert.ok(
-    !registrations[0].tools.some((tool) => tool.name === "Skill"),
-    "a catalog the gate would reject must not register the Skill tool",
+    registrations[0].tools.some((tool) => tool.name === "Skill"),
+    "the surviving skill still registers the Skill tool",
   );
-  // The rejected state is invalidated like any other failed refresh: the
-  // on-disk file is the empty tombstone, never the gate-rejected content.
   const { path } = stateFileOf(harness, "session-omp");
   const state = JSON.parse(readFileSync(path, "utf8"));
-  assert.deepEqual(state.skills, []);
-  assert.equal(state.memory, null);
+  assert.deepEqual(state.skills, [{ id: "keep-me", name: "Keep", description: "" }]);
+  assert.ok(warnings.some((entry) => /invalid skill/i.test(entry.message)), "the drop must be logged");
+});
+
+test("host-tool policy rides the state and a risk/plan-safe change alone re-registers", async () => {
+  const project = makeProject();
+  const entry = (overrides = {}) => ({
+    definition: {
+      name: "plugin_demo_run",
+      description: "Run something",
+      parameters: { type: "object" },
+      loadMode: "essential",
+    },
+    risk: "low",
+    planSafeActions: [],
+    origin: "plugin",
+    ...overrides,
+  });
+  const harness = skillBridgeHarness({ skills: [], hostToolsByProject: { [project]: [entry()] } });
+  const { bridge } = harness;
+  await bridge.prompt({ sessionId: "session-omp", content: "hello", projectPath: project });
+  const runtime = harness.runtime;
+  const { path } = stateFileOf(harness, "session-omp");
+  const first = JSON.parse(readFileSync(path, "utf8"));
+  assert.deepEqual(first.hostTools, [
+    { name: "plugin_demo_run", risk: "low", planSafeActions: [], origin: "plugin" },
+  ]);
+
+  // Only the policy changes: names and schemas are identical. It must still
+  // re-register and land in the state.
+  harness.hostToolsByProject[project] = [entry({ risk: "high", planSafeActions: ["inspect"] })];
+  runtime.push({ type: "agent_end", messages: [] });
+  await new Promise((resolve) => setImmediate(resolve));
+  await bridge.prompt({ sessionId: "session-omp", content: "again", projectPath: project });
+
+  assert.equal(runtime.commands.filter((command) => command.type === "set_host_tools").length, 2);
+  const rewritten = JSON.parse(readFileSync(path, "utf8"));
+  assert.deepEqual(rewritten.hostTools, [
+    { name: "plugin_demo_run", risk: "high", planSafeActions: ["inspect"], origin: "plugin" },
+  ]);
 });
 
 test("capability failure logs carry no error text, only a stable classification", async () => {
@@ -447,13 +500,17 @@ test("capability failure logs carry no error text, only a stable classification"
   }
 });
 
-test("two sessions keep isolated state files and isolated catalogs", async () => {
+test("two sessions keep isolated state files, policies and catalogs", async () => {
   const projectA = makeProject();
   const projectB = makeProject();
   const harness = skillBridgeHarness({
     perSession: {
       [projectA]: { skills: [{ id: "skill-a", name: "A", description: "" }], memory: "memory-a" },
       [projectB]: { skills: [{ id: "skill-b", name: "B", description: "" }], memory: "memory-b" },
+    },
+    policy: {
+      "session-a": { mode: "plan", permissionMode: "accept-edits" },
+      "session-b": { mode: "goal", permissionMode: "auto" },
     },
   });
   const { bridge } = harness;
@@ -466,5 +523,9 @@ test("two sessions keep isolated state files and isolated catalogs", async () =>
   assert.deepEqual(stateB.skills, [{ id: "skill-b", name: "B", description: "" }]);
   assert.equal(stateA.memory, "memory-a");
   assert.equal(stateB.memory, "memory-b");
+  assert.equal(stateA.mode, "plan");
+  assert.equal(stateB.mode, "goal");
+  assert.equal(stateA.permissionMode, "accept-edits");
+  assert.equal(stateB.permissionMode, "auto");
   assert.notEqual(stateFileOf(harness, "session-a").runRoot, stateFileOf(harness, "session-b").runRoot);
 });

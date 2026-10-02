@@ -43,15 +43,22 @@ import {
 } from "@pi-desktop/shared";
 import {
   DESKTOP_STATE_FILE,
+  MAX_DESKTOP_STATE_SKILLS,
+  MAX_MEMORY_CHARS,
   OmpSessionRunner,
   OmpRuntimeError,
   descriptorRisk,
   findGateExtension,
   inspectBundledGate,
+  isValidDesktopSkillMeta,
   readDesktopCapabilityState,
   resolveBundledGate,
   serializeDesktopCapabilityState,
   writeDesktopCapabilityState,
+  type DesktopHostToolPolicy,
+  type DesktopPermissionMode,
+  type DesktopRuntimeMode,
+  type DesktopSkillMeta,
   type OmpConversionDiagnostics,
   type OmpHostToolDefinition,
   type OmpHostToolExecutor,
@@ -64,7 +71,8 @@ import {
   type OmpUiRequest,
   type SubagentListEntry,
 } from "@pi-desktop/omp-runtime";
-import { desktopSkillToolDefinition } from "./omp-host-tools";
+import { composeModeSystemPrompt } from "@pi-desktop/agent-runtime";
+import { desktopSkillToolDefinition, type OmpHostToolCatalogEntry } from "./omp-host-tools";
 
 export type OmpSessionBridgeLogger = {
   app(
@@ -156,6 +164,16 @@ export type OmpSessionBridgeOptions = {
    */
   capabilities?: OmpCapabilityProvider;
   /**
+   * The session's current mode and effective permission mode, read from the
+   * host session row before every prompt (M5/T20-B1). This is the mandatory
+   * half of the run-scoped state: when it is absent the whole state channel
+   * stays off (unit fixtures), and when it is present but a prompt cannot
+   * assemble or persist the policy the prompt is refused — never downgraded
+   * to an unclamped Agent turn. A bridge given `capabilities` without this
+   * provider is a wiring error and refuses construction.
+   */
+  sessionPolicy?: OmpSessionPolicyProvider;
+  /**
    * The desktop's host tools (M5/T19-B): the per-project catalog the bridge
    * registers through `set_host_tools`, and the executor that serves the
    * model's calls. Absent (Pi path, unit fixtures) means no desktop tools are
@@ -197,14 +215,40 @@ export type OmpCapabilityProvider = {
 };
 
 /**
+ * The mandatory half of the run-scoped state (M5/T20-B1): the session's
+ * current mode and effective permission mode, read from the host session row
+ * on every prompt. `permissionMode` is already resolved with PI's `inherit`
+ * semantics (the app's current `defaultPermissionMode`, else `ask`); the
+ * bridge validates the enums strictly and refuses a prompt it cannot assemble,
+ * so a Plan/Goal intent never silently runs as Agent.
+ *
+ * Returning `null` means the host session row is gone — also a refusal.
+ */
+export type OmpSessionPolicyProvider = {
+  policy(sessionId: string): Promise<{ mode: string | null; permissionMode: string | null } | null>;
+};
+
+/**
+ * The validated per-prompt policy snapshot the state file carries. `mode` and
+ * `permissionMode` come from {@link OmpSessionPolicyProvider}; `modeBlock` is
+ * the production composer's output for that exact mode.
+ */
+export type OmpRuntimePolicySnapshot = {
+  mode: DesktopRuntimeMode;
+  permissionMode: DesktopPermissionMode;
+  modeBlock: string;
+};
+
+/**
  * The seam between the session registry and the desktop's tool registries.
  *
- * `catalog` is consulted once per runner/native-session pair, before the first
- * prompt; `executor` is bound to one entry's project and model binding, so a
- * session's tools can only ever reach its own project's scoped tools.
+ * `catalog` is consulted once per prompt (the same single assembly feeds both
+ * `set_host_tools` and the run-scoped policy table); `executor` is bound to one
+ * entry's project and model binding, so a session's tools can only ever reach
+ * its own project's scoped tools.
  */
 export type OmpHostToolProvider = {
-  catalog(projectPath: string): Promise<OmpHostToolDefinition[]>;
+  catalog(projectPath: string): Promise<OmpHostToolCatalogEntry[]>;
   executor(binding: {
     sessionId: string;
     projectPath: string;
@@ -654,6 +698,13 @@ class SessionEntry {
    * built without one: no state is written and no `Skill` tool is exposed.
    */
   private readonly capabilities: OmpCapabilityProvider | undefined;
+  /**
+   * The session's live mode/permission policy (M5/T20-B1). Together with
+   * {@link capabilities} it forms the run-scoped state channel; a prompt is
+   * refused when the policy cannot be read, validated, written or
+   * self-validated.
+   */
+  private readonly sessionPolicy: OmpSessionPolicyProvider | undefined;
   /** The (runner, native session, catalog) triple the tools were last registered for. */
   private hostToolsRegisteredRunner: OmpSessionRunner | null = null;
   private hostToolsRegisteredSession: string | null = null;
@@ -731,6 +782,7 @@ class SessionEntry {
     binding: { providerId: string | null; modelId: string | null; thinkingLevel: string | null };
     hostTools?: OmpHostToolProvider;
     capabilities?: OmpCapabilityProvider;
+    sessionPolicy?: OmpSessionPolicyProvider;
     onTurnEnd?: OmpSessionBridgeOptions["onTurnEnd"];
   }) {
     this.sessionId = deps.sessionId;
@@ -745,6 +797,7 @@ class SessionEntry {
     this.binding = deps.binding;
     this.hostTools = deps.hostTools;
     this.capabilities = deps.capabilities;
+    this.sessionPolicy = deps.sessionPolicy;
     this.onTurnEnd = deps.onTurnEnd;
     // The executor is bound once: the project directory and model binding are
     // fixed for the entry's lifetime, so the bound executor can never reach
@@ -1159,18 +1212,28 @@ class SessionEntry {
     const epoch = this.stopEpoch;
     await this.ensureNativeSession(gate, spec);
     const runner = await this.ensureRunner(gate);
-    // The desktop's skill catalog and project memory are refreshed into the
+    // One catalog assembly per prompt feeds both the runtime registration and
+    // the policy table in the run-scoped state, so the tools the model can
+    // call and the gate's risk/plan-safe view can never describe different
+    // catalogs. A catalog failure refuses the prompt (the host tools are part
+    // of the contract this phase must keep honest).
+    const catalog = this.hostTools ? await this.hostTools.catalog(this.projectDirectory) : [];
+    // The session's mode, effective permission mode, mode block, skill
+    // catalog, project memory and host-tool policy are refreshed into the
     // run-scoped state file before every prompt, the way the Pi host re-reads
-    // them per launch: an edit, a removal, a scope change or a plugin unload
-    // is visible to the very next prompt, and the trusted gate reads the
-    // file during `before_agent_start` of the prompt that follows. The
-    // returned flag decides the `Skill` tool's presence for this turn.
-    const capabilityRefresh = await this.refreshDesktopState();
+    // them per launch: a mode/permission change, a catalog edit, a scope
+    // change or a plugin unload is visible to the very next prompt, and the
+    // trusted gate reads the file during `before_agent_start` of the prompt
+    // that follows. The returned flag decides the `Skill` tool's presence for
+    // this turn. Mode and policy are mandatory: any failure to read, write or
+    // self-validate them refuses the prompt instead of running it unclamped.
+    const runtimeState = await this.refreshDesktopState(catalog);
     // The session's desktop tools are (re)registered before every prompt, the
     // way the Pi host reassembles its catalog per launch: a changed catalog —
-    // a plugin installed/unloaded, a scope edit, an MCP change — is visible to
-    // the next turn, and an unchanged one is skipped by fingerprint.
-    await this.registerHostTools(runner, capabilityRefresh.skillsPresent);
+    // a plugin installed/unloaded, a scope edit, an MCP change, a changed
+    // risk or plan-safe declaration — is visible to the next turn, and an
+    // unchanged one is skipped by fingerprint.
+    await this.registerHostTools(runner, runtimeState.skillsPresent, catalog);
     // Enable the subagent subscription once the runtime is ready and the native
     // session is established. A refused subscription is logged but does not fail
     // the prompt: the turn still runs, and the child list/read paths report a
@@ -1188,40 +1251,110 @@ class SessionEntry {
     return { accepted: started.accepted, turnId: started.turnId };
   }
 
+  /** A refused prompt carrying the run-scoped-state error code. */
+  private stateRefusal(message: string): Error {
+    return Object.assign(new Error(message), { errorCode: "OMP_CAPABILITY_STATE_FAILED" });
+  }
+
   /**
-   * Refresh the run-scoped desktop-capability state before one prompt.
+   * Read, validate, write and self-validate the run-scoped desktop runtime
+   * state before one prompt.
    *
-   * The snapshot is read once per prompt from the single loader and written
-   * atomically (alias-safe, 0600) into the run root. A failed read or write
-   * must never let the previous turn's state reach the gate — the gate
-   * accepts files up to 10 minutes old, so a silent skip would inject a
-   * stale catalog and stale memory. The failure path therefore installs an
-   * empty tombstone in place of any previous state; if even that cannot be
-   * written, the prompt is refused before submission (the runtime must never
-   * read a stale file). With the state provably invisible, the turn proceeds
-   * with the native prompt — the PI best-effort experience — and reports
-   * `skillsPresent: false` so the `Skill` tool is withdrawn too: the model
-   * is never handed a skill loader without its catalog. The native prompt
-   * and the approval gate are untouched by any failure here.
+   * The mandatory half — mode, the production `composeModeSystemPrompt(mode,
+   * "")` block, and the effective permission mode read from the host session
+   * row — must be assembled exactly once and persisted atomically (alias-safe,
+   * 0600) into the run root. Any failure on that half refuses the prompt
+   * before submission: there is no tombstone and no Agent fallback, because a
+   * Plan/Goal intent must never silently run as an unclamped Agent turn with a
+   * stale state file. The skills/memory half is PI-best-effort: a failed read
+   * becomes an empty capability part while the mode/policy half stays exact
+   * and the `Skill` tool is withdrawn for the turn. The written file is
+   * re-validated with the very contract the gate reads (`readDesktopCapabilityState`,
+   * no second rule set) and compared field-by-field against the snapshot, so a
+   * writer bug can never smuggle a different state past the gate.
    */
-  private async refreshDesktopState(): Promise<{ skillsPresent: boolean }> {
-    if (!this.capabilities) return { skillsPresent: false };
-    let snapshot: OmpCapabilitySnapshot;
-    try {
-      snapshot = await this.capabilities.snapshot(this.projectDirectory);
-    } catch (error) {
-      this.logger?.app("omp", "warn", "desktop capability snapshot failed", {
-        data: { sessionId: this.sessionId, error: capabilityErrorFields(error) },
-      });
-      this.invalidateDesktopState();
-      return { skillsPresent: false };
-    }
+  private async refreshDesktopState(catalog: OmpHostToolCatalogEntry[]): Promise<{ skillsPresent: boolean }> {
+    if (!this.sessionPolicy) return { skillsPresent: false };
     const runRoot = this.supervisor.runRoot();
     if (!runRoot || !this.nativeSessionId) {
-      // No owned run root means the gate's path is gone with it: nothing to
-      // read, nothing to invalidate.
-      return { skillsPresent: false };
+      throw this.stateRefusal(
+        "the OMP run root or native session identity is missing; refusing to prompt without a writable runtime state",
+      );
     }
+    let row: { mode: string | null; permissionMode: string | null } | null;
+    try {
+      row = await this.sessionPolicy.policy(this.sessionId);
+    } catch (error) {
+      this.logger?.app("omp", "warn", "session policy read failed", {
+        data: { sessionId: this.sessionId, error: capabilityErrorFields(error) },
+      });
+      throw this.stateRefusal(
+        "the session mode and permission mode could not be read; refusing to prompt without the runtime policy",
+      );
+    }
+    if (!row) {
+      this.logger?.app("omp", "warn", "host session row is gone", {
+        data: { sessionId: this.sessionId },
+      });
+      throw this.stateRefusal("the host session row is gone; refusing to prompt without the runtime policy");
+    }
+    const mode = row.mode;
+    const permissionMode = row.permissionMode;
+    if (mode !== "agent" && mode !== "plan" && mode !== "goal") {
+      this.logger?.app("omp", "warn", "host session reported an unknown mode", {
+        data: { sessionId: this.sessionId, mode },
+      });
+      throw this.stateRefusal(`the host session reports an unknown mode ${JSON.stringify(mode)}; refusing to prompt`);
+    }
+    if (permissionMode !== "ask" && permissionMode !== "accept-edits" && permissionMode !== "auto") {
+      this.logger?.app("omp", "warn", "host session reported an unknown permission mode", {
+        data: { sessionId: this.sessionId, permissionMode },
+      });
+      throw this.stateRefusal(
+        `the host session reports an unknown permission mode ${JSON.stringify(permissionMode)}; refusing to prompt`,
+      );
+    }
+    // The production composer's output for this exact mode. Only the mode
+    // block is taken: basePrompt is empty, so the PI default runtime prompt
+    // can never leak into the state.
+    const modeBlock = composeModeSystemPrompt(mode, "");
+    // Skills and project memory are best-effort, exactly where Pi is: a failed
+    // read injects nothing and withdraws the `Skill` tool, but never disturbs
+    // the mode/policy half. A malformed catalog line is dropped like PI's own
+    // best-effort skill loading does, so it cannot poison the whole state.
+    let skills: DesktopSkillMeta[] = [];
+    let memory: string | null = null;
+    if (this.capabilities) {
+      try {
+        const snapshot: OmpCapabilitySnapshot = await this.capabilities.snapshot(this.projectDirectory);
+        const valid = snapshot.skills.filter(isValidDesktopSkillMeta).slice(0, MAX_DESKTOP_STATE_SKILLS);
+        if (valid.length !== snapshot.skills.length) {
+          this.logger?.app("omp", "warn", "desktop capability snapshot contained invalid skill entries", {
+            data: { sessionId: this.sessionId, dropped: snapshot.skills.length - valid.length },
+          });
+        }
+        skills = valid;
+        if (typeof snapshot.memory === "string" && snapshot.memory.length <= MAX_MEMORY_CHARS) {
+          memory = snapshot.memory;
+        } else if (typeof snapshot.memory === "string") {
+          this.logger?.app("omp", "warn", "desktop capability snapshot memory exceeded the schema ceiling", {
+            data: { sessionId: this.sessionId },
+          });
+        }
+      } catch (error) {
+        this.logger?.app("omp", "warn", "desktop capability snapshot failed", {
+          data: { sessionId: this.sessionId, error: capabilityErrorFields(error) },
+        });
+        skills = [];
+        memory = null;
+      }
+    }
+    const hostTools: DesktopHostToolPolicy[] = catalog.map((entry) => ({
+      name: entry.definition.name,
+      risk: entry.risk,
+      planSafeActions: [...entry.planSafeActions],
+      origin: entry.origin,
+    }));
     const statePath = join(runRoot, DESKTOP_STATE_FILE);
     try {
       writeDesktopCapabilityState(
@@ -1229,86 +1362,68 @@ class SessionEntry {
         serializeDesktopCapabilityState(
           {
             sessionId: this.nativeSessionId,
-            skills: snapshot.skills,
-            ...(snapshot.memory !== undefined ? { memory: snapshot.memory } : {}),
+            mode,
+            modeBlock,
+            permissionMode,
+            skills,
+            memory,
+            hostTools,
           },
           this.now(),
         ),
       );
     } catch (error) {
-      this.logger?.app("omp", "warn", "desktop capability state write failed", {
+      this.logger?.app("omp", "warn", "desktop runtime state write failed", {
         data: { sessionId: this.sessionId, error: capabilityErrorFields(error) },
       });
-      this.invalidateDesktopState();
-      return { skillsPresent: false };
+      throw this.stateRefusal(
+        "the desktop runtime state could not be written; refusing to prompt without mode and policy state",
+      );
     }
-    // A successful write does not decide tool presence: the gate accepts
-    // exactly what `readDesktopCapabilityState` accepts, and a loader bug or
-    // an out-of-bounds catalog line could produce a file that contract
-    // rejects. Re-validate the on-disk state with the very same contract (no
-    // second, driftable rule set) and confirm it belongs to this native
-    // session; otherwise the refresh follows the same tombstone path as a
-    // failed snapshot — a gate-invisible catalog must never register the
-    // Skill tool.
+    // A successful write does not decide anything: the gate accepts exactly
+    // what `readDesktopCapabilityState` accepts, so re-validate the on-disk
+    // state with the very same contract and confirm it still describes this
+    // native session and this snapshot. Any divergence refuses the prompt.
     const verified = readDesktopCapabilityState(statePath, this.now());
-    if (!verified || verified.sessionId !== this.nativeSessionId) {
-      this.logger?.app("omp", "warn", "desktop capability state failed self-validation", {
+    if (
+      !verified ||
+      verified.sessionId !== this.nativeSessionId ||
+      verified.mode !== mode ||
+      verified.modeBlock !== modeBlock ||
+      verified.permissionMode !== permissionMode ||
+      verified.memory !== (memory && memory.trim() ? memory.trim() : null) ||
+      verified.skills.length !== skills.length ||
+      verified.hostTools.length !== hostTools.length
+    ) {
+      this.logger?.app("omp", "warn", "desktop runtime state failed self-validation", {
         data: { sessionId: this.sessionId },
       });
-      this.invalidateDesktopState();
-      return { skillsPresent: false };
+      throw this.stateRefusal(
+        "the desktop runtime state failed self-validation; refusing to prompt with state the gate would reject",
+      );
     }
     return { skillsPresent: verified.skills.length > 0 };
-  }
-
-  /**
-   * Make any previously written state invisible before the prompt is
-   * submitted: an empty tombstone (no skills, no memory) atomically replaces
-   * the stale file, so the gate can only read "nothing to inject". If even
-   * the tombstone cannot be written, the prompt must not reach the runtime —
-   * the gate would otherwise read the previous turn's catalog and memory —
-   * so the failure is raised instead of swallowed. Logs carry only stable
-   * error classification, never error text, stack or state content.
-   */
-  private invalidateDesktopState(): void {
-    const runRoot = this.supervisor.runRoot();
-    if (!runRoot || !this.nativeSessionId) return;
-    try {
-      writeDesktopCapabilityState(
-        join(runRoot, DESKTOP_STATE_FILE),
-        serializeDesktopCapabilityState(
-          { sessionId: this.nativeSessionId, skills: [], memory: null },
-          this.now(),
-        ),
-      );
-    } catch (error) {
-      this.logger?.app("omp", "error", "desktop capability state could not be invalidated", {
-        data: { sessionId: this.sessionId, error: capabilityErrorFields(error) },
-      });
-      throw Object.assign(
-        new Error(
-          "the desktop capability state could not be refreshed and the previous state could not be invalidated; refusing to prompt with stale state",
-        ),
-        { errorCode: "OMP_CAPABILITY_STATE_FAILED" },
-      );
-    }
   }
 
   /**
    * Register this session's desktop tool catalog through `set_host_tools`,
    * fail-closed.
    *
-   * The catalog is reassembled before every prompt, matching the Pi host,
-   * which rebuilds `pluginTools`/`userMcpTools` on every launch
-   * (`session-launch.ts` `resolveAgentRuntimeLaunch`) — so installing or
-   * unloading a plugin, changing an activation scope or editing an MCP server
-   * is visible to the very next turn. A registration is skipped only when the
-   * (runner, native session, catalog) triple is exactly what was last
-   * registered: the pinned runtime replaces its whole host-tool set per
-   * registration, so the fingerprint skip is what keeps an unchanged catalog
-   * from being re-sent, while any content change re-registers the new set —
-   * tools are never exposed twice, and a tool removed from the catalog is
-   * removed from the runtime too.
+   * The catalog is assembled once per prompt by the caller (the same assembly
+   * that produced the state's policy table), matching the Pi host, which
+   * rebuilds `pluginTools`/`userMcpTools` on every launch (`session-launch.ts`
+   * `resolveAgentRuntimeLaunch`) — so installing or unloading a plugin,
+   * changing an activation scope, editing an MCP server, or changing a
+   * declared risk or plan-safe action list is visible to the very next turn. A
+   * registration is skipped only when the (runner, native session, catalog +
+   * policy) fingerprint is exactly what was last registered: the pinned
+   * runtime replaces its whole host-tool set per registration, so the
+   * fingerprint skip is what keeps an unchanged catalog from being re-sent,
+   * while any content change re-registers the new set — tools are never
+   * exposed twice, and a tool removed from the catalog is removed from the
+   * runtime too. The policy fields are part of the fingerprint because the
+   * run-scoped state must never carry a risk/plan-safe view that disagrees
+   * with the registered catalog.
    *
    * A refused registration — a duplicate name, a collision with a native
    * tool — or a response whose echoed `toolNames` differ from the request
@@ -1316,18 +1431,33 @@ class SessionEntry {
    * actually registered, and a tool the model cannot see is never silently
    * dropped.
    */
-  private async registerHostTools(runner: OmpSessionRunner, includeSkillTool: boolean): Promise<void> {
+  private async registerHostTools(
+    runner: OmpSessionRunner,
+    includeSkillTool: boolean,
+    catalog: OmpHostToolCatalogEntry[],
+  ): Promise<void> {
     if (!this.hostTools) return;
-    const definitions = await this.hostTools.catalog(this.projectDirectory);
+    const definitions = catalog.map((entry) => entry.definition);
     // The on-demand `Skill` tool rides the same registration, and only when
     // the desktop catalog is non-empty (the Pi registration gate): the model
     // is never offered a skill loader without a Skills section to read. The
     // bridge — not the adapter — owns its presence, so a state refresh that
     // failed closed also withdraws the tool.
     const withSkill = includeSkillTool ? [...definitions, desktopSkillToolDefinition()] : definitions;
-    const fingerprint = JSON.stringify(
-      withSkill.map((definition) => [definition.name, definition.description, definition.parameters, definition.loadMode ?? null]),
-    );
+    const fingerprint = JSON.stringify({
+      tools: withSkill.map((definition) => [
+        definition.name,
+        definition.description,
+        definition.parameters,
+        definition.loadMode ?? null,
+      ]),
+      policy: catalog.map((entry) => [
+        entry.definition.name,
+        entry.risk,
+        entry.planSafeActions,
+        entry.origin,
+      ]),
+    });
     if (
       this.hostToolsRegisteredRunner === runner &&
       this.hostToolsRegisteredSession === this.nativeSessionId &&
@@ -1466,6 +1596,14 @@ class SessionEntry {
 }
 
 export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSessionBridge {
+  // The run-scoped state is one channel with one schema: capabilities without
+  // the mandatory session policy could only ever be written as a lie (a state
+  // that silently claims Agent). Refuse the wiring instead of degrading.
+  if (options.capabilities && !options.sessionPolicy) {
+    throw new Error(
+      "the OMP session bridge was given a capability provider without a session policy provider; the run-scoped state cannot be written",
+    );
+  }
   const logger = options.logger;
   const now = options.now ?? Date.now;
   const resolveGate = options.gateResolver ?? ((startDir: string) => findGateExtension(startDir));
@@ -1604,6 +1742,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       binding,
       ...(options.hostTools ? { hostTools: options.hostTools } : {}),
       ...(options.capabilities ? { capabilities: options.capabilities } : {}),
+      ...(options.sessionPolicy ? { sessionPolicy: options.sessionPolicy } : {}),
       ...(options.onTurnEnd ? { onTurnEnd: options.onTurnEnd } : {}),
     });
     entries.set(spec.sessionId, entry);

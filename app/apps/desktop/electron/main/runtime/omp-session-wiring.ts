@@ -79,6 +79,30 @@ function hostOrThrow(host: () => HostProcess | null): HostProcess {
 }
 
 /**
+ * Resolve the host session row's `permission_mode` to the effective mode the
+ * gate may consume, with PI host-core's exact semantics
+ * (`session_collaboration/permissions.rs` `effective_mode`): a concrete mode
+ * passes through; `inherit` resolves to the app's current
+ * `defaultPermissionMode` when that is a legal non-inherit value, and to `ask`
+ * otherwise. Never `null`-coerced to a friendlier value: an unreadable value
+ * stays `null` and the bridge refuses the prompt.
+ */
+export function resolveEffectivePermissionMode(
+  permissionMode: string | null,
+  defaultPermissionMode: string | null,
+): string | null {
+  if (permissionMode !== "inherit") return permissionMode;
+  if (
+    defaultPermissionMode === "ask" ||
+    defaultPermissionMode === "accept-edits" ||
+    defaultPermissionMode === "auto"
+  ) {
+    return defaultPermissionMode;
+  }
+  return "ask";
+}
+
+/**
  * Read one provider and its model binding, project them fail-closed, and write
  * the minimal `models.yml` into the runtime's transient agent directory.
  *
@@ -158,6 +182,30 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
     resourcesPath: deps.resourcesPath ?? null,
     appPath: deps.appPath,
     sessionDir,
+    // The session's mode and effective permission mode, read from the host
+    // session row on every prompt (M5/T20-B1). `inherit` is resolved here,
+    // desktop-side, with the app's *current* default — never a startup
+    // environment value — and the bridge validates the enums strictly.
+    // A missing row, a failed read or a read-only value the bridge cannot
+    // classify refuses the prompt rather than running it as Agent.
+    sessionPolicy: {
+      policy: async (sessionId: string) => {
+        const client = hostOrThrow(deps.host);
+        const { session } = await client.call<{
+          session?: { mode?: unknown; permissionMode?: unknown } | null;
+        }>("session.get", { id: sessionId });
+        if (!session) return null;
+        const mode = typeof session.mode === "string" ? session.mode : null;
+        const permissionMode = typeof session.permissionMode === "string" ? session.permissionMode : null;
+        let defaultPermissionMode: string | null = null;
+        if (permissionMode === "inherit") {
+          const settings = await client.call<{ defaultPermissionMode?: unknown }>("settings.get");
+          defaultPermissionMode =
+            typeof settings?.defaultPermissionMode === "string" ? settings.defaultPermissionMode : null;
+        }
+        return { mode, permissionMode: resolveEffectivePermissionMode(permissionMode, defaultPermissionMode) };
+      },
+    },
     createSupervisor: (spec: OmpSessionRuntimeSpec) =>
       engineRuntime.ompRuntime.createSupervisor({
         sessionDir,

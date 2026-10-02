@@ -8,6 +8,7 @@
  * provider absent and every behavioral assertion below fails on that fact.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { register } from "node:module";
 import test from "node:test";
 import { dirname, join } from "node:path";
@@ -210,4 +211,41 @@ test("the gate's prompt blocks are byte-identical to the PI prompt helpers", asy
     desktopCapabilityPrompt({ skills, memory: "notes" }),
     `${pluginSkillsPrompt(skills)}\n\n${projectMemoryPrompt("notes")}`,
   );
+});
+
+test("the production mode composer is byte-identical to the pinned PI source", async () => {
+  const { composeModeSystemPrompt, DEFAULT_RUNTIME_SYSTEM_PROMPT } = await import(
+    "../../../packages/agent-runtime/src/mode-prompts.ts"
+  );
+  const appSource = readFileSync(join(here, "../../../packages/agent-runtime/src/mode-prompts.ts"), "utf8");
+  const pinnedSource = readFileSync(
+    join(here, "../../../../upstream/pi-desktop/packages/agent-runtime/src/mode-prompts.ts"),
+    "utf8",
+  );
+  assert.equal(
+    appSource,
+    pinnedSource,
+    "the composer must stay byte-identical to the fixed PI source (the state carries its output verbatim)",
+  );
+
+  const blocks = {
+    agent: composeModeSystemPrompt("agent", ""),
+    plan: composeModeSystemPrompt("plan", ""),
+    goal: composeModeSystemPrompt("goal", ""),
+  };
+  for (const [mode, block] of Object.entries(blocks)) {
+    assert.ok(block.length > 0, `${mode} must produce a block`);
+    assert.ok(!block.includes(DEFAULT_RUNTIME_SYSTEM_PROMPT), `${mode} must not carry the PI default base`);
+    assert.ok(!block.startsWith("\n") && !block.endsWith("\n"), `${mode} block must be trimmed for append`);
+  }
+  // The three blocks are mutually exclusive: only the Plan block names
+  // SubmitPlan, only the Goal block names SubmitGoal, and the Agent block
+  // contains neither.
+  assert.ok(blocks.plan.includes("SubmitPlan") && !blocks.plan.includes("SubmitGoal"));
+  assert.ok(blocks.goal.includes("SubmitGoal") && !blocks.goal.includes("SubmitPlan"));
+  assert.ok(!blocks.agent.includes("SubmitPlan") && !blocks.agent.includes("SubmitGoal"));
+  // Appending the block is a pure concatenation over whatever base the
+  // runtime produced: the base is preserved byte-for-byte.
+  const base = "native base part one\n\nnative base part two";
+  assert.equal(composeModeSystemPrompt("plan", base), `${base}\n\n${blocks.plan}`);
 });

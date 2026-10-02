@@ -17,14 +17,16 @@
  * gap is owned by the noted later stage; the checks here must be REPLACED by
  * real behavioral tests there, not converted into pins.
  *
- * g1's verdict policy: static symbols cannot prove that the durable mode
- * actually reaches the prompt, so g1 NEVER auto-closes. The baseline (no
- * mode-ish state field, no composer seam, no protocol key) reports GAP-OPEN;
- * any appearance of such a symbol reports REVIEW-REQUIRED and keeps the exit
- * code non-zero for a human re-review. Only the T20-B behavior test (B2/B13)
- * may replace this check.
+ * g1's verdict policy (2026-10-02, T20-B1): g1 was RETIRED to the T20-B1
+ * behavior tests that execute the production mode/policy path
+ * (`apps/desktop/test/omp-runtime-state-e2e.test.mjs` on the real patched
+ * runtime, `apps/desktop/test/omp-skill-path-bridge.test.mjs`,
+ * `packages/omp-runtime/src/desktop-state.test.ts`,
+ * `packages/omp-runtime/src/session/gate-desktop-state.test.ts`); the probe no
+ * longer matches symbols (F8: static symbols cannot prove a data flow), and
+ * only checks that those replacement tests exist. g2/g3 stay open.
  */
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -53,68 +55,43 @@ function sourceSeam(rel) {
 }
 
 // ---------------------------------------------------------------------------
-// g1 (owner: T20-B) — mode/permissionMode is persistence-only in the bridge
+// g1 (owner: T20-B) — RETIRED to behavior tests (2026-10-02, T20-B1)
 //
-// Verdict policy (F8): this check NEVER auto-closes. Static keyword matching
-// cannot prove a data flow — a state property plus comments naming the
-// composer and the gate would satisfy any `includes` heuristic — so the only
-// way g1 retires is the T20-B behavior test (B2/B13), which replaces it.
-//   - baseline (no mode-ish state field, no composer seam, no protocol key):
-//     GAP-OPEN, exit 1;
-//   - ANY appearance of a mode-ish state field, a composer seam, or a
-//     protocol mode/systemPrompt/tools key: REVIEW-REQUIRED, exit 1, with the
-//     matched symbols reported for the human re-review.
+// History: static keyword matching could never prove the data flow (F8), so
+// this check used to report GAP-OPEN / REVIEW-REQUIRED and never auto-close.
+// T20-B1 implemented the production path (mode + effective permission in the
+// run-scoped state, the mode block appended by the gate, the contract tool
+// clamp, the host-tool policy table) and replaced this diagnostic with the
+// behavior tests below, which execute that path for real:
+//
+//   node --test apps/desktop/test/omp-runtime-state-e2e.test.mjs
+//     (real fixed patched OMP + fake provider, production wiring/bridge/gate)
+//   node --test apps/desktop/test/omp-skill-path-bridge.test.mjs
+//   pnpm -C packages/omp-runtime test desktop-state gate-desktop-state
+//
+// The probe keeps ONE mechanical invariant — the replacement tests must
+// exist — and otherwise reports the retirement with the exact commands. It
+// must never be turned back into a symbol-presence check.
 // ---------------------------------------------------------------------------
 {
-  const typesSource = readFileSync(
-    ompSource("packages/coding-agent/src/modes/rpc/rpc-types.ts"),
-    "utf8",
-  );
-  const promptVariant = typesSource.match(
-    /\|\s*\{[^{}]*?type:\s*"prompt";[^{}]*?\}/s,
-  )?.[0] ?? "";
-  const promptCarriesModeKey = /(mode|systemPrompt|tools)\s*[?:]/.test(promptVariant);
-
-  const stateSource = sourceSeam("packages/omp-runtime/src/desktop-state.ts");
-  const stateFieldNames = [
-    ...new Set([...stateSource.matchAll(/^\s*([A-Za-z]*[Mm]ode[A-Za-z]*)\s*\??\s*:/gm)].map((match) => match[1])),
+  const behaviorTests = [
+    "apps/desktop/test/omp-runtime-state-e2e.test.mjs",
+    "apps/desktop/test/omp-skill-path-bridge.test.mjs",
+    "packages/omp-runtime/src/desktop-state.test.ts",
+    "packages/omp-runtime/src/session/gate-desktop-state.test.ts",
   ];
-
-  const engineSeamDir = join(appRoot, "apps/desktop/electron/main/runtime");
-  const engineSeams = readdirSync(engineSeamDir)
-    .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
-    .map((name) => ({ name, source: readFileSync(join(engineSeamDir, name), "utf8") }));
-  const composerSeamFiles = engineSeams
-    .filter((seam) => /composeModeSystemPrompt|mode-prompts/.test(seam.source))
-    .map((seam) => seam.name);
-
-  const gateSource = sourceSeam("packages/omp-runtime/extensions/omp-desktop-gate.ts");
-  const gateReadsValidatedState = /readDesktopCapabilityState/.test(gateSource);
-
-  const triggers = [
-    promptCarriesModeKey ? `pinned prompt command carries a mode/systemPrompt/tools key (${promptVariant.trim().replace(/\s+/g, " ")})` : null,
-    stateFieldNames.length > 0 ? `runtime-domain state has mode-ish field(s): ${stateFieldNames.join("|")}` : null,
-    composerSeamFiles.length > 0 ? `engine seam references the mode composer: ${composerSeamFiles.join("|")}` : null,
-  ].filter((entry) => entry !== null);
-
-  if (triggers.length > 0) {
-    console.log(
-      `REVIEW-REQUIRED g1: ${triggers.join("; ")} — static symbols cannot prove the mode actually reaches the prompt (a field or comment would match them), so g1 is NOT closed here; a human must replace this diagnostic with the T20-B behavior test (B2/B13) that asserts the bridge writes composeModeSystemPrompt(mode, "") into the validated state and the gate appends it`,
-    );
-    open.push("g1");
-  } else {
+  const missing = behaviorTests.filter((rel) => !existsSync(join(appRoot, rel)));
+  if (missing.length > 0) {
     report(
       "g1",
       "T20-B",
       true,
-      "session mode/permissionMode persist to the host DB only; no OMP prompt/tool path reads them",
-      [
-        `pinned prompt command has no mode/systemPrompt/tools key: ${!promptCarriesModeKey}`,
-        `state mode-ish fields: ${stateFieldNames.join("|") || "none"}`,
-        `engine seams referencing the mode composer: ${composerSeamFiles.join("|") || "none"}`,
-        `gate reads the validated state (T19-C skills/memory only, not mode): ${gateReadsValidatedState}`,
-        "retirement: T20-B behavior test (B2/B13) replaces this check; g1 never auto-closes",
-      ].join("; "),
+      "the g1 behavior tests that replaced this diagnostic are missing; the mode/policy data flow has no executable evidence",
+      `missing: ${missing.join(", ")}; restore the T20-B1 behavior tests instead of reviving static keyword matching`,
+    );
+  } else {
+    console.log(
+      `GAP-RETIRED g1 (owner: T20-B) mode and effective permission mode ride the run-scoped state into the prompt, the contract clamp and the host-tool policy table [evidence: replaced by behavior tests ${behaviorTests.join(", ")}; run: node --test apps/desktop/test/omp-runtime-state-e2e.test.mjs (real patched runtime + local fake provider) and pnpm -C packages/omp-runtime test; static diagnostics cannot prove the data flow (F8), so this probe does not check symbols]`,
     );
   }
 }

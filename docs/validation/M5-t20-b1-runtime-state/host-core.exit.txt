@@ -1,0 +1,1 @@
+host-core-tests exit=0
