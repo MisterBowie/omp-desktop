@@ -1,0 +1,79 @@
+
+> @pi-desktop/omp-runtime@0.15.2 test /home/vv/person/code/omp-desktop-m5-t20-c/app/packages/omp-runtime
+> vitest run
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/home/vv/person/code/omp-desktop-m5-t20-c/app/packages/omp-runtime[39m
+
+ [32m✓[39m src/desktop-state.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/session/subagents.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/session/gate-permissions.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32m✓[39m src/session/host-tools.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 138[2mms[22m[39m
+ [32m✓[39m src/session/subagent-frames.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32m✓[39m src/session/tool-paths.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/session/gate.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/session/turn-fence.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/session/gate-desktop-state.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/session/subagent-runner.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/session/runner.test.ts [2m([22m[2m44 tests[22m[2m)[22m[32m 129[2mms[22m[39m
+ [32m✓[39m src/session/turn-end.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 212[2mms[22m[39m
+ [32m✓[39m src/session/host-tool-runner.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 215[2mms[22m[39m
+ [32m✓[39m src/session/ui-requests.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/session/start-refusal.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/protocol.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+ [32m✓[39m src/bundled.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+ [32m✓[39m src/isolation.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/bundled-smoke.test.ts [2m([22m[2m9 tests[22m[2m | [22m[33m6 skipped[39m[2m)[22m[32m 100[2mms[22m[39m
+ [32m✓[39m src/launcher.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 323[2mms[22m[39m
+     [33m[2m✓[22m[39m fails typed and bounded when the launcher hangs [33m 303[2mms[22m[39m
+ [32m✓[39m src/session/events.test.ts [2m([22m[2m32 tests[22m[2m)[22m[33m 1170[2mms[22m[39m
+ [32m✓[39m src/pinned-runtime.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1777[2mms[22m[39m
+     [33m[2m✓[22m[39m starts, negotiates v2, answers, and is reclaimed with its scratch root [33m 1776[2mms[22m[39m
+ [32m✓[39m src/desktop-state-supervisor.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 5248[2mms[22m[39m
+     [33m[2m✓[22m[39m points OMP_DESKTOP_STATE at the owned run root and reports the run root [33m 1055[2mms[22m[39m
+     [33m[2m✓[22m[39m does not let an embedder's extraEnv redirect the state path [33m 1046[2mms[22m[39m
+     [33m[2m✓[22m[39m removes the state file with the run root on stop [33m 1050[2mms[22m[39m
+     [33m[2m✓[22m[39m enables the mandatory channel at spawn by default [33m 1049[2mms[22m[39m
+     [33m[2m✓[22m[39m opts a standalone fixture out only through the explicit option [33m 1045[2mms[22m[39m
+ [32m✓[39m src/config-overlay.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 6282[2mms[22m[39m
+     [33m[2m✓[22m[39m passes a run-scoped --config overlay that forces the source boundary [33m 1055[2mms[22m[39m
+     [33m[2m✓[22m[39m derives the overlay path per run instead of encoding it in constructor args [33m 2091[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps the overlay last so no earlier flag or config word can outrank it [33m 1042[2mms[22m[39m
+     [33m[2m✓[22m[39m rewrites the overlay after prepareRun so an embedder hook cannot weaken it [33m 1044[2mms[22m[39m
+     [33m[2m✓[22m[39m never writes through a filesystem alias a hook plants at the overlay path [33m 1045[2mms[22m[39m
+ [32m✓[39m src/supervisor-lifecycle.test.ts [2m([22m[2m17 tests[22m[2m)[22m[33m 6833[2mms[22m[39m
+     [33m[2m✓[22m[39m adopts a process the failed handshake could not stop [33m 6487[2mms[22m[39m
+     [33m[2m✓[22m[39m reports the plain failure when the handshake's process was reaped [33m 327[2mms[22m[39m
+ [32m✓[39m src/supervisor.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 9529[2mms[22m[39m
+     [33m[2m✓[22m[39m starts nothing until asked, then reports a running runtime [33m 1050[2mms[22m[39m
+     [33m[2m✓[22m[39m coalesces concurrent starts into one runtime [33m 1050[2mms[22m[39m
+     [33m[2m✓[22m[39m stops the runtime and removes the directory it created [33m 1049[2mms[22m[39m
+     [33m[2m✓[22m[39m reports a failed cleanup instead of claiming the run was reclaimed [33m 1047[2mms[22m[39m
+     [33m[2m✓[22m[39m hides the operator's environment from the runtime [33m 1051[2mms[22m[39m
+     [33m[2m✓[22m[39m terminates a detached command tree only when asked [33m 1099[2mms[22m[39m
+     [33m[2m✓[22m[39m terminates a bare pid that is not a group leader [33m 1092[2mms[22m[39m
+     [33m[2m✓[22m[39m reclaims every runtime it owns on shutdown [33m 1044[2mms[22m[39m
+     [33m[2m✓[22m[39m creates the state directory under the product's data root only [33m 1044[2mms[22m[39m
+ [32m✓[39m src/process.test.ts [2m([22m[2m20 tests[22m[2m)[22m[33m 16420[2mms[22m[39m
+     [33m[2m✓[22m[39m reaches a negotiated v2 session against the mock runtime [33m 1051[2mms[22m[39m
+     [33m[2m✓[22m[39m times out a runtime that never becomes ready and reaps it [33m 426[2mms[22m[39m
+     [33m[2m✓[22m[39m matches responses by id and forwards events [33m 1042[2mms[22m[39m
+     [33m[2m✓[22m[39m reassembles a response larger than one line [33m 1059[2mms[22m[39m
+     [33m[2m✓[22m[39m distinguishes a real deadline from a broken stream [33m 1345[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses to send a chunk frame to the runtime [33m 1043[2mms[22m[39m
+     [33m[2m✓[22m[39m reports the runtime's stderr as diagnostics only [33m 1048[2mms[22m[39m
+     [33m[2m✓[22m[39m stops in protocol before breaking the bridge [33m 1045[2mms[22m[39m
+     [33m[2m✓[22m[39m sends abort_bash when the caller knows a command is running [33m 1044[2mms[22m[39m
+     [33m[2m✓[22m[39m escalates to SIGKILL when the runtime ignores SIGTERM and EOF [33m 923[2mms[22m[39m
+     [33m[2m✓[22m[39m reclaims a descendant that outlives the group leader [33m 3167[2mms[22m[39m
+     [33m[2m✓[22m[39m runs one stop sequence when several callers stop at once [33m 1050[2mms[22m[39m
+     [33m[2m✓[22m[39m does not cache a stop whose process group survived [33m 944[2mms[22m[39m
+     [33m[2m✓[22m[39m is idempotent and reports the same verdict twice [33m 1047[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m27 passed[39m[22m[90m (27)[39m
+[2m      Tests [22m [1m[32m437 passed[39m[22m[2m | [22m[33m6 skipped[39m[90m (443)[39m
+[2m   Start at [22m 00:44:08
+[2m   Duration [22m 17.39s[2m (transform 4.86s, setup 0ms, import 10.11s, tests 48.62s, environment 3ms)[22m
+
+
+EXIT=0

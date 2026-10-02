@@ -115,6 +115,7 @@
 
 ### T20-C 执行时权限与模式传播（先于 B2 的提交接通）
 
+- **状态（2026-10-03）**：**已实现、待独立复审**（分支 `codex/m5-t20-c-execution-policy`，提交 `a7d0291`）。gate 决策表、`tool-paths` 移植、风险保真、插件真实 mode（含子进程 `planSafeActions` 转发修复）与委托策略均已落地；行为证据：gate/路径单元测试、真实 Bun 打包工具门探针、真实 `PluginRuntime` 子进程测试、真实已补丁 OMP 生产 E2E、B1 回归与 T17-T19 定向回归。证据 `docs/validation/M5-t20-c-execution-policy.md`；设计见 ADR 0309。g2 已退场为行为测试。
 - **范围**：gate 按 PI §1.3.1 决策表实现（契约硬拒绝先于一切；`Read`/`Glob`/`Grep`/`Bash`/`BrowserPreview`/`new_context` 例外；`mcp_*`=Low 仅在非契约常规判定；`plugin_*` 按 manifest 声明风险，缺失/非法→medium；`BrowserPreview`=Medium；外部路径例外；无 UI 时只在本来需要交互时 fail closed）；插件执行 ctx.mode 取真实持久模式 + `planSafeActions` 逐 action；子代理 `hasUI=false` fail-closed；风险来自状态策略表而非名字猜测。
 - **矩阵行**：C1-C8；g2 与本任务退场。
 - **可观察退出口径**：gate 单元 + 真实 OMP E2E 逐格匹配 §1.3.1；`auto` 不能复活契约模式下的 Write/Edit/未知/`mcp_*`；`planSafeActions` 逐 action 生效；反向/边界对照（如无声明插件在 auto 下仍被契约拒绝）。

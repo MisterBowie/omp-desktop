@@ -1,0 +1,12 @@
+✔ a plugin tool executes under the admitted turn's real mode and per-action guard (21.159592ms)
+✔ user MCP tools are refused outside Agent mode before any remote call (0.204599ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 441.502578
+
+EXIT=0

@@ -1124,8 +1124,41 @@ Agent 时 bridge 回收进程、下一次提示词在同一持久 native 会话�
 投影上重建默认呈现（native 顶层 + `xd://` 延迟分区）并重注册宿主目录，seeds 跨替换延续、无重放、
 身份不变、被移除/禁用的工具不复活；回收失败则拒绝提示词。gate 自身的 Agent 恢复路径保留为同进程
 回退：恢复夹取前选择 + 夹取期间被移除的名字，目录类名字按**当时**目录过滤、native 名字按夹取前
-选择过滤，不用 `getAllTools` 全开。④子代理仍零注入、审批描述符仍携带有效权限模式。T20-C/B2/D
-仍未开始。
+选择过滤，不用 `getAllTools` 全开。④子代理仍零注入、审批描述符仍携带有效权限模式。T20-B2/D 仍未开始；
+T20-C 见下一节。
+
+### 执行时权限决策（M5/T20-C，ADR 0309）
+
+受信 gate 的 `tool_call` 决策升级为 PI §1.3.1 的顺序，全部输入来自本次提示词的单一份运行域快照
+（mode / 已解析 permissionMode / 每宿主工具 risk+planSafeActions）：
+
+- **顺序**：合约模式硬拒绝最先——PI allowlist 之外的任何工具、无非空 `planSafeActions` 的插件工具，
+  在任何 permissionMode、外部路径、session grant 与夹具开关之前被 block，拒绝码为
+  `WRITE_DISABLED_IN_PLAN` / `EDIT_DISABLED_IN_PLAN` / `PLUGIN_DISABLED_IN_PLAN` /
+  `TOOL_DISABLED_IN_PLAN`；随后是显式外部路径例外（`auto` 放行、session grant 放行、否则弹卡）；
+  再按 Low / `auto` / `accept-edits`（仅 Write/Edit）/ session grant；其余弹卡。`ask` 与 PI 专名
+  `BrowserPreview`/`new_context` 保持合约许可（不注册 BrowserPreview）；`OMP_DESKTOP_GATE_MODE`
+  降为夹具开关，位于合约拒绝之下。
+- **外部路径**：`session/tool-paths.ts` 移植 host-core `workspace.rs` 的语义（词法 `.`/`..` 归一
+  与根钳制、按组件包含、最深已存在祖先 canonicalize 与有界悬空符号链接跟随、workspace/scratch
+  双根与 `requires_external_path_permission`），`..`/符号链接/别名逃逸会弹卡而不是漏过；OMP 会话
+  当前没有 scratch 根（参数保留并已有测试）。
+- **风险保真**：原生名按 PI 映射（read/glob/grep Low；write/edit/bash High；其余含 `apply_patch`、
+  `eval`、`browser`、`computer`、`BrowserPreview` 一律 Medium）；宿主工具取状态策略表的声明风险
+  （缺失/未注册 → Medium）；`mcp_*` 在非合约模式为 Low。`browser`/`computer`/`browserpreview`
+  加入默认 gated 名单，使其在 ask/accept-edits 下弹卡而不是无审批执行。
+- **插件真实模式**：bridge 记录被准入回合的 `{turnId, mode}`，执行器只按该回合读取（未知回合拒绝），
+  插件执行上下文收到真实 mode，PI 的逐 action `planSafeActions` guard 因此在执行时生效；用户 MCP
+  工具在非 agent 模式于适配器边界拒绝；插件子进程 API 现在把 `planSafeActions` 转发给
+  `agent.registerTool`（修复上游 child 未转发、guard 恒见空列表的缺口）。
+- **委托与失败**：强制通道开启时，交互会话的状态不可读/他会话/非法会让每个调用 block
+  （`policy-unavailable`）；委托会话（`hasUI=false`）在状态年龄界内沿用所属会话最后一次校验的快照
+  （PI 的子代理调用同样按父会话持久策略裁决），否则拒绝；无 UI 只在"本就需要交互"处 fail closed，
+  Low/`auto`/grant 调用照常通过、无提权。
+- **卡片一致**：审批描述符的风险、mode、permissionMode 与理由都来自同一个策略对象。
+- **证据分层**：gate 层合约硬拒绝（含被 B1 目录夹取隐藏的工具）由 gate 单元测试与真实 Bun 打包的
+  产物探针证明；生产 E2E 在真实已补丁运行时上覆盖可达决策，并把隐藏工具尝试如实标为目录层
+  "not found"，不冒充 gate 拒绝。
 
 ### Provider certificate trust（issue #714）
 

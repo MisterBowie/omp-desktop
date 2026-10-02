@@ -1655,18 +1655,27 @@ RPC (evidence: `docs/validation/M5-host-tool-rpc.md`, ADR 0304 §4):
   pending entry drops the late completion — remote side effects are never
   claimed prevented or retracted (the fixed Pi client has the same
   limitation).
-- **Execution context (limitation, T20)**: the adapter passes `mode: "agent"`
-  to plugin tools; the Pi host passes the durable session mode and the plugin
-  runtime enforces declared `planSafeActions` from `ctx.mode`
-  (`plugin-runtime.ts:2505-2525`). OMP prompt/spec carry no mode today and
-  Plan/Goal is deferred, so full Pi execution-context compatibility is not
-  claimed; T20 must propagate and enforce the real mode first.
+- **Execution context**: the adapter passes the *admitted turn's real mode*
+  (`agent`/`plan`/`goal`) to plugin tools (M5/T20-C, ADR 0309): the bridge
+  records the policy of the admitted prompt (`{turnId, mode}`) and the
+  executor's `modeForTurn(turnId)` answers only for that exact turn — an
+  unknown turn is refused before any dispatch. The Pi host passes the durable
+  session mode and the plugin runtime enforces declared `planSafeActions` from
+  `ctx.mode` (`plugin-runtime.ts:2505-2525`); with the real mode now
+  propagated, that guard runs unchanged (a plugin tool without a non-empty
+  declaration is denied in Plan/Goal, and only declared actions pass). The
+  plugin child API forwards `planSafeActions` to `agent.registerTool` (a fork
+  fix of the upstream gap where the host registry read a field the child never
+  sent), and user MCP tools are refused outside `agent` at the adapter
+  boundary — the same denial PI host-core applies before the plugin bridge.
 - **Approval**: the trusted gate controls `plugin_*`/`mcp_*` unconditionally
   (the `OMP_DESKTOP_GATE_TOOLS` list only tunes native names), raising a real
   `tool_permission_request` before any execution — no parallel approval
-  system. Risk: `plugin_*` = `high` (conservative upper bound — the pinned
-  protocol carries no declared-risk channel, so low/medium-declared plugins
-  see a stricter prompt this phase), `mcp_*` = `medium` (matching the Pi host).
+  system. Since M5/T20-C the card's risk is the decision's risk: the plugin's
+  declared `low|medium|high` from the run-scoped policy table (missing/
+  illegal/unregistered → `medium`, PI's default) and `mcp_*` = `low` (PI
+  host-core) — the earlier conservative name-prefix bound is gone, and the
+  decision table governs when a card is raised at all (ADR 0309).
 - **Turn lifecycle**: the runner's `closeRun(generation, reason)` announces
   `session:turnEnded` exactly once per turn — completed for a normal
   `agent_end`, aborted for a user-requested stop (including a late `agent_end`
@@ -1807,8 +1816,9 @@ contract tool catalog (evidence: `docs/validation/M5-capability-user-paths.md`,
   measured in `apps/desktop/test/omp-start-handler-semantics.test.mjs`). The
   gate's `tool_call` approval descriptor additionally carries the effective
   permission mode when the owning state is readable, so the resolved policy
-  is observably consumed (T20-C replaces this with the execution-time
-  decision table).
+  is observably consumed. M5/T20-C replaces that per-call read with the
+  execution-time decision table below; the descriptor now carries `risk`,
+  `mode`, `permissionMode` and the decision reason from the same policy.
 - **On-demand `Skill` path**: the bridge registers a host tool named `Skill`
   (exact Pi description and `{ id }` schema, `loadMode: "essential"`) only
   when the desktop catalog is non-empty — the Pi registration gate. The
@@ -1835,16 +1845,64 @@ contract tool catalog (evidence: `docs/validation/M5-capability-user-paths.md`,
   validation still refuses the turn. Any mandatory mode/policy failure
   refuses the prompt before submission — a stale catalog, mode or policy can
   never reach a provider request.
+
 - **User path**: Settings, the project-memory editor, skill management,
   plugin enable/scope controls and the composer slash-skill path already
   write through the stores this loader reads; `/skill-id` routes to the
   `Skill` tool. OMP-native project skills stay discoverable and loadable
   through `skill://` beside the desktop catalog. No new or decorative UI was
   added. M5/T20-B1 (runtime mode/policy state, the mode block and the
-  contract tool clamp) is implemented; T20-C (execution-time permission
-  enforcement and real plugin execution mode), T20-B2 (submit/approve/
-  dispatch) and T20-D (capability opening) stay closed and unclaimed, and
-  `plan`/`goal` capabilities remain off.
+  contract tool clamp) and M5/T20-C (execution-time permission enforcement,
+  external-path decisions and real plugin execution mode) are implemented;
+  T20-B2 (submit/approve/dispatch) and T20-D (capability opening) stay closed
+  and unclaimed, and `plan`/`goal` capabilities remain off.
+
+M5/T20-C implements PI's execution-time permission decisions in the trusted
+gate (evidence: `docs/validation/M5-t20-c-execution-policy.md`, ADR 0309):
+
+- **Decision order (PI §1.3.1)**: with an owned snapshot the gate applies
+  PI's order — contract hard deny first (every tool outside PI's allowlist,
+  plus plugin tools without a non-empty `planSafeActions` declaration, is
+  blocked with PI's rejection codes `WRITE_DISABLED_IN_PLAN` /
+  `EDIT_DISABLED_IN_PLAN` / `PLUGIN_DISABLED_IN_PLAN` /
+  `TOOL_DISABLED_IN_PLAN` under every permission mode, external path, grant
+  or legacy switch), then the explicit external-path exception (`auto`
+  allows, a session grant allows, otherwise ask), then Low risk / `auto` /
+  `accept-edits` (Write/Edit only) / session grant, then a card. `ask` and
+  the PI-only `BrowserPreview`/`new_context` names stay contract-allowed; no
+  `BrowserPreview` is registered. The launch-scoped
+  `OMP_DESKTOP_GATE_MODE` is a fixture-only switch subordinate to the
+  contract deny.
+- **External paths**: `session/tool-paths.ts` ports host-core's resolver
+  (lexical `.`/`..` normalization with root clamping, component-wise
+  containment, deepest-existing-ancestor canonicalization with bounded
+  dangling-symlink following, the two-root workspace/scratch resolver and
+  `requires_external_path_permission` for `Read|Glob|Grep|Write|Edit`) so
+  `..`, symlink and alias escapes card instead of slipping through. The OMP
+  session has no scratch root today; the parameter is kept and tested so the
+  semantics stay identical to PI if one is ever wired.
+- **Risk fidelity**: native names use PI's mapping (`read`/`glob`/`grep`
+  Low; `write`/`edit`/`bash` High; everything unnamed — `apply_patch`,
+  `eval`, `browser`, `computer`, `BrowserPreview` — Medium); host tools use
+  the run-scoped policy table (declared plugin risk, missing/unregistered →
+  Medium); `mcp_*` is Low outside contract modes. `browser`/`computer`/
+  `browserpreview` join the default gated names so they ask under ask/
+  accept-edits instead of running unapproved.
+- **Delegates and failure**: with the mandatory channel on, an unreadable,
+  foreign or invalid state for the interactive session blocks every call
+  (`policy-unavailable`); a delegate (`hasUI=false`) uses the owning
+  session's last validated snapshot while it is within the state age bound
+  (PI decides subagent calls under the parent's durable policy) or is
+  refused; no-UI fails closed exactly where the decision would have asked —
+  Low/`auto`/grant calls still pass without elevation.
+- **Card coherence**: the approval descriptor carries `risk`, `mode`,
+  `permissionMode` and the decision reason from the same policy object, so
+  the card and the enforced decision cannot disagree.
+- **Evidence layering**: the gate-layer contract deny (including tools the
+  B1 catalog clamp hides) is proven by the gate unit tests and by driving the
+  Bun-bundled shipped gate; the production E2E exercises the reachable
+  decisions on the real patched runtime and labels hidden-tool attempts as
+  catalog-layer not-found results instead of claiming a gate refusal.
 
 ## 15. Pinned runtime patch level (M5/T20-R3A; base migrated in M5/T20-R4A, ADR 0305) — risk reduction, R3 not lifted
 
