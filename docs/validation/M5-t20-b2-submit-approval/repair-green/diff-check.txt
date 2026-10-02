@@ -3,3 +3,6 @@ exit:0
 
 $ git diff --HEAD --check
 exit:0
+
+$ git diff --check 9491016062e36a2967cf3db74d2a4990421d9d30..HEAD
+exit:0
