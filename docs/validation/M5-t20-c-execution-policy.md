@@ -302,26 +302,44 @@ skipped。** RED/GREEN 原始日志见 §6。
 ## 6. 证据文件
 
 `docs/validation/M5-t20-c-execution-policy/` 下：首稿证据 `*-c.txt`、R1/R2 返修证据 `*-repair.txt`、
-第二次返修证据 `*-repair2.txt`（`omp-runtime-vitest-repair2.txt`、`desktop-suite-repair2.txt`、
-`c-execution-policy-e2e-repair2.txt`、`b1-fence-plugin-repair2.txt`、`compiled-gate-repair2.txt`、
-`build-typecheck-lint-repair2.txt`、`checks-repair2.txt`、`manifest-verify-repair2.txt`）；
+第二次返修证据 `*-repair2.txt`、第三次返修证据 `*-repair3.txt`（`gate-delegate-ownership-red-repair3.txt`、
+`omp-runtime-vitest-repair3.txt`、`c-execution-policy-e2e-repair3.txt`、`b1-fence-plugin-repair3.txt`、
+`compiled-gate-repair3.txt`、`desktop-bridges-repair3.txt`、`build-typecheck-lint-repair3.txt`、
+`checks-repair3.txt`、`manifest-verify-repair3.txt`）；
 `root-review-20261003/` 逐字节保存根复审提交的 R1/R2 原始报告、脚本与总结（本工作区未在 macOS 上运行它们）。
-所有本工作区日志为对应命令原始 stdout/stderr 直接落盘（未编辑字节）并追加 `EXIT=`。
+所有本工作区日志为对应命令原始 stdout/stderr 直接落盘（未编辑字节）并追加 `EXIT=`；RED 日志带一小段
+过程前言（说明临时还原修复前 gate 版本、两边摘要），测试输出本身未编辑。
 
-**清单基准（R4 返修）**：
+**清单基准（R4/R5 返修）**：
 
 - 子清单 `root-review-20261003/SHA256SUMS.txt` 以**该子目录**为基准（`cd` 进去即可
   `sha256sum -c SHA256SUMS.txt`），只列本目录中除自身以外的 11 个文件——自引用条目已移除，根复审先前
-  观察到的"自身哈希不匹配"即由此消失。
+  观察到的"自身哈希不匹配"即由此消失（本次未变，逐字节相同）。
 - 父清单 `SHA256SUMS.txt` 是**单一 sha256sum 兼容列表**（无 `---` 分节、无内嵌同名段），以
-  **本证据目录**为基准，用显式相对路径（含 `root-review-20261003/…` 前缀）收录 35 个文件：本目录
-  全部文件（除父清单自身与 `manifest-verify-repair2.txt` 这份校验日志——清单无法收录自身哈希）以及
-  子目录全部 12 个文件（含子清单自身，其摘要稳定是因为子清单不再自引用）。
-- 逐条独立校验（原始输出见 `manifest-verify-repair2.txt`）：两个基准下 `sha256sum -c` 全部 OK；
+  **本证据目录**为基准，用显式相对路径（含 `root-review-20261003/…` 前缀）收录 44 个文件：本目录
+  全部文件（除父清单自身与 `manifest-verify-repair3.txt` 这份校验日志——清单无法收录自身哈希）以及
+  子目录全部 12 个文件（含子清单自身，其摘要稳定是因为子清单不再自引用；第二次返修的校验日志
+  `manifest-verify-repair2.txt` 已固定为普通文件，现被收录）。
+- 逐条独立校验（原始输出见 `manifest-verify-repair3.txt`）：两个基准下 `sha256sum -c` 全部 OK；
   所列文件全部受 Git 跟踪（按各自基准目录解析路径）；父清单条目集合与磁盘文件集合**逐一相等**；
   根复审原始报告/脚本与其归档提交 `6d26530` 的 Git blob 逐位相同（未规范化空白）。
 
-### 6.1 提交坐标（第二次返修）
+### 6.1 提交坐标（第三次返修）
+
+- 代码/测试提交 `30ff735a0ebde879ebb7dac6651119d6f3685c56`：gate 的 `delegateLineage` 逐跳准入身份与
+  `delegateDescendsFrom` 的同记录比较、`gate-delegate-ownership.test.ts` 新增 7 步与边界用例、
+  `omp-sidecar.test.mjs` 的 7 步编译产物探针。
+- 文档/证据提交 `35836b59ce96afe0c606ae0f8c177392e8d01792`：ADR 0309 §7.3、spec 中英的祖先准入规则、
+  本记录（§0.3/§2 C4/§4/§5）、`docs/04-task-board.md`、`HANDOFF.md` 与 `*-repair3.txt` 原始日志
+  （含 RED 与 `checks-repair3.txt`）。
+- 随后的清单/坐标提交（见 `git log`）把子清单（11 条，未变）、父清单（44 条）与
+  `manifest-verify-repair3.txt` 固定在上述字节之上（生成顺序：先写完整日志 → 再生成清单 → 最后生成
+  校验日志），并把本节坐标写实。
+- 完整区间 `git diff --check bff27e1..30ff735` 与 `bff27e1..35836b5` 均 `EXIT=0`（原始输出在
+  `checks-repair3.txt` 尾部）。本工作区只追加提交，不 amend/rebase/强推；远端分支
+  `codex/m5-t20-c-execution-policy`。
+
+### 6.2 提交坐标（第二次返修）
 
 - 代码/测试提交 `feb4e111afa7a1c1e737ad057e4c469a8a429c20`：gate 的 `bindDelegate` 与公开上下文事实
   （`SessionManagerFacts`/`DelegateLifecycleContext`）、`gate-handler-testkit.ts` 的委托事实与 `lifecycle`
