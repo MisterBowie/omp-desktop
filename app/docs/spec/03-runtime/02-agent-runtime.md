@@ -1810,13 +1810,14 @@ loop-level implementation can. The "R3 lifted / T20-B may start" status from the
 previous commit of this branch is retracted.
 
 **Scope revision (2026-10-02).** The user excluded the Cursor + Plan/Goal
-combination from the product scope: it is unsupported and refused (ADR 0306),
-while Cursor in Agent mode stays available. Non-Cursor providers do not produce
-the pre-executed blocks above, so the non-Cursor route whose dispatch is decided
-by the patched loop continues in scope under the same strict contract (every
-`toolCall` counted, sole batches, settle-time termination). This note changes
-neither the patch set nor the "not strict" fact for the Cursor combination. See
-`docs/validation/M5-t20-non-cursor-scope.md`.
+combination from the product scope: it is unsupported and refused (ADR 0306).
+The gate does not refuse Cursor in Agent mode, but the desktop wires no Cursor
+transport yet, so this revision adds no Cursor capability. Non-Cursor providers
+do not produce the pre-executed blocks above, so the non-Cursor route whose
+dispatch is decided by the patched loop continues in scope under the same strict
+contract (every `toolCall` counted, sole batches, settle-time termination). This
+note changes neither the patch set nor the "not strict" fact for the Cursor
+combination. See `docs/validation/M5-t20-non-cursor-scope.md`.
 
 ## 16. Plan/Goal × Cursor product gate (M5/T20-R3C, ADR 0306)
 
@@ -1890,10 +1891,12 @@ that work, not the feature.
 **Current scope (2026-10-02).** This exclusion is the product's current scope
 rather than a temporary blocker: the user placed "Cursor + Plan/Goal" out of
 scope while keeping the non-Cursor Plan/Goal route in scope under the strict
-contract. The gate above and every boundary it added stay in force, and Cursor in
-Agent mode is not disabled. T20-B/C/D are still unstarted and will proceed only
-for the non-Cursor route, starting with the runtime-domain mode/policy channel;
-the split is in `docs/validation/M5-t20-non-cursor-scope.md`.
+contract. The gate above and every boundary it added stay in force; the gate
+does not refuse Cursor in Agent mode either, but the desktop wires no Cursor
+transport yet, so this confirmation adds no Cursor capability. T20-B/C/D are
+still unstarted and will proceed only for the non-Cursor route, starting with
+the runtime-domain mode/policy channel; the split is in
+`docs/validation/M5-t20-non-cursor-scope.md`.
 
 ## 17. Bundled sidecar build and admission (M5/T20-R4B; reproducible builds since M6/T20-R4-3; packaged-resource acceptance since M6/T21-A, ADR 0307)
 

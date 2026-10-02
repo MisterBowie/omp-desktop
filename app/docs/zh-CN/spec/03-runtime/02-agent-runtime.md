@@ -1150,8 +1150,9 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
 
 **当前范围（2026-10-02）**：该排除是产品的当前范围，而不是临时阻塞——用户把「Cursor + Plan/Goal」
 移出范围，同时把非 Cursor 的 Plan/Goal 路线保留在范围内并要求满足严格契约（非 Cursor 提供方不产生
-§15 所述预执行块）。上述门与它新增的全部边界继续生效，Agent 模式下的 Cursor 不被禁用。
-T20-B/C/D 仍未开始，且只会针对非 Cursor 路线推进，第一步是运行域 mode/policy 通道；拆分见
+§15 所述预执行块）。上述门与它新增的全部边界继续生效；组合门不拒绝 Cursor + Agent，但当前桌面尚未
+接通 Cursor 传输，本轮不新增该能力。T20-B/C/D 仍未开始，且只会针对非 Cursor 路线推进，第一步是运行域
+mode/policy 通道；拆分见
 `docs/validation/M5-t20-non-cursor-scope.md`。
 
 ## 17. bundled sidecar 的构建与准入（M5/T20-R4B；自 M6/T20-R4-3 起为可复现构建；自 M6/T21-A 起含打包资源验收，ADR 0307）

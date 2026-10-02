@@ -144,8 +144,10 @@ scope**, not a temporary blocker: Cursor + Plan/Goal is unsupported and refused.
 The decision keeps every boundary described above in force — the host-core
 durable-write guard, the Main-process refusals at `sessionConfigure` /
 `sessionCreate` / `agentPrompt`, and the renderer prevention — and it does not
-globally disable Cursor: Cursor models in Agent mode remain available, and every
-non-Cursor provider in Plan/Goal mode is unaffected by this gate.
+globally disable Cursor: the gate does not refuse Cursor in Agent mode, and
+every non-Cursor provider in Plan/Goal mode is unaffected by this gate. The
+desktop does not wire a Cursor transport yet, so this confirmation adds no
+Cursor session capability.
 
 The non-Cursor Plan/Goal route stays in scope, but it is **not implemented yet**:
 T20-B/C/D are still unstarted, the runtime-domain mode/policy channel and the

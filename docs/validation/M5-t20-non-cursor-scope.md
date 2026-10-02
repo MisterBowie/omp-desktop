@@ -10,14 +10,14 @@
 
 2026-10-02 用户指示：**先排除 Cursor + Plan/Goal**。本记录把该指示落成当前产品范围，解释如下：
 
-1. **Cursor + Plan/Goal = 不支持且拒绝。** ADR 0306 的既有门全部保留并继续生效：host-core 持久写入守卫（每连接 TEMP 触发器）、Main 进程 `sessionConfigure`/`sessionCreate`/`agentPrompt` 的写入前拒绝、派发门（`runtime/plans.ts` 的 Pi-only 拒绝）与渲染层预防；错误码 `PLAN_GOAL_CURSOR_UNSUPPORTED` 不变。**不移除任何既有门或回归，也不全局禁用 Cursor**：Agent 模式下的 Cursor 模型与所有非 Cursor 提供方不受影响。
+1. **Cursor + Plan/Goal = 不支持且拒绝。** ADR 0306 的既有门全部保留并继续生效：host-core 持久写入守卫（每连接 TEMP 触发器）、Main 进程 `sessionConfigure`/`sessionCreate`/`agentPrompt` 的写入前拒绝、派发门（`runtime/plans.ts` 的 Pi-only 拒绝）与渲染层预防；错误码 `PLAN_GOAL_CURSOR_UNSUPPORTED` 不变。**不移除任何既有门或回归，也不全局禁用 Cursor**：组合门不拒绝 Cursor + Agent，但当前桌面尚未接通 Cursor 传输，本轮不新增该能力；所有非 Cursor 提供方不受影响。
 2. **非 Cursor 路线仍在范围内，契约不降级。** 对"受支持 HTTP 模型、工具派发由已补丁 agent loop 裁决"的会话，Plan/Goal 仍必须满足 PI 严格契约：提交工具独占**全部 `toolCall` 块**的批次；混合批次整批拒绝、所有兄弟零副作用；声明 `sole` 的会话关闭工具投机；提交终支 terminate 且无后续 provider 步。**不得**把验收降成"尽量阻断"，也不得缩小批次计数。
-3. **这是用户授权的范围调整，不是上游能力变化。** Cursor 通道的严格 RED 证据（R3B 实测 **0/12**）继续有效，其含义是"该组合被范围排除的事实"，**不表示已修复或已通过**。桌面模型投影本来就不含 `cursor-agent` 传输（`packages/shared/src/model-catalog.ts` 的 `API_STYLES`），产品当前不调用 Cursor；Cursor 实验只导入本地代码/模拟帧，无真实服务请求（本轮执行器与远端模型仍为用户指定的 DeepSeek）。
+3. **这是用户授权的范围调整，不是上游能力变化。** Cursor 通道的严格 RED 证据（R3B 实测 **0/12**）继续有效，其含义是"该组合被范围排除的事实"，**不表示已修复或已通过**。桌面模型投影本来就不含 `cursor-agent` 传输（`packages/shared/src/model-catalog.ts` 的 `API_STYLES` 无该样式；`apps/desktop/electron/main/runtime/omp-model-projection.ts` 无 Cursor 传输映射，两文件源码中 `cursor` 零出现），产品当前不调用 Cursor；Cursor 实验只导入本地代码/模拟帧，无真实服务请求（本轮执行器与远端模型仍为用户指定的 DeepSeek）。
 4. **T20 整体未完成、Plan/Goal 未实现。** 现存缺口 g1/g2/g3 与 B/C/D 矩阵全部未实现（§3），`plan`/`goal` 能力保持关闭，OMP 会话的 Plan/Goal 入口不开放。
 
 | 组合 | 当前范围 | 现状 |
 | --- | --- | --- |
-| Cursor + Agent 模式 | 保留可用 | 不受本决定影响（无新改动） |
+| Cursor + Agent 模式 | 组合门不拒绝；**当前桌面尚未接通 Cursor 传输，本轮不新增该能力** | 无新改动；18 项门回归为 mock runtime，只证明不被门拒绝，不代表产品已支持 Cursor 会话 |
 | Cursor + Plan/Goal | **不支持、拒绝** | ADR 0306 门已实现并测试（host-core + Main + 渲染层） |
 | 非 Cursor + Plan/Goal | **在范围内、尚未实现** | T20-B/C/D 未开始；能力关闭 |
 | 非 Cursor `sole`/terminate 的 loop 受控路径 | 在范围内、必须严格 | 本轮在 18.3.0 + patch `.3` 上复测（§2）；宿主审批/恰一次/重启不重放仍未实现 |
@@ -62,7 +62,7 @@
 | `node --test apps/desktop/test/packaging-sidecar-source.test.mjs apps/desktop/test/preview-workflow.test.mjs apps/desktop/test/omp-sidecar.test.mjs` | **13 passed / 0 failed，exit 0**——证明 manifest 只新增 `status.scopeNote` 后，pin 校验、CLI `--check`、工具门深度确定性与打包来源测试不受影响 |
 | `node scripts/omp-patch.mjs --check` | `OMP-PATCH-OK 62bc57b+omp-desktop.3`，exit 0（patch sha256 `ad63ced9…`、87190 字节、7673 文件） |
 
-以上回归**没有新增产品逻辑、没有新增镜像实现的新测试**，只重跑既有测试证明：不支持组合继续被提前拒绝；普通 Agent/非 Cursor 路径不受误拒。
+以上回归**没有新增产品逻辑、没有新增镜像实现的新测试**，只重跑既有测试证明：不支持组合继续被提前拒绝；普通 Agent/非 Cursor 路径不受误拒。**Cursor 门 18/18 只证明 provider=cursor + agent 的组合不会被该门拒绝（mock runtime），不证明产品支持 Cursor 会话**——当前桌面没有 `cursor-agent` 传输映射（§1、§7）。
 
 ### 2.3 文档/矩阵/静态检查（2026-10-02，`app/`）
 
@@ -132,6 +132,7 @@
 - **T20 未完成、Plan/Goal 未实现、能力未开放**；本记录不把任何 B/C/D 行标为完成。
 - 46/46 只覆盖 **loop 受控路径**：不覆盖真实 Cursor 服务端、不覆盖真实付费/远程模型、不覆盖 Windows、未跑 `packages/agent` 全量套件、未证明宿主审批/恰一次/重启不重放（这些仍是 B/C/D 的验收项）。
 - 本阶段**未改产品运行时代码**（`app/` 的代码与测试无行为变化）；变更只有文档、ADR/spec 镜像与 `manifest.status` 的日期化范围说明（不改 patchLevel、patch/hash/bytes、fork commit/tree、capability ids 或构建产物 pin）。
+- **不声称 Cursor 会话可用**：组合门不拒绝 Cursor + Agent；当前桌面尚未接通 Cursor 传输，本轮不新增该能力（18 项门回归为 mock runtime，§1、§7）。
 - 历史 RED（Cursor 0/12）逐字保留；"T20-B 不得开始"类旧结论只在 Cursor 组合的语境下继续成立，不作为非 Cursor 路线的现行规划。
 
 ## 6. 证据文件
@@ -139,7 +140,7 @@
 | 文件（`docs/validation/M5-t20-non-cursor-scope/`） | 内容 | SHA-256 |
 | --- | --- | --- |
 | `t20-feasibility-patched-20261002.json` | 本轮 spike 结果（46/46，含 `patched.runtime` 坐标与全部 artifacts） | `89400edb4bf838addeaa876eaec84c50596ef376cc1d410c0edf8816a573f01b` |
-| `t20-feasibility-patched-20261002.log` | spike 原始 stdout（未编辑） | `eba1ce725958323ce1b6390458507d9b87168b8c6eebcfb4bfc9081a5f290c7e` |
+| `t20-feasibility-patched-20261002.log` | spike 原始 stdout（未编辑；`*.log` 命中根 `.gitignore`，本轮复审返修用 `git add -f` 单独归档为**受跟踪文件**，字节与摘要不变） | `eba1ce725958323ce1b6390458507d9b87168b8c6eebcfb4bfc9081a5f290c7e` |
 | `cursor-gate-tests-20261002.txt` | 三份 Cursor 门 desktop test 输出（18/18） | `d6885a77870063ff21a68abaca2bafaf713173c760204de19a0841bde1d33275` |
 | `shared-predicate-20261002.txt.gz` | `plan-goal-model-gate` vitest 输出（7/7）**原始字节**（确定性 `gzip -n -9`） | `761b96b72337c0088ff8ab267d249703629c31a3afe31896765c820405e4dd7f` |
 | `shared-predicate-20261002.txt` | 上述原始输出的**可读副本**（去掉 EOF 一个空行；文件头注明归一化，原始 `.txt` sha256 `7525b49b…e453`） | `88bc053ec7e131b65dce99666dfaee3771c85072b18a5d4cadfc67e09579c046` |
@@ -148,6 +149,13 @@
 | `manifest-consumers-20261002.txt` | manifest 消费方回归输出（13/13） | `ebe6d17f854a3b65feb73b1fd023a7aabf951f0a0b03b8d1f74041cb2e1eae26` |
 | `checks-20261002.txt` | 矩阵 lint、gap 探针（默认/启用）、docs/locales/release-docs 检查的原始输出与退出码 | `554d5e8ae7db4a06a067695e33f6090035ab9220ecad04a041664f7e465b2d44` |
 
-两份日志的原始输出以 EOF 空行结尾，`git diff --check` 会将其判为 "new blank line at EOF"；按仓库既有做法**不改写原始输出**，而是保存确定性 gzip（`gzip -n -9`，含 SHA-256）并保留**清楚标注归一化**的可读副本，未新增任何 whitespace 忽略规则。其余日志未做归一化（原始即通过 `--check`）。
+两份日志的原始输出以 EOF 空行结尾，`git diff --check` 会将其判为 "new blank line at EOF"；按仓库既有做法**不改写原始输出**，而是保存确定性 gzip（`gzip -n -9`，含 SHA-256）并保留**清楚标注归一化**的可读副本，未新增任何 whitespace 忽略规则。其余日志未做归一化（原始即通过 `--check`）。本表 9 个引用文件在最终提交中的存在性与 SHA-256 已用 `git ls-files` 与 `git show HEAD:<path> | sha256sum` 逐项核对（§7）。
 
 运行后已用 `git checkout --` 恢复脚本写出的已跟踪结果文件 `app/experiments/omp-bridge/results/t20-feasibility-patched.json`（旧历史不被本轮覆盖）；本轮输出以上表副本为准。
+
+## 7. 独立复审返修（2026-10-02；仅文档/证据）
+
+独立复审要求两项修正，均只改文档与证据归档：不改产品代码、测试、patch 构件、pin 或 manifest 其他字段；不重跑已绿的 46/46 与 18/18，只做静态与摘要核验（历史计数与结论保持原样）。
+
+1. **证据引用缺失（归档）**：§6 引用 `t20-feasibility-patched-20261002.log`（SHA-256 `eba1ce72…`），但前稿提交不含该文件——`*.log` 命中根 `.gitignore` 第 11 行，文件只存在于工作树。本轮**未改写日志字节**，用 `git add -f` 把该原始文件单独归档为受跟踪文件（SHA-256 不变，见 §6）；未修改 ignore 规则、未新增忽略例外、未手写或重建日志。该日志无行尾空白、无 EOF 空行，无需 gzip/可读副本（复审提示的 `/tmp/t20-feasibility-patched-20261002.log` 在本机已不存在；证据目录中的同名文件 SHA-256 与前稿记录完全一致，归档的就是该记录的原始字节）。最终提交以 `git ls-files docs/validation/M5-t20-non-cursor-scope/` 与 `git show HEAD:<path> | sha256sum` 核对 §6 全部 9 个引用文件在提交中真实存在且摘要一致（不只存在于工作树）。
+2. **门许可误写为传输可用**：前稿新增范围说明多处把"组合门不拒绝 Cursor + Agent（18 项 mock runtime 测试）"写作 Cursor 会话保持可用/保留可用。源码事实：`packages/shared/src/model-catalog.ts` 的 `API_STYLES` 无 `cursor-agent`；`apps/desktop/electron/main/runtime/omp-model-projection.ts` 无 Cursor 传输映射（两文件 `cursor` 零出现）。桌面当前不调用 Cursor 服务，18 项门回归只证明该组合不被门拒绝，不证明产品支持 Cursor 会话。本轮把新增范围说明统一改为 **"组合门不拒绝 Cursor + Agent；当前桌面尚未接通 Cursor 传输，本轮不新增该能力"**（HANDOFF、`00-scope-and-decisions`、任务看板、ADR 0305/0306、英文/中文 spec、R3C 报告顶部说明、本文件 §1 组合表/§2.2/§5）。用户仅排除 Plan/Goal 组合的范围意图不变，Cursor 未被全局禁用；历史原文保持原样，其"不受门影响"表述只按门判定理解，并由新说明补上当前 transport 状态，不把旧历史改写为"已通过调用服务"。

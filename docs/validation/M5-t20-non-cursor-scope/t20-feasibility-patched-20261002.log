@@ -1,0 +1,47 @@
+PASS t20-feasibility-patched: 46/46 checks
+  ok   s1-mixed-bash-first: process group reaped
+  ok   R3-a [bash, SubmitPlan]: the sibling bash call has ZERO side effects — PI blocks every call in a batch that contains a transition tool
+  ok   R3-a [bash, SubmitPlan]: the transition call is blocked before it executes — SubmitPlan host calls: 0, execution starts: 0
+  ok   s2-mixed-submit-first: process group reaped
+  ok   R3-a [SubmitPlan, bash]: the sibling bash call has ZERO side effects — sibling file: false, execution starts: 0
+  ok   s3-double-submit: process group reaped
+  ok   R3-a [SubmitPlan, SubmitPlan]: a duplicated transition call executes zero times — PI's batch guard blocks the whole batch; observed 0 submissions, 0 execution starts
+  ok   s3b-blocked-transition-sibling: process group reaped
+  ok   R3-a: blocking the transition call in the gate still leaves the sibling with ZERO side effects — the interception payload has no batch view, so a per-call block cannot protect the siblings
+  ok   s4-continue-after-success: process group reaped
+  ok   R3-b: a successful submission leaves no further provider step — model calls after the submit result: 0
+  ok   R3-b: a successful submission leaves no further tool execution
+  ok   s5-failure-branch: process group reaped
+  ok   R3-c: a failed submission also leaves no further provider step — model calls after the failed submit result: 0
+  ok   s6-abort-pending: process group reaped
+  ok   R3-d: abandoning a pending transition call cancels it by targetId — cancel.targetId=15967a1182fedab9 call.id=15967a1182fedab9
+  ok   R3-d: the aborted turn terminates — 1 agent_end frames
+  ok   R3-d: the session stays observable after the abort — {"id":"req-0f64b0c8","type":"response","command":"get_state","success":true,"data":{"model":{"id":"local-model","name":"local-model","api":"openai-completions","provider":"m1fake","baseUrl":"http://12
+  ok   s7-abort-on-intercept: process group reaped
+  ok   R3-a: aborting from the transition interception still leaves the sibling with ZERO side effects
+  ok   r4a-forward-order: process group reaped
+  ok   R4: the registered host tool is visible before the clamp
+  ok   R4: the clamped tool list equals the clamp exactly (sequence, no extras) — read,grep,glob,bash,SubmitPlan
+  ok   r4b-reverse-order: process group reaped
+  ok   R4: a clamp without registration equals the clamp exactly — read,grep,glob,bash
+  ok   R4: registering host tools after a clamp re-exposes them (the clamp does not stick) — read,grep,glob,bash,SubmitPlan,HostEcho
+  ok   r4c-catalog-lifecycle: process group reaped
+  ok   R4: every prompt's tool list equals its own catalog+clamp exactly (sequence, no residue, no duplicates) — [["read","grep","glob","bash","HostEcho"],["read","grep","glob","bash","HostEcho","SubmitPlan"],["read","grep","glob","bash","HostEcho","SubmitGoal"],["read","grep","glob","bash","HostEcho"],["read","grep","glob","bas...
+  ok   R4: the removed submit tool stays out after the catalog drops it (prompt 4 = agent) — read,grep,glob,bash,HostEcho
+  ok   R4: the re-registered submit tool is visible again on the next plan prompt (prompt 5) — read,grep,glob,bash,HostEcho,SubmitPlan
+  ok   R4: the goal prompt carries SubmitGoal and not SubmitPlan (prompt 3) — read,grep,glob,bash,HostEcho,SubmitGoal
+  ok   r4d-clamp-and-mode-block: process group reaped
+  ok   R4: every prompt's tool list equals its catalog+clamp exactly (sequence, no residue, no duplicates) — [["read","grep","glob","bash","HostEcho"],["read","grep","glob","bash","HostEcho"],["read","grep","glob","bash","SubmitGoal"]]
+  ok   R4: the third prompt is a real change (catalog gains SubmitGoal, clamp drops HostEcho) — read,grep,glob,bash,SubmitGoal
+  ok   R4: a prompt that both clamps and appends a mode block is delivered within one policy retry — attempts=2 requests=1
+  ok   R4: an unchanged clamp on the next prompt needs exactly one preparation — attempts=1
+  ok   R4: the real catalog+clamp change converges within one retry — attempts=2 requests=1
+  ok   R2: the appended block is the production composeModeSystemPrompt(mode, '') bytes, exactly once — [1,1,1]
+  ok   R2: no other mode block is mixed into the prompt — [[0,0],[0,0],[0,0]]
+  ok   R2: the runtime keeps exactly one system message — [1,1,1]
+  ok   R2: PI Desktop's default base prompt is not injected
+  ok   R2: the block is a pure append — the prompt text ends with it, and no mode block leaks into the prefix — [10279,10279,10283]
+  ok   R2: UTF-8 bytes satisfy system = prefix + block on every prompt — prefixBytes=[12651,12651,12655] systemBytes=[12827,14377,14811] blockBytes=[176,1726,2156]
+  ok   R2: prompts with the same tool catalog keep byte-identical prefixes (the block does not perturb the base) — prefixBytes=[12651,12651,12655] tools0=read,grep,glob,bash,HostEcho tools1=read,grep,glob,bash,HostEcho
+  ok   R2: a changed tool catalog changes the base prefix, not the append shape (prompt 3 vs 2) — prefixBytes2=12655 prefixBytes1=12651
+  ok   R2: this is byte-parity evidence for the mode block only (source module equality)

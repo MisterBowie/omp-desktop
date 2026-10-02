@@ -4,7 +4,7 @@
 
 ## 0. M5/T20 范围修正交付摘要（**范围决策已落盘；T20 未完成、Plan/Goal 未实现**）
 
-- 用户 2026-10-02 指示"先排除 Cursor + Plan/Goal"：**该组合不支持且拒绝**——ADR 0306 的 host-core 持久写入门、Main 进程写入前拒绝、派发门与渲染层预防全部保留；**不全局禁用 Cursor**（Agent 模式下的 Cursor 模型保持可用），不移除任何既有门或回归。这是**用户授权的范围调整，不是上游能力变化**：Cursor 通道的严格 0/12 RED 证据继续有效，只表示该组合被范围排除，不宣称已修复/已通过。桌面模型投影本就不含 `cursor-agent` 传输（`model-catalog.ts` 的 `API_STYLES`），产品当前不调用 Cursor；Cursor 实验只用本地代码/模拟帧，无真实服务请求。
+- 用户 2026-10-02 指示"先排除 Cursor + Plan/Goal"：**该组合不支持且拒绝**——ADR 0306 的 host-core 持久写入门、Main 进程写入前拒绝、派发门与渲染层预防全部保留；**不全局禁用 Cursor**（组合门不拒绝 Cursor + Agent；当前桌面尚未接通 Cursor 传输，本轮不新增该能力），不移除任何既有门或回归。这是**用户授权的范围调整，不是上游能力变化**：Cursor 通道的严格 0/12 RED 证据继续有效，只表示该组合被范围排除，不宣称已修复/已通过。桌面模型投影本就不含 `cursor-agent` 传输（`model-catalog.ts` 的 `API_STYLES`），产品当前不调用 Cursor；Cursor 实验只用本地代码/模拟帧，无真实服务请求。
 - **非 Cursor、工具派发由已补丁 agent loop 裁决的受支持 HTTP 模型路线仍在范围内**，且必须满足 PI 严格契约：提交工具独占**全部 `toolCall`** 批次的计数、混合批次兄弟零副作用、`sole` 目录关闭投机、终支 terminate 且无后续 provider 步；不得降级为"尽量阻断"或缩小批次计数。宿主审批/恰一次/重启不重放等仍未实现，保持未完成。
 - 本轮（分支 `codex/m5-t20-non-cursor-scope`，基线 `c8b358706417d2f8fa1949fe589f1d5f5512ce8d`；追加提交，不 amend/rebase/强推）只做范围落盘与验证，**未改产品运行时**。证据（`docs/validation/M5-t20-non-cursor-scope.md`，全部本地 FakeProvider/固定运行时，无付费/远程调用）：
   - ① 现基线（OMP `62bc57be` + patch `62bc57b+omp-desktop.3`，真实固定运行时 + 真实补丁 scratch 树）`node app/experiments/omp-bridge/t20-feasibility.mjs --patched` → **46/46、exit 0**：混合批次零副作用（含顺序颠倒/重复提交）、gate 逐调用 block 保护不了兄弟、成功/失败终支 0 后续 provider 请求、abort 按 targetId 且会话可观察、目录顺序/生命周期严格相等、`r4d` attempts `2/1/2`、mode block 纯追加（blockBytes 176/1726/2156，`system = prefix + block`）。

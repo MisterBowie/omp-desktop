@@ -160,12 +160,14 @@ Consequences:
 ## Scope revision (2026-10-02): the Cursor combination is excluded, the contract is not relaxed
 
 On 2026-10-02 the user placed **Cursor + Plan/Goal out of product scope**: the
-combination is unsupported and refused by the ADR 0306 gate, while Cursor in
-Agent mode stays available and no existing gate or regression is removed. This is
-a scope decision, not an upstream capability change: the R3 findings above — and
-the 0/12 strict-contract measurement against the real Cursor exec dispatcher
-(`docs/validation/M5-omp-transition-patch.md` §9/§10) — keep their historical
-value as the fact that describes the excluded combination.
+combination is unsupported and refused by the ADR 0306 gate; the gate does not
+refuse Cursor in Agent mode either, but the desktop wires no Cursor transport
+yet and this scope revision adds no Cursor capability. No existing gate or
+regression is removed. This is a scope decision, not an upstream capability
+change: the R3 findings above — and the 0/12 strict-contract measurement against
+the real Cursor exec dispatcher (`docs/validation/M5-omp-transition-patch.md`
+§9/§10) — keep their historical value as the fact that describes the excluded
+combination.
 
 The exclusion does not relax the contract for the route that remains in scope.
 Non-Cursor providers do not produce the `kCursorExecResolved` pre-executed blocks,
@@ -185,9 +187,9 @@ That list is what the T20-B/C/D rows of
 `docs/validation/M5-plan-goal-capability-gates.md` §7 verify; the loop-controlled
 part of it was re-measured on the current base 2026-10-02
 (`62bc57be` + `62bc57b+omp-desktop.3`, patched scratch tree, fake provider) and is
-recorded in `docs/validation/M5-t20-non-cursor-scope.md`. Host approval, exactly
--once dispatch and restart-no-replay remain unimplemented and are owned by
-T20-B/C/D; T20 is not complete and the `plan`/`goal` capabilities stay closed
+recorded in `docs/validation/M5-t20-non-cursor-scope.md`. Host approval,
+exactly-once dispatch and restart-no-replay remain unimplemented and are owned
+by T20-B/C/D; T20 is not complete and the `plan`/`goal` capabilities stay closed
 until T20-D.
 
 ## Consequences
