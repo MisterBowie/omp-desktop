@@ -1,0 +1,34 @@
+## matrix ids
+MATRIX-ID-OK: B1-B14, C1-C8, D1-D3 each appear exactly once
+EXIT=0
+
+## gap probe (opt-in; g3 open expected exit 1)
+EXIT=1
+GAP-OPEN g3 (owner: T20-B) an approved Plan/Goal execution for an OMP session is refused before claiming; the queued row stays queued and nothing runs on the OMP engine [evidence: runtime/plans.ts refuseOutsidePiRuntime("plan execution") present: true]
+VERDICT g4: pinned rpc-ui RpcCommand union has 45 commands: negotiate_protocol, prompt, steer, follow_up, abort, abort_and_prompt, new_session, get_state, set_fast_mode, get_available_commands, get_entries, get_tree, set_todos, set_host_tools, set_host_uri_schemes, set_subagent_subscription, get_subagents, get_subagent_messages, set_model, cycle_model, get_available_models, set_thinking_level, cycle_thinking_level, get_available_thinking_levels, set_steering_mode, set_follow_up_mode, set_interrupt_mode, compact, set_auto_compaction, set_auto_retry, abort_retry, bash, abort_bash, get_session_stats, export_html, switch_session, branch, get_branch_messages, get_last_assistant_text, set_session_name, handoff, get_messages, get_messages_page, get_login_providers, login
+VERDICT g4: no plan/goal/permission/approval command exists in the pinned rpc-ui surface (rpc-ui = rpc + tool-UI context; see the validation document)
+SUMMARY: 1 gap(s) open [g3]
+
+## omp-patch --check
+EXIT=0
+OMP-PATCH-OK 62bc57b+omp-desktop.3 (base 62bc57be1b03ef0802a33cf7f5f530e534527531)
+  patch      : app/patches/oh-my-pi/0001-omp-desktop-runtime.patch (sha256 ad63ced9f7488ff088194754b4902732e1e7ebd0bdfa10a7926b3c5dc1beeaa9)
+  capabilities: rpc-host-tool-concurrency, rpc-host-tool-sole-batch-policy, agent-tool-result-terminate, rpc-host-tool-result-terminate, reproducible-sidecar-build, explicit-bytecode-build-mode
+
+## release docs
+Release documentation is aligned with 0.15.2 (0.15.x line).
+EXIT=0
+
+## agent policy sync
+Agent policy sync check passed (AGENTS.md ↔ CLAUDE.md).
+EXIT=0
+
+## locales + check-docs (6 pre-existing problems expected)
+EXIT=1
+> @pi-desktop/docs@0.15.2 check:locales /home/vv/person/code/omp-desktop-m5-t20-c/app/docs
+> node scripts/check-locales.mjs
+Verified 79 English/Chinese specification pairs.
+6 documentation problem(s) across 509 pages.
+
+## git diff --check bff27e1..34d2ffa (code+test repair commit, complete range)
+EXIT=0

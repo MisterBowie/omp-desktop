@@ -1,0 +1,120 @@
+{
+  "desktopCommit": "fc0fb29842516b191b704d37d21c44e489b8c167",
+  "layer": "actual production bridge/gate + fixed patched OMP + local FakeProvider; the first genuine native Bash is approved once through the production UI decision path; it changes only the owned disposable state file permissionMode, without changing desktop policy; the next native Bash in the SAME admitted Plan/ask prompt must still require approval or fail closed",
+  "results": [
+    {
+      "case": "same-turn-unchanged-control",
+      "cards": [
+        {
+          "toolName": "bash",
+          "risk": "high",
+          "decision": "allow-once"
+        },
+        {
+          "toolName": "bash",
+          "risk": "high",
+          "decision": "deny"
+        }
+      ],
+      "ends": [
+        {
+          "sessionId": "turn-policy-review",
+          "turnId": "omp-turn:turn-policy-review:05c653e6-f602-4644-81d3-a74280b89816:1",
+          "reason": "completed"
+        }
+      ],
+      "hostPolicy": {
+        "mode": "plan",
+        "permissionMode": "ask"
+      },
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:turn-policy-review:05c653e6-f602-4644-81d3-a74280b89816:1"
+      },
+      "finalState": "idle",
+      "providerRequests": 3,
+      "bashAdvertised": true,
+      "toolResults": [
+        {
+          "id": "review_first",
+          "content": "review-control-approved\n\n\nWall time: 0.06 seconds"
+        },
+        {
+          "id": "review_second",
+          "content": "denied by user (Deny)"
+        }
+      ],
+      "firstBodyExecuted": true,
+      "effect": false,
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "finalStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      }
+    },
+    {
+      "case": "same-turn-owned-policy-mutated",
+      "cards": [
+        {
+          "toolName": "bash",
+          "risk": "high",
+          "decision": "allow-once"
+        }
+      ],
+      "ends": [
+        {
+          "sessionId": "turn-policy-review",
+          "turnId": "omp-turn:turn-policy-review:fbb7afd1-c90d-45a3-a06b-f4e0a9a3b438:1",
+          "reason": "completed"
+        }
+      ],
+      "hostPolicy": {
+        "mode": "plan",
+        "permissionMode": "ask"
+      },
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:turn-policy-review:fbb7afd1-c90d-45a3-a06b-f4e0a9a3b438:1"
+      },
+      "finalState": "idle",
+      "providerRequests": 3,
+      "bashAdvertised": true,
+      "toolResults": [
+        {
+          "id": "review_first",
+          "content": "review-owned-policy-mutated\n\n\nWall time: 0.05 seconds"
+        },
+        {
+          "id": "review_second",
+          "content": "(no output)\n\nWall time: 0.00 seconds"
+        }
+      ],
+      "firstBodyExecuted": true,
+      "effect": true,
+      "passed": false,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "finalStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      }
+    }
+  ],
+  "passed": false
+}

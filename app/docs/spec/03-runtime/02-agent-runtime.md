@@ -1813,12 +1813,14 @@ contract tool catalog (evidence: `docs/validation/M5-capability-user-paths.md`,
   switch off (a fixture that never enabled the channel) the T19-C degradation
   stands: no state, no injection. A thrown handler error is *not* protection
   (the pinned extension runner logs it and still delivers the prompt;
-  measured in `apps/desktop/test/omp-start-handler-semantics.test.mjs`). The
-  gate's `tool_call` approval descriptor additionally carries the effective
-  permission mode when the owning state is readable, so the resolved policy
-  is observably consumed. M5/T20-C replaces that per-call read with the
-  execution-time decision table below; the descriptor now carries `risk`,
-  `mode`, `permissionMode` and the decision reason from the same policy.
+  measured in `apps/desktop/test/omp-start-handler-semantics.test.mjs`). M5/T20-B1
+  also made the gate's `tool_call` approval descriptor carry the effective
+  permission mode when the owning state was readable, so the resolved policy
+  was observably consumed. M5/T20-C replaced that per-call read with the
+  execution-time decision table below, and its review repair removed the read
+  entirely from the product path: the descriptor now carries `risk`, `mode`,
+  `permissionMode` and the decision reason from the admitted turn's immutable
+  policy, and the mutable file is consulted at admission time only.
 - **On-demand `Skill` path**: the bridge registers a host tool named `Skill`
   (exact Pi description and `{ id }` schema, `loadMode: "essential"`) only
   when the desktop catalog is non-empty — the Pi registration gate. The
@@ -1858,29 +1860,61 @@ contract tool catalog (evidence: `docs/validation/M5-capability-user-paths.md`,
   and unclaimed, and `plan`/`goal` capabilities remain off.
 
 M5/T20-C implements PI's execution-time permission decisions in the trusted
-gate (evidence: `docs/validation/M5-t20-c-execution-policy.md`, ADR 0309):
+gate (evidence: `docs/validation/M5-t20-c-execution-policy.md`, ADR 0309;
+the review repair of 2026-10-03 added the turn admission and the desktop
+session's grant lifetime, ADR 0309 §6):
 
-- **Decision order (PI §1.3.1)**: with an owned snapshot the gate applies
-  PI's order — contract hard deny first (every tool outside PI's allowlist,
-  plus plugin tools without a non-empty `planSafeActions` declaration, is
-  blocked with PI's rejection codes `WRITE_DISABLED_IN_PLAN` /
-  `EDIT_DISABLED_IN_PLAN` / `PLUGIN_DISABLED_IN_PLAN` /
-  `TOOL_DISABLED_IN_PLAN` under every permission mode, external path, grant
-  or legacy switch), then the explicit external-path exception (`auto`
-  allows, a session grant allows, otherwise ask), then Low risk / `auto` /
-  `accept-edits` (Write/Edit only) / session grant, then a card. `ask` and
-  the PI-only `BrowserPreview`/`new_context` names stay contract-allowed; no
-  `BrowserPreview` is registered. The launch-scoped
-  `OMP_DESKTOP_GATE_MODE` is a fixture-only switch subordinate to the
-  contract deny.
+- **One admitted policy per prompt**: before every prompt the runner installs
+  a fresh turn token **and** the desktop's policy admission — the session
+  `mode`, the effective `permissionMode`, the host-tool
+  `{risk, planSafeActions, origin}` table and the session's deliberate
+  grants, encoded by `session/turn-admission.ts` — through the existing
+  `/omp-desktop-turn` handshake; the gate installs it only for that token and
+  acknowledges with the SHA-256 of the exact argument, so the user prompt is
+  submitted only once the gate provably holds that policy. Every call of the
+  turn — the owning session's own calls and its delegates (`hasUI=false`,
+  PI's subagent-under-parent-policy semantics) — decides from that immutable
+  record; the mutable run-scoped file is the *content* channel (mode block,
+  skills, memory, mandatory-presence proof) and is never re-read for policy
+  on the product path, so a tool body rewriting `permissionMode` mid-prompt
+  cannot relax the rest of the turn. `agent_start` arms the record, a
+  terminal `agent_end` retires it (scheduled continuations keep it) and a
+  start refusal clears it; a record whose turn never started, a foreign
+  interactive session and — with the mandatory channel on — a process with no
+  record all block (`policy-unavailable`). A payload-less host (a fixture
+  driving the gate without an admission) freezes the first validated read of
+  the fenced turn instead, so the same rewrite cannot move its decision
+  either; every new user prompt re-resolves the settings and replaces the
+  record wholesale.
+- **Decision order (PI §1.3.1)**: the gate applies PI's order — contract hard
+  deny first (every tool outside PI's allowlist, plus plugin tools without a
+  non-empty `planSafeActions` declaration, is blocked with PI's rejection
+  codes `WRITE_DISABLED_IN_PLAN` / `EDIT_DISABLED_IN_PLAN` /
+  `PLUGIN_DISABLED_IN_PLAN` / `TOOL_DISABLED_IN_PLAN` under every permission
+  mode, external path, grant or legacy switch), then the explicit
+  external-path exception (`auto` allows, a session grant allows, otherwise
+  ask), then Low risk / `auto` / `accept-edits` (Write/Edit only) / session
+  grant, then a card. `ask` and the PI-only `BrowserPreview`/`new_context`
+  names stay contract-allowed; no `BrowserPreview` is registered. For an
+  admitted turn the launch-scoped `OMP_DESKTOP_GATE_MODE` is ignored entirely
+  (it may neither allow nor deny around PI's order) and
+  `OMP_DESKTOP_GATE_TOOLS` may only add native names to the product's gated
+  default, never shrink it. The adjudicated set is the configured
+  side-effect native names plus every desktop host tool; a native name
+  outside both is not adjudicated by this gate (OMP's own approval still
+  applies), and any unknown name that *is* adjudicated carries Medium risk
+  (PI's default), never Low.
 - **External paths**: `session/tool-paths.ts` ports host-core's resolver
   (lexical `.`/`..` normalization with root clamping, component-wise
   containment, deepest-existing-ancestor canonicalization with bounded
   dangling-symlink following, the two-root workspace/scratch resolver and
   `requires_external_path_permission` for `Read|Glob|Grep|Write|Edit`) so
-  `..`, symlink and alias escapes card instead of slipping through. The OMP
-  session has no scratch root today; the parameter is kept and tested so the
-  semantics stay identical to PI if one is ever wired.
+  `..`, symlink and alias escapes card instead of slipping through. Relative
+  paths are joined to the workspace exactly as PI does, so a relative escape
+  (`../outside`) *is* external; the macOS `/var` alias behavior matches PI's
+  lexical-root-before-realpath order. The OMP session has no scratch root
+  today; the parameter is kept and tested so the semantics stay identical to
+  PI if one is ever wired.
 - **Risk fidelity**: native names use PI's mapping (`read`/`glob`/`grep`
   Low; `write`/`edit`/`bash` High; everything unnamed — `apply_patch`,
   `eval`, `browser`, `computer`, `BrowserPreview` — Medium); host tools use
@@ -1888,12 +1922,25 @@ gate (evidence: `docs/validation/M5-t20-c-execution-policy.md`, ADR 0309):
   Medium); `mcp_*` is Low outside contract modes. `browser`/`computer`/
   `browserpreview` join the default gated names so they ask under ask/
   accept-edits instead of running unapproved.
+- **Session grants**: the desktop answers a live gate approval with the exact
+  option the user picked — `allow-session` maps to the gate's second option
+  (`Allow for this session`), which is the only label the gate grants on — and
+  the desktop session's grant store (the bridge's counterpart of PI's
+  in-memory `AppState.session_grants`) records it only when the decision was
+  actually delivered (a stale, cancelled, failed-send or duplicated
+  resolution mints nothing). The grant is re-sent with every admission, so it
+  survives a same-session runtime replacement (the Plan → Agent rebuild),
+  is per desktop session, is dropped when a different native identity binds,
+  and `clearSessionGrants` (PI `permissions.clearSessionGrants`) plus the
+  delete path drop it explicitly; it never becomes a disk-resident escalation
+  channel.
 - **Delegates and failure**: with the mandatory channel on, an unreadable,
   foreign or invalid state for the interactive session blocks every call
-  (`policy-unavailable`); a delegate (`hasUI=false`) uses the owning
-  session's last validated snapshot while it is within the state age bound
-  (PI decides subagent calls under the parent's durable policy) or is
-  refused; no-UI fails closed exactly where the decision would have asked —
+  (`policy-unavailable`); a delegate (`hasUI=false`) decides under the owning
+  turn's admitted record (PI decides subagent calls under the parent's
+  durable policy) and is refused when that record is absent, retired or
+  foreign — no earlier turn's or another session's policy is ever lent;
+  no-UI fails closed exactly where the decision would have asked —
   Low/`auto`/grant calls still pass without elevation.
 - **Card coherence**: the approval descriptor carries `risk`, `mode`,
   `permissionMode` and the decision reason from the same policy object, so

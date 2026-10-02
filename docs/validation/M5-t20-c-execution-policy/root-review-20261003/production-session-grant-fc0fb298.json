@@ -1,0 +1,98 @@
+{
+  "desktopCommit": "fc0fb29842516b191b704d37d21c44e489b8c167",
+  "layer": "actual fixed patched OMP and production bridge/gate; one persistent desktop/native identity; actual Bash append effects; PI host-core stores grants by desktop session; its session.configure route does not clear them (host process restart is outside this probe)",
+  "phases": [
+    {
+      "name": "initial-plan-grant",
+      "cards": [
+        "bash"
+      ],
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:grant-review:b2fa2268-7d7e-4f39-882a-4e342be14162:1"
+      },
+      "resolution": {
+        "ok": true,
+        "outcome": "answered"
+      },
+      "nativeId": "01a0fd92-f589-72f2-a347-d639a6958f01",
+      "state": "idle",
+      "providerRequests": 2,
+      "effects": 1,
+      "ends": [
+        {
+          "sessionId": "grant-review",
+          "turnId": "omp-turn:grant-review:b2fa2268-7d7e-4f39-882a-4e342be14162:1",
+          "reason": "completed"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "name": "same-plan-grant-control",
+      "cards": [
+        "bash"
+      ],
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:grant-review:b2fa2268-7d7e-4f39-882a-4e342be14162:2"
+      },
+      "resolution": {
+        "ok": true,
+        "outcome": "answered"
+      },
+      "nativeId": "01a0fd92-f589-72f2-a347-d639a6958f01",
+      "state": "idle",
+      "providerRequests": 2,
+      "effects": 0,
+      "ends": [
+        {
+          "sessionId": "grant-review",
+          "turnId": "omp-turn:grant-review:b2fa2268-7d7e-4f39-882a-4e342be14162:2",
+          "reason": "completed"
+        }
+      ],
+      "passed": false
+    },
+    {
+      "name": "agent-after-runtime-rebuild",
+      "cards": [
+        "bash"
+      ],
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:grant-review:b2fa2268-7d7e-4f39-882a-4e342be14162:3"
+      },
+      "resolution": {
+        "ok": true,
+        "outcome": "answered"
+      },
+      "nativeId": "01a0fd92-f589-72f2-a347-d639a6958f01",
+      "state": "idle",
+      "providerRequests": 2,
+      "effects": 0,
+      "ends": [
+        {
+          "sessionId": "grant-review",
+          "turnId": "omp-turn:grant-review:b2fa2268-7d7e-4f39-882a-4e342be14162:3",
+          "reason": "completed"
+        }
+      ],
+      "passed": false
+    }
+  ],
+  "dispose": {
+    "ok": true,
+    "failures": []
+  },
+  "finalStop": {
+    "stopped": true,
+    "reaped": true,
+    "cleaned": true,
+    "steps": [
+      "nothing owned"
+    ],
+    "errors": []
+  },
+  "passed": false
+}

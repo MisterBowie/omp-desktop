@@ -1,0 +1,75 @@
+{
+  "at": "2026-10-02T17:12:44.981209+00:00",
+  "candidate": "fc0fb29842516b191b704d37d21c44e489b8c167",
+  "verdict": "changes-required",
+  "scope": "T20-C only; B1 accepted; B2/D not started; Cursor+Plan/Goal excluded",
+  "source": "original remote commits imported unchanged; root made no product-source edits",
+  "checks": {
+    "status": {
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "diffFromCBase": {
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "diffIncludingB1Archive": {
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "submodules": {
+      "exit": 0,
+      "stdout": " 62bc57be1b03ef0802a33cf7f5f530e534527531 upstream/oh-my-pi (62bc57be)\n 0111e306c120ad5820688d7608cb37bad8fbcc1f upstream/pi-desktop (0111e306)\n",
+      "stderr": ""
+    }
+  },
+  "acceptedValidation": {
+    "build:js": "exit0",
+    "runtime": "27 files / 437 pass / 6 skip",
+    "desktopTargeted": "56 pass / 0 fail / 0 skip",
+    "compiledGate": "10 pass / 0 fail / 0 skip",
+    "canonicalRegisteredGate": "20/20",
+    "canonicalProductionNative": "8/8",
+    "actualPluginChildAndNativePipeline": "5/5",
+    "trackedCArchiveDigests": "9/9 match"
+  },
+  "requiredRepairs": [
+    {
+      "id": "R1",
+      "priority": "P1",
+      "report": "production-session-grant-fc0fb298.json",
+      "finding": "real allow-session maps to allow-once on wire; next same-Plan and same-native Agent-after-rebuild still ask; body0 after deny; first grant positive control body1",
+      "source": "app/packages/omp-runtime/src/session/ui-requests.ts responseFor; gate sessionAllowed process-local; PI session_grants desktop ownership/configure does not clear",
+      "next": "correct actual wire; preserve desktop-session grant lifetime across runtime replacement; explicit reset/no cross-session or stale resolution leak"
+    },
+    {
+      "id": "R2",
+      "priority": "P1",
+      "report": "production-turn-policy-fc0fb298.json",
+      "finding": "Plan/ask prompt approves first Bash once; that native body changes only owned state.permissionMode to auto; next native Bash writes sentinel with no second card. Unchanged-file control receives second card and body0. Both runs3provider/completed/idle/cleaned.",
+      "source": "gate tool_call rereads and replaces admitted snapshot; process-global cache lacks turn/native binding",
+      "next": "bind immutable admitted per-prompt snapshot to native identity/fence; no earlier/newer/foreign borrowing; preserve mandatory next-prompt validation and no-UI restrictions"
+    }
+  ],
+  "additionalObservations": [
+    {
+      "kind": "PI-parity-boundary",
+      "reports": [
+        "production-native-policy-fc0fb298.json",
+        "gate-policy-fc0fb298.json"
+      ],
+      "note": "Mac /var alias spelling treated as external; canonical variants pass all unchanged expectations. PI resolver also lexical-checks canonical root before realpath for workspace inputs. Needs exact caller/parity classification; not labeled new C regression without proof."
+    },
+    {
+      "kind": "helper-only-boundaries",
+      "report": "gate-policy-extended-fc0fb298.json",
+      "note": "Agent legacy allow bypass and synthetic unknown not gated observed in controlled hook fixtures; production legacy setting/reachable unknown registration not established; not labeled actual exploits."
+    }
+  ],
+  "cleanup": "all independent actual runtime/provider/plugin scratch cleanup succeeded; no test process remains after recorded exec completions",
+  "nextPrompt": "../omp-t20-c-review-repair-prompt-20261003.md",
+  "remoteRepair": "prepared, not launched yet"
+}
