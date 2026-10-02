@@ -75,6 +75,8 @@ function harness(
     /** Extra observers; one runtime is driven by exactly one runner. */
     onUiClosed?: (requestId: string, reason: string) => void;
     onUiRecord?: (record: OmpUiRecord) => void;
+    nativeSessionIdentity?: () => string | null | undefined;
+    onTurnEnd?: (info: { sessionId: string; turnId: string; reason: "completed" | "aborted" | "error" }) => void;
   } = {},
 ) {
   const runtime = new FakeRuntime();
@@ -90,6 +92,8 @@ function harness(
     convergeTimeoutMs: 200,
     abortTimeoutMs: 100,
     teardown: options.teardown,
+    nativeSessionIdentity: options.nativeSessionIdentity,
+    onTurnEnd: options.onTurnEnd,
   });
   return { runtime, envelopes, requests, runner };
 }
@@ -147,6 +151,104 @@ describe("prompting", () => {
     runtime.request = async () => ({ success: false, error: "busy" });
     await expect(runner.prompt("x")).rejects.toMatchObject({ code: "not-started" });
     expect(runner.status().isRunning).toBe(false);
+  });
+});
+
+describe("structured start refusals", () => {
+  const NATIVE = "native-1";
+
+  function refusalFrame(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      type: "extension_ui_request",
+      id: "ui-refusal",
+      method: "notify",
+      message: JSON.stringify({
+        v: 1,
+        kind: "omp-desktop-start-refusal",
+        sessionId: NATIVE,
+        code: "state-missing",
+        reason: "the desktop runtime state for this session is missing or unreadable",
+        refusalId: "refusal-1",
+        at: 1_700_000_000_000,
+        ...overrides,
+      }),
+    };
+  }
+
+  it("closes the awaiting generation exactly once with one error and one turn end", async () => {
+    const turns: Array<{ sessionId: string; turnId: string; reason: string }> = [];
+    const { runtime, envelopes, runner } = harness({
+      nativeSessionIdentity: () => NATIVE,
+      onTurnEnd: (info) => turns.push(info),
+    });
+    const started = await runner.prompt("one");
+    runtime.push(refusalFrame());
+    expect(runner.runState()).toBe("idle");
+    expect(runner.status().isRunning).toBe(false);
+    const errors = envelopes.filter((entry) => entry.event.type === "error");
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({
+      sessionId: "omp-1",
+      turnId: started.turnId,
+      event: { error: { code: "OMP_RUNTIME_STATE_REFUSED" } },
+    });
+    expect(turns).toEqual([{ sessionId: "omp-1", turnId: started.turnId, reason: "error" }]);
+    expect(runner.diagnostics()).toMatchObject({ startRefusals: 1, ignoredStartRefusals: 0 });
+
+    // A duplicate delivery arrives with no run in flight: counted, never a
+    // second terminal event.
+    runtime.push(refusalFrame({ refusalId: "refusal-2" }));
+    expect(envelopes.filter((entry) => entry.event.type === "error")).toHaveLength(1);
+    expect(runner.diagnostics()).toMatchObject({ ignoredStartRefusals: 1 });
+
+    // The refused session is immediately promptable again.
+    const second = await runner.prompt("two");
+    expect(second.accepted).toBe(true);
+    runtime.push({ type: "agent_end", messages: [] });
+    expect(turns).toHaveLength(2);
+    expect(turns[1]?.reason).toBe("completed");
+  });
+
+  it("ignores a refusal for another native session, a started run, and no run at all", async () => {
+    const turns: Array<{ sessionId: string; turnId: string; reason: string }> = [];
+    const { runtime, envelopes, runner } = harness({
+      nativeSessionIdentity: () => NATIVE,
+      onTurnEnd: (info) => turns.push(info),
+    });
+
+    // No run in flight: nothing to close.
+    runtime.push(refusalFrame());
+    expect(envelopes).toHaveLength(0);
+    expect(runner.runState()).toBe("idle");
+
+    // Another session's identity while a run is awaiting start: ignored.
+    await runner.prompt("one");
+    runtime.push(refusalFrame({ sessionId: "delegate-native" }));
+    expect(runner.runState()).toBe("running");
+    expect(envelopes).toHaveLength(0);
+
+    // The run has emitted `agent_start`: a refusal cannot legitimately belong
+    // to it any more, so it must not close the turn.
+    runtime.push({ type: "agent_start" });
+    runtime.push(refusalFrame({ sessionId: NATIVE, refusalId: "late-1" }));
+    expect(runner.runState()).toBe("running");
+    expect(envelopes.filter((entry) => entry.event.type === "error")).toHaveLength(0);
+    runtime.push({ type: "message_start", message: { role: "assistant", content: [{ type: "text", text: "ok" }] } });
+    runtime.push({ type: "agent_end", messages: [] });
+    expect(turns).toEqual([{ sessionId: "omp-1", turnId: "omp-turn:omp-1:1", reason: "completed" }]);
+    expect(runner.diagnostics()).toMatchObject({ startRefusals: 0, ignoredStartRefusals: 3 });
+  });
+
+  it("ignores a refusal shaped like a user notification or a malformed descriptor", async () => {
+    const { runtime, envelopes, runner } = harness({ nativeSessionIdentity: () => NATIVE });
+    await runner.prompt("one");
+    runtime.push({ type: "extension_ui_request", id: "n-1", method: "notify", message: "hello from a plugin" });
+    runtime.push({ ...refusalFrame(), message: "{not json" });
+    runtime.push(refusalFrame({ v: 2 }));
+    expect(runner.runState()).toBe("running");
+    expect(envelopes).toHaveLength(0);
+    runtime.push({ type: "agent_end", messages: [] });
+    expect(runner.runState()).toBe("idle");
   });
 });
 

@@ -47,6 +47,7 @@ import {
   type SubagentSynthesis,
 } from "./subagents.js";
 import { classifyUiRequest } from "./ui-requests.js";
+import { parseStartRefusalNotice, type OmpStartRefusal } from "./start-refusal.js";
 import {
   OmpUiRequests,
   type OmpUiDecision,
@@ -135,6 +136,14 @@ export type OmpSessionRunnerOptions = {
    * seed counters still order turns and messages inside one context.
    */
   contextId?: string;
+  /**
+   * The native session id this runner's entry owns, read live (the entry
+   * persists it when the native session is created or restored, after the
+   * runner exists). A structured start refusal is honored only when it names
+   * this session, so a delegate's or another session's signal can never close
+   * this runner's generation.
+   */
+  nativeSessionIdentity?: () => string | null | undefined;
   /** How long to wait for one convergence step before escalating. */
   convergeTimeoutMs?: number;
   /** How long to wait for `abort` itself to be answered. */
@@ -167,6 +176,12 @@ type RunRecord = {
   startedAt: number;
   bashOpen: boolean;
   settled: boolean;
+  /**
+   * True once the runtime emitted `agent_start` for this generation. A start
+   * refusal can only be produced before the provider request, so a refusal
+   * that arrives after this flag is set is late and must not close the run.
+   */
+  started: boolean;
 };
 
 const DEFAULT_CONVERGE_TIMEOUT_MS = 10_000;
@@ -186,6 +201,7 @@ export class OmpSessionRunner {
   private readonly now: () => number;
   private readonly convergeTimeoutMs: number;
   private readonly abortTimeoutMs: number;
+  private readonly nativeSessionIdentity: OmpSessionRunnerOptions["nativeSessionIdentity"];
 
   private readonly converter: OmpEventConverter;
   private readonly ui: OmpUiRequests;
@@ -224,6 +240,10 @@ export class OmpSessionRunner {
   /** Generations whose terminal event was already emitted (emit at most once). */
   private readonly terminalSignalled = new Set<number>();
   private lateFrames = 0;
+  /** Structured start refusals that closed the awaiting generation. */
+  private startRefusals = 0;
+  /** Structured start refusals ignored as late, duplicate or foreign. */
+  private ignoredStartRefusals = 0;
   private readonly waiters = new Set<() => void>();
   private disposed: { code: string; message: string } | null = null;
   /** Single-flight stop: concurrent callers share one attempt, so a racing stop
@@ -251,6 +271,7 @@ export class OmpSessionRunner {
     this.now = options.now ?? Date.now;
     this.convergeTimeoutMs = options.convergeTimeoutMs ?? DEFAULT_CONVERGE_TIMEOUT_MS;
     this.abortTimeoutMs = options.abortTimeoutMs ?? DEFAULT_ABORT_TIMEOUT_MS;
+    this.nativeSessionIdentity = options.nativeSessionIdentity;
     this.converter = new OmpEventConverter({
       sessionId: this.sessionId,
       now: this.now,
@@ -338,6 +359,8 @@ export class OmpSessionRunner {
 
   diagnostics(): {
     lateFrames: number;
+    startRefusals: number;
+    ignoredStartRefusals: number;
     conversion: ReturnType<OmpEventConverter["snapshot"]>;
     uiRecords: readonly OmpUiRecord[];
     state: OmpRunState;
@@ -347,6 +370,8 @@ export class OmpSessionRunner {
   } {
     return {
       lateFrames: this.lateFrames,
+      startRefusals: this.startRefusals,
+      ignoredStartRefusals: this.ignoredStartRefusals,
       conversion: this.converter.snapshot(),
       uiRecords: this.ui.records(),
       state: this.state,
@@ -544,6 +569,7 @@ export class OmpSessionRunner {
       startedAt: this.now(),
       bashOpen: false,
       settled: false,
+      started: false,
     };
     this.state = "running";
     try {
@@ -844,6 +870,11 @@ export class OmpSessionRunner {
 
   private onFrame(frame: OmpFrame): void {
     if (frame.type === "extension_ui_request") {
+      const refusal = parseStartRefusalNotice(frame);
+      if (refusal) {
+        this.handleStartRefusal(refusal);
+        return;
+      }
       const classified = classifyUiRequest(frame);
       if (!classified) return;
       if (classified.kind === "approval" || classified.kind === "question") {
@@ -1016,8 +1047,52 @@ export class OmpSessionRunner {
     });
   }
 
+  /**
+   * Honor one structured start refusal from the desktop gate.
+   *
+   * The gate's `before_agent_start` handler runs before the provider request,
+   * so a genuine refusal can only describe the generation currently awaiting
+   * its start. Attribution is therefore: the descriptor must name the native
+   * session this entry owns, and the live run must not have emitted
+   * `agent_start` yet. Anything else is counted and ignored — a delegate's
+   * refusal (its own native id), a duplicate delivery, or a signal that lost
+   * the race with the start must never close a newer generation. The run
+   * lifecycle closes a generation at most once, and the terminal error
+   * envelope carries the refused turn's own id, so the desktop clears exactly
+   * that turn instead of leaving it running.
+   */
+  private handleStartRefusal(refusal: OmpStartRefusal): void {
+    const expected = this.nativeSessionIdentity?.() ?? null;
+    if (
+      expected === null ||
+      refusal.sessionId !== expected ||
+      this.state !== "running" ||
+      !this.run ||
+      this.run.started
+    ) {
+      this.ignoredStartRefusals += 1;
+      return;
+    }
+    this.startRefusals += 1;
+    this.closeGeneration(this.run.generation, "the desktop runtime state refused the turn", {
+      error: appError("OMP_RUNTIME_STATE_REFUSED", refusal.reason, {
+        refusalId: refusal.refusalId,
+        code: refusal.code,
+        at: refusal.at,
+      }),
+      // The runtime emitted no terminal agent event for the aborted start, so
+      // the desktop needs this one even though the refused turn never
+      // presented a dialog.
+      whenCardsPresented: false,
+    });
+  }
+
   private trackRunState(event: AgentEvent): void {
     if (!this.run) return;
+    if (event.type === "agent_start") {
+      this.run.started = true;
+      return;
+    }
     if (event.type === "tool_start" && event.toolName === "bash") {
       this.bashCallIds.add(event.toolCallId);
       this.run.bashOpen = true;

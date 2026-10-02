@@ -42,10 +42,15 @@
  *     project-memory blocks plus the production `composeModeSystemPrompt(mode,
  *     "")` output to the runtime's system prompt when the file is fresh,
  *     valid and owned by the firing session; in Plan/Goal it also clamps the
- *     active tool set to the PI contract catalog. A file that claims the
- *     firing session but fails validation refuses the turn (`ctx.abort()`,
- *     the runtime's own formal stop path — a thrown handler error is logged
- *     and swallowed by the extension runner and would NOT protect the turn).
+ *     active tool set to the PI contract catalog. The owning bridge marks the
+ *     channel mandatory with `desktop-state.required` next to the state file;
+ *     from then on a file that is missing, unreadable or fails validation
+ *     refuses the interactive session's turn (`ctx.abort()` plus a structured
+ *     `notify` — a thrown handler error is logged and swallowed by the
+ *     extension runner and would NOT protect the turn), while a delegate
+ *     session (no UI) keeps the zero-injection skip a real subagent needs.
+ *     Without the marker (fixtures that never enabled the channel) the old
+ *     explicit degradation stands: no state, no injection.
  */
 import {
   OMP_APPROVAL_OPTIONS,
@@ -56,11 +61,19 @@ import {
 } from "../src/session/approval-protocol.ts";
 import {
   desktopCapabilityPrompt,
+  isDesktopStateRequired,
   readDesktopStateForSession,
   type DesktopCapabilityState,
   type DesktopHostToolPolicy,
   type DesktopPermissionMode,
 } from "../src/desktop-state.ts";
+import {
+  encodeStartRefusal,
+  OMP_START_REFUSAL_KIND,
+  OMP_START_REFUSAL_VERSION,
+  type OmpStartRefusal,
+  type OmpStartRefusalCode,
+} from "../src/session/start-refusal.ts";
 
 const DEFAULT_GATED_TOOLS = "write,edit,apply_patch,bash,eval";
 
@@ -354,7 +367,7 @@ export type BeforeAgentStartEventSlice = {
   systemPrompt: string[];
 };
 
-/** The session identity and stop channel the injection handler reads. */
+/** The session identity, UI availability and stop channel the injection handler reads. */
 export type BeforeAgentStartContextSlice = {
   sessionManager?: { getSessionId?: () => string } | null;
   /**
@@ -365,13 +378,31 @@ export type BeforeAgentStartContextSlice = {
    * swallowed, and the provider request would still be delivered.
    */
   abort?: () => void;
+  /**
+   * The pinned `ExtensionContext.hasUI`: false in a delegate session — `task`
+   * and `eval` subagents initialize their extension runner with the runtime's
+   * no-op UI context (`task/executor.ts` `extensionRunner.initialize(actions,
+   * contextActions)` with no `uiContext`), while the rpc-ui parent session
+   * passes its real UI context. It is how a mandatory-channel refusal tells
+   * the interactive session (refuse) from a delegate (zero-injection skip).
+   */
+  hasUI?: boolean | (() => boolean);
+  /** The context's UI surface; `notify` carries the structured refusal. */
+  ui?: { notify?: (message: string, type?: "info" | "warning" | "error") => void } | null;
+};
+
+/** Why a `before_agent_start` turn was refused, carried into the notify. */
+export type StartRefusalVerdict = {
+  code: OmpStartRefusalCode;
+  reason: string;
+  sessionId: string | null;
 };
 
 /** The gate's verdict for one `before_agent_start`. */
 export type BeforeAgentStartDecision =
   | { kind: "inject"; state: DesktopCapabilityState; systemPrompt: string[] }
   | { kind: "skip" }
-  | { kind: "refuse"; reason: string };
+  | ({ kind: "refuse" } & StartRefusalVerdict);
 
 /**
  * Decide the `before_agent_start` answer for one state file.
@@ -384,18 +415,25 @@ export type BeforeAgentStartDecision =
  * into the state.
  *
  * Every other case is explicit:
- *   - a file owned by another session (a subagent delegate) or an absent file
- *     → `skip`: nothing is injected and no tool set is touched (Pi's delegates
- *     never receive project memory, skills or mode blocks either);
- *   - a file that claims this session but fails validation → `refuse`: the
- *     turn must be aborted, because continuing would silently run a Plan/Goal
- *     intent as an unclamped Agent turn.
+ *   - a valid file owned by another native identity (a delegate session) or,
+ *     without the mandatory marker, an absent file → `skip`: nothing is
+ *     injected and no tool set is touched (PI's delegates never receive
+ *     project memory, skills or mode blocks either);
+ *   - a file that claims this session but fails validation → `refuse` (this
+ *     was already true without the marker: continuing would silently run a
+ *     Plan/Goal intent as an unclamped Agent turn);
+ *   - with the mandatory marker (`desktop-state.required`) and an interactive
+ *     context (`hasUI` not false): every read that is not `owned` refuses —
+ *     deleted, truncated, oversized, identity-less, foreign and out-of-schema
+ *     states alike. The channel was enabled by the bridge for this run, so
+ *     "cannot read the state" is an anomaly, not "the channel is off".
  */
 export function beforeAgentStartPolicy(
   event: BeforeAgentStartEventSlice,
   context: BeforeAgentStartContextSlice,
   statePath: string | undefined | null,
   now: number,
+  options: { required?: boolean } = {},
 ): BeforeAgentStartDecision {
   let sessionId: string | undefined;
   try {
@@ -404,18 +442,62 @@ export function beforeAgentStartPolicy(
     sessionId = undefined;
   }
   const read = readDesktopStateForSession(statePath, now, sessionId);
-  if (read.kind === "absent" || read.kind === "foreign") return { kind: "skip" };
+  if (read.kind === "owned") {
+    const systemPrompt = [...event.systemPrompt];
+    const capability = desktopCapabilityPrompt(read.state);
+    if (capability) systemPrompt.push(capability);
+    systemPrompt.push(read.state.modeBlock);
+    return { kind: "inject", state: read.state, systemPrompt };
+  }
+  // The mandatory channel only binds the interactive session that owns it. A
+  // delegate session runs with the no-op UI context; its reads are `foreign`
+  // (the parent's file) or `absent` (no attributable owner), and it keeps the
+  // zero-injection skip rather than refusing the delegate's turn.
+  const mandatory = options.required === true && uiAvailable(context) !== false;
   if (read.kind === "invalid") {
     return {
       kind: "refuse",
-      reason: "the desktop runtime state for this session is missing or invalid; refusing to run the turn without its mode and policy",
+      code: "state-invalid",
+      reason:
+        "the desktop runtime state for this session is missing or invalid; refusing to run the turn without its mode and policy",
+      sessionId: sessionId ?? read.sessionId,
     };
   }
-  const systemPrompt = [...event.systemPrompt];
-  const capability = desktopCapabilityPrompt(read.state);
-  if (capability) systemPrompt.push(capability);
-  systemPrompt.push(read.state.modeBlock);
-  return { kind: "inject", state: read.state, systemPrompt };
+  if (!mandatory) return { kind: "skip" };
+  if (read.kind === "foreign") {
+    return {
+      kind: "refuse",
+      code: "state-foreign",
+      reason:
+        "the desktop runtime state belongs to another native session; refusing to run this turn without its mode and policy",
+      sessionId: sessionId ?? null,
+    };
+  }
+  return {
+    kind: "refuse",
+    code: "state-missing",
+    reason:
+      "the desktop runtime state for this session is missing or unreadable; refusing to run the turn without its mode and policy",
+    sessionId: sessionId ?? null,
+  };
+}
+
+/**
+ * The pinned `ExtensionContext.hasUI` as a tri-state: `false` is the one
+ * affirmative answer a delegate gives. Unknown contexts (no field exposed)
+ * are treated as interactive so the mandatory channel stays fail-closed.
+ */
+function uiAvailable(context: BeforeAgentStartContextSlice): boolean | undefined {
+  const flag = context.hasUI;
+  if (typeof flag === "function") {
+    try {
+      return flag() === true;
+    } catch {
+      return false;
+    }
+  }
+  if (typeof flag === "boolean") return flag;
+  return undefined;
 }
 
 /**
@@ -437,7 +519,21 @@ export function contractActiveToolNames(
 }
 
 /** The gate's cross-prompt clamp memory: the pre-contract selection and whether a clamp is live. */
-export type ContractClampState = { applied: boolean; before: string[] };
+export type ContractClampState = {
+  applied: boolean;
+  /** The live Agent selection captured before the first clamp. */
+  before: string[];
+  /**
+   * Names the clamp observed in the live selection but removed from it while
+   * the contract was applied — most importantly a host tool that
+   * `set_host_tools` auto-activated after the clamp began. They are the
+   * restore candidates the {@link ContractClampState.before} snapshot cannot
+   * contain; at restore each one is filtered against the catalog *current at
+   * that prompt*, so a tool removed or disabled while the clamp was live is
+   * never revived.
+   */
+  removed: string[];
+};
 
 export type ContractClampResult =
   | { ok: true; changed: boolean; active: string[] }
@@ -468,9 +564,20 @@ export async function applyContractToolClamp(
       return { ok: false, reason: "the runtime exposes no tool-selection API to restore the pre-Plan selection" };
     }
     const active = api.getActiveTools?.() ?? [];
-    const restore = [...clamp.before, ...active.filter((name) => !clamp.before.includes(name))];
+    const catalog = new Set(state.hostTools.map((tool) => tool.name));
+    const restore: string[] = [];
+    for (const name of [...clamp.before, ...clamp.removed, ...active]) {
+      if (restore.includes(name)) continue;
+      // A catalog-managed name (declared plugin/user-MCP tool) is restored
+      // only while the catalog current at this prompt still declares it; a
+      // native name only when the pre-clamp Agent selection had it. Nothing
+      // is invented and nothing disabled is revived.
+      const managed = catalog.has(name) || name.startsWith("plugin_") || name.startsWith("mcp_");
+      if (managed ? catalog.has(name) : clamp.before.includes(name)) restore.push(name);
+    }
     clamp.applied = false;
     clamp.before = [];
+    clamp.removed = [];
     await api.setActiveTools(restore);
     return { ok: true, changed: true, active: restore };
   }
@@ -480,9 +587,18 @@ export async function applyContractToolClamp(
   const active = api.getActiveTools();
   if (!clamp.applied) {
     clamp.before = [...active];
+    clamp.removed = [];
     clamp.applied = true;
   }
   const allowed = contractActiveToolNames(state, active);
+  // Remember everything the contract removes from the live selection — that
+  // is the only place a newly registered, auto-activated host tool is still
+  // observable after the clamp has hidden it.
+  for (const name of active) {
+    if (!allowed.includes(name) && !clamp.before.includes(name) && !clamp.removed.includes(name)) {
+      clamp.removed.push(name);
+    }
+  }
   if (active.length === allowed.length && active.every((name, index) => name === allowed[index])) {
     return { ok: true, changed: false, active };
   }
@@ -497,10 +613,42 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
   const mode = (env?.OMP_DESKTOP_GATE_MODE ?? "ask").trim() as "ask" | "deny" | "allow";
   const timeoutMs = Number(env?.OMP_DESKTOP_GATE_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
   const sessionAllowed = new Set<string>();
-  const clamp: ContractClampState = { applied: false, before: [] };
+  const clamp: ContractClampState = { applied: false, before: [], removed: [] };
+  let refusalSequence = 0;
 
-  /** Refuse one agent start through the runtime's own abort path. */
-  const refuseStart = (context: BeforeAgentStartContextSlice, reason: string): void => {
+  /**
+   * Refuse one agent start: the runtime's own abort path *and* the structured
+   * notify the desktop runner consumes.
+   *
+   * `ctx.abort()` is what keeps the provider request from being delivered, but
+   * the pinned runtime emits no terminal agent event for a turn aborted in
+   * `before_agent_start` — so the runner would keep reporting the generation
+   * as running. The `notify` extension-UI request is the runtime's own formal
+   * output channel; its message carries the versioned refusal descriptor
+   * (`session/start-refusal.ts`) that lets the runner close exactly the
+   * session and generation it is starting. Delivery first (the abort path has
+   * its own logging), then the abort.
+   */
+  const refuseStart = (context: BeforeAgentStartContextSlice, decision: StartRefusalVerdict): void => {
+    const at = Date.now();
+    const refusal: OmpStartRefusal = {
+      v: OMP_START_REFUSAL_VERSION,
+      kind: OMP_START_REFUSAL_KIND,
+      sessionId: decision.sessionId,
+      code: decision.code,
+      reason: decision.reason,
+      refusalId: `omp-refusal-${at}-${refusalSequence++}`,
+      at,
+    };
+    if (typeof context.ui?.notify === "function") {
+      try {
+        context.ui.notify(encodeStartRefusal(refusal), "error");
+      } catch (error) {
+        pi.logger?.warn?.("desktop gate could not deliver the start refusal", String(error));
+      }
+    } else {
+      pi.logger?.warn?.("desktop gate refused an agent start but the context exposes no notify", decision.reason);
+    }
     if (typeof context.abort === "function") {
       try {
         context.abort();
@@ -511,7 +659,7 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
     }
     // The pinned runtime always provides abort; a host that does not cannot be
     // protected from inside this process. Never pretend the refusal happened.
-    pi.logger?.warn?.("desktop gate refused an agent start but the runtime exposes no abort", reason);
+    pi.logger?.warn?.("desktop gate refused an agent start but the runtime exposes no abort", decision.reason);
   };
 
   pi.on("tool_call", async (event, context) => {
@@ -541,18 +689,26 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
   // system prompt here, and nowhere else; the mode's tool contract is clamped
   // in the same handler, before the runtime commits the start. A failed read
   // injects nothing (a delegate session) or refuses the turn (the owner's
-  // state is invalid); the handler never throws into the agent start.
+  // state is invalid, or — with the mandatory marker — missing/unreadable);
+  // the handler never throws into the agent start.
   pi.on("before_agent_start", async (event, context) => {
+    const statePath = env?.OMP_DESKTOP_STATE;
     try {
-      const decision = beforeAgentStartPolicy(event, context, env?.OMP_DESKTOP_STATE, Date.now());
+      const decision = beforeAgentStartPolicy(event, context, statePath, Date.now(), {
+        required: isDesktopStateRequired(statePath),
+      });
       if (decision.kind === "refuse") {
-        refuseStart(context, decision.reason);
+        refuseStart(context, decision);
         return undefined;
       }
       if (decision.kind === "skip") return undefined;
       const clamped = await applyContractToolClamp(pi, clamp, decision.state);
       if (!clamped.ok) {
-        refuseStart(context, clamped.reason);
+        refuseStart(context, {
+          code: "clamp-unavailable",
+          reason: clamped.reason,
+          sessionId: context.sessionManager?.getSessionId?.() ?? null,
+        });
         return undefined;
       }
       return { systemPrompt: decision.systemPrompt };
@@ -561,9 +717,13 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
       // state file is owned by this session refuses the turn, and otherwise
       // falls back to "no injection" (the native prompt ships untouched).
       try {
-        const read = readDesktopStateForSession(env?.OMP_DESKTOP_STATE, Date.now(), context.sessionManager?.getSessionId?.());
+        const read = readDesktopStateForSession(statePath, Date.now(), context.sessionManager?.getSessionId?.());
         if (read.kind === "owned" || read.kind === "invalid") {
-          refuseStart(context, `desktop gate failed while applying the runtime state: ${String(error)}`);
+          refuseStart(context, {
+            code: "gate-error",
+            reason: `desktop gate failed while applying the runtime state: ${String(error)}`,
+            sessionId: context.sessionManager?.getSessionId?.() ?? null,
+          });
         }
       } catch {
         // The probe itself failed; nothing attributable to refuse.

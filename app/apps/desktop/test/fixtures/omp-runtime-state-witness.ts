@@ -28,6 +28,13 @@ interface BeforeAgentStartEvent {
 
 interface WitnessContext {
   sessionManager?: { getSessionId?: () => string };
+  /**
+   * The pinned `ExtensionContext.hasUI`: true for the rpc-ui parent session,
+   * false for a `task`/`eval` delegate (its extension runner is initialized
+   * with the no-op UI context). The mandatory-channel gate refuses only the
+   * interactive session; a delegate keeps zero injection.
+   */
+  hasUI?: boolean;
 }
 
 interface ExtensionAPI {
@@ -51,6 +58,7 @@ export default function runtimeStateWitness(pi: ExtensionAPI): void {
           attempt,
           prompt: typeof event?.prompt === "string" ? event.prompt : null,
           sessionId: context?.sessionManager?.getSessionId?.() ?? null,
+          hasUI: typeof context?.hasUI === "boolean" ? context.hasUI : null,
           partBytes: parts.map((part) => Buffer.byteLength(part, "utf8")),
           sha256: createHash("sha256").update(joined).digest("hex"),
           activeTools: typeof pi.getActiveTools === "function" ? pi.getActiveTools() : null,

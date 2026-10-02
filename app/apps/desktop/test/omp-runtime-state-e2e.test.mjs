@@ -59,10 +59,45 @@ const {
 
 const GATE = findGateExtension(here);
 const WITNESS = join(here, "fixtures", "omp-runtime-state-witness.ts");
+const MUTATOR = join(here, "fixtures", "omp-state-mutator.ts");
 const BUN = join(homedir(), ".bun", "bin", "bun");
 
 /** The PI contract's native allowlist, stated independently of the product. */
 const CONTRACT_NATIVE_TOOLS = ["read", "grep", "glob", "bash", "ask", "new_context"];
+
+/**
+ * The pinned runtime's own Agent-mode top-level presentation for this
+ * configuration, stated independently of any provider table the test reads
+ * (the review's F4 counterexample: these must stay top-level across every
+ * Agent prompt; the deferred builtins below must not be promoted into it by
+ * the Plan/Goal clamp and its restore).
+ */
+const NATIVE_TOP_LEVEL = [
+  "read",
+  "bash",
+  "edit",
+  "ask",
+  "eval",
+  "glob",
+  "grep",
+  "task",
+  "wait",
+  "todo",
+  "web_search",
+  "write",
+];
+
+/** Builtins the default presentation keeps under `xd://` (enabled, not top-level). */
+const DEFERRED_NATIVE = ["ast_edit", "debug", "lsp"];
+
+/**
+ * The Agent table a *fresh* runtime must expose for one catalog: the native
+ * top-level set, then plugin tools in catalog order, then user MCP tools, then
+ * the Skill host tool appended by the bridge.
+ */
+function agentBaseline(pluginNames, { mcp = ["mcp_alpha_lookup"], skill = true } = {}) {
+  return [...NATIVE_TOP_LEVEL, ...pluginNames, ...mcp, ...(skill ? ["Skill"] : [])];
+}
 
 const scratch = [];
 function makeScratch(prefix) {
@@ -117,6 +152,8 @@ function contractExpected(liveNames, safePluginNames) {
 }
 
 const SESSION = "session-b1";
+/** The probe session whose state file is corrupted between write and gate read. */
+const REFUSAL_SESSION = "session-b1-refusal";
 const PROJECT_PROVIDER = "m1fake";
 const PROJECT_MODEL = "local-model";
 
@@ -191,6 +228,18 @@ test(
           engineRef: null,
         },
       ],
+      [
+        REFUSAL_SESSION,
+        {
+          id: REFUSAL_SESSION,
+          mode: "agent",
+          permissionMode: "inherit",
+          providerId: PROJECT_PROVIDER,
+          modelId: PROJECT_MODEL,
+          projectPath: project,
+          engineRef: null,
+        },
+      ],
     ]);
     const hostSettings = { defaultPermissionMode: "accept-edits" };
     let projectMemory;
@@ -237,27 +286,30 @@ test(
     };
 
     const envelopes = [];
+    const turnEnds = [];
     const supervisors = [];
-    const engineRuntime = {
-      gateExtension: GATE,
-      ompRuntime: {
+
+    /**
+     * One runtime factory seam for a bridge. `trusted` is the exact
+     * `--trusted-extension` order (the handler order the runtime runs), so the
+     * refusal probe can load its state mutator BEFORE the shipped gate.
+     */
+    function runtimeFactory({ dataRoot: root, stderrName, trusted, witness, extraEnv = {}, collect }) {
+      return {
         launcher: LAUNCHER,
         launcherError: null,
         createSupervisor: ({ sessionDir: dir, modelSelector }) => {
-          const stderrLog = join(dataRoot, "runtime-stderr.log");
+          const stderrLog = join(root, stderrName);
           const supervisor = new OmpRuntimeSupervisor({
-            dataRoot,
+            dataRoot: root,
             launcherPath: LAUNCHER,
             expectedRuntimeVersion: "18.3.0",
             sessionDir: dir,
             args: [
               ...(modelSelector ? ["--model", modelSelector] : []),
-              "--trusted-extension",
-              GATE,
-              "--trusted-extension",
-              WITNESS,
+              ...trusted.flatMap((extension) => ["--trusted-extension", extension]),
             ],
-            extraEnv: { OMP_T20_B1_WITNESS: witnessLog, PI_NO_TITLE: "1" },
+            extraEnv: { OMP_T20_B1_WITNESS: witness, PI_NO_TITLE: "1", ...extraEnv },
             spawnImpl: (options) => {
               const child = spawn(options.command, options.args, {
                 cwd: options.cwd,
@@ -274,11 +326,19 @@ test(
             readyTimeoutMs: 60_000,
           });
           supervisor.setWorkingDirectory(project);
-          supervisors.push(supervisor);
+          collect.push(supervisor);
           return supervisor;
         },
-      },
-    };
+      };
+    }
+
+    const engineRuntime = { gateExtension: GATE, ompRuntime: runtimeFactory({
+      dataRoot,
+      stderrName: "runtime-stderr.log",
+      trusted: [GATE, WITNESS],
+      witness: witnessLog,
+      collect: supervisors,
+    }) };
 
     const hostTools = createOmpHostToolAdapter({
       plugins,
@@ -302,10 +362,45 @@ test(
       isPackaged: false,
       appPath: here,
       emitAgentEvent: (envelope) => envelopes.push(envelope),
+      onTurnEnd: (info) => turnEnds.push(info),
       hostTools,
       capabilities,
     });
     t.after(() => bridge.dispose("b1 e2e finished").catch(() => undefined));
+
+    // --- The refusal probe: a second session whose state is corrupted between
+    // the bridge's atomic write and the gate's read (M5/T20-B1 F1/F2). --------
+    const refusalDataRoot = makeScratch("omp-b1-refusal-data-");
+    const refusalWitnessLog = join(refusalDataRoot, "witness.jsonl");
+    const mutatorControl = join(refusalDataRoot, "mutator-control.json");
+    const mutatorLog = join(refusalDataRoot, "mutator.jsonl");
+    const refusalEnvelopes = [];
+    const refusalTurnEnds = [];
+    const refusalSupervisors = [];
+    writeFileSync(mutatorControl, JSON.stringify({ action: "none" }));
+    const refusalEngineRuntime = {
+      gateExtension: GATE,
+      ompRuntime: runtimeFactory({
+        dataRoot: refusalDataRoot,
+        stderrName: "runtime-stderr.log",
+        trusted: [MUTATOR, GATE, WITNESS],
+        witness: refusalWitnessLog,
+        extraEnv: { OMP_T20_B1_MUTATOR: mutatorControl, OMP_T20_B1_MUTATOR_LOG: mutatorLog },
+        collect: refusalSupervisors,
+      }),
+    };
+    const refusalBridge = wireOmpSessions({
+      dataRoot: refusalDataRoot,
+      host: () => fakeHost,
+      engineRuntime: refusalEngineRuntime,
+      isPackaged: false,
+      appPath: here,
+      emitAgentEvent: (envelope) => refusalEnvelopes.push(envelope),
+      onTurnEnd: (info) => refusalTurnEnds.push(info),
+      hostTools,
+      capabilities,
+    }).bridge;
+    t.after(() => refusalBridge.dispose("b1 refusal probe finished").catch(() => undefined));
 
     // --- Catalog fixtures ----------------------------------------------------
     const pluginTool = ({ fullName, name, risk, planSafeActions }) => ({
@@ -320,12 +415,21 @@ test(
     });
     const INSPECT = pluginTool({ fullName: "plugin_demo_inspect", name: "inspect", risk: "low", planSafeActions: ["inspect"] });
     const PLAIN = pluginTool({ fullName: "plugin_demo_plain", name: "plain", risk: "medium", planSafeActions: [] });
+    /** The same plugin tool with a declared plan-safe action list. */
+    const PLAIN_SAFE = { ...PLAIN, planSafeActions: ["plain"] };
     const RUN = pluginTool({ fullName: "plugin_demo_run", name: "run", risk: "high", planSafeActions: ["run"] });
     const MCP_TOOL = {
       fullName: "mcp_alpha_lookup",
       serverId: "alpha",
       toolName: "lookup",
       description: "Lookup tool",
+      schema: { type: "object", properties: {} },
+    };
+    const MCP_BETA = {
+      fullName: "mcp_beta_echo",
+      serverId: "beta",
+      toolName: "echo",
+      description: "Echo tool",
       schema: { type: "object", properties: {} },
     };
     pluginState.tools = [INSPECT, PLAIN];
@@ -343,6 +447,7 @@ test(
         .map((line) => JSON.parse(line));
     };
 
+    const turnIds = [];
     const promptAndWait = async (label, content, script, expectText) => {
       provider.script(script);
       const before = envelopes.length;
@@ -361,6 +466,7 @@ test(
         runtimeVersion: ref?.runtimeVersion ?? null,
       });
       assert.equal(started.accepted, true, `${label}: the prompt must be accepted`);
+      turnIds.push(started.turnId);
       const done = await waitFor(() => {
         const slice = envelopes.slice(before);
         return (
@@ -370,7 +476,7 @@ test(
         );
       });
       assert.equal(done, true, `${label}: turn did not settle; timeline:\n${envelopeTimeline(envelopes)}`);
-      return { request: provider.requests[provider.requests.length - 1], envelopes: envelopes.slice(before) };
+      return { request: provider.requests[provider.requests.length - 1], envelopes: envelopes.slice(before), turnId: started.turnId };
     };
 
 
@@ -382,30 +488,29 @@ test(
       [{ text: "state described", finish: "stop" }],
       "state described",
     );
+    // A fresh runtime exposes its own default presentation: the native
+    // top-level set, then the desktop catalog (plugins, user MCP) and the
+    // Skill tool appended by the bridge. This is the independent baseline
+    // every later Agent prompt (including post-rebuild ones) must match.
     const S0 = requestToolNames(p1.request);
-    assert.ok(S0.includes("plugin_demo_inspect"), `the safe plugin tool must be active in Agent mode; got ${JSON.stringify(S0)}`);
-    assert.ok(S0.includes("plugin_demo_plain"), "the undeclared plugin tool must be active in Agent mode");
-    assert.ok(S0.includes("mcp_alpha_lookup"), "user MCP tools must be active in Agent mode");
-    assert.ok(S0.includes("Skill"), "a non-empty skill catalog must register the Skill host tool");
+    assertStrictSequence(S0, agentBaseline(["plugin_demo_inspect", "plugin_demo_plain"]), "agent-1 (fresh Agent baseline)");
     assertModePromptShape({ label: "agent-1", systemText: requestSystemText(p1.request), mode: "agent", capabilityExpected: true });
     const p1Witness = witnessEntries().filter((entry) => entry.prompt === "describe the workspace state");
     assert.equal(p1Witness.length, 1, "an unchanged Agent prompt must start in one attempt");
-    // The live enabled selection (includes tools OMP demotes to xd:// discovery
-    // in the default presentation). The gate's clamp/restore uses the only
-    // selection API the extension surface offers (`setActiveTools` →
-    // `setActiveToolsByName`), which pins every restored name top-level — the
-    // same effect OMP's own interactive Plan mode has on `xd://` mounts
-    // (`interactive-mode.ts` saves and restores the enabled list the same
-    // way). E0 is the rule's input, so Agent-mode expectations below are
-    // derived from it plus the catalog operations, never from the provider
-    // table itself.
+    // The live enabled selection also contains the builtins the default
+    // presentation keeps under `xd://`. They must stay deferred: the Plan/Goal
+    // clamp must never promote them into the Agent top-level table.
     const E0 = p1Witness[0].activeTools;
     assert.ok(
       S0.every((name) => E0.includes(name)),
       `the provider table must be a subset of the active selection; active=${JSON.stringify(E0)}`,
     );
-    const stateFile = join(supervisors[0].runRoot(), "desktop-state.json");
-    const state1 = JSON.parse(readFileSync(stateFile, "utf8"));
+    for (const deferred of DEFERRED_NATIVE) {
+      assert.ok(E0.includes(deferred), `the default Agent presentation must keep ${deferred} enabled`);
+      assert.ok(!S0.includes(deferred), `${deferred} must stay deferred (xd://), never Agent top-level`);
+    }
+    const stateFile = () => join(supervisors[0].runRoot(), "desktop-state.json");
+    const state1 = JSON.parse(readFileSync(stateFile(), "utf8"));
     assert.equal(state1.mode, "agent");
     assert.equal(state1.permissionMode, "accept-edits", "inherit must resolve to the app default");
     assert.equal(state1.modeBlock, composeModeSystemPrompt("agent", ""));
@@ -423,12 +528,13 @@ test(
     assert.equal((await bridge.configure(SESSION, { mode: "plan" })).ok, true);
     const planScript = [{ text: "plan drafted", finish: "stop" }];
     const p2 = await promptAndWait("plan-1", "draft a plan for the change", planScript, "plan drafted");
-    const expectedP2 = contractExpected(S0, ["plugin_demo_inspect"]);
+    const expectedP2 = contractExpected(E0, ["plugin_demo_inspect"]);
     assertStrictSequence(requestToolNames(p2.request), expectedP2, "plan-1");
     assert.ok(expectedP2.includes("plugin_demo_inspect"), "the declared safe plugin must stay contract-visible");
     assert.ok(!expectedP2.includes("plugin_demo_plain"), "an undeclared plugin must be hidden in Plan");
     assert.ok(!expectedP2.includes("mcp_alpha_lookup"), "user MCP must be hidden in Plan");
     assert.ok(!expectedP2.includes("Skill"), "the Skill tool must be hidden in Plan");
+    assert.ok(!expectedP2.includes("ast_edit"), "a deferred builtin must not become contract-visible");
     assertModePromptShape({ label: "plan-1", systemText: requestSystemText(p2.request), mode: "plan", capabilityExpected: true });
     const p2Witness = witnessEntries().filter((entry) => entry.prompt === "draft a plan for the change");
     assert.equal(p2Witness.length, 2, "entering Plan must clamp in one policy retry");
@@ -465,51 +571,163 @@ test(
       "the new safe plugin must join the clamp",
     );
 
-    // --- Phase 4: back to Agent; the clamp is restored, permission switches --
+    // --- Phase 4: back to Agent. The contract mode is left by rebuilding the
+    // runtime process: the pinned runtime exposes no presentation-restore API
+    // to extensions, so the replacement process re-applies its own default
+    // Agent presentation over the same persisted native session. ------------
     assert.equal((await bridge.configure(SESSION, { mode: "agent" })).ok, true);
     hostSettings.defaultPermissionMode = "auto";
+    const nativeIdentityBefore4 = hostSessions.get(SESSION).engineRef?.nativeSessionId ?? null;
     const p4 = await promptAndWait(
       "agent-2",
       "apply the change now",
       [{ text: "change applied", finish: "stop" }],
       "change applied",
     );
-    const expectedP4 = [...E0.filter((name) => name !== "plugin_demo_plain"), "plugin_demo_run"];
-    assertStrictSequence(requestToolNames(p4.request), expectedP4, "agent-2");
-    assert.ok(expectedP4.includes("mcp_alpha_lookup"), "Agent mode must restore user MCP visibility");
-    assert.ok(expectedP4.includes("Skill"), "Agent mode must restore the Skill tool");
+    const expectedP4 = agentBaseline(["plugin_demo_inspect", "plugin_demo_run"]);
+    assertStrictSequence(requestToolNames(p4.request), expectedP4, "agent-2 (post-rebuild Agent baseline)");
     assertModePromptShape({ label: "agent-2", systemText: requestSystemText(p4.request), mode: "agent", capabilityExpected: true });
-    const p4Witness = witnessEntries().filter((entry) => entry.prompt === "apply the change now");
-    assert.equal(p4Witness.length, 2, "leaving the contract clamp must cost one policy retry");
-    for (const restored of ["write", "edit", "mcp_alpha_lookup", "Skill"]) {
+    for (const deferred of DEFERRED_NATIVE) {
       assert.ok(
-        p4Witness[1].activeTools.includes(restored),
-        `${restored} must be restored to the live selection in Agent; active=${JSON.stringify(p4Witness[1].activeTools)}`,
+        !requestToolNames(p4.request).includes(deferred),
+        `${deferred} must stay deferred after leaving the contract mode`,
       );
     }
-    const state4 = JSON.parse(readFileSync(stateFile, "utf8"));
+    // The rebuild keeps the persisted identity and the full history, and
+    // replays nothing: every earlier user prompt appears exactly once, and the
+    // new prompt was not sent twice.
+    assert.equal(
+      hostSessions.get(SESSION).engineRef?.nativeSessionId,
+      nativeIdentityBefore4,
+      "the rebuild must keep the same persisted native session identity",
+    );
+    const history4 = (p4.request.body?.messages ?? [])
+      .filter((message) => message.role === "user")
+      .map((message) => (typeof message.content === "string" ? message.content : JSON.stringify(message.content)));
+    for (const earlier of ["describe the workspace state", "draft a plan for the change", "negotiate the goal contract"]) {
+      assert.equal(
+        history4.filter((text) => text.includes(earlier)).length,
+        1,
+        `the rebuilt runtime must carry ${JSON.stringify(earlier)} exactly once`,
+      );
+    }
+    assert.equal(
+      history4.filter((text) => text.includes("apply the change now")).length,
+      1,
+      "the rebuilt runtime must not replay the new prompt",
+    );
+    const p4Witness = witnessEntries().filter((entry) => entry.prompt === "apply the change now");
+    assert.equal(p4Witness.length, 1, "the rebuilt runtime must start the Agent prompt in one attempt");
+    const state4 = JSON.parse(readFileSync(stateFile(), "utf8"));
     assert.equal(state4.permissionMode, "auto", "the changed app default must resolve on the next prompt");
     assert.equal(state4.mode, "agent");
+    const E4 = p4Witness[0].activeTools;
+    for (const deferred of DEFERRED_NATIVE) {
+      assert.ok(E4.includes(deferred), `the rebuilt Agent process must keep ${deferred} enabled but deferred`);
+      assert.ok(!expectedP4.includes(deferred), `${deferred} must not be promoted into the rebuilt Agent table`);
+    }
 
-    // --- Phase 5: Plan again; re-added plugin is clamped out -----------------
+    // --- Phase 4b: a user-MCP catalog change on the next Agent prompt --------
+    pluginState.tools = [INSPECT, RUN];
+    pluginState.userMcpTools = [MCP_BETA];
+    const p4b = await promptAndWait(
+      "agent-2b",
+      "check the beta tool",
+      [{ text: "beta checked", finish: "stop" }],
+      "beta checked",
+    );
+    const expectedP4b = [...NATIVE_TOP_LEVEL, "plugin_demo_inspect", "plugin_demo_run", "Skill", "mcp_beta_echo"];
+    assertStrictSequence(requestToolNames(p4b.request), expectedP4b, "agent-2b (user MCP replaced)");
+    assert.ok(!requestToolNames(p4b.request).includes("mcp_alpha_lookup"), "a removed user MCP tool must not linger");
+    assert.equal(
+      witnessEntries().filter((entry) => entry.prompt === "check the beta tool").length,
+      1,
+      "a catalog-only Agent change must start in one attempt",
+    );
+
+    // --- Phase 4c: the previous MCP server is re-added (remove/re-add) -------
+    pluginState.userMcpTools = [MCP_BETA, MCP_TOOL];
+    const p4c = await promptAndWait(
+      "agent-2c",
+      "check both MCP servers",
+      [{ text: "both checked", finish: "stop" }],
+      "both checked",
+    );
+    const expectedP4c = [
+      ...NATIVE_TOP_LEVEL,
+      "plugin_demo_inspect",
+      "plugin_demo_run",
+      "Skill",
+      "mcp_beta_echo",
+      "mcp_alpha_lookup",
+    ];
+    assertStrictSequence(requestToolNames(p4c.request), expectedP4c, "agent-2c (MCP re-added)");
+    const E4c = witnessEntries().filter((entry) => entry.prompt === "check both MCP servers")[0].activeTools;
+
+    // --- Phase 5: Plan again. A NEW plugin registered during Plan with a
+    // declared plan-safe action list is contract-visible; flipping the list to
+    // empty hides it again — and neither operation may cost it in Agent. -----
     assert.equal((await bridge.configure(SESSION, { mode: "plan" })).ok, true);
-    pluginState.tools = [INSPECT, PLAIN, RUN];
+    pluginState.tools = [INSPECT, PLAIN_SAFE, RUN];
     const p5 = await promptAndWait(
       "plan-2",
       "reconsider the plan",
       [{ text: "plan reconsidered", finish: "stop" }],
       "plan reconsidered",
     );
-    const expectedP5 = contractExpected(expectedP4, ["plugin_demo_inspect", "plugin_demo_run"]);
+    const expectedP5 = contractExpected([...E4c, "plugin_demo_plain"], [
+      "plugin_demo_inspect",
+      "plugin_demo_plain",
+      "plugin_demo_run",
+    ]);
     assertStrictSequence(requestToolNames(p5.request), expectedP5, "plan-2");
-    assert.ok(!expectedP5.includes("plugin_demo_plain"), "a re-added undeclared plugin must be hidden in Plan");
+    assert.ok(expectedP5.includes("plugin_demo_plain"), "a plan-safe plugin registered during Plan must be visible");
+    assert.ok(!expectedP5.includes("mcp_beta_echo"), "user MCP must stay hidden in Plan");
     assertModePromptShape({ label: "plan-2", systemText: requestSystemText(p5.request), mode: "plan", capabilityExpected: true });
+    const p5Witness = witnessEntries().filter((entry) => entry.prompt === "reconsider the plan");
+    assert.ok(
+      p5Witness.length >= 1 && p5Witness.length <= 2,
+      `entering Plan with a catalog change must converge within one retry; attempts=${p5Witness.length}`,
+    );
 
-    // --- Phase 6: approval descriptor carries the effective permission mode --
+    pluginState.tools = [INSPECT, PLAIN, RUN];
+    const p5b = await promptAndWait(
+      "plan-3",
+      "tighten the plan contract",
+      [{ text: "plan tightened", finish: "stop" }],
+      "plan tightened",
+    );
+    const expectedP5b = expectedP5.filter((name) => name !== "plugin_demo_plain");
+    assertStrictSequence(requestToolNames(p5b.request), expectedP5b, "plan-3 (safeActions removed)");
+    assert.ok(!expectedP5b.includes("plugin_demo_plain"), "an empty plan-safe list must hide the plugin again in Plan");
+
+    // --- Phase 6: back to Agent. The runtime is rebuilt once more — the
+    // plan-safe plugin registered during Plan must be present with the
+    // unchanged catalog (the review's F3 counterexample), and the deferred
+    // builtins must be back under xd:// (F4). The approval descriptor must
+    // carry the effective permission mode. -----------------------------------
     assert.equal((await bridge.configure(SESSION, { mode: "agent" })).ok, true);
+    const expectedP6 = agentBaseline(
+      ["plugin_demo_inspect", "plugin_demo_plain", "plugin_demo_run"],
+      { mcp: ["mcp_beta_echo", "mcp_alpha_lookup"] },
+    );
+    // Warm-up turn: the rebuild happens on this prompt, so the raw-frame
+    // observer below attaches to the replacement process.
+    const p6a = await promptAndWait(
+      "agent-3a",
+      "warm up the rebuilt agent",
+      [{ text: "warmed up", finish: "stop" }],
+      "warmed up",
+    );
+    assertStrictSequence(requestToolNames(p6a.request), expectedP6, "agent-3a (post-rebuild Agent baseline)");
+    assert.equal(
+      witnessEntries().filter((entry) => entry.prompt === "warm up the rebuilt agent").length,
+      1,
+      "the rebuilt Agent process must start the prompt in one attempt",
+    );
     const dialogs = [];
     const runtimeHandle = supervisors[0].currentRuntime();
-    assert.ok(runtimeHandle, "the runtime must be live");
+    assert.ok(runtimeHandle, "the replacement runtime must be live");
     runtimeHandle.onFrame((frame) => {
       if (frame && frame.type === "extension_ui_request") dialogs.push(frame);
     });
@@ -550,31 +768,12 @@ test(
     const descriptor = parseApprovalDescriptor(approvalFrame.optionDetails?.[0]?.description);
     assert.equal(descriptor?.permissionMode, "auto", "the gate must consume the resolved effective permission mode");
     assert.equal(descriptor?.toolName, "write");
-    // The clamps in between must leave no trace: the restored Agent table is
-    // the pre-clamp selection, nothing duplicated, nothing stale. One runtime
-    // rule shapes the order and is stated here independently: a `set_host_tools`
-    // refresh re-seats the previously active RPC host tools after the non-RPC
-    // names (previous active non-RPC, then preserved RPC in their previous
-    // order, then newly activated RPC). The re-added undeclared plugin is the
-    // newly activated one; every desktop host tool is an RPC host tool.
-    const RPC_HOST_TOOLS = [
-      "plugin_demo_inspect",
-      "plugin_demo_plain",
-      "plugin_demo_run",
-      "mcp_alpha_lookup",
-      "Skill",
-    ];
-    const expectedP6 = [
-      ...E0.filter((name) => name !== "plugin_demo_plain" && !RPC_HOST_TOOLS.includes(name)),
-      "plugin_demo_inspect",
-      "mcp_alpha_lookup",
-      "Skill",
-      "plugin_demo_run",
-      "plugin_demo_plain",
-    ];
+    // The rebuilt Agent table must be the fresh baseline with the unchanged
+    // catalog: nothing duplicated, nothing stale, the plan-added plugin
+    // present, and the deferred builtins not promoted.
     const p6Requests = provider.requests.slice(requestsBeforePhase6);
     assert.equal(p6Requests.length >= 1, true, "agent-3: the provider request must be captured");
-    assertStrictSequence(requestToolNames(p6Requests[0]), expectedP6, "agent-3");
+    assertStrictSequence(requestToolNames(p6Requests[0]), expectedP6, "agent-3 (approval prompt)");
     assertModePromptShape({ label: "agent-3", systemText: requestSystemText(p6Requests[0]), mode: "agent", capabilityExpected: true });
     // Answer through the product's resolution path.
     assert.equal(bridge.resolvePermission(permissionEvent.event.request.requestId, "allow-once").ok, true);
@@ -683,8 +882,22 @@ test(
     }
     const subagentWitness = witnessEntries().filter((entry) => entry.sessionId !== state1.sessionId);
     assert.ok(subagentWitness.length >= 1, "the delegate must fire under its own native session id");
+    const parentWitness = witnessEntries().filter((entry) => entry.sessionId === state1.sessionId);
+    assert.ok(parentWitness.length >= 1, "the parent session must be observed under its own native session id");
+    assert.ok(
+      parentWitness.every((entry) => entry.hasUI === true),
+      "the rpc-ui parent session must report hasUI=true",
+    );
+    assert.ok(
+      subagentWitness.every((entry) => entry.hasUI === false),
+      "a delegate session must report hasUI=false (its extension runner runs without a UI context)",
+    );
+    assert.ok(
+      !envelopes.slice(beforeSubagent).some((entry) => entry.event.type === "error"),
+      "a delegate must never be refused by the mandatory state channel",
+    );
 
-    // --- Phase 8: a runtime restart resets the clamp baseline ----------------
+    // --- Phase 8: an explicit restart still starts from the default baseline -
     const disposed = await bridge.disposeSession(SESSION, "b1 restart probe");
     assert.equal(disposed.ok, true, `the session runtime must be reclaimed cleanly: ${JSON.stringify(disposed.failures)}`);
     const restart = await promptAndWait(
@@ -693,16 +906,7 @@ test(
       [{ text: "restart confirmed", finish: "stop" }],
       "restart confirmed",
     );
-    // A fresh runtime starts from the default presentation: previously
-    // xd-discoverable builtins are demoted again, and the host tools appear in
-    // catalog order (plugins, then user MCP) with the Skill tool appended.
-    const expectedRestart = [
-      ...S0.filter((name) => name !== "mcp_alpha_lookup" && name !== "Skill"),
-      "plugin_demo_run",
-      "mcp_alpha_lookup",
-      "Skill",
-    ];
-    assertStrictSequence(requestToolNames(restart.request), expectedRestart, "agent-5 (post-restart)");
+    assertStrictSequence(requestToolNames(restart.request), expectedP6, "agent-5 (explicit restart baseline)");
     assertModePromptShape({ label: "agent-5", systemText: requestSystemText(restart.request), mode: "agent", capabilityExpected: true });
     const restartWitness = witnessEntries().filter((entry) => entry.prompt === "confirm the restart baseline");
     assert.equal(
@@ -711,9 +915,135 @@ test(
       `a fresh runtime must start from the unclamped baseline in one attempt; attempts=${restartWitness.length}`,
     );
 
-    // Every prompt converged within the runtime's single policy retry: no
-    // prompt may need the third attempt (which would raise
-    // `AgentStartPolicyChangedError` and fail the turn anyway).
+    // --- Phase 9: F1/F2 counterexamples. The refusal probe session has its
+    // `desktop-state.required` marker set (its bridge carries a session
+    // policy), so every state the gate cannot read as owned-and-valid must
+    // refuse the turn: zero provider requests, exactly one observable terminal
+    // error carrying the refused turn id, exactly one turn end, the runner
+    // back to idle, and the session promptable again once the state is
+    // repaired. ---------------------------------------------------------------
+    const refusalTimeline = () => envelopeTimeline(refusalEnvelopes);
+    const postRequests = () => provider.requests.filter((request) => request.method === "POST");
+    const refusalRequest = async (content) => {
+      const ref = hostSessions.get(REFUSAL_SESSION).engineRef;
+      const started = await refusalBridge.prompt({
+        sessionId: REFUSAL_SESSION,
+        content,
+        projectPath: project,
+        providerId: PROJECT_PROVIDER,
+        modelId: PROJECT_MODEL,
+        thinkingLevel: null,
+        nativeSessionId: ref?.nativeSessionId ?? null,
+        nativeSessionPath: ref?.nativeSessionPath ?? null,
+        adapterVersion: ref?.adapterVersion ?? null,
+        runtimeVersion: ref?.runtimeVersion ?? null,
+      });
+      return started;
+    };
+    const mutatorEntries = () => {
+      if (!existsSync(mutatorLog)) return [];
+      return readFileSync(mutatorLog, "utf8")
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line));
+    };
+    const expectRefusal = async (label, action) => {
+      writeFileSync(mutatorControl, JSON.stringify({ action }));
+      provider.script([{ text: `${label} must never be answered`, finish: "stop" }]);
+      const requestsBefore = postRequests().length;
+      const envelopeBefore = refusalEnvelopes.length;
+      const endsBefore = refusalTurnEnds.length;
+      const started = await refusalRequest(label);
+      assert.equal(
+        started.accepted,
+        true,
+        `${label}: the prompt command is accepted; the refusal is delivered as the terminal error`,
+      );
+      const closed = await waitFor(
+        () =>
+          !refusalBridge.status(REFUSAL_SESSION).isRunning &&
+          refusalEnvelopes.slice(envelopeBefore).some((entry) => entry.event.type === "error"),
+      );
+      assert.equal(closed, true, `${label}: the refused turn must reach a terminal state; timeline:\n${refusalTimeline()}`);
+      const slice = refusalEnvelopes.slice(envelopeBefore);
+      const errors = slice.filter((entry) => entry.event.type === "error");
+      assert.equal(errors.length, 1, `${label}: exactly one terminal error`);
+      assert.equal(
+        errors[0].event.error.code,
+        "OMP_RUNTIME_STATE_REFUSED",
+        `${label}: the refusal must be observable as its own error code`,
+      );
+      assert.equal(errors[0].turnId, started.turnId, `${label}: the error must carry the refused turn id`);
+      for (const forbidden of ["agent_start", "agent_end", "message_start", "tool_start"]) {
+        assert.ok(!slice.some((entry) => entry.event.type === forbidden), `${label}: a refused turn must emit no ${forbidden}`);
+      }
+      const ends = refusalTurnEnds.slice(endsBefore).filter((info) => info.turnId === started.turnId);
+      assert.deepEqual(
+        ends,
+        [{ sessionId: REFUSAL_SESSION, turnId: started.turnId, reason: "error" }],
+        `${label}: exactly one turn end for the refused turn`,
+      );
+      assert.equal(refusalBridge.status(REFUSAL_SESSION).state, "idle", `${label}: the runner must return to idle`);
+      assert.equal(postRequests().length, requestsBefore, `${label}: zero provider requests`);
+      const applied = mutatorEntries().at(-1);
+      assert.equal(applied?.action, action, `${label}: the mutator must have applied ${action}`);
+      assert.equal(applied?.outcome, action === "delete" ? "deleted" : action, `${label}: mutator outcome`);
+      assert.equal(applied?.hasUI, true, `${label}: the mutating context is the interactive parent`);
+    };
+    const expectNormalTurn = async (label, action) => {
+      writeFileSync(mutatorControl, JSON.stringify({ action }));
+      provider.script([{ text: `${label} answered`, finish: "stop" }]);
+      const requestsBefore = postRequests().length;
+      const envelopeBefore = refusalEnvelopes.length;
+      const endsBefore = refusalTurnEnds.length;
+      const started = await refusalRequest(label);
+      assert.equal(started.accepted, true, `${label}: the prompt must be accepted`);
+      const done = await waitFor(() => {
+        const slice = refusalEnvelopes.slice(envelopeBefore);
+        return (
+          slice.some(
+            (entry) => entry.event.type === "message_end" && JSON.stringify(entry.event.message).includes(`${label} answered`),
+          ) && slice.some((entry) => entry.event.type === "agent_end")
+        );
+      });
+      assert.equal(done, true, `${label}: the turn must settle; timeline:\n${refusalTimeline()}`);
+      const slice = refusalEnvelopes.slice(envelopeBefore);
+      assert.ok(!slice.some((entry) => entry.event.type === "error"), `${label}: a readable state must not produce an error`);
+      assert.equal(postRequests().length, requestsBefore + 1, `${label}: the repaired state must reach the provider once`);
+      const ends = refusalTurnEnds.slice(endsBefore).filter((info) => info.turnId === started.turnId);
+      assert.deepEqual(
+        ends,
+        [{ sessionId: REFUSAL_SESSION, turnId: started.turnId, reason: "completed" }],
+        `${label}: exactly one completed turn end`,
+      );
+      assert.equal(
+        mutatorEntries().at(-1)?.outcome,
+        action === "none" ? "none" : action,
+        `${label}: the mutator outcome`,
+      );
+    };
+
+    // The very FIRST prompt of the probe session is the deleted-state
+    // counterexample: the bridge wrote the state, the mutator removed it, the
+    // gate must refuse rather than run an unclamped Agent turn.
+    await expectRefusal("refusal-first-delete", "delete");
+    await expectNormalTurn("refusal-recover-1", "none");
+    await expectRefusal("refusal-malformed", "malformed");
+    await expectRefusal("refusal-oversize", "oversize");
+    await expectNormalTurn("refusal-recover-2", "none");
+    await expectRefusal("refusal-unknown-schema", "unknown-schema");
+    await expectRefusal("refusal-identity-missing", "identity-missing");
+    // F2: a parseable state whose owner is correct but whose mode is invalid —
+    // the old gate aborted with no terminal signal and stranded the turn.
+    await expectRefusal("refusal-owned-invalid", "owned-invalid");
+    await expectNormalTurn("refusal-recover-3", "none");
+    // Negative control: a forged refusal naming another native session, with
+    // the state left valid, must not close the awaiting turn.
+    await expectNormalTurn("refusal-foreign-notify", "foreign-notify");
+
+    // No prompt ever needed the third start attempt (which would raise
+    // `AgentStartPolicyChangedError`), and no turn id was ever reused across
+    // the runtime rebuilds. The refusal witness log is checked the same way.
     const attemptsByPrompt = new Map();
     for (const entry of witnessEntries()) {
       if (typeof entry.prompt === "string" && entry.prompt.length > 0) {
@@ -723,5 +1053,6 @@ test(
     for (const [prompt, attempts] of attemptsByPrompt) {
       assert.ok(attempts <= 2, `prompt ${JSON.stringify(prompt)} needed ${attempts} attempts`);
     }
+    assert.equal(new Set(turnIds).size, turnIds.length, `live turn ids must never be reused: ${JSON.stringify(turnIds)}`);
   },
 );

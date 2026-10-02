@@ -51,6 +51,7 @@ import {
   findGateExtension,
   inspectBundledGate,
   isValidDesktopSkillMeta,
+  markDesktopStateRequired,
   readDesktopCapabilityState,
   resolveBundledGate,
   serializeDesktopCapabilityState,
@@ -724,6 +725,21 @@ class SessionEntry {
    * alone after a replacement.
    */
   private nativeSessionRunner: OmpSessionRunner | null = null;
+  /**
+   * The session mode of the last prompt whose mandatory run-scoped state was
+   * written. It is what detects the contract-mode → Agent transition: the
+   * Plan/Goal clamp leaves the runtime's own tool presentation pinned, and the
+   * pinned runtime exposes no presentation API to extensions, so leaving a
+   * contract mode rebuilds the process instead of restoring a narrower
+   * selection through `setActiveToolsByName`.
+   */
+  private lastPromptMode: DesktopRuntimeMode | null = null;
+  /**
+   * Single-flight process rebuild for {@link lastPromptMode}: concurrent
+   * prompts for one entry share one restart, and a prompt that arrives while
+   * the restart is in flight waits for it rather than starting a second.
+   */
+  private agentPresentationReset: Promise<void> | null = null;
   /** Turn counter seed for the next runner, carried across runtime replacement. */
   private generationSeed = 0;
   /** Live message-id sequence seed for the next runner, carried across replacement. */
@@ -955,6 +971,9 @@ class SessionEntry {
       generationSeed: this.generationSeed,
       messageSequenceSeed: this.messageSequenceSeed,
       contextId: this.contextId,
+      // Read live: the native session is established after the runner exists,
+      // and a structured start refusal is attributed by this identity.
+      nativeSessionIdentity: () => this.nativeSessionId,
       ...(this.hostToolExecutor ? { hostToolExecutor: this.hostToolExecutor } : {}),
       // The runner owns the turn-end announcement (its closeRun knows the
       // real reason); the bridge forwards it through its once-guard to the
@@ -1210,6 +1229,17 @@ class SessionEntry {
   async prompt(gate: string, spec: OmpSessionRuntimeSpec, content: string): Promise<OmpPromptResult> {
     this.assertOpen();
     const epoch = this.stopEpoch;
+    // The mode is read before anything starts: it decides whether this prompt
+    // is the contract-mode → Agent transition that must rebuild the runtime
+    // process (the pinned runtime has no extension API to restore its tool
+    // presentation, and the clamp's selection API pins every name it
+    // restores). Reading first also means a host row that cannot be read
+    // refuses the prompt before any runtime is started.
+    const policy = this.sessionPolicy ? await this.readSessionPolicy() : null;
+    if (this.agentPresentationReset) await this.agentPresentationReset;
+    if (policy && policy.mode === "agent" && this.lastPromptMode !== null && this.lastPromptMode !== "agent") {
+      await this.ensureAgentPresentationReset();
+    }
     await this.ensureNativeSession(gate, spec);
     const runner = await this.ensureRunner(gate);
     // One catalog assembly per prompt feeds both the runtime registration and
@@ -1227,7 +1257,8 @@ class SessionEntry {
     // that follows. The returned flag decides the `Skill` tool's presence for
     // this turn. Mode and policy are mandatory: any failure to read, write or
     // self-validate them refuses the prompt instead of running it unclamped.
-    const runtimeState = await this.refreshDesktopState(catalog);
+    const runtimeState = await this.refreshDesktopState(catalog, policy);
+    if (policy) this.lastPromptMode = policy.mode;
     // The session's desktop tools are (re)registered before every prompt, the
     // way the Pi host reassembles its catalog per launch: a changed catalog —
     // a plugin installed/unloaded, a scope edit, an MCP change, a changed
@@ -1257,28 +1288,22 @@ class SessionEntry {
   }
 
   /**
-   * Read, validate, write and self-validate the run-scoped desktop runtime
-   * state before one prompt.
+   * Read and validate the session's mode and effective permission mode.
    *
-   * The mandatory half — mode, the production `composeModeSystemPrompt(mode,
-   * "")` block, and the effective permission mode read from the host session
-   * row — must be assembled exactly once and persisted atomically (alias-safe,
-   * 0600) into the run root. Any failure on that half refuses the prompt
-   * before submission: there is no tombstone and no Agent fallback, because a
-   * Plan/Goal intent must never silently run as an unclamped Agent turn with a
-   * stale state file. The skills/memory half is PI-best-effort: a failed read
-   * becomes an empty capability part while the mode/policy half stays exact
-   * and the `Skill` tool is withdrawn for the turn. The written file is
-   * re-validated with the very contract the gate reads (`readDesktopCapabilityState`,
-   * no second rule set) and compared field-by-field against the snapshot, so a
-   * writer bug can never smuggle a different state past the gate.
+   * This is the mandatory half of the run-scoped state, read from the host
+   * session row before anything starts. `inherit` has already been resolved by
+   * the wiring against the app's *current* default; the bridge only accepts
+   * the three runtime modes and the three effective permission modes. A
+   * missing row, a failed read or an unclassifiable value refuses the prompt:
+   * there is no tombstone and no Agent fallback.
    */
-  private async refreshDesktopState(catalog: OmpHostToolCatalogEntry[]): Promise<{ skillsPresent: boolean }> {
-    if (!this.sessionPolicy) return { skillsPresent: false };
-    const runRoot = this.supervisor.runRoot();
-    if (!runRoot || !this.nativeSessionId) {
+  private async readSessionPolicy(): Promise<{
+    mode: DesktopRuntimeMode;
+    permissionMode: DesktopPermissionMode;
+  }> {
+    if (!this.sessionPolicy) {
       throw this.stateRefusal(
-        "the OMP run root or native session identity is missing; refusing to prompt without a writable runtime state",
+        "the session policy provider is not wired; refusing to prompt without the runtime policy",
       );
     }
     let row: { mode: string | null; permissionMode: string | null } | null;
@@ -1298,8 +1323,7 @@ class SessionEntry {
       });
       throw this.stateRefusal("the host session row is gone; refusing to prompt without the runtime policy");
     }
-    const mode = row.mode;
-    const permissionMode = row.permissionMode;
+    const { mode, permissionMode } = row;
     if (mode !== "agent" && mode !== "plan" && mode !== "goal") {
       this.logger?.app("omp", "warn", "host session reported an unknown mode", {
         data: { sessionId: this.sessionId, mode },
@@ -1314,6 +1338,92 @@ class SessionEntry {
         `the host session reports an unknown permission mode ${JSON.stringify(permissionMode)}; refusing to prompt`,
       );
     }
+    return { mode, permissionMode };
+  }
+
+  /**
+   * Rebuild the runtime process when the session leaves a contract mode.
+   *
+   * The Plan/Goal clamp can only call the extension API's `setActiveTools` →
+   * `setActiveToolsByName`, which pins every name it restores top-level and
+   * clears the runtime's `xd://` mounts; the pinned runtime exposes no
+   * presentation restore to extensions (`ExtensionActions` has only
+   * `getActiveTools`/`getAllTools`/`setActiveTools`; `setActiveToolPresentation`
+   * is a session method the interactive controller and the SDK call
+   * directly). A fresh process therefore re-applies the runtime's own default
+   * presentation — native/deferred partition included — and the host tool
+   * catalog is re-registered on this prompt because the runner is retired.
+   * The restarted process reopens the same persisted native session
+   * (`ensureNativeSession` → `switch_session`) with the same project and model
+   * projection, so no turn is replayed and no identity changes.
+   *
+   * A stop/reclaim failure refuses the prompt: continuing in the old process
+   * would silently keep the pinned selection the contract clamp produced.
+   */
+  private ensureAgentPresentationReset(): Promise<void> {
+    if (this.agentPresentationReset) return this.agentPresentationReset;
+    const reset = this.resetAgentPresentationAfterContract();
+    this.agentPresentationReset = reset;
+    void reset
+      .finally(() => {
+        if (this.agentPresentationReset === reset) this.agentPresentationReset = null;
+      })
+      .catch(() => undefined);
+    return reset;
+  }
+
+  private async resetAgentPresentationAfterContract(): Promise<void> {
+    const runner = this.runner;
+    if (!runner) return;
+    if (runner.runState() !== "idle" || runner.isStopping()) {
+      throw new OmpRuntimeError("not-started", "the runtime is running; stop it before prompting again");
+    }
+    const stop = await this.supervisor.stop({ abortBash: false });
+    if (stop.reaped && (!stop.cleaned || this.supervisor.pendingCleanup.length > 0)) {
+      await this.supervisor.reclaimAll();
+    }
+    if (!stop.reaped || this.supervisor.pendingCleanup.length > 0) {
+      throw this.stateRefusal(
+        "the OMP runtime could not be reclaimed to restore the Agent tool presentation; refusing to prompt",
+      );
+    }
+    this.retireRunner();
+    this.logger?.app("omp", "info", "omp runtime rebuilt to restore the Agent tool presentation", {
+      data: { sessionId: this.sessionId },
+    });
+  }
+
+  /**
+   * Read, validate, write and self-validate the run-scoped desktop runtime
+   * state before one prompt.
+   *
+   * The mandatory half — mode, the production `composeModeSystemPrompt(mode,
+   * "")` block, and the effective permission mode read from the host session
+   * row — must be assembled exactly once and persisted atomically (alias-safe,
+   * 0600) into the run root, together with the mandatory-channel marker that
+   * tells the gate this run cannot silently run without its state. Any failure
+   * on that half refuses the prompt before submission: there is no tombstone
+   * and no Agent fallback, because a Plan/Goal intent must never silently run
+   * as an unclamped Agent turn with a stale state file. The skills/memory half
+   * is PI-best-effort: a failed read becomes an empty capability part while the
+   * mode/policy half stays exact and the `Skill` tool is withdrawn for the
+   * turn. The written file is re-validated with the very contract the gate
+   * reads (`readDesktopCapabilityState`, no second rule set) and compared
+   * field-by-field against the snapshot, so a writer bug can never smuggle a
+   * different state past the gate.
+   */
+  private async refreshDesktopState(
+    catalog: OmpHostToolCatalogEntry[],
+    policy: { mode: DesktopRuntimeMode; permissionMode: DesktopPermissionMode } | null,
+  ): Promise<{ skillsPresent: boolean }> {
+    if (!policy || !this.sessionPolicy) return { skillsPresent: false };
+    const runRoot = this.supervisor.runRoot();
+    if (!runRoot || !this.nativeSessionId) {
+      throw this.stateRefusal(
+        "the OMP run root or native session identity is missing; refusing to prompt without a writable runtime state",
+      );
+    }
+    const { mode, permissionMode } = policy;
     // The production composer's output for this exact mode. Only the mode
     // block is taken: basePrompt is empty, so the PI default runtime prompt
     // can never leak into the state.
@@ -1357,6 +1467,11 @@ class SessionEntry {
     }));
     const statePath = join(runRoot, DESKTOP_STATE_FILE);
     try {
+      // The marker first: once it exists, the gate refuses this session's turn
+      // whenever the state cannot be read back as owned and valid. A marker
+      // that cannot be written must refuse the prompt too — otherwise the run
+      // would silently fall back to "no state, no injection".
+      markDesktopStateRequired(statePath);
       writeDesktopCapabilityState(
         statePath,
         serializeDesktopCapabilityState(

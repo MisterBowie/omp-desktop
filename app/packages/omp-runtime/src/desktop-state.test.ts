@@ -15,6 +15,7 @@
  */
 import {
   chmodSync,
+  existsSync,
   linkSync,
   lstatSync,
   mkdirSync,
@@ -29,6 +30,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   DESKTOP_STATE_FILE,
+  DESKTOP_STATE_REQUIRED_FILE,
   MAX_DESKTOP_STATE_AGE_MS,
   MAX_DESKTOP_STATE_BYTES,
   MAX_DESKTOP_STATE_HOST_TOOLS,
@@ -44,6 +46,8 @@ import {
   desktopCapabilityPrompt,
   desktopMemoryPrompt,
   desktopSkillsPrompt,
+  isDesktopStateRequired,
+  markDesktopStateRequired,
   readDesktopCapabilityState,
   readDesktopStateForSession,
   readDesktopStateSessionId,
@@ -435,6 +439,31 @@ describe("ownership-aware read", () => {
     expect(readDesktopStateSessionId(path)).toBeNull();
     writeState(dir, JSON.stringify({ sessionId: 42 }));
     expect(readDesktopStateSessionId(path)).toBeNull();
+  });
+});
+
+describe("mandatory-channel marker", () => {
+  it("is absent until the owning bridge writes it, next to the state file", () => {
+    const dir = makeDir();
+    const path = join(dir, DESKTOP_STATE_FILE);
+    expect(isDesktopStateRequired(path)).toBe(false);
+    markDesktopStateRequired(path);
+    expect(isDesktopStateRequired(path)).toBe(true);
+    expect(existsSync(join(dir, DESKTOP_STATE_REQUIRED_FILE))).toBe(true);
+    // Writing the state does not clear the marker.
+    writeDesktopCapabilityState(path, stateOf());
+    expect(isDesktopStateRequired(path)).toBe(true);
+  });
+
+  it("does not claim the channel for an absent path, a directory, or a deleted run root", () => {
+    expect(isDesktopStateRequired(undefined)).toBe(false);
+    expect(isDesktopStateRequired(null)).toBe(false);
+    const dir = makeDir();
+    const path = join(dir, DESKTOP_STATE_FILE);
+    mkdirSync(join(dir, DESKTOP_STATE_REQUIRED_FILE));
+    expect(isDesktopStateRequired(path)).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
+    expect(isDesktopStateRequired(path)).toBe(false);
   });
 });
 

@@ -29,6 +29,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   DESKTOP_STATE_FILE,
   MAX_DESKTOP_STATE_AGE_MS,
+  markDesktopStateRequired,
   serializeDesktopCapabilityState,
 } from "../desktop-state.js";
 import ompDesktopGate, {
@@ -38,6 +39,7 @@ import ompDesktopGate, {
   type ExtensionAPI,
 } from "../../extensions/omp-desktop-gate.ts";
 import { parseApprovalDescriptor } from "../session/approval-protocol.js";
+import { parseStartRefusalNotice } from "../session/start-refusal.js";
 
 const created: string[] = [];
 afterEach(() => {
@@ -164,6 +166,74 @@ describe("before_agent_start policy decision", () => {
     writeFileSync(path, JSON.stringify({ v: 1, sessionId: "some-other-session", mode: "plan" }));
     expect(beforeAgentStartPolicy({ systemPrompt: [...BASE_PROMPT] }, context(), path, NOW).kind).toBe("skip");
   });
+
+  it("refuses every non-owned read once the bridge marks the channel mandatory", () => {
+    const interactive = () => ({ ...context(), hasUI: true });
+    const required = { required: true };
+    // Deleted, malformed, oversized, identity-less and out-of-schema files are
+    // all "missing/unreadable" on the mandatory channel — never a silent
+    // Agent turn.
+    const deleted = writeState();
+    markDesktopStateRequired(deleted);
+    rmSync(deleted);
+    expect(beforeAgentStartPolicy({ systemPrompt: [...BASE_PROMPT] }, interactive(), deleted, NOW, required)).toMatchObject({
+      kind: "refuse",
+      code: "state-missing",
+    });
+
+    for (const corrupt of ["{", "x".repeat(600 * 1024)]) {
+      const path = writeState();
+      markDesktopStateRequired(path);
+      writeFileSync(path, corrupt);
+      expect(beforeAgentStartPolicy({ systemPrompt: [...BASE_PROMPT] }, interactive(), path, NOW, required)).toMatchObject({
+        kind: "refuse",
+        code: "state-missing",
+      });
+    }
+
+    const noIdentity = writeState();
+    markDesktopStateRequired(noIdentity);
+    writeFileSync(noIdentity, JSON.stringify({ v: 2, mode: "plan", writtenAt: NOW }));
+    expect(beforeAgentStartPolicy({ systemPrompt: [...BASE_PROMPT] }, interactive(), noIdentity, NOW, required)).toMatchObject({
+      kind: "refuse",
+      code: "state-missing",
+    });
+
+    const unknownSchema = writeState();
+    markDesktopStateRequired(unknownSchema);
+    writeFileSync(unknownSchema, JSON.stringify({ v: 1, sessionId: OWNING_SESSION, mode: "plan", writtenAt: NOW }));
+    expect(beforeAgentStartPolicy({ systemPrompt: [...BASE_PROMPT] }, interactive(), unknownSchema, NOW, required)).toMatchObject({
+      kind: "refuse",
+      code: "state-invalid",
+    });
+
+    const foreign = writeState({ sessionId: "some-other-native" });
+    markDesktopStateRequired(foreign);
+    expect(beforeAgentStartPolicy({ systemPrompt: [...BASE_PROMPT] }, interactive(), foreign, NOW, required)).toMatchObject({
+      kind: "refuse",
+      code: "state-foreign",
+    });
+  });
+
+  it("keeps the delegate zero-injection skip on a mandatory channel (hasUI=false)", () => {
+    const path = writeState(); // valid, owned by the parent native session
+    markDesktopStateRequired(path);
+    const delegate = { ...context("delegate-native"), hasUI: false };
+    const required = { required: true };
+    expect(beforeAgentStartPolicy({ systemPrompt: [...BASE_PROMPT] }, delegate, path, NOW, required).kind).toBe("skip");
+    expect(
+      beforeAgentStartPolicy({ systemPrompt: [...BASE_PROMPT] }, delegate, join(stateDir(), "gone.json"), NOW, required)
+        .kind,
+    ).toBe("skip");
+  });
+
+  it("degrades explicitly without the marker, and fails closed when hasUI is unknown", () => {
+    const absent = join(stateDir(), "absent.json");
+    expect(beforeAgentStartPolicy({ systemPrompt: [...BASE_PROMPT] }, context(), absent, NOW).kind).toBe("skip");
+    expect(
+      beforeAgentStartPolicy({ systemPrompt: [...BASE_PROMPT] }, context(), absent, NOW, { required: true }).kind,
+    ).toBe("refuse");
+  });
 });
 
 describe("contract tool catalog", () => {
@@ -226,18 +296,18 @@ describe("contract clamp state machine", () => {
 
   it("does nothing in Agent when no clamp is live", async () => {
     const { api, calls } = fakeApi(["read", "write"]);
-    const result = await applyContractToolClamp(api, { applied: false, before: [] }, { mode: "agent", hostTools: [] });
+    const result = await applyContractToolClamp(api, { applied: false, before: [], removed: [] }, { mode: "agent", hostTools: [] });
     expect(result).toEqual({ ok: true, changed: false, active: ["read", "write"] });
     expect(calls).toEqual([]);
   });
 
   it("clamps on entering Plan and is a no-op when the selection already matches", async () => {
     const { api, calls, active } = fakeApi(["read", "write", "bash"]);
-    const clamp = { applied: false, before: [] as string[] };
+    const clamp = { applied: false, before: [] as string[], removed: [] as string[] };
     const entered = await applyContractToolClamp(api, clamp, { mode: "plan", hostTools: [] });
     expect(entered.ok).toBe(true);
     if (entered.ok) expect(entered.active).toEqual(["read", "bash"]);
-    expect(clamp).toEqual({ applied: true, before: ["read", "write", "bash"] });
+    expect(clamp).toEqual({ applied: true, before: ["read", "write", "bash"], removed: [] });
     expect(active).toEqual(["read", "bash"]);
     expect(calls).toHaveLength(1);
 
@@ -247,26 +317,62 @@ describe("contract clamp state machine", () => {
     expect(calls).toHaveLength(1);
   });
 
-  it("restores the pre-clamp selection plus tools activated meanwhile when returning to Agent", async () => {
+  it("restores the pre-clamp selection plus a catalog-current tool activated while clamped", async () => {
     const { api, calls, active } = fakeApi(["read", "write", "bash"]);
-    const clamp = { applied: false, before: [] as string[] };
+    const clamp = { applied: false, before: [] as string[], removed: [] as string[] };
     await applyContractToolClamp(api, clamp, { mode: "plan", hostTools: [] });
-    // The runtime auto-activates a newly registered host tool while clamped.
+    // The runtime auto-activates a newly registered host tool while clamped;
+    // the clamp observes it before hiding it, so it is a restore candidate.
     active.push("plugin_demo_run");
-    const restored = await applyContractToolClamp(api, clamp, { mode: "agent", hostTools: [] });
+    const clampAgain = await applyContractToolClamp(api, clamp, { mode: "plan", hostTools: [] });
+    expect(clampAgain.ok).toBe(true);
+    if (clampAgain.ok) expect(clampAgain.active).toEqual(["read", "bash"]);
+    expect(clamp.removed).toContain("plugin_demo_run");
+
+    const catalogTool = { name: "plugin_demo_run", risk: "low" as const, planSafeActions: ["inspect"], origin: "plugin" as const };
+    const restored = await applyContractToolClamp(api, clamp, {
+      mode: "agent",
+      hostTools: [catalogTool],
+    });
     expect(restored.ok).toBe(true);
     if (restored.ok) expect(restored.active).toEqual(["read", "write", "bash", "plugin_demo_run"]);
-    expect(clamp).toEqual({ applied: false, before: [] });
+    expect(clamp).toEqual({ applied: false, before: [], removed: [] });
     expect(calls.at(-1)).toEqual(["read", "write", "bash", "plugin_demo_run"]);
 
     // A second Agent turn without a new clamp changes nothing.
-    const stable = await applyContractToolClamp(api, clamp, { mode: "agent", hostTools: [] });
+    const stable = await applyContractToolClamp(api, clamp, { mode: "agent", hostTools: [catalogTool] });
     expect(stable.ok).toBe(true);
     if (stable.ok) expect(stable.changed).toBe(false);
   });
 
+  it("never revives a removed or disabled catalog tool on the Agent restore", async () => {
+    const { api, active } = fakeApi(["read", "write", "bash"]);
+    const clamp = { applied: false, before: [] as string[], removed: [] as string[] };
+    await applyContractToolClamp(api, clamp, { mode: "plan", hostTools: [] });
+    // Two host tools are auto-activated while clamped; the plugin is then
+    // removed from the catalog before the Agent prompt, the MCP server is
+    // disabled the same way.
+    active.push("plugin_demo_run", "mcp_alpha_lookup");
+    await applyContractToolClamp(api, clamp, { mode: "plan", hostTools: [] });
+    const restored = await applyContractToolClamp(api, clamp, { mode: "agent", hostTools: [] });
+    expect(restored.ok).toBe(true);
+    if (restored.ok) expect(restored.active).toEqual(["read", "write", "bash"]);
+    expect(clamp.removed).toEqual([]);
+  });
+
+  it("does not invent a catalog tool that was never part of the live selection", async () => {
+    const { api } = fakeApi(["read", "write"]);
+    const clamp = { applied: true, before: ["read", "write"], removed: [] as string[] };
+    // The catalog declares a tool the runtime never activated for this
+    // session: the restore must not enable it just because it is declared.
+    const catalogTool = { name: "plugin_demo_declared", risk: "low" as const, planSafeActions: ["inspect"], origin: "plugin" as const };
+    const restored = await applyContractToolClamp(api, clamp, { mode: "agent", hostTools: [catalogTool] });
+    expect(restored.ok).toBe(true);
+    if (restored.ok) expect(restored.active).toEqual(["read", "write"]);
+  });
+
   it("refuses a contract mode when the runtime exposes no tool-selection API", async () => {
-    const result = await applyContractToolClamp({}, { applied: false, before: [] }, { mode: "goal", hostTools: [] });
+    const result = await applyContractToolClamp({}, { applied: false, before: [], removed: [] }, { mode: "goal", hostTools: [] });
     expect(result.ok).toBe(false);
   });
 });
@@ -316,7 +422,7 @@ describe("registered handlers", () => {
     expect(setCalls).toEqual([["read", "bash", "ask"]]);
   });
 
-  it("refuses the turn through ctx.abort when the owned state is invalid", async () => {
+  it("refuses the turn through ctx.abort and a structured notify when the owned state is invalid", async () => {
     const dir = stateDir();
     const path = join(dir, DESKTOP_STATE_FILE);
     writeFileSync(path, JSON.stringify({ v: 1, sessionId: OWNING_SESSION, skills: [], memory: null }));
@@ -324,13 +430,72 @@ describe("registered handlers", () => {
     const { api, captured, setCalls } = fakeGate();
     ompDesktopGate(api);
     let aborted = 0;
+    const notifications: Array<{ message: string; type?: string }> = [];
     const result = await captured.beforeAgentStart!(
       { type: "before_agent_start", systemPrompt: [...BASE_PROMPT] },
-      { ...context(), abort: () => { aborted += 1; } },
+      {
+        ...context(),
+        abort: () => {
+          aborted += 1;
+        },
+        hasUI: true,
+        ui: {
+          notify: (message: string, type?: "info" | "warning" | "error") => {
+            notifications.push({ message, type });
+          },
+        },
+      },
     );
     expect(result).toBeUndefined();
     expect(aborted).toBe(1);
     expect(setCalls).toEqual([]);
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]?.type).toBe("error");
+    const refusal = parseStartRefusalNotice({
+      type: "extension_ui_request",
+      id: "frame-1",
+      method: "notify",
+      message: notifications[0]?.message,
+    });
+    expect(refusal).toMatchObject({ sessionId: OWNING_SESSION, code: "state-invalid" });
+  });
+
+  it("refuses a deleted mandatory state in the registered handler, but never a delegate", async () => {
+    const path = writeState({}, Date.now());
+    markDesktopStateRequired(path);
+    rmSync(path);
+    process.env.OMP_DESKTOP_STATE = path;
+    const { api, captured } = fakeGate();
+    ompDesktopGate(api);
+    let aborted = 0;
+    await captured.beforeAgentStart!(
+      { type: "before_agent_start", systemPrompt: [...BASE_PROMPT] },
+      {
+        ...context(),
+        abort: () => {
+          aborted += 1;
+        },
+        hasUI: true,
+        ui: { notify: () => undefined },
+      },
+    );
+    expect(aborted).toBe(1);
+
+    // A delegate (no UI) reading the same run root keeps zero injection and
+    // is never aborted: its own state read is not the owner's failure.
+    const delegate = await captured.beforeAgentStart!(
+      { type: "before_agent_start", systemPrompt: [...BASE_PROMPT] },
+      {
+        ...context("delegate-native"),
+        abort: () => {
+          aborted += 1;
+        },
+        hasUI: false,
+        ui: { notify: () => undefined },
+      },
+    );
+    expect(delegate).toBeUndefined();
+    expect(aborted).toBe(1);
   });
 
   it("carries the effective permission mode into the approval descriptor from the owned state", async () => {
