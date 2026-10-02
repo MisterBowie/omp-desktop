@@ -1,0 +1,501 @@
+{
+  "desktopCommit": "50e4f6ee4d7222fbdd47f078f74a28d0a185cb1b",
+  "transport": "real patched fixed OMP + production bridge/gate + local FakeProvider",
+  "results": [
+    {
+      "strategy": "control",
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:review-failure:214359b3-d00f-41ca-9707-d40c032ca21c:1"
+      },
+      "providerRequests": 1,
+      "eventTypes": [
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "message_start",
+        "message_update",
+        "message_end",
+        "turn_end",
+        "agent_end"
+      ],
+      "turnEnds": [
+        {
+          "sessionId": "review-failure",
+          "turnId": "omp-turn:review-failure:214359b3-d00f-41ca-9707-d40c032ca21c:1",
+          "reason": "completed"
+        }
+      ],
+      "diagnostics": {
+        "sessionId": "review-failure",
+        "lateFrames": 1,
+        "conversion": {
+          "unmappedFrames": {
+            "prompt_result": 1,
+            "assistant:text_start": 1,
+            "assistant:text_end": 1
+          },
+          "toolResultMessages": {},
+          "droppedParts": {},
+          "notes": [
+            "an informational notice was counted, not shown"
+          ]
+        },
+        "uiRecords": [],
+        "state": "idle",
+        "sessions": [
+          {
+            "sessionId": "review-failure",
+            "state": "idle",
+            "lateFrames": 1
+          }
+        ],
+        "hostTools": {
+          "pending": 0,
+          "executed": 0,
+          "cancelled": 0,
+          "duplicates": 0,
+          "unknownCancels": 0,
+          "noRun": 0,
+          "malformed": 0,
+          "lateCompletions": 0,
+          "rememberedIds": 0,
+          "trackedGenerations": 0
+        }
+      },
+      "mutations": [
+        {
+          "strategy": "control",
+          "mode": "plan",
+          "owner": "01a0fd43-b20c-7148-a4ea-6662e69cc54d",
+          "firing": "01a0fd43-b20c-7148-a4ea-6662e69cc54d"
+        },
+        {
+          "strategy": "control",
+          "mode": "plan",
+          "owner": "01a0fd43-b20c-7148-a4ea-6662e69cc54d",
+          "firing": "01a0fd43-b20c-7148-a4ea-6662e69cc54d"
+        }
+      ],
+      "retry": {
+        "accepted": true,
+        "turnId": "omp-turn:review-failure:214359b3-d00f-41ca-9707-d40c032ca21c:2"
+      },
+      "retryProviderRequests": 1,
+      "retryState": "idle",
+      "disposeResult": {
+        "ok": true,
+        "failures": []
+      },
+      "bridgeDisposed": true,
+      "finalStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      }
+    },
+    {
+      "strategy": "delete",
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:review-failure:dbbb5e1c-8fbd-44de-9b1a-ed342b963a11:1"
+      },
+      "providerRequests": 0,
+      "eventTypes": [
+        "error"
+      ],
+      "turnEnds": [
+        {
+          "sessionId": "review-failure",
+          "turnId": "omp-turn:review-failure:dbbb5e1c-8fbd-44de-9b1a-ed342b963a11:1",
+          "reason": "error"
+        }
+      ],
+      "diagnostics": {
+        "sessionId": "review-failure",
+        "lateFrames": 1,
+        "conversion": {
+          "unmappedFrames": {
+            "prompt_result": 1
+          },
+          "toolResultMessages": {},
+          "droppedParts": {},
+          "notes": []
+        },
+        "uiRecords": [],
+        "state": "idle",
+        "sessions": [
+          {
+            "sessionId": "review-failure",
+            "state": "idle",
+            "lateFrames": 1
+          }
+        ],
+        "hostTools": {
+          "pending": 0,
+          "executed": 0,
+          "cancelled": 0,
+          "duplicates": 0,
+          "unknownCancels": 0,
+          "noRun": 0,
+          "malformed": 0,
+          "lateCompletions": 0,
+          "rememberedIds": 0,
+          "trackedGenerations": 0
+        }
+      },
+      "mutations": [
+        {
+          "strategy": "delete",
+          "mode": "plan",
+          "owner": "01a0fd43-c5a2-73fc-be8c-9472fb5f43a0",
+          "firing": "01a0fd43-c5a2-73fc-be8c-9472fb5f43a0"
+        }
+      ],
+      "retry": {
+        "accepted": true,
+        "turnId": "omp-turn:review-failure:dbbb5e1c-8fbd-44de-9b1a-ed342b963a11:2"
+      },
+      "retryProviderRequests": 1,
+      "retryState": "idle",
+      "disposeResult": {
+        "ok": true,
+        "failures": []
+      },
+      "bridgeDisposed": true,
+      "finalStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      }
+    },
+    {
+      "strategy": "malformed",
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:review-failure:54b88fb5-b28d-45e7-abbf-ae9dc12a790e:1"
+      },
+      "providerRequests": 0,
+      "eventTypes": [
+        "error"
+      ],
+      "turnEnds": [
+        {
+          "sessionId": "review-failure",
+          "turnId": "omp-turn:review-failure:54b88fb5-b28d-45e7-abbf-ae9dc12a790e:1",
+          "reason": "error"
+        }
+      ],
+      "diagnostics": {
+        "sessionId": "review-failure",
+        "lateFrames": 1,
+        "conversion": {
+          "unmappedFrames": {
+            "prompt_result": 1
+          },
+          "toolResultMessages": {},
+          "droppedParts": {},
+          "notes": []
+        },
+        "uiRecords": [],
+        "state": "idle",
+        "sessions": [
+          {
+            "sessionId": "review-failure",
+            "state": "idle",
+            "lateFrames": 1
+          }
+        ],
+        "hostTools": {
+          "pending": 0,
+          "executed": 0,
+          "cancelled": 0,
+          "duplicates": 0,
+          "unknownCancels": 0,
+          "noRun": 0,
+          "malformed": 0,
+          "lateCompletions": 0,
+          "rememberedIds": 0,
+          "trackedGenerations": 0
+        }
+      },
+      "mutations": [
+        {
+          "strategy": "malformed",
+          "mode": "plan",
+          "owner": "01a0fd43-d922-76bd-81fd-fa54cb68aa3e",
+          "firing": "01a0fd43-d922-76bd-81fd-fa54cb68aa3e"
+        }
+      ],
+      "retry": {
+        "accepted": true,
+        "turnId": "omp-turn:review-failure:54b88fb5-b28d-45e7-abbf-ae9dc12a790e:2"
+      },
+      "retryProviderRequests": 1,
+      "retryState": "idle",
+      "disposeResult": {
+        "ok": true,
+        "failures": []
+      },
+      "bridgeDisposed": true,
+      "finalStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      }
+    },
+    {
+      "strategy": "owned-invalid",
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:review-failure:b8171120-2355-40b1-9d43-99aaa113a64f:1"
+      },
+      "providerRequests": 0,
+      "eventTypes": [
+        "error"
+      ],
+      "turnEnds": [
+        {
+          "sessionId": "review-failure",
+          "turnId": "omp-turn:review-failure:b8171120-2355-40b1-9d43-99aaa113a64f:1",
+          "reason": "error"
+        }
+      ],
+      "diagnostics": {
+        "sessionId": "review-failure",
+        "lateFrames": 1,
+        "conversion": {
+          "unmappedFrames": {
+            "prompt_result": 1
+          },
+          "toolResultMessages": {},
+          "droppedParts": {},
+          "notes": []
+        },
+        "uiRecords": [],
+        "state": "idle",
+        "sessions": [
+          {
+            "sessionId": "review-failure",
+            "state": "idle",
+            "lateFrames": 1
+          }
+        ],
+        "hostTools": {
+          "pending": 0,
+          "executed": 0,
+          "cancelled": 0,
+          "duplicates": 0,
+          "unknownCancels": 0,
+          "noRun": 0,
+          "malformed": 0,
+          "lateCompletions": 0,
+          "rememberedIds": 0,
+          "trackedGenerations": 0
+        }
+      },
+      "mutations": [
+        {
+          "strategy": "owned-invalid",
+          "mode": "plan",
+          "owner": "01a0fd43-ecab-70f0-91bb-c85e6fa5978d",
+          "firing": "01a0fd43-ecab-70f0-91bb-c85e6fa5978d"
+        }
+      ],
+      "retry": {
+        "accepted": true,
+        "turnId": "omp-turn:review-failure:b8171120-2355-40b1-9d43-99aaa113a64f:2"
+      },
+      "retryProviderRequests": 1,
+      "retryState": "idle",
+      "disposeResult": {
+        "ok": true,
+        "failures": []
+      },
+      "bridgeDisposed": true,
+      "finalStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      }
+    },
+    {
+      "strategy": "delete-channel-files",
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:review-failure:a8b6b391-de3f-4115-89f8-fb0d26d084f8:1"
+      },
+      "providerRequests": 0,
+      "eventTypes": [
+        "error"
+      ],
+      "turnEnds": [
+        {
+          "sessionId": "review-failure",
+          "turnId": "omp-turn:review-failure:a8b6b391-de3f-4115-89f8-fb0d26d084f8:1",
+          "reason": "error"
+        }
+      ],
+      "diagnostics": {
+        "sessionId": "review-failure",
+        "lateFrames": 1,
+        "conversion": {
+          "unmappedFrames": {
+            "prompt_result": 1
+          },
+          "toolResultMessages": {},
+          "droppedParts": {},
+          "notes": []
+        },
+        "uiRecords": [],
+        "state": "idle",
+        "sessions": [
+          {
+            "sessionId": "review-failure",
+            "state": "idle",
+            "lateFrames": 1
+          }
+        ],
+        "hostTools": {
+          "pending": 0,
+          "executed": 0,
+          "cancelled": 0,
+          "duplicates": 0,
+          "unknownCancels": 0,
+          "noRun": 0,
+          "malformed": 0,
+          "lateCompletions": 0,
+          "rememberedIds": 0,
+          "trackedGenerations": 0
+        }
+      },
+      "mutations": [
+        {
+          "strategy": "delete-channel-files",
+          "mode": "plan",
+          "owner": "01a0fd44-0039-7598-a7f6-d996ab776eb0",
+          "firing": "01a0fd44-0039-7598-a7f6-d996ab776eb0"
+        }
+      ],
+      "retry": {
+        "accepted": true,
+        "turnId": "omp-turn:review-failure:a8b6b391-de3f-4115-89f8-fb0d26d084f8:2"
+      },
+      "retryProviderRequests": 1,
+      "retryState": "idle",
+      "disposeResult": {
+        "ok": true,
+        "failures": []
+      },
+      "bridgeDisposed": true,
+      "finalStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      }
+    },
+    {
+      "strategy": "new-unsafe-plugin-during-plan",
+      "phases": [
+        {
+          "phase": "agent-baseline",
+          "settled": true,
+          "state": "idle",
+          "providerTools": [
+            "read",
+            "bash",
+            "edit",
+            "ask",
+            "eval",
+            "glob",
+            "grep",
+            "task",
+            "wait",
+            "todo",
+            "web_search",
+            "write"
+          ]
+        },
+        {
+          "phase": "plan-baseline",
+          "settled": true,
+          "state": "idle",
+          "providerTools": [
+            "read",
+            "bash",
+            "ask",
+            "glob",
+            "grep"
+          ]
+        },
+        {
+          "phase": "plan-add-plugin",
+          "settled": true,
+          "state": "idle",
+          "providerTools": [
+            "read",
+            "bash",
+            "ask",
+            "glob",
+            "grep"
+          ]
+        },
+        {
+          "phase": "agent-same-catalog",
+          "settled": true,
+          "state": "idle",
+          "providerTools": [
+            "read",
+            "bash",
+            "edit",
+            "ask",
+            "eval",
+            "glob",
+            "grep",
+            "task",
+            "wait",
+            "todo",
+            "web_search",
+            "write",
+            "plugin_demo_new_unsafe"
+          ]
+        }
+      ],
+      "returnedAgentPluginVisible": true,
+      "disposeResult": {
+        "ok": true,
+        "failures": []
+      },
+      "finalStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      }
+    }
+  ]
+}

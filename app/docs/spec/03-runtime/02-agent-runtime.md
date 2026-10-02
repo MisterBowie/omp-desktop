@@ -1791,7 +1791,14 @@ contract tool catalog (evidence: `docs/validation/M5-capability-user-paths.md`,
   delegates are counted and ignored, and a `v: 1` descriptor (no token) no
   longer parses, so a replayed frame can never close a newer generation. A
   missing command, refused handshake or missing acknowledgment fails the
-  prompt before the user prompt is sent. A delegate session (`hasUI=false`;
+  prompt before the user prompt is sent. A stop or dispose that lands while
+  the preparation is in flight cancels the admitted generation: the runner
+  revalidates the generation captured at admission after every await and
+  immediately before it writes user content, closes the canceled generation
+  as `aborted` (exactly once, so the stop converges without a teardown),
+  refuses the prompt, and a late handshake or acknowledgment continuation can
+  neither arm a stale fence nor submit the canceled prompt. A delegate
+  session (`hasUI=false`;
   `task`/`eval` subagents initialize their extension runner with the no-op UI
   context) keeps zero injection and is never refused by the channel. With the
   switch off (a fixture that never enabled the channel) the T19-C degradation

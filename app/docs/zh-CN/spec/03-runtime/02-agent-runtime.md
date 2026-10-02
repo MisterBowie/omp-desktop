@@ -1114,7 +1114,10 @@ gate 通过运行时正式的 `notify` 通道发出带版本的结构化拒绝�
 本 entry 的 native session 且携带该代 token、fence 已确认、当前代尚未 `agent_start`，才关闭该代：恰
 一次 `error`（`OMP_RUNTIME_STATE_REFUSED`）+ 恰一次 `turnEnd(error)`，关闭 dialogs/hostcalls 并回到
 idle。重复投递、上一代的迟到描述符（旧 token）、他会话/子代理信号只计数不关闭；`v: 1`（无 token）不再
-可解析。命令缺失、握手被拒或未确认会在发送用户提示词之前失败。③**离开合约模式重建
+可解析。命令缺失、握手被拒或未确认会在发送用户提示词之前失败。准备期间到达的 Stop 或 dispose 会取消
+被准入的那一代：runner 在每个 await 之后、写入用户内容之前立即重验准入时捕获的代号，以 `aborted`
+恰一次关闭被取消的代（Stop 因此无需 teardown 即可收敛）并拒绝该 prompt；迟到的握手/确认续延既不能装上
+过期 fence，也不能提交被取消的 prompt。③**离开合约模式重建
 运行时进程**——扩展面只暴露按名选择的 `setActiveTools`（会把它恢复的名字钉在顶层），没有
 presentation 恢复 API（`setActiveToolPresentation` 非扩展接口，RPC 也无该命令），因此 Plan/Goal →
 Agent 时 bridge 回收进程、下一次提示词在同一持久 native 会话（`switch_session`）、同一项目/模型

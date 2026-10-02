@@ -1,0 +1,81 @@
+✔ refuses to prompt when this build has no gate extension (1.209148ms)
+✔ refuses to prompt when this build has no runtime executable (0.204776ms)
+✔ starts the runtime once and streams the run under one turn id (2.898666ms)
+✔ runs two OMP sessions on independent runtimes (0.593783ms)
+✔ surfaces a gate approval as a permission request and answers it once (0.910413ms)
+✔ an approval is answered under the session the bridge stored for it (0.38954ms)
+✔ surfaces a runtime question through the ask card and returns the chosen option (0.502757ms)
+✔ stopping cancels the dialogs the runtime is blocked on (6.224546ms)
+✔ dispose cancels dialogs and reclaims the runtime (0.670456ms)
+✔ retains a directory-only debt across stop retries until it is removable (3.280974ms)
+✔ reclaims a dead runtime and rebuilds it for the next prompt in the same session (1.865378ms)
+✔ an immediate successful teardown still lets the next prompt rebuild (1.253895ms)
+✔ a converged protocol stop reuses the live runtime (0.716252ms)
+✔ pending cleanup refuses the next prompt without starting a second runtime (0.833365ms)
+✔ the retired runtime's handlers are detached and old frames do not reach the replacement (1.210588ms)
+✔ a dispose that cannot reclaim keeps the session's ownership, not a second runtime (0.904201ms)
+✔ reports a transport failure as one typed error, not a hung turn (0.575667ms)
+✔ an OMP prompt reaches the bridge without touching the Pi runtime (1.178225ms)
+✔ an OMP session's status comes from the runtime that owns it (0.383563ms)
+✔ binds the session's project directory before the runtime starts (0.213913ms)
+✔ refuses an empty or relative project directory without starting anything (0.253983ms)
+✔ refuses a different project directory for a runtime already bound to one (0.383733ms)
+✔ a question's id cannot be consumed through the permission path (0.287323ms)
+✔ an approval's id cannot be consumed through the ask path (0.248475ms)
+✔ an answer that names another session is refused (0.256412ms)
+✔ a duplicate decision, or one after a stop, never writes a second frame (5.668957ms)
+✔ a skipped question is failed closed instead of leaving the runtime waiting (0.464522ms)
+✔ an answer the runtime's select cannot carry is failed closed too (0.262528ms)
+✔ a confirmation answers yes/no and a dismissal is a cancellation (0.342837ms)
+✔ a dialog raised by an earlier run cannot be answered into the next one (0.463268ms)
+✔ a late reply after a transport failure or a dispose writes nothing (0.616996ms)
+✔ the runtime retracting a dialog clears it in the bridge as well (0.25954ms)
+✔ stopping another session leaves this one's dialogs, state and wire untouched (0.268721ms)
+✔ a refused prompt closes its dialog and tells the renderer the turn ended (0.652615ms)
+✔ a thrown prompt request keeps its own error and still ends the turn (0.515826ms)
+✔ replacement runtimes keep every reply visible with distinct ids (2.300563ms)
+✔ a prompt racing a stop is refused and never starts a second runtime mid-teardown (1.237209ms)
+✔ stop during startup or restore cancels the pending prompt and leaves the session idle (2.928295ms)
+✔ dispose during startup or restore cancels the pending prompt and reclaims (0.953609ms)
+✖ stop during turn-fence preparation cancels the pending prompt and leaves the session idle (202.807215ms)
+✔ two concurrent prompts share one runtime and only one starts a run (0.744739ms)
+✔ a prompt racing disposeSession's completion window is refused and leaves no orphan (0.804797ms)
+✔ a prompt racing application shutdown's completion window is refused and leaves no orphan (0.58776ms)
+✔ a new session racing whole-bridge shutdown is refused before it starts a runtime (0.570283ms)
+✔ a prompt racing a startup or restore stop is refused, not submitted after the stop reports nothing running (2.711375ms)
+✔ concurrent stop and dispose overlap without reopening admission (0.569461ms)
+✔ whole-bridge shutdown refuses an existing session before any cleanup await (1.258185ms)
+✔ whole-bridge shutdown invalidates a prompt still preparing before it submits (0.938683ms)
+✔ a model change reconfigures without reusing the earlier reply's live ids (1.454104ms)
+✔ a disposed and reopened session mints fresh live ids without colliding (0.966701ms)
+✔ a recreated bridge mints live ids that do not collide with a retained reply (0.927837ms)
+ℹ tests 51
+ℹ suites 0
+ℹ pass 50
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 756.237104
+
+✖ failing tests:
+
+test at test/omp-session-bridge.test.mjs:1878:1
+✖ stop during turn-fence preparation cancels the pending prompt and leaves the session idle (202.807215ms)
+  AssertionError [ERR_ASSERTION]: the pending prompt must be cancelled on discovery
+  + actual - expected
+  
+  + undefined
+  - true
+  
+      at TestContext.<anonymous> (file:///home/vv/person/code/omp-desktop-m5-t20-b1/app/apps/desktop/test/omp-session-bridge.test.mjs:1938:14)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+EXIT=1

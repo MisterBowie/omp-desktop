@@ -306,3 +306,66 @@ bridge.prompt
 | `repair2-red/*` | 第二次复审原始 RED（summary/probe/replay）+ `SHA256SUMS.txt` + `README.md`（说明与哈希） | 见 `repair2-red/SHA256SUMS.txt` 与 §10.1 |
 
 （`repair2-evidence-sha256.txt` 为上述 7 个日志的 `sha256sum` 汇总，未做归一化；所有日志为对应命令的原始 stdout/stderr 直接落盘。）
+
+## 11. 2026-10-02 第三次独立复审返修（R4：turn-fence 准备期 Stop 竞态；RED 原样归档 `repair3-red/`，GREEN 追加）
+
+### 11.1 判定与 RED 证据（原样归档，未编辑）
+
+第三次独立复审（Mac arm64 / Node v24.14.0 / Bun 1.4.2；候选提交 `7fa4be024e16c0a1cbafa752052ee46829a7fab3`，被测源码 `50e4f6ee4d7222fbdd47f078f74a28d0a185cb1b`，两者只差两行 Markdown）确认 F1-F4、R1、R3 的独立探针全部 GREEN（缺失/不可解析/owned-invalid/两文件同删 → provider0、恰一 error/turnEnd、idle、下一 prompt provider1；Agent 插件/原生/deferred 目录恢复；新旧拒绝描述符矩阵含正对照），但判 `changes-required` 一条（R4/P1）：
+
+| 编号 | 反例（原证据，字节未编辑） |
+| --- | --- |
+| R4 | 新增的异步 turn-fence 准备忽略准备期间到达的 Stop：`runner.prompt` 在 `armTurnFence` 之后无条件提交用户 prompt，`armTurnFence` 在 await command discovery 之后不重验“本代是否仍被准入”。真实线序 `get_available_commands → abort → 内部绑定 prompt → 用户 prompt`：Stop 时 `state=stopping`、`providerAtStopRequest=0`，但 bridge 仍 `accepted=true`、**`providerRequests=1`**（被取消的 prompt 在 abort 之后被提交并完整执行）；固定运行时早于 `agent_start` 的 abort 不产生 `agent_end`，所以协议内 abort 无法取消尚未分发的 prompt。同批 `start-refusal-generation-*.json` 的新旧描述符矩阵（含正对照）继续 GREEN |
+
+原始文件：`repair3-red/production-fence-stop-race-50e4f6ee.json`、`repair3-red/production-fence-stop-race-probe.mjs`、`repair3-red/start-refusal-generation-50e4f6ee.json`、`repair3-red/start-refusal-generation-review.mjs`、`repair3-red/production-state-failure-probe-50e4f6ee.json`、`repair3-red/third-review-summary-7fa4be02.json`。
+
+### 11.2 返修内容与实现坐标
+
+**把 turn-fence 准备绑定到“被准入的那一代”，每个 await 之后重验取消/生命周期归属。** `runner.ts` 在 `prompt` 里把本代的 `RunRecord` 捕获为本地 `run`，并新增：
+
+- `isCurrentRun(run)`：当且仅当 `state === "running"` 且 `this.run === run` 时该代仍可提交内容。Stop 在 `performStop` 的**第一个 await 之前**同步把状态置为 `stopping`，dispose 同步清空 `run`，两者都是本代的取消。
+- `closeCancelledRun(run, reason)`：当该代仍是本 runner 的时候取消其 dialogs 并以 `aborted` 关闭（恰一次 turnEnd）；dispose/teardown 已关闭的代、替换后的新代一律不动。
+- `refuseCanceledPreparation(run)`：先 `closeCancelledRun`，再抛 typed `stopping` 拒绝。
+
+重验点（按修复后代码顺序）：①`get_available_commands` 响应到达后、**缓存命令可用性之前**；②握手的 `prompt` 请求异常/响应到达后；③ACK 等待返回后；④`prompt()` 内最后一道同步检查，紧跟 `runtime.request({type:"prompt", message})` 写入之前（同一次同步块，中途无 await，Stop 无法插入）；⑤`prompt()` 的 catch 中：本代仍现行 → 原有关闭路径；已在别处被取消但仍是本 runner 的代 → `closeCancelledRun`。`performStop` 在置 `stopping` 后立即 `pendingTurnAck?.settle(false)`：Stop 直接取消对 ack 的等待，不必等 fence 截止时间，也不会让迟到的 ack 之后装上过期 fence。被取消代不再发送用户 prompt、不 arm fence、不 `turnFences++`、不缓存/触碰新代。
+
+真实运行时语义依据（返修前核对固定源码，与复审 RED 线序一致）：`abort` 是**普通（串行）RPC 命令**（`rpc-mode.ts` 的 `RpcInputDispatcher` 只让 control 帧插队，`bash` 后台分发），因此它排在已提交帧之后、无法撤销尚未分发的 prompt；`agent_start` 之前的 abort 不发 `agent_end`（复审探针与本机生产反例均实测）。用户 Stop 的准备期结果：prompt 以 `stopping` 被拒、恰一次 `turnEnd(aborted)`、回到 idle、Stop `converged=true`/`toreDown=false`（保留活进程）、下一次真实 prompt 在同一 runtime/持久 native 会话上正常准入。不伪造 `agent_end`、不用私有 API、产品代码无 monkeypatch、无额外 provider 请求、无 token 泄漏。
+
+### 11.3 GREEN 计数与证据（2026-10-02/03，Linux x64 / Node v24.14.0 / Bun 1.4.2；全部本地 FakeProvider，无付费/远程模型）
+
+| 命令 | 结果 | exit | 原始日志 |
+| --- | --- | --- | --- |
+| `pnpm -C packages/omp-runtime test` | 25 files / **404 passed / 6 skipped**（+4：discovery / 握手响应 / ACK 三个边界 + dispose 准备期取消；含 stop 重试 `nothing running`、下一 prompt 新 fence、迟到 ack 只计数、不 arm 过期 fence） | 0 | `omp-runtime-vitest-repair3.txt` |
+| `node --test test/omp-session-turn-fence-e2e.test.mjs`（**新增**：真实补丁 OMP + 生产 bridge/runner/gate + FakeProvider；seam 只用公开 `runtimeFactory` 包裹真实进程的 request 转发） | **1 passed**（8.2s 单跑 / 16.2s 负载下）：control 正常 provider1；`stop-on-command-discovery`、`stop-on-fence-handshake` 两策略下 Stop 同步置 `stopping`、取消的 prompt 以 `stopping` 被拒、**providerRequests=0**、无用户 prompt 帧、恰一 `turnEnd(aborted)`、无 agent 事件、无伪造 `agent_end`、无宿主/文件副作用；恢复 prompt 在同一 bridge/持久 native 身份（`new_session`=1、`switch_session`=0、persist=1）上 provider1 完成、turn 身份不同；dispose/最终 stop `reaped && cleaned` | 0 | `turn-fence-stop-e2e-repair3.txt` |
+| `node --test test/omp-session-bridge.test.mjs` | **51 passed**（+1：`stop during turn-fence preparation...` discovery 与 ack 两个 held 边界；stop 不提前返回、恰一 aborted、下一 prompt 在同一 runtime 上恢复） | 0 | `desktop-suite-repair3.txt`（全量内含） |
+| `node --test test/omp-runtime-state-e2e.test.mjs`（B1 生产 E2E，真实补丁树 + 生产 wiring/gate + mutator/witness） | **1 passed**（15.4s；P1-P9 与拒绝/恢复矩阵保持） | 0 | `b1-e2e-repair3.txt` |
+| 真实运行时套件组（start-handler 语义 / session / subagent / skill-path / host-tool / persistence / concurrent-approval / capability-source） | **24 passed** | 0 | `runtime-e2e-repair3.txt` |
+| `node --test test/*.test.mjs`（`apps/desktop` 全量，`env -u SSH_ASKPASS`） | **2979 tests / 2968 pass / 0 fail / 11 skipped** | 0 | `desktop-suite-repair3.txt` |
+| `pnpm build:js` / `pnpm -r --if-present typecheck` / `pnpm lint` | 全绿 | 0 / 0 / 0 | `build-typecheck-lint-repair3.txt` |
+| matrix ids / gap 探针（`OMP_T20_GAP_PROBE=1`）/ omp-patch / release-docs / agent-policy / locales / check-docs / `git diff --check` | `MATRIX-ID-OK` / g2/g3 open（exit 1 预期）/ `OMP-PATCH-OK 62bc57b+omp-desktop.3` / 对齐 0.15.2 / 通过 / 79 对 / **6 项预存在**（508 页）/ 干净 | 0 / **1（预期）** / 0 / 0 / 0 / 0 / **1（预存在）** / 0 | `checks-repair3.txt` |
+
+RED（最终版新测试 + 临时还原的未修复 runner 源码及其重建 `dist`，原始 stdout/stderr 直接落盘并追加 `EXIT=1`）：runner 层 **4 failed / 40 passed**、bridge 层 **1 failed / 50 passed**、生产 E2E **1 failed**（三份日志归档于 `repair3-red/`，与被取消行为一致）。GREEN 前已恢复修复源码并重建（E2E/桌面套件经包 `dist` 消费产品运行时）。
+
+未跑：host-core / cargo / 283MB 打包（本轮未改 Rust、patch 构件、fork、pins/manifest）。仅 Linux x64。门禁 `desktopStateRequired` 生产 wiring 未改。
+
+### 11.4 验证层次与不声称
+
+- **runner 层（确定性）**：三个 held 边界（command discovery / 握手响应 / gate ACK）+ dispose 准备期取消各一个用例；断言零用户 prompt、零 fence arm、恰一 aborted、dispose 不再继续准备、stop 重试 `nothing running`、迟到 ack `ignoredTurnAcks` 计数且不影响下一代的 fence。
+- **bridge 层**：同一不变量在两个 held 边界上通过真实 bridge/runner 生命周期验证（含 stop 不提前返回、`toreDown=false`、恢复 prompt 在同一 runtime/持久身份）。
+- **生产层**：真实固定已补丁 OMP 进程 + 生产 bridge/runner/gate + FakeProvider；seam 只在真实帧提交后同步触发用户 Stop，不延迟/伪造/重排任何 RPC 帧或响应，control 策略证明同一层可正常 provider1；断言 provider 精确计数、线序（无用户 prompt）、恰一终态、恢复同一 native 身份、无文件副作用。
+- **不声称**：未验证真实 OMP 在 stdout 上重放帧（本轮不涉及）；未改/未重跑 Rust、patch 构件与打包；g2/g3 仍 open，T20 未完成、Plan/Goal 未实现、能力关闭；B1 验收仍待本地复审；仅 Linux x64，无 macOS/Windows 实机、无真实付费模型。
+
+### 11.5 返修证据文件（`docs/validation/M5-t20-b1-runtime-state/`）
+
+| 文件 | 内容 | SHA-256 |
+| --- | --- | --- |
+| `omp-runtime-vitest-repair3.txt` | 包 vitest 原始输出（25 files / 404 passed / 6 skipped，EXIT=0） | `eb9dd67f61f125427bba762f6bbd52dd9a1dc479943c6d14ec83f00f9a25e5be` |
+| `turn-fence-stop-e2e-repair3.txt` | 新增生产反例 E2E（1 passed / EXIT=0） | `c03cf968b87129851199657e379abcddf7d15f3616ed03a88837ddccf593659a` |
+| `b1-e2e-repair3.txt` | B1 生产 E2E 单跑（1 passed / EXIT=0） | `f40d3b516a1c957f480dd65cd2a8429ae5e7fef068855322eca3af368799a4ff` |
+| `runtime-e2e-repair3.txt` | 真实运行时套件组（24 passed / EXIT=0） | `5118c5df6569fee2f44d7731c175939b25c2bf9066069c56e30b0a123896ab4a` |
+| `desktop-suite-repair3.txt` | desktop 全量原始输出（2979/2968/0/11，EXIT=0） | `7def3556fe63641ae9235b330b103e968381892cf40ad1046482c32c9a1b5c57` |
+| `build-typecheck-lint-repair3.txt` | build:js / 全仓 typecheck / lint（exit 0/0/0） | `9b084b7f3aaa48f4f78180711c7c9491602ef1e48d77439fa3d09446af57e513` |
+| `checks-repair3.txt` | 矩阵 lint / gap 探针（exit 1 预期）/ omp-patch / release-docs / agent-policy / locales / check-docs（6 预存在，exit 1）/ `git diff --check` | `53c15e9478e62cd93fa63f7266eea2e348945eef8314940848b2da15adfbf543` |
+| `repair3-red/*` | 第三次复审原始 RED（summary/probe/replay，未编辑）+ 本轮三份新测试 RED 日志 + `SHA256SUMS.txt` + `README.md` | 见 `repair3-red/SHA256SUMS.txt` 与 §11.1 |
+
+（`repair3-evidence-sha256.txt` 为上述 7 个日志的 `sha256sum` 汇总；所有日志为对应命令的原始 stdout/stderr 直接落盘，仅追加 `EXIT=` 行。）

@@ -1,0 +1,156 @@
+{
+  "desktopCommit": "50e4f6ee4d7222fbdd47f078f74a28d0a185cb1b",
+  "layer": "actual patched OMP + production bridge/runner/gate + local FakeProvider; public runtimeFactory seam only invokes user stop immediately after real command discovery is submitted; no RPC frames or responses delayed/forged/reordered",
+  "results": [
+    {
+      "strategy": "control",
+      "rpc": [
+        {
+          "type": "new_session"
+        },
+        {
+          "type": "get_state"
+        },
+        {
+          "type": "set_subagent_subscription"
+        },
+        {
+          "type": "get_available_commands"
+        },
+        {
+          "type": "prompt",
+          "control": true,
+          "message": "[turn binding]"
+        },
+        {
+          "type": "prompt",
+          "control": false,
+          "message": "user prompt cancelled before the fence completed"
+        }
+      ],
+      "events": [
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "message_start",
+        "message_update",
+        "message_end",
+        "turn_end",
+        "agent_end"
+      ],
+      "ends": [
+        {
+          "sessionId": "fence-stop-review",
+          "turnId": "omp-turn:fence-stop-review:e7648384-b48b-4f6c-879b-aceaddabb04d:1",
+          "reason": "completed"
+        }
+      ],
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:fence-stop-review:e7648384-b48b-4f6c-879b-aceaddabb04d:1"
+      },
+      "providerRequests": 1,
+      "finalState": "idle",
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "finalStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      }
+    },
+    {
+      "strategy": "stop-on-command-discovery",
+      "rpc": [
+        {
+          "type": "new_session"
+        },
+        {
+          "type": "get_state"
+        },
+        {
+          "type": "set_subagent_subscription"
+        },
+        {
+          "type": "get_available_commands"
+        },
+        {
+          "type": "abort"
+        },
+        {
+          "type": "prompt",
+          "control": true,
+          "message": "[turn binding]"
+        },
+        {
+          "type": "prompt",
+          "control": false,
+          "message": "user prompt cancelled before the fence completed"
+        },
+        {
+          "type": "get_subagents"
+        }
+      ],
+      "events": [
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "message_start",
+        "message_update",
+        "message_end",
+        "turn_end",
+        "agent_end"
+      ],
+      "ends": [
+        {
+          "sessionId": "fence-stop-review",
+          "turnId": "omp-turn:fence-stop-review:6c48761b-55af-4309-b20b-e21ac7c77fba:1",
+          "reason": "aborted"
+        }
+      ],
+      "providerAtStopRequest": 0,
+      "stateAtStopRequest": "stopping",
+      "prompt": {
+        "accepted": true,
+        "turnId": "omp-turn:fence-stop-review:6c48761b-55af-4309-b20b-e21ac7c77fba:1"
+      },
+      "stop": {
+        "aborted": true,
+        "abortBashSent": false,
+        "converged": true,
+        "toreDown": false,
+        "steps": [
+          "abort acknowledged",
+          "turn converged"
+        ],
+        "errors": []
+      },
+      "providerRequests": 1,
+      "finalState": "idle",
+      "passed": false,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "finalStop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true,
+        "steps": [
+          "nothing owned"
+        ],
+        "errors": []
+      }
+    }
+  ],
+  "passed": false
+}

@@ -1,0 +1,32 @@
+✖ M5/T20-B1 third repair: a stop during turn-fence preparation never submits the canceled prompt (6087.466887ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6529.117945
+
+✖ failing tests:
+
+test at test/omp-session-turn-fence-e2e.test.mjs:100:1
+✖ M5/T20-B1 third repair: a stop during turn-fence preparation never submits the canceled prompt (6087.466887ms)
+  AssertionError [ERR_ASSERTION]: stop-on-command-discovery: the canceled prompt is refused
+  + actual - expected
+  
+  + undefined
+  - true
+  
+      at TestContext.<anonymous> (file:///home/vv/person/code/omp-desktop-m5-t20-b1/app/apps/desktop/test/omp-session-turn-fence-e2e.test.mjs:205:18)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+EXIT=1

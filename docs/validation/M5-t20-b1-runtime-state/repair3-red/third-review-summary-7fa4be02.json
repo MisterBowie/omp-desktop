@@ -1,0 +1,55 @@
+{
+  "candidate": "7fa4be024e16c0a1cbafa752052ee46829a7fab3",
+  "testedSource": "50e4f6ee4d7222fbdd47f078f74a28d0a185cb1b",
+  "onlyFinalDelta": [
+    "HANDOFF.md",
+    "docs/validation/M5-t20-b1-runtime-state.md"
+  ],
+  "decision": "changes-required",
+  "independentBuildExit": 0,
+  "githubRefMatches": true,
+  "evidenceManifest": {
+    "uniqueFiles": 14,
+    "checks": 19,
+    "hashesAndTracked": true
+  },
+  "resolved": [
+    "F1-F4 original production probes",
+    "R1 both-files loss",
+    "R2 removed marker writer",
+    "R3 stale/foreign descriptor positive-controlled matrix"
+  ],
+  "remaining": {
+    "id": "R4",
+    "layer": "actual fixed patched OMP + production bridge/runner/gate + local FakeProvider",
+    "trigger": "Stop synchronously after real get_available_commands submission, before user prompt dispatch",
+    "observed": "provider0 at Stop; abort then internal fence then actual user prompt; accepted=true/provider1; eventual aborted terminal",
+    "expected": "canceled preparation never sends user prompt/provider request"
+  },
+  "files": {
+    "start-refusal-generation-50e4f6ee.json": {
+      "sha256": "7d31a3650a4118b2c5c7ff80ee8397ba6ea8f6359b4bbe07a7eda399ae60abea",
+      "bytes": 3463
+    },
+    "start-refusal-generation-review.mjs": {
+      "sha256": "3fd6cd483d0ca55b4a1429154905af179a01f74aee0ce848363bdee6e3ac91be",
+      "bytes": 6541
+    },
+    "production-fence-stop-race-50e4f6ee.json": {
+      "sha256": "f1b9c3265485e456fd6d49f4561d9ed014e807fb29ebcbf50963b367e4bcfa10",
+      "bytes": 3739
+    },
+    "production-fence-stop-race-probe.mjs": {
+      "sha256": "9994eb53af0358636808f6e56bf514d57365238e57e96798c5ca7cca24d32473",
+      "bytes": 5268
+    },
+    "production-state-failure-probe-50e4f6ee.json": {
+      "sha256": "b53c0046ab16af0d72150ad91cb479bb546269b5aab360fccd83c00546511cc8",
+      "bytes": 12377
+    },
+    "repair2-evidence-7fa4be02.json": {
+      "sha256": "a314b1be0f89b62e7232c60ec5be9945f42d7d8c7cec0c12f89c20c63835f58b",
+      "bytes": 2717
+    }
+  }
+}

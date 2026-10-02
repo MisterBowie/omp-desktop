@@ -1,0 +1,112 @@
+
+ RUN  v4.1.10 /home/vv/person/code/omp-desktop-m5-t20-b1/app/packages/omp-runtime
+
+ ❯ src/session/runner.test.ts (44 tests | 4 failed) 626ms
+     × refuses the prompt when a stop arrives during command discovery 5ms
+     × refuses the prompt when a stop arrives while the handshake response is pending 1ms
+     × refuses the prompt when a stop cancels the wait for the acknowledgment 201ms
+     × refuses the prompt and announces one aborted turn when the runner is disposed while preparing 301ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/runner.test.ts > a stop cancels the turn-fence preparation (third repair) > refuses the prompt when a stop arrives during command discovery
+AssertionError: promise resolved "{ accepted: true, …(2) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "accepted": true,
++   "generation": 1,
++   "turnId": "omp-turn:omp-fence-stop:1",
+  }
+
+ ❯ src/session/runner.test.ts:1178:24
+    1176|     release.resolve(null);
+    1177|
+    1178|     await expect(prompt).rejects.toMatchObject({ code: "stopping" });
+       |                        ^
+    1179|     const outcome = await stop;
+    1180|     expect(outcome).toMatchObject({ aborted: true, converged: true, to…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/session/runner.test.ts > a stop cancels the turn-fence preparation (third repair) > refuses the prompt when a stop arrives while the handshake response is pending
+AssertionError: promise resolved "{ accepted: true, …(2) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "accepted": true,
++   "generation": 1,
++   "turnId": "omp-turn:omp-fence-stop:1",
+  }
+
+ ❯ src/session/runner.test.ts:1217:24
+    1215|     release.resolve(null);
+    1216|
+    1217|     await expect(prompt).rejects.toMatchObject({ code: "stopping" });
+       |                        ^
+    1218|     await stop;
+    1219|     // The handshake was in flight when the stop landed, but the runne…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/session/runner.test.ts > a stop cancels the turn-fence preparation (third repair) > refuses the prompt when a stop cancels the wait for the acknowledgment
+AssertionError: expected OmpRuntimeError: the runtime did not ackn… { …(2) } to match object { code: 'stopping' }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+- {
+-   "code": "stopping",
++ OmpRuntimeError {
++   "code": "request-timeout",
+  }
+
+ ❯ src/session/runner.test.ts:1237:24
+    1235|     // rather than let the fence deadline (300 ms) expire.
+    1236|     const stop = runner.stop();
+    1237|     await expect(prompt).rejects.toMatchObject({ code: "stopping" });
+       |                        ^
+    1238|     await stop;
+    1239|     expect(kinds(commands)).toEqual(["get_available_commands", "handsh…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/session/runner.test.ts > a stop cancels the turn-fence preparation (third repair) > refuses the prompt and announces one aborted turn when the runner is disposed while preparing
+AssertionError: expected OmpRuntimeError: the runtime did not ackn… { …(2) } to match object { code: 'stopping' }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+- {
+-   "code": "stopping",
++ OmpRuntimeError {
++   "code": "request-timeout",
+  }
+
+ ❯ src/session/runner.test.ts:1265:24
+    1263|     release.resolve(null);
+    1264|
+    1265|     await expect(prompt).rejects.toMatchObject({ code: "stopping" });
+       |                        ^
+    1266|     expect(kinds(commands)).toEqual(["get_available_commands"]);
+    1267|     expect(turns).toEqual([{ sessionId: "omp-fence-stop", turnId: "omp…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 40 passed (44)
+   Start at  23:57:32
+   Duration  888ms (transform 109ms, setup 0ms, import 196ms, tests 626ms, environment 0ms)
+
+EXIT=1

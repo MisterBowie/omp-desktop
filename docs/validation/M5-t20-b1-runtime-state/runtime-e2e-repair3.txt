@@ -1,0 +1,102 @@
+✔ a workspace MCP config stays undiscovered under the run boundary (18245.203277ms)
+✔ workspace and global config cannot re-enable the OMP memory backend (1889.358061ms)
+✔ ambient extensions are not loaded under the trusted boundary (16855.072529ms)
+✔ the desktop gate is the only policy over a tool call (2042.873162ms)
+✔ run paths with spaces and non-ASCII characters launch, converse, and clean up (1922.999583ms)
+✔ plugin agent tool executes exactly once and its result reaches the model (2518.437311ms)
+✔ a denied plugin tool executes zero times and its denial reaches the model (1967.733164ms)
+✔ desktop user MCP tool executes exactly once against the real server (2512.482025ms)
+✔ plugin-declared MCP tool executes exactly once under its plugin_* name (2773.060803ms)
+✔ a cancelled host tool leaves no late side effect in the model context (3028.861338ms)
+✔ a project MCP decoy is still never loaded by native discovery while desktop tools run (1950.985159ms)
+✔ F7: concurrent OMP sessions each block on their own approval; answering A never releases B (3720.447723ms)
+E2E timeline (61 events):
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 agent_start
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 turn_start
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_start
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_end
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_start
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_update
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_end
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 tool_start call_read
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 tool_end call_read
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 turn_end
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 turn_start
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_start
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_update
+- tool_permission_request
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_end
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 tool_start call_write_1
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 tool_end call_write_1
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 turn_end
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 turn_start
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_start
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_update
+- tool_permission_request
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_end
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 tool_start call_write_2
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 tool_update call_write_2
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 tool_end call_write_2
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 turn_end
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 turn_start
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_start
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_update
+- tool_permission_request
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_end
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 tool_start call_tests
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 tool_update call_tests
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 tool_update call_tests
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 tool_update call_tests
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 tool_end call_tests
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 turn_end
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 turn_start
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_start
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_update
+- tool_permission_request
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_end
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 tool_start call_long
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 tool_end call_long
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 tool_update call_long
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 turn_end
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 turn_start
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_start
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 message_end
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 turn_end
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:1 agent_end
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:2 agent_start
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:2 turn_start
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:2 message_start
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:2 message_end
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:2 message_start
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:2 message_update
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:2 message_end
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:2 turn_end
+omp-turn:e2e-omp-session:96ffc70d-2a7e-4ea0-a56a-ad11fdefd5a4:2 agent_end
+E2E tool ends: call_read:ok, call_write_1:error, call_write_2:ok, call_tests:ok, call_long:error
+E2E approvals: call_write_1/high, call_write_2/high, call_tests/high, call_long/high
+✔ M3 end-to-end: read, deny, approve once, run tests, stop a long task (2962.332809ms)
+✔ M4 end-to-end: persistent native session, restore without replay, concurrent projects (6261.289666ms)
+✔ the desktop catalog and project memory reach the system prompt; skill bodies stay out (2377.549288ms)
+✔ the model loads a skill body through the Skill host tool exactly once, unapproved (1960.235223ms)
+✔ memory edits and removal reach the next prompt; nothing is duplicated into the transcript (2014.289242ms)
+✔ a plugin unloaded between catalog and execution fails closed with the PI error (3698.360518ms)
+✔ an OMP-native project skill stays discoverable beside the desktop catalog (1955.686417ms)
+✔ a planted symlink cannot redirect the state write; spaces/non-ASCII paths work; dispose removes the state (1918.355815ms)
+✔ before_agent_start: ctx.abort refuses the prompt and a throwing handler does not (16110.974341ms)
+subagent E2E frames: subagent_lifecycle, subagent_event, subagent_progress
+subagent E2E child id: Scout1, parent: call_task_1
+subagent E2E child rows: 10 (message_start, message_end, message_start, message_update, message_end, tool_start, tool_end, message_start, message_update, message_end)
+subagent E2E child envelopes: 19
+subagent E2E task result delegated: true
+✔ M5 subagent end-to-end: spawn, frames, attribution, deny no side effect, snapshot, stop (2749.588307ms)
+✔ M5 subagent end-to-end: a policy-allowed child tool executes exactly once (2220.24715ms)
+✔ M5 subagent end-to-end: parent stop reclaims a still-running detached child (14157.679363ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 41800.772587
+EXIT=0

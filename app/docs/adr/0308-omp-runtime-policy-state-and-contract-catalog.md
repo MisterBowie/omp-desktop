@@ -187,7 +187,15 @@ installs a **turn token** inside the runtime process before every prompt
 
 A missing command, a malformed command list, a refused handshake or a missing
 acknowledgment fails the prompt before the user prompt is sent (the caller
-receives the failure; no provider request is made). The command is registered
+receives the failure; no provider request is made). A **stop or dispose that
+lands while that preparation is in flight cancels the admitted generation**:
+the runner revalidates the generation captured at admission after every await
+and immediately before it writes user content (the runtime's `abort` is an
+ordinary serialized command and cannot cancel a prompt that has not been
+dispatched yet), closes the canceled generation as `aborted` exactly once —
+so the stop converges without a teardown — refuses the prompt with
+`stopping`, and a late handshake or acknowledgment continuation can neither
+arm a stale fence nor submit the canceled prompt. The command is registered
 by the trusted gate only and is documented as reserved; the model can never
 issue it, and an ordinary user notification parses to `null`.
 
