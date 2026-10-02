@@ -1,5 +1,6 @@
-M5/T20-C second repair (R4): evidence manifest verification
-Date: 2026-10-02T18:26:11Z  Host: Linux 7.0.0-34-generic x86_64
+M5/T20-C second repair (R3/R4): evidence manifest verification
+Date: 2026-10-02T18:31:15Z  Host: Linux 7.0.0-34-generic x86_64
+Product commit under verification: feb4e111afa7a1c1e737ad057e4c469a8a429c20 (emitted into the parent list as the code commit's changes)
 
 Each list is a plain sha256sum-compatible list; its base directory is stated below.
 Self-inclusion is removed: no list contains an entry for itself.

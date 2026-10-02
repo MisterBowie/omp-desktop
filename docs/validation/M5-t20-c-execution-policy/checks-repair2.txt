@@ -62,3 +62,6 @@ CHECK_DOCS_EXIT=1
 
 ## git diff --check bff27e1..feb4e11 (code+test repair commit, complete range)
 EXIT=0
+
+## git diff --check bff27e1..ce419ec (docs/evidence commit included, complete repair range)
+EXIT=0

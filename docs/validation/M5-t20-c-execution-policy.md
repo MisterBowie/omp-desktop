@@ -282,6 +282,16 @@ RED/GREEN 报告与日志字节保持原样（未规范化空白）。
 
 ### 6.1 提交坐标（第二次返修）
 
-- 代码/测试提交与文档/证据提交见本节末尾的坐标行（本工作区只追加，不 amend/rebase/强推）；远端分支
-  `codex/m5-t20-c-execution-policy`。完整区间 `git diff --check bff27e1..HEAD` 结果记录在
-  `checks-repair2.txt` 与后续坐标提交中。
+- 代码/测试提交 `feb4e111afa7a1c1e737ad057e4c469a8a429c20`：gate 的 `bindDelegate` 与公开上下文事实
+  （`SessionManagerFacts`/`DelegateLifecycleContext`）、`gate-handler-testkit.ts` 的委托事实与 `lifecycle`
+  驱动、新增 `gate-delegate-ownership.test.ts`（7 例）、`gate-admission.test.ts`/`gate-permissions.test.ts`/
+  `gate-review-matrix.test.ts`/`gate.test.ts` 的代际语义更新、C E2E 的真实子会话 header 归属/新鲜度断言、
+  `omp-sidecar.test.mjs` 的打包产物代际探针、`check-omp-plan-goal-gaps.mjs` 的 g2 证据清单。
+- 文档/证据提交 `ce419ec82fcd757473975bb33f10ad0ce2ae0588`：ADR 0309 §7（含 §7.1 摘要定位与 §7.2 已知
+  限制）、spec 中英（§14/§11 的委托规则与摘要定位）、本记录（§0.2/§2 C4/§3/§4/§5/§6）、`docs/04-task-board.md`、
+  `HANDOFF.md` 与 `*-repair2.txt` 原始日志。
+- 随后的清单/坐标提交（见 `git log`）把子清单（11 条）、父清单（35 条）与 `manifest-verify-repair2.txt`
+  固定在上述字节之上（生成顺序：先写完整日志 → 再生成清单 → 最后生成校验日志），并把本节坐标写实。
+- 完整区间 `git diff --check bff27e1..feb4e11` 与 `bff27e1..ce419ec` 均 `EXIT=0`（原始输出在
+  `checks-repair2.txt` 尾部）。本工作区只追加提交，不 amend/rebase/强推；远端分支
+  `codex/m5-t20-c-execution-policy`。
