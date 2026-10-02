@@ -369,3 +369,27 @@ RED（最终版新测试 + 临时还原的未修复 runner 源码及其重建 `d
 | `repair3-red/*` | 第三次复审原始 RED（summary/probe/replay，未编辑）+ 本轮三份新测试 RED 日志 + `SHA256SUMS.txt` + `README.md` | 见 `repair3-red/SHA256SUMS.txt` 与 §11.1 |
 
 （`repair3-evidence-sha256.txt` 为上述 7 个日志的 `sha256sum` 汇总；所有日志为对应命令的原始 stdout/stderr 直接落盘，仅追加 `EXIT=` 行。）
+
+## 12. 2026-10-03 证据归档整理（gzip；B1 最终区间空白检查收尾，非行为轮）
+
+根复审独立验收 `bff27e1`（行为判定 `B1 behavior accepted`）后，唯一遗留的归档级问题是：
+`git diff --check 7fa4be0 bff27e1` **exit 2**，且全部命中只来自两份**字节原样**的 RED 日志——
+`repair3-red/bridge-test-red.txt` 第 67/70 行与 `repair3-red/e2e-test-red.txt` 第 17/20 行
+各有一个只含两个空格的原始 TAP 输出空行（`node --test` 原样 stdout）。按归档范围修复
+（不改产品代码、不改行为结论、不重开 B1）：
+
+| 文件 | 处理 | 解码后 SHA-256（= `bff27e1` 中的 Git blob） | 归档 `.gz` SHA-256 |
+| --- | --- | --- | --- |
+| `repair3-red/bridge-test-red.txt` → `.txt.gz` | 确定性 gzip（`compresslevel=9, mtime=0`，头部无文件名；`.gz` 字节是捕获字节的纯函数），跟踪明文删除 | `975875e11cde84effff37a58444d64b668a679a2c86b055aabd7963f53a2512e` | `0727b12e4cb9b9978ef973401cbe034640091d6efb34ef1ee9d085a36d75197d` |
+| `repair3-red/e2e-test-red.txt` → `.txt.gz` | 同上 | `ddb5a4829a70961bcc22bcb0e170b5a213139843266144263727c2cab4fc6d24` | `f5e18c14d8ce2c638d59e2b220d7820c558c1f3d8fc75411a1ea21a22927f350` |
+| `repair3-red/runner-tests-red.txt` | 无空白问题，保持明文原样 | `83ed30b501167ea88c1627cb8cc8763bbfd908be3621f0f80c6d4349766e56b5` | —（未压缩） |
+
+验证（本机 Linux x64 / Node v24.14.0）：`git show bff27e1:<path> | sha256sum` 与
+`gunzip -c <path>.gz | sha256sum` 对两份文件逐一相等，且 Python `gzip.decompress` 与原始
+`git show` 字节 `==`（逐字节，不只是摘要）；`.gz` 头部实测 `1f8b0800000000000203`
+（无 FNAME、MTIME=0）。`repair3-red/README.md`（含两种摘要与解码命令）与
+`repair3-red/SHA256SUMS.txt`（每个跟踪文件的实际摘要）已同步更新。
+
+**更正后的口径**：历史区间 `7fa4be0..bff27e1` 的 `git diff --check` 退出码**仍是 2**（提交对象不可变，
+不剥离原始捕获空白、不重写历史、不放宽空白规则）；修正后的最终区间 `7fa4be0..<本归档提交>`
+空白检查为 0。B1 的行为证据、计数与结论均不变。
