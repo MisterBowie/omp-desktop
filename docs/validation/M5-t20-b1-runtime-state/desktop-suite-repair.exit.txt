@@ -1,2 +1,1 @@
-desktop-suite-repair=0
-omp-runtime-vitest-repair=0
+exit=0
