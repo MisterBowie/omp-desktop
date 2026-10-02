@@ -176,3 +176,7 @@ All commands below were captured verbatim under
   continuation timer is introduced; the whole M5/T20 stage is not claimed
   complete.
 - Only Linux x64 was exercised; no macOS/Windows run, no release/tag/main merge.
+- The sidecar verification runs the production verifier over the source-tree
+  `app/apps/desktop/resources` layout (the same `Resources` layout the launcher
+  resolves at runtime). It is **not** an electron-builder installed application
+  and does not replace M6/T21's packaged-resource acceptance.
