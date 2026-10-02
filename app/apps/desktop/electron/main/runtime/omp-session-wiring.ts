@@ -29,6 +29,7 @@ import {
   createOmpSessionBridge,
   type OmpCapabilityProvider,
   type OmpHostToolProvider,
+  type OmpHostTurnLifecycle,
   type OmpSessionBridge,
   type OmpSessionRuntimeSpec,
   type OmpTurnEndInfo,
@@ -76,6 +77,40 @@ function hostOrThrow(host: () => HostProcess | null): HostProcess {
   const value = host();
   if (!value) throw Object.assign(new Error("host unavailable"), { errorCode: "HOST_UNAVAILABLE" });
   return value;
+}
+
+/**
+ * The durable host turn lifecycle the OMP bridge consumes (M5/T20-B2):
+ * `session.beginTurn` opens the row and returns its id, `session.endTurn`
+ * settles exactly that row. `recoverInflight` stays false — OMP's native JSONL
+ * is the only transcript source (M2), so there is no Pi in-flight assistant row
+ * to promote — and no task notification is created (the OMP path had none
+ * before this phase). Exported so the E2E can wire the production
+ * implementation instead of re-deriving the RPC calls.
+ */
+export function createOmpHostTurnLifecycle(host: () => HostProcess | null): OmpHostTurnLifecycle {
+  return {
+    begin: async (input: { sessionId: string; providerId: string | null; modelId: string | null }) => {
+      const client = hostOrThrow(host);
+      const turn = await client.call<{ turnId?: unknown }>("session.beginTurn", {
+        sessionId: input.sessionId,
+        ...(input.providerId ? { providerId: input.providerId } : {}),
+        ...(input.modelId ? { modelId: input.modelId } : {}),
+      });
+      const turnId = typeof turn?.turnId === "string" ? turn.turnId.trim() : "";
+      if (!turnId) throw new Error("session.beginTurn returned no turn id");
+      return turnId;
+    },
+    end: async (input: { turnId: string; status: "completed" | "aborted" | "error" }) => {
+      const client = hostOrThrow(host);
+      await client.call("session.endTurn", {
+        turnId: input.turnId,
+        status: input.status,
+        recoverInflight: false,
+        createNotification: false,
+      });
+    },
+  };
 }
 
 /**
@@ -229,6 +264,10 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
       }),
     emitAgentEvent: deps.emitAgentEvent,
     gateResolver: () => engineRuntime.gateExtension,
+    // The durable host turn lifecycle (M5/T20-B2): the bridge opens one host
+    // turn per accepted OMP prompt and settles exactly that turn when the
+    // runner closes its generation.
+    hostTurns: createOmpHostTurnLifecycle(deps.host),
     ...(deps.hostTools ? { hostTools: deps.hostTools } : {}),
     ...(deps.capabilities ? { capabilities: deps.capabilities } : {}),
     ...(deps.onTurnEnd ? { onTurnEnd: deps.onTurnEnd } : {}),

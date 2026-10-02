@@ -65,6 +65,25 @@ export type OmpHostToolDefinition = {
    * and hide it from most model requests.
    */
   loadMode?: "essential" | "discoverable";
+  /**
+   * Scheduling mode for this tool when several calls share one turn
+   * (`RpcHostToolDefinition.concurrency`): `"shared"` (default) or
+   * `"exclusive"`. The runtime rejects an unrecognized declaration.
+   */
+  concurrency?: "shared" | "exclusive";
+  /**
+   * Batch admission rule (`RpcHostToolDefinition.batchPolicy`): `"any"`
+   * (default) or `"sole"` — a sole tool must be the only tool call of its
+   * assistant message, and a mixed batch is rejected whole before scheduling.
+   */
+  batchPolicy?: "any" | "sole";
+  /**
+   * Settlement declaration (`RpcHostToolDefinition.terminateOnSettle`): when
+   * `true`, any settled result of this tool ends the agent run once its batch
+   * settles — including a schema-validation rejection that never reaches the
+   * executor. Defaults to off.
+   */
+  terminateOnSettle?: boolean;
 };
 
 /** The runtime's `host_tool_call` frame, narrowed to the fields this module reads. */
@@ -80,8 +99,19 @@ export type OmpHostToolCall = {
 /** The identity of the run that owns a call, supplied by the runner. */
 export type OmpHostToolRun = {
   generation: number;
+  /**
+   * The runner's live generation identity (`omp-turn:…`), used for dispatch
+   * checks. Never a host database identity.
+   */
   turnId: string;
   sessionId: string;
+  /**
+   * The durable host turn bound to this run (M5/T20-B2), or null when the run
+   * has no host turn (unit fixtures, Pi path). A tool that must act on the
+   * host's own turn — the submit tools — refuses a null binding instead of
+   * substituting the live generation id.
+   */
+  hostTurnId: string | null;
 };
 
 /** One content block the pinned runtime's `host_tool_result` accepts. */

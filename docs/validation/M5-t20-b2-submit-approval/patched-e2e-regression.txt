@@ -1,0 +1,10 @@
+✔ M5/T20-C end-to-end: PI execution-time permissions on the patched runtime (13045.553536ms)
+✔ M5/T20-B1 end-to-end: production mode/policy state and contract catalog on the patched runtime (16293.545185ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16768.345121

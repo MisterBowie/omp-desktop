@@ -420,7 +420,7 @@ test("a normal agent_end announces the turn completed exactly once", async () =>
   await new Promise((resolve) => setImmediate(resolve));
 
   assert.deepEqual(turnEnds, [
-    { sessionId: "session-omp", turnId: started.turnId, reason: "completed" },
+    { sessionId: "session-omp", turnId: started.turnId, hostTurnId: null, reason: "completed" },
   ]);
 });
 

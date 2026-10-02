@@ -1,7 +1,10 @@
 # ADR 0305: A maintainable patch level on the pinned OMP runtime
 
 - Status: Accepted (M5/T20-R3A); base re-cut in M5/T20-R4A, **revised after
-  independent review (F3)**. The
+  independent review (F3)**, **revised at .4 (2026-10-03)**: the patch set gains
+  the settle-time termination declaration (`AgentTool.terminateOnSettle` /
+  `RpcHostToolDefinition.terminateOnSettle`, ADR 0310), which covers the
+  schema-validation rejection a result flag cannot. The
   patch-set mechanism stands; the claim that the patch level satisfies PI's
   transition-tool contract does **not** — see "Unresolved (F3)".
 - Date: 2026-09-25 (F3 revision 2026-09-25; R4A base migration 2026-09-27;
@@ -61,8 +64,8 @@ moved it from `d49918fab2dba3986927f2d46721629ed0f3a02c`, `omp/18.2.7`, to
   levels.
 
 The patch level is named `<base-short-sha>+omp-desktop.<n>` (currently
-`62bc57b+omp-desktop.3`; `62bc57b+omp-desktop.2` and `d49918f+omp-desktop.1` are
-recorded in `manifest.history`) and is described as **maintained by OMP Desktop**, never
+`62bc57b+omp-desktop.4`; `62bc57b+omp-desktop.3`, `62bc57b+omp-desktop.2` and
+`d49918f+omp-desktop.1` are recorded in `manifest.history`) and is described as **maintained by OMP Desktop**, never
 as upstream OMP support for the version. Anything that reports a runtime version
 must keep reporting `omp/18.3.0` plus the patch level from the manifest.
 

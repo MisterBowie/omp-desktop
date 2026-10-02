@@ -1,0 +1,30 @@
+## pnpm build:js
+apps/desktop build: (!) Some chunks are larger than 500 kB after minification. Consider:
+apps/desktop build: - Using dynamic import() to code-split the application
+apps/desktop build: - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+apps/desktop build: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+apps/desktop build: Done
+exit=0 (logged at run time)
+
+## pnpm typecheck
+packages/host-runtime typecheck$ tsc -p tsconfig.json --noEmit
+packages/racp typecheck$ tsc -p tsconfig.json --noEmit
+packages/racp typecheck: Done
+packages/host-runtime typecheck: Done
+apps/desktop typecheck$ tsc -p tsconfig.json --noEmit
+apps/pi-host typecheck$ tsc -p tsconfig.json --noEmit
+apps/pi-host typecheck: Done
+apps/desktop typecheck: Done
+
+## pnpm lint
+> pi-desktop@0.15.2 lint:biome /home/vv/person/code/omp-desktop-m5-t20-b2/app
+> biome lint
+
+Checked 75 files in 31ms. No fixes applied.
+Scope: 12 of 13 workspace projects
+apps/desktop lint$ node ../../scripts/check-style-tokens.mjs
+apps/desktop lint: style tokens OK
+apps/desktop lint: Done
+
+## git diff --check
+exit=0

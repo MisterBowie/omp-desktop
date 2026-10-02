@@ -207,7 +207,34 @@ describe("C1 contract hard deny", () => {
     expect(contractAllowsTool("browser", [])).toBe(false);
     expect(contractAllowsTool("computer", [])).toBe(false);
     // The clamp (B1) still never invents BrowserPreview.
-    expect(contractActiveToolNames({ hostTools: [] }, ["read", "write", "BrowserPreview"])).toEqual(["read"]);
+    expect(contractActiveToolNames({ mode: "plan", hostTools: [] }, ["read", "write", "BrowserPreview"])).toEqual(["read"]);
+  });
+
+  it("admits the mode's submit tool without a card and denies the other kind", async () => {
+    const world = makeWorld();
+    const submit = { name: "SubmitPlan", risk: "low" as const, planSafeActions: [], origin: "desktop" as const };
+    const plan = await decideToolCall(
+      { ...EVENT, toolName: "SubmitPlan", input: { title: "t", markdown: "# m", question: "q" } },
+      world.context,
+      policy({ snapshot: snapshot("plan", "ask", [submit]) }),
+    );
+    expect(plan).toMatchObject({ block: false, route: "contract-allow" });
+
+    // The other kind's submit tool is a contract deny, never a card.
+    const { context, cards } = cardContext(world);
+    const wrongKind = await decideToolCall(
+      { ...EVENT, toolName: "SubmitGoal", input: { title: "t", markdown: "# m", question: "q" } },
+      context,
+      policy({ snapshot: snapshot("plan", "ask", [submit]) }),
+    );
+    expect(wrongKind.block).toBe(true);
+    expect(wrongKind.route).toBe("contract-deny");
+    expect(wrongKind.reason).toMatch(/^PLAN_KIND_MISMATCH/);
+    expect(cards.length).toBe(0);
+
+    // Agent mode has no contract to submit to: the call is not contract-granted
+    // (and the tool is not part of the Agent catalog).
+    expect(contractAllowsTool("SubmitPlan", [submit], "agent")).toBe(false);
   });
 });
 

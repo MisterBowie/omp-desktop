@@ -26,7 +26,9 @@
  * longer matches symbols (F8: static symbols cannot prove a data flow), and
  * only checks that those replacement tests exist. g2 was RETIRED the same way
  * to the T20-C behavior tests (the probe no longer matches the removed
- * hardcoded-mode literal); g3 stays open.
+ * hardcoded-mode literal), and g3 was RETIRED to the T20-B2 dispatch behavior
+ * tests (the probe no longer matches the removed OMP refusal; g1/g2/g3 now
+ * only check that their replacement tests exist).
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -143,18 +145,46 @@ function sourceSeam(rel) {
 }
 
 // ---------------------------------------------------------------------------
-// g3 (owner: T20-B) — approved plan execution refuses OMP sessions
+// g3 (owner: T20-B) — RETIRED to behavior tests (2026-10-03, T20-B2)
+//
+// History: this check matched `refuseOutsidePiRuntime(…, "plan execution")`,
+// which blocked every approved execution for an OMP session before the claim.
+// T20-B2 replaced that with the per-engine dispatch in `runtime/plans.ts`
+// (OMP: wait for the live turn, claim CAS once, restore the native session,
+// submit the shared approved-plan instruction; Pi unchanged; any other engine
+// still refused before the claim) and retired this diagnostic to the behavior
+// tests below, which execute the production seam for real:
+//
+//   node --test apps/desktop/test/omp-plan-submit-e2e.test.mjs
+//     (real fixed patched OMP + production bridge/gate/adapter + real
+//      host-core database + fake provider: approval dispatch, double-dispatch
+//      CAS, completion, restart no-replay)
+//   node --test apps/desktop/test/plan-drain-engine-gate.test.mjs
+//     (engine decided before the claim; OMP not wired and gate refusals skip)
+//
+// The probe keeps ONE mechanical invariant — the replacement tests must
+// exist — and otherwise reports the retirement with the exact commands. It
+// must never be turned back into a symbol-presence check.
 // ---------------------------------------------------------------------------
 {
-  const plansSource = sourceSeam("apps/desktop/electron/main/runtime/plans.ts");
-  const refused = /refuseOutsidePiRuntime\([\s\S]{0,160}?"plan execution"\)/.test(plansSource);
-  report(
-    "g3",
-    "T20-B",
-    refused,
-    "an approved Plan/Goal execution for an OMP session is refused before claiming; the queued row stays queued and nothing runs on the OMP engine",
-    `runtime/plans.ts refuseOutsidePiRuntime("plan execution") present: ${refused}`,
-  );
+  const behaviorTests = [
+    "apps/desktop/test/omp-plan-submit-e2e.test.mjs",
+    "apps/desktop/test/plan-drain-engine-gate.test.mjs",
+  ];
+  const missing = behaviorTests.filter((rel) => !existsSync(join(appRoot, rel)));
+  if (missing.length > 0) {
+    report(
+      "g3",
+      "T20-B",
+      true,
+      "the g3 behavior tests that replaced this diagnostic are missing; approved-execution dispatch has no executable evidence",
+      `missing: ${missing.join(", ")}; restore the T20-B behavior tests instead of reviving the refusal check`,
+    );
+  } else {
+    console.log(
+      `GAP-RETIRED g3 (owner: T20-B) an approved Plan/Goal execution for an OMP session dispatches through the claim CAS into the OMP runtime; other engines are refused before the claim and the row stays queued [evidence: replaced by behavior tests ${behaviorTests.join(", ")}; run: PI_DESKTOP_HOST_BIN=<host-core> node --test apps/desktop/test/omp-plan-submit-e2e.test.mjs apps/desktop/test/plan-drain-engine-gate.test.mjs; a symbol check cannot prove the dispatch path, so this probe does not match symbols]`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

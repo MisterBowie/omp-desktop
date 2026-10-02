@@ -18,6 +18,7 @@ export * from "./subagent.js";
 export * from "./subagent-definitions.js";
 export * from "./session-title-summarize.js";
 export * from "./stream-coalescer.js";
+export * from "./plan-execution-instruction.js";
 export * from "./extensions/index.js";
 export { startAuthenticatedProxyRelay } from "./authenticated-proxy-relay.js";
 export type { AuthenticatedProxyRelay } from "./authenticated-proxy-relay.js";

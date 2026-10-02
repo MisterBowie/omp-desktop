@@ -1107,12 +1107,16 @@ export function registerAgentIpc({
       // decided *before* the transaction runs: refusing afterwards would leave a
       // session approved and unable to run. Rejection starts nothing and keeps
       // the host's own reject semantics.
-      // The plan pipeline is the desktop's own approval machinery for the Pi
-      // runtime's plan tool; it has no OMP counterpart until M5 decides one.
-      refuseOutsidePiRuntime(
-        await engineRouter.requireForSession(sessionId, "prompt"),
-        "plan approval",
-      );
+      const approvalEngine = await engineRouter.requireForSession(sessionId, "prompt");
+      if (approvalEngine === "omp" && !ompSessions) {
+        // Approving here would queue an execution no wired runtime can drain;
+        // refuse before the transaction so nothing durable changes.
+        throw Object.assign(new Error("this build has no OMP runtime"), {
+          errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+          engine: "omp",
+          capability: "prompt",
+        });
+      }
     }
     const result = await host.call<PlanResolutionResult>("plans.resolve", {
       proposalId,

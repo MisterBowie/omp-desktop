@@ -188,7 +188,7 @@ describe("bundled runtime verification", () => {
 
   it("keeps the default pins the desktop ships", () => {
     expect(BUNDLED_EXPECTATION.ompVersion).toBe("18.3.0");
-    expect(BUNDLED_EXPECTATION.patchLevel).toBe("62bc57b+omp-desktop.3");
+    expect(BUNDLED_EXPECTATION.patchLevel).toBe("62bc57b+omp-desktop.4");
     expect(BUNDLED_EXPECTATION.forkCommit).toMatch(/^[0-9a-f]{40}$/);
     // The schema changed when `extensions`/`desktopVersion` became required, and
     // again when `build.bytecode` did, so it is a new version rather than a

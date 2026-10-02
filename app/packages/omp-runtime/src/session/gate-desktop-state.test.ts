@@ -35,6 +35,7 @@ import ompDesktopGate, {
   applyContractToolClamp,
   beforeAgentStartPolicy,
   contractActiveToolNames,
+  contractAllowsTool,
   type ExtensionAPI,
 } from "../../extensions/omp-desktop-gate.ts";
 import { parseApprovalDescriptor } from "../session/approval-protocol.js";
@@ -255,7 +256,7 @@ describe("contract tool catalog", () => {
   ];
 
   it("keeps the PI contract natives plus declared plan-safe plugin tools, in current order", () => {
-    expect(contractActiveToolNames({ hostTools }, active)).toEqual([
+    expect(contractActiveToolNames({ mode: "plan", hostTools }, active)).toEqual([
       "read",
       "grep",
       "glob",
@@ -268,8 +269,34 @@ describe("contract tool catalog", () => {
 
   it("never invents a tool absent from the live set and never admits user MCP", () => {
     const live = ["read", "write", "mcp_server_tool"];
-    expect(contractActiveToolNames({ hostTools }, live)).toEqual(["read"]);
-    expect(contractActiveToolNames({ hostTools: [] }, ["read", "browser", "plugin_demo_run"])).toEqual(["read"]);
+    expect(contractActiveToolNames({ mode: "plan", hostTools }, live)).toEqual(["read"]);
+    expect(contractActiveToolNames({ mode: "plan", hostTools: [] }, ["read", "browser", "plugin_demo_run"])).toEqual(["read"]);
+  });
+
+  it("admits exactly the mode's own submit tool and deny the other kind", () => {
+    const submit = { name: "SubmitPlan", risk: "low" as const, planSafeActions: [], origin: "desktop" as const };
+    expect(contractAllowsTool("SubmitPlan", [submit], "plan")).toBe(true);
+    expect(contractAllowsTool("SubmitGoal", [submit], "plan")).toBe(false);
+    expect(contractAllowsTool("SubmitPlan", [], "goal")).toBe(false);
+    expect(contractAllowsTool("SubmitGoal", [], "goal")).toBe(true);
+    // No mode, no grant: a caller that does not name the contract cannot admit
+    // a submit tool by name.
+    expect(contractAllowsTool("SubmitPlan", [submit])).toBe(false);
+    expect(contractAllowsTool("SubmitPlan", [submit], "agent")).toBe(false);
+  });
+
+  it("keeps the mode's submit tool in the contract clamp and drops the other kind", () => {
+    const live = ["read", "write", "bash", "SubmitPlan", "SubmitGoal"];
+    expect(contractActiveToolNames({ mode: "plan", hostTools: [] }, live)).toEqual([
+      "read",
+      "bash",
+      "SubmitPlan",
+    ]);
+    expect(contractActiveToolNames({ mode: "goal", hostTools: [] }, live)).toEqual([
+      "read",
+      "bash",
+      "SubmitGoal",
+    ]);
   });
 });
 

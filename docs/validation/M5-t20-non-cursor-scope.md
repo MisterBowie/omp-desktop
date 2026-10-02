@@ -90,7 +90,7 @@
 
 - **g1**：`mode`/`permissionMode` 仅持久化在 host DB，没有任何 OMP prompt/工具路径读取它们（归属 T20-B1）。
 - **g2**：插件执行上下文硬编码 `mode: "agent"`，会话持久模式不到达插件执行（归属 T20-C）。
-- **g3**：已批准的 Plan/Goal 执行在 claim 前被 Pi-only 拒绝，OMP 会话的 queued 执行不运行（归属 T20-B2）。
+- **g3**：已批准的 Plan/Goal 执行在 claim 前被 Pi-only 拒绝，OMP 会话的 queued 执行不运行（归属 T20-B2；2026-10-03：B2 已实现，职责改为按引擎分派并复用 CAS，见 §4 状态）。
 - **能力表**：`OMP_ENGINE_CAPABILITIES` 无 `plan`/`goal` 键；OMP 会话 Plan/Goal 入口不开放（归属 T20-D 前的最后一个门）。
 - 宿主审批闭环、恰一次派发、重启不重放、执行时权限表（风险/`planSafeActions`/有效模式）**全部未实现**。
 
@@ -106,6 +106,9 @@
 - **明确不做**：不注册 `SubmitPlan`/`SubmitGoal`（提交入口保持关闭）；不动 g3 的派发拒绝与 `plan`/`goal` 能力键。
 
 ### T20-B2 提交/审批/派发闭环（依赖 B1）
+
+- **状态（2026-10-03）**：**已实现、待独立复审**（分支 `codex/m5-t20-b2-approval`，基线 `94910160`，补丁级 `.4`；证据 `docs/validation/M5-t20-b2-submit-approval.md`，设计 ADR 0310）。提交工具按合约模式注册（PI 名称/schema/sole/terminateOnSettle）、不可变工件与审批复用、持久 host turn、批准后经 CAS 派发到 OMP 均已落地；`plan`/`goal` 能力键仍关闭，整矩阵与能力开放属 T20-D。
+
 
 - **范围**：提交工具注册与 kind 校验；产物（`.pi/<kind>/…` 不可变、sha256/大小、防覆盖/symlink 拒）；审批卡（`PlanApprovalBar` 复用）、reject/过期/打断语义、approve 原子写 mode=agent+permission_mode+queued；claim CAS 先于任何 OMP prompt、finish CAS、drain 只派 queued、boot 打断不重放、执行期配置冻结；批准后以选定 permissionMode 运行的 agent 回合；Goal 无延续定时器（如实记录差异）。
 - **矩阵行**：B4-B9、D1（提交/审批/派发部分）、D3 的闭环；g3 与本任务退场。

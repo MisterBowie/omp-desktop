@@ -93,6 +93,25 @@ export type OmpHostToolAdapterDeps = {
   /** PI's activation-scope predicate; the same one `session-launch.ts` uses. */
   pluginActiveInProject(pluginId: string, projectPath: string | null | undefined): boolean;
   /**
+   * The host's Plan/Goal submission endpoint (`plans.submit` RPC). The
+   * executor passes only the binding's durable identity — desktop session id,
+   * host turn id and the frame's real tool-call id — never a model-supplied
+   * value. Absent means the submit tools cannot run: a call fails closed
+   * instead of pretending a submission was accepted.
+   */
+  plans?: {
+    submit(input: {
+      sessionId: string;
+      /** Durable host turn id from the run binding, never the live generation. */
+      turnId: string;
+      toolCallId: string;
+      kind: DesktopSubmitKind;
+      title: string;
+      markdown: string;
+      question: string;
+    }): Promise<unknown>;
+  };
+  /**
    * Builtin skill body reader (`builtin-skills.ts`): null for any id the host
    * does not ship, which lets the lookup fall through to the user catalog.
    */
@@ -117,7 +136,37 @@ export type OmpHostToolAdapterDeps = {
   log?: (level: "info" | "warn" | "error", message: string, data?: unknown) => void;
 };
 
-/** One session's binding the executor is scoped to. */
+/**
+ * The host RPC surface the submit endpoint needs; `HostProcess` satisfies it.
+ */
+export type OmpHostToolPlansHost = {
+  call<T = unknown>(method: string, params?: unknown): Promise<T>;
+};
+
+/**
+ * The host's Plan/Goal submission endpoint (`plans.submit`) as the adapter
+ * consumes it. The executor supplies the durable identity from the run
+ * binding; this closure only reaches the host RPC, and `plans.submit` itself
+ * enforces the kind / durable-mode / live-turn / single-pending rules.
+ * Exported so the E2E wires the production implementation.
+ */
+export function createHostPlansSubmit(
+  host: () => OmpHostToolPlansHost | null,
+): NonNullable<OmpHostToolAdapterDeps["plans"]> {
+  return {
+    submit: async (input) => {
+      const client = host();
+      if (!client) {
+        throw Object.assign(new Error("host unavailable"), { errorCode: "HOST_UNAVAILABLE" });
+      }
+      return client.call("plans.submit", input);
+    },
+  };
+}
+
+/**
+ * One session's binding the executor is scoped to.
+ */
 export type OmpHostToolBinding = {
   sessionId: string;
   /** The project every execution re-checks against; never crossed. */
@@ -161,9 +210,10 @@ export type OmpHostToolAdapter = {
  * Which desktop registry served one host tool. Provenance is taken from the
  * registry that produced the entry, never from the name prefix: plugin tools
  * (including plugin-declared MCP tools) come from the plugin registry, user
- * MCP tools from the user MCP runtime.
+ * MCP tools from the user MCP runtime, and `desktop` names this adapter's own
+ * built-in tools (the Plan/Goal submit tools, M5/T20-B2).
  */
-export type OmpHostToolOrigin = "plugin" | "user-mcp";
+export type OmpHostToolOrigin = "plugin" | "user-mcp" | "desktop";
 
 /**
  * One catalog entry: the wire definition the runtime registers, plus the
@@ -222,13 +272,83 @@ export function desktopSkillToolDefinition(): OmpHostToolDefinition {
   };
 }
 /**
+ * The Plan/Goal submit tools, exactly PI's `SUBMIT_TOOL_NAMES` and
+ * `buildSubmitTool` contract (`agent-runtime/src/runtime.ts`): one kind-keyed
+ * table so Plan and Goal cannot drift, the same names, descriptions and
+ * `title`/`markdown`/`question` schema, declared `sole` (the only tool call of
+ * its assistant message) and `terminateOnSettle` (any settled result ends the
+ * run — success, host failure or a schema rejection that never reaches the
+ * executor). The bridge adds the active mode's entry to the catalog, so the
+ * other kind's tool never appears.
+ */
+export const DESKTOP_SUBMIT_TOOL_KINDS = ["plan", "goal"] as const;
+export type DesktopSubmitKind = (typeof DESKTOP_SUBMIT_TOOL_KINDS)[number];
+
+/** The submit tool name one contract kind owns (PI `SUBMIT_TOOL_NAMES`). */
+export const DESKTOP_SUBMIT_TOOL_NAMES: Record<DesktopSubmitKind, string> = {
+  plan: "SubmitPlan",
+  goal: "SubmitGoal",
+};
+
+/** The definition the bridge registers for `SubmitPlan`/`SubmitGoal`. */
+export function desktopSubmitToolCatalogEntry(kind: DesktopSubmitKind): OmpHostToolCatalogEntry {
+  const name = DESKTOP_SUBMIT_TOOL_NAMES[kind];
+  const definition: OmpHostToolDefinition = {
+    name,
+    description:
+      kind === "plan"
+        ? "Submit one new complete Markdown implementation plan for user approval. Prior submissions are immutable historical checkpoints; after a rejected, expired, or interrupted approval, revise the plan and submit a new full snapshot in this turn. Do not use this until the plan is concrete."
+        : "Submit one new complete Markdown goal contract for user approval: the outcome to reach, the acceptance criteria that prove it, and the boundaries you must not cross. Prior submissions are immutable historical checkpoints; after a rejected, expired, or interrupted approval, revise the contract and submit a new full snapshot in this turn. Do not use this until the goal is unambiguous and every criterion is checkable.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description:
+            kind === "plan"
+              ? "A concise title for the implementation plan."
+              : "A concise title naming the goal.",
+        },
+        markdown: {
+          type: "string",
+          description:
+            kind === "plan"
+              ? "The exact Markdown implementation plan, including files, behavior, and validation."
+              : "The exact Markdown goal contract, with a Goal section, an Acceptance criteria section of objectively checkable items, and a Boundaries section. Describe outcomes, not implementation steps.",
+        },
+        question: {
+          type: "string",
+          description:
+            kind === "plan"
+              ? "The question or decision the user should answer when approving this plan."
+              : "The question or decision the user should answer when approving this goal contract.",
+        },
+      },
+      required: ["title", "markdown", "question"],
+    },
+    loadMode: "essential",
+    concurrency: "exclusive",
+    batchPolicy: "sole",
+    terminateOnSettle: true,
+  };
+  return {
+    definition,
+    // PI's risk table classifies the submit tools Low; the declaration rides
+    // the run-scoped policy table so the card/risk lookup never guesses from
+    // the name.
+    risk: "low",
+    planSafeActions: [],
+    origin: "desktop",
+  };
+}
+
+/**
  * One image block must leave room for the frame envelope and other blocks.
  * The frame-level budget itself is enforced at the protocol write boundary
  * (`boundHostToolContent` in the runtime package), which every outcome —
  * successful or thrown-error — passes through.
  */
 const IMAGE_BYTES = 512 * 1024;
-
 /** One content block the runtime's `host_tool_result` accepts. */
 type OutcomeBlock = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
 
@@ -365,6 +485,109 @@ export function createOmpHostToolAdapter(deps: OmpHostToolAdapterDeps): OmpHostT
         });
       }
     };
+    /**
+     * Serve one Plan/Goal submission through the host's own plans protocol.
+     *
+     * The host's durable validator is authoritative (kind vs the persistent
+     * session mode, live turn membership, one pending per session, artifact
+     * publication); this branch's own checks are the desktop-side fail-closed
+     * layer: the admitted turn's mode must be the kind being submitted, and a
+     * run without a durable host turn must never submit under a fabricated id.
+     */
+    const runSubmit = async (
+      call: OmpHostToolCall,
+      run: OmpHostToolRun,
+      signal: AbortSignal,
+      kind: DesktopSubmitKind,
+      mode: DesktopRuntimeMode,
+    ): Promise<OmpHostToolOutcome> => {
+      // A call the runtime cancelled before it started must not submit.
+      assertDispatchable(run, signal);
+      const name = DESKTOP_SUBMIT_TOOL_NAMES[kind];
+      const label = kind === "plan" ? "Plan" : "Goal";
+      if (mode !== kind) {
+        return outcomeFor({
+          content: [
+            {
+              type: "text",
+              text: `PLAN_KIND_MISMATCH: ${name} is not available in ${mode} mode`,
+            },
+          ],
+          isError: true,
+        });
+      }
+      if (!run.hostTurnId) {
+        return outcomeFor({
+          content: [
+            {
+              type: "text",
+              text: `${name} has no durable host turn bound to this run; refusing to submit`,
+            },
+          ],
+          isError: true,
+        });
+      }
+      if (!deps.plans) {
+        return outcomeFor({
+          content: [{ type: "text", text: `${name} is not wired in this build` }],
+          isError: true,
+        });
+      }
+      const args = call.arguments ?? {};
+      const title = typeof args.title === "string" ? args.title.trim() : "";
+      const markdown = typeof args.markdown === "string" ? args.markdown : "";
+      const question = typeof args.question === "string" ? args.question.trim() : "";
+      if (!title || !markdown.trim() || !question) {
+        return outcomeFor({
+          content: [
+            {
+              type: "text",
+              text: `${name} requires non-empty title, markdown, and question.`,
+            },
+          ],
+          isError: true,
+        });
+      }
+      try {
+        const result = await deps.plans.submit({
+          sessionId: binding.sessionId,
+          turnId: run.hostTurnId,
+          toolCallId: call.toolCallId,
+          kind,
+          title,
+          markdown,
+          question,
+        });
+        if (!isPendingProposalResult(result)) {
+          return outcomeFor({
+            content: [
+              {
+                type: "text",
+                text: `${label} submission returned an invalid proposal.`,
+              },
+            ],
+            isError: true,
+          });
+        }
+        return outcomeFor({
+          content: [
+            {
+              type: "text",
+              text:
+                kind === "plan"
+                  ? "Plan submitted for approval. Execution will begin only after approval."
+                  : "Goal contract submitted for approval. Autonomous execution will begin only after approval.",
+            },
+          ],
+        });
+      } catch (error) {
+        const errorCode = planSubmitErrorCode(error);
+        return outcomeFor({
+          content: [{ type: "text", text: `${label} submission failed: ${errorCode}` }],
+          isError: true,
+        });
+      }
+    };
     return {
       async execute(call: OmpHostToolCall, run: OmpHostToolRun, signal: AbortSignal): Promise<OmpHostToolOutcome> {
         try {
@@ -383,6 +606,20 @@ export function createOmpHostToolAdapter(deps: OmpHostToolAdapterDeps): OmpHostT
               ),
               { errorCode: "PERMISSION_DENIED" },
             );
+          }
+          // The Plan/Goal submit tools act on the host's own turn, so they run
+          // before the plugin/MCP branches: their identity comes only from the
+          // run binding (durable session/turn + the frame's real toolCallId),
+          // and a call in the wrong mode or without a durable turn fails
+          // closed instead of reaching `plans.submit`.
+          const submitKind: DesktopSubmitKind | null =
+            call.toolName === DESKTOP_SUBMIT_TOOL_NAMES.plan
+              ? "plan"
+              : call.toolName === DESKTOP_SUBMIT_TOOL_NAMES.goal
+                ? "goal"
+                : null;
+          if (submitKind !== null) {
+            return await runSubmit(call, run, signal, submitKind, mode);
           }
           if (call.toolName.startsWith("mcp_")) {
             // Last synchronous gate before entering the MCP call path: the Pi
@@ -575,6 +812,44 @@ function outcomeFor(result: unknown): OmpHostToolOutcome {
     content: boundHostToolContent(blocks),
     ...(failed ? { isError: true } : {}),
   };
+}
+
+/**
+ * True when a `plans.submit` reply carries the pending proposal with the
+ * immutable artifact identity PI's submit tool requires before it reports
+ * success to the model: status `pending`, a proposal id, and a relative path,
+ * sha256 and byte size. A reply missing any of them is not a submission the
+ * desktop can show or approve, so it is reported to the model as invalid.
+ */
+function isPendingProposalResult(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const status = "status" in value ? value.status : undefined;
+  const proposal = "proposal" in value ? value.proposal : undefined;
+  if (status !== "pending" || !proposal || typeof proposal !== "object") return false;
+  const id = "id" in proposal ? proposal.id : undefined;
+  const artifact = "artifact" in proposal ? proposal.artifact : undefined;
+  if (typeof id !== "string" || !artifact || typeof artifact !== "object") return false;
+  const relativePath = "relativePath" in artifact ? artifact.relativePath : undefined;
+  const sha256 = "sha256" in artifact ? artifact.sha256 : undefined;
+  const sizeBytes = "sizeBytes" in artifact ? artifact.sizeBytes : undefined;
+  return typeof relativePath === "string" && typeof sha256 === "string" && typeof sizeBytes === "number";
+}
+
+/**
+ * The host error code carried by a failed `plans.submit` RPC. The host
+ * transport puts it in `data.errorCode` (Pi contract) and some paths attach it
+ * to the error itself; anything unrecognized reports the generic failure code
+ * rather than an empty message.
+ */
+function planSubmitErrorCode(error: unknown): string {
+  if (error && typeof error === "object") {
+    const data = "data" in error ? error.data : undefined;
+    if (data && typeof data === "object" && "errorCode" in data && typeof data.errorCode === "string") {
+      return data.errorCode;
+    }
+    if ("errorCode" in error && typeof error.errorCode === "string") return error.errorCode;
+  }
+  return "PLAN_SUBMIT_FAILED";
 }
 
 /** Map one MCP/AgentToolResult content array block-by-block, unbounded. */

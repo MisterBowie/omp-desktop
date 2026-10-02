@@ -347,9 +347,9 @@ export const OMP_RUNTIME_VERSION = "18.3.0";
  * constants equal the manifest's `base.sha` / `patchLevel` / `fork.*` values.
  */
 export const OMP_RUNTIME_BASE_SHA = "62bc57be1b03ef0802a33cf7f5f530e534527531";
-export const OMP_RUNTIME_PATCH_LEVEL = "62bc57b+omp-desktop.3";
+export const OMP_RUNTIME_PATCH_LEVEL = "62bc57b+omp-desktop.4";
 export const OMP_RUNTIME_FORK_REPOSITORY = "https://github.com/MisterBowie/oh-my-pi";
-export const OMP_RUNTIME_FORK_COMMIT = "6226f805e92654344de04def413fa5cb91cb16b9";
+export const OMP_RUNTIME_FORK_COMMIT = "512370a1b177cf45e4d12781104506ea372fb8a9";
 
 /** One JSONL frame, newline included (`rpc-frame.ts` MAX_RPC_FRAME_BYTES). */
 export const OMP_MAX_FRAME_BYTES = 1024 * 1024;

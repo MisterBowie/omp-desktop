@@ -146,9 +146,13 @@ function assertStrictSequence(actual, expected, label) {
 }
 
 /** The independent PI-contract expectation for one live selection. */
-function contractExpected(liveNames, safePluginNames) {
-  const allowed = new Set([...CONTRACT_NATIVE_TOOLS, ...safePluginNames]);
-  return liveNames.filter((name) => allowed.has(name));
+function contractExpected(liveNames, safePluginNames, submitTool = null) {
+  // M5/T20-B2: the contract catalog carries the mode's own submit tool, which
+  // the runtime auto-activates when the bridge registers it for that prompt.
+  const allowed = new Set([...CONTRACT_NATIVE_TOOLS, ...safePluginNames, ...(submitTool ? [submitTool] : [])]);
+  const expected = liveNames.filter((name) => allowed.has(name));
+  if (submitTool && !expected.includes(submitTool)) expected.push(submitTool);
+  return expected;
 }
 
 const SESSION = "session-b1";
@@ -244,6 +248,8 @@ test(
     const hostSettings = { defaultPermissionMode: "accept-edits" };
     let projectMemory;
     const hostCalls = [];
+    let hostTurnSeq = 0;
+    const hostTurnEnds = [];
     const fakeHost = {
       isAvailable: () => true,
       async call(method, params = {}) {
@@ -253,6 +259,13 @@ test(
             return { session: hostSessions.get(params.id) ?? null };
           case "settings.get":
             return { ...hostSettings };
+          case "session.beginTurn":
+            // M5/T20-B2: the production wiring opens one durable host turn per
+            // accepted prompt; the fixture records it like the real host would.
+            return { turnId: `host-turn-${(hostTurnSeq += 1)}` };
+          case "session.endTurn":
+            hostTurnEnds.push({ turnId: params.turnId, status: params.status });
+            return { ok: true };
           case "session.bindEngine": {
             const session = hostSessions.get(params.id);
             if (session) {
@@ -537,13 +550,15 @@ test(
     assert.equal((await bridge.configure(SESSION, { mode: "plan" })).ok, true);
     const planScript = [{ text: "plan drafted", finish: "stop" }];
     const p2 = await promptAndWait("plan-1", "draft a plan for the change", planScript, "plan drafted");
-    const expectedP2 = contractExpected(E0, ["plugin_demo_inspect"]);
+    const expectedP2 = contractExpected(E0, ["plugin_demo_inspect"], "SubmitPlan");
     assertStrictSequence(requestToolNames(p2.request), expectedP2, "plan-1");
     assert.ok(expectedP2.includes("plugin_demo_inspect"), "the declared safe plugin must stay contract-visible");
     assert.ok(!expectedP2.includes("plugin_demo_plain"), "an undeclared plugin must be hidden in Plan");
     assert.ok(!expectedP2.includes("mcp_alpha_lookup"), "user MCP must be hidden in Plan");
     assert.ok(!expectedP2.includes("Skill"), "the Skill tool must be hidden in Plan");
     assert.ok(!expectedP2.includes("ast_edit"), "a deferred builtin must not become contract-visible");
+    assert.ok(expectedP2.includes("SubmitPlan"), "Plan must expose its own submit tool");
+    assert.ok(!expectedP2.includes("SubmitGoal"), "the other kind's submit tool must not be registered");
     assertModePromptShape({ label: "plan-1", systemText: requestSystemText(p2.request), mode: "plan", capabilityExpected: true });
     const p2Witness = witnessEntries().filter((entry) => entry.prompt === "draft a plan for the change");
     assert.equal(p2Witness.length, 2, "entering Plan must clamp in one policy retry");
@@ -566,9 +581,11 @@ test(
       [{ text: "goal negotiated", finish: "stop" }],
       "goal negotiated",
     );
-    const expectedP3 = [...expectedP2, "plugin_demo_run"];
+    const expectedP3 = contractExpected([...E0, "plugin_demo_run"], ["plugin_demo_inspect", "plugin_demo_run"], "SubmitGoal");
     assertStrictSequence(requestToolNames(p3.request), expectedP3, "goal-1");
     assert.ok(!expectedP3.includes("plugin_demo_plain"), "a removed plugin tool must not linger");
+    assert.ok(expectedP3.includes("SubmitGoal"), "Goal must expose its own submit tool");
+    assert.ok(!expectedP3.includes("SubmitPlan"), "the plan submit tool must be withdrawn in Goal");
     assertModePromptShape({ label: "goal-1", systemText: requestSystemText(p3.request), mode: "goal", capabilityExpected: true });
     const p3Witness = witnessEntries().filter((entry) => entry.prompt === "negotiate the goal contract");
     assert.ok(
@@ -688,7 +705,7 @@ test(
       "plugin_demo_inspect",
       "plugin_demo_plain",
       "plugin_demo_run",
-    ]);
+    ], "SubmitPlan");
     assertStrictSequence(requestToolNames(p5.request), expectedP5, "plan-2");
     assert.ok(expectedP5.includes("plugin_demo_plain"), "a plan-safe plugin registered during Plan must be visible");
     assert.ok(!expectedP5.includes("mcp_beta_echo"), "user MCP must stay hidden in Plan");
@@ -996,9 +1013,14 @@ test(
       }
       const ends = refusalTurnEnds.slice(endsBefore).filter((info) => info.turnId === started.turnId);
       assert.deepEqual(
-        ends,
+        ends.map((info) => ({ sessionId: info.sessionId, turnId: info.turnId, reason: info.reason })),
         [{ sessionId: REFUSAL_SESSION, turnId: started.turnId, reason: "error" }],
         `${label}: exactly one turn end for the refused turn`,
+      );
+      assert.equal(
+        typeof ends[0]?.hostTurnId,
+        "string",
+        `${label}: the refusal must settle its own durable host turn (M5/T20-B2)`,
       );
       assert.equal(refusalBridge.status(REFUSAL_SESSION).state, "idle", `${label}: the runner must return to idle`);
       assert.equal(postRequests().length, requestsBefore, `${label}: zero provider requests`);
@@ -1038,9 +1060,14 @@ test(
       assert.equal(postRequests().length, requestsBefore + 1, `${label}: the repaired state must reach the provider once`);
       const ends = refusalTurnEnds.slice(endsBefore).filter((info) => info.turnId === started.turnId);
       assert.deepEqual(
-        ends,
+        ends.map((info) => ({ sessionId: info.sessionId, turnId: info.turnId, reason: info.reason })),
         [{ sessionId: REFUSAL_SESSION, turnId: started.turnId, reason: "completed" }],
         `${label}: exactly one completed turn end`,
+      );
+      assert.equal(
+        typeof ends[0]?.hostTurnId,
+        "string",
+        `${label}: a normal turn settles its own durable host turn (M5/T20-B2)`,
       );
       assert.equal(
         mutatorEntries().at(-1)?.outcome,

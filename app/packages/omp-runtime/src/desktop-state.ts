@@ -129,9 +129,11 @@ export type DesktopHostToolRisk = (typeof DESKTOP_HOST_TOOL_RISKS)[number];
 /**
  * Which desktop registry served one host tool. This is provenance, never a
  * name-prefix guess: plugin tools (including plugin-declared MCP tools) come
- * from the plugin registry, user MCP tools from the user MCP runtime.
+ * from the plugin registry, user MCP tools from the user MCP runtime, and
+ * `desktop` names the runtime's own built-in desktop tools (the Plan/Goal
+ * submit tools, M5/T20-B2).
  */
-export const DESKTOP_HOST_TOOL_ORIGINS = ["plugin", "user-mcp"] as const;
+export const DESKTOP_HOST_TOOL_ORIGINS = ["plugin", "user-mcp", "desktop"] as const;
 export type DesktopHostToolOrigin = (typeof DESKTOP_HOST_TOOL_ORIGINS)[number];
 
 /**

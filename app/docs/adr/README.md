@@ -333,6 +333,7 @@ Each ADR includes:
 | 0307 | [The bundled OMP sidecar is a verified build product](0307-bundled-omp-sidecar.md) | Accepted (M5/T20-R4B; R3 stays blocked) |
 | 0308 | [OMP runtime mode/policy state, the mode block, and the contract tool catalog](0308-omp-runtime-policy-state-and-contract-catalog.md) | Accepted (M5/T20-B1; T20-C/B2/D remain declared) |
 | 0309 | [OMP execution-time permission enforcement (PI's decision table)](0309-omp-execution-time-permission-policy.md) | Accepted (M5/T20-C; T20-B2/D remain declared) |
+| 0310 | [OMP Plan/Goal submission, approval and dispatch](0310-omp-plan-submit-approval-and-dispatch.md) | Accepted (M5/T20-B2; T20-D remains declared; pending root acceptance) |
 | turn-process-and-thinking-display | [Turn process and thinking presentation](turn-process-and-thinking-display.md) | Accepted |
 | provider-display-order | [Provider display order](provider-display-order.md) | Accepted |
 | registry-header-variable-spelling | [Remote header variables accept the registry's `{name}` spelling](registry-header-variable-spelling.md) | Proposed |

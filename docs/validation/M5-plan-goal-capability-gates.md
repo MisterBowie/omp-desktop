@@ -6,6 +6,8 @@
 
 > **2026-10-03 状态说明（链接 `docs/validation/M5-t20-c-execution-policy.md`）**：**B1 已由根复审独立验收（`bff27e1`）；§7 的 C1-C8 已实现并通过本机全量验证、待独立复审**（分支 `codex/m5-t20-c-execution-policy`，提交 `a7d0291`；证据含 gate/路径单元测试、真实 Bun 打包工具门探针、真实 PluginRuntime 子进程测试与真实已补丁 OMP 生产 E2E）。执行时顺序、外部路径、风险保真、插件真实 mode 与委托策略以 ADR 0309 为准；g1/g2 已退场为行为测试，g3 与 B4-B9/B2/D1-D3 仍未实现，`plan`/`goal` 能力保持关闭。§1.3.1 表格不变，仍是 C 的验收基准。
 
+> **2026-10-03 状态说明 2（链接 `docs/validation/M5-t20-b2-submit-approval.md`，ADR 0310）**：**B2 的提交/审批/派发闭环已实现、待独立复审**（分支 `codex/m5-t20-b2-approval`，基线 `94910160`，补丁级 `.4`）。§7 的 **B4-B8 与 B13 目录生命周期、D1/D3 的闭环**由本轮实现并附真实 E2E 证据：提交工具按模式注册与错 kind 拒绝、不可变工件（sha/大小/不可覆盖/新修订）、`PLAN_ALREADY_PENDING`、reject→重提、claim CAS 恰一次 prompt、重启不重放、批准后 agent 回合与共享指令；**B9 能力键与整矩阵仍在 T20-D**，`plan`/`goal` 保持关闭。g3 的行为测试已就位（提交/审批/派发 E2E），静态探针的退场与能力键开放一并留到 D。
+
 本轮（F8-F12）结论摘要：
 
 | 项 | 结论 | 证据 |

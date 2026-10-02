@@ -1,0 +1,30 @@
+(node:1644922) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ T20-B2 plan submission (unpatched RED): valid, schema-rejected, mixed-batch, duplicate and revision (33658.861595ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 35423.436654
+
+✖ failing tests:
+
+test at apps/desktop/test/omp-plan-submit-e2e.test.mjs:324:1
+✖ T20-B2 plan submission (unpatched RED): valid, schema-rejected, mixed-batch, duplicate and revision (33658.861595ms)
+  AssertionError [ERR_ASSERTION]: the submit turn must settle
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/vv/person/code/omp-desktop-m5-t20-b2/app/apps/desktop/test/omp-plan-submit-e2e.test.mjs:370:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -249,17 +249,34 @@ const CONTRACT_MODE_ALLOWED: Record<string, true> = {
 };
 
 /**
- * True when a contract mode (Plan/Goal) may execute this tool: a PI-allowed
- * native name, or a plugin tool whose forwarded declaration carries a
- * non-empty `planSafeActions` list (PI ADR 0211). The per-action restriction
- * of such a plugin tool is enforced at execution by the PI plugin-runtime
- * guard with the turn's real mode (M5/T20-C). User MCP tools and plugin tools
- * without a declaration are never contract-allowed.
+ * The submit tool each contract mode owns, exactly PI's `SUBMIT_TOOL_NAMES`
+ * (`agent-runtime/src/runtime.ts`): Plan mode exposes `SubmitPlan` only, Goal
+ * mode `SubmitGoal` only. The other kind's submit tool is contract-denied, so
+ * a wrong-kind submission is refused before it can reach the host's own
+ * durable-mode check.
+ */
+export const SUBMIT_TOOL_BY_MODE: Partial<Record<DesktopRuntimeMode, string>> = {
+  plan: "SubmitPlan",
+  goal: "SubmitGoal",
+};
+
+/**
+ * True when a contract mode (Plan/Goal) may execute this tool: the mode's own
+ * submit tool, a PI-allowed native name, or a plugin tool whose forwarded
+ * declaration carries a non-empty `planSafeActions` list (PI ADR 0211). The
+ * per-action restriction of such a plugin tool is enforced at execution by the
+ * PI plugin-runtime guard with the turn's real mode (M5/T20-C). User MCP tools
+ * and plugin tools without a declaration are never contract-allowed, and the
+ * *other* kind's submit tool is denied like any unknown name. Without a mode
+ * the submit tools are not granted — a caller that does not name the contract
+ * cannot admit one.
  */
 export function contractAllowsTool(
   toolName: string,
   hostTools: readonly DesktopHostToolPolicy[],
+  mode?: DesktopRuntimeMode,
 ): boolean {
+  if (mode !== undefined && SUBMIT_TOOL_BY_MODE[mode] === toolName) return true;
   if (CONTRACT_MODE_ALLOWED[toolName.toLowerCase()] === true) return true;
   const declared = hostTools.find((tool) => tool.name === toolName);
   return (
@@ -270,6 +287,9 @@ export function contractAllowsTool(
 /** The PI rejection code and message for one contract-denied call. */
 function contractDenyReason(toolName: string, mode: DesktopRuntimeMode): string {
   const name = toolName.toLowerCase();
+  if (name === "submitplan" || name === "submitgoal") {
+    return `PLAN_KIND_MISMATCH: ${toolName} is not available in ${mode} mode`;
+  }
   if (name === "write") return `WRITE_DISABLED_IN_PLAN: Write is disabled in ${mode} mode`;
   if (name === "edit") return `EDIT_DISABLED_IN_PLAN: Edit is disabled in ${mode} mode`;
   if (toolName.startsWith("plugin_")) {
@@ -637,7 +657,7 @@ export async function decideToolCall(
   const snapshot = policy.snapshot;
   if (snapshot) {
     const contract = snapshot.mode === "plan" || snapshot.mode === "goal";
-    if (contract && !contractAllowsTool(event.toolName, snapshot.hostTools)) {
+    if (contract && !contractAllowsTool(event.toolName, snapshot.hostTools, snapshot.mode)) {
       return {
         block: true,
         reason: contractDenyReason(event.toolName, snapshot.mode),
@@ -876,10 +896,15 @@ function uiAvailable(context: BeforeAgentStartContextSlice): boolean | undefined
  * nothing outside the live active set is invented.
  */
 export function contractActiveToolNames(
-  state: Pick<DesktopCapabilityState, "hostTools">,
+  state: Pick<DesktopCapabilityState, "mode" | "hostTools">,
   activeNames: readonly string[],
 ): string[] {
   const allowed = new Set<string>(CONTRACT_MODE_NATIVE_TOOLS);
+  // The mode's own submit tool rides the contract catalog exactly like PI's
+  // `rebuildToolCatalog` adds `SubmitPlan`/`SubmitGoal`; the other kind's name
+  // stays out.
+  const submitTool = state.mode === "plan" || state.mode === "goal" ? SUBMIT_TOOL_BY_MODE[state.mode] : undefined;
+  if (submitTool !== undefined) allowed.add(submitTool);
   for (const tool of state.hostTools as DesktopHostToolPolicy[]) {
     if (tool.origin === "plugin" && tool.planSafeActions.length > 0) allowed.add(tool.name);
   }

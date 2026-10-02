@@ -73,7 +73,7 @@ import {
   type SubagentListEntry,
 } from "@pi-desktop/omp-runtime";
 import { composeModeSystemPrompt } from "@pi-desktop/agent-runtime";
-import { desktopSkillToolDefinition, type OmpHostToolCatalogEntry } from "./omp-host-tools";
+import { desktopSkillToolDefinition, desktopSubmitToolCatalogEntry, type OmpHostToolCatalogEntry } from "./omp-host-tools";
 
 export type OmpSessionBridgeLogger = {
   app(
@@ -107,6 +107,23 @@ export type NativeSessionBoundInfo = {
   nativeSessionId: string;
   nativeSessionPath: string;
   runtimeVersion: string | null;
+};
+
+/**
+ * The durable host turn lifecycle (M5/T20-B2). `begin` opens the host's own
+ * turn row (`session.beginTurn`) and returns its id; `end` settles exactly
+ * that row (`session.endTurn`). The bridge calls `begin` once per accepted
+ * prompt — both the regular user entry and the approved-plan execution entry
+ * go through `prompt` — and `end` once per closed generation, so no other
+ * component may begin or end an OMP turn.
+ */
+export type OmpHostTurnLifecycle = {
+  begin(input: { sessionId: string; providerId: string | null; modelId: string | null }): Promise<string>;
+  end(input: {
+    sessionId: string;
+    turnId: string;
+    status: "completed" | "aborted" | "error";
+  }): Promise<void>;
 };
 
 export type OmpSessionBridgeOptions = {
@@ -155,6 +172,17 @@ export type OmpSessionBridgeOptions = {
     thinkingLevel?: string | null;
     permissionMode?: string | null;
   }) => void | Promise<void>;
+  /**
+   * The durable host turn lifecycle (M5/T20-B2). Exactly one component — this
+   * bridge — begins a host turn for every OMP prompt it accepts (the regular
+   * user entry and the approved-plan execution entry both call `prompt`) and
+   * settles exactly that turn when the runner closes its generation. The
+   * returned id is the host database's own `turns.id`, carried into the run
+   * binding so a submit tool acts on the real turn; the live `omp-turn:…`
+   * generation id never substitutes for it. Absent (Pi path, unit fixtures)
+   * means OMP prompts run without a host turn row.
+   */
+  hostTurns?: OmpHostTurnLifecycle;
   /** The app-owned persistent native-session directory (containment root). */
   sessionDir: string;
   /**
@@ -299,6 +327,12 @@ export type OmpHostToolProvider = {
 export type OmpTurnEndInfo = {
   sessionId: string;
   turnId: string;
+  /**
+   * The durable host turn this run was bound to (M5/T20-B2), or null when the
+   * run had none. The wiring settles exactly this host turn — never the live
+   * generation id.
+   */
+  hostTurnId: string | null;
   reason: "completed" | "aborted" | "error";
 };
 
@@ -310,7 +344,13 @@ export type OmpSessionStatus = {
   state: OmpRunState;
 };
 
-export type OmpPromptResult = { accepted: boolean; turnId: string };
+export type OmpPromptResult = {
+  accepted: boolean;
+  /** The live generation identity (`omp-turn:…`), never a host id. */
+  turnId: string;
+  /** The durable host turn bound to this prompt, or null without a lifecycle. */
+  hostTurnId: string | null;
+};
 
 export type OmpPromptInput = {
   sessionId: string;
@@ -739,6 +779,29 @@ class SessionEntry {
    * can run under a policy that was never admitted for it.
    */
   private admittedTurnPolicy: { turnId: string; mode: DesktopRuntimeMode } | null = null;
+  /**
+   * The durable host turn bound to the entry's current prompt (M5/T20-B2).
+   * Filled before the runner accepts, so a prompt that is refused (or stopped
+   * while its preparation awaits) still settles its own host turn; the live
+   * generation id is recorded once the runner accepts and is what the runner's
+   * turn-end callback matches against.
+   */
+  private hostTurn: { hostTurnId: string; liveTurnId: string | null } | null = null;
+  /**
+   * Host turns already settled by this entry. Kept for the entry's whole
+   * lifetime like {@link announcedTurnEnds}: a bounded cache could forget an
+   * old turn and settle it twice.
+   */
+  private readonly settledHostTurns = new Set<string>();
+  /**
+   * Durable ends dispatched from the runner's synchronous turn-end callback,
+   * so a prompt that follows in the same tick can wait for the previous
+   * turn's row to close before `beginTurn` (the host refuses a second running
+   * turn).
+   */
+  private pendingHostTurnEnds: Array<Promise<unknown>> = [];
+  /** The durable host turn lifecycle (M5/T20-B2); absent in Pi/fixture wiring. */
+  private readonly hostTurns: OmpSessionBridgeOptions["hostTurns"];
   /** The desktop's `session:turnEnded` announcement, and its once-per-turn guard. */
   private readonly onTurnEnd: OmpSessionBridgeOptions["onTurnEnd"];
   private readonly announcedTurnEnds = new Set<string>();
@@ -831,6 +894,7 @@ class SessionEntry {
     sessionGrants: () => ReadonlySet<string>;
     noteNativeSession: (nativeSessionId: string | null) => void;
     onTurnEnd?: OmpSessionBridgeOptions["onTurnEnd"];
+    hostTurns?: OmpSessionBridgeOptions["hostTurns"];
   }) {
     this.sessionId = deps.sessionId;
     this.projectDirectory = deps.projectDirectory;
@@ -848,6 +912,7 @@ class SessionEntry {
     this.sessionGrants = deps.sessionGrants;
     this.noteNativeSession = deps.noteNativeSession;
     this.onTurnEnd = deps.onTurnEnd;
+    this.hostTurns = deps.hostTurns;
     // The executor is bound once: the project directory and model binding are
     // fixed for the entry's lifetime, so the bound executor can never reach
     // another project's scoped tools even if a later prompt tried. Its
@@ -1019,16 +1084,15 @@ class SessionEntry {
       nativeSessionIdentity: () => this.nativeSessionId,
       ...(this.hostToolExecutor ? { hostToolExecutor: this.hostToolExecutor } : {}),
       // The runner owns the turn-end announcement (its closeRun knows the
-      // real reason); the bridge forwards it through its once-guard to the
-      // desktop's `session:turnEnded` broadcast. Ordinary envelopes are never
+      // real reason); the bridge forwards it through its once-guard: the
+      // durable host turn is settled from here, and the desktop's
+      // `session:turnEnded` broadcast is forwarded when a listener is wired.
+      // This callback is unconditional — host-turn settlement must not depend
+      // on the optional plugin announcement. Ordinary envelopes are never
       // inspected for terminal state — a converter error mid-run is not a
       // turn end, and a prompt failure may close a run without any envelope.
-      ...(this.onTurnEnd
-        ? {
-            onTurnEnd: (info: { sessionId: string; turnId: string; reason: "completed" | "aborted" | "error" }) =>
-              this.announceTurnEnded(info.turnId, info.reason),
-          }
-        : {}),
+      onTurnEnd: (info: { sessionId: string; turnId: string; reason: "completed" | "aborted" | "error" }) =>
+        this.announceTurnEnded(info.turnId, info.reason),
       emit: (envelope) => this.emitAgentEvent(envelope),
       onUiRequest: (request, info) => this.surfaceUiRequest(request, info.sessionId, info.generation),
       onUiClosed: (requestId, reason) => {
@@ -1295,8 +1359,15 @@ class SessionEntry {
     // the policy table in the run-scoped state, so the tools the model can
     // call and the gate's risk/plan-safe view can never describe different
     // catalogs. A catalog failure refuses the prompt (the host tools are part
-    // of the contract this phase must keep honest).
-    const catalog = this.hostTools ? await this.hostTools.catalog(this.projectDirectory) : [];
+    // of the contract this phase must keep honest). A contract mode's submit
+    // tool (PI's `SUBMIT_TOOL_NAMES`) is appended here — the only place the
+    // catalog is assembled — so Plan exposes exactly `SubmitPlan` and Goal
+    // exactly `SubmitGoal`, and Agent exposes neither.
+    const pluginCatalog = this.hostTools ? await this.hostTools.catalog(this.projectDirectory) : [];
+    const catalog =
+      policy && (policy.mode === "plan" || policy.mode === "goal")
+        ? [...pluginCatalog, desktopSubmitToolCatalogEntry(policy.mode)]
+        : pluginCatalog;
     // The session's mode, effective permission mode, mode block, skill
     // catalog, project memory and host-tool policy are refreshed into the
     // run-scoped state file before every prompt, the way the Pi host re-reads
@@ -1347,10 +1418,92 @@ class SessionEntry {
             grants: [...this.sessionGrants()],
           }
         : undefined;
-    const started = await runner.prompt(content, admission ? { admission } : {});
+    // The durable host turn is opened here — the single place any OMP prompt
+    // gets one, for the regular user entry and the approved-plan execution
+    // entry alike. As late as possible: every step that can refuse the prompt
+    // has already run, so a refused preparation leaves no turn row behind.
+    // A previous turn's durable end dispatched from the runner's synchronous
+    // close is awaited first, because the host refuses a second running turn.
+    let hostTurnId: string | null = null;
+    if (this.hostTurns) {
+      await Promise.allSettled(this.pendingHostTurnEnds);
+      this.pendingHostTurnEnds = [];
+      if (this.stopEpoch !== epoch) {
+        throw new OmpRuntimeError("stopping", "a stop was requested while the prompt was being prepared");
+      }
+      try {
+        const begun = await this.hostTurns.begin({
+          sessionId: this.sessionId,
+          providerId: spec.providerId,
+          modelId: spec.modelId,
+        });
+        hostTurnId = typeof begun === "string" && begun.trim() ? begun.trim() : null;
+        if (!hostTurnId) throw new Error("session.beginTurn returned no turn id");
+      } catch (error) {
+        throw Object.assign(
+          new Error(
+            `the durable host turn could not be started: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+          { errorCode: "OMP_HOST_TURN_FAILED" },
+        );
+      }
+      this.hostTurn = { hostTurnId, liveTurnId: null };
+    }
+    let started: { accepted: boolean; turnId: string; hostTurnId: string | null };
+    try {
+      started = await runner.prompt(
+        content,
+        admission ? { admission, hostTurnId } : { hostTurnId },
+      );
+    } catch (error) {
+      // The runner refused or the transport failed. This path owns the host
+      // turn it just opened: a stop that raced the begin settles it as
+      // aborted, everything else as error. The runner's own close already
+      // announced the live generation (its callback cannot match a host turn
+      // whose live id was never assigned), so this is the only settlement.
+      if (hostTurnId) {
+        this.hostTurn = null;
+        this.endHostTurn(hostTurnId, this.stopEpoch !== epoch ? "aborted" : "error");
+      }
+      throw error;
+    }
+    if (this.hostTurn && this.hostTurn.hostTurnId === hostTurnId) {
+      this.hostTurn.liveTurnId = started.turnId;
+    }
     this.admittedTurnPolicy =
       started.accepted && policy ? { turnId: started.turnId, mode: policy.mode } : null;
-    return { accepted: started.accepted, turnId: started.turnId };
+    return { accepted: started.accepted, turnId: started.turnId, hostTurnId };
+  }
+
+  /**
+   * Settle one durable host turn exactly once, from the runner's synchronous
+   * turn-end callback. The promise is retained so the next prompt can wait for
+   * the row to close; two attempts are made because the end is dispatched
+   * without a waiter, and a failure that persists stays in the log rather than
+   * being retried forever (the next prompt's `beginTurn` then refuses, which is
+   * the fail-closed answer).
+   */
+  private endHostTurn(hostTurnId: string, status: "completed" | "aborted" | "error"): void {
+    if (!this.hostTurns || this.settledHostTurns.has(hostTurnId)) return;
+    this.settledHostTurns.add(hostTurnId);
+    const lifecycle = this.hostTurns;
+    const attempt = async (remaining: number): Promise<void> => {
+      try {
+        await lifecycle.end({ sessionId: this.sessionId, turnId: hostTurnId, status });
+      } catch (error) {
+        if (remaining > 0) {
+          const { promise, resolve } = Promise.withResolvers<void>();
+          setTimeout(resolve, 50);
+          await promise;
+          return attempt(remaining - 1);
+        }
+        this.logger?.app("omp", "warn", "host turn end failed", {
+          data: { sessionId: this.sessionId, turnId: hostTurnId, status, error: String(error) },
+        });
+      }
+    };
+    const pending = attempt(1);
+    this.pendingHostTurnEnds.push(pending);
   }
 
   /** A refused prompt carrying the run-scoped-state error code. */
@@ -1636,6 +1789,9 @@ class SessionEntry {
         definition.description,
         definition.parameters,
         definition.loadMode ?? null,
+        definition.concurrency ?? null,
+        definition.batchPolicy ?? null,
+        definition.terminateOnSettle ?? null,
       ]),
       policy: catalog.map((entry) => [
         entry.definition.name,
@@ -1695,10 +1851,22 @@ class SessionEntry {
    * announce twice. The set is released wholesale when the entry is disposed.
    */
   private announceTurnEnded(turnId: string, reason: "completed" | "aborted" | "error"): void {
+    // The runner closed exactly one generation; its live id identifies the
+    // host turn that generation was bound to. Settling the durable row happens
+    // here — the single host-turn settle point — even when no plugin
+    // announcement is wired. A generation whose host turn was already settled
+    // by the prompt-failure path (or that never had one) matches nothing.
+    const hostTurn = this.hostTurn;
+    let hostTurnId: string | null = null;
+    if (hostTurn && hostTurn.liveTurnId === turnId) {
+      hostTurnId = hostTurn.hostTurnId;
+      this.hostTurn = null;
+      this.endHostTurn(hostTurnId, reason);
+    }
     if (!this.onTurnEnd || this.announcedTurnEnds.has(turnId)) return;
     this.announcedTurnEnds.add(turnId);
     try {
-      this.onTurnEnd({ sessionId: this.sessionId, turnId, reason });
+      this.onTurnEnd({ sessionId: this.sessionId, turnId, hostTurnId, reason });
     } catch {
       // The announcement is advisory: its failure must never disturb the
       // runner close or the renderer's event fan-out.
@@ -1965,6 +2133,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       sessionGrants: () => grantsFor(spec.sessionId, entries.get(spec.sessionId)?.nativeSessionId ?? null),
       noteNativeSession: (nativeSessionId) => noteNativeSession(spec.sessionId, nativeSessionId),
       ...(options.onTurnEnd ? { onTurnEnd: options.onTurnEnd } : {}),
+      ...(options.hostTurns ? { hostTurns: options.hostTurns } : {}),
     });
     entries.set(spec.sessionId, entry);
     return entry;

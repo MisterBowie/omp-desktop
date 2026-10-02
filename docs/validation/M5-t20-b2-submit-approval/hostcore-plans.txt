@@ -1,0 +1,29 @@
+$ CARGO_TARGET_DIR=<shared m6-t21 target> cargo test -p host-core --locked plans::
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running unittests src/main.rs (/home/vv/person/code/omp-desktop-m6-t21/app/target/debug/deps/pi_desktop_host_core-93ec89f565717615)
+
+running 20 tests
+test plans::tests::title_slug_and_filename_are_descriptive_and_local_minute_shaped ... ok
+test plans::tests::every_kind_publishes_into_its_own_artifact_directory ... ok
+test plans::tests::configure_gate_blocks_changes_while_a_turn_is_running ... ok
+test plans::tests::enter_plan_mode_rejects_a_stale_turn_without_a_mode_write ... ok
+test plans::tests::oversized_markdown_is_rejected_before_artifact_creation ... ok
+test plans::tests::existing_plan_symlink_is_rejected ... ok
+test plans::tests::submitting_the_other_contract_kind_is_rejected ... ok
+test plans::tests::enter_plan_mode_uses_the_active_turn_and_tool_identity ... ok
+test plans::tests::entering_goal_mode_writes_the_goal_mode_and_kind ... ok
+test plans::tests::publication_collides_without_overwriting ... ok
+test plans::tests::approval_deadline_expires_lazily_and_rejects_late_resolution ... ok
+test plans::tests::duplicate_resolution_returns_committed_result_and_conflict_is_stale ... ok
+test plans::tests::configure_gate_blocks_pending_and_active_execution_changes ... ok
+test plans::tests::goal_contract_round_trips_through_its_own_kind ... ok
+test plans::tests::claim_and_finish_are_durable_cas_transitions ... ok
+test plans::tests::enter_refuses_the_cursor_contract_combination_without_writing_the_mode ... ok
+test plans::tests::approval_switches_session_and_creates_outbox_atomically ... ok
+test plans::tests::reject_has_no_side_effects_and_allows_new_turn_submission ... ok
+test plans::tests::pending_rows_are_interrupted_during_database_restart ... ok
+test plans::tests::enter_still_writes_the_mode_for_a_non_cursor_provider ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 586 filtered out; finished in 0.55s
+
+exit=0

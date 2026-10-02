@@ -1,0 +1,10 @@
+$ node scripts/omp-patch.mjs --check
+OMP-PATCH-OK 62bc57b+omp-desktop.4 (base 62bc57be1b03ef0802a33cf7f5f530e534527531)
+  patch      : app/patches/oh-my-pi/0001-omp-desktop-runtime.patch (sha256 d6d30785389a2ffc84bdff8ac72a4cea27c2abc50e14d709397f23dd2362882f)
+  capabilities: rpc-host-tool-concurrency, rpc-host-tool-sole-batch-policy, agent-tool-result-terminate, rpc-host-tool-result-terminate, rpc-host-tool-settle-termination, reproducible-sidecar-build, explicit-bytecode-build-mode
+  tracked files copied: 7673
+exit=0
+
+$ node scripts/omp-sidecar.mjs --check --source /home/vv/person/code/omp-fork-t20-b2
+OMP-SIDECAR-OK 62bc57b+omp-desktop.4 (fork 512370a1b177cf45e4d12781104506ea372fb8a9)
+exit=0

@@ -1128,6 +1128,34 @@ Agent 时 bridge 回收进程、下一次提示词在同一持久 native 会话�
 T20-C 见下一节（其复审返修后，产品路径的 `tool_call` 不再按调用回读状态文件：描述符携带的
 risk/mode/permissionMode/理由全部来自本回合被准入的不可变策略，可变文件只在准入时被读取）。
 
+### 提交、审批与派发（M5/T20-B2，ADR 0310；2026-10-03）
+
+非 Cursor 路线现在实现 Plan/Goal 的提交、审批与派发闭环（证据
+`docs/validation/M5-t20-b2-submit-approval.md`）；`plan`/`goal` 能力键仍关闭，T20-D 仍未开始。
+
+- **提交工具**：bridge 在每次提示词的唯一目录装配点追加**当前合约模式自己的**提交工具——Plan 只有
+  `SubmitPlan`、Goal 只有 `SubmitGoal`、Agent 两者都没有——名称/描述/schema（required 的
+  `title`/`markdown`/`question`）与 PI 逐字一致，声明 `loadMode: "essential"`、
+  `concurrency: "exclusive"`、`batchPolicy: "sole"` 与补丁级 `.4` 的
+  `terminateOnSettle: true`；运行域策略表声明 `{risk: "low", origin: "desktop"}`。gate 的合约决策只放行
+  本模式自己的提交工具（另一种 kind 以 `PLAN_KIND_MISMATCH` 拒绝），目录夹取保留该名字。声明在 agent
+  loop 的统一结算边界强制执行：成功、宿主拒绝、语义错误与**从未到达 execute 的 schema 校验失败**都
+  在提交后终止且无后续 provider 请求；被批次准入拒绝或中断跳过的调用不终止，混合批次仍整批零副作用
+  `block-and-continue`。
+- **身份**：bridge 是 OMP 持久 host turn 的唯一责任方——每次被接受的提示词（普通入口与批准执行入口）
+  提交前恰一次 `session.beginTurn`，runner 关闭该代时恰一次结算（`recoverInflight: false`、不建通知），
+  live `omp-turn:…` 代号与 host turn id 分开保存。executor 只使用绑定中的
+  `{sessionId, hostTurnId, toolCallId}` 提交；宿主 `plans.submit` 仍是权威（durable kind、每会话一个
+  pending、live turn、工件发布），其错误码原样到达模型。
+- **审批与派发**：复用既有 `plans.resolve` 事务（approve → `mode=agent` + 所选 `permissionMode` +
+  `queued`）与既有 `PlanApprovalBar`/`plans.changed` 表面，不新增第二审批队列。`runtime/plans.ts` 在
+  任何持久变更前判定引擎：OMP 先等本会话 live 回合结算，再以 queued→running CAS 恰一次 claim、恢复
+  native 会话身份，并把共享的 `approvedPlanInstruction(execution)`（工件路径、标题、问题与边界标签内
+  的完整 Markdown）经同一 prompt 路径提交；Pi 路径不变；其它引擎/拒绝在 claim 前跳过。拒绝/过期/
+  中断、CAS 失败者与重启维护都不会发提示词、不会重放；完成/中断按持久 host turn id 结算，后来的回合
+  不能结算错误的执行。Goal 延续定时器仍未实现（一次批准的 Goal 是一个 agent 回合，与本版本 Pi 路径
+  一致）。
+
 ### 执行时权限决策（M5/T20-C，ADR 0309；2026-10-03 复审返修见 §6）
 
 受信 gate 的 `tool_call` 决策升级为 PI §1.3.1 的顺序（mode / 已解析 permissionMode / 每宿主工具

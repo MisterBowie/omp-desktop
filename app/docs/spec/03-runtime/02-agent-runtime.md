@@ -1854,10 +1854,53 @@ contract tool catalog (evidence: `docs/validation/M5-capability-user-paths.md`,
   `Skill` tool. OMP-native project skills stay discoverable and loadable
   through `skill://` beside the desktop catalog. No new or decorative UI was
   added. M5/T20-B1 (runtime mode/policy state, the mode block and the
-  contract tool clamp) and M5/T20-C (execution-time permission enforcement,
-  external-path decisions and real plugin execution mode) are implemented;
-  T20-B2 (submit/approve/dispatch) and T20-D (capability opening) stay closed
-  and unclaimed, and `plan`/`goal` capabilities remain off.
+  contract tool clamp), M5/T20-C (execution-time permission enforcement,
+  external-path decisions and real plugin execution mode) and M5/T20-B2
+  (submit/approve/dispatch) are implemented; T20-D (capability opening and
+  the full-matrix acceptance) stays closed and unclaimed, and `plan`/`goal`
+  capabilities remain off.
+
+M5/T20-B2 implements the non-Cursor Plan/Goal submission, approval and
+dispatch loop (evidence: `docs/validation/M5-t20-b2-submit-approval.md`,
+ADR 0310):
+
+- **Submit tools (PI contract)**: the bridge appends exactly the active
+  contract mode's tool to the per-prompt catalog — `SubmitPlan` for Plan,
+  `SubmitGoal` for Goal, neither for Agent — with PI's verbatim names,
+  descriptions and required `title`/`markdown`/`question` schema, declared
+  `loadMode: "essential"`, `concurrency: "exclusive"`, `batchPolicy: "sole"`
+  and the patch set's `terminateOnSettle: true` (ADR 0305 `.4`). The
+  run-scoped policy table declares them `{risk: "low", origin: "desktop"}`;
+  the gate's contract decision grants exactly the mode's own submit tool
+  (the other kind is `PLAN_KIND_MISMATCH`) and the clamp keeps it active.
+  Because the declaration is enforced at the loop's settlement boundary, a
+  valid submission, a host rejection, a semantic error and a
+  schema-validation rejection that never reaches `execute` all end the run
+  with no further provider request; a call skipped by batch admission or an
+  interrupt does not terminate, and a rejected mixed batch still
+  block-and-continues with zero side effects.
+- **Identity**: the bridge is the single owner of the durable host turn — one
+  `session.beginTurn` immediately before each accepted prompt (user entry and
+  approved execution alike) and exactly one settlement from the runner's
+  close, `recoverInflight: false`, no task notification, the live
+  `omp-turn:…` generation id and the host turn id stored separately. The
+  executor submits with the bound `{sessionId, hostTurnId, toolCallId}` only;
+  the host's `plans.submit` remains authoritative (durable kind, one pending,
+  live turn, artifact publication) and its error code reaches the model.
+- **Approval and dispatch**: the existing `plans.resolve` transaction
+  (approve → `mode=agent` + selected `permissionMode` + `queued`) and the
+  existing `PlanApprovalBar`/`plans.changed` surface are reused — no second
+  queue. `runtime/plans.ts` decides the engine before the claim: OMP waits
+  for the session's live turn, claims queued→running exactly once (CAS),
+  restores the native session identity and submits the shared
+  `approvedPlanInstruction(execution)` (artifact path, title, question and
+  exact Markdown inside boundary tags) through the same prompt path; the Pi
+  path is unchanged; any other engine or refusal skips before the claim.
+  Rejected/expired/interrupted approvals, a CAS loser and boot-maintenance
+  interruptions never prompt and never replay; completion/interruption is
+  settled from the durable host turn id, so a later turn cannot finish the
+  wrong execution. Goal continuation timers remain not implemented (one
+  agent turn per approved Goal, as Pi's path in this release).
 
 M5/T20-C implements PI's execution-time permission decisions in the trusted
 gate (evidence: `docs/validation/M5-t20-c-execution-policy.md`, ADR 0309;

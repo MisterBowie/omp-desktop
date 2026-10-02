@@ -111,6 +111,7 @@ import {
   type SubagentPermission,
 } from "@pi-desktop/shared";
 import { createStreamCoalescer, type StreamCoalescer } from "./stream-coalescer.js";
+import { approvedPlanInstruction } from "./plan-execution-instruction.js";
 import type { RuntimeHost } from "./host-client.js";
 import { classifyAgentError } from "./agent-errors.js";
 import {
@@ -7481,32 +7482,7 @@ Delegation rules:
     this.autonomousExecution = true;
 
     const kind = execution.kind === "goal" ? "goal" : "plan";
-    const instruction =
-      kind === "goal"
-        ? [
-            "The user approved the goal contract below. Reach that goal now, autonomously.",
-            `Use the host-created goal artifact at the workspace-relative path: ${execution.artifact.relativePath}`,
-            `Approved goal title: ${execution.title}`,
-            `Approval question: ${execution.question}`,
-            "Treat the following Markdown as the exact approved contract. Do not renegotiate it, replace it with a new contract, or ask for approval again.",
-            "<approved-goal-markdown>",
-            execution.plan,
-            "</approved-goal-markdown>",
-            "Choose your own approach with the normal Agent tools. Then verify every acceptance criterion yourself, running the checks the contract names rather than assuming they pass.",
-            "Keep working while a criterion is still unmet and you have an untried approach. Stop early only if a boundary in the contract blocks you or a criterion cannot be verified; say which one and why.",
-            "Finish with a report that walks the acceptance criteria one by one, each marked met or unmet with the evidence you observed.",
-          ].join("\n")
-        : [
-            "Execute the approved implementation plan now.",
-            `Use the host-created plan artifact at the workspace-relative path: ${execution.artifact.relativePath}`,
-            `Approved plan title: ${execution.title}`,
-            `Approval question: ${execution.question}`,
-            "Treat the following Markdown as the exact approved snapshot. Do not replace it with a new plan or ask for approval again.",
-            "<approved-plan-markdown>",
-            execution.plan,
-            "</approved-plan-markdown>",
-            "Implement the approved plan with the normal Agent tools, then report the result.",
-          ].join("\n");
+    const instruction = approvedPlanInstruction(execution);
     const internalId = `approved-${kind}:${execution.id}`;
     const internalMessage: AgentMessage = {
       role: "user",

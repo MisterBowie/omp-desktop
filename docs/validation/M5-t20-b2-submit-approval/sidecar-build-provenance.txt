@@ -1,0 +1,86 @@
+# Fork checkout coordinates
+512370a1b177cf45e4d12781104506ea372fb8a9
+0
+
+$ node scripts/omp-sidecar.mjs --build --source /home/vv/person/code/omp-fork-t20-b2
+OMP-SIDECAR-BUILT omp in app/apps/desktop/resources/omp-runtime
+  sha256     : 47a30f08f0e779ab7da48ac4af32cc03d8f5dae16b3f6a54fdeeeef4f8b9dddd
+  bytes      : 284001760
+  fork commit: 512370a1b177cf45e4d12781104506ea372fb8a9
+exit=0
+
+$ TMPDIR=/tmp/omp-b2-deep-tmp/a/b/c node scripts/omp-sidecar.mjs --build --source /home/vv/person/code/omp-fork-t20-b2 --out /tmp/omp-sidecar-build2
+OMP-SIDECAR-BUILT omp in ../../../../../tmp/omp-sidecar-build2
+  sha256     : 47a30f08f0e779ab7da48ac4af32cc03d8f5dae16b3f6a54fdeeeef4f8b9dddd
+  bytes      : 284001760
+  fork commit: 512370a1b177cf45e4d12781104506ea372fb8a9
+exit=0
+
+$ cmp build1/omp build2/omp
+binary identical (exit 0)
+
+$ cmp gate bundles
+gate identical (exit 0)
+
+$ diff -u provenance
+provenance identical (exit 0)
+
+$ sha256sum both binaries
+47a30f08f0e779ab7da48ac4af32cc03d8f5dae16b3f6a54fdeeeef4f8b9dddd  apps/desktop/resources/omp-runtime/omp
+47a30f08f0e779ab7da48ac4af32cc03d8f5dae16b3f6a54fdeeeef4f8b9dddd  /tmp/omp-sidecar-build2/omp
+
+$ cat provenance.json (build 1)
+{
+  "schema": "omp-desktop.bundled-sidecar/3",
+  "fork": {
+    "repository": "https://github.com/MisterBowie/oh-my-pi",
+    "commit": "512370a1b177cf45e4d12781104506ea372fb8a9",
+    "tree": "78886eaf82d4145521369b9e734cfff53f53fb54"
+  },
+  "upstreamBase": {
+    "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+    "version": "18.3.0"
+  },
+  "patchLevel": "62bc57b+omp-desktop.4",
+  "capabilities": [
+    "rpc-host-tool-concurrency",
+    "rpc-host-tool-sole-batch-policy",
+    "agent-tool-result-terminate",
+    "rpc-host-tool-result-terminate",
+    "rpc-host-tool-settle-termination",
+    "reproducible-sidecar-build",
+    "explicit-bytecode-build-mode"
+  ],
+  "ompVersion": "18.3.0",
+  "desktopVersion": "0.15.2",
+  "platform": "linux",
+  "arch": "x64",
+  "binary": {
+    "filename": "omp",
+    "bytes": 284001760,
+    "sha256": "47a30f08f0e779ab7da48ac4af32cc03d8f5dae16b3f6a54fdeeeef4f8b9dddd"
+  },
+  "extensions": [
+    {
+      "path": "extensions/omp-desktop-gate.js",
+      "bytes": 41981,
+      "sha256": "b43059832de9c0a5f8aaffa0511b22cd2f9decc42d38b7e743c07a42aa6e3156"
+    }
+  ],
+  "build": {
+    "tool": "bun",
+    "bunVersion": "1.4.2",
+    "bytecode": true
+  }
+}
+
+$ node scripts/verify-packaged-runtime.mjs --resources apps/desktop/resources
+PACKAGED-RUNTIME-OK run omp/18.3.0 linux/x64
+  resources  : /home/vv/person/code/omp-desktop-m5-t20-b2/app/apps/desktop/resources
+  binary     : /home/vv/person/code/omp-desktop-m5-t20-b2/app/apps/desktop/resources/omp-runtime/omp (284001760 B, sha256 47a30f08f0e779ab7da48ac4af32cc03d8f5dae16b3f6a54fdeeeef4f8b9dddd)
+  gate       : /home/vv/person/code/omp-desktop-m5-t20-b2/app/apps/desktop/resources/omp-runtime/extensions/omp-desktop-gate.js (41981 B, sha256 b43059832de9c0a5f8aaffa0511b22cd2f9decc42d38b7e743c07a42aa6e3156)
+  provenance : patchLevel 62bc57b+omp-desktop.4, fork 512370a1b177cf45e4d12781104506ea372fb8a9
+  runtime    : v2 negotiated, get_state ok, gate load control refused
+  child env  : PATH=/tmp/omp-packaged-accept-3CvNWj/empty-path, HOME=/tmp/omp-packaged-accept-3CvNWj/data/omp-runtime/run-lkHYjj/home, NODE_PATH/redirects/credentials absent
+  stop       : stopped=true reaped=true cleaned=true, leftover runs 0
+exit=0

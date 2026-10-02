@@ -195,6 +195,8 @@ test(
       ],
     ]);
     const hostSettings = { defaultPermissionMode: "ask" };
+    let hostTurnSeq = 0;
+    const hostTurnEnds = [];
     const fakeHost = {
       isAvailable: () => true,
       async call(method, params = {}) {
@@ -203,6 +205,13 @@ test(
             return { session: hostSessions.get(params.id) ?? null };
           case "settings.get":
             return { ...hostSettings };
+          case "session.beginTurn":
+            // M5/T20-B2: the production wiring opens one durable host turn per
+            // accepted prompt; the fixture records it like the real host would.
+            return { turnId: `host-turn-${(hostTurnSeq += 1)}` };
+          case "session.endTurn":
+            hostTurnEnds.push({ turnId: params.turnId, status: params.status });
+            return { ok: true };
           case "session.bindEngine": {
             const session = hostSessions.get(params.id);
             if (session) {

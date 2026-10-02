@@ -27,7 +27,7 @@ function harness(execute?: OmpHostToolExecutor) {
   return { calls, written };
 }
 
-const RUN: OmpHostToolRun = { sessionId: "omp-1", turnId: "turn-1", generation: 1 };
+const RUN: OmpHostToolRun = { sessionId: "omp-1", turnId: "turn-1", generation: 1, hostTurnId: null };
 
 function callFrame(id: string, overrides: Record<string, unknown> = {}) {
   return {

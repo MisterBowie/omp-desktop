@@ -1,7 +1,9 @@
-import { ErrorCodes, IPC, type AgentEventEnvelope, type AppNotification, type PlanExecution, type PlanExecutionFinishStatus, type UiMessage } from "@pi-desktop/shared";
+import { ErrorCodes, IPC, type AgentEventEnvelope, type AppNotification, type EngineId, type PlanExecution, type PlanExecutionFinishStatus, type UiMessage } from "@pi-desktop/shared";
+import { approvedPlanInstruction } from "@pi-desktop/agent-runtime";
 import { executionFromResponse, executionListFromResponse, planExecutionFromUnknown } from "@pi-desktop/host-runtime";
 import { refuseOutsidePiRuntime, type EngineRouter } from "./engine-router";
 import type { RuntimeState } from "./context";
+import type { OmpSessionBridge } from "./omp-session";
 import type {
   SessionCoordination,
   TurnEndedPayload,
@@ -74,6 +76,13 @@ export type PlanRuntimeDependencies = {
    * same gate as a prompt.
    */
   getEngineRouter: () => EngineRouter | null;
+  /**
+   * The OMP session bridge, resolved lazily because the registry is wired
+   * after the plan runtime in the boot sequence. Null when this build has no
+   * OMP runtime: an approved execution for an OMP session is then skipped with
+   * nothing changed (the row stays queued), never claimed.
+   */
+  getOmpSessions: () => OmpSessionBridge | null;
   isQuitting: () => boolean;
   onTurnSettled?: (sessionId: string, turnId: string) => Promise<void>;
 };
@@ -81,6 +90,7 @@ export type PlanRuntimeDependencies = {
 export function createPlanRuntime({
   runtimeState,
   getEngineRouter,
+  getOmpSessions,
   planState,
   logger,
   sendToRenderer,
@@ -108,6 +118,11 @@ export function createPlanRuntime({
   dispatchApprovedPlan: (rawExecution: unknown) => Promise<void>;
   drainApprovedPlanExecutions: () => Promise<void>;
   dispatchExecutionForProposal: (proposalId: string) => Promise<void>;
+  settleOmpTurnEnd: (info: {
+    sessionId: string;
+    hostTurnId: string | null;
+    reason: "completed" | "aborted" | "error";
+  }) => void;
 } {
 // Read the shared turn state once, by the names the finalizer below uses. The
 // instance is owned by the coordination factory; this module only reads it.
@@ -441,20 +456,32 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
         errorCode: ErrorCodes.ENGINE_UNAVAILABLE,
       });
     }
-    try {
-      // Draining a plan execution is Pi-runtime machinery; see
-      // `refuseOutsidePiRuntime` for why this is not a shared capability.
-      refuseOutsidePiRuntime(engineRouter.require(session, "prompt"), "plan execution");
-    } catch (refusal) {
-      // An approved execution for a session this build cannot drive is skipped
-      // with nothing changed: the row stays queued, no turn exists, and the rest
-      // of the drain continues. The alternative — refusing after claiming —
-      // would rewrite the row as interrupted for a runtime that never ran it.
+    // The engine is decided before anything durable changes: `plans.claimExecution`
+    // moves the row from queued to running, so gating afterwards would leave an
+    // execution marked running for a session this build cannot drive — and the
+    // failure path would rewrite it as interrupted. A refusal here (a closed
+    // capability, an engine the gate cannot route, a runtime this build cannot
+    // drive) skips exactly this execution with nothing changed, so the rest of
+    // the drain continues.
+    const skipExecution = (refusal: unknown): void => {
       logger.app("runtime", "warn", "approved plan execution skipped", {
         sessionId: initial.sessionId,
         code: (refusal as { errorCode?: string })?.errorCode,
         data: { executionId: initial.id, reason: String((refusal as Error)?.message ?? refusal) },
       });
+    };
+    let engine: EngineId | undefined;
+    try {
+      engine = engineRouter.require(session, "prompt");
+      // Draining a plan execution into the Pi runtime is Pi-runtime machinery;
+      // every other engine is refused before the claim.
+      if (engine !== "omp") refuseOutsidePiRuntime(engine, "plan execution");
+    } catch (refusal) {
+      skipExecution(refusal);
+      return;
+    }
+    if (engine === "omp") {
+      await dispatchApprovedPlanToOmp(initial, session);
       return;
     }
     // Only now is the Pi runtime required: the engine is known to be Pi.
@@ -541,10 +568,126 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
 
 }
 
+/**
+ * Dispatch one approved Plan/Goal execution into the OMP runtime.
+ *
+ * The engine is already known to be OMP. The queued row is claimed exactly
+ * once (host CAS), then the shared PI instruction for the immutable artifact is
+ * submitted through the bridge's own prompt path — the same prompt path the
+ * user entry uses, so the durable host turn is opened exactly once and the
+ * session's admitted policy (mode `agent`, the permission mode the approval
+ * selected) reaches the runtime. A CAS loser, or a row the host already marked
+ * interrupted/completed, never prompts. The execution is settled when the
+ * bridge announces that host turn's end (`index.ts`), keyed by the durable
+ * host turn id recorded here, so a later turn on the same session can never
+ * finish the wrong execution.
+ */
+async function dispatchApprovedPlanToOmp(
+  initial: PlanExecution,
+  session: {
+    projectPath?: unknown;
+    providerId?: unknown;
+    modelId?: unknown;
+    thinkingLevel?: unknown;
+  },
+): Promise<void> {
+  const omp = getOmpSessions();
+  const host = runtimeState.host;
+  if (!omp || !host) {
+    logger.app("runtime", "warn", "approved plan execution skipped", {
+      sessionId: initial.sessionId,
+      data: {
+        executionId: initial.id,
+        reason: !host ? "the host is unavailable" : "the OMP runtime is not wired in this build",
+      },
+    });
+    return;
+  }
+  // A live OMP turn owns the session's runtime; the runner accepts one prompt
+  // at a time, so wait for it exactly like the Pi path waits for its active
+  // turn. The row stays queued (nothing claimed) while waiting.
+  if (omp.status(initial.sessionId).isRunning) {
+    const retry = setTimeout(() => void dispatchApprovedPlan(initial), 250);
+    retry.unref();
+    return;
+  }
+  const claimResponse = await host.call("plans.claimExecution", {
+    executionId: initial.id,
+  });
+  const execution = executionFromResponse(claimResponse);
+  if (!execution || execution.state !== "running") {
+    // The CAS was lost (another dispatcher claimed it) or the row is a durable
+    // recovery outcome. Neither may prompt.
+    logger.app("runtime", "warn", "approved plan execution claim did not yield a running row", {
+      sessionId: initial.sessionId,
+      data: { executionId: initial.id, state: execution?.state ?? "missing" },
+    });
+    return;
+  }
+  claimedExecutionSessions.set(execution.id, execution.sessionId);
+  try {
+    // Restore the session's own native identity: without it the bridge would
+    // open a new native session and fork the transcript.
+    const engineRef = await host
+      .call<{
+        engineRef?: {
+          nativeSessionId?: string | null;
+          nativeSessionPath?: string | null;
+          adapterVersion?: number | null;
+          runtimeVersion?: string | null;
+        } | null;
+      }>("session.getEngineRef", { id: execution.sessionId })
+      .then((response) => response.engineRef ?? null)
+      .catch(() => null);
+    const started = await omp.prompt({
+      sessionId: execution.sessionId,
+      content: approvedPlanInstruction(execution),
+      projectPath:
+        typeof session.projectPath === "string" && session.projectPath.trim()
+          ? session.projectPath.trim()
+          : null,
+      providerId: typeof session.providerId === "string" ? session.providerId : null,
+      modelId: typeof session.modelId === "string" ? session.modelId : null,
+      thinkingLevel: typeof session.thinkingLevel === "string" ? session.thinkingLevel : null,
+      nativeSessionId: engineRef?.nativeSessionId ?? null,
+      nativeSessionPath: engineRef?.nativeSessionPath ?? null,
+      adapterVersion: engineRef?.adapterVersion ?? null,
+      runtimeVersion: engineRef?.runtimeVersion ?? null,
+    });
+    if (started.accepted !== true || !started.hostTurnId) {
+      throw new Error("approved plan execution was not accepted");
+    }
+    approvedExecutionIdsBySession.set(execution.sessionId, execution.id);
+    approvedExecutionTurns.set(execution.id, {
+      sessionId: execution.sessionId,
+      turnId: started.hostTurnId,
+    });
+    startedApprovedExecutions.add(execution.id);
+    logger.app("runtime", "info", "approved plan execution started", {
+      sessionId: execution.sessionId,
+      data: { executionId: execution.id, turnId: started.hostTurnId },
+    });
+  } catch (error: unknown) {
+    const errorCode =
+      (error as { data?: { errorCode?: string } })?.data?.errorCode ||
+      (error as { errorCode?: string })?.errorCode ||
+      ErrorCodes.PLAN_EXECUTION_INTERRUPTED;
+    await finishApprovedExecution(initial.id, "interrupted", errorCode);
+    logger.app("runtime", "warn", "approved plan execution failed to start", {
+      sessionId: initial.sessionId,
+      data: { executionId: initial.id, error: String(error) },
+    });
+  }
+}
+
 async function drainApprovedPlanExecutions(): Promise<void> {
   if (planState.approvedExecutionDrain) return planState.approvedExecutionDrain;
   planState.approvedExecutionDrain = (async () => {
-    if (!runtimeState.host || !runtimeState.sidecar) return;
+    // The drain serves both engines: each dispatch resolves the session's
+    // engine and refuses/skips before claiming when that engine cannot run the
+    // row. Requiring the Pi sidecar here would strand every OMP queued
+    // execution (the pre-B2 behavior this replaces).
+    if (!runtimeState.host) return;
     for (const [executionId, finish] of pendingExecutionFinishes) {
       await finishApprovedExecution(executionId, finish.status, finish.errorCode);
     }
@@ -561,6 +704,35 @@ async function drainApprovedPlanExecutions(): Promise<void> {
   } finally {
     planState.approvedExecutionDrain = null;
   }
+}
+
+/**
+ * Settle an approved OMP execution whose durable host turn just ended.
+ *
+ * The bridge calls this exactly once per closed host turn (from its
+ * `onTurnEnd`, which `index.ts` composes with the plugin announcement). The Pi
+ * path finishes executions from its persisted `agent_end`
+ * (`event-persistence.ts`); OMP events never enter that path, so this is the
+ * single settlement point for an OMP execution — keyed by the durable host
+ * turn id recorded at dispatch, never by session liveness, so a later turn on
+ * the same session can never finish the wrong execution.
+ */
+function settleOmpTurnEnd(info: { sessionId: string; hostTurnId: string | null; reason: "completed" | "aborted" | "error" }): void {
+  const executionId = info.hostTurnId
+    ? approvedExecutionIdsBySession.get(info.sessionId)
+    : undefined;
+  if (!executionId) return;
+  const executionTurn = approvedExecutionTurns.get(executionId);
+  if (executionTurn?.turnId !== info.hostTurnId) return;
+  void finishApprovedExecution(
+    executionId,
+    info.reason === "completed" ? "completed" : "interrupted",
+    info.reason === "completed" ? undefined : "PLAN_EXECUTION_INTERRUPTED",
+  ).catch((error: unknown) => {
+    logger.app("runtime", "warn", "OMP approved execution finalization failed", {
+      data: { executionId, error: String(error) },
+    });
+  });
 }
 
 async function dispatchExecutionForProposal(proposalId: string): Promise<void> {
@@ -585,5 +757,6 @@ async function dispatchExecutionForProposal(proposalId: string): Promise<void> {
     dispatchApprovedPlan,
     drainApprovedPlanExecutions,
     dispatchExecutionForProposal,
+    settleOmpTurnEnd,
   };
 }

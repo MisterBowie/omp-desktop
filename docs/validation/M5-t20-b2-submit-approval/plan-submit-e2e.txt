@@ -1,0 +1,14 @@
+(node:1648669) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ T20-B2 plan submission (patched): valid, schema-rejected, mixed-batch, duplicate and revision (3220.64966ms)
+✔ T20-B2 mixed batch [bash, SubmitPlan] is rejected whole, does not terminate, and ordinary tools still run (2939.701301ms)
+✔ T20-B2 approval dispatch: queued execution runs in OMP with the approved instruction, exactly once (4912.901877ms)
+✔ T20-B2 rejected approval never executes, and a restart does not replay a queued one (3845.515751ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 18316.435977

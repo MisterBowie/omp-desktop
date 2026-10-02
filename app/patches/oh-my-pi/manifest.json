@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "patchLevel": "62bc57b+omp-desktop.3",
-  "description": "OMP Desktop patch set for the pinned upstream OMP runtime: RPC host-tool scheduling and batch policy, settle-time run termination, the all-toolCall batch count, a deterministic native-addon archive, and an explicit bytecode switch on the build entry. Risk reduction and release-build reproducibility only: it does NOT make the sole-batch contract strict — see status.",
+  "patchLevel": "62bc57b+omp-desktop.4",
+  "description": "OMP Desktop patch set for the pinned upstream OMP runtime: RPC host-tool scheduling and batch policy, settle-time run termination (result flag and per-tool settlement declaration), the all-toolCall batch count, a deterministic native-addon archive, and an explicit bytecode switch on the build entry. Risk reduction and release-build reproducibility only: it does NOT make the sole-batch contract strict — see status.",
   "base": {
     "submodule": "upstream/oh-my-pi",
     "repository": "https://github.com/can1357/oh-my-pi",
@@ -10,21 +10,22 @@
   },
   "fork": {
     "repository": "https://github.com/MisterBowie/oh-my-pi",
-    "branch": "codex/omp-desktop-18.3.0-patch-3",
-    "commit": "6226f805e92654344de04def413fa5cb91cb16b9",
-    "tree": "5249cb07059b009e890bece6f7d59daeb1cb94f6",
+    "branch": "codex/omp-desktop-18.3.0-patch-4",
+    "commit": "512370a1b177cf45e4d12781104506ea372fb8a9",
+    "tree": "78886eaf82d4145521369b9e734cfff53f53fb54",
     "note": "Self-maintained fork whose HEAD is exactly base.sha + this patch level. `scripts/omp-sidecar.mjs` refuses any other commit; can1357/oh-my-pi stays a read-only upstream."
   },
   "patch": {
     "file": "0001-omp-desktop-runtime.patch",
-    "sha256": "ad63ced9f7488ff088194754b4902732e1e7ebd0bdfa10a7926b3c5dc1beeaa9",
-    "bytes": 87190
+    "sha256": "d6d30785389a2ffc84bdff8ac72a4cea27c2abc50e14d709397f23dd2362882f",
+    "bytes": 101113
   },
   "capabilities": [
     "rpc-host-tool-concurrency",
     "rpc-host-tool-sole-batch-policy",
     "agent-tool-result-terminate",
     "rpc-host-tool-result-terminate",
+    "rpc-host-tool-settle-termination",
     "reproducible-sidecar-build",
     "explicit-bytecode-build-mode"
   ],
@@ -48,9 +49,10 @@
   "contract": {
     "concurrencyField": "RpcHostToolDefinition.concurrency",
     "batchPolicyField": "RpcHostToolDefinition.batchPolicy",
+    "settleTerminationField": "AgentTool.terminateOnSettle / RpcHostToolDefinition.terminateOnSettle",
     "terminateField": "AgentToolResult.terminate",
     "invalidDeclaration": "set_host_tools request is rejected; the value never degrades to the default",
-    "invalidDeclarationDetail": "RpcHostToolDefinition.concurrency/batchPolicy values outside their union throw in normalizeHostToolPolicy, which the set_host_tools command and the host-tool adapter both call",
+    "invalidDeclarationDetail": "RpcHostToolDefinition.concurrency/batchPolicy/terminateOnSettle values outside their union throw in normalizeHostToolPolicy, which the set_host_tools command and the host-tool adapter both call",
     "bytecodeBuildEntry": "packages/coding-agent/scripts/build-binary.ts accepts exactly `--bytecode`/`--no-bytecode` (default on, one declaration, anything else exits 2); `compileCodingAgent` takes it as the typed option `CodingAgentCompileOptions.bytecode`, never from the environment"
   },
   "verification": {
@@ -72,6 +74,26 @@
     ]
   },
   "history": [
+    {
+      "patchLevel": "62bc57b+omp-desktop.3",
+      "base": {
+        "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+        "version": "18.3.0"
+      },
+      "patch": {
+        "file": "0001-omp-desktop-runtime.patch",
+        "sha256": "ad63ced9f7488ff088194754b4902732e1e7ebd0bdfa10a7926b3c5dc1beeaa9",
+        "bytes": 87190
+      },
+      "fork": {
+        "repository": "https://github.com/MisterBowie/oh-my-pi",
+        "branch": "codex/omp-desktop-18.3.0-patch-3",
+        "commit": "6226f805e92654344de04def413fa5cb91cb16b9",
+        "tree": "5249cb07059b009e890bece6f7d59daeb1cb94f6"
+      },
+      "retired": "2026-10-03",
+      "retiredReason": "T20-B2 added the settle-time termination declaration (AgentTool.terminateOnSettle), which changed the patched tree; the .3 artifact bytes and fork coordinates are kept here as history."
+    },
     {
       "patchLevel": "62bc57b+omp-desktop.2",
       "base": {
@@ -103,18 +125,18 @@
   "notes": [
     "This is an OMP Desktop-maintained patch level, not upstream OMP support: the runtime remains pinned at 62bc57be (omp/18.3.0) plus this patch set.",
     "Rebuild the patch after any source edit with: git -C <checkout> -c core.abbrev=7 diff <base.sha> <fork.commit> > app/patches/oh-my-pi/0001-omp-desktop-runtime.patch, then refresh patch.sha256 and patch.bytes. The explicit core.abbrev=7 pins the index lines to 7 hex digits: a machine-level core.abbrev would otherwise change the patch bytes while preserving semantics, so the artifact could not be reproduced byte-for-byte elsewhere.",
-    "The patch file was renamed from 0001-rpc-host-tool-transition-contract.patch at .3, when it stopped being only the RPC contract; the current-state documents are updated, the dated validation records keep the name they were written with.",
-    "The 18.3.0 artifact is the 18.2.7 artifact with exactly one changed context line: the 18.3.0 agent-loop.ts comment reads `wait` where 18.2.7 read `hub wait`. The added and removed line multisets are identical between the two artifacts.",
+    "The .4 patch artifact was regenerated on 2026-10-03 from fork commit 512370a1b177cf45e4d12781104506ea372fb8a9; it adds the settle-time termination declaration (AgentTool.terminateOnSettle, RpcHostToolDefinition.terminateOnSettle) enforced at the loop's single settlement boundary, so a schema-validation rejection, a pre-execution hook rejection, an execution throw, a host error and a success all terminate identically for a declared tool.",
+    "The zero-side-effect property of a rejected mixed batch is unchanged by .4: a batch carrying a sole tool plus any sibling is still rejected whole with terminate false so the model can correct.",
     "reproducible-sidecar-build: embed-native.ts writes the embedded addon tar.gz with fixed entry timestamps and a recomputed header checksum, because Bun.Archive stamps each entry with the current time. Without it, two builds of one fork commit produced different binaries — measured at T20-R4-3 on Bun 1.4.2 (first difference at byte 81260680).",
-    "explicit-bytecode-build-mode: bytecode stays on by default (upstream release behavior and the fast boot path). The desktop sidecar build passes `--bytecode` explicitly and records it as `build.bytecode` in the provenance manifest; measured reproducibility holds for bytecode on and off once the archive is deterministic.",
-    "The .3 patch artifact was regenerated on 2026-10-01 after a comment-only correction of the bytecode documentation in compile-binary.ts and build-binary.ts (fork commit 6226f80…; the superseded fork commit 6b5017bc… and its artifact stay in git history and in the dated R4-3 record). No file in the patch set was added or removed, and no runtime/build behavior changed."
+    "explicit-bytecode-build-mode: bytecode stays on by default (upstream release behavior and the fast boot path). The desktop sidecar build passes `--bytecode` explicitly and records it as `build.bytecode` in the provenance manifest; measured reproducibility holds for bytecode on and off once the archive is deterministic."
   ],
   "status": {
     "soleBatchContract": "not-strict",
     "blocker": "F3: a `kCursorExecResolved` sibling was executed by the provider/editor bridge before the assistant message existed, so its side effect cannot be prevented or retracted by any loop-level patch; PI counts every toolCall block, so the batch is still rejected, but \"zero side effects in a rejected batch\" is unreachable at this layer.",
     "mitigationsApplied": [
       "batch admission counts every toolCall block of the assistant message (Cursor-resolved included), matching PI runtime.ts:2222",
-      "speculation is disabled for a provider call whose active tool set advertises a sole-declared tool, so no speculative physical work starts before the batch decision"
+      "speculation is disabled for a provider call whose active tool set advertises a sole-declared tool, so no speculative physical work starts before the batch decision",
+      "a declared settle-terminating host tool terminates the run on every settled result path, including a schema-validation rejection that never reaches execute"
     ],
     "retractedClaims": [
       "R3 lifted",

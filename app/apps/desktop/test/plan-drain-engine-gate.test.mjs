@@ -42,7 +42,7 @@ function queuedExecution(sessionId) {
 }
 
 /** Everything the plan runtime needs, with the calls it makes recorded. */
-function harness({ queued, engineFor, engineRouter = null }) {
+function harness({ queued, engineFor, engineRouter = null, omp = null }) {
   const hostCalls = [];
   const sidecarCalls = [];
   const logs = [];
@@ -106,6 +106,7 @@ function harness({ queued, engineFor, engineRouter = null }) {
       projectPath: "/tmp/project",
       sidecarParams: { sessionId: "any" },
     }),
+    getOmpSessions: () => omp,
     getEngineRouter:
       engineRouter ??
       (() =>
@@ -127,10 +128,22 @@ function harness({ queued, engineFor, engineRouter = null }) {
 
 const methodsOf = (calls) => calls.map((entry) => entry.method);
 
-test("a queued execution for another engine is skipped without touching anything", async () => {
+test("a session the engine gate refuses is skipped before any claim", async () => {
+  // The refusal the engine gate produces for a session it cannot route (the
+  // ADR 0306 guard, an unreadable engine, a closed capability) must fire
+  // before `plans.claimExecution`: claiming first would leave the row running
+  // for a runtime that never ran it.
+  const refusingRouter = {
+    require: () => {
+      throw Object.assign(new Error("plan execution is not available for this engine"), {
+        errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+      });
+    },
+  };
   const { dependencies, hostCalls, sidecarCalls, logs } = harness({
     queued: [queuedExecution(OMP_SESSION)],
-    engineFor: async (id) => (id === OMP_SESSION ? "omp" : "pi"),
+    engineFor: async () => "omp",
+    engineRouter: () => refusingRouter,
   });
   await createPlanRuntime(dependencies).drainApprovedPlanExecutions();
 
@@ -141,6 +154,44 @@ test("a queued execution for another engine is skipped without touching anything
   const reported = logs.join(" ");
   assert.match(reported, /approved plan execution skipped/);
   assert.match(reported, new RegExp(ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE));
+});
+
+test("a queued execution for an OMP session is skipped before any claim when the OMP runtime is not wired", async () => {
+  const { dependencies, hostCalls, sidecarCalls, logs } = harness({
+    queued: [queuedExecution(OMP_SESSION)],
+    engineFor: async () => "omp",
+    omp: null,
+  });
+  await createPlanRuntime(dependencies).drainApprovedPlanExecutions();
+
+  assert.deepEqual(methodsOf(hostCalls), ["plans.queuedExecutions", "session.get"]);
+  assert.deepEqual(sidecarCalls, []);
+  assert.match(logs.join(" "), /the OMP runtime is not wired in this build/);
+});
+
+test("a queued execution for an OMP session claims once and prompts the bridge, never the Pi sidecar", async () => {
+  const prompts = [];
+  const omp = {
+    status: () => ({ isRunning: false }),
+    prompt: async (input) => {
+      prompts.push(input);
+      return { accepted: true, turnId: "omp-turn:1", hostTurnId: "host-turn-1" };
+    },
+  };
+  const { dependencies, hostCalls, sidecarCalls } = harness({
+    queued: [queuedExecution(OMP_SESSION)],
+    engineFor: async () => "omp",
+    omp,
+  });
+  await createPlanRuntime(dependencies).drainApprovedPlanExecutions();
+
+  const methods = methodsOf(hostCalls);
+  assert.equal(methods.filter((method) => method === "plans.claimExecution").length, 1);
+  assert.deepEqual(sidecarCalls, [], "the Pi runtime must not be called for an OMP session");
+  assert.equal(prompts.length, 1, "exactly one OMP prompt");
+  assert.equal(prompts[0].sessionId, OMP_SESSION);
+  assert.match(prompts[0].content, /<approved-plan-markdown>/);
+  assert.match(prompts[0].content, /\.pi\/plans\/plan\.md/);
 });
 
 test("a queued execution for a Pi session still dispatches", async () => {

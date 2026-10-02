@@ -188,7 +188,14 @@ export type OmpSessionRunnerOptions = {
 
 type RunRecord = {
   generation: number;
+  /** The live generation identity (`omp-turn:…`), never a host id. */
   turnId: string;
+  /**
+   * The durable host turn bound to this run (M5/T20-B2), captured when the
+   * prompt was accepted; null when no host turn was bound. Submit tools read
+   * this binding, never a model-supplied value.
+   */
+  hostTurnId: string | null;
   promptMessage: string;
   startedAt: number;
   bashOpen: boolean;
@@ -596,8 +603,8 @@ export class OmpSessionRunner {
    */
   async prompt(
     message: string,
-    options: { admission?: OmpTurnAdmission } = {},
-  ): Promise<{ accepted: boolean; turnId: string; generation: number }> {
+    options: { admission?: OmpTurnAdmission; hostTurnId?: string | null } = {},
+  ): Promise<{ accepted: boolean; turnId: string; generation: number; hostTurnId: string | null }> {
     this.throwIfDisposed();
     if (this.pendingReclaim) {
       throw new OmpRuntimeError(
@@ -638,6 +645,7 @@ export class OmpSessionRunner {
     const run: RunRecord = {
       generation,
       turnId,
+      hostTurnId: options.hostTurnId ?? null,
       promptMessage: message,
       startedAt: this.now(),
       bashOpen: false,
@@ -669,7 +677,7 @@ export class OmpSessionRunner {
           `the runtime refused the prompt: ${response.error ?? "unknown error"}`,
         );
       }
-      return { accepted: true, turnId, generation };
+      return { accepted: true, turnId, generation, hostTurnId: run.hostTurnId };
     } catch (error) {
       if (this.isCurrentRun(run)) {
         // The run never started, so anything it raised on the way is
@@ -1221,7 +1229,12 @@ export class OmpSessionRunner {
       this.hostTools.handleCall(
         frame,
         this.state === "running" && this.run
-          ? { sessionId: this.sessionId, turnId: this.run.turnId, generation: this.run.generation }
+          ? {
+              sessionId: this.sessionId,
+              turnId: this.run.turnId,
+              generation: this.run.generation,
+              hostTurnId: this.run.hostTurnId,
+            }
           : null,
       );
       return;

@@ -102,7 +102,7 @@ import { registerNotificationIpc } from "./ipc/notification-ipc";
 import { registerSessionIpc } from "./ipc/session-ipc";
 import { createDesktopEngineRuntimeForApp } from "./runtime/engine-runtime";
 import { wireOmpSessions } from "./runtime/omp-session-wiring";
-import { createOmpHostToolAdapter } from "./runtime/omp-host-tools";
+import { createOmpHostToolAdapter, createHostPlansSubmit } from "./runtime/omp-host-tools";
 import { createOmpDesktopCapabilities } from "./runtime/omp-desktop-capabilities";
 import { loadBuiltinSkillBody } from "./builtin-skills";
 import { registerSettingsIpc } from "./ipc/settings-ipc";
@@ -1120,6 +1120,9 @@ const sessionCollaboration = createSessionCollaborationService({
 
 const planRuntime = createPlanRuntime({
   runtimeState, getEngineRouter: () => engineRuntime.engineRouter,
+  // The OMP registry is wired later in the boot sequence; the getter is read
+  // at dispatch time, never during construction.
+  getOmpSessions: () => ompSessions,
   planState: planRuntimeState,
   logger,
   sendToRenderer,
@@ -1148,6 +1151,7 @@ const {
   dispatchApprovedPlan,
   drainApprovedPlanExecutions,
   dispatchExecutionForProposal,
+  settleOmpTurnEnd,
 } = planRuntime;
 
 const eventPersistence = createEventPersistence({
@@ -1268,6 +1272,11 @@ const ompSessions = wireOmpSessions({
     plugins,
     userMcp,
     pluginActiveInProject,
+    // The host's Plan/Goal submission endpoint (M5/T20-B2). The executor
+    // supplies the durable identity from the run binding; this closure only
+    // reaches the host RPC, and `plans.submit` itself enforces the kind /
+    // mode / live-turn / single-pending rules.
+    plans: createHostPlansSubmit(() => host),
     // The on-demand Skill path (M5/T19-C) reads bodies live with the exact
     // PI precedence: builtin first, then the user's own (scope re-checked),
     // then the plugin's — the same readers the Pi sidecar's local tool uses.
@@ -1290,7 +1299,14 @@ const ompSessions = wireOmpSessions({
     activeUserSkills,
     log: logger,
   }),
-  onTurnEnd: announceTurnEnded,
+  onTurnEnd: (info) => {
+    announceTurnEnded(info);
+    // The Pi path finishes an approved execution from its persisted agent_end
+    // (`event-persistence.ts`). OMP events never enter that path (M2: the
+    // native JSONL is the only transcript writer), so the plan runtime
+    // settles an approved execution from this durable-turn-keyed announcement.
+    settleOmpTurnEnd(info);
+  },
 }).bridge;
 function registerIpc() {
   return registerIpcHandlers({
