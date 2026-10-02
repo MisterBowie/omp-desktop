@@ -233,7 +233,7 @@ bridge.prompt
 | `repair-red/production-state-failure-probe.json` | F1-F4 原始探针结果（本机拉回，未编辑） | `8837fe9ab559e798d8737148afbc4622dcdd87d1a520ebc35136c65b10a7e671` |
 | `repair-red/production-state-failure-probe.mjs` | 复审机可读脚本（import 绝对路径，不直接运行） | `35af356b12f9c6d085aa93388299194662b39be50d9a7d9945852e984087858b` |
 | `repair-red/start-refusal-probe.json` | `ctx.abort` 语义前置探针（control/throw/abort） | `42dacea8461988ba6d7451aeb7a4508877741798db98b60e11c4db0e35fb644f` |
-| `b1-e2e-repair.txt` | 返修后 B1 生产 E2E（1/1） | `9cc1c224b05ba58f9db9da366c4c648351e3b441683f4b62e73f2bd59ef846d7` |
+| `b1-e2e-repair.txt` | 返修后 B1 生产 E2E（1/1；含 scratch 清理） | `71207e607c4dbe87134a722bfdb15d68ef48d979f3193e3606e1c61b14bdabba` |
 | `desktop-suite-repair.txt` / `.exit.txt` | desktop 全量（2977/2966/0/11）与 exit | `1d7994b88385bc01fc6c55843568f726c3acde0c87a4c215fea58fa626bc47b7` / `09d97839c18a1fde649d05f3c5ff984f3535520607585ef662aa8667a423a8cf` |
 | `omp-runtime-vitest-repair.txt` + `.gz` | 包 vitest 输出（24 files / 384 passed / 6 skipped）；`.gz` 为原始字节（`gzip -n -9`），`.txt` 为去掉 EOF 空行并注明归一化的可读副本 | `.txt` `2c2ec52585de9c8dc3a8109a9cc9b482c779797121186b6488127641e597ca65`；`.gz` `333945a82a9a7daa5453629f7f3851bb54e9eb108618a87979ea3d6e64501c05` |
 | `desktop-targeted-repair.exit.txt` | 五个针对性套件的 exit code（全 0） | `07c4ac3e58d4e725043534ae4c39da3c6b54c545431ca4d642610b5da3c0710e` |

@@ -401,6 +401,12 @@ test(
       capabilities,
     }).bridge;
     t.after(() => refusalBridge.dispose("b1 refusal probe finished").catch(() => undefined));
+    // Registered last on purpose: `t.after` hooks run in registration order,
+    // so every supervisor is reclaimed before its scratch root is removed (a
+    // live runtime recreates its `omp-sessions` directory otherwise).
+    t.after(() => {
+      for (const dir of scratch.splice(0)) rmSync(dir, { recursive: true, force: true });
+    });
 
     // --- Catalog fixtures ----------------------------------------------------
     const pluginTool = ({ fullName, name, risk, planSafeActions }) => ({
