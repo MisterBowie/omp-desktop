@@ -39,7 +39,7 @@ jobs:
           # commit patches/oh-my-pi/manifest.json pins, with full history so the
           # build can re-prove HEAD == base + patch level.
           repository: MisterBowie/oh-my-pi
-          ref: 512370a1b177cf45e4d12781104506ea372fb8a9
+          ref: 36483311dfff67be7504f591974df93fc512a45a
           path: .omp-sidecar-source
           fetch-depth: 0
 

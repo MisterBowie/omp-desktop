@@ -27,6 +27,7 @@ import {
   type OmpModeTransition,
 } from "./mode-transition.js";
 import { parseTurnFailureNotice } from "./turn-failure.js";
+import { parseStartRefusalNotice } from "./start-refusal.js";
 import { OMP_APPROVAL_OPTIONS } from "./approval-protocol.js";
 import type { OmpTurnAdmission } from "./turn-admission.js";
 
@@ -184,6 +185,15 @@ function failureNotices(h: GateHandlerHarness) {
     .filter((failure) => failure !== null);
 }
 
+/** The structured start-refusal descriptors the gate emitted (not the fence ack). */
+function refusalNotices(h: GateHandlerHarness) {
+  return h.notices
+    .map((notice) =>
+      parseStartRefusalNotice({ type: "extension_ui_request", method: "notify", message: notice.message }),
+    )
+    .filter((refusal) => refusal !== null);
+}
+
 const BASH: ToolCallEvent = { type: "tool_call", toolCallId: "call-bash", toolName: "bash", input: { command: "true" } };
 const READ: ToolCallEvent = { type: "tool_call", toolCallId: "call-read", toolName: "read", input: { path: "a.txt" } };
 const WRITE: ToolCallEvent = { type: "tool_call", toolCallId: "call-write", toolName: "write", input: { path: "out.txt", content: "x" } };
@@ -244,6 +254,54 @@ async function startSuccessorAgentTurn(
   const child = h.delegateContext(childSessionId);
   await h.lifecycle("session_start", child);
   return child;
+}
+
+/** Start the harness on a fence-admitted Plan turn (no mid-turn transition yet). */
+async function startedPlanTurn(
+  options: { awaitToolSelection?: () => Promise<void> | void } = {},
+): Promise<GateHandlerHarness> {
+  process.env.OMP_DESKTOP_STATE = writeState("plan");
+  process.env.OMP_DESKTOP_STATE_REQUIRED = "1";
+  const h = createGateHandlerHarness({
+    sessionId: OWNER,
+    activeTools: [...AGENT_ACTIVE],
+    ...(options.awaitToolSelection ? { awaitToolSelection: options.awaitToolSelection } : {}),
+  });
+  h.arm(TOKEN_A, admission({ mode: "plan", hostTools: PLAN_HOST_TOOLS }));
+  expect(await h.beforeAgentStart()).toMatchObject({ systemPrompt: ["native prompt", PLAN_BLOCK] });
+  h.agentStart();
+  return h;
+}
+
+/** Rewrite the run file as Agent, then arm/start the successor — the next prompt's own file. */
+function startSuccessorAgentTurnFromAgentFile(
+  h: GateHandlerHarness,
+  childSessionId: string,
+): Promise<Record<string, unknown>> {
+  process.env.OMP_DESKTOP_STATE = writeState("agent");
+  return startSuccessorAgentTurn(h, childSessionId);
+}
+
+/**
+ * A one-shot suspension on the gate's next `setActiveTools` call. The first
+ * call after `suspend` consumes the promise; every later call passes through,
+ * so a successor turn's own legitimate restore never blocks on the seam.
+ */
+function toolSelectionSeam(): {
+  hook: () => Promise<void> | undefined;
+  suspend: (promise: Promise<void>) => void;
+} {
+  let pending: Promise<void> | undefined;
+  return {
+    hook: () => {
+      const promise = pending;
+      pending = undefined;
+      return promise;
+    },
+    suspend: (promise) => {
+      pending = promise;
+    },
+  };
 }
 
 describe("gate mid-turn mode transition", () => {
@@ -543,6 +601,128 @@ describe("gate mid-turn mode transition", () => {
     expect(h.toolSelections).toHaveLength(before.selections);
     expect(h.aborted()).toBe(before.aborts);
     expect(failureNotices(h)).toHaveLength(0);
+    expect(await h.toolCall(WRITE)).toBeUndefined();
+    expect(await h.toolCall(BASH, child)).toBeUndefined();
+  });
+
+  // The `before_agent_start` start attempt reaches the clamp twice: the
+  // transitioned-continuation branch (a queued batch in the already moved
+  // turn) and the ordinary branch (the prompt-time mode). Both suspend inside
+  // `setActiveTools`, and a successor turn can be armed and started in that
+  // window; whatever the continuation then does — return the injection,
+  // publish the cached parts, refuse, retire or abort — it must first verify
+  // it still owns the live generation.
+
+  it("fails the current turn when a transitioned continuation's clamp rejects", async () => {
+    const seam = toolSelectionSeam();
+    const hold = deferred();
+    const h = await startedAgentTurn({ awaitToolSelection: seam.hook });
+    await h.toolResult(enterResult(readyRecord()));
+    seam.suspend(hold.promise);
+    const pending = h.beforeAgentStart();
+    await until(() => h.toolSelections.length === 2);
+    hold.reject(new Error("controlled current continuation clamp rejection"));
+    expect(await pending).toBeUndefined();
+    // The record is still this continuation's: the failure is real and must
+    // refuse and terminate this very turn — never be swallowed.
+    const [refusal] = refusalNotices(h);
+    expect(refusal?.code).toBe("gate-error");
+    expect(refusal?.turnToken).toBe(TOKEN_A);
+    expect(refusal?.sessionId).toBe(OWNER);
+    expect(h.aborted()).toBe(1);
+    const write = await h.toolCall(WRITE);
+    expect(write?.block).toBe(true);
+    expect(write?.reason).toMatch(/policy is unavailable/);
+  });
+
+  it("a resolved transitioned continuation after a successor turn returns nothing and never touches it", async () => {
+    const seam = toolSelectionSeam();
+    const hold = deferred();
+    const h = await startedAgentTurn({ awaitToolSelection: seam.hook });
+    await h.toolResult(enterResult(readyRecord()));
+    seam.suspend(hold.promise);
+    const pending = h.beforeAgentStart();
+    await until(() => h.toolSelections.length === 2);
+    const child = await startSuccessorAgentTurn(h, "native-child-continuation-resolve");
+    expect(await h.toolCall(WRITE)).toBeUndefined();
+    expect(await h.toolCall(BASH, child)).toBeUndefined();
+    const notices = h.notices.length;
+    const aborts = h.aborted();
+    hold.resolve();
+    // The stale continuation must abstain: not return the successor's cached
+    // prompt, not notify and not abort.
+    expect(await pending).toBeUndefined();
+    expect(h.notices).toHaveLength(notices);
+    expect(h.aborted()).toBe(aborts);
+    expect(await h.toolCall(WRITE)).toBeUndefined();
+    expect(await h.toolCall(BASH, child)).toBeUndefined();
+  });
+
+  it("a rejected transitioned continuation after a successor turn never fails or aborts it", async () => {
+    const seam = toolSelectionSeam();
+    const hold = deferred();
+    const h = await startedAgentTurn({ awaitToolSelection: seam.hook });
+    await h.toolResult(enterResult(readyRecord()));
+    seam.suspend(hold.promise);
+    const pending = h.beforeAgentStart();
+    await until(() => h.toolSelections.length === 2);
+    const child = await startSuccessorAgentTurn(h, "native-child-continuation-reject");
+    const notices = h.notices.length;
+    const aborts = h.aborted();
+    hold.reject(new Error("controlled stale continuation clamp rejection"));
+    expect(await pending).toBeUndefined();
+    // The rejection is the stale continuation's own failure: no refusal
+    // attributed to the successor's token, no retirement of its admission and
+    // no abort of its context.
+    expect(refusalNotices(h)).toHaveLength(0);
+    expect(h.notices).toHaveLength(notices);
+    expect(h.aborted()).toBe(aborts);
+    expect(await h.toolCall(WRITE)).toBeUndefined();
+    expect(await h.toolCall(BASH, child)).toBeUndefined();
+  });
+
+  it("a resolved start continuation after a successor turn publishes nothing into the successor's cache", async () => {
+    const seam = toolSelectionSeam();
+    const hold = deferred();
+    const h = await startedPlanTurn({ awaitToolSelection: seam.hook });
+    seam.suspend(hold.promise);
+    const pending = h.lifecycle("before_agent_start", h.context, {
+      type: "before_agent_start",
+      systemPrompt: ["native prompt", "stale-base"],
+    });
+    await until(() => h.toolSelections.length === 2);
+    const child = await startSuccessorAgentTurnFromAgentFile(h, "native-child-start-resolve");
+    expect(await h.toolCall(WRITE)).toBeUndefined();
+    expect(await h.toolCall(BASH, child)).toBeUndefined();
+    const notices = h.notices.length;
+    const aborts = h.aborted();
+    hold.resolve();
+    expect(await pending).toBeUndefined();
+    expect(h.notices).toHaveLength(notices);
+    expect(h.aborted()).toBe(aborts);
+    expect(await h.toolCall(WRITE)).toBeUndefined();
+    expect(await h.toolCall(BASH, child)).toBeUndefined();
+    // The successor's own cached parts survive: its transition rebuilds from
+    // its own base, never from the stale continuation's.
+    await h.toolResult(enterResult(readyRecord()));
+    expect(h.systemPromptReplacements).toEqual([["native prompt", PLAN_BLOCK]]);
+  });
+
+  it("a rejected start continuation after a successor turn never fails or aborts it", async () => {
+    const seam = toolSelectionSeam();
+    const hold = deferred();
+    const h = await startedPlanTurn({ awaitToolSelection: seam.hook });
+    seam.suspend(hold.promise);
+    const pending = h.beforeAgentStart();
+    await until(() => h.toolSelections.length === 2);
+    const child = await startSuccessorAgentTurnFromAgentFile(h, "native-child-start-reject");
+    const notices = h.notices.length;
+    const aborts = h.aborted();
+    hold.reject(new Error("controlled stale start clamp rejection"));
+    expect(await pending).toBeUndefined();
+    expect(refusalNotices(h)).toHaveLength(0);
+    expect(h.notices).toHaveLength(notices);
+    expect(h.aborted()).toBe(aborts);
     expect(await h.toolCall(WRITE)).toBeUndefined();
     expect(await h.toolCall(BASH, child)).toBeUndefined();
   });

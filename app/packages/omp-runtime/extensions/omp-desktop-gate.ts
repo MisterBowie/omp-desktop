@@ -1535,14 +1535,26 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
    * (`session/start-refusal.ts`) that lets the runner close exactly the
    * session and generation it is starting. Delivery first (the abort path has
    * its own logging), then the abort.
+   *
+   * `token` is the generation the refusal was *decided* under, passed in by
+   * the caller — never whatever token happens to be armed when a suspended
+   * handler finally gives up. A start attempt that lost its admission to a
+   * successor must not refuse, retire or abort that successor (the caller
+   * checks ownership before calling this at all), and this token parameter is
+   * what keeps a refusal made under an older generation attributable to that
+   * generation.
    */
-  const refuseStart = (context: BeforeAgentStartContextSlice, decision: StartRefusalVerdict): void => {
+  const refuseStart = (
+    context: BeforeAgentStartContextSlice,
+    decision: StartRefusalVerdict,
+    token: string | null,
+  ): void => {
     const at = Date.now();
     const refusal: OmpStartRefusal = {
       v: OMP_START_REFUSAL_VERSION,
       kind: OMP_START_REFUSAL_KIND,
       sessionId: decision.sessionId,
-      turnToken,
+      turnToken: token,
       code: decision.code,
       reason: decision.reason,
       refusalId: `omp-refusal-${at}-${refusalSequence++}`,
@@ -1560,7 +1572,7 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
     // The refused turn never started: its admission is retired here, so a
     // late callback cannot decide under a policy for a turn that was aborted.
     // The bindings that referenced it are dropped with it.
-    if (admittedTurn && admittedTurn.token === turnToken) {
+    if (admittedTurn && admittedTurn.token === token) {
       retireAdmittedTurn();
     }
     if (typeof context.abort === "function") {
@@ -1918,18 +1930,42 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
   // injects nothing (a delegate session) or refuses the turn (the owner's
   // state is invalid, or — with the mandatory marker — missing/unreadable);
   // the handler never throws into the agent start.
+  //
+  // Every await in this handler re-checks ownership (M5/T20-D second review
+  // repair). A start attempt can be suspended in the prompt-time clamp — the
+  // transitioned continuation and the ordinary branch both call
+  // `applyContractToolClamp` — while the turn ends, a successor fence replaces
+  // the admission wholesale and the successor's own start caches its prompt
+  // parts. A start attempt that no longer owns the live record must abstain
+  // (return undefined) rather than return its injection (or borrow the
+  // successor's cached prompt), overwrite the successor's cached parts, refuse
+  // under the successor's token, retire its admission or abort its context.
+  // Ownership is exact identity — the record object this invocation read or
+  // installed, plus the token it was read under — never a mutable-field
+  // comparison a later fence could fake.
   pi.on("before_agent_start", async (event, context) => {
     // A delegate's own start is a legitimate ownership signal too (and the
     // first one a fixture context without a session file exposes): bind it to
     // the live admission before the policy decision below can skip the start.
     bindDelegate(context);
     const statePath = env?.OMP_DESKTOP_STATE;
+    // The generation this invocation owns, updated as soon as the record it
+    // decides under is known and re-checked after every await.
+    let ownedRecord: AdmittedTurn | null = admittedTurn;
+    let ownedToken: string | null = turnToken;
+    const lostOwnership = (): boolean => {
+      if (admittedTurn === ownedRecord && turnToken === ownedToken) return false;
+      pi.logger?.warn?.(
+        "the desktop gate discarded a stale agent start: its admission is no longer the live one",
+      );
+      return true;
+    };
     try {
       const decision = beforeAgentStartPolicy(event, context, statePath, Date.now(), {
         required: isDesktopStateRequired(env?.OMP_DESKTOP_STATE_REQUIRED),
       });
       if (decision.kind === "refuse") {
-        refuseStart(context, decision);
+        refuseStart(context, decision, ownedToken);
         return undefined;
       }
       if (decision.kind === "skip") return undefined;
@@ -1946,20 +1982,34 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
           injectedPromptParts !== null &&
           decision.state.sessionId === admittedTurn.nativeSessionId
         ) {
-          const clampedTransitioned = await applyContractToolClamp(pi, clamp, admittedTurn.snapshot);
+          // Capture the generation and the exact parts this continuation owns
+          // *before* the await: afterwards the module-global record and cache
+          // may already describe a successor turn, and this callback must
+          // neither return the successor's cached prompt nor refuse under its
+          // token.
+          const continuing = admittedTurn;
+          const parts = injectedPromptParts;
+          ownedRecord = continuing;
+          ownedToken = turnToken;
+          const clampedTransitioned = await applyContractToolClamp(pi, clamp, continuing.snapshot);
+          if (lostOwnership()) return undefined;
           if (!clampedTransitioned.ok) {
-            refuseStart(context, {
-              code: "clamp-unavailable",
-              reason: clampedTransitioned.reason,
-              sessionId,
-            });
+            refuseStart(
+              context,
+              {
+                code: "clamp-unavailable",
+                reason: clampedTransitioned.reason,
+                sessionId,
+              },
+              ownedToken,
+            );
             return undefined;
           }
           return {
             systemPrompt: [
-              ...injectedPromptParts.base,
-              ...(injectedPromptParts.capability === null ? [] : [injectedPromptParts.capability]),
-              injectedPromptParts.modeBlock,
+              ...parts.base,
+              ...(parts.capability === null ? [] : [parts.capability]),
+              parts.modeBlock,
             ],
           };
         }
@@ -1973,22 +2023,30 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
           decision.state.mode !== admittedTurn.snapshot.mode ||
           decision.state.permissionMode !== admittedTurn.snapshot.permissionMode
         ) {
-          refuseStart(context, {
-            code: "state-mismatch",
-            reason:
-              "the run-scoped desktop state does not match the admitted policy (session, mode or permission mode changed after admission)",
-            sessionId,
-          });
+          refuseStart(
+            context,
+            {
+              code: "state-mismatch",
+              reason:
+                "the run-scoped desktop state does not match the admitted policy (session, mode or permission mode changed after admission)",
+              sessionId,
+            },
+            ownedToken,
+          );
           return undefined;
         }
       } else if (admittedTurn && admittedTurn.source === "fence" && admittedTurn.token === turnToken) {
         // A fenced admission exists and this start is not its owning session:
         // refuse rather than adopt a different session's file as the policy.
-        refuseStart(context, {
-          code: "state-foreign",
-          reason: `the admitted turn belongs to native session ${JSON.stringify(admittedTurn.nativeSessionId)}, not this start`,
-          sessionId,
-        });
+        refuseStart(
+          context,
+          {
+            code: "state-foreign",
+            reason: `the admitted turn belongs to native session ${JSON.stringify(admittedTurn.nativeSessionId)}, not this start`,
+            sessionId,
+          },
+          ownedToken,
+        );
         return undefined;
       } else if (
         !admittedTurn ||
@@ -2015,13 +2073,23 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
         };
       }
       const admitted = admittedTurn;
+      // The record this prompt-time clamp decides under; re-checked after the
+      // await, because the clamp is the window in which a successor fence can
+      // replace the admission and cache its own parts.
+      ownedRecord = admitted;
+      ownedToken = turnToken;
       const clamped = await applyContractToolClamp(pi, clamp, admitted ? admitted.snapshot : decision.state);
+      if (lostOwnership()) return undefined;
       if (!clamped.ok) {
-        refuseStart(context, {
-          code: "clamp-unavailable",
-          reason: clamped.reason,
-          sessionId: context.sessionManager?.getSessionId?.() ?? null,
-        });
+        refuseStart(
+          context,
+          {
+            code: "clamp-unavailable",
+            reason: clamped.reason,
+            sessionId: context.sessionManager?.getSessionId?.() ?? null,
+          },
+          ownedToken,
+        );
         return undefined;
       }
       // Cache the exact parts this injection produced: a host-confirmed
@@ -2036,18 +2104,27 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
     } catch (error) {
       // The handler must not silently degrade: an unexpected failure while a
       // state file is owned by this session refuses the turn, and otherwise
-      // falls back to "no injection" (the native prompt ships untouched).
-      try {
-        const read = readDesktopStateForSession(statePath, Date.now(), context.sessionManager?.getSessionId?.());
-        if (read.kind === "owned" || read.kind === "invalid") {
-          refuseStart(context, {
-            code: "gate-error",
-            reason: `desktop gate failed while applying the runtime state: ${String(error)}`,
-            sessionId: context.sessionManager?.getSessionId?.() ?? null,
-          });
+      // falls back to "no injection" (the native prompt ships untouched). A
+      // failure of a continuation that meanwhile lost its admission to a
+      // successor is only its own: it must not refuse, retire or abort that
+      // successor.
+      if (!lostOwnership()) {
+        try {
+          const read = readDesktopStateForSession(statePath, Date.now(), context.sessionManager?.getSessionId?.());
+          if (read.kind === "owned" || read.kind === "invalid") {
+            refuseStart(
+              context,
+              {
+                code: "gate-error",
+                reason: `desktop gate failed while applying the runtime state: ${String(error)}`,
+                sessionId: context.sessionManager?.getSessionId?.() ?? null,
+              },
+              ownedToken,
+            );
+          }
+        } catch {
+          // The probe itself failed; nothing attributable to refuse.
         }
-      } catch {
-        // The probe itself failed; nothing attributable to refuse.
       }
       return undefined;
     }
