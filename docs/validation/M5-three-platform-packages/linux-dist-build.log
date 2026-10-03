@@ -1,0 +1,264 @@
+
+> @pi-desktop/desktop@0.15.2 dist:linux /home/vv/person/code/omp-desktop-m5-packages/app/apps/desktop
+> pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/release-package.mjs --platform linux --publish never
+
+
+> @pi-desktop/desktop@0.15.2 build:deps /home/vv/person/code/omp-desktop-m5-packages/app/apps/desktop
+> pnpm --filter '@pi-desktop/desktop^...' build
+
+Scope: 9 of 13 workspace projects
+../../packages/shared build$ tsc -p tsconfig.json
+../../packages/i18n build$ tsc -p tsconfig.json
+../../packages/plugin-sdk build$ tsc -p tsconfig.json
+../../packages/i18n build: Done
+../../packages/plugin-sdk build: Done
+../../packages/shared build: Done
+../../packages/agent-host build$ tsc -p tsconfig.json
+../../packages/agent-runtime build$ tsc -p tsconfig.json
+../../packages/omp-runtime build$ tsc -p tsconfig.json
+../../packages/plugin-devkit build$ tsc -p tsconfig.json
+../../packages/plugin-devkit build: Done
+../../packages/omp-runtime build: Done
+../../packages/agent-host build: Done
+../../packages/agent-runtime build: Done
+../../packages/host-runtime build$ tsc -p tsconfig.json
+../../packages/racp build$ tsc -p tsconfig.json
+../../packages/racp build: Done
+../../packages/host-runtime build: Done
+
+> @pi-desktop/desktop@0.15.2 build:host-release /home/vv/person/code/omp-desktop-m5-packages/app/apps/desktop
+> cargo build --release --manifest-path ../../Cargo.toml -p host-core
+
+    Finished `release` profile [optimized] target(s) in 0.05s
+
+> @pi-desktop/desktop@0.15.2 bundle:runtime /home/vv/person/code/omp-desktop-m5-packages/app/apps/desktop
+> pnpm -C ../../packages/agent-runtime bundle
+
+
+> @pi-desktop/agent-runtime@0.15.2 bundle /home/vv/person/code/omp-desktop-m5-packages/app/packages/agent-runtime
+> esbuild src/sidecar.ts --bundle --platform=node --format=esm --define:PI_BUNDLED_NODE=true --outfile=dist-bundle/sidecar.js --banner:js="import { createRequire as __piCreateRequire } from 'node:module'; const require = __piCreateRequire(import.meta.url);" && node -e "fs.writeFileSync('dist-bundle/package.json', JSON.stringify({ type: 'module' }, null, 2) + '\n')"
+
+
+  dist-bundle/sidecar.js  15.0mb ⚠️
+
+⚡ Done in 207ms
+vite v7.3.6 building ssr environment for production...
+transforming...
+✓ 2842 modules transformed.
+rendering chunks...
+out/main/chunks/openai-prompt-cache-COP8flKD.js          0.35 kB
+out/main/chunks/node-DUuTPR4P.js                         0.38 kB
+out/main/chunks/headers-CHRjKt3O.js                      0.49 kB
+out/main/chunks/hash-RwksDas4.js                         0.50 kB
+out/main/chunks/error-body-DKhVTZMw.js                   2.81 kB
+out/main/chunks/provider-retry-CLODmUJt.js               3.06 kB
+out/main/chunks/multipart-parser-Bd07a34c.js            10.95 kB
+out/main/chunks/pi-messages-CyfO7W1e.js                 11.01 kB
+out/main/chunks/json-parse-6hu4-sZc.js                  11.55 kB
+out/main/chunks/openai-responses-BlcH8D3p.js            12.85 kB
+out/main/chunks/google-generative-ai-J8psaTqd.js        14.74 kB
+out/main/chunks/azure-openai-responses-DqjqMTQC.js      16.01 kB
+out/main/chunks/google-vertex-C7pAkvzw.js               16.83 kB
+out/main/chunks/transform-messages-DPHqPCt4.js          20.39 kB
+out/main/plugin-host-process.js                         22.82 kB
+out/main/chunks/openai-responses-shared-03A1_4i-.js     26.89 kB
+out/main/chunks/mistral-conversations-BCHhUvlb.js       27.05 kB
+out/main/chunks/index-KgTK8x7A.js                       39.55 kB
+out/main/chunks/openai-completions-9cJJXsEl.js          50.72 kB
+out/main/chunks/openai-codex-responses-hAhHP8V1.js      52.96 kB
+out/main/chunks/node-B2r5bF76.js                        87.63 kB
+out/main/chunks/index-BINk2yPx.js                      241.49 kB
+out/main/chunks/client-BjqfcAKe.js                     320.47 kB
+out/main/chunks/anthropic-messages-DLudpkfE.js         522.06 kB
+out/main/chunks/google-shared-DhOmC0Hf.js            1,312.34 kB
+out/main/index.js                                    6,059.96 kB
+✓ built in 3.79s
+vite v7.3.6 building ssr environment for production...
+transforming...
+✓ 5 modules transformed.
+rendering chunks...
+out/preload/index.cjs        17.18 kB
+out/preload/plugin-panel.js  25.97 kB
+✓ built in 26ms
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 5152 modules transformed.
+rendering chunks...
+out/renderer/index.html                                           0.72 kB
+out/renderer/assets/KaTeX_Size4-Regular-Dl5lxZxV.woff2            4.93 kB
+out/renderer/assets/KaTeX_Size2-Regular-Dy4dx90m.woff2            5.21 kB
+out/renderer/assets/KaTeX_Size1-Regular-mCD8mA8B.woff2            5.47 kB
+out/renderer/assets/KaTeX_Caligraphic-Regular-Di6jR-x-.woff2      6.91 kB
+out/renderer/assets/KaTeX_Caligraphic-Bold-Dq_IR9rO.woff2         6.91 kB
+out/renderer/assets/KaTeX_Script-Regular-D3wIWfF6.woff2           9.64 kB
+out/renderer/assets/home-mascot-still-light-P-vWa3Uv.png         10.14 kB
+out/renderer/assets/KaTeX_SansSerif-Regular-DDBCnlJ7.woff2       10.34 kB
+out/renderer/assets/KaTeX_Fraktur-Regular-CTYiF6lA.woff2         11.32 kB
+out/renderer/assets/KaTeX_Fraktur-Bold-CL6g_b3V.woff2            11.35 kB
+out/renderer/assets/KaTeX_SansSerif-Italic-C3H0VqGB.woff2        12.03 kB
+out/renderer/assets/KaTeX_SansSerif-Bold-D1sUS0GD.woff2          12.22 kB
+out/renderer/assets/KaTeX_Typewriter-Regular-CO6r4hn1.woff2      13.57 kB
+out/renderer/assets/home-mascot-light-BkHnB2PE.gif               14.53 kB
+out/renderer/assets/KaTeX_Math-BoldItalic-CZnvNsCZ.woff2         16.40 kB
+out/renderer/assets/KaTeX_Math-Italic-t53AETM-.woff2             16.44 kB
+out/renderer/assets/KaTeX_Main-BoldItalic-DxDJ3AOS.woff2         16.78 kB
+out/renderer/assets/home-mascot-still-dark-BxXodyPO.png          16.92 kB
+out/renderer/assets/KaTeX_Main-Italic-NWA7e6Wa.woff2             16.99 kB
+out/renderer/assets/KaTeX_Main-Bold-Cx986IdX.woff2               25.32 kB
+out/renderer/assets/KaTeX_Main-Regular-B22Nviop.woff2            26.27 kB
+out/renderer/assets/logo-dark-tTBLWgku.png                       27.95 kB
+out/renderer/assets/KaTeX_AMS-Regular-BQhdFMY1.woff2             28.08 kB
+out/renderer/assets/logo-light-D6Rpzm4k.png                      31.87 kB
+out/renderer/assets/home-mascot-dark-BS3m6HWm.gif                36.66 kB
+out/renderer/assets/ScheduledPage-3DOIJ4wo.css                    0.80 kB
+out/renderer/assets/index-BtDIXlA6.css                          504.88 kB
+out/renderer/assets/channel-BQDliccg.js                           0.11 kB
+out/renderer/assets/init-Gi6I4Gst.js                              0.15 kB
+out/renderer/assets/chunk-2Q5K7J3B-hwuLu2p5.js                    0.20 kB
+out/renderer/assets/chunk-JWPE2WC7-2SvXc2xl.js                    0.23 kB
+out/renderer/assets/chunk-XXDRQBXY-3JFf2bl-.js                    0.24 kB
+out/renderer/assets/chunk-5VM5RSS4-LYL_Xev4.js                    0.37 kB
+out/renderer/assets/stateDiagram-v2-UEYNNEHI-BMiSKncP.js          0.46 kB
+out/renderer/assets/classDiagram-JCYQIIEL-D7wp152d.js             0.50 kB
+out/renderer/assets/classDiagram-v2-OCEON4UE-D7wp152d.js          0.50 kB
+out/renderer/assets/chunk-KBJHAD2P-ZDvLbucE.js                    0.51 kB
+out/renderer/assets/swimlanesDiagram-ULZ7WXOC-CSWci5Gk.js         0.58 kB
+out/renderer/assets/infoDiagram-6WML65LV-DPKc8VpW.js              0.61 kB
+out/renderer/assets/sizeCapture-X5ZJPWSS-CDw3Dr78.js              0.97 kB
+out/renderer/assets/ordinal-Cboi1Yqb.js                           1.19 kB
+out/renderer/assets/dotenv-Da5cRb03.js                            1.42 kB
+out/renderer/assets/ini-BEwlwnbL.js                               1.53 kB
+out/renderer/assets/railroadDiagram-AXF67PYL-Bx1c32Ig.js          1.64 kB
+out/renderer/assets/docker-BcOcwvcX.js                            1.74 kB
+out/renderer/assets/SettingsMenuSelect-DwNg3WXg.js                1.81 kB
+out/renderer/assets/abnfDiagram-N423BO3Z-VC5Zt63B.js              1.84 kB
+out/renderer/assets/chunk-2GRJ4B5K-Ch-bu1LH.js                    1.88 kB
+out/renderer/assets/pegDiagram-VL7TDLO6-RrOkTEIi.js               1.99 kB
+out/renderer/assets/ebnfDiagram-BXEA7PRR-C5ZEXaHt.js              2.04 kB
+out/renderer/assets/diff-D97Zzqfu.js                              2.57 kB
+out/renderer/assets/json-Cp-IABpG.js                              2.82 kB
+out/renderer/assets/jsonl-DcaNXYhu.js                             3.01 kB
+out/renderer/assets/jsonc-Des-eS-w.js                             3.11 kB
+out/renderer/assets/arc-D9Icc2-t.js                               3.43 kB
+out/renderer/assets/PullRequestsPage-w_Y7qwuH.js                  3.71 kB
+out/renderer/assets/diagram-LBJQPF4R-BVaYvYaW.js                  4.25 kB
+out/renderer/assets/defaultLocale-DX6XiGOO.js                     4.69 kB
+out/renderer/assets/map-DxJ2ADlA.js                               5.07 kB
+out/renderer/assets/xml-sdJ4AIDG.js                               5.38 kB
+out/renderer/assets/linear-CbpvhXlJ.js                            5.66 kB
+out/renderer/assets/ScopeControl-CBiGb0L-.js                      6.04 kB
+out/renderer/assets/diagram-UB23O5K3-DGeCnH9o.js                  6.11 kB
+out/renderer/assets/pieDiagram-7S7Q4E2Y-BDoHqAh0.js               6.33 kB
+out/renderer/assets/postcss-DnzrXTVv.js                           6.41 kB
+out/renderer/assets/toml-vGWfd6FD.js                              6.43 kB
+out/renderer/assets/proto-C7zT0LnQ.js                             6.55 kB
+out/renderer/assets/chunk-RYQCIY6F-DUrWw7D3.js                    7.08 kB
+out/renderer/assets/prisma-Vru482bI.js                            7.74 kB
+out/renderer/assets/diagram-7IWD3JNH-6A50CEk6.js                  8.37 kB
+out/renderer/assets/dagre-VZM6K2ZE-Bt4NnEzP.js                    8.60 kB
+out/renderer/assets/dart-bE4Kk8sk.js                              8.62 kB
+out/renderer/assets/kotlin-BdnUsdx6.js                            8.79 kB
+out/renderer/assets/make-CHLpvVh8.js                              8.96 kB
+out/renderer/assets/hcl-BWvSN4gD.js                              10.05 kB
+out/renderer/assets/cynefinDiagram-MW4NZA55-i3Qz1Tkm.js          10.13 kB
+out/renderer/assets/ScheduledPage-BVSBAxRz.js                    10.30 kB
+out/renderer/assets/stateDiagram-OKZ733FA-BJjp4RI0.js            10.46 kB
+out/renderer/assets/yaml-Buea-lGh.js                             10.51 kB
+out/renderer/assets/diagram-B4RE2ZJO-TT_O0kiP.js                 10.75 kB
+out/renderer/assets/terraform-BETggiCN.js                        11.39 kB
+out/renderer/assets/bat-CickPsom.js                              12.89 kB
+out/renderer/assets/rust-B1yitclQ.js                             15.07 kB
+out/renderer/assets/lua-BaeVxFsk.js                              15.54 kB
+out/renderer/assets/chunk-6Q2QTUOP-D6sgVCwA.js                   15.73 kB
+out/renderer/assets/diagram-Q27KOJAE-CPxsiBG2.js                 15.99 kB
+out/renderer/assets/ishikawaDiagram-WSZJBQD7-CyYRt4p7.js         17.50 kB
+out/renderer/assets/graphql-ChdNCCLP.js                          18.00 kB
+out/renderer/assets/svelte-C71xKXYG.js                           18.25 kB
+out/renderer/assets/groovy-gcz8RCvz.js                           19.18 kB
+out/renderer/assets/powershell-BmBUJMz7.js                       20.16 kB
+out/renderer/assets/kanban-definition-27J2QSJJ-CL-iw0IF.js       20.33 kB
+out/renderer/assets/capture-rig-DqTDHEQe.js                      20.98 kB
+out/renderer/assets/mindmap-definition-FAOFIHXS-DBC2Xsz1.js      23.21 kB
+out/renderer/assets/sankeyDiagram-W5VNT64P-CGkPpBFp.js           23.24 kB
+out/renderer/assets/sql-CRqJ_cUM.js                              23.43 kB
+out/renderer/assets/journeyDiagram-NVQOT4AX-CjpwhPZV.js          23.60 kB
+out/renderer/assets/graph-DOmOIIwC.js                            23.92 kB
+out/renderer/assets/astro-BrJk1R9x.js                            24.01 kB
+out/renderer/assets/one-light-C3Wv6jpd.js                        25.30 kB
+out/renderer/assets/wardleyDiagram-T6FBY63Y-ByLVw43A.js          25.53 kB
+out/renderer/assets/vue-CHlpWS_5.js                              25.69 kB
+out/renderer/assets/erDiagram-JOGREHBK-DvvBn6mD.js               27.13 kB
+out/renderer/assets/java-CylS5w8V.js                             27.22 kB
+out/renderer/assets/scala-CqE71os6.js                            28.89 kB
+out/renderer/assets/purify.es-Cz4mVeUR.js                        28.98 kB
+out/renderer/assets/gitGraphDiagram-DS77QQ5N-BaD3ESXC.js         29.45 kB
+out/renderer/assets/timeline-definition-Z64GVDOM-BQxEesaQ.js     30.87 kB
+out/renderer/assets/layout-D-LzfAck.js                           31.00 kB
+out/renderer/assets/requirementDiagram-LRYGKXZP-CS2n73XM.js      31.03 kB
+out/renderer/assets/one-dark-pro-DVMEJ2y_.js                     33.79 kB
+out/renderer/assets/quadrantDiagram-CIZ2JOQS-DV80J3ri.js         34.04 kB
+out/renderer/assets/nginx-BpAMiNFr.js                            35.37 kB
+out/renderer/assets/chunk-5RXB4S5H-8_k68x9N.js                   38.16 kB
+out/renderer/assets/shellscript-Yzrsuije.js                      41.48 kB
+out/renderer/assets/xychartDiagram-ELKLHX3M-DSaFNP0u.js          41.95 kB
+out/renderer/assets/vennDiagram-T6HMQDX7-CFZpOPOg.js             42.00 kB
+out/renderer/assets/go-C27-OAKa.js                               46.82 kB
+out/renderer/assets/css-CLj8gQPS.js                              49.04 kB
+out/renderer/assets/chunk-GF5L2VYU-DUpaangR.js                   49.21 kB
+out/renderer/assets/ruby-B6QtyW_S.js                             54.79 kB
+out/renderer/assets/mermaid-CQcHuHx7.js                          54.81 kB
+out/renderer/assets/PluginsPage-Da3o3zuH.js                      55.68 kB
+out/renderer/assets/html-pp8916En.js                             57.25 kB
+out/renderer/assets/markdown-Cvjx9yec.js                         59.34 kB
+out/renderer/assets/flowDiagram-UKHOOZJN-Dos-eE1m.js             60.74 kB
+out/renderer/assets/ganttDiagram-PKOTCBZU-DggM-fN3.js            69.73 kB
+out/renderer/assets/python-B6aJPvgy.js                           69.95 kB
+out/renderer/assets/c4Diagram-5PPSVZJV-DtJK3CPa.js               69.97 kB
+out/renderer/assets/c-BIGW1oBm.js                                72.11 kB
+out/renderer/assets/blockDiagram-VBNYF7ZC-ByxqrhEp.js            73.77 kB
+out/renderer/assets/cose-bilkent-JH36ORCC-DfFoDE5e.js            81.73 kB
+out/renderer/assets/swift-C2oV4EkX.js                            87.23 kB
+out/renderer/assets/csharp-DSvCPggb.js                           90.19 kB
+out/renderer/assets/php-Csjmro_R.js                             113.09 kB
+out/renderer/assets/sequenceDiagram-SI44F4Z6-CbbOg389.js        117.00 kB
+out/renderer/assets/swimlanes-SLNWSIFB-DJDRJU0t.js              118.87 kB
+out/renderer/assets/mdx-Cmh6b_Ma.js                             136.11 kB
+out/renderer/assets/architectureDiagram-T3A2C74G-TSwAHDgE.js    151.86 kB
+out/renderer/assets/javascript-wDzz0qaB.js                      174.83 kB
+out/renderer/assets/tsx-COt5Ahok.js                             175.54 kB
+out/renderer/assets/jsx-g9-lgVsj.js                             177.79 kB
+out/renderer/assets/typescript-BPQ3VLAy.js                      181.08 kB
+out/renderer/assets/cytoscape.esm-D3_iZ_3b.js                   442.92 kB
+out/renderer/assets/mermaid.core-XbE0yN4G.js                    593.62 kB
+out/renderer/assets/SettingsPage-WHaNF13g.js                    615.41 kB
+out/renderer/assets/cynefin-VYW2F7L2-o2UO7cua.js                687.71 kB
+out/renderer/assets/cpp-DddhVWhK.js                             796.96 kB
+out/renderer/assets/index-BDhpH7m0.js                         2,808.41 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 5.72s
+RELEASE-PACKAGE linux/x64: preflight /home/vv/.nvm/versions/node/v24.14.0/bin/node /home/vv/person/code/omp-desktop-m5-packages/app/scripts/omp-sidecar.mjs --preflight --platform linux --arch x64
+OMP-SIDECAR-PREFLIGHT built linux/x64 in app/apps/desktop/resources/omp-runtime
+  fork commit: 36483311dfff67be7504f591974df93fc512a45a
+  sha256     : f6111efdd9f60f8ab831da0d6292e37868e89dd163af46103780fd83924f560c
+RELEASE-PACKAGE linux/x64: electron-builder --linux --x64 --publish never
+  • electron-builder  version=26.15.3 os=7.0.0-34-generic
+  • loaded configuration  file=package.json ("build" field)
+  • packageManager not detected by file, falling back to environment detection  resolvedPackageManager=pnpm detected=/home/vv/person/code/omp-desktop-m5-packages/app/apps/desktop
+  • detected workspace root for project using packageManager field  pm=pnpm config=pnpm@10.34.5 resolved=/home/vv/person/code/omp-desktop-m5-packages/app projectDir=/home/vv/person/code/omp-desktop-m5-packages/app/apps/desktop
+  • executing @electron/rebuild  electronVersion=43.6.0 arch=x64 buildFromSource=false workspaceRoot=/home/vv/person/code/omp-desktop-m5-packages/app projectDir=./ appDir=./
+  • installing native dependencies  arch=x64
+  • completed installing native dependencies
+  • packaging       platform=linux arch=x64 electron=43.6.0 appOutDir=release/linux-unpacked
+  • downloaded      label=electron progress=100%
+  • downloaded electron zip extracted successfully  output=/home/vv/person/code/omp-desktop-m5-packages/app/apps/desktop/release/linux-unpacked
+  • searching for node modules  pm=pnpm searchDir=/home/vv/person/code/omp-desktop-m5-packages/app/apps/desktop
+  • building        target=AppImage arch=x64 file=release/OMP-Desktop-0.15.2-x86_64.AppImage
+  • building embedded block map  file=release/OMP-Desktop-0.15.2-x86_64.AppImage
+  • building        target=deb arch=x64 file=release/omp-desktop_0.15.2_amd64.deb
+  • adding autoupdate files for: deb  resourceDir=release/linux-unpacked/resources
+  • building        target=rpm arch=x64 file=release/omp-desktop-0.15.2-x86_64.rpm
+  • adding autoupdate files for: rpm  resourceDir=release/linux-unpacked/resources
