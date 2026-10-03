@@ -75,7 +75,7 @@ both the root-original and adapted hashes are under
   still false for one reason only — see 0.4.
 - `repair-20261003-green/model-entry-flow-f56fe838.json` — normal flow 2/2.
 - Product regressions added at the same layers (RED before the fix):
-  `repair-20261003-red/product-e2e-prefix-red.txt` shows all three new
+  `repair-20261003-red/product-e2e-prefix-red.txt.gz` shows all three new
   `omp-plan-submit-e2e` cases failing against the pre-fix source, while
   `repair-20261003-green/plan-submit-e2e.txt` shows the whole file **13
   passed / 0 failed** after the fix. Unit regressions: the gate stale
@@ -116,6 +116,12 @@ FakeProvider only (no paid/remote model); raw logs in
 | `node scripts/omp-patch.mjs --check --source <fork>` / sidecar `--check` | `OMP-SIDECAR-OK 62bc57b+omp-desktop.5` (unchanged patch/binary) |
 | `node scripts/omp-sidecar.mjs --build --source <fork>` | real Linux x64 `omp` 244295136 B / `f6111efd…` (unchanged); **rebuilt gate bundle** 52297 B / `dbefff57…`; provenance `.5` (`sidecar-build.txt`) |
 | `node scripts/verify-packaged-runtime.mjs --resources apps/desktop/resources` | `PACKAGED-RUNTIME-OK run`: protocol v2, `get_state` ok, gate-load control refused, minimal child PATH + isolated HOME, `stopped=true reaped=true cleaned=true` (`packaged-runtime.txt`) |
+
+Repair commit: `6a4ecbd051a805563bd1fae4751dc346529e605a` on
+`codex/m5-t20-d-mode-entry` (pushed to `origin`, ordinary append on top of
+`f56fe838`; the fork, patch level `.5` and both fixed submodules are
+unchanged). The repair docs/evidence follow in the same commit; this
+coordinates paragraph is a separate append.
 
 Not run / not claimed in this round: macOS and Windows real runs, electron-
 builder installer resources, release/tag/main merge, the D capability keys and
