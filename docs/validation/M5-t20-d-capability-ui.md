@@ -358,6 +358,67 @@ JSON 与 parent 链完整，唯一差异是末尾无 LF）：production bridge �
 | 真实 runtime（改） | `apps/desktop/test/omp-history-e2e.test.mjs`（1 例，真固定运行时 + FakeProvider） | 真实 writer 记录去掉末尾 LF 与冷读 id 全等；残缺追加被拒且 torn sha 不变；提交后重试恰 +1 行；损坏副本被拒且 sha 不变；原转录 sha 跨成功/拒绝/final 不变（`7892f203…`、3371 B）、provider 2、supervisor 构造 1/0、run 目录 `[]` |
 | 真实 UI E2E | `apps/scripts/e2e-omp-plan-ui.mjs`（未改） | R1–R6 闭环在最终源码复跑：`SUMMARY 1 passed, 0 failed`、exit 0；13 张截图；重启后发新 prompt 前 9/9 user 行 overlap（9 assistant turn / 14 assistant 消息 / 11 tool 行 / 9 process 组）；pending 重启与重选后原生 sha 均为 `42b51045…`（28357 B）；同文本两次提交 live `…:1`/`…:3` → entry `6618fd7a`/`fe11412c`（二次重选稳定）、provider 16→18 恰 +2；三次重启 provider 不增（无重放）；`CLEANUP scratchRemoved=true survivingOwnedProcesses=0 errors=0` | `repair4-20261003/omp-plan-ui-run.txt`、`ui/omp-plan-ui-raw.json`、`ui/omp-plan-ui-01..13-*.png` |
 
+### 1.9 第五轮定向返修（2026-10-03，R13）
+
+根在原始 `80ce94ac6cb2a04b883a1062e0ac984b11939c70` 上独立复核：构建、类型检查、lint、
+docs、产品 source diff 通过；runtime 定向 108、desktop 定向 133、IPC/null 叶边界 8/8；真实
+macOS arm64 compiled `.5` writer + production bridge 冷读 8/8（完整无 LF 末条消息可见、畸形
+完整行与半写尾部 typed 拒绝、全部 byte-pure、`providerDelta=0`、reader 工厂 0、清理干净）。
+**R11/R12 判定闭合，本轮不重复返修。**
+
+但根随后以**未改的已提交** UI 脚本在 Linux 真 Electron/Host/OMP 上运行两次，两次业务断言
+都是 `1 passed, 0 failed`，两次都**误杀外围复验父进程**：
+
+| 轮次 | `running-restart.before` 误纳 | 记录的发信号 | 后果 |
+|---|---|---|---|
+| 首轮（SSH 内） | `python3` PID/PGID `2279095` | `SIGTERM-owned-groups [2279095]`（07:53:39.619Z） | SSH exit 255，外围 `root-review.json` 缺失 |
+| 脱离 SSH 重跑 | `python3` PID `2282200` / PGID `2282199` | `SIGTERM-owned-groups [2282199]`（07:58:09.366Z） | 外围报告与其 shell exit 文件均缺失 |
+
+内部报告仍宣布 clean/passed，所以不能据此忽略误杀。归档摘要：
+`ui-process-ownership-failure.json`（archive 2085818 B、sha256 `74ff72c2…`）。
+
+**R13（P1）根因**：`app/scripts/e2e-omp-plan-ui.mjs:554-557` 的
+`const markers = [state.tempRoot, state.patchedTree]` 对全部 `/proc` 命令行做 substring 匹配。
+`state.patchedTree` 是**共享构建树**（固定 `/tmp/omp-patched-t20d-ui-repair1`），外围复验器
+以 `--patched-tree /tmp/omp-patched-t20d-ui-repair1` 启动 harness，于是父级 Python 进程的命令行
+命中该标记被归入自有集合；`terminateOwnedApp` 再对 `remaining` 的 PGID 发信号，父进程组被杀，
+外围报告无法写出。凡是与本次运行共享同一 patched tree 的无关进程（例如并发的另一轮测试）
+都可能被误杀，因此这是所有权判据本身的问题，不是参数、SSH 权限或 macOS 历史读取的问题。
+
+**修复（只改 harness、新增归属 helper/回归与文档；产品代码、gate、host-core、fork、补丁级
+`.5`、固定子模块未动）**
+
+- 新增 `app/scripts/e2e/process-ownership.mjs`。归属只看本次运行的真实证据：
+  1. 记录的 spawn 根本体（Electron 的 `pid` + `starttime`，spawn 后立即读取）及其 ppid 后代；
+  2. argv 元素或环境值中出现的**本次唯一 scratch root**（`mkdtemp` 原始路径与 realpath 两种
+     拼写）——逐 argv 元素（含 `--key=value` 的 value）、逐 `KEY=VALUE` 环境值按**路径元素
+     边界**匹配（`/tmp/run` 命中 `/tmp/run/data`，不命中 `/tmp/run-2`），供被 reparent 的脱离
+     OMP 运行时归属。
+  **共享 patched tree 不再参与任何所有权判定**；harness 自身与全部祖先（外层启动器、父 shell、
+  父进程）无条件排除，祖先即使携带 run root 也只记入 `ignored` 而不发信号。
+- 发信号改为"计划 + 执行"：每个阶段重读进程表，只有"该组当前全部存活成员都是已核对
+  `starttime` 的自有目标"的进程组才 `kill(-pgid)`；混合组、自身组、祖先组与显式排除组一律
+  退化为对自有成员逐 PID 发信号，绝不扩大为整组终止。PID 消失/复用按 `starttime` 重查并记为
+  `stale`（不猜测）；`ESRCH` 视为目标已退出，其他 kill 错误（如 `EPERM`）随阶段原样上报。
+- 重启第一阶段仍只拆 Electron 组（`onlyGroups: [electron pgid]`），但纯度判定使用**完整自有
+  集合**（否则 Electron 的渲染层子进程会被误判为 foreign）；脱离幸存者留给后续
+  SIGTERM→SIGKILL 升级阶段，升级阶段同样排除 Electron 组并按混合组规则处理。
+- raw JSON 继续记录 `processes.runRoots`/`roots`/`protectedAncestors`/`excludedAncestors` 与每个
+  stage 的 `groups`/`pids`/`mixedGroups`/`protectedTargets`/`stale`/`results`，外围可逐项复核
+  归属与信号决策。
+- 三种审批权限、running/pending 真实重启、不重放、稳定消息身份、重启/重选历史、原生字节不变、
+  隔离 HOME/XDG/TMPDIR、scratch 回收与"残留即失败"语义全部保留，未通过禁用清理或弱化断言换取
+  通过。
+
+**本轮回归（`app/scripts/e2e/process-ownership.test.mjs`，`node --test`，16 例全过）**
+
+| 类别 | 断言要点 |
+|---|---|
+| 归属（受控进程表） | 归档复现：外围 Python 复验器（argv 含 `--patched-tree <共享树>`）与共享树使用者都不入自有；祖先即使携带 run root 也被记录为 `ancestor-run-root` 且不入集合；被 reparent 的 `omp` 仅凭环境中的 run root 归属；根 PID 复用（starttime 不符）时连其后代一并不认领；`/tmp/run` 与 `/tmp/run-2`、`/tmp/runner` 的边界区分 |
+| 信号计划 | 纯自有组 → 组信号；混合组（自有 leader + 无关成员）→ 仅逐 PID、`mixedGroups` 记录 foreign；自身组/祖先组/`excludedGroups` 绝不作为组目标；`onlyGroups` 收窄阶段仍按完整自有集合判纯度（含真实混合反例）；PID 消失/复用 → `stale` 且零信号；kill spy 验证 `-pgid` 取反、`ESRCH` 归"已退出"、`EPERM` 如实上报 |
+| 真实 sentinel 冒烟（仅本任务自建子进程） | ①自有脱离组（argv 携带 run root + `sleep` 子进程）被整组回收；②仅环境携带 run root、已被 reparent 的 `sleep` 被归属并回收；③混合组只杀自有 leader、**无关成员存活**（本机实测确认其确实未被信号命中） |
+| 活表自检 | 真实 `/proc` 表能描述本进程（pid/ppid/pgid/starttime/argv/环境），`sameProcess` 对同 pid 不同 starttime 判否 |
+
 ## 2. 验证（命令、退出码、原始日志）
 
 所有命令在 `/home/vv/person/code/omp-desktop-m5-t20-d-ui/app`，Node v24.14.0、
@@ -495,6 +556,15 @@ patched 运行时树 `/tmp/omp-patched-t20d-ui-repair1` 在跑前跑后核验（
 | 旧证据不变 | 四份清单 `sha256sum -c` | **92/92 `OK`**（20+14+28+30；旧件未改写） | `repair4-20261003/old-evidence-integrity.txt` |
 | 第四轮证据清单 | `cd repair4-20261003 && sha256sum -c SHA256SUMS.txt` | **27/27 `OK`**（自排除 manifest，覆盖日志、13 张截图与 raw JSON） | `repair4-20261003/SHA256SUMS.txt` |
 
+### 2.4 第五轮返修命令与结果（R13）
+
+| 验证 | 命令（要点） | 结果 | 原始日志 |
+| --- | --- | --- | --- |
+| 语法 | `node --check scripts/e2e-omp-plan-ui.mjs`、`scripts/e2e/process-ownership.mjs`、`scripts/e2e/process-ownership.test.mjs` | 三者 exit 0 | `repair5-20261003/syntax-check.txt` |
+| 归属/信号回归 + 真实 sentinel 冒烟 | `node --test scripts/e2e/process-ownership.test.mjs` | **16/16 通过**、exit 0；真实 sentinel 三例（脱离组回收、被 reparent 进程按环境 run root 归属、混合组只杀自有成员且无关成员存活）；运行后 `ps` 无遗留 `sleep 300` | `repair5-20261003/process-ownership-test.txt` |
+| 源码状态预检第 1 轮（等价包装器，未提交状态） | `python3 /tmp/omp-t20-d-ui-r13-precheck-wrapper.py --candidate 80ce94ac… --output /tmp/omp-t20-d-ui-root-review-r13-precheck --ended-runner 2266833 --harness-sha256 7909a4b7… --patched-tree /tmp/omp-patched-t20d-ui-repair1 --xauthority …`（与根脚本仅差 HEAD/clean/harness-hash 三条一次性断言） | 外围 `passed: true`、exit 0；`timedOut=false`、`forcedCleanup=[]`、`survivors=[]`；harness `1 passed, 0 failed`、provider 16 无重放、`scratchRemoved=true`、`survivingOwnedProcesses=[]`；raw 中 `before` 无 `python3`、父级列入 `protectedAncestors` | `/tmp/omp-t20-d-ui-root-review-r13-precheck/root-review.json`（预检，不归档） |
+| 源码状态预检第 2 轮（修正第一阶段 onlyGroups 后） | 同上，输出目录 `/tmp/omp-t20-d-ui-root-review-r13-precheck2` | 外围 `passed: true`、exit 0、无 forcedCleanup/survivors；harness `1 passed, 0 failed`；`running-restart` 第一阶段 `onlyGroups=[<electron pgid>]`、`groups=[<electron pgid>]`、`pids=[]`（整体组信号），`before` 15 个自有进程且无 `python3` | `/tmp/omp-t20-d-ui-root-review-r13-precheck2/root-review.json`（预检，不归档） |
+
 ## 3. 全矩阵映射（B1–B14 / C1–C8 / D1–D3）
 
 证据层级：**unit**（纯函数/单元）、**handler**（受控 handler/夹具）、**runtime/Host**
@@ -529,7 +599,7 @@ patched 运行时树 `/tmp/omp-patched-t20d-ui-repair1` 在跑前跑后核验（
 | C8 | 外部路径例外 | 已接受 C + 回归 | unit | 通过 |
 | D1 | SubmitGoal、goal 提示词、批准后自主执行自停 | 本阶段 Goal E2E（§1.3）；无延续定时器 | runtime/Host + host-core | 通过 |
 | D2 | `goal_updated` 只读展示 | 未实现（矩阵可选）；不伪造 Goal 状态，不新建第二套 Goal | — | 可选未实现 |
-| D3 | 端到端用户路径 | 本阶段 UI E2E（§1.2 首稿 + §1.5 返修：三种批准权限、真实 Reject/重提、真实 running 与 pending 应用重启、专属 HOME 隔离、PID/进程组级回收验证、单份 raw JSON 证据 + §1.6 第二轮：重启后历史先于新 prompt 可见、每输入一次气泡、同文本两次提交、重选/分页身份稳定、读取不改原生字节 + §1.7 第三轮：同一闭环在直读实现上复跑 + §1.8 第四轮：R11/R12 修复后的最终源码复跑，13 张截图 + raw JSON，provider 无重放、读取/重选 sha 不变）+ 已接受 B2 的派发证据 | renderer + runtime/Host + host-core + OS 进程 | 通过 |
+| D3 | 端到端用户路径 | 本阶段 UI E2E（§1.2 首稿 + §1.5 返修：三种批准权限、真实 Reject/重提、真实 running 与 pending 应用重启、专属 HOME 隔离、PID/进程组级回收验证、单份 raw JSON 证据 + §1.6 第二轮：重启后历史先于新 prompt 可见、每输入一次气泡、同文本两次提交、重选/分页身份稳定、读取不改原生字节 + §1.7 第三轮：同一闭环在直读实现上复跑 + §1.8 第四轮：R11/R12 修复后的最终源码复跑，13 张截图 + raw JSON，provider 无重放、读取/重选 sha 不变 + §1.9 第五轮：R13 后按本次运行唯一证据判定自有进程、按组纯度发信号（混合组只发自有成员）、外围复验父进程不被纳入也不被 signal，16 例归属/信号回归 + 真实 sentinel 冒烟 + 根通用外围脚本原样真跑）+ 已接受 B2 的派发证据 | renderer + runtime/Host + host-core + OS 进程 | 通过 |
 
 ## 4. 未做与不声称
 
@@ -556,6 +626,18 @@ patched 运行时树 `/tmp/omp-patched-t20d-ui-repair1` 在跑前跑后核验（
   的 `malformedRecords`）保留，桌面读取契约有意不再复制其宽松——这是文档化的分歧，不是遗漏。
   第四轮同样不声称"根已接受"：证据为本机 Linux x64 的真实 writer/单元/bridge/真实 UI 复跑；根
   使用的是 macOS arm64 原生字节夹具，未在本机以 macOS 复跑。整 M5/T20 与三平台包仍未完成。
+- 第五轮（R13，§1.9）只改 UI harness、新增 `app/scripts/e2e/process-ownership.mjs` 与其回归、
+  以及文档：产品代码、gate、host-core、fork、补丁级（仍 `.5`）、固定子模块与既有产品断言未动，
+  R1–R12 已闭合行为未触碰；R11/R12 未重复返修。归属/信号判定依赖 Linux `/proc`
+  （命令行与环境）；非 Linux 仍降级为"只验证 Electron 子进程"路径（代码在，本轮未实跑）。
+  第五轮不声称"根已接受"：本机证据是 Linux x64 的真实 UI 复跑与 16 例归属回归；三平台包、
+  整 M5/T20 仍未完成，最终验收由根执行。
+- 第五轮如实记录两点：(1) 归属判据只接受"本次运行的唯一 scratch root"，因此若将来引入新的
+  脱离子进程且既不继承 spawn 根、也不携带该 root，它会落入 `leftover` 并使运行失败——这是
+  刻意的 fail-closed：宁可失败并保留 scratch，也不扩大所有权判据去猜。(2) 第一阶段的
+  `onlyGroups` 只拆 Electron 组，纯度判定必须用完整自有集合；只传根条目的实现会被本机预检
+  第一轮直接暴露（Electron 的渲染层子进程被当成 foreign，组信号退化为逐 PID），该中间状态
+  已修正并记录在 §2.4 的两轮预检中。
 - 第四轮如实记录一个调用顺序要求：桌面测试经 workspace 构建产物消费 `@pi-desktop/omp-runtime`，
   改动该包后必须先 `pnpm build:js`（首次未重建时 bridge 测试读到旧 dist，属于测试基建而非产品
   缺陷；重建后全部定向测试复跑通过）。

@@ -1,0 +1,28 @@
+$ node --test scripts/e2e/process-ownership.test.mjs  # exit 0
+✔ the archived misclassification: a launcher that names the shared tree is not owned (1.016603ms)
+✔ an ancestor stays excluded even when it carries the run root, and its children are not adopted (0.166475ms)
+✔ a recycled root pid contributes nothing, not even its children (0.09875ms)
+✔ path identity is matched on element boundaries, never as a substring (0.080341ms)
+✔ a reparented process is attributed by its run root in the environment (0.106795ms)
+✔ an unsupported process table reports itself as unsupported (0.063805ms)
+✔ a pure-owned group is signaled as a group (0.23596ms)
+✔ a narrowed stage targets one group but still judges purity over the whole owned set (0.162323ms)
+✔ a mixed group never escalates to the whole group (0.092924ms)
+✔ our own group, an ancestor's group and excluded groups are never group targets (0.193493ms)
+✔ a vanished or recycled pid is reported as stale, never signaled (0.087335ms)
+✔ the signal executor negates groups, spares stale targets and reports real errors (0.249076ms)
+✔ the live /proc table describes this process (4.673534ms)
+✔ reclaims its own detached group and leaves a shared-tree decoy alone (118.225802ms)
+✔ attributes a reparented detached runtime by its run environment (110.731771ms)
+✔ a group that mixes an owned leader with an unrelated member is signaled member-only (113.623102ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 383.550505
+
+$ ps -eo pid,ppid,pgid,etimes,args | (leftover sentinel check)
+(no leftover sleep 300 sentinel)

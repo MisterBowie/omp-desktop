@@ -42,6 +42,11 @@
  * runtime group, tool children) and reclamation is verified after each
  * restart and at teardown: a survivor is a hard failure, never a silent
  * timeout, and the scratch root is kept for diagnosis when that happens.
+ * Ownership is anchored to the recorded spawn roots and to this run's unique
+ * scratch root only (`e2e/process-ownership.mjs`); the shared patched tree is
+ * never an ownership signal, so an outer launcher that merely names it, a
+ * concurrent task on the same tree, every ancestor of this process and any
+ * process an owned group shares with an unrelated member are never signaled.
  *
  * The run writes one structured raw report (`omp-plan-ui-raw.json`): every
  * fixture provider request, per-step UI snapshots, the real session/native/
@@ -64,7 +69,6 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  readdirSync,
   realpathSync,
   rmSync,
   statSync,
@@ -80,12 +84,14 @@ import { FakeProvider } from "../experiments/omp-bridge/lib/provider.mjs";
 import { repositoryRoot, resolveElectronBinary } from "./e2e/boot.mjs";
 import { resolveHostBinary } from "./e2e/host.mjs";
 import {
-  bunBinary,
-  isolatedEnv,
-  isSignalableProcessGroup,
-  loadManifest,
-  preparePatchedTree,
-} from "./omp-patch.mjs";
+  collectOwnedProcesses,
+  planSignalTargets,
+  readProcessIdentity,
+  readProcessTable,
+  sameProcess,
+  signalProcessPlan,
+} from "./e2e/process-ownership.mjs";
+import { bunBinary, isolatedEnv, loadManifest, preparePatchedTree } from "./omp-patch.mjs";
 
 const WAIT_TIMEOUT_MS = 45_000;
 const TURN_TIMEOUT_MS = 240_000;
@@ -448,11 +454,16 @@ function startElectron(state) {
   );
   state.electron = child;
   state.electronStartedAt = new Date().toISOString();
+  // The spawn record ownership is anchored to: a pid without its start time
+  // could later name a recycled process, so it is read while the child is
+  // known to be the one just created.
+  state.electronBirth = readProcessIdentity(child.pid) ?? { pid: child.pid };
   state.processReports.push({
     label: "spawn",
     at: state.electronStartedAt,
     electronPid: child.pid ?? null,
     electronPgid: child.pid ?? null,
+    electronStarttime: state.electronBirth.starttime ?? null,
   });
   child.stdout?.on("data", (chunk) => {
     state.electronOutput += `[stdout] ${chunk}`;
@@ -473,48 +484,7 @@ function startElectron(state) {
 /* Owned-process evidence and reclamation (R2)                                */
 /* ------------------------------------------------------------------------- */
 
-/** One /proc snapshot: pid, ppid, pgid, comm, start time and command line. */
-function readProcSnapshot() {
-  const entries = new Map();
-  if (process.platform !== "linux" || !existsSync("/proc")) return entries;
-  let names;
-  try {
-    names = readdirSync("/proc");
-  } catch {
-    return entries;
-  }
-  for (const name of names) {
-    if (!/^\d+$/.test(name)) continue;
-    const pid = Number(name);
-    let statText = "";
-    try {
-      statText = readFileSync(`/proc/${name}/stat`, "utf8");
-    } catch {
-      continue;
-    }
-    const open = statText.indexOf("(");
-    const close = statText.lastIndexOf(")");
-    if (open < 0 || close < 0) continue;
-    const comm = statText.slice(open + 1, close);
-    const fields = statText.slice(close + 2).trim().split(/\s+/);
-    let cmdline = "";
-    try {
-      cmdline = readFileSync(`/proc/${name}/cmdline`, "utf8");
-    } catch {
-      // Kernel threads and exited races have no readable command line.
-    }
-    entries.set(pid, {
-      pid,
-      ppid: Number(fields[1] ?? 0),
-      pgid: Number(fields[2] ?? 0),
-      comm,
-      starttime: fields[19] ?? "",
-      cmdline: cmdline.split("\0").filter(Boolean).join(" ").trim(),
-    });
-  }
-  return entries;
-}
-
+/** The bounded per-process evidence projection (pid, group, identity, argv). */
 function describeProcess(entry) {
   return {
     pid: entry.pid,
@@ -522,67 +492,46 @@ function describeProcess(entry) {
     pgid: entry.pgid,
     comm: entry.comm,
     starttime: entry.starttime,
+    ownership: entry.ownership ?? null,
     cmdline: entry.cmdline.length > 700 ? `${entry.cmdline.slice(0, 700)}…` : entry.cmdline,
   };
 }
 
 /**
- * The processes this run owns: every descendant of the roots (Electron and,
- * while it lives, the spawned children) plus anything whose command line still
- * names this run's unique scratch root — a detached OMP runtime survives
- * reparenting, so the ppid walk alone is not enough.
+ * The processes this run owns (`e2e/process-ownership.mjs`): the recorded
+ * spawn roots with their descendants plus detached processes that still carry
+ * this run's unique scratch root in an argv element or environment value (a
+ * detached OMP runtime survives reparenting, so the ppid walk alone is not
+ * enough).
+ *
+ * The shared patched tree is deliberately *not* an ownership signal: the
+ * harness's own launcher, an unrelated task that references the same tree and
+ * every ancestor of this process stay out of the set, so cleanup can never
+ * signal them.
  */
 function ownedProcessSnapshot(state, roots) {
-  const table = readProcSnapshot();
-  if (table.size === 0) return { supported: false, processes: [] };
-  const children = new Map();
-  for (const entry of table.values()) {
-    const list = children.get(entry.ppid) ?? [];
-    list.push(entry.pid);
-    children.set(entry.ppid, list);
-  }
-  const owned = new Map();
-  const queue = roots.filter((pid) => typeof pid === "number" && pid > 1);
-  while (queue.length > 0) {
-    const pid = queue.shift();
-    if (owned.has(pid)) continue;
-    const entry = table.get(pid);
-    if (!entry) continue;
-    owned.set(pid, entry);
-    for (const childPid of children.get(pid) ?? []) queue.push(childPid);
-  }
-  const markers = [state.tempRoot, state.patchedTree].filter(Boolean);
-  for (const entry of table.values()) {
-    if (owned.has(entry.pid) || entry.pid === process.pid) continue;
-    if (markers.some((marker) => entry.cmdline.includes(marker))) owned.set(entry.pid, entry);
-  }
+  const table = readProcessTable();
+  const snapshot = collectOwnedProcesses({
+    table,
+    selfPid: process.pid,
+    roots: (roots ?? []).filter((root) => root && typeof root.pid === "number" && root.pid > 1),
+    runRoots: state.runRoots ?? [],
+  });
+  if (!snapshot.supported) return { supported: false, processes: [], protectedAncestors: [], ignored: [] };
   return {
     supported: true,
-    processes: [...owned.values()].map(describeProcess).sort((a, b) => a.pid - b.pid),
+    processes: snapshot.processes.map(describeProcess).sort((a, b) => a.pid - b.pid),
+    protectedAncestors: snapshot.protectedAncestors.map(describeProcess),
+    ignored: snapshot.ignored,
   };
-}
-
-/** True when the pid still exists with the same identity (start time). */
-function processStillOwned(entry) {
-  if (process.platform !== "linux") return false;
-  let statText = "";
-  try {
-    statText = readFileSync(`/proc/${entry.pid}/stat`, "utf8");
-  } catch {
-    return false;
-  }
-  const close = statText.lastIndexOf(")");
-  if (close < 0) return false;
-  const fields = statText.slice(close + 2).trim().split(/\s+/);
-  return String(fields[19] ?? "") === String(entry.starttime ?? "");
 }
 
 async function waitForProcessesGone(entries, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
-  let remaining = entries.filter(processStillOwned);
+  let remaining = entries.filter((entry) => sameProcess(entry));
   while (remaining.length > 0 && Date.now() < deadline) {
     await delay(POLL_MS);
-    remaining = remaining.filter(processStillOwned);
+    remaining = remaining.filter((entry) => sameProcess(entry));
   }
   return remaining;
 }
@@ -595,6 +544,38 @@ async function waitForElectronExit(child, timeoutMs) {
   if (electronHasExited(child)) return true;
   const exited = new Promise((resolveExit) => child.once("exit", resolveExit));
   return Promise.race([exited.then(() => true), delay(timeoutMs).then(() => false)]);
+}
+
+/**
+ * Signal the still-owned targets of one stage with a fresh process-table scan.
+ *
+ * `planSignalTargets` decides per group: a group is signaled as a group only
+ * when every live member is an owned target whose recorded start time still
+ * matches; a group shared with an unrelated process, our own group and an
+ * ancestor's group fall back to member-level signals, so cleanup can never
+ * widen into a group kill that reaches a foreign process.
+ */
+function signalOwnedStage(state, ownedEntries, signal, options = {}) {
+  const { action, excludedGroups = [], onlyGroups = null } = options;
+  const plan = planSignalTargets({
+    table: readProcessTable(),
+    owned: ownedEntries,
+    selfPid: process.pid,
+    excludedGroups,
+    onlyGroups,
+  });
+  const results = signalProcessPlan(plan, signal);
+  return {
+    action,
+    at: new Date().toISOString(),
+    onlyGroups,
+    groups: plan.groups,
+    pids: plan.pids,
+    mixedGroups: plan.mixedGroups,
+    protectedTargets: plan.protectedTargets,
+    stale: plan.stale,
+    results,
+  };
 }
 
 /**
@@ -613,6 +594,8 @@ async function terminateOwnedApp(state, label) {
     electronPid: state.electron?.pid ?? null,
     processScanSupported: true,
     before: [],
+    protectedAncestors: [],
+    excludedAncestors: [],
     stages: [],
     leftover: [],
     ok: false,
@@ -626,30 +609,73 @@ async function terminateOwnedApp(state, label) {
     state.processReports.push(report);
     return report;
   }
-  const snapshot = ownedProcessSnapshot(state, [child.pid]);
+  const birth = state.electronBirth ?? { pid: child.pid };
+  const snapshot = ownedProcessSnapshot(state, [birth]);
   report.processScanSupported = snapshot.supported;
   report.before = snapshot.processes;
+  report.protectedAncestors = snapshot.protectedAncestors ?? [];
+  // Everything the ownership rule refused to adopt — in particular an outer
+  // launcher that only names the shared patched tree — stays listed here.
+  report.excludedAncestors = (snapshot.ignored ?? []).filter((item) =>
+    String(item.reason ?? "").startsWith("ancestor"),
+  );
   state.stopping = true;
   try {
+    const rootEntry = report.before.find((entry) => entry.pid === child.pid) ?? null;
     if (electronHasExited(child)) {
       report.stages.push({ action: "already-exited", at: new Date().toISOString() });
-    } else {
+    } else if (process.platform === "win32") {
+      report.stages.push({ action: "SIGTERM", target: `pid ${child.pid}`, at: new Date().toISOString() });
+      child.kill();
+    } else if (!snapshot.supported) {
       report.stages.push({ action: "SIGTERM", target: `process-group -${child.pid}`, at: new Date().toISOString() });
       try {
-        if (process.platform === "win32") child.kill();
-        else process.kill(-child.pid, "SIGTERM");
+        process.kill(-child.pid, "SIGTERM");
+      } catch {
+        // Already gone.
+      }
+    } else if (rootEntry) {
+      // The whole owned set decides whether the Electron group is exclusively
+      // ours; only that group (or its member fallback) is signaled here, and
+      // the detached survivors are left to the escalation below.
+      report.stages.push(
+        signalOwnedStage(state, report.before, "SIGTERM", {
+          action: "SIGTERM",
+          onlyGroups: [rootEntry.pgid],
+        }),
+      );
+    } else {
+      report.stages.push({
+        action: "SIGTERM",
+        target: `process-group -${child.pid}`,
+        note: "the Electron root is missing from the process table",
+        at: new Date().toISOString(),
+      });
+      try {
+        process.kill(-child.pid, "SIGTERM");
       } catch {
         // Already gone.
       }
     }
     const exited = await waitForElectronExit(child, CLEANUP_TIMEOUT_MS);
     if (!exited) {
-      report.stages.push({ action: "SIGKILL", target: `process-group -${child.pid}`, at: new Date().toISOString() });
-      try {
-        if (process.platform === "win32") child.kill("SIGKILL");
-        else process.kill(-child.pid, "SIGKILL");
-      } catch {
-        // Best effort; the verification below decides.
+      if (process.platform === "win32") {
+        report.stages.push({ action: "SIGKILL", target: `pid ${child.pid}`, at: new Date().toISOString() });
+        child.kill("SIGKILL");
+      } else if (!snapshot.supported || !rootEntry) {
+        report.stages.push({ action: "SIGKILL", target: `process-group -${child.pid}`, at: new Date().toISOString() });
+        try {
+          process.kill(-child.pid, "SIGKILL");
+        } catch {
+          // Best effort; the verification below decides.
+        }
+      } else {
+        report.stages.push(
+          signalOwnedStage(state, report.before, "SIGKILL", {
+            action: "SIGKILL",
+            onlyGroups: [rootEntry.pgid],
+          }),
+        );
       }
       await waitForElectronExit(child, PROC_ESCALATION_MS);
     }
@@ -659,28 +685,22 @@ async function terminateOwnedApp(state, label) {
       ? await waitForProcessesGone(report.before, PROC_GRACE_MS)
       : [];
     if (remaining.length > 0) {
-      const ownGroup = typeof process.getpgrp === "function" ? process.getpgrp() : null;
-      const groups = [...new Set(remaining.map((entry) => entry.pgid))].filter(
-        (pgid) => isSignalableProcessGroup(pgid) && pgid !== ownGroup && pgid !== child.pid,
+      // The Electron group was just signaled; only its detached survivors are
+      // escalated, member by member when a group is not exclusively owned.
+      report.stages.push(
+        signalOwnedStage(state, remaining, "SIGTERM", {
+          action: "SIGTERM-owned-groups",
+          excludedGroups: [child.pid],
+        }),
       );
-      report.stages.push({ action: "SIGTERM-owned-groups", groups, at: new Date().toISOString() });
-      for (const pgid of groups) {
-        try {
-          process.kill(-pgid, "SIGTERM");
-        } catch {
-          // Group may have exited between the scan and the signal.
-        }
-      }
       remaining = await waitForProcessesGone(remaining, PROC_ESCALATION_MS);
       if (remaining.length > 0) {
-        report.stages.push({ action: "SIGKILL-owned-groups", groups, at: new Date().toISOString() });
-        for (const pgid of groups) {
-          try {
-            process.kill(-pgid, "SIGKILL");
-          } catch {
-            // Same race as above.
-          }
-        }
+        report.stages.push(
+          signalOwnedStage(state, remaining, "SIGKILL", {
+            action: "SIGKILL-owned-groups",
+            excludedGroups: [child.pid],
+          }),
+        );
         remaining = await waitForProcessesGone(remaining, PROC_ESCALATION_MS);
       }
     }
@@ -1252,7 +1272,12 @@ function writeRawEvidence(state) {
       body: entry.body,
     })),
   };
-  evidence.processes = { reports: state.processReports };
+  evidence.processes = {
+    runRoots: state.runRoots,
+    roots: state.electronBirth ? [state.electronBirth] : [],
+    note: "ownership uses this run's spawn roots and unique scratch root only; the shared patched tree is never an ownership signal",
+    reports: state.processReports,
+  };
   evidence.console = state.consoleDiagnostics;
   evidence.electronOutputTail = state.electronOutput ? shortText(state.electronOutput, 8_000) : "";
   evidence.cleanup = state.cleanupReport;
@@ -1532,6 +1557,8 @@ async function main() {
   })();
 
   const provider = await FakeProvider.start();
+  const scratchRootRaw = mkdtempSync(join(tmpdir(), `omp-plan-ui-${process.pid}-`));
+  const scratchRoot = realpathSync(scratchRootRaw);
 
   const state = {
     appDir: appDirInfo.appDir,
@@ -1541,7 +1568,11 @@ async function main() {
     patchedTree,
     runtimeProvenance,
     provider,
-    tempRoot: realpathSync(mkdtempSync(join(tmpdir(), `omp-plan-ui-${process.pid}-`))),
+    tempRoot: scratchRoot,
+    // The unique path identity ownership is allowed to use; both spellings are
+    // kept in case TMPDIR itself is reached through a symlink. The shared
+    // patched tree is deliberately not part of it (M5/T20-D R13).
+    runRoots: [...new Set([scratchRootRaw, scratchRoot])],
     dataDir: null,
     profileDir: null,
     workspace: null,
@@ -1550,6 +1581,7 @@ async function main() {
     cdpPort: null,
     electron: null,
     electronStartedAt: null,
+    electronBirth: null,
     cdp: null,
     screenshots: [],
     consoleDiagnostics: [],
@@ -2119,7 +2151,10 @@ async function runAcceptance(state) {
   assert(runningTurn?.id, `no durable running turn for the held execution: ${jsonText(runningTurn)}`);
   const held = await waitFor(
     async () => {
-      const snapshot = ownedProcessSnapshot(state, [state.electron?.pid]);
+      const snapshot = ownedProcessSnapshot(
+        state,
+        state.electronBirth ? [state.electronBirth] : [],
+      );
       if (!snapshot.supported) return { snapshot, runtime: null, sleeper: null };
       const runtimeProcess = snapshot.processes.find((entry) =>
         entry.cmdline.includes(state.patchedLauncher),
