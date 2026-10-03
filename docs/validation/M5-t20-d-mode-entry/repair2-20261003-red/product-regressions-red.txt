@@ -1,0 +1,107 @@
+
+ RUN  v4.1.10 /home/vv/person/code/omp-desktop-m5-t20-d-enter/app/packages/omp-runtime
+
+ ❯ src/session/gate-mode-transition.test.ts (19 tests | 4 failed) 21ms
+     × a resolved transitioned continuation after a successor turn returns nothing and never touches it 3ms
+     × a rejected transitioned continuation after a successor turn never fails or aborts it 2ms
+     × a resolved start continuation after a successor turn publishes nothing into the successor's cache 1ms
+     × a rejected start continuation after a successor turn never fails or aborts it 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/gate-mode-transition.test.ts > gate mid-turn mode transition > a resolved transitioned continuation after a successor turn returns nothing and never touches it
+AssertionError: expected { systemPrompt: [ …(2) ] } to be undefined
+
+- Expected:
+undefined
+
++ Received:
+{
+  "systemPrompt": [
+    "native prompt",
+    "You are operating in Agent mode. After the user approves a plan.",
+  ],
+}
+
+ ❯ src/session/gate-mode-transition.test.ts:654:27
+    652|     // The stale continuation must abstain: not return the successor's…
+    653|     // prompt, not notify and not abort.
+    654|     expect(await pending).toBeUndefined();
+       |                           ^
+    655|     expect(h.notices).toHaveLength(notices);
+    656|     expect(h.aborted()).toBe(aborts);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/session/gate-mode-transition.test.ts > gate mid-turn mode transition > a rejected transitioned continuation after a successor turn never fails or aborts it
+AssertionError: expected [ { v: 2, …(7) } ] to have a length of +0 but got 1
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ src/session/gate-mode-transition.test.ts:677:31
+    675|     // attributed to the successor's token, no retirement of its admis…
+    676|     // no abort of its context.
+    677|     expect(refusalNotices(h)).toHaveLength(0);
+       |                               ^
+    678|     expect(h.notices).toHaveLength(notices);
+    679|     expect(h.aborted()).toBe(aborts);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/session/gate-mode-transition.test.ts > gate mid-turn mode transition > a resolved start continuation after a successor turn publishes nothing into the successor's cache
+AssertionError: expected { systemPrompt: [ …(3) ] } to be undefined
+
+- Expected:
+undefined
+
++ Received:
+{
+  "systemPrompt": [
+    "native prompt",
+    "stale-base",
+    "You are operating in Plan mode as the same PI-Desktop agent.",
+  ],
+}
+
+ ❯ src/session/gate-mode-transition.test.ts:700:27
+    698|     const aborts = h.aborted();
+    699|     hold.resolve();
+    700|     expect(await pending).toBeUndefined();
+       |                           ^
+    701|     expect(h.notices).toHaveLength(notices);
+    702|     expect(h.aborted()).toBe(aborts);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/session/gate-mode-transition.test.ts > gate mid-turn mode transition > a rejected start continuation after a successor turn never fails or aborts it
+AssertionError: expected [ { v: 2, …(7) } ] to have a length of +0 but got 1
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ src/session/gate-mode-transition.test.ts:723:31
+    721|     hold.reject(new Error("controlled stale start clamp rejection"));
+    722|     expect(await pending).toBeUndefined();
+    723|     expect(refusalNotices(h)).toHaveLength(0);
+       |                               ^
+    724|     expect(h.notices).toHaveLength(notices);
+    725|     expect(h.aborted()).toBe(aborts);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 15 passed (19)
+   Start at  10:54:29
+   Duration  190ms (transform 79ms, setup 0ms, import 98ms, tests 21ms, environment 0ms)
+
+undefined
+/home/vv/person/code/omp-desktop-m5-t20-d-enter/app/packages/omp-runtime:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/session/gate-mode-transition.test.ts

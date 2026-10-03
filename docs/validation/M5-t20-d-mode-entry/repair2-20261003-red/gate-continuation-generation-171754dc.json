@@ -1,0 +1,68 @@
+{
+  "candidate": "171754dc216552b4d0837bf72a90ddf7dac039ff",
+  "layer": "real gate registered handlers, real admission/transition codecs and serialized state; controlled public API promises; no provider/tool bodies/host DB, no universal native reachability claim",
+  "cases": [
+    {
+      "scenario": "current-continuation",
+      "planBeforeBlocked": true,
+      "result": {
+        "systemPrompt": [
+          "native",
+          "Plan mode A"
+        ]
+      },
+      "planAfterBlocked": true,
+      "passed": true
+    },
+    {
+      "scenario": "current-continuation-failure",
+      "planBeforeBlocked": true,
+      "aborts": 1,
+      "afterBlocked": true,
+      "notices": [
+        "{\"v\":2,\"kind\":\"omp-desktop-turn-ack\",\"token\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"admissionDigest\":\"5f8a02318366b37314c146062c4dfc0a3efae9772dd4594ef7cfbc21dff5551a\"}",
+        "{\"v\":2,\"kind\":\"omp-desktop-start-refusal\",\"sessionId\":\"owner-native\",\"turnToken\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"code\":\"gate-error\",\"reason\":\"desktop gate failed while applying the runtime state: Error: controlled current continuation clamp rejection\",\"refusalId\":\"omp-refusal-1790995992054-0\",\"at\":1790995992054}"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "continuation-resolve-after-new-turn",
+      "planBeforeBlocked": true,
+      "newOwnerBeforeAllowed": true,
+      "newChildBeforeAllowed": true,
+      "staleResult": {
+        "systemPrompt": [
+          "native",
+          "Agent mode bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ]
+      },
+      "newOwnerAfter": null,
+      "newChildAfter": null,
+      "lateNotices": [],
+      "lateAborts": 0,
+      "passed": false
+    },
+    {
+      "scenario": "continuation-reject-after-new-turn",
+      "planBeforeBlocked": true,
+      "newOwnerBeforeAllowed": true,
+      "newChildBeforeAllowed": true,
+      "staleResult": null,
+      "newOwnerAfter": {
+        "block": true,
+        "reason": "the desktop runtime policy is unavailable; refusing the call without its mode and permission mode"
+      },
+      "newChildAfter": {
+        "block": true,
+        "reason": "the desktop runtime policy is unavailable; refusing the call without its mode and permission mode"
+      },
+      "lateNotices": [
+        "{\"v\":2,\"kind\":\"omp-desktop-start-refusal\",\"sessionId\":\"owner-native\",\"turnToken\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"code\":\"gate-error\",\"reason\":\"desktop gate failed while applying the runtime state: Error: controlled stale continuation clamp rejection\",\"refusalId\":\"omp-refusal-1790995992056-0\",\"at\":1790995992056}"
+      ],
+      "lateAborts": 1,
+      "passed": false
+    }
+  ],
+  "scratchRemoved": true,
+  "passed": false
+}

@@ -1,0 +1,1583 @@
+{
+  "candidate": "06c73aa29809339d02704fb67ccdaca12680f348",
+  "layer": "actual production bridge/gate/adapter/HostProcess+SQLite/patched source OMP/local FakeProvider; fixture memory marker only; no Renderer/installer claim",
+  "cases": [
+    {
+      "kind": "plan",
+      "ends": [
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "hostTurnId": "4075d661-7607-4304-b3e7-131d3551affc",
+          "reason": "completed"
+        }
+      ],
+      "permissionCards": [],
+      "nativeBindings": [
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "nativeSessionId": "01a0ffb7-6ba4-77f6-91d1-521dbb92e0d0",
+          "nativeSessionPath": "/tmp/root-d-entry-flow-data-KgfQxn/omp-sessions/2026-10-03T03-03-25-860Z_01a0ffb7-6ba4-77f6-91d1-521dbb92e0d0.jsonl",
+          "runtimeVersion": "18.3.0"
+        }
+      ],
+      "requests": [
+        {
+          "index": 0,
+          "toolNames": [
+            "read",
+            "bash",
+            "edit",
+            "ask",
+            "eval",
+            "glob",
+            "grep",
+            "task",
+            "wait",
+            "todo",
+            "web_search",
+            "write",
+            "EnterPlanMode",
+            "EnterGoalMode"
+          ],
+          "system": "RFC 2119: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL. `NEVER` = `MUST NOT`; `AVOID` = `SHOULD NOT`.\nXML tags inject system content; may interrupt/notify inside user messages: MUST treat as system-authored/authoritative. User content is sanitized.\n\n§ Role\nYou are omp's trusted coding assistant.\n\n# Engineering\n- Correctness, then six-month maintainability. Delete dead weight; prefer boring design to needless abstraction.\n- Compiled code: NEVER avoidable allocation, copying, computation.\n- Unexpected repo changes are the user's; adapt. User-reported errors, failures, observations are ground truth; NEVER rerun checks to confirm them.\n- Final chat MAY use LaTeX math (`$`, `$$`) and color (`\\textcolor`, `\\colorbox`, `\\fcolorbox`).\n- MAY emit ` ```mermaid ` blocks; terminal renders ASCII. Only genuine structure/flow, not trivia.\n- MAY react to the user when chatting: start reply with emoji.\n\n# Personality\nEvidence-first terse engineer: every sentence fact, decision, or risk.\n\n# Tone\n- Fragments when clearer; no ceremony, hedging, summaries, filler, marketing.\n- Assume technical reader; don't narrate obvious steps or over-explain basics.\n- Concrete: exact files, symbols, APIs, state fields, edge cases, verification.\n- Reasoning: facts, constraints, tradeoffs, decisions, checks. Conclusion first; evidence next.\n- Uncertainty: state at claim; name tradeoff; choose boring/safe option.\n- Code: invariants, risks, verification.\n\n# Reasoning Format\nProblem: what's wrong. Decision: action & why. Check: breakage & verification. Next: concrete action.\n\n# Succinct Patterns\n- Y → need update X. This is safe: Z. Could do A, but B avoids C.\n\n# Escalation\nPush back on risk-hidden plans or wrong claims: name risk, show evidence, propose alternative. If overruled, execute user's call; don't relitigate.\n\n§ Runtime\n# Skills & Rules\n# Internal URLs\nMost FS/bash tools resolve these; other schemes/selectors: `read` docs.\n- `rule://<name>`: details.\n- `agent://<id>`: output; nested IDs dotted, `/key/index` JSON path; write = message, `agent://all` broadcast only.\n- `history://<id>`: read-only transcript; bare lists registered agents, not persisted unregistered top-level sessions.\n- `artifact://<id>`: content; `local://<name>.md`: shared artifact.\n- `proc://`: jobs/services; `proc://<id>`: read status/output, write service stdin; write `proc://<id>/kill` cancels/stops (no `content` needed).\n- `issue://<N>` / `pr://<N>` (`<owner>/<repo>/<N>` for other repos): GitHub issue/PR; bare: recent; `?state=&limit=&author=&label=`. PR diff: `pr://<N>/diff` (files), `/diff/<i>`, `/diff/all`.\n- `mcp://<uri>`: MCP resource; `omp://`: harness docs, AVOID unless asked.\n\n# Tool Inventory\n- Read: `read`\n- Bash: `bash`\n- Edit: `edit`\n- Ask: `ask`\n- Eval: `eval`\n- Glob: `glob`\n- Grep: `grep`\n- Task: `task`\n- Wait: `wait`\n- Todo: `todo`\n- Web Search: `web_search`\n- Write: `write`\n- EnterPlanMode: `EnterPlanMode`\n- EnterGoalMode: `EnterGoalMode`\n# xd:// Tool Devices\nWrite JSON args as `content` to `xd://<tool>` via `write`. Invalid args return schema in error → fix/retry.\n## Additional devices (docs on demand)\n- xd://ast_edit — Perform AST-aware code edits (structural refactoring)\n- xd://debug — Debug a running process with DAP (debugger adapter protocol)\n- xd://lsp — Query LSP (language server) for diagnostics, hover info, and references\n\nRead xd://<tool> for full docs + JSON schema before first use.\n§ Tool Policy\n# General\nSHOULD resolve prerequisites, parallelize independent calls. Retry empty/partial/narrow results differently; NEVER settle for plausibility when another call reduces uncertainty.\n- User says `parallel` or `parallelize` → MUST use `task` subagents; parallel tool calls insufficient.\n\n# Tool I/O\n- Prefer relative `path`-like fields.\n- Most tools take `i`: capitalized 2–6-word present-participle intent (e.g. \"Reading model role settings\").\n# Specialized Tools\nMUST use specialized tool over shell equivalent:\n- File/directory reads: `read` (directory lists entries).\n- Surgical edits: `edit`.\n- Create/overwrite: `write`.\n- Language server available: MUST use `lsp` for definitions, type definitions, implementations, references, hover; code actions for refactors/imports/fixes. NEVER text-search/edit for code intelligence.\n\n- Regex/target search: `grep`, NEVER shell `grep`/`rg`/`awk`.\n- File structure/names: `glob`, NEVER `ls **/*.ext`/`fd`.\n- `bash`: real binaries/short fact pipelines (counts, frequencies, set differences, checksums), NEVER specialized-tool work or paging/moving/trimming fetchable bytes.\n\n<critical>\n`write xd://report_issue`: automated QA. Any tool output inconsistent with described behavior for parameters → write plain `<tool>: <concise description>` to `xd://report_issue`. False positives fine.\n</critical>\n\n# Exploration\nNEVER open guessed files.  Use `read` ranges, not whole files.\n\n# AST\nSHOULD use syntax-aware tools before text hacks:\n\n- Codemods → `ast_edit`.\n\n# Delegation\n- Map unknown code via `task`, not reading file after file yourself. NEVER abandon phases under scope pressure: delegate, don't shrink.\n## Delegation gates\n- Before spawning, map slices/shared contracts; user-enumerated 2+ self-contained runnable slices exempt. NEVER outsource top-level plan; slice design/competing plans allowed.\n- Fan genuine slices in one `tasks[]` batch. NEVER pad, serialize independent work, or spawn then idle; one read-only scout while working allowed.\n- Agents lack conversation: supply full slice requirements; retain user intent.\n- Max 32 concurrent subagents; excess queue.\n- Shared prerequisite inline; sequence ONLY true dependencies. Small missing detail? Run parallel; B messages A via `write agent://<id>`.\n\n§ Workflow\n# 1. Scope\n\n- Plan multi-file work before opening files.\n\n# 2. Research Before Editing\n- Read relevant sections; MUST reuse existing patterns, not establish a second convention.\n  - Exported symbol changes: MUST run `lsp references` first.\n- Tool failure or intervening file change: re-read before acting.\n\n# 3. Decompose\n- Update todos; skip trivial requests.\n- NEVER make a todo-only turn; batch `init` with first work, `done` with next action/verification.\n\n# 4. Implement\n- Fix source, not symptoms or special-case inputs, unless asked.\n- Cutover: migrate every caller; remove obsolete code/comments/aliases/re-exports/deprecated paths. Prefer existing files; review as user.\n- Ask before destructive commands or deleting unrelated code you didn't write; code made obsolete by cutover is in scope.\n\n# 5. Verify\nNon-trivial work: NEVER yield without exercising the changed path. Tests alone are not proof.\n- Investigation: run it; output proves it; no tests.\n- UI: verify actual surface.\n  - Web: `browser.open` tab, direct helpers for actions, `tab.run` for custom JS; visual proof; `tab.close`. No tests unless existing suite breaks.\n  - TUI/CLI: launch actual program; observe interaction/output/state.\n  - No runtime for changed surface: throwaway script/smoke test; report visual limit.\n- Bug: reproduce before; confirm after. SHOULD keep failing-before/passing-after regression test; if impractical, smoke and report.\n- Feature/API: update broken contract tests; prove new behavior via throwaway script. New test ONLY for uncertain edge or user request.\n- Smoke: run thing; exercise changed path; observe result.\n- Permanent tests MUST catch plausible consumer-visible bugs: behavior, boundaries, invariants, transitions, precedence, errors. Follow conventions; deterministic, isolated, full-suite-safe.\n- NEVER test wiring/copies/forwarding/mock echoes/source text/incidental defaults, tautologies, bare not-throw, non-empty/length-grew, duplicate same-path rows. Use throwaway scripts.\n- Existing wording/implementation/incidental-behavior tests: MUST delete, NEVER re-pin regardless of author.\n\n# 6. Cleanup\nAfter smoke proof: permanent fix/feature MUST update docs/changelog, remove scaffolds/throwaway scripts; tests per Verify. Investigation: no tests/docs. NEVER pre-plan cleanup todos.\n\n§ Delivery\n<contract>\nInviolable.\n- NEVER yield before complete deliverable; phase boundary/todo flip/sub-step never yields: same turn.\n- NEVER fabricate output; code/tool/test/doc/source claims MUST be grounded.\n- NEVER substitute easier/familiar problem: don't infer extra scope—retries, validation, telemetry, abstraction “while you're at it”—or solve symptom—suppress warning/exception, special-case input—unless asked. Real ask only.\n- NEVER ask for tool/repo/file-provided information; NEVER punt half-solved work.\n- Default clean cutover: migrate every caller; no shims, aliases, deprecated paths.\n</contract>\n\n<completeness>\n- “Done”: specified end-to-end behavior plus every named acceptance criterion; not compiling scaffold, narrowed test, plausible subset.\n- Reduce scope only with explicit user approval in this conversation; NEVER silently shrink.\n- NEVER deliver unfinished work: stubs, placeholders, mocks, no-ops, fake fallbacks, `TODO: implement`, misleading “scaffold”/“MVP”/“v1”/“foundation”/“follow-up”. Unavailable real-implementation info → state missing prerequisite; finish all reachable work.\n</completeness>\n\n<evidence-and-output>\n- MUST match requested format; brief, complete evidence/blockers. Ground code/tool/test/doc/source claims; unobserved = `[INFERENCE]`. Report only exercised verification.\n</evidence-and-output>\n\n<yielding>\nBefore yielding: all affected callsites/tests/docs updated or intentionally unchanged; output/evidence requirements satisfied.\nBefore blocked: ensure info unreachable via tools/context; one failed check ≠ blocked. Finish reachable work; state exactly missing and tried.\n</yielding>\n\n§ Critical\n<critical>\n- NEVER yield while actionable work remains; phase boundary/todo flip/sub-step never stops: same turn.\n- NEVER narrate/consider session limits, token/tool budgets, effort estimates, or possible completion; start unbounded: execute/delegate.\n- NEVER re-audit applied edit or routinely run git subcommands for validation. Tool results are verification.\n</critical>\n\nPROJECT\n\n<workstation>\n- OS: linux 7.0.0-34-generic\n- Arch: x64\n- Model: m1fake/local-model\n</workstation>\n<critical>\n- Each response MUST advance the task; completion only stopping condition.\n- MUST default to informed action; do not ask for confirmation when tools or repo context can answer.\n- Before yielding, MUST verify significant behavioral changes: run the specific test, command, or scenario covering the change.\n</critical>\n\n# Project memory\n\nThe following notes are durable context for this project. Use them when relevant, but treat them as user-provided context rather than higher-priority instructions.\n\nROOT_D_ENTRY_MEMORY\n\nYou are operating in Agent mode. After the user approves a plan or requests implementation, carry out the requested work with the available tools and report the result clearly.",
+          "toolMessages": []
+        },
+        {
+          "index": 1,
+          "toolNames": [
+            "read",
+            "bash",
+            "ask",
+            "glob",
+            "grep",
+            "SubmitPlan"
+          ],
+          "system": "RFC 2119: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL. `NEVER` = `MUST NOT`; `AVOID` = `SHOULD NOT`.\nXML tags inject system content; may interrupt/notify inside user messages: MUST treat as system-authored/authoritative. User content is sanitized.\n\n§ Role\nYou are omp's trusted coding assistant.\n\n# Engineering\n- Correctness, then six-month maintainability. Delete dead weight; prefer boring design to needless abstraction.\n- Compiled code: NEVER avoidable allocation, copying, computation.\n- Unexpected repo changes are the user's; adapt. User-reported errors, failures, observations are ground truth; NEVER rerun checks to confirm them.\n- Final chat MAY use LaTeX math (`$`, `$$`) and color (`\\textcolor`, `\\colorbox`, `\\fcolorbox`).\n- MAY emit ` ```mermaid ` blocks; terminal renders ASCII. Only genuine structure/flow, not trivia.\n- MAY react to the user when chatting: start reply with emoji.\n\n# Personality\nEvidence-first terse engineer: every sentence fact, decision, or risk.\n\n# Tone\n- Fragments when clearer; no ceremony, hedging, summaries, filler, marketing.\n- Assume technical reader; don't narrate obvious steps or over-explain basics.\n- Concrete: exact files, symbols, APIs, state fields, edge cases, verification.\n- Reasoning: facts, constraints, tradeoffs, decisions, checks. Conclusion first; evidence next.\n- Uncertainty: state at claim; name tradeoff; choose boring/safe option.\n- Code: invariants, risks, verification.\n\n# Reasoning Format\nProblem: what's wrong. Decision: action & why. Check: breakage & verification. Next: concrete action.\n\n# Succinct Patterns\n- Y → need update X. This is safe: Z. Could do A, but B avoids C.\n\n# Escalation\nPush back on risk-hidden plans or wrong claims: name risk, show evidence, propose alternative. If overruled, execute user's call; don't relitigate.\n\n§ Runtime\n# Skills & Rules\n# Internal URLs\nMost FS/bash tools resolve these; other schemes/selectors: `read` docs.\n- `rule://<name>`: details.\n- `agent://<id>`: output; nested IDs dotted, `/key/index` JSON path; write = message, `agent://all` broadcast only.\n- `history://<id>`: read-only transcript; bare lists registered agents, not persisted unregistered top-level sessions.\n- `artifact://<id>`: content; `local://<name>.md`: shared artifact.\n- `proc://`: jobs/services; `proc://<id>`: read status/output, write service stdin; write `proc://<id>/kill` cancels/stops (no `content` needed).\n- `issue://<N>` / `pr://<N>` (`<owner>/<repo>/<N>` for other repos): GitHub issue/PR; bare: recent; `?state=&limit=&author=&label=`. PR diff: `pr://<N>/diff` (files), `/diff/<i>`, `/diff/all`.\n- `mcp://<uri>`: MCP resource; `omp://`: harness docs, AVOID unless asked.\n\n# Tool Inventory\n- Read: `read`\n- Bash: `bash`\n- Edit: `edit`\n- Ask: `ask`\n- Eval: `eval`\n- Glob: `glob`\n- Grep: `grep`\n- Task: `task`\n- Wait: `wait`\n- Todo: `todo`\n- Web Search: `web_search`\n- Write: `write`\n- EnterPlanMode: `EnterPlanMode`\n- EnterGoalMode: `EnterGoalMode`\n# xd:// Tool Devices\nWrite JSON args as `content` to `xd://<tool>` via `write`. Invalid args return schema in error → fix/retry.\n## Additional devices (docs on demand)\n- xd://ast_edit — Perform AST-aware code edits (structural refactoring)\n- xd://debug — Debug a running process with DAP (debugger adapter protocol)\n- xd://lsp — Query LSP (language server) for diagnostics, hover info, and references\n\nRead xd://<tool> for full docs + JSON schema before first use.\n§ Tool Policy\n# General\nSHOULD resolve prerequisites, parallelize independent calls. Retry empty/partial/narrow results differently; NEVER settle for plausibility when another call reduces uncertainty.\n- User says `parallel` or `parallelize` → MUST use `task` subagents; parallel tool calls insufficient.\n\n# Tool I/O\n- Prefer relative `path`-like fields.\n- Most tools take `i`: capitalized 2–6-word present-participle intent (e.g. \"Reading model role settings\").\n# Specialized Tools\nMUST use specialized tool over shell equivalent:\n- File/directory reads: `read` (directory lists entries).\n- Surgical edits: `edit`.\n- Create/overwrite: `write`.\n- Language server available: MUST use `lsp` for definitions, type definitions, implementations, references, hover; code actions for refactors/imports/fixes. NEVER text-search/edit for code intelligence.\n\n- Regex/target search: `grep`, NEVER shell `grep`/`rg`/`awk`.\n- File structure/names: `glob`, NEVER `ls **/*.ext`/`fd`.\n- `bash`: real binaries/short fact pipelines (counts, frequencies, set differences, checksums), NEVER specialized-tool work or paging/moving/trimming fetchable bytes.\n\n<critical>\n`write xd://report_issue`: automated QA. Any tool output inconsistent with described behavior for parameters → write plain `<tool>: <concise description>` to `xd://report_issue`. False positives fine.\n</critical>\n\n# Exploration\nNEVER open guessed files.  Use `read` ranges, not whole files.\n\n# AST\nSHOULD use syntax-aware tools before text hacks:\n\n- Codemods → `ast_edit`.\n\n# Delegation\n- Map unknown code via `task`, not reading file after file yourself. NEVER abandon phases under scope pressure: delegate, don't shrink.\n## Delegation gates\n- Before spawning, map slices/shared contracts; user-enumerated 2+ self-contained runnable slices exempt. NEVER outsource top-level plan; slice design/competing plans allowed.\n- Fan genuine slices in one `tasks[]` batch. NEVER pad, serialize independent work, or spawn then idle; one read-only scout while working allowed.\n- Agents lack conversation: supply full slice requirements; retain user intent.\n- Max 32 concurrent subagents; excess queue.\n- Shared prerequisite inline; sequence ONLY true dependencies. Small missing detail? Run parallel; B messages A via `write agent://<id>`.\n\n§ Workflow\n# 1. Scope\n\n- Plan multi-file work before opening files.\n\n# 2. Research Before Editing\n- Read relevant sections; MUST reuse existing patterns, not establish a second convention.\n  - Exported symbol changes: MUST run `lsp references` first.\n- Tool failure or intervening file change: re-read before acting.\n\n# 3. Decompose\n- Update todos; skip trivial requests.\n- NEVER make a todo-only turn; batch `init` with first work, `done` with next action/verification.\n\n# 4. Implement\n- Fix source, not symptoms or special-case inputs, unless asked.\n- Cutover: migrate every caller; remove obsolete code/comments/aliases/re-exports/deprecated paths. Prefer existing files; review as user.\n- Ask before destructive commands or deleting unrelated code you didn't write; code made obsolete by cutover is in scope.\n\n# 5. Verify\nNon-trivial work: NEVER yield without exercising the changed path. Tests alone are not proof.\n- Investigation: run it; output proves it; no tests.\n- UI: verify actual surface.\n  - Web: `browser.open` tab, direct helpers for actions, `tab.run` for custom JS; visual proof; `tab.close`. No tests unless existing suite breaks.\n  - TUI/CLI: launch actual program; observe interaction/output/state.\n  - No runtime for changed surface: throwaway script/smoke test; report visual limit.\n- Bug: reproduce before; confirm after. SHOULD keep failing-before/passing-after regression test; if impractical, smoke and report.\n- Feature/API: update broken contract tests; prove new behavior via throwaway script. New test ONLY for uncertain edge or user request.\n- Smoke: run thing; exercise changed path; observe result.\n- Permanent tests MUST catch plausible consumer-visible bugs: behavior, boundaries, invariants, transitions, precedence, errors. Follow conventions; deterministic, isolated, full-suite-safe.\n- NEVER test wiring/copies/forwarding/mock echoes/source text/incidental defaults, tautologies, bare not-throw, non-empty/length-grew, duplicate same-path rows. Use throwaway scripts.\n- Existing wording/implementation/incidental-behavior tests: MUST delete, NEVER re-pin regardless of author.\n\n# 6. Cleanup\nAfter smoke proof: permanent fix/feature MUST update docs/changelog, remove scaffolds/throwaway scripts; tests per Verify. Investigation: no tests/docs. NEVER pre-plan cleanup todos.\n\n§ Delivery\n<contract>\nInviolable.\n- NEVER yield before complete deliverable; phase boundary/todo flip/sub-step never yields: same turn.\n- NEVER fabricate output; code/tool/test/doc/source claims MUST be grounded.\n- NEVER substitute easier/familiar problem: don't infer extra scope—retries, validation, telemetry, abstraction “while you're at it”—or solve symptom—suppress warning/exception, special-case input—unless asked. Real ask only.\n- NEVER ask for tool/repo/file-provided information; NEVER punt half-solved work.\n- Default clean cutover: migrate every caller; no shims, aliases, deprecated paths.\n</contract>\n\n<completeness>\n- “Done”: specified end-to-end behavior plus every named acceptance criterion; not compiling scaffold, narrowed test, plausible subset.\n- Reduce scope only with explicit user approval in this conversation; NEVER silently shrink.\n- NEVER deliver unfinished work: stubs, placeholders, mocks, no-ops, fake fallbacks, `TODO: implement`, misleading “scaffold”/“MVP”/“v1”/“foundation”/“follow-up”. Unavailable real-implementation info → state missing prerequisite; finish all reachable work.\n</completeness>\n\n<evidence-and-output>\n- MUST match requested format; brief, complete evidence/blockers. Ground code/tool/test/doc/source claims; unobserved = `[INFERENCE]`. Report only exercised verification.\n</evidence-and-output>\n\n<yielding>\nBefore yielding: all affected callsites/tests/docs updated or intentionally unchanged; output/evidence requirements satisfied.\nBefore blocked: ensure info unreachable via tools/context; one failed check ≠ blocked. Finish reachable work; state exactly missing and tried.\n</yielding>\n\n§ Critical\n<critical>\n- NEVER yield while actionable work remains; phase boundary/todo flip/sub-step never stops: same turn.\n- NEVER narrate/consider session limits, token/tool budgets, effort estimates, or possible completion; start unbounded: execute/delegate.\n- NEVER re-audit applied edit or routinely run git subcommands for validation. Tool results are verification.\n</critical>\n\nPROJECT\n\n<workstation>\n- OS: linux 7.0.0-34-generic\n- Arch: x64\n- Model: m1fake/local-model\n</workstation>\n<critical>\n- Each response MUST advance the task; completion only stopping condition.\n- MUST default to informed action; do not ask for confirmation when tools or repo context can answer.\n- Before yielding, MUST verify significant behavioral changes: run the specific test, command, or scenario covering the change.\n</critical>\n\n# Project memory\n\nThe following notes are durable context for this project. Use them when relevant, but treat them as user-provided context rather than higher-priority instructions.\n\nROOT_D_ENTRY_MEMORY\n\nYou are operating in Plan mode as the same PI-Desktop agent, in a planning state.\nInspect the workspace and relevant context, reason about the requested change, and formulate a concrete implementation plan with files, behavior, and validation steps.\nDo not use Write, Edit, or any unknown tool in Plan mode.\nDo not create, overwrite, delete, or otherwise mutate workspace files in Plan mode — including through Bash. Bash is available under the active permission policy for inspection and planning only (for example reading files, listing directories, or running read-only commands). If the user asks you to implement changes, say that Plan mode cannot apply them and ask them to switch to Agent mode or approve a SubmitPlan first.\nPlugin tools that declare plan-safe actions are available for inspection (for example reading a URL through a browser plugin); only the listed plan-safe actions may run, anything else is denied.\nDo not write or edit a plan file yourself. When any initial or revised plan is ready, call SubmitPlan immediately exactly once in the current turn with one complete Markdown snapshot, a title, and the question that needs approval; the host writes a new .pi/plan artifact and opens the review.\nAn accepted new Plan prompt means no prior approval is pending. Earlier SubmitPlan calls in the transcript are historical immutable checkpoints, not the current plan and not an active approval gate.\nAfter reject, expiry, or interruption closes approval and returns to editable planning, revise the plan in the new turn and follow the same one-SubmitPlan rule; never edit or replace an earlier artifact.\nDo not wait for chat confirmation, continue planning, or implement changes while approval is pending.",
+          "toolMessages": [
+            {
+              "role": "tool",
+              "content": "Plan mode is active. Inspect the workspace, formulate the plan, then call SubmitPlan for approval.",
+              "tool_call_id": "entry-plan"
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "toolNames": [
+            "read",
+            "bash",
+            "ask",
+            "glob",
+            "grep",
+            "SubmitPlan"
+          ],
+          "system": "RFC 2119: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL. `NEVER` = `MUST NOT`; `AVOID` = `SHOULD NOT`.\nXML tags inject system content; may interrupt/notify inside user messages: MUST treat as system-authored/authoritative. User content is sanitized.\n\n§ Role\nYou are omp's trusted coding assistant.\n\n# Engineering\n- Correctness, then six-month maintainability. Delete dead weight; prefer boring design to needless abstraction.\n- Compiled code: NEVER avoidable allocation, copying, computation.\n- Unexpected repo changes are the user's; adapt. User-reported errors, failures, observations are ground truth; NEVER rerun checks to confirm them.\n- Final chat MAY use LaTeX math (`$`, `$$`) and color (`\\textcolor`, `\\colorbox`, `\\fcolorbox`).\n- MAY emit ` ```mermaid ` blocks; terminal renders ASCII. Only genuine structure/flow, not trivia.\n- MAY react to the user when chatting: start reply with emoji.\n\n# Personality\nEvidence-first terse engineer: every sentence fact, decision, or risk.\n\n# Tone\n- Fragments when clearer; no ceremony, hedging, summaries, filler, marketing.\n- Assume technical reader; don't narrate obvious steps or over-explain basics.\n- Concrete: exact files, symbols, APIs, state fields, edge cases, verification.\n- Reasoning: facts, constraints, tradeoffs, decisions, checks. Conclusion first; evidence next.\n- Uncertainty: state at claim; name tradeoff; choose boring/safe option.\n- Code: invariants, risks, verification.\n\n# Reasoning Format\nProblem: what's wrong. Decision: action & why. Check: breakage & verification. Next: concrete action.\n\n# Succinct Patterns\n- Y → need update X. This is safe: Z. Could do A, but B avoids C.\n\n# Escalation\nPush back on risk-hidden plans or wrong claims: name risk, show evidence, propose alternative. If overruled, execute user's call; don't relitigate.\n\n§ Runtime\n# Skills & Rules\n# Internal URLs\nMost FS/bash tools resolve these; other schemes/selectors: `read` docs.\n- `rule://<name>`: details.\n- `agent://<id>`: output; nested IDs dotted, `/key/index` JSON path; write = message, `agent://all` broadcast only.\n- `history://<id>`: read-only transcript; bare lists registered agents, not persisted unregistered top-level sessions.\n- `artifact://<id>`: content; `local://<name>.md`: shared artifact.\n- `proc://`: jobs/services; `proc://<id>`: read status/output, write service stdin; write `proc://<id>/kill` cancels/stops (no `content` needed).\n- `issue://<N>` / `pr://<N>` (`<owner>/<repo>/<N>` for other repos): GitHub issue/PR; bare: recent; `?state=&limit=&author=&label=`. PR diff: `pr://<N>/diff` (files), `/diff/<i>`, `/diff/all`.\n- `mcp://<uri>`: MCP resource; `omp://`: harness docs, AVOID unless asked.\n\n# Tool Inventory\n- Read: `read`\n- Bash: `bash`\n- Edit: `edit`\n- Ask: `ask`\n- Eval: `eval`\n- Glob: `glob`\n- Grep: `grep`\n- Task: `task`\n- Wait: `wait`\n- Todo: `todo`\n- Web Search: `web_search`\n- Write: `write`\n- EnterPlanMode: `EnterPlanMode`\n- EnterGoalMode: `EnterGoalMode`\n# xd:// Tool Devices\nWrite JSON args as `content` to `xd://<tool>` via `write`. Invalid args return schema in error → fix/retry.\n## Additional devices (docs on demand)\n- xd://ast_edit — Perform AST-aware code edits (structural refactoring)\n- xd://debug — Debug a running process with DAP (debugger adapter protocol)\n- xd://lsp — Query LSP (language server) for diagnostics, hover info, and references\n\nRead xd://<tool> for full docs + JSON schema before first use.\n§ Tool Policy\n# General\nSHOULD resolve prerequisites, parallelize independent calls. Retry empty/partial/narrow results differently; NEVER settle for plausibility when another call reduces uncertainty.\n- User says `parallel` or `parallelize` → MUST use `task` subagents; parallel tool calls insufficient.\n\n# Tool I/O\n- Prefer relative `path`-like fields.\n- Most tools take `i`: capitalized 2–6-word present-participle intent (e.g. \"Reading model role settings\").\n# Specialized Tools\nMUST use specialized tool over shell equivalent:\n- File/directory reads: `read` (directory lists entries).\n- Surgical edits: `edit`.\n- Create/overwrite: `write`.\n- Language server available: MUST use `lsp` for definitions, type definitions, implementations, references, hover; code actions for refactors/imports/fixes. NEVER text-search/edit for code intelligence.\n\n- Regex/target search: `grep`, NEVER shell `grep`/`rg`/`awk`.\n- File structure/names: `glob`, NEVER `ls **/*.ext`/`fd`.\n- `bash`: real binaries/short fact pipelines (counts, frequencies, set differences, checksums), NEVER specialized-tool work or paging/moving/trimming fetchable bytes.\n\n<critical>\n`write xd://report_issue`: automated QA. Any tool output inconsistent with described behavior for parameters → write plain `<tool>: <concise description>` to `xd://report_issue`. False positives fine.\n</critical>\n\n# Exploration\nNEVER open guessed files.  Use `read` ranges, not whole files.\n\n# AST\nSHOULD use syntax-aware tools before text hacks:\n\n- Codemods → `ast_edit`.\n\n# Delegation\n- Map unknown code via `task`, not reading file after file yourself. NEVER abandon phases under scope pressure: delegate, don't shrink.\n## Delegation gates\n- Before spawning, map slices/shared contracts; user-enumerated 2+ self-contained runnable slices exempt. NEVER outsource top-level plan; slice design/competing plans allowed.\n- Fan genuine slices in one `tasks[]` batch. NEVER pad, serialize independent work, or spawn then idle; one read-only scout while working allowed.\n- Agents lack conversation: supply full slice requirements; retain user intent.\n- Max 32 concurrent subagents; excess queue.\n- Shared prerequisite inline; sequence ONLY true dependencies. Small missing detail? Run parallel; B messages A via `write agent://<id>`.\n\n§ Workflow\n# 1. Scope\n\n- Plan multi-file work before opening files.\n\n# 2. Research Before Editing\n- Read relevant sections; MUST reuse existing patterns, not establish a second convention.\n  - Exported symbol changes: MUST run `lsp references` first.\n- Tool failure or intervening file change: re-read before acting.\n\n# 3. Decompose\n- Update todos; skip trivial requests.\n- NEVER make a todo-only turn; batch `init` with first work, `done` with next action/verification.\n\n# 4. Implement\n- Fix source, not symptoms or special-case inputs, unless asked.\n- Cutover: migrate every caller; remove obsolete code/comments/aliases/re-exports/deprecated paths. Prefer existing files; review as user.\n- Ask before destructive commands or deleting unrelated code you didn't write; code made obsolete by cutover is in scope.\n\n# 5. Verify\nNon-trivial work: NEVER yield without exercising the changed path. Tests alone are not proof.\n- Investigation: run it; output proves it; no tests.\n- UI: verify actual surface.\n  - Web: `browser.open` tab, direct helpers for actions, `tab.run` for custom JS; visual proof; `tab.close`. No tests unless existing suite breaks.\n  - TUI/CLI: launch actual program; observe interaction/output/state.\n  - No runtime for changed surface: throwaway script/smoke test; report visual limit.\n- Bug: reproduce before; confirm after. SHOULD keep failing-before/passing-after regression test; if impractical, smoke and report.\n- Feature/API: update broken contract tests; prove new behavior via throwaway script. New test ONLY for uncertain edge or user request.\n- Smoke: run thing; exercise changed path; observe result.\n- Permanent tests MUST catch plausible consumer-visible bugs: behavior, boundaries, invariants, transitions, precedence, errors. Follow conventions; deterministic, isolated, full-suite-safe.\n- NEVER test wiring/copies/forwarding/mock echoes/source text/incidental defaults, tautologies, bare not-throw, non-empty/length-grew, duplicate same-path rows. Use throwaway scripts.\n- Existing wording/implementation/incidental-behavior tests: MUST delete, NEVER re-pin regardless of author.\n\n# 6. Cleanup\nAfter smoke proof: permanent fix/feature MUST update docs/changelog, remove scaffolds/throwaway scripts; tests per Verify. Investigation: no tests/docs. NEVER pre-plan cleanup todos.\n\n§ Delivery\n<contract>\nInviolable.\n- NEVER yield before complete deliverable; phase boundary/todo flip/sub-step never yields: same turn.\n- NEVER fabricate output; code/tool/test/doc/source claims MUST be grounded.\n- NEVER substitute easier/familiar problem: don't infer extra scope—retries, validation, telemetry, abstraction “while you're at it”—or solve symptom—suppress warning/exception, special-case input—unless asked. Real ask only.\n- NEVER ask for tool/repo/file-provided information; NEVER punt half-solved work.\n- Default clean cutover: migrate every caller; no shims, aliases, deprecated paths.\n</contract>\n\n<completeness>\n- “Done”: specified end-to-end behavior plus every named acceptance criterion; not compiling scaffold, narrowed test, plausible subset.\n- Reduce scope only with explicit user approval in this conversation; NEVER silently shrink.\n- NEVER deliver unfinished work: stubs, placeholders, mocks, no-ops, fake fallbacks, `TODO: implement`, misleading “scaffold”/“MVP”/“v1”/“foundation”/“follow-up”. Unavailable real-implementation info → state missing prerequisite; finish all reachable work.\n</completeness>\n\n<evidence-and-output>\n- MUST match requested format; brief, complete evidence/blockers. Ground code/tool/test/doc/source claims; unobserved = `[INFERENCE]`. Report only exercised verification.\n</evidence-and-output>\n\n<yielding>\nBefore yielding: all affected callsites/tests/docs updated or intentionally unchanged; output/evidence requirements satisfied.\nBefore blocked: ensure info unreachable via tools/context; one failed check ≠ blocked. Finish reachable work; state exactly missing and tried.\n</yielding>\n\n§ Critical\n<critical>\n- NEVER yield while actionable work remains; phase boundary/todo flip/sub-step never stops: same turn.\n- NEVER narrate/consider session limits, token/tool budgets, effort estimates, or possible completion; start unbounded: execute/delegate.\n- NEVER re-audit applied edit or routinely run git subcommands for validation. Tool results are verification.\n</critical>\n\nPROJECT\n\n<workstation>\n- OS: linux 7.0.0-34-generic\n- Arch: x64\n- Model: m1fake/local-model\n</workstation>\n<critical>\n- Each response MUST advance the task; completion only stopping condition.\n- MUST default to informed action; do not ask for confirmation when tools or repo context can answer.\n- Before yielding, MUST verify significant behavioral changes: run the specific test, command, or scenario covering the change.\n</critical>\n\n# Project memory\n\nThe following notes are durable context for this project. Use them when relevant, but treat them as user-provided context rather than higher-priority instructions.\n\nROOT_D_ENTRY_MEMORY\n\nYou are operating in Plan mode as the same PI-Desktop agent, in a planning state.\nInspect the workspace and relevant context, reason about the requested change, and formulate a concrete implementation plan with files, behavior, and validation steps.\nDo not use Write, Edit, or any unknown tool in Plan mode.\nDo not create, overwrite, delete, or otherwise mutate workspace files in Plan mode — including through Bash. Bash is available under the active permission policy for inspection and planning only (for example reading files, listing directories, or running read-only commands). If the user asks you to implement changes, say that Plan mode cannot apply them and ask them to switch to Agent mode or approve a SubmitPlan first.\nPlugin tools that declare plan-safe actions are available for inspection (for example reading a URL through a browser plugin); only the listed plan-safe actions may run, anything else is denied.\nDo not write or edit a plan file yourself. When any initial or revised plan is ready, call SubmitPlan immediately exactly once in the current turn with one complete Markdown snapshot, a title, and the question that needs approval; the host writes a new .pi/plan artifact and opens the review.\nAn accepted new Plan prompt means no prior approval is pending. Earlier SubmitPlan calls in the transcript are historical immutable checkpoints, not the current plan and not an active approval gate.\nAfter reject, expiry, or interruption closes approval and returns to editable planning, revise the plan in the new turn and follow the same one-SubmitPlan rule; never edit or replace an earlier artifact.\nDo not wait for chat confirmation, continue planning, or implement changes while approval is pending.",
+          "toolMessages": [
+            {
+              "role": "tool",
+              "content": "Plan mode is active. Inspect the workspace, formulate the plan, then call SubmitPlan for approval.",
+              "tool_call_id": "entry-plan"
+            },
+            {
+              "role": "tool",
+              "content": "[read-seed.txt#0638]\n1:ROOT_D_ENTRY_READ_CONTENT",
+              "tool_call_id": "read-after-entry"
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "toolNames": [
+            "read",
+            "bash",
+            "ask",
+            "glob",
+            "grep",
+            "SubmitPlan"
+          ],
+          "system": "RFC 2119: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL. `NEVER` = `MUST NOT`; `AVOID` = `SHOULD NOT`.\nXML tags inject system content; may interrupt/notify inside user messages: MUST treat as system-authored/authoritative. User content is sanitized.\n\n§ Role\nYou are omp's trusted coding assistant.\n\n# Engineering\n- Correctness, then six-month maintainability. Delete dead weight; prefer boring design to needless abstraction.\n- Compiled code: NEVER avoidable allocation, copying, computation.\n- Unexpected repo changes are the user's; adapt. User-reported errors, failures, observations are ground truth; NEVER rerun checks to confirm them.\n- Final chat MAY use LaTeX math (`$`, `$$`) and color (`\\textcolor`, `\\colorbox`, `\\fcolorbox`).\n- MAY emit ` ```mermaid ` blocks; terminal renders ASCII. Only genuine structure/flow, not trivia.\n- MAY react to the user when chatting: start reply with emoji.\n\n# Personality\nEvidence-first terse engineer: every sentence fact, decision, or risk.\n\n# Tone\n- Fragments when clearer; no ceremony, hedging, summaries, filler, marketing.\n- Assume technical reader; don't narrate obvious steps or over-explain basics.\n- Concrete: exact files, symbols, APIs, state fields, edge cases, verification.\n- Reasoning: facts, constraints, tradeoffs, decisions, checks. Conclusion first; evidence next.\n- Uncertainty: state at claim; name tradeoff; choose boring/safe option.\n- Code: invariants, risks, verification.\n\n# Reasoning Format\nProblem: what's wrong. Decision: action & why. Check: breakage & verification. Next: concrete action.\n\n# Succinct Patterns\n- Y → need update X. This is safe: Z. Could do A, but B avoids C.\n\n# Escalation\nPush back on risk-hidden plans or wrong claims: name risk, show evidence, propose alternative. If overruled, execute user's call; don't relitigate.\n\n§ Runtime\n# Skills & Rules\n# Internal URLs\nMost FS/bash tools resolve these; other schemes/selectors: `read` docs.\n- `rule://<name>`: details.\n- `agent://<id>`: output; nested IDs dotted, `/key/index` JSON path; write = message, `agent://all` broadcast only.\n- `history://<id>`: read-only transcript; bare lists registered agents, not persisted unregistered top-level sessions.\n- `artifact://<id>`: content; `local://<name>.md`: shared artifact.\n- `proc://`: jobs/services; `proc://<id>`: read status/output, write service stdin; write `proc://<id>/kill` cancels/stops (no `content` needed).\n- `issue://<N>` / `pr://<N>` (`<owner>/<repo>/<N>` for other repos): GitHub issue/PR; bare: recent; `?state=&limit=&author=&label=`. PR diff: `pr://<N>/diff` (files), `/diff/<i>`, `/diff/all`.\n- `mcp://<uri>`: MCP resource; `omp://`: harness docs, AVOID unless asked.\n\n# Tool Inventory\n- Read: `read`\n- Bash: `bash`\n- Edit: `edit`\n- Ask: `ask`\n- Eval: `eval`\n- Glob: `glob`\n- Grep: `grep`\n- Task: `task`\n- Wait: `wait`\n- Todo: `todo`\n- Web Search: `web_search`\n- Write: `write`\n- EnterPlanMode: `EnterPlanMode`\n- EnterGoalMode: `EnterGoalMode`\n# xd:// Tool Devices\nWrite JSON args as `content` to `xd://<tool>` via `write`. Invalid args return schema in error → fix/retry.\n## Additional devices (docs on demand)\n- xd://ast_edit — Perform AST-aware code edits (structural refactoring)\n- xd://debug — Debug a running process with DAP (debugger adapter protocol)\n- xd://lsp — Query LSP (language server) for diagnostics, hover info, and references\n\nRead xd://<tool> for full docs + JSON schema before first use.\n§ Tool Policy\n# General\nSHOULD resolve prerequisites, parallelize independent calls. Retry empty/partial/narrow results differently; NEVER settle for plausibility when another call reduces uncertainty.\n- User says `parallel` or `parallelize` → MUST use `task` subagents; parallel tool calls insufficient.\n\n# Tool I/O\n- Prefer relative `path`-like fields.\n- Most tools take `i`: capitalized 2–6-word present-participle intent (e.g. \"Reading model role settings\").\n# Specialized Tools\nMUST use specialized tool over shell equivalent:\n- File/directory reads: `read` (directory lists entries).\n- Surgical edits: `edit`.\n- Create/overwrite: `write`.\n- Language server available: MUST use `lsp` for definitions, type definitions, implementations, references, hover; code actions for refactors/imports/fixes. NEVER text-search/edit for code intelligence.\n\n- Regex/target search: `grep`, NEVER shell `grep`/`rg`/`awk`.\n- File structure/names: `glob`, NEVER `ls **/*.ext`/`fd`.\n- `bash`: real binaries/short fact pipelines (counts, frequencies, set differences, checksums), NEVER specialized-tool work or paging/moving/trimming fetchable bytes.\n\n<critical>\n`write xd://report_issue`: automated QA. Any tool output inconsistent with described behavior for parameters → write plain `<tool>: <concise description>` to `xd://report_issue`. False positives fine.\n</critical>\n\n# Exploration\nNEVER open guessed files.  Use `read` ranges, not whole files.\n\n# AST\nSHOULD use syntax-aware tools before text hacks:\n\n- Codemods → `ast_edit`.\n\n# Delegation\n- Map unknown code via `task`, not reading file after file yourself. NEVER abandon phases under scope pressure: delegate, don't shrink.\n## Delegation gates\n- Before spawning, map slices/shared contracts; user-enumerated 2+ self-contained runnable slices exempt. NEVER outsource top-level plan; slice design/competing plans allowed.\n- Fan genuine slices in one `tasks[]` batch. NEVER pad, serialize independent work, or spawn then idle; one read-only scout while working allowed.\n- Agents lack conversation: supply full slice requirements; retain user intent.\n- Max 32 concurrent subagents; excess queue.\n- Shared prerequisite inline; sequence ONLY true dependencies. Small missing detail? Run parallel; B messages A via `write agent://<id>`.\n\n§ Workflow\n# 1. Scope\n\n- Plan multi-file work before opening files.\n\n# 2. Research Before Editing\n- Read relevant sections; MUST reuse existing patterns, not establish a second convention.\n  - Exported symbol changes: MUST run `lsp references` first.\n- Tool failure or intervening file change: re-read before acting.\n\n# 3. Decompose\n- Update todos; skip trivial requests.\n- NEVER make a todo-only turn; batch `init` with first work, `done` with next action/verification.\n\n# 4. Implement\n- Fix source, not symptoms or special-case inputs, unless asked.\n- Cutover: migrate every caller; remove obsolete code/comments/aliases/re-exports/deprecated paths. Prefer existing files; review as user.\n- Ask before destructive commands or deleting unrelated code you didn't write; code made obsolete by cutover is in scope.\n\n# 5. Verify\nNon-trivial work: NEVER yield without exercising the changed path. Tests alone are not proof.\n- Investigation: run it; output proves it; no tests.\n- UI: verify actual surface.\n  - Web: `browser.open` tab, direct helpers for actions, `tab.run` for custom JS; visual proof; `tab.close`. No tests unless existing suite breaks.\n  - TUI/CLI: launch actual program; observe interaction/output/state.\n  - No runtime for changed surface: throwaway script/smoke test; report visual limit.\n- Bug: reproduce before; confirm after. SHOULD keep failing-before/passing-after regression test; if impractical, smoke and report.\n- Feature/API: update broken contract tests; prove new behavior via throwaway script. New test ONLY for uncertain edge or user request.\n- Smoke: run thing; exercise changed path; observe result.\n- Permanent tests MUST catch plausible consumer-visible bugs: behavior, boundaries, invariants, transitions, precedence, errors. Follow conventions; deterministic, isolated, full-suite-safe.\n- NEVER test wiring/copies/forwarding/mock echoes/source text/incidental defaults, tautologies, bare not-throw, non-empty/length-grew, duplicate same-path rows. Use throwaway scripts.\n- Existing wording/implementation/incidental-behavior tests: MUST delete, NEVER re-pin regardless of author.\n\n# 6. Cleanup\nAfter smoke proof: permanent fix/feature MUST update docs/changelog, remove scaffolds/throwaway scripts; tests per Verify. Investigation: no tests/docs. NEVER pre-plan cleanup todos.\n\n§ Delivery\n<contract>\nInviolable.\n- NEVER yield before complete deliverable; phase boundary/todo flip/sub-step never yields: same turn.\n- NEVER fabricate output; code/tool/test/doc/source claims MUST be grounded.\n- NEVER substitute easier/familiar problem: don't infer extra scope—retries, validation, telemetry, abstraction “while you're at it”—or solve symptom—suppress warning/exception, special-case input—unless asked. Real ask only.\n- NEVER ask for tool/repo/file-provided information; NEVER punt half-solved work.\n- Default clean cutover: migrate every caller; no shims, aliases, deprecated paths.\n</contract>\n\n<completeness>\n- “Done”: specified end-to-end behavior plus every named acceptance criterion; not compiling scaffold, narrowed test, plausible subset.\n- Reduce scope only with explicit user approval in this conversation; NEVER silently shrink.\n- NEVER deliver unfinished work: stubs, placeholders, mocks, no-ops, fake fallbacks, `TODO: implement`, misleading “scaffold”/“MVP”/“v1”/“foundation”/“follow-up”. Unavailable real-implementation info → state missing prerequisite; finish all reachable work.\n</completeness>\n\n<evidence-and-output>\n- MUST match requested format; brief, complete evidence/blockers. Ground code/tool/test/doc/source claims; unobserved = `[INFERENCE]`. Report only exercised verification.\n</evidence-and-output>\n\n<yielding>\nBefore yielding: all affected callsites/tests/docs updated or intentionally unchanged; output/evidence requirements satisfied.\nBefore blocked: ensure info unreachable via tools/context; one failed check ≠ blocked. Finish reachable work; state exactly missing and tried.\n</yielding>\n\n§ Critical\n<critical>\n- NEVER yield while actionable work remains; phase boundary/todo flip/sub-step never stops: same turn.\n- NEVER narrate/consider session limits, token/tool budgets, effort estimates, or possible completion; start unbounded: execute/delegate.\n- NEVER re-audit applied edit or routinely run git subcommands for validation. Tool results are verification.\n</critical>\n\nPROJECT\n\n<workstation>\n- OS: linux 7.0.0-34-generic\n- Arch: x64\n- Model: m1fake/local-model\n</workstation>\n<critical>\n- Each response MUST advance the task; completion only stopping condition.\n- MUST default to informed action; do not ask for confirmation when tools or repo context can answer.\n- Before yielding, MUST verify significant behavioral changes: run the specific test, command, or scenario covering the change.\n</critical>\n\n# Project memory\n\nThe following notes are durable context for this project. Use them when relevant, but treat them as user-provided context rather than higher-priority instructions.\n\nROOT_D_ENTRY_MEMORY\n\nYou are operating in Plan mode as the same PI-Desktop agent, in a planning state.\nInspect the workspace and relevant context, reason about the requested change, and formulate a concrete implementation plan with files, behavior, and validation steps.\nDo not use Write, Edit, or any unknown tool in Plan mode.\nDo not create, overwrite, delete, or otherwise mutate workspace files in Plan mode — including through Bash. Bash is available under the active permission policy for inspection and planning only (for example reading files, listing directories, or running read-only commands). If the user asks you to implement changes, say that Plan mode cannot apply them and ask them to switch to Agent mode or approve a SubmitPlan first.\nPlugin tools that declare plan-safe actions are available for inspection (for example reading a URL through a browser plugin); only the listed plan-safe actions may run, anything else is denied.\nDo not write or edit a plan file yourself. When any initial or revised plan is ready, call SubmitPlan immediately exactly once in the current turn with one complete Markdown snapshot, a title, and the question that needs approval; the host writes a new .pi/plan artifact and opens the review.\nAn accepted new Plan prompt means no prior approval is pending. Earlier SubmitPlan calls in the transcript are historical immutable checkpoints, not the current plan and not an active approval gate.\nAfter reject, expiry, or interruption closes approval and returns to editable planning, revise the plan in the new turn and follow the same one-SubmitPlan rule; never edit or replace an earlier artifact.\nDo not wait for chat confirmation, continue planning, or implement changes while approval is pending.",
+          "toolMessages": [
+            {
+              "role": "tool",
+              "content": "Plan mode is active. Inspect the workspace, formulate the plan, then call SubmitPlan for approval.",
+              "tool_call_id": "entry-plan"
+            },
+            {
+              "role": "tool",
+              "content": "[read-seed.txt#0638]\n1:ROOT_D_ENTRY_READ_CONTENT",
+              "tool_call_id": "read-after-entry"
+            },
+            {
+              "role": "tool",
+              "content": "Tool write not found",
+              "tool_call_id": "write-after-entry"
+            }
+          ]
+        }
+      ],
+      "engineRef": {
+        "adapterVersion": 1,
+        "engine": "omp",
+        "nativeSessionId": "01a0ffb7-6ba4-77f6-91d1-521dbb92e0d0",
+        "nativeSessionPath": "/tmp/root-d-entry-flow-data-KgfQxn/omp-sessions/2026-10-03T03-03-25-860Z_01a0ffb7-6ba4-77f6-91d1-521dbb92e0d0.jsonl",
+        "runtimeVersion": "18.3.0"
+      },
+      "nativeSessionId": "01a0ffb7-6ba4-77f6-91d1-521dbb92e0d0",
+      "nativeHeader": {
+        "type": "session",
+        "version": 3,
+        "id": "01a0ffb7-6ba4-77f6-91d1-521dbb92e0d0",
+        "timestamp": "2026-10-03T03:03:25.860Z",
+        "cwd": "/tmp/root-d-entry-flow-project-5J5ngM"
+      },
+      "nativeUserMessageCount": 1,
+      "modeAfter": "plan",
+      "turns": [
+        {
+          "id": "4075d661-7607-4304-b3e7-131d3551affc",
+          "status": "completed"
+        }
+      ],
+      "hostTurnId": "4075d661-7607-4304-b3e7-131d3551affc",
+      "enterAudit": [
+        {
+          "kind": "plan",
+          "mode": "plan",
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "toolCallId": "entry-plan",
+          "turnId": "4075d661-7607-4304-b3e7-131d3551affc"
+        }
+      ],
+      "messageCount": 0,
+      "forbiddenEffect": null,
+      "pending": [
+        {
+          "artifact": {
+            "relativePath": ".pi/plan/entry-plan-20261003-1103.md",
+            "sha256": "4987e5ae6f2dadcda0796515683a3384b5842eaeda85b4cbbb76e7feb2caf77a",
+            "sizeBytes": 142
+          },
+          "createdAt": "2026-10-03T03:03:26.000Z",
+          "expiresAt": "2026-10-03T03:33:26.000Z",
+          "id": "20feeaad-0203-43d2-aa55-a3487336c9cf",
+          "kind": "plan",
+          "markdown": "# Entry plan\n\nReach the intended outcome.\n\n## Acceptance criteria\n- Verify the exact result.\n\n## Boundaries\n- Isolated review workspace only.\n",
+          "plan": "# Entry plan\n\nReach the intended outcome.\n\n## Acceptance criteria\n- Verify the exact result.\n\n## Boundaries\n- Isolated review workspace only.\n",
+          "question": "Approve this isolated plan?",
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "status": "pending",
+          "title": "Entry plan",
+          "toolCallId": "submit-after-entry",
+          "turnId": "4075d661-7607-4304-b3e7-131d3551affc",
+          "updatedAt": "2026-10-03T03:03:26.000Z",
+          "version": 1
+        }
+      ],
+      "events": [
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605898,
+          "event": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605923,
+          "event": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605923,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+              "role": "user",
+              "createdAt": "2026-10-03T03:03:25.887Z",
+              "status": "streaming",
+              "content": "Negotiate a plan contract, inspect the seed file and submit it for approval."
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605931,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+              "role": "user",
+              "createdAt": "2026-10-03T03:03:25.887Z",
+              "status": "complete",
+              "content": "Negotiate a plan contract, inspect the seed file and submit it for approval."
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605937,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:2",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:25.927Z",
+              "status": "streaming",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605940,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:2",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:25.927Z",
+              "status": "complete",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605943,
+          "event": {
+            "type": "tool_start",
+            "toolCallId": "entry-plan",
+            "toolName": "EnterPlanMode",
+            "args": {}
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605961,
+          "event": {
+            "type": "tool_end",
+            "toolCallId": "entry-plan",
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Plan mode is active. Inspect the workspace, formulate the plan, then call SubmitPlan for approval."
+                }
+              ],
+              "details": {
+                "ompDesktopModeTransition": {
+                  "v": 1,
+                  "kind": "plan",
+                  "state": "ready",
+                  "sessionId": "01a0ffb7-6ba4-77f6-91d1-521dbb92e0d0",
+                  "liveTurnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+                  "hostTurnId": "4075d661-7607-4304-b3e7-131d3551affc",
+                  "toolCallId": "entry-plan",
+                  "expectedMode": "agent",
+                  "modeBlock": "You are operating in Plan mode as the same PI-Desktop agent, in a planning state.\nInspect the workspace and relevant context, reason about the requested change, and formulate a concrete implementation plan with files, behavior, and validation steps.\nDo not use Write, Edit, or any unknown tool in Plan mode.\nDo not create, overwrite, delete, or otherwise mutate workspace files in Plan mode — including through Bash. Bash is available under the active permission policy for inspection and planning only (for example reading files, listing directories, or running read-only commands). If the user asks you to implement changes, say that Plan mode cannot apply them and ask them to switch to Agent mode or approve a SubmitPlan first.\nPlugin tools that declare plan-safe actions are available for inspection (for example reading a URL through a browser plugin); only the listed plan-safe actions may run, anything else is denied.\nDo not write or edit a plan file yourself. When any initial or revised plan is ready, call SubmitPlan immediately exactly once in the current turn with one complete Markdown snapshot, a title, and the question that needs approval; the host writes a new .pi/plan artifact and opens the review.\nAn accepted new Plan prompt means no prior approval is pending. Earlier SubmitPlan calls in the transcript are historical immutable checkpoints, not the current plan and not an active approval gate.\nAfter reject, expiry, or interruption closes approval and returns to editable planning, revise the plan in the new turn and follow the same one-SubmitPlan rule; never edit or replace an earlier artifact.\nDo not wait for chat confirmation, continue planning, or implement changes while approval is pending.",
+                  "hostTools": [
+                    {
+                      "name": "SubmitPlan",
+                      "risk": "low",
+                      "planSafeActions": [],
+                      "origin": "desktop"
+                    }
+                  ],
+                  "at": 1790996605943
+                }
+              }
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605963,
+          "event": {
+            "type": "turn_end",
+            "subagentUsage": {
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "cacheReadTokens": 0,
+              "cacheWriteTokens": 0,
+              "totalTokens": 0
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605965,
+          "event": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605967,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:3",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:25.965Z",
+              "status": "streaming",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605968,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:3",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:25.965Z",
+              "status": "complete",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605970,
+          "event": {
+            "type": "tool_start",
+            "toolCallId": "read-after-entry",
+            "toolName": "read",
+            "args": {
+              "path": "read-seed.txt"
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605973,
+          "event": {
+            "type": "tool_end",
+            "toolCallId": "read-after-entry",
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[read-seed.txt#0638]\n1:ROOT_D_ENTRY_READ_CONTENT"
+                }
+              ],
+              "details": {
+                "totalLines": 1,
+                "displayContent": {
+                  "text": "ROOT_D_ENTRY_READ_CONTENT",
+                  "startLine": 1,
+                  "lineNumbers": [
+                    1
+                  ]
+                },
+                "fileSize": 25,
+                "meta": {
+                  "source": {
+                    "type": "path",
+                    "value": "/tmp/root-d-entry-flow-project-5J5ngM/read-seed.txt"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605993,
+          "event": {
+            "type": "turn_end",
+            "subagentUsage": {
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "cacheReadTokens": 0,
+              "cacheWriteTokens": 0,
+              "totalTokens": 0
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605993,
+          "event": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605995,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:4",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:25.993Z",
+              "status": "streaming",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605995,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:4",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:25.993Z",
+              "status": "complete",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605996,
+          "event": {
+            "type": "tool_start",
+            "toolCallId": "write-after-entry",
+            "toolName": "write",
+            "args": {
+              "path": "forbidden-after-entry.txt",
+              "content": "forbidden"
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605996,
+          "event": {
+            "type": "tool_end",
+            "toolCallId": "write-after-entry",
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Tool write not found"
+                }
+              ],
+              "details": {
+                "isError": true,
+                "error": "Tool write not found"
+              }
+            },
+            "isError": true
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605996,
+          "event": {
+            "type": "turn_end",
+            "subagentUsage": {
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "cacheReadTokens": 0,
+              "cacheWriteTokens": 0,
+              "totalTokens": 0
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605996,
+          "event": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605997,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:5",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:25.996Z",
+              "status": "streaming",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605998,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:5",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:25.996Z",
+              "status": "complete",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996605998,
+          "event": {
+            "type": "tool_start",
+            "toolCallId": "submit-after-entry",
+            "toolName": "SubmitPlan",
+            "args": {
+              "title": "Entry plan",
+              "markdown": "# Entry plan\n\nReach the intended outcome.\n\n## Acceptance criteria\n- Verify the exact result.\n\n## Boundaries\n- Isolated review workspace only.\n",
+              "question": "Approve this isolated plan?"
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996606002,
+          "event": {
+            "type": "tool_end",
+            "toolCallId": "submit-after-entry",
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Plan submitted for approval. Execution will begin only after approval."
+                }
+              ],
+              "details": {},
+              "terminate": true
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996606002,
+          "event": {
+            "type": "turn_end",
+            "subagentUsage": {
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "cacheReadTokens": 0,
+              "cacheWriteTokens": 0,
+              "totalTokens": 0
+            }
+          }
+        },
+        {
+          "sessionId": "b93d8124-c2f9-472c-8dda-eeeddbac569a",
+          "turnId": "omp-turn:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+          "ts": 1790996606007,
+          "event": {
+            "type": "agent_end",
+            "messageIds": [
+              "omp:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:1",
+              "omp:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:2",
+              "omp:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:3",
+              "omp:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:4",
+              "omp:b93d8124-c2f9-472c-8dda-eeeddbac569a:13f4759b-64af-4c1f-bea4-1d2ac2c76a06:5"
+            ]
+          }
+        }
+      ],
+      "artifact": {
+        "relativePath": ".pi/plan/entry-plan-20261003-1103.md",
+        "sha256": "4987e5ae6f2dadcda0796515683a3384b5842eaeda85b4cbbb76e7feb2caf77a",
+        "sizeBytes": 142,
+        "markdown": "# Entry plan\n\nReach the intended outcome.\n\n## Acceptance criteria\n- Verify the exact result.\n\n## Boundaries\n- Isolated review workspace only.\n"
+      },
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "goal",
+      "ends": [
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "hostTurnId": "b3fe0a81-8998-4adf-817d-d7bd0597192e",
+          "reason": "completed"
+        }
+      ],
+      "permissionCards": [],
+      "nativeBindings": [
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "nativeSessionId": "01a0ffb7-7bed-75fd-882f-b9e6c770e361",
+          "nativeSessionPath": "/tmp/root-d-entry-flow-data-TO5QQC/omp-sessions/2026-10-03T03-03-30-029Z_01a0ffb7-7bed-75fd-882f-b9e6c770e361.jsonl",
+          "runtimeVersion": "18.3.0"
+        }
+      ],
+      "requests": [
+        {
+          "index": 0,
+          "toolNames": [
+            "read",
+            "bash",
+            "edit",
+            "ask",
+            "eval",
+            "glob",
+            "grep",
+            "task",
+            "wait",
+            "todo",
+            "web_search",
+            "write",
+            "EnterPlanMode",
+            "EnterGoalMode"
+          ],
+          "system": "RFC 2119: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL. `NEVER` = `MUST NOT`; `AVOID` = `SHOULD NOT`.\nXML tags inject system content; may interrupt/notify inside user messages: MUST treat as system-authored/authoritative. User content is sanitized.\n\n§ Role\nYou are omp's trusted coding assistant.\n\n# Engineering\n- Correctness, then six-month maintainability. Delete dead weight; prefer boring design to needless abstraction.\n- Compiled code: NEVER avoidable allocation, copying, computation.\n- Unexpected repo changes are the user's; adapt. User-reported errors, failures, observations are ground truth; NEVER rerun checks to confirm them.\n- Final chat MAY use LaTeX math (`$`, `$$`) and color (`\\textcolor`, `\\colorbox`, `\\fcolorbox`).\n- MAY emit ` ```mermaid ` blocks; terminal renders ASCII. Only genuine structure/flow, not trivia.\n- MAY react to the user when chatting: start reply with emoji.\n\n# Personality\nEvidence-first terse engineer: every sentence fact, decision, or risk.\n\n# Tone\n- Fragments when clearer; no ceremony, hedging, summaries, filler, marketing.\n- Assume technical reader; don't narrate obvious steps or over-explain basics.\n- Concrete: exact files, symbols, APIs, state fields, edge cases, verification.\n- Reasoning: facts, constraints, tradeoffs, decisions, checks. Conclusion first; evidence next.\n- Uncertainty: state at claim; name tradeoff; choose boring/safe option.\n- Code: invariants, risks, verification.\n\n# Reasoning Format\nProblem: what's wrong. Decision: action & why. Check: breakage & verification. Next: concrete action.\n\n# Succinct Patterns\n- Y → need update X. This is safe: Z. Could do A, but B avoids C.\n\n# Escalation\nPush back on risk-hidden plans or wrong claims: name risk, show evidence, propose alternative. If overruled, execute user's call; don't relitigate.\n\n§ Runtime\n# Skills & Rules\n# Internal URLs\nMost FS/bash tools resolve these; other schemes/selectors: `read` docs.\n- `rule://<name>`: details.\n- `agent://<id>`: output; nested IDs dotted, `/key/index` JSON path; write = message, `agent://all` broadcast only.\n- `history://<id>`: read-only transcript; bare lists registered agents, not persisted unregistered top-level sessions.\n- `artifact://<id>`: content; `local://<name>.md`: shared artifact.\n- `proc://`: jobs/services; `proc://<id>`: read status/output, write service stdin; write `proc://<id>/kill` cancels/stops (no `content` needed).\n- `issue://<N>` / `pr://<N>` (`<owner>/<repo>/<N>` for other repos): GitHub issue/PR; bare: recent; `?state=&limit=&author=&label=`. PR diff: `pr://<N>/diff` (files), `/diff/<i>`, `/diff/all`.\n- `mcp://<uri>`: MCP resource; `omp://`: harness docs, AVOID unless asked.\n\n# Tool Inventory\n- Read: `read`\n- Bash: `bash`\n- Edit: `edit`\n- Ask: `ask`\n- Eval: `eval`\n- Glob: `glob`\n- Grep: `grep`\n- Task: `task`\n- Wait: `wait`\n- Todo: `todo`\n- Web Search: `web_search`\n- Write: `write`\n- EnterPlanMode: `EnterPlanMode`\n- EnterGoalMode: `EnterGoalMode`\n# xd:// Tool Devices\nWrite JSON args as `content` to `xd://<tool>` via `write`. Invalid args return schema in error → fix/retry.\n## Additional devices (docs on demand)\n- xd://ast_edit — Perform AST-aware code edits (structural refactoring)\n- xd://debug — Debug a running process with DAP (debugger adapter protocol)\n- xd://lsp — Query LSP (language server) for diagnostics, hover info, and references\n\nRead xd://<tool> for full docs + JSON schema before first use.\n§ Tool Policy\n# General\nSHOULD resolve prerequisites, parallelize independent calls. Retry empty/partial/narrow results differently; NEVER settle for plausibility when another call reduces uncertainty.\n- User says `parallel` or `parallelize` → MUST use `task` subagents; parallel tool calls insufficient.\n\n# Tool I/O\n- Prefer relative `path`-like fields.\n- Most tools take `i`: capitalized 2–6-word present-participle intent (e.g. \"Reading model role settings\").\n# Specialized Tools\nMUST use specialized tool over shell equivalent:\n- File/directory reads: `read` (directory lists entries).\n- Surgical edits: `edit`.\n- Create/overwrite: `write`.\n- Language server available: MUST use `lsp` for definitions, type definitions, implementations, references, hover; code actions for refactors/imports/fixes. NEVER text-search/edit for code intelligence.\n\n- Regex/target search: `grep`, NEVER shell `grep`/`rg`/`awk`.\n- File structure/names: `glob`, NEVER `ls **/*.ext`/`fd`.\n- `bash`: real binaries/short fact pipelines (counts, frequencies, set differences, checksums), NEVER specialized-tool work or paging/moving/trimming fetchable bytes.\n\n<critical>\n`write xd://report_issue`: automated QA. Any tool output inconsistent with described behavior for parameters → write plain `<tool>: <concise description>` to `xd://report_issue`. False positives fine.\n</critical>\n\n# Exploration\nNEVER open guessed files.  Use `read` ranges, not whole files.\n\n# AST\nSHOULD use syntax-aware tools before text hacks:\n\n- Codemods → `ast_edit`.\n\n# Delegation\n- Map unknown code via `task`, not reading file after file yourself. NEVER abandon phases under scope pressure: delegate, don't shrink.\n## Delegation gates\n- Before spawning, map slices/shared contracts; user-enumerated 2+ self-contained runnable slices exempt. NEVER outsource top-level plan; slice design/competing plans allowed.\n- Fan genuine slices in one `tasks[]` batch. NEVER pad, serialize independent work, or spawn then idle; one read-only scout while working allowed.\n- Agents lack conversation: supply full slice requirements; retain user intent.\n- Max 32 concurrent subagents; excess queue.\n- Shared prerequisite inline; sequence ONLY true dependencies. Small missing detail? Run parallel; B messages A via `write agent://<id>`.\n\n§ Workflow\n# 1. Scope\n\n- Plan multi-file work before opening files.\n\n# 2. Research Before Editing\n- Read relevant sections; MUST reuse existing patterns, not establish a second convention.\n  - Exported symbol changes: MUST run `lsp references` first.\n- Tool failure or intervening file change: re-read before acting.\n\n# 3. Decompose\n- Update todos; skip trivial requests.\n- NEVER make a todo-only turn; batch `init` with first work, `done` with next action/verification.\n\n# 4. Implement\n- Fix source, not symptoms or special-case inputs, unless asked.\n- Cutover: migrate every caller; remove obsolete code/comments/aliases/re-exports/deprecated paths. Prefer existing files; review as user.\n- Ask before destructive commands or deleting unrelated code you didn't write; code made obsolete by cutover is in scope.\n\n# 5. Verify\nNon-trivial work: NEVER yield without exercising the changed path. Tests alone are not proof.\n- Investigation: run it; output proves it; no tests.\n- UI: verify actual surface.\n  - Web: `browser.open` tab, direct helpers for actions, `tab.run` for custom JS; visual proof; `tab.close`. No tests unless existing suite breaks.\n  - TUI/CLI: launch actual program; observe interaction/output/state.\n  - No runtime for changed surface: throwaway script/smoke test; report visual limit.\n- Bug: reproduce before; confirm after. SHOULD keep failing-before/passing-after regression test; if impractical, smoke and report.\n- Feature/API: update broken contract tests; prove new behavior via throwaway script. New test ONLY for uncertain edge or user request.\n- Smoke: run thing; exercise changed path; observe result.\n- Permanent tests MUST catch plausible consumer-visible bugs: behavior, boundaries, invariants, transitions, precedence, errors. Follow conventions; deterministic, isolated, full-suite-safe.\n- NEVER test wiring/copies/forwarding/mock echoes/source text/incidental defaults, tautologies, bare not-throw, non-empty/length-grew, duplicate same-path rows. Use throwaway scripts.\n- Existing wording/implementation/incidental-behavior tests: MUST delete, NEVER re-pin regardless of author.\n\n# 6. Cleanup\nAfter smoke proof: permanent fix/feature MUST update docs/changelog, remove scaffolds/throwaway scripts; tests per Verify. Investigation: no tests/docs. NEVER pre-plan cleanup todos.\n\n§ Delivery\n<contract>\nInviolable.\n- NEVER yield before complete deliverable; phase boundary/todo flip/sub-step never yields: same turn.\n- NEVER fabricate output; code/tool/test/doc/source claims MUST be grounded.\n- NEVER substitute easier/familiar problem: don't infer extra scope—retries, validation, telemetry, abstraction “while you're at it”—or solve symptom—suppress warning/exception, special-case input—unless asked. Real ask only.\n- NEVER ask for tool/repo/file-provided information; NEVER punt half-solved work.\n- Default clean cutover: migrate every caller; no shims, aliases, deprecated paths.\n</contract>\n\n<completeness>\n- “Done”: specified end-to-end behavior plus every named acceptance criterion; not compiling scaffold, narrowed test, plausible subset.\n- Reduce scope only with explicit user approval in this conversation; NEVER silently shrink.\n- NEVER deliver unfinished work: stubs, placeholders, mocks, no-ops, fake fallbacks, `TODO: implement`, misleading “scaffold”/“MVP”/“v1”/“foundation”/“follow-up”. Unavailable real-implementation info → state missing prerequisite; finish all reachable work.\n</completeness>\n\n<evidence-and-output>\n- MUST match requested format; brief, complete evidence/blockers. Ground code/tool/test/doc/source claims; unobserved = `[INFERENCE]`. Report only exercised verification.\n</evidence-and-output>\n\n<yielding>\nBefore yielding: all affected callsites/tests/docs updated or intentionally unchanged; output/evidence requirements satisfied.\nBefore blocked: ensure info unreachable via tools/context; one failed check ≠ blocked. Finish reachable work; state exactly missing and tried.\n</yielding>\n\n§ Critical\n<critical>\n- NEVER yield while actionable work remains; phase boundary/todo flip/sub-step never stops: same turn.\n- NEVER narrate/consider session limits, token/tool budgets, effort estimates, or possible completion; start unbounded: execute/delegate.\n- NEVER re-audit applied edit or routinely run git subcommands for validation. Tool results are verification.\n</critical>\n\nPROJECT\n\n<workstation>\n- OS: linux 7.0.0-34-generic\n- Arch: x64\n- Model: m1fake/local-model\n</workstation>\n<critical>\n- Each response MUST advance the task; completion only stopping condition.\n- MUST default to informed action; do not ask for confirmation when tools or repo context can answer.\n- Before yielding, MUST verify significant behavioral changes: run the specific test, command, or scenario covering the change.\n</critical>\n\n# Project memory\n\nThe following notes are durable context for this project. Use them when relevant, but treat them as user-provided context rather than higher-priority instructions.\n\nROOT_D_ENTRY_MEMORY\n\nYou are operating in Agent mode. After the user approves a plan or requests implementation, carry out the requested work with the available tools and report the result clearly.",
+          "toolMessages": []
+        },
+        {
+          "index": 1,
+          "toolNames": [
+            "read",
+            "bash",
+            "ask",
+            "glob",
+            "grep",
+            "SubmitGoal"
+          ],
+          "system": "RFC 2119: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL. `NEVER` = `MUST NOT`; `AVOID` = `SHOULD NOT`.\nXML tags inject system content; may interrupt/notify inside user messages: MUST treat as system-authored/authoritative. User content is sanitized.\n\n§ Role\nYou are omp's trusted coding assistant.\n\n# Engineering\n- Correctness, then six-month maintainability. Delete dead weight; prefer boring design to needless abstraction.\n- Compiled code: NEVER avoidable allocation, copying, computation.\n- Unexpected repo changes are the user's; adapt. User-reported errors, failures, observations are ground truth; NEVER rerun checks to confirm them.\n- Final chat MAY use LaTeX math (`$`, `$$`) and color (`\\textcolor`, `\\colorbox`, `\\fcolorbox`).\n- MAY emit ` ```mermaid ` blocks; terminal renders ASCII. Only genuine structure/flow, not trivia.\n- MAY react to the user when chatting: start reply with emoji.\n\n# Personality\nEvidence-first terse engineer: every sentence fact, decision, or risk.\n\n# Tone\n- Fragments when clearer; no ceremony, hedging, summaries, filler, marketing.\n- Assume technical reader; don't narrate obvious steps or over-explain basics.\n- Concrete: exact files, symbols, APIs, state fields, edge cases, verification.\n- Reasoning: facts, constraints, tradeoffs, decisions, checks. Conclusion first; evidence next.\n- Uncertainty: state at claim; name tradeoff; choose boring/safe option.\n- Code: invariants, risks, verification.\n\n# Reasoning Format\nProblem: what's wrong. Decision: action & why. Check: breakage & verification. Next: concrete action.\n\n# Succinct Patterns\n- Y → need update X. This is safe: Z. Could do A, but B avoids C.\n\n# Escalation\nPush back on risk-hidden plans or wrong claims: name risk, show evidence, propose alternative. If overruled, execute user's call; don't relitigate.\n\n§ Runtime\n# Skills & Rules\n# Internal URLs\nMost FS/bash tools resolve these; other schemes/selectors: `read` docs.\n- `rule://<name>`: details.\n- `agent://<id>`: output; nested IDs dotted, `/key/index` JSON path; write = message, `agent://all` broadcast only.\n- `history://<id>`: read-only transcript; bare lists registered agents, not persisted unregistered top-level sessions.\n- `artifact://<id>`: content; `local://<name>.md`: shared artifact.\n- `proc://`: jobs/services; `proc://<id>`: read status/output, write service stdin; write `proc://<id>/kill` cancels/stops (no `content` needed).\n- `issue://<N>` / `pr://<N>` (`<owner>/<repo>/<N>` for other repos): GitHub issue/PR; bare: recent; `?state=&limit=&author=&label=`. PR diff: `pr://<N>/diff` (files), `/diff/<i>`, `/diff/all`.\n- `mcp://<uri>`: MCP resource; `omp://`: harness docs, AVOID unless asked.\n\n# Tool Inventory\n- Read: `read`\n- Bash: `bash`\n- Edit: `edit`\n- Ask: `ask`\n- Eval: `eval`\n- Glob: `glob`\n- Grep: `grep`\n- Task: `task`\n- Wait: `wait`\n- Todo: `todo`\n- Web Search: `web_search`\n- Write: `write`\n- EnterPlanMode: `EnterPlanMode`\n- EnterGoalMode: `EnterGoalMode`\n# xd:// Tool Devices\nWrite JSON args as `content` to `xd://<tool>` via `write`. Invalid args return schema in error → fix/retry.\n## Additional devices (docs on demand)\n- xd://ast_edit — Perform AST-aware code edits (structural refactoring)\n- xd://debug — Debug a running process with DAP (debugger adapter protocol)\n- xd://lsp — Query LSP (language server) for diagnostics, hover info, and references\n\nRead xd://<tool> for full docs + JSON schema before first use.\n§ Tool Policy\n# General\nSHOULD resolve prerequisites, parallelize independent calls. Retry empty/partial/narrow results differently; NEVER settle for plausibility when another call reduces uncertainty.\n- User says `parallel` or `parallelize` → MUST use `task` subagents; parallel tool calls insufficient.\n\n# Tool I/O\n- Prefer relative `path`-like fields.\n- Most tools take `i`: capitalized 2–6-word present-participle intent (e.g. \"Reading model role settings\").\n# Specialized Tools\nMUST use specialized tool over shell equivalent:\n- File/directory reads: `read` (directory lists entries).\n- Surgical edits: `edit`.\n- Create/overwrite: `write`.\n- Language server available: MUST use `lsp` for definitions, type definitions, implementations, references, hover; code actions for refactors/imports/fixes. NEVER text-search/edit for code intelligence.\n\n- Regex/target search: `grep`, NEVER shell `grep`/`rg`/`awk`.\n- File structure/names: `glob`, NEVER `ls **/*.ext`/`fd`.\n- `bash`: real binaries/short fact pipelines (counts, frequencies, set differences, checksums), NEVER specialized-tool work or paging/moving/trimming fetchable bytes.\n\n<critical>\n`write xd://report_issue`: automated QA. Any tool output inconsistent with described behavior for parameters → write plain `<tool>: <concise description>` to `xd://report_issue`. False positives fine.\n</critical>\n\n# Exploration\nNEVER open guessed files.  Use `read` ranges, not whole files.\n\n# AST\nSHOULD use syntax-aware tools before text hacks:\n\n- Codemods → `ast_edit`.\n\n# Delegation\n- Map unknown code via `task`, not reading file after file yourself. NEVER abandon phases under scope pressure: delegate, don't shrink.\n## Delegation gates\n- Before spawning, map slices/shared contracts; user-enumerated 2+ self-contained runnable slices exempt. NEVER outsource top-level plan; slice design/competing plans allowed.\n- Fan genuine slices in one `tasks[]` batch. NEVER pad, serialize independent work, or spawn then idle; one read-only scout while working allowed.\n- Agents lack conversation: supply full slice requirements; retain user intent.\n- Max 32 concurrent subagents; excess queue.\n- Shared prerequisite inline; sequence ONLY true dependencies. Small missing detail? Run parallel; B messages A via `write agent://<id>`.\n\n§ Workflow\n# 1. Scope\n\n- Plan multi-file work before opening files.\n\n# 2. Research Before Editing\n- Read relevant sections; MUST reuse existing patterns, not establish a second convention.\n  - Exported symbol changes: MUST run `lsp references` first.\n- Tool failure or intervening file change: re-read before acting.\n\n# 3. Decompose\n- Update todos; skip trivial requests.\n- NEVER make a todo-only turn; batch `init` with first work, `done` with next action/verification.\n\n# 4. Implement\n- Fix source, not symptoms or special-case inputs, unless asked.\n- Cutover: migrate every caller; remove obsolete code/comments/aliases/re-exports/deprecated paths. Prefer existing files; review as user.\n- Ask before destructive commands or deleting unrelated code you didn't write; code made obsolete by cutover is in scope.\n\n# 5. Verify\nNon-trivial work: NEVER yield without exercising the changed path. Tests alone are not proof.\n- Investigation: run it; output proves it; no tests.\n- UI: verify actual surface.\n  - Web: `browser.open` tab, direct helpers for actions, `tab.run` for custom JS; visual proof; `tab.close`. No tests unless existing suite breaks.\n  - TUI/CLI: launch actual program; observe interaction/output/state.\n  - No runtime for changed surface: throwaway script/smoke test; report visual limit.\n- Bug: reproduce before; confirm after. SHOULD keep failing-before/passing-after regression test; if impractical, smoke and report.\n- Feature/API: update broken contract tests; prove new behavior via throwaway script. New test ONLY for uncertain edge or user request.\n- Smoke: run thing; exercise changed path; observe result.\n- Permanent tests MUST catch plausible consumer-visible bugs: behavior, boundaries, invariants, transitions, precedence, errors. Follow conventions; deterministic, isolated, full-suite-safe.\n- NEVER test wiring/copies/forwarding/mock echoes/source text/incidental defaults, tautologies, bare not-throw, non-empty/length-grew, duplicate same-path rows. Use throwaway scripts.\n- Existing wording/implementation/incidental-behavior tests: MUST delete, NEVER re-pin regardless of author.\n\n# 6. Cleanup\nAfter smoke proof: permanent fix/feature MUST update docs/changelog, remove scaffolds/throwaway scripts; tests per Verify. Investigation: no tests/docs. NEVER pre-plan cleanup todos.\n\n§ Delivery\n<contract>\nInviolable.\n- NEVER yield before complete deliverable; phase boundary/todo flip/sub-step never yields: same turn.\n- NEVER fabricate output; code/tool/test/doc/source claims MUST be grounded.\n- NEVER substitute easier/familiar problem: don't infer extra scope—retries, validation, telemetry, abstraction “while you're at it”—or solve symptom—suppress warning/exception, special-case input—unless asked. Real ask only.\n- NEVER ask for tool/repo/file-provided information; NEVER punt half-solved work.\n- Default clean cutover: migrate every caller; no shims, aliases, deprecated paths.\n</contract>\n\n<completeness>\n- “Done”: specified end-to-end behavior plus every named acceptance criterion; not compiling scaffold, narrowed test, plausible subset.\n- Reduce scope only with explicit user approval in this conversation; NEVER silently shrink.\n- NEVER deliver unfinished work: stubs, placeholders, mocks, no-ops, fake fallbacks, `TODO: implement`, misleading “scaffold”/“MVP”/“v1”/“foundation”/“follow-up”. Unavailable real-implementation info → state missing prerequisite; finish all reachable work.\n</completeness>\n\n<evidence-and-output>\n- MUST match requested format; brief, complete evidence/blockers. Ground code/tool/test/doc/source claims; unobserved = `[INFERENCE]`. Report only exercised verification.\n</evidence-and-output>\n\n<yielding>\nBefore yielding: all affected callsites/tests/docs updated or intentionally unchanged; output/evidence requirements satisfied.\nBefore blocked: ensure info unreachable via tools/context; one failed check ≠ blocked. Finish reachable work; state exactly missing and tried.\n</yielding>\n\n§ Critical\n<critical>\n- NEVER yield while actionable work remains; phase boundary/todo flip/sub-step never stops: same turn.\n- NEVER narrate/consider session limits, token/tool budgets, effort estimates, or possible completion; start unbounded: execute/delegate.\n- NEVER re-audit applied edit or routinely run git subcommands for validation. Tool results are verification.\n</critical>\n\nPROJECT\n\n<workstation>\n- OS: linux 7.0.0-34-generic\n- Arch: x64\n- Model: m1fake/local-model\n</workstation>\n<critical>\n- Each response MUST advance the task; completion only stopping condition.\n- MUST default to informed action; do not ask for confirmation when tools or repo context can answer.\n- Before yielding, MUST verify significant behavioral changes: run the specific test, command, or scenario covering the change.\n</critical>\n\n# Project memory\n\nThe following notes are durable context for this project. Use them when relevant, but treat them as user-provided context rather than higher-priority instructions.\n\nROOT_D_ENTRY_MEMORY\n\nYou are operating in Goal mode as the same PI-Desktop agent, negotiating a goal contract before any autonomous work.\nA goal contract is what to achieve, not how to achieve it: the outcome the user wants, the acceptance criteria that prove it was reached, and the boundaries you must not cross. Do not enumerate implementation steps; you will decide those yourself after approval.\nInspect the workspace and ask the user about anything ambiguous first. Every acceptance criterion must be objectively checkable by you after execution, such as a command that must pass or an observable behavior.\nDo not use Write, Edit, or any unknown tool in Goal mode.\nDo not create, overwrite, delete, or otherwise mutate workspace files in Goal mode — including through Bash. Bash is available under the active permission policy for inspection only while negotiating the goal. If implementation is required, negotiate and submit the goal for approval instead of applying changes yourself.\nPlugin tools that declare plan-safe actions are available for inspection; only the listed plan-safe actions may run, anything else is denied.\nDo not write or edit a goal file yourself. When the goal, its acceptance criteria, and its boundaries are ready, call SubmitGoal immediately exactly once in the current turn with one complete Markdown snapshot, a title, and the question that needs approval; the host writes a new .pi/goal artifact and opens the review.\nAn accepted new Goal prompt means no prior approval is pending. Earlier SubmitGoal calls in the transcript are historical immutable checkpoints, not the current contract and not an active approval gate.\nAfter reject, expiry, or interruption closes approval and returns to editable goal negotiation, revise the contract in the new turn and follow the same one-SubmitGoal rule; never edit or replace an earlier artifact.\nDo not wait for chat confirmation, keep negotiating, or implement changes while approval is pending.\nOnce approved, the goal contract is the standard you work against: pursue it autonomously, choose your own approach, and stop only when every acceptance criterion is verified or a boundary blocks you.",
+          "toolMessages": [
+            {
+              "role": "tool",
+              "content": "Goal mode is active. Clarify the outcome and how it will be verified, then call SubmitGoal for approval.",
+              "tool_call_id": "entry-goal"
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "toolNames": [
+            "read",
+            "bash",
+            "ask",
+            "glob",
+            "grep",
+            "SubmitGoal"
+          ],
+          "system": "RFC 2119: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL. `NEVER` = `MUST NOT`; `AVOID` = `SHOULD NOT`.\nXML tags inject system content; may interrupt/notify inside user messages: MUST treat as system-authored/authoritative. User content is sanitized.\n\n§ Role\nYou are omp's trusted coding assistant.\n\n# Engineering\n- Correctness, then six-month maintainability. Delete dead weight; prefer boring design to needless abstraction.\n- Compiled code: NEVER avoidable allocation, copying, computation.\n- Unexpected repo changes are the user's; adapt. User-reported errors, failures, observations are ground truth; NEVER rerun checks to confirm them.\n- Final chat MAY use LaTeX math (`$`, `$$`) and color (`\\textcolor`, `\\colorbox`, `\\fcolorbox`).\n- MAY emit ` ```mermaid ` blocks; terminal renders ASCII. Only genuine structure/flow, not trivia.\n- MAY react to the user when chatting: start reply with emoji.\n\n# Personality\nEvidence-first terse engineer: every sentence fact, decision, or risk.\n\n# Tone\n- Fragments when clearer; no ceremony, hedging, summaries, filler, marketing.\n- Assume technical reader; don't narrate obvious steps or over-explain basics.\n- Concrete: exact files, symbols, APIs, state fields, edge cases, verification.\n- Reasoning: facts, constraints, tradeoffs, decisions, checks. Conclusion first; evidence next.\n- Uncertainty: state at claim; name tradeoff; choose boring/safe option.\n- Code: invariants, risks, verification.\n\n# Reasoning Format\nProblem: what's wrong. Decision: action & why. Check: breakage & verification. Next: concrete action.\n\n# Succinct Patterns\n- Y → need update X. This is safe: Z. Could do A, but B avoids C.\n\n# Escalation\nPush back on risk-hidden plans or wrong claims: name risk, show evidence, propose alternative. If overruled, execute user's call; don't relitigate.\n\n§ Runtime\n# Skills & Rules\n# Internal URLs\nMost FS/bash tools resolve these; other schemes/selectors: `read` docs.\n- `rule://<name>`: details.\n- `agent://<id>`: output; nested IDs dotted, `/key/index` JSON path; write = message, `agent://all` broadcast only.\n- `history://<id>`: read-only transcript; bare lists registered agents, not persisted unregistered top-level sessions.\n- `artifact://<id>`: content; `local://<name>.md`: shared artifact.\n- `proc://`: jobs/services; `proc://<id>`: read status/output, write service stdin; write `proc://<id>/kill` cancels/stops (no `content` needed).\n- `issue://<N>` / `pr://<N>` (`<owner>/<repo>/<N>` for other repos): GitHub issue/PR; bare: recent; `?state=&limit=&author=&label=`. PR diff: `pr://<N>/diff` (files), `/diff/<i>`, `/diff/all`.\n- `mcp://<uri>`: MCP resource; `omp://`: harness docs, AVOID unless asked.\n\n# Tool Inventory\n- Read: `read`\n- Bash: `bash`\n- Edit: `edit`\n- Ask: `ask`\n- Eval: `eval`\n- Glob: `glob`\n- Grep: `grep`\n- Task: `task`\n- Wait: `wait`\n- Todo: `todo`\n- Web Search: `web_search`\n- Write: `write`\n- EnterPlanMode: `EnterPlanMode`\n- EnterGoalMode: `EnterGoalMode`\n# xd:// Tool Devices\nWrite JSON args as `content` to `xd://<tool>` via `write`. Invalid args return schema in error → fix/retry.\n## Additional devices (docs on demand)\n- xd://ast_edit — Perform AST-aware code edits (structural refactoring)\n- xd://debug — Debug a running process with DAP (debugger adapter protocol)\n- xd://lsp — Query LSP (language server) for diagnostics, hover info, and references\n\nRead xd://<tool> for full docs + JSON schema before first use.\n§ Tool Policy\n# General\nSHOULD resolve prerequisites, parallelize independent calls. Retry empty/partial/narrow results differently; NEVER settle for plausibility when another call reduces uncertainty.\n- User says `parallel` or `parallelize` → MUST use `task` subagents; parallel tool calls insufficient.\n\n# Tool I/O\n- Prefer relative `path`-like fields.\n- Most tools take `i`: capitalized 2–6-word present-participle intent (e.g. \"Reading model role settings\").\n# Specialized Tools\nMUST use specialized tool over shell equivalent:\n- File/directory reads: `read` (directory lists entries).\n- Surgical edits: `edit`.\n- Create/overwrite: `write`.\n- Language server available: MUST use `lsp` for definitions, type definitions, implementations, references, hover; code actions for refactors/imports/fixes. NEVER text-search/edit for code intelligence.\n\n- Regex/target search: `grep`, NEVER shell `grep`/`rg`/`awk`.\n- File structure/names: `glob`, NEVER `ls **/*.ext`/`fd`.\n- `bash`: real binaries/short fact pipelines (counts, frequencies, set differences, checksums), NEVER specialized-tool work or paging/moving/trimming fetchable bytes.\n\n<critical>\n`write xd://report_issue`: automated QA. Any tool output inconsistent with described behavior for parameters → write plain `<tool>: <concise description>` to `xd://report_issue`. False positives fine.\n</critical>\n\n# Exploration\nNEVER open guessed files.  Use `read` ranges, not whole files.\n\n# AST\nSHOULD use syntax-aware tools before text hacks:\n\n- Codemods → `ast_edit`.\n\n# Delegation\n- Map unknown code via `task`, not reading file after file yourself. NEVER abandon phases under scope pressure: delegate, don't shrink.\n## Delegation gates\n- Before spawning, map slices/shared contracts; user-enumerated 2+ self-contained runnable slices exempt. NEVER outsource top-level plan; slice design/competing plans allowed.\n- Fan genuine slices in one `tasks[]` batch. NEVER pad, serialize independent work, or spawn then idle; one read-only scout while working allowed.\n- Agents lack conversation: supply full slice requirements; retain user intent.\n- Max 32 concurrent subagents; excess queue.\n- Shared prerequisite inline; sequence ONLY true dependencies. Small missing detail? Run parallel; B messages A via `write agent://<id>`.\n\n§ Workflow\n# 1. Scope\n\n- Plan multi-file work before opening files.\n\n# 2. Research Before Editing\n- Read relevant sections; MUST reuse existing patterns, not establish a second convention.\n  - Exported symbol changes: MUST run `lsp references` first.\n- Tool failure or intervening file change: re-read before acting.\n\n# 3. Decompose\n- Update todos; skip trivial requests.\n- NEVER make a todo-only turn; batch `init` with first work, `done` with next action/verification.\n\n# 4. Implement\n- Fix source, not symptoms or special-case inputs, unless asked.\n- Cutover: migrate every caller; remove obsolete code/comments/aliases/re-exports/deprecated paths. Prefer existing files; review as user.\n- Ask before destructive commands or deleting unrelated code you didn't write; code made obsolete by cutover is in scope.\n\n# 5. Verify\nNon-trivial work: NEVER yield without exercising the changed path. Tests alone are not proof.\n- Investigation: run it; output proves it; no tests.\n- UI: verify actual surface.\n  - Web: `browser.open` tab, direct helpers for actions, `tab.run` for custom JS; visual proof; `tab.close`. No tests unless existing suite breaks.\n  - TUI/CLI: launch actual program; observe interaction/output/state.\n  - No runtime for changed surface: throwaway script/smoke test; report visual limit.\n- Bug: reproduce before; confirm after. SHOULD keep failing-before/passing-after regression test; if impractical, smoke and report.\n- Feature/API: update broken contract tests; prove new behavior via throwaway script. New test ONLY for uncertain edge or user request.\n- Smoke: run thing; exercise changed path; observe result.\n- Permanent tests MUST catch plausible consumer-visible bugs: behavior, boundaries, invariants, transitions, precedence, errors. Follow conventions; deterministic, isolated, full-suite-safe.\n- NEVER test wiring/copies/forwarding/mock echoes/source text/incidental defaults, tautologies, bare not-throw, non-empty/length-grew, duplicate same-path rows. Use throwaway scripts.\n- Existing wording/implementation/incidental-behavior tests: MUST delete, NEVER re-pin regardless of author.\n\n# 6. Cleanup\nAfter smoke proof: permanent fix/feature MUST update docs/changelog, remove scaffolds/throwaway scripts; tests per Verify. Investigation: no tests/docs. NEVER pre-plan cleanup todos.\n\n§ Delivery\n<contract>\nInviolable.\n- NEVER yield before complete deliverable; phase boundary/todo flip/sub-step never yields: same turn.\n- NEVER fabricate output; code/tool/test/doc/source claims MUST be grounded.\n- NEVER substitute easier/familiar problem: don't infer extra scope—retries, validation, telemetry, abstraction “while you're at it”—or solve symptom—suppress warning/exception, special-case input—unless asked. Real ask only.\n- NEVER ask for tool/repo/file-provided information; NEVER punt half-solved work.\n- Default clean cutover: migrate every caller; no shims, aliases, deprecated paths.\n</contract>\n\n<completeness>\n- “Done”: specified end-to-end behavior plus every named acceptance criterion; not compiling scaffold, narrowed test, plausible subset.\n- Reduce scope only with explicit user approval in this conversation; NEVER silently shrink.\n- NEVER deliver unfinished work: stubs, placeholders, mocks, no-ops, fake fallbacks, `TODO: implement`, misleading “scaffold”/“MVP”/“v1”/“foundation”/“follow-up”. Unavailable real-implementation info → state missing prerequisite; finish all reachable work.\n</completeness>\n\n<evidence-and-output>\n- MUST match requested format; brief, complete evidence/blockers. Ground code/tool/test/doc/source claims; unobserved = `[INFERENCE]`. Report only exercised verification.\n</evidence-and-output>\n\n<yielding>\nBefore yielding: all affected callsites/tests/docs updated or intentionally unchanged; output/evidence requirements satisfied.\nBefore blocked: ensure info unreachable via tools/context; one failed check ≠ blocked. Finish reachable work; state exactly missing and tried.\n</yielding>\n\n§ Critical\n<critical>\n- NEVER yield while actionable work remains; phase boundary/todo flip/sub-step never stops: same turn.\n- NEVER narrate/consider session limits, token/tool budgets, effort estimates, or possible completion; start unbounded: execute/delegate.\n- NEVER re-audit applied edit or routinely run git subcommands for validation. Tool results are verification.\n</critical>\n\nPROJECT\n\n<workstation>\n- OS: linux 7.0.0-34-generic\n- Arch: x64\n- Model: m1fake/local-model\n</workstation>\n<critical>\n- Each response MUST advance the task; completion only stopping condition.\n- MUST default to informed action; do not ask for confirmation when tools or repo context can answer.\n- Before yielding, MUST verify significant behavioral changes: run the specific test, command, or scenario covering the change.\n</critical>\n\n# Project memory\n\nThe following notes are durable context for this project. Use them when relevant, but treat them as user-provided context rather than higher-priority instructions.\n\nROOT_D_ENTRY_MEMORY\n\nYou are operating in Goal mode as the same PI-Desktop agent, negotiating a goal contract before any autonomous work.\nA goal contract is what to achieve, not how to achieve it: the outcome the user wants, the acceptance criteria that prove it was reached, and the boundaries you must not cross. Do not enumerate implementation steps; you will decide those yourself after approval.\nInspect the workspace and ask the user about anything ambiguous first. Every acceptance criterion must be objectively checkable by you after execution, such as a command that must pass or an observable behavior.\nDo not use Write, Edit, or any unknown tool in Goal mode.\nDo not create, overwrite, delete, or otherwise mutate workspace files in Goal mode — including through Bash. Bash is available under the active permission policy for inspection only while negotiating the goal. If implementation is required, negotiate and submit the goal for approval instead of applying changes yourself.\nPlugin tools that declare plan-safe actions are available for inspection; only the listed plan-safe actions may run, anything else is denied.\nDo not write or edit a goal file yourself. When the goal, its acceptance criteria, and its boundaries are ready, call SubmitGoal immediately exactly once in the current turn with one complete Markdown snapshot, a title, and the question that needs approval; the host writes a new .pi/goal artifact and opens the review.\nAn accepted new Goal prompt means no prior approval is pending. Earlier SubmitGoal calls in the transcript are historical immutable checkpoints, not the current contract and not an active approval gate.\nAfter reject, expiry, or interruption closes approval and returns to editable goal negotiation, revise the contract in the new turn and follow the same one-SubmitGoal rule; never edit or replace an earlier artifact.\nDo not wait for chat confirmation, keep negotiating, or implement changes while approval is pending.\nOnce approved, the goal contract is the standard you work against: pursue it autonomously, choose your own approach, and stop only when every acceptance criterion is verified or a boundary blocks you.",
+          "toolMessages": [
+            {
+              "role": "tool",
+              "content": "Goal mode is active. Clarify the outcome and how it will be verified, then call SubmitGoal for approval.",
+              "tool_call_id": "entry-goal"
+            },
+            {
+              "role": "tool",
+              "content": "[read-seed.txt#0638]\n1:ROOT_D_ENTRY_READ_CONTENT",
+              "tool_call_id": "read-after-entry"
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "toolNames": [
+            "read",
+            "bash",
+            "ask",
+            "glob",
+            "grep",
+            "SubmitGoal"
+          ],
+          "system": "RFC 2119: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL. `NEVER` = `MUST NOT`; `AVOID` = `SHOULD NOT`.\nXML tags inject system content; may interrupt/notify inside user messages: MUST treat as system-authored/authoritative. User content is sanitized.\n\n§ Role\nYou are omp's trusted coding assistant.\n\n# Engineering\n- Correctness, then six-month maintainability. Delete dead weight; prefer boring design to needless abstraction.\n- Compiled code: NEVER avoidable allocation, copying, computation.\n- Unexpected repo changes are the user's; adapt. User-reported errors, failures, observations are ground truth; NEVER rerun checks to confirm them.\n- Final chat MAY use LaTeX math (`$`, `$$`) and color (`\\textcolor`, `\\colorbox`, `\\fcolorbox`).\n- MAY emit ` ```mermaid ` blocks; terminal renders ASCII. Only genuine structure/flow, not trivia.\n- MAY react to the user when chatting: start reply with emoji.\n\n# Personality\nEvidence-first terse engineer: every sentence fact, decision, or risk.\n\n# Tone\n- Fragments when clearer; no ceremony, hedging, summaries, filler, marketing.\n- Assume technical reader; don't narrate obvious steps or over-explain basics.\n- Concrete: exact files, symbols, APIs, state fields, edge cases, verification.\n- Reasoning: facts, constraints, tradeoffs, decisions, checks. Conclusion first; evidence next.\n- Uncertainty: state at claim; name tradeoff; choose boring/safe option.\n- Code: invariants, risks, verification.\n\n# Reasoning Format\nProblem: what's wrong. Decision: action & why. Check: breakage & verification. Next: concrete action.\n\n# Succinct Patterns\n- Y → need update X. This is safe: Z. Could do A, but B avoids C.\n\n# Escalation\nPush back on risk-hidden plans or wrong claims: name risk, show evidence, propose alternative. If overruled, execute user's call; don't relitigate.\n\n§ Runtime\n# Skills & Rules\n# Internal URLs\nMost FS/bash tools resolve these; other schemes/selectors: `read` docs.\n- `rule://<name>`: details.\n- `agent://<id>`: output; nested IDs dotted, `/key/index` JSON path; write = message, `agent://all` broadcast only.\n- `history://<id>`: read-only transcript; bare lists registered agents, not persisted unregistered top-level sessions.\n- `artifact://<id>`: content; `local://<name>.md`: shared artifact.\n- `proc://`: jobs/services; `proc://<id>`: read status/output, write service stdin; write `proc://<id>/kill` cancels/stops (no `content` needed).\n- `issue://<N>` / `pr://<N>` (`<owner>/<repo>/<N>` for other repos): GitHub issue/PR; bare: recent; `?state=&limit=&author=&label=`. PR diff: `pr://<N>/diff` (files), `/diff/<i>`, `/diff/all`.\n- `mcp://<uri>`: MCP resource; `omp://`: harness docs, AVOID unless asked.\n\n# Tool Inventory\n- Read: `read`\n- Bash: `bash`\n- Edit: `edit`\n- Ask: `ask`\n- Eval: `eval`\n- Glob: `glob`\n- Grep: `grep`\n- Task: `task`\n- Wait: `wait`\n- Todo: `todo`\n- Web Search: `web_search`\n- Write: `write`\n- EnterPlanMode: `EnterPlanMode`\n- EnterGoalMode: `EnterGoalMode`\n# xd:// Tool Devices\nWrite JSON args as `content` to `xd://<tool>` via `write`. Invalid args return schema in error → fix/retry.\n## Additional devices (docs on demand)\n- xd://ast_edit — Perform AST-aware code edits (structural refactoring)\n- xd://debug — Debug a running process with DAP (debugger adapter protocol)\n- xd://lsp — Query LSP (language server) for diagnostics, hover info, and references\n\nRead xd://<tool> for full docs + JSON schema before first use.\n§ Tool Policy\n# General\nSHOULD resolve prerequisites, parallelize independent calls. Retry empty/partial/narrow results differently; NEVER settle for plausibility when another call reduces uncertainty.\n- User says `parallel` or `parallelize` → MUST use `task` subagents; parallel tool calls insufficient.\n\n# Tool I/O\n- Prefer relative `path`-like fields.\n- Most tools take `i`: capitalized 2–6-word present-participle intent (e.g. \"Reading model role settings\").\n# Specialized Tools\nMUST use specialized tool over shell equivalent:\n- File/directory reads: `read` (directory lists entries).\n- Surgical edits: `edit`.\n- Create/overwrite: `write`.\n- Language server available: MUST use `lsp` for definitions, type definitions, implementations, references, hover; code actions for refactors/imports/fixes. NEVER text-search/edit for code intelligence.\n\n- Regex/target search: `grep`, NEVER shell `grep`/`rg`/`awk`.\n- File structure/names: `glob`, NEVER `ls **/*.ext`/`fd`.\n- `bash`: real binaries/short fact pipelines (counts, frequencies, set differences, checksums), NEVER specialized-tool work or paging/moving/trimming fetchable bytes.\n\n<critical>\n`write xd://report_issue`: automated QA. Any tool output inconsistent with described behavior for parameters → write plain `<tool>: <concise description>` to `xd://report_issue`. False positives fine.\n</critical>\n\n# Exploration\nNEVER open guessed files.  Use `read` ranges, not whole files.\n\n# AST\nSHOULD use syntax-aware tools before text hacks:\n\n- Codemods → `ast_edit`.\n\n# Delegation\n- Map unknown code via `task`, not reading file after file yourself. NEVER abandon phases under scope pressure: delegate, don't shrink.\n## Delegation gates\n- Before spawning, map slices/shared contracts; user-enumerated 2+ self-contained runnable slices exempt. NEVER outsource top-level plan; slice design/competing plans allowed.\n- Fan genuine slices in one `tasks[]` batch. NEVER pad, serialize independent work, or spawn then idle; one read-only scout while working allowed.\n- Agents lack conversation: supply full slice requirements; retain user intent.\n- Max 32 concurrent subagents; excess queue.\n- Shared prerequisite inline; sequence ONLY true dependencies. Small missing detail? Run parallel; B messages A via `write agent://<id>`.\n\n§ Workflow\n# 1. Scope\n\n- Plan multi-file work before opening files.\n\n# 2. Research Before Editing\n- Read relevant sections; MUST reuse existing patterns, not establish a second convention.\n  - Exported symbol changes: MUST run `lsp references` first.\n- Tool failure or intervening file change: re-read before acting.\n\n# 3. Decompose\n- Update todos; skip trivial requests.\n- NEVER make a todo-only turn; batch `init` with first work, `done` with next action/verification.\n\n# 4. Implement\n- Fix source, not symptoms or special-case inputs, unless asked.\n- Cutover: migrate every caller; remove obsolete code/comments/aliases/re-exports/deprecated paths. Prefer existing files; review as user.\n- Ask before destructive commands or deleting unrelated code you didn't write; code made obsolete by cutover is in scope.\n\n# 5. Verify\nNon-trivial work: NEVER yield without exercising the changed path. Tests alone are not proof.\n- Investigation: run it; output proves it; no tests.\n- UI: verify actual surface.\n  - Web: `browser.open` tab, direct helpers for actions, `tab.run` for custom JS; visual proof; `tab.close`. No tests unless existing suite breaks.\n  - TUI/CLI: launch actual program; observe interaction/output/state.\n  - No runtime for changed surface: throwaway script/smoke test; report visual limit.\n- Bug: reproduce before; confirm after. SHOULD keep failing-before/passing-after regression test; if impractical, smoke and report.\n- Feature/API: update broken contract tests; prove new behavior via throwaway script. New test ONLY for uncertain edge or user request.\n- Smoke: run thing; exercise changed path; observe result.\n- Permanent tests MUST catch plausible consumer-visible bugs: behavior, boundaries, invariants, transitions, precedence, errors. Follow conventions; deterministic, isolated, full-suite-safe.\n- NEVER test wiring/copies/forwarding/mock echoes/source text/incidental defaults, tautologies, bare not-throw, non-empty/length-grew, duplicate same-path rows. Use throwaway scripts.\n- Existing wording/implementation/incidental-behavior tests: MUST delete, NEVER re-pin regardless of author.\n\n# 6. Cleanup\nAfter smoke proof: permanent fix/feature MUST update docs/changelog, remove scaffolds/throwaway scripts; tests per Verify. Investigation: no tests/docs. NEVER pre-plan cleanup todos.\n\n§ Delivery\n<contract>\nInviolable.\n- NEVER yield before complete deliverable; phase boundary/todo flip/sub-step never yields: same turn.\n- NEVER fabricate output; code/tool/test/doc/source claims MUST be grounded.\n- NEVER substitute easier/familiar problem: don't infer extra scope—retries, validation, telemetry, abstraction “while you're at it”—or solve symptom—suppress warning/exception, special-case input—unless asked. Real ask only.\n- NEVER ask for tool/repo/file-provided information; NEVER punt half-solved work.\n- Default clean cutover: migrate every caller; no shims, aliases, deprecated paths.\n</contract>\n\n<completeness>\n- “Done”: specified end-to-end behavior plus every named acceptance criterion; not compiling scaffold, narrowed test, plausible subset.\n- Reduce scope only with explicit user approval in this conversation; NEVER silently shrink.\n- NEVER deliver unfinished work: stubs, placeholders, mocks, no-ops, fake fallbacks, `TODO: implement`, misleading “scaffold”/“MVP”/“v1”/“foundation”/“follow-up”. Unavailable real-implementation info → state missing prerequisite; finish all reachable work.\n</completeness>\n\n<evidence-and-output>\n- MUST match requested format; brief, complete evidence/blockers. Ground code/tool/test/doc/source claims; unobserved = `[INFERENCE]`. Report only exercised verification.\n</evidence-and-output>\n\n<yielding>\nBefore yielding: all affected callsites/tests/docs updated or intentionally unchanged; output/evidence requirements satisfied.\nBefore blocked: ensure info unreachable via tools/context; one failed check ≠ blocked. Finish reachable work; state exactly missing and tried.\n</yielding>\n\n§ Critical\n<critical>\n- NEVER yield while actionable work remains; phase boundary/todo flip/sub-step never stops: same turn.\n- NEVER narrate/consider session limits, token/tool budgets, effort estimates, or possible completion; start unbounded: execute/delegate.\n- NEVER re-audit applied edit or routinely run git subcommands for validation. Tool results are verification.\n</critical>\n\nPROJECT\n\n<workstation>\n- OS: linux 7.0.0-34-generic\n- Arch: x64\n- Model: m1fake/local-model\n</workstation>\n<critical>\n- Each response MUST advance the task; completion only stopping condition.\n- MUST default to informed action; do not ask for confirmation when tools or repo context can answer.\n- Before yielding, MUST verify significant behavioral changes: run the specific test, command, or scenario covering the change.\n</critical>\n\n# Project memory\n\nThe following notes are durable context for this project. Use them when relevant, but treat them as user-provided context rather than higher-priority instructions.\n\nROOT_D_ENTRY_MEMORY\n\nYou are operating in Goal mode as the same PI-Desktop agent, negotiating a goal contract before any autonomous work.\nA goal contract is what to achieve, not how to achieve it: the outcome the user wants, the acceptance criteria that prove it was reached, and the boundaries you must not cross. Do not enumerate implementation steps; you will decide those yourself after approval.\nInspect the workspace and ask the user about anything ambiguous first. Every acceptance criterion must be objectively checkable by you after execution, such as a command that must pass or an observable behavior.\nDo not use Write, Edit, or any unknown tool in Goal mode.\nDo not create, overwrite, delete, or otherwise mutate workspace files in Goal mode — including through Bash. Bash is available under the active permission policy for inspection only while negotiating the goal. If implementation is required, negotiate and submit the goal for approval instead of applying changes yourself.\nPlugin tools that declare plan-safe actions are available for inspection; only the listed plan-safe actions may run, anything else is denied.\nDo not write or edit a goal file yourself. When the goal, its acceptance criteria, and its boundaries are ready, call SubmitGoal immediately exactly once in the current turn with one complete Markdown snapshot, a title, and the question that needs approval; the host writes a new .pi/goal artifact and opens the review.\nAn accepted new Goal prompt means no prior approval is pending. Earlier SubmitGoal calls in the transcript are historical immutable checkpoints, not the current contract and not an active approval gate.\nAfter reject, expiry, or interruption closes approval and returns to editable goal negotiation, revise the contract in the new turn and follow the same one-SubmitGoal rule; never edit or replace an earlier artifact.\nDo not wait for chat confirmation, keep negotiating, or implement changes while approval is pending.\nOnce approved, the goal contract is the standard you work against: pursue it autonomously, choose your own approach, and stop only when every acceptance criterion is verified or a boundary blocks you.",
+          "toolMessages": [
+            {
+              "role": "tool",
+              "content": "Goal mode is active. Clarify the outcome and how it will be verified, then call SubmitGoal for approval.",
+              "tool_call_id": "entry-goal"
+            },
+            {
+              "role": "tool",
+              "content": "[read-seed.txt#0638]\n1:ROOT_D_ENTRY_READ_CONTENT",
+              "tool_call_id": "read-after-entry"
+            },
+            {
+              "role": "tool",
+              "content": "Tool write not found",
+              "tool_call_id": "write-after-entry"
+            }
+          ]
+        }
+      ],
+      "engineRef": {
+        "adapterVersion": 1,
+        "engine": "omp",
+        "nativeSessionId": "01a0ffb7-7bed-75fd-882f-b9e6c770e361",
+        "nativeSessionPath": "/tmp/root-d-entry-flow-data-TO5QQC/omp-sessions/2026-10-03T03-03-30-029Z_01a0ffb7-7bed-75fd-882f-b9e6c770e361.jsonl",
+        "runtimeVersion": "18.3.0"
+      },
+      "nativeSessionId": "01a0ffb7-7bed-75fd-882f-b9e6c770e361",
+      "nativeHeader": {
+        "type": "session",
+        "version": 3,
+        "id": "01a0ffb7-7bed-75fd-882f-b9e6c770e361",
+        "timestamp": "2026-10-03T03:03:30.029Z",
+        "cwd": "/tmp/root-d-entry-flow-project-sEAl9w"
+      },
+      "nativeUserMessageCount": 1,
+      "modeAfter": "goal",
+      "turns": [
+        {
+          "id": "b3fe0a81-8998-4adf-817d-d7bd0597192e",
+          "status": "completed"
+        }
+      ],
+      "hostTurnId": "b3fe0a81-8998-4adf-817d-d7bd0597192e",
+      "enterAudit": [
+        {
+          "kind": "goal",
+          "mode": "goal",
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "toolCallId": "entry-goal",
+          "turnId": "b3fe0a81-8998-4adf-817d-d7bd0597192e"
+        }
+      ],
+      "messageCount": 0,
+      "forbiddenEffect": null,
+      "pending": [
+        {
+          "artifact": {
+            "relativePath": ".pi/goal/entry-goal-20261003-1103.md",
+            "sha256": "f8945488e1575f30b9b20745e7edc33018219d3731b767013d2caab442e843c7",
+            "sizeBytes": 142
+          },
+          "createdAt": "2026-10-03T03:03:30.173Z",
+          "expiresAt": "2026-10-03T03:33:30.173Z",
+          "id": "db6fffb8-a3c9-4989-9338-1166d1fcf1a5",
+          "kind": "goal",
+          "markdown": "# Entry goal\n\nReach the intended outcome.\n\n## Acceptance criteria\n- Verify the exact result.\n\n## Boundaries\n- Isolated review workspace only.\n",
+          "plan": "# Entry goal\n\nReach the intended outcome.\n\n## Acceptance criteria\n- Verify the exact result.\n\n## Boundaries\n- Isolated review workspace only.\n",
+          "question": "Approve this isolated goal?",
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "status": "pending",
+          "title": "Entry goal",
+          "toolCallId": "submit-after-entry",
+          "turnId": "b3fe0a81-8998-4adf-817d-d7bd0597192e",
+          "updatedAt": "2026-10-03T03:03:30.173Z",
+          "version": 1
+        }
+      ],
+      "events": [
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610070,
+          "event": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610095,
+          "event": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610095,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+              "role": "user",
+              "createdAt": "2026-10-03T03:03:30.054Z",
+              "status": "streaming",
+              "content": "Negotiate a goal contract, inspect the seed file and submit it for approval."
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610103,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+              "role": "user",
+              "createdAt": "2026-10-03T03:03:30.054Z",
+              "status": "complete",
+              "content": "Negotiate a goal contract, inspect the seed file and submit it for approval."
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610107,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:2",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:30.099Z",
+              "status": "streaming",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610111,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:2",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:30.099Z",
+              "status": "complete",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610113,
+          "event": {
+            "type": "tool_start",
+            "toolCallId": "entry-goal",
+            "toolName": "EnterGoalMode",
+            "args": {}
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610132,
+          "event": {
+            "type": "tool_end",
+            "toolCallId": "entry-goal",
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Goal mode is active. Clarify the outcome and how it will be verified, then call SubmitGoal for approval."
+                }
+              ],
+              "details": {
+                "ompDesktopModeTransition": {
+                  "v": 1,
+                  "kind": "goal",
+                  "state": "ready",
+                  "sessionId": "01a0ffb7-7bed-75fd-882f-b9e6c770e361",
+                  "liveTurnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+                  "hostTurnId": "b3fe0a81-8998-4adf-817d-d7bd0597192e",
+                  "toolCallId": "entry-goal",
+                  "expectedMode": "agent",
+                  "modeBlock": "You are operating in Goal mode as the same PI-Desktop agent, negotiating a goal contract before any autonomous work.\nA goal contract is what to achieve, not how to achieve it: the outcome the user wants, the acceptance criteria that prove it was reached, and the boundaries you must not cross. Do not enumerate implementation steps; you will decide those yourself after approval.\nInspect the workspace and ask the user about anything ambiguous first. Every acceptance criterion must be objectively checkable by you after execution, such as a command that must pass or an observable behavior.\nDo not use Write, Edit, or any unknown tool in Goal mode.\nDo not create, overwrite, delete, or otherwise mutate workspace files in Goal mode — including through Bash. Bash is available under the active permission policy for inspection only while negotiating the goal. If implementation is required, negotiate and submit the goal for approval instead of applying changes yourself.\nPlugin tools that declare plan-safe actions are available for inspection; only the listed plan-safe actions may run, anything else is denied.\nDo not write or edit a goal file yourself. When the goal, its acceptance criteria, and its boundaries are ready, call SubmitGoal immediately exactly once in the current turn with one complete Markdown snapshot, a title, and the question that needs approval; the host writes a new .pi/goal artifact and opens the review.\nAn accepted new Goal prompt means no prior approval is pending. Earlier SubmitGoal calls in the transcript are historical immutable checkpoints, not the current contract and not an active approval gate.\nAfter reject, expiry, or interruption closes approval and returns to editable goal negotiation, revise the contract in the new turn and follow the same one-SubmitGoal rule; never edit or replace an earlier artifact.\nDo not wait for chat confirmation, keep negotiating, or implement changes while approval is pending.\nOnce approved, the goal contract is the standard you work against: pursue it autonomously, choose your own approach, and stop only when every acceptance criterion is verified or a boundary blocks you.",
+                  "hostTools": [
+                    {
+                      "name": "SubmitGoal",
+                      "risk": "low",
+                      "planSafeActions": [],
+                      "origin": "desktop"
+                    }
+                  ],
+                  "at": 1790996610113
+                }
+              }
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610134,
+          "event": {
+            "type": "turn_end",
+            "subagentUsage": {
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "cacheReadTokens": 0,
+              "cacheWriteTokens": 0,
+              "totalTokens": 0
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610137,
+          "event": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610139,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:3",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:30.137Z",
+              "status": "streaming",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610141,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:3",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:30.137Z",
+              "status": "complete",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610144,
+          "event": {
+            "type": "tool_start",
+            "toolCallId": "read-after-entry",
+            "toolName": "read",
+            "args": {
+              "path": "read-seed.txt"
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610146,
+          "event": {
+            "type": "tool_end",
+            "toolCallId": "read-after-entry",
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[read-seed.txt#0638]\n1:ROOT_D_ENTRY_READ_CONTENT"
+                }
+              ],
+              "details": {
+                "totalLines": 1,
+                "displayContent": {
+                  "text": "ROOT_D_ENTRY_READ_CONTENT",
+                  "startLine": 1,
+                  "lineNumbers": [
+                    1
+                  ]
+                },
+                "fileSize": 25,
+                "meta": {
+                  "source": {
+                    "type": "path",
+                    "value": "/tmp/root-d-entry-flow-project-sEAl9w/read-seed.txt"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610167,
+          "event": {
+            "type": "turn_end",
+            "subagentUsage": {
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "cacheReadTokens": 0,
+              "cacheWriteTokens": 0,
+              "totalTokens": 0
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610167,
+          "event": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610168,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:4",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:30.167Z",
+              "status": "streaming",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610169,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:4",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:30.167Z",
+              "status": "complete",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610169,
+          "event": {
+            "type": "tool_start",
+            "toolCallId": "write-after-entry",
+            "toolName": "write",
+            "args": {
+              "path": "forbidden-after-entry.txt",
+              "content": "forbidden"
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610169,
+          "event": {
+            "type": "tool_end",
+            "toolCallId": "write-after-entry",
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Tool write not found"
+                }
+              ],
+              "details": {
+                "isError": true,
+                "error": "Tool write not found"
+              }
+            },
+            "isError": true
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610170,
+          "event": {
+            "type": "turn_end",
+            "subagentUsage": {
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "cacheReadTokens": 0,
+              "cacheWriteTokens": 0,
+              "totalTokens": 0
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610170,
+          "event": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610171,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:5",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:30.170Z",
+              "status": "streaming",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610171,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:5",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:30.170Z",
+              "status": "complete",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610172,
+          "event": {
+            "type": "tool_start",
+            "toolCallId": "submit-after-entry",
+            "toolName": "SubmitGoal",
+            "args": {
+              "title": "Entry goal",
+              "markdown": "# Entry goal\n\nReach the intended outcome.\n\n## Acceptance criteria\n- Verify the exact result.\n\n## Boundaries\n- Isolated review workspace only.\n",
+              "question": "Approve this isolated goal?"
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610174,
+          "event": {
+            "type": "tool_end",
+            "toolCallId": "submit-after-entry",
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Goal contract submitted for approval. Autonomous execution will begin only after approval."
+                }
+              ],
+              "details": {},
+              "terminate": true
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610175,
+          "event": {
+            "type": "turn_end",
+            "subagentUsage": {
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "cacheReadTokens": 0,
+              "cacheWriteTokens": 0,
+              "totalTokens": 0
+            }
+          }
+        },
+        {
+          "sessionId": "d10760b3-0283-49b3-961d-cf99ae5e136f",
+          "turnId": "omp-turn:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+          "ts": 1790996610180,
+          "event": {
+            "type": "agent_end",
+            "messageIds": [
+              "omp:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:1",
+              "omp:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:2",
+              "omp:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:3",
+              "omp:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:4",
+              "omp:d10760b3-0283-49b3-961d-cf99ae5e136f:d2635d9b-6ee1-4a70-a7ca-6f140e99189a:5"
+            ]
+          }
+        }
+      ],
+      "artifact": {
+        "relativePath": ".pi/goal/entry-goal-20261003-1103.md",
+        "sha256": "f8945488e1575f30b9b20745e7edc33018219d3731b767013d2caab442e843c7",
+        "sizeBytes": 142,
+        "markdown": "# Entry goal\n\nReach the intended outcome.\n\n## Acceptance criteria\n- Verify the exact result.\n\n## Boundaries\n- Isolated review workspace only.\n"
+      },
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    }
+  ],
+  "patchManifest": {
+    "schemaVersion": 1,
+    "patchLevel": "62bc57b+omp-desktop.5",
+    "description": "OMP Desktop patch set for the pinned upstream OMP runtime: RPC host-tool scheduling and batch policy, settle-time run termination (result flag and per-tool settlement declaration), the all-toolCall batch count, an optional live system-prompt action for a host-confirmed mid-turn mode transition, a deterministic native-addon archive, and an explicit bytecode switch on the build entry. Risk reduction and release-build reproducibility only: it does NOT make the sole-batch contract strict — see status.",
+    "base": {
+      "submodule": "upstream/oh-my-pi",
+      "repository": "https://github.com/can1357/oh-my-pi",
+      "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+      "version": "18.3.0"
+    },
+    "fork": {
+      "repository": "https://github.com/MisterBowie/oh-my-pi",
+      "branch": "codex/omp-desktop-18.3.0-patch-5",
+      "commit": "36483311dfff67be7504f591974df93fc512a45a",
+      "tree": "7ba57b6d06fb8fe7e3f6352c67692e56cf39c3cd",
+      "note": "Self-maintained fork whose HEAD is exactly base.sha + this patch level. `scripts/omp-sidecar.mjs` refuses any other commit; can1357/oh-my-pi stays a read-only upstream."
+    },
+    "patch": {
+      "file": "0001-omp-desktop-runtime.patch",
+      "sha256": "645242861412c8f2810cab397824413129ccbd5e5b7a94ca70caf0e76795895b",
+      "bytes": 118548
+    },
+    "capabilities": [
+      "rpc-host-tool-concurrency",
+      "rpc-host-tool-sole-batch-policy",
+      "agent-tool-result-terminate",
+      "rpc-host-tool-result-terminate",
+      "extension-live-system-prompt",
+      "rpc-host-tool-settle-termination",
+      "reproducible-sidecar-build",
+      "explicit-bytecode-build-mode"
+    ],
+    "files": [
+      "docs/extensions.md",
+      "docs/rpc.md",
+      "packages/agent/src/agent-loop.ts",
+      "packages/agent/src/telemetry.ts",
+      "packages/agent/src/types.ts",
+      "packages/agent/test/agent-loop.test.ts",
+      "packages/coding-agent/scripts/build-binary.ts",
+      "packages/coding-agent/scripts/compile-binary.ts",
+      "packages/coding-agent/src/extensibility/extensions/loader.ts",
+      "packages/coding-agent/src/extensibility/extensions/runner.ts",
+      "packages/coding-agent/src/extensibility/extensions/types.ts",
+      "packages/coding-agent/src/modes/rpc/host-tools.ts",
+      "packages/coding-agent/src/modes/rpc/rpc-client.ts",
+      "packages/coding-agent/src/modes/rpc/rpc-mode.ts",
+      "packages/coding-agent/src/modes/rpc/rpc-types.ts",
+      "packages/coding-agent/src/modes/runtime-init.ts",
+      "packages/coding-agent/src/session/agent-session.ts",
+      "packages/coding-agent/test/agent-session-turn-system-prompt.test.ts",
+      "packages/coding-agent/test/build-binary-bytecode.test.ts",
+      "packages/coding-agent/test/extensions-runner.test.ts",
+      "packages/coding-agent/test/rpc-host-tools.test.ts",
+      "packages/natives/scripts/embed-native.ts",
+      "packages/natives/test/embed-native.test.ts"
+    ],
+    "contract": {
+      "concurrencyField": "RpcHostToolDefinition.concurrency",
+      "batchPolicyField": "RpcHostToolDefinition.batchPolicy",
+      "settleTerminationField": "AgentTool.terminateOnSettle / RpcHostToolDefinition.terminateOnSettle",
+      "terminateField": "AgentToolResult.terminate",
+      "invalidDeclaration": "set_host_tools request is rejected; the value never degrades to the default",
+      "invalidDeclarationDetail": "RpcHostToolDefinition.concurrency/batchPolicy/terminateOnSettle values outside their union throw in normalizeHostToolPolicy, which the set_host_tools command and the host-tool adapter both call",
+      "bytecodeBuildEntry": "packages/coding-agent/scripts/build-binary.ts accepts exactly `--bytecode`/`--no-bytecode` (default on, one declaration, anything else exits 2); `compileCodingAgent` takes it as the typed option `CodingAgentCompileOptions.bytecode`, never from the environment",
+      "liveSystemPromptAction": "ExtensionAPI.setTurnSystemPrompt(prompt: string[]) — optional; a host that does not provide it rejects the call, and the desktop gate treats absence as a failed transition"
+    },
+    "verification": {
+      "patchCheck": "node scripts/omp-patch.mjs --check",
+      "prepareAndVerify": "node scripts/omp-patch.mjs --apply --out <dir> --prepare-build --verify",
+      "suites": [
+        "packages/agent/test/agent-loop.test.ts",
+        "packages/coding-agent/test/rpc-host-tools.test.ts",
+        "packages/coding-agent/test/agent-session-turn-system-prompt.test.ts"
+      ],
+      "spike": "node experiments/omp-bridge/t20-feasibility.mjs --patched",
+      "targetedSuites": [
+        "packages/agent/test/agent-loop.test.ts",
+        "packages/coding-agent/test/agent-session-before-agent-start-prompt-override.test.ts",
+        "packages/coding-agent/test/agent-session-turn-system-prompt.test.ts",
+        "packages/coding-agent/test/extensions-runner.test.ts",
+        "packages/coding-agent/test/rpc-host-tools.test.ts",
+        "packages/coding-agent/test/rpc-input-frame.test.ts"
+      ],
+      "reproducibilitySuites": [
+        "packages/natives/test/embed-native.test.ts",
+        "packages/coding-agent/test/build-binary-bytecode.test.ts"
+      ]
+    },
+    "history": [
+      {
+        "patchLevel": "62bc57b+omp-desktop.4",
+        "base": {
+          "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+          "version": "18.3.0"
+        },
+        "patch": {
+          "file": "0001-omp-desktop-runtime.patch",
+          "sha256": "d6d30785389a2ffc84bdff8ac72a4cea27c2abc50e14d709397f23dd2362882f",
+          "bytes": 101113
+        },
+        "fork": {
+          "repository": "https://github.com/MisterBowie/oh-my-pi",
+          "branch": "codex/omp-desktop-18.3.0-patch-4",
+          "commit": "512370a1b177cf45e4d12781104506ea372fb8a9",
+          "tree": "78886eaf82d4145521369b9e734cfff53f53fb54"
+        },
+        "retired": "2026-10-03",
+        "retiredReason": "T20-D-Enter added the optional live system-prompt extension action, which changed the patched tree; the .4 artifact bytes and fork coordinates are kept here as history."
+      },
+      {
+        "patchLevel": "62bc57b+omp-desktop.3",
+        "base": {
+          "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+          "version": "18.3.0"
+        },
+        "patch": {
+          "file": "0001-omp-desktop-runtime.patch",
+          "sha256": "ad63ced9f7488ff088194754b4902732e1e7ebd0bdfa10a7926b3c5dc1beeaa9",
+          "bytes": 87190
+        },
+        "fork": {
+          "repository": "https://github.com/MisterBowie/oh-my-pi",
+          "branch": "codex/omp-desktop-18.3.0-patch-3",
+          "commit": "6226f805e92654344de04def413fa5cb91cb16b9",
+          "tree": "5249cb07059b009e890bece6f7d59daeb1cb94f6"
+        },
+        "retired": "2026-10-03",
+        "retiredReason": "T20-B2 added the settle-time termination declaration (AgentTool.terminateOnSettle), which changed the patched tree; the .3 artifact bytes and fork coordinates are kept here as history."
+      },
+      {
+        "patchLevel": "62bc57b+omp-desktop.2",
+        "base": {
+          "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+          "version": "18.3.0"
+        },
+        "patch": {
+          "file": "0001-rpc-host-tool-transition-contract.patch",
+          "sha256": "4edbfadff9cc3238ae6bb7c206e7d8e0be33c2190068e6731fdb58e43ec9b545",
+          "bytes": 72910
+        },
+        "retired": "2026-09-28",
+        "retiredReason": "T20-R4-3 added the deterministic native-addon archive and the explicit bytecode build switch, which changed the patched tree; the .2 artifact and its file name are kept in git history, not in this tree."
+      },
+      {
+        "patchLevel": "d49918f+omp-desktop.1",
+        "base": {
+          "sha": "d49918fab2dba3986927f2d46721629ed0f3a02c",
+          "version": "18.2.7"
+        },
+        "patch": {
+          "sha256": "e08ca7fff29bbd03e298f4488888b2692adda1486e3fff80536a31dd8af6fd5c",
+          "bytes": 72978
+        },
+        "retired": "2026-09-27",
+        "retiredReason": "T20-R4A migrated the patch set to the new pinned base 62bc57be (omp/18.3.0); the 18.2.7 artifact is kept in git history, not in this tree."
+      }
+    ],
+    "notes": [
+      "This is an OMP Desktop-maintained patch level, not upstream OMP support: the runtime remains pinned at 62bc57be (omp/18.3.0) plus this patch set.",
+      "Rebuild the patch after any source edit with: git -C <checkout> -c core.abbrev=7 diff <base.sha> <fork.commit> > app/patches/oh-my-pi/0001-omp-desktop-runtime.patch, then refresh patch.sha256 and patch.bytes. The explicit core.abbrev=7 pins the index lines to 7 hex digits: a machine-level core.abbrev would otherwise change the patch bytes while preserving semantics, so the artifact could not be reproduced byte-for-byte elsewhere.",
+      "runner.initialize copies each ExtensionActions member onto the shared runtime explicitly; .5 therefore also copies the optional setTurnSystemPrompt action (with a refusing fallback), so a host that provides it is reachable through the extension API instead of the runtime's throwing stub.",
+      "The .5 patch artifact was regenerated on 2026-10-03 from fork commit 22f565c9403b5d5ce1870462529292d7a32fd550; it adds the optional ExtensionAPI.setTurnSystemPrompt action (AgentSession.setTurnSystemPrompt) so a trusted host with a host-confirmed mid-turn contract change (M5/T20-D's Agent -> Plan/Goal entry) can move the live run's system prompt before the next provider request. The action is optional and absent from every other ExtensionActions provider; ordinary runs are unchanged.",
+      "The .4 patch artifact was regenerated on 2026-10-03 from fork commit 512370a1b177cf45e4d12781104506ea372fb8a9; it adds the settle-time termination declaration (AgentTool.terminateOnSettle, RpcHostToolDefinition.terminateOnSettle) enforced at the loop's single settlement boundary, so a schema-validation rejection, a pre-execution hook rejection, an execution throw, a host error and a success all terminate identically for a declared tool.",
+      "The zero-side-effect property of a rejected mixed batch is unchanged by .4: a batch carrying a sole tool plus any sibling is still rejected whole with terminate false so the model can correct.",
+      "reproducible-sidecar-build: embed-native.ts writes the embedded addon tar.gz with fixed entry timestamps and a recomputed header checksum, because Bun.Archive stamps each entry with the current time. Without it, two builds of one fork commit produced different binaries — measured at T20-R4-3 on Bun 1.4.2 (first difference at byte 81260680).",
+      "explicit-bytecode-build-mode: bytecode stays on by default (upstream release behavior and the fast boot path). The desktop sidecar build passes `--bytecode` explicitly and records it as `build.bytecode` in the provenance manifest; measured reproducibility holds for bytecode on and off once the archive is deterministic."
+    ],
+    "status": {
+      "soleBatchContract": "not-strict",
+      "blocker": "F3: a `kCursorExecResolved` sibling was executed by the provider/editor bridge before the assistant message existed, so its side effect cannot be prevented or retracted by any loop-level patch; PI counts every toolCall block, so the batch is still rejected, but \"zero side effects in a rejected batch\" is unreachable at this layer.",
+      "mitigationsApplied": [
+        "batch admission counts every toolCall block of the assistant message (Cursor-resolved included), matching PI runtime.ts:2222",
+        "speculation is disabled for a provider call whose active tool set advertises a sole-declared tool, so no speculative physical work starts before the batch decision",
+        "a declared settle-terminating host tool terminates the run on every settled result path, including a schema-validation rejection that never reaches execute"
+      ],
+      "retractedClaims": [
+        "R3 lifted",
+        "T20-B may start"
+      ],
+      "scopeNote": {
+        "date": "2026-10-02",
+        "note": "Scope explanation only; it does not change patchLevel, the patch artifact, pins, capability ids or build outputs, and it does not turn the global not-strict fact into a general strict claim. The user excluded the Cursor + Plan/Goal combination from product scope on 2026-10-02: it is unsupported and refused by the ADR 0306 gate, so the F3 blocker above now describes that excluded combination. Non-Cursor providers do not produce the pre-executed blocks, so the non-Cursor route whose dispatch is decided by the patched loop stays in scope and is still held to the strict contract (all-toolCall counting, sole batches, settle-time termination). T20-B/C/D remain unstarted.",
+        "record": "docs/validation/M5-t20-non-cursor-scope.md"
+      }
+    }
+  },
+  "finalCleanupErrors": [],
+  "passed": true
+}

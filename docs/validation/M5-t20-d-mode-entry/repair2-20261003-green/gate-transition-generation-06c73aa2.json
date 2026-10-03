@@ -1,0 +1,70 @@
+{
+  "candidate": "06c73aa29809339d02704fb67ccdaca12680f348",
+  "layer": "real gate registered handlers, real admission/transition codecs and serialized state; controlled public API promises; no provider/tool bodies/host DB, no universal native reachability claim",
+  "cases": [
+    {
+      "scenario": "positive-current-transition",
+      "beforeAllowed": true,
+      "afterBlocked": true,
+      "failures": [],
+      "passed": true
+    },
+    {
+      "scenario": "positive-current-failure",
+      "beforeAllowed": true,
+      "failures": [
+        {
+          "v": 1,
+          "kind": "omp-desktop-turn-failure",
+          "sessionId": "owner-native",
+          "turnToken": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "code": "transition-apply-failed",
+          "reason": "the gate could not apply the plan transition: Error: controlled current API failure",
+          "failureId": "omp-turn-failure-1790996600531-0",
+          "at": 1790996600531
+        }
+      ],
+      "aborts": 1,
+      "afterBlocked": true,
+      "passed": true
+    },
+    {
+      "scenario": "prompt-resolve-after-new-turn",
+      "beforeAllowed": true,
+      "newOwnerBeforeAllowed": true,
+      "newChildBeforeAllowed": true,
+      "newOwnerAfter": null,
+      "newChildAfter": null,
+      "lateSelections": [],
+      "newFailures": [],
+      "lateAborts": 0,
+      "passed": true
+    },
+    {
+      "scenario": "prompt-reject-after-new-turn",
+      "beforeAllowed": true,
+      "newOwnerBeforeAllowed": true,
+      "newChildBeforeAllowed": true,
+      "newOwnerAfter": null,
+      "newChildAfter": null,
+      "lateSelections": [],
+      "newFailures": [],
+      "lateAborts": 0,
+      "passed": true
+    },
+    {
+      "scenario": "clamp-reject-after-new-turn",
+      "beforeAllowed": true,
+      "newOwnerBeforeAllowed": true,
+      "newChildBeforeAllowed": true,
+      "newOwnerAfter": null,
+      "newChildAfter": null,
+      "lateSelections": [],
+      "newFailures": [],
+      "lateAborts": 0,
+      "passed": true
+    }
+  ],
+  "scratchRemoved": true,
+  "passed": true
+}

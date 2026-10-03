@@ -1,0 +1,534 @@
+(node:1967978) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  "candidate": "06c73aa29809339d02704fb67ccdaca12680f348",
+  "layer": "real production bridge/gate/adapter/HostProcess+SQLite/patched source OMP/local FakeProvider; controlled public host reply/catalog await; not unmodified transport scheduling/Renderer/installer",
+  "cases": [
+    {
+      "kind": "plan",
+      "scenario": "malformed-committed-reply",
+      "ends": [
+        {
+          "sessionId": "e3b45efa-2e0e-4ebf-9097-24b9eb14f849",
+          "turnId": "omp-turn:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:1",
+          "hostTurnId": "41333a17-85b7-4f77-9b71-49a0c8e5fb49",
+          "reason": "error"
+        },
+        {
+          "sessionId": "e3b45efa-2e0e-4ebf-9097-24b9eb14f849",
+          "turnId": "omp-turn:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:2",
+          "hostTurnId": "e001899a-b7af-4ed2-b951-d8ce78080cc3",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 2,
+      "hostTurnId": "41333a17-85b7-4f77-9b71-49a0c8e5fb49",
+      "realHostReply": {
+        "kind": "plan",
+        "ok": true,
+        "state": "planning"
+      },
+      "modeAfter": "plan",
+      "turnsBeforeRecovery": [
+        {
+          "id": "41333a17-85b7-4f77-9b71-49a0c8e5fb49",
+          "status": "error"
+        }
+      ],
+      "initialEnd": {
+        "sessionId": "e3b45efa-2e0e-4ebf-9097-24b9eb14f849",
+        "turnId": "omp-turn:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:1",
+        "hostTurnId": "41333a17-85b7-4f77-9b71-49a0c8e5fb49",
+        "reason": "error"
+      },
+      "initialProviderCount": 1,
+      "forbiddenEffect": null,
+      "audit": [
+        {
+          "kind": "plan",
+          "mode": "plan",
+          "sessionId": "e3b45efa-2e0e-4ebf-9097-24b9eb14f849",
+          "toolCallId": "entry-plan",
+          "turnId": "41333a17-85b7-4f77-9b71-49a0c8e5fb49"
+        }
+      ],
+      "enterCatalogReached": true,
+      "recoveryAccepted": {
+        "accepted": true,
+        "turnId": "omp-turn:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:2",
+        "hostTurnId": "e001899a-b7af-4ed2-b951-d8ce78080cc3"
+      },
+      "recoveryTools": [
+        "read",
+        "bash",
+        "ask",
+        "glob",
+        "grep",
+        "SubmitPlan"
+      ],
+      "finalTurns": [
+        {
+          "id": "41333a17-85b7-4f77-9b71-49a0c8e5fb49",
+          "status": "error"
+        },
+        {
+          "id": "e001899a-b7af-4ed2-b951-d8ce78080cc3",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "plan",
+      "scenario": "catalog-error-after-commit",
+      "ends": [
+        {
+          "sessionId": "fe5518ee-7f6b-48c7-b994-32dec8af5cf7",
+          "turnId": "omp-turn:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:1",
+          "hostTurnId": "4eb0f50f-c911-4920-b260-e6a69d3d30aa",
+          "reason": "error"
+        },
+        {
+          "sessionId": "fe5518ee-7f6b-48c7-b994-32dec8af5cf7",
+          "turnId": "omp-turn:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:2",
+          "hostTurnId": "677c7dd2-326f-4c80-9653-370c067f6c23",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 3,
+      "hostTurnId": "4eb0f50f-c911-4920-b260-e6a69d3d30aa",
+      "realHostReply": {
+        "kind": "plan",
+        "ok": true,
+        "state": "planning"
+      },
+      "enterCatalogReached": true,
+      "modeAfter": "plan",
+      "turnsBeforeRecovery": [
+        {
+          "id": "4eb0f50f-c911-4920-b260-e6a69d3d30aa",
+          "status": "error"
+        }
+      ],
+      "initialEnd": {
+        "sessionId": "fe5518ee-7f6b-48c7-b994-32dec8af5cf7",
+        "turnId": "omp-turn:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:1",
+        "hostTurnId": "4eb0f50f-c911-4920-b260-e6a69d3d30aa",
+        "reason": "error"
+      },
+      "initialProviderCount": 1,
+      "forbiddenEffect": null,
+      "audit": [
+        {
+          "kind": "plan",
+          "mode": "plan",
+          "sessionId": "fe5518ee-7f6b-48c7-b994-32dec8af5cf7",
+          "toolCallId": "entry-plan",
+          "turnId": "4eb0f50f-c911-4920-b260-e6a69d3d30aa"
+        }
+      ],
+      "recoveryAccepted": {
+        "accepted": true,
+        "turnId": "omp-turn:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:2",
+        "hostTurnId": "677c7dd2-326f-4c80-9653-370c067f6c23"
+      },
+      "recoveryTools": [
+        "read",
+        "bash",
+        "ask",
+        "glob",
+        "grep",
+        "SubmitPlan"
+      ],
+      "finalTurns": [
+        {
+          "id": "4eb0f50f-c911-4920-b260-e6a69d3d30aa",
+          "status": "error"
+        },
+        {
+          "id": "677c7dd2-326f-4c80-9653-370c067f6c23",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "plan",
+      "scenario": "stop-during-catalog",
+      "ends": [
+        {
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+          "hostTurnId": "d9c8e776-f563-4794-bcc4-6ab69fa46a34",
+          "reason": "aborted"
+        },
+        {
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:2",
+          "hostTurnId": "c5ff1abd-dc3b-4901-8535-02d2a6f8b294",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 3,
+      "hostTurnId": "d9c8e776-f563-4794-bcc4-6ab69fa46a34",
+      "realHostReply": {
+        "kind": "plan",
+        "ok": true,
+        "state": "planning"
+      },
+      "enterCatalogReached": true,
+      "modeAtStop": "plan",
+      "stop": {
+        "aborted": true,
+        "abortBashSent": false,
+        "converged": true,
+        "toreDown": false,
+        "steps": [
+          "cancelled 1 pending host tool call(s)",
+          "abort acknowledged",
+          "turn converged"
+        ],
+        "errors": []
+      },
+      "modeAfter": "plan",
+      "turnsBeforeRecovery": [
+        {
+          "id": "d9c8e776-f563-4794-bcc4-6ab69fa46a34",
+          "status": "aborted"
+        }
+      ],
+      "initialEnd": {
+        "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+        "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+        "hostTurnId": "d9c8e776-f563-4794-bcc4-6ab69fa46a34",
+        "reason": "aborted"
+      },
+      "initialProviderCount": 1,
+      "forbiddenEffect": null,
+      "audit": [
+        {
+          "kind": "plan",
+          "mode": "plan",
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "toolCallId": "entry-plan",
+          "turnId": "d9c8e776-f563-4794-bcc4-6ab69fa46a34"
+        }
+      ],
+      "recoveryAccepted": {
+        "accepted": true,
+        "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:2",
+        "hostTurnId": "c5ff1abd-dc3b-4901-8535-02d2a6f8b294"
+      },
+      "recoveryTools": [
+        "read",
+        "bash",
+        "ask",
+        "glob",
+        "grep",
+        "SubmitPlan"
+      ],
+      "finalTurns": [
+        {
+          "id": "d9c8e776-f563-4794-bcc4-6ab69fa46a34",
+          "status": "aborted"
+        },
+        {
+          "id": "c5ff1abd-dc3b-4901-8535-02d2a6f8b294",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "goal",
+      "scenario": "malformed-committed-reply",
+      "ends": [
+        {
+          "sessionId": "7ebff494-7e3f-4573-a1d9-8e1fddeaf13e",
+          "turnId": "omp-turn:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:1",
+          "hostTurnId": "d4c45578-d853-427d-bf75-678ce3cf04fc",
+          "reason": "error"
+        },
+        {
+          "sessionId": "7ebff494-7e3f-4573-a1d9-8e1fddeaf13e",
+          "turnId": "omp-turn:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:2",
+          "hostTurnId": "0076a99a-0008-4ec0-85a4-1a61e7629c13",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 2,
+      "hostTurnId": "d4c45578-d853-427d-bf75-678ce3cf04fc",
+      "realHostReply": {
+        "kind": "goal",
+        "ok": true,
+        "state": "planning"
+      },
+      "modeAfter": "goal",
+      "turnsBeforeRecovery": [
+        {
+          "id": "d4c45578-d853-427d-bf75-678ce3cf04fc",
+          "status": "error"
+        }
+      ],
+      "initialEnd": {
+        "sessionId": "7ebff494-7e3f-4573-a1d9-8e1fddeaf13e",
+        "turnId": "omp-turn:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:1",
+        "hostTurnId": "d4c45578-d853-427d-bf75-678ce3cf04fc",
+        "reason": "error"
+      },
+      "initialProviderCount": 1,
+      "forbiddenEffect": null,
+      "audit": [
+        {
+          "kind": "goal",
+          "mode": "goal",
+          "sessionId": "7ebff494-7e3f-4573-a1d9-8e1fddeaf13e",
+          "toolCallId": "entry-goal",
+          "turnId": "d4c45578-d853-427d-bf75-678ce3cf04fc"
+        }
+      ],
+      "enterCatalogReached": true,
+      "recoveryAccepted": {
+        "accepted": true,
+        "turnId": "omp-turn:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:2",
+        "hostTurnId": "0076a99a-0008-4ec0-85a4-1a61e7629c13"
+      },
+      "recoveryTools": [
+        "read",
+        "bash",
+        "ask",
+        "glob",
+        "grep",
+        "SubmitGoal"
+      ],
+      "finalTurns": [
+        {
+          "id": "d4c45578-d853-427d-bf75-678ce3cf04fc",
+          "status": "error"
+        },
+        {
+          "id": "0076a99a-0008-4ec0-85a4-1a61e7629c13",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "goal",
+      "scenario": "catalog-error-after-commit",
+      "ends": [
+        {
+          "sessionId": "f7a65cd9-2b64-4a1d-9301-cf3713c9f939",
+          "turnId": "omp-turn:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:1",
+          "hostTurnId": "a0d427f6-7e24-4321-b923-e3bae976a19f",
+          "reason": "error"
+        },
+        {
+          "sessionId": "f7a65cd9-2b64-4a1d-9301-cf3713c9f939",
+          "turnId": "omp-turn:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:2",
+          "hostTurnId": "f5f777f2-2a19-49a8-877d-535191ff8718",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 3,
+      "hostTurnId": "a0d427f6-7e24-4321-b923-e3bae976a19f",
+      "realHostReply": {
+        "kind": "goal",
+        "ok": true,
+        "state": "planning"
+      },
+      "enterCatalogReached": true,
+      "modeAfter": "goal",
+      "turnsBeforeRecovery": [
+        {
+          "id": "a0d427f6-7e24-4321-b923-e3bae976a19f",
+          "status": "error"
+        }
+      ],
+      "initialEnd": {
+        "sessionId": "f7a65cd9-2b64-4a1d-9301-cf3713c9f939",
+        "turnId": "omp-turn:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:1",
+        "hostTurnId": "a0d427f6-7e24-4321-b923-e3bae976a19f",
+        "reason": "error"
+      },
+      "initialProviderCount": 1,
+      "forbiddenEffect": null,
+      "audit": [
+        {
+          "kind": "goal",
+          "mode": "goal",
+          "sessionId": "f7a65cd9-2b64-4a1d-9301-cf3713c9f939",
+          "toolCallId": "entry-goal",
+          "turnId": "a0d427f6-7e24-4321-b923-e3bae976a19f"
+        }
+      ],
+      "recoveryAccepted": {
+        "accepted": true,
+        "turnId": "omp-turn:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:2",
+        "hostTurnId": "f5f777f2-2a19-49a8-877d-535191ff8718"
+      },
+      "recoveryTools": [
+        "read",
+        "bash",
+        "ask",
+        "glob",
+        "grep",
+        "SubmitGoal"
+      ],
+      "finalTurns": [
+        {
+          "id": "a0d427f6-7e24-4321-b923-e3bae976a19f",
+          "status": "error"
+        },
+        {
+          "id": "f5f777f2-2a19-49a8-877d-535191ff8718",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "goal",
+      "scenario": "stop-during-catalog",
+      "ends": [
+        {
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+          "hostTurnId": "3b1a3c13-2f4a-4362-9c77-b8f9386a60bb",
+          "reason": "aborted"
+        },
+        {
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:2",
+          "hostTurnId": "5052c229-66cb-435a-b5e2-a7096ab90766",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 3,
+      "hostTurnId": "3b1a3c13-2f4a-4362-9c77-b8f9386a60bb",
+      "realHostReply": {
+        "kind": "goal",
+        "ok": true,
+        "state": "planning"
+      },
+      "enterCatalogReached": true,
+      "modeAtStop": "goal",
+      "stop": {
+        "aborted": true,
+        "abortBashSent": false,
+        "converged": true,
+        "toreDown": false,
+        "steps": [
+          "cancelled 1 pending host tool call(s)",
+          "abort acknowledged",
+          "turn converged"
+        ],
+        "errors": []
+      },
+      "modeAfter": "goal",
+      "turnsBeforeRecovery": [
+        {
+          "id": "3b1a3c13-2f4a-4362-9c77-b8f9386a60bb",
+          "status": "aborted"
+        }
+      ],
+      "initialEnd": {
+        "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+        "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+        "hostTurnId": "3b1a3c13-2f4a-4362-9c77-b8f9386a60bb",
+        "reason": "aborted"
+      },
+      "initialProviderCount": 1,
+      "forbiddenEffect": null,
+      "audit": [
+        {
+          "kind": "goal",
+          "mode": "goal",
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "toolCallId": "entry-goal",
+          "turnId": "3b1a3c13-2f4a-4362-9c77-b8f9386a60bb"
+        }
+      ],
+      "recoveryAccepted": {
+        "accepted": true,
+        "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:2",
+        "hostTurnId": "5052c229-66cb-435a-b5e2-a7096ab90766"
+      },
+      "recoveryTools": [
+        "read",
+        "bash",
+        "ask",
+        "glob",
+        "grep",
+        "SubmitGoal"
+      ],
+      "finalTurns": [
+        {
+          "id": "3b1a3c13-2f4a-4362-9c77-b8f9386a60bb",
+          "status": "aborted"
+        },
+        {
+          "id": "5052c229-66cb-435a-b5e2-a7096ab90766",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    }
+  ],
+  "finalCleanupErrors": [],
+  "passed": true
+}

@@ -1,0 +1,80 @@
+{
+  "manifests": [
+    {
+      "manifest": "repair-20261003-SHA256SUMS.txt",
+      "entries": 41,
+      "mismatches": [],
+      "selfListed": false
+    },
+    {
+      "manifest": "repair-20261003-corrections/SHA256SUMS.txt",
+      "entries": 3,
+      "mismatches": [],
+      "selfListed": false
+    },
+    {
+      "manifest": "repair-20261003-green/SHA256SUMS.txt",
+      "entries": 17,
+      "mismatches": [],
+      "selfListed": false
+    },
+    {
+      "manifest": "repair-20261003-red/SHA256SUMS.txt",
+      "entries": 7,
+      "mismatches": [],
+      "selfListed": false
+    },
+    {
+      "manifest": "repair-20261003-scripts/green/SHA256SUMS.txt",
+      "entries": 4,
+      "mismatches": [],
+      "selfListed": false
+    },
+    {
+      "manifest": "repair-20261003-scripts/red/SHA256SUMS.txt",
+      "entries": 4,
+      "mismatches": [],
+      "selfListed": false
+    },
+    {
+      "manifest": "repair2-20261003-SHA256SUMS.txt",
+      "entries": 31,
+      "mismatches": [],
+      "selfListed": false
+    },
+    {
+      "manifest": "repair2-20261003-green/SHA256SUMS.txt",
+      "entries": 19,
+      "mismatches": [],
+      "selfListed": false
+    },
+    {
+      "manifest": "repair2-20261003-red/SHA256SUMS.txt",
+      "entries": 2,
+      "mismatches": [],
+      "selfListed": false
+    },
+    {
+      "manifest": "repair2-20261003-scripts/SHA256SUMS.txt",
+      "entries": 7,
+      "mismatches": [],
+      "selfListed": false
+    }
+  ],
+  "trees": [
+    {
+      "manifest": "repair-20261003-SHA256SUMS.txt",
+      "files": 41,
+      "uncovered": [],
+      "extra": []
+    },
+    {
+      "manifest": "repair2-20261003-SHA256SUMS.txt",
+      "files": 31,
+      "uncovered": [],
+      "extra": []
+    }
+  ],
+  "mismatches": [],
+  "passed": true
+}

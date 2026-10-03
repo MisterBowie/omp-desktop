@@ -1,0 +1,55 @@
+{
+  "candidate": "06c73aa29809339d02704fb67ccdaca12680f348",
+  "layer": "real gate registered handlers, real admission/transition codecs and serialized state; controlled public API promises; no provider/tool bodies/host DB, no universal native reachability claim",
+  "cases": [
+    {
+      "scenario": "current-continuation",
+      "planBeforeBlocked": true,
+      "result": {
+        "systemPrompt": [
+          "native",
+          "Plan mode A"
+        ]
+      },
+      "planAfterBlocked": true,
+      "passed": true
+    },
+    {
+      "scenario": "current-continuation-failure",
+      "planBeforeBlocked": true,
+      "aborts": 1,
+      "afterBlocked": true,
+      "notices": [
+        "{\"v\":2,\"kind\":\"omp-desktop-turn-ack\",\"token\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"admissionDigest\":\"5f8a02318366b37314c146062c4dfc0a3efae9772dd4594ef7cfbc21dff5551a\"}",
+        "{\"v\":2,\"kind\":\"omp-desktop-start-refusal\",\"sessionId\":\"owner-native\",\"turnToken\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"code\":\"gate-error\",\"reason\":\"desktop gate failed while applying the runtime state: Error: controlled current continuation clamp rejection\",\"refusalId\":\"omp-refusal-1790996600427-0\",\"at\":1790996600427}"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "continuation-resolve-after-new-turn",
+      "planBeforeBlocked": true,
+      "newOwnerBeforeAllowed": true,
+      "newChildBeforeAllowed": true,
+      "staleResult": null,
+      "newOwnerAfter": null,
+      "newChildAfter": null,
+      "lateNotices": [],
+      "lateAborts": 0,
+      "passed": true
+    },
+    {
+      "scenario": "continuation-reject-after-new-turn",
+      "planBeforeBlocked": true,
+      "newOwnerBeforeAllowed": true,
+      "newChildBeforeAllowed": true,
+      "staleResult": null,
+      "newOwnerAfter": null,
+      "newChildAfter": null,
+      "lateNotices": [],
+      "lateAborts": 0,
+      "passed": true
+    }
+  ],
+  "scratchRemoved": true,
+  "passed": true
+}

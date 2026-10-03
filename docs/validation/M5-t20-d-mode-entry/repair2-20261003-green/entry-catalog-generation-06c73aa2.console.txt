@@ -1,0 +1,214 @@
+(node:1968923) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  "candidate": "06c73aa29809339d02704fb67ccdaca12680f348",
+  "layer": "actual bridge/gate/adapter/patched source OMP/HostProcess+SQLite/local fake provider; public catalog promise delayed across Stop and subsequent actual prompt; public session.configure models a user mode change",
+  "cases": [
+    {
+      "kind": "plan",
+      "ends": [
+        {
+          "sessionId": "05ef1246-876e-465e-899e-e6ec0dc0c50b",
+          "turnId": "omp-turn:05ef1246-876e-465e-899e-e6ec0dc0c50b:758273ae-4761-4f5a-9f51-208bf1e68cb3:1",
+          "hostTurnId": "1bbd7c5c-0b75-474a-b3cd-e94d765de403",
+          "reason": "aborted"
+        },
+        {
+          "sessionId": "05ef1246-876e-465e-899e-e6ec0dc0c50b",
+          "turnId": "omp-turn:05ef1246-876e-465e-899e-e6ec0dc0c50b:758273ae-4761-4f5a-9f51-208bf1e68cb3:2",
+          "hostTurnId": "bac6749d-16b3-4f84-8c0f-e801186a2040",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 3,
+      "first": {
+        "accepted": true,
+        "turnId": "omp-turn:05ef1246-876e-465e-899e-e6ec0dc0c50b:758273ae-4761-4f5a-9f51-208bf1e68cb3:1",
+        "hostTurnId": "1bbd7c5c-0b75-474a-b3cd-e94d765de403"
+      },
+      "oldCatalogWaiting": true,
+      "modeBeforeStop": "plan",
+      "stop": {
+        "aborted": true,
+        "abortBashSent": false,
+        "converged": true,
+        "toreDown": false,
+        "steps": [
+          "cancelled 1 pending host tool call(s)",
+          "abort acknowledged",
+          "turn converged"
+        ],
+        "errors": []
+      },
+      "second": {
+        "accepted": true,
+        "turnId": "omp-turn:05ef1246-876e-465e-899e-e6ec0dc0c50b:758273ae-4761-4f5a-9f51-208bf1e68cb3:2",
+        "hostTurnId": "bac6749d-16b3-4f84-8c0f-e801186a2040"
+      },
+      "oldCatalogReleased": true,
+      "secondRequests": [
+        {
+          "tools": [
+            "read",
+            "bash",
+            "edit",
+            "ask",
+            "eval",
+            "glob",
+            "grep",
+            "task",
+            "wait",
+            "todo",
+            "web_search",
+            "write",
+            "EnterPlanMode",
+            "EnterGoalMode"
+          ]
+        },
+        {
+          "tools": [
+            "read",
+            "bash",
+            "edit",
+            "ask",
+            "eval",
+            "glob",
+            "grep",
+            "task",
+            "wait",
+            "todo",
+            "web_search",
+            "write",
+            "EnterPlanMode",
+            "EnterGoalMode"
+          ]
+        }
+      ],
+      "modeAfter": "agent",
+      "turns": [
+        {
+          "id": "1bbd7c5c-0b75-474a-b3cd-e94d765de403",
+          "status": "aborted"
+        },
+        {
+          "id": "bac6749d-16b3-4f84-8c0f-e801186a2040",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "goal",
+      "ends": [
+        {
+          "sessionId": "4a7242f8-9233-447f-b4b4-a1b5ed472557",
+          "turnId": "omp-turn:4a7242f8-9233-447f-b4b4-a1b5ed472557:def7befd-8333-4f27-921a-ab00eebbd5db:1",
+          "hostTurnId": "4fa192ea-3163-4d29-ae73-c6e751b32156",
+          "reason": "aborted"
+        },
+        {
+          "sessionId": "4a7242f8-9233-447f-b4b4-a1b5ed472557",
+          "turnId": "omp-turn:4a7242f8-9233-447f-b4b4-a1b5ed472557:def7befd-8333-4f27-921a-ab00eebbd5db:2",
+          "hostTurnId": "8688b4f5-26d3-4cf2-beef-46eed7076f51",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 3,
+      "first": {
+        "accepted": true,
+        "turnId": "omp-turn:4a7242f8-9233-447f-b4b4-a1b5ed472557:def7befd-8333-4f27-921a-ab00eebbd5db:1",
+        "hostTurnId": "4fa192ea-3163-4d29-ae73-c6e751b32156"
+      },
+      "oldCatalogWaiting": true,
+      "modeBeforeStop": "goal",
+      "stop": {
+        "aborted": true,
+        "abortBashSent": false,
+        "converged": true,
+        "toreDown": false,
+        "steps": [
+          "cancelled 1 pending host tool call(s)",
+          "abort acknowledged",
+          "turn converged"
+        ],
+        "errors": []
+      },
+      "second": {
+        "accepted": true,
+        "turnId": "omp-turn:4a7242f8-9233-447f-b4b4-a1b5ed472557:def7befd-8333-4f27-921a-ab00eebbd5db:2",
+        "hostTurnId": "8688b4f5-26d3-4cf2-beef-46eed7076f51"
+      },
+      "oldCatalogReleased": true,
+      "secondRequests": [
+        {
+          "tools": [
+            "read",
+            "bash",
+            "edit",
+            "ask",
+            "eval",
+            "glob",
+            "grep",
+            "task",
+            "wait",
+            "todo",
+            "web_search",
+            "write",
+            "EnterPlanMode",
+            "EnterGoalMode"
+          ]
+        },
+        {
+          "tools": [
+            "read",
+            "bash",
+            "edit",
+            "ask",
+            "eval",
+            "glob",
+            "grep",
+            "task",
+            "wait",
+            "todo",
+            "web_search",
+            "write",
+            "EnterPlanMode",
+            "EnterGoalMode"
+          ]
+        }
+      ],
+      "modeAfter": "agent",
+      "turns": [
+        {
+          "id": "4fa192ea-3163-4d29-ae73-c6e751b32156",
+          "status": "aborted"
+        },
+        {
+          "id": "8688b4f5-26d3-4cf2-beef-46eed7076f51",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    }
+  ],
+  "finalCleanupErrors": [],
+  "passed": true
+}

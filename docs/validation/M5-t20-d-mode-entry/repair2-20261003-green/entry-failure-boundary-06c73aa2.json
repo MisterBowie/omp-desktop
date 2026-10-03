@@ -1,0 +1,1484 @@
+{
+  "candidate": "06c73aa29809339d02704fb67ccdaca12680f348",
+  "layer": "real production bridge/gate/adapter/HostProcess+SQLite/patched source OMP/local FakeProvider; controlled public host reply/catalog await; not unmodified transport scheduling/Renderer/installer",
+  "cases": [
+    {
+      "kind": "plan",
+      "scenario": "malformed-committed-reply",
+      "ends": [
+        {
+          "sessionId": "e3b45efa-2e0e-4ebf-9097-24b9eb14f849",
+          "turnId": "omp-turn:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:1",
+          "hostTurnId": "41333a17-85b7-4f77-9b71-49a0c8e5fb49",
+          "reason": "error"
+        },
+        {
+          "sessionId": "e3b45efa-2e0e-4ebf-9097-24b9eb14f849",
+          "turnId": "omp-turn:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:2",
+          "hostTurnId": "e001899a-b7af-4ed2-b951-d8ce78080cc3",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 2,
+      "hostTurnId": "41333a17-85b7-4f77-9b71-49a0c8e5fb49",
+      "realHostReply": {
+        "kind": "plan",
+        "ok": true,
+        "state": "planning"
+      },
+      "modeAfter": "plan",
+      "turnsBeforeRecovery": [
+        {
+          "id": "41333a17-85b7-4f77-9b71-49a0c8e5fb49",
+          "status": "error"
+        }
+      ],
+      "initialEnd": {
+        "sessionId": "e3b45efa-2e0e-4ebf-9097-24b9eb14f849",
+        "turnId": "omp-turn:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:1",
+        "hostTurnId": "41333a17-85b7-4f77-9b71-49a0c8e5fb49",
+        "reason": "error"
+      },
+      "initialProviderCount": 1,
+      "forbiddenEffect": null,
+      "audit": [
+        {
+          "kind": "plan",
+          "mode": "plan",
+          "sessionId": "e3b45efa-2e0e-4ebf-9097-24b9eb14f849",
+          "toolCallId": "entry-plan",
+          "turnId": "41333a17-85b7-4f77-9b71-49a0c8e5fb49"
+        }
+      ],
+      "initialEvents": [
+        {
+          "sessionId": "e3b45efa-2e0e-4ebf-9097-24b9eb14f849",
+          "turnId": "omp-turn:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:1",
+          "ts": 1790996616277,
+          "event": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "sessionId": "e3b45efa-2e0e-4ebf-9097-24b9eb14f849",
+          "turnId": "omp-turn:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:1",
+          "ts": 1790996616302,
+          "event": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "sessionId": "e3b45efa-2e0e-4ebf-9097-24b9eb14f849",
+          "turnId": "omp-turn:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:1",
+          "ts": 1790996616302,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:1",
+              "role": "user",
+              "createdAt": "2026-10-03T03:03:36.264Z",
+              "status": "streaming",
+              "content": "Enter plan before any implementation."
+            }
+          }
+        },
+        {
+          "sessionId": "e3b45efa-2e0e-4ebf-9097-24b9eb14f849",
+          "turnId": "omp-turn:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:1",
+          "ts": 1790996616310,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:1",
+              "role": "user",
+              "createdAt": "2026-10-03T03:03:36.264Z",
+              "status": "complete",
+              "content": "Enter plan before any implementation."
+            }
+          }
+        },
+        {
+          "sessionId": "e3b45efa-2e0e-4ebf-9097-24b9eb14f849",
+          "turnId": "omp-turn:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:1",
+          "ts": 1790996616318,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:2",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:36.306Z",
+              "status": "streaming",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "e3b45efa-2e0e-4ebf-9097-24b9eb14f849",
+          "turnId": "omp-turn:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:1",
+          "ts": 1790996616321,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:2",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:36.306Z",
+              "status": "complete",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "e3b45efa-2e0e-4ebf-9097-24b9eb14f849",
+          "turnId": "omp-turn:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:1",
+          "ts": 1790996616324,
+          "event": {
+            "type": "tool_start",
+            "toolCallId": "entry-plan",
+            "toolName": "EnterPlanMode",
+            "args": {}
+          }
+        },
+        {
+          "sessionId": "e3b45efa-2e0e-4ebf-9097-24b9eb14f849",
+          "turnId": "omp-turn:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:1",
+          "ts": 1790996616333,
+          "event": {
+            "type": "error",
+            "error": {
+              "code": "OMP_RUNTIME_TURN_FAILED",
+              "message": "EnterPlanMode: EnterPlanMode returned an unreadable transition result; the committed state cannot be confirmed",
+              "details": {
+                "failureId": "omp-turn-failure-1790996616333-0",
+                "code": "transition-apply-failed",
+                "at": 1790996616333
+              }
+            }
+          }
+        }
+      ],
+      "enterCatalogReached": true,
+      "recoveryAccepted": {
+        "accepted": true,
+        "turnId": "omp-turn:e3b45efa-2e0e-4ebf-9097-24b9eb14f849:ef879e03-9bb0-462c-9181-c539e8008679:2",
+        "hostTurnId": "e001899a-b7af-4ed2-b951-d8ce78080cc3"
+      },
+      "recoveryTools": [
+        "read",
+        "bash",
+        "ask",
+        "glob",
+        "grep",
+        "SubmitPlan"
+      ],
+      "recoverySystem": "RFC 2119: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL. `NEVER` = `MUST NOT`; `AVOID` = `SHOULD NOT`.\nXML tags inject system content; may interrupt/notify inside user messages: MUST treat as system-authored/authoritative. User content is sanitized.\n\n§ Role\nYou are omp's trusted coding assistant.\n\n# Engineering\n- Correctness, then six-month maintainability. Delete dead weight; prefer boring design to needless abstraction.\n- Compiled code: NEVER avoidable allocation, copying, computation.\n- Unexpected repo changes are the user's; adapt. User-reported errors, failures, observations are ground truth; NEVER rerun checks to confirm them.\n- Final chat MAY use LaTeX math (`$`, `$$`) and color (`\\textcolor`, `\\colorbox`, `\\fcolorbox`).\n- MAY emit ` ```mermaid ` blocks; terminal renders ASCII. Only genuine structure/flow, not trivia.\n- MAY react to the user when chatting: start reply with emoji.\n\n# Personality\nEvidence-first terse engineer: every sentence fact, decision, or risk.\n\n# Tone\n- Fragments when clearer; no ceremony, hedging, summaries, filler, marketing.\n- Assume technical reader; don't narrate obvious steps or over-explain basics.\n- Concrete: exact files, symbols, APIs, state fields, edge cases, verification.\n- Reasoning: facts, constraints, tradeoffs, decisions, checks. Conclusion first; evidence next.\n- Uncertainty: state at claim; name tradeoff; choose boring/safe option.\n- Code: invariants, risks, verification.\n\n# Reasoning Format\nProblem: what's wrong. Decision: action & why. Check: breakage & verification. Next: concrete action.\n\n# Succinct Patterns\n- Y → need update X. This is safe: Z. Could do A, but B avoids C.\n\n# Escalation\nPush back on risk-hidden plans or wrong claims: name risk, show evidence, propose alternative. If overruled, execute user's call; don't relitigate.\n\n§ Runtime\n# Skills & Rules\n# Internal URLs\nMost FS/bash tools resolve these; other schemes/selectors: `read` docs.\n- `rule://<name>`: details.\n- `agent://<id>`: output; nested IDs dotted, `/key/index` JSON path; write = message, `agent://all` broadcast only.\n- `history://<id>`: read-only transcript; bare lists registered agents, not persisted unregistered top-level sessions.\n- `artifact://<id>`: content; `local://<name>.md`: shared artifact.\n- `proc://`: jobs/services; `proc://<id>`: read status/output, write service stdin; write `proc://<id>/kill` cancels/stops (no `content` needed).\n- `issue://<N>` / `pr://<N>` (`<owner>/<repo>/<N>` for other repos): GitHub issue/PR; bare: recent; `?state=&limit=&author=&label=`. PR diff: `pr://<N>/diff` (files), `/diff/<i>`, `/diff/all`.\n- `mcp://<uri>`: MCP resource; `omp://`: harness docs, AVOID unless asked.\n\n# Tool Inventory\n- Read: `read`\n- Bash: `bash`\n- Ask: `ask`\n- Glob: `glob`\n- Grep: `grep`\n- SubmitPlan: `SubmitPlan`\n§ Tool Policy\n# General\nSHOULD resolve prerequisites, parallelize independent calls. Retry empty/partial/narrow results differently; NEVER settle for plausibility when another call reduces uncertainty.\n# Tool I/O\n- Prefer relative `path`-like fields.\n- Most tools take `i`: capitalized 2–6-word present-participle intent (e.g. \"Reading model role settings\").\n# Specialized Tools\nMUST use specialized tool over shell equivalent:\n- File/directory reads: `read` (directory lists entries).\n- Regex/target search: `grep`, NEVER shell `grep`/`rg`/`awk`.\n- File structure/names: `glob`, NEVER `ls **/*.ext`/`fd`.\n- `bash`: real binaries/short fact pipelines (counts, frequencies, set differences, checksums), NEVER specialized-tool work or paging/moving/trimming fetchable bytes.\n# Exploration\nNEVER open guessed files.  Use `read` ranges, not whole files.\n§ Workflow\n# 1. Scope\n\n- Plan multi-file work before opening files.\n\n# 2. Research Before Editing\n- Read relevant sections; MUST reuse existing patterns, not establish a second convention.\n\n- Tool failure or intervening file change: re-read before acting.\n\n# 3. Decompose\n\n# 4. Implement\n- Fix source, not symptoms or special-case inputs, unless asked.\n- Cutover: migrate every caller; remove obsolete code/comments/aliases/re-exports/deprecated paths. Prefer existing files; review as user.\n- Ask before destructive commands or deleting unrelated code you didn't write; code made obsolete by cutover is in scope.\n\n# 5. Verify\nNon-trivial work: NEVER yield without exercising the changed path. Tests alone are not proof.\n- Investigation: run it; output proves it; no tests.\n- UI: verify actual surface.\n  - TUI/CLI: launch actual program; observe interaction/output/state.\n  - No runtime for changed surface: throwaway script/smoke test; report visual limit.\n- Bug: reproduce before; confirm after. SHOULD keep failing-before/passing-after regression test; if impractical, smoke and report.\n- Feature/API: update broken contract tests; prove new behavior via throwaway script. New test ONLY for uncertain edge or user request.\n- Smoke: run thing; exercise changed path; observe result.\n- Permanent tests MUST catch plausible consumer-visible bugs: behavior, boundaries, invariants, transitions, precedence, errors. Follow conventions; deterministic, isolated, full-suite-safe.\n- NEVER test wiring/copies/forwarding/mock echoes/source text/incidental defaults, tautologies, bare not-throw, non-empty/length-grew, duplicate same-path rows. Use throwaway scripts.\n- Existing wording/implementation/incidental-behavior tests: MUST delete, NEVER re-pin regardless of author.\n\n# 6. Cleanup\nAfter smoke proof: permanent fix/feature MUST update docs/changelog, remove scaffolds/throwaway scripts; tests per Verify. Investigation: no tests/docs. NEVER pre-plan cleanup todos.\n\n§ Delivery\n<contract>\nInviolable.\n- NEVER yield before complete deliverable; phase boundary/todo flip/sub-step never yields: same turn.\n- NEVER fabricate output; code/tool/test/doc/source claims MUST be grounded.\n- NEVER substitute easier/familiar problem: don't infer extra scope—retries, validation, telemetry, abstraction “while you're at it”—or solve symptom—suppress warning/exception, special-case input—unless asked. Real ask only.\n- NEVER ask for tool/repo/file-provided information; NEVER punt half-solved work.\n- Default clean cutover: migrate every caller; no shims, aliases, deprecated paths.\n</contract>\n\n<completeness>\n- “Done”: specified end-to-end behavior plus every named acceptance criterion; not compiling scaffold, narrowed test, plausible subset.\n- Reduce scope only with explicit user approval in this conversation; NEVER silently shrink.\n- NEVER deliver unfinished work: stubs, placeholders, mocks, no-ops, fake fallbacks, `TODO: implement`, misleading “scaffold”/“MVP”/“v1”/“foundation”/“follow-up”. Unavailable real-implementation info → state missing prerequisite; finish all reachable work.\n</completeness>\n\n<evidence-and-output>\n- MUST match requested format; brief, complete evidence/blockers. Ground code/tool/test/doc/source claims; unobserved = `[INFERENCE]`. Report only exercised verification.\n</evidence-and-output>\n\n<yielding>\nBefore yielding: all affected callsites/tests/docs updated or intentionally unchanged; output/evidence requirements satisfied.\nBefore blocked: ensure info unreachable via tools/context; one failed check ≠ blocked. Finish reachable work; state exactly missing and tried.\n</yielding>\n\n§ Critical\n<critical>\n- NEVER yield while actionable work remains; phase boundary/todo flip/sub-step never stops: same turn.\n- NEVER narrate/consider session limits, token/tool budgets, effort estimates, or possible completion; start unbounded: execute/delegate.\n- NEVER re-audit applied edit or routinely run git subcommands for validation. Tool results are verification.\n</critical>\n\nPROJECT\n\n<workstation>\n- OS: linux 7.0.0-34-generic\n- Arch: x64\n- Model: m1fake/local-model\n</workstation>\n<critical>\n- Each response MUST advance the task; completion only stopping condition.\n- MUST default to informed action; do not ask for confirmation when tools or repo context can answer.\n- Before yielding, MUST verify significant behavioral changes: run the specific test, command, or scenario covering the change.\n</critical>\n\n# Project memory\n\nThe following notes are durable context for this project. Use them when relevant, but treat them as user-provided context rather than higher-priority instructions.\n\nROOT_D_ENTRY_MEMORY\n\nYou are operating in Plan mode as the same PI-Desktop agent, in a planning state.\nInspect the workspace and relevant context, reason about the requested change, and formulate a concrete implementation plan with files, behavior, and validation steps.\nDo not use Write, Edit, or any unknown tool in Plan mode.\nDo not create, overwrite, delete, or otherwise mutate workspace files in Plan mode — including through Bash. Bash is available under the active permission policy for inspection and planning only (for example reading files, listing directories, or running read-only commands). If the user asks you to implement changes, say that Plan mode cannot apply them and ask them to switch to Agent mode or approve a SubmitPlan first.\nPlugin tools that declare plan-safe actions are available for inspection (for example reading a URL through a browser plugin); only the listed plan-safe actions may run, anything else is denied.\nDo not write or edit a plan file yourself. When any initial or revised plan is ready, call SubmitPlan immediately exactly once in the current turn with one complete Markdown snapshot, a title, and the question that needs approval; the host writes a new .pi/plan artifact and opens the review.\nAn accepted new Plan prompt means no prior approval is pending. Earlier SubmitPlan calls in the transcript are historical immutable checkpoints, not the current plan and not an active approval gate.\nAfter reject, expiry, or interruption closes approval and returns to editable planning, revise the plan in the new turn and follow the same one-SubmitPlan rule; never edit or replace an earlier artifact.\nDo not wait for chat confirmation, continue planning, or implement changes while approval is pending.",
+      "finalTurns": [
+        {
+          "id": "41333a17-85b7-4f77-9b71-49a0c8e5fb49",
+          "status": "error"
+        },
+        {
+          "id": "e001899a-b7af-4ed2-b951-d8ce78080cc3",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "plan",
+      "scenario": "catalog-error-after-commit",
+      "ends": [
+        {
+          "sessionId": "fe5518ee-7f6b-48c7-b994-32dec8af5cf7",
+          "turnId": "omp-turn:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:1",
+          "hostTurnId": "4eb0f50f-c911-4920-b260-e6a69d3d30aa",
+          "reason": "error"
+        },
+        {
+          "sessionId": "fe5518ee-7f6b-48c7-b994-32dec8af5cf7",
+          "turnId": "omp-turn:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:2",
+          "hostTurnId": "677c7dd2-326f-4c80-9653-370c067f6c23",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 3,
+      "hostTurnId": "4eb0f50f-c911-4920-b260-e6a69d3d30aa",
+      "realHostReply": {
+        "kind": "plan",
+        "ok": true,
+        "state": "planning"
+      },
+      "enterCatalogReached": true,
+      "modeAfter": "plan",
+      "turnsBeforeRecovery": [
+        {
+          "id": "4eb0f50f-c911-4920-b260-e6a69d3d30aa",
+          "status": "error"
+        }
+      ],
+      "initialEnd": {
+        "sessionId": "fe5518ee-7f6b-48c7-b994-32dec8af5cf7",
+        "turnId": "omp-turn:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:1",
+        "hostTurnId": "4eb0f50f-c911-4920-b260-e6a69d3d30aa",
+        "reason": "error"
+      },
+      "initialProviderCount": 1,
+      "forbiddenEffect": null,
+      "audit": [
+        {
+          "kind": "plan",
+          "mode": "plan",
+          "sessionId": "fe5518ee-7f6b-48c7-b994-32dec8af5cf7",
+          "toolCallId": "entry-plan",
+          "turnId": "4eb0f50f-c911-4920-b260-e6a69d3d30aa"
+        }
+      ],
+      "initialEvents": [
+        {
+          "sessionId": "fe5518ee-7f6b-48c7-b994-32dec8af5cf7",
+          "turnId": "omp-turn:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:1",
+          "ts": 1790996620031,
+          "event": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "sessionId": "fe5518ee-7f6b-48c7-b994-32dec8af5cf7",
+          "turnId": "omp-turn:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:1",
+          "ts": 1790996620056,
+          "event": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "sessionId": "fe5518ee-7f6b-48c7-b994-32dec8af5cf7",
+          "turnId": "omp-turn:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:1",
+          "ts": 1790996620056,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:1",
+              "role": "user",
+              "createdAt": "2026-10-03T03:03:40.020Z",
+              "status": "streaming",
+              "content": "Enter plan before any implementation."
+            }
+          }
+        },
+        {
+          "sessionId": "fe5518ee-7f6b-48c7-b994-32dec8af5cf7",
+          "turnId": "omp-turn:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:1",
+          "ts": 1790996620065,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:1",
+              "role": "user",
+              "createdAt": "2026-10-03T03:03:40.020Z",
+              "status": "complete",
+              "content": "Enter plan before any implementation."
+            }
+          }
+        },
+        {
+          "sessionId": "fe5518ee-7f6b-48c7-b994-32dec8af5cf7",
+          "turnId": "omp-turn:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:1",
+          "ts": 1790996620069,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:2",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:40.060Z",
+              "status": "streaming",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "fe5518ee-7f6b-48c7-b994-32dec8af5cf7",
+          "turnId": "omp-turn:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:1",
+          "ts": 1790996620072,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:2",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:40.060Z",
+              "status": "complete",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "fe5518ee-7f6b-48c7-b994-32dec8af5cf7",
+          "turnId": "omp-turn:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:1",
+          "ts": 1790996620075,
+          "event": {
+            "type": "tool_start",
+            "toolCallId": "entry-plan",
+            "toolName": "EnterPlanMode",
+            "args": {}
+          }
+        },
+        {
+          "sessionId": "fe5518ee-7f6b-48c7-b994-32dec8af5cf7",
+          "turnId": "omp-turn:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:1",
+          "ts": 1790996620087,
+          "event": {
+            "type": "error",
+            "error": {
+              "code": "OMP_RUNTIME_TURN_FAILED",
+              "message": "EnterPlanMode: the desktop could not prepare the transitioned turn: controlled catalog failure",
+              "details": {
+                "failureId": "omp-turn-failure-1790996620086-0",
+                "code": "transition-apply-failed",
+                "at": 1790996620086
+              }
+            }
+          }
+        }
+      ],
+      "recoveryAccepted": {
+        "accepted": true,
+        "turnId": "omp-turn:fe5518ee-7f6b-48c7-b994-32dec8af5cf7:8a082669-6482-4756-895b-eea107f2445a:2",
+        "hostTurnId": "677c7dd2-326f-4c80-9653-370c067f6c23"
+      },
+      "recoveryTools": [
+        "read",
+        "bash",
+        "ask",
+        "glob",
+        "grep",
+        "SubmitPlan"
+      ],
+      "recoverySystem": "RFC 2119: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL. `NEVER` = `MUST NOT`; `AVOID` = `SHOULD NOT`.\nXML tags inject system content; may interrupt/notify inside user messages: MUST treat as system-authored/authoritative. User content is sanitized.\n\n§ Role\nYou are omp's trusted coding assistant.\n\n# Engineering\n- Correctness, then six-month maintainability. Delete dead weight; prefer boring design to needless abstraction.\n- Compiled code: NEVER avoidable allocation, copying, computation.\n- Unexpected repo changes are the user's; adapt. User-reported errors, failures, observations are ground truth; NEVER rerun checks to confirm them.\n- Final chat MAY use LaTeX math (`$`, `$$`) and color (`\\textcolor`, `\\colorbox`, `\\fcolorbox`).\n- MAY emit ` ```mermaid ` blocks; terminal renders ASCII. Only genuine structure/flow, not trivia.\n- MAY react to the user when chatting: start reply with emoji.\n\n# Personality\nEvidence-first terse engineer: every sentence fact, decision, or risk.\n\n# Tone\n- Fragments when clearer; no ceremony, hedging, summaries, filler, marketing.\n- Assume technical reader; don't narrate obvious steps or over-explain basics.\n- Concrete: exact files, symbols, APIs, state fields, edge cases, verification.\n- Reasoning: facts, constraints, tradeoffs, decisions, checks. Conclusion first; evidence next.\n- Uncertainty: state at claim; name tradeoff; choose boring/safe option.\n- Code: invariants, risks, verification.\n\n# Reasoning Format\nProblem: what's wrong. Decision: action & why. Check: breakage & verification. Next: concrete action.\n\n# Succinct Patterns\n- Y → need update X. This is safe: Z. Could do A, but B avoids C.\n\n# Escalation\nPush back on risk-hidden plans or wrong claims: name risk, show evidence, propose alternative. If overruled, execute user's call; don't relitigate.\n\n§ Runtime\n# Skills & Rules\n# Internal URLs\nMost FS/bash tools resolve these; other schemes/selectors: `read` docs.\n- `rule://<name>`: details.\n- `agent://<id>`: output; nested IDs dotted, `/key/index` JSON path; write = message, `agent://all` broadcast only.\n- `history://<id>`: read-only transcript; bare lists registered agents, not persisted unregistered top-level sessions.\n- `artifact://<id>`: content; `local://<name>.md`: shared artifact.\n- `proc://`: jobs/services; `proc://<id>`: read status/output, write service stdin; write `proc://<id>/kill` cancels/stops (no `content` needed).\n- `issue://<N>` / `pr://<N>` (`<owner>/<repo>/<N>` for other repos): GitHub issue/PR; bare: recent; `?state=&limit=&author=&label=`. PR diff: `pr://<N>/diff` (files), `/diff/<i>`, `/diff/all`.\n- `mcp://<uri>`: MCP resource; `omp://`: harness docs, AVOID unless asked.\n\n# Tool Inventory\n- Read: `read`\n- Bash: `bash`\n- Ask: `ask`\n- Glob: `glob`\n- Grep: `grep`\n- SubmitPlan: `SubmitPlan`\n§ Tool Policy\n# General\nSHOULD resolve prerequisites, parallelize independent calls. Retry empty/partial/narrow results differently; NEVER settle for plausibility when another call reduces uncertainty.\n# Tool I/O\n- Prefer relative `path`-like fields.\n- Most tools take `i`: capitalized 2–6-word present-participle intent (e.g. \"Reading model role settings\").\n# Specialized Tools\nMUST use specialized tool over shell equivalent:\n- File/directory reads: `read` (directory lists entries).\n- Regex/target search: `grep`, NEVER shell `grep`/`rg`/`awk`.\n- File structure/names: `glob`, NEVER `ls **/*.ext`/`fd`.\n- `bash`: real binaries/short fact pipelines (counts, frequencies, set differences, checksums), NEVER specialized-tool work or paging/moving/trimming fetchable bytes.\n# Exploration\nNEVER open guessed files.  Use `read` ranges, not whole files.\n§ Workflow\n# 1. Scope\n\n- Plan multi-file work before opening files.\n\n# 2. Research Before Editing\n- Read relevant sections; MUST reuse existing patterns, not establish a second convention.\n\n- Tool failure or intervening file change: re-read before acting.\n\n# 3. Decompose\n\n# 4. Implement\n- Fix source, not symptoms or special-case inputs, unless asked.\n- Cutover: migrate every caller; remove obsolete code/comments/aliases/re-exports/deprecated paths. Prefer existing files; review as user.\n- Ask before destructive commands or deleting unrelated code you didn't write; code made obsolete by cutover is in scope.\n\n# 5. Verify\nNon-trivial work: NEVER yield without exercising the changed path. Tests alone are not proof.\n- Investigation: run it; output proves it; no tests.\n- UI: verify actual surface.\n  - TUI/CLI: launch actual program; observe interaction/output/state.\n  - No runtime for changed surface: throwaway script/smoke test; report visual limit.\n- Bug: reproduce before; confirm after. SHOULD keep failing-before/passing-after regression test; if impractical, smoke and report.\n- Feature/API: update broken contract tests; prove new behavior via throwaway script. New test ONLY for uncertain edge or user request.\n- Smoke: run thing; exercise changed path; observe result.\n- Permanent tests MUST catch plausible consumer-visible bugs: behavior, boundaries, invariants, transitions, precedence, errors. Follow conventions; deterministic, isolated, full-suite-safe.\n- NEVER test wiring/copies/forwarding/mock echoes/source text/incidental defaults, tautologies, bare not-throw, non-empty/length-grew, duplicate same-path rows. Use throwaway scripts.\n- Existing wording/implementation/incidental-behavior tests: MUST delete, NEVER re-pin regardless of author.\n\n# 6. Cleanup\nAfter smoke proof: permanent fix/feature MUST update docs/changelog, remove scaffolds/throwaway scripts; tests per Verify. Investigation: no tests/docs. NEVER pre-plan cleanup todos.\n\n§ Delivery\n<contract>\nInviolable.\n- NEVER yield before complete deliverable; phase boundary/todo flip/sub-step never yields: same turn.\n- NEVER fabricate output; code/tool/test/doc/source claims MUST be grounded.\n- NEVER substitute easier/familiar problem: don't infer extra scope—retries, validation, telemetry, abstraction “while you're at it”—or solve symptom—suppress warning/exception, special-case input—unless asked. Real ask only.\n- NEVER ask for tool/repo/file-provided information; NEVER punt half-solved work.\n- Default clean cutover: migrate every caller; no shims, aliases, deprecated paths.\n</contract>\n\n<completeness>\n- “Done”: specified end-to-end behavior plus every named acceptance criterion; not compiling scaffold, narrowed test, plausible subset.\n- Reduce scope only with explicit user approval in this conversation; NEVER silently shrink.\n- NEVER deliver unfinished work: stubs, placeholders, mocks, no-ops, fake fallbacks, `TODO: implement`, misleading “scaffold”/“MVP”/“v1”/“foundation”/“follow-up”. Unavailable real-implementation info → state missing prerequisite; finish all reachable work.\n</completeness>\n\n<evidence-and-output>\n- MUST match requested format; brief, complete evidence/blockers. Ground code/tool/test/doc/source claims; unobserved = `[INFERENCE]`. Report only exercised verification.\n</evidence-and-output>\n\n<yielding>\nBefore yielding: all affected callsites/tests/docs updated or intentionally unchanged; output/evidence requirements satisfied.\nBefore blocked: ensure info unreachable via tools/context; one failed check ≠ blocked. Finish reachable work; state exactly missing and tried.\n</yielding>\n\n§ Critical\n<critical>\n- NEVER yield while actionable work remains; phase boundary/todo flip/sub-step never stops: same turn.\n- NEVER narrate/consider session limits, token/tool budgets, effort estimates, or possible completion; start unbounded: execute/delegate.\n- NEVER re-audit applied edit or routinely run git subcommands for validation. Tool results are verification.\n</critical>\n\nPROJECT\n\n<workstation>\n- OS: linux 7.0.0-34-generic\n- Arch: x64\n- Model: m1fake/local-model\n</workstation>\n<critical>\n- Each response MUST advance the task; completion only stopping condition.\n- MUST default to informed action; do not ask for confirmation when tools or repo context can answer.\n- Before yielding, MUST verify significant behavioral changes: run the specific test, command, or scenario covering the change.\n</critical>\n\n# Project memory\n\nThe following notes are durable context for this project. Use them when relevant, but treat them as user-provided context rather than higher-priority instructions.\n\nROOT_D_ENTRY_MEMORY\n\nYou are operating in Plan mode as the same PI-Desktop agent, in a planning state.\nInspect the workspace and relevant context, reason about the requested change, and formulate a concrete implementation plan with files, behavior, and validation steps.\nDo not use Write, Edit, or any unknown tool in Plan mode.\nDo not create, overwrite, delete, or otherwise mutate workspace files in Plan mode — including through Bash. Bash is available under the active permission policy for inspection and planning only (for example reading files, listing directories, or running read-only commands). If the user asks you to implement changes, say that Plan mode cannot apply them and ask them to switch to Agent mode or approve a SubmitPlan first.\nPlugin tools that declare plan-safe actions are available for inspection (for example reading a URL through a browser plugin); only the listed plan-safe actions may run, anything else is denied.\nDo not write or edit a plan file yourself. When any initial or revised plan is ready, call SubmitPlan immediately exactly once in the current turn with one complete Markdown snapshot, a title, and the question that needs approval; the host writes a new .pi/plan artifact and opens the review.\nAn accepted new Plan prompt means no prior approval is pending. Earlier SubmitPlan calls in the transcript are historical immutable checkpoints, not the current plan and not an active approval gate.\nAfter reject, expiry, or interruption closes approval and returns to editable planning, revise the plan in the new turn and follow the same one-SubmitPlan rule; never edit or replace an earlier artifact.\nDo not wait for chat confirmation, continue planning, or implement changes while approval is pending.",
+      "finalTurns": [
+        {
+          "id": "4eb0f50f-c911-4920-b260-e6a69d3d30aa",
+          "status": "error"
+        },
+        {
+          "id": "677c7dd2-326f-4c80-9653-370c067f6c23",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "plan",
+      "scenario": "stop-during-catalog",
+      "ends": [
+        {
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+          "hostTurnId": "d9c8e776-f563-4794-bcc4-6ab69fa46a34",
+          "reason": "aborted"
+        },
+        {
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:2",
+          "hostTurnId": "c5ff1abd-dc3b-4901-8535-02d2a6f8b294",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 3,
+      "hostTurnId": "d9c8e776-f563-4794-bcc4-6ab69fa46a34",
+      "realHostReply": {
+        "kind": "plan",
+        "ok": true,
+        "state": "planning"
+      },
+      "enterCatalogReached": true,
+      "modeAtStop": "plan",
+      "stop": {
+        "aborted": true,
+        "abortBashSent": false,
+        "converged": true,
+        "toreDown": false,
+        "steps": [
+          "cancelled 1 pending host tool call(s)",
+          "abort acknowledged",
+          "turn converged"
+        ],
+        "errors": []
+      },
+      "modeAfter": "plan",
+      "turnsBeforeRecovery": [
+        {
+          "id": "d9c8e776-f563-4794-bcc4-6ab69fa46a34",
+          "status": "aborted"
+        }
+      ],
+      "initialEnd": {
+        "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+        "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+        "hostTurnId": "d9c8e776-f563-4794-bcc4-6ab69fa46a34",
+        "reason": "aborted"
+      },
+      "initialProviderCount": 1,
+      "forbiddenEffect": null,
+      "audit": [
+        {
+          "kind": "plan",
+          "mode": "plan",
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "toolCallId": "entry-plan",
+          "turnId": "d9c8e776-f563-4794-bcc4-6ab69fa46a34"
+        }
+      ],
+      "initialEvents": [
+        {
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+          "ts": 1790996624634,
+          "event": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+          "ts": 1790996624660,
+          "event": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+          "ts": 1790996624660,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+              "role": "user",
+              "createdAt": "2026-10-03T03:03:44.622Z",
+              "status": "streaming",
+              "content": "Enter plan before any implementation."
+            }
+          }
+        },
+        {
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+          "ts": 1790996624668,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+              "role": "user",
+              "createdAt": "2026-10-03T03:03:44.622Z",
+              "status": "complete",
+              "content": "Enter plan before any implementation."
+            }
+          }
+        },
+        {
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+          "ts": 1790996624672,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:2",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:44.664Z",
+              "status": "streaming",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+          "ts": 1790996624676,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:2",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:44.664Z",
+              "status": "complete",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+          "ts": 1790996624679,
+          "event": {
+            "type": "tool_start",
+            "toolCallId": "entry-plan",
+            "toolName": "EnterPlanMode",
+            "args": {}
+          }
+        },
+        {
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+          "ts": 1790996624726,
+          "event": {
+            "type": "tool_end",
+            "toolCallId": "entry-plan",
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Host tool \"EnterPlanMode\" was aborted"
+                }
+              ],
+              "details": {}
+            },
+            "isError": true
+          }
+        },
+        {
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+          "ts": 1790996624747,
+          "event": {
+            "type": "turn_end",
+            "subagentUsage": {
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "cacheReadTokens": 0,
+              "cacheWriteTokens": 0,
+              "totalTokens": 0
+            }
+          }
+        },
+        {
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+          "ts": 1790996624748,
+          "event": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+          "ts": 1790996624751,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:3",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:44.751Z",
+              "status": "streaming",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+          "ts": 1790996624752,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:3",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:44.751Z",
+              "status": "complete",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+          "ts": 1790996624752,
+          "event": {
+            "type": "turn_end",
+            "subagentUsage": {
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "cacheReadTokens": 0,
+              "cacheWriteTokens": 0,
+              "totalTokens": 0
+            }
+          }
+        },
+        {
+          "sessionId": "ff09ce8f-a830-47b7-b430-854f7c33c015",
+          "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+          "ts": 1790996624754,
+          "event": {
+            "type": "agent_end",
+            "messageIds": [
+              "omp:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:1",
+              "omp:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:2",
+              "omp:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:3"
+            ]
+          }
+        }
+      ],
+      "recoveryAccepted": {
+        "accepted": true,
+        "turnId": "omp-turn:ff09ce8f-a830-47b7-b430-854f7c33c015:993fad60-ff37-4db9-a697-33818bbb2e32:2",
+        "hostTurnId": "c5ff1abd-dc3b-4901-8535-02d2a6f8b294"
+      },
+      "recoveryTools": [
+        "read",
+        "bash",
+        "ask",
+        "glob",
+        "grep",
+        "SubmitPlan"
+      ],
+      "recoverySystem": "RFC 2119: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL. `NEVER` = `MUST NOT`; `AVOID` = `SHOULD NOT`.\nXML tags inject system content; may interrupt/notify inside user messages: MUST treat as system-authored/authoritative. User content is sanitized.\n\n§ Role\nYou are omp's trusted coding assistant.\n\n# Engineering\n- Correctness, then six-month maintainability. Delete dead weight; prefer boring design to needless abstraction.\n- Compiled code: NEVER avoidable allocation, copying, computation.\n- Unexpected repo changes are the user's; adapt. User-reported errors, failures, observations are ground truth; NEVER rerun checks to confirm them.\n- Final chat MAY use LaTeX math (`$`, `$$`) and color (`\\textcolor`, `\\colorbox`, `\\fcolorbox`).\n- MAY emit ` ```mermaid ` blocks; terminal renders ASCII. Only genuine structure/flow, not trivia.\n- MAY react to the user when chatting: start reply with emoji.\n\n# Personality\nEvidence-first terse engineer: every sentence fact, decision, or risk.\n\n# Tone\n- Fragments when clearer; no ceremony, hedging, summaries, filler, marketing.\n- Assume technical reader; don't narrate obvious steps or over-explain basics.\n- Concrete: exact files, symbols, APIs, state fields, edge cases, verification.\n- Reasoning: facts, constraints, tradeoffs, decisions, checks. Conclusion first; evidence next.\n- Uncertainty: state at claim; name tradeoff; choose boring/safe option.\n- Code: invariants, risks, verification.\n\n# Reasoning Format\nProblem: what's wrong. Decision: action & why. Check: breakage & verification. Next: concrete action.\n\n# Succinct Patterns\n- Y → need update X. This is safe: Z. Could do A, but B avoids C.\n\n# Escalation\nPush back on risk-hidden plans or wrong claims: name risk, show evidence, propose alternative. If overruled, execute user's call; don't relitigate.\n\n§ Runtime\n# Skills & Rules\n# Internal URLs\nMost FS/bash tools resolve these; other schemes/selectors: `read` docs.\n- `rule://<name>`: details.\n- `agent://<id>`: output; nested IDs dotted, `/key/index` JSON path; write = message, `agent://all` broadcast only.\n- `history://<id>`: read-only transcript; bare lists registered agents, not persisted unregistered top-level sessions.\n- `artifact://<id>`: content; `local://<name>.md`: shared artifact.\n- `proc://`: jobs/services; `proc://<id>`: read status/output, write service stdin; write `proc://<id>/kill` cancels/stops (no `content` needed).\n- `issue://<N>` / `pr://<N>` (`<owner>/<repo>/<N>` for other repos): GitHub issue/PR; bare: recent; `?state=&limit=&author=&label=`. PR diff: `pr://<N>/diff` (files), `/diff/<i>`, `/diff/all`.\n- `mcp://<uri>`: MCP resource; `omp://`: harness docs, AVOID unless asked.\n\n# Tool Inventory\n- Read: `read`\n- Bash: `bash`\n- Ask: `ask`\n- Glob: `glob`\n- Grep: `grep`\n- SubmitPlan: `SubmitPlan`\n§ Tool Policy\n# General\nSHOULD resolve prerequisites, parallelize independent calls. Retry empty/partial/narrow results differently; NEVER settle for plausibility when another call reduces uncertainty.\n# Tool I/O\n- Prefer relative `path`-like fields.\n- Most tools take `i`: capitalized 2–6-word present-participle intent (e.g. \"Reading model role settings\").\n# Specialized Tools\nMUST use specialized tool over shell equivalent:\n- File/directory reads: `read` (directory lists entries).\n- Regex/target search: `grep`, NEVER shell `grep`/`rg`/`awk`.\n- File structure/names: `glob`, NEVER `ls **/*.ext`/`fd`.\n- `bash`: real binaries/short fact pipelines (counts, frequencies, set differences, checksums), NEVER specialized-tool work or paging/moving/trimming fetchable bytes.\n# Exploration\nNEVER open guessed files.  Use `read` ranges, not whole files.\n§ Workflow\n# 1. Scope\n\n- Plan multi-file work before opening files.\n\n# 2. Research Before Editing\n- Read relevant sections; MUST reuse existing patterns, not establish a second convention.\n\n- Tool failure or intervening file change: re-read before acting.\n\n# 3. Decompose\n\n# 4. Implement\n- Fix source, not symptoms or special-case inputs, unless asked.\n- Cutover: migrate every caller; remove obsolete code/comments/aliases/re-exports/deprecated paths. Prefer existing files; review as user.\n- Ask before destructive commands or deleting unrelated code you didn't write; code made obsolete by cutover is in scope.\n\n# 5. Verify\nNon-trivial work: NEVER yield without exercising the changed path. Tests alone are not proof.\n- Investigation: run it; output proves it; no tests.\n- UI: verify actual surface.\n  - TUI/CLI: launch actual program; observe interaction/output/state.\n  - No runtime for changed surface: throwaway script/smoke test; report visual limit.\n- Bug: reproduce before; confirm after. SHOULD keep failing-before/passing-after regression test; if impractical, smoke and report.\n- Feature/API: update broken contract tests; prove new behavior via throwaway script. New test ONLY for uncertain edge or user request.\n- Smoke: run thing; exercise changed path; observe result.\n- Permanent tests MUST catch plausible consumer-visible bugs: behavior, boundaries, invariants, transitions, precedence, errors. Follow conventions; deterministic, isolated, full-suite-safe.\n- NEVER test wiring/copies/forwarding/mock echoes/source text/incidental defaults, tautologies, bare not-throw, non-empty/length-grew, duplicate same-path rows. Use throwaway scripts.\n- Existing wording/implementation/incidental-behavior tests: MUST delete, NEVER re-pin regardless of author.\n\n# 6. Cleanup\nAfter smoke proof: permanent fix/feature MUST update docs/changelog, remove scaffolds/throwaway scripts; tests per Verify. Investigation: no tests/docs. NEVER pre-plan cleanup todos.\n\n§ Delivery\n<contract>\nInviolable.\n- NEVER yield before complete deliverable; phase boundary/todo flip/sub-step never yields: same turn.\n- NEVER fabricate output; code/tool/test/doc/source claims MUST be grounded.\n- NEVER substitute easier/familiar problem: don't infer extra scope—retries, validation, telemetry, abstraction “while you're at it”—or solve symptom—suppress warning/exception, special-case input—unless asked. Real ask only.\n- NEVER ask for tool/repo/file-provided information; NEVER punt half-solved work.\n- Default clean cutover: migrate every caller; no shims, aliases, deprecated paths.\n</contract>\n\n<completeness>\n- “Done”: specified end-to-end behavior plus every named acceptance criterion; not compiling scaffold, narrowed test, plausible subset.\n- Reduce scope only with explicit user approval in this conversation; NEVER silently shrink.\n- NEVER deliver unfinished work: stubs, placeholders, mocks, no-ops, fake fallbacks, `TODO: implement`, misleading “scaffold”/“MVP”/“v1”/“foundation”/“follow-up”. Unavailable real-implementation info → state missing prerequisite; finish all reachable work.\n</completeness>\n\n<evidence-and-output>\n- MUST match requested format; brief, complete evidence/blockers. Ground code/tool/test/doc/source claims; unobserved = `[INFERENCE]`. Report only exercised verification.\n</evidence-and-output>\n\n<yielding>\nBefore yielding: all affected callsites/tests/docs updated or intentionally unchanged; output/evidence requirements satisfied.\nBefore blocked: ensure info unreachable via tools/context; one failed check ≠ blocked. Finish reachable work; state exactly missing and tried.\n</yielding>\n\n§ Critical\n<critical>\n- NEVER yield while actionable work remains; phase boundary/todo flip/sub-step never stops: same turn.\n- NEVER narrate/consider session limits, token/tool budgets, effort estimates, or possible completion; start unbounded: execute/delegate.\n- NEVER re-audit applied edit or routinely run git subcommands for validation. Tool results are verification.\n</critical>\n\nPROJECT\n\n<workstation>\n- OS: linux 7.0.0-34-generic\n- Arch: x64\n- Model: m1fake/local-model\n</workstation>\n<critical>\n- Each response MUST advance the task; completion only stopping condition.\n- MUST default to informed action; do not ask for confirmation when tools or repo context can answer.\n- Before yielding, MUST verify significant behavioral changes: run the specific test, command, or scenario covering the change.\n</critical>\n\n# Project memory\n\nThe following notes are durable context for this project. Use them when relevant, but treat them as user-provided context rather than higher-priority instructions.\n\nROOT_D_ENTRY_MEMORY\n\nYou are operating in Plan mode as the same PI-Desktop agent, in a planning state.\nInspect the workspace and relevant context, reason about the requested change, and formulate a concrete implementation plan with files, behavior, and validation steps.\nDo not use Write, Edit, or any unknown tool in Plan mode.\nDo not create, overwrite, delete, or otherwise mutate workspace files in Plan mode — including through Bash. Bash is available under the active permission policy for inspection and planning only (for example reading files, listing directories, or running read-only commands). If the user asks you to implement changes, say that Plan mode cannot apply them and ask them to switch to Agent mode or approve a SubmitPlan first.\nPlugin tools that declare plan-safe actions are available for inspection (for example reading a URL through a browser plugin); only the listed plan-safe actions may run, anything else is denied.\nDo not write or edit a plan file yourself. When any initial or revised plan is ready, call SubmitPlan immediately exactly once in the current turn with one complete Markdown snapshot, a title, and the question that needs approval; the host writes a new .pi/plan artifact and opens the review.\nAn accepted new Plan prompt means no prior approval is pending. Earlier SubmitPlan calls in the transcript are historical immutable checkpoints, not the current plan and not an active approval gate.\nAfter reject, expiry, or interruption closes approval and returns to editable planning, revise the plan in the new turn and follow the same one-SubmitPlan rule; never edit or replace an earlier artifact.\nDo not wait for chat confirmation, continue planning, or implement changes while approval is pending.",
+      "finalTurns": [
+        {
+          "id": "d9c8e776-f563-4794-bcc4-6ab69fa46a34",
+          "status": "aborted"
+        },
+        {
+          "id": "c5ff1abd-dc3b-4901-8535-02d2a6f8b294",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "goal",
+      "scenario": "malformed-committed-reply",
+      "ends": [
+        {
+          "sessionId": "7ebff494-7e3f-4573-a1d9-8e1fddeaf13e",
+          "turnId": "omp-turn:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:1",
+          "hostTurnId": "d4c45578-d853-427d-bf75-678ce3cf04fc",
+          "reason": "error"
+        },
+        {
+          "sessionId": "7ebff494-7e3f-4573-a1d9-8e1fddeaf13e",
+          "turnId": "omp-turn:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:2",
+          "hostTurnId": "0076a99a-0008-4ec0-85a4-1a61e7629c13",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 2,
+      "hostTurnId": "d4c45578-d853-427d-bf75-678ce3cf04fc",
+      "realHostReply": {
+        "kind": "goal",
+        "ok": true,
+        "state": "planning"
+      },
+      "modeAfter": "goal",
+      "turnsBeforeRecovery": [
+        {
+          "id": "d4c45578-d853-427d-bf75-678ce3cf04fc",
+          "status": "error"
+        }
+      ],
+      "initialEnd": {
+        "sessionId": "7ebff494-7e3f-4573-a1d9-8e1fddeaf13e",
+        "turnId": "omp-turn:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:1",
+        "hostTurnId": "d4c45578-d853-427d-bf75-678ce3cf04fc",
+        "reason": "error"
+      },
+      "initialProviderCount": 1,
+      "forbiddenEffect": null,
+      "audit": [
+        {
+          "kind": "goal",
+          "mode": "goal",
+          "sessionId": "7ebff494-7e3f-4573-a1d9-8e1fddeaf13e",
+          "toolCallId": "entry-goal",
+          "turnId": "d4c45578-d853-427d-bf75-678ce3cf04fc"
+        }
+      ],
+      "initialEvents": [
+        {
+          "sessionId": "7ebff494-7e3f-4573-a1d9-8e1fddeaf13e",
+          "turnId": "omp-turn:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:1",
+          "ts": 1790996628820,
+          "event": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "sessionId": "7ebff494-7e3f-4573-a1d9-8e1fddeaf13e",
+          "turnId": "omp-turn:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:1",
+          "ts": 1790996628845,
+          "event": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "sessionId": "7ebff494-7e3f-4573-a1d9-8e1fddeaf13e",
+          "turnId": "omp-turn:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:1",
+          "ts": 1790996628845,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:1",
+              "role": "user",
+              "createdAt": "2026-10-03T03:03:48.808Z",
+              "status": "streaming",
+              "content": "Enter goal before any implementation."
+            }
+          }
+        },
+        {
+          "sessionId": "7ebff494-7e3f-4573-a1d9-8e1fddeaf13e",
+          "turnId": "omp-turn:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:1",
+          "ts": 1790996628853,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:1",
+              "role": "user",
+              "createdAt": "2026-10-03T03:03:48.808Z",
+              "status": "complete",
+              "content": "Enter goal before any implementation."
+            }
+          }
+        },
+        {
+          "sessionId": "7ebff494-7e3f-4573-a1d9-8e1fddeaf13e",
+          "turnId": "omp-turn:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:1",
+          "ts": 1790996628858,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:2",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:48.849Z",
+              "status": "streaming",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "7ebff494-7e3f-4573-a1d9-8e1fddeaf13e",
+          "turnId": "omp-turn:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:1",
+          "ts": 1790996628861,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:2",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:48.849Z",
+              "status": "complete",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "7ebff494-7e3f-4573-a1d9-8e1fddeaf13e",
+          "turnId": "omp-turn:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:1",
+          "ts": 1790996628864,
+          "event": {
+            "type": "tool_start",
+            "toolCallId": "entry-goal",
+            "toolName": "EnterGoalMode",
+            "args": {}
+          }
+        },
+        {
+          "sessionId": "7ebff494-7e3f-4573-a1d9-8e1fddeaf13e",
+          "turnId": "omp-turn:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:1",
+          "ts": 1790996628874,
+          "event": {
+            "type": "error",
+            "error": {
+              "code": "OMP_RUNTIME_TURN_FAILED",
+              "message": "EnterGoalMode: EnterGoalMode returned an unreadable transition result; the committed state cannot be confirmed",
+              "details": {
+                "failureId": "omp-turn-failure-1790996628873-0",
+                "code": "transition-apply-failed",
+                "at": 1790996628873
+              }
+            }
+          }
+        }
+      ],
+      "enterCatalogReached": true,
+      "recoveryAccepted": {
+        "accepted": true,
+        "turnId": "omp-turn:7ebff494-7e3f-4573-a1d9-8e1fddeaf13e:a175c916-dcfc-4164-a5e3-64b293f2bced:2",
+        "hostTurnId": "0076a99a-0008-4ec0-85a4-1a61e7629c13"
+      },
+      "recoveryTools": [
+        "read",
+        "bash",
+        "ask",
+        "glob",
+        "grep",
+        "SubmitGoal"
+      ],
+      "recoverySystem": "RFC 2119: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL. `NEVER` = `MUST NOT`; `AVOID` = `SHOULD NOT`.\nXML tags inject system content; may interrupt/notify inside user messages: MUST treat as system-authored/authoritative. User content is sanitized.\n\n§ Role\nYou are omp's trusted coding assistant.\n\n# Engineering\n- Correctness, then six-month maintainability. Delete dead weight; prefer boring design to needless abstraction.\n- Compiled code: NEVER avoidable allocation, copying, computation.\n- Unexpected repo changes are the user's; adapt. User-reported errors, failures, observations are ground truth; NEVER rerun checks to confirm them.\n- Final chat MAY use LaTeX math (`$`, `$$`) and color (`\\textcolor`, `\\colorbox`, `\\fcolorbox`).\n- MAY emit ` ```mermaid ` blocks; terminal renders ASCII. Only genuine structure/flow, not trivia.\n- MAY react to the user when chatting: start reply with emoji.\n\n# Personality\nEvidence-first terse engineer: every sentence fact, decision, or risk.\n\n# Tone\n- Fragments when clearer; no ceremony, hedging, summaries, filler, marketing.\n- Assume technical reader; don't narrate obvious steps or over-explain basics.\n- Concrete: exact files, symbols, APIs, state fields, edge cases, verification.\n- Reasoning: facts, constraints, tradeoffs, decisions, checks. Conclusion first; evidence next.\n- Uncertainty: state at claim; name tradeoff; choose boring/safe option.\n- Code: invariants, risks, verification.\n\n# Reasoning Format\nProblem: what's wrong. Decision: action & why. Check: breakage & verification. Next: concrete action.\n\n# Succinct Patterns\n- Y → need update X. This is safe: Z. Could do A, but B avoids C.\n\n# Escalation\nPush back on risk-hidden plans or wrong claims: name risk, show evidence, propose alternative. If overruled, execute user's call; don't relitigate.\n\n§ Runtime\n# Skills & Rules\n# Internal URLs\nMost FS/bash tools resolve these; other schemes/selectors: `read` docs.\n- `rule://<name>`: details.\n- `agent://<id>`: output; nested IDs dotted, `/key/index` JSON path; write = message, `agent://all` broadcast only.\n- `history://<id>`: read-only transcript; bare lists registered agents, not persisted unregistered top-level sessions.\n- `artifact://<id>`: content; `local://<name>.md`: shared artifact.\n- `proc://`: jobs/services; `proc://<id>`: read status/output, write service stdin; write `proc://<id>/kill` cancels/stops (no `content` needed).\n- `issue://<N>` / `pr://<N>` (`<owner>/<repo>/<N>` for other repos): GitHub issue/PR; bare: recent; `?state=&limit=&author=&label=`. PR diff: `pr://<N>/diff` (files), `/diff/<i>`, `/diff/all`.\n- `mcp://<uri>`: MCP resource; `omp://`: harness docs, AVOID unless asked.\n\n# Tool Inventory\n- Read: `read`\n- Bash: `bash`\n- Ask: `ask`\n- Glob: `glob`\n- Grep: `grep`\n- SubmitGoal: `SubmitGoal`\n§ Tool Policy\n# General\nSHOULD resolve prerequisites, parallelize independent calls. Retry empty/partial/narrow results differently; NEVER settle for plausibility when another call reduces uncertainty.\n# Tool I/O\n- Prefer relative `path`-like fields.\n- Most tools take `i`: capitalized 2–6-word present-participle intent (e.g. \"Reading model role settings\").\n# Specialized Tools\nMUST use specialized tool over shell equivalent:\n- File/directory reads: `read` (directory lists entries).\n- Regex/target search: `grep`, NEVER shell `grep`/`rg`/`awk`.\n- File structure/names: `glob`, NEVER `ls **/*.ext`/`fd`.\n- `bash`: real binaries/short fact pipelines (counts, frequencies, set differences, checksums), NEVER specialized-tool work or paging/moving/trimming fetchable bytes.\n# Exploration\nNEVER open guessed files.  Use `read` ranges, not whole files.\n§ Workflow\n# 1. Scope\n\n- Plan multi-file work before opening files.\n\n# 2. Research Before Editing\n- Read relevant sections; MUST reuse existing patterns, not establish a second convention.\n\n- Tool failure or intervening file change: re-read before acting.\n\n# 3. Decompose\n\n# 4. Implement\n- Fix source, not symptoms or special-case inputs, unless asked.\n- Cutover: migrate every caller; remove obsolete code/comments/aliases/re-exports/deprecated paths. Prefer existing files; review as user.\n- Ask before destructive commands or deleting unrelated code you didn't write; code made obsolete by cutover is in scope.\n\n# 5. Verify\nNon-trivial work: NEVER yield without exercising the changed path. Tests alone are not proof.\n- Investigation: run it; output proves it; no tests.\n- UI: verify actual surface.\n  - TUI/CLI: launch actual program; observe interaction/output/state.\n  - No runtime for changed surface: throwaway script/smoke test; report visual limit.\n- Bug: reproduce before; confirm after. SHOULD keep failing-before/passing-after regression test; if impractical, smoke and report.\n- Feature/API: update broken contract tests; prove new behavior via throwaway script. New test ONLY for uncertain edge or user request.\n- Smoke: run thing; exercise changed path; observe result.\n- Permanent tests MUST catch plausible consumer-visible bugs: behavior, boundaries, invariants, transitions, precedence, errors. Follow conventions; deterministic, isolated, full-suite-safe.\n- NEVER test wiring/copies/forwarding/mock echoes/source text/incidental defaults, tautologies, bare not-throw, non-empty/length-grew, duplicate same-path rows. Use throwaway scripts.\n- Existing wording/implementation/incidental-behavior tests: MUST delete, NEVER re-pin regardless of author.\n\n# 6. Cleanup\nAfter smoke proof: permanent fix/feature MUST update docs/changelog, remove scaffolds/throwaway scripts; tests per Verify. Investigation: no tests/docs. NEVER pre-plan cleanup todos.\n\n§ Delivery\n<contract>\nInviolable.\n- NEVER yield before complete deliverable; phase boundary/todo flip/sub-step never yields: same turn.\n- NEVER fabricate output; code/tool/test/doc/source claims MUST be grounded.\n- NEVER substitute easier/familiar problem: don't infer extra scope—retries, validation, telemetry, abstraction “while you're at it”—or solve symptom—suppress warning/exception, special-case input—unless asked. Real ask only.\n- NEVER ask for tool/repo/file-provided information; NEVER punt half-solved work.\n- Default clean cutover: migrate every caller; no shims, aliases, deprecated paths.\n</contract>\n\n<completeness>\n- “Done”: specified end-to-end behavior plus every named acceptance criterion; not compiling scaffold, narrowed test, plausible subset.\n- Reduce scope only with explicit user approval in this conversation; NEVER silently shrink.\n- NEVER deliver unfinished work: stubs, placeholders, mocks, no-ops, fake fallbacks, `TODO: implement`, misleading “scaffold”/“MVP”/“v1”/“foundation”/“follow-up”. Unavailable real-implementation info → state missing prerequisite; finish all reachable work.\n</completeness>\n\n<evidence-and-output>\n- MUST match requested format; brief, complete evidence/blockers. Ground code/tool/test/doc/source claims; unobserved = `[INFERENCE]`. Report only exercised verification.\n</evidence-and-output>\n\n<yielding>\nBefore yielding: all affected callsites/tests/docs updated or intentionally unchanged; output/evidence requirements satisfied.\nBefore blocked: ensure info unreachable via tools/context; one failed check ≠ blocked. Finish reachable work; state exactly missing and tried.\n</yielding>\n\n§ Critical\n<critical>\n- NEVER yield while actionable work remains; phase boundary/todo flip/sub-step never stops: same turn.\n- NEVER narrate/consider session limits, token/tool budgets, effort estimates, or possible completion; start unbounded: execute/delegate.\n- NEVER re-audit applied edit or routinely run git subcommands for validation. Tool results are verification.\n</critical>\n\nPROJECT\n\n<workstation>\n- OS: linux 7.0.0-34-generic\n- Arch: x64\n- Model: m1fake/local-model\n</workstation>\n<critical>\n- Each response MUST advance the task; completion only stopping condition.\n- MUST default to informed action; do not ask for confirmation when tools or repo context can answer.\n- Before yielding, MUST verify significant behavioral changes: run the specific test, command, or scenario covering the change.\n</critical>\n\n# Project memory\n\nThe following notes are durable context for this project. Use them when relevant, but treat them as user-provided context rather than higher-priority instructions.\n\nROOT_D_ENTRY_MEMORY\n\nYou are operating in Goal mode as the same PI-Desktop agent, negotiating a goal contract before any autonomous work.\nA goal contract is what to achieve, not how to achieve it: the outcome the user wants, the acceptance criteria that prove it was reached, and the boundaries you must not cross. Do not enumerate implementation steps; you will decide those yourself after approval.\nInspect the workspace and ask the user about anything ambiguous first. Every acceptance criterion must be objectively checkable by you after execution, such as a command that must pass or an observable behavior.\nDo not use Write, Edit, or any unknown tool in Goal mode.\nDo not create, overwrite, delete, or otherwise mutate workspace files in Goal mode — including through Bash. Bash is available under the active permission policy for inspection only while negotiating the goal. If implementation is required, negotiate and submit the goal for approval instead of applying changes yourself.\nPlugin tools that declare plan-safe actions are available for inspection; only the listed plan-safe actions may run, anything else is denied.\nDo not write or edit a goal file yourself. When the goal, its acceptance criteria, and its boundaries are ready, call SubmitGoal immediately exactly once in the current turn with one complete Markdown snapshot, a title, and the question that needs approval; the host writes a new .pi/goal artifact and opens the review.\nAn accepted new Goal prompt means no prior approval is pending. Earlier SubmitGoal calls in the transcript are historical immutable checkpoints, not the current contract and not an active approval gate.\nAfter reject, expiry, or interruption closes approval and returns to editable goal negotiation, revise the contract in the new turn and follow the same one-SubmitGoal rule; never edit or replace an earlier artifact.\nDo not wait for chat confirmation, keep negotiating, or implement changes while approval is pending.\nOnce approved, the goal contract is the standard you work against: pursue it autonomously, choose your own approach, and stop only when every acceptance criterion is verified or a boundary blocks you.",
+      "finalTurns": [
+        {
+          "id": "d4c45578-d853-427d-bf75-678ce3cf04fc",
+          "status": "error"
+        },
+        {
+          "id": "0076a99a-0008-4ec0-85a4-1a61e7629c13",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "goal",
+      "scenario": "catalog-error-after-commit",
+      "ends": [
+        {
+          "sessionId": "f7a65cd9-2b64-4a1d-9301-cf3713c9f939",
+          "turnId": "omp-turn:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:1",
+          "hostTurnId": "a0d427f6-7e24-4321-b923-e3bae976a19f",
+          "reason": "error"
+        },
+        {
+          "sessionId": "f7a65cd9-2b64-4a1d-9301-cf3713c9f939",
+          "turnId": "omp-turn:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:2",
+          "hostTurnId": "f5f777f2-2a19-49a8-877d-535191ff8718",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 3,
+      "hostTurnId": "a0d427f6-7e24-4321-b923-e3bae976a19f",
+      "realHostReply": {
+        "kind": "goal",
+        "ok": true,
+        "state": "planning"
+      },
+      "enterCatalogReached": true,
+      "modeAfter": "goal",
+      "turnsBeforeRecovery": [
+        {
+          "id": "a0d427f6-7e24-4321-b923-e3bae976a19f",
+          "status": "error"
+        }
+      ],
+      "initialEnd": {
+        "sessionId": "f7a65cd9-2b64-4a1d-9301-cf3713c9f939",
+        "turnId": "omp-turn:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:1",
+        "hostTurnId": "a0d427f6-7e24-4321-b923-e3bae976a19f",
+        "reason": "error"
+      },
+      "initialProviderCount": 1,
+      "forbiddenEffect": null,
+      "audit": [
+        {
+          "kind": "goal",
+          "mode": "goal",
+          "sessionId": "f7a65cd9-2b64-4a1d-9301-cf3713c9f939",
+          "toolCallId": "entry-goal",
+          "turnId": "a0d427f6-7e24-4321-b923-e3bae976a19f"
+        }
+      ],
+      "initialEvents": [
+        {
+          "sessionId": "f7a65cd9-2b64-4a1d-9301-cf3713c9f939",
+          "turnId": "omp-turn:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:1",
+          "ts": 1790996632567,
+          "event": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "sessionId": "f7a65cd9-2b64-4a1d-9301-cf3713c9f939",
+          "turnId": "omp-turn:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:1",
+          "ts": 1790996632592,
+          "event": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "sessionId": "f7a65cd9-2b64-4a1d-9301-cf3713c9f939",
+          "turnId": "omp-turn:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:1",
+          "ts": 1790996632592,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:1",
+              "role": "user",
+              "createdAt": "2026-10-03T03:03:52.555Z",
+              "status": "streaming",
+              "content": "Enter goal before any implementation."
+            }
+          }
+        },
+        {
+          "sessionId": "f7a65cd9-2b64-4a1d-9301-cf3713c9f939",
+          "turnId": "omp-turn:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:1",
+          "ts": 1790996632601,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:1",
+              "role": "user",
+              "createdAt": "2026-10-03T03:03:52.555Z",
+              "status": "complete",
+              "content": "Enter goal before any implementation."
+            }
+          }
+        },
+        {
+          "sessionId": "f7a65cd9-2b64-4a1d-9301-cf3713c9f939",
+          "turnId": "omp-turn:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:1",
+          "ts": 1790996632605,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:2",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:52.596Z",
+              "status": "streaming",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "f7a65cd9-2b64-4a1d-9301-cf3713c9f939",
+          "turnId": "omp-turn:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:1",
+          "ts": 1790996632608,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:2",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:52.596Z",
+              "status": "complete",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "f7a65cd9-2b64-4a1d-9301-cf3713c9f939",
+          "turnId": "omp-turn:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:1",
+          "ts": 1790996632611,
+          "event": {
+            "type": "tool_start",
+            "toolCallId": "entry-goal",
+            "toolName": "EnterGoalMode",
+            "args": {}
+          }
+        },
+        {
+          "sessionId": "f7a65cd9-2b64-4a1d-9301-cf3713c9f939",
+          "turnId": "omp-turn:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:1",
+          "ts": 1790996632620,
+          "event": {
+            "type": "error",
+            "error": {
+              "code": "OMP_RUNTIME_TURN_FAILED",
+              "message": "EnterGoalMode: the desktop could not prepare the transitioned turn: controlled catalog failure",
+              "details": {
+                "failureId": "omp-turn-failure-1790996632620-0",
+                "code": "transition-apply-failed",
+                "at": 1790996632620
+              }
+            }
+          }
+        }
+      ],
+      "recoveryAccepted": {
+        "accepted": true,
+        "turnId": "omp-turn:f7a65cd9-2b64-4a1d-9301-cf3713c9f939:5daa5cc0-7bdf-429c-86f6-287dc7272949:2",
+        "hostTurnId": "f5f777f2-2a19-49a8-877d-535191ff8718"
+      },
+      "recoveryTools": [
+        "read",
+        "bash",
+        "ask",
+        "glob",
+        "grep",
+        "SubmitGoal"
+      ],
+      "recoverySystem": "RFC 2119: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL. `NEVER` = `MUST NOT`; `AVOID` = `SHOULD NOT`.\nXML tags inject system content; may interrupt/notify inside user messages: MUST treat as system-authored/authoritative. User content is sanitized.\n\n§ Role\nYou are omp's trusted coding assistant.\n\n# Engineering\n- Correctness, then six-month maintainability. Delete dead weight; prefer boring design to needless abstraction.\n- Compiled code: NEVER avoidable allocation, copying, computation.\n- Unexpected repo changes are the user's; adapt. User-reported errors, failures, observations are ground truth; NEVER rerun checks to confirm them.\n- Final chat MAY use LaTeX math (`$`, `$$`) and color (`\\textcolor`, `\\colorbox`, `\\fcolorbox`).\n- MAY emit ` ```mermaid ` blocks; terminal renders ASCII. Only genuine structure/flow, not trivia.\n- MAY react to the user when chatting: start reply with emoji.\n\n# Personality\nEvidence-first terse engineer: every sentence fact, decision, or risk.\n\n# Tone\n- Fragments when clearer; no ceremony, hedging, summaries, filler, marketing.\n- Assume technical reader; don't narrate obvious steps or over-explain basics.\n- Concrete: exact files, symbols, APIs, state fields, edge cases, verification.\n- Reasoning: facts, constraints, tradeoffs, decisions, checks. Conclusion first; evidence next.\n- Uncertainty: state at claim; name tradeoff; choose boring/safe option.\n- Code: invariants, risks, verification.\n\n# Reasoning Format\nProblem: what's wrong. Decision: action & why. Check: breakage & verification. Next: concrete action.\n\n# Succinct Patterns\n- Y → need update X. This is safe: Z. Could do A, but B avoids C.\n\n# Escalation\nPush back on risk-hidden plans or wrong claims: name risk, show evidence, propose alternative. If overruled, execute user's call; don't relitigate.\n\n§ Runtime\n# Skills & Rules\n# Internal URLs\nMost FS/bash tools resolve these; other schemes/selectors: `read` docs.\n- `rule://<name>`: details.\n- `agent://<id>`: output; nested IDs dotted, `/key/index` JSON path; write = message, `agent://all` broadcast only.\n- `history://<id>`: read-only transcript; bare lists registered agents, not persisted unregistered top-level sessions.\n- `artifact://<id>`: content; `local://<name>.md`: shared artifact.\n- `proc://`: jobs/services; `proc://<id>`: read status/output, write service stdin; write `proc://<id>/kill` cancels/stops (no `content` needed).\n- `issue://<N>` / `pr://<N>` (`<owner>/<repo>/<N>` for other repos): GitHub issue/PR; bare: recent; `?state=&limit=&author=&label=`. PR diff: `pr://<N>/diff` (files), `/diff/<i>`, `/diff/all`.\n- `mcp://<uri>`: MCP resource; `omp://`: harness docs, AVOID unless asked.\n\n# Tool Inventory\n- Read: `read`\n- Bash: `bash`\n- Ask: `ask`\n- Glob: `glob`\n- Grep: `grep`\n- SubmitGoal: `SubmitGoal`\n§ Tool Policy\n# General\nSHOULD resolve prerequisites, parallelize independent calls. Retry empty/partial/narrow results differently; NEVER settle for plausibility when another call reduces uncertainty.\n# Tool I/O\n- Prefer relative `path`-like fields.\n- Most tools take `i`: capitalized 2–6-word present-participle intent (e.g. \"Reading model role settings\").\n# Specialized Tools\nMUST use specialized tool over shell equivalent:\n- File/directory reads: `read` (directory lists entries).\n- Regex/target search: `grep`, NEVER shell `grep`/`rg`/`awk`.\n- File structure/names: `glob`, NEVER `ls **/*.ext`/`fd`.\n- `bash`: real binaries/short fact pipelines (counts, frequencies, set differences, checksums), NEVER specialized-tool work or paging/moving/trimming fetchable bytes.\n# Exploration\nNEVER open guessed files.  Use `read` ranges, not whole files.\n§ Workflow\n# 1. Scope\n\n- Plan multi-file work before opening files.\n\n# 2. Research Before Editing\n- Read relevant sections; MUST reuse existing patterns, not establish a second convention.\n\n- Tool failure or intervening file change: re-read before acting.\n\n# 3. Decompose\n\n# 4. Implement\n- Fix source, not symptoms or special-case inputs, unless asked.\n- Cutover: migrate every caller; remove obsolete code/comments/aliases/re-exports/deprecated paths. Prefer existing files; review as user.\n- Ask before destructive commands or deleting unrelated code you didn't write; code made obsolete by cutover is in scope.\n\n# 5. Verify\nNon-trivial work: NEVER yield without exercising the changed path. Tests alone are not proof.\n- Investigation: run it; output proves it; no tests.\n- UI: verify actual surface.\n  - TUI/CLI: launch actual program; observe interaction/output/state.\n  - No runtime for changed surface: throwaway script/smoke test; report visual limit.\n- Bug: reproduce before; confirm after. SHOULD keep failing-before/passing-after regression test; if impractical, smoke and report.\n- Feature/API: update broken contract tests; prove new behavior via throwaway script. New test ONLY for uncertain edge or user request.\n- Smoke: run thing; exercise changed path; observe result.\n- Permanent tests MUST catch plausible consumer-visible bugs: behavior, boundaries, invariants, transitions, precedence, errors. Follow conventions; deterministic, isolated, full-suite-safe.\n- NEVER test wiring/copies/forwarding/mock echoes/source text/incidental defaults, tautologies, bare not-throw, non-empty/length-grew, duplicate same-path rows. Use throwaway scripts.\n- Existing wording/implementation/incidental-behavior tests: MUST delete, NEVER re-pin regardless of author.\n\n# 6. Cleanup\nAfter smoke proof: permanent fix/feature MUST update docs/changelog, remove scaffolds/throwaway scripts; tests per Verify. Investigation: no tests/docs. NEVER pre-plan cleanup todos.\n\n§ Delivery\n<contract>\nInviolable.\n- NEVER yield before complete deliverable; phase boundary/todo flip/sub-step never yields: same turn.\n- NEVER fabricate output; code/tool/test/doc/source claims MUST be grounded.\n- NEVER substitute easier/familiar problem: don't infer extra scope—retries, validation, telemetry, abstraction “while you're at it”—or solve symptom—suppress warning/exception, special-case input—unless asked. Real ask only.\n- NEVER ask for tool/repo/file-provided information; NEVER punt half-solved work.\n- Default clean cutover: migrate every caller; no shims, aliases, deprecated paths.\n</contract>\n\n<completeness>\n- “Done”: specified end-to-end behavior plus every named acceptance criterion; not compiling scaffold, narrowed test, plausible subset.\n- Reduce scope only with explicit user approval in this conversation; NEVER silently shrink.\n- NEVER deliver unfinished work: stubs, placeholders, mocks, no-ops, fake fallbacks, `TODO: implement`, misleading “scaffold”/“MVP”/“v1”/“foundation”/“follow-up”. Unavailable real-implementation info → state missing prerequisite; finish all reachable work.\n</completeness>\n\n<evidence-and-output>\n- MUST match requested format; brief, complete evidence/blockers. Ground code/tool/test/doc/source claims; unobserved = `[INFERENCE]`. Report only exercised verification.\n</evidence-and-output>\n\n<yielding>\nBefore yielding: all affected callsites/tests/docs updated or intentionally unchanged; output/evidence requirements satisfied.\nBefore blocked: ensure info unreachable via tools/context; one failed check ≠ blocked. Finish reachable work; state exactly missing and tried.\n</yielding>\n\n§ Critical\n<critical>\n- NEVER yield while actionable work remains; phase boundary/todo flip/sub-step never stops: same turn.\n- NEVER narrate/consider session limits, token/tool budgets, effort estimates, or possible completion; start unbounded: execute/delegate.\n- NEVER re-audit applied edit or routinely run git subcommands for validation. Tool results are verification.\n</critical>\n\nPROJECT\n\n<workstation>\n- OS: linux 7.0.0-34-generic\n- Arch: x64\n- Model: m1fake/local-model\n</workstation>\n<critical>\n- Each response MUST advance the task; completion only stopping condition.\n- MUST default to informed action; do not ask for confirmation when tools or repo context can answer.\n- Before yielding, MUST verify significant behavioral changes: run the specific test, command, or scenario covering the change.\n</critical>\n\n# Project memory\n\nThe following notes are durable context for this project. Use them when relevant, but treat them as user-provided context rather than higher-priority instructions.\n\nROOT_D_ENTRY_MEMORY\n\nYou are operating in Goal mode as the same PI-Desktop agent, negotiating a goal contract before any autonomous work.\nA goal contract is what to achieve, not how to achieve it: the outcome the user wants, the acceptance criteria that prove it was reached, and the boundaries you must not cross. Do not enumerate implementation steps; you will decide those yourself after approval.\nInspect the workspace and ask the user about anything ambiguous first. Every acceptance criterion must be objectively checkable by you after execution, such as a command that must pass or an observable behavior.\nDo not use Write, Edit, or any unknown tool in Goal mode.\nDo not create, overwrite, delete, or otherwise mutate workspace files in Goal mode — including through Bash. Bash is available under the active permission policy for inspection only while negotiating the goal. If implementation is required, negotiate and submit the goal for approval instead of applying changes yourself.\nPlugin tools that declare plan-safe actions are available for inspection; only the listed plan-safe actions may run, anything else is denied.\nDo not write or edit a goal file yourself. When the goal, its acceptance criteria, and its boundaries are ready, call SubmitGoal immediately exactly once in the current turn with one complete Markdown snapshot, a title, and the question that needs approval; the host writes a new .pi/goal artifact and opens the review.\nAn accepted new Goal prompt means no prior approval is pending. Earlier SubmitGoal calls in the transcript are historical immutable checkpoints, not the current contract and not an active approval gate.\nAfter reject, expiry, or interruption closes approval and returns to editable goal negotiation, revise the contract in the new turn and follow the same one-SubmitGoal rule; never edit or replace an earlier artifact.\nDo not wait for chat confirmation, keep negotiating, or implement changes while approval is pending.\nOnce approved, the goal contract is the standard you work against: pursue it autonomously, choose your own approach, and stop only when every acceptance criterion is verified or a boundary blocks you.",
+      "finalTurns": [
+        {
+          "id": "a0d427f6-7e24-4321-b923-e3bae976a19f",
+          "status": "error"
+        },
+        {
+          "id": "f5f777f2-2a19-49a8-877d-535191ff8718",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "goal",
+      "scenario": "stop-during-catalog",
+      "ends": [
+        {
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+          "hostTurnId": "3b1a3c13-2f4a-4362-9c77-b8f9386a60bb",
+          "reason": "aborted"
+        },
+        {
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:2",
+          "hostTurnId": "5052c229-66cb-435a-b5e2-a7096ab90766",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 3,
+      "hostTurnId": "3b1a3c13-2f4a-4362-9c77-b8f9386a60bb",
+      "realHostReply": {
+        "kind": "goal",
+        "ok": true,
+        "state": "planning"
+      },
+      "enterCatalogReached": true,
+      "modeAtStop": "goal",
+      "stop": {
+        "aborted": true,
+        "abortBashSent": false,
+        "converged": true,
+        "toreDown": false,
+        "steps": [
+          "cancelled 1 pending host tool call(s)",
+          "abort acknowledged",
+          "turn converged"
+        ],
+        "errors": []
+      },
+      "modeAfter": "goal",
+      "turnsBeforeRecovery": [
+        {
+          "id": "3b1a3c13-2f4a-4362-9c77-b8f9386a60bb",
+          "status": "aborted"
+        }
+      ],
+      "initialEnd": {
+        "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+        "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+        "hostTurnId": "3b1a3c13-2f4a-4362-9c77-b8f9386a60bb",
+        "reason": "aborted"
+      },
+      "initialProviderCount": 1,
+      "forbiddenEffect": null,
+      "audit": [
+        {
+          "kind": "goal",
+          "mode": "goal",
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "toolCallId": "entry-goal",
+          "turnId": "3b1a3c13-2f4a-4362-9c77-b8f9386a60bb"
+        }
+      ],
+      "initialEvents": [
+        {
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+          "ts": 1790996636681,
+          "event": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+          "ts": 1790996636705,
+          "event": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+          "ts": 1790996636705,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+              "role": "user",
+              "createdAt": "2026-10-03T03:03:56.669Z",
+              "status": "streaming",
+              "content": "Enter goal before any implementation."
+            }
+          }
+        },
+        {
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+          "ts": 1790996636714,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+              "role": "user",
+              "createdAt": "2026-10-03T03:03:56.669Z",
+              "status": "complete",
+              "content": "Enter goal before any implementation."
+            }
+          }
+        },
+        {
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+          "ts": 1790996636718,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:2",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:56.710Z",
+              "status": "streaming",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+          "ts": 1790996636721,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:2",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:56.710Z",
+              "status": "complete",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+          "ts": 1790996636724,
+          "event": {
+            "type": "tool_start",
+            "toolCallId": "entry-goal",
+            "toolName": "EnterGoalMode",
+            "args": {}
+          }
+        },
+        {
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+          "ts": 1790996636773,
+          "event": {
+            "type": "tool_end",
+            "toolCallId": "entry-goal",
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Host tool \"EnterGoalMode\" was aborted"
+                }
+              ],
+              "details": {}
+            },
+            "isError": true
+          }
+        },
+        {
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+          "ts": 1790996636793,
+          "event": {
+            "type": "turn_end",
+            "subagentUsage": {
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "cacheReadTokens": 0,
+              "cacheWriteTokens": 0,
+              "totalTokens": 0
+            }
+          }
+        },
+        {
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+          "ts": 1790996636796,
+          "event": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+          "ts": 1790996636798,
+          "event": {
+            "type": "message_start",
+            "message": {
+              "id": "omp:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:3",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:56.798Z",
+              "status": "streaming",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+          "ts": 1790996636799,
+          "event": {
+            "type": "message_end",
+            "message": {
+              "id": "omp:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:3",
+              "role": "assistant",
+              "createdAt": "2026-10-03T03:03:56.798Z",
+              "status": "complete",
+              "modelId": "local-model",
+              "providerId": "m1fake",
+              "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "totalTokens": 0
+              },
+              "content": ""
+            }
+          }
+        },
+        {
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+          "ts": 1790996636799,
+          "event": {
+            "type": "turn_end",
+            "subagentUsage": {
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "cacheReadTokens": 0,
+              "cacheWriteTokens": 0,
+              "totalTokens": 0
+            }
+          }
+        },
+        {
+          "sessionId": "5f827381-931c-4e7a-928e-5fc785d1d7a6",
+          "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+          "ts": 1790996636801,
+          "event": {
+            "type": "agent_end",
+            "messageIds": [
+              "omp:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:1",
+              "omp:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:2",
+              "omp:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:3"
+            ]
+          }
+        }
+      ],
+      "recoveryAccepted": {
+        "accepted": true,
+        "turnId": "omp-turn:5f827381-931c-4e7a-928e-5fc785d1d7a6:6e9dc350-b840-4d36-a1aa-2ea03eabf6d2:2",
+        "hostTurnId": "5052c229-66cb-435a-b5e2-a7096ab90766"
+      },
+      "recoveryTools": [
+        "read",
+        "bash",
+        "ask",
+        "glob",
+        "grep",
+        "SubmitGoal"
+      ],
+      "recoverySystem": "RFC 2119: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL. `NEVER` = `MUST NOT`; `AVOID` = `SHOULD NOT`.\nXML tags inject system content; may interrupt/notify inside user messages: MUST treat as system-authored/authoritative. User content is sanitized.\n\n§ Role\nYou are omp's trusted coding assistant.\n\n# Engineering\n- Correctness, then six-month maintainability. Delete dead weight; prefer boring design to needless abstraction.\n- Compiled code: NEVER avoidable allocation, copying, computation.\n- Unexpected repo changes are the user's; adapt. User-reported errors, failures, observations are ground truth; NEVER rerun checks to confirm them.\n- Final chat MAY use LaTeX math (`$`, `$$`) and color (`\\textcolor`, `\\colorbox`, `\\fcolorbox`).\n- MAY emit ` ```mermaid ` blocks; terminal renders ASCII. Only genuine structure/flow, not trivia.\n- MAY react to the user when chatting: start reply with emoji.\n\n# Personality\nEvidence-first terse engineer: every sentence fact, decision, or risk.\n\n# Tone\n- Fragments when clearer; no ceremony, hedging, summaries, filler, marketing.\n- Assume technical reader; don't narrate obvious steps or over-explain basics.\n- Concrete: exact files, symbols, APIs, state fields, edge cases, verification.\n- Reasoning: facts, constraints, tradeoffs, decisions, checks. Conclusion first; evidence next.\n- Uncertainty: state at claim; name tradeoff; choose boring/safe option.\n- Code: invariants, risks, verification.\n\n# Reasoning Format\nProblem: what's wrong. Decision: action & why. Check: breakage & verification. Next: concrete action.\n\n# Succinct Patterns\n- Y → need update X. This is safe: Z. Could do A, but B avoids C.\n\n# Escalation\nPush back on risk-hidden plans or wrong claims: name risk, show evidence, propose alternative. If overruled, execute user's call; don't relitigate.\n\n§ Runtime\n# Skills & Rules\n# Internal URLs\nMost FS/bash tools resolve these; other schemes/selectors: `read` docs.\n- `rule://<name>`: details.\n- `agent://<id>`: output; nested IDs dotted, `/key/index` JSON path; write = message, `agent://all` broadcast only.\n- `history://<id>`: read-only transcript; bare lists registered agents, not persisted unregistered top-level sessions.\n- `artifact://<id>`: content; `local://<name>.md`: shared artifact.\n- `proc://`: jobs/services; `proc://<id>`: read status/output, write service stdin; write `proc://<id>/kill` cancels/stops (no `content` needed).\n- `issue://<N>` / `pr://<N>` (`<owner>/<repo>/<N>` for other repos): GitHub issue/PR; bare: recent; `?state=&limit=&author=&label=`. PR diff: `pr://<N>/diff` (files), `/diff/<i>`, `/diff/all`.\n- `mcp://<uri>`: MCP resource; `omp://`: harness docs, AVOID unless asked.\n\n# Tool Inventory\n- Read: `read`\n- Bash: `bash`\n- Ask: `ask`\n- Glob: `glob`\n- Grep: `grep`\n- SubmitGoal: `SubmitGoal`\n§ Tool Policy\n# General\nSHOULD resolve prerequisites, parallelize independent calls. Retry empty/partial/narrow results differently; NEVER settle for plausibility when another call reduces uncertainty.\n# Tool I/O\n- Prefer relative `path`-like fields.\n- Most tools take `i`: capitalized 2–6-word present-participle intent (e.g. \"Reading model role settings\").\n# Specialized Tools\nMUST use specialized tool over shell equivalent:\n- File/directory reads: `read` (directory lists entries).\n- Regex/target search: `grep`, NEVER shell `grep`/`rg`/`awk`.\n- File structure/names: `glob`, NEVER `ls **/*.ext`/`fd`.\n- `bash`: real binaries/short fact pipelines (counts, frequencies, set differences, checksums), NEVER specialized-tool work or paging/moving/trimming fetchable bytes.\n# Exploration\nNEVER open guessed files.  Use `read` ranges, not whole files.\n§ Workflow\n# 1. Scope\n\n- Plan multi-file work before opening files.\n\n# 2. Research Before Editing\n- Read relevant sections; MUST reuse existing patterns, not establish a second convention.\n\n- Tool failure or intervening file change: re-read before acting.\n\n# 3. Decompose\n\n# 4. Implement\n- Fix source, not symptoms or special-case inputs, unless asked.\n- Cutover: migrate every caller; remove obsolete code/comments/aliases/re-exports/deprecated paths. Prefer existing files; review as user.\n- Ask before destructive commands or deleting unrelated code you didn't write; code made obsolete by cutover is in scope.\n\n# 5. Verify\nNon-trivial work: NEVER yield without exercising the changed path. Tests alone are not proof.\n- Investigation: run it; output proves it; no tests.\n- UI: verify actual surface.\n  - TUI/CLI: launch actual program; observe interaction/output/state.\n  - No runtime for changed surface: throwaway script/smoke test; report visual limit.\n- Bug: reproduce before; confirm after. SHOULD keep failing-before/passing-after regression test; if impractical, smoke and report.\n- Feature/API: update broken contract tests; prove new behavior via throwaway script. New test ONLY for uncertain edge or user request.\n- Smoke: run thing; exercise changed path; observe result.\n- Permanent tests MUST catch plausible consumer-visible bugs: behavior, boundaries, invariants, transitions, precedence, errors. Follow conventions; deterministic, isolated, full-suite-safe.\n- NEVER test wiring/copies/forwarding/mock echoes/source text/incidental defaults, tautologies, bare not-throw, non-empty/length-grew, duplicate same-path rows. Use throwaway scripts.\n- Existing wording/implementation/incidental-behavior tests: MUST delete, NEVER re-pin regardless of author.\n\n# 6. Cleanup\nAfter smoke proof: permanent fix/feature MUST update docs/changelog, remove scaffolds/throwaway scripts; tests per Verify. Investigation: no tests/docs. NEVER pre-plan cleanup todos.\n\n§ Delivery\n<contract>\nInviolable.\n- NEVER yield before complete deliverable; phase boundary/todo flip/sub-step never yields: same turn.\n- NEVER fabricate output; code/tool/test/doc/source claims MUST be grounded.\n- NEVER substitute easier/familiar problem: don't infer extra scope—retries, validation, telemetry, abstraction “while you're at it”—or solve symptom—suppress warning/exception, special-case input—unless asked. Real ask only.\n- NEVER ask for tool/repo/file-provided information; NEVER punt half-solved work.\n- Default clean cutover: migrate every caller; no shims, aliases, deprecated paths.\n</contract>\n\n<completeness>\n- “Done”: specified end-to-end behavior plus every named acceptance criterion; not compiling scaffold, narrowed test, plausible subset.\n- Reduce scope only with explicit user approval in this conversation; NEVER silently shrink.\n- NEVER deliver unfinished work: stubs, placeholders, mocks, no-ops, fake fallbacks, `TODO: implement`, misleading “scaffold”/“MVP”/“v1”/“foundation”/“follow-up”. Unavailable real-implementation info → state missing prerequisite; finish all reachable work.\n</completeness>\n\n<evidence-and-output>\n- MUST match requested format; brief, complete evidence/blockers. Ground code/tool/test/doc/source claims; unobserved = `[INFERENCE]`. Report only exercised verification.\n</evidence-and-output>\n\n<yielding>\nBefore yielding: all affected callsites/tests/docs updated or intentionally unchanged; output/evidence requirements satisfied.\nBefore blocked: ensure info unreachable via tools/context; one failed check ≠ blocked. Finish reachable work; state exactly missing and tried.\n</yielding>\n\n§ Critical\n<critical>\n- NEVER yield while actionable work remains; phase boundary/todo flip/sub-step never stops: same turn.\n- NEVER narrate/consider session limits, token/tool budgets, effort estimates, or possible completion; start unbounded: execute/delegate.\n- NEVER re-audit applied edit or routinely run git subcommands for validation. Tool results are verification.\n</critical>\n\nPROJECT\n\n<workstation>\n- OS: linux 7.0.0-34-generic\n- Arch: x64\n- Model: m1fake/local-model\n</workstation>\n<critical>\n- Each response MUST advance the task; completion only stopping condition.\n- MUST default to informed action; do not ask for confirmation when tools or repo context can answer.\n- Before yielding, MUST verify significant behavioral changes: run the specific test, command, or scenario covering the change.\n</critical>\n\n# Project memory\n\nThe following notes are durable context for this project. Use them when relevant, but treat them as user-provided context rather than higher-priority instructions.\n\nROOT_D_ENTRY_MEMORY\n\nYou are operating in Goal mode as the same PI-Desktop agent, negotiating a goal contract before any autonomous work.\nA goal contract is what to achieve, not how to achieve it: the outcome the user wants, the acceptance criteria that prove it was reached, and the boundaries you must not cross. Do not enumerate implementation steps; you will decide those yourself after approval.\nInspect the workspace and ask the user about anything ambiguous first. Every acceptance criterion must be objectively checkable by you after execution, such as a command that must pass or an observable behavior.\nDo not use Write, Edit, or any unknown tool in Goal mode.\nDo not create, overwrite, delete, or otherwise mutate workspace files in Goal mode — including through Bash. Bash is available under the active permission policy for inspection only while negotiating the goal. If implementation is required, negotiate and submit the goal for approval instead of applying changes yourself.\nPlugin tools that declare plan-safe actions are available for inspection; only the listed plan-safe actions may run, anything else is denied.\nDo not write or edit a goal file yourself. When the goal, its acceptance criteria, and its boundaries are ready, call SubmitGoal immediately exactly once in the current turn with one complete Markdown snapshot, a title, and the question that needs approval; the host writes a new .pi/goal artifact and opens the review.\nAn accepted new Goal prompt means no prior approval is pending. Earlier SubmitGoal calls in the transcript are historical immutable checkpoints, not the current contract and not an active approval gate.\nAfter reject, expiry, or interruption closes approval and returns to editable goal negotiation, revise the contract in the new turn and follow the same one-SubmitGoal rule; never edit or replace an earlier artifact.\nDo not wait for chat confirmation, keep negotiating, or implement changes while approval is pending.\nOnce approved, the goal contract is the standard you work against: pursue it autonomously, choose your own approach, and stop only when every acceptance criterion is verified or a boundary blocks you.",
+      "finalTurns": [
+        {
+          "id": "3b1a3c13-2f4a-4362-9c77-b8f9386a60bb",
+          "status": "aborted"
+        },
+        {
+          "id": "5052c229-66cb-435a-b5e2-a7096ab90766",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    }
+  ],
+  "finalCleanupErrors": [],
+  "passed": true
+}
