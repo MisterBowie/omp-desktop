@@ -427,6 +427,10 @@ macOS arm64 compiled `.5` writer + production bridge 冷读 8/8（完整无 LF �
 （`passed: false`），与 harness 无关，报告按原样归档为
 `repair5-20261003/root-review-superseded-dirty-tree.json`。
 
+被复跑的候选是 `a4c190313fcf592c55c88b3803989a55a1bca610`；其后的归档提交只新增本轮文档与
+证据（`git diff` 不含任何 harness/产品文件），harness 在两个提交上字节相同
+（sha256 `4d02057022df4f6fdf0eb7fafb7ea8b5cbe3a2adb8b9444fd8358ce81c8c44a5`）。
+
 ## 2. 验证（命令、退出码、原始日志）
 
 所有命令在 `/home/vv/person/code/omp-desktop-m5-t20-d-ui/app`，Node v24.14.0、
