@@ -301,8 +301,12 @@ jobs:
         # The dist scripts pass `--publish never` themselves: electron-builder
         # must never self-publish, and this workflow owns the release step. The
         # explicit architecture keeps the package and the native sidecar
-        # aligned with the runner this matrix entry selected.
-        run: pnpm --filter @pi-desktop/desktop run ${{ matrix.dist }} -- --${{ matrix.arch }}
+        # aligned with the runner this matrix entry selected. The flag is
+        # passed without a standalone `--`: pnpm appends these arguments to the
+        # end of the script command line, which is the release entry, and that
+        # entry refuses a literal `--` because electron-builder must see the
+        # whole command line (run 37133058318 failed on `-- --x64`, exit 2).
+        run: pnpm --filter @pi-desktop/desktop run ${{ matrix.dist }} --${{ matrix.arch }}
 
       - name: Verify the Linux host-core glibc floor
         if: matrix.platform == 'linux'
