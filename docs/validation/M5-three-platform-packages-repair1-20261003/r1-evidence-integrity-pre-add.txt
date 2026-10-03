@@ -1,0 +1,10 @@
+# 修复前快照（linux-dist-build.log 尚未纳入 Git；于 git add -f 之前采集）
+
+$ node docs/validation/M5-three-platform-packages-repair1-20261003/r1-evidence-integrity.mjs
+FAIL: manifest != git:
+  only manifest: linux-dist-build.log
+  only git:
+exit=1
+
+# 即根复审结论所述：SHA256SUMS.txt 列出 linux-dist-build.log，但原始 Git 交付缺少它
+# （.gitignore:11:*.log 使该文件无法被普通 add 收集；当时 git ls-files 只有 12 文件，其中含清单自身）。

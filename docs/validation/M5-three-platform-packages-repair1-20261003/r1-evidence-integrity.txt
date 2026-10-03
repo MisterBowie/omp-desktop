@@ -1,0 +1,9 @@
+$ node docs/validation/M5-three-platform-packages-repair1-20261003/r1-evidence-integrity.mjs
+
+manifest (12): README.md, assemble-smoke-BUILD-RECORD.json, assemble-smoke-SHA256SUMS.txt, assemble-smoke-release-notes.md, desktop-suite-after-provisioning.log.gz, desktop-suite-environment-note.txt, linux-build-record.json, linux-dist-build.log, linux-package-metadata.txt, linux-packaged-runtime.json, linux-plan-goal-regression.txt, tests-and-gates.txt
+disk     (12): equal to manifest
+git      (12): equal to manifest (plus SHA256SUMS.txt, self-excluded)
+digests  : 12/12 OK (sha256sum over the delivered bytes)
+delivered: linux-dist-build.log bytes=18052 sha256=9eb36eaa0b72843e21a258a2deefe757f0887e8ae56236adc6f4fb58aa248cf8 tracked=true
+OK: manifest == disk == git, self-excluding SHA256SUMS.txt
+exit=0

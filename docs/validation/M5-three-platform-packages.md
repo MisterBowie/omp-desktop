@@ -2,6 +2,7 @@
 
 本记录交付 M5 阶段的**发布准备**：可供根复审的三平台打包工作流、安装身份修正、发布前/发布后校验脚本及其测试与证据。
 **本阶段不创建 tag、不触发 Actions、不创建或上传 Release**；真实三平台 native CI 与统一 prerelease 由根在复审通过后按受控 `m5-test-*` tag 触发。
+2026-10-03 根在 `0a4750d0` 复审后列出 R1–R3 必须补正项，本轮普通追加提交完成（见 §10）；交付范围与功能不变。
 
 - 工作树：`/home/vv/person/code/omp-desktop-m5-packages`，分支 `codex/m5-three-platform-packages`
 - 基线：`860c264177314f5c9501f90c2ef6bcbcd6aaa11b`（根独立验收通过的 M5 功能最终提交）
@@ -31,7 +32,7 @@
 - **打包**：`pnpm install --frozen-lockfile`（app）与 `cargo build --release --locked -p host-core`，随后 `pnpm --filter @pi-desktop/desktop run dist:<platform> -- --<arch>`（cwd `app/`）。`--publish never` 在 dist 脚本内；工作流自身**不**传递平台/配置/publish 参数，也不使用 `--prepackaged`/`--projectDir`/`-c.*`。macOS 为未签名通道（`CSC_IDENTITY_AUTO_DISCOVERY=false`，无任何签名/公证 secret）。
 - **包内验收**：把**本次 electron-builder 输出**的 `Resources` 复制到仓库外、含空格与中文的路径，配自有 HOME/XDG/TMPDIR，再运行生产 `verify-packaged-runtime.mjs --resources <copy> --json`（hash/provenance、version/protocol/`get_state`、精确 missing-gate 拒绝、停止/进程组回收/runroot 清理）。不使用源码目录 `apps/desktop/resources` 代替。
 - **包内 Plan/Goal 回归**：`OMP_E2E_PACKAGED_RESOURCES` 指向同一份隔离副本，运行既有真实 `omp-plan-submit-e2e.test.mjs`（同一套 Entry/Goal/Submit 用例），驱动**包内** sidecar 与打包后的 gate bundle；仅本地 FakeProvider。回归用自有干净 scratch 根（见 §5 结论 3）。
-- **上传**：每平台 `package-<platform>-<arch>`（实际包 + `build-record.json`）与 `reports-<platform>-<arch>`（原始 `packaged-runtime.json`、`plan-goal.txt`）两组 Actions artifacts；失败时也尝试上传诊断报告。
+- **上传**：每平台 `package-<platform>-<arch>`（实际包 + `build-record.json`）与 `reports-<platform>-<arch>`（原始 `packaged-runtime.json`、`plan-goal.txt`；失败时另含 `packaged-runtime.stderr.txt`＝verifier stderr + 退出状态）两组 Actions artifacts。隔离根在可能失败的验收命令之前写入 step output，失败时也上传诊断报告且保留原失败退出码（§10 R3）。
 - **发布（仅 tag 事件，`needs: [guard, build]`）**：`assemble-test-release.mjs` 要求恰好三个平台、逐项复核 revision/version/stage/patchLevel/fork、重算每个载荷的 sha256、拒绝 `latest*.yml` 与 `*.blockmap`、生成**只含载荷**的 `SHA256SUMS.txt`（自排除）+ `BUILD-RECORD.json` + release notes；随后 `gh release create <tag> --verify-tag --prerelease`（不 `--latest`、不 `--clobber`、不触碰 `m5-preview`）；最后回读 `releases/tags/<tag>`（tag/prerelease/draft/资产名与字节/下载 URL）、断言该 Release **不是**仓库 `latest`、下载全部资产并 `sha256sum -c` 复核。
 
 ### 2.2 安装身份修正（并存所需的最小配置）
@@ -132,7 +133,25 @@
 
 目录 `docs/validation/M5-three-platform-packages/`（含自排除 `SHA256SUMS.txt`，`sha256sum -c` 全 `OK`）：
 
-- 真实运行：`linux-dist-build.log`、`linux-packaged-runtime.json`、`linux-plan-goal-regression.txt`、`linux-build-record.json`、`linux-package-metadata.txt`
+- 真实运行：`linux-dist-build.log`（R1 后由 Git 精确跟踪，字节未改）、`linux-packaged-runtime.json`、`linux-plan-goal-regression.txt`、`linux-build-record.json`、`linux-package-metadata.txt`
 - 装配烟雾（含合成夹具说明）：`assemble-smoke-release-notes.md`、`assemble-smoke-BUILD-RECORD.json`、`assemble-smoke-SHA256SUMS.txt`
 - 测试与环境：`tests-and-gates.txt`、`desktop-suite-after-provisioning.log.gz`（确定性 gzip）、`desktop-suite-environment-note.txt`
 - 说明：`README.md`（区分真实证据与夹具，避免误读）
+
+返修轮 R1–R3（2026-10-03）另有 `docs/validation/M5-three-platform-packages-repair1-20261003/`（含自排除 `SHA256SUMS.txt`）：R1 完整性检查脚本与输出、R3 失败路径 probe 脚本与输出、相关套件输出、命令账本。
+
+## 10. 返修轮 R1–R3（2026-10-03，根在 `0a4750d0` 复审后）
+
+普通追加提交完成；不重跑编译器/全部桌面套件/昂贵打包（变化仅发布脚本、工作流与对应测试），Mac 77/77、Linux 包内 15/15 与 M5 功能证据继续准确引用。提交坐标：R1 = `2d71acb`，R2/R3 = `615ac93`，文档/证据提交为二者之后的普通追加子提交（最终 HEAD 见 `git log`）。
+
+| 项 | 根列出的问题 | 修复 | 定向证据（`M5-three-platform-packages-repair1-20261003/`） |
+| --- | --- | --- | --- |
+| R1 | `SHA256SUMS.txt` 列出 `linux-dist-build.log`，但该文件被根 `.gitignore` 的 `*.log` 忽略；原始交付只有 12 个 tracked 文件，清单中的日志缺失 | 仅对该唯一路径 `git add -f`（不改字节、不改其它证据、不重写历史），提交 `2d71acb` | `r1-evidence-integrity.txt`：清单/磁盘/Git tracked 三个 12 文件全集相等（自排除 `SHA256SUMS.txt`），12/12 摘要 `sha256sum` 匹配，日志 18052 B / `9eb36eaa…` tracked=true；修复前 RED 见 `r1-evidence-integrity-pre-add.txt`（恰为 `only manifest: linux-dist-build.log`） |
+| R2 | 发布 notes 在 `childEnvironmentReadable=false` 时仍生成 `child PATH/HOME asserted (host does not expose /proc)`；生产 verifier 对无 `/proc` 主机明确返回 readable=false，且只在 childEnv 存在时断言 PATH/HOME | `assemble-test-release.mjs`：可读 → `child PATH/HOME asserted (child environment readable)`；不可读 → `child env not observed (host does not expose /proc; isolated launch config used, PATH/HOME not asserted)`，表后补充"隔离启动配置照常使用、观测不可得时不写已实测"；新增夹具测试覆盖 true/false 两个分支 | `targeted-tests.txt`：相关 11 文件 **78 passed / 0 failed / 1 skipped**（macOS 专属用例按既有约定在 Linux 跳过；含 2 个新增用例）；新增用例 "release notes state the child-environment observation limit instead of asserting it"（Windows false 行不得出现 asserted、Linux true 行断言存在） |
+| R3 | 工作流在 `set -e` 下先跑 verifier、后写 `iso` step output；verifier 失败时 `:404` 的 failure artifact 条件 `steps.acceptance.outputs.iso != ''` 为假，报告上传被跳过，verifier stderr 只剩 job log | ① `iso` 在可能失败的验收命令（含 `cp`）之前写入 `GITHUB_OUTPUT`；② verifier 的 stderr 与退出状态保存到 `$iso/packaged-runtime.stderr.txt`（`set +e` → `verify_status=$?` → `set -e` → `exit "$verify_status"`，不 mask）；③ failure artifact 路径加入该文件 | `r3-failure-path-probe.txt`：从工作流提取真实步骤体、将 verifier 替换为以 `PACKAGED-RUNTIME-FAIL`+exit 1 失败的 stub 后运行 → step exit=1（未变绿）、iso 在失败前已发布、stderr 文件含失败消息与 `exit status: 1`；工作流契约测试 "a refused package fails the lane and its diagnosis stays uploadable" 钉住顺序/退出码/上传路径 |
+
+说明：
+
+- verifier 判定强度未降低：readable=false 不跳过断言——同一次运行仍以进程内观测（run root 前缀、config root、decoy 目录、停止/回收/清理）断言隔离，只是 OS 子进程环境观测在无 `/proc` 主机不可得（与 `verify-packaged-runtime.mjs` 现有行为一致，未改动该文件）。
+- 原证据目录字节未改：装配烟雾 `assemble-smoke-release-notes.md` 是 R2 修复前的历史输出（Linux 主机可读，行文本为旧 true 分支措辞）；新措辞由新增测试覆盖，不回写旧证据。
+- macOS/Windows native 构建/验收仍未在本机运行；tag 与 native CI 仍待根复核后触发（§7/§8 不变）。

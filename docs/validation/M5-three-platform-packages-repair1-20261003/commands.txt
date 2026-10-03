@@ -1,0 +1,46 @@
+R1–R3 返修轮命令账本（2026-10-03）
+工作树：/home/vv/person/code/omp-desktop-m5-packages
+分支：codex/m5-three-platform-packages（基线 0a4750d0ecddbb53defc5ddd10e38f52fa870805）
+Node：v24.14.0（nvm use 24）；固定子模块 PI 0111e306 / OMP 62bc57be；受控 fork 36483311（补丁级 .5）均未动
+
+# ── R1：把清单列出但被 *.log 忽略的原始日志纳入 Git（仅此一路径）
+git status --short
+#   -> 空（工作树干净）
+git check-ignore -v docs/validation/M5-three-platform-packages/linux-dist-build.log
+#   -> .gitignore:11:*.log  docs/validation/M5-three-platform-packages/linux-dist-build.log
+sha256sum docs/validation/M5-three-platform-packages/linux-dist-build.log
+#   -> 9eb36eaa0b72843e21a258a2deefe757f0887e8ae56236adc6f4fb58aa248cf8（18052 B，与清单一致）
+node docs/validation/M5-three-platform-packages-repair1-20261003/r1-evidence-integrity.mjs
+#   -> exit 1（RED；见 r1-evidence-integrity-pre-add.txt：only manifest: linux-dist-build.log）
+git add -f docs/validation/M5-three-platform-packages/linux-dist-build.log
+git commit -m "fix(m5-packages): deliver the omitted linux-dist-build.log evidence in Git" \
+  -- docs/validation/M5-three-platform-packages/linux-dist-build.log
+#   -> 2d71acb91245479e11cf86b17de8d3fa918850d5（仅该文件；1 file changed, 264 insertions）
+node docs/validation/M5-three-platform-packages-repair1-20261003/r1-evidence-integrity.mjs
+#   -> exit 0（GREEN；见 r1-evidence-integrity.txt：manifest == disk == git，12/12 摘要匹配）
+
+# ── R2/R3：发布脚本与工作流定向测试（cwd app/）
+node --test --test-reporter=tap \
+  apps/desktop/test/packaging-footprint.test.mjs apps/desktop/test/auto-update.test.mjs \
+  apps/desktop/test/development-branding.test.mjs apps/desktop/test/ci-workflow.test.mjs \
+  apps/desktop/test/macos-release-lane.test.mjs apps/desktop/test/macos-release-verification.test.mjs \
+  apps/desktop/test/release-asar.test.mjs apps/desktop/test/preview-workflow.test.mjs \
+  apps/desktop/test/packaging-sidecar-source.test.mjs apps/desktop/test/three-platform-package-workflow.test.mjs \
+  apps/desktop/test/test-package-staging.test.mjs
+#   -> exit 0；tests 79 / pass 78 / fail 0 / cancelled 0 / skipped 1（macOS 专属按既有约定跳过；含两个新增用例）
+#      见 targeted-tests.txt
+git add .github/workflows/three-platform-test-packages.yml app/scripts/assemble-test-release.mjs \
+  app/apps/desktop/test/test-package-staging.test.mjs app/apps/desktop/test/three-platform-package-workflow.test.mjs
+git commit -m "fix(m5-packages): keep child-env claims and failure diagnostics honest"
+#   -> 615ac93（R2/R3；4 files changed，91 insertions）
+#   文档与证据（验证记录 §10、任务看板、HANDOFF、本目录）为该二者之后的普通追加提交（见 git log --oneline -3）。
+
+# ── R3：失败路径 probe（仓库根）
+bash docs/validation/M5-three-platform-packages-repair1-20261003/r3-failure-path-probe.sh
+#   -> exit 0；从工作流提取真实步骤体、以 PACKAGED-RUNTIME-FAIL + exit 1 的 stub 替换 verifier 后运行：
+#      step exit=1（未变绿）、iso 在失败前已发布、packaged-runtime.stderr.txt 含失败消息与 exit status: 1
+#      见 r3-failure-path-probe.txt
+
+# ── 明确未运行（本轮不要求，不声称通过）
+#   - 编译器 / 全部桌面套件 / 昂贵打包（dist:linux）未重跑（变化仅发布脚本、工作流与对应测试）
+#   - native macOS / Windows 构建与验收未在本机运行；tag 与 native CI 待根复核后触发

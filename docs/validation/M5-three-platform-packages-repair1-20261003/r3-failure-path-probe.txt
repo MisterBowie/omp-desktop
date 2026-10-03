@@ -1,0 +1,5 @@
+$ bash docs/validation/M5-three-platform-packages-repair1-20261003/r3-failure-path-probe.sh
+
+PASS: step exit=1; iso published before failure
+PASS: packaged-runtime.stderr.txt -> PACKAGED-RUNTIME-FAIL the packaged runtime did not reach idle (phase starting) verify-packaged-runtime exit status: 1
+exit=0
