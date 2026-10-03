@@ -1856,9 +1856,14 @@ contract tool catalog (evidence: `docs/validation/M5-capability-user-paths.md`,
   added. M5/T20-B1 (runtime mode/policy state, the mode block and the
   contract tool clamp), M5/T20-C (execution-time permission enforcement,
   external-path decisions and real plugin execution mode) and M5/T20-B2
-  (submit/approve/dispatch) are implemented; T20-D (capability opening and
-  the full-matrix acceptance) stays closed and unclaimed, and `plan`/`goal`
-  capabilities remain off.
+  (submit/approve/dispatch) are implemented; M5/T20-D declares the `plan` and
+  `goal` capabilities open and drives them from the same table in the Main
+  boundaries and the composer entries (ADR 0312), with the real Electron
+  acceptance of the full loop (evidence:
+  `docs/validation/M5-t20-d-capability-ui.md`). A capability *declaration* is
+  a separate axis from the runtime *phase*: the declaration says the engine
+  can host the mode, never that a process is currently running. The Cursor +
+  Plan/Goal exclusion (ADR 0306) is unchanged.
 
 M5/T20-B2 implements the non-Cursor Plan/Goal submission, approval and
 dispatch loop (evidence: `docs/validation/M5-t20-b2-submit-approval.md`,
@@ -2152,18 +2157,24 @@ The desktop adds the boundaries a database trigger cannot cover:
   model pin that would create it.
 
 Non-Cursor providers and Cursor models in Agent mode are untouched. R3 itself
-remains blocked and T20-B/C/D remain unstarted: this gate is a precondition for
-that work, not the feature.
+remains blocked for that combination, and T20-B/C/D were still unstarted when
+this gate landed: the gate is a precondition for that work, not the feature.
 
 **Current scope (2026-10-02).** This exclusion is the product's current scope
 rather than a temporary blocker: the user placed "Cursor + Plan/Goal" out of
 scope while keeping the non-Cursor Plan/Goal route in scope under the strict
 contract. The gate above and every boundary it added stay in force; the gate
 does not refuse Cursor in Agent mode either, but the desktop wires no Cursor
-transport yet, so this confirmation adds no Cursor capability. T20-B/C/D are
-still unstarted and will proceed only for the non-Cursor route, starting with
-the runtime-domain mode/policy channel; the split is in
-`docs/validation/M5-t20-non-cursor-scope.md`.
+transport yet, so this confirmation adds no Cursor capability. T20-B/C/D were
+still unstarted at that date and proceed only for the non-Cursor route; the
+split is in `docs/validation/M5-t20-non-cursor-scope.md`.
+
+**Current status (2026-10-03).** Supersedes the "unstarted" wording above for
+progress tracking only: the root reviewer has accepted B1, C, B2 and the
+model-side EnterPlanMode/EnterGoalMode work; T20-D (`plan`/`goal` capability
+declarations, the composer entries and the real Electron acceptance, ADR 0312)
+is implemented and under root review. The Cursor + Plan/Goal exclusion and
+every gate in this section are unchanged.
 
 ## 17. Bundled sidecar build and admission (M5/T20-R4B; reproducible builds since M6/T20-R4-3; packaged-resource acceptance since M6/T21-A, ADR 0307)
 
@@ -2359,6 +2370,7 @@ that archive with the wall clock, not from bytecode; the upstream
 build does not use. Measurements, control builds and the refusal evidence are in
 `docs/validation/M6-r4-3-reproducible-sidecar.md`, so R4-3 is **satisfied**.
 
-Not addressed here: R3 stays blocked and T20-B/C/D stay unstarted, so M5/T20
-remains **partially complete** in HANDOFF, the task board, ADR 0307 and this
-section.
+Not addressed here: R3 stays blocked for the excluded combination, and
+T20-B/C/D were unstarted when this section was written, so M5/T20 was then
+**partially complete** in HANDOFF, the task board, ADR 0307 and this section
+(the 2026-10-03 status notes above record the later progress).

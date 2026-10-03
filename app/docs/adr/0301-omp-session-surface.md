@@ -1,4 +1,4 @@
-# 0301 — The OMP conversation surface: events, dialogs and stopping
+# ADR 0301: The OMP conversation surface: events, dialogs and stopping
 
 - Status: Accepted
 - Date: 2026-09-23

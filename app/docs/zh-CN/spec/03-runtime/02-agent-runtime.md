@@ -1124,14 +1124,17 @@ Agent 时 bridge 回收进程、下一次提示词在同一持久 native 会话�
 投影上重建默认呈现（native 顶层 + `xd://` 延迟分区）并重注册宿主目录，seeds 跨替换延续、无重放、
 身份不变、被移除/禁用的工具不复活；回收失败则拒绝提示词。gate 自身的 Agent 恢复路径保留为同进程
 回退：恢复夹取前选择 + 夹取期间被移除的名字，目录类名字按**当时**目录过滤、native 名字按夹取前
-选择过滤，不用 `getAllTools` 全开。④子代理仍零注入、审批描述符仍携带有效权限模式。T20-B2/D 仍未开始；
+选择过滤，不用 `getAllTools` 全开。④子代理仍零注入、审批描述符仍携带有效权限模式。本节写作时
+T20-B2/D 尚未开始（B2 与 T20-D 见后续小节）；
 T20-C 见下一节（其复审返修后，产品路径的 `tool_call` 不再按调用回读状态文件：描述符携带的
 risk/mode/permissionMode/理由全部来自本回合被准入的不可变策略，可变文件只在准入时被读取）。
 
 ### 提交、审批与派发（M5/T20-B2，ADR 0310；2026-10-03）
 
 非 Cursor 路线现在实现 Plan/Goal 的提交、审批与派发闭环（证据
-`docs/validation/M5-t20-b2-submit-approval.md`）；`plan`/`goal` 能力键仍关闭，T20-D 仍未开始。
+`docs/validation/M5-t20-b2-submit-approval.md`）。`plan`/`goal` 能力键的开放与真实桌面验收
+由 T20-D 完成（ADR 0312；证据 `docs/validation/M5-t20-d-capability-ui.md`）：能力**声明**
+与运行时**阶段**是两个轴，声明表示引擎可以承载该模式，不等于当前有进程在运行。
 
 - **提交工具**：bridge 在每次提示词的唯一目录装配点追加**当前合约模式自己的**提交工具——Plan 只有
   `SubmitPlan`、Goal 只有 `SubmitGoal`、Agent 两者都没有——名称/描述/schema（required 的
@@ -1277,15 +1280,18 @@ provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行�
 * 渲染层在契约模式下不提供 Cursor 提供方并说明原因；在 IPC 之前以本地化提示拒绝该组合；并跳过会
   形成该组合的自动模型 pin。
 
-非 Cursor 提供方与 Agent 模式下的 Cursor 模型不受影响。R3 本身仍未解除、T20-B/C/D 仍未开始：
-本门是这些工作的前置条件，而不是该功能本身。
+非 Cursor 提供方与 Agent 模式下的 Cursor 模型不受影响。R3 本身仍未解除（针对该组合）、
+T20-B/C/D 在本门落地时尚未开始：本门是这些工作的前置条件，而不是该功能本身。
 
 **当前范围（2026-10-02）**：该排除是产品的当前范围，而不是临时阻塞——用户把「Cursor + Plan/Goal」
 移出范围，同时把非 Cursor 的 Plan/Goal 路线保留在范围内并要求满足严格契约（非 Cursor 提供方不产生
 §15 所述预执行块）。上述门与它新增的全部边界继续生效；组合门不拒绝 Cursor + Agent，但当前桌面尚未
-接通 Cursor 传输，本轮不新增该能力。T20-B/C/D 仍未开始，且只会针对非 Cursor 路线推进，第一步是运行域
-mode/policy 通道；拆分见
-`docs/validation/M5-t20-non-cursor-scope.md`。
+接通 Cursor 传输，本轮不新增该能力。T20-B/C/D 在该日尚未开始，且只会针对非 Cursor 路线推进；
+拆分见 `docs/validation/M5-t20-non-cursor-scope.md`。
+
+**当前状态（2026-10-03）**：以下仅更新进度口径，不影响本节任何门——根已独立验收 B1、C、B2 与
+模型侧 EnterPlanMode/EnterGoalMode；T20-D（`plan`/`goal` 能力声明、composer 入口与真实 Electron
+验收，ADR 0312）已实现、待根复审。「Cursor + Plan/Goal」排除与本节全部门保持不变。
 
 ## 17. bundled sidecar 的构建与准入（M5/T20-R4B；自 M6/T20-R4-3 起为可复现构建；自 M6/T21-A 起含打包资源验收，ADR 0307）
 
@@ -1407,5 +1413,5 @@ mode/policy 通道；拆分见
 `--compile --bytecode --splitting` 的修复（oven-sh/bun#42151）覆盖的是本构建未使用的模式。测量、
 对照构建与拒绝证据见 `docs/validation/M6-r4-3-reproducible-sidecar.md`，因此 R4-3 **已满足**。
 
-本文不涉及：R3 仍然阻塞、T20-B/C/D 仍未开始，因此 M5/T20 在 HANDOFF、任务板、ADR 0307 与本节中
-一律记为**部分完成**。
+本文不涉及：R3 仍然阻塞（针对该组合）、T20-B/C/D 在本文写作时尚未开始，因此 M5/T20 当时在
+HANDOFF、任务板、ADR 0307 与本节中记为**部分完成**（后续进度见上文 2026-10-03 状态说明）。

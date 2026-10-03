@@ -1,6 +1,9 @@
 # M5/T20-D：能力键、真实桌面闭环与完整矩阵
 
-更新时间：2026-10-03。状态：**实现完成，本机验证通过，待根独立复审**。分支
+更新时间：2026-10-03。状态：**首稿 `8a1dd8fc` 经根复审判 changes-required（R1–R4：缺
+auto 批准与 running 执行重启、无专属 HOME/回收失败不可见、无可审计 raw 证据且 execution id
+印错、现行 spec/矩阵状态漂移）；定向返修完成、本机验证通过、待根复审**（返修证据
+`docs/validation/M5-t20-d-capability-ui/repair-20261003/`，§1.5）。分支
 `codex/m5-t20-d-capability-ui`（普通追加提交，不 amend/rebase/强推，不发布、不合 main、
 不建 PR），基线 `68519ea19f6fee37fec2c5817256f3a68ea8606e`（根已接受的 D-Enter 最终原始提交）。
 固定子模块 OMP `62bc57be`、PI `0111e306`（未动）；补丁级保持 `62bc57b+omp-desktop.5`
@@ -111,24 +114,98 @@ live 回合 id（`omp-turn:*`）也不可能等于 durable Pi 回合 id，于是
 `main-wiring-contract.test.mjs` 断言组合根确实以关闭门接线；D3 UI E2E 现在断言渲染层收到
 `agent_end`、停止按钮消失、重提经真实 composer 送达并产生新工件。
 
+### 1.5 定向返修（2026-10-03，R1–R4）
+
+根在 `8a1dd8fc` 判 changes-required：R1 缺 auto 批准与"已批准执行中"的应用/Host 重启；
+R2 测试子进程未隔离 HOME、回收失败只静默超时；R3 唯一产物是 PNG、无原始请求/身份/DB/清理
+证据，且摘要把 proposal id 当 accept-edits 的 execution id 打印；R4 现行 spec 与矩阵仍写
+"T20-D 未开始/能力关闭"、把已接受的 C 写成待复审。返修只改测试 harness（
+`app/scripts/e2e-omp-plan-ui.mjs`）与文档，**未改产品代码、gate、fork、补丁或固定子模块**。
+
+**R1 完整真实 UI 路径（三种批准权限 + running 重启）**。就在既有流程上补齐：
+
+- **auto**：第三轮经真实审批菜单选 `auto` 批准；执行回合跑两条 high-risk `bash`（`accept-edits`
+  只覆盖 write/edit、`ask` 会弹卡），全程无权限卡、两条副作用都真实落盘；durable 行
+  `target_permission_mode=auto`、会话行 `mode=agent`/`permission_mode=auto`，execution
+  `completed`（`scenarios.auto`；权限模式与执行行见下表）。
+- **running 执行中的应用/Host 重启**：第四轮批准后，第一步 `bash` 追加 `held-run` 到副作用
+  文件，第二步 `/bin/sleep 600`（绝对路径强制真实外部进程；固定运行时的 brush-core 会把裸
+  `sleep` 当内建，不产生子进程）把执行保持在确定状态；断言持久 `execution_state=running`、
+  durable turn 行 `running`、真实运行身份（OMP runtime 独立进程组 + `/bin/sleep` 子进程的
+  PID/PGID），再终止旧应用及其拥有的全部进程并**核对退出**，最后以同一数据目录重启：execution
+  → `interrupted`/`PLAN_EXECUTION_INTERRUPTED`、turn → `aborted`、audit
+  `plan_execution_interrupted`、provider 请求数不变（16，零重放）、副作用文件仍只有一行、UI
+  无待决审批；随后一个真实 Agent 回合完成（恰好 +1 provider 请求）证明 UI 恢复可用
+  （`scenarios.runningHold`/`runningRestart`）。pending 重启一仍保留（第四份 pending →
+  `interrupted`/`PLAN_APPROVAL_INTERRUPTED`、completed 不重放）。
+
+本轮 UI E2E 关键身份（`repair-20261003/omp-plan-ui-raw.json`，全部来自真实 API/DB/进程表）：
+
+| 项 | 值 |
+| --- | --- |
+| session / native | `d4ef1a60-617e-473f-b9cb-8161203c1d64` / `01a10019-c350-7153-accf-c961227a90e0`（runtime 18.3.0，host 侧 `native_session_path` 在 data 目录内） |
+| ask execution | `9e655938-6130-4cb3-a25a-109381e01775`（write 真卡 + Allow once） |
+| accept-edits execution | `eb86767b-6a65-493c-acc2-80364d6db226`（无卡落盘） |
+| auto execution | `d754330e-5af2-4e3c-a5d0-05272d301a9a`（两条 bash 无卡） |
+| held execution / turn | `1b9905ce-f8cc-4b80-87d6-e10abeb1afe8` / `df5327f5-f1fc-42d6-bbcf-c63a80862d15`（重启前 running → 重启后 interrupted/aborted） |
+| held 进程身份 | OMP runtime pid 2074418（pgid 2074418，独立组，cmdline 含 patched 树与 config overlay）/ `/bin/sleep` pid 2074520（pgid 2074520） |
+| provider 请求 | 16（重启前后不变；恢复回合恰 +1） |
+| 清理 | 三次回收（running-restart/pending-restart/final）`ok=true`、`electronExited=true`、stages 仅 `SIGTERM`、leftover 0；scratch 已删除、无幸存自有进程 |
+
+**R2 HOME 隔离与回收证明**。子进程环境从零构造（`HOME`、`XDG_CONFIG/DATA/STATE/CACHE_HOME`、
+`TMPDIR` 全在本次 scratch 内），只透传 DISPLAY/XAUTHORITY 与绝对 Node/Bun/系统 PATH；产品运行
+时把继承 HOME 的 `~/.bun/bin` 放在子 PATH 首位，故在专属 HOME 内以符号链接指向绝对 bun/node
+（不写用户 HOME、不复制任何用户配置/技能/凭据）。每次重启与最终清理都记录 Electron/Main、
+host-core、OMP runtime 及其工具子进程的 PID/PPID/PGID/starttime/cmdline，并按身份（pid +
+starttime，防 PID 复用）确认退出；宽限后升级 SIGTERM→SIGKILL 只作用于**这些自有进程组**；
+仍存活即判失败、保留 scratch 并非零退出（本轮从头全绿）。不以宽泛进程名杀用户其它实例。
+
+**R3 原始证据与准确身份**。`repair-20261003/omp-plan-ui-raw.json` 保存：runtime provenance
+（manifest base/fork/patch sha/大小、launcher sha、隔离 HOME 下 `omp --version` 探针 `omp/18.3.0`）、
+专属环境与工具链链接、全部 16 条 fixture provider 请求、逐步 UI 快照、真实 session/native/
+live/durable/proposal/execution id、只读 SQLite（sessions/plan_approvals/turns/audit_log）快照、
+工件与截图的路径/字节/大小/sha256、进程与回收报告、最终清理结论；凭据形状字段统一 redact。
+摘要行已改为打印真实 execution id（原缺陷：把 proposal id 当 accept-edits execution id）。
+**证据分层**：renderer（截图/DOM 快照/`uiAgentEvents` 中 `omp-turn:…` live id）、Host/runtime
+（SQLite 行、audit、进程表）、受控 handler（FakeProvider 请求、session/native 行）、历史接受证据
+（B1/C/B2/D-Enter 原始报告）分别标注，不互相冒充。重启恢复的准确陈述：**执行不重放、副作用不
+重复、UI 可用**由上述断言证明；native 转录完整（恢复回合的 provider 请求携带 M1–M6/EXEC1–4 全部
+历史、38 条消息）；同时如实记录该时点渲染层会话面板只显示重启后的回合
+（`scenarios.runningRestart.recovery.ui`），**不以刚启动的空界面推断历史丢失**——转录面板的
+恢复渲染不在本阶段验收范围。
+
+**R4 现行状态同步**。`app/docs/spec/03-runtime/02-agent-runtime.md`（英）与
+`app/docs/zh-CN/spec/03-runtime/02-agent-runtime.md`（中）的用户路径与 §16 Cursor 段改为当前
+事实：`plan`/`goal` 能力已声明开放（ADR 0312），能力**声明**与运行时**阶段**是两个轴；旧
+"T20-B/C/D 未开始"改为带日期的历史表述并新增 2026-10-03 状态说明；
+`docs/validation/M5-plan-goal-capability-gates.md` 状态说明 3 改为"C/B2/D-Enter 已验收、
+D 首稿判 changes-required、定向返修完成待复审"。带日期的历史记录与原失败证据保留。
+
 ## 2. 验证（命令、退出码、原始日志）
 
 所有命令在 `/home/vv/person/code/omp-desktop-m5-t20-d-ui/app`，Node v24.14.0、
 Bun 1.4.2、Linux x64；固定 patched 运行时树由 `scripts/omp-patch.mjs --apply
---prepare-build` 现成构建（本机放 `/tmp/omp-patched-t20d-ui`），`omp --version` =
-`omp/18.3.0`。UI E2E 使用用户会话显示端点（`DISPLAY=:1` +
-`XAUTHORITY=/run/user/1000/.mutter-Xwaylandauth.JKWYV3`，Xwayland 2560x1440）与
-`--no-sandbox`；Electron 43.6.0 二进制由 `~/.cache/electron` 的
+--prepare-build` 现成构建（首稿放 `/tmp/omp-patched-t20d-ui`，返修轮重新构建为专属树
+`/tmp/omp-patched-t20d-ui-repair1`，manifest `.5`、launcher sha256
+`1bc44850…`、隔离 HOME 下 `--version` = `omp/18.3.0`）。UI E2E 使用用户会话显示端点
+（`DISPLAY=:1` + `XAUTHORITY=/run/user/1000/.mutter-Xwaylandauth.JKWYV3`，Xwayland
+2560x1440）与 `--no-sandbox`；Electron 43.6.0 二进制由 `~/.cache/electron` 的
 `electron-v43.6.0-linux-x64.zip` 离线安装。
 
-证据全集的 SHA-256 清单：`M5-t20-d-capability-ui/SHA256SUMS.txt`（20 个原始文件，
-**不包含自身**，`sha256sum -c` 全通过；本文件本身由 Git 追踪，不在该目录清单内）。
+证据全集：首稿 20 个原始文件由 `M5-t20-d-capability-ui/SHA256SUMS.txt` 覆盖
+（**不包含清单自身**，`sha256sum -c` 全通过，本轮未改）；返修轮证据放子目录
+`M5-t20-d-capability-ui/repair-20261003/`，由该子目录自己的 `SHA256SUMS.txt` 覆盖
+（同样自排除、`sha256sum -c` 全通过）。本文件本身由 Git 追踪，不在任何清单内。
 
 | 验证 | 命令（要点） | 结果 | 原始日志 |
 | --- | --- | --- | --- |
 | B9 RED | 暂存实现后运行 `vitest run src/engine.test.ts`、`node --test engine-router/engine-session-ipc/omp-mode-capability-render` | shared 2 失败/12 通过；desktop 3 失败（router 门、IPC 边界、渲染层 offeredModes） | `red-b9-shared-engine.txt`、`red-b9-desktop-boundaries.txt` |
 | B9 GREEN | 同上（实现恢复后） | shared 14/14；desktop 20/20（含 `omp-mode-capability-render.test.mjs` 的 chip 显隐/受限循环 SSR 断言与 IPC/create+configure 的关闭声明拒绝） | `green-b9-shared-engine.txt`、`green-b9-desktop-boundaries.txt` |
-| D3 UI E2E | `DISPLAY=:1 … OMP_DESKTOP_RUNTIME=<patched> node scripts/e2e-omp-plan-ui.mjs` | `SUMMARY 1 passed, 0 failed`、exit 0，8 张截图 | `omp-plan-ui-run.txt`、`omp-plan-ui-artifacts/` |
+| D3 UI E2E（首稿，历史） | `DISPLAY=:1 … OMP_DESKTOP_RUNTIME=<patched> node scripts/e2e-omp-plan-ui.mjs` | `SUMMARY 1 passed, 0 failed`、exit 0，8 张截图（仅 ask/accept-edits/ pending 重启，见 §1.5 返修原因） | `omp-plan-ui-run.txt`、`omp-plan-ui-artifacts/` |
+| **D3 UI E2E（返修：三种权限 + running/pending 重启 + 隔离/回收/raw 证据）** | `DISPLAY=:1 XAUTHORITY=… PI_DESKTOP_E2E_PATCHED_TREE=/tmp/omp-patched-t20d-ui-repair1 PI_DESKTOP_E2E_ARTIFACT_DIR=…/repair-20261003 node scripts/e2e-omp-plan-ui.mjs` | `SUMMARY 1 passed, 0 failed`、exit 0；12 张截图；`CLEANUP scratchRemoved=true survivingOwnedProcesses=0 errors=0`；raw JSON 929889 B | `repair-20261003/omp-plan-ui-run.txt`、`repair-20261003/omp-plan-ui-raw.json`、`repair-20261003/omp-plan-ui-01..12-*.png` |
+| docs 门（返修轮新增） | `pnpm docs:check`（`check:locales` 79 对 + `check:docs` 512 页） | exit 0；顺带修复该门此前已有的 ADR 目录问题（0301 H1 前缀、0301–0305/0312 索引缺失、0306–0311 过期状态词） | 命令输出（§2 末尾） |
+| 矩阵 ID 检查 | `node scripts/check-t20-matrix-ids.mjs` | exit 0（B1–B14/C1–C8/D1–D3 编号仍各恰一次） | 命令输出（§2 末尾） |
+| 返修轮 lint/typecheck | `pnpm lint`、`pnpm --filter @pi-desktop/desktop typecheck` | 均 exit 0（产品代码未改，重跑确认 harness/文档改动无影响） | 命令输出（§2 末尾） |
 | D1/B13 E2E | `node --test --test-name-pattern "T20-D lifecycle\|T20-D Goal" apps/desktop/test/omp-plan-submit-e2e.test.mjs` | 2/2 通过、exit 0 | `goal-lifecycle-e2e.txt` |
 | 终止事件修复单测 | `node --test apps/desktop/test/omp-terminal-delivery.test.mjs apps/desktop/test/main-wiring-contract.test.mjs` | 8/8 通过（2 + 6） | 输出见命令 |
 | B1 state E2E（含 D-Enter 过期断言修正后） | `cd apps/desktop && node --test test/omp-runtime-state-e2e.test.mjs` | 1/1 通过、exit 0 | `b1-state-e2e.txt` |
@@ -140,6 +217,40 @@ Bun 1.4.2、Linux x64；固定 patched 运行时树由 `scripts/omp-patch.mjs --
 **首次全量运行的调用错误（如实记录）**：第一次以 `app/` 为 CWD 运行 `node --test apps/desktop/test/*.test.mjs`，3 个按包内相对路径读取文件的测试（`browser-cdp`、`bundled-plugins`、`plugin-work-panel-views`）因 CWD 不符而整文件失败；改用仓库约定 CWD（`apps/desktop`）后三者全绿。其余 3 个失败为真实的过期断言/桩问题（见下段），已修正并以本表为准。
 
 **D-Enter 遗留的过期断言修正（全量套件暴露）**：`omp-runtime-state-e2e.test.mjs`（Agent 目录基线 1 处 + 策略表 1 处 + MCP 变化后目录 2 处）与 `omp-skill-path-bridge.test.mjs`（宿主工具策略 2 处）的期望仍停留在 D-Enter 之前（不含 `EnterPlanMode`/`EnterGoalMode`），`plan-goal-cursor-gate.test.mjs` 的手工 `@pi-desktop/shared` 桩缺 `normalizeEngineId`（本阶段 Main 边界新增调用）。均已按 D-Enter 已接受的实际行为修正；核对：`git show 68519ea1:app/apps/desktop/electron/main/runtime/omp-host-tools.ts | grep -c EnterPlanMode` = 1 而两个测试文件在基线处为 0 ⇒ 这两处断言在基线即为红、只是不在根验收的 10 文件子集内。
+
+### 2.1 返修轮命令输出（docs/lint/typecheck/matrix）
+
+```text
+$ pnpm docs:check        # 第一次（返修前状态）
+Verified 79 English/Chinese specification pairs.
+ADR catalog:
+  - adr/0301-omp-session-surface.md: H1 must start with "ADR", found "0301 — The OMP conversation surface: events, dialogs and stopping"
+ADR index:
+  - adr/0301-…0305-….md: missing from the adr/README.md index        （5 条，历史阶段遗漏）
+  - adr/0312-omp-mode-capabilities-and-terminal-delivery.md: missing from the adr/README.md index
+docs:check exit=1
+
+$ pnpm docs:check        # 修复 0301 H1 与 0301–0305/0312 索引行并清除 0306–0311 的过期状态词后
+Verified 79 English/Chinese specification pairs.
+Verified 512 documentation pages.
+docs:check exit=0
+
+$ node scripts/check-t20-matrix-ids.mjs
+MATRIX-ID-OK: B1-B14, C1-C8, D1-D3 each appear exactly once
+exit=0
+
+$ pnpm lint
+Checked 75 files in 37ms. No fixes applied.
+lint exit=0
+
+$ pnpm --filter @pi-desktop/desktop typecheck
+tsc -p tsconfig.json --noEmit
+typecheck exit=0
+```
+
+`docs:check` 的失败项在返修前即存在（0301 H1 前缀与 0301–0305 索引是更早阶段就有的遗漏；
+0312 由本分支首稿引入），本轮全部修复，门恢复 exit 0；这属于"运行仓库自带的文档门后发现并
+修正现行目录事实"，未改任何 ADR 正文语义（0301 仅标题格式对齐其余 ADR；README 索引行是元数据）。
 
 ## 3. 全矩阵映射（B1–B14 / C1–C8 / D1–D3）
 
@@ -157,8 +268,8 @@ Bun 1.4.2、Linux x64；固定 patched 运行时树由 `scripts/omp-patch.mjs --
 | B4 | SubmitPlan/Goal 可见性与错模式拒绝 | 已接受 B2（`omp-plan-submit-e2e` 提交/错 kind/重复 pending）+ 本阶段 D1 Goal 用例 | runtime/Host + host-core | 通过 |
 | B5 | 提交产物不可变、sha/大小、防覆盖、awaiting 驱动审批卡 | 已接受 B2 + 本阶段 D1（`.pi/goal` 字节/sha/大小）与 D3 UI（pending 真实卡片 + 工件路径） | host-core + renderer | 通过 |
 | B6 | 审批 reject/过期/打断、approve 原子、重复/冲突 | 已接受 B2 + 本阶段 D3 UI（真实 Reject → 可编辑 → 重提新工件、旧工件字节不变、审批不串会话） | host-core + renderer | 通过 |
-| B7 | 恰一次执行/CAS/drain/boot maintenance/配置冻结 | 已接受 B2 + 本阶段 D3 UI 真实应用重启（pending→interrupted、completed 不重放、无新 provider 请求） | host-core + renderer | 通过 |
-| B8 | 批准后按选定权限执行 | 已接受 B2 + 本阶段 D3 UI：ask → 真实权限卡 → Allow once → 落盘；accept-edits → 无卡落盘；两行 completed | runtime/Host + renderer | 通过 |
+| B7 | 恰一次执行/CAS/drain/boot maintenance/配置冻结 | 已接受 B2 + 本阶段 D3 UI 两条真实应用重启：pending→`interrupted`/`PLAN_APPROVAL_INTERRUPTED`；**running**（真实 `/bin/sleep` 子进程持住）→`interrupted`/`PLAN_EXECUTION_INTERRUPTED` + turn `aborted` + audit 行；两条重启 provider 请求数都不变、副作用日志不重复（§1.5） | host-core + renderer + OS 进程 | 通过 |
+| B8 | 批准后按选定权限执行 | 已接受 B2 + 本阶段 D3 UI 三种真实批准：ask → 真实权限卡 → Allow once → 落盘；accept-edits → 无卡落盘；**auto** 经真实审批菜单 → high-risk `bash` 无卡执行、durable 行 `target_permission_mode=auto`、会话 `mode=agent`/`permission_mode=auto`；三条 execution 均 `completed`、无遗留 running（§1.5） | runtime/Host + renderer | 通过 |
 | B9 | 能力声明：plan/goal 键、渲染层显隐、Pi 零变化 | 本阶段 §1.1（shared 14/14 + router/IPC/renderer 20/20 + RED 记录）；Pi 循环与行为不变 | unit + renderer + handler | 通过 |
 | B10 | Agent 回归与 T17–T19 不受影响 | desktop 全量 **3026 tests / 3015 passed / 0 failed / 11 skipped**（含 T17–T19 全部用例与全部 OMP E2E） | 既有套件 | 通过 |
 | B11 | `set_host_tools`→`before_agent_start` 顺序契约 | 已接受 spike R4-1/R4-2（`M5-plan-goal-capability-gates.md` §4.2）+ B13 生命周期 E2E（每回合目录与 clamp 一致、无自动激活残留） | runtime/Host | 通过 |
@@ -170,19 +281,29 @@ Bun 1.4.2、Linux x64；固定 patched 运行时树由 `scripts/omp-patch.mjs --
 | C3 | 插件 `planSafeActions` 与 `ctx.mode` | 已接受 C + 回归 | handler + unit | 通过 |
 | C4 | 子代理 `hasUI=false` fail-closed | 已接受 C/T17 + 回归 | unit + runtime/Host | 通过 |
 | C5 | 高权限工具（browser/computer/eval）决策表 | 已接受 C + 回归 | unit + runtime/Host | 通过 |
-| C6 | 四条常规权限模式 | 已接受 C + 本阶段 D3 UI 的 ask/accept-edits 实际执行路径 | unit + renderer | 通过 |
+| C6 | 四条常规权限模式 | 已接受 C + 本阶段 D3 UI 的 ask/accept-edits/**auto** 实际执行路径（auto 与 accept-edits 的差别以 `bash` 对照：accept-edits 只放 write/edit，bash 在 auto 下才无卡） | unit + renderer | 通过 |
 | C7 | 风险保真（含 BrowserPreview/`mcp_*`） | 已接受 C（F1 修正后的表）+ 本阶段 D3 权限卡真实 risk 文案 | unit + renderer | 通过 |
 | C8 | 外部路径例外 | 已接受 C + 回归 | unit | 通过 |
 | D1 | SubmitGoal、goal 提示词、批准后自主执行自停 | 本阶段 Goal E2E（§1.3）；无延续定时器 | runtime/Host + host-core | 通过 |
 | D2 | `goal_updated` 只读展示 | 未实现（矩阵可选）；不伪造 Goal 状态，不新建第二套 Goal | — | 可选未实现 |
-| D3 | 端到端用户路径 | 本阶段 UI E2E（§1.2）+ 已接受 B2 的派发/重启证据 | renderer + runtime/Host + host-core | 通过 |
+| D3 | 端到端用户路径 | 本阶段 UI E2E（§1.2 首稿 + §1.5 返修：三种批准权限、真实 Reject/重提、真实 running 与 pending 应用重启、专属 HOME 隔离、PID/进程组级回收验证、单份 raw JSON 证据）+ 已接受 B2 的派发证据 | renderer + runtime/Host + host-core + OS 进程 | 通过 |
 
 ## 4. 未做与不声称
 
 - D2 未实现（矩阵可选）；无 OMP interactive Goal 延续定时器，也不声称有。
 - 不声称 M5/T20 全部完成：T21 整体、T22、T23、T24/M7 与用户三平台真实 GitHub 测试包未交付；
   本阶段的编译/运行验证是源码树资源（patched launcher + 源码 gate），不是安装包验收。
-- 未在 macOS/Windows 实机运行本阶段 E2E；UI 证据仅 Linux x64 + Xwayland 会话显示。
+- 未在 macOS/Windows 实机运行本阶段 E2E；UI 证据仅 Linux x64 + Xwayland 会话显示。返修轮的
+  进程身份/回收验证依赖 Linux `/proc`（非 Linux 会降级为只验证 Electron 子进程，代码路径在，
+  但本轮未实跑）。
 - 未修改/未升级 fork 与补丁级（保持 `.5`）；未改 Cursor 门（ADR 0306）与其它已关闭能力。
+- 返修轮只改 `app/scripts/e2e-omp-plan-ui.mjs` 与文档（含 ADR 目录/索引的机械修复）；产品代码、
+  gate、host-core、fork、补丁与固定子模块未动，故未重跑产品全量套件、未重建编译产物（改动不在
+  其影响面）。
+- 重启后**转录面板**的恢复渲染未在本阶段验收：§1.5 记录的是返修运行中"重启 + 恢复回合结束后"
+  的实际可观察状态（面板只显示重启后的回合），native 转录完整另有 provider 请求为证；不据此
+  声称历史丢失，也不声称面板恢复完整。
+- 专属 HOME 下产品运行时的子 PATH 派生自继承 HOME（`~/.bun/bin` 首位），harness 因此在专属 HOME
+  内链接绝对 bun/node；这是测试环境构造要求（如实记录），不修改产品行为，也不读取用户配置。
 - 未调用任何付费/远程模型；全部 E2E 使用本地 FakeProvider。
 - B10/C 行的细节证据以已接受阶段的原始报告为准（本文件 §3 只给引用与回归命令）。
