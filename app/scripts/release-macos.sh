@@ -22,7 +22,7 @@
 # (DEBUG=electron-notarize*), prints a heartbeat while electron-builder is
 # silent, dumps diagnostics when the signing phase stalls, bounds the phase
 # with a hard timeout, and reports per-file codesign timings. The
-# `signing PI-Desktop.app` line electron-builder emits is otherwise the last
+# `signing OMP Desktop.app` line electron-builder emits is otherwise the last
 # thing the log shows for minutes, because nested signing, silent full
 # retries, and Apple's notarization queue all happen without output.
 # See docs/spec/06-delivery/06-release-runbook.md for the full runbook.

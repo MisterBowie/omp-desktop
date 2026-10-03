@@ -1,0 +1,16 @@
+OMP Desktop macOS first launch
+
+After moving OMP Desktop.app to Applications, a signed and notarized build
+opens without extra steps. Test packages that are not signed yet are the
+exception: macOS may refuse the first launch, or report the app as damaged.
+
+If that happens, open Terminal and run:
+
+xattr -r -d com.apple.quarantine "/Applications/OMP Desktop.app"
+
+Use this only for an app obtained from a trusted OMP Desktop source. It removes
+only Apple's quarantine attribute from OMP Desktop.app. Signed and notarized
+builds do not need it.
+
+The macOS ZIP package also includes OMP-Desktop-macOS-open.command, which can
+clear the same attribute and launch the app after installation.

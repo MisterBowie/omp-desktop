@@ -32,14 +32,26 @@ const sidecarDir = ".omp-sidecar-source";
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
 
+/**
+ * The repository-level three-platform lane exists only in this repository's
+ * layout (the product keeps its workflows under `app/`), so it is skipped when
+ * `app/` is checked out as its own repository.
+ */
+const rootWorkflow = await read("../../../../.github/workflows/three-platform-test-packages.yml").catch(() => null);
 const workflows = [
   ["release.yml", await read("../../../.github/workflows/release.yml")],
   ["linux-package.yml", await read("../../../.github/workflows/linux-package.yml")],
+  ...(rootWorkflow ? [["three-platform-test-packages.yml", rootWorkflow]] : []),
 ];
 
 /** The job block that packages, so the checks cannot be satisfied elsewhere. */
 function packagingJob(source, name) {
   if (name === "release.yml") {
+    const job = source.match(/^  build:\n[\s\S]*?(?=^  publish:)/m)?.[0];
+    assert.ok(job, `${name}: the build job is missing`);
+    return job;
+  }
+  if (name === "three-platform-test-packages.yml") {
     const job = source.match(/^  build:\n[\s\S]*?(?=^  publish:)/m)?.[0];
     assert.ok(job, `${name}: the build job is missing`);
     return job;

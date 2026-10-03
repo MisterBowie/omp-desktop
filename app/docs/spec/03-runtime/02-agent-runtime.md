@@ -2170,11 +2170,14 @@ still unstarted at that date and proceed only for the non-Cursor route; the
 split is in `docs/validation/M5-t20-non-cursor-scope.md`.
 
 **Current status (2026-10-03).** Supersedes the "unstarted" wording above for
-progress tracking only: the root reviewer has accepted B1, C, B2 and the
-model-side EnterPlanMode/EnterGoalMode work; T20-D (`plan`/`goal` capability
-declarations, the composer entries and the real Electron acceptance, ADR 0312)
-is implemented and under root review. The Cursor + Plan/Goal exclusion and
-every gate in this section are unchanged.
+progress tracking only: the root reviewer has accepted B1, C, B2, the
+model-side EnterPlanMode/EnterGoalMode work and — at
+`860c264177314f5c9501f90c2ef6bcbcd6aaa11b` — T20-D with the whole M5
+functionality (`plan`/`goal` capability declarations, the composer entries and
+the real Electron acceptance, ADR 0312; `docs/validation/M5-t20-d-capability-ui.md`).
+The Cursor + Plan/Goal exclusion and every gate in this section are unchanged;
+what remains open is delivery, not the exclusion (three-platform test packages,
+T21 whole/T22/T23/T24).
 
 ## 17. Bundled sidecar build and admission (M5/T20-R4B; reproducible builds since M6/T20-R4-3; packaged-resource acceptance since M6/T21-A, ADR 0307)
 

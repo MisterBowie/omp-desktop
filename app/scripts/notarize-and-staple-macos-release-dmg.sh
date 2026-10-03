@@ -3,7 +3,7 @@
 # ticket. Run after electron-builder produced the DMG.
 #
 # Why this exists: electron-builder's `mac.notarize=true` notarizes the built
-# `PI-Desktop.app` (so the app and the ZIP that carries it pass Gatekeeper and
+# `OMP Desktop.app` (so the app and the ZIP that carries it pass Gatekeeper and
 # in-app updates work). The DMG is a separate artifact with its own signature,
 # so it needs its own notarytool submission before it can be stapled. Stapling a
 # DMG that was never submitted fails with:

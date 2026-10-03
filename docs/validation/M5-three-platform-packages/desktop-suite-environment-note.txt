@@ -1,0 +1,60 @@
+# 全量桌面套件的环境对照（2026-10-03，Linux x64）
+
+## 1. 全新工作树未给固定子模块装依赖时（本树第一次全量跑）
+ℹ tests 3067
+ℹ pass 3012
+ℹ fail 44
+ℹ skipped 11
+失败文件分布：
+     15 test at test/omp-plan-submit-e2e.test.mjs
+      6 test at test/omp-skill-path-e2e.test.mjs
+      6 test at test/omp-host-tool-e2e.test.mjs
+      5 test at test/omp-capability-source-e2e.test.mjs
+      3 test at test/omp-subagent-e2e.test.mjs
+      1 test at test/remote-host-ssh-password.test.mjs
+      1 test at test/omp-start-handler-semantics.test.mjs
+      1 test at test/omp-session-turn-fence-e2e.test.mjs
+      1 test at test/omp-session-persistence-e2e.test.mjs
+      1 test at test/omp-session-e2e.test.mjs
+      1 test at test/omp-session-concurrent-approval-e2e.test.mjs
+      1 test at test/omp-runtime-state-e2e.test.mjs
+      1 test at test/omp-history-e2e.test.mjs
+      1 test at test/omp-execution-policy-e2e.test.mjs
+共同根因（首个失败的控制运行时）：
+  Error: the control runtime exited before ready (code 1)
+  --- control stderr ---
+  error: Failed to load pi_natives native addon for linux-x64 (modern).
+  Tried:
+
+## 2. 同一文件在基线工作树（860c2641，已装依赖）单独跑
+ℹ tests 5
+ℹ pass 5
+ℹ fail 0
+ℹ skipped 0
+
+## 3. 同一文件在本树（未装依赖）单独跑
+ℹ tests 5
+ℹ pass 0
+ℹ fail 5
+ℹ skipped 0
+
+## 4. 本树补齐固定子模块依赖（bun install --frozen-lockfile + bun run build:native，均未改 tracked 文件）后全量重跑
+ℹ tests 3067
+ℹ pass 3055
+ℹ fail 1
+ℹ skipped 11
+✖ a key-authenticated transport is handed no askpass material (9.654814ms)
+✖ failing tests:
+✖ a key-authenticated transport is handed no askpass material (9.654814ms)
+
+## 5. 上述唯一失败在本机是既有环境变量问题（SSH_ASKPASS），按 M0 记录的既有做法去掉该变量后单独跑
+SSH_ASKPASS=/usr/bin/false
+ℹ tests 14
+ℹ pass 14
+ℹ fail 0
+ℹ skipped 0
+
+子模块 gitlink 未变：
+ 62bc57be1b03ef0802a33cf7f5f530e534527531 upstream/oh-my-pi (62bc57b)
+ 0111e306c120ad5820688d7608cb37bad8fbcc1f upstream/pi-desktop (0111e30)
+子模块工作树 dirty 行数：0

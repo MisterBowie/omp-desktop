@@ -27,9 +27,9 @@ const NOTARY_ENV = {
 };
 
 async function writeSignedAppFixture(release) {
-  const app = join(release, "mac-arm64", "PI-Desktop.app");
+  const app = join(release, "mac-arm64", "OMP Desktop.app");
   const hostCore = join(app, "Contents", "Resources", "bin", "pi-desktop-host-core");
-  const dmg = join(release, "PI-Desktop-0.14.2-arm64.dmg");
+  const dmg = join(release, "OMP-Desktop-0.14.2-arm64.dmg");
   await mkdir(join(app, "Contents", "Resources", "bin"), { recursive: true });
   await writeFile(hostCore, "fixture");
   await writeFile(dmg, "fixture");
@@ -37,7 +37,7 @@ async function writeSignedAppFixture(release) {
 }
 
 async function writeDmgFixture(release) {
-  const dmg = join(release, "PI-Desktop-0.15.1-beta.3-arm64.dmg");
+  const dmg = join(release, "OMP-Desktop-0.15.1-beta.3-arm64.dmg");
   await mkdir(release, { recursive: true });
   await writeFile(dmg, "fixture");
   return dmg;
@@ -256,7 +256,7 @@ test("macOS release verification requires a notarized Developer ID app and DMG",
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /Notarized Developer ID/);
-  assert.match(result.stdout, /PI-Desktop-0\.14\.2-arm64\.dmg/);
+  assert.match(result.stdout, /OMP-Desktop-0\.14\.2-arm64\.dmg/);
   assert.match(result.stdout, /host-core sidecar/);
   assert.equal(
     await readFile(staplerLog, "utf8"),

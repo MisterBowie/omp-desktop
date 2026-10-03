@@ -638,7 +638,7 @@ patched 运行时树 `/tmp/omp-patched-t20d-ui-repair1` 在跑前跑后核验（
 | R13c GREEN（a6c146d） | 探针同上（主仓库） | `passed=true`、exit 0；三种身份缺失变体（缺字段/null/空串）owned `[]`、零目标、零信号 | `repair6-20261003/green-r13c-missing-birth.json` |
 | **真实 UI E2E（根原通用外围 wrapper 原样）** | `python3 /tmp/omp-t20-d-ui-repair6-root-20261003/run-ui-review-linux-candidate.py --candidate a6c146d… --output /tmp/omp-t20-d-ui-root-review-a6c146d-repair6 --ended-runner 2287589 --harness-sha256 52186783… --patched-tree /tmp/omp-patched-t20d-ui-repair1 --xauthority /run/user/1000/.mutter-Xwaylandauth.JKWYV3` | 外围 `passed=true`、exit 0、`timedOut=false`、`forcedCleanup=[]`、survivors `[]`、`statusAfter=''`；harness `SUMMARY 1 passed, 0 failed`、`CLEANUP scratchRemoved=true survivingOwnedProcesses=0 errors=0`；raw 1 071 752 B/`5fa6373f…`；13 张截图；三个终止阶段均整组信号、无 mixed/stale/失败，父 Python 只在 `protectedAncestors`、`before` 无 python3；原生 sha 重启/重选不变（`d96fe2c8…`） | `repair6-20261003/root-review.json`、`omp-plan-ui-run.txt`、`preflight.json`、`ui/omp-plan-ui-raw.json`、`ui/omp-plan-ui-01..13-*.png` |
 | 旧证据不变 | 六份清单 `sha256sum -c` | **140/140 `OK`**（20+14+28+30+27+21；旧件未改写） | `repair6-20261003/old-evidence-integrity.txt` |
-| 第六轮证据清单 | `cd repair6-20261003 && sha256sum -c SHA256SUMS.txt` | 27/27 `OK`（自排除 manifest） | `repair6-20261003/SHA256SUMS.txt` |
+| 第六轮证据清单 | `cd repair6-20261003 && sha256sum -c SHA256SUMS.txt` | **28/28 `OK`**（自排除 manifest；2026-10-03 订正：本节原记 27/27 为笔误，清单实际 28 行，复核命令与输出见本行证据） | `repair6-20261003/SHA256SUMS.txt` |
 
 命令与退出码汇总另见 `repair6-20261003/commands.txt`。本地真实 UI 复跑向 wrapper 的
 `--ended-runner` 传入第五轮已退出的 runner PID `2287589`（运行前核对 `/proc/2287589` 不存在），

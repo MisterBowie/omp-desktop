@@ -1,0 +1,517 @@
+# M5 three-platform test packages: macOS arm64, Windows x64, Linux x64.
+#
+# Every major stage has to end with installable packages the user can try on all
+# three platforms (user goal #9). This workflow is that delivery for M5: it
+# builds the real installers from one exact revision, verifies the bundled OMP
+# runtime *inside each packaged output*, runs the this-stage Plan/Goal
+# regression against those packaged artifacts, and only then publishes one
+# prerelease carrying the packages, a fresh checksum list and a machine-readable
+# build record.
+#
+# Where it lives: GitHub reads workflows only from the repository root, and this
+# repository keeps the product source under `app/`, so the root
+# `.github/workflows/` directory holds the workflows that actually run. Every
+# product command therefore names `app/` (or `app/apps/desktop`) as its working
+# directory. The sibling `mac-preview-package.yml` is the older macOS-only
+# preview lane; it is left as it is, and this workflow never touches the
+# `m5-preview` release it uploads to.
+#
+# Entry point: a controlled test tag `m5-test-*` pushed at the reviewed
+# preparation commit. That is the only trigger this workflow declares, and the
+# guard job refuses anything else:
+#   - there is deliberately no `workflow_dispatch`: the button only appears once
+#     this file is on the default branch (which this work must not write), and a
+#     branch dispatch would name no reviewed revision to bind the release to;
+#   - pushing the preparation branch itself must not start a package run, and it
+#     does not, because only the tag event matches;
+#   - the release is created on the tag that triggered the run, so "any tag" is
+#     never a reason to fall back to the default branch or another revision.
+#
+# What it refuses (all of it fails the job, nothing is published):
+#   - a revision other than the tag's own commit, in every build job and again
+#     for every staged artifact in the publish job;
+#   - a sidecar built from another fork commit, patch level or base than
+#     `app/patches/oh-my-pi/manifest.json` pins, checked against the packaged
+#     `provenance.json` and re-checked by the assembly step;
+#   - a package whose isolated-copy acceptance did not reach idle, did not
+#     negotiate protocol v2, did not answer `get_state`, did not refuse a missing
+#     tool gate, or did not reclaim its processes and run roots;
+#   - a platform set that is not exactly macOS arm64 + Windows x64 + Linux x64;
+#   - updater payloads in the release (`latest*.yml`, `*.blockmap`) and any
+#     attempt to make the test package the repository's "latest" release;
+#   - publishing before all three platform jobs verified.
+#
+# What it does not claim: macOS packages are unsigned and not notarized (no
+# Developer ID is configured here), Windows and Linux packages are unsigned, and
+# installer/shortcut/desktop-entry behaviour inside a real user session stays
+# T22/T23 work. The release notes state that, per platform, together with the
+# pass/skip counts each platform actually produced.
+
+name: Three-platform test packages
+
+on:
+  push:
+    tags: ["m5-test-*"]
+
+# Least privilege by default; only the publish job may write the release.
+permissions:
+  contents: read
+
+concurrency:
+  group: three-platform-test-packages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: Bind the run to the reviewed tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      revision: ${{ steps.bind.outputs.revision }}
+      version: ${{ steps.pins.outputs.version }}
+      patch_level: ${{ steps.pins.outputs.patch_level }}
+      fork_commit: ${{ steps.pins.outputs.fork_commit }}
+      omp_version: ${{ steps.pins.outputs.omp_version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history: the tag's commit is compared against the run's own
+          # revision, and `refs/tags/<tag>^{commit}` is peeled locally.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          # Reading two JSON files needs a node, and the pin makes it the same
+          # one the build jobs use instead of whatever the runner image ships.
+          node-version: 24
+
+      - name: Refuse every trigger except a controlled m5-test-* tag push
+        id: bind
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" != "push" || "${GITHUB_REF}" != refs/tags/m5-test-* ]]; then
+            echo "::error::This workflow packages only from a controlled m5-test-* tag push (event=${GITHUB_EVENT_NAME}, ref=${GITHUB_REF}). A branch push or another tag must not start a package run."
+            exit 1
+          fi
+          # One tag, one revision: never a branch tip, never the default branch.
+          tag_commit="$(git rev-parse "refs/tags/${GITHUB_REF_NAME}^{commit}")"
+          if [[ "$tag_commit" != "${GITHUB_SHA}" ]]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} points at ${tag_commit}; this run is for ${GITHUB_SHA}."
+            exit 1
+          fi
+          if [[ "$(git rev-parse HEAD)" != "${GITHUB_SHA}" ]]; then
+            echo "::error::The checkout is not the tagged revision."
+            exit 1
+          fi
+          echo "revision=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Packaging ${GITHUB_REF_NAME} at ${GITHUB_SHA}: $(git log -1 --format=%s)"
+
+      - name: Read the product version and the controlled runtime pins
+        id: pins
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("node:fs");
+            const version = JSON.parse(fs.readFileSync("app/apps/desktop/package.json", "utf8")).version;
+            const manifest = JSON.parse(fs.readFileSync("app/patches/oh-my-pi/manifest.json", "utf8"));
+            fs.appendFileSync(
+              process.env.GITHUB_OUTPUT,
+              [
+                `version=${version}`,
+                `patch_level=${manifest.patchLevel}`,
+                `fork_commit=${manifest.fork.commit}`,
+                `omp_version=${manifest.base.version}`,
+              ].join("\n") + "\n",
+            );
+            console.log(`product ${version}, patch level ${manifest.patchLevel}, fork ${manifest.fork.commit}`);
+          '
+
+  build:
+    name: Package ${{ matrix.name }}
+    needs: guard
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64
+            os: macos-15
+            platform: darwin
+            arch: arm64
+            artifact: macos-arm64
+            dist: dist:mac
+            resources: apps/desktop/release/mac-arm64/OMP Desktop.app/Contents/Resources
+          - name: Windows x64
+            os: windows-latest
+            platform: win32
+            arch: x64
+            artifact: windows-x64
+            dist: dist:win
+            resources: apps/desktop/release/win-unpacked/resources
+          - name: Linux x64
+            # Ubuntu 22.04 keeps host-core at glibc 2.35 so Ubuntu 22.04,
+            # Debian 12 and Fedora 36+ can load the binary — the same runner
+            # reason the fixed PI release lane records. ubuntu-latest (24.04)
+            # would raise the floor to 2.39.
+            os: ubuntu-22.04
+            platform: linux
+            arch: x64
+            artifact: linux-x64
+            dist: dist:linux
+            resources: apps/desktop/release/linux-unpacked/resources
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    env:
+      # The bundled sidecar is compiled (host target) or verified (cross target)
+      # from this checkout by scripts/omp-sidecar.mjs, before electron-builder.
+      OMP_SIDECAR_SOURCE: ${{ github.workspace }}/.omp-sidecar-source
+      # Unsigned test lane: never look for, or use, a Developer ID certificate.
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify the revision, the native platform and the architecture
+        run: |
+          set -euo pipefail
+          if [[ "$(git rev-parse HEAD)" != "${{ needs.guard.outputs.revision }}" ]]; then
+            echo "::error::The checkout is not the tagged revision ${{ needs.guard.outputs.revision }}."
+            exit 1
+          fi
+          machine="$(uname -m)"
+          case "${{ matrix.platform }}" in
+            darwin)
+              if [[ "$machine" != "arm64" ]]; then
+                echo "::error::The macOS lane needs an arm64 runner; uname -m reports $machine."
+                exit 1
+              fi
+              ;;
+            win32)
+              if [[ "${PROCESSOR_ARCHITECTURE:-}" != "AMD64" ]]; then
+                echo "::error::The Windows lane needs an x64 runner; PROCESSOR_ARCHITECTURE=${PROCESSOR_ARCHITECTURE:-unset}."
+                exit 1
+              fi
+              ;;
+            linux)
+              if [[ "$machine" != "x86_64" ]]; then
+                echo "::error::The Linux lane needs an x86_64 runner; uname -m reports $machine."
+                exit 1
+              fi
+              ;;
+            *)
+              echo "::error::Unknown matrix platform ${{ matrix.platform }}."
+              exit 1
+              ;;
+          esac
+          node -e '
+            const [expectedPlatform, expectedArch] = process.argv.slice(1);
+            if (process.platform !== expectedPlatform || process.arch !== expectedArch) {
+              console.error(`::error::Expected a ${expectedPlatform}/${expectedArch} runner, got ${process.platform}/${process.arch}.`);
+              process.exit(1);
+            }
+            console.log(`runner ${process.platform}/${process.arch}, uname ${process.getSystemVersion?.() ?? ""}`);
+          ' "${{ matrix.platform }}" "${{ matrix.arch }}"
+
+      - uses: pnpm/action-setup@v6
+        with:
+          # The product's packageManager field pins pnpm 10.34.5 (the workspace
+          # lockfile is 10.34.5's format); no other version may install it.
+          package_json_file: app/package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      # The desktop's Rust toolchain: stable, as its own CI uses. The OMP fork's
+      # native build pins a nightly in its own rust-toolchain.toml and is
+      # installed separately below — the two must not be mixed.
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app -> target
+
+      - name: Check out the pinned OMP sidecar fork
+        uses: actions/checkout@v7
+        with:
+          # The bundled sidecar is compiled from the self-maintained fork at the
+          # commit patches/oh-my-pi/manifest.json pins, never from an upstream
+          # release asset; `apps/desktop/test/packaging-sidecar-source.test.mjs`
+          # compares these fields against the manifest.
+          repository: MisterBowie/oh-my-pi
+          ref: 36483311dfff67be7504f591974df93fc512a45a
+          path: .omp-sidecar-source
+          # The build re-proves HEAD == base + patch level with
+          # `git diff <base> HEAD` and `git apply --check --reverse`, so the base
+          # commit object must be present: a shallow clone is refused.
+          fetch-depth: 0
+
+      - name: Install the fork's pinned Rust toolchain
+        working-directory: .omp-sidecar-source
+        run: |
+          set -euo pipefail
+          channel="$(sed -n 's/^channel[[:space:]]*=[[:space:]]*"\(.*\)"/\1/p' rust-toolchain.toml)"
+          if [[ -z "$channel" ]]; then
+            echo "::error::The pinned fork declares no channel in rust-toolchain.toml."
+            exit 1
+          fi
+          rustup toolchain install "$channel" --profile default --no-self-update
+          echo "OMP native build toolchain: $channel"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          # scripts/omp-sidecar.mjs compiles with Bun and records the version it
+          # used in the provenance manifest.
+          bun-version: "1.4.2"
+
+      - name: Install the pinned fork dependencies
+        working-directory: .omp-sidecar-source
+        run: bun install --frozen-lockfile
+
+      # The Bun single-file build embeds the host N-API addon, and a clean
+      # checkout has none: build it exactly as the fork's own setup does
+      # (`bun setup`, step "build:native") before the sidecar preflight
+      # compiles the runtime.
+      - name: Build the fork's host native addon
+        working-directory: .omp-sidecar-source
+        run: bun run build:native
+
+      - name: Prepare package inputs
+        working-directory: app
+        run: |
+          set -euo pipefail
+          # `--locked` fails on a drifted Cargo.lock instead of silently
+          # rewriting it; the desktop dist step's own (unlocked) build then
+          # reuses this one.
+          cargo build --release --locked -p host-core &
+          host_build_pid=$!
+          trap 'kill "$host_build_pid" 2>/dev/null || true' EXIT
+
+          pnpm install --frozen-lockfile
+          pnpm --filter '@pi-desktop/desktop^...' --fail-if-no-match build
+
+          wait "$host_build_pid"
+          trap - EXIT
+
+      - name: Package ${{ matrix.name }} (sidecar preflight, then electron-builder)
+        working-directory: app
+        # The dist scripts pass `--publish never` themselves: electron-builder
+        # must never self-publish, and this workflow owns the release step. The
+        # explicit architecture keeps the package and the native sidecar
+        # aligned with the runner this matrix entry selected.
+        run: pnpm --filter @pi-desktop/desktop run ${{ matrix.dist }} -- --${{ matrix.arch }}
+
+      - name: Verify the Linux host-core glibc floor
+        if: matrix.platform == 'linux'
+        working-directory: app
+        run: node scripts/check-linux-host-glibc.mjs target/release/pi-desktop-host-core
+
+      - name: Verify the packaged runtime from an isolated copy
+        id: acceptance
+        working-directory: app
+        run: |
+          set -euo pipefail
+          resources="${{ matrix.resources }}"
+          if [[ ! -d "$resources" ]]; then
+            echo "::error::electron-builder produced no Resources at $resources."
+            ls -la apps/desktop/release || true
+            exit 1
+          fi
+          # A copy outside the repository, on a path carrying spaces and
+          # non-ASCII characters, with its own HOME/XDG/TMPDIR: the package must
+          # not depend on the build machine's layout, environment or caches. The
+          # path is created by node itself so bash and node resolve the same
+          # absolute path on every platform.
+          iso="$(node --input-type=module -e 'import { mkdtempSync } from "node:fs";
+            import { tmpdir } from "node:os";
+            import { join } from "node:path";
+            process.stdout.write(mkdtempSync(join(tmpdir(), "omp-packages 隔离 with spaces-")).replaceAll("\\", "/"));')"
+          export HOME="$iso/home"
+          export XDG_CONFIG_HOME="$iso/xdg-config" XDG_DATA_HOME="$iso/xdg-data" XDG_CACHE_HOME="$iso/xdg-cache"
+          export TMPDIR="$iso/tmp" TEMP="$iso/tmp" TMP="$iso/tmp"
+          mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME" "$TMPDIR" "$iso/Resources"
+          cp -R "$resources/." "$iso/Resources/"
+          echo "isolated Resources: $iso/Resources"
+          node scripts/verify-packaged-runtime.mjs --resources "$iso/Resources" --json > "$iso/packaged-runtime.json"
+          cat "$iso/packaged-runtime.json"
+          echo "iso=$iso" >> "$GITHUB_OUTPUT"
+
+      - name: Run the packaged Plan/Goal regression
+        working-directory: app
+        env:
+          # The suite drives the sidecar and the gate bundle this package ships
+          # (from the isolated copy above), not a patched source tree — see the
+          # fixture in apps/desktop/test/omp-plan-submit-e2e.test.mjs. No
+          # provider request leaves the machine: the fixture uses a local fake
+          # provider.
+          OMP_E2E_PACKAGED_RESOURCES: ${{ steps.acceptance.outputs.iso }}/Resources
+        run: |
+          set -euo pipefail
+          iso="${{ steps.acceptance.outputs.iso }}"
+          # The regression gets its own scratch root under the runner's temp
+          # directory, still with its own HOME/XDG/TMPDIR: the fixture builds
+          # scratch directories and shell commands from `tmpdir()`, and a path
+          # carrying spaces would be testing the fixture's quoting rather than
+          # the package. The spaced/non-ASCII path requirement is carried by the
+          # packaged-runtime verification above, which starts the packaged
+          # binary and gate from exactly that path.
+          e2e="${RUNNER_TEMP}/omp-plan-goal-${{ github.run_id }}-${{ matrix.artifact }}"
+          mkdir -p "$e2e"
+          export HOME="$e2e/home"
+          export XDG_CONFIG_HOME="$e2e/xdg-config" XDG_DATA_HOME="$e2e/xdg-data" XDG_CACHE_HOME="$e2e/xdg-cache"
+          export TMPDIR="$e2e/tmp" TEMP="$e2e/tmp" TMP="$e2e/tmp"
+          mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME" "$TMPDIR"
+          set +e
+          # A pinned reporter keeps the summary machine-readable for the staging
+          # step (`# pass <n>`), independent of where stdout points.
+          node --test --test-reporter=tap apps/desktop/test/omp-plan-submit-e2e.test.mjs 2>&1 | tee "$iso/plan-goal.txt"
+          status=${PIPESTATUS[0]}
+          set -e
+          exit "$status"
+
+      - name: Stage the release assets and the build record
+        working-directory: app
+        run: |
+          set -euo pipefail
+          iso="${{ steps.acceptance.outputs.iso }}"
+          node scripts/stage-test-package.mjs \
+            --platform "${{ matrix.platform }}" \
+            --arch "${{ matrix.arch }}" \
+            --release-dir apps/desktop/release \
+            --resources "$iso/Resources" \
+            --verify-report "$iso/packaged-runtime.json" \
+            --plan-goal-log "$iso/plan-goal.txt" \
+            --out "$iso/stage" \
+            --version "${{ needs.guard.outputs.version }}" \
+            --stage "${{ github.ref_name }}" \
+            --revision "${{ needs.guard.outputs.revision }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Upload this platform's package
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-${{ matrix.artifact }}
+          if-no-files-found: error
+          compression-level: 0
+          path: ${{ steps.acceptance.outputs.iso }}/stage/*
+
+      - name: Report diagnostics when a step failed
+        if: failure() && steps.acceptance.outputs.iso != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports-${{ matrix.artifact }}
+          if-no-files-found: warn
+          compression-level: 0
+          path: |
+            ${{ steps.acceptance.outputs.iso }}/packaged-runtime.json
+            ${{ steps.acceptance.outputs.iso }}/plan-goal.txt
+
+      - name: Upload this platform's raw acceptance report
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports-${{ matrix.artifact }}
+          if-no-files-found: error
+          compression-level: 0
+          path: |
+            ${{ steps.acceptance.outputs.iso }}/packaged-runtime.json
+            ${{ steps.acceptance.outputs.iso }}/plan-goal.txt
+
+  publish:
+    name: Publish the test prerelease
+    needs: [guard, build]
+    # Pushing the tag is the only trigger, but the release must exist only for a
+    # tag push that names the revision this workflow just built and verified.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/m5-test-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Download the three platform packages
+        uses: actions/download-artifact@v8
+        with:
+          pattern: package-*
+          path: dist
+
+      - name: Assemble the release, its checksums and its notes
+        working-directory: app
+        run: |
+          set -euo pipefail
+          node scripts/assemble-test-release.mjs \
+            --input ../dist \
+            --out ../release \
+            --tag "${{ github.ref_name }}" \
+            --revision "${{ github.sha }}" \
+            --version "${{ needs.guard.outputs.version }}" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ls -l ../release
+
+      - name: Create the prerelease on the tag that triggered this run
+        working-directory: app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mapfile -t assets < <(find ../release -maxdepth 1 -type f ! -name 'RELEASE-NOTES.md' -printf '%p\n' | sort)
+          if [[ "${#assets[@]}" -lt 9 ]]; then
+            echo "::error::Expected at least 9 release files (7 packages, SHA256SUMS.txt, BUILD-RECORD.json); got ${#assets[@]}."
+            printf '%s\n' "${assets[@]}"
+            exit 1
+          fi
+          # `--verify-tag`: the tag already exists (it triggered this run) and
+          # the guard bound it to this revision, so `gh` must never create a tag
+          # on some other commit. `--prerelease` keeps the test package away from
+          # the repository's "latest" release.
+          gh release create "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --verify-tag \
+            --prerelease \
+            --title "M5 test packages ${{ needs.guard.outputs.version }} (${{ github.ref_name }})" \
+            --notes-file ../release/RELEASE-NOTES.md \
+            "${assets[@]}"
+
+      - name: Verify the published release and its bytes
+        working-directory: app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # The REST API is the source of truth here (`gh release view` has no
+          # field for the repository's "latest" release, and that is exactly the
+          # flag a test package must never acquire).
+          gh api "repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}" \
+            --jq '{tagName: .tag_name, isPrerelease: .prerelease, isDraft: .draft, assets: [.assets[] | {name: .name, size: .size, url: .browser_download_url}]}' \
+            > "${RUNNER_TEMP}/release-view.json"
+          cat "${RUNNER_TEMP}/release-view.json"
+          node scripts/assemble-test-release.mjs \
+            --release-json "${RUNNER_TEMP}/release-view.json" \
+            --out ../release \
+            --tag "${{ github.ref_name }}" \
+            --revision "${{ github.sha }}"
+          latest="$(gh api "repos/${{ github.repository }}/releases/latest" --jq .tag_name 2>/dev/null || true)"
+          if [[ "$latest" == "${{ github.ref_name }}" ]]; then
+            echo "::error::The test package became the repository's latest release; it must stay a prerelease."
+            exit 1
+          fi
+          echo "latest release: ${latest:-none}"
+          # Download every asset back and re-check the published bytes against
+          # the checksum list this run wrote.
+          mkdir -p ../verify
+          gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" --dir ../verify
+          diff <(cd ../release && ls -1 | grep -v '^RELEASE-NOTES.md$' | sort) \
+               <(cd ../verify && ls -1 | sort)
+          ( cd ../verify && sha256sum -c SHA256SUMS.txt )
+          gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" \
+            --json assets --jq '.assets[] | "\(.name) \(.size) \(.url)"'

@@ -9,7 +9,8 @@
   durable `876fb07` residual and a post-migration TEMP install, so an upgrade
   that skips the intermediate release is never blocked by the old guard.
   Confirmed as the product's current scope on 2026-10-02 (see "Current scope").
-- Date: 2026-09-25 (current-scope confirmation 2026-10-02)
+- Date: 2026-09-25 (current-scope confirmation 2026-10-02; progress status
+  2026-10-03)
 - Scope: which (mode, model) combinations a session may hold, and where the
   desktop refuses the invalid ones.
 - Evidence: `docs/validation/M5-cursor-plan-goal-gate.md`,
@@ -157,13 +158,37 @@ continue to describe the excluded Cursor combination only, exactly as recorded i
 `docs/validation/M5-omp-transition-patch.md` §9/§10 and
 `docs/validation/M5-t20-non-cursor-scope.md`.
 
+## Current status (2026-10-03)
+
+Progress-tracking update only: **every gate in this ADR is unchanged**, and the
+Cursor + Plan/Goal exclusion stays the product's scope.
+
+The "not implemented yet" wording above was accurate when it was written and is
+left as history. Since then, the non-Cursor Plan/Goal route landed and was
+accepted by the independent root review:
+
+- B1 (runtime state and policy channel), C (execution policy and plugin modes),
+  B2 (submit/approval/dispatch) and the model-side `EnterPlanMode`/
+  `EnterGoalMode` work are accepted (`docs/validation/M5-t20-b1-runtime-state.md`,
+  `M5-t20-c-execution-policy.md`, `M5-t20-b2-submit-approval.md`,
+  `M5-t20-d-mode-entry.md`).
+- T20-D opened the `plan`/`goal` capability keys and the composer entries
+  (ADR 0312) and closed the acceptance matrix; the M5 functionality was accepted
+  at `860c264177314f5c9501f90c2ef6bcbcd6aaa11b`
+  (`docs/validation/M5-t20-d-capability-ui.md`, root report
+  `omp-t20-d-ui-review-20261003/review-860c2641/independent-review.md`).
+- What is *not* done is the delivery around it, not the exclusion: the
+  three-platform test packages and T21 (whole)/T22/T23/T24 stay in progress
+  (`docs/validation/M5-three-platform-packages.md`).
+
 ## Consequences
 
 - The product limitation is explicit and testable rather than implicit: strict
   Cursor compatibility with Plan/Goal is not claimed, and R3's blocked status is
   unchanged.
 - Plan/Goal for OMP stays unimplemented (T20-B/C/D unstarted). This gate is a
-  precondition for that work, not the feature.
+  precondition for that work, not the feature. *(Superseded for progress
+  tracking only — see "Current status (2026-10-03)"; the gate itself stands.)*
 - Coverage: host-core tests that first reproduce the hole and then prove the
   guard (the transition tool, configure, create, forks, imports, the plan⇄goal hop
   on a pre-existing row, both repairs, non-Cursor behaviour, the RPC codes, and

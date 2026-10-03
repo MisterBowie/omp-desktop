@@ -1,0 +1,147 @@
+# 真实 Linux x64 包元数据（2026-10-03，工作树 = 本提交内容）
+
+## 构建命令
+cd app/apps/desktop && pnpm run dist:linux   # exit 0, 2m38s
+
+## electron-builder 输出
+total 632620
+drwxr-xr-x  3 vv vv      4096 Oct  3 17:06 .
+drwxrwxr-x 10 vv vv      4096 Oct  3 17:03 ..
+-rwxr-xr-x  1 vv vv 250455207 Oct  3 17:04 OMP-Desktop-0.15.2-x86_64.AppImage
+-rw-rw-r--  1 vv vv      1484 Oct  3 17:06 builder-debug.yml
+-rw-rw-r--  1 vv vv       710 Oct  3 17:06 latest-linux.yml
+drwxrwxr-x  4 vv vv      4096 Oct  3 17:04 linux-unpacked
+-rw-rw-r--  1 vv vv 188877517 Oct  3 17:06 omp-desktop-0.15.2-x86_64.rpm
+-rw-rw-r--  1 vv vv 208438940 Oct  3 17:05 omp-desktop_0.15.2_amd64.deb
+
+## deb 控制字段
+Package: omp-desktop
+Version: 0.15.2
+Architecture: amd64
+Maintainer: vastsa <hhxk666@gmail.com>
+Homepage: https://github.com/MisterBowie/omp-desktop
+Description: 
+  OMP Desktop Electron application
+
+## deb 关键路径
+drwxrwxr-x 0/0               0 2026-10-03 17:04 ./opt/OMP Desktop/resources/bin/
+-rwxrwxr-x 0/0        12267696 2026-10-03 17:04 ./opt/OMP Desktop/resources/bin/pi-desktop-host-core
+-rw-rw-r-- 0/0        20596870 2026-10-03 17:04 ./opt/OMP Desktop/resources/app.asar
+-rw-rw-r-- 0/0            1215 2026-10-03 17:04 ./opt/OMP Desktop/resources/omp-runtime/provenance.json
+-rwxr-xr-x 0/0       244295136 2026-10-03 17:04 ./opt/OMP Desktop/resources/omp-runtime/omp
+-rwxr-xr-x 0/0       224488696 2026-10-03 17:04 ./opt/OMP Desktop/omp-desktop
+drwxr-xr-x 0/0               0 2026-10-03 17:04 ./usr/share/icons/hicolor/512x512/
+drwxr-xr-x 0/0               0 2026-10-03 17:04 ./usr/share/icons/hicolor/512x512/apps/
+-rw-rw-r-- 0/0          229936 2026-10-03 16:50 ./usr/share/icons/hicolor/512x512/apps/omp-desktop.png
+drwxr-xr-x 0/0               0 2026-10-03 17:04 ./usr/share/applications/
+-rw-rw-r-- 0/0             213 2026-10-03 17:04 ./usr/share/applications/omp-desktop.desktop
+
+## 安装后的 desktop entry
+[Desktop Entry]
+Name=OMP Desktop
+Exec="/opt/OMP Desktop/omp-desktop" %U
+Terminal=false
+Type=Application
+Icon=omp-desktop
+StartupWMClass=omp-desktop
+Comment=OMP Desktop Electron application
+Categories=Development;
+
+## rpm 元数据（rpm 4.18.2，本地解包前缀，无 root）
+Name        : omp-desktop
+Version     : 0.15.2
+Release     : 1
+Architecture: x86_64
+Install Date: (not installed)
+Group       : default
+Size        : 587303722
+License     : unknown
+Signature   : (none)
+Source RPM  : omp-desktop-0.15.2-1.src.rpm
+Build Date  : Sat Oct  3 17:05:07 2026
+Build Host  : vv
+Relocations : / 
+Packager    : vastsa <hhxk666@gmail.com>
+Vendor      : vastsa <hhxk666@gmail.com>
+URL         : https://github.com/MisterBowie/omp-desktop
+Summary     : OMP Desktop Electron application
+Description :
+OMP Desktop Electron application
+
+## rpm 关键路径
+/opt/OMP Desktop/omp-desktop
+/opt/OMP Desktop/resources/app.asar
+/opt/OMP Desktop/resources/omp-runtime/omp
+/usr/share/applications/omp-desktop.desktop
+/usr/share/icons/hicolor/512x512/apps/omp-desktop.png
+
+## unpacked 应用（Resources 所在的真实目录）
+-rwxr-xr-x 1 vv vv 224488696 Oct  3 17:04 omp-desktop
+drwxrwxr-x 8 vv vv      4096 Oct  3 17:04 resources
+-rw-r--r-- 1 vv vv   7422300 Oct  3 17:04 resources.pak
+
+## app-update.yml（打包内置更新源）
+owner: MisterBowie
+repo: omp-desktop
+provider: github
+updaterCacheDirName: '@pi-desktopdesktop-updater'
+
+## 打包资源摘要
+f6111efdd9f60f8ab831da0d6292e37868e89dd163af46103780fd83924f560c  app/apps/desktop/release/linux-unpacked/resources/omp-runtime/omp
+3dd09910f71ee63f2b1ba13e06d8655f9b73af5e88f2c4dd29a92e0f11cd528b  app/apps/desktop/release/linux-unpacked/resources/omp-runtime/extensions/omp-desktop-gate.js
+{
+  "schema": "omp-desktop.bundled-sidecar/3",
+  "fork": {
+    "repository": "https://github.com/MisterBowie/oh-my-pi",
+    "commit": "36483311dfff67be7504f591974df93fc512a45a",
+    "tree": "7ba57b6d06fb8fe7e3f6352c67692e56cf39c3cd"
+  },
+  "upstreamBase": {
+    "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+    "version": "18.3.0"
+  },
+  "patchLevel": "62bc57b+omp-desktop.5",
+  "capabilities": [
+    "rpc-host-tool-concurrency",
+    "rpc-host-tool-sole-batch-policy",
+    "agent-tool-result-terminate",
+    "rpc-host-tool-result-terminate",
+    "extension-live-system-prompt",
+    "rpc-host-tool-settle-termination",
+    "reproducible-sidecar-build",
+    "explicit-bytecode-build-mode"
+  ],
+  "ompVersion": "18.3.0",
+  "desktopVersion": "0.15.2",
+  "platform": "linux",
+  "arch": "x64",
+  "binary": {
+    "filename": "omp",
+    "bytes": 244295136,
+    "sha256": "f6111efdd9f60f8ab831da0d6292e37868e89dd163af46103780fd83924f560c"
+  },
+  "extensions": [
+    {
+      "path": "extensions/omp-desktop-gate.js",
+      "bytes": 53025,
+      "sha256": "3dd09910f71ee63f2b1ba13e06d8655f9b73af5e88f2c4dd29a92e0f11cd528b"
+    }
+  ],
+  "build": {
+    "tool": "bun",
+    "bunVersion": "1.4.2",
+    "bytecode": true
+  }
+}
+
+## AppImage 内嵌 desktop entry（--appimage-extract）
+[Desktop Entry]
+Name=OMP Desktop
+Exec=AppRun --no-sandbox %U
+Terminal=false
+Type=Application
+Icon=omp-desktop
+StartupWMClass=omp-desktop
+X-AppImage-Version=0.15.2
+Comment=OMP Desktop Electron application
+Categories=Development;

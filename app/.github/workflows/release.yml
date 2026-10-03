@@ -358,16 +358,16 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          expected_dmg=(apps/desktop/release/PI-Desktop-*-${{ matrix.arch }}.dmg)
-          expected_dmg_blockmap=(apps/desktop/release/PI-Desktop-*-${{ matrix.arch }}.dmg.blockmap)
-          expected_zip=(apps/desktop/release/PI-Desktop-*-${{ matrix.arch }}-mac.zip)
-          expected_zip_blockmap=(apps/desktop/release/PI-Desktop-*-${{ matrix.arch }}-mac.zip.blockmap)
+          expected_dmg=(apps/desktop/release/OMP-Desktop-*-${{ matrix.arch }}.dmg)
+          expected_dmg_blockmap=(apps/desktop/release/OMP-Desktop-*-${{ matrix.arch }}.dmg.blockmap)
+          expected_zip=(apps/desktop/release/OMP-Desktop-*-${{ matrix.arch }}-mac.zip)
+          expected_zip_blockmap=(apps/desktop/release/OMP-Desktop-*-${{ matrix.arch }}-mac.zip.blockmap)
           if [[ "${#expected_dmg[@]}" -ne 1 || "${#expected_dmg_blockmap[@]}" -ne 1 || "${#expected_zip[@]}" -ne 1 || "${#expected_zip_blockmap[@]}" -ne 1 ]]; then
             echo "::error::Expected exactly one ${{ matrix.arch }} DMG, DMG blockmap, ZIP, and ZIP blockmap."
             printf '%s\n' apps/desktop/release/* || true
             exit 1
           fi
-          for artifact in apps/desktop/release/PI-Desktop-*; do
+          for artifact in apps/desktop/release/OMP-Desktop-*; do
             case "$artifact" in
               *-${{ matrix.arch }}.dmg|*-${{ matrix.arch }}.dmg.blockmap|*-${{ matrix.arch }}-mac.zip|*-${{ matrix.arch }}-mac.zip.blockmap) ;;
               *)

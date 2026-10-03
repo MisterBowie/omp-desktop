@@ -87,8 +87,10 @@ jobs:
           set -euo pipefail
           mkdir -p ../../../.artifacts/mac-arm64
           out=../../../.artifacts/mac-arm64
-          cp "release/PI-Desktop-0.15.2-arm64.dmg" "$out/OMP-Desktop-0.15.2-m5preview-mac-arm64.dmg"
-          cp "release/PI-Desktop-0.15.2-arm64-mac.zip" "$out/OMP-Desktop-0.15.2-m5preview-mac-arm64.zip"
+          # The product's artifactName now carries the OMP identity; only the
+          # download name of the preview asset keeps its stage label.
+          cp "release/OMP-Desktop-0.15.2-arm64.dmg" "$out/OMP-Desktop-0.15.2-m5preview-mac-arm64.dmg"
+          cp "release/OMP-Desktop-0.15.2-arm64-mac.zip" "$out/OMP-Desktop-0.15.2-m5preview-mac-arm64.zip"
           (cd "$out" && shasum -a 256 ./* > SHA256SUMS.txt && cat SHA256SUMS.txt)
 
       - name: Upload to release

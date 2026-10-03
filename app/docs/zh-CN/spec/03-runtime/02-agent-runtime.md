@@ -1289,9 +1289,11 @@ T20-B/C/D 在本门落地时尚未开始：本门是这些工作的前置条件�
 接通 Cursor 传输，本轮不新增该能力。T20-B/C/D 在该日尚未开始，且只会针对非 Cursor 路线推进；
 拆分见 `docs/validation/M5-t20-non-cursor-scope.md`。
 
-**当前状态（2026-10-03）**：以下仅更新进度口径，不影响本节任何门——根已独立验收 B1、C、B2 与
-模型侧 EnterPlanMode/EnterGoalMode；T20-D（`plan`/`goal` 能力声明、composer 入口与真实 Electron
-验收，ADR 0312）已实现、待根复审。「Cursor + Plan/Goal」排除与本节全部门保持不变。
+**当前状态（2026-10-03）**：以下仅更新进度口径，不影响本节任何门——根已独立验收 B1、C、B2、
+模型侧 EnterPlanMode/EnterGoalMode，以及 `860c264177314f5c9501f90c2ef6bcbcd6aaa11b` 上的 T20-D
+与整段 M5 功能（`plan`/`goal` 能力声明、composer 入口与真实 Electron 验收，ADR 0312；见
+`docs/validation/M5-t20-d-capability-ui.md`）。「Cursor + Plan/Goal」排除与本节全部门保持不变；
+仍未完成的是交付而非排除本身（三平台测试包、T21 整体、T22/T23/T24）。
 
 ## 17. bundled sidecar 的构建与准入（M5/T20-R4B；自 M6/T20-R4-3 起为可复现构建；自 M6/T21-A 起含打包资源验收，ADR 0307）
 

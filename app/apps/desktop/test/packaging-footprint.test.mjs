@@ -9,15 +9,15 @@ const sharedPackageJson = JSON.parse(
   await readFile(new URL("../../../packages/shared/package.json", import.meta.url), "utf8"),
 );
 const macOpenFixNote = await readFile(
-  new URL("../PI-Desktop-macOS-opening-help.txt", import.meta.url),
+  new URL("../OMP-Desktop-macOS-opening-help.txt", import.meta.url),
   "utf8",
 );
 const macOpenScript = await readFile(
-  new URL("../PI-Desktop-macOS-open.command", import.meta.url),
+  new URL("../OMP-Desktop-macOS-open.command", import.meta.url),
   "utf8",
 );
 const macOpenScriptStat = await stat(
-  new URL("../PI-Desktop-macOS-open.command", import.meta.url),
+  new URL("../OMP-Desktop-macOS-open.command", import.meta.url),
 );
 const dmgBackground = await readFile(
   new URL("../build/dmg-background.png", import.meta.url),
@@ -250,8 +250,8 @@ test("macOS targets follow the native architecture selected by the runner", () =
 
 test("macOS DMG is a two-icon install; ZIP keeps the unsigned helper", () => {
   assert.deepEqual(packageJson.build.mac.extraDistFiles, [
-    "PI-Desktop-macOS-open.command",
-    "PI-Desktop-macOS-opening-help.txt",
+    "OMP-Desktop-macOS-open.command",
+    "OMP-Desktop-macOS-opening-help.txt",
   ]);
   assert.equal(packageJson.build.dmg.background, "build/dmg-background.png");
   assert.equal(packageJson.build.dmg.icon, "build/icon.icns");
@@ -280,11 +280,12 @@ test("macOS DMG is a two-icon install; ZIP keeps the unsigned helper", () => {
   assert.ok(macOpenScriptStat.mode & 0o111, "opening helper must be executable");
   assert.match(
     macOpenFixNote,
-    /xattr -r -d com\.apple\.quarantine \/Applications\/PI-Desktop\.app/,
+    /xattr -r -d com\.apple\.quarantine "\/Applications\/OMP Desktop\.app"/,
   );
-  assert.match(macOpenFixNote, /trusted PI-Desktop source/);
+  assert.match(macOpenFixNote, /trusted OMP Desktop source/);
   assert.match(macOpenFixNote, /Signed and\s+notarized\s+builds do not need/);
-  assert.match(macOpenFixNote, /PI-Desktop-macOS-open\.command/);
+  assert.match(macOpenFixNote, /OMP-Desktop-macOS-open\.command/);
+  assert.match(macOpenScript, /readonly APP_BUNDLE_NAME="OMP Desktop\.app"/);
   assert.match(macOpenScript, /\/Applications\/\$\{APP_BUNDLE_NAME\}/);
   assert.match(macOpenScript, /CFBundleIdentifier/);
   assert.match(macOpenScript, /net\.misterbowie\.omp-desktop/);
@@ -292,6 +293,76 @@ test("macOS DMG is a two-icon install; ZIP keeps the unsigned helper", () => {
   assert.match(macOpenScript, /\/usr\/bin\/open/);
   assert.doesNotMatch(macOpenScript, /\bsudo\s+\//);
   assert.doesNotMatch(macOpenScript, /xattr -cr/);
+});
+
+test("every installed identity is OMP's own, so PI-Desktop stays installable beside it", () => {
+  // The two products share one machine: everything a user or an OS installer
+  // resolves by name — Start-menu shortcut, portable extraction directory,
+  // Linux executable, .desktop entry, deb/rpm package, download artifact — has
+  // to be OMP's own name. A single inherited PI name makes one product overwrite
+  // or shadow the other (the data directories and the app id are already
+  // separated; see packages/shared/src/app-identity.ts).
+  assert.equal(packageJson.build.appId, "net.misterbowie.omp-desktop");
+  assert.equal(packageJson.build.productName, "OMP Desktop");
+
+  /** What PI-Desktop itself installs, from upstream/pi-desktop @ 0111e306. */
+  const piDesktopNames = {
+    winExecutable: "PI-Desktop",
+    winShortcut: "PI-Desktop",
+    portableDir: "PI-Desktop-Portable",
+    linuxExecutable: "pi-desktop",
+    desktopEntry: "pi-desktop.desktop",
+    debPackage: "pi-desktop",
+    rpmPackage: "pi-desktop",
+  };
+
+  assert.equal(packageJson.build.win.executableName, "OMP Desktop");
+  assert.notEqual(packageJson.build.win.executableName, piDesktopNames.winExecutable);
+  assert.equal(packageJson.build.nsis.shortcutName, "OMP Desktop");
+  assert.notEqual(packageJson.build.nsis.shortcutName, piDesktopNames.winShortcut);
+  assert.equal(packageJson.build.portable.unpackDirName, "OMP-Desktop-Portable");
+  assert.notEqual(packageJson.build.portable.unpackDirName, piDesktopNames.portableDir);
+  assert.equal(packageJson.build.linux.executableName, "omp-desktop");
+  assert.notEqual(packageJson.build.linux.executableName, piDesktopNames.linuxExecutable);
+  assert.equal(packageJson.desktopName, "omp-desktop.desktop");
+  assert.notEqual(packageJson.desktopName, piDesktopNames.desktopEntry);
+  assert.equal(packageJson.build.deb.packageName, "omp-desktop");
+  assert.notEqual(packageJson.build.deb.packageName, piDesktopNames.debPackage);
+  assert.equal(packageJson.build.rpm.packageName, "omp-desktop");
+  assert.notEqual(packageJson.build.rpm.packageName, piDesktopNames.rpmPackage);
+
+  // Download artifacts carry the product name, and the platform/arch labels the
+  // release job stages (version, stage, platform, arch) are appended by the
+  // workflow — never by an inherited PI pattern.
+  assert.equal(packageJson.build.mac.artifactName, "OMP-Desktop-${version}-${arch}-mac.${ext}");
+  assert.equal(packageJson.build.dmg.artifactName, "OMP-Desktop-${version}-${arch}.${ext}");
+  assert.equal(packageJson.build.nsis.artifactName, "OMP-Desktop-Setup-${version}.${ext}");
+  assert.equal(packageJson.build.portable.artifactName, "OMP-Desktop-Portable-${version}.${ext}");
+  assert.equal(packageJson.build.deb.artifactName, "omp-desktop_${version}_${arch}.${ext}");
+  assert.equal(packageJson.build.rpm.artifactName, "omp-desktop-${version}-${arch}.${ext}");
+  for (const pattern of [
+    packageJson.build.mac.artifactName,
+    packageJson.build.dmg.artifactName,
+    packageJson.build.nsis.artifactName,
+    packageJson.build.portable.artifactName,
+    packageJson.build.deb.artifactName,
+    packageJson.build.rpm.artifactName,
+  ]) {
+    assert.doesNotMatch(pattern, /PI-Desktop|pi-desktop/);
+  }
+
+  // macOS keeps its own descriptions from naming the other product: the
+  // permission prompts are what a first launch shows the user.
+  const extendInfo = JSON.stringify(packageJson.build.mac.extendInfo);
+  assert.match(extendInfo, /OMP Desktop/);
+  assert.doesNotMatch(extendInfo, /PI-Desktop/);
+
+  // The package's own metadata reaches users through the deb/rpm description
+  // and the deb/rpm `Homepage` field, so it names this product and points at
+  // this product's repository — not at the upstream fork's.
+  assert.equal(packageJson.description, "OMP Desktop Electron application");
+  assert.equal(packageJson.homepage, "https://github.com/MisterBowie/omp-desktop");
+  assert.doesNotMatch(JSON.stringify([packageJson.description, packageJson.homepage]), /PI-Desktop|vastsa/);
 });
 
 test("packaging does not include removed PTY native payload configuration", () => {

@@ -104,11 +104,11 @@ exit 0
     // deliberately does not create them unless it was really invoked.
     "electron-builder": `#!/usr/bin/env bash
 printf 'electron-builder %s\\n' "$*" >> "${log}"
-app="${repoRoot}/apps/desktop/release/mac-${HOST_ARCH}/PI-Desktop.app"
+app="${repoRoot}/apps/desktop/release/mac-${HOST_ARCH}/OMP Desktop.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/bin"
-: > "$app/Contents/MacOS/PI-Desktop"
+: > "$app/Contents/MacOS/OMP Desktop"
 : > "$app/Contents/Resources/bin/pi-desktop-host-core"
-: > "${repoRoot}/apps/desktop/release/PI-Desktop-0.0.0-${HOST_ARCH}.dmg"
+: > "${repoRoot}/apps/desktop/release/OMP-Desktop-0.0.0-${HOST_ARCH}.dmg"
 exit 0
 `,
     codesign: `#!/usr/bin/env bash

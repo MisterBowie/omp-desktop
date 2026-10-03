@@ -1,10 +1,10 @@
 {
   "name": "@pi-desktop/desktop",
   "version": "0.15.2",
-  "desktopName": "pi-desktop.desktop",
+  "desktopName": "omp-desktop.desktop",
   "private": true,
-  "description": "PI-Desktop Electron application",
-  "homepage": "https://github.com/vastsa/PI-Desktop",
+  "description": "OMP Desktop Electron application",
+  "homepage": "https://github.com/MisterBowie/omp-desktop",
   "author": {
     "name": "vastsa",
     "email": "hhxk666@gmail.com"
@@ -144,7 +144,7 @@
       }
     ],
     "mac": {
-      "artifactName": "PI-Desktop-${version}-${arch}-mac.${ext}",
+      "artifactName": "OMP-Desktop-${version}-${arch}-mac.${ext}",
       "target": [
         {
           "target": "dmg"
@@ -160,8 +160,8 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
-        "NSLocalNetworkUsageDescription": "PI-Desktop needs local network access so agents can reach OpenAI-compatible providers, Ollama, and other AI endpoints running on your LAN. / PI-Desktop 需要本地网络访问权限，以便助手请求同一局域网中的 OpenAI 兼容服务、Ollama 等本地 AI 端点。",
-        "NSMicrophoneUsageDescription": "PI-Desktop plugins may use the microphone after you grant them audio access. / 在你授权后，PI-Desktop 插件可以使用麦克风。",
+        "NSLocalNetworkUsageDescription": "OMP Desktop needs local network access so agents can reach OpenAI-compatible providers, Ollama, and other AI endpoints running on your LAN. / OMP Desktop 需要本地网络访问权限，以便助手请求同一局域网中的 OpenAI 兼容服务、Ollama 等本地 AI 端点。",
+        "NSMicrophoneUsageDescription": "OMP Desktop plugins may use the microphone after you grant them audio access. / 在你授权后，OMP Desktop 插件可以使用麦克风。",
         "NSBonjourServices": [
           "_http._tcp",
           "_https._tcp"
@@ -178,12 +178,12 @@
         }
       ],
       "extraDistFiles": [
-        "PI-Desktop-macOS-open.command",
-        "PI-Desktop-macOS-opening-help.txt"
+        "OMP-Desktop-macOS-open.command",
+        "OMP-Desktop-macOS-opening-help.txt"
       ]
     },
     "dmg": {
-      "artifactName": "PI-Desktop-${version}-${arch}.${ext}",
+      "artifactName": "OMP-Desktop-${version}-${arch}.${ext}",
       "background": "build/dmg-background.png",
       "icon": "build/icon.icns",
       "window": {
@@ -206,7 +206,7 @@
       ]
     },
     "win": {
-      "executableName": "PI-Desktop",
+      "executableName": "OMP Desktop",
       "target": [
         {
           "target": "nsis",
@@ -236,28 +236,29 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "PI-Desktop",
-      "artifactName": "PI-Desktop-Setup-${version}.${ext}"
+      "shortcutName": "OMP Desktop",
+      "artifactName": "OMP-Desktop-Setup-${version}.${ext}"
     },
     "portable": {
-      "artifactName": "PI-Desktop-Portable-${version}.${ext}",
+      "artifactName": "OMP-Desktop-Portable-${version}.${ext}",
       "requestExecutionLevel": "user",
-      "unpackDirName": "PI-Desktop-Portable"
+      "unpackDirName": "OMP-Desktop-Portable"
     },
     "deb": {
-      "packageName": "pi-desktop",
-      "artifactName": "pi-desktop_${version}_${arch}.${ext}"
+      "packageName": "omp-desktop",
+      "artifactName": "omp-desktop_${version}_${arch}.${ext}"
     },
     "rpm": {
-      "packageName": "pi-desktop",
-      "artifactName": "pi-desktop-${version}-${arch}.${ext}",
+      "packageName": "omp-desktop",
+      "artifactName": "omp-desktop-${version}-${arch}.${ext}",
       "fpm": [
         "--rpm-rpmbuild-define",
         "_build_id_links none"
       ]
     },
     "linux": {
-      "executableName": "pi-desktop",
+      "executableName": "omp-desktop",
+      "artifactName": "OMP-Desktop-${version}-${arch}.${ext}",
       "syncDesktopName": true,
       "target": [
         {

@@ -1,0 +1,5 @@
+890ef53802c16efe9013e6bd08a803c94437cd44a7e1019ec633019bccd4a375  OMP-Desktop-0.15.2-m5-test-local-20261003-linux-x64.AppImage
+9d8863cebe226bde10eb84d8b4285cab1351088fc185e355c7ec89b35d25b395  OMP-Desktop-0.15.2-m5-test-local-20261003-linux-x64.deb
+f46a4f84d803f9ee2ba76303db200db737b54294be79666a182a885e44587d4d  OMP-Desktop-0.15.2-m5-test-local-20261003-linux-x64.rpm
+36b169cb881c1b857c9c0146d25d67e8ee42eed2f113d40a3ab630aafe5bed23  OMP-Desktop-0.15.2-m5-test-local-20261003-macos-arm64-fixture.dmg
+36b169cb881c1b857c9c0146d25d67e8ee42eed2f113d40a3ab630aafe5bed23  OMP-Desktop-0.15.2-m5-test-local-20261003-windows-x64-fixture.exe

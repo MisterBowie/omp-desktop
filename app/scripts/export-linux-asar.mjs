@@ -39,7 +39,7 @@ export async function exportLinuxAsar({
   await mkdir(destinationDirectory, { recursive: true });
   const destination = join(
     destinationDirectory,
-    `PI-Desktop-${releaseVersion}-linux-x64.asar`,
+    `OMP-Desktop-${releaseVersion}-linux-x64.asar`,
   );
   await copyFile(source, destination);
   return { source, destination, version: releaseVersion };

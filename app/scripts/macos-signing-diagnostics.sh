@@ -2,7 +2,7 @@
 # Record a non-sensitive snapshot of the macOS code-signing environment before
 # electron-builder starts packaging.
 #
-# Why this exists: @electron/osx-sign walks the whole `PI-Desktop.app` and runs
+# Why this exists: @electron/osx-sign walks the whole `OMP Desktop.app` and runs
 # one `codesign --sign <identity> --force --timestamp --entitlements ...` per
 # Mach-O file and per nested bundle, strictly serially. When a release signing
 # step stalls, every interesting question is environmental: is a usable

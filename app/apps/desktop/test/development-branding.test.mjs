@@ -51,9 +51,13 @@ test("Windows runtime registers the canonical native application identity", () =
   );
 });
 
-test("Windows packages pin PI-Desktop executable and shortcut names", () => {
-  assert.equal(packageJson.build.win.executableName, "PI-Desktop");
-  assert.equal(packageJson.build.nsis.shortcutName, "PI-Desktop");
+test("Windows packages pin OMP Desktop executable and shortcut names", () => {
+  // Both must differ from PI-Desktop's own names, or the two installed
+  // applications collide in the Start menu and in their taskbar identity.
+  assert.equal(packageJson.build.win.executableName, "OMP Desktop");
+  assert.equal(packageJson.build.nsis.shortcutName, "OMP Desktop");
+  assert.notEqual(packageJson.build.win.executableName, "PI-Desktop");
+  assert.notEqual(packageJson.build.nsis.shortcutName, "PI-Desktop");
 });
 
 test("Windows packages and windows use the canonical PI-Desktop icon", () => {
@@ -76,8 +80,11 @@ test("Windows packages and windows use the canonical PI-Desktop icon", () => {
 });
 
 test("Linux packages align the desktop entry with the Wayland app identity", () => {
-  assert.equal(packageJson.desktopName, "pi-desktop.desktop");
+  assert.equal(packageJson.desktopName, "omp-desktop.desktop");
   assert.equal(packageJson.build.linux.syncDesktopName, true);
+  // The installed .desktop file must not overwrite PI-Desktop's own entry.
+  assert.notEqual(packageJson.desktopName, "pi-desktop.desktop");
+  assert.equal(packageJson.build.linux.executableName, "omp-desktop");
 });
 
 test("macOS development uses the canonical PI-Desktop Dock icon", () => {

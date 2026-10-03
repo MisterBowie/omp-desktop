@@ -1,0 +1,28 @@
+# 新增/受影响套件与静态门的实际输出（2026-10-03）
+
+## 身份/打包/工作流相关 11 个文件
+ℹ tests 77
+ℹ pass 76
+ℹ fail 0
+ℹ skipped 1
+
+## staging/装配行为测试（重复一次作为交付前复核）
+ℹ tests 20
+ℹ pass 20
+ℹ fail 0
+ℹ skipped 0
+
+## 静态门
+build:js exit=0
+typecheck exit=0
+lint exit=0
+docs:check exit=0
+check-release-docs exit=0
+check-t20-matrix-ids exit=0
+
+## 语法检查（node --check）
+scripts/stage-test-package.mjs OK
+scripts/assemble-test-release.mjs OK
+scripts/verify-packaged-runtime.mjs OK
+scripts/omp-sidecar.mjs OK
+scripts/release-package.mjs OK

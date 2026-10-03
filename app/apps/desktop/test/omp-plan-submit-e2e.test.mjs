@@ -35,7 +35,7 @@ import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, 
 import { register } from "node:module";
 import { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 
@@ -90,12 +90,20 @@ function waitFor(predicate, timeoutMs = 30_000, intervalMs = 50) {
   });
 }
 
-/** The host-core binary the tests drive (env override, then the dev builds). */
+/**
+ * The host-core binary the tests drive (env override, then the dev builds).
+ *
+ * `pi-desktop-host-core.exe` is checked too: on Windows the cargo output
+ * carries the extension, and without it the suite would report every case as
+ * skipped on the very platform whose package this fixture also has to prove.
+ */
 function resolveHostBinary() {
   const candidates = [
     process.env.PI_DESKTOP_HOST_BIN,
     join(here, "../../../target/debug/pi-desktop-host-core"),
     join(here, "../../../target/release/pi-desktop-host-core"),
+    join(here, "../../../target/debug/pi-desktop-host-core.exe"),
+    join(here, "../../../target/release/pi-desktop-host-core.exe"),
   ].filter(Boolean);
   for (const candidate of candidates) {
     if (existsSync(candidate)) return candidate;
@@ -103,8 +111,35 @@ function resolveHostBinary() {
   return null;
 }
 
+/**
+ * The launcher and gate of an electron-builder output, when the suite is run
+ * against a package instead of a source tree.
+ *
+ * `OMP_E2E_PACKAGED_RESOURCES` points at the `Resources` directory of a
+ * packaged application (the same input `scripts/verify-packaged-runtime.mjs`
+ * takes). The suite then drives the artifacts the package actually ships — the
+ * compiled sidecar and the compiled gate bundle — instead of a scratch copy of
+ * the pinned submodule, so "the gate/bridge behave" is a statement about the
+ * released bytes. The provenance manifest is read and asserted against the
+ * controlled patch manifest, so a package built from another fork commit or
+ * patch level cannot silently stand in for this one.
+ */
+function packagedArtifacts(resources) {
+  const runtimeDir = join(resolve(resources), "omp-runtime");
+  const launcher = join(runtimeDir, process.platform === "win32" ? "omp.exe" : "omp");
+  const gate = join(runtimeDir, "extensions", "omp-desktop-gate.js");
+  const provenancePath = join(runtimeDir, "provenance.json");
+  for (const path of [launcher, gate, provenancePath]) {
+    assert.ok(existsSync(path), `the packaged resources are missing ${path}`);
+  }
+  return { launcher, gate, provenance: JSON.parse(readFileSync(provenancePath, "utf8")) };
+}
+
+const PACKAGED = process.env.OMP_E2E_PACKAGED_RESOURCES
+  ? packagedArtifacts(process.env.OMP_E2E_PACKAGED_RESOURCES)
+  : null;
 const HOST_BINARY = resolveHostBinary();
-const GATE = findGateExtension(here);
+const GATE = PACKAGED ? PACKAGED.gate : findGateExtension(here);
 
 // The fixed patched runtime: a scratch copy of the pinned submodule with the
 // controlled patch set (.4) applied. Prepared once; the runtime under test is
@@ -116,7 +151,23 @@ const GATE = findGateExtension(here);
 let PATCHED_LAUNCHER = null;
 let PATCH_MANIFEST = null;
 const UNPATCHED = process.env.OMP_B2_UNPATCHED === "1";
-if (HOST_BINARY && GATE && UNPATCHED) {
+if (PACKAGED) {
+  PATCH_MANIFEST = JSON.parse(readFileSync(join(here, "../../../patches/oh-my-pi/manifest.json"), "utf8"));
+  for (const [field, actual, expected] of [
+    ["fork.commit", PACKAGED.provenance.fork?.commit, PATCH_MANIFEST.fork.commit],
+    ["patchLevel", PACKAGED.provenance.patchLevel, PATCH_MANIFEST.patchLevel],
+    ["ompVersion", PACKAGED.provenance.ompVersion, PATCH_MANIFEST.base.version],
+    ["platform", PACKAGED.provenance.platform, process.platform],
+    ["arch", PACKAGED.provenance.arch, process.arch],
+  ]) {
+    assert.equal(
+      actual,
+      expected,
+      `the packaged runtime must be the manifest's ${field} (got ${actual}, expected ${expected})`,
+    );
+  }
+  PATCHED_LAUNCHER = PACKAGED.launcher;
+} else if (HOST_BINARY && GATE && UNPATCHED) {
   PATCHED_LAUNCHER = findPinnedLauncher(here);
 } else if (HOST_BINARY && GATE) {
   const prepared = await preparePatchedTree({ prepareBuild: true, keep: true });
@@ -410,8 +461,16 @@ test(
     const host = await startHost(dataRoot);
 
     // The patched runtime really carries the settlement declaration (the RED
-    // track deliberately runs the bare submodule, which does not).
-    if (!UNPATCHED) {
+    // track deliberately runs the bare submodule, which does not). A packaged
+    // launcher has no source tree beside it, so the same fact is read from the
+    // provenance manifest the package was admitted with — which this fixture
+    // already required to be the controlled manifest's patch level.
+    if (PACKAGED) {
+      assert.ok(
+        PACKAGED.provenance.capabilities?.includes("rpc-host-tool-settle-termination"),
+        "the packaged sidecar's provenance must declare the settle-termination capability",
+      );
+    } else if (!UNPATCHED) {
       const typesSource = readFileSync(join(dirname(PATCHED_LAUNCHER), "..", "..", "agent", "src", "types.ts"), "utf8");
       assert.match(typesSource, /terminateOnSettle\?: boolean/);
     }
