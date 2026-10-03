@@ -1,14 +1,16 @@
 # M5/T20-D：能力键、真实桌面闭环与完整矩阵
 
-更新时间：2026-10-03。状态：**首稿 `8a1dd8fc` 的 R1–R4 已由根独立复验闭合；根随即判
-changes-required（R5：一次提交的用户气泡渲染两次；R6：重启后会话面板看不到已产生的历史）。
-第二轮定向返修（本 §1.6）完成、本机验证通过、待根复审**。证据：首稿与第一轮返修见
-`docs/validation/M5-t20-d-capability-ui/`（`repair-20261003/`），第二轮见
-`repair2-20261003/`。分支 `codex/m5-t20-d-capability-ui`（普通追加提交，不 amend/rebase/
-强推，不发布、不合 main、不建 PR），本返修基于 `2093f271318294881085f2ee8d047ace2e51ad41`
-（根已独立复验的 R1–R4 提交），首个基线 `68519ea19f6fee37fec2c5817256f3a68ea8606e`。
-固定子模块 OMP `62bc57be`、PI `0111e306`（未动）；补丁级保持 `62bc57b+omp-desktop.5`
-（fork commit `36483311dfff67be7504f591974df93fc512a45a`，本阶段不改 fork、不改 patch）。
+更新时间：2026-10-03。状态：**首稿 `8a1dd8fc` 的 R1–R4 已由根独立复验闭合；根随后判
+changes-required（R5：一次提交的用户气泡渲染两次；R6：重启后会话面板看不到已产生的历史）；
+第二轮定向返修（§1.6）后根再以真实 macOS arm64 原生运行时故障注入与受控边界探针判
+changes-required（R7–R10）；第三轮定向返修（§1.7）完成、本机验证通过、待根复审**。证据：
+首稿与第一轮返修见 `docs/validation/M5-t20-d-capability-ui/`（`repair-20261003/`），第二轮见
+`repair2-20261003/`，第三轮见 `repair3-20261003/`。分支 `codex/m5-t20-d-capability-ui`
+（普通追加提交，不 amend/rebase/强推，不发布、不合 main、不建 PR），本返修基于
+`b6a9e4c2ac0625ffd37b61f3d007f9992b8dfa23`（根复审判 changes-required 的候选），首个基线
+`68519ea19f6fee37fec2c5817256f3a68ea8606e`。固定子模块 OMP `62bc57be`、PI `0111e306`
+（未动）；补丁级保持 `62bc57b+omp-desktop.5`（fork commit
+`36483311dfff67be7504f591974df93fc512a45a`，本阶段不改 fork、不改 patch）。
 
 本阶段在用户授权范围内交付矩阵 **B9**（能力声明与入口）、**D3**（真实用户路径）、
 **D1**（Goal 闭环）与 **B13/B2** 的生命周期回归，并给出 B1–B14 / C1–C8 / D1–D3 共 25 行的
@@ -242,6 +244,78 @@ prompt 的乐观行），按各自终止事件结算（自身终止缺失时由�
 | 桌面只读投影 | `apps/desktop/test/omp-model-projection.test.mjs`（+2） | 读配置保留模型身份、`auth:"none"`、无 `apiKey`；`hasSecret:false` 输出相同（从不读密钥）；不可投影/无提供商行→回环占位项 |
 | 真实 UI E2E | `apps/scripts/e2e-omp-plan-ui.mjs`（+断言） | 重启后、发新 prompt 前：面板显示重启前的 user 行（同 id、同文本、各恰一次）与 assistant/tool 历史；恢复 prompt 只渲染一个气泡；重新选中（经另一个会话往返）后行 id/文本不变、原生 transcript sha 不变；两段逐字节相同的提交都保留且 id 不同、provider 恰好 +2；重启本身 provider 不增、无重放（既有断言保留） |
 
+### 1.7 第三轮定向返修（2026-10-03，R7–R10）
+
+根在 `b6a9e4c2` 上用**真实 macOS arm64 编译的 `.5` 原生运行时 + 生产 bridge + 真实 writer 的
+故障注入**（`/tmp/omp-t20-d-ui-repair3-root-20261003/…/history-failure-native-mac.json`）与
+**注册后 IPC handler + 受控 host/runtime 接缝的边界探针**（`history-boundary.json`）判定四组
+缺陷；两组证据都是已执行的真实失败，不是草稿猜测。本轮不改 fork/补丁/gate/host-core，产品改动
+集中在历史读取路径与其 IPC 边界。
+
+**R7（P1）：失败的历史浏览改写被浏览的原生文件。** 第二轮的非存活会话读取会先启动一个瞬时
+runtime、`switch_session` 绑到目标转录；成功路径靠 `new_session` 先离开再回收，但
+`get_entries` 拒绝、`get_state` 身份不符会跳过切离，`new_session` 返回 `success:false` 或被取消
+也没有检查（抛错仅 warn），随后 graceful stop 在仍持有会话时向被浏览文件追加
+`customType:session_exit`（根实测四种失败路径各 **+207 B**，detach 取消/超时两项还错误地返回了
+成功历史）。修复不是补 detach 顺序，而是**删除瞬时 runtime 读取路径**：无存活运行时会话改由
+进程内直读器 `readNativeSessionEntries` 读取（`packages/omp-runtime/src/session/native-session-file.ts`）
+——没有写者、没有锁、没有子进程，因此"失败时改写文件"在结构上不可能；成功/异常/取消/超时/
+无凭据语义统一由"我们从不打开写句柄"取代（"取消/超时"作为运行时行为随之消失，同类失败现在
+表现为文件级/格式级拒绝且不改字节，见证据）。
+
+**R8（P1）：临时 reader 不属于 bridge 生命周期。** 同一路径的 reader 未登记进 `entries`；
+production supervisor 在 `stop.reaped=false` 时仍持有 runtime/ownership（`pendingCleanup` 可为
+0），而 bridge 只看 `pendingCleanup`；探针显示 stop 明确未 reaped 时 `readHistory` 仍返回成功、
+`dispose` 报 `{ok:true}`，start 悬停时 dispose 提前 ok、释放后 reader 继续启动读取。随着 R7 的
+路径删除，reader 进程、run 目录与所有权都不再存在（"无子进程的新设计按实际所有权验证"）：本轮
+用真实计数证明冷读 **0** 次 supervisor 构造、**0** 个 run 目录、`dispose` 无失败，并保留
+shutdown 后拒绝读取的闸门。
+
+**R9（P1）：host 元数据读取失败被伪装成成功空历史。** `session-ipc` 的 `withOmpHistory` 把
+`engineForSession` 异常 catch 成 `pi`、把 `session.getEngineRef` 异常 catch 成 `null`，于是可信
+OMP 会话因一次 lookup 异常退化为宿主空转录。修复：两处都不再降级——引擎判定失败与原生引用
+读取失败都向上抛（渲染层可见、可重试），只有**成功读到"无引用"**（会话尚未跑过原生回合）才是
+空历史；Pi 既有行为不变。
+
+**R10（P2）：显式 null 活动叶回退到最后存储分支。** `history.ts` 把非法/缺失 leaf 与 `null`
+一并归并后 `leafId ?? 最后 entry`。修复：显式 `leafId: null`（运行时的 `resetLeaf`，固定
+`buildSessionContext` 正是渲染为空消息）→ 空活动分支；缺失/非字符串/空串等畸形叶 → 协议拒绝，
+绝不猜测旧 tip（不因此开放 branch 能力）。
+
+**本轮真实 UI 证据（`repair3-20261003/omp-plan-ui-*.png` 13 张 + `omp-plan-ui-raw.json` 1039569 B，
+真实 Electron 渲染层 + 生产 bridge/gate + patched `.5` 运行时 + 本地 FakeProvider）**：
+
+| 断言 | 证据 |
+| --- | --- |
+| 重启后、发新 prompt 前看到历史（R6 保持） | `scenarios.history.afterHeldRestart` 9/9 user 行 overlap；roles = 9 assistant turn / 14 assistant 消息 / 11 tool 行 / 9 process 组 |
+| 读取/重选不改原生字节（R7 保持） | `nativeTranscriptAfterPendingRestart.sha256` == `nativeTranscriptAfterReselect.sha256` = `ec6e32b7…` |
+| 同文本两次提交：两个气泡、两个持久 entry、二次重选稳定（R5 保持） | live `…:1` / `…:3` → entry `3e6bbb95` / `dfec4207`（重选两次不变）；provider 16→18 恰 +2 |
+| 重启不重放 | 三次重启 provider 请求数不变（总 16） |
+| 清理 | `CLEANUP scratchRemoved=true survivingOwnedProcesses=0 errors=0` |
+| 全闭环 | 三种审批权限、reject/重提、running/pending 重启、工件/CAS 断言全部保留并通过；`SUMMARY 1 passed, 0 failed` |
+
+**本轮新增/修改的测试与证据**（`repair3-20261003/`）：
+
+| 层 | 文件 | 断言要点 |
+|---|---|---|
+| 直读器（新，unit） | `packages/omp-runtime/src/session/native-session-file.test.ts`（13 例） | title slot 折叠；header 在后也可读；仅 header 为空；畸形记录跳过；未落幕尾行忽略；metadata 尾 entry 仍是叶；CRLF；v2 `hookMessage`→`custom` 内存改名；身份不符 `OMP_RESTORE_FAILED`；无 header/空文件/版本 1/版本 4/畸形版本 `OMP_HISTORY_INVALID`；文件上界与单记录上界拒绝；缺文件 `OMP_HISTORY_READ_FAILED` |
+| 投影叶语义（改） | `packages/omp-runtime/src/session/history.test.ts`（+2，共 10） | 显式 `null` → 空页（entry 不复活）；`undefined`/空串/数字/对象/数组叶全部拒绝 |
+| bridge 读取（重写） | `apps/desktop/test/omp-history-read.test.mjs`（8 例） | 冷读**不构造任何 supervisor**、文件原地读；失败类别（外部路径/他者 header/缺文件/版本 1/结构破损）不改字节；shutdown 后拒绝读取；显式 null 叶空页（存活 runtime 路径）；存活 runtime 复用与 `replacedLiveMessageIds` 台账不变 |
+| 真实 runtime（重写） | `apps/desktop/test/omp-history-e2e.test.mjs`（1 例，真固定运行时 + FakeProvider） | **等价性**：同一转录，存活 runtime 的 `get_entries` 投影与冷读的 id/角色/内容完全一致（`3b31aa12`/`7fcbb16e`/`history-call-1`/`7f83dd33`）；字节纯度跨成功读取、版本拒绝、身份拒绝、最终态（`a176c4a2…`、3371 B）；**0** 次 reader supervisor 构造、**0** 个 run 目录；provider 请求不变；并发 writer 行边界语义（未落幕尾行不可见、补上换行后可见） |
+| IPC 边界（+3） | `apps/desktop/test/engine-session-ipc.test.mjs`（12 例） | 引擎 lookup 失败与 `session.getEngineRef` 失败都上抛（sessionGet/sessionOpen，readHistory 不被调用）；成功"无引用"是唯一空历史；读取失败仍上抛；Pi 不触发原生读取 |
+| 读配置投影（删） | `apps/desktop/test/omp-model-projection.test.mjs`（15 例） | 随瞬时读取路径删除 `projectReadOnlyModelsYaml` 及其 2 例；其余投影断言不变 |
+| 真实 UI E2E | `apps/scripts/e2e-omp-plan-ui.mjs`（未改） | R1–R6 完整闭环在本轮源码上复跑通过（上表） |
+
+**被删除的旧实现（干净切换）**：`omp-session.ts` 的 `readEntriesWithReadOnlyRuntime` 与
+`createReadSupervisor` 选项、`omp-session-wiring.ts` 的只读 supervisor 装配、
+`omp-model-projection.ts` 的 `projectReadOnlyModelsYaml`/`READ_ONLY_MODEL_PROVIDER_ID` 及其测试；
+`omp-history-read.test.mjs` 中针对旧命令序（`switch_session→get_state→get_entries→new_session`）、
+只读 profile、reader 回收失败的行随路径一起删除，替换为直读路径的等价断言。
+
+**直读器的已知边界（如实记录，不回归）**：只接受 session 格式版本 2 与 3（版本 1 无稳定 entry
+id、未知未来版本拒绝，均显式报错）；`blob:sha256:` 图片引用不由直读器解析——旧瞬时 runtime 在
+重启后同样无法解析（blob 存储位于已删除的 run root 内），行为未回归（ADR 0313 已记录该限制）。
+
 ## 2. 验证（命令、退出码、原始日志）
 
 所有命令在 `/home/vv/person/code/omp-desktop-m5-t20-d-ui/app`，Node v24.14.0、
@@ -325,6 +399,36 @@ typecheck exit=0
 0312 由本分支首稿引入），本轮全部修复，门恢复 exit 0；这属于"运行仓库自带的文档门后发现并
 修正现行目录事实"，未改任何 ADR 正文语义（0301 仅标题格式对齐其余 ADR；README 索引行是元数据）。
 
+### 2.2 第三轮返修命令与结果（R7–R10）
+
+所有命令在 `/home/vv/person/code/omp-desktop-m5-t20-d-ui/app`（UI/真实 E2E 在仓库内亦同），
+Node v24.14.0、Bun 1.4.2、Linux x64；UI E2E 使用 `DISPLAY=:1` +
+`XAUTHORITY=/run/user/1000/.mutter-Xwaylandauth.JKWYV3`（Xwayland 2560x1440）与 `--no-sandbox`；
+patched 运行时树 `/tmp/omp-patched-t20d-ui-repair1` 在跑前跑后核验（launcher sha256
+`1bc44850…`、隔离 HOME 下 `--version` = `omp/18.3.0`，见 `repair3-20261003/patched-tree-input.txt`）。
+
+| 验证 | 命令（要点） | 结果 | 原始日志 |
+| --- | --- | --- | --- |
+| 直读器 + 投影单测（新/改） | `packages/omp-runtime && vitest run src/session/native-session-file.test.ts src/session/history.test.ts` | **2 files / 23 passed**、exit 0 | `repair3-20261003/native-history-unit.txt` |
+| runtime 包全量 | `packages/omp-runtime && vitest run` | **35 files / 530 passed / 6 skipped**、exit 0 | `repair3-20261003/runtime-vitest.txt` |
+| shared 包全量 | `pnpm --filter @pi-desktop/shared test` | **86 files / 986 passed**、exit 0 | `repair3-20261003/shared-vitest.txt` |
+| bridge 读取单测（重写） | `apps/desktop && node --test test/omp-history-read.test.mjs` | 8/8 通过、exit 0 | `repair3-20261003/omp-history-read.txt` |
+| 真实 runtime 读取 E2E（重写） | `apps/desktop && node --test test/omp-history-e2e.test.mjs` | 1/1 通过、exit 0；结构化行：sha 前后与拒绝后均 `a176c4a2…`（3371 B）、provider 2、supervisor 构造 1/0、live/cold 行 id 全等、run 目录 `[]` | `repair3-20261003/omp-history-e2e.txt` |
+| IPC 边界 | `apps/desktop && node --test test/engine-session-ipc.test.mjs` | 12/12 通过、exit 0 | `repair3-20261003/engine-session-ipc.txt` |
+| 投影套件 | `apps/desktop && node --test test/omp-model-projection.test.mjs` | 15/15 通过、exit 0 | `repair3-20261003/omp-model-projection.txt` |
+| OMP bridge 定向合集 | `apps/desktop && node --test test/omp-session-bridge.test.mjs test/omp-history-read.test.mjs test/omp-session-ownership.test.mjs test/omp-session-failclosed.test.mjs test/omp-session-configure.test.mjs test/omp-host-tool-bridge.test.mjs test/omp-terminal-delivery.test.mjs test/engine-session-ipc.test.mjs test/omp-model-projection.test.mjs` | **136/136 通过**、exit 0 | `repair3-20261003/omp-bridge-directed.txt` |
+| Goal/生命周期真实 E2E | `apps/desktop && node --test --test-name-pattern "T20-D" test/omp-plan-submit-e2e.test.mjs` | 8/8 通过、exit 0 | `repair3-20261003/goal-lifecycle-e2e.txt` |
+| **真实 UI E2E（R1–R6 复跑）** | `DISPLAY=:1 … PI_DESKTOP_E2E_PATCHED_TREE=/tmp/omp-patched-t20d-ui-repair1 PI_DESKTOP_E2E_ARTIFACT_DIR=…/ui node scripts/e2e-omp-plan-ui.mjs` | `SUMMARY 1 passed, 0 failed`、exit 0；13 张截图；`CLEANUP scratchRemoved=true survivingOwnedProcesses=0 errors=0`；raw JSON 1039569 B；provider 16 无重放 | `repair3-20261003/omp-plan-ui-run.txt`、`omp-plan-ui-raw.json`、`omp-plan-ui-01..13-*.png` |
+| desktop 全量 | `apps/desktop && env -u SSH_ASKPASS node --test test/*.test.mjs` | **3045 tests / 3034 passed / 0 failed / 11 skipped**、exit 0 | `repair3-20261003/desktop-full.txt` |
+| typecheck / lint / docs / 矩阵 | `pnpm typecheck`、`pnpm lint`、`pnpm docs:check`、`node scripts/check-t20-matrix-ids.mjs` | 均 exit 0（docs 79 对语言 + 513 页） | `repair3-20261003/typecheck.txt`、`lint.txt`、`docs-check.txt`、`matrix-ids.txt` |
+| 旧证据完整性 | `sha256sum -c`（首稿 `SHA256SUMS.txt`、`repair-20261003/`、`repair2-20261003/`） | 三份清单全部 `OK`（旧 20/14/28 件未改写） | 命令输出 |
+| 第三轮证据清单 | `repair3-20261003/ && sha256sum -c SHA256SUMS.txt` | 30 件全 `OK`（自排除 manifest） | `repair3-20261003/SHA256SUMS.txt` |
+
+不带 `env -u SSH_ASKPASS` 首次运行 desktop 全量时，唯一失败是
+`remote-host-ssh-password.test.mjs` 的"key-auth 不携带 askpass 材料"——本会话环境里存在
+`SSH_ASKPASS=/usr/bin/false`（与产品改动无关，前几轮同样以 `env -u SSH_ASKPASS` 运行）；
+以该环境重跑该文件 14/14 通过，并以同样的方式取得上表全量结果，如实记录。
+
 ## 3. 全矩阵映射（B1–B14 / C1–C8 / D1–D3）
 
 证据层级：**unit**（纯函数/单元）、**handler**（受控 handler/夹具）、**runtime/Host**
@@ -344,7 +448,7 @@ typecheck exit=0
 | B7 | 恰一次执行/CAS/drain/boot maintenance/配置冻结 | 已接受 B2 + 本阶段 D3 UI 两条真实应用重启：pending→`interrupted`/`PLAN_APPROVAL_INTERRUPTED`；**running**（真实 `/bin/sleep` 子进程持住）→`interrupted`/`PLAN_EXECUTION_INTERRUPTED` + turn `aborted` + audit 行；两条重启 provider 请求数都不变、副作用日志不重复（§1.5） | host-core + renderer + OS 进程 | 通过 |
 | B8 | 批准后按选定权限执行 | 已接受 B2 + 本阶段 D3 UI 三种真实批准：ask → 真实权限卡 → Allow once → 落盘；accept-edits → 无卡落盘；**auto** 经真实审批菜单 → high-risk `bash` 无卡执行、durable 行 `target_permission_mode=auto`、会话 `mode=agent`/`permission_mode=auto`；三条 execution 均 `completed`、无遗留 running（§1.5） | runtime/Host + renderer | 通过 |
 | B9 | 能力声明：plan/goal 键、渲染层显隐、Pi 零变化 | 本阶段 §1.1（shared 14/14 + router/IPC/renderer 20/20 + RED 记录）；Pi 循环与行为不变 | unit + renderer + handler | 通过 |
-| B10 | Agent 回归与 T17–T19 不受影响 | desktop 全量 **3026 tests / 3015 passed / 0 failed / 11 skipped**（含 T17–T19 全部用例与全部 OMP E2E） | 既有套件 | 通过 |
+| B10 | Agent 回归与 T17–T19 不受影响 | desktop 全量 **3045 tests / 3034 passed / 0 failed / 11 skipped**（第三轮复跑，含 T17–T19 全部用例与全部 OMP E2E） | 既有套件 | 通过 |
 | B11 | `set_host_tools`→`before_agent_start` 顺序契约 | 已接受 spike R4-1/R4-2（`M5-plan-goal-capability-gates.md` §4.2）+ B13 生命周期 E2E（每回合目录与 clamp 一致、无自动激活残留） | runtime/Host | 通过 |
 | B12 | 首次夹取 1 次 policy retry、其后稳定 | 已接受 spike R4-4（attempts 2/1/2）+ 本阶段 B13 五回合均不出现 `AgentStartPolicyChangedError`（回合全部正常完成） | runtime/Host | 通过 |
 | B13 | 目录生命周期与真实持久模式切换 | 本阶段 B13 生命周期 E2E（Agent→Plan→Goal→Agent→Plan，重加与首轮逐项相等、无重复/残留、策略表由 host 行驱动） | runtime/Host | 通过 |
@@ -359,7 +463,7 @@ typecheck exit=0
 | C8 | 外部路径例外 | 已接受 C + 回归 | unit | 通过 |
 | D1 | SubmitGoal、goal 提示词、批准后自主执行自停 | 本阶段 Goal E2E（§1.3）；无延续定时器 | runtime/Host + host-core | 通过 |
 | D2 | `goal_updated` 只读展示 | 未实现（矩阵可选）；不伪造 Goal 状态，不新建第二套 Goal | — | 可选未实现 |
-| D3 | 端到端用户路径 | 本阶段 UI E2E（§1.2 首稿 + §1.5 返修：三种批准权限、真实 Reject/重提、真实 running 与 pending 应用重启、专属 HOME 隔离、PID/进程组级回收验证、单份 raw JSON 证据 + §1.6 第二轮：重启后历史先于新 prompt 可见、每输入一次气泡、同文本两次提交、重选/分页身份稳定、读取不改原生字节）+ 已接受 B2 的派发证据 | renderer + runtime/Host + host-core + OS 进程 | 通过 |
+| D3 | 端到端用户路径 | 本阶段 UI E2E（§1.2 首稿 + §1.5 返修：三种批准权限、真实 Reject/重提、真实 running 与 pending 应用重启、专属 HOME 隔离、PID/进程组级回收验证、单份 raw JSON 证据 + §1.6 第二轮：重启后历史先于新 prompt 可见、每输入一次气泡、同文本两次提交、重选/分页身份稳定、读取不改原生字节 + §1.7 第三轮：同一闭环在直读实现上复跑，同一 13 张截图与 raw JSON，读取路径已无 reader 进程）+ 已接受 B2 的派发证据 | renderer + runtime/Host + host-core + OS 进程 | 通过 |
 
 ## 4. 未做与不声称
 
@@ -373,17 +477,28 @@ typecheck exit=0
 - 第一轮返修（R1–R4）只改 `app/scripts/e2e-omp-plan-ui.mjs` 与文档（含 ADR 目录/索引的机械修复），
   产品代码、gate、host-core、fork、补丁与固定子模块未动。第二轮（R5/R6）改了产品代码：OMP 会话
   的只读历史投影、prompt 身份绑定、实时行台账与共享 `SessionDetail.replacedLiveMessageIds`
-  （ADR 0313）；fork、补丁级（仍 `.5`）、gate 与 host-core 未动。
+  （ADR 0313）；fork、补丁级（仍 `.5`）、gate 与 host-core 未动。第三轮（R7–R10，§1.7）改了产品
+  代码：删除瞬时只读 runtime 与只读模型投影，新增进程内直读器
+  `packages/omp-runtime/src/session/native-session-file.ts`，修 `history.ts` 的叶语义与
+  `session-ipc.ts` 的元数据失败传播；fork、补丁级（仍 `.5`）、gate、host-core 与 UI E2E 脚本未动。
+- 第三轮不声称"根已接受"：R7–R10 的修复证据是本机 Linux x64 上的真实 runtime/单元/UI 复跑；根
+  上一轮使用的是 macOS arm64 原生运行时的故障注入，本轮未在 macOS 实机复跑（直读器为纯 Node 文件
+  解析，但本轮未以 macOS 原生字节复核）。整 M5/T20 与三平台包仍未完成。
+- 第三轮直读器明确接受的 session 版本为 2 与 3；版本 1（无稳定 entry id）与未知未来版本显式拒绝，
+  这是行为边界而非缺陷（旧瞬时路径对 v1 会生成随机 id，与"稳定 entry id"契约冲突）。`blob:sha256:`
+  图片引用不由直读器解析；重启后的旧瞬时路径同样无法解析（blob 存储位于已删除的 run root），
+  行为未回归。
 - 重启后**转录面板**的恢复渲染：第二轮已验收（§1.6）——重启后、发出任何新 prompt 之前，面板显示
   重启前的 user/assistant/tool 历史（行 id 为原生 entry id，overlap 与原会话一致、无重复、无
   丢失，且读取前后原生 transcript 字节不变）。第一轮 §1.5 如实记录的"只显示重启后回合"是当时的
-  可观察状态，现已修复，不以旧记录推断历史丢失。
-- 第二轮未在 macOS/Windows 实机运行；历史读取与身份断言仅 Linux x64 + Xwayland 实跑。
+  可观察状态，现已修复，不以旧记录推断历史丢失；第三轮在同一断言集上复跑，读取实现换为直读且
+  `nativeTranscriptAfterPendingRestart.sha256 == nativeTranscriptAfterReselect.sha256` 保持。
+- 第二轮与第三轮均未在 macOS/Windows 实机运行；历史读取与身份断言仅 Linux x64 + Xwayland 实跑。
 - 专属 HOME 下产品运行时的子 PATH 派生自继承 HOME（`~/.bun/bin` 首位），harness 因此在专属 HOME
   内链接绝对 bun/node；这是测试环境构造要求（如实记录），不修改产品行为，也不读取用户配置。
-- 未调用任何付费/远程模型；全部 E2E 使用本地 FakeProvider。历史读取的"无凭据"由只读投影单元测试
-  （`hasSecret:false` 输出相同、从不读取密钥）与真实 runtime E2E 的 secretless 读取覆盖，未在 UI 中
-  删除已有凭据后再跑。
+- 未调用任何付费/远程模型；全部 E2E 使用本地 FakeProvider。第三轮"无凭据"的证明从"只读 profile
+  不读取密钥"升级为结构性事实：冷读不接触 provider 目录、不启动任何进程，真实 runtime E2E 以
+  不存在的 provider/model 标识完成读取；仍未在 UI 中删除已有凭据后再跑。
 - 历史读取的入口是 `sessionGet`/`sessionOpen`（真实渲染层加载路径）；OMP 会话的侧边栏搜索、
   导出与 compaction 标记仍沿用既有实现，不在本轮范围。
 - B10/C 行的细节证据以已接受阶段的原始报告为准（本文件 §3 只给引用与回归命令）。

@@ -208,9 +208,12 @@ export function registerSessionIpc({
    * engine other than OMP (and Pi, the default for records predating the engine
    * field) keeps the host transcript exactly as before.
    *
-   * A failed engine lookup only skips the projection (the host read still
-   * answers, as it did before this path existed); a failed *history* read
-   * throws, because an unreadable transcript must never look like an empty one.
+   * A failed engine lookup or a failed native-reference read throws — it must
+   * never degrade to "not OMP" or to "no reference": either would silently
+   * show the wrong (host/Pi) transcript or an empty one for a session whose
+   * transcript lives only in its native file. The renderer sees the error and
+   * can retry; a *successful* absence of a reference (the session has never
+   * run a native turn) is the one legitimate empty result.
    */
   async function withOmpHistory(
     session: RuntimeSession,
@@ -218,17 +221,11 @@ export function registerSessionIpc({
     window: { messageBefore?: number; messageAround?: string; messageLimit?: number; contentLimit?: number },
   ): Promise<RuntimeSession> {
     if (!engineRouter?.engineForSession || !ompSessions?.readHistory) return session;
-    const engine = await engineRouter.engineForSession(sessionId).catch((error) => {
-      logger.app("session", "warn", "session engine lookup failed; leaving the host transcript", {
-        sessionId,
-        data: { error: String((error as Error)?.message ?? error) },
-      });
-      return "pi";
-    });
+    const engine = await engineRouter.engineForSession(sessionId);
     if (engine !== "omp") return session;
     // The native reference is a main/host-boundary value: read here and handed
     // to the bridge, never taken from the renderer or surfaced to it.
-    const engineRef = await host!
+    const reference = await host!
       .call<{
         engineRef?: {
           nativeSessionId?: string | null;
@@ -236,9 +233,8 @@ export function registerSessionIpc({
           adapterVersion?: number | null;
           runtimeVersion?: string | null;
         } | null;
-      }>("session.getEngineRef", { id: sessionId })
-      .then((response) => response.engineRef ?? null)
-      .catch(() => null);
+      }>("session.getEngineRef", { id: sessionId });
+    const engineRef = reference.engineRef ?? null;
     const history = await ompSessions.readHistory({
       sessionId,
       projectPath:

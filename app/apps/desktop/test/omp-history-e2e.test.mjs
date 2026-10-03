@@ -8,23 +8,29 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 
 /**
- * M5/T20-R2 acceptance: the read-only native history path over the *real*
- * pinned runtime, with a local fake provider.
+ * M5/T20-D repair3 acceptance: the read-only native history path over the
+ * *real* pinned runtime, with a local fake provider. The read path itself was
+ * reworked: a session without a live runtime is now read from its own file by
+ * the in-process direct reader — no runtime is started, so there is no reader
+ * process, run directory or cleanup to own.
  *
- * Proves the four properties an OMP session's history read must have:
+ * Proves the properties an OMP session's history read must have:
  *
  *   1. a transcript written by one runtime process is readable by a *cold*
- *      reader — a fresh process that never prompted — so an application restart
+ *      reader — a fresh bridge that never prompted — so an application restart
  *      shows history before the user sends anything;
- *   2. the read requires no provider credential and issues no provider request
- *      (the reader boots from the session's model *identity* with the secret
- *      deliberately omitted);
- *   3. the read does not write: the transcript bytes and the session directory
- *      are identical afterwards, including after the reader is reclaimed (the
- *      reader leaves the session before disposal, so its own `session_exit`
- *      diagnostic cannot land in the transcript);
- *   4. a reference this build cannot read fails closed instead of rendering a
- *      different session or an empty page.
+ *   2. the cold read is equivalent to the live runtime's own `get_entries`
+ *      projection (same row ids, same order, same count);
+ *   3. the read requires no provider credential and issues no provider request;
+ *   4. the read does not write: the transcript bytes and the session directory
+ *      are identical afterwards — on success and after every failure class;
+ *   5. no runtime is created for a read: the supervisor factory is never
+ *      called, no run directory appears, and bridge disposal holds nothing;
+ *   6. a reference this build cannot read (wrong identity, missing file,
+ *      unsupported version, corrupt entries) fails closed instead of rendering
+ *      a different session or an empty page;
+ *   7. a concurrent native writer is observed at a line boundary: a trailing
+ *      fragment is ignored until its newline commits it.
  */
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
@@ -35,7 +41,6 @@ const { OmpRuntimeSupervisor, ensureSessionStateDir, findPinnedLauncher, findGat
   "../../../packages/omp-runtime/src/index.ts"
 );
 const { createOmpSessionBridge } = await import("../electron/main/runtime/omp-session.ts");
-const { projectReadOnlyModelsYaml } = await import("../electron/main/runtime/omp-model-projection.ts");
 
 const LAUNCHER = findPinnedLauncher(here);
 const GATE = findGateExtension(here);
@@ -69,8 +74,23 @@ function transcriptFacts(path, sessionDir) {
   };
 }
 
+/** The identity a read needs; provider/model are carried but never consulted. */
+function readRequest(nativeSessionId, nativeSessionPath, extra = {}) {
+  return {
+    sessionId: SESSION,
+    projectPath: null,
+    providerId: "provider-that-does-not-exist",
+    modelId: "model-that-does-not-exist",
+    nativeSessionId,
+    nativeSessionPath,
+    adapterVersion: 1,
+    runtimeVersion: "18.3.0",
+    ...extra,
+  };
+}
+
 test(
-  "M5/R2 end-to-end: a cold read-only runtime shows the native transcript without writing it",
+  "M5/repair3 end-to-end: a cold in-process read shows the native transcript without writing it or starting a runtime",
   { timeout: 300_000 },
   async () => {
     assert.ok(LAUNCHER, "the pinned runtime launcher must be present");
@@ -78,6 +98,7 @@ test(
 
     const dataRoot = makeScratch("omp-history-data-");
     const sessionDir = ensureSessionStateDir(dataRoot);
+    const runtimeStateDir = join(dataRoot, "omp-runtime");
     const project = makeScratch("omp-history-project-");
     const markerPath = join(project, "marker.txt");
     writeFileSync(markerPath, "before\n");
@@ -109,8 +130,12 @@ test(
 
     const bound = new Map();
     const envelopes = [];
+    const supervisorFactories = [];
     const writer = createOmpSessionBridge({
-      createSupervisor: () => writerSupervisor(),
+      createSupervisor: () => {
+        supervisorFactories.push("writer");
+        return writerSupervisor();
+      },
       launcher: LAUNCHER,
       isPackaged: false,
       appPath: here,
@@ -142,50 +167,52 @@ test(
       const requestsAfterTurn = provider.requests.length;
       assert.ok(requestsAfterTurn >= 2, `the turn must have reached the provider (${requestsAfterTurn})`);
 
-      // --- 2. stop the writer; the transcript survives ------------------------
+      // --- 2. the live runtime's own projection (the equivalence authority) ---
+      const live = await writer.readHistory(readRequest(nativeSessionId, nativeSessionPath, { projectPath: project }));
+      assert.ok(live.messages.some((message) => message.role === "user"), "the live read must show the user row");
+      assert.ok(live.messages.some((message) => message.role === "assistant"), "the live read must show the assistant row");
+      assert.ok(
+        live.messages.some((message) => message.role === "tool" && message.toolCallId === "history-call-1"),
+        "the live read must show the tool row",
+      );
+      assert.equal(provider.requests.length, requestsAfterTurn, "a live history read must not contact the provider");
+
+      // --- 3. stop the writer; the transcript survives ------------------------
       const disposed = await writer.disposeSession(SESSION, "cold-read test");
       assert.equal(disposed.ok, true, `the writer must be reclaimed: ${JSON.stringify(disposed.failures)}`);
       assert.ok(existsSync(nativeSessionPath), "the transcript must survive the writer");
       factsBefore = transcriptFacts(nativeSessionPath, sessionDir);
+      const runRootsBefore = existsSync(runtimeStateDir) ? readdirSync(runtimeStateDir).sort() : [];
 
-      // --- 3. a cold reader: read profile, no prompt, no secret ---------------
-      const providerProjection = (hasSecret) => ({
-        id: "m1fake",
-        enabled: true,
-        baseUrl: provider.baseUrl,
-        apiStyle: "chat_completions",
-        authKind: "api_key_and_base_url",
-        hasSecret,
-        models: [{ id: "local-model", contextWindow: 200_000 }],
-      });
-      const readSupervisor = (hasSecret = true) =>
-        new OmpRuntimeSupervisor({
-          dataRoot,
-          launcherPath: LAUNCHER,
-          expectedRuntimeVersion: "18.3.0",
-          // The read profile owns no persistent session directory: the reader's
-          // own startup session never materializes in the product's.
-          args: ["--trusted-extension", GATE],
-          desktopStateRequired: false,
-          extraEnv: { OMP_DESKTOP_GATE_TOOLS: "read", OMP_DESKTOP_GATE_MODE: "deny" },
-          prepareRun: (paths) => {
-            // Exactly what the production wiring writes: the session's model
-            // identity without its credential (auth: none), or a loopback
-            // placeholder when the provider row cannot be projected. The secret
-            // is never read on this path, and no `--model` selector is passed.
-            writeFileSync(
-              join(paths.agentDir, "models.yml"),
-              projectReadOnlyModelsYaml(providerProjection(hasSecret), "local-model"),
-              "utf8",
-            );
-          },
-          readyTimeoutMs: 60_000,
-        });
+      // --- 4. a cold read: same bridge, no entry, no runtime ------------------
+      const cold = await writer.readHistory(readRequest(nativeSessionId, nativeSessionPath, { projectPath: project }));
+      assert.deepEqual(
+        cold.messages.map((message) => [message.id, message.role, message.content]),
+        live.messages.map((message) => [message.id, message.role, message.content]),
+        "the direct read must be equivalent to the live runtime's projection",
+      );
+      assert.equal(cold.messageCount, live.messageCount);
+      assert.equal(cold.replacedLiveMessageIds.length, 0, "a cold read has no live rows to replace");
+      assert.equal(
+        supervisorFactories.length,
+        1,
+        "no runtime may be created for a history read (only the writer's supervisor exists)",
+      );
+      assert.deepEqual(
+        existsSync(runtimeStateDir) ? readdirSync(runtimeStateDir).sort() : [],
+        runRootsBefore,
+        "a history read must not create a run directory",
+      );
+      assert.equal(provider.requests.length, requestsAfterTurn, "a cold history read must not contact the provider");
 
-      // What the production wiring's read profile writes.
-      const reader = createOmpSessionBridge({
-        createSupervisor: readSupervisor,
-        createReadSupervisor: readSupervisor,
+      // A fresh bridge that never prompted, with a supervisor factory that
+      // must never run at all: the cold read has no runtime construction path.
+      let coldFactoryCalls = 0;
+      const coldOnly = createOmpSessionBridge({
+        createSupervisor: () => {
+          coldFactoryCalls += 1;
+          throw new Error("a history read must not construct a runtime");
+        },
         launcher: LAUNCHER,
         isPackaged: false,
         appPath: here,
@@ -194,160 +221,156 @@ test(
         emitAgentEvent: () => undefined,
         logger: { app: () => undefined },
       });
-
-      const requestsBeforeRead = provider.requests.length;
-      const read = await reader.readHistory({
-        sessionId: SESSION,
-        projectPath: project,
-        providerId: "m1fake",
-        modelId: "local-model",
-        nativeSessionId,
-        nativeSessionPath,
-        adapterVersion: 1,
-        runtimeVersion: "18.3.0",
-      });
-
-      // Rows: the user's input, the assistant's reply, and the tool call keyed
-      // by its own toolCallId (the identity the live renderer uses).
-      const user = read.messages.find((message) => message.role === "user");
-      const assistant = read.messages.find((message) => message.role === "assistant");
-      const tool = read.messages.find((message) => message.role === "tool");
-      assert.ok(user, `the transcript must contain the user row (${JSON.stringify(read.messages.map((m) => m.role))})`);
-      assert.match(user.id, /^omp:history-session:entry:/);
-      assert.match(user.content, /HISTORY-USER-ONE/);
-      assert.ok(assistant, "the transcript must contain the assistant row");
-      assert.ok(
-        read.messages.some((message) => message.role === "assistant" && /marker looks fine/.test(message.content)),
-        `the transcript must contain the final assistant reply (${JSON.stringify(read.messages.map((m) => [m.role, m.content.slice(0, 40)]))})`,
+      const coldOnlyRead = await coldOnly.readHistory(readRequest(nativeSessionId, nativeSessionPath, { projectPath: project }));
+      assert.deepEqual(
+        coldOnlyRead.messages.map((message) => message.id),
+        live.messages.map((message) => message.id),
+        "a session with no runtime history must be readable from the file alone",
       );
-      assert.ok(tool, "the transcript must contain the tool row");
-      assert.equal(tool.id, "history-call-1");
-      assert.equal(tool.toolCallId, "history-call-1");
-      assert.equal(tool.toolStatus, "success");
-      assert.equal(read.messageCount, read.messages.length);
-      assert.deepEqual(read.replacedLiveMessageIds, [], "a cold read has no live rows to replace");
+      assert.equal(coldFactoryCalls, 0);
+      // No credential was needed: the request above names a provider that does
+      // not exist and no secret was ever read; the read still succeeded.
+      const coldDisposal = await coldOnly.dispose("test cleanup");
+      assert.equal(coldDisposal.ok, true, JSON.stringify(coldDisposal.failures));
 
-      // The read issued no provider request, and no turn ran.
-      assert.equal(provider.requests.length, requestsBeforeRead, "a history read must not contact the provider");
-      assert.equal(readFileSync(markerPath, "utf8"), "before\n", "a history read must not execute tools");
-
-      // A second read of the same transcript returns the same ids.
-      const again = await reader.readHistory({
-        sessionId: SESSION,
-        projectPath: project,
-        providerId: "m1fake",
-        modelId: "local-model",
-        nativeSessionId,
-        nativeSessionPath,
-        adapterVersion: 1,
-        runtimeVersion: "18.3.0",
-      });
+      // A second cold read returns the same ids (stable identity across reads).
+      const again = await writer.readHistory(readRequest(nativeSessionId, nativeSessionPath, { projectPath: project }));
       assert.deepEqual(
         again.messages.map((message) => message.id),
-        read.messages.map((message) => message.id),
-        "repeated reads must return stable ids",
+        cold.messages.map((message) => message.id),
+        "repeated cold reads must return stable ids",
       );
 
       // Bounded window: the newest page reports how much history precedes it.
-      const tail = await reader.readHistory({
-        sessionId: SESSION,
-        projectPath: project,
-        providerId: "m1fake",
-        modelId: "local-model",
-        nativeSessionId,
-        nativeSessionPath,
-        adapterVersion: 1,
-        runtimeVersion: "18.3.0",
-        messageLimit: 2,
-      });
+      const tail = await writer.readHistory(
+        readRequest(nativeSessionId, nativeSessionPath, { projectPath: project, messageLimit: 2 }),
+      );
       assert.equal(tail.messages.length, 2);
       assert.equal(tail.hasMoreBefore, true);
-      assert.equal(tail.messageStart, read.messageCount - 2);
-      assert.deepEqual(
-        tail.messages.map((message) => message.id),
-        read.messages.slice(-2).map((message) => message.id),
+      assert.equal(tail.messageStart, cold.messageCount - 2);
+
+      // --- 5. byte purity after the successful reads --------------------------
+      const factsAfterReads = transcriptFacts(nativeSessionPath, sessionDir);
+      assert.equal(factsAfterReads.sha256, factsBefore.sha256, "the transcript bytes changed during a history read");
+      assert.deepEqual(factsAfterReads.directory, factsBefore.directory, "the session directory gained or lost a file");
+
+      // --- 6. concurrent native writer: only committed lines are records ------
+      const partialPath = join(sessionDir, "partial.jsonl");
+      const committed = readFileSync(nativeSessionPath, "utf8").split("\n").filter((line) => line.length > 0);
+      writeFileSync(partialPath, `${committed.join("\n")}\n`, "utf8");
+      const lastEntryId = JSON.parse(committed.at(-1)).id;
+      const appendedEntry = {
+        id: "m-after",
+        parentId: lastEntryId,
+        type: "message",
+        timestamp: "2026-01-01T00:00:09.000Z",
+        message: { role: "user", content: [{ type: "text", text: "after the cold read" }], timestamp: 9 },
+      };
+      const serialized = JSON.stringify(appendedEntry);
+      // The writer is mid-record: only the committed lines may be read.
+      writeFileSync(partialPath, serialized.slice(0, 24), { flag: "a" });
+      const partialRead = await writer.readHistory(readRequest(nativeSessionId, partialPath, { projectPath: project }));
+      assert.equal(
+        partialRead.messageCount,
+        cold.messageCount,
+        "an unterminated trailing write must not be read as a record",
       );
+      // The newline commits the record: now it is visible, with its stable id.
+      writeFileSync(partialPath, `${serialized.slice(24)}\n`, { flag: "a" });
+      const completedRead = await writer.readHistory(readRequest(nativeSessionId, partialPath, { projectPath: project }));
+      assert.equal(completedRead.messageCount, cold.messageCount + 1);
+      assert.equal(completedRead.messages.at(-1).content, "after the cold read");
 
-      // A session whose provider no longer has a usable credential still
-      // reads: the read profile projects the identity without the secret, and
-      // the reader never contacts the provider.
-      const secretless = createOmpSessionBridge({
-        createSupervisor: () => readSupervisor(false),
-        createReadSupervisor: () => readSupervisor(false),
-        launcher: LAUNCHER,
-        isPackaged: false,
-        appPath: here,
-        sessionDir,
-        gateResolver: () => GATE,
-        emitAgentEvent: () => undefined,
-        logger: { app: () => undefined },
-      });
-      const secretlessRead = await secretless.readHistory({
-        sessionId: SESSION,
-        projectPath: project,
-        providerId: "m1fake",
-        modelId: "local-model",
-        nativeSessionId,
-        nativeSessionPath,
-        adapterVersion: 1,
-        runtimeVersion: "18.3.0",
-      });
-      assert.deepEqual(
-        secretlessRead.messages.map((message) => message.id),
-        read.messages.map((message) => message.id),
-        "history must be readable without a usable provider credential",
-      );
-      assert.equal(provider.requests.length, requestsBeforeRead, "a credential-free read must not contact the provider");
-      const secretlessDisposal = await secretless.dispose("test cleanup");
-      assert.equal(secretlessDisposal.ok, true, JSON.stringify(secretlessDisposal.failures));
-
-      // --- 4. byte purity, including after the reader was reclaimed ----------
-      const factsAfter = transcriptFacts(nativeSessionPath, sessionDir);
-      assert.equal(factsAfter.sha256, factsBefore.sha256, "the transcript bytes changed during a history read");
-      assert.deepEqual(factsAfter.directory, factsBefore.directory, "the session directory gained or lost a file");
-      assert.equal(provider.requests.length, requestsBeforeRead);
-
-      // --- 5. an unreadable reference fails closed ---------------------------
+      // --- 7. failure classes: refused, never touching the truth --------------
       await assert.rejects(
         () =>
-          reader.readHistory({
-            sessionId: SESSION,
-            projectPath: project,
-            providerId: "m1fake",
-            modelId: "local-model",
-            nativeSessionId: "not-this-session",
-            nativeSessionPath,
-            adapterVersion: 1,
-            runtimeVersion: "18.3.0",
+          writer.readHistory({
+            ...readRequest("not-this-session", nativeSessionPath, { projectPath: project }),
           }),
         (error) => error.errorCode === "OMP_RESTORE_FAILED",
         "a transcript whose header names another session must be refused",
       );
       await assert.rejects(
         () =>
-          reader.readHistory({
-            sessionId: SESSION,
-            projectPath: project,
-            nativeSessionId,
-            nativeSessionPath: join(sessionDir, "missing.jsonl"),
-            adapterVersion: 1,
-            runtimeVersion: "18.3.0",
+          writer.readHistory({
+            ...readRequest(nativeSessionId, join(sessionDir, "missing.jsonl"), { projectPath: project }),
           }),
         (error) => error.errorCode === "OMP_RESTORE_FAILED",
         "a missing transcript must be refused, never rendered as empty",
       );
+      await assert.rejects(
+        () => writer.readHistory(readRequest(nativeSessionId, sessionDir, { projectPath: project })),
+        (error) => error.errorCode === "OMP_RESTORE_FAILED",
+        "a directory must never be read as a transcript",
+      );
+      // A version this build cannot read without rewriting it: refused.
+      const v1Path = join(sessionDir, "v1.jsonl");
+      writeFileSync(
+        v1Path,
+        `${JSON.stringify({ type: "session", id: nativeSessionId, cwd: project, timestamp: "2026-01-01T00:00:00.000Z" })}\n${JSON.stringify({ type: "message", message: { role: "user", content: [{ type: "text", text: "legacy" }] } })}\n`,
+        "utf8",
+      );
+      await assert.rejects(
+        () => writer.readHistory(readRequest(nativeSessionId, v1Path, { projectPath: project })),
+        (error) => error.errorCode === "OMP_HISTORY_INVALID" && /version 1/.test(error.message),
+        "a version 1 journal must be refused explicitly",
+      );
+      assert.equal(
+        supervisorFactories.length,
+        1,
+        "no failure may create a runtime",
+      );
+      assert.equal(provider.requests.length, requestsAfterTurn, "no failure may contact the provider");
+
       const factsAfterRefusals = transcriptFacts(nativeSessionPath, sessionDir);
       assert.equal(factsAfterRefusals.sha256, factsBefore.sha256, "a refused read must not touch the transcript");
-      assert.equal(provider.requests.length, requestsBeforeRead);
+      assert.deepEqual(
+        factsAfterRefusals.directory.filter((name) => !factsBefore.directory.includes(name)),
+        ["partial.jsonl", "v1.jsonl"],
+        "no read may create a file in the session directory",
+      );
 
-      const readerDisposal = await reader.dispose("test cleanup");
-      assert.equal(readerDisposal.ok, true, `the reader must hold nothing: ${JSON.stringify(readerDisposal.failures)}`);
+      const readerDisposal = await writer.dispose("test cleanup");
+      assert.equal(readerDisposal.ok, true, `the bridge must hold nothing: ${JSON.stringify(readerDisposal.failures)}`);
 
-      // One last purity check with every reader/writer process gone.
+      // One last purity check with every runtime process gone: none of the
+      // reads above left anything behind.
       const finalFacts = transcriptFacts(nativeSessionPath, sessionDir);
-      assert.equal(finalFacts.sha256, factsBefore.sha256, "the transcript changed after the readers were reclaimed");
+      assert.equal(finalFacts.sha256, factsBefore.sha256, "the transcript changed after the reads");
       assert.equal(finalFacts.sizeBytes, factsBefore.sizeBytes);
-      assert.deepEqual(finalFacts.directory, factsBefore.directory);
+      assert.deepEqual(
+        finalFacts.directory.filter((name) => !factsBefore.directory.includes(name)),
+        ["partial.jsonl", "v1.jsonl"],
+        "no read may leave a file behind",
+      );
+      assert.deepEqual(
+        existsSync(runtimeStateDir) ? readdirSync(runtimeStateDir).sort() : [],
+        [],
+        "every run directory must be reclaimed",
+      );
+
+      // One structured line for the evidence log: the exact facts the
+      // assertions above compare, so a reviewer can re-derive every claim.
+      console.log(
+        `OMP-HISTORY-E2E ${JSON.stringify({
+          session: SESSION,
+          nativeSessionId,
+          sha256: {
+            beforeReads: factsBefore.sha256,
+            afterReads: factsAfterReads.sha256,
+            afterRefusals: factsAfterRefusals.sha256,
+            final: finalFacts.sha256,
+          },
+          sizeBytes: { before: factsBefore.sizeBytes, final: finalFacts.sizeBytes },
+          directoryDelta: finalFacts.directory.filter((name) => !factsBefore.directory.includes(name)),
+          providerRequests: provider.requests.length,
+          supervisorFactories: supervisorFactories.length,
+          coldOnlySupervisorFactories: coldFactoryCalls,
+          liveMessageIds: live.messages.map((message) => message.id),
+          coldMessageIds: cold.messages.map((message) => message.id),
+          runRoots: existsSync(runtimeStateDir) ? readdirSync(runtimeStateDir).sort() : [],
+        })}`,
+      );
     } finally {
       try {
         await writer.dispose("test cleanup");

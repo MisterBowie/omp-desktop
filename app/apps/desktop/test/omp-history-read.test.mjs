@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { register } from "node:module";
 import { tmpdir } from "node:os";
 import test, { after } from "node:test";
@@ -7,17 +8,18 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 /**
- * The bridge's read-only history path (M5/T20-R2).
+ * The bridge's read-only history path (M5/T20-R2, reworked by T20-D repair3).
  *
  * `sessionGet` for an OMP session must show the transcript the runtime wrote,
- * without a turn: no prompt, no provider call, no tool, no transcript write,
- * and no provider credential required to start the reader. These tests pin the
- * parts a fake runtime can prove deterministically — which runtime profile is
- * used, the command order (including stepping off the transcript before the
- * process is reclaimed, so the runtime's own `session_exit` diagnostic cannot
- * land in the read transcript), the identity/version refusals, the supersede
- * ledger, and that every failure surfaces as an error rather than an empty
- * page. The real pinned runtime is exercised in `omp-history-e2e.test.mjs`.
+ * without a turn: no prompt, no provider call, no tool, no transcript write.
+ * A session with a live runtime is asked through its own process; a session
+ * without one is read from its file *in-process* by the direct reader — no
+ * runtime is started for a read, so there is no reader process to own, leak,
+ * detach or reclaim. These tests pin the parts a fake runtime can prove
+ * deterministically: which path is taken, the identity/format refusals, that
+ * every failure surfaces as an error rather than an empty page, and that a
+ * failed read leaves the transcript bytes untouched. The real pinned runtime
+ * is exercised in `omp-history-e2e.test.mjs`.
  */
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
@@ -41,6 +43,11 @@ function makeProject() {
   const path = realpathSync(mkdtempSync(join(tmpdir(), "omp-history-project-")));
   scratch.push(path);
   return path;
+}
+
+/** sha256 of a file, for proving a read (or a failure) did not rewrite it. */
+function fileSha(path) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
 class FakeRuntime {
@@ -134,23 +141,25 @@ const TRANSCRIPT_ENTRIES = [
   { id: "m3", parentId: "m2", type: "message", timestamp: "2026-01-01T00:00:03.000Z", message: { role: "toolResult", toolName: "read", toolCallId: "call-1", content: [{ type: "text", text: "body" }], timestamp: 3 } },
 ];
 
+/** The direct reader fixture: a v3 journal with the title slot the runtime writes. */
+const TITLE_SLOT = { type: "title", v: 1, title: "history", updatedAt: "2026-01-01T00:00:00.000Z", pad: " ".repeat(8) };
+
+function writeNativeSession(path, { id, entries = TRANSCRIPT_ENTRIES, version = 3 }) {
+  const lines = [JSON.stringify(TITLE_SLOT), JSON.stringify({ type: "session", id, version, timestamp: "2026-01-01T00:00:00.000Z", cwd: "/p" })];
+  for (const entry of entries) lines.push(JSON.stringify(entry));
+  writeFileSync(path, `${lines.join("\n")}\n`, "utf8");
+}
+
 function readHarness() {
   const sessionDir = realpathSync(mkdtempSync(join(tmpdir(), "omp-history-sessions-")));
   const project = makeProject();
   scratch.push(sessionDir);
   const nativeSessionId = "native-id";
   const nativeSessionPath = join(sessionDir, "native-session.jsonl");
-  writeFileSync(
-    nativeSessionPath,
-    `${JSON.stringify({ type: "session", id: nativeSessionId, cwd: project, timestamp: "2026-01-01T00:00:00.000Z" })}\n`,
-  );
+  writeNativeSession(nativeSessionPath, { id: nativeSessionId });
   const envelopes = [];
-  const readSupervisors = [];
-  const readRuntimes = [];
-  const promptSupervisors = [];
-  const promptRuntimes = [];
-  /** Supervisors the next `createReadSupervisor` call returns, in order. */
-  const scriptedReaders = [];
+  const supervisors = [];
+  const runtimes = [];
   const createRuntime = () => {
     const runtime = new FakeRuntime();
     runtime.state = { sessionId: nativeSessionId, sessionFile: nativeSessionPath, sessionName: "session", isStreaming: false };
@@ -160,34 +169,13 @@ function readHarness() {
     };
     return runtime;
   };
-  const firstRuntime = createRuntime();
-  const firstSupervisor = fakeSupervisor(firstRuntime);
-  promptRuntimes.push(firstRuntime);
-  promptSupervisors.push(firstSupervisor);
-  let promptCreated = 0;
-  const promptFactoryCalls = [];
   const bridge = createOmpSessionBridge({
     createSupervisor: () => {
-      promptFactoryCalls.push(promptCreated);
-      if (promptCreated === 0) {
-        promptCreated += 1;
-        return firstSupervisor;
-      }
       const runtime = createRuntime();
       const supervisor = fakeSupervisor(runtime);
-      promptRuntimes.push(runtime);
-      promptSupervisors.push(supervisor);
-      promptCreated += 1;
+      runtimes.push(runtime);
+      supervisors.push(supervisor);
       return supervisor;
-    },
-    createReadSupervisor: () => {
-      const supervisor = scriptedReaders.shift();
-      if (supervisor) return supervisor;
-      const runtime = createRuntime();
-      const created = fakeSupervisor(runtime);
-      readRuntimes.push(runtime);
-      readSupervisors.push(created);
-      return created;
     },
     launcher: LAUNCHER,
     isPackaged: false,
@@ -204,13 +192,8 @@ function readHarness() {
     nativeSessionPath,
     project,
     envelopes,
-    readSupervisors,
-    readRuntimes,
-    promptSupervisors,
-    promptRuntimes,
-    scriptedReaders,
-    promptFactoryCalls,
-    createRuntime,
+    supervisors,
+    runtimes,
     identity: {
       sessionId: OMP_SESSION,
       projectPath: project,
@@ -225,7 +208,7 @@ function readHarness() {
 }
 
 test("a session with no native reference reads as empty and starts nothing", async () => {
-  const { bridge, project, readSupervisors, promptFactoryCalls } = readHarness();
+  const { bridge, project, supervisors } = readHarness();
   const result = await bridge.readHistory({
     sessionId: OMP_SESSION,
     projectPath: project,
@@ -235,25 +218,14 @@ test("a session with no native reference reads as empty and starts nothing", asy
   assert.deepEqual(result.messages, []);
   assert.equal(result.messageCount, 0);
   assert.deepEqual(result.replacedLiveMessageIds, []);
-  assert.equal(readSupervisors.length, 0);
-  assert.deepEqual(promptFactoryCalls, []);
+  assert.equal(supervisors.length, 0);
 });
 
-test("a cold read uses the read-only profile and leaves the transcript before reclaiming", async () => {
-  const { bridge, identity, readSupervisors, readRuntimes, promptFactoryCalls } = readHarness();
+test("a cold read reads the file in-process: no runtime is created, no supervisor is asked", async () => {
+  const { bridge, identity, supervisors } = readHarness();
+  const before = fileSha(identity.nativeSessionPath);
   const result = await bridge.readHistory(identity);
-  assert.deepEqual(promptFactoryCalls, [], "a history read must not use the prompt profile");
-  assert.equal(readSupervisors.length, 1);
-  const supervisor = readSupervisors[0];
-  const runtime = readRuntimes[0];
-  assert.deepEqual(runtime.commands, ["switch_session", "get_state", "get_entries", "new_session"]);
-  assert.ok(
-    runtime.commands.includes("new_session"),
-    "the reader must leave the session before it is reclaimed (no session_exit in the transcript)",
-  );
-  assert.deepEqual(supervisor.calls.slice(0, 2), [`setWorkingDirectory:${identity.projectPath}`, "start"]);
-  assert.equal(supervisor.stopped.length, 1);
-  assert.equal(supervisor.reclaimed, 0);
+  assert.equal(supervisors.length, 0, "a history read must not start a runtime");
   assert.deepEqual(
     result.messages.map((message) => [message.id, message.role, message.content]),
     [
@@ -265,10 +237,11 @@ test("a cold read uses the read-only profile and leaves the transcript before re
   assert.equal(result.messageCount, 3);
   assert.equal(result.messageStart, 0);
   assert.equal(result.hasMoreBefore, false);
+  assert.equal(fileSha(identity.nativeSessionPath), before, "a successful read must not modify the file");
 });
 
 test("a missing, foreign or unreadable reference fails closed without starting a runtime", async () => {
-  const { bridge, identity, sessionDir, readSupervisors } = readHarness();
+  const { bridge, identity, sessionDir, supervisors } = readHarness();
 
   await assert.rejects(
     () => bridge.readHistory({ ...identity, nativeSessionPath: "/tmp/somewhere-else.jsonl" }),
@@ -291,67 +264,84 @@ test("a missing, foreign or unreadable reference fails closed without starting a
     () => bridge.readHistory({ ...identity, adapterVersion: 99 }),
     (error) => error.errorCode === "OMP_RESTORE_FAILED",
   );
-  assert.equal(readSupervisors.length, 0);
-});
-
-test("a reader that opens another session is refused, and its process is still reclaimed", async () => {
-  const harness = readHarness();
-  const runtime = harness.createRuntime();
-  runtime.state = { sessionId: "different-session", sessionFile: harness.nativeSessionPath, sessionName: "other" };
-  runtime.entriesResponse = { success: true, data: { entries: TRANSCRIPT_ENTRIES, leafId: "m3" } };
-  const supervisor = fakeSupervisor(runtime);
-  harness.scriptedReaders.push(supervisor);
-
   await assert.rejects(
-    () => harness.bridge.readHistory(harness.identity),
+    () => bridge.readHistory({ ...identity, nativeSessionPath: join(sessionDir, "missing.jsonl") }),
     (error) => error.errorCode === "OMP_RESTORE_FAILED",
   );
-  assert.equal(supervisor.stopped.length, 1);
-  // A clean stop needs no sweep: only a reaped stop that left a directory debt
-  // reclaims again (and that path is covered by the leak test below).
-  assert.equal(supervisor.reclaimed, 0);
+  assert.equal(supervisors.length, 0);
 });
 
-test("a refused get_entries throws instead of returning an empty transcript, and reclaims the reader", async () => {
+test("a corrupt or unsupported transcript fails closed and is left byte-identical", async () => {
   const harness = readHarness();
-  const runtime = harness.createRuntime();
-  runtime.entriesResponse = { success: false, error: "unknown_since" };
-  const supervisor = fakeSupervisor(runtime);
-  harness.scriptedReaders.push(supervisor);
+  const { bridge, identity, nativeSessionPath } = harness;
 
+  // Version 1 has no stable entry ids: explicitly refused, never guessed.
+  writeNativeSession(nativeSessionPath, { id: identity.nativeSessionId, version: 1 });
+  const v1 = fileSha(nativeSessionPath);
   await assert.rejects(
-    () => harness.bridge.readHistory(harness.identity),
-    (error) => error.errorCode === "OMP_HISTORY_READ_FAILED",
+    () => bridge.readHistory(identity),
+    (error) => error.errorCode === "OMP_HISTORY_INVALID" && /version 1/.test(error.message),
   );
-  assert.equal(supervisor.stopped.length, 1);
-  assert.equal(supervisor.reclaimed, 0);
+  assert.equal(fileSha(nativeSessionPath), v1, "a refused read must not modify the file");
+
+  // A structurally broken entry (a missing id) must not become a partial page.
+  writeNativeSession(nativeSessionPath, {
+    id: identity.nativeSessionId,
+    entries: [{ id: "m1", parentId: null, type: "message", timestamp: "2026-01-01T00:00:01.000Z", message: { role: "user", content: [{ type: "text", text: "hello" }] } }, { parentId: "m1", type: "message" }],
+  });
+  const broken = fileSha(nativeSessionPath);
+  await assert.rejects(
+    () => bridge.readHistory(identity),
+    (error) => error.errorCode === "OMP_HISTORY_INVALID",
+  );
+  assert.equal(fileSha(nativeSessionPath), broken, "a refused read must not modify the file");
+
+  // A file whose header was replaced after the reference was persisted: the
+  // direct reader re-checks identity itself (the path validator ran first).
+  writeNativeSession(nativeSessionPath, { id: "someone-else", version: 3 });
+  await assert.rejects(
+    () => bridge.readHistory(identity),
+    (error) => error.errorCode === "OMP_RESTORE_FAILED",
+  );
+  assert.equal(harness.supervisors.length, 0, "no failure may start a runtime");
 });
 
-test("a reader that cannot be reclaimed reports failure instead of a silent leak", async () => {
+test("a read admitted after shutdown is refused, and shutdown never starts a reader", async () => {
   const harness = readHarness();
-  const runtime = harness.createRuntime();
-  const supervisor = fakeSupervisor(runtime);
-  supervisor.pendingCleanup.push({ pid: 1 });
-  supervisor.stop = async function stop() {
-    this.stopped.push({});
-    return { reaped: true, cleaned: false, escalated: "none", steps: [], abortAcknowledged: true, errors: [] };
-  };
-  supervisor.reclaimAll = async function reclaimAll() {
-    this.reclaimed += 1;
-    return [];
-  };
-  harness.scriptedReaders.push(supervisor);
-
+  const disposal = await harness.bridge.dispose("test shutdown");
+  assert.equal(disposal.ok, true, JSON.stringify(disposal.failures));
   await assert.rejects(
     () => harness.bridge.readHistory(harness.identity),
-    (error) => error.errorCode === "OMP_HISTORY_READ_FAILED" && /reclaimed/.test(error.message),
+    (error) => error.errorCode === "ENGINE_UNAVAILABLE",
   );
-  assert.equal(supervisor.reclaimed, 1);
+  assert.equal(harness.supervisors.length, 0, "no shutdown path may start a runtime for a read");
+});
+
+test("an explicit null leaf renders an empty active branch, not the last stored entry", async () => {
+  const harness = readHarness();
+  await harness.bridge.prompt({
+    sessionId: harness.identity.sessionId,
+    content: "hello",
+    projectPath: harness.identity.projectPath,
+    nativeSessionId: harness.identity.nativeSessionId,
+    nativeSessionPath: harness.identity.nativeSessionPath,
+  });
+  // The live path answers `get_entries` with a null leaf (the runtime's own
+  // `resetLeaf` reports exactly this); the projection must honour it.
+  const promptRuntime = harness.runtimes[0];
+  promptRuntime.entriesResponse = {
+    success: true,
+    data: { entries: TRANSCRIPT_ENTRIES, leafId: null },
+  };
+  const result = await harness.bridge.readHistory(harness.identity);
+  assert.deepEqual(result.messages, []);
+  assert.equal(result.messageCount, 0);
+  assert.equal(harness.supervisors.length, 1, "the read reused the session's own runtime");
 });
 
 test("a live runtime is reused, and a tail read names only the settled live rows it replaced", async () => {
   const harness = readHarness();
-  const { bridge, identity, promptRuntimes, readSupervisors } = harness;
+  const { bridge, identity, runtimes, supervisors } = harness;
   await bridge.prompt({
     sessionId: identity.sessionId,
     content: "hello",
@@ -362,7 +352,8 @@ test("a live runtime is reused, and a tail read names only the settled live rows
     runtimeVersion: "18.3.0",
     userMessageId: "11111111-2222-4333-8444-555555555555",
   });
-  const promptRuntime = promptRuntimes[0];
+  assert.equal(supervisors.length, 1, "the prompt owns the only runtime");
+  const promptRuntime = runtimes[0];
   promptRuntime.push({ type: "message_start", message: { role: "user", content: [{ type: "text", text: "hello" }] } });
   promptRuntime.push({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "hello" }] } });
   promptRuntime.push({ type: "message_start", message: { role: "assistant", content: [{ type: "text", text: "hi" }] } });
@@ -380,7 +371,7 @@ test("a live runtime is reused, and a tail read names only the settled live rows
   ).event.message.id;
 
   const result = await bridge.readHistory({ ...identity, messageLimit: 1 });
-  assert.equal(readSupervisors.length, 0, "a live runtime must be asked, not a second process");
+  assert.equal(supervisors.length, 1, "a live runtime must be asked, not a second process");
   assert.equal(promptRuntime.commands.filter((command) => command === "get_entries").length, 1);
   assert.deepEqual(result.replacedLiveMessageIds, [liveUserRowId, liveAssistantRowId]);
   // The in-flight tool row is not superseded, and the widened window still
@@ -424,7 +415,7 @@ test("an in-flight prompt's optimistic row is never superseded, and a prompt wit
 
   // A second prompt without an optimistic id (the approved-execution entry)
   // records nothing for it; the first run's row is settled by its own terminal.
-  const promptRuntime = harness.promptRuntimes[0];
+  const promptRuntime = harness.runtimes[0];
   promptRuntime.push({ type: "agent_end", messages: [] });
   await bridge.prompt({
     sessionId: identity.sessionId,

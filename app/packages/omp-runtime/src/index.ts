@@ -199,6 +199,14 @@ export {
   type OmpHistoryWindow,
 } from "./session/history.js";
 export {
+  MAX_SESSION_FILE_BYTES,
+  MAX_SESSION_RECORD_BYTES,
+  OMP_HISTORY_READ_FAILED,
+  OMP_RESTORE_FAILED,
+  readNativeSessionEntries,
+  type NativeSessionEntries,
+} from "./session/native-session-file.js";
+export {
   OmpHostToolCalls,
   boundHostToolContent,
   isHostToolCallFrame,

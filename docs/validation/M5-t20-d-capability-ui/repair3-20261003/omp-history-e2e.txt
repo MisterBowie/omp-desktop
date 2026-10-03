@@ -1,0 +1,10 @@
+OMP-HISTORY-E2E {"session":"history-session","nativeSessionId":"01a1009d-cb25-7743-a3e5-8887254ed6df","sha256":{"beforeReads":"a176c4a24560497854ec807639f71d9c265d449b33e2844b6d96be3eeae3e3cf","afterReads":"a176c4a24560497854ec807639f71d9c265d449b33e2844b6d96be3eeae3e3cf","afterRefusals":"a176c4a24560497854ec807639f71d9c265d449b33e2844b6d96be3eeae3e3cf","final":"a176c4a24560497854ec807639f71d9c265d449b33e2844b6d96be3eeae3e3cf"},"sizeBytes":{"before":3371,"final":3371},"directoryDelta":["partial.jsonl","v1.jsonl"],"providerRequests":2,"supervisorFactories":1,"coldOnlySupervisorFactories":0,"liveMessageIds":["omp:history-session:entry:3b31aa12","omp:history-session:entry:7fcbb16e","history-call-1","omp:history-session:entry:7f83dd33"],"coldMessageIds":["omp:history-session:entry:3b31aa12","omp:history-session:entry:7fcbb16e","history-call-1","omp:history-session:entry:7f83dd33"],"runRoots":[]}
+✔ M5/repair3 end-to-end: a cold in-process read shows the native transcript without writing it or starting a runtime (1938.692691ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2366.39393

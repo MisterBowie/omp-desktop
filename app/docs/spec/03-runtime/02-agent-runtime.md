@@ -2375,7 +2375,7 @@ T20-B/C/D were unstarted when this section was written, so M5/T20 was then
 **partially complete** in HANDOFF, the task board, ADR 0307 and this section
 (the 2026-10-03 status notes above record the later progress).
 
-## 18. OMP native history reads and prompt identity (M5/T20-D repair 2, ADR 0313)
+## 18. OMP native history reads and prompt identity (M5/T20-D repair 2; read path reworked in repair 3, ADR 0313)
 
 One writer per session means an OMP session's transcript is the runtime's own
 native session file; the desktop never double-writes it into the host's
@@ -2385,38 +2385,46 @@ history projection** of the runtime's canonical entries.
 
 ### 18.1 The read
 
-`OmpSessionBridge.readHistory` projects `get_entries` (`{ entries, leafId }`) into
-desktop rows: the active branch is walked from `leafId` to the root through
-`parentId`, message entries are projected through the same converter the live
-stream uses, and a row's id is `omp:<session>:entry:<entryId>` — stable across
-reads. A tool row uses its `toolCallId` as the row id when that id is unique on
-the branch (the renderer keys live tool rows that way, so a durable tool row
-replaces its live twin instead of duplicating it) and falls back to the entry id
-otherwise. The window mirrors the native reader's `detail()`: `messageLimit`
-(default 100, hard bound), `messageBefore`, `messageAround` and `contentLimit`,
-with `messageStart`/`messageEnd`/`hasMoreBefore`/`hasMoreAfter`/`messageCount`.
+`OmpSessionBridge.readHistory` projects `{ entries, leafId }` into desktop rows:
+the active branch is walked from `leafId` to the root through `parentId`, message
+entries are projected through the same converter the live stream uses, and a
+row's id is `omp:<session>:entry:<entryId>` — stable across reads. A tool row
+uses its `toolCallId` as the row id when that id is unique on the branch (the
+renderer keys live tool rows that way, so a durable tool row replaces its live
+twin instead of duplicating it) and falls back to the entry id otherwise. The
+window mirrors the native reader's `detail()`: `messageLimit` (default 100, hard
+bound), `messageBefore`, `messageAround` and `contentLimit`, with
+`messageStart`/`messageEnd`/`hasMoreBefore`/`hasMoreAfter`/`messageCount`.
 
-The runtime is chosen without ever putting two processes on one file:
+The entries come from one of two paths, and neither puts a second process on a
+live file:
 
 - a session whose runtime is alive is asked through that runtime (the process
   that owns the transcript), after the same reference validation a prompt does;
-- otherwise a transient supervisor is started from the **read profile**: the
-  session's model *identity* projected without its credential (`auth: none`), or
-  a loopback placeholder when the provider row cannot be projected, with no
-  `--model` selector and no run-scoped state. The reader is switched to the
-  persisted transcript, its reported identity is verified against the persisted
-  reference, the entries are read, the reader steps off the transcript
-  (`new_session`) and is reclaimed.
+- otherwise the file itself is read **in-process** by
+  `readNativeSessionEntries` — no runtime is started for a read at all, so there
+  is no reader process, run directory or ownership to leak. The reader has no
+  writer and no lock; it folds the fixed-width title slot, validates the session
+  header's identity and format version (versions 2 and 3 are readable; version 1
+  predates stable entry ids and unknown versions are refused), applies the
+  loader's v2 `hookMessage` → `custom` rename in memory without writing it
+  back, skips malformed records exactly like the native lenient loader, ignores
+  a trailing record without its newline (only complete lines are committed
+  records, so a concurrent native writer is always observed at a line
+  boundary), reports the last physical entry as the leaf, and enforces explicit
+  file and per-record byte bounds.
 
 The read executes no prompt and no tool, issues no provider request and requires
-no usable provider credential; the `new_session` step exists because a runtime
-that disposes with a session open appends a `session_exit` diagnostic to it, and
-a history read must leave the transcript byte-identical. A missing, foreign,
-half-written or version-incompatible reference, an unreachable runtime, a
-malformed entry list and a failed reclaim all fail closed; an empty page is
-returned only for a session with no native reference yet. A session with no
-native reference is not an error, and an unreadable transcript is never an empty
-page.
+no provider credential of any kind. A missing, foreign, half-written,
+unreadable, oversized or version-incompatible reference, a corrupt entry list
+and an I/O failure all fail closed; an empty page is returned only for a session
+with no native reference yet, or when the runtime reports an explicit
+`leafId: null` (no active branch — the pinned context builder renders exactly
+that as no messages). A missing or malformed leaf is a protocol violation and is
+refused, never repaired to the last stored entry. At the IPC boundary a failed
+engine lookup or native-reference read propagates as an error the renderer can
+retry: a session that cannot be *proven* to be Pi never silently shows the host
+transcript, and an unreadable transcript is never an empty page.
 
 ### 18.2 One identity per submitted prompt
 

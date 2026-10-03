@@ -1,0 +1,16 @@
+✔ a session with no native reference reads as empty and starts nothing (1.167423ms)
+✔ a cold read reads the file in-process: no runtime is created, no supervisor is asked (5.327442ms)
+✔ a missing, foreign or unreadable reference fails closed without starting a runtime (0.752421ms)
+✔ a corrupt or unsupported transcript fails closed and is left byte-identical (1.606834ms)
+✔ a read admitted after shutdown is refused, and shutdown never starts a reader (0.31743ms)
+✔ an explicit null leaf renders an empty active branch, not the last stored entry (2.040111ms)
+✔ a live runtime is reused, and a tail read names only the settled live rows it replaced (1.328623ms)
+✔ an in-flight prompt's optimistic row is never superseded, and a prompt without one records nothing (0.612783ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 424.686455

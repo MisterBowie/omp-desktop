@@ -1,0 +1,23 @@
+✔ maps the supported PI api styles to OMP api values (0.450165ms)
+✔ refuses unsupported and absent api styles (0.062858ms)
+✔ projects exactly one provider and one model, auth: none carries no key (0.694988ms)
+✔ projects an apiKey binding with the credential and never elsewhere (0.118225ms)
+✔ fails closed on an empty or incompatible projection (0.228497ms)
+✔ R4: resolves a valid provider/model binding (0.148275ms)
+✔ R4: refuses a disabled provider (0.05393ms)
+✔ R4: refuses a model not in the provider's configured models (0.059217ms)
+✔ R4: refuses a key-auth provider without a stored secret (0.057892ms)
+✔ R4: refuses OAuth and basic auth instead of downgrading to auth:none (0.099601ms)
+✔ R4: refuses an incompatible thinking level (0.048845ms)
+✔ R4: projects provider headers into the yaml (0.063125ms)
+✔ F5: rejects unknown and empty authKind instead of downgrading to auth:none (0.054933ms)
+✔ F5: a key-auth provider with no key fails closed via needsKey (0.033732ms)
+✔ F5: quotes a provider id containing a colon (0.040876ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 75.413466

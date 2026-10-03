@@ -1,0 +1,39 @@
+(node:2217276) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Temp data /tmp/omp-plan-ui-2217276-CPPwKP/data
+Temp profile /tmp/omp-plan-ui-2217276-CPPwKP/profile
+Temp workspace /tmp/omp-plan-ui-2217276-CPPwKP/workspace
+Temp HOME /tmp/omp-plan-ui-2217276-CPPwKP/home
+Artifacts /tmp/omp-t20-d-ui-repair3-20261003/ui
+Patched runtime /tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/omp
+ARTIFACT /tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-01-plan-mode.png
+ARTIFACT /tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-02-pending.png
+ARTIFACT /tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-03-resubmitted.png
+ARTIFACT /tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-04-permission.png
+ARTIFACT /tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-05-executed.png
+ARTIFACT /tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-06-accept-edits.png
+ARTIFACT /tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-07-auto.png
+ARTIFACT /tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-08-running-before-restart.png
+ARTIFACT /tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-09-running-after-restart.png
+ARTIFACT /tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-10-running-recovered.png
+ARTIFACT /tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-11-pending-before-restart.png
+ARTIFACT /tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-12-after-pending-restart.png
+ARTIFACT /tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-13-history-reselect.png
+PASS E2E-OMP-PLAN-UI - session ca4e50a7-013b-4b6a-a492-3d71ec2ca286; artifacts .pi/plan/e2e-plan-one-20261003-1509.md -> .pi/plan/e2e-plan-two-20261003-1509.md -> .pi/plan/e2e-plan-three-20261003-1509.md -> .pi/plan/e2e-plan-five-20261003-1509.md -> .pi/plan/e2e-plan-six-20261003-1510.md; executions ask=23ff07d4-5993-4e8b-b0cf-e27e1b5b0ac1 accept-edits=cf80169f-9ca2-4b62-bde2-32716d6dfd8d auto=10046f66-501f-45bf-a13a-1a4901333703 held=332dd49a-9706-46bf-8542-4ad396fc63a1 (interrupted after restart); held turn e4e06d5c-aff7-4bc0-a1d6-a11d39ba13ba interrupted; provider requests 16, no replay
+CLEANUP scratchRemoved=true survivingOwnedProcesses=0 errors=0
+EVIDENCE /tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-raw.json
+SCREENSHOTS
+/tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-01-plan-mode.png
+/tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-02-pending.png
+/tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-03-resubmitted.png
+/tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-04-permission.png
+/tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-05-executed.png
+/tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-06-accept-edits.png
+/tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-07-auto.png
+/tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-08-running-before-restart.png
+/tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-09-running-after-restart.png
+/tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-10-running-recovered.png
+/tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-11-pending-before-restart.png
+/tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-12-after-pending-restart.png
+/tmp/omp-t20-d-ui-repair3-20261003/ui/omp-plan-ui-13-history-reselect.png
+SUMMARY 1 passed, 0 failed

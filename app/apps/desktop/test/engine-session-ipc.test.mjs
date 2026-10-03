@@ -230,13 +230,14 @@ const ompSessionRow = {
   thinkingLevel: "medium",
 };
 
-function ompHarness({ readHistory, engine = "omp" }) {
+function ompHarness({ readHistory, engine = "omp", engineLookup = "ok", readEngineRef = null }) {
   const calls = [];
   const reads = [];
   const router = createEngineRouter({
     status: (id) => ({ engine: id, phase: "idle", runtimeVersion: null, protocolVersion: null, reason: null, capabilities: {} }),
     sessionEngine: async (sessionId) => {
       calls.push(sessionId);
+      if (engineLookup === "throw") throw new Error("host unavailable");
       return engine;
     },
   });
@@ -244,6 +245,7 @@ function ompHarness({ readHistory, engine = "omp" }) {
     async (method, input) => {
       if (method === "session.get") return { session: { ...ompSessionRow } };
       if (method === "session.getEngineRef") {
+        if (readEngineRef) return readEngineRef(input);
         return {
           engineRef: {
             nativeSessionId: "native-1",
@@ -346,40 +348,63 @@ test("a Pi session keeps the host transcript and never reads the native runtime"
   assert.deepEqual(result.session.messages, []);
 });
 
-test("an unreadable engine record leaves the host transcript in place", async () => {
-  const handlers = new Map();
-  const router = createEngineRouter({
-    status: (id) => ({ engine: id, phase: "idle", runtimeVersion: null, protocolVersion: null, reason: null, capabilities: {} }),
-    sessionEngine: async () => {
-      throw new Error("host unavailable");
+test("a failed engine lookup propagates instead of falling back to the host transcript", async () => {
+  const { handlers, reads } = ompHarness({
+    engineLookup: "throw",
+    readHistory: async () => {
+      throw new Error("must not be called");
     },
   });
-  let reads = 0;
-  registerSessionIpc({
-    registrar: { handle: (channel, handler) => handlers.set(channel, handler) },
-    getHost: () => ({ call: async (method) => (method === "session.get" ? { session: { ...ompSessionRow } } : {}) }),
-    getSidecar: () => ({ call: async () => ({}) }),
-    engineRouter: router,
-    ompSessions: {
-      readHistory: async () => {
-        reads += 1;
-        throw new Error("must not be called");
-      },
+  // A lookup failure means the engine is unknown, not that the session is Pi:
+  // returning the (empty) host transcript would hide an OMP session's history.
+  await assert.rejects(
+    () => handlers.get(IPC.invoke.sessionGet)({ id: "omp-session" }),
+    (error) => /host unavailable/.test(error.message),
+  );
+  await assert.rejects(
+    () => handlers.get(IPC.invoke.sessionOpen)("omp-session"),
+    (error) => /host unavailable/.test(error.message),
+  );
+  assert.deepEqual(reads, []);
+});
+
+test("a failed native-reference read propagates instead of rendering no history", async () => {
+  const { handlers, reads } = ompHarness({
+    readEngineRef: async () => {
+      throw new Error("the metadata store is unavailable");
     },
-    dataDir: "/unused",
-    activeTurns: new Map(),
-    sessionProjects: new Map(),
-    persistenceOutbox: {},
-    logger: { app() {} },
-    plugins: { broadcastEvent() {} },
-    sessionCapabilityContext: async () => ({ providers: [], defaults: {} }),
-    enrichSession,
-    acquireSessionOperation: async () => () => {},
-    stripWinLongPrefix: (value) => value,
+    readHistory: async () => {
+      throw new Error("must not be called");
+    },
+  });
+  // A successful "no reference" is an empty transcript; a failed reference
+  // read is an error the renderer must see (and can retry) — the host row's
+  // always-empty messages must never stand in for it.
+  await assert.rejects(
+    () => handlers.get(IPC.invoke.sessionGet)({ id: "omp-session" }),
+    (error) => /metadata store is unavailable/.test(error.message),
+  );
+  assert.deepEqual(reads, []);
+});
+
+test("a successfully read absence of a native reference is the only empty transcript", async () => {
+  const { handlers, reads } = ompHarness({
+    readEngineRef: async () => ({ engineRef: null }),
+    readHistory: async () => ({
+      messages: [],
+      messageCount: 0,
+      messageStart: 0,
+      messageEnd: 0,
+      hasMoreBefore: false,
+      hasMoreAfter: false,
+      replacedLiveMessageIds: [],
+    }),
   });
   const result = await handlers.get(IPC.invoke.sessionGet)({ id: "omp-session" });
-  assert.equal(reads, 0);
   assert.deepEqual(result.session.messages, []);
+  assert.equal(reads.length, 1);
+  assert.equal(reads[0].nativeSessionId, null);
+  assert.equal(reads[0].nativeSessionPath, null);
 });
 
 test("sessionOpen projects the native transcript the same way", async () => {

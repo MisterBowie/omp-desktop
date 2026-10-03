@@ -1,0 +1,20 @@
+✔ an explicit engine choice reaches the host unchanged (1.286639ms)
+✔ a caller that names no engine sends none, so the host default decides (0.110514ms)
+✔ session.list keeps each session's engine, desktop and native alike (3.881739ms)
+✔ an unknown engine is rejected by the host, not rewritten here (0.345078ms)
+✔ a Plan/Goal mode the engine does not declare is refused before any write (0.849722ms)
+✔ sessionGet merges the native transcript over the host row for an OMP session (0.349127ms)
+✔ an OMP history read failure is reported instead of an empty transcript (0.151094ms)
+✔ a Pi session keeps the host transcript and never reads the native runtime (0.136888ms)
+✔ a failed engine lookup propagates instead of falling back to the host transcript (0.264126ms)
+✔ a failed native-reference read propagates instead of rendering no history (0.171123ms)
+✔ a successfully read absence of a native reference is the only empty transcript (0.10992ms)
+✔ sessionOpen projects the native transcript the same way (0.100991ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 352.489219

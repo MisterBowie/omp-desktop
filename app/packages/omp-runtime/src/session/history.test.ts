@@ -161,12 +161,33 @@ describe("projectOmpHistory", () => {
     expect(() => projectOmpHistory([], "leaf", { sessionId: "s" })).toThrow(OmpHistoryError);
   });
 
-  it("uses the last entry as the leaf when the runtime reports none", () => {
+  it("honours an explicit null leaf as an empty active branch", () => {
     const entries = [
       entry("m1", null, textMessage("user", "hello")),
       entry("m2", "m1", textMessage("assistant", "hi")),
     ];
-    expect(projectOmpHistory(entries, null, { sessionId: "s" }).messages.map((m) => m.content)).toEqual(["hello", "hi"]);
+    // `leafId: null` is the runtime reporting no active branch (its
+    // `resetLeaf`): the pinned context builder renders exactly that as no
+    // messages, and the last stored entry must never be resurrected as the tip.
+    expect(projectOmpHistory(entries, null, { sessionId: "s" })).toMatchObject({
+      messages: [],
+      entryIds: [],
+      messageCount: 0,
+      messageStart: 0,
+      messageEnd: 0,
+      hasMoreBefore: false,
+      hasMoreAfter: false,
+    });
+  });
+
+  it("refuses a missing or malformed leaf instead of guessing the last entry", () => {
+    const entries = [
+      entry("m1", null, textMessage("user", "hello")),
+      entry("m2", "m1", textMessage("assistant", "hi")),
+    ];
+    for (const leaf of [undefined, "", 7, { id: "m2" }, ["m2"]]) {
+      expect(() => projectOmpHistory(entries, leaf, { sessionId: "s" })).toThrow(/leaf is missing or malformed/);
+    }
   });
 
   it("skips non-message entries and unrecognised roles without dropping the branch", () => {

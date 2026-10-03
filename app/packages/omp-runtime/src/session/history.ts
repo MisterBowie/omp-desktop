@@ -26,7 +26,11 @@
  *   - Malformed input fails closed: a missing id, a duplicated id, an unknown
  *     parent, a cycle, or a leaf that is not in the entry list throws
  *     {@link OmpHistoryError} instead of returning a partial transcript. An
- *     empty history (no entries, no leaf) is the only legitimate empty result.
+ *     empty history is only legitimate when the runtime says so: no entries, or
+ *     an *explicit* `leafId: null` (its `resetLeaf`: no active branch — the
+ *     pinned `buildSessionContext` renders exactly that as no messages). A
+ *     missing or malformed leaf is a protocol violation and is refused; the
+ *     last stored entry is never guessed as the branch tip.
  */
 import type { UiMessage } from "@pi-desktop/shared";
 
@@ -38,6 +42,12 @@ export const OMP_HISTORY_INVALID = "OMP_HISTORY_INVALID";
 /** A malformed or inconsistent transcript read; never returned as an empty page. */
 export class OmpHistoryError extends Error {
   readonly code = OMP_HISTORY_INVALID;
+  /**
+   * The same code under the property name the desktop's IPC error boundary
+   * reads, so a projection refusal reaches the renderer with its real code
+   * (`INTERNAL` would hide that the transcript, not the app, is at fault).
+   */
+  readonly errorCode = OMP_HISTORY_INVALID;
   constructor(message: string) {
     super(message);
     this.name = "OmpHistoryError";
@@ -96,7 +106,7 @@ export function projectOmpHistory(
   options: OmpHistoryOptions,
 ): OmpHistoryProjection {
   const parsed = parseEntries(entries);
-  const leaf = typeof leafId === "string" && leafId.length > 0 ? leafId : null;
+  const leaf = parseLeafId(leafId);
   const branch = activeBranch(parsed, leaf);
 
   const converter = new OmpEventConverter({ sessionId: options.sessionId });
@@ -195,9 +205,27 @@ function parseEntries(entries: unknown): EntryRecord[] {
 }
 
 /**
+ * The runtime's active leaf, strictly typed.
+ *
+ * `null` is the runtime explicitly saying "no active branch" (its own
+ * `resetLeaf`; the pinned `buildSessionContext` returns no messages for it).
+ * A non-empty string names the branch tip. Anything else — an absent field, an
+ * empty string, a non-string — is a protocol violation: it must be refused,
+ * never silently repaired into the last stored entry, because that would show
+ * a branch the runtime does not consider active.
+ */
+function parseLeafId(leafId: unknown): string | null {
+  if (leafId === null) return null;
+  if (typeof leafId === "string" && leafId.length > 0) return leafId;
+  throw new OmpHistoryError("the transcript's active leaf is missing or malformed");
+}
+
+/**
  * The active branch, root first. The pinned runtime reports the branch tip as
  * `leafId`; a chain break (an unknown parent) or a cycle is a corrupted
- * transcript and fails closed rather than being silently truncated.
+ * transcript and fails closed rather than being silently truncated. An
+ * explicit `leafId: null` is the runtime reporting no active branch and yields
+ * an empty page, not the last stored entry.
  */
 function activeBranch(entries: EntryRecord[], leafId: string | null): EntryRecord[] {
   if (entries.length === 0) {
@@ -206,7 +234,8 @@ function activeBranch(entries: EntryRecord[], leafId: string | null): EntryRecor
     }
     return [];
   }
-  const leaf = leafId ?? entries[entries.length - 1]!.id;
+  if (leafId === null) return [];
+  const leaf = leafId;
   const byId = new Map(entries.map((entry) => [entry.id, entry]));
   if (!byId.has(leaf)) {
     throw new OmpHistoryError(`the transcript's leaf ${leaf} is not one of its entries`);

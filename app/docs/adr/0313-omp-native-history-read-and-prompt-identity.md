@@ -1,6 +1,6 @@
 # ADR 0313: OMP native history reads and one identity per submitted prompt
 
-- Status: Accepted (M5/T20-D repair round 2; 2026-10-03). Implementation
+- Status: Accepted (M5/T20-D repair rounds 2–3; 2026-10-03). Implementation
   complete, pending the root's independent re-review. Does not claim M5/T20
   completion: the full matrix and the three-platform packages remain.
 - Date: 2026-10-03
@@ -9,13 +9,16 @@
   the runtime's durable echo and a later durable read.
 - Amends: ADR 0300 (engine boundary: adds the read path at the `sessionGet`
   boundary), ADR 0312 §"1" (the capability keys are unaffected; this ADR adds
-  no capability). Keeps every closed capability closed.
-- Evidence: `docs/validation/M5-t20-d-capability-ui.md` §0 (repair 2),
-  `app/apps/desktop/electron/main/runtime/omp-session.ts`,
-  `app/apps/desktop/electron/main/runtime/omp-model-projection.ts`,
+  no capability). Keeps every closed capability closed. Amended in place by
+  repair round 3 (§"Repair 3 amendment"): the transient read runtime of
+  decision 1 was replaced by a direct, in-process file reader after measured
+  byte-purity failures.
+- Evidence: `docs/validation/M5-t20-d-capability-ui.md` §0 (repair 2 and
+  repair 3), `app/apps/desktop/electron/main/runtime/omp-session.ts`,
+  `app/packages/omp-runtime/src/session/native-session-file.ts`,
+  `app/packages/omp-runtime/src/session/history.ts`,
   `app/apps/desktop/electron/main/ipc/session-ipc.ts`,
   `app/apps/desktop/electron/main/ipc/agent-ipc.ts`,
-  `app/packages/omp-runtime/src/session/history.ts`,
   `app/packages/omp-runtime/src/session/events.ts`,
   `app/apps/desktop/src/lib/session-transcript.ts`,
   `app/scripts/e2e-omp-plan-ui.mjs`.
@@ -35,37 +38,43 @@ upsert-by-id could not correlate them. Two defects, one missing contract: the
 desktop had no read path into the native transcript, and no identity contract
 between what the renderer showed and what the runtime persisted.
 
-The runtime's RPC surface already exposes exactly the read this needs —
-`get_entries` (the canonical append history plus the active `leafId`) — and its
-own documentation blesses the structural subset (`id`/`parentId` plus message
-entries) for permissive clients. Re-implementing the session file format in the
-desktop would be a second parser of a format the runtime owns; dumping the file
-without a running runtime would trade one duplication for another.
+The runtime's RPC surface exposes the read this needs — `get_entries` (the
+canonical append history plus the active `leafId`) — through a session the
+runtime has opened. Repair round 2 used exactly that surface with a transient
+"read profile" runtime. Repair round 3 measured what a session-owning reader
+costs, and reversed the mechanism (not the projection).
 
 ## Decision
 
-1. **The transcript is read from the runtime, read-only, through a transient
-   read profile.** `OmpSessionBridge.readHistory` projects `get_entries` into
-   desktop rows (active-branch walk, entry ids as row ids, `toolCallId` for
-   tool rows whose call id is unique on the branch) with the same bounded
-   window PI's native reader applies. A session whose runtime is alive is asked
-   through that runtime (the transcript's own writer, no second process on one
-   file); otherwise a transient supervisor is started from a **read profile**:
-   the session's model identity projected *without* its credential (`auth:
-   none`, or a loopback placeholder when the provider row cannot be projected),
-   no `--model` selector, no run-scoped state, and no prompt ever sent. The
-   reader is switched to the persisted transcript, verifies the identity the
-   runtime reports, reads, steps off the transcript (`new_session`) and is
-   reclaimed — so the runtime's own `session_exit` diagnostic cannot land in
-   the transcript it just read. A read therefore requires no usable provider
-   credential, issues no provider request, executes no tool and leaves the
-   transcript byte-identical.
+1. **The transcript is read read-only, through two paths, never a second
+   process on a live file.** `OmpSessionBridge.readHistory` projects
+   `{ entries, leafId }` into desktop rows (active-branch walk, entry ids as row
+   ids, `toolCallId` for tool rows whose call id is unique on the branch) with
+   the same bounded window PI's native reader applies. A session whose runtime
+   is alive is asked through that runtime — the transcript's own writer, so no
+   second process ever opens a live file. A session with no live runtime is
+   read from its own file **in-process by a direct reader**
+   (`readNativeSessionEntries`): no runtime is started, so the read has no
+   writer, no lock, no lockfile, no child process and no lifecycle to leak. The
+   reader parses the pinned format's contract (title slot folded, header
+   identity and version validated, `hookMessage` v2 role renamed in memory,
+   lenient malformed records, leaf = last physical entry), re-checks the
+   header's session id itself after the path validator, and enforces explicit
+   file/record byte bounds. A read therefore requires no provider credential at
+   all, issues no provider request, executes no tool, leaves the transcript
+   byte-identical on success *and* on every failure, and terminates the last
+   uncommitted line at a record boundary. An explicit `leafId: null` is the
+   runtime reporting no active branch and renders an empty page; a missing or
+   malformed leaf is a protocol violation, never silently repaired to the last
+   stored entry.
 
 2. **Fail closed, except for a session that truly has nothing.** A missing,
-   foreign, half-written or version-incompatible native reference, an
-   unreachable runtime, a malformed entry list and a failed reclaim all throw.
-   An empty page is reserved for a session with no native reference yet. A
-   partially reclaimed reader is reported as a failure, never as a silent leak.
+   foreign, half-written, unreadable, oversized or version-incompatible native
+   reference, a corrupt entry list and a failed reclaim all throw. An empty
+   page is reserved for a session with no native reference yet, or for an
+   explicit null leaf. A failed engine lookup or native-reference read at the
+   IPC boundary throws too: a session that cannot be *proven* to be Pi must not
+   silently show the host transcript as if it were one.
 
 3. **One identity per submitted prompt.** The renderer's optimistic row id
    rides the prompt (`userMessageId`, UUID-validated at the same boundary the
@@ -91,25 +100,60 @@ without a running runtime would trade one duplication for another.
 
 - Restarting the application shows an OMP session's transcript before the user
   types anything; the panel no longer depends on a prompt to fill itself.
-- A history read costs one runtime start when the session has no live runtime.
-  That is the price of reading the transcript through its owner instead of
-  parsing the file in the desktop; the runtime is the same one the next prompt
-  would have started, and the read profile is transient by construction.
+- A history read with no live runtime now costs one file read and zero
+  processes: it cannot leak a process, a run directory or an ownership debt,
+  and it needs no provider catalogue (let alone a credential) to run.
+- The desktop now owns a small, bounded reader for the pinned session format
+  (title slot, header identity/version, entry records, leaf). It is the only
+  place that knows the on-disk shape, it never writes, and its equivalence to
+  the runtime's own `get_entries` projection is pinned against the real
+  runtime (`omp-history-e2e.test.mjs`).
 - `SessionDetail.replacedLiveMessageIds` joins the shared session types as an
   optional field: engines whose live and durable ids already agree (Pi native,
   desktop) never set it, and a reader that ignores it loses nothing.
-- The reader's model catalogue names the session's model without a credential.
-  It can never serve a request (no prompt reaches the reader), and the secret
-  never enters a process whose only job is to parse a transcript.
 - Known limit: a live row older than the returned tail window — possible only
   when a single app run produced more rows than the ledger bound — is not named
   while the window does not contain its twin; its durable row arrives with the
   older page, and the row is never dropped from storage.
+- Known limit: blob-backed image payloads (`blob:sha256:` refs) are not
+  resolved by the direct reader. The transient runtime could not resolve them
+  either after a restart (the blob store lives inside the deleted run root), so
+  no behavior regressed; a future round can point the blob store at the
+  persistent session root.
+
+## Repair 3 amendment (2026-10-03)
+
+Repair round 2's transient read profile was measured against the real pinned
+runtime with the production bridge and a fault-injecting writer. Successful
+reads were byte-pure, but **every failure path appended a native `session_exit`
+record to the file being browsed**: a refused `get_entries` (+207 B), a
+`get_state` identity mismatch (+207 B), a cancelled or timed-out detach (+207 B
+each, while the read still reported success), because the runtime is disposed
+while still holding the session. The same reader was invisible to the bridge's
+lifecycle: it was not registered before start, so `dispose` reported success
+while its start was still in flight, and a stop that never reaped left no
+retryable handle. A read path that can mutate user data must not exist.
+
+The transient runtime was therefore removed, not patched: `readHistory` reads
+the file directly in-process (`readNativeSessionEntries`), the read-profile
+wiring and model projection were deleted, and the acceptance compares real
+native bytes and the session directory across success, corrupt-version,
+identity-mismatch, missing-file and in-flight-write cases. The alternative —
+keep a process but guarantee a detach/kill ordering that can never write — was
+rejected because it preserves the failing architecture to satisfy its own
+tests.
 
 ## Alternatives
 
-- **Parse the native JSONL in the desktop.** Rejected: a second implementation
-  of branch/leaf/compaction semantics the runtime owns, kept in sync by hope.
+- **Keep the transient read runtime and harden its teardown (detach-first,
+  SIGKILL fallback).** Rejected by repair round 3: measured evidence shows the
+  graceful dispose writes into whatever session the runtime holds, and a
+  kill-based guarantee is one signal-timing change away from writing again.
+  The direct reader makes the failure impossible instead of unlikely.
+- **Use the runtime's high-level `loadSessionMessagesReadOnly` via a fork
+  change.** Rejected: it returns folded `AgentMessage`s without entry ids, so
+  it cannot feed the desktop's stable-row projection, and it would change the
+  fixed fork/patch for a read the desktop can perform itself.
 - **Return the whole branch without a window.** Rejected: unbounded payloads;
   the renderer already reads bounded pages.
 - **Deduplicate the user row by content or a time window.** Rejected: two

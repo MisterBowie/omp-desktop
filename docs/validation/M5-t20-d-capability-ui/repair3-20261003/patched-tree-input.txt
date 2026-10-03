@@ -1,0 +1,13 @@
+# Patched runtime tree input verification (M5/T20-D repair3)
+#
+# The UI E2E and the real-runtime E2E read this tree; it is a plain directory
+# (not a git checkout), pinned by the manifest digest recorded in the repository.
+tree=/tmp/omp-patched-t20d-ui-repair1
+launcher=/tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/omp
+1bc44850fc7d36c713bd4bf9ba6312b6e96a19e35ee11af957ca720fa10918db  /tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/omp
+
+# Expected from the earlier rounds (M6/T20-R4-3 / D-Enter / repair1):
+# 1bc44850fc7d36c713bd4bf9ba6312b6e96a19e35ee11af957ca720fa10918db  .../scripts/omp
+
+# The runtime this tree reports, probed in an isolated HOME:
+omp/18.3.0

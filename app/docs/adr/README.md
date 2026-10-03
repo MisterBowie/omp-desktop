@@ -341,7 +341,7 @@ Each ADR includes:
 | 0310 | [OMP Plan/Goal submission, approval and dispatch](0310-omp-plan-submit-approval-and-dispatch.md) | Accepted (M5/T20-B2) |
 | 0311 | [OMP model-side mode entry (EnterPlanMode / EnterGoalMode)](0311-omp-model-side-mode-entry.md) | Accepted (M5/T20-D-Enter) |
 | 0312 | [Plan/Goal engine capabilities, their boundaries, and unguarded OMP terminal delivery](0312-omp-mode-capabilities-and-terminal-delivery.md) | Accepted (M5/T20-D; pending root review) |
-| 0313 | [OMP native history reads and one identity per submitted prompt](0313-omp-native-history-read-and-prompt-identity.md) | Accepted (M5/T20-D repair 2; pending root review) |
+| 0313 | [OMP native history reads and one identity per submitted prompt](0313-omp-native-history-read-and-prompt-identity.md) | Accepted (M5/T20-D repair 2, read path reworked in repair 3; pending root review) |
 | turn-process-and-thinking-display | [Turn process and thinking presentation](turn-process-and-thinking-display.md) | Accepted |
 | provider-display-order | [Provider display order](provider-display-order.md) | Accepted |
 | registry-header-variable-spelling | [Remote header variables accept the registry's `{name}` spelling](registry-header-variable-spelling.md) | Proposed |
