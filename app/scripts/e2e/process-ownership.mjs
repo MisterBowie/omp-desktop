@@ -7,7 +7,8 @@
  *
  *   - the process is a recorded spawn root or a ppid descendant of one, and
  *     still carries the start time it had when it was recorded (a recycled pid
- *     is a different process);
+ *     is a different process; a root record without a recorded start time is
+ *     not an identity and is refused rather than claimed by its number);
  *   - or the process carries the run's unique scratch root in one argv element
  *     or one environment value, which is how a detached OMP runtime that
  *     survived reparenting stays attributable to the run.
@@ -176,10 +177,11 @@ export function sameProcess(entry, procRoot = DEFAULT_PROC_ROOT) {
 /**
  * The processes this run owns, per the rules in the module header.
  *
- * `roots` are spawn records (`{ pid, starttime }`); a root whose pid vanished
- * or whose start time changed contributes nothing. `runRoots` are the run's
- * unique scratch paths; they are the only path identity accepted. The harness
- * itself and all of its ancestors are always excluded.
+ * `roots` are spawn records (`{ pid, starttime }`); a root whose pid vanished,
+ * whose start time changed, or whose start time was never recorded contributes
+ * nothing. `runRoots` are the run's unique scratch paths; they are the only
+ * path identity accepted. The harness itself and all of its ancestors are
+ * always excluded.
  */
 export function collectOwnedProcesses({ table, selfPid, roots = [], runRoots = [] }) {
   if (!(table instanceof Map) || table.size === 0) {
@@ -202,7 +204,15 @@ export function collectOwnedProcesses({ table, selfPid, roots = [], runRoots = [
       ignored.push({ pid: root.pid, reason: "root-gone" });
       continue;
     }
-    if (root.starttime != null && String(root.starttime) !== String(entry.starttime)) {
+    // A number is not an identity. A root whose recorded start time is missing
+    // or empty can never be claimed, not even while its pid currently exists:
+    // that process could be a recycled stranger. Real remnants are still found
+    // through this run's unique scratch root below.
+    if (root.starttime == null || String(root.starttime).trim() === "") {
+      ignored.push({ pid: root.pid, reason: "root-identity-missing" });
+      continue;
+    }
+    if (String(root.starttime) !== String(entry.starttime)) {
       ignored.push({
         pid: root.pid,
         reason: "root-reused",
@@ -257,7 +267,8 @@ export function collectOwnedProcesses({ table, selfPid, roots = [], runRoots = [
  * Decide how to signal `owned` against a fresh table.
  *
  * Only processes that still exist with their recorded start time are targets;
- * everything else is reported as `stale`. A process group is a group target
+ * everything else is reported as `stale`, and a record without a usable start
+ * time is never a target. A process group is a group target
  * only when every live member is an owned live target and the group is neither
  * ours, nor an ancestor's, nor explicitly excluded: a mixed group is signaled
  * member by member so an unrelated process in it is never hit.
@@ -289,6 +300,19 @@ export function planSignalTargets({
   const stale = [];
   for (const entry of owned) {
     const current = table.get(entry.pid);
+    // A target needs a recorded identity that still matches; a record without
+    // a start time could name a recycled process at signal time and is never
+    // signaled (it is not "the same" as anything).
+    if (String(entry.starttime ?? "").trim() === "") {
+      stale.push({
+        pid: entry.pid,
+        comm: entry.comm ?? null,
+        reason: "identity-missing",
+        starttime: current ? current.starttime : null,
+        recordedStarttime: String(entry.starttime ?? ""),
+      });
+      continue;
+    }
     if (!current || String(current.starttime) !== String(entry.starttime)) {
       stale.push({
         pid: entry.pid,

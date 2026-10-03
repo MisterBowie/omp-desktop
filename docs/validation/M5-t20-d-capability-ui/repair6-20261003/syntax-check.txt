@@ -1,0 +1,6 @@
+# M5/T20-D repair6 (R13b/R13c) syntax checks
+# 2026-10-03T08:36:52Z  node v24.14.0  Linux 7.0.0-34-generic x86_64
+
+$ node --check scripts/e2e-omp-plan-ui.mjs  # exit 0
+$ node --check scripts/e2e/process-ownership.mjs  # exit 0
+$ node --check scripts/e2e/process-ownership.test.mjs  # exit 0

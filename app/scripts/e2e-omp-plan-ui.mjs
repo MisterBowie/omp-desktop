@@ -456,14 +456,21 @@ function startElectron(state) {
   state.electronStartedAt = new Date().toISOString();
   // The spawn record ownership is anchored to: a pid without its start time
   // could later name a recycled process, so it is read while the child is
-  // known to be the one just created.
-  state.electronBirth = readProcessIdentity(child.pid) ?? { pid: child.pid };
+  // known to be the one just created. A failed read stays `null` — a bare
+  // number is never an identity and must not be recorded as one.
+  state.electronBirth = readProcessIdentity(child.pid) ?? null;
+  if (state.electronBirth === null && process.platform === "linux") {
+    console.error(
+      `WARN Electron spawn identity unavailable for pid ${child.pid}; ownership will require this run's unique scratch root`,
+    );
+  }
   state.processReports.push({
     label: "spawn",
     at: state.electronStartedAt,
     electronPid: child.pid ?? null,
     electronPgid: child.pid ?? null,
-    electronStarttime: state.electronBirth.starttime ?? null,
+    electronStarttime: state.electronBirth?.starttime ?? null,
+    spawnIdentityMissing: state.electronBirth === null,
   });
   child.stdout?.on("data", (chunk) => {
     state.electronOutput += `[stdout] ${chunk}`;
@@ -586,6 +593,14 @@ function signalOwnedStage(state, ownedEntries, signal, options = {}) {
  * group. A process that survives the escalation is a hard failure: the caller
  * fails the run and keeps the scratch root for diagnosis instead of deleting
  * it and claiming success.
+ *
+ * Ownership refusals hold for every stage: when the recorded spawn root is not
+ * owned in the snapshot (its pid vanished, was reused, or its start time was
+ * never recorded) the run never widens the signal to that pid or its former
+ * group. Only processes the ownership rule can still prove — a detached
+ * runtime that carries this run's unique scratch root — are signaled, by their
+ * own identity. With no proof, nothing is signaled and the run fails with the
+ * refusal in the report rather than guessing at a number.
  */
 async function terminateOwnedApp(state, label) {
   const report = {
@@ -593,6 +608,7 @@ async function terminateOwnedApp(state, label) {
     at: new Date().toISOString(),
     electronPid: state.electron?.pid ?? null,
     processScanSupported: true,
+    spawnIdentity: null,
     before: [],
     protectedAncestors: [],
     excludedAncestors: [],
@@ -609,8 +625,11 @@ async function terminateOwnedApp(state, label) {
     state.processReports.push(report);
     return report;
   }
-  const birth = state.electronBirth ?? { pid: child.pid };
-  const snapshot = ownedProcessSnapshot(state, [birth]);
+  // Ownership is anchored only to the recorded spawn identity; without one the
+  // unique scratch root below is the sole evidence left.
+  const birth = state.electronBirth ?? null;
+  report.spawnIdentity = birth ? { pid: birth.pid, starttime: String(birth.starttime ?? "") } : null;
+  const snapshot = ownedProcessSnapshot(state, birth ? [birth] : []);
   report.processScanSupported = snapshot.supported;
   report.before = snapshot.processes;
   report.protectedAncestors = snapshot.protectedAncestors ?? [];
@@ -622,18 +641,23 @@ async function terminateOwnedApp(state, label) {
   state.stopping = true;
   try {
     const rootEntry = report.before.find((entry) => entry.pid === child.pid) ?? null;
+    // Why the recorded root is not a target of this stage. `null` means it is
+    // owned; otherwise every later SIGTERM/SIGKILL branch must keep refusing it.
+    const rootRefusal =
+      rootEntry !== null
+        ? null
+        : !birth
+          ? { pid: child.pid, reason: "spawn-identity-missing" }
+          : ((snapshot.ignored ?? []).find((item) => item.pid === child.pid) ?? {
+              pid: child.pid,
+              reason: "root-not-owned",
+            });
+    report.rootRefusal = rootRefusal;
     if (electronHasExited(child)) {
       report.stages.push({ action: "already-exited", at: new Date().toISOString() });
     } else if (process.platform === "win32") {
       report.stages.push({ action: "SIGTERM", target: `pid ${child.pid}`, at: new Date().toISOString() });
       child.kill();
-    } else if (!snapshot.supported) {
-      report.stages.push({ action: "SIGTERM", target: `process-group -${child.pid}`, at: new Date().toISOString() });
-      try {
-        process.kill(-child.pid, "SIGTERM");
-      } catch {
-        // Already gone.
-      }
     } else if (rootEntry) {
       // The whole owned set decides whether the Electron group is exclusively
       // ours; only that group (or its member fallback) is signaled here, and
@@ -644,11 +668,27 @@ async function terminateOwnedApp(state, label) {
           onlyGroups: [rootEntry.pgid],
         }),
       );
-    } else {
+    } else if (snapshot.supported) {
+      // The ownership rule refused the root. That refusal is not a licence to
+      // widen the signal to the old pid or its ex-group: only proven remnants
+      // are addressed, and with none proven nothing is signaled here (the
+      // Electron verification below decides the run's fate).
+      report.stages.push({
+        action: "SIGTERM-proven-remnants",
+        root: rootRefusal,
+        note: "the recorded Electron root is not owned in this snapshot; no signal is sent to its pid or former group",
+        at: new Date().toISOString(),
+      });
+      if (report.before.length > 0) {
+        report.stages.push(signalOwnedStage(state, report.before, "SIGTERM", { action: "SIGTERM-proven-remnants" }));
+      }
+    } else if (process.platform !== "linux") {
+      // No verifiable process table on this platform: the direct spawn group is
+      // all that can be addressed, and the report records that limitation.
       report.stages.push({
         action: "SIGTERM",
         target: `process-group -${child.pid}`,
-        note: "the Electron root is missing from the process table",
+        note: "no verifiable process table on this platform; only the direct spawn group can be addressed",
         at: new Date().toISOString(),
       });
       try {
@@ -656,26 +696,57 @@ async function terminateOwnedApp(state, label) {
       } catch {
         // Already gone.
       }
+    } else {
+      // Linux without a readable process table: nothing can be proven, so
+      // nothing may be signaled.
+      report.stages.push({
+        action: "SIGTERM-refused",
+        root: rootRefusal,
+        note: "the Linux process table is unavailable; ownership cannot be proven and no signal is sent",
+        at: new Date().toISOString(),
+      });
     }
     const exited = await waitForElectronExit(child, CLEANUP_TIMEOUT_MS);
     if (!exited) {
       if (process.platform === "win32") {
         report.stages.push({ action: "SIGKILL", target: `pid ${child.pid}`, at: new Date().toISOString() });
         child.kill("SIGKILL");
-      } else if (!snapshot.supported || !rootEntry) {
-        report.stages.push({ action: "SIGKILL", target: `process-group -${child.pid}`, at: new Date().toISOString() });
-        try {
-          process.kill(-child.pid, "SIGKILL");
-        } catch {
-          // Best effort; the verification below decides.
-        }
-      } else {
+      } else if (rootEntry) {
         report.stages.push(
           signalOwnedStage(state, report.before, "SIGKILL", {
             action: "SIGKILL",
             onlyGroups: [rootEntry.pgid],
           }),
         );
+      } else if (snapshot.supported) {
+        report.stages.push({
+          action: "SIGKILL-proven-remnants",
+          root: rootRefusal,
+          note: "no SIGKILL is sent to a pid or group this run cannot prove",
+          at: new Date().toISOString(),
+        });
+        if (report.before.length > 0) {
+          report.stages.push(signalOwnedStage(state, report.before, "SIGKILL", { action: "SIGKILL-proven-remnants" }));
+        }
+      } else if (process.platform !== "linux") {
+        report.stages.push({
+          action: "SIGKILL",
+          target: `process-group -${child.pid}`,
+          note: "no verifiable process table on this platform; only the direct spawn group can be addressed",
+          at: new Date().toISOString(),
+        });
+        try {
+          process.kill(-child.pid, "SIGKILL");
+        } catch {
+          // Best effort; the verification below decides.
+        }
+      } else {
+        report.stages.push({
+          action: "SIGKILL-refused",
+          root: rootRefusal,
+          note: "the Linux process table is unavailable; no SIGKILL is sent to an unprovable target",
+          at: new Date().toISOString(),
+        });
       }
       await waitForElectronExit(child, PROC_ESCALATION_MS);
     }
@@ -707,16 +778,23 @@ async function terminateOwnedApp(state, label) {
     report.leftover = remaining;
     if (!snapshot.supported) {
       report.ok = report.electronExited === true;
-      report.limitation = "process table unavailable on this platform; verified the Electron child only";
+      report.limitation =
+        process.platform === "linux"
+          ? "the Linux process table is unavailable; ownership of the app tree is unverified and no signal was sent"
+          : "no verifiable process table on this platform; only the direct spawn group was addressed, the app tree is unverified";
     } else {
       report.ok = report.electronExited === true && remaining.length === 0;
     }
     if (!report.ok) {
-      report.failure = report.electronExited
-        ? `${remaining.length} owned process(es) survived SIGKILL: ${remaining
-            .map((entry) => `${entry.pid}:${entry.comm}`)
-            .join(", ")}`
-        : "the Electron process did not exit";
+      if (report.electronExited && remaining.length > 0) {
+        report.failure = `${remaining.length} owned process(es) survived SIGKILL: ${remaining
+          .map((entry) => `${entry.pid}:${entry.comm}`)
+          .join(", ")}`;
+      } else if (!report.electronExited && rootRefusal) {
+        report.failure = `the Electron process is still alive but this run cannot prove ownership of its pid (${rootRefusal.reason}); no signal was sent to it or its former group`;
+      } else {
+        report.failure = "the Electron process did not exit";
+      }
     }
   } finally {
     state.electron = null;
@@ -1702,9 +1780,17 @@ async function main() {
         cleanupErrors.push(error);
       }
     }
+    // An unverified-but-alive Electron means the run cannot claim a clean
+    // reclamation; the scratch root stays for diagnosis exactly like surviving
+    // owned processes.
     const surviving = state.processReports
-      .filter((report) => report.ok === false && Array.isArray(report.leftover) && report.leftover.length > 0)
-      .flatMap((report) => report.leftover.map((entry) => `${entry.pid}:${entry.comm}`));
+      .filter((report) => report.ok === false)
+      .flatMap((report) => [
+        ...(Array.isArray(report.leftover) ? report.leftover.map((entry) => `${entry.pid}:${entry.comm}`) : []),
+        ...(report.electronExited === false && typeof report.electronPid === "number"
+          ? [`${report.electronPid}:electron-unverified`]
+          : []),
+      ]);
     const mayRemoveScratch = surviving.length === 0;
     let scratchRemoved = false;
     if (mayRemoveScratch) {

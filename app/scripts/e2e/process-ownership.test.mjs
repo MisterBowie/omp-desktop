@@ -12,11 +12,13 @@
  */
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
+import { fileURLToPath } from "node:url";
 
 import {
   ancestorPids,
@@ -228,9 +230,72 @@ test("an unsupported process table reports itself as unsupported", () => {
   });
 });
 
+test("a root without a recorded start time is refused, never claimed by its number", () => {
+  const unrelated = () => entryOf({ pid: 100, ppid: 1, pgid: 100, comm: "unrelated", starttime: "new-birth" });
+  const remnant = () =>
+    entryOf({
+      pid: 300,
+      ppid: 1,
+      pgid: 300,
+      comm: "omp",
+      starttime: "remnant-birth",
+      environ: [`HOME=${RUN_ROOT}/home`],
+    });
+  const launcher = entryOf({ pid: 3, ppid: 1, pgid: 3, comm: "python3", starttime: "launcher" });
+  const harness = entryOf({ pid: 7, ppid: 3, pgid: 7, comm: "node", starttime: "harness" });
+  // Missing, empty and whitespace-only records are all "no identity": a pid
+  // number alone could name a recycled stranger, so it is never claimed.
+  for (const starttime of [undefined, null, "", "   "]) {
+    const table = tableOf(launcher, harness, unrelated(), remnant());
+    const snapshot = collectOwnedProcesses({
+      table,
+      selfPid: 7,
+      roots: [{ pid: 100, starttime }],
+      runRoots: [RUN_ROOT],
+    });
+    assert.deepEqual(snapshot.processes.map((entry) => entry.pid), [300], `starttime=${String(starttime)}`);
+    assert.ok(
+      snapshot.ignored.some((item) => item.pid === 100 && item.reason === "root-identity-missing"),
+      `the identity-less root must be recorded: ${JSON.stringify(snapshot.ignored)}`,
+    );
+  }
+  // A recorded start time still claims exactly the live process carrying it.
+  const table = tableOf(launcher, harness, unrelated(), remnant());
+  const claimed = collectOwnedProcesses({ table, selfPid: 7, roots: [{ pid: 100, starttime: "new-birth" }] });
+  assert.deepEqual(
+    claimed.processes.map((entry) => [entry.pid, entry.ownership]),
+    [[100, "root"]],
+  );
+  // ... and a record carrying a different time still contributes nothing.
+  const reused = collectOwnedProcesses({ table, selfPid: 7, roots: [{ pid: 100, starttime: "old-birth" }] });
+  assert.deepEqual(reused.processes, []);
+  assert.ok(reused.ignored.some((item) => item.pid === 100 && item.reason === "root-reused"));
+});
+
 /* --------------------------------------------------------------------- */
 /* Signal plans                                                           */
 /* --------------------------------------------------------------------- */
+
+test("a signal plan never targets a record without a usable start time", () => {
+  const table = tableOf(
+    entryOf({ pid: 100, comm: "node", starttime: "1" }),
+    entryOf({ pid: 400, comm: "omp", starttime: "8" }),
+  );
+  const identityless = entryOf({ pid: 400, comm: "omp", starttime: "" });
+  const valid = entryOf({ pid: 500, comm: "omp", starttime: "9" });
+  table.set(500, valid);
+  const kill = killSpy();
+  const plan = planSignalTargets({ table, owned: [identityless, valid], selfPid: 100 });
+  assert.deepEqual(plan.groups, [500]);
+  assert.deepEqual(plan.pids, []);
+  assert.deepEqual(
+    plan.stale.map((item) => [item.pid, item.reason]),
+    [[400, "identity-missing"]],
+  );
+  const results = signalProcessPlan(plan, "SIGTERM", { kill });
+  assert.deepEqual(kill.calls, [{ target: -500, signal: "SIGTERM" }]);
+  assert.equal(results.length, 1);
+});
 
 test("a pure-owned group is signaled as a group", () => {
   const table = tableOf(
@@ -589,4 +654,188 @@ test("a group that mixes an owned leader with an unrelated member is signaled me
     forceKill(leader.pid, foreignPid);
     rmSync(runRoot, { recursive: true, force: true });
   }
+});
+
+/* --------------------------------------------------------------------- */
+/* R13b/R13c: the actual cleanup entry point                              */
+/* --------------------------------------------------------------------- */
+
+/**
+ * `terminateOwnedApp` extracted from the shipped harness: these tests drive the
+ * real decision chain (refusal propagation through every SIGTERM/SIGKILL
+ * branch, escalation) against a controlled process table and a signal sink, so
+ * a refusal can never silently widen into a pid or group signal. The
+ * module-level dependencies are injected; no OS signal is reachable.
+ */
+const harnessPath = join(dirname(fileURLToPath(import.meta.url)), "..", "e2e-omp-plan-ui.mjs");
+const harnessSource = readFileSync(harnessPath, "utf8");
+const typescript = createRequire(import.meta.url)("typescript");
+const harnessAst = typescript.createSourceFile(
+  harnessPath,
+  harnessSource,
+  typescript.ScriptTarget.Latest,
+  true,
+  typescript.ScriptKind.JS,
+);
+const terminateDeclaration = harnessAst.statements.find(
+  (node) => typescript.isFunctionDeclaration(node) && node.name?.text === "terminateOwnedApp",
+);
+assert.ok(terminateDeclaration, "terminateOwnedApp must stay the harness cleanup entry point");
+const terminateOwnedAppSource = terminateDeclaration.getText(harnessAst);
+
+const HARNESS_PID = 7;
+const ancestorRow = () =>
+  entryOf({
+    pid: 3,
+    ppid: 1,
+    pgid: 3,
+    comm: "python3",
+    starttime: "launcher",
+    argv: ["python3", "wrapper.py", RUN_ROOT],
+  });
+const harnessRow = () => entryOf({ pid: HARNESS_PID, ppid: 3, pgid: HARNESS_PID, comm: "node", starttime: "harness" });
+
+function cleanupFixture({ table, birth, childExitsOn }) {
+  const killCalls = [];
+  const kill = (target, signal) => killCalls.push({ target, signal });
+  const child = {
+    pid: 100,
+    exitCode: null,
+    signalCode: null,
+    kill: (signal) => killCalls.push({ target: 100, signal: signal ?? "SIGTERM", via: "child.kill" }),
+  };
+  let waits = 0;
+  const state = { cdp: null, electron: child, electronBirth: birth, processReports: [], runRoots: [RUN_ROOT] };
+  const terminate = new Function(
+    "ownedProcessSnapshot",
+    "electronHasExited",
+    "process",
+    "signalOwnedStage",
+    "waitForElectronExit",
+    "waitForProcessesGone",
+    "CLEANUP_TIMEOUT_MS",
+    "PROC_ESCALATION_MS",
+    "PROC_GRACE_MS",
+    `return (${terminateOwnedAppSource});`,
+  )(
+    (_state, roots) => collectOwnedProcesses({ table, selfPid: HARNESS_PID, roots, runRoots: _state.runRoots }),
+    (value) => value.exitCode !== null || value.signalCode !== null,
+    { platform: "linux", pid: HARNESS_PID, kill },
+    (_state, ownedEntries, signal, options = {}) => {
+      // Mirrors the harness stage with a controlled table and the same plan and
+      // executor used in production, so a widened group signal would be visible.
+      const plan = planSignalTargets({
+        table,
+        owned: ownedEntries,
+        selfPid: HARNESS_PID,
+        excludedGroups: options.excludedGroups ?? [],
+        onlyGroups: options.onlyGroups ?? null,
+      });
+      const results = signalProcessPlan(plan, signal, { kill });
+      return { action: options.action, groups: plan.groups, pids: plan.pids, mixedGroups: plan.mixedGroups, stale: plan.stale, results };
+    },
+    async () => {
+      waits += 1;
+      if (typeof childExitsOn === "function" ? childExitsOn(waits) : childExitsOn) {
+        child.exitCode = 0;
+        return true;
+      }
+      return false;
+    },
+    async () => [],
+    5,
+    5,
+    5,
+  );
+  return { child, killCalls, state, terminate };
+}
+
+function assertNoStageSignals(report) {
+  for (const stage of report.stages) {
+    assert.deepEqual(stage.groups ?? [], [], JSON.stringify(stage));
+    assert.deepEqual(stage.pids ?? [], [], JSON.stringify(stage));
+  }
+}
+
+test("the actual cleanup refuses a gone or reused Electron root without any signal", async () => {
+  for (const scenario of ["reused", "gone"]) {
+    const table = tableOf(ancestorRow(), harnessRow());
+    if (scenario === "reused") {
+      table.set(100, entryOf({ pid: 100, ppid: 1, pgid: 100, comm: "unrelated", starttime: "new-birth" }));
+    }
+    const fixture = cleanupFixture({ table, birth: { pid: 100, starttime: "old-birth" }, childExitsOn: () => true });
+    const report = await fixture.terminate(fixture.state, scenario);
+    assert.deepEqual(fixture.killCalls, [], `${scenario}: no signal may target the unproven pid or group`);
+    assert.equal(report.ok, true);
+    assert.equal(report.rootRefusal.reason, scenario === "reused" ? "root-reused" : "root-gone");
+    assert.deepEqual(report.before, []);
+    assert.ok(report.stages.some((stage) => stage.action === "SIGTERM-proven-remnants" && stage.root));
+    assertNoStageSignals(report);
+  }
+});
+
+test("the actual cleanup with no recorded spawn identity escalates without a pid signal", async () => {
+  const table = tableOf(
+    ancestorRow(),
+    harnessRow(),
+    entryOf({ pid: 100, ppid: 1, pgid: 100, comm: "unrelated", starttime: "new-birth" }),
+  );
+  const fixture = cleanupFixture({ table, birth: null, childExitsOn: () => false });
+  let error = null;
+  try {
+    await fixture.terminate(fixture.state, "identity-missing");
+  } catch (failure) {
+    error = failure;
+  }
+  assert.ok(error, "an unprovable, still-alive Electron must fail the run");
+  assert.match(error.message, /cannot prove ownership/);
+  assert.deepEqual(fixture.killCalls, []);
+  const report = fixture.state.processReports.at(-1);
+  assert.equal(report.rootRefusal.reason, "spawn-identity-missing");
+  assert.equal(report.electronExited, false);
+  assert.ok(report.stages.some((stage) => stage.action === "SIGTERM-proven-remnants"));
+  assert.ok(report.stages.some((stage) => stage.action === "SIGKILL-proven-remnants"));
+  assertNoStageSignals(report);
+  assert.match(report.failure, /cannot prove ownership/);
+});
+
+test("the actual cleanup still reclaims proven remnants when the root is refused", async () => {
+  const remnant = entryOf({
+    pid: 300,
+    ppid: 1,
+    pgid: 300,
+    comm: "omp",
+    starttime: "remnant-birth",
+    environ: [`HOME=${RUN_ROOT}/home`],
+  });
+  const table = tableOf(
+    ancestorRow(),
+    harnessRow(),
+    entryOf({ pid: 100, ppid: 1, pgid: 100, comm: "unrelated", starttime: "new-birth" }),
+    remnant,
+  );
+  const fixture = cleanupFixture({ table, birth: { pid: 100, starttime: "old-birth" }, childExitsOn: () => true });
+  const report = await fixture.terminate(fixture.state, "remnant");
+  assert.deepEqual(
+    report.before.map((entry) => entry.pid),
+    [300],
+  );
+  assert.deepEqual(fixture.killCalls, [{ target: -300, signal: "SIGTERM" }]);
+  assert.equal(report.ok, true);
+});
+
+test("the actual cleanup keeps the owned signal path for a proven root", async () => {
+  const table = tableOf(
+    ancestorRow(),
+    harnessRow(),
+    entryOf({ pid: 100, ppid: 1, pgid: 100, comm: "electron", starttime: "old-birth" }),
+  );
+  const fixture = cleanupFixture({ table, birth: { pid: 100, starttime: "old-birth" }, childExitsOn: (wait) => wait > 1 });
+  const report = await fixture.terminate(fixture.state, "owned");
+  assert.deepEqual(fixture.killCalls, [
+    { target: -100, signal: "SIGTERM" },
+    { target: -100, signal: "SIGKILL" },
+  ]);
+  assert.equal(report.ok, true);
+  assert.equal(report.rootRefusal, null);
 });
