@@ -121,6 +121,9 @@ Bun 1.4.2、Linux x64；固定 patched 运行时树由 `scripts/omp-patch.mjs --
 `--no-sandbox`；Electron 43.6.0 二进制由 `~/.cache/electron` 的
 `electron-v43.6.0-linux-x64.zip` 离线安装。
 
+证据全集的 SHA-256 清单：`M5-t20-d-capability-ui/SHA256SUMS.txt`（20 个原始文件，
+**不包含自身**，`sha256sum -c` 全通过；本文件本身由 Git 追踪，不在该目录清单内）。
+
 | 验证 | 命令（要点） | 结果 | 原始日志 |
 | --- | --- | --- | --- |
 | B9 RED | 暂存实现后运行 `vitest run src/engine.test.ts`、`node --test engine-router/engine-session-ipc/omp-mode-capability-render` | shared 2 失败/12 通过；desktop 3 失败（router 门、IPC 边界、渲染层 offeredModes） | `red-b9-shared-engine.txt`、`red-b9-desktop-boundaries.txt` |
