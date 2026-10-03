@@ -300,6 +300,33 @@ describe("host tool calls", () => {
     expect(results[0]?.isError).toBe(true);
   });
 
+  it("an executor error carrying structured details settles as a result-level error so they survive", async () => {
+    // The top-level frame flag is the runtime's reject channel: it throws the
+    // text and discards the settled value, so a details-bearing failure (the
+    // mode-transition record) must ride the documented `result.isError` shape —
+    // the extension `tool_result` hook then receives the flag *and* the
+    // details, which is what lets the gate stop the inconsistent turn.
+    const details = { ompDesktopModeTransition: { v: 1, state: "failed", reason: "catalogue refused" } };
+    const { calls, written } = harness({
+      execute: async () => ({
+        content: [{ type: "text", text: "the transition could not be applied" }],
+        isError: true,
+        details,
+      }),
+    });
+    calls.handleCall(callFrame("h1"), RUN);
+    await settle();
+
+    const results = written.filter((frame) => frame.type === "host_tool_result");
+    expect(results).toHaveLength(1);
+    expect(results[0]?.isError).toBeUndefined();
+    const result = results[0]?.result as { isError?: boolean; details?: unknown; content?: unknown };
+    expect(result.isError).toBe(true);
+    expect(result.details).toEqual(details);
+    // The model-visible text is unchanged; only the error channel moved.
+    expect(JSON.stringify(result.content)).toContain("could not be applied");
+  });
+
   it("cancelAll aborts every pending execution with the reason on the signal", async () => {
     const reasons: string[] = [];
     const { calls } = harness({

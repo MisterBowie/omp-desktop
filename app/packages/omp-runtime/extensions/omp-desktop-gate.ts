@@ -1588,18 +1588,27 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
    * turn-end announcement — and the bridge settles the durable host turn as
    * failed. The admission is retired here: the turn is over, and a late
    * callback must not decide under a policy for an aborted turn.
+   *
+   * The descriptor names the token that was live when the failure was
+   * *decided*, passed in by the caller — never whatever token happens to be
+   * armed when a slow handler finally gives up. A continuation that lost its
+   * admission to a successor turn must not fail, retire or abort that
+   * successor (the caller checks ownership before calling this at all), and
+   * this token parameter is what keeps a decision made under an older
+   * generation attributable to that generation.
    */
   const failStartedTurn = (
     context: ToolCallContext,
     code: OmpTurnFailureCode,
     reason: string,
+    token: string | null,
   ): void => {
     const at = Date.now();
     const failure: OmpTurnFailure = {
       v: OMP_TURN_FAILURE_VERSION,
       kind: OMP_TURN_FAILURE_KIND,
       sessionId: sessionIdOf(context) ?? null,
-      turnToken,
+      turnToken: token,
       code,
       reason,
       failureId: `omp-turn-failure-${at}-${turnFailureSequence++}`,
@@ -1614,7 +1623,7 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
     } else {
       pi.logger?.warn?.("desktop gate failed a turn but the context exposes no notify", reason);
     }
-    if (admittedTurn && admittedTurn.token === turnToken) {
+    if (admittedTurn && admittedTurn.token === token) {
       retireAdmittedTurn();
     }
     if (typeof context.abort === "function") {
@@ -1659,6 +1668,19 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
    * An ordinary host refusal (a failed `plans.enter`: wrong mode, stale turn,
    * a pending execution) arrives as an error result *without* a record; that
    * is a correctable tool error and no transition is attempted.
+   *
+   * Every await in the apply path re-checks ownership (M5/T20-D review
+   * repair). The admission is process-global state that a replacement fence
+   * swaps wholesale, and the result handler runs concurrently with the agent
+   * lifecycle: a turn can end (a terminal `agent_end`) and a successor turn be
+   * armed and started while this handler is suspended in the prompt API or the
+   * clamp. A continuation that no longer owns the live record must not
+   * replace it with a transitioned copy, retire the successor's delegate
+   * bindings, overwrite the cached prompt parts, apply the old clamp to the
+   * successor's selection, emit a failure attributed to the successor's token,
+   * or abort its context. Ownership is exact identity — the record object this
+   * continuation installed or read, plus the token this result was validated
+   * against — never a mutable-field comparison a later fence could fake.
    */
   pi.on("tool_result", async (event, context) => {
     const kind = enterKindForToolName(event.toolName);
@@ -1670,15 +1692,17 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
           context,
           "transition-invalid",
           `${event.toolName} settled without a valid mode transition record`,
+          turnToken,
         );
       }
       return undefined;
     }
     const current = admittedTurn;
+    const token = turnToken;
     const problem = modeTransitionProblem(transition, {
       nativeSessionId: current?.nativeSessionId ?? null,
       firingSessionId: sessionIdOf(context),
-      turnToken,
+      turnToken: token,
       record:
         current === null
           ? null
@@ -1696,11 +1720,12 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
         context,
         "transition-invalid",
         `${event.toolName}: ${problem ?? "the record kind does not match the tool"}`,
+        token,
       );
       return undefined;
     }
     if (transition.state === "failed") {
-      failStartedTurn(context, "transition-apply-failed", `${event.toolName}: ${transition.reason}`);
+      failStartedTurn(context, "transition-apply-failed", `${event.toolName}: ${transition.reason}`, token);
       return undefined;
     }
     const parts = injectedPromptParts;
@@ -1709,9 +1734,24 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
         context,
         "transition-apply-failed",
         "the gate has no prepared system prompt to rebuild the transitioned turn",
+        token,
       );
       return undefined;
     }
+    /**
+     * The record this continuation owns: the live record it validated against,
+     * later the transitioned copy it installed. `true` once a fence, a start
+     * refusal or a terminal lifecycle replaced or retired it — after which
+     * this continuation may only stop touching process state.
+     */
+    let owned: AdmittedTurn = current;
+    const lostOwnership = (): boolean => {
+      if (admittedTurn === owned && turnToken === token) return false;
+      pi.logger?.warn?.(
+        "the desktop gate discarded a stale mode transition: its admission is no longer the live one",
+      );
+      return true;
+    };
     try {
       if (typeof pi.setTurnSystemPrompt !== "function") {
         throw new Error("the runtime exposes no live system-prompt API");
@@ -1724,10 +1764,11 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
         transition.modeBlock,
       ];
       await pi.setTurnSystemPrompt(prompt);
+      if (lostOwnership()) return undefined;
       // Replace the record wholesale before the clamp: every later decision
       // reads the transitioned snapshot, and the previous record's delegate
       // bindings are retired with it.
-      admittedTurn = {
+      owned = {
         ...current,
         snapshot: {
           mode: transition.kind,
@@ -1736,17 +1777,25 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
         },
         transitioned: transition.kind,
       };
+      admittedTurn = owned;
       retireDelegateBindings();
       injectedPromptParts = { ...parts, modeBlock: transition.modeBlock };
-      const clamped = await applyContractToolClamp(pi, clamp, admittedTurn.snapshot);
+      const clamped = await applyContractToolClamp(pi, clamp, owned.snapshot);
       if (!clamped.ok) throw new Error(clamped.reason);
+      if (lostOwnership()) return undefined;
     } catch (error) {
-      retireAdmittedTurn();
-      failStartedTurn(
-        context,
-        "transition-apply-failed",
-        `the gate could not apply the ${kind} transition: ${String(error)}`,
-      );
+      // A failure of this continuation is only this turn's to report while
+      // this turn's record is still the live one; otherwise the successor owns
+      // the process and must not be retired, failed or aborted from here.
+      if (!lostOwnership()) {
+        retireAdmittedTurn();
+        failStartedTurn(
+          context,
+          "transition-apply-failed",
+          `the gate could not apply the ${kind} transition: ${String(error)}`,
+          token,
+        );
+      }
     }
     return undefined;
   });

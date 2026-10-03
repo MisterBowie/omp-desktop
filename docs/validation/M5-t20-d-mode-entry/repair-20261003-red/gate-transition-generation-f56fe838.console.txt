@@ -1,0 +1,116 @@
+{
+  "candidate": "f56fe8386c71c886212391907fc289055eeaf9b8",
+  "layer": "real gate registered handlers, real admission/transition codecs and serialized state; controlled public API promises; no provider/tool bodies/host DB, no universal native reachability claim",
+  "cases": [
+    {
+      "scenario": "positive-current-transition",
+      "beforeAllowed": true,
+      "afterBlocked": true,
+      "failures": [],
+      "passed": true
+    },
+    {
+      "scenario": "positive-current-failure",
+      "beforeAllowed": true,
+      "failures": [
+        {
+          "v": 1,
+          "kind": "omp-desktop-turn-failure",
+          "sessionId": "owner-native",
+          "turnToken": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "code": "transition-apply-failed",
+          "reason": "the gate could not apply the plan transition: Error: controlled current API failure",
+          "failureId": "omp-turn-failure-1790993386315-0",
+          "at": 1790993386315
+        }
+      ],
+      "aborts": 1,
+      "afterBlocked": true,
+      "passed": true
+    },
+    {
+      "scenario": "prompt-resolve-after-new-turn",
+      "beforeAllowed": true,
+      "newOwnerBeforeAllowed": true,
+      "newChildBeforeAllowed": true,
+      "newOwnerAfter": {
+        "block": true,
+        "reason": "WRITE_DISABLED_IN_PLAN: Write is disabled in plan mode"
+      },
+      "newChildAfter": {
+        "block": true,
+        "reason": "the desktop runtime policy is unavailable; refusing the call without its mode and permission mode"
+      },
+      "lateSelections": [
+        [
+          "read",
+          "bash",
+          "SubmitPlan"
+        ]
+      ],
+      "newFailures": [],
+      "lateAborts": 0,
+      "passed": false
+    },
+    {
+      "scenario": "prompt-reject-after-new-turn",
+      "beforeAllowed": true,
+      "newOwnerBeforeAllowed": true,
+      "newChildBeforeAllowed": true,
+      "newOwnerAfter": {
+        "block": true,
+        "reason": "the desktop runtime policy is unavailable; refusing the call without its mode and permission mode"
+      },
+      "newChildAfter": {
+        "block": true,
+        "reason": "the desktop runtime policy is unavailable; refusing the call without its mode and permission mode"
+      },
+      "lateSelections": [],
+      "newFailures": [
+        {
+          "v": 1,
+          "kind": "omp-desktop-turn-failure",
+          "sessionId": "owner-native",
+          "turnToken": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "code": "transition-apply-failed",
+          "reason": "the gate could not apply the plan transition: Error: controlled stale API rejection",
+          "failureId": "omp-turn-failure-1790993386316-1",
+          "at": 1790993386316
+        }
+      ],
+      "lateAborts": 1,
+      "passed": false
+    },
+    {
+      "scenario": "clamp-reject-after-new-turn",
+      "beforeAllowed": true,
+      "newOwnerBeforeAllowed": true,
+      "newChildBeforeAllowed": true,
+      "newOwnerAfter": {
+        "block": true,
+        "reason": "the desktop runtime policy is unavailable; refusing the call without its mode and permission mode"
+      },
+      "newChildAfter": {
+        "block": true,
+        "reason": "the desktop runtime policy is unavailable; refusing the call without its mode and permission mode"
+      },
+      "lateSelections": [],
+      "newFailures": [
+        {
+          "v": 1,
+          "kind": "omp-desktop-turn-failure",
+          "sessionId": "owner-native",
+          "turnToken": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "code": "transition-apply-failed",
+          "reason": "the gate could not apply the plan transition: Error: controlled stale API rejection",
+          "failureId": "omp-turn-failure-1790993386316-2",
+          "at": 1790993386316
+        }
+      ],
+      "lateAborts": 1,
+      "passed": false
+    }
+  ],
+  "scratchRemoved": true,
+  "passed": false
+}

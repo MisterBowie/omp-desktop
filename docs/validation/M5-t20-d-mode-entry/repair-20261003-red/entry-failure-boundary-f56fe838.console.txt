@@ -1,0 +1,552 @@
+{
+  "candidate": "f56fe8386c71c886212391907fc289055eeaf9b8",
+  "layer": "real production bridge/gate/adapter/HostProcess+SQLite/patched source OMP/local FakeProvider; controlled public host reply/catalog await; not unmodified transport scheduling/Renderer/installer",
+  "cases": [
+    {
+      "kind": "plan",
+      "scenario": "malformed-committed-reply",
+      "ends": [
+        {
+          "sessionId": "9bf0134f-988a-406d-b45d-b87863742059",
+          "turnId": "omp-turn:9bf0134f-988a-406d-b45d-b87863742059:39ac07cb-5924-481b-9141-32888e26302e:1",
+          "hostTurnId": "2f3e8269-7c15-4e27-9633-b10839304ea0",
+          "reason": "completed"
+        },
+        {
+          "sessionId": "9bf0134f-988a-406d-b45d-b87863742059",
+          "turnId": "omp-turn:9bf0134f-988a-406d-b45d-b87863742059:39ac07cb-5924-481b-9141-32888e26302e:2",
+          "hostTurnId": "ab1f51a7-49de-48ed-a286-783086564f42",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 2,
+      "hostTurnId": "2f3e8269-7c15-4e27-9633-b10839304ea0",
+      "realHostReply": {
+        "kind": "plan",
+        "ok": true,
+        "state": "planning"
+      },
+      "modeAfter": "plan",
+      "turnsBeforeRecovery": [
+        {
+          "id": "2f3e8269-7c15-4e27-9633-b10839304ea0",
+          "status": "completed"
+        }
+      ],
+      "initialEnd": {
+        "sessionId": "9bf0134f-988a-406d-b45d-b87863742059",
+        "turnId": "omp-turn:9bf0134f-988a-406d-b45d-b87863742059:39ac07cb-5924-481b-9141-32888e26302e:1",
+        "hostTurnId": "2f3e8269-7c15-4e27-9633-b10839304ea0",
+        "reason": "completed"
+      },
+      "initialProviderCount": 3,
+      "forbiddenEffect": "unexpected write after host commit",
+      "audit": [
+        {
+          "kind": "plan",
+          "mode": "plan",
+          "sessionId": "9bf0134f-988a-406d-b45d-b87863742059",
+          "toolCallId": "entry-plan",
+          "turnId": "2f3e8269-7c15-4e27-9633-b10839304ea0"
+        }
+      ],
+      "enterCatalogReached": true,
+      "recoveryAccepted": {
+        "accepted": true,
+        "turnId": "omp-turn:9bf0134f-988a-406d-b45d-b87863742059:39ac07cb-5924-481b-9141-32888e26302e:2",
+        "hostTurnId": "ab1f51a7-49de-48ed-a286-783086564f42"
+      },
+      "recoveryTools": [
+        "read",
+        "bash",
+        "ask",
+        "glob",
+        "grep",
+        "SubmitPlan"
+      ],
+      "finalTurns": [
+        {
+          "id": "2f3e8269-7c15-4e27-9633-b10839304ea0",
+          "status": "completed"
+        },
+        {
+          "id": "ab1f51a7-49de-48ed-a286-783086564f42",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [
+        {
+          "name": "inconsistent or cancelled run does not continue",
+          "error": "Expected values to be strictly equal:\n\n3 !== 1\n"
+        }
+      ],
+      "passed": false,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "plan",
+      "scenario": "catalog-error-after-commit",
+      "ends": [
+        {
+          "sessionId": "52e697f8-57d9-42d6-877c-b30624fbc5c7",
+          "turnId": "omp-turn:52e697f8-57d9-42d6-877c-b30624fbc5c7:4723e8f6-09bc-4fe3-9aaa-40a0246d9993:1",
+          "hostTurnId": "0685f72b-3862-4649-85fb-78bdadc9c8bd",
+          "reason": "completed"
+        },
+        {
+          "sessionId": "52e697f8-57d9-42d6-877c-b30624fbc5c7",
+          "turnId": "omp-turn:52e697f8-57d9-42d6-877c-b30624fbc5c7:4723e8f6-09bc-4fe3-9aaa-40a0246d9993:2",
+          "hostTurnId": "a4c7b42e-a379-4411-bdea-ce130de544e7",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 3,
+      "hostTurnId": "0685f72b-3862-4649-85fb-78bdadc9c8bd",
+      "realHostReply": {
+        "kind": "plan",
+        "ok": true,
+        "state": "planning"
+      },
+      "enterCatalogReached": true,
+      "modeAfter": "plan",
+      "turnsBeforeRecovery": [
+        {
+          "id": "0685f72b-3862-4649-85fb-78bdadc9c8bd",
+          "status": "completed"
+        }
+      ],
+      "initialEnd": {
+        "sessionId": "52e697f8-57d9-42d6-877c-b30624fbc5c7",
+        "turnId": "omp-turn:52e697f8-57d9-42d6-877c-b30624fbc5c7:4723e8f6-09bc-4fe3-9aaa-40a0246d9993:1",
+        "hostTurnId": "0685f72b-3862-4649-85fb-78bdadc9c8bd",
+        "reason": "completed"
+      },
+      "initialProviderCount": 3,
+      "forbiddenEffect": "unexpected write after host commit",
+      "audit": [
+        {
+          "kind": "plan",
+          "mode": "plan",
+          "sessionId": "52e697f8-57d9-42d6-877c-b30624fbc5c7",
+          "toolCallId": "entry-plan",
+          "turnId": "0685f72b-3862-4649-85fb-78bdadc9c8bd"
+        }
+      ],
+      "recoveryAccepted": {
+        "accepted": true,
+        "turnId": "omp-turn:52e697f8-57d9-42d6-877c-b30624fbc5c7:4723e8f6-09bc-4fe3-9aaa-40a0246d9993:2",
+        "hostTurnId": "a4c7b42e-a379-4411-bdea-ce130de544e7"
+      },
+      "recoveryTools": [
+        "read",
+        "bash",
+        "ask",
+        "glob",
+        "grep",
+        "SubmitPlan"
+      ],
+      "finalTurns": [
+        {
+          "id": "0685f72b-3862-4649-85fb-78bdadc9c8bd",
+          "status": "completed"
+        },
+        {
+          "id": "a4c7b42e-a379-4411-bdea-ce130de544e7",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [
+        {
+          "name": "inconsistent or cancelled run does not continue",
+          "error": "Expected values to be strictly equal:\n\n3 !== 1\n"
+        }
+      ],
+      "passed": false,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "plan",
+      "scenario": "stop-during-catalog",
+      "ends": [
+        {
+          "sessionId": "2977adc3-a8d6-4db7-94e4-d1603fc226cb",
+          "turnId": "omp-turn:2977adc3-a8d6-4db7-94e4-d1603fc226cb:2acafc41-d1d9-47a3-a57c-528a65bdd02a:1",
+          "hostTurnId": "4b16c997-09de-4443-81ac-2e6bac698f51",
+          "reason": "aborted"
+        },
+        {
+          "sessionId": "2977adc3-a8d6-4db7-94e4-d1603fc226cb",
+          "turnId": "omp-turn:2977adc3-a8d6-4db7-94e4-d1603fc226cb:2acafc41-d1d9-47a3-a57c-528a65bdd02a:2",
+          "hostTurnId": "8aea6622-1f95-492b-92c1-3be218007cae",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 3,
+      "hostTurnId": "4b16c997-09de-4443-81ac-2e6bac698f51",
+      "realHostReply": {
+        "kind": "plan",
+        "ok": true,
+        "state": "planning"
+      },
+      "enterCatalogReached": true,
+      "modeAtStop": "plan",
+      "stop": {
+        "aborted": true,
+        "abortBashSent": false,
+        "converged": true,
+        "toreDown": false,
+        "steps": [
+          "cancelled 1 pending host tool call(s)",
+          "abort acknowledged",
+          "turn converged"
+        ],
+        "errors": []
+      },
+      "modeAfter": "plan",
+      "turnsBeforeRecovery": [
+        {
+          "id": "4b16c997-09de-4443-81ac-2e6bac698f51",
+          "status": "aborted"
+        }
+      ],
+      "initialEnd": {
+        "sessionId": "2977adc3-a8d6-4db7-94e4-d1603fc226cb",
+        "turnId": "omp-turn:2977adc3-a8d6-4db7-94e4-d1603fc226cb:2acafc41-d1d9-47a3-a57c-528a65bdd02a:1",
+        "hostTurnId": "4b16c997-09de-4443-81ac-2e6bac698f51",
+        "reason": "aborted"
+      },
+      "initialProviderCount": 1,
+      "forbiddenEffect": null,
+      "audit": [
+        {
+          "kind": "plan",
+          "mode": "plan",
+          "sessionId": "2977adc3-a8d6-4db7-94e4-d1603fc226cb",
+          "toolCallId": "entry-plan",
+          "turnId": "4b16c997-09de-4443-81ac-2e6bac698f51"
+        }
+      ],
+      "recoveryAccepted": {
+        "accepted": true,
+        "turnId": "omp-turn:2977adc3-a8d6-4db7-94e4-d1603fc226cb:2acafc41-d1d9-47a3-a57c-528a65bdd02a:2",
+        "hostTurnId": "8aea6622-1f95-492b-92c1-3be218007cae"
+      },
+      "recoveryTools": [
+        "read",
+        "bash",
+        "ask",
+        "glob",
+        "grep",
+        "SubmitPlan"
+      ],
+      "finalTurns": [
+        {
+          "id": "4b16c997-09de-4443-81ac-2e6bac698f51",
+          "status": "aborted"
+        },
+        {
+          "id": "8aea6622-1f95-492b-92c1-3be218007cae",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "goal",
+      "scenario": "malformed-committed-reply",
+      "ends": [
+        {
+          "sessionId": "f509a664-a2bd-45c1-b4f4-b81d7bd1aaee",
+          "turnId": "omp-turn:f509a664-a2bd-45c1-b4f4-b81d7bd1aaee:011b95e2-270b-4eb1-9087-7f4ea9d9bc3b:1",
+          "hostTurnId": "9c02d7a0-b746-447b-8947-8372ca4a7fa2",
+          "reason": "completed"
+        },
+        {
+          "sessionId": "f509a664-a2bd-45c1-b4f4-b81d7bd1aaee",
+          "turnId": "omp-turn:f509a664-a2bd-45c1-b4f4-b81d7bd1aaee:011b95e2-270b-4eb1-9087-7f4ea9d9bc3b:2",
+          "hostTurnId": "2385e843-1af8-4c9d-80bc-f4548b08d50e",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 2,
+      "hostTurnId": "9c02d7a0-b746-447b-8947-8372ca4a7fa2",
+      "realHostReply": {
+        "kind": "goal",
+        "ok": true,
+        "state": "planning"
+      },
+      "modeAfter": "goal",
+      "turnsBeforeRecovery": [
+        {
+          "id": "9c02d7a0-b746-447b-8947-8372ca4a7fa2",
+          "status": "completed"
+        }
+      ],
+      "initialEnd": {
+        "sessionId": "f509a664-a2bd-45c1-b4f4-b81d7bd1aaee",
+        "turnId": "omp-turn:f509a664-a2bd-45c1-b4f4-b81d7bd1aaee:011b95e2-270b-4eb1-9087-7f4ea9d9bc3b:1",
+        "hostTurnId": "9c02d7a0-b746-447b-8947-8372ca4a7fa2",
+        "reason": "completed"
+      },
+      "initialProviderCount": 3,
+      "forbiddenEffect": "unexpected write after host commit",
+      "audit": [
+        {
+          "kind": "goal",
+          "mode": "goal",
+          "sessionId": "f509a664-a2bd-45c1-b4f4-b81d7bd1aaee",
+          "toolCallId": "entry-goal",
+          "turnId": "9c02d7a0-b746-447b-8947-8372ca4a7fa2"
+        }
+      ],
+      "enterCatalogReached": true,
+      "recoveryAccepted": {
+        "accepted": true,
+        "turnId": "omp-turn:f509a664-a2bd-45c1-b4f4-b81d7bd1aaee:011b95e2-270b-4eb1-9087-7f4ea9d9bc3b:2",
+        "hostTurnId": "2385e843-1af8-4c9d-80bc-f4548b08d50e"
+      },
+      "recoveryTools": [
+        "read",
+        "bash",
+        "ask",
+        "glob",
+        "grep",
+        "SubmitGoal"
+      ],
+      "finalTurns": [
+        {
+          "id": "9c02d7a0-b746-447b-8947-8372ca4a7fa2",
+          "status": "completed"
+        },
+        {
+          "id": "2385e843-1af8-4c9d-80bc-f4548b08d50e",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [
+        {
+          "name": "inconsistent or cancelled run does not continue",
+          "error": "Expected values to be strictly equal:\n\n3 !== 1\n"
+        }
+      ],
+      "passed": false,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "goal",
+      "scenario": "catalog-error-after-commit",
+      "ends": [
+        {
+          "sessionId": "0af08491-ee62-4731-8dd3-1d0212344691",
+          "turnId": "omp-turn:0af08491-ee62-4731-8dd3-1d0212344691:f3d503a1-0646-4efc-978d-131ca78dd055:1",
+          "hostTurnId": "792842d3-df66-48f1-b3a8-0878212f733e",
+          "reason": "completed"
+        },
+        {
+          "sessionId": "0af08491-ee62-4731-8dd3-1d0212344691",
+          "turnId": "omp-turn:0af08491-ee62-4731-8dd3-1d0212344691:f3d503a1-0646-4efc-978d-131ca78dd055:2",
+          "hostTurnId": "98175d9d-8949-43a3-8360-a14e2b2ebf82",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 3,
+      "hostTurnId": "792842d3-df66-48f1-b3a8-0878212f733e",
+      "realHostReply": {
+        "kind": "goal",
+        "ok": true,
+        "state": "planning"
+      },
+      "enterCatalogReached": true,
+      "modeAfter": "goal",
+      "turnsBeforeRecovery": [
+        {
+          "id": "792842d3-df66-48f1-b3a8-0878212f733e",
+          "status": "completed"
+        }
+      ],
+      "initialEnd": {
+        "sessionId": "0af08491-ee62-4731-8dd3-1d0212344691",
+        "turnId": "omp-turn:0af08491-ee62-4731-8dd3-1d0212344691:f3d503a1-0646-4efc-978d-131ca78dd055:1",
+        "hostTurnId": "792842d3-df66-48f1-b3a8-0878212f733e",
+        "reason": "completed"
+      },
+      "initialProviderCount": 3,
+      "forbiddenEffect": "unexpected write after host commit",
+      "audit": [
+        {
+          "kind": "goal",
+          "mode": "goal",
+          "sessionId": "0af08491-ee62-4731-8dd3-1d0212344691",
+          "toolCallId": "entry-goal",
+          "turnId": "792842d3-df66-48f1-b3a8-0878212f733e"
+        }
+      ],
+      "recoveryAccepted": {
+        "accepted": true,
+        "turnId": "omp-turn:0af08491-ee62-4731-8dd3-1d0212344691:f3d503a1-0646-4efc-978d-131ca78dd055:2",
+        "hostTurnId": "98175d9d-8949-43a3-8360-a14e2b2ebf82"
+      },
+      "recoveryTools": [
+        "read",
+        "bash",
+        "ask",
+        "glob",
+        "grep",
+        "SubmitGoal"
+      ],
+      "finalTurns": [
+        {
+          "id": "792842d3-df66-48f1-b3a8-0878212f733e",
+          "status": "completed"
+        },
+        {
+          "id": "98175d9d-8949-43a3-8360-a14e2b2ebf82",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [
+        {
+          "name": "inconsistent or cancelled run does not continue",
+          "error": "Expected values to be strictly equal:\n\n3 !== 1\n"
+        }
+      ],
+      "passed": false,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "goal",
+      "scenario": "stop-during-catalog",
+      "ends": [
+        {
+          "sessionId": "bab1f191-212b-4438-b714-880a549ea402",
+          "turnId": "omp-turn:bab1f191-212b-4438-b714-880a549ea402:d3197f4b-432f-4690-bad0-d8eb3c252b84:1",
+          "hostTurnId": "4f35885d-72c2-440f-8ea2-5cf0af3c824a",
+          "reason": "aborted"
+        },
+        {
+          "sessionId": "bab1f191-212b-4438-b714-880a549ea402",
+          "turnId": "omp-turn:bab1f191-212b-4438-b714-880a549ea402:d3197f4b-432f-4690-bad0-d8eb3c252b84:2",
+          "hostTurnId": "8ccd3867-9650-41bb-8484-f9758219a0d4",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 3,
+      "hostTurnId": "4f35885d-72c2-440f-8ea2-5cf0af3c824a",
+      "realHostReply": {
+        "kind": "goal",
+        "ok": true,
+        "state": "planning"
+      },
+      "enterCatalogReached": true,
+      "modeAtStop": "goal",
+      "stop": {
+        "aborted": true,
+        "abortBashSent": false,
+        "converged": true,
+        "toreDown": false,
+        "steps": [
+          "cancelled 1 pending host tool call(s)",
+          "abort acknowledged",
+          "turn converged"
+        ],
+        "errors": []
+      },
+      "modeAfter": "goal",
+      "turnsBeforeRecovery": [
+        {
+          "id": "4f35885d-72c2-440f-8ea2-5cf0af3c824a",
+          "status": "aborted"
+        }
+      ],
+      "initialEnd": {
+        "sessionId": "bab1f191-212b-4438-b714-880a549ea402",
+        "turnId": "omp-turn:bab1f191-212b-4438-b714-880a549ea402:d3197f4b-432f-4690-bad0-d8eb3c252b84:1",
+        "hostTurnId": "4f35885d-72c2-440f-8ea2-5cf0af3c824a",
+        "reason": "aborted"
+      },
+      "initialProviderCount": 1,
+      "forbiddenEffect": null,
+      "audit": [
+        {
+          "kind": "goal",
+          "mode": "goal",
+          "sessionId": "bab1f191-212b-4438-b714-880a549ea402",
+          "toolCallId": "entry-goal",
+          "turnId": "4f35885d-72c2-440f-8ea2-5cf0af3c824a"
+        }
+      ],
+      "recoveryAccepted": {
+        "accepted": true,
+        "turnId": "omp-turn:bab1f191-212b-4438-b714-880a549ea402:d3197f4b-432f-4690-bad0-d8eb3c252b84:2",
+        "hostTurnId": "8ccd3867-9650-41bb-8484-f9758219a0d4"
+      },
+      "recoveryTools": [
+        "read",
+        "bash",
+        "ask",
+        "glob",
+        "grep",
+        "SubmitGoal"
+      ],
+      "finalTurns": [
+        {
+          "id": "4f35885d-72c2-440f-8ea2-5cf0af3c824a",
+          "status": "aborted"
+        },
+        {
+          "id": "8ccd3867-9650-41bb-8484-f9758219a0d4",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    }
+  ],
+  "finalCleanupErrors": [],
+  "passed": false
+}

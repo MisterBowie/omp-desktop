@@ -123,7 +123,12 @@ export type OmpHostToolContentBlock =
 export type OmpHostToolOutcome = {
   /** Blocks the model reads; the frame must fit the 1 MiB line limit. */
   content: OmpHostToolContentBlock[];
-  /** True marks a failed execution (surface as a tool error, not a result). */
+  /**
+   * True marks a failed execution (surface as a tool error, not a result).
+   * When `details` are also present the failure is settled as a
+   * `result.isError` result rather than a top-level frame error, because the
+   * runtime's reject channel drops the settled value — see {@link settle}.
+   */
   isError?: boolean;
   /**
    * In-process metadata carried on the result (never model-visible text): the
@@ -522,14 +527,27 @@ export class OmpHostToolCalls {
     entry.settled = true;
     this.pendingCalls.delete(id);
     this.counters.executed += 1;
+    // The frame's top-level `isError` is the *reject* channel: the pinned
+    // runtime throws the result's text and discards the settled value —
+    // including any structured `details` (`.5` `RpcHostToolBridge.handleResult`
+    // rejects non-terminating top-level errors). An error that carries
+    // structured details (the mode-transition record) must survive to the
+    // trusted extension hook, so it is settled through the protocol's other
+    // documented error shape instead: `result.isError`, which the agent loop
+    // reads as `isError = frame.isError || result.isError` and which the
+    // extension `tool_result` hook receives together with the details.
+    // Outcomes without details keep the plain top-level error path unchanged.
+    const result: Record<string, unknown> = {
+      content: boundHostToolContent(outcome.content),
+      ...(outcome.details === undefined ? {} : { details: outcome.details }),
+    };
+    const structuredError = outcome.isError === true && outcome.details !== undefined;
+    if (structuredError) result.isError = true;
     this.write({
       type: "host_tool_result",
       id,
-      result: {
-        content: boundHostToolContent(outcome.content),
-        ...(outcome.details === undefined ? {} : { details: outcome.details }),
-      },
-      ...(outcome.isError === true ? { isError: true } : {}),
+      result,
+      ...(outcome.isError === true && !structuredError ? { isError: true } : {}),
     });
   }
 }

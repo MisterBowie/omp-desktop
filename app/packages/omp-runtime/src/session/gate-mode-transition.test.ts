@@ -189,7 +189,13 @@ const READ: ToolCallEvent = { type: "tool_call", toolCallId: "call-read", toolNa
 const WRITE: ToolCallEvent = { type: "tool_call", toolCallId: "call-write", toolName: "write", input: { path: "out.txt", content: "x" } };
 
 /** Start the harness on an admitted Agent turn and return it. */
-async function startedAgentTurn(options: { liveSystemPrompt?: boolean } = {}): Promise<GateHandlerHarness> {
+async function startedAgentTurn(
+  options: {
+    liveSystemPrompt?: boolean;
+    awaitSystemPrompt?: () => Promise<void> | void;
+    awaitToolSelection?: () => Promise<void> | void;
+  } = {},
+): Promise<GateHandlerHarness> {
   const path = writeState("agent");
   process.env.OMP_DESKTOP_STATE = path;
   process.env.OMP_DESKTOP_STATE_REQUIRED = "1";
@@ -197,11 +203,47 @@ async function startedAgentTurn(options: { liveSystemPrompt?: boolean } = {}): P
     sessionId: OWNER,
     activeTools: [...AGENT_ACTIVE],
     ...(options.liveSystemPrompt === false ? { liveSystemPrompt: false } : {}),
+    ...(options.awaitSystemPrompt ? { awaitSystemPrompt: options.awaitSystemPrompt } : {}),
+    ...(options.awaitToolSelection ? { awaitToolSelection: options.awaitToolSelection } : {}),
   });
   h.arm(TOKEN_A, admission());
   expect(await h.beforeAgentStart()).toMatchObject({ systemPrompt: ["native prompt", AGENT_BLOCK] });
   h.agentStart();
   return h;
+}
+
+/** A promise the test settles explicitly: the async seams of the transition. */
+function deferred(): { promise: Promise<void>; resolve: () => void; reject: (error: Error) => void } {
+  let resolve!: () => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<void>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+/** Yield microtasks until the predicate holds (the seams above are microtask-only). */
+async function until(predicate: () => boolean): Promise<void> {
+  for (let index = 0; index < 100 && !predicate(); index += 1) await Promise.resolve();
+}
+
+/**
+ * Arm and start a successor Agent turn B — a terminal `agent_end` for A, a new
+ * fence admission, its start and a bound delegate — the real interleaving a
+ * suspended transition must not touch.
+ */
+async function startSuccessorAgentTurn(
+  h: GateHandlerHarness,
+  childSessionId: string,
+): Promise<Record<string, unknown>> {
+  h.agentEnd();
+  h.arm(TOKEN_B, admission());
+  await h.beforeAgentStart();
+  h.agentStart();
+  const child = h.delegateContext(childSessionId);
+  await h.lifecycle("session_start", child);
+  return child;
 }
 
 describe("gate mid-turn mode transition", () => {
@@ -427,5 +469,81 @@ describe("gate mid-turn mode transition", () => {
     const write = await h.toolCall(WRITE);
     expect(write?.block).toBe(true);
     expect(write?.reason).toMatch(/WRITE_DISABLED_IN_PLAN/);
+  });
+
+  it("a prompt replacement that resolves after a successor turn is armed never moves the successor", async () => {
+    const hold = deferred();
+    const h = await startedAgentTurn({ awaitSystemPrompt: () => hold.promise });
+    const pending = h.toolResult(enterResult(readyRecord()));
+    await until(() => h.systemPromptReplacements.length === 1);
+    const child = await startSuccessorAgentTurn(h, "native-child-late-resolve");
+    // The successor turn is live: its Agent policy allows Write and its bound
+    // delegate is decided by the successor's record.
+    expect(await h.toolCall(WRITE)).toBeUndefined();
+    expect(await h.toolCall(BASH, child)).toBeUndefined();
+    const before = {
+      prompts: h.systemPromptReplacements.length,
+      selections: h.toolSelections.length,
+      aborts: h.aborted(),
+    };
+    hold.resolve();
+    await pending;
+    // The late continuation neither replaced the successor's record with the
+    // transitioned copy, retired its delegate bindings, applied the old clamp,
+    // failed its turn nor aborted its context.
+    expect(h.systemPromptReplacements).toHaveLength(before.prompts);
+    expect(h.toolSelections).toHaveLength(before.selections);
+    expect(h.aborted()).toBe(before.aborts);
+    expect(failureNotices(h)).toHaveLength(0);
+    expect(await h.toolCall(WRITE)).toBeUndefined();
+    expect(await h.toolCall(BASH, child)).toBeUndefined();
+  });
+
+  it("a stale prompt rejection never retires, fails or aborts the successor turn", async () => {
+    const hold = deferred();
+    const h = await startedAgentTurn({ awaitSystemPrompt: () => hold.promise });
+    const pending = h.toolResult(enterResult(readyRecord()));
+    await until(() => h.systemPromptReplacements.length === 1);
+    const child = await startSuccessorAgentTurn(h, "native-child-late-reject");
+    const aborts = h.aborted();
+    hold.reject(new Error("controlled stale API rejection"));
+    await pending;
+    // The rejection is this continuation's own failure, but the admission it
+    // started under is gone: it must not retire the successor's record, emit a
+    // failure attributed to the successor's token or abort its context.
+    expect(h.aborted()).toBe(aborts);
+    expect(failureNotices(h)).toHaveLength(0);
+    expect(h.systemPromptReplacements).toHaveLength(1);
+    expect(h.toolSelections).toHaveLength(0);
+    expect(await h.toolCall(WRITE)).toBeUndefined();
+    expect(await h.toolCall(BASH, child)).toBeUndefined();
+  });
+
+  it("a stale clamp rejection never retires the successor's admission", async () => {
+    // Only the transitioned clamp is held: the successor's own start performs
+    // its legitimate Agent restore, which must not suspend on the stale seam.
+    const seam = deferred();
+    let consumed = false;
+    const h = await startedAgentTurn({
+      awaitToolSelection: () => {
+        if (consumed) return undefined;
+        consumed = true;
+        return seam.promise;
+      },
+    });
+    const pending = h.toolResult(enterResult(readyRecord()));
+    await until(() => h.toolSelections.length === 1);
+    // The prompt replacement resolved synchronously; the handler installed the
+    // transitioned copy and is now suspended inside the clamp's selection.
+    expect(h.systemPromptReplacements).toHaveLength(1);
+    const child = await startSuccessorAgentTurn(h, "native-child-late-clamp");
+    const before = { selections: h.toolSelections.length, aborts: h.aborted() };
+    seam.reject(new Error("controlled stale clamp rejection"));
+    await pending;
+    expect(h.toolSelections).toHaveLength(before.selections);
+    expect(h.aborted()).toBe(before.aborts);
+    expect(failureNotices(h)).toHaveLength(0);
+    expect(await h.toolCall(WRITE)).toBeUndefined();
+    expect(await h.toolCall(BASH, child)).toBeUndefined();
   });
 });

@@ -233,7 +233,10 @@ test("reports a host refusal as a correctable error with no transition record", 
   assert.equal(outcome.details, undefined);
 });
 
-test("reports an invalid host reply as an error with no transition record", async () => {
+test("an unreadable host reply stops the turn with a failed record instead of a correctable error", async () => {
+  // The host may have committed before answering with a shape this build
+  // cannot attribute; that uncertainty must stop the turn, never be reported
+  // as a correctable refusal the model can retry under a stale contract.
   for (const reply of [
     { ok: false, state: "planning", kind: "plan" },
     { ok: true, state: "awaiting_approval", kind: "plan" },
@@ -245,8 +248,50 @@ test("reports an invalid host reply as an error with no transition record", asyn
       .executor(binding())
       .execute(callFor("EnterPlanMode", "tc-6"), RUN, new AbortController().signal);
     assert.equal(outcome.isError, true, JSON.stringify(reply));
-    assert.match(JSON.stringify(outcome.content), /invalid transition result/);
-    assert.equal(outcome.details, undefined);
+    assert.match(JSON.stringify(outcome.content), /unreadable transition result/);
+    const record = decodeModeTransitionDetails(outcome.details);
+    assert.equal(record?.state, "failed", JSON.stringify(reply));
+    assert.equal(record?.kind, "plan");
+    assert.equal(record?.toolCallId, "tc-6");
+    assert.match(record?.reason ?? "", /committed state cannot be confirmed/);
+  }
+});
+
+test("only the host's own pre-commit refusals stay correctable", async () => {
+  // `PlanManager::enter` authors exactly these codes before its mode CAS can
+  // commit; every other failure (a transport error, a timeout, a lost
+  // response, an unknown code) is undecidable and must stop the turn.
+  for (const code of ["PLAN_INVALID_ARGUMENT", "PLAN_SESSION_NOT_FOUND", "PLAN_ALREADY_ACTIVE", "PLAN_APPROVAL_STALE"]) {
+    const { plans } = enterHost({
+      enter: async () => {
+        throw Object.assign(new Error(code), { data: { errorCode: code } });
+      },
+    });
+    const outcome = await adapterWith(plans)
+      .executor(binding())
+      .execute(callFor("EnterPlanMode", `tc-${code}`), RUN, new AbortController().signal);
+    assert.equal(outcome.isError, true, code);
+    assert.match(JSON.stringify(outcome.content), new RegExp(`was refused: ${code}`));
+    assert.equal(decodeModeTransitionDetails(outcome.details), null, code);
+  }
+  for (const error of [
+    Object.assign(new Error("socket closed"), { data: { errorCode: "OMP_HOST_UNAVAILABLE" } }),
+    new Error("the host call timed out"),
+  ]) {
+    const { plans } = enterHost({
+      enter: async () => {
+        throw error;
+      },
+    });
+    const outcome = await adapterWith(plans)
+      .executor(binding())
+      .execute(callFor("EnterGoalMode", "tc-undecidable"), RUN, new AbortController().signal);
+    assert.equal(outcome.isError, true);
+    const record = decodeModeTransitionDetails(outcome.details);
+    assert.equal(record?.state, "failed");
+    assert.equal(record?.kind, "goal");
+    assert.match(record?.reason ?? "", /did not deliver a decidable transition result/);
+    assert.match(record?.reason ?? "", /cannot be confirmed/);
   }
 });
 

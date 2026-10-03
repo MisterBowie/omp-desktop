@@ -1,14 +1,126 @@
 # M5/T20-D-Enter validation: model-side mode entry
 
-Status: implementation complete and locally validated; the root's independent
-review is pending. T20-D's capability/UI acceptance and the plan/goal engine
-capability keys stay open; the Cursor + Plan/Goal gate (ADR 0306) is untouched.
+Status: **the first independent review (candidate `f56fe838`) was not accepted
+and reported four findings (R1-R4); this repair round implements and verifies
+the fixes; the candidate still awaits the root's re-review.** T20-D's
+capability/UI acceptance and the plan/goal engine capability keys stay open;
+the Cursor + Plan/Goal gate (ADR 0306) is untouched.
 
 Baseline: `2d96fa1e8bf3848021d1f265c0a258a9c455ef4c` (the root-accepted B2
 final commit). Product branch `codex/m5-t20-d-mode-entry`; fork branch
 `codex/omp-desktop-18.3.0-patch-5`. Fixed submodules: OMP `62bc57be`
 (omp/18.3.0), PI `0111e306`. Patch level `.5` = base + fork
-`36483311dfff67be7504f591974df93fc512a45a`.
+`36483311dfff67be7504f591974df93fc512a45a` (**unchanged by this repair**).
+
+## 0. First independent review repair (2026-10-03)
+
+### 0.1 Reproducing the review REDs on this candidate
+
+The root's four review scripts were copied to this machine and adapted **only**
+in the repo/output/host-binary paths (expectations untouched); the copies and
+both the root-original and adapted hashes are under
+`repair-20261003-scripts/`. Reproduced RED (raw JSON + console under
+`repair-20261003-red/`):
+
+| Group | RED result on `f56fe838` (before the fix) |
+| --- | --- |
+| `gate-transition-generation-review.mjs` | 2 positive controls green; all 3 stale-continuation counterexamples red (successor's record replaced by the transitioned copy / successor failed and aborted with its own token) |
+| `entry-failure-boundary-review.mjs` | 2 Stop controls green; all 4 committed-but-unfailed cases red (`malformed-committed-reply`, `catalog-error-after-commit` × plan/goal: 3 provider requests, the native write landed, the durable turn settled `completed`) |
+| `entry-catalog-generation-review.mjs` | both kinds red: B, prompted as Agent after A's Stop and `session.configure(agent)`, first advertised both Enter tools, then lost them and gained A's `SubmitPlan`/`SubmitGoal` when A's held catalogue assembly was released |
+
+### 0.2 Fixes
+
+1. **Failure record must survive the RPC error channel** (R1). A host-tool
+   error carrying structured `details` is now settled as `result.isError`
+   instead of the frame's top-level `isError`, because the pinned runtime's
+   reject path throws the text and discards the settled value
+   (`RpcHostToolBridge.handleResult`). Outcomes without details keep the old
+   top-level path. (`app/packages/omp-runtime/src/session/host-tools.ts`)
+2. **Undecidable commits stop the turn** (R2). Only the host's four
+   pre-CAS refusals stay correctable; an unreadable reply, a transport
+   failure, a timeout or an unknown error code is reported as a
+   `state: "failed"` record because it cannot rule out a commit.
+   (`app/apps/desktop/electron/main/runtime/omp-host-tools.ts`)
+3. **The gate's transition continuation is generation-bound** (R4). Every
+   await (prompt replacement, clamp) re-checks exact record identity plus the
+   token captured at validation; a stale continuation no longer replaces the
+   successor's record, retires its delegates, overwrites the prompt cache,
+   applies the old clamp, emits a failure naming the successor's token or
+   aborts its context. Turn-failure descriptors take the token the failure was
+   decided under. (`app/packages/omp-runtime/extensions/omp-desktop-gate.ts`)
+4. **The desktop preparation is live-turn-bound** (R3). `enterMode` re-checks
+   closed/stopping state, the admission record, the runner and the runner's
+   current turn after the catalogue assembly and around the registration; the
+   registration guard is re-checked immediately before `set_host_tools` and
+   again before the acknowledgment is trusted and the cache fingerprint
+   published. A stopped Enter can neither register a catalogue on the
+   successor's runtime nor poison the cache. The fork and the fixed submodules
+   are unchanged (no patch-level move).
+   (`app/apps/desktop/electron/main/runtime/omp-session.ts`)
+
+### 0.3 Behaviour after the repair (raw evidence)
+
+- `repair-20261003-green/gate-transition-generation-f56fe838.json` — **5/5**
+  (2 controls + 3 former counterexamples).
+- `repair-20261003-green/entry-catalog-generation-f56fe838.json` — **2/2**:
+  after A aborts, B stays Agent in both of its provider requests (both Enter
+  tools present, both submit tools absent), A `aborted`, B `completed`, mode
+  `agent`.
+- `repair-20261003-green/entry-failure-boundary-f56fe838.json` — the four
+  former failure cases now show exactly what the repair promises: **one**
+  provider request, no write, a terminal desktop `error`, `onTurnEnd.reason =
+  error`, the durable turn settled **`error`**, the committed mode durable,
+  and the next real prompt recovering with the right submit tool and mode
+  block. The two Stop controls stay green. The script's own `passed` flag is
+  still false for one reason only — see 0.4.
+- `repair-20261003-green/model-entry-flow-f56fe838.json` — normal flow 2/2.
+- Product regressions added at the same layers (RED before the fix):
+  `repair-20261003-red/product-e2e-prefix-red.txt` shows all three new
+  `omp-plan-submit-e2e` cases failing against the pre-fix source, while
+  `repair-20261003-green/plan-submit-e2e.txt` shows the whole file **13
+  passed / 0 failed** after the fix. Unit regressions: the gate stale
+  continuation cases (`gate-mode-transition.test.ts`), the structured-error
+  settlement (`host-tools.test.ts`), and the adapter's undecidable-commit
+  cases (`omp-mode-entry-unit.test.mjs`).
+
+### 0.4 Reviewer expectation correction: the durable turn status
+
+`entry-failure-boundary-review.mjs` asserts `turns.status === "failed"` for
+the two committed-unprepared scenarios. The host cannot store that value:
+`end_turn_settling` accepts only `completed | aborted | error` and coerces
+anything else to `completed` — the very status the review rejects — and it is
+the sole writer of `turns.status`; the pinned PI reference has the same
+three-value match, and the product's own turn-status unions are
+`running | completed | aborted | error`. The probe under
+`repair-20261003-corrections/` drives the real host binary and reads the row
+back: requesting `"failed"` stores `completed`, requesting `"error"` stores
+`"error"`. The repair therefore settles a failed post-commit transition turn
+as the host's `error` terminal (with the structured `omp-desktop-turn-failure`
+notice carrying `transition-apply-failed`/`transition-invalid`). The original
+review script and its expectation are preserved unchanged; the correction
+record is `repair-20261003-corrections/turn-status-expectation.json`.
+
+### 0.5 Verification of the repair round
+
+All commands were run on Linux x64, Node v24.14.0, Bun 1.4.2, local
+FakeProvider only (no paid/remote model); raw logs in
+`repair-20261003-green/`.
+
+| Command | Result |
+| --- | --- |
+| `pnpm --filter @pi-desktop/omp-runtime test` | 33 files, **499 passed / 6 skipped / 0 failed**, exit 0 (`runtime-vitest.txt`) |
+| `node --test apps/desktop/test/omp-mode-entry-unit.test.mjs` | **14 passed / 0 failed** (`mode-entry-unit.txt`) |
+| `node --test` over the 11 affected desktop suites (mode-entry unit, submit unit, host-tool adapter/bridge, session failclosed/bridge, host-tool e2e, session e2e, turn-fence e2e, execution-policy e2e, plan-submit e2e) | **164 passed / 0 failed**, exit 0 (`desktop-affected.txt`) |
+| `node --test apps/desktop/test/omp-plan-submit-e2e.test.mjs` | **13 passed / 0 failed** (all B2 + T20-D cases + the 3 repair cases) (`plan-submit-e2e.txt`) |
+| `pnpm build:js` / `pnpm typecheck` / `pnpm lint` | exit 0 each (`build-js.txt`, `typecheck.txt`, `lint.txt`) |
+| `node scripts/omp-patch.mjs --check --source <fork>` / sidecar `--check` | `OMP-SIDECAR-OK 62bc57b+omp-desktop.5` (unchanged patch/binary) |
+| `node scripts/omp-sidecar.mjs --build --source <fork>` | real Linux x64 `omp` 244295136 B / `f6111efd…` (unchanged); **rebuilt gate bundle** 52297 B / `dbefff57…`; provenance `.5` (`sidecar-build.txt`) |
+| `node scripts/verify-packaged-runtime.mjs --resources apps/desktop/resources` | `PACKAGED-RUNTIME-OK run`: protocol v2, `get_state` ok, gate-load control refused, minimal child PATH + isolated HOME, `stopped=true reaped=true cleaned=true` (`packaged-runtime.txt`) |
+
+Not run / not claimed in this round: macOS and Windows real runs, electron-
+builder installer resources, release/tag/main merge, the D capability keys and
+UI matrix. The gate-bundle rebuild is the source-tree `Resources` layout smoke
+(`verify-packaged-runtime.mjs`), not an installed packaged application.
 
 Executor: one fresh session, model deepseek/deepseek-flash with thinking=max
 (the user-selected executor; the planning/root session is separate). Environment:

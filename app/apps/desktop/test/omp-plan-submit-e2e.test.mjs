@@ -210,6 +210,16 @@ async function buildBridge({
   hostTurns = null,
   runtimeFactory = null,
   pluginTools = [],
+  /**
+   * Controlled public seam over the real `plans.enter` reply: the host call
+   * still commits for real; only the answer the adapter reads is transformed.
+   */
+  transformEnterReply = null,
+  /**
+   * Controlled public seam over the bridge's host-tool catalog assembly: how
+   * many times the transition's re-registration happens, and when it answers.
+   */
+  enterCatalogHook = null,
 }) {
   const sessionDir = ensureSessionStateDir(dataRoot);
   // One supervisor per session, exactly like the production wiring: a shared
@@ -250,7 +260,15 @@ async function buildBridge({
     },
     userMcp: { toolsForProject: async () => [], callTool: async () => "" },
     pluginActiveInProject: () => true,
-    plans: createHostPlansEndpoints(() => host),
+    plans: transformEnterReply
+      ? {
+          ...createHostPlansEndpoints(() => host),
+          enter: async (input) => {
+            const actual = await host.call("plans.enter", input);
+            return transformEnterReply(actual, input);
+          },
+        }
+      : createHostPlansEndpoints(() => host),
   });
 
   const bridge = createOmpSessionBridge({
@@ -274,7 +292,12 @@ async function buildBridge({
       },
     },
     hostTurns: hostTurns ?? createOmpHostTurnLifecycle(() => host),
-    hostTools,
+    hostTools: enterCatalogHook
+      ? {
+          executor: hostTools.executor,
+          catalog: async (projectPath) => enterCatalogHook(await hostTools.catalog(projectPath)),
+        }
+      : hostTools,
     persistNativeSession: async (info) => {
       await host.call("session.bindEngine", {
         id: info.sessionId,
@@ -1568,5 +1591,319 @@ test(
     const { session } = await host.call("session.get", { id: sessionId });
     assert.equal(session.mode, "plan");
     assert.equal(events.filter((entry) => entry.event.type === "tool_start" && entry.event.toolCallId === "call_sole_enter").length, 1);
+  },
+);
+/**
+ * The T20-D review-repair regressions (R1/R2): once the host has committed a
+ * mode, a desktop-side failure to prepare the live turn — or an answer the
+ * adapter cannot read, which cannot rule out a commit — must stop the *same*
+ * turn with a desktop-visible error and no further provider request or tool
+ * side effect, and the next real prompt must rebuild from the durable host
+ * row. The turn row settles as the host's `error` terminal (its status
+ * vocabulary is `running | completed | aborted | error`; there is no `failed`
+ * value — see `docs/validation/M5-t20-d-mode-entry.md`).
+ */
+test(
+  "T20-D failure boundary: a committed Enter whose catalogue rebuild fails stops the turn and recovers in Plan",
+  { timeout: 600_000, skip: READY ? false : "host-core binary or patched runtime not available" },
+  async () => {
+    const project = makeScratch("t20d-enter-fail-catalog-project-");
+    const dataRoot = makeScratch("t20d-enter-fail-catalog-data-");
+    const provider = await FakeProvider.start({ model: "local-model" });
+    scratch.push({ close: () => provider.close?.() });
+    const host = await startHost(dataRoot);
+    const forbiddenWrite = join(project, "inconsistent-write.txt");
+    const sessionId = await createSession(host, {
+      title: "enter catalog failure",
+      projectPath: project,
+      mode: "agent",
+      permissionMode: "auto",
+    });
+    const events = [];
+    const ends = [];
+    let catalogCalls = 0;
+    const { bridge } = await buildBridge({
+      host,
+      dataRoot,
+      project,
+      provider,
+      events,
+      onTurnEnd: (info) => ends.push({ ...info }),
+      enterCatalogHook: async (catalog) => {
+        catalogCalls += 1;
+        // The first assembly is the prompt's; the transition's re-registration
+        // fails after the host has already committed the durable mode.
+        if (catalogCalls === 2) throw new Error("controlled catalog failure");
+        return catalog;
+      },
+    });
+    provider.script([
+      {
+        text: "entering plan",
+        finish: "tool_calls",
+        toolCalls: [{ id: "entry-plan", name: "EnterPlanMode", args: {} }],
+      },
+      {
+        text: "this turn must never run",
+        finish: "tool_calls",
+        toolCalls: [
+          { id: "write-in-inconsistent-mode", name: "write", args: { path: forbiddenWrite, content: "unexpected\n" } },
+        ],
+      },
+      { text: "nor this provider request", finish: "stop" },
+    ]);
+
+    const accepted = await promptThrough(host, bridge, sessionId, "Enter plan before any implementation.");
+    assert.equal(accepted.accepted, true);
+    assert.ok(accepted.hostTurnId, "the admitted prompt is bound to a durable host turn");
+    assert.equal(
+      await waitFor(() => bridge.status(sessionId).isRunning === false && ends.length === 1),
+      true,
+      `the failed transition must settle the turn; errors: ${JSON.stringify(
+        events.filter((entry) => entry.event.type === "error").map((entry) => entry.event.error),
+      )}`,
+    );
+    assert.equal(postRequests(provider).length, 1, "the next provider request must never be sent");
+    assert.equal(existsSync(forbiddenWrite), false, "no tool side effect after the committed Enter");
+    assert.ok(
+      events.some((entry) => entry.event.type === "error"),
+      "the desktop sees a terminal error for the failed transition",
+    );
+    assert.equal(catalogCalls, 2, "the transition's catalogue assembly really ran");
+    assert.equal(ends[0].reason, "error");
+    assert.equal(ends[0].hostTurnId, accepted.hostTurnId, "the failure settles its own durable turn");
+
+    // The host row is the durable fact: the mode stayed committed, and the
+    // turn was settled as a failure — never as a completed turn.
+    const { session } = await host.call("session.get", { id: sessionId });
+    assert.equal(session.mode, "plan", "the committed host mode remains durable");
+    const turns = readTurnRows(dataRoot, sessionId);
+    assert.equal(turns.length, 1);
+    assert.equal(turns[0].id, accepted.hostTurnId);
+    assert.equal(turns[0].status, "error", "the failed transition must not settle as completed");
+    const audit = new DatabaseSync(join(dataRoot, "pi.sqlite"), { readOnly: true });
+    try {
+      const rows = audit
+        .prepare("SELECT payload_json FROM audit_log WHERE session_id = ? AND kind = 'plan_entered'")
+        .all(sessionId)
+        .map((row) => JSON.parse(row.payload_json));
+      assert.equal(rows.length, 1, "the host committed exactly one entry");
+      assert.equal(rows[0].turnId, accepted.hostTurnId);
+    } finally {
+      audit.close();
+    }
+
+    // The next real prompt rebuilds from the authoritative row: Plan catalogue
+    // and Plan prompt, exactly one durable turn, no second user message.
+    provider.script([{ text: "Recovery read-only turn complete.", finish: "stop" }]);
+    const recovery = await promptThrough(host, bridge, sessionId, "Read the current contract and stop.");
+    assert.equal(recovery.accepted, true);
+    assert.equal(
+      await waitFor(() => bridge.status(sessionId).isRunning === false && ends.length === 2),
+      true,
+      "the recovery turn must settle",
+    );
+    const latest = postRequests(provider).at(-1);
+    const recoveryTools = toolNamesOf(latest);
+    assert.ok(recoveryTools.includes("SubmitPlan"), `the Plan catalogue must return: ${recoveryTools.join(", ")}`);
+    assert.equal(recoveryTools.includes("EnterPlanMode"), false);
+    assert.equal(recoveryTools.includes("write"), false);
+    assert.match(systemTextOf(latest), new RegExp(PLAN_BLOCK_PREFIX));
+    const finalTurns = readTurnRows(dataRoot, sessionId);
+    assert.equal(finalTurns.length, 2);
+    assert.equal(finalTurns[1].status, "completed");
+  },
+);
+
+test(
+  "T20-D failure boundary: an unreadable committed Enter reply stops the turn and recovers in Goal",
+  { timeout: 600_000, skip: READY ? false : "host-core binary or patched runtime not available" },
+  async () => {
+    const project = makeScratch("t20d-enter-fail-reply-project-");
+    const dataRoot = makeScratch("t20d-enter-fail-reply-data-");
+    const provider = await FakeProvider.start({ model: "local-model" });
+    scratch.push({ close: () => provider.close?.() });
+    const host = await startHost(dataRoot);
+    const forbiddenWrite = join(project, "inconsistent-write.txt");
+    const sessionId = await createSession(host, {
+      title: "enter unreadable reply",
+      projectPath: project,
+      mode: "agent",
+      permissionMode: "auto",
+    });
+    const events = [];
+    const ends = [];
+    let realReply = null;
+    const { bridge } = await buildBridge({
+      host,
+      dataRoot,
+      project,
+      provider,
+      events,
+      onTurnEnd: (info) => ends.push({ ...info }),
+      // The host call really commits; only the answer the adapter reads is
+      // corrupted — exactly the "committed but unattributable" boundary.
+      transformEnterReply: (actual) => {
+        realReply = actual;
+        return { ...actual, kind: "invalid-kind" };
+      },
+    });
+    provider.script([
+      {
+        text: "entering goal",
+        finish: "tool_calls",
+        toolCalls: [{ id: "entry-goal", name: "EnterGoalMode", args: {} }],
+      },
+      {
+        text: "this turn must never run",
+        finish: "tool_calls",
+        toolCalls: [
+          { id: "write-in-inconsistent-mode", name: "write", args: { path: forbiddenWrite, content: "unexpected\n" } },
+        ],
+      },
+      { text: "nor this provider request", finish: "stop" },
+    ]);
+
+    const accepted = await promptThrough(host, bridge, sessionId, "Enter goal before any implementation.");
+    assert.equal(accepted.accepted, true);
+    assert.equal(
+      await waitFor(() => bridge.status(sessionId).isRunning === false && ends.length === 1),
+      true,
+      `the unreadable reply must stop the turn; errors: ${JSON.stringify(
+        events.filter((entry) => entry.event.type === "error").map((entry) => entry.event.error),
+      )}`,
+    );
+    assert.deepEqual(realReply, { ok: true, state: "planning", kind: "goal" }, "the real host committed");
+    assert.equal(postRequests(provider).length, 1, "the next provider request must never be sent");
+    assert.equal(existsSync(forbiddenWrite), false, "no tool side effect after the committed Enter");
+    assert.equal(ends[0].reason, "error");
+    assert.equal((await host.call("session.get", { id: sessionId })).session.mode, "goal");
+
+    provider.script([{ text: "Recovery read-only turn complete.", finish: "stop" }]);
+    const recovery = await promptThrough(host, bridge, sessionId, "Read the current contract and stop.");
+    assert.equal(recovery.accepted, true);
+    assert.equal(
+      await waitFor(() => bridge.status(sessionId).isRunning === false && ends.length === 2),
+      true,
+      "the recovery turn must settle",
+    );
+    const latest = postRequests(provider).at(-1);
+    const recoveryTools = toolNamesOf(latest);
+    assert.ok(recoveryTools.includes("SubmitGoal"), `the Goal catalogue must return: ${recoveryTools.join(", ")}`);
+    assert.equal(recoveryTools.includes("EnterGoalMode"), false);
+    assert.equal(recoveryTools.includes("write"), false);
+    assert.match(systemTextOf(latest), new RegExp(GOAL_BLOCK_PREFIX));
+    const finalTurns = readTurnRows(dataRoot, sessionId);
+    assert.equal(finalTurns.length, 2);
+    assert.equal(finalTurns[1].status, "completed");
+  },
+);
+
+test(
+  "T20-D generation safety: a stopped Enter's late catalogue answer never changes the successor Agent turn",
+  { timeout: 600_000, skip: READY ? false : "host-core binary or patched runtime not available" },
+  async () => {
+    const project = makeScratch("t20d-enter-stale-catalog-project-");
+    const dataRoot = makeScratch("t20d-enter-stale-catalog-data-");
+    writeFileSync(join(project, "seed.txt"), "seed content\n");
+    const provider = await FakeProvider.start({ model: "local-model" });
+    scratch.push({ close: () => provider.close?.() });
+    const host = await startHost(dataRoot);
+    const sessionId = await createSession(host, {
+      title: "stale enter catalog",
+      projectPath: project,
+      mode: "agent",
+      permissionMode: "auto",
+    });
+    const events = [];
+    const ends = [];
+    let releaseCatalog = null;
+    const heldCatalog = new Promise((resolve) => {
+      releaseCatalog = resolve;
+    });
+    let catalogCalls = 0;
+    let oldCatalogWaiting = false;
+    const { bridge } = await buildBridge({
+      host,
+      dataRoot,
+      project,
+      provider,
+      events,
+      onTurnEnd: (info) => ends.push({ ...info }),
+      enterCatalogHook: async (catalog) => {
+        catalogCalls += 1;
+        // The second assembly is the stopped Enter's transition; it is held
+        // until after the successor Agent turn has started and issued its
+        // first provider request.
+        if (catalogCalls === 2) {
+          oldCatalogWaiting = true;
+          await heldCatalog;
+        }
+        return catalog;
+      },
+    });
+
+    // --- A: a real Enter commits, then a real Stop settles A ---------------
+    provider.script([
+      {
+        text: "entering plan",
+        finish: "tool_calls",
+        toolCalls: [{ id: "entry-A", name: "EnterPlanMode", args: {} }],
+      },
+    ]);
+    const first = await promptThrough(host, bridge, sessionId, "Enter plan");
+    assert.equal(first.accepted, true);
+    assert.equal(await waitFor(() => oldCatalogWaiting), true, "the held transition catalogue assembly was reached");
+    assert.equal((await host.call("session.get", { id: sessionId })).session.mode, "plan");
+    await bridge.stop(sessionId);
+    assert.equal(
+      await waitFor(() => ends.length === 1 && readTurnRows(dataRoot, sessionId)[0].status === "aborted"),
+      true,
+      "Stop settles A's durable turn as aborted",
+    );
+
+    // --- B: a genuine successor Agent turn, its first request in flight ----
+    await host.call("session.configure", { id: sessionId, mode: "agent", permissionMode: "auto" });
+    const postsBefore = postRequests(provider).length;
+    provider.script([
+      {
+        text: "reading the seed",
+        finish: "tool_calls",
+        toolCalls: [{ id: "read-B", name: "read", args: { path: "seed.txt" } }],
+        delayMs: 2000,
+      },
+      { text: "B complete", finish: "stop" },
+    ]);
+    const second = await promptThrough(host, bridge, sessionId, "Read seed then stop in Agent mode.");
+    assert.equal(second.accepted, true);
+    assert.equal(await waitFor(() => postRequests(provider).length > postsBefore), true, "B's first request was sent");
+
+    // The old Enter's catalogue assembly now answers; it must not register a
+    // catalogue for, or publish cache state about, B's runtime.
+    releaseCatalog();
+    assert.equal(
+      await waitFor(
+        () =>
+          ends.length === 2 &&
+          bridge.status(sessionId).isRunning === false &&
+          readTurnRows(dataRoot, sessionId).every((row) => row.status !== "running"),
+      ),
+      true,
+      "B settles",
+    );
+    const secondRequests = postRequests(provider).slice(postsBefore);
+    assert.equal(secondRequests.length, 2);
+    for (const request of secondRequests) {
+      const tools = toolNamesOf(request);
+      assert.ok(tools.includes("EnterPlanMode"), `B must stay Agent: ${tools.join(", ")}`);
+      assert.ok(tools.includes("EnterGoalMode"), `B must stay Agent: ${tools.join(", ")}`);
+      assert.equal(tools.includes("SubmitPlan"), false, "the stale Plan catalogue must not leak into B");
+      assert.equal(tools.includes("SubmitGoal"), false);
+      assert.match(systemTextOf(request), new RegExp(AGENT_BLOCK_PREFIX));
+    }
+    const turns = readTurnRows(dataRoot, sessionId);
+    assert.equal(turns[0].status, "aborted");
+    assert.equal(turns[1].status, "completed");
+    assert.equal((await host.call("session.get", { id: sessionId })).session.mode, "agent");
   },
 );

@@ -1,0 +1,22 @@
+✔ enter catalog entries carry the PI name/schema and the sole, non-terminating policy (0.811324ms)
+✔ enters Plan through the host with the durable identity and returns a ready record (1.285861ms)
+✔ enters Goal through the host and never reads identity from model arguments (0.151527ms)
+✔ refuses a non-Agent turn and a run without a durable host turn before any host call (0.363892ms)
+✔ refuses an already-aborted call without touching the host (0.288861ms)
+✔ refuses to enter without an established native session (0.111152ms)
+✔ records the native session identity the gate validates, not the desktop session id (0.116256ms)
+✔ reports a host refusal as a correctable error with no transition record (0.153322ms)
+✔ an unreadable host reply stops the turn with a failed record instead of a correctable error (0.299855ms)
+✔ only the host's own pre-commit refusals stay correctable (0.385452ms)
+✔ a stop racing the committed transition reports a failed record instead of success (0.129308ms)
+✔ a desktop preparation failure after the commit reports a failed record (0.122207ms)
+✔ a stop during desktop preparation also reports a failed record (0.095265ms)
+✔ the record's envelope is the one the gate decodes (0.080498ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 272.141523

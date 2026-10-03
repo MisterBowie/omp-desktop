@@ -1,0 +1,8 @@
+PACKAGED-RUNTIME-OK run omp/18.3.0 linux/x64
+  resources  : /home/vv/person/code/omp-desktop-m5-t20-d-enter/app/apps/desktop/resources
+  binary     : /home/vv/person/code/omp-desktop-m5-t20-d-enter/app/apps/desktop/resources/omp-runtime/omp (244295136 B, sha256 f6111efdd9f60f8ab831da0d6292e37868e89dd163af46103780fd83924f560c)
+  gate       : /home/vv/person/code/omp-desktop-m5-t20-d-enter/app/apps/desktop/resources/omp-runtime/extensions/omp-desktop-gate.js (52297 B, sha256 dbefff576338d3764f44f046d4209f459cda05b7e3698862be86a5f987fcf90e)
+  provenance : patchLevel 62bc57b+omp-desktop.5, fork 36483311dfff67be7504f591974df93fc512a45a
+  runtime    : v2 negotiated, get_state ok, gate load control refused
+  child env  : PATH=/tmp/omp-packaged-accept-ofZsj5/empty-path, HOME=/tmp/omp-packaged-accept-ofZsj5/data/omp-runtime/run-U9wIXY/home, NODE_PATH/redirects/credentials absent
+  stop       : stopped=true reaped=true cleaned=true, leftover runs 0

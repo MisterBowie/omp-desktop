@@ -1,0 +1,220 @@
+{
+  "candidate": "f56fe8386c71c886212391907fc289055eeaf9b8",
+  "layer": "actual bridge/gate/adapter/patched source OMP/HostProcess+SQLite/local fake provider; public catalog promise delayed across Stop and subsequent actual prompt; public session.configure models a user mode change",
+  "cases": [
+    {
+      "kind": "plan",
+      "ends": [
+        {
+          "sessionId": "5e887190-532c-4e78-a1e0-3b3d65416d3e",
+          "turnId": "omp-turn:5e887190-532c-4e78-a1e0-3b3d65416d3e:e0c6c848-e2c1-436d-8fed-d39ccd92c4e3:1",
+          "hostTurnId": "e0b0da19-7590-4357-ba79-670f0e0cdfe6",
+          "reason": "aborted"
+        },
+        {
+          "sessionId": "5e887190-532c-4e78-a1e0-3b3d65416d3e",
+          "turnId": "omp-turn:5e887190-532c-4e78-a1e0-3b3d65416d3e:e0c6c848-e2c1-436d-8fed-d39ccd92c4e3:2",
+          "hostTurnId": "a7271163-eed3-478b-b77f-8f7593c46e9a",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 3,
+      "first": {
+        "accepted": true,
+        "turnId": "omp-turn:5e887190-532c-4e78-a1e0-3b3d65416d3e:e0c6c848-e2c1-436d-8fed-d39ccd92c4e3:1",
+        "hostTurnId": "e0b0da19-7590-4357-ba79-670f0e0cdfe6"
+      },
+      "oldCatalogWaiting": true,
+      "modeBeforeStop": "plan",
+      "stop": {
+        "aborted": true,
+        "abortBashSent": false,
+        "converged": true,
+        "toreDown": false,
+        "steps": [
+          "cancelled 1 pending host tool call(s)",
+          "abort acknowledged",
+          "turn converged"
+        ],
+        "errors": []
+      },
+      "second": {
+        "accepted": true,
+        "turnId": "omp-turn:5e887190-532c-4e78-a1e0-3b3d65416d3e:e0c6c848-e2c1-436d-8fed-d39ccd92c4e3:2",
+        "hostTurnId": "a7271163-eed3-478b-b77f-8f7593c46e9a"
+      },
+      "oldCatalogReleased": true,
+      "secondRequests": [
+        {
+          "tools": [
+            "read",
+            "bash",
+            "edit",
+            "ask",
+            "eval",
+            "glob",
+            "grep",
+            "task",
+            "wait",
+            "todo",
+            "web_search",
+            "write",
+            "EnterPlanMode",
+            "EnterGoalMode"
+          ]
+        },
+        {
+          "tools": [
+            "read",
+            "bash",
+            "edit",
+            "ask",
+            "eval",
+            "glob",
+            "grep",
+            "task",
+            "wait",
+            "todo",
+            "web_search",
+            "write",
+            "SubmitPlan"
+          ]
+        }
+      ],
+      "modeAfter": "agent",
+      "turns": [
+        {
+          "id": "e0b0da19-7590-4357-ba79-670f0e0cdfe6",
+          "status": "aborted"
+        },
+        {
+          "id": "a7271163-eed3-478b-b77f-8f7593c46e9a",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [
+        {
+          "name": "B stays Agent after old catalog release",
+          "error": "The expression evaluated to a falsy value:\n\n  assert.ok(request.tools.includes('EnterPlanMode'))\n"
+        }
+      ],
+      "passed": false,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "goal",
+      "ends": [
+        {
+          "sessionId": "21c6d277-88f0-40b8-8cab-f65b8d384d99",
+          "turnId": "omp-turn:21c6d277-88f0-40b8-8cab-f65b8d384d99:d1dc8ba3-2eeb-42da-bbcd-0f7f7be353ba:1",
+          "hostTurnId": "7d6d5b96-880d-4e71-ae75-1d77557bba87",
+          "reason": "aborted"
+        },
+        {
+          "sessionId": "21c6d277-88f0-40b8-8cab-f65b8d384d99",
+          "turnId": "omp-turn:21c6d277-88f0-40b8-8cab-f65b8d384d99:d1dc8ba3-2eeb-42da-bbcd-0f7f7be353ba:2",
+          "hostTurnId": "ec6db7c1-9277-4c6d-ae46-24b1ed5f0aed",
+          "reason": "completed"
+        }
+      ],
+      "catalogCalls": 3,
+      "first": {
+        "accepted": true,
+        "turnId": "omp-turn:21c6d277-88f0-40b8-8cab-f65b8d384d99:d1dc8ba3-2eeb-42da-bbcd-0f7f7be353ba:1",
+        "hostTurnId": "7d6d5b96-880d-4e71-ae75-1d77557bba87"
+      },
+      "oldCatalogWaiting": true,
+      "modeBeforeStop": "goal",
+      "stop": {
+        "aborted": true,
+        "abortBashSent": false,
+        "converged": true,
+        "toreDown": false,
+        "steps": [
+          "cancelled 1 pending host tool call(s)",
+          "abort acknowledged",
+          "turn converged"
+        ],
+        "errors": []
+      },
+      "second": {
+        "accepted": true,
+        "turnId": "omp-turn:21c6d277-88f0-40b8-8cab-f65b8d384d99:d1dc8ba3-2eeb-42da-bbcd-0f7f7be353ba:2",
+        "hostTurnId": "ec6db7c1-9277-4c6d-ae46-24b1ed5f0aed"
+      },
+      "oldCatalogReleased": true,
+      "secondRequests": [
+        {
+          "tools": [
+            "read",
+            "bash",
+            "edit",
+            "ask",
+            "eval",
+            "glob",
+            "grep",
+            "task",
+            "wait",
+            "todo",
+            "web_search",
+            "write",
+            "EnterPlanMode",
+            "EnterGoalMode"
+          ]
+        },
+        {
+          "tools": [
+            "read",
+            "bash",
+            "edit",
+            "ask",
+            "eval",
+            "glob",
+            "grep",
+            "task",
+            "wait",
+            "todo",
+            "web_search",
+            "write",
+            "SubmitGoal"
+          ]
+        }
+      ],
+      "modeAfter": "agent",
+      "turns": [
+        {
+          "id": "7d6d5b96-880d-4e71-ae75-1d77557bba87",
+          "status": "aborted"
+        },
+        {
+          "id": "ec6db7c1-9277-4c6d-ae46-24b1ed5f0aed",
+          "status": "completed"
+        }
+      ],
+      "messageCount": 0,
+      "failures": [
+        {
+          "name": "B stays Agent after old catalog release",
+          "error": "The expression evaluated to a falsy value:\n\n  assert.ok(request.tools.includes('EnterPlanMode'))\n"
+        }
+      ],
+      "passed": false,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    }
+  ],
+  "finalCleanupErrors": [],
+  "passed": false
+}

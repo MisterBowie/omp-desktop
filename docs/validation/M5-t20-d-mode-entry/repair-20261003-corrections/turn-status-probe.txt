@@ -1,0 +1,23 @@
+(node:1925586) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  "binaryPath": "/home/vv/person/code/omp-desktop-m5-t20-d-enter/app/target/debug/pi-desktop-host-core",
+  "outcomes": [
+    {
+      "requestedStatus": "failed",
+      "rpc": {
+        "ok": true
+      }
+    },
+    {
+      "requestedStatus": "error",
+      "rpc": {
+        "ok": true
+      }
+    }
+  ],
+  "storedStatuses": [
+    "completed",
+    "error"
+  ]
+}

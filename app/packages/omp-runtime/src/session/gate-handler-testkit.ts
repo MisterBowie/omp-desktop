@@ -34,6 +34,14 @@ export type GateHarnessOptions = {
    * of silently keeping the old prompt.
    */
   liveSystemPrompt?: boolean;
+  /**
+   * Awaited inside `setTurnSystemPrompt` after the replacement was recorded.
+   * Lets a test suspend a transition inside the prompt API — the window in
+   * which a successor turn can be armed — instead of racing real timers.
+   */
+  awaitSystemPrompt?: () => Promise<void> | void;
+  /** Awaited inside `setActiveTools` after the selection was recorded. */
+  awaitToolSelection?: () => Promise<void> | void;
 };
 
 export type GateHandlerHarness = {
@@ -154,12 +162,14 @@ export function createGateHandlerHarness(options: GateHarnessOptions = {}): Gate
     getActiveTools: () => [...active],
     setActiveTools: async (names: string[]) => {
       toolSelections.push([...names]);
+      await options.awaitToolSelection?.();
     },
     ...(options.liveSystemPrompt === false
       ? {}
       : {
           setTurnSystemPrompt: async (prompt: string[]) => {
             systemPromptReplacements.push([...prompt]);
+            await options.awaitSystemPrompt?.();
           },
         }),
     logger: { warn: () => undefined },

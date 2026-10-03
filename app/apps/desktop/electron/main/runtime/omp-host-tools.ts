@@ -724,11 +724,14 @@ export function createOmpHostToolAdapter(deps: OmpHostToolAdapterDeps): OmpHostT
         });
       }
       const at = Date.now();
-      // A committed transition the desktop could not prepare. The record is
-      // the only channel that tells the gate to stop the inconsistent turn;
-      // its own encoder ceiling can only fail for a pathological catalogue,
-      // in which case the error result still stops the model from pretending
-      // the entry succeeded (no record => the gate fails the turn).
+      // A transition whose commit state the desktop cannot vouch for: the host
+      // committed but the desktop could not prepare the live turn, or the
+      // `plans.enter` answer was unreadable / failed in a way that may have
+      // followed a commit. The record is the only channel that tells the gate
+      // to stop the inconsistent turn; its own encoder ceiling can only fail
+      // for a pathological catalogue, in which case the error result still
+      // stops the model from pretending the entry succeeded (no record => the
+      // gate fails the turn).
       const failedOutcome = (reason: string): OmpHostToolOutcome => {
         let details: Record<string, OmpModeTransition> | undefined;
         try {
@@ -761,16 +764,33 @@ export function createOmpHostToolAdapter(deps: OmpHostToolAdapterDeps): OmpHostT
           kind,
         });
         if (!isEnterPlanResult(result, kind)) {
-          return outcomeFor({
-            content: [{ type: "text", text: `${name} returned an invalid transition result.` }],
-            isError: true,
-          });
+          // An unreadable reply can neither confirm nor rule out that the host
+          // committed the durable mode (the real host may have written the CAS
+          // and answered with a shape this build cannot attribute). It is not
+          // a correctable refusal: stop the turn and let the next prompt
+          // recover from the authoritative row.
+          return failedOutcome(
+            `${name} returned an unreadable transition result; the committed state cannot be confirmed`,
+          );
         }
       } catch (error) {
-        // The host refused: wrong durable mode, stale turn, an active
-        // execution. This is a correctable tool error with no transition.
+        const code = planSubmitErrorCode(error);
+        if (ENTER_REFUSAL_CODES[code] !== true) {
+          // Only the host's own pre-commit validators answer with those codes.
+          // Anything else — a transport failure, a timeout, a lost response, an
+          // unrecognized error code — can happen *after* the host committed,
+          // so the desktop has no evidence the durable mode is unchanged and
+          // must not report a correctable refusal. Stop the turn; the next
+          // prompt rebuilds from the durable row.
+          return failedOutcome(
+            `${name} did not deliver a decidable transition result (${code}); the committed state cannot be confirmed`,
+          );
+        }
+        // The host refused before committing: wrong durable mode, stale turn,
+        // an active execution. This is a correctable tool error with no
+        // transition.
         return outcomeFor({
-          content: [{ type: "text", text: `${name} was refused: ${planSubmitErrorCode(error)}` }],
+          content: [{ type: "text", text: `${name} was refused: ${code}` }],
           isError: true,
         });
       }
@@ -1099,6 +1119,24 @@ function isEnterPlanResult(value: unknown, kind: DesktopSubmitKind): boolean {
   const reported = "kind" in value ? value.kind : undefined;
   return ok === true && state === "planning" && reported === kind;
 }
+
+/**
+ * The `plans.enter` refusals the host authors *before* its mode CAS commits.
+ *
+ * `PlanManager::enter` validates the arguments, the session row, the durable
+ * mode and (inside the transaction, with no write on a miss) the live turn
+ * before it can commit; each rejection names one of these codes. They are the
+ * only outcomes the desktop may report as a correctable refusal with proof
+ * that nothing was written — every other error (transport, timeout, an
+ * unknown code) can follow a commit whose response was lost, so the adapter
+ * stops the turn instead of guessing.
+ */
+const ENTER_REFUSAL_CODES: Record<string, true> = {
+  PLAN_INVALID_ARGUMENT: true,
+  PLAN_SESSION_NOT_FOUND: true,
+  PLAN_ALREADY_ACTIVE: true,
+  PLAN_APPROVAL_STALE: true,
+};
 
 /**
  * The host error code carried by a failed `plans.submit`/`plans.enter` RPC.

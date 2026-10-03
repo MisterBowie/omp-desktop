@@ -1,0 +1,312 @@
+(node:1925877) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  "candidate": "f56fe8386c71c886212391907fc289055eeaf9b8",
+  "layer": "actual production bridge/gate/adapter/HostProcess+SQLite/patched source OMP/local FakeProvider; fixture memory marker only; no Renderer/installer claim",
+  "cases": [
+    {
+      "kind": "plan",
+      "ends": [
+        {
+          "sessionId": "bf8fd619-a1d6-41d3-b982-528571c96557",
+          "turnId": "omp-turn:bf8fd619-a1d6-41d3-b982-528571c96557:024b9279-dc25-4d9f-ba28-077ad0876dda:1",
+          "hostTurnId": "1db24ef6-a145-4d1e-8e6b-537bb471a820",
+          "reason": "completed"
+        }
+      ],
+      "permissionCards": [],
+      "nativeBindings": [
+        {
+          "sessionId": "bf8fd619-a1d6-41d3-b982-528571c96557",
+          "nativeSessionId": "01a0ff92-a7d0-73ef-a7c5-803be002deaf",
+          "nativeSessionPath": "/tmp/root-d-entry-flow-data-sd4RCg/omp-sessions/2026-10-03T02-23-16-432Z_01a0ff92-a7d0-73ef-a7c5-803be002deaf.jsonl",
+          "runtimeVersion": "18.3.0"
+        }
+      ],
+      "requests": [
+        {
+          "index": 0,
+          "toolNames": [
+            "read",
+            "bash",
+            "edit",
+            "ask",
+            "eval",
+            "glob",
+            "grep",
+            "task",
+            "wait",
+            "todo",
+            "web_search",
+            "write",
+            "EnterPlanMode",
+            "EnterGoalMode"
+          ],
+          "systemSha256": "a013dd3d49cb26bbdaf332f4b3fd82884e810b7df41da13421198591d719100a"
+        },
+        {
+          "index": 1,
+          "toolNames": [
+            "read",
+            "bash",
+            "ask",
+            "glob",
+            "grep",
+            "SubmitPlan"
+          ],
+          "systemSha256": "eea4fd4fb953b76132ff0d088373d971360d30087c51ea4c8570cf7eefc0fd9d"
+        },
+        {
+          "index": 2,
+          "toolNames": [
+            "read",
+            "bash",
+            "ask",
+            "glob",
+            "grep",
+            "SubmitPlan"
+          ],
+          "systemSha256": "eea4fd4fb953b76132ff0d088373d971360d30087c51ea4c8570cf7eefc0fd9d"
+        },
+        {
+          "index": 3,
+          "toolNames": [
+            "read",
+            "bash",
+            "ask",
+            "glob",
+            "grep",
+            "SubmitPlan"
+          ],
+          "systemSha256": "eea4fd4fb953b76132ff0d088373d971360d30087c51ea4c8570cf7eefc0fd9d"
+        }
+      ],
+      "engineRef": {
+        "adapterVersion": 1,
+        "engine": "omp",
+        "nativeSessionId": "01a0ff92-a7d0-73ef-a7c5-803be002deaf",
+        "nativeSessionPath": "/tmp/root-d-entry-flow-data-sd4RCg/omp-sessions/2026-10-03T02-23-16-432Z_01a0ff92-a7d0-73ef-a7c5-803be002deaf.jsonl",
+        "runtimeVersion": "18.3.0"
+      },
+      "nativeSessionId": "01a0ff92-a7d0-73ef-a7c5-803be002deaf",
+      "nativeHeader": {
+        "type": "session",
+        "version": 3,
+        "id": "01a0ff92-a7d0-73ef-a7c5-803be002deaf",
+        "timestamp": "2026-10-03T02:23:16.432Z",
+        "cwd": "/tmp/root-d-entry-flow-project-HY4WF0"
+      },
+      "nativeUserMessageCount": 1,
+      "modeAfter": "plan",
+      "turns": [
+        {
+          "id": "1db24ef6-a145-4d1e-8e6b-537bb471a820",
+          "status": "completed"
+        }
+      ],
+      "hostTurnId": "1db24ef6-a145-4d1e-8e6b-537bb471a820",
+      "enterAudit": [
+        {
+          "kind": "plan",
+          "mode": "plan",
+          "sessionId": "bf8fd619-a1d6-41d3-b982-528571c96557",
+          "toolCallId": "entry-plan",
+          "turnId": "1db24ef6-a145-4d1e-8e6b-537bb471a820"
+        }
+      ],
+      "messageCount": 0,
+      "forbiddenEffect": null,
+      "pending": [
+        {
+          "artifact": {
+            "relativePath": ".pi/plan/entry-plan-20261003-1023.md",
+            "sha256": "4987e5ae6f2dadcda0796515683a3384b5842eaeda85b4cbbb76e7feb2caf77a",
+            "sizeBytes": 142
+          },
+          "createdAt": "2026-10-03T02:23:16.573Z",
+          "expiresAt": "2026-10-03T02:53:16.573Z",
+          "id": "4d69fcac-4fbe-4156-961d-b303f14f5ec8",
+          "kind": "plan",
+          "markdown": "# Entry plan\n\nReach the intended outcome.\n\n## Acceptance criteria\n- Verify the exact result.\n\n## Boundaries\n- Isolated review workspace only.\n",
+          "plan": "# Entry plan\n\nReach the intended outcome.\n\n## Acceptance criteria\n- Verify the exact result.\n\n## Boundaries\n- Isolated review workspace only.\n",
+          "question": "Approve this isolated plan?",
+          "sessionId": "bf8fd619-a1d6-41d3-b982-528571c96557",
+          "status": "pending",
+          "title": "Entry plan",
+          "toolCallId": "submit-after-entry",
+          "turnId": "1db24ef6-a145-4d1e-8e6b-537bb471a820",
+          "updatedAt": "2026-10-03T02:23:16.573Z",
+          "version": 1
+        }
+      ],
+      "artifact": {
+        "relativePath": ".pi/plan/entry-plan-20261003-1023.md",
+        "sha256": "4987e5ae6f2dadcda0796515683a3384b5842eaeda85b4cbbb76e7feb2caf77a",
+        "sizeBytes": 142,
+        "markdown": "# Entry plan\n\nReach the intended outcome.\n\n## Acceptance criteria\n- Verify the exact result.\n\n## Boundaries\n- Isolated review workspace only.\n"
+      },
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    },
+    {
+      "kind": "goal",
+      "ends": [
+        {
+          "sessionId": "d1c8d35a-1bd8-487c-a9e0-42a93a0b7a09",
+          "turnId": "omp-turn:d1c8d35a-1bd8-487c-a9e0-42a93a0b7a09:db298943-e131-4a32-9cb7-f2c9bd8a6d1b:1",
+          "hostTurnId": "d84d7dcc-b81e-4043-b753-78e85381728b",
+          "reason": "completed"
+        }
+      ],
+      "permissionCards": [],
+      "nativeBindings": [
+        {
+          "sessionId": "d1c8d35a-1bd8-487c-a9e0-42a93a0b7a09",
+          "nativeSessionId": "01a0ff92-b751-7576-95bc-24323afabc20",
+          "nativeSessionPath": "/tmp/root-d-entry-flow-data-bQzK5C/omp-sessions/2026-10-03T02-23-20-401Z_01a0ff92-b751-7576-95bc-24323afabc20.jsonl",
+          "runtimeVersion": "18.3.0"
+        }
+      ],
+      "requests": [
+        {
+          "index": 0,
+          "toolNames": [
+            "read",
+            "bash",
+            "edit",
+            "ask",
+            "eval",
+            "glob",
+            "grep",
+            "task",
+            "wait",
+            "todo",
+            "web_search",
+            "write",
+            "EnterPlanMode",
+            "EnterGoalMode"
+          ],
+          "systemSha256": "a013dd3d49cb26bbdaf332f4b3fd82884e810b7df41da13421198591d719100a"
+        },
+        {
+          "index": 1,
+          "toolNames": [
+            "read",
+            "bash",
+            "ask",
+            "glob",
+            "grep",
+            "SubmitGoal"
+          ],
+          "systemSha256": "072a9b2779cf7add83f3050fcf9c3dabc1e1cff5570c8d97032af2a17a2e69a7"
+        },
+        {
+          "index": 2,
+          "toolNames": [
+            "read",
+            "bash",
+            "ask",
+            "glob",
+            "grep",
+            "SubmitGoal"
+          ],
+          "systemSha256": "072a9b2779cf7add83f3050fcf9c3dabc1e1cff5570c8d97032af2a17a2e69a7"
+        },
+        {
+          "index": 3,
+          "toolNames": [
+            "read",
+            "bash",
+            "ask",
+            "glob",
+            "grep",
+            "SubmitGoal"
+          ],
+          "systemSha256": "072a9b2779cf7add83f3050fcf9c3dabc1e1cff5570c8d97032af2a17a2e69a7"
+        }
+      ],
+      "engineRef": {
+        "adapterVersion": 1,
+        "engine": "omp",
+        "nativeSessionId": "01a0ff92-b751-7576-95bc-24323afabc20",
+        "nativeSessionPath": "/tmp/root-d-entry-flow-data-bQzK5C/omp-sessions/2026-10-03T02-23-20-401Z_01a0ff92-b751-7576-95bc-24323afabc20.jsonl",
+        "runtimeVersion": "18.3.0"
+      },
+      "nativeSessionId": "01a0ff92-b751-7576-95bc-24323afabc20",
+      "nativeHeader": {
+        "type": "session",
+        "version": 3,
+        "id": "01a0ff92-b751-7576-95bc-24323afabc20",
+        "timestamp": "2026-10-03T02:23:20.401Z",
+        "cwd": "/tmp/root-d-entry-flow-project-Hb44Qv"
+      },
+      "nativeUserMessageCount": 1,
+      "modeAfter": "goal",
+      "turns": [
+        {
+          "id": "d84d7dcc-b81e-4043-b753-78e85381728b",
+          "status": "completed"
+        }
+      ],
+      "hostTurnId": "d84d7dcc-b81e-4043-b753-78e85381728b",
+      "enterAudit": [
+        {
+          "kind": "goal",
+          "mode": "goal",
+          "sessionId": "d1c8d35a-1bd8-487c-a9e0-42a93a0b7a09",
+          "toolCallId": "entry-goal",
+          "turnId": "d84d7dcc-b81e-4043-b753-78e85381728b"
+        }
+      ],
+      "messageCount": 0,
+      "forbiddenEffect": null,
+      "pending": [
+        {
+          "artifact": {
+            "relativePath": ".pi/goal/entry-goal-20261003-1023.md",
+            "sha256": "f8945488e1575f30b9b20745e7edc33018219d3731b767013d2caab442e843c7",
+            "sizeBytes": 142
+          },
+          "createdAt": "2026-10-03T02:23:20.542Z",
+          "expiresAt": "2026-10-03T02:53:20.542Z",
+          "id": "ac3118fc-681f-44f5-ab6e-e355a088b7e5",
+          "kind": "goal",
+          "markdown": "# Entry goal\n\nReach the intended outcome.\n\n## Acceptance criteria\n- Verify the exact result.\n\n## Boundaries\n- Isolated review workspace only.\n",
+          "plan": "# Entry goal\n\nReach the intended outcome.\n\n## Acceptance criteria\n- Verify the exact result.\n\n## Boundaries\n- Isolated review workspace only.\n",
+          "question": "Approve this isolated goal?",
+          "sessionId": "d1c8d35a-1bd8-487c-a9e0-42a93a0b7a09",
+          "status": "pending",
+          "title": "Entry goal",
+          "toolCallId": "submit-after-entry",
+          "turnId": "d84d7dcc-b81e-4043-b753-78e85381728b",
+          "updatedAt": "2026-10-03T02:23:20.542Z",
+          "version": 1
+        }
+      ],
+      "artifact": {
+        "relativePath": ".pi/goal/entry-goal-20261003-1023.md",
+        "sha256": "f8945488e1575f30b9b20745e7edc33018219d3731b767013d2caab442e843c7",
+        "sizeBytes": 142,
+        "markdown": "# Entry goal\n\nReach the intended outcome.\n\n## Acceptance criteria\n- Verify the exact result.\n\n## Boundaries\n- Isolated review workspace only.\n"
+      },
+      "failures": [],
+      "passed": true,
+      "dispose": {
+        "ok": true,
+        "failures": []
+      },
+      "hostExited": true,
+      "cleanupErrors": [],
+      "scratchRemoved": true
+    }
+  ],
+  "finalCleanupErrors": [],
+  "passed": true
+}

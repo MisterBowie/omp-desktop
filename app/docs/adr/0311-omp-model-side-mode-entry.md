@@ -187,6 +187,60 @@ stays recorded). `EnterGoalMode` only moves the same Agent into the Goal
 contract; `SubmitGoal` publishes `.pi/goal/<unique-name>.md` through the
 unchanged host path.
 
+### 7. First independent review repair (2026-10-03): the failure channel and generation ownership
+
+The root's independent review reproduced four production gaps at the real
+bridge/gate/adapter/host layer; the repairs below keep the §1-§6 contracts and
+add no new protocol surface (no fork change, no patch-level move).
+
+1. **A structured error must survive to the gate.** The frame's top-level
+   `isError` is the runtime's *reject* channel: `.5`'s
+   `RpcHostToolBridge.handleResult` throws the text and discards the settled
+   value, including `details` — so a `state: "failed"` transition record sent
+   that way never reached the gate, the error stayed "correctable", and the
+   turn continued under a committed mode. An error outcome that carries
+   `details` is now settled as the protocol's documented other error shape
+   (`result.isError: true`, no top-level flag): the agent loop reads
+   `frame.isError || result.isError`, and the extension `tool_result` hook
+   receives the flag **and** the details. Outcomes without details keep the
+   unchanged top-level path.
+2. **"Undecidable commit" is not "correctable refusal".** Only the host's four
+   pre-CAS refusals (`PLAN_INVALID_ARGUMENT`, `PLAN_SESSION_NOT_FOUND`,
+   `PLAN_ALREADY_ACTIVE`, `PLAN_APPROVAL_STALE`) prove that nothing was
+   written. An unreadable reply, a transport failure, a timeout or an unknown
+   error code can follow a commit whose response was lost, so the adapter
+   reports a `state: "failed"` record and the turn stops; the next prompt
+   recovers from the durable row.
+3. **The transition continuation is bound to its own generation.** The
+   `tool_result` handler awaits twice (prompt API, clamp); a terminal
+   `agent_end` and a successor turn can be armed in those windows. Every await
+   now re-checks exact identity — the record object the continuation owns
+   (updated once, when it installs the transitioned copy) plus the token the
+   record was validated against — and a continuation that lost ownership must
+   not replace the live record, retire the successor's delegate bindings,
+   overwrite the cached prompt parts, apply the old clamp, emit a failure
+   attributed to the successor's token or abort its context. Failure
+   descriptors take the token captured when the failure was decided.
+4. **The desktop preparation is bound to its own live turn.** `enterMode`
+   re-checks, after the catalogue assembly and around the runtime
+   registration, that the entry is not closed/stopping, that the admission
+   record and runner are still the same objects, and that the runner still
+   reports this very turn as its running current turn; the registration
+   helper re-checks the same guard immediately before sending `set_host_tools`
+   and again before trusting the acknowledgment and publishing the cache
+   fingerprint. A stopped or superseded Enter can therefore neither register a
+   catalogue on the successor's runtime nor poison the registration cache.
+
+Notes that are contracts, not implementation details:
+
+- The durable host turn vocabulary is `running | completed | aborted | error`
+  (host-core `end_turn_settling`; product type unions match). A failed
+  post-commit transition settles the turn as **`error`** — the same terminal
+  the runner already uses for a failed turn — never `completed`.
+- A known host refusal remains a correctable tool error; the repairs
+  deliberately keep that path so wrong-mode/stale-retry scenarios are not
+  disabled.
+
 ## Consequences
 
 - A non-Cursor OMP session can now enter Plan or Goal from the model, in the

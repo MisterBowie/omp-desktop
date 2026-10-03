@@ -1,0 +1,238 @@
+✔ M5/T20-C end-to-end: PI execution-time permissions on the patched runtime (14400.315742ms)
+✔ the catalog maps plugin agent tools to plugin_* names with verbatim schema and description (2.548006ms)
+✔ the catalog carries the declared risk and plan-safe actions, never a name-based guess (0.31237ms)
+✔ user MCP tools are Low risk with no plan-safe actions, and their own origin (0.350526ms)
+✔ the desktop forwards a description verbatim; the runtime's own trim is OMP's (0.172656ms)
+✔ plugins inactive for the project are invisible to its catalog (0.228945ms)
+✔ a duplicate tool name fails the catalog closed instead of overwriting (0.621333ms)
+✔ an undeliverable definition fails the catalog closed and names the tool (0.343984ms)
+✔ the executor runs a plugin tool with the bound session identity and arguments (0.912209ms)
+✔ the executor reads the live thinking level at each execution, never a stale snapshot (0.378552ms)
+✔ the executor refuses a plugin tool that is no longer loaded or no longer active (0.520195ms)
+✔ a turn that is no longer dispatchable never starts a plugin tool (0.262764ms)
+✔ a turn that is no longer dispatchable never starts an MCP call (0.243158ms)
+✔ an already-aborted signal never starts a plugin tool (0.283995ms)
+✔ the executor honours the abort signal for a plugin tool (0.264439ms)
+✔ an mcp_* call routes through the user MCP runtime against the bound project (0.293946ms)
+✔ a throwing user MCP client surfaces as an executor failure with the code's text (0.246926ms)
+✔ an AgentToolResult-shaped plugin value with inner isError becomes an outer failure (0.171431ms)
+✔ MCP image blocks pass through faithfully as OMP ImageContent (0.181247ms)
+✔ an over-budget MCP image pair keeps the first image verbatim plus the marker (8.437253ms)
+✔ non-text blocks and structuredContent are preserved as deterministic text beside text blocks (0.585353ms)
+✔ a huge multibyte result is bounded on its serialized content and marked truncated (31.175618ms)
+✔ a result full of JSON escapes is bounded on its serialized bytes, not its raw text (113.636547ms)
+✔ a plain string result that fits is returned untouched (0.221692ms)
+✔ an over-budget multi-block result keeps its head and marks the cut exactly (28.293928ms)
+✔ the truncation marker itself is budgeted when a later block no longer fits (64.211256ms)
+✔ a whitespace-only tool name fails the catalog closed, like the pinned runtime (0.27705ms)
+✔ a plugin's details/useless keys ride along as text, never mapped onto OMP metadata (0.273349ms)
+✔ toast drain and delivery run after a plugin tool and never change its result (0.301578ms)
+✔ a throwing toast delivery never changes a successful tool result (0.231615ms)
+✔ a throwing toast drain never changes a successful tool result (0.200108ms)
+✔ an executor bound to one project never reaches another project's scoped tools (0.166855ms)
+✔ the bridge registers the project's catalog through set_host_tools before the first prompt (13.217874ms)
+✔ a catalog change between turns re-registers the new tool set on the same runner (2.609829ms)
+✔ a tool removed from the catalog is removed from the next registration too (1.943798ms)
+✔ a registration whose echoed names differ from the request fails the prompt closed (1.185043ms)
+✔ a runtime refusal of set_host_tools fails the prompt closed (0.786122ms)
+✔ a host_tool_call during a prompt is executed exactly once and its result written (1.945939ms)
+✔ two sessions on different projects get different catalogs and cannot share them (1.30055ms)
+✔ a host_tool_call with no active run is answered isError and never executed (2.178574ms)
+✔ a normal agent_end announces the turn completed exactly once (1.616832ms)
+✔ a stop whose run settles with agent_end announces aborted, never completed (1.356822ms)
+✔ a stop whose run is torn down announces aborted exactly once (201.478725ms)
+✔ a transport failure announces error exactly once (1.744079ms)
+✔ a dispose with a live turn announces aborted exactly once (1.010472ms)
+✔ the entry's dispatch gate reads the live runner state (201.47114ms)
+✔ the executor binding reads the live thinking level after an online configure (1.151305ms)
+✔ a failed thinking persist keeps the binding on the old level (0.533073ms)
+✔ plugin agent tool executes exactly once and its result reaches the model (2439.06694ms)
+✔ a denied plugin tool executes zero times and its denial reaches the model (2139.618404ms)
+✔ desktop user MCP tool executes exactly once against the real server (2493.808331ms)
+✔ plugin-declared MCP tool executes exactly once under its plugin_* name (2006.051195ms)
+✔ a cancelled host tool leaves no late side effect in the model context (2997.923912ms)
+✔ a project MCP decoy is still never loaded by native discovery while desktop tools run (1958.685365ms)
+✔ enter catalog entries carry the PI name/schema and the sole, non-terminating policy (3.565704ms)
+✔ enters Plan through the host with the durable identity and returns a ready record (1.595714ms)
+✔ enters Goal through the host and never reads identity from model arguments (0.351111ms)
+✔ refuses a non-Agent turn and a run without a durable host turn before any host call (0.754121ms)
+✔ refuses an already-aborted call without touching the host (0.594036ms)
+✔ refuses to enter without an established native session (0.261425ms)
+✔ records the native session identity the gate validates, not the desktop session id (0.342733ms)
+✔ reports a host refusal as a correctable error with no transition record (0.343985ms)
+✔ an unreadable host reply stops the turn with a failed record instead of a correctable error (0.734866ms)
+✔ only the host's own pre-commit refusals stay correctable (0.892909ms)
+✔ a stop racing the committed transition reports a failed record instead of success (0.29355ms)
+✔ a desktop preparation failure after the commit reports a failed record (0.265019ms)
+✔ a stop during desktop preparation also reports a failed record (0.208139ms)
+✔ the record's envelope is the one the gate decodes (0.216493ms)
+(node:1928858) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ T20-B2 plan submission (patched): valid, schema-rejected, mixed-batch, duplicate and revision (3431.413108ms)
+✔ T20-B2 mixed batch [bash, SubmitPlan] is rejected whole, does not terminate, and ordinary tools still run (3007.605565ms)
+✔ T20-B2 approval dispatch: queued execution runs in OMP with the approved instruction, exactly once (4816.095266ms)
+✔ T20-B2 rejected approval never executes, and a restart does not replay a queued one (3789.109089ms)
+✔ T20-B2 Stop during the durable host begin refuses the prompt before it is sent, settles its row aborted, and the next turn recovers (2972.563041ms)
+✔ T20-B2 a real terminal delivered before the prompt response still closes its own durable host turn (7727.366148ms)
+✔ T20-B2 an approved execution settles from a terminal that beats the dispatch prompt return, and a refused begin interrupts it (7737.796094ms)
+✔ T20-D model-side mode entry: EnterPlanMode switches the same live turn, then SubmitPlan ends it (3180.404986ms)
+✔ T20-D model-side mode entry: EnterGoalMode switches to Goal and SubmitGoal publishes the goal artifact (2827.644057ms)
+✔ T20-D model-side mode entry: a mixed Enter batch is rejected whole, then a sole retry enters (2897.546724ms)
+✔ T20-D failure boundary: a committed Enter whose catalogue rebuild fails stops the turn and recovers in Plan (2725.96191ms)
+✔ T20-D failure boundary: an unreadable committed Enter reply stops the turn and recovers in Goal (2583.189586ms)
+✔ T20-D generation safety: a stopped Enter's late catalogue answer never changes the successor Agent turn (5974.556497ms)
+✔ submit catalog entries carry the PI name/schema and the sole+terminate policy (1.767488ms)
+✔ submits through the host with the durable identity from the run binding (1.667113ms)
+✔ refuses a wrong-kind call and a call without a durable host turn (0.298765ms)
+✔ refuses empty arguments and a missing host wiring before any host call (0.530209ms)
+✔ surfaces the host error code and rejects a malformed proposal reply (0.545076ms)
+✔ refuses to prompt when this build has no gate extension (1.309005ms)
+✔ refuses to prompt when this build has no runtime executable (0.229645ms)
+✔ starts the runtime once and streams the run under one turn id (3.806844ms)
+✔ runs two OMP sessions on independent runtimes (0.88482ms)
+✔ surfaces a gate approval as a permission request and answers it once (1.178007ms)
+✔ mints a session grant only from a delivered allow-session, and clears it explicitly (10.360876ms)
+✔ an approval is answered under the session the bridge stored for it (0.824361ms)
+✔ surfaces a runtime question through the ask card and returns the chosen option (1.049709ms)
+✔ stopping cancels the dialogs the runtime is blocked on (12.490855ms)
+✔ dispose cancels dialogs and reclaims the runtime (1.637653ms)
+✔ retains a directory-only debt across stop retries until it is removable (4.129439ms)
+✔ reclaims a dead runtime and rebuilds it for the next prompt in the same session (2.947733ms)
+✔ an immediate successful teardown still lets the next prompt rebuild (2.336222ms)
+✔ a converged protocol stop reuses the live runtime (0.892735ms)
+✔ pending cleanup refuses the next prompt without starting a second runtime (1.182702ms)
+✔ the retired runtime's handlers are detached and old frames do not reach the replacement (1.977564ms)
+✔ a dispose that cannot reclaim keeps the session's ownership, not a second runtime (1.241024ms)
+✔ reports a transport failure as one typed error, not a hung turn (0.846789ms)
+✔ an OMP prompt reaches the bridge without touching the Pi runtime (1.420697ms)
+✔ an OMP session's status comes from the runtime that owns it (0.418594ms)
+✔ binds the session's project directory before the runtime starts (0.252822ms)
+✔ refuses an empty or relative project directory without starting anything (0.337357ms)
+✔ refuses a different project directory for a runtime already bound to one (0.396902ms)
+✔ a question's id cannot be consumed through the permission path (0.380147ms)
+✔ an approval's id cannot be consumed through the ask path (0.361073ms)
+✔ an answer that names another session is refused (0.326585ms)
+✔ a duplicate decision, or one after a stop, never writes a second frame (5.285389ms)
+✔ a skipped question is failed closed instead of leaving the runtime waiting (0.687388ms)
+✔ an answer the runtime's select cannot carry is failed closed too (0.443963ms)
+✔ a confirmation answers yes/no and a dismissal is a cancellation (0.437049ms)
+✔ a dialog raised by an earlier run cannot be answered into the next one (0.432909ms)
+✔ a late reply after a transport failure or a dispose writes nothing (0.901564ms)
+✔ the runtime retracting a dialog clears it in the bridge as well (0.450533ms)
+✔ stopping another session leaves this one's dialogs, state and wire untouched (0.363888ms)
+✔ a refused prompt closes its dialog and tells the renderer the turn ended (0.815613ms)
+✔ a thrown prompt request keeps its own error and still ends the turn (0.809587ms)
+✔ replacement runtimes keep every reply visible with distinct ids (2.76004ms)
+✔ a prompt racing a stop is refused and never starts a second runtime mid-teardown (1.401391ms)
+✔ stop during startup or restore cancels the pending prompt and leaves the session idle (4.441397ms)
+✔ dispose during startup or restore cancels the pending prompt and reclaims (1.109684ms)
+✔ stop during turn-fence preparation cancels the pending prompt and leaves the session idle (3.451284ms)
+✔ two concurrent prompts share one runtime and only one starts a run (0.458532ms)
+✔ a prompt racing disposeSession's completion window is refused and leaves no orphan (1.129087ms)
+✔ a prompt racing application shutdown's completion window is refused and leaves no orphan (0.851013ms)
+✔ a new session racing whole-bridge shutdown is refused before it starts a runtime (0.938133ms)
+✔ a prompt racing a startup or restore stop is refused, not submitted after the stop reports nothing running (3.327803ms)
+✔ concurrent stop and dispose overlap without reopening admission (0.706392ms)
+✔ whole-bridge shutdown refuses an existing session before any cleanup await (1.587901ms)
+✔ whole-bridge shutdown invalidates a prompt still preparing before it submits (1.195959ms)
+✔ a model change reconfigures without reusing the earlier reply's live ids (2.194178ms)
+✔ a disposed and reopened session mints fresh live ids without colliding (1.224748ms)
+✔ a recreated bridge mints live ids that do not collide with a retained reply (1.049183ms)
+E2E timeline (61 events):
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 agent_start
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 turn_start
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_start
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_end
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_start
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_update
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_end
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 tool_start call_read
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 tool_end call_read
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 turn_end
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 turn_start
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_start
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_update
+- tool_permission_request
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_end
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 tool_start call_write_1
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 tool_end call_write_1
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 turn_end
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 turn_start
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_start
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_update
+- tool_permission_request
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_end
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 tool_start call_write_2
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 tool_update call_write_2
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 tool_end call_write_2
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 turn_end
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 turn_start
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_start
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_update
+- tool_permission_request
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_end
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 tool_start call_tests
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 tool_update call_tests
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 tool_update call_tests
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 tool_update call_tests
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 tool_end call_tests
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 turn_end
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 turn_start
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_start
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_update
+- tool_permission_request
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_end
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 tool_start call_long
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 tool_end call_long
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 tool_update call_long
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 turn_end
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 turn_start
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_start
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 message_end
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 turn_end
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:1 agent_end
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:2 agent_start
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:2 turn_start
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:2 message_start
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:2 message_end
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:2 message_start
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:2 message_update
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:2 message_end
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:2 turn_end
+omp-turn:e2e-omp-session:d438d71f-df89-43e5-8ac6-9671d06d2b46:2 agent_end
+E2E tool ends: call_read:ok, call_write_1:error, call_write_2:ok, call_tests:ok, call_long:error
+E2E approvals: call_write_1/high, call_write_2/high, call_tests/high, call_long/high
+✔ M3 end-to-end: read, deny, approve once, run tests, stop a long task (2842.802663ms)
+✔ R1: refuses a restore whose path is outside the session directory (2.70733ms)
+✔ R1: refuses a restore whose path is a symlink (0.511469ms)
+✔ R1: refuses a restore whose path is a directory or missing (0.477332ms)
+✔ R1: refuses a restore whose file header id disagrees with the reference (0.404761ms)
+✔ R1: refuses a restore with an unsupported adapter or a downgraded runtime version (0.408626ms)
+✔ R1: refuses a restore when the runtime opens a different native session (0.434295ms)
+✔ R5: dispose reports a reclaim that returned stopped:false (1.422839ms)
+✔ R5: dispose continues past a thrown reclaim and reports both sessions (0.744497ms)
+✔ R7: rename works for a not-yet-prompted session by briefly restoring and cleaning up (0.62751ms)
+✔ F1: refuses a restore whose intermediate directory is a symlink escaping the session dir (0.345981ms)
+✔ F1: refuses a restore whose get_state reports no sessionFile (0.292731ms)
+✔ F1: refuses a restore whose get_state reports the same id at a different path (0.278032ms)
+✔ F6: a failed host persist on rename reverts an empty prior title and reports the fork (0.352965ms)
+✔ F6: a one-shot rename whose runtime cleanup fails is reported as inconsistent (0.310256ms)
+✔ P3: a packaged prompt reports the bundled-runtime-invalid reason for a missing binary (1.114111ms)
+✔ P3: a packaged control operation reports the same reason for a missing binary (0.505278ms)
+✔ P3: a packaged prompt reports the bundled-runtime-invalid reason for a tampered binary (2.608205ms)
+✔ P3: a packaged control operation reports the same reason for a tampered binary (0.904178ms)
+✔ P3: a packaged prompt reports the bundled-runtime-invalid reason for a tampered manifest (0.675968ms)
+✔ P3: a packaged control operation reports the same reason for a tampered manifest (1.178573ms)
+✔ P3: a packaged prompt reports the bundled-runtime-invalid reason for a tampered gate (0.918354ms)
+✔ P3: a packaged control operation reports the same reason for a tampered gate (0.802468ms)
+✔ P3: a packaged build resolves the platform's own executable name (0.612571ms)
+✔ P3: a packaged launcher refusal carries the adapter's concrete reason (0.354027ms)
+✔ M5/T20-B1 third repair: a stop during turn-fence preparation never submits the canceled prompt (9936.796924ms)
+ℹ tests 164
+ℹ suites 0
+ℹ pass 164
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 75053.356704

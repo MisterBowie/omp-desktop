@@ -1,0 +1,26 @@
+{
+  "candidate": "f56fe8386c71c886212391907fc289055eeaf9b8",
+  "round": "T20-D-Enter first independent review repair (2026-10-03)",
+  "finding": "entry-failure-boundary-review.mjs asserts turns.status === 'failed' for the committed-but-unpreparable Enter scenarios (malformed-committed-reply, catalog-error-after-commit). The durable host turn cannot hold that value.",
+  "classification": "Reviewer expectation error, not a D-Enter regression: 'failed' is not in the host's durable turn vocabulary (running | completed | aborted | error). Requesting it over the supported RPC coerces silently to 'completed' — the exact status the review rejects — while 'error' is the host's failure terminal. The product-side facts the review actually requires are green: exactly one provider request, zero tool side effects, a desktop-visible terminal error, the committed mode kept durable, and the next real prompt recovering from the durable row.",
+  "evidence": {
+    "hostWriter": "app/crates/host-core/src/sessions.rs:3413-3449 — end_turn_settling maps status to completed|aborted|error (anything else -> completed) and is the only writer of turns.status",
+    "fixedPiParity": "upstream/pi-desktop/crates/host-core/src/sessions.rs:3237-3248 — the pinned reference has the same three-value match",
+    "productVocabulary": [
+      "app/packages/shared/src/types/platform.ts:99 — status: \"running\" | \"completed\" | \"aborted\" | \"error\"",
+      "app/apps/desktop/electron/main/runtime/omp-session.ts:132 — status: \"completed\" | \"aborted\" | \"error\"",
+      "app/apps/desktop/electron/main/runtime/session-coordination.ts:16 — TurnEndReason = \"completed\" | \"aborted\" | \"error\""
+    ],
+    "spec": "app/docs/spec/03-runtime/04-data-storage.md:545 — turns.status: running | completed | aborted | error",
+    "probe": "docs/validation/M5-t20-d-mode-entry/repair-20261003-corrections/turn-status-probe.mjs (.txt is its output)",
+    "probeResult": "session.endTurn {status:\"failed\"} -> stored \"completed\"; {status:\"error\"} -> stored \"error\" (real host binary, isolated SQLite, direct row read)"
+  },
+  "observedAfterRepair": {
+    "plan/catalog-error-after-commit": "initialProviderCount=1; forbiddenEffect=null; initialEnd.reason=error; terminal desktop error event; durable turn status=error; host mode=plan; recovery prompt carries SubmitPlan and the Plan prompt, Enter absent, write absent; recovery completed",
+    "goal/catalog-error-after-commit": "same shape with goal/SubmitGoal",
+    "plan|goal/malformed-committed-reply": "same shape: real host committed (reply {ok:true,state:'planning',kind}), adapter cannot attribute the answer, turn stopped with status=error",
+    "plan|goal/stop-during-catalog": "unchanged green control: aborted, one provider request, no effect, recovery in the committed mode"
+  },
+  "action": "The original review scripts are preserved unchanged (including the 'failed' literal). The product settles a failed post-commit transition turn as the host's error terminal; internal turn-failure descriptors still report code transition-apply-failed / transition-invalid. Correct assertion for that script: status === 'error'.",
+  "by": "repair runner, T20-D-Enter review repair"
+}

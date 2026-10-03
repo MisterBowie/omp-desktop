@@ -958,22 +958,52 @@ class SessionEntry {
         if (admitted.mode !== "agent") {
           throw new Error(`turn ${run.turnId} is in ${admitted.mode} mode; ${kind} cannot be entered`);
         }
-        if (this.closed) {
-          throw new Error("the session was disposed during the mode transition");
-        }
+        const runner = this.runner;
+        if (!runner) throw new Error("the runtime runner is gone");
+        // The transition's whole authority is the live turn: the exact
+        // admission record it was admitted under, the runner that owns the
+        // process, and the Stop/dispose lifecycle of this entry (M5/T20-D
+        // review repair). The catalogue assembly and the runtime registration
+        // below exist only to move *this* turn's contract; a Stop that
+        // converged, a dispose, a runner replacement or a successor turn that
+        // finished arming while one of them was awaited must never let this
+        // continuation register a catalogue on, or publish cache state about,
+        // a runtime it no longer owns. Every await boundary therefore
+        // re-checks the same identities — object identity for the record and
+        // the runner, plus the runner's own current-turn state — and throws
+        // for the caller to report as a failed transition (the durable host
+        // fact is already committed and the gate stops the stale turn).
+        const assertCurrent = (what: string): void => {
+          if (this.closed) throw new Error(`the session was disposed ${what}`);
+          if (this.stopping) throw new Error(`a stop is in progress ${what}`);
+          if (this.admittedTurnPolicy !== admitted) {
+            throw new Error(`the ${kind} transition was superseded by another turn ${what}`);
+          }
+          if (this.runner !== runner) throw new Error(`the runtime runner was replaced ${what}`);
+          if (
+            runner.isStopping() ||
+            runner.runState() !== "running" ||
+            runner.status().currentTurnId !== run.turnId
+          ) {
+            throw new Error(`turn ${run.turnId} stopped running ${what}`);
+          }
+        };
+        assertCurrent("before the mode transition was prepared");
         // The durable host mode changed: record it before any await, so a host
         // tool that follows (a submit attempt, a plugin execution) is judged
         // under the new mode even when the catalogue registration below fails
         // and the gate stops the turn.
         admitted.mode = kind;
-        const runner = this.runner;
-        if (!runner) throw new Error("the runtime runner is gone");
         // The same assembly the prompt performs for a contract-mode catalogue:
         // the live plugin/MCP catalog plus the new mode's submit tool. The
         // Enter tools are deliberately absent — they are Agent-only.
         const pluginCatalog = this.hostTools ? await this.hostTools.catalog(this.projectDirectory) : [];
+        assertCurrent("while the transitioned catalogue was assembled");
         const catalog: OmpHostToolCatalogEntry[] = [...pluginCatalog, desktopSubmitToolCatalogEntry(kind)];
-        await this.registerHostTools(runner, this.lastSkillsPresent === true, catalog);
+        await this.registerHostTools(runner, this.lastSkillsPresent === true, catalog, () =>
+          assertCurrent("while the transitioned catalogue was registered"),
+        );
+        assertCurrent("before the transitioned turn was handed back");
         return {
           modeBlock: composeModeSystemPrompt(kind, ""),
           hostTools: catalog.map((entry) => ({
@@ -1872,6 +1902,7 @@ class SessionEntry {
     runner: OmpSessionRunner,
     includeSkillTool: boolean,
     catalog: OmpHostToolCatalogEntry[],
+    assertOwned?: () => void,
   ): Promise<void> {
     if (!this.hostTools) return;
     const definitions = catalog.map((entry) => entry.definition);
@@ -1905,11 +1936,19 @@ class SessionEntry {
     ) {
       return;
     }
+    // A caller that performs an ownership-sensitive registration (the mid-turn
+    // mode transition) supplies a guard: it is re-checked immediately before
+    // the request — so a stale caller never sends a catalogue at all — and
+    // again before the acknowledgment is trusted and published, so a stop,
+    // dispose or successor turn that lands while the request is in flight
+    // cannot have this registration cached as the session's current one.
+    assertOwned?.();
     const runtime = this.runtimeHandle();
     const response = await runtime.request(
       { type: "set_host_tools", tools: withSkill },
       { timeoutMs: 20_000 },
     );
+    assertOwned?.();
     if (response.success !== true) {
       throw Object.assign(
         new Error(`the runtime refused to register the desktop host tools: ${response.error ?? "unknown error"}`),
