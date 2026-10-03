@@ -37,6 +37,7 @@ import {
 import {
   projectionError,
   projectModelsYaml,
+  projectReadOnlyModelsYaml,
   resolveProviderProjection,
 } from "./omp-model-projection";
 
@@ -260,6 +261,39 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
           : {}),
         prepareRun: async (paths) => {
           await projectSessionModels(deps.host, spec, paths);
+        },
+      }),
+    /**
+     * The transient read profile for history reads (M5/T20-R2).
+     *
+     * A read starts the runtime only to parse the transcript through the
+     * runtime's own `get_entries`; it must not need a provider credential and
+     * must not be able to run a turn. This profile therefore projects the
+     * session's model *identity* without its secret (`auth: none`, or a
+     * loopback placeholder when the provider row cannot be projected), skips
+     * the `--model` selector and writes no run-scoped state — and the bridge
+     * never sends it a prompt.
+     */
+    createReadSupervisor: (spec: OmpSessionRuntimeSpec) =>
+      engineRuntime.ompRuntime.createSupervisor({
+        desktopStateRequired: false,
+        prepareRun: async (paths) => {
+          const client = hostOrThrow(deps.host);
+          let provider: ProjectionProvider | null = null;
+          if (spec.providerId) {
+            // Best effort: a session whose provider row was deleted, disabled
+            // or renamed must still show its transcript. A configured secret is
+            // deliberately never read on this path.
+            provider = await client
+              .call<{ provider?: ProjectionProvider | null }>("providers.get", { id: spec.providerId })
+              .then((response) => response?.provider ?? null)
+              .catch(() => null);
+          }
+          writeFileSync(
+            join(paths.agentDir, "models.yml"),
+            projectReadOnlyModelsYaml(provider, spec.modelId ?? null),
+            "utf8",
+          );
         },
       }),
     emitAgentEvent: deps.emitAgentEvent,

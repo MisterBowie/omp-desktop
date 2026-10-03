@@ -375,5 +375,15 @@ test("the user row is inserted before the host round trip and echoed under the s
     main,
     /id: durableUserMessageId\(\s*req\.messageId,\s*Array\.isArray\(session\.messages\)\s*\?\s*session\.messages\s*:\s*\[\],\s*\)/,
   );
-  assert.match(attachments, /export function durableUserMessageId\([\s\S]*?UUID_PATTERN\.test\(requested\)[\s\S]*?!existing\.some\(\(message\) => message\?\.id === requested\)/);
+  // A renderer id is adopted only when it is a UUID the session does not hold
+  // (D288); callers that must know whether adoption happened (the OMP prompt
+  // path, where the runtime's echo re-keys that exact row) use the predicate.
+  assert.match(
+    attachments,
+    /export function isDurableUserMessageId\(requested: unknown\): requested is string \{[\s\S]*?UUID_PATTERN\.test\(requested\)/,
+  );
+  assert.match(
+    attachments,
+    /export function durableUserMessageId\([\s\S]*?isDurableUserMessageId\(requested\)[\s\S]*?!existing\.some\(\(message\) => message\?\.id === requested\)/,
+  );
 });

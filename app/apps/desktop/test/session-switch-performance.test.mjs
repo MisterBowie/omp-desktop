@@ -171,7 +171,11 @@ test("reopening a running session never lets durable detail erase its live tail"
   assert.match(store, /const liveSessionTranscripts = new Set/);
   assert.match(store, /cacheBackgroundTranscriptEvent\(envelope\)/);
   assert.match(store, /const runningAtSelection = stateAtStart\.runningSessions\[id\] === true/);
-  assert.match(store, /mergeLiveSessionMessages\(detail\.session\.messages \?\? \[\], liveMessages\)/);
+  // The merge also drops the live rows the read replaced (M5/T20-R2): a
+  // streamed row and its durable twin do not share an id, so the read names
+  // them explicitly instead of letting the live tail duplicate them.
+  assert.match(store, /mergeLiveSessionMessages\(detail\.session\.messages \?\? \[\], liveMessages, \{/);
+  assert.match(store, /replacedLiveMessageIds: detail\.session\.replacedLiveMessageIds/);
   // The detail reader itself must preserve a live cache: otherwise its promise
   // can erase the partial row before selectSession reaches its final commit.
   assert.match(store, /liveSessionTranscripts\.has\(id\) \|\| state\.runningSessions\[id\]/);

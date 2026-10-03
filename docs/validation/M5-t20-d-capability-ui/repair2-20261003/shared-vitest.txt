@@ -1,0 +1,15 @@
+$ pnpm --filter @pi-desktop/shared test
+
+> @pi-desktop/shared@0.15.2 test /home/vv/person/code/omp-desktop-m5-t20-d-ui/app/packages/shared
+> vitest run
+
+
+ RUN  v4.1.10 /home/vv/person/code/omp-desktop-m5-t20-d-ui/app/packages/shared
+
+
+ Test Files  86 passed (86)
+      Tests  986 passed (986)
+   Start at  14:03:39
+   Duration  1.28s (transform 7.71s, setup 0ms, import 11.35s, tests 599ms, environment 7ms)
+
+exit=0

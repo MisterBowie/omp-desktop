@@ -2374,3 +2374,79 @@ Not addressed here: R3 stays blocked for the excluded combination, and
 T20-B/C/D were unstarted when this section was written, so M5/T20 was then
 **partially complete** in HANDOFF, the task board, ADR 0307 and this section
 (the 2026-10-03 status notes above record the later progress).
+
+## 18. OMP native history reads and prompt identity (M5/T20-D repair 2, ADR 0313)
+
+One writer per session means an OMP session's transcript is the runtime's own
+native session file; the desktop never double-writes it into the host's
+`messages`. `sessionGet`/`sessionOpen` must still show that transcript, so for
+an OMP session the host row is metadata and the messages come from a **read-only
+history projection** of the runtime's canonical entries.
+
+### 18.1 The read
+
+`OmpSessionBridge.readHistory` projects `get_entries` (`{ entries, leafId }`) into
+desktop rows: the active branch is walked from `leafId` to the root through
+`parentId`, message entries are projected through the same converter the live
+stream uses, and a row's id is `omp:<session>:entry:<entryId>` — stable across
+reads. A tool row uses its `toolCallId` as the row id when that id is unique on
+the branch (the renderer keys live tool rows that way, so a durable tool row
+replaces its live twin instead of duplicating it) and falls back to the entry id
+otherwise. The window mirrors the native reader's `detail()`: `messageLimit`
+(default 100, hard bound), `messageBefore`, `messageAround` and `contentLimit`,
+with `messageStart`/`messageEnd`/`hasMoreBefore`/`hasMoreAfter`/`messageCount`.
+
+The runtime is chosen without ever putting two processes on one file:
+
+- a session whose runtime is alive is asked through that runtime (the process
+  that owns the transcript), after the same reference validation a prompt does;
+- otherwise a transient supervisor is started from the **read profile**: the
+  session's model *identity* projected without its credential (`auth: none`), or
+  a loopback placeholder when the provider row cannot be projected, with no
+  `--model` selector and no run-scoped state. The reader is switched to the
+  persisted transcript, its reported identity is verified against the persisted
+  reference, the entries are read, the reader steps off the transcript
+  (`new_session`) and is reclaimed.
+
+The read executes no prompt and no tool, issues no provider request and requires
+no usable provider credential; the `new_session` step exists because a runtime
+that disposes with a session open appends a `session_exit` diagnostic to it, and
+a history read must leave the transcript byte-identical. A missing, foreign,
+half-written or version-incompatible reference, an unreachable runtime, a
+malformed entry list and a failed reclaim all fail closed; an empty page is
+returned only for a session with no native reference yet. A session with no
+native reference is not an error, and an unreadable transcript is never an empty
+page.
+
+### 18.2 One identity per submitted prompt
+
+The renderer paints the user's row before the prompt leaves (`messageId`, a UUID
+validated at the desktop host boundary as before). That id rides the prompt into
+the bridge and the runner (`userMessageId`); the converter binds it to the next
+user frame and reports that frame as PI's `user_message_persisted` against the
+optimistic row instead of minting a second row, and Main no longer echoes the
+user row itself. The binding is one-shot and is discarded when its run closes
+without echoing, so a later prompt can never be re-keyed onto an older row. A
+prompt without an optimistic id (the approved-plan execution entry) keeps the
+plain behavior: the native frame becomes the user row.
+
+### 18.3 Superseding live rows on a durable read
+
+A streamed row and its durable twin cannot share an id (the runtime's live frames
+carry no entry id), so the merge is made explicit rather than content-based:
+
+- the bridge records an exact, single-writer ledger of the live rows it announced
+  for a session (the renderer derives its rows from these same envelopes),
+  including the optimistic row of an admitted prompt;
+- a row is considered settled from its own terminal event, or from the run's
+  `agent_end`/`error` when its own terminal never arrived; only settled rows can
+  have a durable twin, and an in-flight row is never named;
+- a **tail** read returns `replacedLiveMessageIds` — the settled rows whose
+  durable twins the returned window contains (the window is widened to cover
+  them) — and the renderer drops exactly those rows before merging. An older
+  page or a centered read names none: it does not contain the twins.
+
+Text and timestamps are never consulted, so two prompts with byte-identical text
+remain two rows with two ids, and a duplicate can never be collapsed into one.
+`SessionDetail.replacedLiveMessageIds` is optional; engines whose live and durable
+rows already share an id (Pi native, desktop) never set it.

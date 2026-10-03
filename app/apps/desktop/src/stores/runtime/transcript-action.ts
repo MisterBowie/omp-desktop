@@ -13,19 +13,20 @@ export async function prepareTranscriptAction(
   const history = state.sessionHistory[id];
   if (!history?.hasMoreBefore && !history?.contentLimited &&
     state.messages.some((message) => message.id === messageId)) return state;
-  let messages;
+  let loaded;
   try {
     // Cache ownership is checked after this asynchronous read, too: a new
     // turn may have already appended a live tail while the read was pending.
-    messages = await runtime.loadFullSessionMessages(id, false);
+    loaded = await runtime.loadFullSessionMessages(id, false);
   } catch (error) {
     if (get().activeSessionId === id)
       get().showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
     return null;
   }
   const current = get();
-  if (!messages || current.activeSessionId !== id || current.isRunning || current.selectingSessionId ||
+  if (!loaded || current.activeSessionId !== id || current.isRunning || current.selectingSessionId ||
     current.messages !== state.messages) return null;
+  const messages = loaded.messages;
   if (!messages.some((message) => message.id === messageId)) return null;
   runtime.cacheSessionTranscript(id, messages, { messageStart: 0, hasMoreBefore: false });
   set({ messages, sessionHistory: {

@@ -1,11 +1,12 @@
 # M5/T20-D：能力键、真实桌面闭环与完整矩阵
 
-更新时间：2026-10-03。状态：**首稿 `8a1dd8fc` 经根复审判 changes-required（R1–R4：缺
-auto 批准与 running 执行重启、无专属 HOME/回收失败不可见、无可审计 raw 证据且 execution id
-印错、现行 spec/矩阵状态漂移）；定向返修完成、本机验证通过、待根复审**（返修证据
-`docs/validation/M5-t20-d-capability-ui/repair-20261003/`，§1.5）。分支
-`codex/m5-t20-d-capability-ui`（普通追加提交，不 amend/rebase/强推，不发布、不合 main、
-不建 PR），基线 `68519ea19f6fee37fec2c5817256f3a68ea8606e`（根已接受的 D-Enter 最终原始提交）。
+更新时间：2026-10-03。状态：**首稿 `8a1dd8fc` 的 R1–R4 已由根独立复验闭合；根随即判
+changes-required（R5：一次提交的用户气泡渲染两次；R6：重启后会话面板看不到已产生的历史）。
+第二轮定向返修（本 §1.6）完成、本机验证通过、待根复审**。证据：首稿与第一轮返修见
+`docs/validation/M5-t20-d-capability-ui/`（`repair-20261003/`），第二轮见
+`repair2-20261003/`。分支 `codex/m5-t20-d-capability-ui`（普通追加提交，不 amend/rebase/
+强推，不发布、不合 main、不建 PR），本返修基于 `2093f271318294881085f2ee8d047ace2e51ad41`
+（根已独立复验的 R1–R4 提交），首个基线 `68519ea19f6fee37fec2c5817256f3a68ea8606e`。
 固定子模块 OMP `62bc57be`、PI `0111e306`（未动）；补丁级保持 `62bc57b+omp-desktop.5`
 （fork commit `36483311dfff67be7504f591974df93fc512a45a`，本阶段不改 fork、不改 patch）。
 
@@ -181,6 +182,66 @@ live/durable/proposal/execution id、只读 SQLite（sessions/plan_approvals/tur
 `docs/validation/M5-plan-goal-capability-gates.md` 状态说明 3 改为"C/B2/D-Enter 已验收、
 D 首稿判 changes-required、定向返修完成待复审"。带日期的历史记录与原失败证据保留。
 
+### 1.6 第二轮定向返修（2026-10-03，R5/R6）
+
+根在 `2093f271` 独立复跑真实 Linux UI 后确认 R1–R4 闭合，同时以 `scenarios.runningRestart.
+recovery.ui.bodyText` 与截图 `omp-plan-ui-10-running-recovered.png` 指出两个未被既有断言覆盖的
+产品缺陷，并说明旧 M4 persistence E2E 只向恢复 bridge 继续 prompt、没有真实 Renderer 历史断言。
+本轮只修这两个缺口及其测试/证据，产品代码集中在 OMP 适配层与必需的会话读取路径；不接通 Cursor、
+不扩大任何关闭能力、不改 fork/补丁/固定子模块、不改 main。
+
+**R5：一次提交的用户气泡渲染两次。** 起因是身份分裂：`agent-ipc` 的 OMP 分支用 `req.messageId`
+自行发 `message_start`/`message_end` 回显，而 `OmpEventConverter` 又为运行时的 user frame 另铸
+一个 id，渲染层按 id 合并自然无法关联。修复沿用 PI 的共享协议而不是新造协议：渲染层乐观行 id 经
+`userMessageId` 随 prompt 进入 bridge/runner（只接受 UUID，与桌面宿主同一条规则），转换器把它绑定
+到随后第一帧 user frame 并报成 `user_message_persisted`（乐观行原地换键），Main 不再自行回显；
+绑定一次性、随 run 关闭丢弃，后续 prompt 绝不会被换键到旧行。同文本两次提交仍按 id 各行其是
+（不做任何按内容/时间的去重）。
+
+**R6：重启后桌面历史不可见。** OMP 正确遵守"唯一原生 transcript 写者"，`sessionGet` 却只读宿主
+`messages`，因此重启后面板只剩新回合。修复新增只读历史投影（ADR 0313）：`get_entries`（runtime
+自身文档为宽松客户端背书的 `id`/`parentId` + message 结构子集）→ 从 `leafId` 沿 `parentId` 走活动
+分支 → 用同一个转换器投影成 `omp:<session>:entry:<entryId>` 行（工具行在其 `toolCallId` 于分支内
+唯一时用它作行 id，与实时工具行同键），窗口照抄原生读取器的 `messageLimit`/`messageBefore`/
+`messageAround`/`contentLimit` 语义。运行时来源二选一：已有存活运行时就用它（转录属主进程，绝不让
+第二个进程碰同一文件）；否则用**只读配置**启动一个瞬时 supervisor——投影会话的模型身份但**不带
+凭据**（`auth: none`；提供商行不可投影时用回环占位项）、不传 `--model`、不写 run 级状态，读完后
+先 `new_session` 离开该转录再回收（否则运行时会在被读的转录里追加 `session_exit`）。因此读取不需要
+可用凭据、不发出 provider 请求、不执行工具、不改写原生文件；缺失/属于他者/只写一半/版本不符的引用、
+畸形 entry、不可达运行时、回收失败一律 fail-closed，只有"尚无原生引用"才是空页。
+
+**实时/持久合并的身份归属。** 运行时实时帧不带 entry id，所以流式行与其持久孪生不可能同 id。
+bridge 因此维护一份精确的、单一写者的实时行台账（渲染层的行就来自同一批 envelope，包含已受理
+prompt 的乐观行），按各自终止事件结算（自身终止缺失时由该 run 的 `agent_end`/`error` 结算）；
+**尾部**读取返回 `replacedLiveMessageIds`（窗口内确有其持久孪生的已结算行，窗口自动加宽覆盖它们），
+渲染层在合并前精确丢弃这些行——绝不比较文本或时间；在飞行行、较旧页与居中读取都不点名。
+`SessionDetail.replacedLiveMessageIds` 为可选字段，Pi 原生/桌面会话从不设置。
+
+**本轮真实 UI 证据（`repair2-20261003/omp-plan-ui-run.txt` + `omp-plan-ui-raw.json`，18 条 provider 请求、13 张截图）**：
+
+| 断言 | 证据 |
+| --- | --- |
+| running 重启后、发新 prompt 前看到历史 | `scenarios.history.beforeHeldRestart` 9 条 user 行 → `afterHeldRestart` 9 条，overlap 9；`afterHeldRestartRoles` = 9 assistant turn / 14 assistant 消息 / 11 tool 行 / 9 process 组；全部行 id 为 `omp:<session>:entry:<id>`（无 live 行） |
+| 每个输入恰一个气泡 | 重启前后、恢复回合后、两次重启之间均无重复文本行（每次捕获都由 `assertTranscriptStable` 校验） |
+| 同文本两次提交都保留且 id 不同 | 提交两次 `E2E-SAME-TEXT-TWICE`：live 行 `…:<ctx>:1` 与 `…:<ctx>:3`（2 条、id 不同；provider 16→18 恰 +2）；重选后合并为 `…:entry:b44e5f94` 与 `…:entry:ece26759`（仍 2 条，未变 4 条、未被吞并）；第二次重选后 entry id 不变 |
+| 持久与实时合并不重复/不消失 | 重选后无重复行、无 durable id 变化（live→entry 属预期换键）；`scenarios.historyRows` 记录两次捕获的完整行集 |
+| 读取/重选不改原生字节 | `nativeTranscriptAfterPendingRestart.sha256` == `nativeTranscriptAfterReselect.sha256`（`3add7787…`） |
+| 重启不增请求、恢复后新 prompt 才增 | held 重启 14→14；恢复回合 +1（15）；pending 重启 16→16；两次同文本提交 +2（18） |
+| 清理 | `scratchRemoved=true survivingOwnedProcesses=0 errors=0`（三次重启回收 + 最终回收） |
+
+**本轮新增/修改的测试与证据**（`repair2-20261003/`）：
+
+| 层 | 文件 | 断言要点 |
+|---|---|---|
+| 共享事件 + 渲染层 reducer（可执行 RED/GREEN 回归） | `r5-r6-regression.mjs` + `r5-r6-regression-baseline-2093f271.json` / `r5-r6-regression-fixed.json` | 同一脚本对两棵树：基线 `2093f271` 下 R5 = 一次提交渲染 **2** 行（渲染层 id + 转换器铸的 `omp:session-omp:1`）、R6 = OMP `sessionGet` 返回 **0** 条消息；修复后 R5 = **1** 行、R6 = 2 条 entry 行且宿主行元数据保留 |
+| 转换器 | `packages/omp-runtime/src/session/events.test.ts`（+3） | 绑定后 user frame 报 `user_message_persisted`（带乐观 id）且 `message_end` 复用同一行 id；绑定只消费一次；无绑定/已丢弃绑定时行为不变 |
+| 历史投影 | `packages/omp-runtime/src/session/history.test.ts`（新，10 例） | 活动分支/顺序/entry id 稳定；工具行 `toolCallId` vs 重复时回退 entry id；窗口/居中/内容上限；畸形/重复 id/未知父/环/leaf 缺失全部抛错；空列表才是空 |
+| bridge 读取 | `apps/desktop/test/omp-history-read.test.mjs`（新，8 例） | 冷读只用只读配置、命令序 `switch_session→get_state→get_entries→new_session`、stop/reclaim；无原生引用不启动任何进程；引用/版本/身份/`get_entries` 失败 fail-closed；回收失败判失败；存活运行时被复用；`replacedLiveMessageIds` 只含已结算行、在飞行行不入列、旧页不点名 |
+| 真实 runtime 读取 | `apps/desktop/test/omp-history-e2e.test.mjs`（新，1 例，真固定运行时+FakeProvider） | 冷读拿到 user/assistant/tool 行与真实入口 id；重复读 id 稳定；分页窗口；**字节纯度**（读取前后与回收后 transcript sha/文件集不变）；provider 请求数不变；无凭据（`hasSecret:false`）仍可读；外来/缺失引用被拒且不触碰文件 |
+| sessionGet/renderer 边界 | `apps/desktop/test/engine-session-ipc.test.mjs`（+5）、`session-transcript.test.mjs`（+3）、`session-switch-performance/transcript-style/transcript-reading/composer-send-state`（随契约同步） | OMP 会话的 `sessionGet`/`sessionOpen` 用原生投影覆盖宿主空 messages 且保留元数据、窗口与 `replacedLiveMessageIds` 透传；读取失败上抛；Pi 会话不触发原生读取；合并只按 `replacedLiveMessageIds` 丢弃（在飞行行保留）、两条同文本仍是两行 |
+| 桌面只读投影 | `apps/desktop/test/omp-model-projection.test.mjs`（+2） | 读配置保留模型身份、`auth:"none"`、无 `apiKey`；`hasSecret:false` 输出相同（从不读密钥）；不可投影/无提供商行→回环占位项 |
+| 真实 UI E2E | `apps/scripts/e2e-omp-plan-ui.mjs`（+断言） | 重启后、发新 prompt 前：面板显示重启前的 user 行（同 id、同文本、各恰一次）与 assistant/tool 历史；恢复 prompt 只渲染一个气泡；重新选中（经另一个会话往返）后行 id/文本不变、原生 transcript sha 不变；两段逐字节相同的提交都保留且 id 不同、provider 恰好 +2；重启本身 provider 不增、无重放（既有断言保留） |
+
 ## 2. 验证（命令、退出码、原始日志）
 
 所有命令在 `/home/vv/person/code/omp-desktop-m5-t20-d-ui/app`，Node v24.14.0、
@@ -203,6 +264,18 @@ Bun 1.4.2、Linux x64；固定 patched 运行时树由 `scripts/omp-patch.mjs --
 | B9 GREEN | 同上（实现恢复后） | shared 14/14；desktop 20/20（含 `omp-mode-capability-render.test.mjs` 的 chip 显隐/受限循环 SSR 断言与 IPC/create+configure 的关闭声明拒绝） | `green-b9-shared-engine.txt`、`green-b9-desktop-boundaries.txt` |
 | D3 UI E2E（首稿，历史） | `DISPLAY=:1 … OMP_DESKTOP_RUNTIME=<patched> node scripts/e2e-omp-plan-ui.mjs` | `SUMMARY 1 passed, 0 failed`、exit 0，8 张截图（仅 ask/accept-edits/ pending 重启，见 §1.5 返修原因） | `omp-plan-ui-run.txt`、`omp-plan-ui-artifacts/` |
 | **D3 UI E2E（返修：三种权限 + running/pending 重启 + 隔离/回收/raw 证据）** | `DISPLAY=:1 XAUTHORITY=… PI_DESKTOP_E2E_PATCHED_TREE=/tmp/omp-patched-t20d-ui-repair1 PI_DESKTOP_E2E_ARTIFACT_DIR=…/repair-20261003 node scripts/e2e-omp-plan-ui.mjs` | `SUMMARY 1 passed, 0 failed`、exit 0；12 张截图；`CLEANUP scratchRemoved=true survivingOwnedProcesses=0 errors=0`；raw JSON 929889 B | `repair-20261003/omp-plan-ui-run.txt`、`repair-20261003/omp-plan-ui-raw.json`、`repair-20261003/omp-plan-ui-01..12-*.png` |
+| R5/R6 RED/GREEN 回归（同脚本双树） | `node r5-r6-regression.mjs --tree <baseline 2093f271>/app --expect red`、`--tree <fixed>/app --expect green` | RED：R5 一次提交渲染 2 行、R6 OMP `sessionGet` 0 条消息；GREEN：R5 1 行、R6 2 条 entry 行 | `repair2-20261003/r5-r6-regression-baseline-2093f271.json`、`r5-r6-regression-fixed.json`、`r5-r6-regression.mjs` |
+| bridge 历史读取单测 | `cd apps/desktop && node --test test/omp-history-read.test.mjs` | 8/8 通过、exit 0 | `repair2-20261003/omp-history-read.txt` |
+| 真实 runtime 历史读取 E2E | `cd apps/desktop && node --test test/omp-history-e2e.test.mjs` | 1/1 通过、exit 0（含字节纯度、无凭据读取、fail-closed） | `repair2-20261003/omp-history-e2e.txt` |
+| **R5/R6 UI E2E（第二轮断言）** | `DISPLAY=:1 … PI_DESKTOP_E2E_PATCHED_TREE=/tmp/omp-patched-t20d-ui-repair1 PI_DESKTOP_E2E_ARTIFACT_DIR=…/ui node scripts/e2e-omp-plan-ui.mjs` | `SUMMARY 1 passed, 0 failed`、exit 0；13 张截图；`CLEANUP scratchRemoved=true survivingOwnedProcesses=0 errors=0`；raw JSON 1039684 B | `repair2-20261003/omp-plan-ui-run.txt`、`omp-plan-ui-raw.json`、`omp-plan-ui-01..13-*.png` |
+| runtime 包（第二轮） | `pnpm --filter @pi-desktop/omp-runtime test` | **34 files / 517 passed / 6 skipped**、exit 0 | `repair2-20261003/runtime-vitest.txt` |
+| shared 包（第二轮） | `pnpm --filter @pi-desktop/shared test` | **86 files / 986 passed**、exit 0 | `repair2-20261003/shared-vitest.txt` |
+| desktop 全量（第二轮） | `cd apps/desktop && env -u SSH_ASKPASS node --test test/*.test.mjs` | 见日志 | `repair2-20261003/desktop-full.txt` |
+| lint / docs / 矩阵 ID（第二轮） | `pnpm lint`；`pnpm docs:check`；`node scripts/check-t20-matrix-ids.mjs` | 均 exit 0（docs 513 页，新增 ADR 0313） | `repair2-20261003/lint.txt`、`docs-check.txt`、`matrix-ids.txt` |
+| typecheck（第二轮） | `pnpm typecheck`（先 `-r build`） | exit 0（desktop/pi-host 全绿） | `repair2-20261003/typecheck.txt` |
+| OMP bridge 定向（第二轮） | `cd apps/desktop && node --test test/omp-session-bridge.test.mjs test/omp-history-read.test.mjs test/omp-session-ownership.test.mjs test/omp-session-failclosed.test.mjs test/omp-session-configure.test.mjs test/omp-host-tool-bridge.test.mjs test/omp-terminal-delivery.test.mjs` | 109/109 通过、exit 0 | 命令输出 |
+| Goal/生命周期真实 E2E（第二轮复跑） | `cd apps/desktop && node --test --test-name-pattern "T20-D" test/omp-plan-submit-e2e.test.mjs` | 8/8 通过、exit 0 | `repair2-20261003/goal-lifecycle-e2e.txt` |
+| desktop 全量（第二轮结果） | 同上 | **3045 tests / 3034 passed / 0 failed / 11 skipped**、exit 0 | `repair2-20261003/desktop-full.txt` |
 | docs 门（返修轮新增） | `pnpm docs:check`（`check:locales` 79 对 + `check:docs` 512 页） | exit 0；顺带修复该门此前已有的 ADR 目录问题（0301 H1 前缀、0301–0305/0312 索引缺失、0306–0311 过期状态词） | 命令输出（§2 末尾） |
 | 矩阵 ID 检查 | `node scripts/check-t20-matrix-ids.mjs` | exit 0（B1–B14/C1–C8/D1–D3 编号仍各恰一次） | 命令输出（§2 末尾） |
 | 返修轮 lint/typecheck | `pnpm lint`、`pnpm --filter @pi-desktop/desktop typecheck` | 均 exit 0（产品代码未改，重跑确认 harness/文档改动无影响） | 命令输出（§2 末尾） |
@@ -286,7 +359,7 @@ typecheck exit=0
 | C8 | 外部路径例外 | 已接受 C + 回归 | unit | 通过 |
 | D1 | SubmitGoal、goal 提示词、批准后自主执行自停 | 本阶段 Goal E2E（§1.3）；无延续定时器 | runtime/Host + host-core | 通过 |
 | D2 | `goal_updated` 只读展示 | 未实现（矩阵可选）；不伪造 Goal 状态，不新建第二套 Goal | — | 可选未实现 |
-| D3 | 端到端用户路径 | 本阶段 UI E2E（§1.2 首稿 + §1.5 返修：三种批准权限、真实 Reject/重提、真实 running 与 pending 应用重启、专属 HOME 隔离、PID/进程组级回收验证、单份 raw JSON 证据）+ 已接受 B2 的派发证据 | renderer + runtime/Host + host-core + OS 进程 | 通过 |
+| D3 | 端到端用户路径 | 本阶段 UI E2E（§1.2 首稿 + §1.5 返修：三种批准权限、真实 Reject/重提、真实 running 与 pending 应用重启、专属 HOME 隔离、PID/进程组级回收验证、单份 raw JSON 证据 + §1.6 第二轮：重启后历史先于新 prompt 可见、每输入一次气泡、同文本两次提交、重选/分页身份稳定、读取不改原生字节）+ 已接受 B2 的派发证据 | renderer + runtime/Host + host-core + OS 进程 | 通过 |
 
 ## 4. 未做与不声称
 
@@ -297,13 +370,20 @@ typecheck exit=0
   进程身份/回收验证依赖 Linux `/proc`（非 Linux 会降级为只验证 Electron 子进程，代码路径在，
   但本轮未实跑）。
 - 未修改/未升级 fork 与补丁级（保持 `.5`）；未改 Cursor 门（ADR 0306）与其它已关闭能力。
-- 返修轮只改 `app/scripts/e2e-omp-plan-ui.mjs` 与文档（含 ADR 目录/索引的机械修复）；产品代码、
-  gate、host-core、fork、补丁与固定子模块未动，故未重跑产品全量套件、未重建编译产物（改动不在
-  其影响面）。
-- 重启后**转录面板**的恢复渲染未在本阶段验收：§1.5 记录的是返修运行中"重启 + 恢复回合结束后"
-  的实际可观察状态（面板只显示重启后的回合），native 转录完整另有 provider 请求为证；不据此
-  声称历史丢失，也不声称面板恢复完整。
+- 第一轮返修（R1–R4）只改 `app/scripts/e2e-omp-plan-ui.mjs` 与文档（含 ADR 目录/索引的机械修复），
+  产品代码、gate、host-core、fork、补丁与固定子模块未动。第二轮（R5/R6）改了产品代码：OMP 会话
+  的只读历史投影、prompt 身份绑定、实时行台账与共享 `SessionDetail.replacedLiveMessageIds`
+  （ADR 0313）；fork、补丁级（仍 `.5`）、gate 与 host-core 未动。
+- 重启后**转录面板**的恢复渲染：第二轮已验收（§1.6）——重启后、发出任何新 prompt 之前，面板显示
+  重启前的 user/assistant/tool 历史（行 id 为原生 entry id，overlap 与原会话一致、无重复、无
+  丢失，且读取前后原生 transcript 字节不变）。第一轮 §1.5 如实记录的"只显示重启后回合"是当时的
+  可观察状态，现已修复，不以旧记录推断历史丢失。
+- 第二轮未在 macOS/Windows 实机运行；历史读取与身份断言仅 Linux x64 + Xwayland 实跑。
 - 专属 HOME 下产品运行时的子 PATH 派生自继承 HOME（`~/.bun/bin` 首位），harness 因此在专属 HOME
   内链接绝对 bun/node；这是测试环境构造要求（如实记录），不修改产品行为，也不读取用户配置。
-- 未调用任何付费/远程模型；全部 E2E 使用本地 FakeProvider。
+- 未调用任何付费/远程模型；全部 E2E 使用本地 FakeProvider。历史读取的"无凭据"由只读投影单元测试
+  （`hasSecret:false` 输出相同、从不读取密钥）与真实 runtime E2E 的 secretless 读取覆盖，未在 UI 中
+  删除已有凭据后再跑。
+- 历史读取的入口是 `sessionGet`/`sessionOpen`（真实渲染层加载路径）；OMP 会话的侧边栏搜索、
+  导出与 compaction 标记仍沿用既有实现，不在本轮范围。
 - B10/C 行的细节证据以已接受阶段的原始报告为准（本文件 §3 只给引用与回归命令）。

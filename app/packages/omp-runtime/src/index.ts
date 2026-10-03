@@ -191,6 +191,14 @@ export {
   type OmpStopOutcome,
 } from "./session/runner.js";
 export {
+  OmpHistoryError,
+  OMP_HISTORY_INVALID,
+  projectOmpHistory,
+  type OmpHistoryOptions,
+  type OmpHistoryProjection,
+  type OmpHistoryWindow,
+} from "./session/history.js";
+export {
   OmpHostToolCalls,
   boundHostToolContent,
   isHostToolCallFrame,

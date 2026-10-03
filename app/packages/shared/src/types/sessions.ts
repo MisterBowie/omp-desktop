@@ -67,6 +67,19 @@ export type SessionDetail = SessionSummary & {
   hasMoreAfter?: boolean;
   /** True when older messages must be requested with another bounded read. */
   hasMoreBefore?: boolean;
+  /**
+   * Live transcript rows this read replaced with durable rows.
+   *
+   * A session whose transcript is streamed live (OMP) mints a live row per
+   * message, then reads the durable transcript from its own storage. The live
+   * row and its durable twin cannot share an id (the runtime's live frames
+   * carry no entry id), so the read names exactly the live rows whose durable
+   * counterparts are in `messages`; the renderer drops those rows from its
+   * cached transcript before merging. Only ever returned for the newest
+   * window, never for an older page — an older page does not contain the
+   * twins, so dropping there would hide messages that are still current.
+   */
+  replacedLiveMessageIds?: string[];
   /** The checkpoint that governs the next model request, i.e. the last of
    * `compactions`. Restored by the runtime on load. */
   compaction?: ContextCompactionRecord;

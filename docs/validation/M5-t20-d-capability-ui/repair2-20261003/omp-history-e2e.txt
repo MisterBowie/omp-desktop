@@ -1,0 +1,11 @@
+$ node --test test/omp-history-e2e.test.mjs
+✔ M5/R2 end-to-end: a cold read-only runtime shows the native transcript without writing it (9235.62222ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9665.877154
+exit=0

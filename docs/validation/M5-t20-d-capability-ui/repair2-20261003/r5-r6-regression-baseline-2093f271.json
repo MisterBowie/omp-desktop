@@ -1,0 +1,26 @@
+{
+  "tree": "/tmp/omp-t20-d-ui-repair2-baseline/app",
+  "checks": [
+    {
+      "id": "R5-user-row-identity",
+      "rendererIdEcho": 2,
+      "preRepairUserRows": 2,
+      "withAdoptedIdentityRows": 2,
+      "withAdoptedIdentityIds": [
+        "11111111-2222-4333-8444-555555555555",
+        "omp:session-omp:1"
+      ]
+    },
+    {
+      "id": "R6-omp-sessionGet-messages",
+      "messageCount": 0,
+      "ids": [],
+      "hostRowMetadataKept": true
+    }
+  ],
+  "verdict": {
+    "r5Pass": false,
+    "r6Pass": false
+  },
+  "expectationMet": true
+}

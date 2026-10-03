@@ -625,7 +625,19 @@ export class OmpSessionRunner {
    */
   async prompt(
     message: string,
-    options: { admission?: OmpTurnAdmission; hostTurnId?: string | null } = {},
+    options: {
+      admission?: OmpTurnAdmission;
+      hostTurnId?: string | null;
+      /**
+       * The renderer's optimistic identity for this prompt (D288). The native
+       * user frame that echoes the prompt is reported as
+       * `user_message_persisted` against this id, so the user's row exists
+       * once — the optimistic bubble is re-keyed, not duplicated. Ignored
+       * (the frame becomes a normal row) when absent, e.g. the approved-plan
+       * execution prompt, which no renderer bubble announced.
+       */
+      userMessageId?: string | null;
+    } = {},
   ): Promise<{ accepted: boolean; turnId: string; generation: number; hostTurnId: string | null }> {
     this.throwIfDisposed();
     if (this.pendingReclaim) {
@@ -679,6 +691,13 @@ export class OmpSessionRunner {
     };
     this.run = run;
     this.state = "running";
+    // The optimistic user row is bound before the prompt is written: the
+    // runtime echoes the prompt as its own user message, and the converter
+    // must know which renderer row that frame belongs to before any frame can
+    // arrive. A prompt without an optimistic id clears an unconsumed binding
+    // from an earlier run, so a stale id can never re-key this turn's row.
+    if (options.userMessageId) this.converter.adoptUserMessageId(options.userMessageId);
+    else this.converter.discardAdoptedUserMessageId();
     try {
       // Bind this generation before the prompt reaches the runtime: the token
       // is installed through the runtime's own command path and acknowledged
@@ -1599,6 +1618,9 @@ export class OmpSessionRunner {
     this.state = "idle";
     this.run = null;
     this.bashCallIds.clear();
+    // A binding whose user frame never arrived dies with its run: a later
+    // prompt must not be re-keyed onto the row of a prompt that was refused.
+    this.converter.discardAdoptedUserMessageId();
     this.generationsWithDialogs.delete(generation);
     // The turn is over: a host tool call still executing can no longer feed a
     // result into it, so it is aborted here rather than answered late — and

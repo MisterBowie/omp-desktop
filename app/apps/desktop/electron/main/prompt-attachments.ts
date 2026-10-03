@@ -288,6 +288,17 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
+ * Whether a renderer-supplied value may identify the new user row (D288).
+ *
+ * The rule is the renderer's id being a UUID; a value that fails it can never
+ * be adopted as a row identity, and a caller that must know whether adoption
+ * happened (rather than just needing a usable id) checks this first.
+ */
+export function isDurableUserMessageId(requested: unknown): requested is string {
+  return typeof requested === "string" && UUID_PATTERN.test(requested);
+}
+
+/**
  * Use the renderer's id for the new user row when it is a UUID the session
  * does not already hold (D288); otherwise mint one. The renderer inserted its
  * optimistic row under that id, so the durable echo lands on the same row.
@@ -297,8 +308,7 @@ export function durableUserMessageId(
   existing: ReadonlyArray<{ id?: unknown }>,
 ): string {
   if (
-    typeof requested === "string" &&
-    UUID_PATTERN.test(requested) &&
+    isDurableUserMessageId(requested) &&
     !existing.some((message) => message?.id === requested)
   ) {
     return requested;

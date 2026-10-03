@@ -256,9 +256,11 @@ test("stopping a turn undoes an unanswered prompt or settles the partial reply",
   assert.match(storeSource, /status:\s*"aborted" as const/);
   // The undo rewrite starts from the full durable transcript merged with the
   // live rows, never from the renderer's paged, display-capped window (D299).
+  // The read also names the live rows it replaced (M5/T20-R2), which the merge
+  // drops before appending anything.
   assert.match(
     storeSource,
-    /const merged = mergeLiveSessionMessages\(fullMessages, get\(\)\.messages\)/,
+    /const merged = mergeLiveSessionMessages\(fullMessages\.messages, get\(\)\.messages, \{[\s\S]*?replacedLiveMessageIds: fullMessages\.replacedLiveMessageIds,/,
   );
   assert.match(storeSource, /resolveComposerSmartStop\(merged, submittedDraft\)/);
   assert.match(

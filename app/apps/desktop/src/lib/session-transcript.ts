@@ -121,7 +121,15 @@ export function upsertLiveSessionMessage(
   return next;
 }
 
-/** Replace only the acknowledged submission identity, never an equal-text row. */
+/**
+ * Replace only the acknowledged submission identity, never an equal-text row.
+ *
+ * The renderer inserted the optimistic row before the prompt left, so a
+ * `user_message_persisted` whose optimistic id is unknown is a late or stray
+ * acknowledgement: it must not invent a row (the durable read is what recovers
+ * a transcript the renderer has lost). Only the exact optimistic row in the
+ * same role is re-keyed; two identical prompts stay two rows.
+ */
 export function reconcilePersistedUserMessage(
   messages: UiMessage[],
   optimisticMessageId: string,
@@ -170,9 +178,22 @@ export function removeLiveSessionMessage(
 export function mergeLiveSessionMessages(
   durableMessages: UiMessage[],
   liveMessages: UiMessage[],
+  options: {
+    /**
+     * Live rows the durable read replaced (session detail's
+     * `replacedLiveMessageIds`). They are dropped before the merge: their
+     * durable twins are in `durableMessages`, and the live and durable ids
+     * cannot be equal for a streamed transcript, so keeping them would show
+     * the same message twice. An in-flight row is never dropped, even if it is
+     * named: a row whose turn has not ended has no durable twin yet.
+     */
+    replacedLiveMessageIds?: readonly string[];
+  } = {},
 ): UiMessage[] {
   const durable = dedupeSessionMessages(durableMessages);
-  const liveNormalized = dedupeSessionMessages(liveMessages);
+  const liveNormalized = dedupeSessionMessages(
+    withoutReplacedLiveRows(liveMessages, options.replacedLiveMessageIds),
+  );
   if (liveNormalized.length === 0) return durable;
   if (durable.length === 0) return liveNormalized;
 
@@ -248,6 +269,24 @@ function isInFlightMessage(message: UiMessage): boolean {
 }
 
 /**
+ * Drop the live rows a durable read replaced, never an in-flight one.
+ *
+ * A settled live row whose twin the read returned is represented durably and
+ * must not survive the merge; an in-flight row has no twin yet (its turn has
+ * not ended), so naming it — which the read never does — could not hide it.
+ */
+function withoutReplacedLiveRows(
+  liveMessages: readonly UiMessage[],
+  replacedLiveMessageIds: readonly string[] | undefined,
+): UiMessage[] {
+  if (!replacedLiveMessageIds || replacedLiveMessageIds.length === 0) return [...liveMessages];
+  const replaced = new Set(replacedLiveMessageIds);
+  return liveMessages.filter(
+    (message) => !replaced.has(message.id) || isInFlightMessage(message),
+  );
+}
+
+/**
  * Whether a durable session page already contains every live row.
  *
  * Live provenance can drop only after this is true. Assistant/tool rows are
@@ -258,8 +297,11 @@ function isInFlightMessage(message: UiMessage): boolean {
 export function durableCoversLiveSessionMessages(
   durableMessages: UiMessage[],
   liveMessages: UiMessage[] | undefined,
+  options: { replacedLiveMessageIds?: readonly string[] } = {},
 ): boolean {
   if (!liveMessages || liveMessages.length === 0) return true;
   const durableIds = new Set(durableMessages.map((message) => message.id));
-  return liveMessages.every((message) => durableIds.has(message.id));
+  return withoutReplacedLiveRows(liveMessages, options.replacedLiveMessageIds).every(
+    (message) => durableIds.has(message.id),
+  );
 }

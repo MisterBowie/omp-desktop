@@ -290,7 +290,7 @@ export function createTranscriptSlice({
         set((current) =>
           current.activeSessionId === sessionId
             ? {
-                messages: fullMessages,
+                messages: fullMessages.messages,
                 sessionHistory: {
                   ...current.sessionHistory,
                   [sessionId]: { messageStart: 0, hasMoreBefore: false },
@@ -343,7 +343,7 @@ export function createTranscriptSlice({
       set((current) =>
         current.activeSessionId === sessionId
           ? {
-              messages: fullMessages,
+              messages: fullMessages.messages,
               sessionHistory: {
                 ...current.sessionHistory,
                 [sessionId]: { messageStart: 0, hasMoreBefore: false },
@@ -493,7 +493,9 @@ export function createTranscriptSlice({
           runtime.submittedComposerDrafts.delete(sessionId);
           return;
         }
-        const merged = mergeLiveSessionMessages(fullMessages, get().messages);
+        const merged = mergeLiveSessionMessages(fullMessages.messages, get().messages, {
+          replacedLiveMessageIds: fullMessages.replacedLiveMessageIds,
+        });
         const fullStop = resolveComposerSmartStop(merged, submittedDraft);
         if (fullStop.kind === "restore") {
           runtime.submittedComposerDrafts.delete(sessionId);

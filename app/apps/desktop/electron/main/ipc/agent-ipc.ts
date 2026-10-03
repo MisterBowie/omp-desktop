@@ -2,7 +2,7 @@ import { IPC, ErrorCodes, isGlobalPermissionMode, planGoalCursorError, planGoalC
 import type { FinishTurn } from "../runtime/plans";
 import { expandSlashInvocation, enhancePromptDraft, summarizeSessionTitle, visionFromModelConfig, type ComposerTemplate, type RuntimeProviderConfig } from "@pi-desktop/agent-runtime";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
-import { appendPromptFallbackPaths, durableUserMessageId, preparePromptAttachments, type PreparedPromptAttachment } from "../prompt-attachments";
+import { appendPromptFallbackPaths, durableUserMessageId, isDurableUserMessageId, preparePromptAttachments, type PreparedPromptAttachment } from "../prompt-attachments";
 import { executionFromResponse, resolveSessionMessageInput } from "@pi-desktop/host-runtime";
 import type { AgentExtensionBridge } from "../agent-extensions";
 import type { AgentHostBridge } from "../agent-host-bridge";
@@ -420,23 +420,15 @@ export function registerAgentIpc({
         }>("session.getEngineRef", { id: req.sessionId })
         .then((r) => r.engineRef ?? null)
         .catch(() => null);
-      const ompUserMessage: UiMessage = {
-        id: req.messageId ?? `omp-user:${req.sessionId}`,
-        role: "user",
-        content: req.content,
-        createdAt: new Date().toISOString(),
-        status: "complete",
-      };
-      emitAgentEvent({
-        sessionId: req.sessionId,
-        ts: Date.now(),
-        event: { type: "message_start", message: ompUserMessage },
-      } satisfies AgentEventEnvelope);
-      emitAgentEvent({
-        sessionId: req.sessionId,
-        ts: Date.now(),
-        event: { type: "message_end", message: ompUserMessage },
-      } satisfies AgentEventEnvelope);
+      // The renderer's optimistic user row is the only user row for this turn:
+      // its id rides the prompt, and the runtime's own echo of the prompt is
+      // reported back as `user_message_persisted` against that exact row (the
+      // desktop's one-writer rule means nothing is written to its own
+      // transcript). Only a renderer-supplied UUID may be adopted — the same
+      // rule the desktop host applies (D288) — and a request without one keeps
+      // the plain behavior (the native frame becomes the user row) instead of
+      // announcing a row the renderer never created.
+      const userMessageId = isDurableUserMessageId(req.messageId) ? req.messageId : null;
       logger.app("session", "info", "omp prompt accepted", {
         data: { sessionId: req.sessionId, projectPath },
       });
@@ -451,6 +443,7 @@ export function registerAgentIpc({
         nativeSessionPath: engineRef?.nativeSessionPath ?? null,
         adapterVersion: engineRef?.adapterVersion ?? null,
         runtimeVersion: engineRef?.runtimeVersion ?? null,
+        userMessageId,
       });
     }
     if (!sidecar) throw new Error("sidecar unavailable");

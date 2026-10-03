@@ -51,6 +51,7 @@ import {
   findGateExtension,
   inspectBundledGate,
   isValidDesktopSkillMeta,
+  projectOmpHistory,
   readDesktopCapabilityState,
   resolveBundledGate,
   serializeDesktopCapabilityState,
@@ -141,6 +142,22 @@ export type OmpSessionBridgeOptions = {
    * projection; the registry does not read providers or secrets itself.
    */
   createSupervisor: (spec: OmpSessionRuntimeSpec) => OmpRuntimeSupervisor;
+  /**
+   * A transient, read-only runtime for history reads (M5/T20-R2).
+   *
+   * A session that has no live runtime still has a transcript to show, and the
+   * transcript is read through the pinned runtime's own `get_entries` — the
+   * desktop does not re-implement the session file format. Because a history
+   * read must not require a usable provider credential (the runtime boots from
+   * a model catalogue, not a key) and must not be able to run a turn, this
+   * factory builds the supervisor with the caller's *read profile*: the
+   * session's model identity without any credential, no `--model` selector and
+   * its own transient session directory. The bridge starts it, switches it to
+   * the persisted transcript, reads, closes the transcript and reclaims the
+   * process; it never sends a prompt. Falls back to `createSupervisor` when
+   * absent (fixtures that never exercise the cold read).
+   */
+  createReadSupervisor?: (spec: OmpSessionRuntimeSpec) => OmpRuntimeSupervisor;
   /** Absolute launcher path, or null when this build has none. */
   launcher: string | null;
   isPackaged: boolean;
@@ -341,6 +358,13 @@ export type OmpPromptInput = {
   adapterVersion?: number | null;
   runtimeVersion?: string | null;
   /**
+   * The renderer's optimistic user-row id for this prompt (D288). It rides the
+   * prompt into the runner so the runtime's own user frame is reported as a
+   * re-key of that row (`user_message_persisted`) instead of a second bubble;
+   * absent for prompts no renderer row announced (approved-plan execution).
+   */
+  userMessageId?: string | null;
+  /**
    * Called once with the durable host turn id after its row exists and the
    * stop/dispose re-check has passed, immediately before the prompt is handed
    * to the runner (M5/T20-B2 review repair). A caller that must settle
@@ -353,8 +377,51 @@ export type OmpPromptInput = {
   onHostTurnBound?: (hostTurnId: string) => void;
 };
 
-export type OmpRenameResult = { ok: boolean; reason?: string; inconsistent?: boolean };
+/**
+ * One read-only history request (sessionGet/sessionOpen for an OMP session).
+ *
+ * The native reference travels the same way a prompt's does and is validated by
+ * the same boundary: the renderer never names a path, and a missing, malformed,
+ * mismatched or version-incompatible reference fails closed instead of
+ * returning an empty transcript.
+ */
+export type OmpHistoryInput = {
+  sessionId: string;
+  projectPath: string | null;
+  providerId?: string | null;
+  modelId?: string | null;
+  thinkingLevel?: string | null;
+  nativeSessionId?: string | null;
+  nativeSessionPath?: string | null;
+  adapterVersion?: number | null;
+  runtimeVersion?: string | null;
+  messageBefore?: number;
+  messageAround?: string;
+  messageLimit?: number;
+  contentLimit?: number;
+};
 
+/**
+ * One history page plus the live rows it supersedes.
+ *
+ * `replacedLiveMessageIds` names the live transcript rows this read replaced
+ * with durable rows: only ever returned for a tail read (the newest window),
+ * and only for rows whose own turn already ended. The renderer drops exactly
+ * those rows from its cached transcript before merging, so a message that was
+ * streamed live and later read durably appears once — by id, never by content,
+ * so two identical prompts stay two rows.
+ */
+export type OmpHistoryRead = {
+  messages: UiMessage[];
+  messageCount: number;
+  messageStart: number;
+  messageEnd: number;
+  hasMoreBefore: boolean;
+  hasMoreAfter: boolean;
+  replacedLiveMessageIds: string[];
+};
+
+export type OmpRenameResult = { ok: boolean; reason?: string; inconsistent?: boolean };
 export type OmpModelSwitchResult = { ok: boolean; reason?: string; inconsistent?: boolean };
 
 /**
@@ -637,6 +704,17 @@ export function validateEngineVersions(
 export type OmpSessionBridge = {
   gatePath(): string | null;
   prompt(input: OmpPromptInput): Promise<OmpPromptResult>;
+  /**
+   * Read one session's native transcript, read-only and without a turn.
+   *
+   * Never prompts, never executes a tool and never writes the transcript (the
+   * read-only runtime leaves the session before it is reclaimed, so its own
+   * `session_exit` diagnostic lands nowhere near the read transcript). A
+   * session with no native reference yet is the only empty result; every
+   * failure — unreachable runtime, malformed entries, identity or version
+   * mismatch — throws instead of returning an empty page.
+   */
+  readHistory(input: OmpHistoryInput): Promise<OmpHistoryRead>;
   rename(sessionId: string, title: string): Promise<OmpRenameResult>;
   /** Branch the session at the renderer's selected point (or the head). */
   branch(sessionId: string, throughMessageId?: string | null): Promise<{ sessionId: string }>;
@@ -716,6 +794,8 @@ class SessionEntry {
   readonly projectDirectory: string;
   private readonly supervisor: OmpRuntimeSupervisor;
   private readonly emitAgentEvent: (envelope: AgentEventEnvelope) => void;
+  private readonly recordLiveRow: (envelope: AgentEventEnvelope) => void;
+  private readonly notePromptUserRow: (messageId: string) => void;
   private readonly logger: OmpSessionBridgeLogger | undefined;
   private readonly now: () => number;
   private readonly runnerFactory: NonNullable<OmpSessionBridgeOptions["runnerFactory"]>;
@@ -883,6 +963,20 @@ class SessionEntry {
     persistNativeSession: OmpSessionBridgeOptions["persistNativeSession"];
     sessionDir: string;
     binding: { providerId: string | null; modelId: string | null; thinkingLevel: string | null };
+    /**
+     * The registry's record of the live transcript rows this process announced
+     * for this session. Every envelope passes through it before the desktop
+     * fan-out, so a durable history read can name exactly the live rows it
+     * supersedes (see `liveRows`).
+     */
+    recordLiveRow: (envelope: AgentEventEnvelope) => void;
+    /**
+     * Record the renderer's optimistic row for a prompt this entry admitted.
+     * The native echo re-keys that row (or a renderer that never saw the event
+     * keeps it under the renderer's id), so both identities must be known to a
+     * later durable read: whichever one the renderer holds is the one it drops.
+     */
+    notePromptUserRow: (messageId: string) => void;
     hostTools?: OmpHostToolProvider;
     capabilities?: OmpCapabilityProvider;
     sessionPolicy?: OmpSessionPolicyProvider;
@@ -895,6 +989,8 @@ class SessionEntry {
     this.projectDirectory = deps.projectDirectory;
     this.supervisor = deps.supervisor;
     this.emitAgentEvent = deps.emitAgentEvent;
+    this.recordLiveRow = deps.recordLiveRow;
+    this.notePromptUserRow = deps.notePromptUserRow;
     this.logger = deps.logger;
     this.now = deps.now;
     this.runnerFactory = deps.runnerFactory;
@@ -1078,6 +1174,43 @@ class SessionEntry {
     this.admittedTurnPolicy = null;
   }
 
+  /** Whether this entry currently owns a live runtime process. */
+  hasLiveRuntime(): boolean {
+    if (this.runner && this.shouldRetireRunner()) this.retireRunner();
+    return this.runner !== null;
+  }
+
+  /**
+   * Read the session's canonical entries through this entry's own runtime.
+   *
+   * Used by the history read when the session's runtime is already alive: the
+   * process that owns the transcript is the one asked for it, so the read
+   * never competes with a second process for the same file. The native
+   * session is established first (idempotent when already bound), exactly as a
+   * prompt would, so the reference's identity and versions are verified.
+   */
+  async readNativeEntries(
+    gate: string,
+    spec: OmpSessionRuntimeSpec,
+  ): Promise<{ entries: unknown; leafId: unknown }> {
+    this.assertOpen();
+    const epoch = this.stopEpoch;
+    await this.ensureNativeSession(gate, spec);
+    if (this.closed || this.stopEpoch !== epoch) {
+      throw new OmpRuntimeError("stopping", "a stop was requested while the history read was being prepared");
+    }
+    const runtime = this.runtimeHandle();
+    const response = await runtime.request({ type: "get_entries" }, { timeoutMs: 20_000 });
+    if (response.success === false) {
+      throw Object.assign(
+        new Error(`the runtime refused the history read: ${response.error ?? "unknown error"}`),
+        { errorCode: "OMP_HISTORY_READ_FAILED" },
+      );
+    }
+    const data = response.data as { entries?: unknown; leafId?: unknown } | undefined;
+    return { entries: data?.entries, leafId: data?.leafId };
+  }
+
   /**
    * Return the runner for this session, building runtime + runner once.
    *
@@ -1171,7 +1304,13 @@ class SessionEntry {
         reason: "completed" | "aborted" | "error";
         hostTurnId: string | null;
       }) => this.announceTurnEnded(info.turnId, info.reason, info.hostTurnId),
-      emit: (envelope) => this.emitAgentEvent(envelope),
+      emit: (envelope) => {
+        // The ledger sees the same envelopes the renderer does, one step
+        // earlier: it is the read path's exact record of the live rows a
+        // durable read supersedes.
+        this.recordLiveRow(envelope);
+        this.emitAgentEvent(envelope);
+      },
       onUiRequest: (request, info) => this.surfaceUiRequest(request, info.sessionId, info.generation),
       onUiClosed: (requestId, reason) => {
         this.approvalRequests.delete(requestId);
@@ -1422,6 +1561,7 @@ class SessionEntry {
     spec: OmpSessionRuntimeSpec,
     content: string,
     onHostTurnBound?: (hostTurnId: string) => void,
+    userMessageId?: string | null,
   ): Promise<OmpPromptResult> {
     this.assertOpen();
     const epoch = this.stopEpoch;
@@ -1579,9 +1719,13 @@ class SessionEntry {
     }
     let started: { accepted: boolean; turnId: string; hostTurnId: string | null };
     try {
+      // The optimistic row is recorded before submission: it is a row the
+      // desktop announced (the renderer painted it), and a later durable read
+      // must be able to name it even when the re-key echo was missed.
+      if (userMessageId) this.notePromptUserRow(userMessageId);
       started = await runner.prompt(
         content,
-        admission ? { admission, hostTurnId } : { hostTurnId },
+        admission ? { admission, hostTurnId, userMessageId } : { hostTurnId, userMessageId },
       );
     } catch (error) {
       // The runner refused or the transport failed. This path owns the host
@@ -2147,6 +2291,103 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
   }
 
   /**
+   * The live transcript rows this process has announced for a session, in
+   * announcement order, each with whether its own turn already ended.
+   *
+   * This is the exact, single-writer record of what the renderer's live
+   * transcript holds for the session (the renderer derives its rows from these
+   * same envelopes), so a durable history read can name the live rows it
+   * supersedes instead of guessing by content or time: two identical prompts
+   * are two rows with two ids, and neither may be collapsed into the other.
+   * A row is provisional until its terminal event (`message_end`/`tool_end`,
+   * or the run's own `agent_end`/`error`) proves the runtime has settled it —
+   * only settled rows can have a durable counterpart, and an in-flight row is
+   * never superseded. A row announced for a delegate (`parentToolCallId`) is
+   * not part of the session's own transcript and is never recorded.
+   *
+   * The ledger is ring-bounded: a session that produced more than the bound of
+   * rows in one app run would keep its oldest rows only until their durable
+   * twins are loaded with an older page.
+   */
+  const liveRows = new Map<string, Map<string, boolean>>();
+  const LIVE_ROW_LEDGER_LIMIT = 512;
+  /**
+   * Extra messages a tail read adds beyond the superseded live-row count.
+   *
+   * The covered window must include the durable twin of every live row it
+   * names. The runtime also appends messages that never become desktop rows
+   * (reminders, abort records), each of which pushes an older live row one
+   * position further from the tail; this slack keeps that from dropping the
+   * oldest superseded row out of the window.
+   */
+  const LIVE_ROW_WINDOW_SLACK = 8;
+
+  /** Record one envelope's transcript row (or settle one) for its session. */
+  function noteLiveRow(envelope: AgentEventEnvelope): void {
+    if (envelope.parentToolCallId) return;
+    const event = envelope.event;
+    if (event.type === "agent_end" || event.type === "error") {
+      // The turn's terminal settles every row that is still provisional: the
+      // runtime has persisted everything it will persist for this run, so a row
+      // whose own terminal event was skipped (an aborted stream) stops being
+      // in flight.
+      settleLiveRows(envelope.sessionId);
+      return;
+    }
+    const rowId =
+      event.type === "message_start" || event.type === "message_end"
+        ? event.message.id
+        : event.type === "tool_start" || event.type === "tool_end"
+          ? event.toolCallId
+          : undefined;
+    if (rowId === undefined) return;
+    let rows = liveRows.get(envelope.sessionId);
+    if (!rows) {
+      rows = new Map<string, boolean>();
+      liveRows.set(envelope.sessionId, rows);
+    }
+    if (event.type === "message_start" || event.type === "tool_start") {
+      rows.set(rowId, false);
+      if (rows.size > LIVE_ROW_LEDGER_LIMIT) {
+        const oldest = rows.keys().next().value;
+        if (oldest !== undefined) rows.delete(oldest);
+      }
+      return;
+    }
+    rows.set(rowId, true);
+  }
+
+  /** Record the optimistic user row of an admitted prompt (provisional). */
+  function notePromptLiveRow(sessionId: string, messageId: string): void {
+    let rows = liveRows.get(sessionId);
+    if (!rows) {
+      rows = new Map<string, boolean>();
+      liveRows.set(sessionId, rows);
+    }
+    rows.set(messageId, false);
+    if (rows.size > LIVE_ROW_LEDGER_LIMIT) {
+      const oldest = rows.keys().next().value;
+      if (oldest !== undefined) rows.delete(oldest);
+    }
+  }
+
+  /** Settle every provisional row of a session (the run's terminal event). */
+  function settleLiveRows(sessionId: string): void {
+    const rows = liveRows.get(sessionId);
+    if (!rows) return;
+    for (const [id, settled] of rows) if (!settled) rows.set(id, true);
+  }
+
+  /** The live rows a tail read supersedes: settled rows only, oldest first. */
+  function settledLiveRowIds(sessionId: string): string[] {
+    const rows = liveRows.get(sessionId);
+    if (!rows) return [];
+    const settled: string[] = [];
+    for (const [id, isSettled] of rows) if (isSettled) settled.push(id);
+    return settled;
+  }
+
+  /**
    * True once application shutdown begins. A new session must not be created
    * after the shutdown sweep has taken its snapshot, or its runtime would
    * outlive the shutdown that was supposed to reclaim it. Per-session disposal
@@ -2270,6 +2511,8 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       projectDirectory: spec.projectDirectory,
       supervisor,
       emitAgentEvent: options.emitAgentEvent,
+      recordLiveRow: noteLiveRow,
+      notePromptUserRow: (messageId) => notePromptLiveRow(spec.sessionId, messageId),
       logger,
       now,
       runnerFactory,
@@ -2310,7 +2553,210 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       runtimeVersion: input.runtimeVersion ?? null,
     };
     const entry = entryFor(spec);
-    return entry.prompt(gate, spec, input.content, input.onHostTurnBound);
+    return entry.prompt(gate, spec, input.content, input.onHostTurnBound, input.userMessageId ?? null);
+  }
+
+  /**
+   * Read one session's native transcript without prompting it.
+   *
+   * Two runtime profiles, one projection:
+   *
+   *   - the session already owns a live runtime (it prompted in this app run):
+   *     the transcript's own writer is asked, so no second process ever opens
+   *     the same file;
+   *   - otherwise a transient read-only runtime is started from the caller's
+   *     read profile — the session's model identity without a credential — is
+   *     switched to the persisted transcript, is asked for `get_entries`, and
+   *     is reclaimed. It never receives a prompt, so the read cannot become a
+   *     turn, cannot contact a provider and cannot execute a tool.
+   *
+   * The persisted reference is validated exactly like a restore (containment,
+   * header identity, adapter/runtime versions), and the opened session is
+   * re-verified after `switch_session`: a reference this build cannot read or a
+   * runtime that opened something else fails closed instead of rendering a
+   * different session or an empty page. A session with no native reference yet
+   * has nothing to read and is the only empty result.
+   */
+  async function readHistory(input: OmpHistoryInput): Promise<OmpHistoryRead> {
+    requireLauncher();
+    const projectDirectory = resolveProjectDirectory(input.projectPath);
+    const spec: OmpSessionRuntimeSpec = {
+      sessionId: input.sessionId,
+      projectDirectory,
+      providerId: typeof input.providerId === "string" && input.providerId.trim() ? input.providerId : null,
+      modelId: typeof input.modelId === "string" && input.modelId.trim() ? input.modelId : null,
+      thinkingLevel: typeof input.thinkingLevel === "string" && input.thinkingLevel.trim() ? input.thinkingLevel : null,
+      nativeSessionId: input.nativeSessionId ?? null,
+      nativeSessionPath: input.nativeSessionPath ?? null,
+      adapterVersion: input.adapterVersion ?? null,
+      runtimeVersion: input.runtimeVersion ?? null,
+    };
+    if (shuttingDown) {
+      throw Object.assign(
+        new Error("the OMP runtime is shutting down; no session can be read"),
+        { errorCode: ErrorCodes.ENGINE_UNAVAILABLE },
+      );
+    }
+    if (!spec.nativeSessionId && !spec.nativeSessionPath) {
+      // The session has never run a native turn: an empty transcript is the
+      // truth, not a failure. A half-written reference (an id without a path,
+      // or the reverse) is a broken binding and is refused below.
+      return {
+        messages: [],
+        messageCount: 0,
+        messageStart: 0,
+        messageEnd: 0,
+        hasMoreBefore: false,
+        hasMoreAfter: false,
+        replacedLiveMessageIds: [],
+      };
+    }
+    validateEngineVersions(spec.adapterVersion, spec.runtimeVersion, undefined);
+    const canonicalPath = validateNativeSessionPath(options.sessionDir, spec.nativeSessionId, spec.nativeSessionPath);
+    // Only the newest window can supersede the live rows: an older page (and a
+    // centered read) does not contain their durable twins, so naming them there
+    // would drop rows the user is looking at.
+    const tailRead = input.messageAround === undefined && input.messageBefore === undefined;
+    const replacedLiveMessageIds = tailRead ? settledLiveRowIds(spec.sessionId) : [];
+    const existing = entries.get(spec.sessionId);
+    const raw = existing?.hasLiveRuntime()
+      ? await existing.readNativeEntries(requireGate(), spec)
+      : await readEntriesWithReadOnlyRuntime(spec, canonicalPath);
+    const projection = projectOmpHistory(raw.entries, raw.leafId, {
+      sessionId: spec.sessionId,
+      // A tail read is widened to cover every live row it supersedes (plus a
+      // small allowance for the runtime's own non-visible messages): dropping a
+      // live row whose durable twin fell outside the window would make the
+      // message disappear from the view until an older page is loaded.
+      messageLimit:
+        replacedLiveMessageIds.length === 0
+          ? input.messageLimit
+          : Math.max(
+              Number.isInteger(input.messageLimit) && (input.messageLimit ?? 0) > 0
+                ? Math.floor(input.messageLimit as number)
+                : 100,
+              replacedLiveMessageIds.length + LIVE_ROW_WINDOW_SLACK,
+            ),
+      messageBefore: input.messageBefore,
+      messageAround: input.messageAround,
+      contentLimit: input.contentLimit,
+    });
+    return {
+      messages: projection.messages,
+      messageCount: projection.messageCount,
+      messageStart: projection.messageStart,
+      messageEnd: projection.messageEnd,
+      hasMoreBefore: projection.hasMoreBefore,
+      hasMoreAfter: projection.hasMoreAfter,
+      replacedLiveMessageIds,
+    };
+  }
+
+  /**
+   * Read a transcript through a transient read-only runtime.
+   *
+   * The runtime is always reclaimed, successful read or not: a leaked process
+   * is worse than a failed read, and a read that cannot prove its process is
+   * gone reports failure instead of pretending to have finished. Before the
+   * reclaim the runtime is moved off the transcript (`new_session`), because a
+   * runtime that disposes while holding a session appends a `session_exit`
+   * diagnostic to it — and a history read must leave the transcript byte-for-
+   * byte as it found it.
+   */
+  async function readEntriesWithReadOnlyRuntime(
+    spec: OmpSessionRuntimeSpec,
+    canonicalPath: string,
+  ): Promise<{ entries: unknown; leafId: unknown }> {
+    const createReadSupervisor = options.createReadSupervisor ?? options.createSupervisor;
+    const supervisor = createReadSupervisor(spec);
+    supervisor.setWorkingDirectory(spec.projectDirectory);
+    let read: { entries: unknown; leafId: unknown } | null = null;
+    let failure: unknown = null;
+    try {
+      await supervisor.start();
+      // The persisted reference's adapter/runtime versions are re-checked
+      // against the runtime that actually started: a transcript written by a
+      // newer runtime is refused rather than parsed by a version that cannot
+      // know its entries (the reuse path does the same through
+      // `ensureNativeSession`).
+      validateEngineVersions(spec.adapterVersion, spec.runtimeVersion, supervisor.status().runtimeVersion);
+      const runtime = supervisor.currentRuntime();
+      if (!runtime) {
+        throw Object.assign(
+          new Error("the read-only OMP runtime did not start"),
+          { errorCode: "OMP_HISTORY_READ_FAILED" },
+        );
+      }
+      const switched = await runtime.request(
+        { type: "switch_session", sessionPath: canonicalPath },
+        { timeoutMs: 20_000 },
+      );
+      const switchData = switched.data as { cancelled?: boolean } | undefined;
+      if (switched.success === false || switchData?.cancelled === true) {
+        throw Object.assign(
+          new Error(`the native session could not be opened for reading: ${switched.error ?? "cancelled"}`),
+          { errorCode: "OMP_RESTORE_FAILED" },
+        );
+      }
+      const state = await runtime.request({ type: "get_state" }, { timeoutMs: 20_000 });
+      const stateData = state.data as { sessionId?: string; sessionFile?: string } | undefined;
+      const openedId = typeof stateData?.sessionId === "string" ? stateData.sessionId : "";
+      const openedPath = typeof stateData?.sessionFile === "string" ? stateData.sessionFile : "";
+      const openedCanonical = openedPath ? canonicalizeIfExists(openedPath) : null;
+      if (openedId !== spec.nativeSessionId || openedCanonical !== canonicalPath) {
+        throw Object.assign(
+          new Error("the read-only runtime opened a different native session than the persisted reference"),
+          { errorCode: "OMP_RESTORE_FAILED" },
+        );
+      }
+      const response = await runtime.request({ type: "get_entries" }, { timeoutMs: 20_000 });
+      if (response.success === false) {
+        throw Object.assign(
+          new Error(`the runtime refused the history read: ${response.error ?? "unknown error"}`),
+          { errorCode: "OMP_HISTORY_READ_FAILED" },
+        );
+      }
+      const data = response.data as { entries?: unknown; leafId?: unknown } | undefined;
+      read = { entries: data?.entries, leafId: data?.leafId };
+      // Step off the transcript before the runtime is reclaimed; the command's
+      // own failure is not fatal (the reclaim below still runs), but it is
+      // logged because it is the one thing that could make the dispose write.
+      try {
+        await runtime.request({ type: "new_session" }, { timeoutMs: 20_000 });
+      } catch (error) {
+        logger?.app("omp", "warn", "the read-only runtime could not leave the session before disposal", {
+          data: { sessionId: spec.sessionId, error: String((error as Error)?.message ?? error) },
+        });
+      }
+    } catch (error) {
+      failure = error;
+    }
+    const reclaimErrors: string[] = [];
+    try {
+      const stop = await supervisor.stop({});
+      if (stop.reaped && (!stop.cleaned || supervisor.pendingCleanup.length > 0)) {
+        await supervisor.reclaimAll();
+      }
+      if (supervisor.pendingCleanup.length > 0) {
+        reclaimErrors.push("its process group or run directory survived");
+      }
+    } catch (error) {
+      reclaimErrors.push(String((error as Error)?.message ?? error));
+    }
+    if (failure) throw failure;
+    if (reclaimErrors.length > 0) {
+      throw Object.assign(
+        new Error(`the history read finished but its read-only runtime could not be reclaimed: ${reclaimErrors.join("; ")}`),
+        { errorCode: "OMP_HISTORY_READ_FAILED" },
+      );
+    }
+    if (!read) {
+      throw Object.assign(
+        new Error("the read-only runtime returned no transcript"),
+        { errorCode: "OMP_HISTORY_READ_FAILED" },
+      );
+    }
+    return read;
   }
 
   /** The runtime handle for a session's runner (fails loudly if absent). */
@@ -2826,6 +3272,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     }
     if (failures.length === 0) {
       entries.delete(sessionId);
+      liveRows.delete(sessionId);
     }
     return { ok: failures.length === 0, failures };
   }
@@ -2915,6 +3362,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
   return {
     gatePath,
     prompt,
+    readHistory,
     rename,
     branch,
     configure,

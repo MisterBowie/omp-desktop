@@ -60,7 +60,7 @@ const enrichSession = (session) => ({
   supportedThinkingLevels: ["off"],
 });
 
-function harness(hostRead, engineRouter) {
+function harness(hostRead, engineRouter, ompSessions = null) {
   const handlers = new Map();
   const calls = [];
   const host = {
@@ -73,6 +73,7 @@ function harness(hostRead, engineRouter) {
     registrar: { handle: (channel, handler) => handlers.set(channel, handler) },
     getHost: () => host,
     ...(engineRouter ? { engineRouter } : {}),
+    ...(ompSessions ? { ompSessions } : {}),
     getSidecar: () => ({
       call: async () => ({ sessions: [{ id: "native-pi:1", source: "pi-native", engine: undefined }] }),
     }),
@@ -211,4 +212,189 @@ test("a Plan/Goal mode the engine does not declare is refused before any write",
   const result = await allowed.handlers.get(IPC.invoke.sessionConfigure)("s2", { mode: "plan" });
   assert.equal(result.session.mode, "plan");
   assert.deepEqual(allowed.calls.map((call) => call.method), ["session.get", "session.configure"]);
+});
+
+/* ------------------------------------------------------------------------- */
+/* OMP native history (M5/T20-R2)                                             */
+/* ------------------------------------------------------------------------- */
+
+const ompSessionRow = {
+  id: "omp-session",
+  title: "OMP session",
+  engine: "omp",
+  messageCount: 0,
+  messages: [],
+  projectPath: "/projects/omp",
+  providerId: "provider-1",
+  modelId: "model-1",
+  thinkingLevel: "medium",
+};
+
+function ompHarness({ readHistory, engine = "omp" }) {
+  const calls = [];
+  const reads = [];
+  const router = createEngineRouter({
+    status: (id) => ({ engine: id, phase: "idle", runtimeVersion: null, protocolVersion: null, reason: null, capabilities: {} }),
+    sessionEngine: async (sessionId) => {
+      calls.push(sessionId);
+      return engine;
+    },
+  });
+  const built = harness(
+    async (method, input) => {
+      if (method === "session.get") return { session: { ...ompSessionRow } };
+      if (method === "session.getEngineRef") {
+        return {
+          engineRef: {
+            nativeSessionId: "native-1",
+            nativeSessionPath: "/sessions/native-1.jsonl",
+            adapterVersion: 1,
+            runtimeVersion: "18.3.0",
+          },
+        };
+      }
+      throw new Error(`unexpected host call ${method}: ${JSON.stringify(input)}`);
+    },
+    router,
+    {
+      readHistory: async (input) => {
+        reads.push(input);
+        return readHistory(input);
+      },
+    },
+  );
+  return { ...built, reads, engineLookups: calls };
+}
+
+test("sessionGet merges the native transcript over the host row for an OMP session", async () => {
+  const { handlers, reads, engineLookups } = ompHarness({
+    readHistory: async () => ({
+      messages: [
+        { id: "omp:omp-session:entry:m1", role: "user", content: "hello", createdAt: "2026-01-01T00:00:00.000Z", status: "complete" },
+        { id: "omp:omp-session:entry:m2", role: "assistant", content: "hi", createdAt: "2026-01-01T00:00:01.000Z", status: "complete" },
+      ],
+      messageCount: 2,
+      messageStart: 0,
+      messageEnd: 2,
+      hasMoreBefore: false,
+      hasMoreAfter: false,
+      replacedLiveMessageIds: ["live-1"],
+    }),
+  });
+  const result = await handlers.get(IPC.invoke.sessionGet)({
+    id: "omp-session",
+    messageLimit: 50,
+    contentLimit: 4096,
+  });
+
+  assert.deepEqual(engineLookups, ["omp-session"]);
+  // The transcript is the native projection; the host row still supplies every
+  // metadata field (and its always-empty host messages are replaced).
+  assert.deepEqual(result.session.messages.map((message) => message.id), [
+    "omp:omp-session:entry:m1",
+    "omp:omp-session:entry:m2",
+  ]);
+  assert.equal(result.session.messageCount, 2);
+  assert.equal(result.session.messageStart, 0);
+  assert.equal(result.session.hasMoreBefore, false);
+  assert.deepEqual(result.session.replacedLiveMessageIds, ["live-1"]);
+  assert.equal(result.session.title, "OMP session");
+  assert.equal(result.session.projectPath, "/projects/omp");
+  assert.equal(result.session.providerId, "provider-1");
+  assert.equal(result.session.supportsVision, false, "enrichment still runs");
+
+  // The native reference is read at the main/host boundary and handed to the
+  // bridge; the caller's window travels through unchanged.
+  assert.deepEqual(reads, [
+    {
+      sessionId: "omp-session",
+      projectPath: "/projects/omp",
+      providerId: "provider-1",
+      modelId: "model-1",
+      thinkingLevel: "medium",
+      nativeSessionId: "native-1",
+      nativeSessionPath: "/sessions/native-1.jsonl",
+      adapterVersion: 1,
+      runtimeVersion: "18.3.0",
+      messageLimit: 50,
+      contentLimit: 4096,
+    },
+  ]);
+});
+
+test("an OMP history read failure is reported instead of an empty transcript", async () => {
+  const { handlers } = ompHarness({
+    readHistory: async () => {
+      throw Object.assign(new Error("the transcript could not be read"), { errorCode: "OMP_HISTORY_READ_FAILED" });
+    },
+  });
+  await assert.rejects(
+    () => handlers.get(IPC.invoke.sessionGet)({ id: "omp-session" }),
+    (error) => error.errorCode === "OMP_HISTORY_READ_FAILED",
+  );
+});
+
+test("a Pi session keeps the host transcript and never reads the native runtime", async () => {
+  const { handlers, reads } = ompHarness({
+    engine: "pi",
+    readHistory: async () => {
+      throw new Error("a Pi session must not read the OMP transcript");
+    },
+  });
+  const result = await handlers.get(IPC.invoke.sessionGet)({ id: "omp-session" });
+  assert.deepEqual(reads, []);
+  assert.deepEqual(result.session.messages, []);
+});
+
+test("an unreadable engine record leaves the host transcript in place", async () => {
+  const handlers = new Map();
+  const router = createEngineRouter({
+    status: (id) => ({ engine: id, phase: "idle", runtimeVersion: null, protocolVersion: null, reason: null, capabilities: {} }),
+    sessionEngine: async () => {
+      throw new Error("host unavailable");
+    },
+  });
+  let reads = 0;
+  registerSessionIpc({
+    registrar: { handle: (channel, handler) => handlers.set(channel, handler) },
+    getHost: () => ({ call: async (method) => (method === "session.get" ? { session: { ...ompSessionRow } } : {}) }),
+    getSidecar: () => ({ call: async () => ({}) }),
+    engineRouter: router,
+    ompSessions: {
+      readHistory: async () => {
+        reads += 1;
+        throw new Error("must not be called");
+      },
+    },
+    dataDir: "/unused",
+    activeTurns: new Map(),
+    sessionProjects: new Map(),
+    persistenceOutbox: {},
+    logger: { app() {} },
+    plugins: { broadcastEvent() {} },
+    sessionCapabilityContext: async () => ({ providers: [], defaults: {} }),
+    enrichSession,
+    acquireSessionOperation: async () => () => {},
+    stripWinLongPrefix: (value) => value,
+  });
+  const result = await handlers.get(IPC.invoke.sessionGet)({ id: "omp-session" });
+  assert.equal(reads, 0);
+  assert.deepEqual(result.session.messages, []);
+});
+
+test("sessionOpen projects the native transcript the same way", async () => {
+  const { handlers, reads } = ompHarness({
+    readHistory: async () => ({
+      messages: [{ id: "omp:omp-session:entry:m1", role: "user", content: "hello", createdAt: "2026-01-01T00:00:00.000Z", status: "complete" }],
+      messageCount: 1,
+      messageStart: 0,
+      messageEnd: 1,
+      hasMoreBefore: false,
+      hasMoreAfter: false,
+      replacedLiveMessageIds: [],
+    }),
+  });
+  const result = await handlers.get(IPC.invoke.sessionOpen)("omp-session");
+  assert.deepEqual(result.session.messages.map((message) => message.content), ["hello"]);
+  assert.equal(reads[0].messageLimit, 1);
 });

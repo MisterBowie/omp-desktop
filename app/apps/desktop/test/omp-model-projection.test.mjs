@@ -16,6 +16,7 @@ const {
   ompApiForStyle,
   projectionError,
   projectModelsYaml,
+  projectReadOnlyModelsYaml,
   resolveProviderProjection,
 } = await import("../electron/main/runtime/omp-model-projection.ts");
 
@@ -160,4 +161,32 @@ test("F5: quotes a provider id containing a colon", () => {
   assert.equal(result.ok, true);
   const yaml = projectModelsYaml({ ...result.projection, apiKey: "k" });
   assert.match(yaml, /"plugin:acme":/);
+});
+
+test("R2: the read-only projection keeps the session's model identity and never carries a credential", () => {
+  const yaml = projectReadOnlyModelsYaml(source(), "acme-x");
+  assert.match(yaml, /"acme":/);
+  assert.match(yaml, /id: "acme-x"/);
+  assert.match(yaml, /auth: "none"/);
+  assert.doesNotMatch(yaml, /apiKey/);
+  assert.doesNotMatch(yaml, new RegExp(CANARY));
+  // A provider whose stored secret is gone projects identically: the read path
+  // never consults the secret store, so history stays readable without one.
+  assert.equal(projectReadOnlyModelsYaml(source({ hasSecret: false }), "acme-x"), yaml);
+});
+
+test("R2: an unprojectable or deleted provider falls back to a loopback placeholder that can never serve a request", () => {
+  // A disabled provider still projects its identity: history must stay readable
+  // for a session whose provider was switched off after the fact.
+  assert.match(projectReadOnlyModelsYaml(source({ enabled: false }), "acme-x"), /"acme":/);
+  // An api style this build cannot project falls back to the placeholder.
+  const unprojectable = projectReadOnlyModelsYaml(source({ apiStyle: "opencode_go" }), "acme-x");
+  assert.match(unprojectable, /"omp-desktop-read":/);
+  assert.match(unprojectable, /baseUrl: "http:\/\/127\.0\.0\.1:1"/);
+  assert.match(unprojectable, /auth: "none"/);
+  assert.match(unprojectable, /id: "acme-x"/);
+  // No provider row at all (a deleted or imported session) still boots a reader.
+  assert.match(projectReadOnlyModelsYaml(null, "acme-x"), /id: "acme-x"/);
+  // A model id that is not a plain identifier never reaches the YAML.
+  assert.match(projectReadOnlyModelsYaml(null, "model with spaces"), /id: "read-only"/);
 });

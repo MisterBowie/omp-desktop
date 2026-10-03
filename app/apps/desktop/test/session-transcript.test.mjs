@@ -260,3 +260,62 @@ test("a durable-only new user row stays ahead of a live streaming tail (D317)", 
     ["keep", "prompt", "answer"],
   );
 });
+
+test("a durable read drops the live rows it replaced, and never an in-flight one", () => {
+  const durable = [
+    message("entry:1", { role: "user", content: "prompt" }),
+    message("entry:2", { content: "answer" }),
+  ];
+  const live = [
+    message("live:1", { role: "user", content: "prompt" }),
+    message("live:2", { content: "answer" }),
+    message("live:3", { content: "streaming", status: "streaming" }),
+  ];
+  assert.deepEqual(
+    mergeLiveSessionMessages(durable, live, {
+      replacedLiveMessageIds: ["live:1", "live:2", "live:3"],
+    }).map((row) => row.id),
+    ["entry:1", "entry:2", "live:3"],
+  );
+  // Without the list the replaced rows would be appended (the live ids never
+  // equal their durable twins), which is exactly the duplicate it prevents.
+  assert.deepEqual(
+    mergeLiveSessionMessages(durable, live).map((row) => row.id),
+    ["entry:1", "entry:2", "live:1", "live:2", "live:3"],
+  );
+});
+
+test("replaced live rows count as covered even when the live page still holds them", () => {
+  const durable = [message("entry:1", { role: "user" }), message("entry:2")];
+  const live = [message("live:1", { role: "user" }), message("live:2")];
+  assert.equal(durableCoversLiveSessionMessages(durable, live), false);
+  assert.equal(
+    durableCoversLiveSessionMessages(durable, live, {
+      replacedLiveMessageIds: ["live:1", "live:2"],
+    }),
+    true,
+  );
+  // An in-flight row is not covered by the read: its durable twin does not
+  // exist yet, so live provenance must survive even if the read names it.
+  const streaming = message("live:3", { status: "streaming" });
+  assert.equal(
+    durableCoversLiveSessionMessages(durable, [streaming], {
+      replacedLiveMessageIds: ["live:3"],
+    }),
+    false,
+  );
+});
+
+test("two identical prompts are two rows, keyed only by id", () => {
+  const durable = [
+    message("entry:1", { role: "user", content: "same text" }),
+    message("entry:2", { content: "first answer" }),
+    message("entry:3", { role: "user", content: "same text" }),
+    message("entry:4", { content: "second answer" }),
+  ];
+  const merged = mergeLiveSessionMessages(durable, [
+    message("entry:1", { role: "user", content: "same text" }),
+    message("live:9", { role: "user", content: "same text" }),
+  ], { replacedLiveMessageIds: ["live:9"] });
+  assert.deepEqual(merged.map((row) => row.id), ["entry:1", "entry:2", "entry:3", "entry:4"]);
+});

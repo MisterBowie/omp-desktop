@@ -109,6 +109,12 @@ const EXEC2 = "E2E-EXEC-TWO";
 const EXEC3 = "E2E-EXEC-THREE";
 const EXEC4 = "E2E-EXEC-FOUR";
 const AFTER_RESTART = "E2E-AFTER-RESTART";
+/**
+ * Two submissions with byte-identical text, sent one after the other after a
+ * restart: the transcript must keep both, with distinct message ids (no
+ * content-based dedupe can be right here).
+ */
+const TWICE = "E2E-SAME-TEXT-TWICE";
 
 const results = new Map();
 
@@ -1097,6 +1103,135 @@ async function captureStep(state, name, extra = {}) {
   return step;
 }
 
+/**
+ * The user bubbles the transcript actually renders, with their row ids.
+ *
+ * The rendered rows are the user-visible surface, so counting them is the
+ * honest check for "one row per submission": the renderer paints a bubble per
+ * transcript row, and this reads the very ids it keyed them by.
+ */
+async function transcriptUserRows(state) {
+  // `textContent`, not `innerText`: message rows use `content-visibility: auto`,
+  // so a row scrolled out of the viewport renders no text and would read as an
+  // empty string even though the transcript holds it.
+  return state.cdp.evaluate(`(() => {
+    const rows = [...document.querySelectorAll("[data-row-role='user'][data-message-id]")];
+    return rows.map((node) => ({
+      id: node.getAttribute("data-message-id"),
+      // Long enough to keep the whole approved-plan instruction: its marker
+      // (the execution marker inside the plan markdown) sits past 400 chars.
+      text: (node.textContent || "").replace(/\\s+/g, " ").trim().slice(0, 4000),
+    }));
+  })()`);
+}
+
+/**
+ * The rendered transcript's structure by role: the assistant turns and tool
+ * rows a recovered panel must show before the user sends anything new.
+ */
+async function transcriptRoleCounts(state) {
+  return state.cdp.evaluate(`(() => ({
+    userRows: document.querySelectorAll("[data-row-role='user'][data-message-id]").length,
+    assistantTurns: document.querySelectorAll("[data-row-role='assistant']").length,
+    toolRows: document.querySelectorAll(".tool-row[data-message-id]").length,
+    // A collapsed process group still renders its header; the tool rows inside
+    // may be hidden by the disclosure, so both are counted.
+    processSections: document.querySelectorAll(".turn-process").length,
+    assistantMessages: document.querySelectorAll("[data-row-role='assistant'] [data-message-id]").length,
+  }))()`);
+}
+
+/** Which E2E markers the given user rows carry (each prompt starts with one). */
+function markerOf(text) {
+  for (const marker of [M1, M2, M3, M4, M5, M6, EXEC1, EXEC2, EXEC3, EXEC4, AFTER_RESTART, TWICE]) {
+    if (text.includes(marker)) return marker;
+  }
+  return text.slice(0, 60);
+}
+
+/**
+ * The promises a rendered transcript makes regardless of how much of it is
+ * mounted: no prompt appears twice, and a row that is present in both captures
+ * keeps the same id (a reselect or a durable read never re-keys a message).
+ *
+ * `assertTranscriptStable(before, after, label, requiredTexts)` also requires
+ * every text in `requiredTexts` to be present, so an empty or truncated window
+ * cannot make the comparison vacuous.
+ */
+function assertTranscriptStable(beforeRows, afterRows, label, requiredTexts = []) {
+  for (const [stage, rows] of [["before", beforeRows], ["after", afterRows]]) {
+    const duplicates = rows
+      .map((row) => row.text)
+      .filter((text, index) => rows.findIndex((row) => row.text === text) !== index);
+    assert(
+      duplicates.length === 0,
+      `${label}: a prompt rendered twice in the ${stage} capture: ${jsonText(duplicates.map((text) => text.slice(0, 60)))}`,
+    );
+  }
+  const idByText = new Map(beforeRows.map((row) => [row.text, row.id]));
+  const overlap = afterRows.filter((row) => idByText.has(row.text));
+  // A live row becoming its durable entry row is the intended re-key (the
+  // runtime's live frames carry no entry id); a durable row changing its
+  // durable id is not — entry ids are stable across reads.
+  const rekeyed = overlap.filter((row) => {
+    const beforeId = idByText.get(row.text);
+    return beforeId.includes(":entry:") && row.id.includes(":entry:") && beforeId !== row.id;
+  });
+  assert(
+    rekeyed.length === 0,
+    `${label}: a durable message changed its entry id: ${jsonText(
+      rekeyed.map((row) => [row.text.slice(0, 40), idByText.get(row.text), row.id]),
+    )}`,
+  );
+  for (const text of requiredTexts) {
+    assert(
+      afterRows.some((row) => row.text.includes(text)),
+      `${label}: the recovered transcript does not show ${text}: ${jsonText(afterRows.map((row) => [row.id, markerOf(row.text)]))}`,
+    );
+  }
+  return overlap.length;
+}
+
+/**
+ * A panel that read its transcript from storage renders durable rows only.
+ *
+ * This is the difference between showing history and showing whatever the
+ * renderer happened to keep in memory: an id minted from a live frame means the
+ * row never came from the native transcript.
+ */
+function assertDurableRows(rows, label) {
+  const live = rows.filter((row) => !row.id.includes(":entry:"));
+  assert(
+    live.length === 0,
+    `${label}: the rendered transcript still shows live rows: ${jsonText(live.map((row) => [row.id, markerOf(row.text)]))}`,
+  );
+}
+
+/**
+ * Wait until the rendered user rows satisfy a predicate.
+ *
+ * A recovered panel reads its transcript asynchronously — and, for an OMP
+ * session with no live runtime, by starting a read-only runtime — so the rows
+ * appear seconds after the session becomes active. Asserting before they land
+ * would test the loading state, not the history.
+ */
+async function waitForUserRows(state, predicate, label, timeoutMs = WAIT_TIMEOUT_MS) {
+  return waitFor(
+    async () => {
+      const rows = await transcriptUserRows(state);
+      return predicate(rows) ? rows : null;
+    },
+    label,
+    state,
+    timeoutMs,
+  );
+}
+
+/** How many rendered user rows carry this submission (the whole prompt text). */
+function countUserRows(rows, text) {
+  return rows.filter((row) => row.text.includes(text)).length;
+}
+
 function writeRawEvidence(state) {
   const evidence = state.evidence;
   evidence.generatedAt = new Date().toISOString();
@@ -1217,6 +1352,15 @@ function scriptProvider(provider, state) {
       { marker: EXEC2, turns: [writeMarker("marker-two.txt", "two\n"), { text: "execution two done", finish: "stop" }] },
       { marker: EXEC1, turns: [writeMarker("marker-one.txt", "one\n"), { text: "execution one done", finish: "stop" }] },
       { marker: AFTER_RESTART, turns: [{ text: "post-restart agent turn", finish: "stop" }] },
+      {
+        marker: TWICE,
+        // Two identical submissions, two answers: the second prompt must reach
+        // the provider (nothing was swallowed as a duplicate).
+        turns: [
+          { text: "first same-text answer", finish: "stop" },
+          { text: "second same-text answer", finish: "stop" },
+        ],
+      },
       {
         marker: M6,
         turns: [
@@ -2008,6 +2152,16 @@ async function runAcceptance(state) {
     providerRequests: requestsBeforeHeldRestart,
     sideEffectLog: fileFacts(state.holdLog),
   };
+  // The transcript the UI has painted so far, captured before the restart so
+  // the recovered panel can be compared with it (M5/T20-R2).
+  const userRowsBeforeHeldRestart = await transcriptUserRows(state);
+  assert(
+    userRowsBeforeHeldRestart.length >= 4,
+    `the live transcript must show the session's prompts before the restart: ${jsonText(userRowsBeforeHeldRestart)}`,
+  );
+  const nativeFilePath =
+    queryOne(state, "SELECT native_session_path FROM sessions WHERE id = ?", sessionId)
+      ?.native_session_path ?? null;
   await captureStep(state, "running-held", {
     scenario: "running-restart",
     executionId: executionHeld.execution_id,
@@ -2087,6 +2241,51 @@ async function runAcceptance(state) {
   };
   await captureScreenshot(state, "omp-plan-ui-09-running-after-restart");
 
+  // R6: the recovered panel shows the pre-restart transcript *before* any new
+  // prompt — the durable read, not a replay and not an empty session. The
+  // resident provider request count is unchanged by the read (asserted above).
+  const heldBeforeMarkers = userRowsBeforeHeldRestart.map((row) => markerOf(row.text));
+  const newestPreRestartMarker = heldBeforeMarkers.at(-1);
+  assert(
+    heldBeforeMarkers.length > 0 && heldBeforeMarkers.every((marker) => marker.length > 0),
+    `every rendered prompt must carry its marker before the restart: ${jsonText(heldBeforeMarkers)}`,
+  );
+  const userRowsAfterHeldRestart = await waitForUserRows(
+    state,
+    (rows) => rows.length > 0 && rows.some((row) => markerOf(row.text) === newestPreRestartMarker),
+    `recovered transcript shows the pre-restart history (${newestPreRestartMarker})`,
+    TURN_TIMEOUT_MS,
+  );
+  const heldRestartMarkers = userRowsAfterHeldRestart.map((row) => markerOf(row.text));
+  // The pre-restart transcript is back, one row per submission, with every
+  // overlapping row under its original id. The newest pre-restart prompt must
+  // be visible, so a truncated or empty window cannot pass.
+  const heldRestartOverlap = assertTranscriptStable(
+    userRowsBeforeHeldRestart,
+    userRowsAfterHeldRestart,
+    "after the running restart",
+    [userRowsBeforeHeldRestart.at(-1).text],
+  );
+  assert(heldRestartOverlap >= 1, "the recovered transcript must overlap the pre-restart transcript");
+  assertDurableRows(userRowsAfterHeldRestart, "after the running restart");
+  const nativeFactsAfterHeldRestart = nativeFilePath ? fileFacts(nativeFilePath) : null;
+  // Assistant turns and tool rows produced before the restart are on screen
+  // again, so the recovered panel is the transcript, not just the new turn.
+  const heldRestartRoles = await transcriptRoleCounts(state);
+  assert(
+    heldRestartRoles.assistantMessages >= 2 &&
+      (heldRestartRoles.toolRows >= 1 || heldRestartRoles.processSections >= 1),
+    `the recovered transcript must render the durable assistant/tool history: ${jsonText(heldRestartRoles)}`,
+  );
+  state.evidence.scenarios.history = {
+    beforeHeldRestart: userRowsBeforeHeldRestart,
+    afterHeldRestart: userRowsAfterHeldRestart,
+    afterHeldRestartMarkers: heldRestartMarkers,
+    afterHeldRestartOverlap: heldRestartOverlap,
+    afterHeldRestartRoles: heldRestartRoles,
+    nativeTranscriptAfterHeldRestart: nativeFactsAfterHeldRestart,
+  };
+
   // The recovered app must be usable: a fresh agent turn completes in the same
   // session and produces exactly one new provider request.
   const requestsBeforeRecoveryTurn = provider.requests.length;
@@ -2101,10 +2300,26 @@ async function runAcceptance(state) {
     provider.requests.length === requestsBeforeRecoveryTurn + 1,
     `the recovery turn produced ${provider.requests.length - requestsBeforeRecoveryTurn} provider requests`,
   );
+  // R5: the prompt the user actually submitted appears exactly once. Before the
+  // repair the panel showed it twice (the desktop's own echo plus the native
+  // user frame), while the provider saw a single request.
+  const recoveryText = `${AFTER_RESTART}: confirm the session still works.`;
+  const rowsAfterRecovery = await transcriptUserRows(state);
+  assert(
+    countUserRows(rowsAfterRecovery, recoveryText) === 1,
+    `the recovery prompt must render one bubble: ${jsonText(rowsAfterRecovery.filter((row) => row.text.includes(AFTER_RESTART)))}`,
+  );
+  assert(
+    rowsAfterRecovery.filter((row) => markerOf(row.text) === AFTER_RESTART).length === 1,
+    "the recovery prompt must appear once in the rendered transcript",
+  );
+  // No earlier prompt was duplicated by the recovery turn either.
+  assertTranscriptStable(rowsAfterRecovery, rowsAfterRecovery, "after the recovery turn", [recoveryText]);
   state.evidence.scenarios.runningRestart.recovery = {
     providerRequests: provider.requests.length,
     providerRequestsDelta: provider.requests.length - requestsBeforeRecoveryTurn,
     ui: await inspectUi(state),
+    userRows: rowsAfterRecovery,
   };
   await captureScreenshot(state, "omp-plan-ui-10-running-recovered");
 
@@ -2169,6 +2384,151 @@ async function runAcceptance(state) {
     ui: restarted,
   };
   await captureScreenshot(state, "omp-plan-ui-12-after-pending-restart");
+
+  // R6: the second restart also shows the transcript before any new prompt —
+  // including the Plan prompt that was submitted just before the restart — and
+  // every prompt remains exactly one bubble.
+  const pendingRestartRows = await waitForUserRows(
+    state,
+    (rows) => rows.some((row) => markerOf(row.text) === M4),
+    "recovered transcript shows the pre-restart Plan prompt",
+    TURN_TIMEOUT_MS,
+  );
+  // The second restart re-read the same transcript: no row may be duplicated,
+  // and every row that is in both captures keeps its id.
+  assertTranscriptStable(userRowsAfterHeldRestart, pendingRestartRows, "after the pending restart", [
+    pendingRestartRows.at(-1).text,
+    recoveryText,
+  ]);
+  assertDurableRows(pendingRestartRows, "after the pending restart");
+  const nativeFactsAfterPendingRestart = nativeFilePath ? fileFacts(nativeFilePath) : null;
+
+  // Reselecting the session — through another session and back — must keep the
+  // same rows with the same ids, and must not rewrite the native transcript.
+  const reselectTarget = await getPreloadResult(state, "sessionCreate", [
+    { title: "E2E reselect target", mode: "agent", engine: "pi", projectPath: state.workspace },
+  ]);
+  const reselectSessionId = reselectTarget?.session?.id;
+  assert(reselectSessionId, `reselect target session creation returned no id: ${jsonText(reselectTarget)}`);
+  await reloadRenderer(state);
+  await selectSession(state, reselectSessionId);
+  await selectSession(state, sessionId);
+  await waitForRendererReady(state);
+  const reselectedRows = await waitForUserRows(
+    state,
+    (rows) => rows.some((row) => markerOf(row.text) === M4),
+    "reselect renders the durable transcript",
+    TURN_TIMEOUT_MS,
+  );
+  state.evidence.scenarios.historyRows = { pendingRestart: pendingRestartRows, reselected: reselectedRows };
+  // The reselect re-reads the session: every row stays a single row and the
+  // overlapping rows keep their ids (the mounted window may grow or shrink, so
+  // only the overlap is comparable). The pre-restart Plan prompt must be there.
+  state.evidence.scenarios.historyRows = { pendingRestart: pendingRestartRows, reselected: reselectedRows };
+  const reselectOverlap = assertTranscriptStable(
+    pendingRestartRows,
+    reselectedRows,
+    "after a reselect",
+    [pendingRestartRows.at(-1).text],
+  );
+  assert(reselectOverlap >= 1, "a reselect must overlap the transcript it replaces");
+  assertDurableRows(reselectedRows, "after a reselect");
+  const nativeFactsAfterReselect = nativeFilePath ? fileFacts(nativeFilePath) : null;
+  if (nativeFilePath) {
+    assert(
+      nativeFactsAfterReselect.sha256 === nativeFactsAfterPendingRestart.sha256,
+      `a history read/reselect must not rewrite the native transcript (${nativeFactsAfterPendingRestart.sha256} -> ${nativeFactsAfterReselect.sha256})`,
+    );
+  }
+
+  // R5: two submissions with byte-identical text both survive, with distinct
+  // ids, and both reach the provider.
+  const requestsBeforeTwice = provider.requests.length;
+  const twiceText = `${TWICE}: submit this exact text twice.`;
+  await fillComposer(state, twiceText);
+  await waitFor(
+    async () => ((await inspectUi(state)).bodyText.includes("first same-text answer") ? true : null),
+    "first identical submission answered",
+    state,
+    TURN_TIMEOUT_MS,
+  );
+  await fillComposer(state, twiceText);
+  await waitFor(
+    async () => ((await inspectUi(state)).bodyText.includes("second same-text answer") ? true : null),
+    "second identical submission answered",
+    state,
+    TURN_TIMEOUT_MS,
+  );
+  assert(
+    provider.requests.length === requestsBeforeTwice + 2,
+    `the two identical submissions produced ${provider.requests.length - requestsBeforeTwice} provider requests`,
+  );
+  const twiceRows = await transcriptUserRows(state);
+  const sameTextRows = twiceRows.filter((row) => row.text.includes(twiceText));
+  assert(
+    sameTextRows.length === 2,
+    `two identical submissions must render two bubbles: ${jsonText(twiceRows.map((row) => [row.id, markerOf(row.text)]))}`,
+  );
+  assert(sameTextRows[0].id !== sameTextRows[1].id, "the two bubbles must have distinct ids");
+  assert(
+    twiceRows.filter((row) => markerOf(row.text) === TWICE).length === 2,
+    "no identical submission may be swallowed",
+  );
+
+  // The same two rows survive another reselect — and the durable read replaces
+  // the live rows by identity, never by matching text: exactly two rows remain
+  // (never four), and they now carry the durable entry ids.
+  await selectSession(state, reselectSessionId);
+  await selectSession(state, sessionId);
+  const twiceRowsAfterReselect = await waitForUserRows(
+    state,
+    (rows) => {
+      const rowsForText = rows.filter((row) => row.text.includes(twiceText));
+      return rowsForText.length === 2 && rowsForText.every((row) => row.id.includes(":entry:"));
+    },
+    "reselect replaces both identical live rows with their durable entry rows",
+    TURN_TIMEOUT_MS,
+  );
+  const twiceRowsForText = twiceRowsAfterReselect.filter((row) => row.text.includes(twiceText));
+  assert(
+    twiceRowsForText.length === 2 && twiceRowsForText.every((row) => row.id.includes(":entry:")),
+    `identical prompts must survive the merge as exactly two durable rows: ${jsonText(twiceRowsForText.map((row) => [row.id, markerOf(row.text)]))}`,
+  );
+  assert(
+    twiceRowsForText[0].id !== twiceRowsForText[1].id,
+    "the two durable rows must keep distinct ids",
+  );
+  // A second reselect keeps the same durable identity (entry ids are stable).
+  await selectSession(state, reselectSessionId);
+  await selectSession(state, sessionId);
+  const twiceRowsAfterSecondReselect = await waitForUserRows(
+    state,
+    (rows) => rows.filter((row) => row.text.includes(twiceText) && row.id.includes(":entry:")).length === 2,
+    "a second reselect keeps both durable rows",
+    TURN_TIMEOUT_MS,
+  );
+  const twiceIdsAfterSecondReselect = twiceRowsAfterSecondReselect
+    .filter((row) => row.text.includes(twiceText))
+    .map((row) => row.id);
+  assert(
+    JSON.stringify(twiceIdsAfterSecondReselect) === JSON.stringify(twiceRowsForText.map((row) => row.id)),
+    `identical prompts must keep their durable ids across reselects: ${jsonText({ before: twiceRowsForText.map((row) => row.id), after: twiceIdsAfterSecondReselect })}`,
+  );
+  state.evidence.scenarios.history.afterPendingRestart = pendingRestartRows;
+  state.evidence.scenarios.history.afterReselect = reselectedRows;
+  state.evidence.scenarios.history.nativeTranscriptAfterPendingRestart = nativeFactsAfterPendingRestart;
+  state.evidence.scenarios.history.nativeTranscriptAfterReselect = nativeFactsAfterReselect;
+  state.evidence.scenarios.history.identicalPrompts = {
+    text: twiceText,
+    rows: sameTextRows,
+    rowsAfterReselect: twiceRowsForText,
+    rowsAfterSecondReselect: twiceRowsAfterSecondReselect.filter((row) => row.text.includes(twiceText)),
+    providerRequestsBefore: requestsBeforeTwice,
+    providerRequestsAfter: provider.requests.length,
+    reselectSessionId,
+  };
+  await captureScreenshot(state, "omp-plan-ui-13-history-reselect");
+  await installAgentEventRecorder(state, sessionId);
 
   // The renderer received the submit turn's terminal events; record the full
   // identity sequence the UI saw (live turn ids included).

@@ -381,7 +381,11 @@ export function createSessionSlice({
             : undefined;
         const selectedMessages = detail.session
           ? liveMessages
-            ? mergeLiveSessionMessages(detail.session.messages ?? [], liveMessages)
+            ? mergeLiveSessionMessages(detail.session.messages ?? [], liveMessages, {
+                ...(detail.session.replacedLiveMessageIds
+                  ? { replacedLiveMessageIds: detail.session.replacedLiveMessageIds }
+                  : {}),
+              })
             : detail.session.messages ?? []
           : liveMessages ?? [];
         if (detail.session) {
@@ -390,7 +394,15 @@ export function createSessionSlice({
         commitSelection(selectedMessages, false, historyWindow);
         if (
           currentState.runningSessions[id] !== true &&
-          durableCoversLiveSessionMessages(detail.session?.messages ?? [], liveMessages)
+          durableCoversLiveSessionMessages(
+            detail.session?.messages ?? [],
+            liveMessages,
+            {
+              ...(detail.session?.replacedLiveMessageIds
+                ? { replacedLiveMessageIds: detail.session.replacedLiveMessageIds }
+                : {}),
+            },
+          )
         ) {
           runtime.liveSessionTranscripts.delete(id);
         }

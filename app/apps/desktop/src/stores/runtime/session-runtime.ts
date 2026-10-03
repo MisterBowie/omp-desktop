@@ -11,6 +11,7 @@ import {
   durableCoversLiveSessionMessages,
   mergeLiveSessionMessages,
   projectMessageEnd,
+  reconcilePersistedUserMessage,
   removeLiveSessionMessage,
   upsertLiveSessionMessage,
 } from "../../lib/session-transcript";
@@ -78,7 +79,10 @@ export type SessionRuntime = {
       contentLimit?: number;
     },
   ) => ReturnType<typeof api.getSession>;
-  loadFullSessionMessages: (id: string, cache?: boolean) => Promise<UiMessage[] | null>;
+  loadFullSessionMessages: (
+    id: string,
+    cache?: boolean,
+  ) => Promise<{ messages: UiMessage[]; replacedLiveMessageIds: string[] } | null>;
   insertOptimisticUserMessage: (sessionId: string, message: UiMessage) => void;
   retractOptimisticUserMessage: (sessionId: string, message: UiMessage) => void;
   cacheBackgroundTranscriptEvent: (envelope: AgentEventEnvelope) => void;
@@ -165,10 +169,13 @@ export function createSessionRuntime({ get, set }: StoreAccess): SessionRuntime 
         const state = get();
         const liveMessages =
           sessionTranscriptCache.get(id) ?? state.retainedTranscripts[id];
+        const replaced = detail.session.replacedLiveMessageIds;
         const messages =
           (liveSessionTranscripts.has(id) || state.runningSessions[id]) &&
           liveMessages
-            ? mergeLiveSessionMessages(detail.session.messages ?? [], liveMessages)
+            ? mergeLiveSessionMessages(detail.session.messages ?? [], liveMessages, {
+                ...(replaced ? { replacedLiveMessageIds: replaced } : {}),
+              })
             : detail.session.messages ?? [];
         cacheSessionTranscript(id, messages, {
           messageStart: detail.session.messageStart ?? 0,
@@ -203,7 +210,16 @@ export function createSessionRuntime({ get, set }: StoreAccess): SessionRuntime 
       ? recordPaneTranscript(current, id, current.messages) : {});
   }
 
-  async function loadFullSessionMessages(id: string, cache = true): Promise<UiMessage[] | null> {
+  /**
+   * The session's full durable transcript, with the live rows this read
+   * replaced. Callers that install the page wholesale ignore the second field
+   * (durable rows are already the complete set); callers that merge the page
+   * with a live transcript pass it so a streamed row is not shown twice.
+   */
+  async function loadFullSessionMessages(
+    id: string,
+    cache = true,
+  ): Promise<{ messages: UiMessage[]; replacedLiveMessageIds: string[] } | null> {
     const detail = await api.getSession(id);
     if (!detail.session) return null;
     const messages = detail.session.messages ?? [];
@@ -211,7 +227,10 @@ export function createSessionRuntime({ get, set }: StoreAccess): SessionRuntime 
         messageStart: 0,
         hasMoreBefore: false,
       });
-    return messages;
+    return {
+      messages,
+      replacedLiveMessageIds: detail.session.replacedLiveMessageIds ?? [],
+    };
   }
 
   function insertOptimisticUserMessage(sessionId: string, message: UiMessage): void {
@@ -254,6 +273,16 @@ export function createSessionRuntime({ get, set }: StoreAccess): SessionRuntime 
     const { event } = envelope;
     let next = current;
     switch (event.type) {
+      // The runtime's durable echo of an admitted prompt re-keys the exact
+      // optimistic row, exactly as it does for the active session: a
+      // background transcript must not keep the row under the renderer's id
+      // while the panel that later opens the session reads it under the
+      // durable one (the id can never be matched by content — two identical
+      // prompts are two rows).
+      case "user_message_persisted": {
+        next = reconcilePersistedUserMessage(current, event.optimisticMessageId, event.message);
+        break;
+      }
       case "message_start":
         next = upsertLiveSessionMessage(current, event.message);
         break;

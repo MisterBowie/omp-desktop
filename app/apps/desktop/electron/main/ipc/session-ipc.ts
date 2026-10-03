@@ -139,6 +139,35 @@ export type SessionIpcDependencies = {
     disposeSession(sessionId: string, reason?: string): Promise<{ ok: boolean; failures: Array<{ sessionId: string; detail: string }> }>;
     /** Drop the session's scoped tool grants (used when the session is deleted). */
     clearSessionGrants?(sessionId: string): void;
+    /**
+     * Read the session's native transcript (read-only; never prompts, never
+     * writes) plus the live rows this read replaces. See the bridge's
+     * `readHistory` for the full contract; a session with no native reference
+     * yet is the only empty result.
+     */
+    readHistory?(input: {
+      sessionId: string;
+      projectPath: string | null;
+      providerId?: string | null;
+      modelId?: string | null;
+      thinkingLevel?: string | null;
+      nativeSessionId?: string | null;
+      nativeSessionPath?: string | null;
+      adapterVersion?: number | null;
+      runtimeVersion?: string | null;
+      messageBefore?: number;
+      messageAround?: string;
+      messageLimit?: number;
+      contentLimit?: number;
+    }): Promise<{
+      messages: Array<Record<string, unknown>>;
+      messageCount: number;
+      messageStart: number;
+      messageEnd: number;
+      hasMoreBefore: boolean;
+      hasMoreAfter: boolean;
+      replacedLiveMessageIds: string[];
+    }>;
   } | null;
 };
 
@@ -168,6 +197,72 @@ export function registerSessionIpc({
       return fn(...args);
     });
   };
+
+  /**
+   * Attach an OMP session's read-only native history to its host row.
+   *
+   * The host row is the metadata authority for every session; an OMP session's
+   * messages live only in its native transcript (M2: one writer per session),
+   * so the durable read is projected from the session's own runtime — see the
+   * bridge's `readHistory` for what that read is and is not allowed to do. Any
+   * engine other than OMP (and Pi, the default for records predating the engine
+   * field) keeps the host transcript exactly as before.
+   *
+   * A failed engine lookup only skips the projection (the host read still
+   * answers, as it did before this path existed); a failed *history* read
+   * throws, because an unreadable transcript must never look like an empty one.
+   */
+  async function withOmpHistory(
+    session: RuntimeSession,
+    sessionId: string,
+    window: { messageBefore?: number; messageAround?: string; messageLimit?: number; contentLimit?: number },
+  ): Promise<RuntimeSession> {
+    if (!engineRouter?.engineForSession || !ompSessions?.readHistory) return session;
+    const engine = await engineRouter.engineForSession(sessionId).catch((error) => {
+      logger.app("session", "warn", "session engine lookup failed; leaving the host transcript", {
+        sessionId,
+        data: { error: String((error as Error)?.message ?? error) },
+      });
+      return "pi";
+    });
+    if (engine !== "omp") return session;
+    // The native reference is a main/host-boundary value: read here and handed
+    // to the bridge, never taken from the renderer or surfaced to it.
+    const engineRef = await host!
+      .call<{
+        engineRef?: {
+          nativeSessionId?: string | null;
+          nativeSessionPath?: string | null;
+          adapterVersion?: number | null;
+          runtimeVersion?: string | null;
+        } | null;
+      }>("session.getEngineRef", { id: sessionId })
+      .then((response) => response.engineRef ?? null)
+      .catch(() => null);
+    const history = await ompSessions.readHistory({
+      sessionId,
+      projectPath:
+        typeof session.projectPath === "string" && session.projectPath.trim() ? session.projectPath : null,
+      providerId: typeof session.providerId === "string" ? session.providerId : null,
+      modelId: typeof session.modelId === "string" ? session.modelId : null,
+      thinkingLevel: typeof session.thinkingLevel === "string" ? session.thinkingLevel : null,
+      nativeSessionId: engineRef?.nativeSessionId ?? null,
+      nativeSessionPath: engineRef?.nativeSessionPath ?? null,
+      adapterVersion: engineRef?.adapterVersion ?? null,
+      runtimeVersion: engineRef?.runtimeVersion ?? null,
+      ...window,
+    });
+    return {
+      ...session,
+      messages: history.messages,
+      messageCount: history.messageCount,
+      messageStart: history.messageStart,
+      messageEnd: history.messageEnd,
+      hasMoreBefore: history.hasMoreBefore,
+      hasMoreAfter: history.hasMoreAfter,
+      replacedLiveMessageIds: history.replacedLiveMessageIds,
+    };
+  }
 
   handle(IPC.invoke.sessionSearch, async (input) => {
     if (!host) throw new Error("host unavailable");
@@ -335,27 +430,33 @@ export function registerSessionIpc({
         if (!sidecar) throw new Error("sidecar unavailable");
         return sidecar.call("native.session.get", { id, ...request });
       }
+      // The host row supplies the session's metadata; for an OMP session the
+      // transcript itself lives in the native session file (the host never
+      // double-writes one), so the messages come from the session's own
+      // read-only history projection — bounded by the same window the caller
+      // asked for. A read that cannot be performed throws (the renderer shows
+      // the failure); only a session with no native transcript yet is empty.
+      const window = {
+        ...(typeof request.messageAround === "string" && request.messageAround.trim()
+          ? { messageAround: request.messageAround }
+          : {}),
+        ...(Number.isInteger(request.messageBefore) && request.messageBefore! >= 0
+          ? { messageBefore: request.messageBefore }
+          : {}),
+        ...(Number.isInteger(request.messageLimit) && request.messageLimit! > 0
+          ? { messageLimit: request.messageLimit }
+          : {}),
+        ...(Number.isInteger(request.contentLimit) && request.contentLimit! > 0
+          ? { contentLimit: request.contentLimit }
+          : {}),
+      };
       const [result, { providers, defaults }] = await Promise.all([
-        host.call<{ session?: RuntimeSession | null }>("session.get", {
-          id,
-          ...(typeof request.messageAround === "string" && request.messageAround.trim()
-            ? { messageAround: request.messageAround }
-            : {}),
-          ...(Number.isInteger(request.messageBefore) && request.messageBefore! >= 0
-            ? { messageBefore: request.messageBefore }
-            : {}),
-          ...(Number.isInteger(request.messageLimit) && request.messageLimit! > 0
-            ? { messageLimit: request.messageLimit }
-            : {}),
-          ...(Number.isInteger(request.contentLimit) && request.contentLimit! > 0
-            ? { contentLimit: request.contentLimit }
-            : {}),
-        }),
+        host.call<{ session?: RuntimeSession | null }>("session.get", { id, ...window }),
         sessionCapabilityContext(),
       ]);
-      return result.session
-        ? { ...result, session: enrichSession(result.session, providers, defaults) }
-        : result;
+      if (!result.session) return result;
+      const enriched = enrichSession(result.session, providers, defaults);
+      return { ...result, session: await withOmpHistory(enriched, id, window) };
     },
   );
   handle(IPC.invoke.sessionCollaboration, async (input?: { sessionId?: unknown }) => {
@@ -389,7 +490,8 @@ export function registerSessionIpc({
         errorCode: ErrorCodes.NOT_FOUND,
       });
     }
-    return { ...result, session: enrichSession(result.session, providers, defaults) };
+    const enriched = enrichSession(result.session, providers, defaults);
+    return { ...result, session: await withOmpHistory(enriched, sessionId, { messageLimit: 1 }) };
   });
   handle(IPC.invoke.sessionDelete, async (id: string) => {
     if (id.startsWith("native-pi:")) {

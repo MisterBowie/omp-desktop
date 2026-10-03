@@ -1,0 +1,28 @@
+{
+  "tree": "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app",
+  "checks": [
+    {
+      "id": "R5-user-row-identity",
+      "rendererIdEcho": 2,
+      "preRepairUserRows": 2,
+      "withAdoptedIdentityRows": 1,
+      "withAdoptedIdentityIds": [
+        "omp:session-omp:1"
+      ]
+    },
+    {
+      "id": "R6-omp-sessionGet-messages",
+      "messageCount": 2,
+      "ids": [
+        "omp:session-omp:entry:m1",
+        "omp:session-omp:entry:m2"
+      ],
+      "hostRowMetadataKept": true
+    }
+  ],
+  "verdict": {
+    "r5Pass": true,
+    "r6Pass": true
+  },
+  "expectationMet": true
+}

@@ -165,6 +165,19 @@ export class OmpEventConverter {
   private streaming: StreamingMessage | null = null;
   private readonly messageIds: string[] = [];
   private readonly contextId: string | undefined;
+  /**
+   * The renderer's optimistic row for the prompt the current run admitted.
+   *
+   * The desktop inserts the user bubble under its own id the moment Send is
+   * pressed, and reports that same id with the prompt. The runtime's native
+   * user frame is the durable echo of that prompt, so its row is announced as
+   * `user_message_persisted` (PI's protocol) instead of a second row the
+   * renderer cannot correlate: the optimistic row is re-keyed to the live row
+   * and stays the only user row for the turn. The binding is one-shot and
+   * belongs to exactly one admitted prompt; a run that never echoes its user
+   * frame (a refused or local-only prompt) discards it.
+   */
+  private pendingUserMessageId: string | undefined;
   /** Set from the assistant message itself, so a finished run can be named. */
   private modelId: string | undefined;
   private readonly parentToolCallId: string | undefined;
@@ -182,6 +195,30 @@ export class OmpEventConverter {
   /** The run's message ids, in creation order. */
   runMessageIds(): string[] {
     return [...this.messageIds];
+  }
+
+  /**
+   * Bind the renderer's optimistic user row to the next user frame.
+   *
+   * Called by the runner for the prompt it is about to submit, before the
+   * prompt reaches the runtime; the converter consumes the binding on the
+   * first user-role `message_start` after it. Only one binding can be
+   * outstanding: a replacement prompt overwrites the previous one.
+   */
+  adoptUserMessageId(messageId: string): void {
+    this.pendingUserMessageId = messageId;
+  }
+
+  /**
+   * Drop a binding whose run ended without echoing its user frame.
+   *
+   * A late frame from a closed generation can never consume it (the runner
+   * attributes frames to the live run and discards late ones), so the binding
+   * is cleared when its run dies: a later prompt without an optimistic id must
+   * not be reported as if it had one.
+   */
+  discardAdoptedUserMessageId(): void {
+    this.pendingUserMessageId = undefined;
   }
 
   /** The sequence the next minted id will use; carried across runtime replacement. */
@@ -209,20 +246,32 @@ export class OmpEventConverter {
    * reopen and incremental reads (a fresh converter must not remint ids).
    * `toolResult` messages are mapped to tool rows — the read is the only path
    * that can recover tool steps the live stream missed.
+   *
+   * `toolRowId` decides a tool row's id: `"entry"` (the default) is the durable
+   * entry identity used by the child-transcript read, and `"toolCall"` is the
+   * tool call identity the renderer uses for live tool rows, so a main-session
+   * history read replaces its live twin instead of duplicating it.
    */
-  convertEntry(entry: unknown): UiMessage | null {
+  convertEntry(entry: unknown, options: { toolRowId?: "entry" | "toolCall" } = {}): UiMessage | null {
     const record = asRecord(entry);
     if (!record) return null;
     const parsed = asMessage(record.message);
     if (!parsed) return null;
     const role = roleOf(parsed);
     if (!role) return null;
-    const id =
+    const entryId =
       typeof record.id === "string" && record.id
         ? `omp:${this.sessionId}:entry:${record.id}`
         : this.mintId();
-    if (role === "tool") return this.toToolRow(id, parsed);
-    return this.toUiMessage(id, parsed, role, "complete");
+    if (role === "tool") {
+      return this.toToolRow(
+        options.toolRowId === "toolCall" && typeof parsed.toolCallId === "string" && parsed.toolCallId
+          ? parsed.toolCallId
+          : entryId,
+        parsed,
+      );
+    }
+    return this.toUiMessage(entryId, parsed, role, "complete");
   }
 
   /** Map a `toolResult` message into a tool row the renderer already presents. */
@@ -408,6 +457,21 @@ export class OmpEventConverter {
     const id = this.mintId();
     this.streaming = { id, role, startedAt: this.now() };
     if (role === "assistant") this.modelId = stringOr(message.model, this.modelId);
+    // The admitted prompt's native echo: the renderer already shows this input
+    // under its own optimistic id, so the durable row is announced as PI's
+    // `user_message_persisted` re-key of that exact row instead of a second
+    // user row. The frame's own `message_end` then completes the same id.
+    if (role === "user" && this.pendingUserMessageId !== undefined) {
+      const optimisticMessageId = this.pendingUserMessageId;
+      this.pendingUserMessageId = undefined;
+      return [
+        {
+          type: "user_message_persisted",
+          optimisticMessageId,
+          message: this.toUiMessage(id, message, "user", "complete"),
+        },
+      ];
+    }
     return [{ type: "message_start", message: this.toUiMessage(id, message, role, "streaming") }];
   }
 

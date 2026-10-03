@@ -316,10 +316,12 @@ test("an explicit old-message action loads canonical input only when required", 
   let reads = 0;
   let cached;
   const runtime = {
+    // The full read also reports the live rows it replaced; an empty list is
+    // the plain case (nothing was streamed for this session).
     loadFullSessionMessages: async (_id, cache) => {
       assert.equal(cache, false);
       reads += 1;
-      return full;
+      return { messages: full, replacedLiveMessageIds: [] };
     },
     cacheSessionTranscript: (_id, messages) => {
       cached = messages;
@@ -351,7 +353,7 @@ test("action preparation cannot overwrite a later navigation or newly started tu
       "old",
     );
     state = { ...state, ...change };
-    pending.resolve([message("old")]);
+    pending.resolve({ messages: [message("old")], replacedLiveMessageIds: [] });
     assert.equal(await read, null);
   }
 });
@@ -373,7 +375,7 @@ test("a visible message still hydrates canonical input when the tail is bounded 
     await prepareTranscriptAction(
       access,
       {
-        loadFullSessionMessages: async () => full,
+        loadFullSessionMessages: async () => ({ messages: full, replacedLiveMessageIds: [] }),
         cacheSessionTranscript: (_id, messages) => assert.equal(messages, full),
       },
       "visible",

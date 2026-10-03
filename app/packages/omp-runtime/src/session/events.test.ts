@@ -542,3 +542,49 @@ describe("durable entry conversion (shared serialized budget)", () => {
     expect(serializedBytes(row)).toBeLessThanOrEqual(ROW_BUDGET_BYTES);
   });
 });
+
+describe("admitted prompt identity (R5)", () => {
+  it("re-keys the renderer's optimistic user row instead of minting a second one", () => {
+    const c = converter();
+    c.adoptUserMessageId("11111111-2222-4333-8444-555555555555");
+    const user = { role: "user", content: [{ type: "text", text: "hello" }], timestamp: 1_000 };
+
+    const start = c.convert({ type: "message_start", message: user });
+    expect(start).toHaveLength(1);
+    expect(start[0]).toMatchObject({
+      type: "user_message_persisted",
+      optimisticMessageId: "11111111-2222-4333-8444-555555555555",
+    });
+    const liveId = start[0].type === "user_message_persisted" ? start[0].message.id : "";
+    expect(liveId).toMatch(/^omp:s1:/);
+
+    // The frame's own end completes that same row, never a second one.
+    const end = c.convert({ type: "message_end", message: user });
+    expect(end).toHaveLength(1);
+    expect(end[0]).toMatchObject({ type: "message_end", message: { id: liveId, role: "user", status: "complete" } });
+    expect(c.runMessageIds()).toContain(liveId);
+  });
+
+  it("consumes the binding once: a later user frame is an ordinary row", () => {
+    const c = converter();
+    c.adoptUserMessageId("11111111-2222-4333-8444-555555555555");
+    const user = { role: "user", content: [{ type: "text", text: "same text" }], timestamp: 1_000 };
+    c.convert({ type: "message_start", message: user });
+    const second = c.convert({ type: "message_start", message: user });
+    expect(second[0]).toMatchObject({ type: "message_start", message: { role: "user", content: "same text" } });
+    // Two identical texts remain two distinct rows.
+    const firstId = c.runMessageIds()[0];
+    const secondId = c.runMessageIds()[1];
+    expect(firstId).not.toBe(secondId);
+  });
+
+  it("never re-keys without an admission, and a discarded binding stays discarded", () => {
+    const c = converter();
+    const user = { role: "user", content: [{ type: "text", text: "hello" }], timestamp: 1_000 };
+    expect(c.convert({ type: "message_start", message: user })[0].type).toBe("message_start");
+
+    c.adoptUserMessageId("11111111-2222-4333-8444-555555555555");
+    c.discardAdoptedUserMessageId();
+    expect(c.convert({ type: "message_start", message: user })[0].type).toBe("message_start");
+  });
+});

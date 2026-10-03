@@ -1,0 +1,18 @@
+$ node --test test/omp-history-read.test.mjs
+✔ a session with no native reference reads as empty and starts nothing (1.1953ms)
+✔ a cold read uses the read-only profile and leaves the transcript before reclaiming (1.356881ms)
+✔ a missing, foreign or unreadable reference fails closed without starting a runtime (0.627282ms)
+✔ a reader that opens another session is refused, and its process is still reclaimed (0.321965ms)
+✔ a refused get_entries throws instead of returning an empty transcript, and reclaims the reader (0.301277ms)
+✔ a reader that cannot be reclaimed reports failure instead of a silent leak (0.347418ms)
+✔ a live runtime is reused, and a tail read names only the settled live rows it replaced (2.805222ms)
+✔ an in-flight prompt's optimistic row is never superseded, and a prompt without one records nothing (0.699148ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 419.550996
+exit=0
