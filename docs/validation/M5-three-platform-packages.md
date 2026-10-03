@@ -2,7 +2,7 @@
 
 本记录交付 M5 阶段的**发布准备**：可供根复审的三平台打包工作流、安装身份修正、发布前/发布后校验脚本及其测试与证据。
 **本阶段不创建 tag、不触发 Actions、不创建或上传 Release**；真实三平台 native CI 与统一 prerelease 由根在复审通过后按受控 `m5-test-*` tag 触发。
-2026-10-03 根在 `0a4750d0` 复审后列出 R1–R3 必须补正项，本轮普通追加提交完成（见 §10）；交付范围与功能不变。
+2026-10-03 根在 `0a4750d0` 复审后列出 R1–R3 必须补正项，本轮普通追加提交完成（见 §10）；首次 native CI run `37133058318` 暴露 R4（pnpm 把独立 `--` 送进发布入口、exit 2），2026-10-03 已普通追加修复（见 §11）；交付范围与功能不变。
 
 - 工作树：`/home/vv/person/code/omp-desktop-m5-packages`，分支 `codex/m5-three-platform-packages`
 - 基线：`860c264177314f5c9501f90c2ef6bcbcd6aaa11b`（根独立验收通过的 M5 功能最终提交）
@@ -29,7 +29,7 @@
 - **guard 作业**：拒绝非 `m5-test-*` tag 事件；`git rev-parse refs/tags/<tag>^{commit}` 必须等于 `GITHUB_SHA`，检出 `HEAD` 也必须等于它（不使用默认分支、不使用任意 tag 指向的别的 SHA）；从产品 `package.json` 与 manifest 读出 version/patchLevel/fork commit 供下游使用。
 - **build 作业矩阵**：macOS arm64（`macos-15`）、Windows x64（`windows-latest`）、Linux x64（`ubuntu-22.04`，沿用 PI 的 glibc 2.35 理由）。每格实际断言：`uname -m`（arm64 / x86_64）、Windows `PROCESSOR_ARCHITECTURE=AMD64`、以及 `process.platform/process.arch`；检出 `HEAD` 必须等于 guard 的 revision。
 - **工具链**：`pnpm/action-setup` 从 `app/package.json` 的 `packageManager`（10.34.5）、node 24（缓存 `app/pnpm-lock.yaml`）、桌面 Rust 用 stable（与其自身 CI 一致）、fork 检出 `fetch-depth: 0` 后从 `rust-toolchain.toml` 安装其 nightly（**两者不混用**）、bun 1.4.2、`bun install --frozen-lockfile` + `bun run build:native`。
-- **打包**：`pnpm install --frozen-lockfile`（app）与 `cargo build --release --locked -p host-core`，随后 `pnpm --filter @pi-desktop/desktop run dist:<platform> -- --<arch>`（cwd `app/`）。`--publish never` 在 dist 脚本内；工作流自身**不**传递平台/配置/publish 参数，也不使用 `--prepackaged`/`--projectDir`/`-c.*`。macOS 为未签名通道（`CSC_IDENTITY_AUTO_DISCOVERY=false`，无任何签名/公证 secret）。
+- **打包**：`pnpm install --frozen-lockfile`（app）与 `cargo build --release --locked -p host-core`，随后 `pnpm --filter @pi-desktop/desktop run dist:<platform> --<arch>`（cwd `app/`；架构直接传，不用独立 `--`，见 §11）。`--publish never` 在 dist 脚本内；工作流自身**不**传递平台/配置/publish 参数，也不使用 `--prepackaged`/`--projectDir`/`-c.*`。macOS 为未签名通道（`CSC_IDENTITY_AUTO_DISCOVERY=false`，无任何签名/公证 secret）。
 - **包内验收**：把**本次 electron-builder 输出**的 `Resources` 复制到仓库外、含空格与中文的路径，配自有 HOME/XDG/TMPDIR，再运行生产 `verify-packaged-runtime.mjs --resources <copy> --json`（hash/provenance、version/protocol/`get_state`、精确 missing-gate 拒绝、停止/进程组回收/runroot 清理）。不使用源码目录 `apps/desktop/resources` 代替。
 - **包内 Plan/Goal 回归**：`OMP_E2E_PACKAGED_RESOURCES` 指向同一份隔离副本，运行既有真实 `omp-plan-submit-e2e.test.mjs`（同一套 Entry/Goal/Submit 用例），驱动**包内** sidecar 与打包后的 gate bundle；仅本地 FakeProvider。回归用自有干净 scratch 根（见 §5 结论 3）。
 - **上传**：每平台 `package-<platform>-<arch>`（实际包 + `build-record.json`）与 `reports-<platform>-<arch>`（原始 `packaged-runtime.json`、`plan-goal.txt`；失败时另含 `packaged-runtime.stderr.txt`＝verifier stderr + 退出状态）两组 Actions artifacts。隔离根在可能失败的验收命令之前写入 step output，失败时也上传诊断报告且保留原失败退出码（§10 R3）。
@@ -120,7 +120,7 @@
 - **未签名、未公证**（macOS 测试通道明确如此）；未做安装器/快捷方式/desktop entry 的真实用户会话验证（T22/T23）。本机只验证了包内元数据（deb/rpm/AppImage 内的 desktop entry 与路径），不是"安装后行为"验收。
 - **`.dmg`/`.exe` 未在本机产出或检查**（Linux 无法构建）；Windows 的包内回归是否全绿、是否有平台性 skip，只能由 CI 报告，且发布记录会逐平台写明通过/跳过数。
 - **rpm/dmg/exe 的真实安装与共存实测**（与 PI-Desktop 同时安装的实机验证）未做。
-- **工作流本身未在 GitHub Actions 实跑过**（本轮不触发）；`gh release create`/`gh api` 路径由脚本与静态测试覆盖，加发布后回读校验，但仍是首次真跑的输入。
+- **工作流本身未在 GitHub Actions 实跑过**（本轮不触发；2026-10-03 更新：根触发的首次 run `37133058318` 已实际运行，并在打包步骤暴露 R4 参数边界——见 §11，该失败不代表打包链通过）；`gh release create`/`gh api` 路径由脚本与静态测试覆盖，加发布后回读校验，但仍是首次真跑的输入。
 - **未创建 tag / 未发布 / 未触碰 `m5-preview` / 未改 main / 未建 PR**。
 
 ## 8. 根复审通过后的入口
@@ -138,7 +138,7 @@
 - 测试与环境：`tests-and-gates.txt`、`desktop-suite-after-provisioning.log.gz`（确定性 gzip）、`desktop-suite-environment-note.txt`
 - 说明：`README.md`（区分真实证据与夹具，避免误读）
 
-返修轮 R1–R3（2026-10-03）另有 `docs/validation/M5-three-platform-packages-repair1-20261003/`（含自排除 `SHA256SUMS.txt`）：R1 完整性检查脚本与输出、R3 失败路径 probe 脚本与输出、相关套件输出、命令账本。
+返修轮 R1–R3（2026-10-03）另有 `docs/validation/M5-three-platform-packages-repair1-20261003/`（含自排除 `SHA256SUMS.txt`）：R1 完整性检查脚本与输出、R3 失败路径 probe 脚本与输出、相关套件输出、命令账本。返修轮 R4 另有 `docs/validation/M5-three-platform-packages-repair2-20261003/`（同样含自排除 `SHA256SUMS.txt` 与完整性脚本）：真实 pnpm→生产 parser 探针、RED 对照、定向套件与发布守卫输出、文档检查、修复 diff、命令账本。
 
 ## 10. 返修轮 R1–R3（2026-10-03，根在 `0a4750d0` 复审后）
 
@@ -155,3 +155,22 @@
 - verifier 判定强度未降低：readable=false 不跳过断言——同一次运行仍以进程内观测（run root 前缀、config root、decoy 目录、停止/回收/清理）断言隔离，只是 OS 子进程环境观测在无 `/proc` 主机不可得（与 `verify-packaged-runtime.mjs` 现有行为一致，未改动该文件）。
 - 原证据目录字节未改：装配烟雾 `assemble-smoke-release-notes.md` 是 R2 修复前的历史输出（Linux 主机可读，行文本为旧 true 分支措辞）；新措辞由新增测试覆盖，不回写旧证据。
 - macOS/Windows native 构建/验收仍未在本机运行；tag 与 native CI 仍待根复核后触发（§7/§8 不变）。
+
+## 11. 返修轮 R4（2026-10-03，首次 native CI `37133058318` 后）
+
+首次 native CI run `37133058318`（tag `m5-test-20261003-f5cdd276`，Linux job `111231905109`）在打包步骤失败：pnpm 把独立 `--` 追加到链尾 `scripts/release-package.mjs`，而入口拒绝该分隔符（它会挡住 electron-builder 需要看到的命令行）——`... run dist:linux -- --x64` → `RELEASE-PACKAGE-FAIL the release entry does not support "--"…`，Exit status 2。固定 PI 的 lane 同样写 `-- --arch`，但其链尾是 electron-builder 本体（接受 `--`）；本产品入口不接受，命令文本不能照搬。
+
+修复（普通追加提交 `13fe139`，父提交 `f5cdd276`）：`.github/workflows/three-platform-test-packages.yml` 的打包调用改为 `... run ${{ matrix.dist }} --${{ matrix.arch }}`（显式架构与脚本内 `--publish never` 不变；入口/守卫/sidecar 预检/builder 参数来源/fork pin 未动）。对应测试 `three-platform-package-workflow.test.mjs`：原静态断言（`:168`）同步为正确调用并加“构建作业不得出现独立 `-- --`”；新增执行测试从工作流读取矩阵与调用模板，用 `app/apps/desktop/package.json` 的真实 `dist:*` 链尾在仓库外夹具中以**真实 pnpm** 驱动**生产 `parseReleaseArgs`**，三平台各断言唯一目标与“每轴恰一次声明”，旧 `-- --<arch>` 负对照必须仍为生产拒绝。若工作流回退旧拼写，该测试在真实 pnpm 调用处以拒绝判红（RED 对照脚本把旧拼写塞回并按字节还原工作流）。
+
+定向证据（`docs/validation/M5-three-platform-packages-repair2-20261003/`，含自排除 `SHA256SUMS.txt` 与完整性检查）：
+
+| 验证 | 结果 |
+| --- | --- |
+| 11 文件工作流/打包套件（`targeted-workflow-suites.txt`） | exit 0；tests 80 / pass 79 / fail 0 / skipped 1（macOS 专属按既有约定跳过） |
+| `omp-release-gate.test.mjs`（`targeted-release-gate.txt`） | exit 0；16/16（既有 `--` 拒绝负对照仍在） |
+| 真实 pnpm→生产 parser 探针（`r4-pnpm-argv-verification.txt`） | exit 0；三平台 direct 调用各 exit 0 且解析唯一目标；legacy `-- --<arch>` 各 exit 2 且错误文本与 run 37133058318 一致 |
+| RED 对照（`r4-workflow-red-control.txt`） | exit 0；旧拼写塞回后新测试以生产拒绝判红，工作流按字节还原（`cmp` 通过） |
+| 文档检查（`doc-checks.txt`） | `check-release-docs`、`docs:check` 均 exit 0 |
+| 证据完整性（`r4-evidence-integrity.txt`） | exit 0；manifest == disk == Git tracked，11/11 摘要匹配 |
+
+同拼写仍留在旧预览 lane `mac-preview-package.yml` 与 `app/.github/workflows/*` 参考 lane、以及 app 文档（ADR 0307、spec 03-runtime、EN/ZH 运行手册）与 `release-package.mjs` 头注释中；这些均非本矩阵生效入口，按 R4 最小范围未改动，逐条列于证据目录 `README.md` §4 供根决策。首次失败 run、旧 tag 与 macOS/Windows 首次 CI 保持原样；native macOS/Windows 构建/验收仍未在本机运行（§7/§8 不变）。

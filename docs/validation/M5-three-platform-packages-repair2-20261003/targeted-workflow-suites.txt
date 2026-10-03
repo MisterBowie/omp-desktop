@@ -1,0 +1,490 @@
+TAP version 13
+# Subtest: update IPC channels are declared and whitelisted for the preload bridge
+ok 1 - update IPC channels are declared and whitelisted for the preload bridge
+  ---
+  duration_ms: 0.502639
+  type: 'test'
+  ...
+# Subtest: main process registers update handlers and the auto-check lifecycle
+ok 2 - main process registers update handlers and the auto-check lifecycle
+  ---
+  duration_ms: 1.751051
+  type: 'test'
+  ...
+# Subtest: updater gates delivery mode by platform and delivery policy
+ok 3 - updater gates delivery mode by platform and delivery policy
+  ---
+  duration_ms: 0.230261
+  type: 'test'
+  ...
+# Subtest: renderer exposes the updates API, banner and settings row
+ok 4 - renderer exposes the updates API, banner and settings row
+  ---
+  duration_ms: 0.307744
+  type: 'test'
+  ...
+# Subtest: check-for-updates is reachable from the application menu
+ok 5 - check-for-updates is reachable from the application menu
+  ---
+  duration_ms: 0.130825
+  type: 'test'
+  ...
+# Subtest: packaging publishes an electron-updater feed for GitHub Releases
+ok 6 - packaging publishes an electron-updater feed for GitHub Releases
+  ---
+  duration_ms: 0.594579
+  type: 'test'
+  ...
+# Subtest: shared shipped-locale changelog is the in-app notes source of truth
+ok 7 - shared shipped-locale changelog is the in-app notes source of truth
+  ---
+  duration_ms: 0.544656
+  type: 'test'
+  ...
+# Subtest: CI skips documentation-only pushes and pull requests
+ok 8 - CI skips documentation-only pushes and pull requests
+  ---
+  duration_ms: 1.077818
+  type: 'test'
+  ...
+# Subtest: CI does not typecheck workspace dependencies twice
+ok 9 - CI does not typecheck workspace dependencies twice
+  ---
+  duration_ms: 0.288411
+  type: 'test'
+  ...
+# Subtest: release runners validate tags without a separate job barrier
+ok 10 - release runners validate tags without a separate job barrier
+  ---
+  duration_ms: 0.245636
+  type: 'test'
+  ...
+# Subtest: release preparation overlaps independent work and avoids duplicate builds
+ok 11 - release preparation overlaps independent work and avoids duplicate builds
+  ---
+  duration_ms: 0.317185
+  type: 'test'
+  ...
+# Subtest: release builds are gated on the CI checks and least-privilege permissions
+ok 12 - release builds are gated on the CI checks and least-privilege permissions
+  ---
+  duration_ms: 0.362887
+  type: 'test'
+  ...
+# Subtest: release artifacts bypass redundant Actions compression
+ok 13 - release artifacts bypass redundant Actions compression
+  ---
+  duration_ms: 0.154753
+  type: 'test'
+  ...
+# Subtest: manual Linux package validation covers the RPM desktop identity
+ok 14 - manual Linux package validation covers the RPM desktop identity
+  ---
+  duration_ms: 0.259305
+  type: 'test'
+  ...
+# Subtest: release workflow publishes the Linux ASAR beside installers
+ok 15 - release workflow publishes the Linux ASAR beside installers
+  ---
+  duration_ms: 0.16811
+  type: 'test'
+  ...
+# Subtest: release matrix packages both native macOS architectures
+ok 16 - release matrix packages both native macOS architectures
+  ---
+  duration_ms: 1.313648
+  type: 'test'
+  ...
+# Subtest: macOS release signing is required on tag pushes
+ok 17 - macOS release signing is required on tag pushes
+  ---
+  duration_ms: 0.850639
+  type: 'test'
+  ...
+# Subtest: the signed local macOS lane selects the native runner architecture
+ok 18 - the signed local macOS lane selects the native runner architecture
+  ---
+  duration_ms: 0.275458
+  type: 'test'
+  ...
+# Subtest: both macOS lanes only reference scripts that exist
+ok 19 - both macOS lanes only reference scripts that exist
+  ---
+  duration_ms: 6.560666
+  type: 'test'
+  ...
+# Subtest: macOS signing instrumentation stays out of the Windows and Linux lanes
+ok 20 - macOS signing instrumentation stays out of the Windows and Linux lanes
+  ---
+  duration_ms: 0.372558
+  type: 'test'
+  ...
+# Subtest: GitHub releases trigger the CNB mirror pipeline with a JSON payload
+ok 21 - GitHub releases trigger the CNB mirror pipeline with a JSON payload
+  ---
+  duration_ms: 0.208247
+  type: 'test'
+  ...
+# Subtest: Windows runtime registers the canonical native application identity
+ok 22 - Windows runtime registers the canonical native application identity
+  ---
+  duration_ms: 1.092228
+  type: 'test'
+  ...
+# Subtest: Windows packages pin OMP Desktop executable and shortcut names
+ok 23 - Windows packages pin OMP Desktop executable and shortcut names
+  ---
+  duration_ms: 0.142414
+  type: 'test'
+  ...
+# Subtest: Windows packages and windows use the canonical PI-Desktop icon
+ok 24 - Windows packages and windows use the canonical PI-Desktop icon
+  ---
+  duration_ms: 0.716673
+  type: 'test'
+  ...
+# Subtest: Linux packages align the desktop entry with the Wayland app identity
+ok 25 - Linux packages align the desktop entry with the Wayland app identity
+  ---
+  duration_ms: 0.132447
+  type: 'test'
+  ...
+# Subtest: macOS development uses the canonical PI-Desktop Dock icon
+ok 26 - macOS development uses the canonical PI-Desktop Dock icon
+  ---
+  duration_ms: 0.188047
+  type: 'test'
+  ...
+# Subtest: macOS icon derivation preserves the canonical renderer asset
+ok 27 - macOS icon derivation preserves the canonical renderer asset
+  ---
+  duration_ms: 0.135101
+  type: 'test'
+  ...
+# Subtest: macOS development launches from a branded host bundle
+ok 28 - macOS development launches from a branded host bundle
+  ---
+  duration_ms: 0.203516
+  type: 'test'
+  ...
+# Subtest: development launcher can be imported without starting Electron
+ok 29 - development launcher can be imported without starting Electron
+  ---
+  duration_ms: 2.719918
+  type: 'test'
+  ...
+# Subtest: macOS development bundle rewrites native identity and reuses its cache
+ok 30 - macOS development bundle rewrites native identity and reuses its cache # SKIP
+  ---
+  duration_ms: 0.058338
+  type: 'test'
+  ...
+# Subtest: the signed local macOS lane packages through the release wrapper
+ok 31 - the signed local macOS lane packages through the release wrapper
+  ---
+  duration_ms: 130.810553
+  type: 'test'
+  ...
+# Subtest: the signed local macOS lane stops before electron-builder when the preflight fails
+ok 32 - the signed local macOS lane stops before electron-builder when the preflight fails
+  ---
+  duration_ms: 70.130188
+  type: 'test'
+  ...
+# Subtest: the DMG is submitted to Apple before it is stapled
+ok 33 - the DMG is submitted to Apple before it is stapled
+  ---
+  duration_ms: 22.547548
+  type: 'test'
+  ...
+# Subtest: stapling retries only after Apple accepts the DMG
+ok 34 - stapling retries only after Apple accepts the DMG
+  ---
+  duration_ms: 2024.004259
+  type: 'test'
+  ...
+# Subtest: a rejected DMG is never stapled and the Apple log is fetched
+ok 35 - a rejected DMG is never stapled and the Apple log is fetched
+  ---
+  duration_ms: 15.04565
+  type: 'test'
+  ...
+# Subtest: a failed submission fails the run and dumps the Apple log
+ok 36 - a failed submission fails the run and dumps the Apple log
+  ---
+  duration_ms: 9.657853
+  type: 'test'
+  ...
+# Subtest: the notarization step fails closed without team-scoped credentials
+ok 37 - the notarization step fails closed without team-scoped credentials
+  ---
+  duration_ms: 4.507457
+  type: 'test'
+  ...
+# Subtest: macOS release verification requires a notarized Developer ID app and DMG
+ok 38 - macOS release verification requires a notarized Developer ID app and DMG
+  ---
+  duration_ms: 13.255364
+  type: 'test'
+  ...
+# Subtest: macOS release verification rejects a Developer ID app without notarization
+ok 39 - macOS release verification rejects a Developer ID app without notarization
+  ---
+  duration_ms: 10.416114
+  type: 'test'
+  ...
+# Subtest: macOS release verification accepts the prefixed identity form
+ok 40 - macOS release verification accepts the prefixed identity form
+  ---
+  duration_ms: 12.268859
+  type: 'test'
+  ...
+# Subtest: macOS release verification rejects a different signing identity
+ok 41 - macOS release verification rejects a different signing identity
+  ---
+  duration_ms: 4.990829
+  type: 'test'
+  ...
+# Subtest: packaging installs only the updater runtime dependency
+ok 42 - packaging installs only the updater runtime dependency
+  ---
+  duration_ms: 1.429001
+  type: 'test'
+  ...
+# Subtest: renderer output keeps its size controls
+ok 43 - renderer output keeps its size controls
+  ---
+  duration_ms: 4.192651
+  type: 'test'
+  ...
+# Subtest: legacy font fallback stripping only removes redundant fallback sources
+ok 44 - legacy font fallback stripping only removes redundant fallback sources
+  ---
+  duration_ms: 0.434199
+  type: 'test'
+  ...
+# Subtest: main bundles JavaScript dependencies and externalizes only runtime modules
+ok 45 - main bundles JavaScript dependencies and externalizes only runtime modules
+  ---
+  duration_ms: 0.182943
+  type: 'test'
+  ...
+# Subtest: sandbox preload entries use standalone shared subpath bundles
+ok 46 - sandbox preload entries use standalone shared subpath bundles
+  ---
+  duration_ms: 0.157816
+  type: 'test'
+  ...
+# Subtest: packaging keeps only shipped locales and excludes non-runtime artifacts
+ok 47 - packaging keeps only shipped locales and excludes non-runtime artifacts
+  ---
+  duration_ms: 1.503122
+  type: 'test'
+  ...
+# Subtest: macOS targets follow the native architecture selected by the runner
+ok 48 - macOS targets follow the native architecture selected by the runner
+  ---
+  duration_ms: 0.225798
+  type: 'test'
+  ...
+# Subtest: macOS DMG is a two-icon install; ZIP keeps the unsigned helper
+ok 49 - macOS DMG is a two-icon install; ZIP keeps the unsigned helper
+  ---
+  duration_ms: 0.351483
+  type: 'test'
+  ...
+# Subtest: every installed identity is OMP's own, so PI-Desktop stays installable beside it
+ok 50 - every installed identity is OMP's own, so PI-Desktop stays installable beside it
+  ---
+  duration_ms: 0.322819
+  type: 'test'
+  ...
+# Subtest: packaging does not include removed PTY native payload configuration
+ok 51 - packaging does not include removed PTY native payload configuration
+  ---
+  duration_ms: 0.211478
+  type: 'test'
+  ...
+# Subtest: every packaging lane checks out the pinned fork the manifest names
+ok 52 - every packaging lane checks out the pinned fork the manifest names
+  ---
+  duration_ms: 1.358101
+  type: 'test'
+  ...
+# Subtest: every packaging lane points OMP_SIDECAR_SOURCE at that checkout
+ok 53 - every packaging lane points OMP_SIDECAR_SOURCE at that checkout
+  ---
+  duration_ms: 0.319668
+  type: 'test'
+  ...
+# Subtest: every packaging lane installs the pinned Bun and frozen fork dependencies
+ok 54 - every packaging lane installs the pinned Bun and frozen fork dependencies
+  ---
+  duration_ms: 0.524875
+  type: 'test'
+  ...
+# Subtest: the preview packages through the product release entry, not an injected binary
+ok 55 - the preview packages through the product release entry, not an injected binary
+  ---
+  duration_ms: 2.668647
+  type: 'test'
+  ...
+# Subtest: exports the exact Linux app.asar with the release asset name
+ok 56 - exports the exact Linux app.asar with the release asset name
+  ---
+  duration_ms: 6.348138
+  type: 'test'
+  ...
+# Subtest: fails when electron-builder did not produce the Linux app.asar
+ok 57 - fails when electron-builder did not produce the Linux app.asar
+  ---
+  duration_ms: 2.114654
+  type: 'test'
+  ...
+# Subtest: staging publishes exactly the platform's payloads under release names
+ok 58 - staging publishes exactly the platform's payloads under release names
+  ---
+  duration_ms: 2.998341
+  type: 'test'
+  ...
+# Subtest: staging refuses a package that is not the controlled patch level
+ok 59 - staging refuses a package that is not the controlled patch level
+  ---
+  duration_ms: 0.699547
+  type: 'test'
+  ...
+# Subtest: staging refuses a report that verified a different resources tree
+ok 60 - staging refuses a report that verified a different resources tree
+  ---
+  duration_ms: 0.506229
+  type: 'test'
+  ...
+# Subtest: staging refuses a runtime that was not reclaimed or whose gate control is unproven
+ok 61 - staging refuses a runtime that was not reclaimed or whose gate control is unproven
+  ---
+  duration_ms: 2.553592
+  type: 'test'
+  ...
+# Subtest: the regression counts are read from either reporter, and only from a complete run
+ok 62 - the regression counts are read from either reporter, and only from a complete run
+  ---
+  duration_ms: 0.358685
+  type: 'test'
+  ...
+# Subtest: staging refuses a regression that failed or never ran
+ok 63 - staging refuses a regression that failed or never ran
+  ---
+  duration_ms: 2.259376
+  type: 'test'
+  ...
+# Subtest: staging refuses a missing or unexpected package output
+ok 64 - staging refuses a missing or unexpected package output
+  ---
+  duration_ms: 2.510004
+  type: 'test'
+  ...
+# Subtest: staging refuses a platform/architecture the stage does not deliver
+ok 65 - staging refuses a platform/architecture the stage does not deliver
+  ---
+  duration_ms: 0.690767
+  type: 'test'
+  ...
+# Subtest: assembly requires the three-platform set and re-hashes every payload
+ok 66 - assembly requires the three-platform set and re-hashes every payload
+  ---
+  duration_ms: 5.516331
+  type: 'test'
+  ...
+# Subtest: release notes state the child-environment observation limit instead of asserting it
+ok 67 - release notes state the child-environment observation limit instead of asserting it
+  ---
+  duration_ms: 2.288548
+  type: 'test'
+  ...
+# Subtest: assembly refuses a platform set that is not exactly the three delivered ones
+ok 68 - assembly refuses a platform set that is not exactly the three delivered ones
+  ---
+  duration_ms: 1.321424
+  type: 'test'
+  ...
+# Subtest: assembly refuses artifacts from another revision, stage or patch level
+ok 69 - assembly refuses artifacts from another revision, stage or patch level
+  ---
+  duration_ms: 4.466438
+  type: 'test'
+  ...
+# Subtest: assembly refuses payload bytes that disagree with their record, and stray payloads
+ok 70 - assembly refuses payload bytes that disagree with their record, and stray payloads
+  ---
+  duration_ms: 2.606919
+  type: 'test'
+  ...
+# Subtest: assembly refuses to assemble or verify anything but a controlled m5-test-* tag
+ok 71 - assembly refuses to assemble or verify anything but a controlled m5-test-* tag
+  ---
+  duration_ms: 0.392229
+  type: 'test'
+  ...
+# Subtest: the published release is verified against the assembled directory
+ok 72 - the published release is verified against the assembled directory
+  ---
+  duration_ms: 2.790796
+  type: 'test'
+  ...
+# Subtest: the packaging lane runs from a controlled m5-test-* tag only
+ok 73 - the packaging lane runs from a controlled m5-test-* tag only
+  ---
+  duration_ms: 2.980749
+  type: 'test'
+  ...
+# Subtest: the matrix is the three native platforms with asserted architectures
+ok 74 - the matrix is the three native platforms with asserted architectures
+  ---
+  duration_ms: 0.669448
+  type: 'test'
+  ...
+# Subtest: every build lane prepares the pinned fork and the two toolchains
+ok 75 - every build lane prepares the pinned fork and the two toolchains
+  ---
+  duration_ms: 0.59565
+  type: 'test'
+  ...
+# Subtest: every build lane packages through the product entry with publish disabled
+ok 76 - every build lane packages through the product entry with publish disabled
+  ---
+  duration_ms: 0.700589
+  type: 'test'
+  ...
+# Subtest: the packaging invocation reaches the production parser for each matrix target
+ok 77 - the packaging invocation reaches the production parser for each matrix target
+  ---
+  duration_ms: 1264.049927
+  type: 'test'
+  ...
+# Subtest: the packaged Resources are verified in isolation and then exercised in-package
+ok 78 - the packaged Resources are verified in isolation and then exercised in-package
+  ---
+  duration_ms: 1.058713
+  type: 'test'
+  ...
+# Subtest: a refused package fails the lane and its diagnosis stays uploadable
+ok 79 - a refused package fails the lane and its diagnosis stays uploadable
+  ---
+  duration_ms: 0.440664
+  type: 'test'
+  ...
+# Subtest: the release is one prerelease gated on all three platforms
+ok 80 - the release is one prerelease gated on all three platforms
+  ---
+  duration_ms: 0.480778
+  type: 'test'
+  ...
+1..80
+# tests 80
+# suites 0
+# pass 79
+# fail 0
+# cancelled 0
+# skipped 1
+# todo 0
+# duration_ms 2161.319875

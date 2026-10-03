@@ -1,0 +1,113 @@
+TAP version 13
+# RELEASE-PACKAGE-FAIL --arch is required for a darwin release from a linux host: a cross-target package needs an artifact staged for that target
+# RELEASE-PACKAGE win32/x64: preflight /home/vv/.nvm/versions/node/v24.14.0/bin/node /home/vv/person/code/omp-desktop-m5-packages/app/scripts/omp-sidecar.mjs --preflight --platform win32 --arch x64
+# RELEASE-PACKAGE win32/x64: electron-builder --win --x64 --publish never
+# RELEASE-PACKAGE win32/x64: preflight /home/vv/.nvm/versions/node/v24.14.0/bin/node /home/vv/person/code/omp-desktop-m5-packages/app/scripts/omp-sidecar.mjs --preflight --platform win32 --arch x64
+# RELEASE-PACKAGE darwin/arm64: preflight /home/vv/.nvm/versions/node/v24.14.0/bin/node /home/vv/person/code/omp-desktop-m5-packages/app/scripts/omp-sidecar.mjs --preflight --platform darwin --arch arm64
+# RELEASE-PACKAGE darwin/arm64: electron-builder --mac --arm64 --publish never -c.mac.forceCodeSigning=true -c.mac.notarize=true
+# RELEASE-PACKAGE darwin/arm64: preflight /home/vv/.nvm/versions/node/v24.14.0/bin/node /home/vv/person/code/omp-desktop-m5-packages/app/scripts/omp-sidecar.mjs --preflight --platform darwin --arch arm64
+# Subtest: every release command bundles the runtime, then runs the target-aware packaging step
+ok 1 - every release command bundles the runtime, then runs the target-aware packaging step
+  ---
+  duration_ms: 0.599686
+  type: 'test'
+  ...
+# Subtest: the preflight and electron-builder are given the same platform and architecture
+ok 2 - the preflight and electron-builder are given the same platform and architecture
+  ---
+  duration_ms: 0.50537
+  type: 'test'
+  ...
+# Subtest: a cross-target release without an explicit architecture fails closed before building
+ok 3 - a cross-target release without an explicit architecture fails closed before building
+  ---
+  duration_ms: 0.830007
+  type: 'test'
+  ...
+# Subtest: the packaging step runs the preflight before electron-builder and stops on failure
+ok 4 - the packaging step runs the preflight before electron-builder and stops on failure
+  ---
+  duration_ms: 0.21822
+  type: 'test'
+  ...
+# Subtest: the preflight admits a staged cross-target artifact built from the same control
+ok 5 - the preflight admits a staged cross-target artifact built from the same control
+  ---
+  duration_ms: 179.064883
+  type: 'test'
+  ...
+# Subtest: the preflight refuses a missing, tampered or foreign staged artifact
+ok 6 - the preflight refuses a missing, tampered or foreign staged artifact
+  ---
+  duration_ms: 784.348817
+  type: 'test'
+  ...
+# Subtest: a cross-target release cannot reuse the host binary
+ok 7 - a cross-target release cannot reuse the host binary
+  ---
+  duration_ms: 199.519487
+  type: 'test'
+  ...
+# Subtest: the release entry forwards the signature overrides it does not own
+ok 8 - the release entry forwards the signature overrides it does not own
+  ---
+  duration_ms: 0.3408
+  type: 'test'
+  ...
+# Subtest: the config allowlist is exactly the signature overrides the fixed lanes pass
+ok 9 - the config allowlist is exactly the signature overrides the fixed lanes pass
+  ---
+  duration_ms: 0.218386
+  type: 'test'
+  ...
+# Subtest: forwarded arguments reach electron-builder only after the preflight passes
+ok 10 - forwarded arguments reach electron-builder only after the preflight passes
+  ---
+  duration_ms: 0.277237
+  type: 'test'
+  ...
+# Subtest: an electron-builder platform switch is the same axis as --platform
+ok 11 - an electron-builder platform switch is the same axis as --platform
+  ---
+  duration_ms: 0.274684
+  type: 'test'
+  ...
+# Subtest: every unsupported spelling of an owned axis or a packaging input is refused before spawning
+ok 12 - every unsupported spelling of an owned axis or a packaging input is refused before spawning
+  ---
+  duration_ms: 0.812108
+  type: 'test'
+  ...
+# Subtest: a conflicting or repeated target is refused instead of silently picked
+ok 13 - a conflicting or repeated target is refused instead of silently picked
+  ---
+  duration_ms: 0.263398
+  type: 'test'
+  ...
+# Subtest: the entry generates exactly one choice per axis and the same target for both steps
+ok 14 - the entry generates exactly one choice per axis and the same target for both steps
+  ---
+  duration_ms: 0.176776
+  type: 'test'
+  ...
+# Subtest: every option the installed electron-builder CLI declares is classified by the entry
+ok 15 - every option the installed electron-builder CLI declares is classified by the entry
+  ---
+  duration_ms: 165.21156
+  type: 'test'
+  ...
+# Subtest: an argument the entry does not recognize is still forwarded verbatim, never guessed at
+ok 16 - an argument the entry does not recognize is still forwarded verbatim, never guessed at
+  ---
+  duration_ms: 0.076832
+  type: 'test'
+  ...
+1..16
+# tests 16
+# suites 0
+# pass 16
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1423.435582

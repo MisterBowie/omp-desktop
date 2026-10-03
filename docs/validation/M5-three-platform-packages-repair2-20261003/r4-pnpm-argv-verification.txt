@@ -1,0 +1,30 @@
+node v24.14.0, pnpm 10.34.5, root /home/vv/person/code/omp-desktop-m5-packages
+fixture /tmp/omp-r4-pnpm-argv.v3RpTd (removed on exit)
+
+fixture scripts carry the real tails: node noop.mjs && node probe.mjs --platform darwin --publish never | node noop.mjs && node probe.mjs --platform win32 --publish never | node noop.mjs && node probe.mjs --platform linux --publish never
+
+== darwin/arm64 (dist:mac) ==
+$ pnpm --filter @pi-desktop/desktop run dist:mac --arm64
+ARGV-PROBE {"argv":["--platform","darwin","--publish","never","--arm64"],"parsed":{"platform":"darwin","arch":"arm64","dir":false,"publish":"never","forwarded":[]}}
+exit=0
+$ pnpm --filter @pi-desktop/desktop run dist:mac -- --arm64
+ARGV-FAIL {"argv":["--platform","darwin","--publish","never","--","--arm64"],"error":"the release entry does not support \"--\": it would hide the rest of the command line from electron-builder"}
+exit=2
+
+== win32/x64 (dist:win) ==
+$ pnpm --filter @pi-desktop/desktop run dist:win --x64
+ARGV-PROBE {"argv":["--platform","win32","--publish","never","--x64"],"parsed":{"platform":"win32","arch":"x64","dir":false,"publish":"never","forwarded":[]}}
+exit=0
+$ pnpm --filter @pi-desktop/desktop run dist:win -- --x64
+ARGV-FAIL {"argv":["--platform","win32","--publish","never","--","--x64"],"error":"the release entry does not support \"--\": it would hide the rest of the command line from electron-builder"}
+exit=2
+
+== linux/x64 (dist:linux) ==
+$ pnpm --filter @pi-desktop/desktop run dist:linux --x64
+ARGV-PROBE {"argv":["--platform","linux","--publish","never","--x64"],"parsed":{"platform":"linux","arch":"x64","dir":false,"publish":"never","forwarded":[]}}
+exit=0
+$ pnpm --filter @pi-desktop/desktop run dist:linux -- --x64
+ARGV-FAIL {"argv":["--platform","linux","--publish","never","--","--x64"],"error":"the release entry does not support \"--\": it would hide the rest of the command line from electron-builder"}
+exit=2
+
+OK: corrected calls resolve one target; the old -- form is refused verbatim

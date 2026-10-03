@@ -1,0 +1,41 @@
+RED setup: the workflow now passes a standalone -- again
+✖ the packaging invocation reaches the production parser for each matrix target (218.789438ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 247.700821
+
+✖ failing tests:
+
+test at apps/desktop/test/three-platform-package-workflow.test.mjs:232:1
+✖ the packaging invocation reaches the production parser for each matrix target (218.789438ms)
+  AssertionError [ERR_ASSERTION]: macOS arm64: pnpm dist:mac --arm64 must reach the release entry with a usable target
+  
+  > @pi-desktop/desktop@0.0.0 dist:mac /tmp/omp-pnpm-argv-TWhJbw
+  > node noop.mjs && node probe.mjs --platform darwin --publish never -- --arm64
+  
+   ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @pi-desktop/desktop@0.0.0 dist:mac: `node noop.mjs && node probe.mjs --platform darwin --publish never -- --arm64`
+  Exit status 2
+   WARN   Local package.json exists, but node_modules missing, did you mean to install?
+  ARGV-FAIL {"argv":["--platform","darwin","--publish","never","--","--arm64"],"error":"the release entry does not support \"--\": it would hide the rest of the command line from electron-builder"}
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///home/vv/person/code/omp-desktop-m5-packages/app/apps/desktop/test/three-platform-package-workflow.test.mjs:311:14)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+RED run exit=1 (expected: non-zero)
+restored: workflow byte-identical to the corrected version
+OK: the old spelling is caught by the execution test; the file is restored

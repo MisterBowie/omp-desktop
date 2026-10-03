@@ -1,0 +1,59 @@
+R4 返修轮命令账本（2026-10-03）
+工作树：/home/vv/person/code/omp-desktop-m5-packages
+分支：codex/m5-three-platform-packages
+基线：f5cdd276c79eda300b132f7afdd2f1bbeb78bdce（精确干净；R1–R3 文档提交）
+R4 代码提交：13fe13958884ab68959ac629d48b36ff851d7df4（仅两文件；父提交=基线）
+Node：v24.14.0（`nvm use 24` 的别名在本机不解析，实际使用已安装的 v24.14.0；未改全局默认）
+pnpm：10.34.5（app/package.json 的 packageManager）
+固定子模块 PI 0111e306 / OMP 62bc57be；受控 fork 36483311（补丁级 .5）均未动
+模型调用：零
+
+# ── 现象（根提供的原始证据；本目录不复写无关 setup 日志）
+# run 37133058318（tag m5-test-20261003-f5cdd276）Linux job 111231905109 = failure：
+#   2026-10-03T15:34:37Z RELEASE-PACKAGE-FAIL the release entry does not support "--": it would hide the rest of the command line from electron-builder
+#   ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL ... dist:linux: `... node ../../scripts/release-package.mjs --platform linux --publish never -- --x64`
+#   Exit status 2
+
+# ── 修复（仅两文件）
+git diff --stat f5cdd276c79eda300b132f7afdd2f1bbeb78bdce 13fe13958884ab68959ac629d48b36ff851d7df4
+#   -> .github/workflows/three-platform-test-packages.yml                  |   8 +-
+#   -> app/apps/desktop/test/three-platform-package-workflow.test.mjs     | 174 ++++++++++++++++++++-
+# 工作流 run 行：pnpm --filter @pi-desktop/desktop run ${{ matrix.dist }} --${{ matrix.arch }}
+# （原为 ... ${{ matrix.dist }} -- --${{ matrix.arch }}）；未改 release-package.mjs / omp-sidecar.mjs / dist 脚本 / fork pin
+
+# ── 定向测试（cwd app/；原始 TAP 见本目录）
+node --test --test-reporter=tap \
+  apps/desktop/test/packaging-footprint.test.mjs apps/desktop/test/auto-update.test.mjs \
+  apps/desktop/test/development-branding.test.mjs apps/desktop/test/ci-workflow.test.mjs \
+  apps/desktop/test/macos-release-lane.test.mjs apps/desktop/test/macos-release-verification.test.mjs \
+  apps/desktop/test/release-asar.test.mjs apps/desktop/test/preview-workflow.test.mjs \
+  apps/desktop/test/packaging-sidecar-source.test.mjs apps/desktop/test/three-platform-package-workflow.test.mjs \
+  apps/desktop/test/test-package-staging.test.mjs
+#   -> exit 0；tests 80 / pass 79 / fail 0 / skipped 1（targeted-workflow-suites.txt）
+node --test --test-reporter=tap apps/desktop/test/omp-release-gate.test.mjs
+#   -> exit 0；tests 16 / pass 16 / fail 0（targeted-release-gate.txt；既有 "--" 拒绝负对照仍在）
+node scripts/check-release-docs.mjs            # -> exit 0
+pnpm docs:check                                # -> exit 0（79 对中英、513 页；notes 非失败）
+# （doc-checks.txt）
+
+# ── 真实 pnpm→生产 parser 探针（仓库根；夹具在临时目录，退出时删除）
+bash docs/validation/M5-three-platform-packages-repair2-20261003/r4-pnpm-argv-probe.sh
+#   -> exit 0（r4-pnpm-argv-verification.txt）：
+#      darwin/arm64 / win32/x64 / linux/x64 的 direct 调用（--<arch>）exit 0，
+#        parsed={"platform":<p>,"arch":<a>,"dir":false,"publish":"never","forwarded":[]}
+#      legacy 调用（-- --<arch>）exit 2，argv 末尾 ["--","--<arch>"]，
+#        error=the release entry does not support "--": it would hide the rest of the command line from electron-builder
+
+# ── RED 对照（把独立 -- 塞回工作流，验证新测试确以生产拒绝判红；随后按字节还原）
+bash docs/validation/M5-three-platform-packages-repair2-20261003/r4-workflow-red-control.sh
+#   -> exit 0（r4-workflow-red-control.txt）：RED run exit=1（AssertionError: must reach the release entry ...，
+#      2 !== 0，含生产拒绝原文）；restored: workflow byte-identical（cmp 通过）
+
+# ── 证据完整性（manifest/磁盘/Git tracked 全集 + 逐文件 SHA-256；自排除两个派生文件）
+node docs/validation/M5-three-platform-packages-repair2-20261003/r4-evidence-integrity.mjs
+#   -> exit 0（r4-evidence-integrity.txt）；SHA256SUMS.txt 覆盖全部载荷文件
+
+# ── 明确未运行（本轮不要求，不声称通过）
+#   - 编译器 / 全量桌面套件 / dist:linux 等昂贵打包未重跑（改动仅工作流与对应测试）
+#   - macOS / Windows native 构建与验收未在本机运行；tag / Actions / Release 未创建或触发
+#   - 首次失败 run 37133058318、旧 tag、macOS/Windows 首次 CI 均保持原样

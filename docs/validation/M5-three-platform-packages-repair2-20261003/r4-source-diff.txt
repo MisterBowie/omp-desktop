@@ -1,0 +1,226 @@
+diff --git a/.github/workflows/three-platform-test-packages.yml b/.github/workflows/three-platform-test-packages.yml
+index 5b220a3..3d74c47 100644
+--- a/.github/workflows/three-platform-test-packages.yml
++++ b/.github/workflows/three-platform-test-packages.yml
+@@ -301,8 +301,12 @@ jobs:
+         # The dist scripts pass `--publish never` themselves: electron-builder
+         # must never self-publish, and this workflow owns the release step. The
+         # explicit architecture keeps the package and the native sidecar
+-        # aligned with the runner this matrix entry selected.
+-        run: pnpm --filter @pi-desktop/desktop run ${{ matrix.dist }} -- --${{ matrix.arch }}
++        # aligned with the runner this matrix entry selected. The flag is
++        # passed without a standalone `--`: pnpm appends these arguments to the
++        # end of the script command line, which is the release entry, and that
++        # entry refuses a literal `--` because electron-builder must see the
++        # whole command line (run 37133058318 failed on `-- --x64`, exit 2).
++        run: pnpm --filter @pi-desktop/desktop run ${{ matrix.dist }} --${{ matrix.arch }}
+ 
+       - name: Verify the Linux host-core glibc floor
+         if: matrix.platform == 'linux'
+diff --git a/app/apps/desktop/test/three-platform-package-workflow.test.mjs b/app/apps/desktop/test/three-platform-package-workflow.test.mjs
+index e50c10a..33b71a8 100644
+--- a/app/apps/desktop/test/three-platform-package-workflow.test.mjs
++++ b/app/apps/desktop/test/three-platform-package-workflow.test.mjs
+@@ -25,7 +25,11 @@
+  * (upstream PI-Desktop layout), so these tests skip there.
+  */
+ import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+ import { access, readFile } from "node:fs/promises";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
+ import test from "node:test";
+ 
+ const workflowUrl = new URL("../../../../.github/workflows/three-platform-test-packages.yml", import.meta.url);
+@@ -36,6 +40,26 @@ const desktopPackage = JSON.parse(await readFile(new URL("../package.json", impo
+ 
+ const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+ 
++/**
++ * The pinned package manager, as this suite can actually invoke it.
++ *
++ * When the suite runs through `pnpm run test`, `npm_execpath` names pnpm's own
++ * CLI entry, so the child is the same package manager the repository pins;
++ * otherwise fall back to `pnpm` from PATH (a `node --test` run outside a pnpm
++ * script still needs pnpm to build the product).
++ */
++function pnpmInvocation() {
++  const execPath = process.env.npm_execpath;
++  if (execPath && /pnpm/i.test(execPath)) {
++    return { command: process.execPath, prefix: [execPath], shell: false };
++  }
++  return {
++    command: process.platform === "win32" ? "pnpm.cmd" : "pnpm",
++    prefix: [],
++    shell: process.platform === "win32",
++  };
++}
++
+ async function workflowSource(t) {
+   try {
+     await access(workflowUrl);
+@@ -165,7 +189,14 @@ test("every build lane packages through the product entry with publish disabled"
+   if (!source) return;
+   const build = job(source, "build");
+ 
+-  assert.match(build, /working-directory: app\n[\s\S]{0,400}?run: pnpm --filter @pi-desktop\/desktop run \$\{\{ matrix\.dist \}\} -- --\$\{\{ matrix\.arch \}\}/);
++  assert.match(
++    build,
++    /working-directory: app\n[\s\S]{0,900}?run: pnpm --filter @pi-desktop\/desktop run \$\{\{ matrix\.dist \}\} --\$\{\{ matrix\.arch \}\}/,
++    "the packaging step must run the product dist script from app/ and pass the matrix architecture directly",
++  );
++  // A standalone `--` would be forwarded by pnpm to the release entry, which
++  // refuses it: the separator would hide the command line from electron-builder.
++  assert.doesNotMatch(executableSource(build), / -- --/);
+   for (const script of ["dist", "dist:mac", "dist:win", "dist:linux"]) {
+     assert.match(desktopPackage.scripts[script], /--publish never/, `${script} must pass --publish never`);
+   }
+@@ -180,6 +211,147 @@ test("every build lane packages through the product entry with publish disabled"
+   assert.doesNotMatch(source, /CSC_LINK|CSC_NAME|APPLE_ID/);
+ });
+ 
++/**
++ * The packaging step's argument boundary is a real pnpm invocation.
++ *
++ * `pnpm run <script> <args>` appends `<args>` to the end of the script command
++ * line, and every `dist:*` chain ends in `scripts/release-package.mjs` — so the
++ * architecture flag must be passed directly. A standalone `--` is forwarded to
++ * the release entry as well, and the entry refuses it (the separator would hide
++ * the rest of the command line from electron-builder); the first native CI run
++ * failed exactly there (`... --publish never -- --x64`, exit 2).
++ *
++ * The static regex above pins the invocation text; this test executes it. A
++ * fixture workspace outside the repository gives each `dist:*` script the real
++ * tail flags read from the desktop package.json, on a two-command chain whose
++ * end is a probe importing the production `parseReleaseArgs` from this
++ * checkout. The matrix entries and the invocation template are read from the
++ * workflow, so a re-added `--` makes the probed argv fail the production parser
++ * instead of only a string match.
++ */
++test("the packaging invocation reaches the production parser for each matrix target", async (t) => {
++  const source = await workflowSource(t);
++  if (!source) return;
++  const build = job(source, "build");
++
++  const matrix = build.match(/^      matrix:\n[\s\S]*?^    runs-on:/m)?.[0];
++  assert.ok(matrix, "the build job must declare its strategy matrix");
++  const entries = matrix
++    .split(/^ {10}- name: /m)
++    .slice(1)
++    .map((block) => {
++      const field = (key) => block.match(new RegExp(`^ {12}${key}: (.+)$`, "m"))?.[1]?.trim();
++      return {
++        name: block.slice(0, block.indexOf("\n")).trim(),
++        platform: field("platform"),
++        arch: field("arch"),
++        dist: field("dist"),
++      };
++    });
++  for (const entry of entries) {
++    assert.ok(entry.platform && entry.arch && entry.dist, `${entry.name}: the matrix entry must name platform, arch and dist`);
++  }
++  assert.deepEqual(
++    entries.map((entry) => `${entry.platform}/${entry.arch}`).sort(),
++    ["darwin/arm64", "linux/x64", "win32/x64"],
++    "the fixture must cover exactly this matrix: macOS arm64, Windows x64, Linux x64",
++  );
++
++  const template = build.match(/^\s+run: (pnpm --filter @pi-desktop\/desktop run \$\{\{ matrix\.dist \}\}.*)$/m)?.[1];
++  assert.ok(template, "the packaging step must run the product dist script through pnpm");
++
++  const parserUrl = new URL("../../../scripts/release-package.mjs", import.meta.url);
++  const fixture = mkdtempSync(join(tmpdir(), "omp-pnpm-argv-"));
++  try {
++    const scripts = {};
++    for (const { dist } of entries) {
++      const chain = desktopPackage.scripts[dist];
++      assert.ok(chain, `${dist} must exist in the desktop package.json`);
++      const tail = chain.split("&&").at(-1).trim();
++      const marker = tail.indexOf("scripts/release-package.mjs");
++      assert.ok(marker >= 0, `${dist} must end in scripts/release-package.mjs`);
++      const flags = tail.slice(marker + "scripts/release-package.mjs".length).trim();
++      assert.match(flags, /^--platform /, `${dist} must declare its platform on the entry's command line`);
++      scripts[dist] = `node noop.mjs && node probe.mjs ${flags}`;
++    }
++    writeFileSync(
++      join(fixture, "package.json"),
++      `${JSON.stringify({ name: "@pi-desktop/desktop", version: "0.0.0", private: true, scripts }, null, 2)}\n`,
++    );
++    writeFileSync(join(fixture, "noop.mjs"), "process.exit(0);\n");
++    writeFileSync(
++      join(fixture, "probe.mjs"),
++      [
++        `import { parseReleaseArgs } from ${JSON.stringify(parserUrl.href)};`,
++        "const argv = process.argv.slice(2);",
++        "try {",
++        '  console.log(`ARGV-PROBE ${JSON.stringify({ argv, parsed: parseReleaseArgs(argv) })}`);',
++        "} catch (error) {",
++        '  console.error(`ARGV-FAIL ${JSON.stringify({ argv, error: error.message })}`);',
++        "  process.exit(2);",
++        "}",
++        "",
++      ].join("\n"),
++    );
++
++    const pnpm = pnpmInvocation();
++    for (const { name, platform, arch, dist } of entries) {
++      const rendered = template
++        .replace("${{ matrix.dist }}", dist)
++        .replace("${{ matrix.arch }}", arch)
++        .split(/\s+/);
++      assert.equal(rendered[0], "pnpm", `${name}: the packaging step must invoke pnpm`);
++      const args = rendered.slice(1);
++
++      const packed = spawnSync(pnpm.command, [...pnpm.prefix, ...args], {
++        cwd: fixture,
++        encoding: "utf8",
++        shell: pnpm.shell,
++      });
++      assert.equal(
++        packed.status,
++        0,
++        `${name}: pnpm ${dist} --${arch} must reach the release entry with a usable target\n${packed.stdout}${packed.stderr}`,
++      );
++      const probeLine = packed.stdout.match(/^ARGV-PROBE (.*)$/m)?.[1];
++      assert.ok(
++        probeLine,
++        `${name}: the probe must report the production parser result\n${packed.stdout}${packed.stderr}`,
++      );
++      const probed = JSON.parse(probeLine);
++      assert.deepEqual(
++        probed.parsed,
++        { platform, arch, dir: false, publish: "never", forwarded: [] },
++        `${name}: the entry must resolve exactly this one target`,
++      );
++      // Each owned axis is declared exactly once on the command line the entry saw.
++      assert.equal(probed.argv.filter((arg) => arg === "--platform").length, 1, `${name}: one platform declaration`);
++      assert.equal(probed.argv.filter((arg) => arg === "--publish").length, 1, `${name}: one publish declaration`);
++      assert.equal(probed.argv.filter((arg) => arg === `--${arch}`).length, 1, `${name}: one architecture declaration`);
++      assert.ok(!probed.argv.includes("--"), `${name}: a standalone -- must never reach the entry`);
++
++      // Negative control: inserting the old standalone `--` before the
++      // architecture flag stays a production refusal, with the exact message.
++      const legacy = [...pnpm.prefix, ...args.slice(0, -1), "--", args.at(-1)];
++      const refused = spawnSync(pnpm.command, legacy, { cwd: fixture, encoding: "utf8", shell: pnpm.shell });
++      assert.equal(refused.status, 2, `${name}: the old -- form must stay a refusal\n${refused.stdout}${refused.stderr}`);
++      const failedLine = refused.stderr.match(/^ARGV-FAIL (.*)$/m)?.[1];
++      assert.ok(
++        failedLine,
++        `${name}: the refusal must come from the release entry\n${refused.stdout}${refused.stderr}`,
++      );
++      const failed = JSON.parse(failedLine);
++      assert.deepEqual(failed.argv.slice(-2), ["--", `--${arch}`], `${name}: pnpm must forward the separator verbatim`);
++      assert.equal(
++        failed.error,
++        'the release entry does not support "--": it would hide the rest of the command line from electron-builder',
++      );
++    }
++  } finally {
++    rmSync(fixture, { recursive: true, force: true });
++  }
++});
++
+ test("the packaged Resources are verified in isolation and then exercised in-package", async (t) => {
+   const source = await workflowSource(t);
+   if (!source) return;

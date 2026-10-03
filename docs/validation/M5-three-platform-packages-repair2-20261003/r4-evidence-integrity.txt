@@ -1,0 +1,7 @@
+manifest (11): README.md, commands.txt, doc-checks.txt, r4-evidence-integrity.mjs, r4-pnpm-argv-probe.sh, r4-pnpm-argv-verification.txt, r4-source-diff.txt, r4-workflow-red-control.sh, r4-workflow-red-control.txt, targeted-release-gate.txt, targeted-workflow-suites.txt
+disk     (11): equal to manifest
+git      (11): equal to manifest
+digests  : 11/11 OK (sha256 over the delivered bytes)
+self-excluded: SHA256SUMS.txt, r4-evidence-integrity.txt
+OK: manifest == disk == git, self-excluding the two derived meta files
+exit=0

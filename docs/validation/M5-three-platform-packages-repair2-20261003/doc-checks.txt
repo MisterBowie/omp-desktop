@@ -1,0 +1,27 @@
+$ node scripts/check-release-docs.mjs   # (cwd app/)
+Release documentation is aligned with 0.15.2 (0.15.x line).
+exit=0
+
+$ pnpm docs:check   # (cwd app/)
+
+> pi-desktop@0.15.2 docs:check /home/vv/person/code/omp-desktop-m5-packages/app
+> pnpm --filter @pi-desktop/docs check:locales && pnpm --filter @pi-desktop/docs check:docs
+
+
+> @pi-desktop/docs@0.15.2 check:locales /home/vv/person/code/omp-desktop-m5-packages/app/docs
+> node scripts/check-locales.mjs
+
+Verified 79 English/Chinese specification pairs.
+
+> @pi-desktop/docs@0.15.2 check:docs /home/vv/person/code/omp-desktop-m5-packages/app/docs
+> node scripts/check-docs.mjs
+
+
+Notes (not failures):
+  - adr/0239-session-collaboration-messages.md: no "Consequences" section, which adr/README.md lists in the format
+  - adr/0240-independent-session-discovery-and-navigable-projections.md: no "Consequences" section, which adr/README.md lists in the format
+  - adr/floating-annotation-index.md: no "Consequences" section, which adr/README.md lists in the format
+  - adr/image-generation-capability.md: no "Consequences" section, which adr/README.md lists in the format
+  - adr/subagent-model-fallback.md: no "Consequences" section, which adr/README.md lists in the format
+Verified 513 documentation pages.
+exit=0
