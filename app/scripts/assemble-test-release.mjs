@@ -313,13 +313,20 @@ export function releaseNotes(combined) {
   for (const platform of combined.platforms) {
     const acceptance = platform.packagedRuntime?.acceptance ?? {};
     const regression = platform.planGoalRegression ?? {};
+    // The verifier reads the child's environment only when the host exposes it
+    // (`readChildEnvironment` returns null without /proc). The isolated launch
+    // configuration is used either way, so the unobserved case must not be
+    // written as if the child PATH/HOME had been asserted.
+    const childEnvironment = acceptance.childEnvironmentReadable
+      ? "child PATH/HOME asserted (child environment readable)"
+      : "child env not observed (host does not expose /proc; isolated launch config used, PATH/HOME not asserted)";
     lines.push(
-      `| ${platformLabel(platform.platform)} ${platform.arch} | omp/${platform.packagedRuntime?.provenance?.ompVersion ?? "?"}, protocol v${acceptance.protocolVersion ?? "?"}, \`get_state\` ok, stopped/reaped/cleaned ${acceptance.stop?.stopped}/${acceptance.stop?.reaped}/${acceptance.stop?.cleaned} | missing-gate refusal verified (\`${acceptance.gateLoadControl}\`) | child PATH/HOME asserted${acceptance.childEnvironmentReadable ? " (readable)" : " (host does not expose /proc)"} | ${regression.pass ?? 0} passed, ${regression.fail ?? 0} failed, ${regression.skipped ?? 0} skipped |`,
+      `| ${platformLabel(platform.platform)} ${platform.arch} | omp/${platform.packagedRuntime?.provenance?.ompVersion ?? "?"}, protocol v${acceptance.protocolVersion ?? "?"}, \`get_state\` ok, stopped/reaped/cleaned ${acceptance.stop?.stopped}/${acceptance.stop?.reaped}/${acceptance.stop?.cleaned} | missing-gate refusal verified (\`${acceptance.gateLoadControl}\`) | ${childEnvironment} | ${regression.pass ?? 0} passed, ${regression.fail ?? 0} failed, ${regression.skipped ?? 0} skipped |`,
     );
   }
   lines.push(
     "",
-    "The packaged-runtime acceptance ran the *packaged* `Resources` — copied first to a path with spaces and non-ASCII characters, under its own HOME/XDG/TMPDIR — through the production verifier, launcher, tool gate and supervisor. The Plan/Goal regression ran the same real suite the source tree runs, but against the packaged sidecar and the packaged gate bundle.",
+    "The packaged-runtime acceptance ran the *packaged* `Resources` — copied first to a path with spaces and non-ASCII characters, under its own HOME/XDG/TMPDIR — through the production verifier, launcher, tool gate and supervisor. The isolated launch configuration is used on every platform; where the host does not expose the child environment (no `/proc`), the table records the child PATH/HOME as not observed instead of claiming they were verified. The Plan/Goal regression ran the same real suite the source tree runs, but against the packaged sidecar and the packaged gate bundle.",
     "",
     "## Signing and update policy",
     "",

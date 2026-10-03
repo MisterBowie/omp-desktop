@@ -333,11 +333,24 @@ jobs:
           export XDG_CONFIG_HOME="$iso/xdg-config" XDG_DATA_HOME="$iso/xdg-data" XDG_CACHE_HOME="$iso/xdg-cache"
           export TMPDIR="$iso/tmp" TEMP="$iso/tmp" TMP="$iso/tmp"
           mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME" "$TMPDIR" "$iso/Resources"
+          # Publish the isolated root before any command that can refuse it:
+          # the failure path must be able to reach the reports collected below
+          # even when the verifier exits non-zero.
+          echo "iso=$iso" >> "$GITHUB_OUTPUT"
           cp -R "$resources/." "$iso/Resources/"
           echo "isolated Resources: $iso/Resources"
-          node scripts/verify-packaged-runtime.mjs --resources "$iso/Resources" --json > "$iso/packaged-runtime.json"
+          # The verifier's exit code stays this step's exit code: a refused
+          # package fails the lane. Its stderr and exit status are kept inside
+          # the isolated root, under the paths the failure artifact uploads, so
+          # the diagnosis survives the step instead of being only a log line.
+          set +e
+          node scripts/verify-packaged-runtime.mjs --resources "$iso/Resources" --json > "$iso/packaged-runtime.json" 2> "$iso/packaged-runtime.stderr.txt"
+          verify_status=$?
+          set -e
+          echo "verify-packaged-runtime exit status: ${verify_status}" >> "$iso/packaged-runtime.stderr.txt"
           cat "$iso/packaged-runtime.json"
-          echo "iso=$iso" >> "$GITHUB_OUTPUT"
+          cat "$iso/packaged-runtime.stderr.txt" >&2
+          exit "$verify_status"
 
       - name: Run the packaged Plan/Goal regression
         working-directory: app
@@ -409,6 +422,7 @@ jobs:
           compression-level: 0
           path: |
             ${{ steps.acceptance.outputs.iso }}/packaged-runtime.json
+            ${{ steps.acceptance.outputs.iso }}/packaged-runtime.stderr.txt
             ${{ steps.acceptance.outputs.iso }}/plan-goal.txt
 
       - name: Upload this platform's raw acceptance report

@@ -357,7 +357,7 @@ test("staging refuses a platform/architecture the stage does not deliver", () =>
 });
 
 /** A staged release tree for one platform, as the workflow uploads it. */
-function fixtureStagedPlatform(input, { platform, arch, revision = REVISION, version = VERSION, stage = STAGE } = {}) {
+function fixtureStagedPlatform(input, { platform, arch, revision = REVISION, version = VERSION, stage = STAGE, childEnvironmentReadable = true } = {}) {
   const dir = join(input, `${platform}-${arch}`);
   mkdirSync(dir, { recursive: true });
   const assets = [];
@@ -392,7 +392,7 @@ function fixtureStagedPlatform(input, { platform, arch, revision = REVISION, ver
         },
         packagedRuntime: {
           provenance: { ompVersion: MANIFEST.base.version, patchLevel: MANIFEST.patchLevel, platform, arch },
-          acceptance: { resources: "/isolated/Resources", protocolVersion: 2, getState: true, gateLoadControl: "refused", stop: { stopped: true, reaped: true, cleaned: true }, leftoverRuns: 0, childEnvironmentReadable: true },
+          acceptance: { resources: "/isolated/Resources", protocolVersion: 2, getState: true, gateLoadControl: "refused", stop: { stopped: true, reaped: true, cleaned: true }, leftoverRuns: 0, childEnvironmentReadable },
         },
         planGoalRegression: { pass: 10, fail: 0, skipped: 0 },
         excluded: [],
@@ -446,6 +446,33 @@ test("assembly requires the three-platform set and re-hashes every payload", () 
   const again = assembleModule.assembleRelease(assembleArgs({ input, out }));
   assert.equal(readFileSync(join(out, "SHA256SUMS.txt"), "utf8"), sums);
   assert.equal(again.platforms.length, 3);
+});
+
+test("release notes state the child-environment observation limit instead of asserting it", () => {
+  const root = makeScratch("release-notes-child-env-");
+  const input = join(root, "dist");
+  fixtureStagedPlatform(input, { platform: "darwin", arch: "arm64" });
+  fixtureStagedPlatform(input, { platform: "win32", arch: "x64", childEnvironmentReadable: false });
+  fixtureStagedPlatform(input, { platform: "linux", arch: "x64" });
+  const out = join(root, "release");
+  assembleModule.assembleRelease(assembleArgs({ input, out }));
+  const notes = readFileSync(join(out, "RELEASE-NOTES.md"), "utf8");
+  const rowFor = (label) => notes.split("\n").find((line) => line.startsWith(`| ${label} `));
+  const windows = rowFor("Windows x64");
+  const linux = rowFor("Linux x64");
+  assert.ok(windows && linux, "the notes must carry one row per platform");
+
+  // A host without /proc observed no child environment: PATH/HOME must not be
+  // written as asserted, and the isolated launch configuration is named as what
+  // was used instead.
+  assert.match(
+    windows,
+    /child env not observed \(host does not expose \/proc; isolated launch config used, PATH\/HOME not asserted\)/,
+  );
+  assert.doesNotMatch(windows, /asserted \(child environment readable\)/);
+
+  // Where the host exposes the child environment, the observation is stated.
+  assert.match(linux, /child PATH\/HOME asserted \(child environment readable\)/);
 });
 
 test("assembly refuses a platform set that is not exactly the three delivered ones", () => {

@@ -217,6 +217,43 @@ test("the packaged Resources are verified in isolation and then exercised in-pac
   assert.match(build, /name: reports-\$\{\{ matrix\.artifact \}\}/);
 });
 
+test("a refused package fails the lane and its diagnosis stays uploadable", async (t) => {
+  const source = await workflowSource(t);
+  if (!source) return;
+  const build = job(source, "build");
+
+  const acceptance = build.slice(
+    build.indexOf("name: Verify the packaged runtime from an isolated copy"),
+    build.indexOf("name: Run the packaged Plan/Goal regression"),
+  );
+  assert.ok(acceptance.length > 0, "the acceptance step must sit inside the build job");
+
+  // The isolated root is published before the verifier can refuse, so the
+  // failure path can still reach the reports it collects.
+  const published = acceptance.indexOf('echo "iso=$iso" >> "$GITHUB_OUTPUT"');
+  const verified = acceptance.indexOf("node scripts/verify-packaged-runtime.mjs");
+  assert.ok(published >= 0, "the acceptance step must publish the isolated root");
+  assert.ok(verified > published, "iso must be published before the verifier can fail");
+
+  // A refused package must keep its non-zero exit code (no `|| true` around
+  // the verifier, no green-washing; the step's earlier `ls ... || true` is a
+  // diagnostic for the missing-Resources branch, not the verifier), and the
+  // verifier's stderr plus exit status are preserved inside the isolated root
+  // where the failure artifact uploads.
+  const verifierTail = acceptance.slice(verified);
+  assert.doesNotMatch(verifierTail, /\|\|/, "the verifier must not be masked");
+  assert.doesNotMatch(build, /continue-on-error/);
+  assert.match(
+    acceptance,
+    /set \+e\n\s+node scripts\/verify-packaged-runtime\.mjs[^\n]*2> "\$iso\/packaged-runtime\.stderr\.txt"\n\s+verify_status=\$\?\n\s+set -e/,
+  );
+  assert.match(acceptance, /exit "\$verify_status"/);
+
+  const failure = build.slice(build.indexOf("name: Report diagnostics when a step failed"));
+  assert.match(failure, /if: failure\(\) && steps\.acceptance\.outputs\.iso != ''/);
+  assert.match(failure, /packaged-runtime\.stderr\.txt/);
+});
+
 test("the release is one prerelease gated on all three platforms", async (t) => {
   const source = await workflowSource(t);
   if (!source) return;
