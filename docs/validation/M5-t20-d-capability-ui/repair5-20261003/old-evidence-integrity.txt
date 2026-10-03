@@ -1,0 +1,6 @@
+$ (cd /home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui && sha256sum -c SHA256SUMS.txt)  # exit 0, 20 files, all OK: True
+$ (cd /home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/repair-20261003 && sha256sum -c SHA256SUMS.txt)  # exit 0, 14 files, all OK: True
+$ (cd /home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/repair2-20261003 && sha256sum -c SHA256SUMS.txt)  # exit 0, 28 files, all OK: True
+$ (cd /home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/repair3-20261003 && sha256sum -c SHA256SUMS.txt)  # exit 0, 30 files, all OK: True
+$ (cd /home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/repair4-20261003 && sha256sum -c SHA256SUMS.txt)  # exit 0, 27 files, all OK: True
+total files checked: 119

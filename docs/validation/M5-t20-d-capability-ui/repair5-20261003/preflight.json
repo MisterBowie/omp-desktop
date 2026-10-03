@@ -1,0 +1,58 @@
+{
+  "candidate": "a4c190313fcf592c55c88b3803989a55a1bca610",
+  "startedAt": 1791015771.9767554,
+  "environment": {
+    "HOME": "/tmp/omp-t20-d-ui-root-review-a4c19031-clean/home",
+    "TMPDIR": "/tmp/omp-t20-d-ui-root-review-a4c19031-clean/tmp",
+    "XDG_CONFIG_HOME": "/tmp/omp-t20-d-ui-root-review-a4c19031-clean/config",
+    "XDG_CACHE_HOME": "/tmp/omp-t20-d-ui-root-review-a4c19031-clean/cache",
+    "XDG_DATA_HOME": "/tmp/omp-t20-d-ui-root-review-a4c19031-clean/data",
+    "XDG_STATE_HOME": "/tmp/omp-t20-d-ui-root-review-a4c19031-clean/state",
+    "PATH": "/home/vv/.nvm/versions/node/v24.14.0/bin:/home/vv/.bun/bin:/usr/local/bin:/usr/bin:/bin",
+    "BUN_BINARY": "/home/vv/.bun/bin/bun",
+    "DISPLAY": ":1",
+    "XAUTHORITY": "/run/user/1000/.mutter-Xwaylandauth.JKWYV3",
+    "LANG": "C.UTF-8",
+    "PI_DESKTOP_HOST_BIN": "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/target/debug/pi-desktop-host-core",
+    "PI_DESKTOP_E2E_PATCHED_TREE": "/tmp/omp-patched-t20d-ui-repair1",
+    "PI_DESKTOP_E2E_ARTIFACT_DIR": "/tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts"
+  },
+  "sourceUnmodified": true,
+  "endedRunner": 2266833,
+  "platform": "linux",
+  "arch": "x86_64",
+  "inputs": [
+    {
+      "path": "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/scripts/e2e-omp-plan-ui.mjs",
+      "bytes": 104044,
+      "sha256": "4d02057022df4f6fdf0eb7fafb7ea8b5cbe3a2adb8b9444fd8358ce81c8c44a5"
+    },
+    {
+      "path": "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/target/debug/pi-desktop-host-core",
+      "bytes": 102414320,
+      "sha256": "5ea67808a282787ff51fc7e7dbf94426b8a89b61b4b9fb33094384766f055e9c"
+    },
+    {
+      "path": "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop/out/main/index.js",
+      "bytes": 6059961,
+      "sha256": "2ce2be6086d4fba2e51b70a37000057e977329f5c8bd25469d2bee889777d3f0"
+    },
+    {
+      "path": "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop/out/renderer/index.html",
+      "bytes": 723,
+      "sha256": "c30d9a1e2dde9b3da9d754eb4afd4c89048fab6e0e1a275128631d9bc7b4ad70"
+    },
+    {
+      "path": "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop/node_modules/electron/dist/electron",
+      "bytes": 224488696,
+      "sha256": "7cb3b42c3beb87ac1783c82cc7a3e8d53bdb9fc015a523a7cd078bba49807d63"
+    },
+    {
+      "path": "/tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/omp",
+      "bytes": 1844,
+      "sha256": "1bc44850fc7d36c713bd4bf9ba6312b6e96a19e35ee11af957ca720fa10918db"
+    }
+  ],
+  "forcedCleanup": [],
+  "timedOut": false
+}

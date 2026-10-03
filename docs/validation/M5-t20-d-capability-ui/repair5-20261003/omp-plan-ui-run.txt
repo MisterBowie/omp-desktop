@@ -1,0 +1,39 @@
+(node:2299304) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Temp data /tmp/omp-t20-d-ui-root-review-a4c19031-clean/tmp/omp-plan-ui-2299304-iCccKR/data
+Temp profile /tmp/omp-t20-d-ui-root-review-a4c19031-clean/tmp/omp-plan-ui-2299304-iCccKR/profile
+Temp workspace /tmp/omp-t20-d-ui-root-review-a4c19031-clean/tmp/omp-plan-ui-2299304-iCccKR/workspace
+Temp HOME /tmp/omp-t20-d-ui-root-review-a4c19031-clean/tmp/omp-plan-ui-2299304-iCccKR/home
+Artifacts /tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts
+Patched runtime /tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/omp
+ARTIFACT /tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-01-plan-mode.png
+ARTIFACT /tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-02-pending.png
+ARTIFACT /tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-03-resubmitted.png
+ARTIFACT /tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-04-permission.png
+ARTIFACT /tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-05-executed.png
+ARTIFACT /tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-06-accept-edits.png
+ARTIFACT /tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-07-auto.png
+ARTIFACT /tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-08-running-before-restart.png
+ARTIFACT /tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-09-running-after-restart.png
+ARTIFACT /tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-10-running-recovered.png
+ARTIFACT /tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-11-pending-before-restart.png
+ARTIFACT /tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-12-after-pending-restart.png
+ARTIFACT /tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-13-history-reselect.png
+PASS E2E-OMP-PLAN-UI - session 3d15a87e-6460-48c6-ba55-bebef3bbb8f3; artifacts .pi/plan/e2e-plan-one-20261003-1623.md -> .pi/plan/e2e-plan-two-20261003-1623.md -> .pi/plan/e2e-plan-three-20261003-1623.md -> .pi/plan/e2e-plan-five-20261003-1623.md -> .pi/plan/e2e-plan-six-20261003-1623.md; executions ask=827687da-62d0-45df-afc1-7ab71d16aaa4 accept-edits=6c4dfeb8-19dc-4972-85cd-6e36ed189e8c auto=8db860a2-9195-42da-8b56-288df0727d64 held=6953d935-f8b0-498f-96bd-30580650ad65 (interrupted after restart); held turn 40596f9c-3f18-4b08-9d5a-a91d180b3f08 interrupted; provider requests 16, no replay
+CLEANUP scratchRemoved=true survivingOwnedProcesses=0 errors=0
+EVIDENCE /tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-raw.json
+SCREENSHOTS
+/tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-01-plan-mode.png
+/tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-02-pending.png
+/tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-03-resubmitted.png
+/tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-04-permission.png
+/tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-05-executed.png
+/tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-06-accept-edits.png
+/tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-07-auto.png
+/tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-08-running-before-restart.png
+/tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-09-running-after-restart.png
+/tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-10-running-recovered.png
+/tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-11-pending-before-restart.png
+/tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-12-after-pending-restart.png
+/tmp/omp-t20-d-ui-root-review-a4c19031-clean/artifacts/omp-plan-ui-13-history-reselect.png
+SUMMARY 1 passed, 0 failed

@@ -419,6 +419,14 @@ macOS arm64 compiled `.5` writer + production bridge 冷读 8/8（完整无 LF �
 | 真实 sentinel 冒烟（仅本任务自建子进程） | ①自有脱离组（argv 携带 run root + `sleep` 子进程）被整组回收；②仅环境携带 run root、已被 reparent 的 `sleep` 被归属并回收；③混合组只杀自有 leader、**无关成员存活**（本机实测确认其确实未被信号命中） |
 | 活表自检 | 真实 `/proc` 表能描述本进程（pid/ppid/pgid/starttime/argv/环境），`sameProcess` 对同 pid 不同 starttime 判否 |
 
+**提交候选复跑（根脚本原样、主证据）**：`a4c1903` 上外围 `passed: true`、exit 0，`root-review.json`
+与外壳退出正常——即 R13 的直接症状（父级被信号、外围报告缺失、SSH 255）不再出现。raw JSON 里
+父 Python 进程只出现在 `protectedAncestors`，`before` 中 `python3` 计数为 0，三个终止阶段的
+信号决策都是"整组信号"（`groups=[<electron pgid>]`、`pids=[]`、`mixed=[]`、`stale=[]`、无失败
+结果）。同候选的首轮复跑因本任务在运行进行中并发把证据文件写入仓库而使外围 `statusAfter` 非空
+（`passed: false`），与 harness 无关，报告按原样归档为
+`repair5-20261003/root-review-superseded-dirty-tree.json`。
+
 ## 2. 验证（命令、退出码、原始日志）
 
 所有命令在 `/home/vv/person/code/omp-desktop-m5-t20-d-ui/app`，Node v24.14.0、
@@ -564,6 +572,10 @@ patched 运行时树 `/tmp/omp-patched-t20d-ui-repair1` 在跑前跑后核验（
 | 归属/信号回归 + 真实 sentinel 冒烟 | `node --test scripts/e2e/process-ownership.test.mjs` | **16/16 通过**、exit 0；真实 sentinel 三例（脱离组回收、被 reparent 进程按环境 run root 归属、混合组只杀自有成员且无关成员存活）；运行后 `ps` 无遗留 `sleep 300` | `repair5-20261003/process-ownership-test.txt` |
 | 源码状态预检第 1 轮（等价包装器，未提交状态） | `python3 /tmp/omp-t20-d-ui-r13-precheck-wrapper.py --candidate 80ce94ac… --output /tmp/omp-t20-d-ui-root-review-r13-precheck --ended-runner 2266833 --harness-sha256 7909a4b7… --patched-tree /tmp/omp-patched-t20d-ui-repair1 --xauthority …`（与根脚本仅差 HEAD/clean/harness-hash 三条一次性断言） | 外围 `passed: true`、exit 0；`timedOut=false`、`forcedCleanup=[]`、`survivors=[]`；harness `1 passed, 0 failed`、provider 16 无重放、`scratchRemoved=true`、`survivingOwnedProcesses=[]`；raw 中 `before` 无 `python3`、父级列入 `protectedAncestors` | `/tmp/omp-t20-d-ui-root-review-r13-precheck/root-review.json`（预检，不归档） |
 | 源码状态预检第 2 轮（修正第一阶段 onlyGroups 后） | 同上，输出目录 `/tmp/omp-t20-d-ui-root-review-r13-precheck2` | 外围 `passed: true`、exit 0、无 forcedCleanup/survivors；harness `1 passed, 0 failed`；`running-restart` 第一阶段 `onlyGroups=[<electron pgid>]`、`groups=[<electron pgid>]`、`pids=[]`（整体组信号），`before` 15 个自有进程且无 `python3` | `/tmp/omp-t20-d-ui-root-review-r13-precheck2/root-review.json`（预检，不归档） |
+| **提交候选 `a4c1903` 的根脚本原样复跑（主证据）** | `python3 /tmp/omp-t20-d-ui-repair5-root-20261003/run-ui-review-linux-candidate.py --candidate a4c190313fcf592c55c88b3803989a55a1bca610 --output /tmp/omp-t20-d-ui-root-review-a4c19031-clean --ended-runner 2266833 --harness-sha256 4d020570… --patched-tree /tmp/omp-patched-t20d-ui-repair1 --xauthority /run/user/1000/.mutter-Xwaylandauth.JKWYV3` | 外围 `passed: true`、exit 0，`root-review.json` 与外壳退出正常（父级未被信号）；`timedOut=false`、`forcedCleanup=[]`、`survivors=[]`、`statusAfter=''`；harness `SUMMARY 1 passed, 0 failed`、exit 0、13 张截图，`CLEANUP scratchRemoved=true survivingOwnedProcesses=0 errors=0`；三次重启 provider 不增（held 重启前后 16、无重放；同文本两次提交后总 18 = 恰 +2）；raw 1 070 283 B/`a893d3b8…`，`before` 15/14/13 且 `python3` 计数 0，父 Python 只出现在 `protectedAncestors`，三个阶段 `onlyGroups` 均判为整组信号（`groups=[<electron pgid>]`、`pids=[]`、`mixed=[]`、`stale=[]`、`results` 无失败）；读取/重选后原生 sha 均为 `11af8beb…`（28887 B）不变 | `repair5-20261003/root-review.json`、`omp-plan-ui-run.txt`、`ui/omp-plan-ui-raw.json`、`ui/omp-plan-ui-01..13-*.png`、`preflight.json` |
+| 同候选首轮复跑（被本任务自身并发写脏工作树，非主证据） | 同上，输出 `/tmp/omp-t20-d-ui-root-review-a4c19031` | harness 断言与主证据一致（`1 passed, 0 failed`、无 forcedCleanup/survivors、`before` 无 `python3`、父级列 `protectedAncestors`、阶段 1 为整组信号），但外围 `passed: false`：本任务在运行进行中把 `old-evidence-integrity.txt` 写入仓库，`statusAfter` 非空。属任务侧并发写，不是 harness 缺陷；报告按原样归档说明原委 | `repair5-20261003/root-review-superseded-dirty-tree.json` |
+| 旧证据不变 | 五份清单 `sha256sum -c` | **119/119 `OK`**（20+14+28+30+27；旧件未改写） | `repair5-20261003/old-evidence-integrity.txt` |
+| 第五轮证据清单 | `cd repair5-20261003 && sha256sum -c SHA256SUMS.txt` | **21/21 `OK`**（自排除 manifest，含根报告、日志、preflight、13 张截图与 raw JSON） | `repair5-20261003/SHA256SUMS.txt` |
 
 ## 3. 全矩阵映射（B1–B14 / C1–C8 / D1–D3）
 
