@@ -56,3 +56,39 @@ PI_DESKTOP_HOST_BIN=<app>/target/debug/pi-desktop-host-core \
 The probe writes its JSON to stdout (the file kept here) and removes its
 scratch directories and the probe output file on exit. Nothing in it is
 product code.
+
+## Second independent review repair (2026-10-03)
+
+The root's second review (candidate `171754dc`) found one remaining
+production gap in the `before_agent_start` continuation and one
+delivery-integrity defect in the first round's manifest; this round's
+evidence:
+
+| Path | What it is |
+| --- | --- |
+| `repair2-20261003-scripts/` | Local copies of the root's five review scripts, adapted **only** in repo/output/host-binary paths (assertions untouched), plus `root-original-sha256.txt` (the originals as received) and `evidence-integrity-check.mjs`, the manifest/totality/tracking verifier. `SHA256SUMS.txt` covers the directory except itself. |
+| `repair2-20261003-red/` | RED on `171754dc` before the fix: `gate-continuation-generation-171754dc.json` (2/4 — the stale resolve returned the successor's cached prompt, the stale reject refused with the successor's token, retired its admission and aborted it) and `product-regressions-red.txt` (the five new registered-handler cases: 4 failed / 15 passed). |
+| `repair2-20261003-green/` | Post-fix runs at repair commit `06c73aa2`: all five review scripts (`-06c73aa2.json` + console; 4/4, 5/5, 2/2, 6/6, 2/2), the product regressions (19/19), the full omp-runtime vitest, the affected desktop suites incl. the real E2Es (166/166), `build-js.txt`, `typecheck.txt`, `lint.txt`, `sidecar-check.txt`, `sidecar-build.txt` (rebuilt gate bundle 53025 B / `3dd09910…`), `packaged-runtime.txt` (production verifier + smoke). |
+| `evidence-integrity-repair2-20261003.txt` | The verifier's JSON report: 10 manifests, 0 mismatches, both evidence trees exactly covered. Meta-evidence, outside the manifest coverage below. |
+
+Two green logs (`runtime-vitest.txt.gz`, `product-regressions-green.txt.gz`)
+are stored as deterministic `gzip -n -9` because their raw bytes end with a
+blank line that `git diff --check` rejects; decoding reproduces the capture
+byte-for-byte.
+
+## Manifest coverage rule
+
+Applied to both rounds and enforced by
+`repair2-20261003-scripts/evidence-integrity-check.mjs`:
+
+- Every per-directory `SHA256SUMS.txt` covers its own directory's files and
+  excludes itself.
+- The top-level `repair-20261003-SHA256SUMS.txt` and
+  `repair2-20261003-SHA256SUMS.txt` each cover **every file under their own
+  `repair*-20261003-*` tree except themselves**, including the per-directory
+  manifests, so each covered tree is fully attested and every listed path is
+  Git-tracked.
+- Documentation outside those trees — this `README.md`, the meta
+  `evidence-integrity-repair2-20261003.txt`, the pre-repair `SHA256SUMS.txt`
+  and the baseline files it covers — is not part of the repair manifests'
+  covered sets.
