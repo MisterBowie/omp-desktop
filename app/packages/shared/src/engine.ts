@@ -74,7 +74,11 @@ export type EngineCapability =
   /** Approve or refuse a tool call before it executes. */
   | "toolApproval"
   /** Surface child-agent lifecycle and progress. */
-  | "subagentEvents";
+  | "subagentEvents"
+  /** Offer Plan mode: an immutable plan proposal and the contract catalogue. */
+  | "plan"
+  /** Offer Goal mode: an immutable goal proposal executed as Agent afterwards. */
+  | "goal";
 
 export const ENGINE_CAPABILITY_KEYS = [
   "prompt",
@@ -87,6 +91,8 @@ export const ENGINE_CAPABILITY_KEYS = [
   "structuredQuestions",
   "toolApproval",
   "subagentEvents",
+  "plan",
+  "goal",
 ] as const satisfies readonly EngineCapability[];
 
 export type EngineCapabilities = Readonly<Record<EngineCapability, boolean>>;
@@ -106,13 +112,23 @@ export const PI_ENGINE_CAPABILITIES: EngineCapabilities = {
   structuredQuestions: true,
   toolApproval: true,
   subagentEvents: true,
+  plan: true,
+  goal: true,
 };
 
 /**
  * M5 truth for the OMP engine: prompting, stopping, questions, approvals,
- * restore (native `switch_session`), model/thinking switching, and subagent
- * lifecycle/progress/event surfacing (`subagentEvents`) are implemented and
- * verified.
+ * restore (native `switch_session`), model/thinking switching, subagent
+ * lifecycle/progress/event surfacing (`subagentEvents`), and the Plan/Goal
+ * contract modes (`plan`/`goal`) are implemented and verified.
+ *
+ * `plan`/`goal` are declared open because the whole contract exists on this
+ * engine: the desktop's own mode state, prompt block and catalogue clamping
+ * (T20-B1), the pre-execution permission decisions (T20-C), the submit/approve/
+ * dispatch closure (T20-B2), and the model-side `EnterPlanMode`/`EnterGoalMode`
+ * entry with the same-turn transition (T20-D-Enter). The capability gates
+ * *offering* a mode; the runtime's live phase is a separate axis
+ * (`liveEngineCapabilities`, `EngineRuntimeStatus`).
  *
  * Still closed, and closed means closed:
  *
@@ -139,6 +155,8 @@ export const OMP_ENGINE_CAPABILITIES: EngineCapabilities = {
   structuredQuestions: true,
   toolApproval: true,
   subagentEvents: true,
+  plan: true,
+  goal: true,
 };
 
 export const ENGINE_CAPABILITIES: Readonly<Record<EngineId, EngineCapabilities>> = {
@@ -174,6 +192,42 @@ export function engineCapabilityRefusal(
     capability,
     message: `The ${normalized} engine does not support "${capability}" in this build`,
   };
+}
+
+/**
+ * The capability key that gates one contract mode (Plan/Goal).
+ *
+ * `null` means the value names no contract mode — Agent, a legacy `chat`, or an
+ * untrusted string. Callers must not read `null` as "allowed", only as "there
+ * is no mode-specific capability to check"; the mode itself is validated where
+ * it is written.
+ */
+export function contractModeCapability(mode: unknown): "plan" | "goal" | null {
+  return mode === "plan" || mode === "goal" ? mode : null;
+}
+
+/**
+ * Whether an engine declares the contract mode `mode`.
+ *
+ * Agent (and any non-contract value) needs no declaration and passes; Plan and
+ * Goal are judged against the engine's declared capability, never against
+ * whether its runtime is up right now.
+ */
+export function engineSupportsContractMode(engine: EngineId, mode: unknown): boolean {
+  const capability = contractModeCapability(mode);
+  return capability === null || engineSupports(engine, capability);
+}
+
+/**
+ * The typed error form of a capability refusal for boundaries that throw.
+ *
+ * Both the fields and the code survive the IPC wrapper, so a renderer sees the
+ * same attributable refusal a direct caller gets.
+ */
+export function engineCapabilityError(
+  refusal: EngineCapabilityRefusal,
+): Error & EngineCapabilityRefusal {
+  return Object.assign(new Error(refusal.message), refusal);
 }
 
 // ---------------------------------------------------------------------------

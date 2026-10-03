@@ -91,12 +91,18 @@ const NATIVE_TOP_LEVEL = [
 const DEFERRED_NATIVE = ["ast_edit", "debug", "lsp"];
 
 /**
+ * The model-side mode entries the bridge registers in the Agent catalogue
+ * (M5/T20-D-Enter): they sit between the host tools and the Skill tool.
+ */
+const AGENT_ENTRY_TOOLS = ["EnterPlanMode", "EnterGoalMode"];
+
+/**
  * The Agent table a *fresh* runtime must expose for one catalog: the native
  * top-level set, then plugin tools in catalog order, then user MCP tools, then
- * the Skill host tool appended by the bridge.
+ * the desktop entry tools, then the Skill host tool appended by the bridge.
  */
 function agentBaseline(pluginNames, { mcp = ["mcp_alpha_lookup"], skill = true } = {}) {
-  return [...NATIVE_TOP_LEVEL, ...pluginNames, ...mcp, ...(skill ? ["Skill"] : [])];
+  return [...NATIVE_TOP_LEVEL, ...pluginNames, ...mcp, ...AGENT_ENTRY_TOOLS, ...(skill ? ["Skill"] : [])];
 }
 
 const scratch = [];
@@ -542,6 +548,9 @@ test(
         ["plugin_demo_inspect", "low", ["inspect"], "plugin"],
         ["plugin_demo_plain", "medium", [], "plugin"],
         ["mcp_alpha_lookup", "low", [], "user-mcp"],
+        // The desktop's Agent-side mode entries (M5/T20-D-Enter).
+        ["EnterPlanMode", "low", [], "desktop"],
+        ["EnterGoalMode", "low", [], "desktop"],
       ],
       "the policy table must mirror the registered catalog",
     );
@@ -662,7 +671,14 @@ test(
       [{ text: "beta checked", finish: "stop" }],
       "beta checked",
     );
-    const expectedP4b = [...NATIVE_TOP_LEVEL, "plugin_demo_inspect", "plugin_demo_run", "Skill", "mcp_beta_echo"];
+    const expectedP4b = [
+      ...NATIVE_TOP_LEVEL,
+      "plugin_demo_inspect",
+      "plugin_demo_run",
+      ...AGENT_ENTRY_TOOLS,
+      "Skill",
+      "mcp_beta_echo",
+    ];
     assertStrictSequence(requestToolNames(p4b.request), expectedP4b, "agent-2b (user MCP replaced)");
     assert.ok(!requestToolNames(p4b.request).includes("mcp_alpha_lookup"), "a removed user MCP tool must not linger");
     assert.equal(
@@ -683,6 +699,7 @@ test(
       ...NATIVE_TOP_LEVEL,
       "plugin_demo_inspect",
       "plugin_demo_run",
+      ...AGENT_ENTRY_TOOLS,
       "Skill",
       "mcp_beta_echo",
       "mcp_alpha_lookup",

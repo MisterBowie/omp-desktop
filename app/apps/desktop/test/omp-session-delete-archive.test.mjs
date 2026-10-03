@@ -89,6 +89,7 @@ function harness({ engineFor, disposeResult } = {}) {
       async requireForSession(sessionId, capability) {
         return engineFor?.(sessionId, capability) ?? "omp";
       },
+      requireContractMode() {},
     },
     ompSessions,
   });

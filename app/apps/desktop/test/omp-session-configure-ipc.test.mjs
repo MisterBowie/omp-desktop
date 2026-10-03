@@ -65,7 +65,10 @@ function harness({ ompSessions = null, engineFor } = {}) {
     enrichSession: (session) => ({ ...session, supportsReasoning: false, supportsVision: false, supportedThinkingLevels: ["off"] }),
     acquireSessionOperation: async () => () => {},
     stripWinLongPrefix: (value) => value,
-    engineRouter: { async requireForSession(sessionId, capability) { return engineFor?.(sessionId, capability) ?? "omp"; } },
+    engineRouter: {
+      async requireForSession(sessionId, capability) { return engineFor?.(sessionId, capability) ?? "omp"; },
+      requireContractMode() {},
+    },
     ompSessions,
   });
   return { handlers, calls };

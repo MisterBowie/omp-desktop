@@ -1,0 +1,29 @@
+✔ a session without an engine belongs to Pi (0.498027ms)
+✔ a transcript source is never read as an engine (0.080566ms)
+✔ Pi keeps every capability open while its runtime is up (0.084666ms)
+✔ a stopped runtime is reported as such without reclassifying the engine (0.540945ms)
+✔ an OMP session is refused every capability this release has not shipped (0.161555ms)
+✔ supports() answers without throwing, for UI affordances (0.080663ms)
+✔ requireContractMode refuses a declared-closed Plan/Goal before anything writes (0.172001ms)
+✔ a persisted Pi session is still Pi, and an OMP one is OMP (0.177197ms)
+✔ a record without an engine field is a legacy Pi session (0.077277ms)
+✔ a failed engine lookup refuses instead of assuming Pi (0.25014ms)
+✔ an engine value this build does not know refuses (0.115255ms)
+✔ a router without a lookup refuses id-only gates (0.076337ms)
+✔ a status provider that throws cannot open a capability (0.128252ms)
+✔ engine capability declarations stay complete for both engines (0.070715ms)
+✔ an explicit engine choice reaches the host unchanged (1.150321ms)
+✔ a caller that names no engine sends none, so the host default decides (0.114238ms)
+✔ session.list keeps each session's engine, desktop and native alike (3.864739ms)
+✔ an unknown engine is rejected by the host, not rewritten here (0.323929ms)
+✔ a Plan/Goal mode the engine does not declare is refused before any write (0.824852ms)
+✔ the composer mode chip is driven by the engine's declared modes (557.383428ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 695.741925
+exit=0

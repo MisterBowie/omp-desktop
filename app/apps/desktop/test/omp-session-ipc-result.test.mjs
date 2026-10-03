@@ -116,7 +116,7 @@ function harness({ ompConfigure, sessionRecord = null } = {}) {
     enrichSession: (session) => ({ ...session, supportsReasoning: false, supportsVision: false, supportedThinkingLevels: ["off"] }),
     acquireSessionOperation: async () => () => {},
     stripWinLongPrefix: (value) => value,
-    engineRouter: { async engineForSession() { return "omp"; }, async requireForSession() { return "omp"; } },
+    engineRouter: { async engineForSession() { return "omp"; }, async requireForSession() { return "omp"; }, requireContractMode() {} },
     ompSessions: {
       async configure() {
         return ompConfigure?.() ?? { ok: true };

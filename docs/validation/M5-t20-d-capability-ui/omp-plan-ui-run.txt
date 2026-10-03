@@ -1,0 +1,27 @@
+(node:2013884) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Temp data /tmp/omp-plan-ui-2013884-qJOI47/data
+Temp profile /tmp/omp-plan-ui-2013884-qJOI47/profile
+Temp workspace /tmp/omp-plan-ui-2013884-qJOI47/workspace
+Artifacts /home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/omp-plan-ui-artifacts
+Patched runtime /tmp/omp-patched-t20d-ui/packages/coding-agent/scripts/omp
+ARTIFACT /home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/omp-plan-ui-artifacts/omp-plan-ui-01-plan-mode.png
+ARTIFACT /home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/omp-plan-ui-artifacts/omp-plan-ui-02-pending.png
+ARTIFACT /home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/omp-plan-ui-artifacts/omp-plan-ui-03-resubmitted.png
+ARTIFACT /home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/omp-plan-ui-artifacts/omp-plan-ui-04-permission.png
+ARTIFACT /home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/omp-plan-ui-artifacts/omp-plan-ui-05-executed.png
+ARTIFACT /home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/omp-plan-ui-artifacts/omp-plan-ui-06-accept-edits.png
+ARTIFACT /home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/omp-plan-ui-artifacts/omp-plan-ui-07-pending-before-restart.png
+ARTIFACT /home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/omp-plan-ui-artifacts/omp-plan-ui-08-after-restart.png
+PASS E2E-OMP-PLAN-UI - session a63c46b5-8e17-43de-bc69-19a0fcb58000; artifacts .pi/plan/e2e-plan-one-20261003-1208.md -> .pi/plan/e2e-plan-two-20261003-1208.md -> .pi/plan/e2e-plan-three-20261003-1208.md; executions 4d421ebb-d17f-473c-846b-48f063b80044 (ask) and 7c82f5b3-5568-4804-bc5b-7754e7893243 (accept-edits) completed; fourth interrupted after restart; provider requests 8, no replay
+SCREENSHOTS
+/home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/omp-plan-ui-artifacts/omp-plan-ui-01-plan-mode.png
+/home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/omp-plan-ui-artifacts/omp-plan-ui-02-pending.png
+/home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/omp-plan-ui-artifacts/omp-plan-ui-03-resubmitted.png
+/home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/omp-plan-ui-artifacts/omp-plan-ui-04-permission.png
+/home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/omp-plan-ui-artifacts/omp-plan-ui-05-executed.png
+/home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/omp-plan-ui-artifacts/omp-plan-ui-06-accept-edits.png
+/home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/omp-plan-ui-artifacts/omp-plan-ui-07-pending-before-restart.png
+/home/vv/person/code/omp-desktop-m5-t20-d-ui/docs/validation/M5-t20-d-capability-ui/omp-plan-ui-artifacts/omp-plan-ui-08-after-restart.png
+SUMMARY 1 passed, 0 failed
+exit=0

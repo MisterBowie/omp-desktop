@@ -448,6 +448,12 @@ test("host-tool policy rides the state and a risk/plan-safe change alone re-regi
     origin: "plugin",
     ...overrides,
   });
+  // The Agent catalogue also carries the desktop's two model-side mode entries
+  // (M5/T20-D-Enter), so their policies ride every Agent state.
+  const desktopEntries = [
+    { name: "EnterPlanMode", risk: "low", planSafeActions: [], origin: "desktop" },
+    { name: "EnterGoalMode", risk: "low", planSafeActions: [], origin: "desktop" },
+  ];
   const harness = skillBridgeHarness({ skills: [], hostToolsByProject: { [project]: [entry()] } });
   const { bridge } = harness;
   await bridge.prompt({ sessionId: "session-omp", content: "hello", projectPath: project });
@@ -456,6 +462,7 @@ test("host-tool policy rides the state and a risk/plan-safe change alone re-regi
   const first = JSON.parse(readFileSync(path, "utf8"));
   assert.deepEqual(first.hostTools, [
     { name: "plugin_demo_run", risk: "low", planSafeActions: [], origin: "plugin" },
+    ...desktopEntries,
   ]);
 
   // Only the policy changes: names and schemas are identical. It must still
@@ -469,6 +476,7 @@ test("host-tool policy rides the state and a risk/plan-safe change alone re-regi
   const rewritten = JSON.parse(readFileSync(path, "utf8"));
   assert.deepEqual(rewritten.hostTools, [
     { name: "plugin_demo_run", risk: "high", planSafeActions: ["inspect"], origin: "plugin" },
+    ...desktopEntries,
   ]);
 });
 

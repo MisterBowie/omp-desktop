@@ -80,6 +80,7 @@ function harness({ engineForSession = "pi" } = {}) {
       async requireForSession(sessionId, capability) {
         return typeof engineForSession === "function" ? engineForSession(sessionId) : engineForSession;
       },
+      requireContractMode() {},
     },
     ompSessions: null,
   });

@@ -58,15 +58,30 @@ export class FakeProvider {
     return this;
   }
 
-  /** Which session a request belongs to, from its own content. */
+  /**
+   * Which session a request belongs to, from its own content.
+   *
+   * The newest user message is the routing key: a session's transcript grows
+   * across turns, so a script keyed on the first message would keep answering
+   * the first prompt forever. Messages are scanned newest-first, so a marker
+   * that appears in a later turn wins over an older one.
+   */
   classifyRequest(body) {
     const messages = body?.messages ?? [];
-    const firstUser = messages.find((m) => m.role === "user");
-    const firstUserText = typeof firstUser?.content === "string"
-      ? firstUser.content
-      : JSON.stringify(firstUser?.content ?? "");
-    for (const [index, sub] of (this.routes?.subagents ?? []).entries()) {
-      if (sub.marker && firstUserText.includes(sub.marker)) return { kind: "subagent", index, marker: sub.marker };
+    const userTexts = messages
+      .filter((message) => message?.role === "user")
+      .map((message) =>
+        typeof message.content === "string"
+          ? message.content
+          : JSON.stringify(message.content ?? ""),
+      );
+    for (let index = userTexts.length - 1; index >= 0; index -= 1) {
+      const text = userTexts[index];
+      for (const [subIndex, sub] of (this.routes?.subagents ?? []).entries()) {
+        if (sub.marker && text.includes(sub.marker)) {
+          return { kind: "subagent", index: subIndex, marker: sub.marker };
+        }
+      }
     }
     return { kind: "parent" };
   }

@@ -1,0 +1,40 @@
+
+ RUN  v4.1.10 /home/vv/person/code/omp-desktop-m5-t20-d-ui/app/packages/shared
+
+ ❯ src/engine.test.ts (14 tests | 2 failed) 6ms
+     × gates contract modes by the engine declaration, never by the runtime phase 2ms
+     × keeps the contract-mode capability names identical to PROPOSAL_KINDS 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/engine.test.ts > engine capabilities > gates contract modes by the engine declaration, never by the runtime phase
+TypeError: engineSupportsContractMode is not a function
+ ❯ src/engine.test.ts:98:14
+     96|   it("gates contract modes by the engine declaration, never by the run…
+     97|     for (const engine of ENGINE_IDS) {
+     98|       expect(engineSupportsContractMode(engine, "plan")).toBe(true);
+       |              ^
+     99|       expect(engineSupportsContractMode(engine, "goal")).toBe(true);
+    100|       // Agent names no contract mode: there is nothing to declare.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/engine.test.ts > engine capabilities > keeps the contract-mode capability names identical to PROPOSAL_KINDS
+AssertionError: expected [ 'prompt', 'stop', 'resume', …(7) ] to include 'plan'
+ ❯ src/engine.test.ts:113:38
+    111|     expect(PROPOSAL_KINDS).toEqual(["plan", "goal"]);
+    112|     for (const kind of PROPOSAL_KINDS) {
+    113|       expect(ENGINE_CAPABILITY_KEYS).toContain(kind);
+       |                                      ^
+    114|       expect(contractModeCapability(kind)).toBe(kind);
+    115|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 12 passed (14)
+   Start at  11:39:52
+   Duration  159ms (transform 67ms, setup 0ms, import 82ms, tests 6ms, environment 0ms)
+
+exit=1

@@ -9,6 +9,7 @@ import {
   draftMatchesExisting,
   providerCreateInputFromDraft,
   isModelConfigImportSource,
+  normalizeEngineId,
   planGoalCursorError,
   planGoalCursorRefusal,
   type ActivationScope,
@@ -126,6 +127,8 @@ export type SessionIpcDependencies = {
   engineRouter?: {
     engineForSession(sessionId: string): Promise<string>;
     requireForSession(sessionId: string, capability: "prompt" | "stop" | "branch" | "modelSwitch"): Promise<string>;
+    /** Refuses a Plan/Goal contract mode the engine's declaration does not carry. */
+    requireContractMode(engine: string, mode: unknown): void;
   };
   ompSessions?: {
     rename(sessionId: string, title: string, context?: unknown): Promise<{ ok: boolean; reason?: string; inconsistent?: boolean }>;
@@ -204,6 +207,16 @@ export function registerSessionIpc({
     if (planGoalRefusal) {
       throw planGoalCursorError(planGoalRefusal);
     }
+    // The engine boundary for the creation mode (M5/T20-D, B9): a Plan/Goal
+    // session may only be created on an engine that declares the mode. The
+    // composer hides unsupported modes, but hiding is not a boundary — a direct
+    // IPC caller reaches this write, and it must be refused here, before any
+    // row is persisted. Agent needs no declaration; an unknown engine value is
+    // left for the host's own validation, exactly as before.
+    engineRouter?.requireContractMode(
+      normalizeEngineId(input.engine),
+      input.mode ?? null,
+    );
     const capabilityPromise = sessionCapabilityContext();
     const res = await host.call<{ session?: (RuntimeSession & { id?: string }) | null }>(
       "session.create",
@@ -756,6 +769,12 @@ export function registerSessionIpc({
       if (planGoalRefusal) {
         throw planGoalCursorError(planGoalRefusal);
       }
+      // The mode this write would leave behind must be declared by the engine
+      // (M5/T20-D, B9). The renderer hides unsupported modes and the composer
+      // never cycles into one, but this boundary is what makes the rule true:
+      // the check happens before any host/runtime mutation, so a refused mode
+      // leaves the persisted row exactly as it was.
+      engineRouter?.requireContractMode(engine, config.mode ?? current?.mode ?? null);
       let result: { session?: RuntimeSession | null };
       if (engine === "omp") {
         // A session that is OMP but has no wired bridge must fail closed: its

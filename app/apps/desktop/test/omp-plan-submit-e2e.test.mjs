@@ -66,6 +66,9 @@ const { createPlanRuntime } = await import("../electron/main/runtime/plans.ts");
 const { createSessionCoordination } = await import("../electron/main/runtime/session-coordination.ts");
 const { createEngineRouter } = await import("../electron/main/runtime/engine-router.ts");
 const { ENGINE_ADAPTER_VERSION } = await import("@pi-desktop/shared");
+const { composeModeSystemPrompt, DEFAULT_RUNTIME_SYSTEM_PROMPT } = await import(
+  "../../../packages/agent-runtime/src/mode-prompts.ts"
+);
 
 /** Every temporary thing this file creates, removed in `after`. */
 const scratch = [];
@@ -1905,5 +1908,268 @@ test(
     assert.equal(turns[0].status, "aborted");
     assert.equal(turns[1].status, "completed");
     assert.equal((await host.call("session.get", { id: sessionId })).session.mode, "agent");
+  },
+);
+
+test(
+  "T20-D lifecycle (B13/B2): real Agent→Plan→Goal→Agent→Plan configuration moves one native session's contract catalogue with no residue",
+  { timeout: 600_000, skip: READY ? false : "host-core binary or patched runtime not available" },
+  async () => {
+    const project = makeScratch("t20d-lifecycle-project-");
+    const dataRoot = makeScratch("t20d-lifecycle-data-");
+    writeFileSync(join(project, "seed.txt"), "seed content\n");
+    const provider = await FakeProvider.start({ model: "local-model" });
+    scratch.push({ close: () => provider.close?.() });
+    const host = await startHost(dataRoot);
+    const sessionId = await createSession(host, {
+      title: "mode lifecycle",
+      projectPath: project,
+      mode: "agent",
+      permissionMode: "auto",
+    });
+    const ends = [];
+    const { bridge } = await buildBridge({
+      host,
+      dataRoot,
+      project,
+      provider,
+      onTurnEnd: (info) => ends.push({ ...info }),
+    });
+    const turns = () => readTurnRows(dataRoot, sessionId);
+    const posts = () => postRequests(provider);
+
+    // One real prompt per mode on the same native session. The mode write goes
+    // through the same `session.configure` transaction the composer uses.
+    const turn = async (label, mode) => {
+      await host.call("session.configure", { id: sessionId, mode });
+      const before = posts().length;
+      provider.script([
+        {
+          text: `${label} inspecting`,
+          finish: "tool_calls",
+          toolCalls: [{ id: `read-${label}`, name: "read", args: { path: "seed.txt" } }],
+        },
+        { text: `${label} complete`, finish: "stop" },
+      ]);
+      const accepted = await promptThrough(host, bridge, sessionId, `${label}: read the seed, then stop.`);
+      assert.equal(accepted.accepted, true, `${label} prompt is accepted`);
+      assert.equal(await waitFor(() => bridge.status(sessionId).isRunning === false), true, `${label} settles`);
+      const requests = posts().slice(before);
+      assert.equal(requests.length, 2, `${label} makes one tool round plus the final text`);
+      const first = requests[0];
+      const system = systemTextOf(first);
+      const modeBlocks = [
+        ["plan", PLAN_BLOCK_PREFIX],
+        ["goal", GOAL_BLOCK_PREFIX],
+        ["agent", AGENT_BLOCK_PREFIX],
+      ].filter(([, prefix]) => system.includes(prefix));
+      assert.equal(
+        modeBlocks.length,
+        1,
+        `${label} carries exactly one mode block, got: ${modeBlocks.map(([name]) => name).join(", ") || "none"}`,
+      );
+      assert.equal(modeBlocks[0][0], mode, `${label} carries the ${mode} block`);
+      assert.equal(
+        system.split(modeBlocks[0][1]).length - 1,
+        1,
+        `${label} injects its mode block exactly once`,
+      );
+      const expectedBlock = composeModeSystemPrompt(mode, "");
+      assert.ok(system.endsWith(expectedBlock), `${label} appends the byte-exact PI mode block`);
+      assert.equal(system.includes(DEFAULT_RUNTIME_SYSTEM_PROMPT), false, `${label} must not inject the PI default base`);
+      const systemMessages = (first.body?.messages ?? []).filter((message) => message.role === "system");
+      assert.equal(systemMessages.length, 1, `${label} keeps exactly one system message`);
+      const prefix = system.slice(0, system.length - expectedBlock.length);
+      assert.ok(prefix.trim().length > 0, `${label} keeps a non-empty native base prompt`);
+      const settled = turns().at(-1);
+      assert.equal(settled.status, "completed", `${label} durable turn completes`);
+      return { tools: toolNamesOf(first), prefix };
+    };
+
+    // Agent baseline: the implementation tools plus the two model-side entries.
+    const agent = await turn("agent", "agent");
+    for (const name of ["read", "write", "edit", "bash", "EnterPlanMode", "EnterGoalMode"]) {
+      assert.ok(agent.tools.includes(name), `Agent catalogue exposes ${name}: ${agent.tools.join(", ")}`);
+    }
+    for (const name of ["SubmitPlan", "SubmitGoal"]) {
+      assert.equal(agent.tools.includes(name), false, `Agent catalogue must not expose ${name}`);
+    }
+
+    // Plan: read-only contract catalogue plus exactly the plan submit tool.
+    const plan = await turn("plan", "plan");
+    for (const name of ["read", "glob", "grep", "bash"]) {
+      assert.ok(plan.tools.includes(name), `Plan catalogue exposes ${name}: ${plan.tools.join(", ")}`);
+    }
+    assert.equal(plan.tools.includes("SubmitPlan"), true, "Plan exposes SubmitPlan");
+    assert.equal(plan.tools.includes("SubmitGoal"), false, "Plan must not expose SubmitGoal");
+    for (const name of ["write", "edit", "apply_patch", "task", "EnterPlanMode", "EnterGoalMode"]) {
+      assert.equal(plan.tools.includes(name), false, `Plan catalogue must not expose ${name}`);
+    }
+
+    // Goal: the same read-only clamp with the goal submit tool.
+    const goal = await turn("goal", "goal");
+    assert.equal(goal.tools.includes("SubmitGoal"), true, "Goal exposes SubmitGoal");
+    assert.equal(goal.tools.includes("SubmitPlan"), false, "Goal must not expose SubmitPlan");
+    for (const name of ["write", "edit", "task", "EnterPlanMode", "EnterGoalMode"]) {
+      assert.equal(goal.tools.includes(name), false, `Goal catalogue must not expose ${name}`);
+    }
+
+    // Back to Agent, then Plan again: the catalogues return exactly, with no
+    // stale submit tool and no duplicated/leftover entries.
+    const agentAgain = await turn("agent-again", "agent");
+    assert.deepEqual(
+      [...agentAgain.tools].sort(),
+      [...agent.tools].sort(),
+      "the Agent catalogue returns exactly after Goal",
+    );
+    const planAgain = await turn("plan-again", "plan");
+    assert.deepEqual(
+      [...planAgain.tools].sort(),
+      [...plan.tools].sort(),
+      "the Plan catalogue re-adds exactly after Agent",
+    );
+    assert.equal(new Set(planAgain.tools).size, planAgain.tools.length, "no duplicated tool entries");
+    assert.equal(planAgain.tools.includes("SubmitGoal"), false, "no Goal residue in the second Plan turn");
+
+    // The native base prompt is preserved as the same single message the mode
+    // block is appended to. Its *content* legitimately differs between modes
+    // (OMP's base prompt lists the active catalogue), so this asserts the
+    // structural contract — one system message, base non-empty, block appended
+    // last and byte-exact — not cross-mode byte equality.
+    for (const [label, candidate] of [["plan", plan], ["goal", goal], ["agent-again", agentAgain], ["plan-again", planAgain]]) {
+      assert.ok(candidate.prefix.trim().length > 0, `the ${label} turn carries no native base prompt`);
+    }
+    assert.equal(ends.length, 5, "every mode turn settles exactly once");
+    assert.equal(turns().length, 5);
+    assert.ok(turns().every((row) => row.status === "completed"));
+    assert.equal((await host.call("session.get", { id: sessionId })).session.mode, "plan");
+  },
+);
+
+test(
+  "T20-D Goal (D1): SubmitGoal publishes .pi/goal with exact bytes, approval runs a plain agent turn that self-stops",
+  { timeout: 600_000, skip: READY ? false : "host-core binary or patched runtime not available" },
+  async () => {
+    const project = makeScratch("t20d-goal-project-");
+    const dataRoot = makeScratch("t20d-goal-data-");
+    const provider = await FakeProvider.start({ model: "local-model" });
+    scratch.push({ close: () => provider.close?.() });
+    const host = await startHost(dataRoot);
+    const sessionId = await createSession(host, {
+      title: "goal e2e",
+      projectPath: project,
+      mode: "goal",
+    });
+    let planRuntime = null;
+    const { bridge } = await buildBridge({
+      host,
+      dataRoot,
+      project,
+      provider,
+      // The production composition: the bridge's turn-end announcement settles
+      // the approved execution by its durable host turn.
+      onTurnEnd: (info) => planRuntime?.settleOmpTurnEnd(info),
+    });
+    planRuntime = buildPlanRuntime({ host, bridge });
+    const posts = () => postRequests(provider);
+
+    const goalMarkdown = [
+      "# Goal: ship the marker",
+      "",
+      "## Acceptance criteria",
+      "",
+      "- `marker-goal.txt` exists with the exact content `goal`.",
+      "",
+    ].join("\n");
+    provider.script([
+      {
+        text: "negotiating the goal",
+        finish: "tool_calls",
+        toolCalls: [
+          {
+            id: "call_submit_goal",
+            name: "SubmitGoal",
+            args: { title: "Goal E2E", markdown: goalMarkdown, question: "Approve this goal?" },
+          },
+        ],
+      },
+      { text: "must never run before approval", finish: "stop" },
+    ]);
+    const submitted = await promptThrough(host, bridge, sessionId, "negotiate the goal with acceptance criteria");
+    assert.equal(submitted.accepted, true);
+    assert.equal(await waitFor(() => bridge.status(sessionId).isRunning === false), true);
+    assert.equal(posts().length, 1, "SubmitGoal ends the turn: no second provider request");
+
+    const goalRequest = posts()[0];
+    const goalSystem = systemTextOf(goalRequest);
+    assert.ok(goalSystem.includes(GOAL_BLOCK_PREFIX), "the goal turn carries the Goal mode block");
+    assert.equal(goalSystem.includes(PLAN_BLOCK_PREFIX), false, "the goal turn must not carry the Plan block");
+    assert.match(goalSystem, /acceptance criteria/i, "PI's Goal prompt wording (acceptance criteria) is the one sent");
+    const goalTools = toolNamesOf(goalRequest);
+    assert.ok(goalTools.includes("SubmitGoal"), `goal turn exposes SubmitGoal: ${goalTools.join(", ")}`);
+    assert.equal(goalTools.includes("SubmitPlan"), false);
+    assert.equal(goalTools.includes("write"), false, "Goal negotiation is read-only");
+
+    const pending = (await host.call("plans.pending", { sessionId })).plans[0];
+    assert.equal(pending.kind, "goal", "the pending proposal is a goal");
+    assert.equal(pending.markdown, goalMarkdown, "the durable proposal carries the exact markdown");
+    assert.equal(pending.title, "Goal E2E");
+    assert.equal(pending.question, "Approve this goal?");
+    assert.match(pending.artifact.relativePath, /^\.pi\/goal\//, `goal artifacts live under .pi/goal: ${pending.artifact.relativePath}`);
+    const artifactPath = join(project, pending.artifact.relativePath);
+    const artifactBytes = readFileSync(artifactPath);
+    assert.equal(artifactBytes.toString("utf8"), goalMarkdown, "the goal artifact bytes are exact");
+    assert.equal(sha256(artifactBytes), pending.artifact.sha256, "the durable sha matches the artifact");
+    assert.equal(artifactBytes.length, pending.artifact.sizeBytes, "the durable size matches the artifact");
+    assert.equal(readTurnRows(dataRoot, sessionId)[0].status, "completed");
+
+    // Approve: the session moves to Agent and the contract runs as an ordinary
+    // agent turn. It self-stops after the scripted final text; no interactive
+    // Goal continuation timer exists on this path.
+    const resolved = await host.call("plans.resolve", {
+      proposalId: pending.id,
+      sessionId,
+      turnId: pending.turnId,
+      toolCallId: pending.toolCallId,
+      action: "approve",
+      version: pending.version,
+      targetPermissionMode: "auto",
+    });
+    assert.equal(resolved.execution.state, "queued");
+    assert.equal(
+      (await host.call("session.get", { id: sessionId })).session.mode,
+      "agent",
+      "approval atomically flips the session to Agent",
+    );
+    provider.script([
+      {
+        text: "working against the contract",
+        finish: "tool_calls",
+        toolCalls: [{ id: "goal-write", name: "write", args: { path: "marker-goal.txt", content: "goal\n" } }],
+      },
+      { text: "acceptance criteria verified; stopping", finish: "stop" },
+    ]);
+    await planRuntime.dispatchApprovedPlan(resolved.execution);
+    assert.equal(
+      await waitFor(() => readExecutionRow(dataRoot, resolved.execution.id)?.execution_state === "completed"),
+      true,
+      "the approved goal execution completes",
+    );
+    assert.equal(readFileSync(join(project, "marker-goal.txt"), "utf8"), "goal\n");
+    assert.equal(
+      posts().length,
+      3,
+      "exactly one tool round plus the final text after approval (no continuation turn)",
+    );
+    assert.equal(await waitFor(() => bridge.status(sessionId).isRunning === false), true);
+    const allTurns = readTurnRows(dataRoot, sessionId);
+    assert.equal(allTurns.length, 2, "one submit turn and one execution turn");
+    assert.ok(allTurns.every((row) => row.status === "completed"), "no turn is left running");
+    const after = posts().length;
+    assert.equal(
+      await waitFor(() => posts().length > after, 3_000),
+      false,
+      "no Goal continuation turn ever starts after the execution settles",
+    );
   },
 );

@@ -1,0 +1,13 @@
+(node:2016708) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ T20-D lifecycle (B13/B2): real Agent→Plan→Goal→Agent→Plan configuration moves one native session's contract catalogue with no residue (5873.1045ms)
+✔ T20-D Goal (D1): SubmitGoal publishes .pi/goal with exact bytes, approval runs a plain agent turn that self-stops (8491.408321ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 18762.374663
+exit=0

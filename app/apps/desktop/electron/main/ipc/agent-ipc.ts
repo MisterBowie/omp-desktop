@@ -365,6 +365,11 @@ export function registerAgentIpc({
     // durable record, so the refusal does not depend on the Pi sidecar being
     // absent or present.
     const promptEngine = engineRouter.require(session, "prompt");
+    // The session's durable mode is part of the launch decision (M5/T20-D, B9):
+    // a record that sits in Plan/Goal must not be prompted on an engine that
+    // does not carry that mode's contract. The gate judges the declaration, so
+    // a stopped runtime is still a temporary outage, not a permanent refusal.
+    engineRouter.requireContractMode(promptEngine, session.mode);
     // Plan/Goal × Cursor product gate (T20-R3C). The durable binding is the
     // authority, so a stale or imported combination (Plan/Goal + the Cursor
     // provider) is refused here — before any runtime work — instead of running

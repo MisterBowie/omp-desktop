@@ -35,6 +35,12 @@ type ContextUsage = Parameters<typeof ContextUsageInspector>[0];
 export type ComposerToolbarProps = {
   t: TFunction;
   mode: Mode;
+  /**
+   * The modes this session's engine declares, in cycle order. The chip is
+   * hidden when empty and cycles only through these; Agent is always offered,
+   * so today this is the full cycle on both engines.
+   */
+  modeOptions: readonly Mode[];
   planningLive: boolean;
   providerId?: string;
   modelId?: string;
@@ -70,6 +76,7 @@ export type ComposerToolbarProps = {
 export function ComposerToolbar({
   t,
   mode,
+  modeOptions,
   planningLive,
   providerId,
   modelId,
@@ -120,6 +127,7 @@ export function ComposerToolbar({
             <IconPlus size={15} aria-hidden="true" />
           </TooltipButton>
         </div>
+        {modeOptions.length > 0 ? (
         <TooltipButton
           type="button"
           className="icon-btn mode-chip composer-mode-chip"
@@ -127,11 +135,13 @@ export function ComposerToolbar({
           data-planning={planningLive ? "true" : undefined}
           tooltip={planningLive ? t(`${mode}.planning`) : t("settings.mode")}
           ariaLabel={planningLive ? t(`${mode}.planning`) : t("settings.mode")}
-          disabled={controlsBlocked}
+          disabled={
+            controlsBlocked || (modeOptions.length === 1 && modeOptions[0] === mode)
+          }
           onClick={async () => {
             modelMenu.setOpen(false);
             setPermissionOpen(false);
-            const next: Mode = nextMode(mode);
+            const next: Mode = nextMode(mode, modeOptions);
             try {
               await configureActiveSession({
                 mode: next,
@@ -153,6 +163,7 @@ export function ComposerToolbar({
             </span>
           </span>
         </TooltipButton>
+        ) : null}
         <AnchoredMenu
           className="composer-permission"
           open={permissionOpen && mode !== "goal"}

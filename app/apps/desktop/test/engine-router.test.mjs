@@ -93,8 +93,8 @@ test("an OMP session is refused every capability this release has not shipped", 
   const router = routerWith();
   assert.deepEqual(router.liveCapabilities("omp"), OMP_ENGINE_CAPABILITIES);
   // M4 ships prompt/stop/resume/modelSwitch/structuredQuestions/toolApproval;
-  // M5/T17 adds subagentEvents.
-  const shipped = new Set(["prompt", "stop", "resume", "modelSwitch", "structuredQuestions", "toolApproval", "subagentEvents"]);
+  // M5/T17 adds subagentEvents; M5/T20 adds the Plan/Goal contract modes.
+  const shipped = new Set(["prompt", "stop", "resume", "modelSwitch", "structuredQuestions", "toolApproval", "subagentEvents", "plan", "goal"]);
   for (const capability of ENGINE_CAPABILITY_KEYS) {
     if (shipped.has(capability)) {
       assert.equal(router.require({ engine: "omp" }, capability), "omp", capability);
@@ -120,6 +120,44 @@ test("supports() answers without throwing, for UI affordances", async () => {
   assert.equal(router.supports({ engine: "omp" }, "prompt"), true);
   assert.equal(router.supports({ engine: "omp" }, "branch"), false);
   assert.equal(router.supports({ engine: "omp" }, "steer"), false);
+});
+
+test("requireContractMode refuses a declared-closed Plan/Goal before anything writes", async () => {
+  // The shipped table declares both modes on both engines...
+  for (const engine of ["pi", "omp"]) {
+    for (const mode of ["plan", "goal"]) routerWith().requireContractMode(engine, mode);
+  }
+  // ...and a runtime that is merely stopped is an outage, not a closed
+  // declaration: the mode stays offered while the process restarts.
+  routerWith({ omp: "stopped" }).requireContractMode("omp", "plan");
+
+  // An engine whose declaration omits Plan is refused, with the engine, the
+  // capability and the shared refusal code intact.
+  const closedPlan = { ...engineCapabilities("pi"), plan: false };
+  const router = createEngineRouter({
+    status: idleStatus,
+    capabilities: (engine) => (engine === "omp" ? closedPlan : engineCapabilities(engine)),
+  });
+  assert.equal(router.requireContractMode("omp", "goal"), undefined);
+  assert.throws(
+    () => router.requireContractMode("omp", "plan"),
+    (error) =>
+      error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE &&
+      error.capability === "plan" &&
+      error.engine === "omp",
+  );
+  // Agent and non-contract values name no capability: there is nothing to
+  // judge, and that is not the same answer as "allowed".
+  for (const value of ["agent", "chat", null, undefined, "", 7]) {
+    assert.equal(router.requireContractMode("omp", value), undefined);
+  }
+  // The declaration table also drives require(): a closed Plan key does not
+  // leak into unrelated capabilities.
+  assert.equal(router.require({ engine: "omp" }, "goal"), "omp");
+  assert.throws(
+    () => router.require({ engine: "omp" }, "plan"),
+    (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+  );
 });
 
 test("a persisted Pi session is still Pi, and an OMP one is OMP", async () => {

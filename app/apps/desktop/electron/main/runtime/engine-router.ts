@@ -32,9 +32,11 @@
 import {
   ErrorCodes,
   closedEngineCapabilities,
+  contractModeCapability,
+  engineCapabilityError,
+  engineCapabilityRefusal,
   isEngineId,
   engineCapabilities,
-  engineCapabilityRefusal,
   liveEngineCapabilities,
   normalizeEngineId,
   type EngineCapability,
@@ -115,6 +117,15 @@ export type EngineRouter = {
   /** `require` for a caller that has an id rather than a record. */
   requireForSession(sessionId: string, capability: EngineCapability): Promise<EngineId>;
   /**
+   * Throwing check for a Plan/Goal contract mode about to be written or run.
+   *
+   * Judges the engine's declaration, exactly like {@link EngineRouter.require}:
+   * a fully implemented mode on a stopped runtime is still a declared mode, and
+   * refusing it here would turn a temporary outage into "this engine never
+   * supports Plan". Agent and non-contract values need no declaration and pass.
+   */
+  requireContractMode(engine: EngineId, mode: unknown): void;
+  /**
    * Throwing check, for every path that is about to *do* something.
    *
    * Judges the engine's declaration, not its runtime's current phase: a path
@@ -148,9 +159,16 @@ export function createEngineRouter(options: {
    * read the record must refuse rather than assume Pi.
    */
   sessionEngine?: EngineSessionLookup;
+  /**
+   * The declaration table the gates judge. Defaults to the shipped
+   * `ENGINE_CAPABILITIES`; tests inject a table to exercise a closed
+   * capability's refusal branch without inventing a third engine.
+   */
+  capabilities?: (engine: EngineId) => EngineCapabilities;
 }): EngineRouter {
   const engineOf = (session: EngineSessionRecord): EngineId =>
     normalizeEngineId(session?.engine);
+  const declaredCapabilities = options.capabilities ?? engineCapabilities;
 
   const statusOf = (engine: EngineId): EngineRuntimeStatus => {
     const normalized = normalizeEngineId(engine);
@@ -175,7 +193,7 @@ export function createEngineRouter(options: {
 
   const router: EngineRouter = {
     engineOf,
-    capabilities: (engine) => engineCapabilities(normalizeEngineId(engine)),
+    capabilities: (engine) => declaredCapabilities(normalizeEngineId(engine)),
     liveCapabilities,
     status: statusOf,
     supports: (session, capability) => liveCapabilities(engineOf(session))[capability],
@@ -206,7 +224,7 @@ export function createEngineRouter(options: {
       const engine = engineOf(session);
       // Declaration, not phase: a stopped runtime must not read as an engine
       // that cannot serve the capability at all.
-      const capabilities = engineCapabilities(engine);
+      const capabilities = declaredCapabilities(engine);
       if (capabilities[capability]) return engine;
       const refusal = engineCapabilityRefusal(engine, capability);
       const detail = statusOf(engine).detail;
@@ -216,6 +234,13 @@ export function createEngineRouter(options: {
         capability: refusal.capability,
       }) as EngineRefusal;
       throw error;
+    },
+    requireContractMode(engine, mode) {
+      const normalized = normalizeEngineId(engine);
+      const capability = contractModeCapability(mode);
+      if (capability === null) return;
+      if (declaredCapabilities(normalized)[capability]) return;
+      throw engineCapabilityError(engineCapabilityRefusal(normalized, capability));
     },
   };
   return router;

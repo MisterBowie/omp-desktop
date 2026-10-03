@@ -1,0 +1,10 @@
+
+ RUN  v4.1.10 /home/vv/person/code/omp-desktop-m5-t20-d-ui/app/packages/shared
+
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  11:40:28
+   Duration  142ms (transform 60ms, setup 0ms, import 75ms, tests 4ms, environment 0ms)
+
+exit=0

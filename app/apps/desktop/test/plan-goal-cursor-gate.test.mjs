@@ -42,12 +42,13 @@ function load(relative, imports, globals = {}) {
 }
 
 const sharedGate = await import("../../../packages/shared/src/plan-goal-model-gate.ts");
+const sharedEngine = await import("../../../packages/shared/src/engine.ts");
 
 const { registerSessionIpc } = load("../electron/main/ipc/session-ipc.ts", {
   electron: { shell: {} },
   "node:fs": fs,
   "node:path": path,
-  "@pi-desktop/shared": { ErrorCodes, ...sharedProtocol, ...sharedGate },
+  "@pi-desktop/shared": { ErrorCodes, ...sharedProtocol, ...sharedGate, ...sharedEngine },
   "../importers": {},
   "../services/session-collaboration": { readSessionCollaboration: async () => null },
   "../services/session-search": { searchSessionsAcrossSources: async () => ({ hits: [], nextOffset: null }) },
@@ -64,6 +65,7 @@ function engineRouterFor(engineFor) {
     require(session) {
       return session?.engine ?? "pi";
     },
+    requireContractMode() {},
     supports() {
       return true;
     },

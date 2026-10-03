@@ -17,8 +17,16 @@ import * as sharedProtocol from "../../../packages/shared/src/protocol.ts";
  * which engine owns it.
  */
 register(pathToFileURL(path.join(import.meta.dirname, "helpers", "ts-import-hooks.mjs")));
-const shared = { ErrorCodes, ...sharedProtocol, ...(await import("../../../packages/shared/src/plan-goal-model-gate.ts")) };
+// Deferred on purpose: these .ts modules must be loaded *after* the import hook
+// above is registered, which a static import would run before.
+const shared = {
+  ErrorCodes,
+  ...sharedProtocol,
+  ...(await import("../../../packages/shared/src/plan-goal-model-gate.ts")),
+  ...(await import("../../../packages/shared/src/engine.ts")),
+};
 const { IPC } = sharedProtocol;
+const { createEngineRouter } = await import("../electron/main/runtime/engine-router.ts");
 
 function load(relative, imports, globals = {}) {
   const file = new URL(relative, import.meta.url);
@@ -52,7 +60,7 @@ const enrichSession = (session) => ({
   supportedThinkingLevels: ["off"],
 });
 
-function harness(hostRead) {
+function harness(hostRead, engineRouter) {
   const handlers = new Map();
   const calls = [];
   const host = {
@@ -64,6 +72,7 @@ function harness(hostRead) {
   registerSessionIpc({
     registrar: { handle: (channel, handler) => handlers.set(channel, handler) },
     getHost: () => host,
+    ...(engineRouter ? { engineRouter } : {}),
     getSidecar: () => ({
       call: async () => ({ sessions: [{ id: "native-pi:1", source: "pi-native", engine: undefined }] }),
     }),
@@ -130,4 +139,76 @@ test("an unknown engine is rejected by the host, not rewritten here", async () =
     /engine must be one of/,
   );
   assert.equal(calls[0].input.engine, "claude");
+});
+
+test("a Plan/Goal mode the engine does not declare is refused before any write", async () => {
+  // A declaration table that omits both contract modes, driven through the real
+  // router: this is the branch a future engine (or a reduced build) takes, and
+  // hiding the composer chip must not be the only thing standing in the way.
+  const closed = {
+    ...(await import("../../../packages/shared/src/engine.ts")).PI_ENGINE_CAPABILITIES,
+    plan: false,
+    goal: false,
+  };
+  const router = createEngineRouter({
+    status: (engine) => ({
+      engine,
+      phase: "idle",
+      runtimeVersion: null,
+      protocolVersion: null,
+      reason: null,
+      capabilities: closed,
+    }),
+    capabilities: () => closed,
+    sessionEngine: async () => "pi",
+  });
+
+  // session.create: refused before the host ever sees the request.
+  const created = harness(async () => ({}), router);
+  for (const mode of ["plan", "goal"]) {
+    await assert.rejects(
+      () => created.handlers.get(IPC.invoke.sessionCreate)({ title: "New task", mode }),
+      (error) =>
+        error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE && error.capability === mode,
+    );
+  }
+  assert.deepEqual(created.calls, [], "a refused creation reached the host");
+
+  // session.configure: the mode the write would leave behind is judged, and the
+  // only host call is the read the merged pair needs.
+  const configured = harness(
+    async (method) =>
+      method === "session.get"
+        ? { session: { id: "s1", engine: "pi", mode: "agent", providerId: null } }
+        : { session: { id: "s1", engine: "pi", mode: "plan", providerId: null } },
+    router,
+  );
+  await assert.rejects(
+    () => configured.handlers.get(IPC.invoke.sessionConfigure)("s1", { mode: "plan" }),
+    (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE && error.capability === "plan",
+  );
+  assert.deepEqual(configured.calls.map((call) => call.method), ["session.get"]);
+
+  // Positive control: the shipped declarations let both writes through.
+  const open = createEngineRouter({
+    status: (engine) => ({
+      engine,
+      phase: "idle",
+      runtimeVersion: null,
+      protocolVersion: null,
+      reason: null,
+      capabilities: shared.engineCapabilities(engine),
+    }),
+    sessionEngine: async () => "pi",
+  });
+  const allowed = harness(
+    async (method) =>
+      method === "session.get"
+        ? { session: { id: "s2", engine: "pi", mode: "agent", providerId: null } }
+        : { session: { id: "s2", engine: "pi", mode: "plan", providerId: null } },
+    open,
+  );
+  const result = await allowed.handlers.get(IPC.invoke.sessionConfigure)("s2", { mode: "plan" });
+  assert.equal(result.session.mode, "plan");
+  assert.deepEqual(allowed.calls.map((call) => call.method), ["session.get", "session.configure"]);
 });

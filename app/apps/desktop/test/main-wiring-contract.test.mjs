@@ -219,3 +219,26 @@ test("a finished turn is announced to every plugin surface", () => {
     "every plugin surface must isolate its own delivery",
   );
 });
+
+test("the OMP registry emits agent events without the Pi turn-ownership guard", () => {
+  // The guard's turn map holds Pi turns only; an OMP session never has an
+  // entry, so a guarded emit would drop every OMP `agent_end` and leave the
+  // renderer stuck on a finished turn (M5/T20-D). This is a wiring contract:
+  // `index.ts` cannot be imported outside Electron, and swapping the option
+  // off is a one-word change no behavioural test in this suite would see.
+  const index = read("index.ts");
+  const ompCall = callArgument(index, "wireOmpSessions");
+  assert.match(
+    ompCall,
+    /emitAgentEvent: \(envelope\) => emitAgentEvent\(envelope, \{ guardPiTurnOwnership: false \}\)/,
+    "wireOmpSessions must fan out OMP envelopes with the Pi guard disabled",
+  );
+  // The Pi paths keep the guarded default.
+  const sidecarCall = callArgument(index, "createSidecarRuntime");
+  assert.match(sidecarCall, /isStaleTerminalEvent,/);
+  assert.doesNotMatch(
+    sidecarCall,
+    /guardPiTurnOwnership/,
+    "the Pi sidecar runtime must keep the ownership guard",
+  );
+});

@@ -1,0 +1,62 @@
+✔ a session without an engine belongs to Pi (0.506893ms)
+✔ a transcript source is never read as an engine (0.080964ms)
+✔ Pi keeps every capability open while its runtime is up (0.087081ms)
+✔ a stopped runtime is reported as such without reclassifying the engine (0.593015ms)
+✔ an OMP session is refused every capability this release has not shipped (0.162132ms)
+✔ supports() answers without throwing, for UI affordances (0.076238ms)
+✖ requireContractMode refuses a declared-closed Plan/Goal before anything writes (0.175041ms)
+✔ a persisted Pi session is still Pi, and an OMP one is OMP (0.200718ms)
+✔ a record without an engine field is a legacy Pi session (0.075309ms)
+✔ a failed engine lookup refuses instead of assuming Pi (0.248291ms)
+✔ an engine value this build does not know refuses (0.114902ms)
+✔ a router without a lookup refuses id-only gates (0.080471ms)
+✔ a status provider that throws cannot open a capability (0.14095ms)
+✔ engine capability declarations stay complete for both engines (0.080248ms)
+✔ an explicit engine choice reaches the host unchanged (1.156526ms)
+✔ a caller that names no engine sends none, so the host default decides (0.118259ms)
+✔ session.list keeps each session's engine, desktop and native alike (3.863519ms)
+✔ an unknown engine is rejected by the host, not rewritten here (0.319508ms)
+✖ a Plan/Goal mode the engine does not declare is refused before any write (0.834917ms)
+✖ the composer mode chip is driven by the engine's declared modes (551.895023ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 17
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 712.393884
+
+✖ failing tests:
+
+test at apps/desktop/test/engine-router.test.mjs:125:1
+✖ requireContractMode refuses a declared-closed Plan/Goal before anything writes (0.175041ms)
+  TypeError: routerWith(...).requireContractMode is not a function
+      at TestContext.<anonymous> (file:///home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop/test/engine-router.test.mjs:128:55)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+
+test at apps/desktop/test/engine-session-ipc.test.mjs:144:1
+✖ a Plan/Goal mode the engine does not declare is refused before any write (0.834917ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop/test/engine-session-ipc.test.mjs:169:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at apps/desktop/test/omp-mode-capability-render.test.mjs:22:1
+✖ the composer mode chip is driven by the engine's declared modes (551.895023ms)
+  TypeError: offeredModes is not a function
+      at TestContext.<anonymous> (file:///home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop/test/omp-mode-capability-render.test.mjs:115:24)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+exit=1

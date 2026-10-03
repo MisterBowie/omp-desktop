@@ -1,4 +1,5 @@
 import type {
+  EngineId,
   ModelInfo,
   Mode,
   PermissionMode,
@@ -7,6 +8,7 @@ import type {
   ThinkingLevel,
 } from "@pi-desktop/shared";
 import {
+  engineSupportsContractMode,
   isSessionThinkingLevel,
   modelIdsMatch,
   PERMISSION_MODES,
@@ -77,9 +79,32 @@ export type PromptEnhancementError = {
   code: string;
 };
 
-export function nextMode(mode: Mode): Mode {
-  const index = MODE_CYCLE.indexOf(mode);
-  return MODE_CYCLE[(index + 1) % MODE_CYCLE.length] ?? "agent";
+/**
+ * The next mode in the cycle the caller may offer.
+ *
+ * `cycle` defaults to the full Agent→Plan→Goal cycle. A caller that knows the
+ * session's engine declares fewer contract modes passes the reduced cycle, so
+ * the chip can never step into a mode that engine does not carry. A mode that
+ * is not in the cycle (a stale record) cycles to the first offered mode.
+ */
+export function nextMode(mode: Mode, cycle: readonly Mode[] = MODE_CYCLE): Mode {
+  if (cycle.length === 0) return mode;
+  const index = cycle.indexOf(mode);
+  if (index < 0) return cycle[0] ?? mode;
+  return cycle[(index + 1) % cycle.length] ?? cycle[0] ?? mode;
+}
+
+/**
+ * The modes the composer may offer a session running on `engine`.
+ *
+ * Agent is never gated; Plan and Goal are dropped when the engine's declaration
+ * does not carry them. The composer hides what this returns, but the
+ * main-process boundary refuses a configure/create/prompt that names a mode the
+ * engine does not carry — the affordance and the enforcement read the same
+ * declaration table.
+ */
+export function offeredModes(engine: EngineId): readonly Mode[] {
+  return MODE_CYCLE.filter((candidate) => engineSupportsContractMode(engine, candidate));
 }
 
 export function isThinkingLevel(value: unknown): value is SessionThinkingLevel {

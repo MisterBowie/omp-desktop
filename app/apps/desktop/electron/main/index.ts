@@ -1101,7 +1101,10 @@ const planUiProbe = createPlanUiProbe({
   logger,
 });
 
-let emitAgentEvent: (envelope: AgentEventEnvelope) => void = () => undefined;
+let emitAgentEvent: (
+  envelope: AgentEventEnvelope,
+  options?: { guardPiTurnOwnership?: boolean },
+) => void = () => undefined;
 
 const sessionCollaboration = createSessionCollaborationService({
   getHost: () => host,
@@ -1267,7 +1270,12 @@ const ompSessions = wireOmpSessions({
   isPackaged: app.isPackaged,
   resourcesPath: process.resourcesPath ?? null,
   appPath: app.getAppPath(),
-  emitAgentEvent: (envelope) => emitAgentEvent(envelope),
+  // OMP terminal envelopes must not pass through the Pi turn-ownership guard
+  // (M5/T20-D): the bridge's runner emits only for the live generation and
+  // drops late frames itself, while an OMP session never has a Pi `activeTurns`
+  // entry — the guard would drop every OMP `agent_end`/`error` and leave the
+  // renderer's running state stuck on a turn that already ended.
+  emitAgentEvent: (envelope) => emitAgentEvent(envelope, { guardPiTurnOwnership: false }),
   hostTools: createOmpHostToolAdapter({
     plugins,
     userMcp,

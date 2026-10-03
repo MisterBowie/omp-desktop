@@ -14,9 +14,11 @@ import {
   OMP_RUNTIME_VERSION,
   PI_ENGINE_CAPABILITIES,
   closedEngineCapabilities,
+  contractModeCapability,
   engineCapabilities,
   engineCapabilityRefusal,
   engineSupports,
+  engineSupportsContractMode,
   isEngineId,
   isSessionEngineRef,
   liveEngineCapabilities,
@@ -25,6 +27,7 @@ import {
   type EngineCapabilities,
 } from "./engine.js";
 import type { SessionSource } from "./types/sessions.js";
+import { PROPOSAL_KINDS } from "./types.js";
 
 describe("engine identity", () => {
   it("resolves every unknown or absent value to Pi, never to a newer engine", () => {
@@ -68,14 +71,51 @@ describe("engine capabilities", () => {
 
   it("opens exactly the OMP capabilities this release ships", () => {
     // M4 ships prompting, stopping, restore, model/thinking switch, approval and
-    // questions; M5/T17 adds subagentEvents. Branching, steering, follow-up and
-    // compaction stay closed until their behaviour exists: an open capability is
-    // a promise that there is an implementation behind the entry point.
-    const shipped = new Set(["prompt", "stop", "resume", "modelSwitch", "structuredQuestions", "toolApproval", "subagentEvents"]);
+    // questions; M5/T17 adds subagentEvents; M5/T20 adds the Plan/Goal contract
+    // modes (mode state, contract catalogue, submit/approve/dispatch, model-side
+    // entry). Branching, steering, follow-up and compaction stay closed until
+    // their behaviour exists: an open capability is a promise that there is an
+    // implementation behind the entry point.
+    const shipped: Record<string, boolean> = {
+      prompt: true,
+      stop: true,
+      resume: true,
+      modelSwitch: true,
+      structuredQuestions: true,
+      toolApproval: true,
+      subagentEvents: true,
+      plan: true,
+      goal: true,
+    };
     for (const key of ENGINE_CAPABILITY_KEYS) {
       expect(PI_ENGINE_CAPABILITIES[key], `pi.${key}`).toBe(true);
-      expect(OMP_ENGINE_CAPABILITIES[key], `omp.${key}`).toBe(shipped.has(key));
+      expect(OMP_ENGINE_CAPABILITIES[key], `omp.${key}`).toBe(shipped[key] === true);
     }
+  });
+
+  it("gates contract modes by the engine declaration, never by the runtime phase", () => {
+    for (const engine of ENGINE_IDS) {
+      expect(engineSupportsContractMode(engine, "plan")).toBe(true);
+      expect(engineSupportsContractMode(engine, "goal")).toBe(true);
+      // Agent names no contract mode: there is nothing to declare.
+      expect(engineSupportsContractMode(engine, "agent")).toBe(true);
+      expect(engineSupportsContractMode(engine, "chat")).toBe(true);
+      expect(engineSupportsContractMode(engine, null)).toBe(true);
+    }
+    expect(contractModeCapability("plan")).toBe("plan");
+    expect(contractModeCapability("goal")).toBe("goal");
+    expect(contractModeCapability("agent")).toBeNull();
+  });
+
+  it("keeps the contract-mode capability names identical to PROPOSAL_KINDS", () => {
+    expect(PROPOSAL_KINDS).toEqual(["plan", "goal"]);
+    for (const kind of PROPOSAL_KINDS) {
+      expect(ENGINE_CAPABILITY_KEYS).toContain(kind);
+      expect(contractModeCapability(kind)).toBe(kind);
+    }
+    // What the shipped engines actually gate is read from the same keys.
+    expect(PI_ENGINE_CAPABILITIES.plan && PI_ENGINE_CAPABILITIES.goal).toBe(true);
+    expect(OMP_ENGINE_CAPABILITIES.plan && OMP_ENGINE_CAPABILITIES.goal).toBe(true);
   });
 
   it("refuses a closed capability with a typed, attributable refusal", () => {

@@ -21,6 +21,7 @@ import type { ModelsDevCatalog } from "../models-dev-catalog";
 import type { PluginRuntime } from "../plugin-runtime";
 import type { UserMcpRuntime } from "../user-mcp";
 import type { RuntimeState } from "./context";
+import { createAgentEventFanout, type AgentEventFanout } from "./agent-event-fanout";
 import type { FinishTurn } from "./plans";
 
 export type SidecarRuntimeDependencies = {
@@ -87,18 +88,16 @@ export function createSidecarRuntime({
   pluginActiveInProject,
   currentNetworkProxy,
 }: SidecarRuntimeDependencies): {
-  emitAgentEvent: (envelope: AgentEventEnvelope) => void;
+  /** Fan out one agent envelope to the Agent Host bridge and the renderer. */
+  emitAgentEvent: AgentEventFanout;
   wireSidecar: (sidecar: AgentSidecar) => void;
   startSidecar: () => Promise<void>;
 } {
-  const emitAgentEvent = (envelope: AgentEventEnvelope) => {
-    // A terminal event for a turn that no longer owns its session must not clear
-    // the current turn's state in Agent Host or the renderer. Persistence is a
-    // separate call, so dropping it here still archives it as history.
-    if (isStaleTerminalEvent(envelope)) return;
-    runtimeState.agentHostBridge?.ingest(envelope);
-    sendToRenderer(IPC.event.agentMessage, envelope);
-  };
+  const emitAgentEvent = createAgentEventFanout({
+    isStaleTerminalEvent,
+    ingest: (envelope) => runtimeState.agentHostBridge?.ingest(envelope),
+    send: (envelope) => sendToRenderer(IPC.event.agentMessage, envelope),
+  });
   const activeToolCalls = new Map<
     string,
     {

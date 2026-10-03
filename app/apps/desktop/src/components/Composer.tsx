@@ -16,6 +16,7 @@ import {
   modelIdsMatch,
   normalizeLargePasteThreshold,
   stripInlineComposerFileReferenceTokens,
+  DEFAULT_ENGINE_ID,
 } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { latestTurnContextInspector } from "../lib/latest-turn-context";
@@ -43,6 +44,7 @@ import {
   cssPixels,
   isPermissionMode,
   isThinkingLevel,
+  offeredModes,
   thinkingLevelForProvider,
   thinkingProviderForModel,
   THINKING_LEVELS,
@@ -303,6 +305,12 @@ export function Composer({
   const mode: Mode = activeSession
     ? activeSession.mode
     : (draftConfiguration?.mode ?? settings?.defaultMode ?? "agent");
+  // The modes this session's engine declares (M5/T20-D, B9). A draft session is
+  // created on the default engine, so the same rule applies before the row
+  // exists. Hiding a mode here is only the affordance; the main-process
+  // boundaries refuse a configure/create/prompt that names a mode the engine
+  // does not carry.
+  const modeOptions = offeredModes(activeSession?.engine ?? DEFAULT_ENGINE_ID);
   const planningLive =
     isRunning &&
     planningState === "planning" &&
@@ -582,6 +590,7 @@ export function Composer({
           <ComposerToolbar
             t={t}
             mode={mode}
+            modeOptions={modeOptions}
             planningLive={planningLive}
             providerId={provider?.id}
             modelId={modelId}
