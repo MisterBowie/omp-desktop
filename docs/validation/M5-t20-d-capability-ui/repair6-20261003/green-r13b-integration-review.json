@@ -1,0 +1,201 @@
+{
+  "candidate": "a6c146d433bf09b295e087f155c2045e48e5bb4d",
+  "layer": "verbatim final harness cleanup function + actual ownership helper; controlled process table and mocked signal sink; no OS signals",
+  "sourceSha256": "521867831d405017a621cf65a0eea8883a6ceece0f046f22dc08cb26a7d640b3",
+  "cases": [
+    {
+      "name": "recorded-root-reused",
+      "passed": true,
+      "signals": [],
+      "delegated": [],
+      "ignored": [
+        {
+          "pid": 100,
+          "reason": "root-reused",
+          "starttime": "new-birth",
+          "recordedStarttime": "old-birth"
+        }
+      ],
+      "result": {
+        "label": "recorded-root-reused",
+        "at": "2026-10-03T08:37:00.980Z",
+        "electronPid": 100,
+        "processScanSupported": true,
+        "spawnIdentity": {
+          "pid": 100,
+          "starttime": "old-birth"
+        },
+        "before": [],
+        "protectedAncestors": [
+          {
+            "pid": 3,
+            "ppid": 1,
+            "pgid": 3,
+            "starttime": "launcher",
+            "argv": [
+              "python3"
+            ],
+            "cmdline": "python3",
+            "comm": "python3",
+            "environ": []
+          }
+        ],
+        "excludedAncestors": [],
+        "stages": [
+          {
+            "action": "SIGTERM-proven-remnants",
+            "root": {
+              "pid": 100,
+              "reason": "root-reused",
+              "starttime": "new-birth",
+              "recordedStarttime": "old-birth"
+            },
+            "note": "the recorded Electron root is not owned in this snapshot; no signal is sent to its pid or former group",
+            "at": "2026-10-03T08:37:00.981Z"
+          }
+        ],
+        "leftover": [],
+        "ok": true,
+        "rootRefusal": {
+          "pid": 100,
+          "reason": "root-reused",
+          "starttime": "new-birth",
+          "recordedStarttime": "old-birth"
+        },
+        "electronExited": true
+      },
+      "unexpectedError": false
+    },
+    {
+      "name": "recorded-root-gone",
+      "passed": true,
+      "signals": [],
+      "delegated": [],
+      "ignored": [
+        {
+          "pid": 100,
+          "reason": "root-gone"
+        }
+      ],
+      "result": {
+        "label": "recorded-root-gone",
+        "at": "2026-10-03T08:37:00.981Z",
+        "electronPid": 100,
+        "processScanSupported": true,
+        "spawnIdentity": {
+          "pid": 100,
+          "starttime": "old-birth"
+        },
+        "before": [],
+        "protectedAncestors": [
+          {
+            "pid": 3,
+            "ppid": 1,
+            "pgid": 3,
+            "starttime": "launcher",
+            "argv": [
+              "python3"
+            ],
+            "cmdline": "python3",
+            "comm": "python3",
+            "environ": []
+          }
+        ],
+        "excludedAncestors": [],
+        "stages": [
+          {
+            "action": "SIGTERM-proven-remnants",
+            "root": {
+              "pid": 100,
+              "reason": "root-gone"
+            },
+            "note": "the recorded Electron root is not owned in this snapshot; no signal is sent to its pid or former group",
+            "at": "2026-10-03T08:37:00.981Z"
+          }
+        ],
+        "leftover": [],
+        "ok": true,
+        "rootRefusal": {
+          "pid": 100,
+          "reason": "root-gone"
+        },
+        "electronExited": true
+      },
+      "unexpectedError": false
+    },
+    {
+      "name": "valid-root-uses-owned-signal-path",
+      "passed": true,
+      "signals": [],
+      "delegated": [
+        {
+          "pids": [
+            100
+          ],
+          "signal": "SIGTERM"
+        }
+      ],
+      "ignored": [],
+      "result": {
+        "label": "valid-root-uses-owned-signal-path",
+        "at": "2026-10-03T08:37:00.981Z",
+        "electronPid": 100,
+        "processScanSupported": true,
+        "spawnIdentity": {
+          "pid": 100,
+          "starttime": "old-birth"
+        },
+        "before": [
+          {
+            "pid": 100,
+            "ppid": 7,
+            "pgid": 100,
+            "starttime": "old-birth",
+            "argv": [
+              "electron"
+            ],
+            "cmdline": "electron",
+            "comm": "electron",
+            "environ": [],
+            "ownership": "root"
+          }
+        ],
+        "protectedAncestors": [
+          {
+            "pid": 3,
+            "ppid": 1,
+            "pgid": 3,
+            "starttime": "launcher",
+            "argv": [
+              "python3"
+            ],
+            "cmdline": "python3",
+            "comm": "python3",
+            "environ": []
+          }
+        ],
+        "excludedAncestors": [],
+        "stages": [
+          {
+            "action": "SIGTERM",
+            "onlyGroups": [
+              100
+            ],
+            "groups": [],
+            "pids": [
+              100
+            ],
+            "results": []
+          }
+        ],
+        "leftover": [],
+        "ok": true,
+        "rootRefusal": null,
+        "electronExited": true
+      },
+      "unexpectedError": false
+    }
+  ],
+  "passed": true,
+  "statusAfter": ""
+}

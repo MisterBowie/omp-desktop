@@ -1,0 +1,173 @@
+{
+  "candidate": "a6c146d433bf09b295e087f155c2045e48e5bb4d",
+  "layer": "final committed helper with controlled process tables and signal spy; no OS signals",
+  "helperSha256": "1ddccdc7a9ed3d6acd91d4ba53b793a5276791fd6d0e070213dd53f056556029",
+  "cases": [
+    {
+      "name": "ancestor-and-shared-source-users-excluded",
+      "passed": true,
+      "pids": [
+        10,
+        11,
+        12
+      ],
+      "protectedPids": [
+        3
+      ]
+    },
+    {
+      "name": "recycled-and-missing-spawn-roots-excluded",
+      "passed": true,
+      "ignored": [
+        {
+          "pid": 10,
+          "reason": "root-reused",
+          "starttime": "new-birth",
+          "recordedStarttime": "old-birth"
+        },
+        {
+          "pid": 99,
+          "reason": "root-gone"
+        }
+      ]
+    },
+    {
+      "name": "detached-child-environment-retains-private-run-identity",
+      "passed": true,
+      "ownership": "environ-run-root"
+    },
+    {
+      "name": "mixed-group-only-signals-owned-pids",
+      "passed": true,
+      "plan": {
+        "groups": [],
+        "pids": [
+          10,
+          11
+        ],
+        "mixedGroups": [
+          {
+            "pgid": 10,
+            "ownedPids": [
+              10,
+              11
+            ],
+            "foreignPids": [
+              30
+            ]
+          }
+        ],
+        "protectedTargets": [],
+        "stale": []
+      },
+      "sent": [
+        {
+          "pid": 10,
+          "signal": "SIGTERM"
+        },
+        {
+          "pid": 11,
+          "signal": "SIGTERM"
+        }
+      ]
+    },
+    {
+      "name": "fully-owned-group-can-be-reclaimed",
+      "passed": true,
+      "plan": {
+        "groups": [
+          10
+        ],
+        "pids": [],
+        "mixedGroups": [],
+        "protectedTargets": [],
+        "stale": []
+      }
+    },
+    {
+      "name": "ancestor-and-self-groups-never-receive-group-signals",
+      "passed": true,
+      "plan": {
+        "groups": [],
+        "pids": [
+          40,
+          41
+        ],
+        "mixedGroups": [],
+        "protectedTargets": [
+          {
+            "pid": 3,
+            "comm": "fixture",
+            "reason": "self-or-ancestor"
+          },
+          {
+            "pid": 7,
+            "comm": "fixture",
+            "reason": "self-or-ancestor"
+          },
+          {
+            "pgid": 3,
+            "reason": "ancestor-group"
+          },
+          {
+            "pgid": 7,
+            "reason": "own-group"
+          }
+        ],
+        "stale": []
+      }
+    },
+    {
+      "name": "signal-plan-refuses-reused-and-gone-identities",
+      "passed": true,
+      "plan": {
+        "groups": [],
+        "pids": [],
+        "mixedGroups": [],
+        "protectedTargets": [],
+        "stale": [
+          {
+            "pid": 10,
+            "comm": "fixture",
+            "reason": "pid-reused",
+            "starttime": "birth-10",
+            "recordedStarttime": "old"
+          },
+          {
+            "pid": 99,
+            "comm": "fixture",
+            "reason": "gone",
+            "starttime": null,
+            "recordedStarttime": "birth-99"
+          }
+        ]
+      }
+    },
+    {
+      "name": "signal-errors-are-reported",
+      "passed": true,
+      "results": [
+        {
+          "target": 98,
+          "kind": "pid",
+          "signal": "SIGTERM",
+          "ok": false,
+          "gone": true,
+          "code": "ESRCH",
+          "message": "vanished"
+        },
+        {
+          "target": 99,
+          "kind": "pid",
+          "signal": "SIGTERM",
+          "ok": false,
+          "gone": false,
+          "code": "EPERM",
+          "message": "denied"
+        }
+      ]
+    }
+  ],
+  "passed": true,
+  "statusAfter": ""
+}

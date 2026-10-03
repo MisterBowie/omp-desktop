@@ -1,0 +1,8 @@
+# M5/T20-D repair6: the six earlier manifests stay byte-identical
+$ (cd . && sha256sum -c SHA256SUMS.txt)  # exit 0, 20 files
+$ (cd repair-20261003 && sha256sum -c SHA256SUMS.txt)  # exit 0, 14 files
+$ (cd repair2-20261003 && sha256sum -c SHA256SUMS.txt)  # exit 0, 28 files
+$ (cd repair3-20261003 && sha256sum -c SHA256SUMS.txt)  # exit 0, 30 files
+$ (cd repair4-20261003 && sha256sum -c SHA256SUMS.txt)  # exit 0, 27 files
+$ (cd repair5-20261003 && sha256sum -c SHA256SUMS.txt)  # exit 0, 21 files
+total files checked: 140

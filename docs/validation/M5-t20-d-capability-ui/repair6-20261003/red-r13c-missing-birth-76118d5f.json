@@ -1,0 +1,98 @@
+{
+  "layer": "actual helper with missing/empty spawn identity and a controlled table; signal plan applied to a kill spy only",
+  "helperPath": "/tmp/omp-t20d-red-76118d5f/app/scripts/e2e/process-ownership.mjs",
+  "helperSha256": "1b6f73a2099f646cc2425d08c17f805652fb565b7c46e3db6a17d342ebf57abd",
+  "reproduced": true,
+  "passed": false,
+  "scenarios": [
+    {
+      "name": "root-without-starttime",
+      "root": {
+        "pid": 100
+      },
+      "expectedOwned": [],
+      "actualOwned": [
+        100
+      ],
+      "ignored": [
+        {
+          "pid": 3,
+          "comm": "fixture",
+          "reason": "ancestor-run-root"
+        }
+      ],
+      "plannedTargets": {
+        "groups": [
+          100
+        ],
+        "pids": [],
+        "mixedGroups": []
+      },
+      "osSignalsSent": [
+        {
+          "target": -100,
+          "signal": "SIGTERM"
+        }
+      ]
+    },
+    {
+      "name": "root-with-null-starttime",
+      "root": {
+        "pid": 100,
+        "starttime": null
+      },
+      "expectedOwned": [],
+      "actualOwned": [
+        100
+      ],
+      "ignored": [
+        {
+          "pid": 3,
+          "comm": "fixture",
+          "reason": "ancestor-run-root"
+        }
+      ],
+      "plannedTargets": {
+        "groups": [
+          100
+        ],
+        "pids": [],
+        "mixedGroups": []
+      },
+      "osSignalsSent": [
+        {
+          "target": -100,
+          "signal": "SIGTERM"
+        }
+      ]
+    },
+    {
+      "name": "root-with-empty-starttime",
+      "root": {
+        "pid": 100,
+        "starttime": ""
+      },
+      "expectedOwned": [],
+      "actualOwned": [],
+      "ignored": [
+        {
+          "pid": 100,
+          "reason": "root-reused",
+          "starttime": "unrelated-new-birth",
+          "recordedStarttime": ""
+        },
+        {
+          "pid": 3,
+          "comm": "fixture",
+          "reason": "ancestor-run-root"
+        }
+      ],
+      "plannedTargets": {
+        "groups": [],
+        "pids": [],
+        "mixedGroups": []
+      },
+      "osSignalsSent": []
+    }
+  ]
+}

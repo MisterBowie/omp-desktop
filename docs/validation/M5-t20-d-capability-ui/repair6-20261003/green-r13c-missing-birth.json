@@ -1,0 +1,86 @@
+{
+  "layer": "actual helper with missing/empty spawn identity and a controlled table; signal plan applied to a kill spy only",
+  "helperPath": "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/scripts/e2e/process-ownership.mjs",
+  "helperSha256": "1ddccdc7a9ed3d6acd91d4ba53b793a5276791fd6d0e070213dd53f056556029",
+  "reproduced": false,
+  "passed": true,
+  "scenarios": [
+    {
+      "name": "root-without-starttime",
+      "root": {
+        "pid": 100
+      },
+      "expectedOwned": [],
+      "actualOwned": [],
+      "ignored": [
+        {
+          "pid": 100,
+          "reason": "root-identity-missing"
+        },
+        {
+          "pid": 3,
+          "comm": "fixture",
+          "reason": "ancestor-run-root"
+        }
+      ],
+      "plannedTargets": {
+        "groups": [],
+        "pids": [],
+        "mixedGroups": []
+      },
+      "osSignalsSent": []
+    },
+    {
+      "name": "root-with-null-starttime",
+      "root": {
+        "pid": 100,
+        "starttime": null
+      },
+      "expectedOwned": [],
+      "actualOwned": [],
+      "ignored": [
+        {
+          "pid": 100,
+          "reason": "root-identity-missing"
+        },
+        {
+          "pid": 3,
+          "comm": "fixture",
+          "reason": "ancestor-run-root"
+        }
+      ],
+      "plannedTargets": {
+        "groups": [],
+        "pids": [],
+        "mixedGroups": []
+      },
+      "osSignalsSent": []
+    },
+    {
+      "name": "root-with-empty-starttime",
+      "root": {
+        "pid": 100,
+        "starttime": ""
+      },
+      "expectedOwned": [],
+      "actualOwned": [],
+      "ignored": [
+        {
+          "pid": 100,
+          "reason": "root-identity-missing"
+        },
+        {
+          "pid": 3,
+          "comm": "fixture",
+          "reason": "ancestor-run-root"
+        }
+      ],
+      "plannedTargets": {
+        "groups": [],
+        "pids": [],
+        "mixedGroups": []
+      },
+      "osSignalsSent": []
+    }
+  ]
+}

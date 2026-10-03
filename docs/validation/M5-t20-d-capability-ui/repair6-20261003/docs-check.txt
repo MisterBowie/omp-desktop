@@ -1,0 +1,13 @@
+# M5/T20-D repair6 doc checks
+
+$ git diff --check  # whitespace/conflict markers, unstaged evidence+docs at freeze
+exit=0
+
+$ git diff --check 76118d5fde020d7bcc8140d0e4a4fa8cb13f9a17..a6c146d433bf09b295e087f155c2045e48e5bb4d -- app docs  # code commit
+exit=0
+
+$ (cd app && node scripts/check-t20-matrix-ids.mjs)
+MATRIX-ID-OK: B1-B14, C1-C8, D1-D3 each appear exactly once
+exit=0
+
+# (app docs site untouched this round; no ADR/spec/app-docs changes, docs:check not applicable)

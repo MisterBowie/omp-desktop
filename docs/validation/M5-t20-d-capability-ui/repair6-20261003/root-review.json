@@ -1,0 +1,831 @@
+{
+  "candidate": "a6c146d433bf09b295e087f155c2045e48e5bb4d",
+  "startedAt": 1791016627.7250051,
+  "environment": {
+    "HOME": "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/home",
+    "TMPDIR": "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp",
+    "XDG_CONFIG_HOME": "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/config",
+    "XDG_CACHE_HOME": "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/cache",
+    "XDG_DATA_HOME": "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/data",
+    "XDG_STATE_HOME": "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/state",
+    "PATH": "/home/vv/.nvm/versions/node/v24.14.0/bin:/home/vv/.bun/bin:/usr/local/bin:/usr/bin:/bin",
+    "BUN_BINARY": "/home/vv/.bun/bin/bun",
+    "DISPLAY": ":1",
+    "XAUTHORITY": "/run/user/1000/.mutter-Xwaylandauth.JKWYV3",
+    "LANG": "C.UTF-8",
+    "PI_DESKTOP_HOST_BIN": "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/target/debug/pi-desktop-host-core",
+    "PI_DESKTOP_E2E_PATCHED_TREE": "/tmp/omp-patched-t20d-ui-repair1",
+    "PI_DESKTOP_E2E_ARTIFACT_DIR": "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/artifacts"
+  },
+  "sourceUnmodified": true,
+  "endedRunner": 2287589,
+  "platform": "linux",
+  "arch": "x86_64",
+  "inputs": [
+    {
+      "path": "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/scripts/e2e-omp-plan-ui.mjs",
+      "bytes": 108532,
+      "sha256": "521867831d405017a621cf65a0eea8883a6ceece0f046f22dc08cb26a7d640b3"
+    },
+    {
+      "path": "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/target/debug/pi-desktop-host-core",
+      "bytes": 102414320,
+      "sha256": "5ea67808a282787ff51fc7e7dbf94426b8a89b61b4b9fb33094384766f055e9c"
+    },
+    {
+      "path": "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop/out/main/index.js",
+      "bytes": 6059961,
+      "sha256": "2ce2be6086d4fba2e51b70a37000057e977329f5c8bd25469d2bee889777d3f0"
+    },
+    {
+      "path": "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop/out/renderer/index.html",
+      "bytes": 723,
+      "sha256": "c30d9a1e2dde9b3da9d754eb4afd4c89048fab6e0e1a275128631d9bc7b4ad70"
+    },
+    {
+      "path": "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop/node_modules/electron/dist/electron",
+      "bytes": 224488696,
+      "sha256": "7cb3b42c3beb87ac1783c82cc7a3e8d53bdb9fc015a523a7cd078bba49807d63"
+    },
+    {
+      "path": "/tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/omp",
+      "bytes": 1844,
+      "sha256": "1bc44850fc7d36c713bd4bf9ba6312b6e96a19e35ee11af957ca720fa10918db"
+    }
+  ],
+  "forcedCleanup": [],
+  "timedOut": false,
+  "harnessPid": 2307885,
+  "exitCode": 0,
+  "survivors": [],
+  "observedOwnedProcesses": [
+    {
+      "pid": 2307885,
+      "ppid": 2307856,
+      "pgid": 2307885,
+      "state": "S",
+      "starttime": "22981894",
+      "argv": [
+        "/home/vv/.nvm/versions/node/v24.14.0/bin/node",
+        "scripts/e2e-omp-plan-ui.mjs"
+      ]
+    },
+    {
+      "pid": 2307912,
+      "ppid": 2307885,
+      "pgid": 2307912,
+      "state": "Z",
+      "starttime": "22981900",
+      "argv": []
+    },
+    {
+      "pid": 2307914,
+      "ppid": 2307912,
+      "pgid": 2307912,
+      "state": "S",
+      "starttime": "22981902",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=zygote --no-zygote-sandbox --no-sandbox"
+      ]
+    },
+    {
+      "pid": 2307915,
+      "ppid": 2307912,
+      "pgid": 2307912,
+      "state": "S",
+      "starttime": "22981902",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=zygote --no-sandbox"
+      ]
+    },
+    {
+      "pid": 2307935,
+      "ppid": 1,
+      "pgid": 2307934,
+      "state": "S",
+      "starttime": "22981916",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/chrome_crashpad_handler",
+        "--monitor-self-annotation=ptype=crashpad-handler",
+        "--no-rate-limit",
+        "--database=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/data/crash-dumps",
+        "--annotation=_productName=OMP Desktop",
+        "--annotation=_version=0.15.2",
+        "--annotation=lsb-release=Ubuntu 24.04.4 LTS",
+        "--annotation=plat=Linux",
+        "--annotation=prod=Electron",
+        "--annotation=ver=43.6.0",
+        "--initial-client-fd=38",
+        "--shared-client-connection"
+      ]
+    },
+    {
+      "pid": 2307947,
+      "ppid": 2307914,
+      "pgid": 2307912,
+      "state": "S",
+      "starttime": "22981942",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=gpu-process --no-sandbox --ozone-platform=x11 --crashpad-handler-pid=2307935 --enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel --user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile --gpu-preferences=WAAAAAAAAAAgAQAEAAAAAAAAAAAAAGAAQAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAACAAAAAAAAAAIAAAAAAAAAABAAAAAAAAAAgAAAAAAAAACAAAAAAAAAAIAAAAAAAAAA== --shared-files --field-trial-handle=3,i,15740179761537676374,49414635388016575,262144 --enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker --disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,4511093557661160087,4274318005668372319,4 --trace-process-track-uuid=3190708988185955192"
+      ]
+    },
+    {
+      "pid": 2307952,
+      "ppid": 2307912,
+      "pgid": 2307912,
+      "state": "S",
+      "starttime": "22981943",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US --service-sandbox-type=none --no-sandbox --crashpad-handler-pid=2307935 --enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel --user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile --standard-schemes=plugin-asset --secure-schemes=plugin-asset --cors-schemes=plugin-asset --fetch-schemes=plugin-asset --streaming-schemes=plugin-asset --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,15740179761537676374,49414635388016575,262144 --enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker --disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,4511093557661160087,4274318005668372319,4 --trace-process-track-uuid=3190708989122997041"
+      ]
+    },
+    {
+      "pid": 2307966,
+      "ppid": 2307915,
+      "pgid": 2307912,
+      "state": "S",
+      "starttime": "22981945",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=renderer --crashpad-handler-pid=2307935 --enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel --user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile --standard-schemes=plugin-asset --secure-schemes=plugin-asset --cors-schemes=plugin-asset --fetch-schemes=plugin-asset --streaming-schemes=plugin-asset --app-path=/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop --enable-sandbox --no-sandbox --remote-debugging-port=33977 --ozone-platform=x11 --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=4 --time-ticks-at-unix-epoch=-1790786809020493 --launch-time-ticks=229819449439 --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,15740179761537676374,49414635388016575,262144 --enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker --disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,4511093557661160087,4274318005668372319,4 --trace-process-track-uuid=31907"
+      ]
+    },
+    {
+      "pid": 2307974,
+      "ppid": 2307912,
+      "pgid": 2307912,
+      "state": "S",
+      "starttime": "22981946",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/target/debug/pi-desktop-host-core"
+      ]
+    },
+    {
+      "pid": 2307995,
+      "ppid": 2307974,
+      "pgid": 2307912,
+      "state": "Z",
+      "starttime": "22981947",
+      "argv": []
+    },
+    {
+      "pid": 2308049,
+      "ppid": 2307912,
+      "pgid": 2307912,
+      "state": "S",
+      "starttime": "22982273",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron",
+        "--use-system-ca",
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/packages/agent-runtime/dist/sidecar.js"
+      ]
+    },
+    {
+      "pid": 2308060,
+      "ppid": 2307912,
+      "pgid": 2307912,
+      "state": "S",
+      "starttime": "22982308",
+      "argv": [
+        "/proc/self/exe",
+        "--type=utility",
+        "--utility-sub-type=node.mojom.NodeService",
+        "--lang=en-US",
+        "--service-sandbox-type=none",
+        "--no-sandbox",
+        "--crashpad-handler-pid=2307935",
+        "--enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel",
+        "--user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile",
+        "--standard-schemes=plugin-asset",
+        "--secure-schemes=plugin-asset",
+        "--cors-schemes=plugin-asset",
+        "--fetch-schemes=plugin-asset",
+        "--streaming-schemes=plugin-asset",
+        "--shared-files=v8_context_snapshot_data:100",
+        "--field-trial-handle=3,i,15740179761537676374,49414635388016575,262144",
+        "--enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker",
+        "--disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation",
+        "--variations-seed-version",
+        "--pseudonymization-salt-handle=7,i,4511093557661160087,4274318005668372319,4",
+        "--trace-process-track-uuid=3190708990997080739"
+      ]
+    },
+    {
+      "pid": 2308076,
+      "ppid": 2307912,
+      "pgid": 2307912,
+      "state": "S",
+      "starttime": "22982311",
+      "argv": [
+        "/proc/self/exe",
+        "--type=utility",
+        "--utility-sub-type=node.mojom.NodeService",
+        "--lang=en-US",
+        "--service-sandbox-type=none",
+        "--no-sandbox",
+        "--crashpad-handler-pid=2307935",
+        "--enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel",
+        "--user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile",
+        "--standard-schemes=plugin-asset",
+        "--secure-schemes=plugin-asset",
+        "--cors-schemes=plugin-asset",
+        "--fetch-schemes=plugin-asset",
+        "--streaming-schemes=plugin-asset",
+        "--shared-files=v8_context_snapshot_data:100",
+        "--field-trial-handle=3,i,15740179761537676374,49414635388016575,262144",
+        "--enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker",
+        "--disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation",
+        "--variations-seed-version",
+        "--pseudonymization-salt-handle=7,i,4511093557661160087,4274318005668372319,4",
+        "--trace-process-track-uuid=3190708991934122588"
+      ]
+    },
+    {
+      "pid": 2308091,
+      "ppid": 2307915,
+      "pgid": 2307912,
+      "state": "S",
+      "starttime": "22982316",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=renderer --crashpad-handler-pid=2307935 --enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel --user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile --standard-schemes=plugin-asset --secure-schemes=plugin-asset --cors-schemes=plugin-asset --fetch-schemes=plugin-asset --streaming-schemes=plugin-asset --app-path=/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop --enable-sandbox --no-sandbox --remote-debugging-port=33977 --ozone-platform=x11 --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=7 --time-ticks-at-unix-epoch=-1790786809020493 --launch-time-ticks=229823160133 --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,15740179761537676374,49414635388016575,262144 --enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker --disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,4511093557661160087,4274318005668372319,4 --trace-process-track-uuid=31907"
+      ]
+    },
+    {
+      "pid": 2308199,
+      "ppid": 2307912,
+      "pgid": 2308199,
+      "state": "S",
+      "starttime": "22983192",
+      "argv": [
+        "bun",
+        "--preload",
+        "/tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/omp.ts",
+        "/tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/../src/cli.ts",
+        "--mode",
+        "rpc-ui",
+        "--trusted-extension",
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/packages/omp-runtime/extensions/omp-desktop-gate.ts",
+        "--model",
+        "dc0c047b-ffb0-4dd2-8b3b-e1c39b67dfc4/local-model",
+        "--session-dir",
+        "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/data/omp-sessions",
+        "--config",
+        "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/data/omp-runtime/run-u5Q5ak/config-overlay.yml"
+      ]
+    },
+    {
+      "pid": 2308278,
+      "ppid": 2307915,
+      "pgid": 2307912,
+      "state": "S",
+      "starttime": "22983284",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=renderer --crashpad-handler-pid=2307935 --enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel --user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile --standard-schemes=plugin-asset --secure-schemes=plugin-asset --cors-schemes=plugin-asset --fetch-schemes=plugin-asset --streaming-schemes=plugin-asset --app-path=/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop --enable-sandbox --no-sandbox --remote-debugging-port=33977 --ozone-platform=x11 --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=8 --time-ticks-at-unix-epoch=-1790786809020493 --launch-time-ticks=229832841203 --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,15740179761537676374,49414635388016575,262144 --enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker --disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,4511093557661160087,4274318005668372319,4 --trace-process-track-uuid=31907"
+      ]
+    },
+    {
+      "pid": 2308447,
+      "ppid": 2307912,
+      "pgid": 2308447,
+      "state": "S",
+      "starttime": "22984616",
+      "argv": [
+        "bun",
+        "--preload",
+        "/tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/omp.ts",
+        "/tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/../src/cli.ts",
+        "--mode",
+        "rpc-ui",
+        "--trusted-extension",
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/packages/omp-runtime/extensions/omp-desktop-gate.ts",
+        "--model",
+        "dc0c047b-ffb0-4dd2-8b3b-e1c39b67dfc4/local-model",
+        "--session-dir",
+        "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/data/omp-sessions",
+        "--config",
+        "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/data/omp-runtime/run-Fb1Onr/config-overlay.yml"
+      ]
+    },
+    {
+      "pid": 2308629,
+      "ppid": 2307912,
+      "pgid": 2308629,
+      "state": "S",
+      "starttime": "22986054",
+      "argv": [
+        "bun",
+        "--preload",
+        "/tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/omp.ts",
+        "/tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/../src/cli.ts",
+        "--mode",
+        "rpc-ui",
+        "--trusted-extension",
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/packages/omp-runtime/extensions/omp-desktop-gate.ts",
+        "--model",
+        "dc0c047b-ffb0-4dd2-8b3b-e1c39b67dfc4/local-model",
+        "--session-dir",
+        "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/data/omp-sessions",
+        "--config",
+        "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/data/omp-runtime/run-FUgE2g/config-overlay.yml"
+      ]
+    },
+    {
+      "pid": 2308805,
+      "ppid": 2307912,
+      "pgid": 2308805,
+      "state": "S",
+      "starttime": "22986860",
+      "argv": [
+        "bun",
+        "--preload",
+        "/tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/omp.ts",
+        "/tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/../src/cli.ts",
+        "--mode",
+        "rpc-ui",
+        "--trusted-extension",
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/packages/omp-runtime/extensions/omp-desktop-gate.ts",
+        "--model",
+        "dc0c047b-ffb0-4dd2-8b3b-e1c39b67dfc4/local-model",
+        "--session-dir",
+        "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/data/omp-sessions",
+        "--config",
+        "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/data/omp-runtime/run-fDzjx5/config-overlay.yml"
+      ]
+    },
+    {
+      "pid": 2308982,
+      "ppid": 1,
+      "pgid": 2308982,
+      "state": "S",
+      "starttime": "22987665",
+      "argv": [
+        "bun",
+        "--preload",
+        "/tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/omp.ts",
+        "/tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/../src/cli.ts",
+        "--mode",
+        "rpc-ui",
+        "--trusted-extension",
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/packages/omp-runtime/extensions/omp-desktop-gate.ts",
+        "--model",
+        "dc0c047b-ffb0-4dd2-8b3b-e1c39b67dfc4/local-model",
+        "--session-dir",
+        "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/data/omp-sessions",
+        "--config",
+        "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/data/omp-runtime/run-UaFtRd/config-overlay.yml"
+      ]
+    },
+    {
+      "pid": 2309090,
+      "ppid": 2308982,
+      "pgid": 2309090,
+      "state": "S",
+      "starttime": "22987761",
+      "argv": [
+        "/bin/sleep",
+        "600"
+      ]
+    },
+    {
+      "pid": 2309170,
+      "ppid": 1,
+      "pgid": 2307912,
+      "state": "S",
+      "starttime": "22988340",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US --service-sandbox-type=none --no-sandbox --crashpad-handler-pid=2307935 --enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel --user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile --standard-schemes=plugin-asset --secure-schemes=plugin-asset --cors-schemes=plugin-asset --fetch-schemes=plugin-asset --streaming-schemes=plugin-asset --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,15740179761537676374,49414635388016575,262144 --enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker --disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,4511093557661160087,4274318005668372319,4 --trace-process-track-uuid=3190708994745248135"
+      ]
+    },
+    {
+      "pid": 2309176,
+      "ppid": 2307885,
+      "pgid": 2309176,
+      "state": "S",
+      "starttime": "22988358",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop/node_modules/electron/dist/electron",
+        "--no-sandbox",
+        "--remote-debugging-port=36499",
+        "--user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile",
+        "."
+      ]
+    },
+    {
+      "pid": 2309178,
+      "ppid": 2309176,
+      "pgid": 2309176,
+      "state": "S",
+      "starttime": "22988360",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=zygote --no-zygote-sandbox --no-sandbox"
+      ]
+    },
+    {
+      "pid": 2309179,
+      "ppid": 2309176,
+      "pgid": 2309176,
+      "state": "S",
+      "starttime": "22988360",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=zygote --no-sandbox"
+      ]
+    },
+    {
+      "pid": 2309199,
+      "ppid": 1,
+      "pgid": 2309198,
+      "state": "S",
+      "starttime": "22988373",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/chrome_crashpad_handler",
+        "--monitor-self-annotation=ptype=crashpad-handler",
+        "--no-rate-limit",
+        "--database=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/data/crash-dumps",
+        "--annotation=_productName=OMP Desktop",
+        "--annotation=_version=0.15.2",
+        "--annotation=lsb-release=Ubuntu 24.04.4 LTS",
+        "--annotation=plat=Linux",
+        "--annotation=prod=Electron",
+        "--annotation=ver=43.6.0",
+        "--initial-client-fd=37",
+        "--shared-client-connection"
+      ]
+    },
+    {
+      "pid": 2309211,
+      "ppid": 2309178,
+      "pgid": 2309176,
+      "state": "S",
+      "starttime": "22988377",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=gpu-process --no-sandbox --ozone-platform=x11 --crashpad-handler-pid=2309199 --enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel --user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile --gpu-preferences=WAAAAAAAAAAgAQAEAAAAAAAAAAAAAGAAQAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAACAAAAAAAAAAIAAAAAAAAAABAAAAAAAAAAgAAAAAAAAACAAAAAAAAAAIAAAAAAAAAA== --shared-files --field-trial-handle=3,i,6161279190784207814,17818353360488913124,262144 --enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker --disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,16644813941165433256,786016186603458102,4 --trace-process-track-uuid=3190708988185955192"
+      ]
+    },
+    {
+      "pid": 2309216,
+      "ppid": 2309176,
+      "pgid": 2309176,
+      "state": "S",
+      "starttime": "22988378",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US --service-sandbox-type=none --no-sandbox --crashpad-handler-pid=2309199 --enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel --user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile --standard-schemes=plugin-asset --secure-schemes=plugin-asset --cors-schemes=plugin-asset --fetch-schemes=plugin-asset --streaming-schemes=plugin-asset --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,6161279190784207814,17818353360488913124,262144 --enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker --disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,16644813941165433256,786016186603458102,4 --trace-process-track-uuid=3190708989122997041"
+      ]
+    },
+    {
+      "pid": 2309231,
+      "ppid": 2309179,
+      "pgid": 2309176,
+      "state": "S",
+      "starttime": "22988380",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=renderer --crashpad-handler-pid=2309199 --enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel --user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile --standard-schemes=plugin-asset --secure-schemes=plugin-asset --cors-schemes=plugin-asset --fetch-schemes=plugin-asset --streaming-schemes=plugin-asset --app-path=/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop --enable-sandbox --no-sandbox --remote-debugging-port=36499 --ozone-platform=x11 --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=4 --time-ticks-at-unix-epoch=-1790786809020493 --launch-time-ticks=229883802080 --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,6161279190784207814,17818353360488913124,262144 --enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker --disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,16644813941165433256,786016186603458102,4 --trace-process-track-uuid=319"
+      ]
+    },
+    {
+      "pid": 2309239,
+      "ppid": 2309176,
+      "pgid": 2309176,
+      "state": "S",
+      "starttime": "22988381",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/target/debug/pi-desktop-host-core"
+      ]
+    },
+    {
+      "pid": 2309264,
+      "ppid": 2309176,
+      "pgid": 2309176,
+      "state": "S",
+      "starttime": "22988384",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron",
+        "--use-system-ca",
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/packages/agent-runtime/dist/sidecar.js"
+      ]
+    },
+    {
+      "pid": 2309308,
+      "ppid": 2309176,
+      "pgid": 2309176,
+      "state": "S",
+      "starttime": "22988420",
+      "argv": [
+        "/proc/self/exe",
+        "--type=utility",
+        "--utility-sub-type=node.mojom.NodeService",
+        "--lang=en-US",
+        "--service-sandbox-type=none",
+        "--no-sandbox",
+        "--crashpad-handler-pid=2309199",
+        "--enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel",
+        "--user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile",
+        "--standard-schemes=plugin-asset",
+        "--secure-schemes=plugin-asset",
+        "--cors-schemes=plugin-asset",
+        "--fetch-schemes=plugin-asset",
+        "--streaming-schemes=plugin-asset",
+        "--shared-files=v8_context_snapshot_data:100",
+        "--field-trial-handle=3,i,6161279190784207814,17818353360488913124,262144",
+        "--enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker",
+        "--disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation",
+        "--variations-seed-version",
+        "--pseudonymization-salt-handle=7,i,16644813941165433256,786016186603458102,4",
+        "--trace-process-track-uuid=3190708990997080739"
+      ]
+    },
+    {
+      "pid": 2309324,
+      "ppid": 2309176,
+      "pgid": 2309176,
+      "state": "S",
+      "starttime": "22988423",
+      "argv": [
+        "/proc/self/exe",
+        "--type=utility",
+        "--utility-sub-type=node.mojom.NodeService",
+        "--lang=en-US",
+        "--service-sandbox-type=none",
+        "--no-sandbox",
+        "--crashpad-handler-pid=2309199",
+        "--enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel",
+        "--user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile",
+        "--standard-schemes=plugin-asset",
+        "--secure-schemes=plugin-asset",
+        "--cors-schemes=plugin-asset",
+        "--fetch-schemes=plugin-asset",
+        "--streaming-schemes=plugin-asset",
+        "--shared-files=v8_context_snapshot_data:100",
+        "--field-trial-handle=3,i,6161279190784207814,17818353360488913124,262144",
+        "--enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker",
+        "--disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation",
+        "--variations-seed-version",
+        "--pseudonymization-salt-handle=7,i,16644813941165433256,786016186603458102,4",
+        "--trace-process-track-uuid=3190708991934122588"
+      ]
+    },
+    {
+      "pid": 2309339,
+      "ppid": 2309179,
+      "pgid": 2309176,
+      "state": "S",
+      "starttime": "22988428",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=renderer --crashpad-handler-pid=2309199 --enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel --user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile --standard-schemes=plugin-asset --secure-schemes=plugin-asset --cors-schemes=plugin-asset --fetch-schemes=plugin-asset --streaming-schemes=plugin-asset --app-path=/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop --enable-sandbox --no-sandbox --remote-debugging-port=36499 --ozone-platform=x11 --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=7 --time-ticks-at-unix-epoch=-1790786809020493 --launch-time-ticks=229884288574 --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,6161279190784207814,17818353360488913124,262144 --enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker --disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,16644813941165433256,786016186603458102,4 --trace-process-track-uuid=319"
+      ]
+    },
+    {
+      "pid": 2309438,
+      "ppid": 2309176,
+      "pgid": 2309438,
+      "state": "S",
+      "starttime": "22988797",
+      "argv": [
+        "bun",
+        "--preload",
+        "/tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/omp.ts",
+        "/tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/../src/cli.ts",
+        "--mode",
+        "rpc-ui",
+        "--trusted-extension",
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/packages/omp-runtime/extensions/omp-desktop-gate.ts",
+        "--model",
+        "dc0c047b-ffb0-4dd2-8b3b-e1c39b67dfc4/local-model",
+        "--session-dir",
+        "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/data/omp-sessions",
+        "--config",
+        "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/data/omp-runtime/run-n12zoD/config-overlay.yml"
+      ]
+    },
+    {
+      "pid": 2309533,
+      "ppid": 2309179,
+      "pgid": 2309176,
+      "state": "S",
+      "starttime": "22989420",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=renderer --crashpad-handler-pid=2309199 --enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel --user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile --standard-schemes=plugin-asset --secure-schemes=plugin-asset --cors-schemes=plugin-asset --fetch-schemes=plugin-asset --streaming-schemes=plugin-asset --app-path=/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop --enable-sandbox --no-sandbox --remote-debugging-port=36499 --ozone-platform=x11 --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=8 --time-ticks-at-unix-epoch=-1790786809020493 --launch-time-ticks=229894206800 --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,6161279190784207814,17818353360488913124,262144 --enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker --disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,16644813941165433256,786016186603458102,4 --trace-process-track-uuid=319"
+      ]
+    },
+    {
+      "pid": 2309603,
+      "ppid": 2307885,
+      "pgid": 2309603,
+      "state": "S",
+      "starttime": "22990028",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop/node_modules/electron/dist/electron",
+        "--no-sandbox",
+        "--remote-debugging-port=43451",
+        "--user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile",
+        "."
+      ]
+    },
+    {
+      "pid": 2309605,
+      "ppid": 2309603,
+      "pgid": 2309603,
+      "state": "S",
+      "starttime": "22990029",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=zygote --no-zygote-sandbox --no-sandbox"
+      ]
+    },
+    {
+      "pid": 2309606,
+      "ppid": 2309603,
+      "pgid": 2309603,
+      "state": "S",
+      "starttime": "22990029",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=zygote --no-sandbox"
+      ]
+    },
+    {
+      "pid": 2309628,
+      "ppid": 1,
+      "pgid": 2309627,
+      "state": "S",
+      "starttime": "22990043",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/chrome_crashpad_handler",
+        "--monitor-self-annotation=ptype=crashpad-handler",
+        "--no-rate-limit",
+        "--database=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/data/crash-dumps",
+        "--annotation=_productName=OMP Desktop",
+        "--annotation=_version=0.15.2",
+        "--annotation=lsb-release=Ubuntu 24.04.4 LTS",
+        "--annotation=plat=Linux",
+        "--annotation=prod=Electron",
+        "--annotation=ver=43.6.0",
+        "--initial-client-fd=37",
+        "--shared-client-connection"
+      ]
+    },
+    {
+      "pid": 2309641,
+      "ppid": 2309605,
+      "pgid": 2309603,
+      "state": "S",
+      "starttime": "22990048",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=gpu-process --no-sandbox --ozone-platform=x11 --crashpad-handler-pid=2309628 --enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel --user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile --gpu-preferences=WAAAAAAAAAAgAQAEAAAAAAAAAAAAAGAAQAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAACAAAAAAAAAAIAAAAAAAAAABAAAAAAAAAAgAAAAAAAAACAAAAAAAAAAIAAAAAAAAAA== --shared-files --field-trial-handle=3,i,5031675685348737784,5166349002701711567,262144 --enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker --disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,16123060104148584701,11717040412374833928,4 --trace-process-track-uuid=3190708988185955192"
+      ]
+    },
+    {
+      "pid": 2309646,
+      "ppid": 2309603,
+      "pgid": 2309603,
+      "state": "S",
+      "starttime": "22990048",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US --service-sandbox-type=none --no-sandbox --crashpad-handler-pid=2309628 --enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel --user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile --standard-schemes=plugin-asset --secure-schemes=plugin-asset --cors-schemes=plugin-asset --fetch-schemes=plugin-asset --streaming-schemes=plugin-asset --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,5031675685348737784,5166349002701711567,262144 --enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker --disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,16123060104148584701,11717040412374833928,4 --trace-process-track-uuid=3190708989122997041"
+      ]
+    },
+    {
+      "pid": 2309659,
+      "ppid": 2309606,
+      "pgid": 2309603,
+      "state": "S",
+      "starttime": "22990050",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=renderer --crashpad-handler-pid=2309628 --enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel --user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile --standard-schemes=plugin-asset --secure-schemes=plugin-asset --cors-schemes=plugin-asset --fetch-schemes=plugin-asset --streaming-schemes=plugin-asset --app-path=/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop --enable-sandbox --no-sandbox --remote-debugging-port=43451 --ozone-platform=x11 --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=4 --time-ticks-at-unix-epoch=-1790786809020493 --launch-time-ticks=229900507204 --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,5031675685348737784,5166349002701711567,262144 --enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker --disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,16123060104148584701,11717040412374833928,4 --trace-process-track-uuid=31"
+      ]
+    },
+    {
+      "pid": 2309667,
+      "ppid": 2309603,
+      "pgid": 2309603,
+      "state": "S",
+      "starttime": "22990051",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/target/debug/pi-desktop-host-core"
+      ]
+    },
+    {
+      "pid": 2309693,
+      "ppid": 2309603,
+      "pgid": 2309603,
+      "state": "S",
+      "starttime": "22990055",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron",
+        "--use-system-ca",
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/packages/agent-runtime/dist/sidecar.js"
+      ]
+    },
+    {
+      "pid": 2309743,
+      "ppid": 2309603,
+      "pgid": 2309603,
+      "state": "S",
+      "starttime": "22990089",
+      "argv": [
+        "/proc/self/exe",
+        "--type=utility",
+        "--utility-sub-type=node.mojom.NodeService",
+        "--lang=en-US",
+        "--service-sandbox-type=none",
+        "--no-sandbox",
+        "--crashpad-handler-pid=2309628",
+        "--enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel",
+        "--user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile",
+        "--standard-schemes=plugin-asset",
+        "--secure-schemes=plugin-asset",
+        "--cors-schemes=plugin-asset",
+        "--fetch-schemes=plugin-asset",
+        "--streaming-schemes=plugin-asset",
+        "--shared-files=v8_context_snapshot_data:100",
+        "--field-trial-handle=3,i,5031675685348737784,5166349002701711567,262144",
+        "--enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker",
+        "--disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation",
+        "--variations-seed-version",
+        "--pseudonymization-salt-handle=7,i,16123060104148584701,11717040412374833928,4",
+        "--trace-process-track-uuid=3190708990997080739"
+      ]
+    },
+    {
+      "pid": 2309759,
+      "ppid": 2309603,
+      "pgid": 2309603,
+      "state": "S",
+      "starttime": "22990093",
+      "argv": [
+        "/proc/self/exe",
+        "--type=utility",
+        "--utility-sub-type=node.mojom.NodeService",
+        "--lang=en-US",
+        "--service-sandbox-type=none",
+        "--no-sandbox",
+        "--crashpad-handler-pid=2309628",
+        "--enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel",
+        "--user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile",
+        "--standard-schemes=plugin-asset",
+        "--secure-schemes=plugin-asset",
+        "--cors-schemes=plugin-asset",
+        "--fetch-schemes=plugin-asset",
+        "--streaming-schemes=plugin-asset",
+        "--shared-files=v8_context_snapshot_data:100",
+        "--field-trial-handle=3,i,5031675685348737784,5166349002701711567,262144",
+        "--enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker",
+        "--disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation",
+        "--variations-seed-version",
+        "--pseudonymization-salt-handle=7,i,16123060104148584701,11717040412374833928,4",
+        "--trace-process-track-uuid=3190708991934122588"
+      ]
+    },
+    {
+      "pid": 2309775,
+      "ppid": 2309606,
+      "pgid": 2309603,
+      "state": "S",
+      "starttime": "22990098",
+      "argv": [
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/node_modules/.pnpm/electron@43.6.0/node_modules/electron/dist/electron --type=renderer --crashpad-handler-pid=2309628 --enable-crash-reporter=3043b5ea-eadf-45e8-a1c2-a404c0ec3e60,no_channel --user-data-dir=/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/profile --standard-schemes=plugin-asset --secure-schemes=plugin-asset --cors-schemes=plugin-asset --fetch-schemes=plugin-asset --streaming-schemes=plugin-asset --app-path=/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/apps/desktop --enable-sandbox --no-sandbox --remote-debugging-port=43451 --ozone-platform=x11 --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=7 --time-ticks-at-unix-epoch=-1790786809020493 --launch-time-ticks=229900984673 --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,5031675685348737784,5166349002701711567,262144 --enable-features=GlobalShortcutsPortalPreferredTrigger,PdfUseShowSaveFilePicker --disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAccessChecks,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=7,i,16123060104148584701,11717040412374833928,4 --trace-process-track-uuid=31"
+      ]
+    },
+    {
+      "pid": 2309868,
+      "ppid": 2309603,
+      "pgid": 2309868,
+      "state": "S",
+      "starttime": "22990546",
+      "argv": [
+        "bun",
+        "--preload",
+        "/tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/omp.ts",
+        "/tmp/omp-patched-t20d-ui-repair1/packages/coding-agent/scripts/../src/cli.ts",
+        "--mode",
+        "rpc-ui",
+        "--trusted-extension",
+        "/home/vv/person/code/omp-desktop-m5-t20-d-ui/app/packages/omp-runtime/extensions/omp-desktop-gate.ts",
+        "--model",
+        "dc0c047b-ffb0-4dd2-8b3b-e1c39b67dfc4/local-model",
+        "--session-dir",
+        "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/data/omp-sessions",
+        "--config",
+        "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie/data/omp-runtime/run-yGH9OP/config-overlay.yml"
+      ]
+    }
+  ],
+  "headAfter": "a6c146d433bf09b295e087f155c2045e48e5bb4d",
+  "statusAfter": "",
+  "harnessResult": {
+    "summary": "1 passed, 0 failed",
+    "results": [
+      {
+        "id": "E2E-OMP-PLAN-UI",
+        "ok": true,
+        "detail": "session 858ae1d5-a7bd-442c-a4eb-dffcedfff52f; artifacts .pi/plan/e2e-plan-one-20261003-1637.md -> .pi/plan/e2e-plan-two-20261003-1637.md -> .pi/plan/e2e-plan-three-20261003-1637.md -> .pi/plan/e2e-plan-five-20261003-1637.md -> .pi/plan/e2e-plan-six-20261003-1638.md; executions ask=12fd9df5-2f94-42fe-bf05-4db99db44ea8 accept-edits=8dbce920-20cb-4041-a477-2c4cb3c0359e auto=02740ad6-2125-4acd-a858-1710fd5664c1 held=f7bea228-3174-45d9-8186-b607e985097a (interrupted after restart); held turn e6063411-8b84-46f5-8775-1d79eef4c971 interrupted; provider requests 16, no replay"
+      }
+    ],
+    "primaryError": null
+  },
+  "harnessCleanup": {
+    "at": "2026-10-03T08:38:44.030Z",
+    "scratchRoot": "/tmp/omp-t20-d-ui-root-review-a6c146d-repair6/tmp/omp-plan-ui-2307885-Sdmhie",
+    "scratchRemoved": true,
+    "survivingOwnedProcesses": [],
+    "errors": []
+  },
+  "passed": true,
+  "finishedAt": 1791016734.1477911
+}

@@ -431,6 +431,50 @@ macOS arm64 compiled `.5` writer + production bridge 冷读 8/8（完整无 LF �
 证据（`git diff` 不含任何 harness/产品文件），harness 在两个提交上字节相同
 （sha256 `4d02057022df4f6fdf0eb7fafb7ea8b5cbe3a2adb8b9444fd8358ce81c8c44a5`）。
 
+### 1.10 第六轮定向返修（2026-10-03，R13b/R13c）
+
+根在 `76118d5f` 上对第五轮做独立复审：GitHub ref/产品/fork clean、固定子模块与补丁 `.5` 核对；
+旧 119 件证据不变、新 21 件完整校验；三个 JS 语法与全 diff `check` 通过；受控探针确认"共享
+patched tree 不再单独认领进程"等改进成立。但根提取**最终原样的 `terminateOwnedApp`**（受控
+进程表 + 信号 spy，无 OS 信号）判出两条身份边界缺陷，verdict `changes-required`：
+
+| 缺陷 | 根证据 | 现象 |
+|---|---|---|
+| R13b | `ui-cleanup-integration-review.mjs`：`passed=false`、1/3、`unexpectedError=false` | 快照 supported 但 rootEntry 为空（恰是 helper 判 `root-gone`/`root-reused` 的结果）时，主函数仍 `process.kill(-child.pid, SIGTERM)`，等待超时后的 SIGKILL 分支同构；PID 复用样例中 helper 已明确 ignored `root-reused`，主函数仍记录 `-100/SIGTERM` 且 `report.ok=true` |
+| R13c | `ui-missing-birth-reference.json`（受控表、无信号） | `startElectron`/`terminateOwnedApp` 把 `readProcessIdentity` 失败回退为 `{pid}`；helper 只在 starttime 非 null 时比较，于是没有本次 argv/env run-root 证据的 unrelated pid100 经 `roots:[{pid:100}]` 进入 owned 并计划 `groups:[100]` |
+
+**修复（只改 harness、归属 helper/回归与文档；产品代码、gate、host-core、fork、补丁级 `.5`、
+固定子模块未动）**
+
+- **拒绝贯穿所有信号分支**：supported 快照下 root 未被认领（gone / pid 复用 / 身份缺失）时，
+  不再向旧 PID 或旧组发任何 SIGTERM/SIGKILL；只清理仍能证明的自有残余（本次唯一 scratch root
+  的 argv/环境证据，按自身身份或"全组存活成员均已证明"的组成员），阶段记录为
+  `SIGTERM-proven-remnants`/`SIGKILL-proven-remnants`，原因落在 `report.rootRefusal`；无法证明
+  而 Electron 仍存活时以含"cannot prove ownership"的错误明确失败，`surviving` 计入
+  `electron-unverified` 从而保留 scratch。Linux 无进程表时同样拒绝（`SIGTERM-refused`/
+  `SIGKILL-refused`）；非 Linux 保留原"只验证直接 spawn 组"的诚实降级并更新 limitation 文案。
+- **身份缺失不是身份相等**：spawn 身份读取失败时 `state.electronBirth` 保持 `null`（spawn 报告
+  新增 `spawnIdentityMissing`），不再伪造裸 PID root；helper 对缺失/空/无效 starttime 的 root
+  记 `root-identity-missing` 并拒绝认领，`planSignalTargets` 对无 starttime 的记录记
+  `identity-missing` 且绝不作为信号目标——真实自有残余仍由本次唯一 scratch root 识别。
+- **回归**：原 16 例与三例真实 sentinel 冒烟全部保留；新增 2 例 helper（身份缺失 root 被拒且
+  残余仍按 run root 归属；信号计划拒绝无身份记录）+ 4 例从 harness 源码提取的**实际**
+  `terminateOwnedApp`（受控进程表 + 信号 sink：gone/reused 零信号、identity-missing 含 SIGKILL
+  升级零信号并以所有权错误失败、root 被拒仍回收已证明残余、有效 root 保持 owned 整组路径）。
+- **RED→GREEN**：`76118d5f` 上根集成脚本 1/3（reused/gone 记录 `-100/SIGTERM`）与 missing-birth
+  探针 `reproduced=true`（owned `[100]`、`groups:[100]`）；候选 `a6c146d` 上根集成脚本 3/3、
+  根 helper 复核 8/8、探针 passed、回归 22/22、语法 3×0。
+- **真实 UI（根原通用外围 wrapper 原样）**：`a6c146d` 上 `passed: true`、exit 0、
+  `timedOut=false`、`forcedCleanup=[]`、survivors 空、`statusAfter=''`、harness
+  `SUMMARY 1 passed, 0 failed`、`CLEANUP scratchRemoved=true survivingOwnedProcesses=0 errors=0`、
+  13 张截图、provider 18（三次重启不增、同文本两次提交恰 +2）；三个终止阶段 `rootRefusal=null`、
+  `groups=[<electron pgid>]`、`pids=[]`、无 mixed/stale/失败结果，父 Python 复验器只出现在
+  `protectedAncestors`、`before` 无 python3；重启/重选后原生 sha 不变
+ （`d96fe2c8…` 前后相等）。
+- **候选说明**：被复跑的是代码提交 `a6c146d433bf09b295e087f155c2045e48e5bb4d`（父 `76118d5f`）；
+  其后的证据提交只新增本文档与 `repair6-20261003/` 证据（`git diff` 不含任何 harness/helper
+  文件），harness sha256 `52186783…`、helper sha256 `1ddccdc7…` 在代码提交与最终提交上字节相同。
+
 ## 2. 验证（命令、退出码、原始日志）
 
 所有命令在 `/home/vv/person/code/omp-desktop-m5-t20-d-ui/app`，Node v24.14.0、
@@ -581,6 +625,25 @@ patched 运行时树 `/tmp/omp-patched-t20d-ui-repair1` 在跑前跑后核验（
 | 旧证据不变 | 五份清单 `sha256sum -c` | **119/119 `OK`**（20+14+28+30+27；旧件未改写） | `repair5-20261003/old-evidence-integrity.txt` |
 | 第五轮证据清单 | `cd repair5-20261003 && sha256sum -c SHA256SUMS.txt` | **21/21 `OK`**（自排除 manifest，含根报告、日志、preflight、13 张截图与 raw JSON） | `repair5-20261003/SHA256SUMS.txt` |
 
+### 2.5 第六轮返修命令与结果（R13b/R13c）
+
+| 验证 | 命令（要点） | 结果 | 原始日志 |
+| --- | --- | --- | --- |
+| 语法 | `node --check scripts/e2e-omp-plan-ui.mjs`、`scripts/e2e/process-ownership.mjs`、`scripts/e2e/process-ownership.test.mjs` | 三者 exit 0 | `repair6-20261003/syntax-check.txt` |
+| 归属/信号回归 + 真实 sentinel 冒烟 | `cd app && node --test scripts/e2e/process-ownership.test.mjs` | **22/22 通过**、exit 0（原 16 例保留 + 6 例新增，含 4 例实际 `terminateOwnedApp` 受控表/信号 sink）；运行后无遗留 `sleep 300` | `repair6-20261003/process-ownership-test.txt` |
+| R13b RED（76118d5f，隔离 worktree） | `node /tmp/omp-t20-d-ui-repair6-root-20261003/ui-cleanup-integration-review.mjs --repo /tmp/omp-t20d-red-76118d5f --candidate 76118d5f… --output …/red-r13b-integration-76118d5f.json` | `passed=false`、**1/3**、`unexpectedError=false`、exit 1；reused/gone 记录 `process.kill(-100, SIGTERM)` | `repair6-20261003/red-r13b-integration-review-76118d5f.json` |
+| R13c RED（76118d5f） | `node r13c-missing-birth-probe.mjs --repo /tmp/omp-t20d-red-76118d5f --output …/red-r13c-missing-birth-76118d5f.json` | `reproduced=true`、`passed=false`、exit 1（owned `[100]`、groups `[100]`、kill spy `-100`） | `repair6-20261003/red-r13c-missing-birth-76118d5f.json` |
+| R13b GREEN（a6c146d，根脚本原样） | 同上根脚本 `--repo $REPO --candidate a6c146d…` | `passed=true`、**3/3**、exit 0；reused/gone `signals=[]`、`delegated=[]`，valid 走 owned 路径（`delegated=[100]`） | `repair6-20261003/green-r13b-integration-review.json` |
+| helper 复核（a6c146d，根脚本原样） | `node /tmp/omp-t20-d-ui-repair6-root-20261003/ui-ownership-review.mjs --repo $REPO --candidate a6c146d…` | **8/8**、exit 0、`helperSha256=1ddccdc7…` | `repair6-20261003/green-ownership-review.json` |
+| R13c GREEN（a6c146d） | 探针同上（主仓库） | `passed=true`、exit 0；三种身份缺失变体（缺字段/null/空串）owned `[]`、零目标、零信号 | `repair6-20261003/green-r13c-missing-birth.json` |
+| **真实 UI E2E（根原通用外围 wrapper 原样）** | `python3 /tmp/omp-t20-d-ui-repair6-root-20261003/run-ui-review-linux-candidate.py --candidate a6c146d… --output /tmp/omp-t20-d-ui-root-review-a6c146d-repair6 --ended-runner 2287589 --harness-sha256 52186783… --patched-tree /tmp/omp-patched-t20d-ui-repair1 --xauthority /run/user/1000/.mutter-Xwaylandauth.JKWYV3` | 外围 `passed=true`、exit 0、`timedOut=false`、`forcedCleanup=[]`、survivors `[]`、`statusAfter=''`；harness `SUMMARY 1 passed, 0 failed`、`CLEANUP scratchRemoved=true survivingOwnedProcesses=0 errors=0`；raw 1 071 752 B/`5fa6373f…`；13 张截图；三个终止阶段均整组信号、无 mixed/stale/失败，父 Python 只在 `protectedAncestors`、`before` 无 python3；原生 sha 重启/重选不变（`d96fe2c8…`） | `repair6-20261003/root-review.json`、`omp-plan-ui-run.txt`、`preflight.json`、`ui/omp-plan-ui-raw.json`、`ui/omp-plan-ui-01..13-*.png` |
+| 旧证据不变 | 六份清单 `sha256sum -c` | **140/140 `OK`**（20+14+28+30+27+21；旧件未改写） | `repair6-20261003/old-evidence-integrity.txt` |
+| 第六轮证据清单 | `cd repair6-20261003 && sha256sum -c SHA256SUMS.txt` | 27/27 `OK`（自排除 manifest） | `repair6-20261003/SHA256SUMS.txt` |
+
+命令与退出码汇总另见 `repair6-20261003/commands.txt`。本地真实 UI 复跑向 wrapper 的
+`--ended-runner` 传入第五轮已退出的 runner PID `2287589`（运行前核对 `/proc/2287589` 不存在），
+以保持该断言的本义（无并发的 runner/harness）；不是放宽或关闭安全断言。
+
 ## 3. 全矩阵映射（B1–B14 / C1–C8 / D1–D3）
 
 证据层级：**unit**（纯函数/单元）、**handler**（受控 handler/夹具）、**runtime/Host**
@@ -615,7 +678,7 @@ patched 运行时树 `/tmp/omp-patched-t20d-ui-repair1` 在跑前跑后核验（
 | C8 | 外部路径例外 | 已接受 C + 回归 | unit | 通过 |
 | D1 | SubmitGoal、goal 提示词、批准后自主执行自停 | 本阶段 Goal E2E（§1.3）；无延续定时器 | runtime/Host + host-core | 通过 |
 | D2 | `goal_updated` 只读展示 | 未实现（矩阵可选）；不伪造 Goal 状态，不新建第二套 Goal | — | 可选未实现 |
-| D3 | 端到端用户路径 | 本阶段 UI E2E（§1.2 首稿 + §1.5 返修：三种批准权限、真实 Reject/重提、真实 running 与 pending 应用重启、专属 HOME 隔离、PID/进程组级回收验证、单份 raw JSON 证据 + §1.6 第二轮：重启后历史先于新 prompt 可见、每输入一次气泡、同文本两次提交、重选/分页身份稳定、读取不改原生字节 + §1.7 第三轮：同一闭环在直读实现上复跑 + §1.8 第四轮：R11/R12 修复后的最终源码复跑，13 张截图 + raw JSON，provider 无重放、读取/重选 sha 不变 + §1.9 第五轮：R13 后按本次运行唯一证据判定自有进程、按组纯度发信号（混合组只发自有成员）、外围复验父进程不被纳入也不被 signal，16 例归属/信号回归 + 真实 sentinel 冒烟 + 根通用外围脚本原样真跑）+ 已接受 B2 的派发证据 | renderer + runtime/Host + host-core + OS 进程 | 通过 |
+| D3 | 端到端用户路径 | 本阶段 UI E2E（§1.2 首稿 + §1.5 返修：三种批准权限、真实 Reject/重提、真实 running 与 pending 应用重启、专属 HOME 隔离、PID/进程组级回收验证、单份 raw JSON 证据 + §1.6 第二轮：重启后历史先于新 prompt 可见、每输入一次气泡、同文本两次提交、重选/分页身份稳定、读取不改原生字节 + §1.7 第三轮：同一闭环在直读实现上复跑 + §1.8 第四轮：R11/R12 修复后的最终源码复跑，13 张截图 + raw JSON，provider 无重放、读取/重选 sha 不变 + §1.9 第五轮：R13 后按本次运行唯一证据判定自有进程、按组纯度发信号（混合组只发自有成员）、外围复验父进程不被纳入也不被 signal，16 例归属/信号回归 + 真实 sentinel 冒烟 + 根通用外围脚本原样真跑 + §1.10 第六轮：身份拒绝贯穿清理全程（gone/reused/身份缺失零信号、只清理已证明残余、无法证明即失败并保留 scratch，22 例回归含 4 例实际清理函数受控用例）+ 根原通用 wrapper 真实 UI 复跑）+ 已接受 B2 的派发证据 | renderer + runtime/Host + host-core + OS 进程 | 通过 |
 
 ## 4. 未做与不声称
 
@@ -648,6 +711,13 @@ patched 运行时树 `/tmp/omp-patched-t20d-ui-repair1` 在跑前跑后核验（
   （命令行与环境）；非 Linux 仍降级为"只验证 Electron 子进程"路径（代码在，本轮未实跑）。
   第五轮不声称"根已接受"：本机证据是 Linux x64 的真实 UI 复跑与 16 例归属回归；三平台包、
   整 M5/T20 仍未完成，最终验收由根执行。
+- 第六轮（R13b/R13c，§1.10）只改 UI harness、归属 helper/回归与文档：产品代码、gate、
+  host-core、fork、补丁级（仍 `.5`）、固定子模块与既有产品断言未动，R1–R12 已闭合行为未触碰。
+  非 Linux 仍走"只验证直接 spawn 组"的降级路径（代码在、本轮未实跑）；Linux 下若进程表不可读
+  则拒绝任何未证明的信号并如实失败；spawn 身份读取失败（Linux）不再伪造裸 PID root，只能靠
+  本次唯一 scratch root 认领残余，无法证明即以所有权错误失败并保留 scratch（刻意的 fail-closed）。
+  第六轮同样不声称"根已接受"：证据为本机 Linux x64 的受控探针、根脚本复核与真实 UI 复跑；
+  整 M5/T20 与三平台包仍未完成，最终验收由根执行。
 - 第五轮如实记录两点：(1) 归属判据只接受"本次运行的唯一 scratch root"，因此若将来引入新的
   脱离子进程且既不继承 spawn 根、也不携带该 root，它会落入 `leftover` 并使运行失败——这是
   刻意的 fail-closed：宁可失败并保留 scratch，也不扩大所有权判据去猜。(2) 第一阶段的

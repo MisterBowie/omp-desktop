@@ -1,0 +1,182 @@
+{
+  "candidate": "76118d5fde020d7bcc8140d0e4a4fa8cb13f9a17",
+  "layer": "verbatim final harness cleanup function + actual ownership helper; controlled process table and mocked signal sink; no OS signals",
+  "sourceSha256": "4d02057022df4f6fdf0eb7fafb7ea8b5cbe3a2adb8b9444fd8358ce81c8c44a5",
+  "cases": [
+    {
+      "name": "recorded-root-reused",
+      "passed": false,
+      "signals": [
+        {
+          "target": -100,
+          "signal": "SIGTERM",
+          "via": "process.kill"
+        }
+      ],
+      "delegated": [],
+      "ignored": [
+        {
+          "pid": 100,
+          "reason": "root-reused",
+          "starttime": "new-birth",
+          "recordedStarttime": "old-birth"
+        }
+      ],
+      "result": {
+        "label": "recorded-root-reused",
+        "at": "2026-10-03T08:34:58.589Z",
+        "electronPid": 100,
+        "processScanSupported": true,
+        "before": [],
+        "protectedAncestors": [
+          {
+            "pid": 3,
+            "ppid": 1,
+            "pgid": 3,
+            "starttime": "launcher",
+            "argv": [
+              "python3"
+            ],
+            "cmdline": "python3",
+            "comm": "python3",
+            "environ": []
+          }
+        ],
+        "excludedAncestors": [],
+        "stages": [
+          {
+            "action": "SIGTERM",
+            "target": "process-group -100",
+            "note": "the Electron root is missing from the process table",
+            "at": "2026-10-03T08:34:58.589Z"
+          }
+        ],
+        "leftover": [],
+        "ok": true,
+        "electronExited": true
+      },
+      "unexpectedError": false
+    },
+    {
+      "name": "recorded-root-gone",
+      "passed": false,
+      "signals": [
+        {
+          "target": -100,
+          "signal": "SIGTERM",
+          "via": "process.kill"
+        }
+      ],
+      "delegated": [],
+      "ignored": [
+        {
+          "pid": 100,
+          "reason": "root-gone"
+        }
+      ],
+      "result": {
+        "label": "recorded-root-gone",
+        "at": "2026-10-03T08:34:58.590Z",
+        "electronPid": 100,
+        "processScanSupported": true,
+        "before": [],
+        "protectedAncestors": [
+          {
+            "pid": 3,
+            "ppid": 1,
+            "pgid": 3,
+            "starttime": "launcher",
+            "argv": [
+              "python3"
+            ],
+            "cmdline": "python3",
+            "comm": "python3",
+            "environ": []
+          }
+        ],
+        "excludedAncestors": [],
+        "stages": [
+          {
+            "action": "SIGTERM",
+            "target": "process-group -100",
+            "note": "the Electron root is missing from the process table",
+            "at": "2026-10-03T08:34:58.590Z"
+          }
+        ],
+        "leftover": [],
+        "ok": true,
+        "electronExited": true
+      },
+      "unexpectedError": false
+    },
+    {
+      "name": "valid-root-uses-owned-signal-path",
+      "passed": true,
+      "signals": [],
+      "delegated": [
+        {
+          "pids": [
+            100
+          ],
+          "signal": "SIGTERM"
+        }
+      ],
+      "ignored": [],
+      "result": {
+        "label": "valid-root-uses-owned-signal-path",
+        "at": "2026-10-03T08:34:58.590Z",
+        "electronPid": 100,
+        "processScanSupported": true,
+        "before": [
+          {
+            "pid": 100,
+            "ppid": 7,
+            "pgid": 100,
+            "starttime": "old-birth",
+            "argv": [
+              "electron"
+            ],
+            "cmdline": "electron",
+            "comm": "electron",
+            "environ": [],
+            "ownership": "root"
+          }
+        ],
+        "protectedAncestors": [
+          {
+            "pid": 3,
+            "ppid": 1,
+            "pgid": 3,
+            "starttime": "launcher",
+            "argv": [
+              "python3"
+            ],
+            "cmdline": "python3",
+            "comm": "python3",
+            "environ": []
+          }
+        ],
+        "excludedAncestors": [],
+        "stages": [
+          {
+            "action": "SIGTERM",
+            "onlyGroups": [
+              100
+            ],
+            "groups": [],
+            "pids": [
+              100
+            ],
+            "results": []
+          }
+        ],
+        "leftover": [],
+        "ok": true,
+        "electronExited": true
+      },
+      "unexpectedError": false
+    }
+  ],
+  "passed": false,
+  "statusAfter": ""
+}

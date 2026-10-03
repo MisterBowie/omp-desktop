@@ -1,0 +1,51 @@
+# M5/T20-D repair6 (R13b/R13c) command log
+# 2026-10-03, Linux x64, node v24.14.0, bun 1.4.2
+# candidate code commit a6c146d433bf09b295e087f155c2045e48e5bb4d (parent 76118d5fde020d7bcc8140d0e4a4fa8cb13f9a17)
+
+# --- syntax and regression (working tree == a6c146d) ---
+$ (cd app && node --check scripts/e2e-omp-plan-ui.mjs scripts/e2e/process-ownership.mjs scripts/e2e/process-ownership.test.mjs)   # each exit 0        -> syntax-check.txt
+$ (cd app && node --test scripts/e2e/process-ownership.test.mjs)                                                                  # 22/22, exit 0      -> process-ownership-test.txt
+
+# --- RED on the root-reviewed commit 76118d5f (isolated git worktree, no OS signals) ---
+$ git worktree add --detach /tmp/omp-t20d-red-76118d5f 76118d5fde020d7bcc8140d0e4a4fa8cb13f9a17                                    # exit 0
+$ node /tmp/omp-t20-d-ui-repair6-root-20261003/ui-cleanup-integration-review.mjs --repo /tmp/omp-t20d-red-76118d5f --candidate 76118d5fde020d7bcc8140d0e4a4fa8cb13f9a17 --output /tmp/omp-t20d-repair6/red-r13b-integration-76118d5f.json
+#   -> passed=false, 1/3 (reused/gone recorded process.kill(-100, SIGTERM)), exit 1                                              -> red-r13b-integration-review-76118d5f.json
+$ node r13c-missing-birth-probe.mjs --repo /tmp/omp-t20d-red-76118d5f --output /tmp/omp-t20d-repair6/red-r13c-missing-birth-76118d5f.json
+#   -> reproduced=true, passed=false (owned [100], groups [100], kill spy -100), exit 1                                          -> red-r13c-missing-birth-76118d5f.json
+
+# --- GREEN at a6c146d (root scripts verbatim, clean tree) ---
+$ node /tmp/omp-t20-d-ui-repair6-root-20261003/ui-cleanup-integration-review.mjs --repo $REPO --candidate a6c146d433bf09b295e087f155c2045e48e5bb4d --output /tmp/omp-t20d-repair6/green-r13b-integration-review.json   # passed=true, 3/3, exit 0  -> green-r13b-integration-review.json
+$ node /tmp/omp-t20-d-ui-repair6-root-20261003/ui-ownership-review.mjs --repo $REPO --candidate a6c146d433bf09b295e087f155c2045e48e5bb4d --output /tmp/omp-t20d-repair6/green-ownership-review.json              # passed=true, 8/8, exit 0  -> green-ownership-review.json
+$ node r13c-missing-birth-probe.mjs --repo $REPO --output /tmp/omp-t20d-repair6/green-r13c-missing-birth.json                                                                                                     # passed=true, exit 0      -> green-r13c-missing-birth.json
+
+# --- real UI E2E with the original generic outer wrapper (root script, unmodified) ---
+$ python3 /tmp/omp-t20-d-ui-repair6-root-20261003/run-ui-review-linux-candidate.py \
+    --candidate a6c146d433bf09b295e087f155c2045e48e5bb4d \
+    --output /tmp/omp-t20-d-ui-root-review-a6c146d-repair6 \
+    --ended-runner 2287589 \
+    --harness-sha256 521867831d405017a621cf65a0eea8883a6ceece0f046f22dc08cb26a7d640b3 \
+    --patched-tree /tmp/omp-patched-t20d-ui-repair1 \
+    --xauthority /run/user/1000/.mutter-Xwaylandauth.JKWYV3                                                                                       # exit 0
+#   wrapper: passed=true, exitCode=0, timedOut=false, forcedCleanup=[], survivors=[], statusAfter=''
+#   harness: SUMMARY 1 passed, 0 failed; CLEANUP scratchRemoved=true survivingOwnedProcesses=0 errors=0; provider 18
+#   evidence: preflight.json, root-review.json, omp-plan-ui-run.txt, ui/omp-plan-ui-raw.json (1071752 B), 13 screenshots   -> all archived here
+#
+# --ended-runner note: the wrapper asserts that the given runner pid is absent
+# (it guards the root's post-runner replay). This local replay used the repair5
+# runner pid 2287589, verified absent (/proc/2287589) before the run, so the
+# assertion keeps its meaning; no second harness/runner was active.
+
+# --- evidence integrity ---
+$ (cd docs/validation/M5-t20-d-capability-ui && sha256sum -c SHA256SUMS.txt)                       # 20/20 OK
+$ (cd .../repair-20261003 && sha256sum -c SHA256SUMS.txt)                                          # 14/14 OK
+$ (cd .../repair2-20261003 && sha256sum -c SHA256SUMS.txt)                                         # 28/28 OK
+$ (cd .../repair3-20261003 && sha256sum -c SHA256SUMS.txt)                                         # 30/30 OK
+$ (cd .../repair4-20261003 && sha256sum -c SHA256SUMS.txt)                                         # 27/27 OK
+$ (cd .../repair5-20261003 && sha256sum -c SHA256SUMS.txt)                                         # 21/21 OK
+#   total 140/140                                                                                  -> old-evidence-integrity.txt
+$ (cd .../repair6-20261003 && sha256sum -c SHA256SUMS.txt)                                         # self-excluded manifest
+
+# --- doc checks (relevant scope: root planning docs only) ---
+$ git diff --check                                                                                 # exit 0
+$ git diff --check 76118d5f..a6c146d -- app docs                                                   # exit 0
+$ (cd app && node scripts/check-t20-matrix-ids.mjs)                                                # MATRIX-ID-OK, exit 0   -> docs-check.txt
