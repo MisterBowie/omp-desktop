@@ -3,11 +3,13 @@
 更新时间：2026-10-03。状态：**首稿 `8a1dd8fc` 的 R1–R4 已由根独立复验闭合；根随后判
 changes-required（R5：一次提交的用户气泡渲染两次；R6：重启后会话面板看不到已产生的历史）；
 第二轮定向返修（§1.6）后根再以真实 macOS arm64 原生运行时故障注入与受控边界探针判
-changes-required（R7–R10）；第三轮定向返修（§1.7）完成、本机验证通过、待根复审**。证据：
-首稿与第一轮返修见 `docs/validation/M5-t20-d-capability-ui/`（`repair-20261003/`），第二轮见
-`repair2-20261003/`，第三轮见 `repair3-20261003/`。分支 `codex/m5-t20-d-capability-ui`
+changes-required（R7–R10）；第三轮定向返修（§1.7）后根再判 changes-required（R11：完整
+无换行末行被丢弃；R12：损坏/半写记录被伪装成成功历史），第四轮定向返修（§1.8）完成、本机
+验证通过、待根复审**。证据：首稿与第一轮返修见 `docs/validation/M5-t20-d-capability-ui/`
+（`repair-20261003/`），第二轮见 `repair2-20261003/`，第三轮见 `repair3-20261003/`，第四轮见
+`repair4-20261003/`。分支 `codex/m5-t20-d-capability-ui`
 （普通追加提交，不 amend/rebase/强推，不发布、不合 main、不建 PR），本返修基于
-`b6a9e4c2ac0625ffd37b61f3d007f9992b8dfa23`（根复审判 changes-required 的候选），首个基线
+`e33bc98c1e16500ad9f1b9b068fb1ceb9a70600c`（根复审判 changes-required 的候选），首个基线
 `68519ea19f6fee37fec2c5817256f3a68ea8606e`。固定子模块 OMP `62bc57be`、PI `0111e306`
 （未动）；补丁级保持 `62bc57b+omp-desktop.5`（fork commit
 `36483311dfff67be7504f591974df93fc512a45a`，本阶段不改 fork、不改 patch）。
@@ -316,6 +318,46 @@ OMP 会话因一次 lookup 异常退化为宿主空转录。修复：两处都�
 id、未知未来版本拒绝，均显式报错）；`blob:sha256:` 图片引用不由直读器解析——旧瞬时 runtime 在
 重启后同样无法解析（blob 存储位于已删除的 run root 内），行为未回归（ADR 0313 已记录该限制）。
 
+### 1.8 第四轮定向返修（2026-10-03，R11/R12）
+
+根在 `e33bc98c` 的独立复审（`/tmp/omp-t20-d-ui-repair4-root-20261003/review-e33bc98c/`，
+真实 macOS arm64 compiled `.5` + production bridge + 原生 writer 的读取探针 5/8；R7–R10
+的具体缺陷维持闭合）判定两条读取缺陷，都是直读器尾部处理把"损坏或写到一半的转录"变成
+"看起来成功的完整历史"。
+
+**R11（P2）：完整 JSON 末行没有换行时，最后一条消息从界面消失。** 旧实现对 EOF 处所有未落下
+换行的片段一律丢弃。根从真实 writer 字节构造私有快照，恰好截在第二条完整 user 记录末尾（记录
+JSON 与 parent 链完整，唯一差异是末尾无 LF）：production bridge 返回 2 行/1 个 user，期望
+3 行/2 个 user，最后一条 user `8fa50d76` 不可见；文件未被删除或改写，是显示截断。固定参考
+（`native-jsonl-tail-reference.json`）实测同字节有 LF（327 B）与无 LF（326 B）在固定 loader
+下 `malformedRecords` 均为 0、返回同一 user 且原字节不变，因此不能把"无 LF"一律当成未落幕
+写入。修复：EOF 片段不再无条件丢弃——完整 JSON 的尾片段按普通记录解析，并走同一 header
+身份/版本/结构校验路径（末尾记录也算叶，保持稳定 id）；读取者绝不向用户文件补写换行。
+
+**R12（P2）：损坏完整行/不完整尾部被伪装成成功历史。** `consumeLine` 的 `JSON.parse` catch
+直接 `return`，EOF 尾部也直接丢弃。根实测 production bridge：真实完整文件后追加一个以 LF
+结尾的畸形记录仍成功返回 4 行；合法 header 加不完整 JSON 尾部成功返回 0 行（与真正空会话
+无法区分）。修复：两者都以 `OMP_HISTORY_INVALID` typed 错误明确拒绝，消息区分"非法 JSON
+记录"与"未终止记录"，沿 bridge/IPC 可见、可重试；并发写者写到一半时拒绝本次快照而不是静默
+截断或猜测，写者提交后同一次读取即可成功。合法空白行、header-only 与显式空结果语义不变。
+固定 OMP 底层的宽松加载保留在 `parseSessionContent`（`malformedRecords` 信号保留），桌面读取
+契约不再复制其宽松而丢掉错误信号，这是有意且文档化的分歧。读取者仍然只读：不删除、不改写、
+不截断、不恢复备份。
+
+**本轮产品改动（最小面）**：`packages/omp-runtime/src/session/native-session-file.ts` 的
+`consumeLine`/`consumeText`/EOF 尾部；同步单测、bridge 单测、真实 runtime E2E 与规格/ADR。
+未改 fork/补丁（仍 `.5`）、gate、host-core、固定子模块与 UI E2E 脚本；未重新引入任何 reader
+进程；未触碰 R1–R10 已闭合的行为。
+
+**本轮新增/修改的测试与证据**（`repair4-20261003/`）：
+
+| 层 | 文件 | 断言要点 |
+|---|---|---|
+| 直读器 unit（改/增） | `packages/omp-runtime/src/session/native-session-file.test.ts`（16 例） | 完整无 LF 尾记录可见且字节不变；尾记录同样做身份/版本校验（header-only/外来 id/版本 4）；畸形完整记录 typed 拒绝且文件不变（含 header 前）；未终止残尾 typed 拒绝、补成完整记录后同读成功；空白尾部忽略；多字节字符跨 64 KiB chunk 的尾记录完整；单记录上界同样作用于无 LF 尾部 |
+| bridge 读取（+1） | `apps/desktop/test/omp-history-read.test.mjs`（9 例） | R11：去 LF 后 3 行（含 `call-1`）可见、文件 sha 不变、不构造 supervisor；R12：畸形行与残缺尾 `OMP_HISTORY_INVALID` 拒绝、拒绝前后 sha 不变；补全记录后重试读出 `entry:m4` |
+| 真实 runtime（改） | `apps/desktop/test/omp-history-e2e.test.mjs`（1 例，真固定运行时 + FakeProvider） | 真实 writer 记录去掉末尾 LF 与冷读 id 全等；残缺追加被拒且 torn sha 不变；提交后重试恰 +1 行；损坏副本被拒且 sha 不变；原转录 sha 跨成功/拒绝/final 不变（`7892f203…`、3371 B）、provider 2、supervisor 构造 1/0、run 目录 `[]` |
+| 真实 UI E2E | `apps/scripts/e2e-omp-plan-ui.mjs`（未改） | R1–R6 闭环在最终源码复跑：`SUMMARY 1 passed, 0 failed`、exit 0；13 张截图；重启后发新 prompt 前 9/9 user 行 overlap（9 assistant turn / 14 assistant 消息 / 11 tool 行 / 9 process 组）；pending 重启与重选后原生 sha 均为 `42b51045…`（28357 B）；同文本两次提交 live `…:1`/`…:3` → entry `6618fd7a`/`fe11412c`（二次重选稳定）、provider 16→18 恰 +2；三次重启 provider 不增（无重放）；`CLEANUP scratchRemoved=true survivingOwnedProcesses=0 errors=0` | `repair4-20261003/omp-plan-ui-run.txt`、`ui/omp-plan-ui-raw.json`、`ui/omp-plan-ui-01..13-*.png` |
+
 ## 2. 验证（命令、退出码、原始日志）
 
 所有命令在 `/home/vv/person/code/omp-desktop-m5-t20-d-ui/app`，Node v24.14.0、
@@ -330,7 +372,10 @@ Bun 1.4.2、Linux x64；固定 patched 运行时树由 `scripts/omp-patch.mjs --
 证据全集：首稿 20 个原始文件由 `M5-t20-d-capability-ui/SHA256SUMS.txt` 覆盖
 （**不包含清单自身**，`sha256sum -c` 全通过，本轮未改）；返修轮证据放子目录
 `M5-t20-d-capability-ui/repair-20261003/`，由该子目录自己的 `SHA256SUMS.txt` 覆盖
-（同样自排除、`sha256sum -c` 全通过）。本文件本身由 Git 追踪，不在任何清单内。
+（同样自排除、`sha256sum -c` 全通过）；第二/三/四轮分别在 `repair2-20261003/`、
+`repair3-20261003/`、`repair4-20261003/`，各自清单同样自排除（旧三份 92 件本轮复跑全部
+`OK`，见 `repair4-20261003/old-evidence-integrity.txt`）。本文件本身由 Git 追踪，不在任何
+清单内。
 
 | 验证 | 命令（要点） | 结果 | 原始日志 |
 | --- | --- | --- | --- |
@@ -429,6 +474,27 @@ patched 运行时树 `/tmp/omp-patched-t20d-ui-repair1` 在跑前跑后核验（
 `SSH_ASKPASS=/usr/bin/false`（与产品改动无关，前几轮同样以 `env -u SSH_ASKPASS` 运行）；
 以该环境重跑该文件 14/14 通过，并以同样的方式取得上表全量结果，如实记录。
 
+### 2.3 第四轮返修命令与结果（R11/R12）
+
+本轮命令均在 `/home/vv/person/code/omp-desktop-m5-t20-d-ui/app`（Node v24.14.0、Linux x64、
+本地 FakeProvider）。注意：桌面测试经 `@pi-desktop/omp-runtime` 消费 workspace **构建产物**，
+改动 `packages/omp-runtime` 后须先 `pnpm build:js`；首跑未重建时 bridge 测试仍读到旧 dist，
+如实记录该调用顺序要求（重建后全部定向测试复跑通过）。
+
+| 检查 | 命令 | 结果 | 日志 |
+| --- | --- | --- | --- |
+| 直读器 + 投影 unit | `packages/omp-runtime && npx vitest run src/session/native-session-file.test.ts src/session/history.test.ts` | **2 files / 27 passed**、exit 0 | `repair4-20261003/native-history-unit.txt` |
+| runtime 包全量 | `packages/omp-runtime && npx vitest run` | **35 files / 534 passed / 6 skipped**、exit 0（较第三轮 +4：新增 R11/R12 直读器用例） | `repair4-20261003/runtime-vitest.txt` |
+| bridge 读取 | `apps/desktop && node --test test/omp-history-read.test.mjs` | 9/9 通过、exit 0（新增 R11/R12 例，见 §1.8） | `repair4-20261003/omp-history-read.txt` |
+| 真实 runtime 读取 E2E | `apps/desktop && node --test test/omp-history-e2e.test.mjs` | 1/1 通过、exit 0；结构化行 sha `7892f203…`/3371 B 跨成功/拒绝/final 不变；provider 2 不增；supervisor 构造 1/0；run 目录 `[]`；目录 delta = `corrupt.jsonl`/`tail.jsonl`/`v1.jsonl` | `repair4-20261003/omp-history-e2e.txt` |
+| OMP bridge 定向合集（9 文件） | `apps/desktop && node --test test/omp-session-bridge.test.mjs test/omp-history-read.test.mjs test/omp-session-ownership.test.mjs test/omp-session-failclosed.test.mjs test/omp-session-configure.test.mjs test/omp-host-tool-bridge.test.mjs test/omp-terminal-delivery.test.mjs test/engine-session-ipc.test.mjs test/omp-model-projection.test.mjs` | **137/137 通过**、exit 0 | `repair4-20261003/omp-bridge-directed.txt` |
+| IPC 边界 | `apps/desktop && node --test test/engine-session-ipc.test.mjs` | 12/12 通过、exit 0 | `repair4-20261003/engine-session-ipc.txt` |
+| **真实 UI E2E（R1–R6 闭环复跑于最终源码）** | `DISPLAY=:1 XAUTHORITY=… PI_DESKTOP_E2E_PATCHED_TREE=/tmp/omp-patched-t20d-ui-repair1 PI_DESKTOP_E2E_ARTIFACT_DIR=…/repair4-20261003/ui node scripts/e2e-omp-plan-ui.mjs` | `SUMMARY 1 passed, 0 failed`、exit 0；13 张截图；`CLEANUP scratchRemoved=true survivingOwnedProcesses=0 errors=0`；raw JSON 1040427 B；provider 16 无重放（同文本后总 18） | `repair4-20261003/omp-plan-ui-run.txt`、`ui/omp-plan-ui-raw.json`、`ui/omp-plan-ui-01..13-*.png` |
+| typecheck / lint / docs / 矩阵 | `pnpm typecheck`、`pnpm lint`、`pnpm docs:check`、`node scripts/check-t20-matrix-ids.mjs` | 均 exit 0（docs 513 页；矩阵 B1–B14/C1–C8/D1–D3 各恰一次） | `repair4-20261003/typecheck.txt`、`lint.txt`、`docs-check.txt`、`matrix-ids.txt` |
+| 源码格式 | `git diff --check -- app` | exit 0 | 命令输出 |
+| 旧证据不变 | 四份清单 `sha256sum -c` | **92/92 `OK`**（20+14+28+30；旧件未改写） | `repair4-20261003/old-evidence-integrity.txt` |
+| 第四轮证据清单 | `cd repair4-20261003 && sha256sum -c SHA256SUMS.txt` | **27/27 `OK`**（自排除 manifest，覆盖日志、13 张截图与 raw JSON） | `repair4-20261003/SHA256SUMS.txt` |
+
 ## 3. 全矩阵映射（B1–B14 / C1–C8 / D1–D3）
 
 证据层级：**unit**（纯函数/单元）、**handler**（受控 handler/夹具）、**runtime/Host**
@@ -463,7 +529,7 @@ patched 运行时树 `/tmp/omp-patched-t20d-ui-repair1` 在跑前跑后核验（
 | C8 | 外部路径例外 | 已接受 C + 回归 | unit | 通过 |
 | D1 | SubmitGoal、goal 提示词、批准后自主执行自停 | 本阶段 Goal E2E（§1.3）；无延续定时器 | runtime/Host + host-core | 通过 |
 | D2 | `goal_updated` 只读展示 | 未实现（矩阵可选）；不伪造 Goal 状态，不新建第二套 Goal | — | 可选未实现 |
-| D3 | 端到端用户路径 | 本阶段 UI E2E（§1.2 首稿 + §1.5 返修：三种批准权限、真实 Reject/重提、真实 running 与 pending 应用重启、专属 HOME 隔离、PID/进程组级回收验证、单份 raw JSON 证据 + §1.6 第二轮：重启后历史先于新 prompt 可见、每输入一次气泡、同文本两次提交、重选/分页身份稳定、读取不改原生字节 + §1.7 第三轮：同一闭环在直读实现上复跑，同一 13 张截图与 raw JSON，读取路径已无 reader 进程）+ 已接受 B2 的派发证据 | renderer + runtime/Host + host-core + OS 进程 | 通过 |
+| D3 | 端到端用户路径 | 本阶段 UI E2E（§1.2 首稿 + §1.5 返修：三种批准权限、真实 Reject/重提、真实 running 与 pending 应用重启、专属 HOME 隔离、PID/进程组级回收验证、单份 raw JSON 证据 + §1.6 第二轮：重启后历史先于新 prompt 可见、每输入一次气泡、同文本两次提交、重选/分页身份稳定、读取不改原生字节 + §1.7 第三轮：同一闭环在直读实现上复跑 + §1.8 第四轮：R11/R12 修复后的最终源码复跑，13 张截图 + raw JSON，provider 无重放、读取/重选 sha 不变）+ 已接受 B2 的派发证据 | renderer + runtime/Host + host-core + OS 进程 | 通过 |
 
 ## 4. 未做与不声称
 
@@ -484,6 +550,15 @@ patched 运行时树 `/tmp/omp-patched-t20d-ui-repair1` 在跑前跑后核验（
 - 第三轮不声称"根已接受"：R7–R10 的修复证据是本机 Linux x64 上的真实 runtime/单元/UI 复跑；根
   上一轮使用的是 macOS arm64 原生运行时的故障注入，本轮未在 macOS 实机复跑（直读器为纯 Node 文件
   解析，但本轮未以 macOS 原生字节复核）。整 M5/T20 与三平台包仍未完成。
+- 第四轮（R11/R12，§1.8）只改直读器尾部语义及其测试/文档：完整 JSON 尾记录不再丢弃、非法 JSON
+  记录（含残尾）typed 拒绝；fork、补丁级（仍 `.5`）、gate、host-core、固定子模块与 UI E2E 脚本
+  未动，未重新引入 reader 进程，R1–R10 已闭合行为未触碰。默认容器的低层宽松（`parseSessionContent`
+  的 `malformedRecords`）保留，桌面读取契约有意不再复制其宽松——这是文档化的分歧，不是遗漏。
+  第四轮同样不声称"根已接受"：证据为本机 Linux x64 的真实 writer/单元/bridge/真实 UI 复跑；根
+  使用的是 macOS arm64 原生字节夹具，未在本机以 macOS 复跑。整 M5/T20 与三平台包仍未完成。
+- 第四轮如实记录一个调用顺序要求：桌面测试经 workspace 构建产物消费 `@pi-desktop/omp-runtime`，
+  改动该包后必须先 `pnpm build:js`（首次未重建时 bridge 测试读到旧 dist，属于测试基建而非产品
+  缺陷；重建后全部定向测试复跑通过）。
 - 第三轮直读器明确接受的 session 版本为 2 与 3；版本 1（无稳定 entry id）与未知未来版本显式拒绝，
   这是行为边界而非缺陷（旧瞬时路径对 v1 会生成随机 id，与"稳定 entry id"契约冲突）。`blob:sha256:`
   图片引用不由直读器解析；重启后的旧瞬时路径同样无法解析（blob 存储位于已删除的 run root），

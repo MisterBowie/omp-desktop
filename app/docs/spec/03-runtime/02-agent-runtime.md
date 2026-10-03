@@ -2408,11 +2408,18 @@ live file:
   header's identity and format version (versions 2 and 3 are readable; version 1
   predates stable entry ids and unknown versions are refused), applies the
   loader's v2 `hookMessage` → `custom` rename in memory without writing it
-  back, skips malformed records exactly like the native lenient loader, ignores
-  a trailing record without its newline (only complete lines are committed
-  records, so a concurrent native writer is always observed at a line
-  boundary), reports the last physical entry as the leaf, and enforces explicit
-  file and per-record byte bounds.
+  back, reports the last physical entry as the leaf, and enforces explicit file
+  and per-record byte bounds. The tail has two deliberate, tested divergences
+  from the native loader's leniency, because the desktop contract refuses a
+  damaged transcript instead of presenting it as complete: a record that is not
+  valid JSON — a terminated line or the final unterminated fragment — refuses
+  the read with a typed error instead of being skipped, while a trailing
+  fragment that is complete JSON is read as a record even without its
+  terminating newline (a writer may hold the newline back, and the pinned loader
+  reads such a tail), so a complete last message is never dropped. A torn
+  snapshot (a concurrent writer mid-record) is refused rather than truncated or
+  read as a shorter history, and the same read succeeds once the writer commits;
+  the reader never rewrites, truncates or "repairs" the file it reads.
 
 The read executes no prompt and no tool, issues no provider request and requires
 no provider credential of any kind. A missing, foreign, half-written,

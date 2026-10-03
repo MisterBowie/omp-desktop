@@ -25,13 +25,19 @@
  *   - Version 2 is read with the same in-memory migration the pinned loader
  *     applies (`hookMessage` -> `custom` on message entries). Nothing is
  *     written back: the direct reader never mutates its input.
- *   - A record that is not valid JSON is skipped, as the native lenient loader
- *     skips it. A record that parses but is structurally broken is passed
- *     through to `projectOmpHistory`, which refuses the whole read.
- *   - A trailing record without its terminating newline is ignored: it is a
- *     write in flight, not a record the writer has committed. Only complete
- *     lines are records, so a concurrent native writer is always observed at
- *     a line boundary.
+ *   - A record that is not valid JSON is refused (`OMP_HISTORY_INVALID`), not
+ *     skipped. The native loader is lenient and counts such records in
+ *     `malformedRecords`; discarding that signal would turn a damaged journal
+ *     into an apparently complete transcript. A record that parses but is
+ *     structurally broken is passed through to `projectOmpHistory`, which
+ *     refuses the whole read.
+ *   - A trailing fragment that is complete JSON is a record: a writer may
+ *     commit the record and hold back only its terminating newline, and the
+ *     pinned loader reads such a tail. A trailing fragment that is not valid
+ *     JSON is an uncommitted write and refuses the whole read
+ *     (`OMP_HISTORY_INVALID`) instead of being dropped or read as an empty
+ *     transcript; a snapshot taken mid-write may simply be retried once the
+ *     writer commits. A blank tail after the last newline is ignored.
  *   - `leafId` is the last entry's id (the native loader reconstructs the
  *     active branch from the last physical journal entry), or `null` for a
  *     header-only file. The projection validates whatever is passed through.
@@ -145,16 +151,21 @@ export async function readNativeSessionEntries(
   let totalBytes = 0;
   const decoder = new StringDecoder("utf8");
 
-  const consumeLine = (line: string): void => {
+  const consumeLine = (line: string, unterminated = false): void => {
     const trimmed = line.trim();
     if (!trimmed) return;
     let record: unknown;
     try {
       record = JSON.parse(trimmed) as unknown;
     } catch {
-      // The native lenient loader skips malformed records the same way; a
-      // record that parses but is structurally broken is refused downstream.
-      return;
+      // Unlike the lenient native loader (which counts these in
+      // `malformedRecords`), the desktop read refuses the snapshot: a skipped
+      // record would present a damaged journal as a complete transcript.
+      throw invalidTranscript(
+        unterminated
+          ? "the native session file ends with an unterminated record that is not valid JSON; the read was refused so a partial snapshot is never shown as the transcript"
+          : "the native session file contains a record that is not valid JSON; the transcript cannot be read",
+      );
     }
     if (!sawFirstRecord) {
       sawFirstRecord = true;
@@ -235,6 +246,17 @@ export async function readNativeSessionEntries(
         consumeText(decoder.write(chunk as Buffer));
       }
       consumeText(decoder.end());
+      // A trailing fragment that is complete JSON is a committed record even
+      // when the writer has not appended its newline yet (the pinned loader
+      // reads exactly that). Anything else is an uncommitted write and refuses
+      // the read instead of dropping the last record or answering an empty
+      // page; the caller may retry once the writer commits it.
+      if (lineParts.length > 0) {
+        const tail = lineParts.join("");
+        lineParts = [];
+        lineBytes = 0;
+        consumeLine(tail, true);
+      }
     } finally {
       stream.destroy();
     }
@@ -245,8 +267,6 @@ export async function readNativeSessionEntries(
     );
   }
 
-  // A trailing fragment without its newline is an uncommitted write and is
-  // deliberately dropped (see the format contract above).
   if (header === null) {
     throw invalidTranscript("the native session file has no readable session header");
   }

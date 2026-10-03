@@ -16,10 +16,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
  * without one is read from its file *in-process* by the direct reader — no
  * runtime is started for a read, so there is no reader process to own, leak,
  * detach or reclaim. These tests pin the parts a fake runtime can prove
- * deterministically: which path is taken, the identity/format refusals, that
- * every failure surfaces as an error rather than an empty page, and that a
- * failed read leaves the transcript bytes untouched. The real pinned runtime
- * is exercised in `omp-history-e2e.test.mjs`.
+ * deterministically: which path is taken, the identity/format refusals, the
+ * complete-JSON tail without its newline, the damaged or unterminated record
+ * that is refused rather than skipped, that every failure surfaces as an error
+ * rather than an empty page, and that a failed read leaves the transcript
+ * bytes untouched. The real pinned runtime is exercised in
+ * `omp-history-e2e.test.mjs`.
  */
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
@@ -304,6 +306,60 @@ test("a corrupt or unsupported transcript fails closed and is left byte-identica
     (error) => error.errorCode === "OMP_RESTORE_FAILED",
   );
   assert.equal(harness.supervisors.length, 0, "no failure may start a runtime");
+});
+
+test("a complete final record without its newline is shown, and damaged records are refused (R11/R12)", async () => {
+  const harness = readHarness();
+  const { bridge, identity, nativeSessionPath } = harness;
+
+  // R11: the writer's final newline withheld. The last record is complete
+  // JSON, so it must be shown — not dropped as an uncommitted write.
+  const terminated = readFileSync(nativeSessionPath, "utf8");
+  writeFileSync(nativeSessionPath, terminated.replace(/\n$/, ""), "utf8");
+  const noLf = fileSha(nativeSessionPath);
+  const read = await bridge.readHistory(identity);
+  assert.deepEqual(
+    read.messages.map((message) => message.id),
+    ["omp:session-omp:entry:m1", "omp:session-omp:entry:m2", "call-1"],
+    "the complete final record must be visible without its terminating newline",
+  );
+  assert.equal(read.messageCount, 3);
+  assert.equal(fileSha(nativeSessionPath), noLf, "the read must not add the missing newline");
+  assert.equal(harness.supervisors.length, 0);
+
+  // R12: a malformed record is a typed refusal, never a silently shorter
+  // history and never an empty page.
+  writeFileSync(nativeSessionPath, `${terminated}not json at all\n`, "utf8");
+  const malformed = fileSha(nativeSessionPath);
+  await assert.rejects(
+    () => bridge.readHistory(identity),
+    (error) => error.errorCode === "OMP_HISTORY_INVALID" && /record that is not valid JSON/.test(error.message),
+  );
+  assert.equal(fileSha(nativeSessionPath), malformed, "a refused read must not modify the file");
+
+  // R12: a writer mid-record. The incomplete tail is neither read as a
+  // committed record nor silently dropped: the snapshot is refused and the
+  // same read succeeds once the record is committed.
+  const m4 = JSON.stringify({
+    id: "m4",
+    parentId: "m3",
+    type: "message",
+    timestamp: "2026-01-01T00:00:04.000Z",
+    message: { role: "user", content: [{ type: "text", text: "after" }], timestamp: 4 },
+  });
+  writeFileSync(nativeSessionPath, `${terminated}${m4.slice(0, 24)}`, "utf8");
+  const midWrite = fileSha(nativeSessionPath);
+  await assert.rejects(
+    () => bridge.readHistory(identity),
+    (error) => error.errorCode === "OMP_HISTORY_INVALID" && /unterminated record/.test(error.message),
+  );
+  assert.equal(fileSha(nativeSessionPath), midWrite, "a refused read must not truncate or repair the file");
+  writeFileSync(nativeSessionPath, `${m4.slice(24)}\n`, { flag: "a" });
+  const committed = await bridge.readHistory(identity);
+  assert.equal(committed.messageCount, 4);
+  assert.equal(committed.messages.at(-1).id, "omp:session-omp:entry:m4");
+  assert.equal(committed.messages.at(-1).content, "after");
+  assert.equal(harness.supervisors.length, 0, "the whole read path must stay process-free");
 });
 
 test("a read admitted after shutdown is refused, and shutdown never starts a reader", async () => {

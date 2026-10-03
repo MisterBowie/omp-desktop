@@ -29,8 +29,9 @@ import test from "node:test";
  *   6. a reference this build cannot read (wrong identity, missing file,
  *      unsupported version, corrupt entries) fails closed instead of rendering
  *      a different session or an empty page;
- *   7. a concurrent native writer is observed at a line boundary: a trailing
- *      fragment is ignored until its newline commits it.
+ *   7. a writer's tail is never guessed: a complete final record without its
+ *      newline is shown, while a torn record refuses the read — retryable
+ *      after the writer commits — instead of being silently truncated.
  */
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
@@ -254,10 +255,19 @@ test(
       assert.equal(factsAfterReads.sha256, factsBefore.sha256, "the transcript bytes changed during a history read");
       assert.deepEqual(factsAfterReads.directory, factsBefore.directory, "the session directory gained or lost a file");
 
-      // --- 6. concurrent native writer: only committed lines are records ------
-      const partialPath = join(sessionDir, "partial.jsonl");
+      // --- 6. writer tails: a complete final record is shown, a torn one is
+      //         refused and retried at the next commit ------------------------
+      const tailPath = join(sessionDir, "tail.jsonl");
       const committed = readFileSync(nativeSessionPath, "utf8").split("\n").filter((line) => line.length > 0);
-      writeFileSync(partialPath, `${committed.join("\n")}\n`, "utf8");
+      // The writer's own records with the final newline withheld: the last
+      // record is complete JSON, so the transcript must still be complete.
+      writeFileSync(tailPath, committed.join("\n"), "utf8");
+      const tailRead = await writer.readHistory(readRequest(nativeSessionId, tailPath, { projectPath: project }));
+      assert.deepEqual(
+        tailRead.messages.map((message) => message.id),
+        cold.messages.map((message) => message.id),
+        "a complete final record must be visible without its terminating newline",
+      );
       const lastEntryId = JSON.parse(committed.at(-1)).id;
       const appendedEntry = {
         id: "m-after",
@@ -267,17 +277,26 @@ test(
         message: { role: "user", content: [{ type: "text", text: "after the cold read" }], timestamp: 9 },
       };
       const serialized = JSON.stringify(appendedEntry);
-      // The writer is mid-record: only the committed lines may be read.
-      writeFileSync(partialPath, serialized.slice(0, 24), { flag: "a" });
-      const partialRead = await writer.readHistory(readRequest(nativeSessionId, partialPath, { projectPath: project }));
-      assert.equal(
-        partialRead.messageCount,
-        cold.messageCount,
-        "an unterminated trailing write must not be read as a record",
+      // The writer terminates its last line and starts the next record: the
+      // snapshot is refused — never silently truncated to the committed lines
+      // — and the file is left untouched.
+      writeFileSync(tailPath, "\n", { flag: "a" });
+      writeFileSync(tailPath, serialized.slice(0, 24), { flag: "a" });
+      const tornSha = createHash("sha256").update(readFileSync(tailPath)).digest("hex");
+      await assert.rejects(
+        () => writer.readHistory(readRequest(nativeSessionId, tailPath, { projectPath: project })),
+        (error) => error.errorCode === "OMP_HISTORY_INVALID" && /unterminated record/.test(error.message),
+        "an unterminated trailing write must be refused, never read as the committed transcript",
       );
-      // The newline commits the record: now it is visible, with its stable id.
-      writeFileSync(partialPath, `${serialized.slice(24)}\n`, { flag: "a" });
-      const completedRead = await writer.readHistory(readRequest(nativeSessionId, partialPath, { projectPath: project }));
+      assert.equal(
+        createHash("sha256").update(readFileSync(tailPath)).digest("hex"),
+        tornSha,
+        "a refused read must not truncate the torn file",
+      );
+      // The newline commits the record: the retried read sees it, with its
+      // stable id.
+      writeFileSync(tailPath, `${serialized.slice(24)}\n`, { flag: "a" });
+      const completedRead = await writer.readHistory(readRequest(nativeSessionId, tailPath, { projectPath: project }));
       assert.equal(completedRead.messageCount, cold.messageCount + 1);
       assert.equal(completedRead.messages.at(-1).content, "after the cold read");
 
@@ -315,6 +334,21 @@ test(
         (error) => error.errorCode === "OMP_HISTORY_INVALID" && /version 1/.test(error.message),
         "a version 1 journal must be refused explicitly",
       );
+      // A committed line that is not valid JSON: refused explicitly, never
+      // skipped into a shorter but apparently complete transcript.
+      const corruptPath = join(sessionDir, "corrupt.jsonl");
+      writeFileSync(corruptPath, `${committed.join("\n")}\nnot json at all\n`, "utf8");
+      const corruptSha = createHash("sha256").update(readFileSync(corruptPath)).digest("hex");
+      await assert.rejects(
+        () => writer.readHistory(readRequest(nativeSessionId, corruptPath, { projectPath: project })),
+        (error) => error.errorCode === "OMP_HISTORY_INVALID" && /record that is not valid JSON/.test(error.message),
+        "a malformed record must be refused, never skipped",
+      );
+      assert.equal(
+        createHash("sha256").update(readFileSync(corruptPath)).digest("hex"),
+        corruptSha,
+        "a refused read must not modify the damaged file",
+      );
       assert.equal(
         supervisorFactories.length,
         1,
@@ -326,7 +360,7 @@ test(
       assert.equal(factsAfterRefusals.sha256, factsBefore.sha256, "a refused read must not touch the transcript");
       assert.deepEqual(
         factsAfterRefusals.directory.filter((name) => !factsBefore.directory.includes(name)),
-        ["partial.jsonl", "v1.jsonl"],
+        ["corrupt.jsonl", "tail.jsonl", "v1.jsonl"],
         "no read may create a file in the session directory",
       );
 
@@ -340,7 +374,7 @@ test(
       assert.equal(finalFacts.sizeBytes, factsBefore.sizeBytes);
       assert.deepEqual(
         finalFacts.directory.filter((name) => !factsBefore.directory.includes(name)),
-        ["partial.jsonl", "v1.jsonl"],
+        ["corrupt.jsonl", "tail.jsonl", "v1.jsonl"],
         "no read may leave a file behind",
       );
       assert.deepEqual(
