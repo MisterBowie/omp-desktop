@@ -1,0 +1,15 @@
+Already verified BUILD-RECORD.json
+Already verified OMP-Desktop-0.15.2-m6-test-20261015-438b389-darwin-arm64-validation.json.gz
+Already verified OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64-validation.json.gz
+Already verified OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64.AppImage
+Already verified OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64.deb
+Already verified OMP-Desktop-0.15.2-m6-test-20261015-438b389-win32-x64-validation.json.gz
+Already verified OMP-Desktop-0.15.2-m6-test-20261015-438b389-windows-x64-setup.exe
+Already verified SHA256SUMS.txt
+Missing ranges 18; 16 bounded connections; complete received ranges retained.
+Ranges 8/18, new 67.1 MB in 123.5s
+Ranges 16/18, new 134.2 MB in 135.5s
+Ranges 18/18, new 147.9 MB in 144.4s
+Verified OMP-Desktop-0.15.2-m6-test-20261015-438b389-macos-arm64.zip
+Verified OMP-Desktop-0.15.2-m6-test-20261015-438b389-windows-x64-portable.exe
+All twelve assets received and GitHub digest-verified; run full source/CI/record/checksum audit next.

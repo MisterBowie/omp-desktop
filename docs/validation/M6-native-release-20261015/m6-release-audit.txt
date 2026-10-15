@@ -1,0 +1,181 @@
+Verified BUILD-RECORD.json sha256 a6927a063634a1830abcd57f09edd810c7b6acfec6a9c86bd66ac2cdd69eab97
+Verified OMP-Desktop-0.15.2-m6-test-20261015-438b389-darwin-arm64-validation.json.gz sha256 ffa7ab7fb338b8939ede8555bf55749c69193b686a3d5127bff1d938bc62713b
+Verified OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64-validation.json.gz sha256 5159736fafbdbbd5d825fc637cb644fb2eaac352fd7a15b1a349eb3b0d2694da
+Verified OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64.deb sha256 36b567f773444ba8861a4601fc05f68c0dbcbbdada55e04b9caad2b25676cfee
+Verified OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64.AppImage sha256 f7b5dcb1ce8c77374bf9beb99c19ac94921c8b53cc16980ee656f12852a6ba8f
+Verified OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64.rpm sha256 07a7186bb7358b18589fc66c1ca232caf7b0552678995390420c592da0359694
+Verified OMP-Desktop-0.15.2-m6-test-20261015-438b389-macos-arm64.dmg sha256 b243c9752c39d917ba3dae23b53a3f198e890be51406ea215500251eee4bec8d
+Verified OMP-Desktop-0.15.2-m6-test-20261015-438b389-win32-x64-validation.json.gz sha256 31a244614c4bb16fae510c5a9df89f9fa11317cd92afe096976cb46267ab49c8
+Verified OMP-Desktop-0.15.2-m6-test-20261015-438b389-macos-arm64.zip sha256 bc00654aa86dbc4298f0612796e3271fa8a0db82220c47eaa693f4e24a604440
+Verified OMP-Desktop-0.15.2-m6-test-20261015-438b389-windows-x64-portable.exe sha256 24812a665e3ff7638b0edd6b0fcb25477afdae0378dacf8ad1dee5a5353b7892
+Verified SHA256SUMS.txt sha256 e5290b09193aae5593a9ee81a69acf8dc154d3a3da271d758450e292649a5a0e
+Verified OMP-Desktop-0.15.2-m6-test-20261015-438b389-windows-x64-setup.exe sha256 7367103bbc2564c6d5051d4e652e8f196b0c02d25aaec241028595be553c332c
+{
+  "verified": true,
+  "observedAt": "2026-10-15T08:18:33.303040+00:00",
+  "candidate": "438b389620217a551add62ae662c17b2e3562d21",
+  "tag": "m6-test-20261015-438b389",
+  "runId": 38695889572,
+  "runUrl": "https://github.com/MisterBowie/omp-desktop/actions/runs/38695889572",
+  "releaseUrl": "https://github.com/MisterBowie/omp-desktop/releases/tag/m6-test-20261015-438b389",
+  "assets": [
+    {
+      "name": "BUILD-RECORD.json",
+      "bytes": 9518,
+      "sha256": "a6927a063634a1830abcd57f09edd810c7b6acfec6a9c86bd66ac2cdd69eab97",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m6-test-20261015-438b389/BUILD-RECORD.json"
+    },
+    {
+      "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-darwin-arm64-validation.json.gz",
+      "bytes": 404188,
+      "sha256": "ffa7ab7fb338b8939ede8555bf55749c69193b686a3d5127bff1d938bc62713b",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m6-test-20261015-438b389/OMP-Desktop-0.15.2-m6-test-20261015-438b389-darwin-arm64-validation.json.gz"
+    },
+    {
+      "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64-validation.json.gz",
+      "bytes": 392569,
+      "sha256": "5159736fafbdbbd5d825fc637cb644fb2eaac352fd7a15b1a349eb3b0d2694da",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m6-test-20261015-438b389/OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64-validation.json.gz"
+    },
+    {
+      "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64.AppImage",
+      "bytes": 250508963,
+      "sha256": "f7b5dcb1ce8c77374bf9beb99c19ac94921c8b53cc16980ee656f12852a6ba8f",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m6-test-20261015-438b389/OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64.AppImage"
+    },
+    {
+      "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64.deb",
+      "bytes": 208061040,
+      "sha256": "36b567f773444ba8861a4601fc05f68c0dbcbbdada55e04b9caad2b25676cfee",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m6-test-20261015-438b389/OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64.deb"
+    },
+    {
+      "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64.rpm",
+      "bytes": 188635149,
+      "sha256": "07a7186bb7358b18589fc66c1ca232caf7b0552678995390420c592da0359694",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m6-test-20261015-438b389/OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64.rpm"
+    },
+    {
+      "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-macos-arm64.dmg",
+      "bytes": 224617896,
+      "sha256": "b243c9752c39d917ba3dae23b53a3f198e890be51406ea215500251eee4bec8d",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m6-test-20261015-438b389/OMP-Desktop-0.15.2-m6-test-20261015-438b389-macos-arm64.dmg"
+    },
+    {
+      "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-macos-arm64.zip",
+      "bytes": 223436337,
+      "sha256": "bc00654aa86dbc4298f0612796e3271fa8a0db82220c47eaa693f4e24a604440",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m6-test-20261015-438b389/OMP-Desktop-0.15.2-m6-test-20261015-438b389-macos-arm64.zip"
+    },
+    {
+      "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-win32-x64-validation.json.gz",
+      "bytes": 314088,
+      "sha256": "31a244614c4bb16fae510c5a9df89f9fa11317cd92afe096976cb46267ab49c8",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m6-test-20261015-438b389/OMP-Desktop-0.15.2-m6-test-20261015-438b389-win32-x64-validation.json.gz"
+    },
+    {
+      "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-windows-x64-portable.exe",
+      "bytes": 200222084,
+      "sha256": "24812a665e3ff7638b0edd6b0fcb25477afdae0378dacf8ad1dee5a5353b7892",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m6-test-20261015-438b389/OMP-Desktop-0.15.2-m6-test-20261015-438b389-windows-x64-portable.exe"
+    },
+    {
+      "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-windows-x64-setup.exe",
+      "bytes": 200459885,
+      "sha256": "7367103bbc2564c6d5051d4e652e8f196b0c02d25aaec241028595be553c332c",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m6-test-20261015-438b389/OMP-Desktop-0.15.2-m6-test-20261015-438b389-windows-x64-setup.exe"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "bytes": 1316,
+      "sha256": "e5290b09193aae5593a9ee81a69acf8dc154d3a3da271d758450e292649a5a0e",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m6-test-20261015-438b389/SHA256SUMS.txt"
+    }
+  ],
+  "installedProofs": [
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "steps": [
+        "project",
+        "deny",
+        "allowOnce",
+        "projectTest",
+        "stopTree",
+        "recoveryNoReplay",
+        "freshTurn",
+        "defaultIsolation"
+      ],
+      "quits": 2,
+      "remainingOwnedProcesses": 0,
+      "historyBytes": 11629,
+      "proof": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-darwin-arm64-validation.json.gz"
+    },
+    {
+      "platform": "linux",
+      "arch": "x64",
+      "steps": [
+        "project",
+        "deny",
+        "allowOnce",
+        "projectTest",
+        "stopTree",
+        "recoveryNoReplay",
+        "freshTurn",
+        "defaultIsolation"
+      ],
+      "quits": 2,
+      "remainingOwnedProcesses": 0,
+      "historyBytes": 10987,
+      "proof": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64-validation.json.gz"
+    },
+    {
+      "platform": "win32",
+      "arch": "x64",
+      "steps": [
+        "project",
+        "deny",
+        "allowOnce",
+        "projectTest",
+        "stopTree",
+        "recoveryNoReplay",
+        "freshTurn",
+        "defaultIsolation"
+      ],
+      "quits": 2,
+      "remainingOwnedProcesses": 0,
+      "historyBytes": 11657,
+      "proof": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-win32-x64-validation.json.gz"
+    }
+  ],
+  "platforms": [
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "counts": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "platform": "linux",
+      "arch": "x64",
+      "counts": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "platform": "win32",
+      "arch": "x64",
+      "counts": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      }
+    }
+  ],
+  "scope": "Actual native M6 test-package release. Records checked against source/CI and every public asset downloaded/hash checked; installed Electron workflows/M6/M7 remain."
+}

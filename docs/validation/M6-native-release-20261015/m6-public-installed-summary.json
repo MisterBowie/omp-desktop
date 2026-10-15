@@ -1,0 +1,102 @@
+{
+  "candidate": "438b389620217a551add62ae662c17b2e3562d21",
+  "scope": "raw installed proof reviewed; full payload audit still pending",
+  "platforms": [
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "steps": {
+        "project": true,
+        "deny": true,
+        "allowOnce": true,
+        "projectTest": true,
+        "stopTree": true,
+        "recoveryNoReplay": true,
+        "freshTurn": true,
+        "defaultIsolation": true
+      },
+      "quits": 2,
+      "remainingProcesses": 0,
+      "projectTest": {
+        "answer": 42,
+        "cwd": "/private/var/folders/nj/vtw8zd2j31d1gdrtntc5y4600000gn/T/omp-installed-TJPrPZ/workspace 中文 with spaces 'quoted'",
+        "home": "/private/var/folders/nj/vtw8zd2j31d1gdrtntc5y4600000gn/T/omp-installed-TJPrPZ/home/.omp-desktop/omp-runtime/run-iFj1Pc/home",
+        "PATH": "/private/var/folders/nj/vtw8zd2j31d1gdrtntc5y4600000gn/T/omp-installed-TJPrPZ/home/.bun/bin:/usr/local/bin:/usr/bin:/bin",
+        "USERPROFILE": null
+      },
+      "closedHistoryBytes": 11629,
+      "nativeWriteCalls": 2,
+      "nativeWriteResults": 2,
+      "deniedWriteResults": 1,
+      "regression": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "platform": "linux",
+      "arch": "x64",
+      "steps": {
+        "project": true,
+        "deny": true,
+        "allowOnce": true,
+        "projectTest": true,
+        "stopTree": true,
+        "recoveryNoReplay": true,
+        "freshTurn": true,
+        "defaultIsolation": true
+      },
+      "quits": 2,
+      "remainingProcesses": 0,
+      "projectTest": {
+        "answer": 42,
+        "cwd": "/tmp/omp-installed-h0unw8/workspace 中文 with spaces 'quoted'",
+        "home": "/tmp/omp-installed-h0unw8/home/.omp-desktop/omp-runtime/run-XD2Dcl/home",
+        "PATH": "/tmp/omp-installed-h0unw8/home/.bun/bin:/usr/local/bin:/usr/bin:/bin",
+        "USERPROFILE": null
+      },
+      "closedHistoryBytes": 10987,
+      "nativeWriteCalls": 2,
+      "nativeWriteResults": 2,
+      "deniedWriteResults": 1,
+      "regression": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "platform": "win32",
+      "arch": "x64",
+      "steps": {
+        "project": true,
+        "deny": true,
+        "allowOnce": true,
+        "projectTest": true,
+        "stopTree": true,
+        "recoveryNoReplay": true,
+        "freshTurn": true,
+        "defaultIsolation": true
+      },
+      "quits": 2,
+      "remainingProcesses": 0,
+      "projectTest": {
+        "answer": 42,
+        "cwd": "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\omp-installed-B5tHpM\\workspace 中文 with spaces 'quoted'",
+        "home": "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\omp-installed-B5tHpM\\home\\.omp-desktop\\omp-runtime\\run-DI3FRb\\home",
+        "PATH": "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\omp-installed-B5tHpM\\home\\.bun\\bin;C:\\Windows\\System32;C:\\Windows;C:\\Program Files\\Git\\cmd;C:\\Program Files\\Git\\bin;C:\\Program Files\\Git\\usr\\bin",
+        "USERPROFILE": "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\omp-installed-B5tHpM\\home\\.omp-desktop\\omp-runtime\\run-DI3FRb\\home"
+      },
+      "closedHistoryBytes": 11657,
+      "nativeWriteCalls": 2,
+      "nativeWriteResults": 2,
+      "deniedWriteResults": 1,
+      "regression": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      }
+    }
+  ]
+}

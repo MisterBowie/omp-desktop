@@ -1,0 +1,70 @@
+{
+  "candidate": "438b389620217a551add62ae662c17b2e3562d21",
+  "tag": "m6-test-20261015-438b389",
+  "verified": true,
+  "proofs": [
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "installed": {
+        "verified": true,
+        "steps": {
+          "project": true,
+          "deny": true,
+          "allowOnce": true,
+          "projectTest": true,
+          "stopTree": true,
+          "recoveryNoReplay": true,
+          "freshTurn": true,
+          "defaultIsolation": true
+        },
+        "reportSha256": "ddd680b2869bcec16be719e17826fbd90b2dd934133d8421a26b3e2aefddc98b",
+        "installerSha256": "b243c9752c39d917ba3dae23b53a3f198e890be51406ea215500251eee4bec8d",
+        "nativeFolderChooserCovered": false,
+        "nativeQuitConfirmationCovered": false
+      }
+    },
+    {
+      "platform": "linux",
+      "arch": "x64",
+      "installed": {
+        "verified": true,
+        "steps": {
+          "project": true,
+          "deny": true,
+          "allowOnce": true,
+          "projectTest": true,
+          "stopTree": true,
+          "recoveryNoReplay": true,
+          "freshTurn": true,
+          "defaultIsolation": true
+        },
+        "reportSha256": "cf972f51808c6b4ed8e142ce78b748af6acfc607008a56d0268a71ac7330d006",
+        "installerSha256": "f7b5dcb1ce8c77374bf9beb99c19ac94921c8b53cc16980ee656f12852a6ba8f",
+        "nativeFolderChooserCovered": false,
+        "nativeQuitConfirmationCovered": false
+      }
+    },
+    {
+      "platform": "win32",
+      "arch": "x64",
+      "installed": {
+        "verified": true,
+        "steps": {
+          "project": true,
+          "deny": true,
+          "allowOnce": true,
+          "projectTest": true,
+          "stopTree": true,
+          "recoveryNoReplay": true,
+          "freshTurn": true,
+          "defaultIsolation": true
+        },
+        "reportSha256": "4bdd59f4760a9242bfcd470f4ec69d5c55772cee2a852686bea92ab56b1db8db",
+        "installerSha256": "7367103bbc2564c6d5051d4e652e8f196b0c02d25aaec241028595be553c332c",
+        "nativeFolderChooserCovered": false,
+        "nativeQuitConfirmationCovered": false
+      }
+    }
+  ]
+}

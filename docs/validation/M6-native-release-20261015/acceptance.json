@@ -1,0 +1,84 @@
+{
+  "status": "M6 accepted; full M7/T24 still required",
+  "candidate": "438b389620217a551add62ae662c17b2e3562d21",
+  "tag": "m6-test-20261015-438b389",
+  "runId": 38695889572,
+  "releaseUrl": "https://github.com/MisterBowie/omp-desktop/releases/tag/m6-test-20261015-438b389",
+  "assets": 12,
+  "assetBytes": 1497063033,
+  "nativeJobs": [
+    {
+      "name": "Bind the run to the reviewed tag",
+      "id": 116292247253,
+      "conclusion": "success"
+    },
+    {
+      "name": "Native environment macos-15",
+      "id": 116292305409,
+      "conclusion": "success"
+    },
+    {
+      "name": "Native environment ubuntu-22.04",
+      "id": 116292305591,
+      "conclusion": "success"
+    },
+    {
+      "name": "Native environment windows-latest",
+      "id": 116292305624,
+      "conclusion": "success"
+    },
+    {
+      "name": "Package Linux x64",
+      "id": 116292614294,
+      "conclusion": "success"
+    },
+    {
+      "name": "Package Windows x64",
+      "id": 116292614311,
+      "conclusion": "success"
+    },
+    {
+      "name": "Package macOS arm64",
+      "id": 116292614407,
+      "conclusion": "success"
+    },
+    {
+      "name": "Publish the test prerelease",
+      "id": 116307754721,
+      "conclusion": "success"
+    }
+  ],
+  "rootMac": {
+    "version": "macOS 13.4",
+    "arch": "arm64",
+    "actualPublicDmg": {
+      "path": "/Users/vv/Documents/对话/omp-local-m6-review-20261015/release-download/OMP-Desktop-0.15.2-m6-test-20261015-438b389-macos-arm64.dmg",
+      "bytes": 224617896,
+      "sha256": "b243c9752c39d917ba3dae23b53a3f198e890be51406ea215500251eee4bec8d"
+    },
+    "steps": {
+      "project": true,
+      "deny": true,
+      "allowOnce": true,
+      "projectTest": true,
+      "stopTree": true,
+      "recoveryNoReplay": true,
+      "freshTurn": true,
+      "defaultIsolation": true
+    },
+    "cleaned": true
+  },
+  "boundaries": [
+    "unsigned and not notarized test prerelease",
+    "loopback FakeProvider only; no paid model invocation",
+    "native folder chooser and native quit confirmation are not covered",
+    "Linux AppImage extraction is tested; DEB/RPM registration is not",
+    "Windows Bash requires Git for Windows per the PI upstream contract",
+    "whole-GUI kernel offline test unsupported on this Mac because of Chromium nested sandbox; rejecting-proxy GUI test and kernel-denied runtime test are separate successful proofs"
+  ],
+  "auditNotes": [
+    "Download resumed only missing ranges after transient network errors; every final full asset digest verified.",
+    "Public BUILD-RECORD intentionally omits internal sourceName. The independent validator reconstructs it from controlled PLATFORM_PAYLOADS and then validates raw proofs. The first incorrect validator invocation was not a product failure.",
+    "Raw audit stdout and early installed summary retain earlier scope prose. Final m6-release-audit.json supersedes that prose; executed audit assertions and verified results were not changed."
+  ]
+}
