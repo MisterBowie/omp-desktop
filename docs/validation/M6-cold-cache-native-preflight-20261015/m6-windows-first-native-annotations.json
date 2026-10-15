@@ -1,0 +1,26 @@
+[
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/f6dba8b724cac19f4040ec871bd325dbc7ea7f60/.github",
+    "start_line": 50,
+    "start_column": null,
+    "end_line": 50,
+    "end_column": null,
+    "annotation_level": "failure",
+    "title": "",
+    "message": "Process completed with exit code 1.",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/f6dba8b724cac19f4040ec871bd325dbc7ea7f60/.github",
+    "start_line": 49,
+    "start_column": null,
+    "end_line": 49,
+    "end_column": null,
+    "annotation_level": "failure",
+    "title": "Native installed workflow",
+    "message": "{\"platform\":\"win32\",\"arch\":\"x64\",\"sourceRevision\":\"f6dba8b724cac19f4040ec871bd325dbc7ea7f60\",\"failure\":\"Error: \\\"out/renderer/index.html\\\" was not found in this archive\\n    at Filesystem.getFile (D:\\\\a\\\\omp-desktop\\\\omp-desktop\\\\app\\\\node_modules\\\\.pnpm\\\\@electron+asar@3.4.1\\\\node_modules\\\\@electron\\\\asar\\\\lib\\\\filesystem.js:187:19)\\n    at extractFile (D:\\\\a\\\\omp-desktop\\\\omp-desktop\\\\app\\\\node_modules\\\\.pnpm\\\\@electron+asar@3.4.1\\\\node_modules\\\\@electron\\\\asar\\\\lib\\\\asar.js:256:33)\\n    at inspectInstalledProduct (file:///D:/a/omp-desktop/omp-desktop/app/scripts/e2e/installed-product.mjs:118:16)\\n    at InstalledApplication.prepare (file:///D:/a/omp-desktop/omp-desktop/app/scripts/e2e/installed-application.mjs:70:21)\\n    at file:///D:/a/omp-desktop/omp-desktop/app/scripts/e2e-installed-smoke.mjs:22:38\\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\\n    at async node:internal/modules/esm/loader:647:26\\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\"}",
+    "raw_details": ""
+  }
+]

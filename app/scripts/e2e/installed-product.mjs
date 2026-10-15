@@ -115,7 +115,7 @@ export function inspectInstalledProduct(appDirectory, platform = process.platfor
   assert.equal(metadata.name, expected.build.extraMetadata.name, "installed package identity is not OMP's own");
   assert.equal(metadata.version, expected.version);
   assert.equal(metadata.homepage, expected.homepage);
-  const html = extractFile(archive, "out/renderer/index.html").toString("utf8");
+  const html = extractFile(archive, join("out", "renderer", "index.html")).toString("utf8");
   assert(html.includes("<title>OMP Desktop</title>"), "installed renderer title is stale");
   const update = parseYaml(readFileSync(join(paths.resources, "app-update.yml"), "utf8"));
   const source = expected.build.publish[0];

@@ -1,0 +1,1 @@
+{"verified":true,"platform":"darwin","arch":"arm64","package":{"name":"omp-desktop","version":"0.15.2","homepage":"https://github.com/MisterBowie/omp-desktop"},"components":915,"noticeSha256":"3f571d5d5fcc0c353f44811a98dd8253d5c466e1a2b7b5d778198b30b60c871a"}

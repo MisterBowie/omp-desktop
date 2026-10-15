@@ -131,9 +131,27 @@ jobs:
             console.log(`product ${version}, patch level ${manifest.patchLevel}, fork ${manifest.fork.commit}`);
           '
 
+  probe:
+    name: Native environment ${{ matrix.os }}
+    needs: guard
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Verify native runtime HOME and PATH before expensive builds
+        if: needs.guard.outputs.milestone == '6'
+        run: node app/scripts/verify-native-isolation.mjs
+
   build:
     name: Package ${{ matrix.name }}
-    needs: guard
+    needs: [guard, probe]
     strategy:
       fail-fast: false
       matrix:
@@ -309,8 +327,8 @@ jobs:
         run: |
           set -euo pipefail
           # `--locked` fails on a drifted Cargo.lock instead of silently
-          # rewriting it; the desktop dist step's own (unlocked) build then
-          # reuses this one.
+          # rewriting it; the desktop dist step's locked build then reuses it
+          # and fetches the complete metadata source graph for offline notices.
           cargo build --release --locked -p host-core &
           host_build_pid=$!
           trap 'kill "$host_build_pid" 2>/dev/null || true' EXIT
@@ -331,7 +349,15 @@ jobs:
         # end of the script command line, which is the release entry, and that
         # entry refuses a literal `--` because electron-builder must see the
         # whole command line (run 37133058318 failed on `-- --x64`, exit 2).
-        run: pnpm --filter @pi-desktop/desktop run ${{ matrix.dist }} --${{ matrix.arch }}
+        run: |
+          set +e
+          pnpm --filter @pi-desktop/desktop run ${{ matrix.dist }} --${{ matrix.arch }} 2>&1 | tee "$RUNNER_TEMP/omp-package.log"
+          package_status=${PIPESTATUS[0]}
+          set -e
+          if [[ "$package_status" != 0 ]]; then
+            node --input-type=module -e 'import {readFileSync} from "node:fs"; import {join} from "node:path"; const tail=readFileSync(join(process.env.RUNNER_TEMP,"omp-package.log"),"utf8").slice(-8000).replaceAll("%","%25").replaceAll("\r","%0D").replaceAll("\n","%0A"); console.log(`::error title=Native package build::${tail}`);'
+          fi
+          exit "$package_status"
 
       - name: Verify the Linux host-core glibc floor
         if: matrix.platform == 'linux'

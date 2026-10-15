@@ -1,5 +1,11 @@
 # 执行任务看板
 
+2026-10-15 M6：首个三平台候选 run38684841320 失败、未发布。Windows 在安装
+ASAR 观察器处失败，Mac/Linux 打包失败。冷 Cargo 缓存缺口已本机复现并修复，
+ASAR 使用原生路径；新增三平台 HOME/PATH 预检，后续原生验证待跑。见
+`validation/M6-cold-cache-native-preflight-20261015.md`。T21–T23/M6 继续进行，
+完整 M7/T24 尚未开始；旧 run/tag 保留。
+
 2026-10-15 M6 原生候选已触发：`m6-test-20261015-f6dba8b7` / run38684841320，三平台构建运行中；发布门定向回归49/49、实际本机包内15/15与8项安装流程通过。另完成真实 PI-Desktop 0.15.0 与 OMP 同 HOME 并存、配置分离及 OMP 退出/重启不影响 PI 的原生验证，最终双方零残留，见 `M6-pi-coexistence-macos-20261015`。完整 M6 仍待三平台结果和公开资产回读；M7/T24 未开始。
 
 2026-10-15 M6 本机安装验收补充：产品构建 `de691ca`、验收脚本 `44da48e` 的真实 macOS arm64 DMG 流程已通过：默认 `.omp-desktop` 目录、预置 PI/OMP 配置隔离、实际拒绝/批准一次/项目测试/三级子进程停止、正常退出/无重放恢复/新回合、最终自有进程为零。原始证据 `docs/validation/M6-installed-macos-local-20261015.md`。T22 继续进行中，T23 原生 Windows/Linux 与完整 M6 三平台交付尚未完成；随后仍需完整 M7/T24 和三平台包。

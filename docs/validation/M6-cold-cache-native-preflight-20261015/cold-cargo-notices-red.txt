@@ -1,0 +1,11 @@
+Error: Rust notice metadata unavailable: error: failed to download `fastrand v2.5.0`
+
+Caused by:
+  attempting to make an HTTP request, but --offline was specified
+    at cargoDependencies (file:///Users/vv/Documents/%E5%AF%B9%E8%AF%9D/omp-desktop-local-m6/app/scripts/distribution-notices.mjs:89:11)
+    at writeDistributionNotices (file:///Users/vv/Documents/%E5%AF%B9%E8%AF%9D/omp-desktop-local-m6/app/scripts/distribution-notices.mjs:128:23)
+    at file:///Users/vv/Documents/%E5%AF%B9%E8%AF%9D/omp-desktop-local-m6/app/[eval1]:1:108
+    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:268:26)
+    at async ModuleLoader.executeModuleJob (node:internal/modules/esm/loader:265:20)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)

@@ -1,0 +1,31 @@
+TAP version 13
+# Subtest: the real release host command prepares cold-cache notices without changing Cargo.lock
+not ok 1 - the real release host command prepares cold-cache notices without changing Cargo.lock
+  ---
+  duration_ms: 751.259459
+  type: 'test'
+  location: '/Users/vv/Documents/对话/omp-desktop-local-m6/app/apps/desktop/test/distribution-notices-cold-cargo.test.mjs:17:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Rust notice metadata unavailable: error: failed to download `notice-dev v1.0.0`
+    
+    Caused by:
+      attempting to make an HTTP request, but --offline was specified
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    cargoDependencies (file:///Users/vv/Documents/%E5%AF%B9%E8%AF%9D/omp-desktop-local-m6/app/scripts/distribution-notices.mjs:89:11)
+    writeDistributionNotices (file:///Users/vv/Documents/%E5%AF%B9%E8%AF%9D/omp-desktop-local-m6/app/scripts/distribution-notices.mjs:128:23)
+    TestContext.<anonymous> (file:///Users/vv/Documents/%E5%AF%B9%E8%AF%9D/omp-desktop-local-m6/app/apps/desktop/test/distribution-notices-cold-cargo.test.mjs:91:18)
+    process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    async Test.run (node:internal/test_runner/test:1125:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 829.142958

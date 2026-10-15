@@ -1,0 +1,37 @@
+{
+  "baseRevision": "ed53adb",
+  "firstNativeCandidate": "f6dba8b724cac19f4040ec871bd325dbc7ea7f60",
+  "firstNativeRun": 38684841320,
+  "firstNativeResult": "guard success; Windows installed observer failed; macOS/Linux packaging failed; publish skipped",
+  "coldCacheReproduction": {
+    "releaseBuild": "exit 0, fresh owned Cargo home and target",
+    "noticesBeforeFetch": "exit 1, offline missing fastrand 2.5.0",
+    "lockedFetch": "completed, no lockfile change",
+    "noticesAfterFetch": {
+      "components": 915,
+      "files": 968,
+      "bytes": 2849500
+    }
+  },
+  "tests": {
+    "coldCargoAndIdentity": {
+      "pass": 6,
+      "fail": 0,
+      "skip": 0
+    },
+    "releaseAndObservation": {
+      "pass": 42,
+      "fail": 0,
+      "skip": 0
+    },
+    "workflow": {
+      "pass": 10,
+      "fail": 0,
+      "skip": 0
+    }
+  },
+  "cargoLockSha256": "1b64271b4c1e8ef9cb078a702dc05db372cf285bb09c40eafbb67150aa6e88e9",
+  "nativeWindowsHomePath": "pending new native probe; not simulated as a pass",
+  "fullM6Complete": false,
+  "fullM7Complete": false
+}

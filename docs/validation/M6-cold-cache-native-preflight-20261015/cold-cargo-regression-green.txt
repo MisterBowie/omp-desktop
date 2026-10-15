@@ -1,0 +1,50 @@
+TAP version 13
+# Subtest: the real release host command prepares cold-cache notices without changing Cargo.lock
+ok 1 - the real release host command prepares cold-cache notices without changing Cargo.lock
+  ---
+  duration_ms: 976.298833
+  type: 'test'
+  ...
+# Subtest: published notice bytes survive collection and repeated builds exactly
+ok 2 - published notice bytes survive collection and repeated builds exactly
+  ---
+  duration_ms: 11.090625
+  type: 'test'
+  ...
+# Subtest: a linked notice outside its package is refused before output is written
+ok 3 - a linked notice outside its package is refused before output is written
+  ---
+  duration_ms: 2.698125
+  type: 'test'
+  ...
+# Subtest: different notices under the same published package identity are refused
+ok 4 - different notices under the same published package identity are refused
+  ---
+  duration_ms: 6.89875
+  type: 'test'
+  ...
+# Subtest: an unlocked stale cache is neither collected nor traversed
+ok 5 - an unlocked stale cache is neither collected nor traversed
+  ---
+  duration_ms: 4.100875
+  type: 'test'
+  ...
+#   • 
+# electron-builder  version=26.15.3 os=22.5.0
+#   • 
+# loaded configuration  file=package.json ("build" field)
+# Subtest: installed metadata gives OMP its own updater cache through the real builder
+ok 6 - installed metadata gives OMP its own updater cache through the real builder
+  ---
+  duration_ms: 299.468292
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1216.294708

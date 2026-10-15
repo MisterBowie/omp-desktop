@@ -34,6 +34,12 @@ dependencies are included and identified as such in the scope statement; their
 presence does not imply that every listed package is distributed. Electron's
 own license/Chromium notices remain in its framework distribution.
 
+`build:host-release` first runs `cargo fetch --locked`, then the locked host
+release build. Cargo's offline metadata also resolves development and other
+target manifests that a native release build alone need not download. A cold
+build cache must therefore be prepared from the full lockfile before notice
+collection. The collector remains offline and never repairs or rewrites locks.
+
 Package acceptance must inspect actual installed metadata, update configuration,
 icons and notice resources, then exercise the real renderer/host/bundled-runtime
 workflow in owned data directories. Configuration and artwork checks alone do

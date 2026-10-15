@@ -2,6 +2,12 @@
 
 ## 当前执行状态（2026-10-15，本机恢复，M5交付已接受）
 
+M6 首个原生候选 run38684841320 已终止且未通过：Windows 安装 ASAR 观察器路径错误，
+Mac/Linux 打包失败，发布 skipped。已在本机冷 Cargo 缓存复现并修复声明准备缺口，
+修正 ASAR 原生路径，并新增耗时构建前的三平台 HOME/PATH 检查。证据
+`docs/validation/M6-cold-cache-native-preflight-20261015.md`。旧 tag/run 保留；
+本节以下“仍在构建”的旧状态不再适用，M6 未接受，接着重跑原生验证。
+
 Mac 默认 profile 补充：`M6-default-profile-macos-20261015` 已实际证明，在安全确认原生 appData 属于自有 HOME 后，不传 profile/data 覆盖参数，M6 包仍选 `Library/Application Support/OMP Desktop` 与 `.omp-desktop`，两次退出均零残留。三平台候选 run38684841320 仍在原生构建，不因本地补证据而移动 tag。
 
 M6 当前受控三平台候选为 `m6-test-20261015-f6dba8b7`（源码 f6dba8b7，run38684841320），已推送专用分支、原生 CI 运行中。完整 M6 尚未接受。构建期间另完成实际 PI-Desktop 0.15.0 与 M6 OMP 的本机并存：同一自有 HOME、独立 profile/data、提供方不串、OMP 退出/重启不影响同一个 PI 进程，最后双方零残留；详见 `docs/validation/M6-pi-coexistence-macos-20261015.md`。未启动/修改用户原应用与真实配置。

@@ -22,7 +22,7 @@
     "test": "node --test test/*.test.mjs",
     "lint": "node ../../scripts/check-style-tokens.mjs",
     "clean": "node -e \"fs.rmSync('out',{recursive:true,force:true});fs.rmSync('dist',{recursive:true,force:true})\"",
-    "build:host-release": "cargo build --release --manifest-path ../../Cargo.toml -p host-core",
+    "build:host-release": "cargo fetch --locked --manifest-path ../../Cargo.toml && cargo build --release --locked --manifest-path ../../Cargo.toml -p host-core",
     "bundle:runtime": "pnpm -C ../../packages/agent-runtime bundle",
     "build:sidecar": "node ../../scripts/omp-sidecar.mjs --build",
     "verify:sidecar": "node ../../scripts/omp-sidecar.mjs --preflight",

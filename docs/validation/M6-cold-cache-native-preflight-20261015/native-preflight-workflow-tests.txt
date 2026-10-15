@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: native environment probes gate all expensive builds and preserve diagnostic failures
+ok 1 - native environment probes gate all expensive builds and preserve diagnostic failures
+  ---
+  duration_ms: 3.281375
+  type: 'test'
+  ...
+# Subtest: the packaging lane runs from controlled M5/M6 test tags only
+ok 2 - the packaging lane runs from controlled M5/M6 test tags only
+  ---
+  duration_ms: 1.09875
+  type: 'test'
+  ...
+# Subtest: the matrix is the three native platforms with asserted architectures
+ok 3 - the matrix is the three native platforms with asserted architectures
+  ---
+  duration_ms: 1.272667
+  type: 'test'
+  ...
+# Subtest: every build lane prepares the pinned fork and the two toolchains
+ok 4 - every build lane prepares the pinned fork and the two toolchains
+  ---
+  duration_ms: 1.396541
+  type: 'test'
+  ...
+# Subtest: every build lane packages through the product entry with publish disabled
+ok 5 - every build lane packages through the product entry with publish disabled
+  ---
+  duration_ms: 1.086208
+  type: 'test'
+  ...
+# Subtest: the packaging invocation reaches the production parser for each matrix target
+ok 6 - the packaging invocation reaches the production parser for each matrix target
+  ---
+  duration_ms: 4378.72275
+  type: 'test'
+  ...
+# Subtest: the packaged Resources are verified in isolation and then exercised in-package
+ok 7 - the packaged Resources are verified in isolation and then exercised in-package
+  ---
+  duration_ms: 0.925292
+  type: 'test'
+  ...
+# Subtest: a refused package fails the lane and its diagnosis stays uploadable
+ok 8 - a refused package fails the lane and its diagnosis stays uploadable
+  ---
+  duration_ms: 0.708917
+  type: 'test'
+  ...
+# Subtest: the release is one prerelease gated on all three platforms
+ok 9 - the release is one prerelease gated on all three platforms
+  ---
+  duration_ms: 0.923083
+  type: 'test'
+  ...
+# Subtest: M6 adds native installed acceptance without weakening or broadening the M5 lane
+ok 10 - M6 adds native installed acceptance without weakening or broadening the M5 lane
+  ---
+  duration_ms: 1.140625
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4435.433083

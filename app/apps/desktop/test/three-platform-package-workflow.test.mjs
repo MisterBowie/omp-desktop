@@ -97,6 +97,20 @@ function job(source, name) {
   return block.join("\n");
 }
 
+test("native environment probes gate all expensive builds and preserve diagnostic failures", async (t) => {
+  const source = await workflowSource(t);
+  if (!source) return;
+  const probe = job(source, "probe");
+  assert.match(probe, /needs: guard/);
+  assert.match(probe, /os: \[macos-15, windows-latest, ubuntu-22.04\]/);
+  assert.match(probe, /if: needs\.guard\.outputs\.milestone == '6'\n\s+run: node app\/scripts\/verify-native-isolation\.mjs/);
+  const build = job(source, "build");
+  assert.match(build, /needs: \[guard, probe\]/);
+  assert.match(build, /package_status=\$\{PIPESTATUS\[0\]\}/);
+  assert.match(build, /exit "\$package_status"/);
+  assert.match(build, /::error title=Native package build::/);
+});
+
 test("the packaging lane runs from controlled M5/M6 test tags only", async (t) => {
   const source = await workflowSource(t);
   if (!source) return;
@@ -192,7 +206,7 @@ test("every build lane packages through the product entry with publish disabled"
 
   assert.match(
     build,
-    /working-directory: app\n[\s\S]{0,900}?run: pnpm --filter @pi-desktop\/desktop run \$\{\{ matrix\.dist \}\} --\$\{\{ matrix\.arch \}\}/,
+    /working-directory: app\n[\s\S]{0,900}?run: \|\n\s+set \+e\n\s+pnpm --filter @pi-desktop\/desktop run \$\{\{ matrix\.dist \}\} --\$\{\{ matrix\.arch \}\}/,
     "the packaging step must run the product dist script from app/ and pass the matrix architecture directly",
   );
   // A standalone `--` would be forwarded by pnpm to the release entry, which
@@ -258,7 +272,7 @@ test("the packaging invocation reaches the production parser for each matrix tar
     "the fixture must cover exactly this matrix: macOS arm64, Windows x64, Linux x64",
   );
 
-  const template = build.match(/^\s+run: (pnpm --filter @pi-desktop\/desktop run \$\{\{ matrix\.dist \}\}.*)$/m)?.[1];
+  const template = build.match(/^\s+(pnpm --filter @pi-desktop\/desktop run \$\{\{ matrix\.dist \}\}.*?) 2>&1 \| tee /m)?.[1];
   assert.ok(template, "the packaging step must run the product dist script through pnpm");
 
   const parserUrl = new URL("../../../scripts/release-package.mjs", import.meta.url);
