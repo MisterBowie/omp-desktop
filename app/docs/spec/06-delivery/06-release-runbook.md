@@ -46,14 +46,14 @@ workflow in owned data directories. Configuration and artwork checks alone do
 not close M6. Test prereleases remain unsigned and do not publish update feeds;
 Developer ID/notarization is qualified only when those signing steps really run.
 
-### Controlled M5/M6 test-package lane
+### Controlled M5/M6/M7 test-package lane
 
 The repository-root `three-platform-test-packages.yml` accepts only reviewed
-`m5-test-*` and `m6-test-*` tag pushes. A branch push, arbitrary tag, manual
-dispatch or unqualified M7 tag cannot publish. The tag's peeled commit must
+`m5-test-*`, `m6-test-*` and `m7-test-*` tag pushes. A branch push, arbitrary tag
+or manual dispatch cannot publish. The tag's peeled commit must
 equal the run revision. All three native build jobs must succeed before the
 single prerelease job writes anything; M5's packaged runtime and Plan/Goal
-acceptance remain mandatory for both stages.
+acceptance remain mandatory for all three stages.
 
 M6 additionally runs `scripts/e2e-installed-smoke.mjs` against the actual DMG,
 NSIS installer or AppImage. The native process observer pins psutil 7.2.2;
@@ -82,6 +82,25 @@ release are untouched. Native chooser/quit confirmation dialogs, OS shortcut
 registration, signing/notarization and paid-provider compatibility are outside
 this automated proof. Full M7 maintenance/upgrade/rollback acceptance remains a
 separate stage with its own release gates.
+
+## M7 native maintenance release gates
+
+M7 retains the M6 installed workflow and M5 strict packaged Plan/Goal gates.
+Every native platform also runs daily maintenance and the fixed old/new/backup-
+restore/old installer rehearsal. The baseline is the exact public M6 asset in
+its controlled JSON record; verify name, bytes and digest before installation,
+never resolve latest. Copy closed profile/data trees with file inventories.
+The inspector invalidates the cached ASAR header before same-path replacement.
+All three actual versions must quit normally with zero owned survivors.
+
+Staging requires both `--maintenance-report` and `--upgrade-report`. Missing raw
+maintenance proof refuses M7 publication. Public `*-maintenance.json.gz` assets
+retain screenshots, native histories, HTTP failure/recovery, forty-turn counts,
+overlapping concurrent tool timestamps, and backup/restoration inventories.
+Assembly reopens these raw files and verifies their bindings and summaries.
+This qualifies manual rollback with the same pinned OMP/schema, not automatic
+update delivery or arbitrary schema downgrades. Existing native-dialog,
+OS-registration and signing limits remain explicit.
 
 ## 1. Build lanes
 

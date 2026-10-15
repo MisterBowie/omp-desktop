@@ -1,0 +1,31 @@
+{
+  "scope": "macOS 13.4 arm64; installed local DMG; loopback deterministic model; 40 UI roundtrips. Electron working-set sums can double-count shared pages and exclude external OMP/host processes. Not a portable benchmark or system peak RSS.",
+  "turns": 40,
+  "turnLatencyMs": {
+    "min": 220,
+    "median": 225.0,
+    "max": 244
+  },
+  "electronSamples": [
+    {
+      "label": "ready",
+      "processes": 7,
+      "workingSetKiBSum": 796368
+    },
+    {
+      "label": "both projects active",
+      "processes": 7,
+      "workingSetKiBSum": 849136
+    },
+    {
+      "label": "after 40 turns",
+      "processes": 7,
+      "workingSetKiBSum": 1010144
+    },
+    {
+      "label": "reopened",
+      "processes": 7,
+      "workingSetKiBSum": 928512
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+# OMP Desktop 发布与维护检查单
+
+当前阶段：M7/T24；最终接受须同时满足本表和三平台实际发布回读。M6 的最终基线为
+`438b389620217a551add62ae662c17b2e3562d21` / `m6-test-20261015-438b389`。
+
+| 检查 | 准入要求 |
+| --- | --- |
+| 源码 | 当前专用分支包含最新 origin/main；固定 PI/OMP 子模块，普通提交；精确 tag 与 run revision 一致 |
+| 运行时 | 生产 dist 入口；受控 fork、patch、Bun与来源清单；缺 gate、错误版本/架构/摘要必须拒绝 |
+| 原有契约 | 每平台真实包内 Plan/Goal 15/15、0 fail/skip；保留 ADR0306 与全部非Cursor严格契约 |
+| 实际安装 | 每平台M6八项流程、两次正常退出、最终零残留；品牌/声明/隔离/停止/历史恢复 |
+| M7日常 | 实际示例代码和项目检查、并发cwd、40回合、HTTP错误和恢复、原生历史无重放、新回合 |
+| M7维护 | 精确公开旧版安装器→当前版→关闭备份还原回退；实际三个版本、相同路径/数据、三次退出零残留 |
+| 原始证明 | `*-validation.json.gz` 与 `*-maintenance.json.gz`；公开截图、JSONL、报告及备份还原清单逐项摘要 |
+| 三平台发布 | macOS arm64、Windows x64、Linux x64原生CI全部成功后统一prerelease；不设latest、不发feed |
+| 根回读 | 完整下载所有公开资产；GitHub digest、SHA清单、BUILD-RECORD、source/tag/run/pins及原始证明重新核验 |
+| 用户交接 | 安装说明、实际观察、限制、上游演练和回退记录更新；没有待执行关键项才完成目标 |
+
+本机执行和测试使用 Node24.14.0、私有 pnpm10.34.5、Bun1.4.2；不修改用户全局默认工具链。
+桌面 Rust stable 与 OMP 自身 nightly-2026-08-12 分开；参考子模块只读，产品在 `app/` 修改。
+包内运行时来自受控 fork `36483311…` / tree `7ba57b6d…` / base `62bc57be…`，版本18.3.0，
+patch `62bc57b+omp-desktop.5`。构建前通过 `OMP_SIDECAR_SOURCE` 明确选择自有干净fork；
+不得用临时bunx/latest或全局omp替代生产入口。
+
+## 维护演练
+
+本机源码演练重新应用历史18.2.7补丁并反向回退，升级到18.3.0当前补丁后重建出精确fork树，
+当前171项上游测试通过，回退源被当前发布准入门拒绝，再返回受控fork通过。
+这是源码/补丁维护演练，未运行历史18.2.7二进制；详见
+[M7投影修复与源码演练](validation/M7-provider-error-projection-20261015.md)。
+实际应用升级与关闭数据备份回退见 [M7本机安装](validation/M7-installed-macos-local-20261015.md)。
+
+后续升级先检查 PI 对应实现和测试，再看 OMP 文档/源码，最后补自己的适配；每次固定新source、
+更新patch/manifest及日期化记录，重建并重跑协议、权限、历史、停止和严格Plan/Goal门。
+存在schema变化时先验证备份恢复及旧版读取边界，再声明回退支持，不能沿用本次相同schema结论。
+
+## 当前本机观察
+
+macOS13.4 arm64、真实新DMG、本机确定性模型：40次Composer回合耗时最小220ms、中位225ms、
+最大244ms；这包括测试驱动的UI往返，不代表真实模型推理耗时。7个Electron进程的working-set
+相加在4个采样点约778–986MiB，重启采样约907MiB；共享页可能重复计数，且不包括外部OMP/
+Rust host，不能称为系统峰值内存或与PI的性能对比。原始数据位于本机review的
+`local-resource-observations.json`，最终公开维护报告保存各平台实际采样。
+
+UI实际截图显示OMP品牌、复用的侧栏/Composer/工具卡、两个项目并行、长会话及错误行。
+保留的限制：未签名/未公证；原生选择器/退出确认框、系统快捷方式/DEB/RPM注册、真实付费模型、
+macOS Intel/Windows ARM64没有被当前自动化证明覆盖。40回合未声称触发上下文压缩或长时间压力测试。
+本机早期ASAR缓存与验收器准备失败、一次最后空闲判定超时均保留，不用后续通过覆盖原始事实。

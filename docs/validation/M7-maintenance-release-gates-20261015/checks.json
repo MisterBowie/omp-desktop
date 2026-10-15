@@ -1,0 +1,34 @@
+{
+  "status": "M7 local gates implemented; final same-candidate native release remains pending",
+  "productVersion": "0.15.3-m7.1",
+  "gates": {
+    "targetedTests": 38,
+    "failed": 0,
+    "skipped": 0,
+    "OMPFullSuite": 546,
+    "changelog": 4,
+    "nativeExistingInstalledSteps": 8,
+    "packagedPlanGoal": 15,
+    "YAMLAndRenderedBashSteps": 22,
+    "docs": true,
+    "lint": true,
+    "desktopTypecheck": true
+  },
+  "sameVersionExistingInstaller": {
+    "path": "/Users/vv/Documents/对话/omp-desktop-local-m7/app/apps/desktop/release/OMP-Desktop-0.15.3-m7.1-arm64.dmg",
+    "bytes": 223823821,
+    "sha256": "5e8abf84b1144ac670d4abd3e67351d999a45ec6f89ff499bcec4084f0f031e1"
+  },
+  "M6ExistingWorkflow": {
+    "project": true,
+    "deny": true,
+    "allowOnce": true,
+    "projectTest": true,
+    "stopTree": true,
+    "recoveryNoReplay": true,
+    "freshTurn": true,
+    "defaultIsolation": true
+  },
+  "baseline": "m6-test-20261015-438b389",
+  "publicRawMaintenance": "Must match exact final native revision/platform/installer; no synthetic fixture may be published."
+}

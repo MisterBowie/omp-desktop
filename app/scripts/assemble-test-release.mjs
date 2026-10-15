@@ -45,6 +45,7 @@ import {
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { testReleaseMilestone } from "./test-release-stage.mjs";
+import { verifyMaintenanceEvidence } from "./maintenance-acceptance-record.mjs";
 import { verifyInstalledEvidence } from "./installed-acceptance-record.mjs";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -171,6 +172,9 @@ export function collectRecords(input) {
 /** The pins and run identity every record must agree on. */
 function assertRecordIdentity(record, manifest, options) {
   const fail = (message) => refuse(message, 1);
+  if (testReleaseMilestone(options.tag) >= 7 && !(record.planGoalRegression?.pass >= 15 && record.planGoalRegression.fail === 0 && record.planGoalRegression.skipped === 0)) {
+    fail(`${record.platform}/${record.arch} M7 requires all packaged Plan/Goal cases with zero failures/skips`);
+  }
   if (record.revision !== options.revision) fail(`${record.platform}/${record.arch} was built from ${record.revision}, this run is ${options.revision}`);
   if (record.version !== options.version) fail(`${record.platform}/${record.arch} is version ${record.version}, this run is ${options.version}`);
   if (record.stage !== options.tag) fail(`${record.platform}/${record.arch} was packaged for ${record.stage}, this run is ${options.tag}`);
@@ -232,6 +236,7 @@ export function assembleRelease(options) {
       refuse(`${name} is in the ${record.platform}/${record.arch} artifact but this release only publishes its payload and record`, 1);
     }
     if (milestone >= 6) verifyInstalledEvidence(recordDir, record, options);
+    if (milestone >= 7) verifyMaintenanceEvidence(recordDir, record, options);
   }
 
   payload.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
@@ -262,6 +267,7 @@ export function assembleRelease(options) {
         packagedRuntime: record.packagedRuntime,
         planGoalRegression: record.planGoalRegression,
         ...(record.installedWorkflow ? { installedWorkflow: record.installedWorkflow } : {}),
+        ...(record.maintenanceWorkflow ? { maintenanceWorkflow: record.maintenanceWorkflow } : {}),
         assets: (record.assets ?? []).map(({ name, bytes, sha256, kind }) => ({ name, kind, bytes, sha256 })),
       }))
       .sort((a, b) => (a.platform < b.platform ? -1 : 1)),
@@ -281,7 +287,7 @@ export function releaseNotes(combined) {
     "",
     milestone === 5
       ? "These are **test packages, not a stable release**: they carry the M5 functionality the root has accepted, they are unsigned, and they publish no auto-update feeds. The previous `m5-preview` release is left untouched."
-      : "These are **M6 test packages, not a stable release**. All three native lanes retain the M5 runtime/Plan/Goal gates and additionally require the actual installed workflow. Public validation assets bind the raw native history, screenshots and process observations to each installer digest. Packages remain unsigned and publish no auto-update feed.",
+      : "These are **native test packages, not a stable release**. All three native lanes retain the M5 runtime/Plan/Goal gates and additionally require the actual installed workflow. Public validation assets bind the raw native history, screenshots and process observations to each installer digest. Packages remain unsigned and publish no auto-update feed.",
     "",
     "## Build identity",
     "",
@@ -330,6 +336,13 @@ export function releaseNotes(combined) {
       `| ${platformLabel(platform.platform)} ${platform.arch} | omp/${platform.packagedRuntime?.provenance?.ompVersion ?? "?"}, protocol v${acceptance.protocolVersion ?? "?"}, \`get_state\` ok, stopped/reaped/cleaned ${acceptance.stop?.stopped}/${acceptance.stop?.reaped}/${acceptance.stop?.cleaned} | missing-gate refusal verified (\`${acceptance.gateLoadControl}\`) | ${childEnvironment} | ${regression.pass ?? 0} passed, ${regression.fail ?? 0} failed, ${regression.skipped ?? 0} skipped |`,
     );
   }
+  if (milestone >= 7) lines.push(
+    "", "## M7 installed maintenance",
+    "",
+    "Each native lane additionally passed a real coding task with seven project assertions, concurrent isolated projects with a background relative write, forty-turn history, real HTTP disconnection and terminal-error recovery, and no replay across restart. Resource/timing observations are bounded fixture measurements, not portable benchmarks or proof of compaction.",
+    "",
+    "The exact public M6 0.15.2 installer is the checksum-pinned baseline. The native old/new/old rehearsal retains one owned install path and profile/data, backs up closed trees, preserves history on upgrade, restores exact backup inventories for rollback, keeps the new project file without replaying old tools, and completes a fresh old-version turn. Public maintenance assets include raw histories, screenshots, reports and restoration inventories. This tests manual installer/backup maintenance with the pinned OMP/schema; it does not test the automatic updater or arbitrary schema downgrades.",
+  );
   lines.push(
     "",
     "The packaged-runtime acceptance ran the *packaged* `Resources` — copied first to a path with spaces and non-ASCII characters, under its own HOME/XDG/TMPDIR — through the production verifier, launcher, tool gate and supervisor. The isolated launch configuration is used on every platform; where the host does not expose the child environment (no `/proc`), the table records the child PATH/HOME as not observed instead of claiming they were verified. The Plan/Goal regression ran the same real suite the source tree runs, but against the packaged sidecar and the packaged gate bundle.",
@@ -347,12 +360,12 @@ export function releaseNotes(combined) {
       : "- Proven per native platform: installed OMP identity/notices/update cache, default isolated data directory, real sidebar/Composer approval and tool paths, denied write preservation, approved write, external project check, three-process Stop, ordered quit, unchanged closed native history with no replay, fresh post-restart turn, and zero owned survivors. The provider is a local deterministic fixture; it does not bypass the production runtime/gate/bridge/UI/persistence.",
     milestone === 5
       ? "- Not proven by this release: installer/shortcut/desktop-entry behaviour inside a real user session (T22/T23), signing/notarization, macOS Intel, Windows ARM64, and the full T21/T22/T23/T24 scope. macOS and Windows runs come from native GitHub runners; the reports for each platform are in `BUILD-RECORD.json` and in the workflow's Actions artifacts."
-      : "- Limits: unsigned/unnotarized; native folder chooser and quit confirmation dialogs, OS desktop/shortcut registration, real paid providers, macOS Intel and Windows ARM64 remain unqualified. Project/provider setup uses public preload IPC, followed by real user controls. A confirmation bypass is enabled only during teardown; production ordered shutdown still executes. Linux uses the actual extracted AppImage; no system deb/rpm installation is claimed. Full M7/T24 maintenance/upgrade/rollback acceptance remains separate.",
+      : "- Limits: unsigned/unnotarized; native folder chooser and quit confirmation dialogs, OS desktop/shortcut registration, real paid providers, macOS Intel and Windows ARM64 remain unqualified. Project/provider setup uses public preload IPC, followed by real user controls. A confirmation bypass is enabled only during teardown; production ordered shutdown still executes. Linux uses the actual extracted AppImage; no system deb/rpm installation is claimed. Automatic updater delivery, arbitrary-version/schema downgrade and signing are not covered by the manual installed maintenance proof.",
     "- Cursor + Plan/Goal remains unsupported and refused (ADR 0306).",
     "",
     "## 中文摘要",
     "",
-    `本 Release 为 M${milestone} 阶段测试包（macOS Apple Silicon、Windows x64、Linux x64），未签名、不含自动更新 feed、不设为 latest，旧 \`m5-preview\` 不受影响。各平台绑定同一提交，保留包内运行时与 Plan/Goal 回归。${milestone >= 6 ? "另强制真实安装应用的审批、工具、停止、隔离与恢复流程，并公开绑定安装器摘要的原始证据；系统选择/退出确认框、系统注册及完整 M7/T24 不在本次证明内。" : "安装身份已改为 OMP Desktop。"}逐平台结果见 \`BUILD-RECORD.json\` 与 \`SHA256SUMS.txt\`。`,
+    `本 Release 为 M${milestone} 阶段测试包（macOS Apple Silicon、Windows x64、Linux x64），未签名、不含自动更新 feed、不设为 latest，旧 \`m5-preview\` 不受影响。各平台绑定同一提交，保留包内运行时与 Plan/Goal 回归。${milestone >= 6 ? "另强制真实安装应用的审批、工具、停止、隔离与恢复流程，并公开绑定安装器摘要的原始证据；系统选择/退出确认框及系统注册不在本次证明内。" : "安装身份已改为 OMP Desktop。"}${milestone >= 7 ? "M7另强制编码/并发/40回合/HTTP故障恢复及固定旧版→新版→备份还原回退的真实安装演练，公开原始维护证明；不冒称自动更新或任意schema降级。" : "完整M7维护验收另行执行。"}逐平台结果见 \`BUILD-RECORD.json\` 与 \`SHA256SUMS.txt\`。`,
     "",
   );
   return lines.join("\n");

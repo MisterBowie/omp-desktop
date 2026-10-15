@@ -1,6 +1,7 @@
-# M5/M6 three-platform test packages: macOS arm64, Windows x64, Linux x64.
+# M5/M6/M7 three-platform test packages: macOS arm64, Windows x64, Linux x64.
 # M6 adds actual native installer workflows, whose raw evidence is published
-# with its own checksum-bound asset. The accepted M5 gates remain mandatory.
+# with its own checksum-bound asset. M7 adds raw daily/upgrade proof gates.
+# The accepted M5 and M6 gates remain mandatory for later stages.
 #
 # Every major stage has to end with installable packages the user can try on all
 # three platforms (user goal #9). This workflow is that delivery for M5: it
@@ -18,7 +19,7 @@
 # preview lane; it is left as it is, and this workflow never touches the
 # `m5-preview` release it uploads to.
 #
-# Entry point: a controlled `m5-test-*` or `m6-test-*` tag at the reviewed
+# Entry point: a controlled `m5-test-*`, `m6-test-*` or `m7-test-*` tag at the reviewed
 # preparation commit. That is the only trigger this workflow declares, and the
 # guard job refuses anything else:
 #   - there is deliberately no `workflow_dispatch`: the button only appears once
@@ -54,7 +55,7 @@ name: Three-platform test packages
 
 on:
   push:
-    tags: ["m5-test-*", "m6-test-*"]
+    tags: ["m5-test-*", "m6-test-*", "m7-test-*"]
 
 # Least privilege by default; only the publish job may write the release.
 permissions:
@@ -89,12 +90,12 @@ jobs:
           # one the build jobs use instead of whatever the runner image ships.
           node-version: 24
 
-      - name: Refuse every trigger except a controlled M5/M6 test tag push
+      - name: Refuse every trigger except a controlled M5/M6/M7 test tag push
         id: bind
         run: |
           set -euo pipefail
-          if [[ "${GITHUB_EVENT_NAME}" != "push" ]] || [[ ! "${GITHUB_REF}" =~ ^refs/tags/m[56]-test-[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
-            echo "::error::This workflow packages only from a controlled m5-test-* or m6-test-* tag push (event=${GITHUB_EVENT_NAME}, ref=${GITHUB_REF})."
+          if [[ "${GITHUB_EVENT_NAME}" != "push" ]] || [[ ! "${GITHUB_REF}" =~ ^refs/tags/m[567]-test-[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+            echo "::error::This workflow packages only from a controlled m5-test-*, m6-test-* or m7-test-* tag push (event=${GITHUB_EVENT_NAME}, ref=${GITHUB_REF})."
             exit 1
           fi
           # One tag, one revision: never a branch tip, never the default branch.
@@ -149,19 +150,19 @@ jobs:
         with:
           node-version: 24
       - name: Verify native runtime HOME and PATH before expensive builds
-        if: needs.guard.outputs.milestone == '6'
+        if: needs.guard.outputs.milestone != '5'
         run: node app/scripts/verify-native-isolation.mjs
       - uses: actions/setup-python@v6
-        if: needs.guard.outputs.milestone == '6' && matrix.os == 'windows-latest'
+        if: needs.guard.outputs.milestone != '5' && matrix.os == 'windows-latest'
         with:
           python-version: '3.12'
       - name: Prepare the pinned Windows observer for the cheap boundary probe
-        if: needs.guard.outputs.milestone == '6' && matrix.os == 'windows-latest'
+        if: needs.guard.outputs.milestone != '5' && matrix.os == 'windows-latest'
         run: |
           python -m pip install --disable-pip-version-check -r app/scripts/e2e/requirements.txt
           echo "OMP_E2E_PYTHON=$(python -c 'import sys; print(sys.executable)')" >> "$GITHUB_ENV"
       - name: Verify Windows path aliases and exact-handle cleanup before expensive builds
-        if: needs.guard.outputs.milestone == '6' && matrix.os == 'windows-latest'
+        if: needs.guard.outputs.milestone != '5' && matrix.os == 'windows-latest'
         run: node app/scripts/verify-native-windows-harness.mjs
 
   build:
@@ -264,12 +265,12 @@ jobs:
           cache-dependency-path: app/pnpm-lock.yaml
 
       - uses: actions/setup-python@v6
-        if: needs.guard.outputs.milestone == '6'
+        if: needs.guard.outputs.milestone != '5'
         with:
           python-version: '3.12'
 
       - name: Install the pinned native process observer
-        if: needs.guard.outputs.milestone == '6'
+        if: needs.guard.outputs.milestone != '5'
         working-directory: app
         run: |
           set -euo pipefail
@@ -277,7 +278,7 @@ jobs:
           echo "OMP_E2E_PYTHON=$(python -c 'import sys; print(sys.executable)')" >> "$GITHUB_ENV"
 
       - name: Prepare the Linux native display
-        if: needs.guard.outputs.milestone == '6' && matrix.platform == 'linux'
+        if: needs.guard.outputs.milestone != '5' && matrix.platform == 'linux'
         run: |
           set -euo pipefail
           sudo apt-get update
@@ -457,7 +458,7 @@ jobs:
 
       - name: Exercise the actual native installed application
         id: installed
-        if: needs.guard.outputs.milestone == '6'
+        if: needs.guard.outputs.milestone != '5'
         working-directory: app
         run: |
           set -euo pipefail
@@ -465,6 +466,7 @@ jobs:
           mkdir -p "$out"
           echo "out=$out" >> "$GITHUB_OUTPUT"
           installer="$(node --input-type=module -e 'import {resolve} from "node:path"; const v=process.argv[1]; const names={darwin:`OMP-Desktop-${v}-arm64.dmg`,win32:`OMP-Desktop-Setup-${v}.exe`,linux:`OMP-Desktop-${v}-x86_64.AppImage`}; console.log(resolve("apps/desktop/release",names[process.platform]));' "${{ needs.guard.outputs.version }}")"
+          echo "installer=$installer" >> "$GITHUB_OUTPUT"
           command=(node scripts/e2e-installed-smoke.mjs "$installer" "$out")
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
             command=(xvfb-run -a -s "-screen 0 1440x1000x24" "${command[@]}")
@@ -477,14 +479,66 @@ jobs:
           node scripts/report-installed-ci.mjs "$out"
           exit "$status"
 
+      - name: Exercise native M7 daily use and installer upgrade rollback
+        id: maintenance
+        if: needs.guard.outputs.milestone == '7'
+        working-directory: app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          out="$(node --input-type=module -e 'import {join} from "node:path"; console.log(join(process.env.RUNNER_TEMP,"omp-maintenance-acceptance").replaceAll("\\", "/"));')"
+          baseline_dir="$out/baseline"
+          mkdir -p "$baseline_dir" "$out/daily" "$out/upgrade"
+          echo "out=$out" >> "$GITHUB_OUTPUT"
+          baseline_tag="$(node --input-type=module -e 'import {MAINTENANCE_BASELINE as b} from "./scripts/e2e/maintenance-baseline.mjs"; console.log(b.tag);')"
+          baseline_name="$(node --input-type=module -e 'import {MAINTENANCE_BASELINE as b} from "./scripts/e2e/maintenance-baseline.mjs"; console.log(b.assets[process.platform].name);')"
+          gh release download "$baseline_tag" --repo MisterBowie/omp-desktop --pattern "$baseline_name" --dir "$baseline_dir"
+          baseline="$baseline_dir/$baseline_name"
+          node --input-type=module -e 'import {verifyMaintenanceBaseline} from "./scripts/e2e/maintenance-baseline.mjs"; verifyMaintenanceBaseline(process.argv[1]);' "$baseline"
+          if [[ "${{ matrix.platform }}" == "linux" ]]; then chmod +x "$baseline"; fi
+          installer="${{ steps.installed.outputs.installer }}"
+          run_case() {
+            local directory="$1"
+            shift
+            local command=(node "$@")
+            if [[ "${{ matrix.platform }}" == "linux" ]]; then
+              command=(xvfb-run -a -s "-screen 0 1440x1000x24" "${command[@]}")
+            fi
+            set +e
+            "${command[@]}" > "$directory/native.stdout.txt" 2> "$directory/native.stderr.txt"
+            local status=$?
+            set -e
+            cat "$directory/native.stdout.txt" "$directory/native.stderr.txt"
+            node scripts/report-maintenance-ci.mjs "$directory"
+            return "$status"
+          }
+          run_case "$out/daily" scripts/e2e-maintenance-smoke.mjs "$installer" "$out/daily"
+          run_case "$out/upgrade" scripts/e2e-maintenance-upgrade.mjs "$baseline" "$installer" "$out/upgrade"
+
+      - name: Preserve raw native maintenance evidence and failures
+        if: always() && steps.maintenance.outputs.out != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: maintenance-${{ matrix.artifact }}
+          if-no-files-found: error
+          compression-level: 0
+          path: |
+            ${{ steps.maintenance.outputs.out }}/daily
+            ${{ steps.maintenance.outputs.out }}/upgrade
+
       - name: Stage the release assets and the build record
         working-directory: app
         run: |
           set -euo pipefail
           iso="${{ steps.acceptance.outputs.iso }}"
           installed_args=()
-          if [[ "${{ needs.guard.outputs.milestone }}" == "6" ]]; then
+          if [[ "${{ needs.guard.outputs.milestone }}" != "5" ]]; then
             installed_args=(--installed-report "${{ steps.installed.outputs.out }}/installed-smoke.json")
+          fi
+          maintenance_args=()
+          if [[ "${{ needs.guard.outputs.milestone }}" == "7" ]]; then
+            maintenance_args=(--maintenance-report "${{ steps.maintenance.outputs.out }}/daily/maintenance-smoke.json" --upgrade-report "${{ steps.maintenance.outputs.out }}/upgrade/maintenance-upgrade.json")
           fi
           node scripts/stage-test-package.mjs \
             --platform "${{ matrix.platform }}" \
@@ -500,7 +554,8 @@ jobs:
             --run-id "${{ github.run_id }}" \
             --run-attempt "${{ github.run_attempt }}" \
             --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            "${installed_args[@]}"
+            "${installed_args[@]}" \
+            "${maintenance_args[@]}"
 
       - name: Upload this platform's package
         uses: actions/upload-artifact@v7
@@ -547,7 +602,7 @@ jobs:
     needs: [guard, build]
     # Pushing the tag is the only trigger, but the release must exist only for a
     # tag push that names the revision this workflow just built and verified.
-    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/m5-test-') || startsWith(github.ref, 'refs/tags/m6-test-'))
+    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/m5-test-') || startsWith(github.ref, 'refs/tags/m6-test-') || startsWith(github.ref, 'refs/tags/m7-test-'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

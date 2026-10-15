@@ -103,7 +103,7 @@ test("native environment probes gate all expensive builds and preserve diagnosti
   const probe = job(source, "probe");
   assert.match(probe, /needs: guard/);
   assert.match(probe, /os: \[macos-15, windows-latest, ubuntu-22.04\]/);
-  assert.match(probe, /if: needs\.guard\.outputs\.milestone == '6'\n\s+run: node app\/scripts\/verify-native-isolation\.mjs/);
+  assert.match(probe, /if: needs\.guard\.outputs\.milestone != '5'\n\s+run: node app\/scripts\/verify-native-isolation\.mjs/);
   assert.match(probe, /matrix\.os == 'windows-latest'[\s\S]*?run: node app\/scripts\/verify-native-windows-harness\.mjs/);
   assert.match(probe, /python -m pip install --disable-pip-version-check -r app\/scripts\/e2e\/requirements\.txt/);
   const build = job(source, "build");
@@ -113,11 +113,11 @@ test("native environment probes gate all expensive builds and preserve diagnosti
   assert.match(build, /::error title=Native package build::/);
 });
 
-test("the packaging lane runs from controlled M5/M6 test tags only", async (t) => {
+test("the packaging lane runs from controlled M5/M6/M7 test tags only", async (t) => {
   const source = await workflowSource(t);
   if (!source) return;
 
-  assert.match(source, /^on:\n  push:\n    tags: \["m5-test-\*", "m6-test-\*"\]\n/m);
+  assert.match(source, /^on:\n  push:\n    tags: \["m5-test-\*", "m6-test-\*", "m7-test-\*"\]\n/m);
   const executable = executableSource(source);
   // No manual dispatch: the button only exists on the default branch, which this
   // work must not write, and a branch dispatch would bind the release to no
@@ -126,7 +126,7 @@ test("the packaging lane runs from controlled M5/M6 test tags only", async (t) =
   assert.doesNotMatch(executable, /^\s+branches:/m, "a branch push must not start a package run");
 
   const guard = job(source, "guard");
-  assert(guard.includes('if [[ "${GITHUB_EVENT_NAME}" != "push" ]] || [[ ! "${GITHUB_REF}" =~ ^refs/tags/m[56]-test-[A-Za-z0-9][A-Za-z0-9._-]*$ ]]'));
+  assert(guard.includes('if [[ "${GITHUB_EVENT_NAME}" != "push" ]] || [[ ! "${GITHUB_REF}" =~ ^refs/tags/m[567]-test-[A-Za-z0-9][A-Za-z0-9._-]*$ ]]'));
   assert.match(guard, /testReleaseMilestone\(process\.env\.GITHUB_REF_NAME\)/);
   assert.match(guard, /git rev-parse "refs\/tags\/\$\{GITHUB_REF_NAME\}\^\{commit\}"/);
   assert.match(guard, /tag_commit" != "\$\{GITHUB_SHA\}"/);
@@ -449,7 +449,7 @@ test("the release is one prerelease gated on all three platforms", async (t) => 
   const publish = job(source, "publish");
 
   assert.match(publish, /needs: \[guard, build\]/);
-  assert(publish.includes("if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/m5-test-') || startsWith(github.ref, 'refs/tags/m6-test-'))"));
+  assert(publish.includes("if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/m5-test-') || startsWith(github.ref, 'refs/tags/m6-test-') || startsWith(github.ref, 'refs/tags/m7-test-'))"));
   // Least privilege: the workflow default is read-only, and exactly one job
   // raises it to write (the publish job).
   assert.match(source, /^permissions:\n  contents: read\n/m, "the workflow default token stays read-only");
@@ -484,7 +484,7 @@ test("M6 adds native installed acceptance without weakening or broadening the M5
   const source = await workflowSource(t);
   if (!source) return;
   const build = job(source, "build");
-  assert.match(build, /name: Exercise the actual native installed application\n\s+id: installed\n\s+if: needs\.guard\.outputs\.milestone == '6'/);
+  assert.match(build, /name: Exercise the actual native installed application\n\s+id: installed\n\s+if: needs\.guard\.outputs\.milestone != '5'/);
   assert.match(build, /node scripts\/e2e-installed-smoke\.mjs "\$installer" "\$out"/);
   for (const name of [".dmg", "Setup-${v}.exe", ".AppImage"]) assert(build.includes(name));
   assert.match(build, /xvfb-run -a -s/);
@@ -494,4 +494,22 @@ test("M6 adds native installed acceptance without weakening or broadening the M5
   // An absent conditional output must never turn an upload into `/*`.
   assert.match(build, /name: Upload the native installed workflow evidence\n\s+if: always\(\) && steps\.installed\.outputs\.out != ''/);
   assert.equal(build.match(/path: \$\{\{ steps\.installed\.outputs\.out \}\}\/\*/g)?.length, 1);
+});
+
+
+test("M7 retains M6 gates and requires native daily and exact-baseline upgrade reports", async (t) => {
+  const source = await workflowSource(t);
+  if (!source) return;
+  const build = job(source, "build");
+  assert.match(build, /id: maintenance\n\s+if: needs\.guard\.outputs\.milestone == '7'/);
+  assert.match(build, /gh release download "\$baseline_tag" --repo MisterBowie\/omp-desktop --pattern "\$baseline_name"/);
+  assert.match(build, /verifyMaintenanceBaseline\(process\.argv\[1\]\)/);
+  assert.match(build, /run_case "\$out\/daily" scripts\/e2e-maintenance-smoke\.mjs/);
+  assert.match(build, /run_case "\$out\/upgrade" scripts\/e2e-maintenance-upgrade\.mjs/);
+  assert.match(build, /--maintenance-report/); assert.match(build, /--upgrade-report/);
+  assert.match(build, /if: always\(\) && steps\.maintenance\.outputs\.out != ''/);
+  assert.match(build, /name: maintenance-\$\{\{ matrix\.artifact \}\}/);
+  const first = build.indexOf('run_case "$out/daily"');
+  const upgrade = build.indexOf('run_case "$out/upgrade"');
+  assert(first > 0 && upgrade > first && build.indexOf("node scripts/stage-test-package.mjs") > upgrade);
 });

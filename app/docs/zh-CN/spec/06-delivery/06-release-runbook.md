@@ -37,12 +37,11 @@ Cargo 离线 metadata 还会解析仅原生发布编译不一定下载的开发�
 renderer/host/包内运行时流程。配置和图标测试不能单独完成 M6。测试 prerelease 仍未
 签名、不发布自动更新 feed；只有实际运行签名及公证后，才记录相应资格。
 
-### 受控 M5/M6 测试包通道
+### 受控 M5/M6/M7 测试包通道
 
-仓库根 `three-platform-test-packages.yml` 只接受已复核提交的 `m5-test-*` 与
-`m6-test-*` tag push；分支、任意 tag、手动 dispatch 和尚未具备门的 M7 tag 均不能
-发布。tag 解引用提交必须等于运行提交，三个原生平台构建全部成功后，唯一的发布
-作业才能写入 prerelease。两个阶段都保留 M5 包内运行时和 Plan/Goal 验收。
+仓库根 `three-platform-test-packages.yml` 只接受已复核提交的 `m5-test-*`、
+`m6-test-*` 和 `m7-test-*` tag push；分支、任意 tag 和手动 dispatch 均不能发布。tag 解引用提交必须等于运行提交，三个原生平台构建全部成功后，唯一的发布
+作业才能写入 prerelease。三个阶段都保留 M5 包内运行时和 Plan/Goal 验收。
 
 M6 另对真实 DMG、NSIS 安装器或 AppImage 运行 `scripts/e2e-installed-smoke.mjs`。
 原生进程观察器固定 psutil 7.2.2，Linux 使用真实 Xvfb 显示。封闭启动环境无全局
@@ -54,7 +53,7 @@ Bun/OMP 路径或运行时覆盖；应用自行选择测试 HOME 内的默认数
 
 不发布更新 feed/blockmap，不覆盖旧 preview 或 latest。原生选择/退出确认框、系统
 快捷方式注册、签名/公证和真实付费模型兼容性不在此自动化证明内；完整 M7 维护、
-升级与回退验收仍是后续独立阶段，须具备自己的发布门。
+升级与回退验收是独立阶段，其发布门见下文。
 
 Windows 验收通过原生文件系统 API 解析真实路径，避免 8.3 短名、长名和 junction
 别名导致项目与所有权互相矛盾。编译前的轻量原生检查会从短路径启动真实 Node 副本，
@@ -62,6 +61,18 @@ Windows 验收通过原生文件系统 API 解析真实路径，避免 8.3 短�
 Win32 handle 被回收。UI 断言失败后先尝试正常退出应用；紧急清理继续拒绝自有根
 以外的可执行文件，且必须精确匹配创建时间与镜像。失败注释仅保留有限的自有进程
 身份元数据，不含 argv 或环境。
+
+## M7 原生维护发布门
+
+M7 保留M6实际安装与M5包内严格Plan/Goal门，并另外在各原生平台运行日常维护脚本和
+固定旧版→新版→备份还原回退脚本。基线必须是受控JSON列出的公开M6安装器字节，安装前
+校验名称/大小/SHA；不下载latest。关闭profile/data备份和还原记录逐文件清单，替换同一路径
+ASAR前清除验收器的归档索引缓存，三个实际版本必须正常退出且最终零残留。
+
+staging必须收到`--maintenance-report`和`--upgrade-report`；M7缺失原始维护证明即拒绝。
+公开`*-maintenance.json.gz`保留真实截图、原生历史、HTTP故障/恢复、40回合计数、并发工具
+时间交叠及备份还原清单；装配重新验证原始文件与摘要。人工回退使用相同固定OMP/schema，
+不冒称自动更新或任意schema降级。系统注册/原生对话框/签名边界继续明确保留。
 
 ## 1. 构建通道
 

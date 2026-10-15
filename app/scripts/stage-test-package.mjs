@@ -51,6 +51,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { testReleaseMilestone } from "./test-release-stage.mjs";
 import { stageInstalledEvidence } from "./installed-acceptance-record.mjs";
+import { stageMaintenanceEvidence } from "./maintenance-acceptance-record.mjs";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const defaultManifest = join(appRoot, "patches", "oh-my-pi", "manifest.json");
@@ -158,6 +159,8 @@ export function parseArgs(argv) {
     "--run-url",
     "--manifest",
     "--installed-report",
+    "--maintenance-report",
+    "--upgrade-report",
   ]);
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -333,6 +336,10 @@ export function stagePackage(options) {
     refuse("the packaged Plan/Goal regression reported no passing case: the packaged gate/bridge were not exercised", 1);
   }
 
+  if (milestone >= 7 && (planGoal.pass < 15 || planGoal.skipped !== 0)) {
+    refuse("M7 requires all packaged Plan/Goal cases: at least 15 passed and zero skipped", 1);
+  }
+
   const releaseDir = resolve(options.releaseDir);
   if (!existsSync(releaseDir)) refuse(`the release directory does not exist: ${releaseDir}`);
   const out = resolve(options.out);
@@ -380,6 +387,11 @@ export function stagePackage(options) {
     installedWorkflow = evidence.summary;
     assets.push(evidence.asset);
   }
+  let maintenanceWorkflow;
+  if (milestone >= 7) {
+    const evidence = stageMaintenanceEvidence(options, assets);
+    maintenanceWorkflow = evidence.summary; assets.push(evidence.asset);
+  }
   const record = {
     schema: "omp-desktop.test-package/1",
     platform: options.platform,
@@ -423,6 +435,7 @@ export function stagePackage(options) {
     },
     planGoalRegression: planGoal,
     ...(installedWorkflow ? { installedWorkflow } : {}),
+    ...(maintenanceWorkflow ? { maintenanceWorkflow } : {}),
     excluded: findExcluded(releaseDir),
     assets,
   };

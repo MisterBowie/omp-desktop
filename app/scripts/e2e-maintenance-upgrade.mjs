@@ -67,7 +67,9 @@ try {
   assert.equal(application.identity.version, baseline.version); await selectSession(application, id);
   const rolledBack = readMaintenanceHistory(application, id); assert(rolledBack.bytes.equals(closed.bytes));
   assert.deepEqual((await invoke(application, "sessionGet", [id])).session.messages, report.baselineProjection);
-  const rollbackReadPosts = posts(); assert.equal(rollbackReadPosts, rollbackRequests); assert.equal(readFileSync(join(application.workspace, "upgrade-note.txt"), "utf8"), "upgraded\n", "rollback replayed the old tool write");
+  const rollbackReadPosts = posts(); assert.equal(rollbackReadPosts, rollbackRequests);
+  report.projectNoteAfterRollback = readFileSync(join(application.workspace, "upgrade-note.txt"), "utf8");
+  assert.equal(report.projectNoteAfterRollback, "upgraded\n", "rollback replayed the old tool write");
   writeFileSync(join(output, "upgrade-rollback-reopened.jsonl"), rolledBack.bytes); report.steps.rollbackHistoryNoReplay = true;
   await application.screenshot("upgrade-03-rollback-history");
   await prompt(application, "M7_ROLLBACK_FRESH Reply after the manual rollback."); await idle(application, id, "M7_ROLLBACK_FRESH_DONE"); report.steps.rollbackFreshTurn = true;
@@ -76,6 +78,10 @@ try {
   await application.quit(); report.bootAndOrderedQuit = true;
 } catch (error) {
   failure = error; report.failure = error.stack ?? String(error);
+  if (application?.renderer && report.sessionId) {
+    try { report.failureState = { status: await invoke(application, "agentGetStatus", [report.sessionId]), ui: await inspect(application), session: await invoke(application, "sessionGet", [report.sessionId]) }; }
+    catch (diagnosticError) { report.failureDiagnosticError = String(diagnosticError); }
+  }
   if (application?.renderer) { try { await application.screenshot("upgrade-failure"); } catch (captureError) { report.failureScreenshotError = String(captureError); } }
 } finally {
   if (application) {
@@ -84,6 +90,7 @@ try {
     writeFileSync(join(output, "application-output.txt"), application.output);
     if (application.clean) application.removeOwnedRoot();
   }
+  report.providerRequests = provider.requests;
   await provider.close(); report.finishedAt = new Date().toISOString(); save();
 }
 if (failure) throw failure;

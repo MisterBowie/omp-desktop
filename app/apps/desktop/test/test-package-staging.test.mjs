@@ -51,6 +51,17 @@ test("M6 staging cannot reuse an M5 runtime-only acceptance as an installed work
   assert.throws(() => stageModule.stagePackage(options), /M6 requires --installed-report/);
 });
 
+test("M7 refuses reduced or skipped packaged Plan/Goal coverage before installed proof", () => {
+  for (const counts of [{ pass: 14 }, { pass: 15, skipped: 1 }]) {
+    const root = makeScratch("m7-reduced-plan-goal-");
+    const acceptance = fixtureAcceptance(root, { platform: "darwin", arch: "arm64" });
+    const releaseDir = fixtureReleaseDir(root, "darwin");
+    const options = stageArgs({ root, platform: "darwin", arch: "arm64", acceptance, releaseDir, log: writeTestLog(root, counts) });
+    options.stage = "m7-test-reduced-plan-goal";
+    assert.throws(() => stageModule.stagePackage(options), /M7 requires all packaged Plan\/Goal/);
+  }
+});
+
 const sha256 = (path) => createHash("sha256").update(readFileSync(path)).digest("hex");
 
 function write(path, content) {

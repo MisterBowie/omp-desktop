@@ -16,7 +16,8 @@ const installer = { kind: "dmg", sourceName: report.installer.path.split("/").at
 test("only stages with explicit current gates are accepted", () => {
   assert.equal(testReleaseMilestone("m5-test-20261015-bdec5007"), 5);
   assert.equal(testReleaseMilestone("m6-test-candidate"), 6);
-  for (const tag of ["v0.15.2", "m7-test-unqualified", "m6-test-", "m6-test-../escape", "m6-preview"]) assert.throws(() => testReleaseMilestone(tag), /controlled/);
+  assert.equal(testReleaseMilestone("m7-test-candidate"), 7);
+  for (const tag of ["v0.15.2", "m8-test-unqualified", "m6-test-", "m6-test-../escape", "m6-preview"]) assert.throws(() => testReleaseMilestone(tag), /controlled/);
 });
 
 test("captured Mac installed report passes; incomplete, stale and different-byte claims fail", () => {
