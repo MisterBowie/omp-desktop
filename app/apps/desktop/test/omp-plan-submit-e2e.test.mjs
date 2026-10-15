@@ -31,7 +31,7 @@
  */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { register } from "node:module";
 import { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
@@ -493,7 +493,7 @@ test(
       {
         text: "this turn must never run",
         finish: "tool_calls",
-        toolCalls: [{ id: "call_sibling", name: "bash", args: { command: `touch ${marker}` } }],
+        toolCalls: [{ id: "call_sibling", name: "bash", args: { command: `touch ${shellQuote(marker)}` } }],
       },
     ]);
     const first = await promptThrough(host, bridge, sessionId, "write me a plan");
@@ -550,7 +550,7 @@ test(
       {
         text: "must never run",
         finish: "tool_calls",
-        toolCalls: [{ id: "call_schema_sibling", name: "bash", args: { command: `touch ${marker}` } }],
+        toolCalls: [{ id: "call_schema_sibling", name: "bash", args: { command: `touch ${shellQuote(marker)}` } }],
       },
     ]);
     const beforeSchema = provider.requests.length;
@@ -576,7 +576,7 @@ test(
       {
         text: "must never run",
         finish: "tool_calls",
-        toolCalls: [{ id: "call_dup_sibling", name: "bash", args: { command: `touch ${marker}` } }],
+        toolCalls: [{ id: "call_dup_sibling", name: "bash", args: { command: `touch ${shellQuote(marker)}` } }],
       },
     ]);
     const beforeDuplicate = provider.requests.length;
@@ -628,7 +628,8 @@ test(
   "T20-B2 mixed batch [bash, SubmitPlan] is rejected whole, does not terminate, and ordinary tools still run",
   { timeout: 600_000, skip: READY ? false : "host-core binary or patched runtime not available" },
   async () => {
-    const project = makeScratch("t20b2-mixed-project-");
+    const project = join(makeScratch("t20b2-mixed-project-"), "项目 with spaces 'quoted'");
+    mkdirSync(project);
     const dataRoot = makeScratch("t20b2-mixed-data-");
     const mixedMarker = join(project, "mixed-sibling.txt");
     const controlMarker = join(project, "control.txt");
@@ -648,7 +649,7 @@ test(
         text: "running both",
         finish: "tool_calls",
         toolCalls: [
-          { id: "call_mixed_bash", name: "bash", args: { command: `touch ${mixedMarker}` } },
+          { id: "call_mixed_bash", name: "bash", args: { command: `touch ${shellQuote(mixedMarker)}` } },
           { id: "call_mixed_submit", name: "SubmitPlan", args: submitArgs() },
         ],
       },
@@ -657,7 +658,7 @@ test(
       {
         text: "correcting with a normal command",
         finish: "tool_calls",
-        toolCalls: [{ id: "call_control", name: "bash", args: { command: `touch ${controlMarker}` } }],
+        toolCalls: [{ id: "call_control", name: "bash", args: { command: `touch ${shellQuote(controlMarker)}` } }],
       },
       { text: "done", finish: "stop" },
     ]);
