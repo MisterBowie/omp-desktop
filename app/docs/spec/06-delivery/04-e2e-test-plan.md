@@ -21,8 +21,25 @@
   Bun/OMP dependency, no rejected write, exactly one allowed write, actual tool
   cancellation, no replay after recovery, and no remaining owned process tree.
   Keep Cursor + Plan/Goal refusal and all non-Cursor strict contracts intact.
-- **Status:** Configuration/artwork contracts and real builder metadata are
-  automated. Installed user paths and native lifecycle results remain required
+- **Automation:** `node scripts/e2e-installed-smoke.mjs <native-installer>
+  <evidence-directory>`, with the test-only Python observer from
+  `scripts/e2e/requirements.txt` selected through `OMP_E2E_PYTHON`. The real
+  packaged executable is copied/installed outside the checkout; Main inspector
+  identity binds its renderer, resources and profile before any interaction.
+  No runtime/host override or capture startup mode is used. The default product
+  data directory is selected without `PI_DESKTOP_DATA_DIR`; pre-existing fake
+  PI/OMP home files must remain unchanged and must not enter model context.
+- **Persistence boundary:** An orderly quit may append `session_exit` records;
+  existing bytes cannot change. Recovery and history reads must preserve the
+  closed transcript byte for byte and issue no provider/tool replay.
+- **Limits:** Provider/project creation uses public preload IPC before real
+  sidebar/Composer/permission/Stop interactions. Native folder chooser coverage
+  is separate. Only at teardown, the existing automated confirmation bypass
+  permits `app.quit()` without a native confirmation dialog; ordered production
+  shutdown and all owned child reaping still run. Native Windows/Linux claims
+  require their own actual installer runs, not simulated platform fixtures.
+- **Status:** macOS arm64 actual DMG workflow, restart and zero-survivor cleanup
+  passed locally on 2026-10-15. Windows/Linux installed workflows remain pending
   M6 acceptance; a successful build alone is insufficient.
 - **Specs:** Release runbook, OMP runtime boundary and bundled sidecar ADR 0307.
 
