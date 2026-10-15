@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
+import {join} from 'node:path';
+import {stageInstalledEvidence,verifyInstalledEvidence} from '/Users/vv/Documents/对话/omp-desktop-local-m7/app/scripts/installed-acceptance-record.mjs';
+import {stageMaintenanceEvidence,verifyMaintenanceEvidence} from '/Users/vv/Documents/对话/omp-desktop-local-m7/app/scripts/maintenance-acceptance-record.mjs';
+const root='/Users/vv/Documents/对话/omp-local-m7-review-20261015';
+const audit=JSON.parse(readFileSync(join(root,'m7-release-audit.json')));const harness=JSON.parse(readFileSync(join(root,'m7-review-harness.json')));
+assert.equal(audit.candidate,harness.productRevision);assert(harness.noPackagedProductSourceChange);
+const source=audit.assets.find(a=>a.name.endsWith('macos-arm64.dmg'));
+const installer={kind:'dmg',name:source.name,sourceName:source.name,bytes:source.bytes,sha256:source.sha256};
+const options={version:'0.15.3-m7.1',platform:'darwin',arch:'arm64',revision:harness.reviewHarnessRevision,stage:'root-review-5c41843',out:join(root,'root-review-capsules'),installedReport:join(root,'public-macos-installed/installed-smoke.json'),maintenanceReport:join(root,'public-macos-daily/maintenance-smoke.json'),upgradeReport:join(root,'public-macos-upgrade/maintenance-upgrade.json')};mkdirSync(options.out,{recursive:true});
+const installed=stageInstalledEvidence(options,[installer]);const maintenance=stageMaintenanceEvidence(options,[installer]);
+const record={platform:options.platform,arch:options.arch,assets:[installer,installed.asset,maintenance.asset],installedWorkflow:installed.summary,maintenanceWorkflow:maintenance.summary};
+verifyInstalledEvidence(options.out,record,options);verifyMaintenanceEvidence(options.out,record,options);
+writeFileSync(join(root,'root-public-proof-verification.json'),JSON.stringify({verified:true,productRevision:audit.candidate,reviewHarnessRevision:options.revision,scope:'Supplementary root Mac run of the unchanged public C installer under the committed H UI harness; not a new release or a rewritten CI proof.',installer,installed:installed.summary,maintenance:maintenance.summary},null,2)+'\n');
+console.log('Actual public Mac installed/daily/upgrade raw evidence reopened under the unchanged strict contracts.');

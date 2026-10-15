@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {verifyInstalledEvidence} from '/Users/vv/Documents/对话/omp-desktop-local-m7/app/scripts/installed-acceptance-record.mjs';
+import {verifyMaintenanceEvidence} from '/Users/vv/Documents/对话/omp-desktop-local-m7/app/scripts/maintenance-acceptance-record.mjs';
+const directory='/Users/vv/Documents/对话/omp-local-m7-review-20261015/candidate-46e7bf7/stage';
+const record=JSON.parse(readFileSync(directory+'/build-record.json'));
+const revision='46e7bf733367e738edb0040aa2b7004990e1f088';
+assert.equal(record.revision,revision);
+verifyInstalledEvidence(directory,record,{version:record.version,revision});
+verifyMaintenanceEvidence(directory,record,{version:record.version,revision});
+writeFileSync(directory+'/../root-reopened-local.json',JSON.stringify({revision,version:record.version,localOnly:true,installed:record.installedWorkflow,maintenance:record.maintenanceWorkflow},null,2)+'\n');
+console.log('Exact-candidate raw installed and maintenance proofs reopened successfully.');

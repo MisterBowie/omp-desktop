@@ -1,0 +1,228 @@
+{
+  "verified": true,
+  "observedAt": "2026-10-15T11:12:16.756768+00:00",
+  "candidate": "46e7bf733367e738edb0040aa2b7004990e1f088",
+  "tag": "m7-test-20261015-46e7bf7",
+  "runId": 38717467884,
+  "runUrl": "https://github.com/MisterBowie/omp-desktop/actions/runs/38717467884",
+  "releaseUrl": "https://github.com/MisterBowie/omp-desktop/releases/tag/m7-test-20261015-46e7bf7",
+  "assets": [
+    {
+      "name": "BUILD-RECORD.json",
+      "bytes": 13764,
+      "sha256": "86b1665e029d4afc78cf642625bd1eed92a7ba7dc97ca5a108dc7319307b973c",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m7-test-20261015-46e7bf7/BUILD-RECORD.json"
+    },
+    {
+      "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-darwin-arm64-maintenance.json.gz",
+      "bytes": 1186951,
+      "sha256": "8e33c6ad00f9eef5e3ea182041738e7018b0e574fc81c40da50227933b9cb25e",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m7-test-20261015-46e7bf7/OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-darwin-arm64-maintenance.json.gz"
+    },
+    {
+      "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-darwin-arm64-validation.json.gz",
+      "bytes": 408014,
+      "sha256": "303d4788aa706ff0f4777f38835e0d8e966139214028e272e305676f886bb865",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m7-test-20261015-46e7bf7/OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-darwin-arm64-validation.json.gz"
+    },
+    {
+      "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64-maintenance.json.gz",
+      "bytes": 1123167,
+      "sha256": "3303bba723ae9f720d1e2605749e6ee3c1acd623ccc9083f309bacdcdee9df25",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m7-test-20261015-46e7bf7/OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64-maintenance.json.gz"
+    },
+    {
+      "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64-validation.json.gz",
+      "bytes": 394224,
+      "sha256": "01d9b54fdf4b7d7c4d08421d083d33f89973af4ba8e8730a61f2d6fb46117c86",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m7-test-20261015-46e7bf7/OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64-validation.json.gz"
+    },
+    {
+      "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64.AppImage",
+      "bytes": 250508801,
+      "sha256": "77fc4d7a8bf3329196a38b2b4a3910bd9bd9bd05e69dd255626e3abfa5d7caa8",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m7-test-20261015-46e7bf7/OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64.AppImage"
+    },
+    {
+      "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64.deb",
+      "bytes": 208062120,
+      "sha256": "6e8b1cbc75ed889257771ca14aba3a2bdb60e63ce809afd976705bf43e43ced3",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m7-test-20261015-46e7bf7/OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64.deb"
+    },
+    {
+      "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64.rpm",
+      "bytes": 188629721,
+      "sha256": "7bf491cfcd1b6691d0341a412e9d1550ae616f9817517e8f0b417cf3196f571f",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m7-test-20261015-46e7bf7/OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64.rpm"
+    },
+    {
+      "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-macos-arm64.dmg",
+      "bytes": 224628084,
+      "sha256": "bf84e48063cbe445df6a6b090b3ef87e114ed8a6621d4cba3fa61dd9e8d5314e",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m7-test-20261015-46e7bf7/OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-macos-arm64.dmg"
+    },
+    {
+      "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-macos-arm64.zip",
+      "bytes": 223439950,
+      "sha256": "83b5dbe94bc0732b6b63c804144b93a84d8e716c091d1bb12fb202729664c026",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m7-test-20261015-46e7bf7/OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-macos-arm64.zip"
+    },
+    {
+      "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-win32-x64-maintenance.json.gz",
+      "bytes": 1065319,
+      "sha256": "d8ecfe5f778cd072a41223f01a1ccba35aa7fe5328eff506e802f596d357d634",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m7-test-20261015-46e7bf7/OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-win32-x64-maintenance.json.gz"
+    },
+    {
+      "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-win32-x64-validation.json.gz",
+      "bytes": 317298,
+      "sha256": "99128cd6edcdb9650d7f3b5c01f6bd6ee3d60e28ce83058c55684589994cf84c",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m7-test-20261015-46e7bf7/OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-win32-x64-validation.json.gz"
+    },
+    {
+      "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-windows-x64-portable.exe",
+      "bytes": 200216594,
+      "sha256": "8e47022386d85f0a3d12493e24b4684612e389356de97b7f5276cf4066586e6d",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m7-test-20261015-46e7bf7/OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-windows-x64-portable.exe"
+    },
+    {
+      "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-windows-x64-setup.exe",
+      "bytes": 200454507,
+      "sha256": "3c7b6a8028d064ab743a99284c0c61947534629572904c85f22c179a38c9da14",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m7-test-20261015-46e7bf7/OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-windows-x64-setup.exe"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "bytes": 1804,
+      "sha256": "7292164fd9cd94425f1d964f9027dffe2b69b71ca9c91c00900a7fe64db19641",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m7-test-20261015-46e7bf7/SHA256SUMS.txt"
+    }
+  ],
+  "installedProofs": [
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "steps": [
+        "project",
+        "deny",
+        "allowOnce",
+        "projectTest",
+        "stopTree",
+        "recoveryNoReplay",
+        "freshTurn",
+        "defaultIsolation"
+      ],
+      "quits": 2,
+      "remainingOwnedProcesses": 0,
+      "historyBytes": 11625,
+      "proof": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-darwin-arm64-validation.json.gz"
+    },
+    {
+      "platform": "linux",
+      "arch": "x64",
+      "steps": [
+        "project",
+        "deny",
+        "allowOnce",
+        "projectTest",
+        "stopTree",
+        "recoveryNoReplay",
+        "freshTurn",
+        "defaultIsolation"
+      ],
+      "quits": 2,
+      "remainingOwnedProcesses": 0,
+      "historyBytes": 10992,
+      "proof": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64-validation.json.gz"
+    },
+    {
+      "platform": "win32",
+      "arch": "x64",
+      "steps": [
+        "project",
+        "deny",
+        "allowOnce",
+        "projectTest",
+        "stopTree",
+        "recoveryNoReplay",
+        "freshTurn",
+        "defaultIsolation"
+      ],
+      "quits": 2,
+      "remainingOwnedProcesses": 0,
+      "historyBytes": 11671,
+      "proof": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-win32-x64-validation.json.gz"
+    }
+  ],
+  "maintenanceProofs": [
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "dailySteps": 6,
+      "upgradeSteps": 7,
+      "longTurns": 40,
+      "orderedQuits": 5,
+      "remainingOwnedProcesses": 0,
+      "baseline": "b243c9752c39d917ba3dae23b53a3f198e890be51406ea215500251eee4bec8d",
+      "profileBackupEntries": 95,
+      "dataBackupEntries": 45,
+      "proof": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-darwin-arm64-maintenance.json.gz"
+    },
+    {
+      "platform": "linux",
+      "arch": "x64",
+      "dailySteps": 6,
+      "upgradeSteps": 7,
+      "longTurns": 40,
+      "orderedQuits": 5,
+      "remainingOwnedProcesses": 0,
+      "baseline": "f7b5dcb1ce8c77374bf9beb99c19ac94921c8b53cc16980ee656f12852a6ba8f",
+      "profileBackupEntries": 111,
+      "dataBackupEntries": 45,
+      "proof": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64-maintenance.json.gz"
+    },
+    {
+      "platform": "win32",
+      "arch": "x64",
+      "dailySteps": 6,
+      "upgradeSteps": 7,
+      "longTurns": 40,
+      "orderedQuits": 5,
+      "remainingOwnedProcesses": 0,
+      "baseline": "7367103bbc2564c6d5051d4e652e8f196b0c02d25aaec241028595be553c332c",
+      "profileBackupEntries": 99,
+      "dataBackupEntries": 39,
+      "proof": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-win32-x64-maintenance.json.gz"
+    }
+  ],
+  "platforms": [
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "counts": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "platform": "linux",
+      "arch": "x64",
+      "counts": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "platform": "win32",
+      "arch": "x64",
+      "counts": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      }
+    }
+  ],
+  "scope": "Actual native M7 test-package release: source/CI/pins, all 15 public asset bytes/checksums, installed and daily/upgrade raw proofs independently verified; unsigned test packages."
+}

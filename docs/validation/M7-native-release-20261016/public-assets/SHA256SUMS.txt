@@ -1,0 +1,13 @@
+8e33c6ad00f9eef5e3ea182041738e7018b0e574fc81c40da50227933b9cb25e  OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-darwin-arm64-maintenance.json.gz
+303d4788aa706ff0f4777f38835e0d8e966139214028e272e305676f886bb865  OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-darwin-arm64-validation.json.gz
+3303bba723ae9f720d1e2605749e6ee3c1acd623ccc9083f309bacdcdee9df25  OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64-maintenance.json.gz
+01d9b54fdf4b7d7c4d08421d083d33f89973af4ba8e8730a61f2d6fb46117c86  OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64-validation.json.gz
+77fc4d7a8bf3329196a38b2b4a3910bd9bd9bd05e69dd255626e3abfa5d7caa8  OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64.AppImage
+6e8b1cbc75ed889257771ca14aba3a2bdb60e63ce809afd976705bf43e43ced3  OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64.deb
+7bf491cfcd1b6691d0341a412e9d1550ae616f9817517e8f0b417cf3196f571f  OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64.rpm
+bf84e48063cbe445df6a6b090b3ef87e114ed8a6621d4cba3fa61dd9e8d5314e  OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-macos-arm64.dmg
+83b5dbe94bc0732b6b63c804144b93a84d8e716c091d1bb12fb202729664c026  OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-macos-arm64.zip
+d8ecfe5f778cd072a41223f01a1ccba35aa7fe5328eff506e802f596d357d634  OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-win32-x64-maintenance.json.gz
+99128cd6edcdb9650d7f3b5c01f6bd6ee3d60e28ce83058c55684589994cf84c  OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-win32-x64-validation.json.gz
+8e47022386d85f0a3d12493e24b4684612e389356de97b7f5276cf4066586e6d  OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-windows-x64-portable.exe
+3c7b6a8028d064ab743a99284c0c61947534629572904c85f22c179a38c9da14  OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-windows-x64-setup.exe

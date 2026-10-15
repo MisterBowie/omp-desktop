@@ -1,0 +1,110 @@
+{
+  "scope": "Loopback FakeProvider, forty UI-driven turns; Electron working-set observations exclude external OMP/host and may double-count shared pages; not portable performance benchmarks.",
+  "observations": [
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "timingsMs": {
+        "min": 253,
+        "median": 282.5,
+        "max": 471
+      },
+      "resources": [
+        {
+          "label": "ready",
+          "processes": 7,
+          "workingSetKiBSum": 863024
+        },
+        {
+          "label": "both projects active",
+          "processes": 7,
+          "workingSetKiBSum": 928624
+        },
+        {
+          "label": "after 40 turns",
+          "processes": 7,
+          "workingSetKiBSum": 1068624
+        },
+        {
+          "label": "reopened",
+          "processes": 7,
+          "workingSetKiBSum": 840768
+        }
+      ],
+      "backupEntries": {
+        "profile": 95,
+        "data": 45
+      }
+    },
+    {
+      "platform": "linux",
+      "arch": "x64",
+      "timingsMs": {
+        "min": 306,
+        "median": 316.5,
+        "max": 386
+      },
+      "resources": [
+        {
+          "label": "ready",
+          "processes": 7,
+          "workingSetKiBSum": 1089024
+        },
+        {
+          "label": "both projects active",
+          "processes": 7,
+          "workingSetKiBSum": 1163268
+        },
+        {
+          "label": "after 40 turns",
+          "processes": 7,
+          "workingSetKiBSum": 1352180
+        },
+        {
+          "label": "reopened",
+          "processes": 7,
+          "workingSetKiBSum": 1066172
+        }
+      ],
+      "backupEntries": {
+        "profile": 111,
+        "data": 45
+      }
+    },
+    {
+      "platform": "win32",
+      "arch": "x64",
+      "timingsMs": {
+        "min": 331,
+        "median": 345.0,
+        "max": 384
+      },
+      "resources": [
+        {
+          "label": "ready",
+          "processes": 7,
+          "workingSetKiBSum": 860188
+        },
+        {
+          "label": "both projects active",
+          "processes": 7,
+          "workingSetKiBSum": 881464
+        },
+        {
+          "label": "after 40 turns",
+          "processes": 7,
+          "workingSetKiBSum": 949220
+        },
+        {
+          "label": "reopened",
+          "processes": 7,
+          "workingSetKiBSum": 810040
+        }
+      ],
+      "backupEntries": {
+        "profile": 99,
+        "data": 39
+      }
+    }
+  ]
+}

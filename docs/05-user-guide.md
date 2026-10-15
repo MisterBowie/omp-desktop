@@ -1,7 +1,7 @@
 # OMP Desktop 使用说明
 
 本项目在 PI-Desktop 界面基础上接入完整 OMP 运行时。当前维护预览版本为
-`0.15.3-m7.1`；测试包从 [本项目 Releases](https://github.com/MisterBowie/omp-desktop/releases)
+`0.15.3-m7.1`；测试包从 [M7三平台测试发布](https://github.com/MisterBowie/omp-desktop/releases/tag/m7-test-20261015-46e7bf7)
 取得，按对应阶段 tag 及平台选择，不使用上游 PI 的下载按钮替代本项目产物。
 
 ## 安装与开始使用
@@ -13,9 +13,11 @@
 | Linux x64 | AppImage；另提供 DEB/RPM | 实际 AppImage 提取后运行 |
 
 这是未签名测试分发；Mac 未公证。Mac 首次打开的说明随 ZIP 一起提供。M6 已完成上述
-三平台安装流程；M7 的最终三平台状态以本阶段发布记录为准。没有用构建成功代替安装验收，
+三平台安装流程；M7三平台的安装、日常使用和真实升级回退也全部通过，根已完整回读公开资产及原始证明，见[M7验收](validation/M7-native-release-20261016.md)。没有用构建成功代替安装验收，
 也没有把 DEB/RPM 系统注册、portable 的独立用户流程或其他CPU架构写成已验证。
 Windows 的 Bash 工具沿用 PI 的 Git for Windows 前提；项目本身使用的语言工具仍由项目提供。
+Linux使用系统sans字体；CI截图的中文项目名出现缺字方框，未证明CJK字体在该runner可用，
+中文路径的实际操作/隔离已通过。需要中文显示时，系统应提供相应CJK字体；产品没有声明捆绑该字体。
 
 1. 打开自己的项目目录，创建 OMP 会话；会话绑定创建时的项目、引擎和运行时。
 2. 在提供方/模型设置中配置自己的受支持 HTTP 模型。普通验收只使用本机假模型，

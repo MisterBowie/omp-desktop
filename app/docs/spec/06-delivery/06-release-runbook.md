@@ -102,6 +102,14 @@ This qualifies manual rollback with the same pinned OMP/schema, not automatic
 update delivery or arbitrary schema downgrades. Existing native-dialog,
 OS-registration and signing limits remain explicit.
 
+Qualified test distribution: [M7 `0.15.3-m7.1`](https://github.com/MisterBowie/omp-desktop/releases/tag/m7-test-20261015-46e7bf7), source `46e7bf7`,
+run `38717467884`. Every native lane passed 15 strict regressions, 8 installed,
+6 daily and 7 upgrade steps, with zero owned survivors. Root re-read all 15
+public files and six raw proofs and reran the same public Mac installer under
+review harness `5c41843`; its revision is distinct from the immutable product.
+Linux CI screenshots show missing Chinese glyphs in fixture names; the inherited
+system font stack does not establish bundled CJK coverage.
+
 ## 1. Build lanes
 
 | Lane | Command | Signing | Use |

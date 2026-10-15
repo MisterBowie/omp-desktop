@@ -1,0 +1,11 @@
+{
+  "candidate": "46e7bf733367e738edb0040aa2b7004990e1f088",
+  "tag": "m7-test-20261015-46e7bf7",
+  "pushed": true,
+  "branch": "codex/m7-daily-maintenance-local",
+  "runId": 38717467884,
+  "runUrl": "https://github.com/MisterBowie/omp-desktop/actions/runs/38717467884",
+  "runStatus": "completed",
+  "runConclusion": "success",
+  "observedAt": "2026-10-15T10:47:38.982990+00:00"
+}

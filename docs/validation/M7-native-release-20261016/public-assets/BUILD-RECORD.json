@@ -1,0 +1,376 @@
+{
+  "schema": "omp-desktop.test-package-release/1",
+  "tag": "m7-test-20261015-46e7bf7",
+  "revision": "46e7bf733367e738edb0040aa2b7004990e1f088",
+  "version": "0.15.3-m7.1",
+  "run": {
+    "url": "https://github.com/MisterBowie/omp-desktop/actions/runs/38717467884"
+  },
+  "pins": {
+    "patchLevel": "62bc57b+omp-desktop.5",
+    "forkRepository": "https://github.com/MisterBowie/oh-my-pi",
+    "forkCommit": "36483311dfff67be7504f591974df93fc512a45a",
+    "forkTree": "7ba57b6d06fb8fe7e3f6352c67692e56cf39c3cd",
+    "baseSha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+    "baseVersion": "18.3.0"
+  },
+  "platforms": [
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "run": {
+        "id": "38717467884",
+        "attempt": "1",
+        "url": "https://github.com/MisterBowie/omp-desktop/actions/runs/38717467884"
+      },
+      "packagedRuntime": {
+        "provenance": {
+          "ompVersion": "18.3.0",
+          "desktopVersion": "0.15.3-m7.1",
+          "platform": "darwin",
+          "arch": "arm64",
+          "patchLevel": "62bc57b+omp-desktop.5",
+          "forkCommit": "36483311dfff67be7504f591974df93fc512a45a",
+          "binaryBytes": 219127424,
+          "binarySha256": "a87714e1c51f48b52a18e120e39ff5ad45c806939c2677e90583e7bc68cc36b7",
+          "gateBytes": 53025,
+          "gateSha256": "3dd09910f71ee63f2b1ba13e06d8655f9b73af5e88f2c4dd29a92e0f11cd528b",
+          "build": {
+            "tool": "bun",
+            "bunVersion": "1.4.2",
+            "bytecode": true
+          }
+        },
+        "acceptance": {
+          "resources": "/var/folders/nj/vtw8zd2j31d1gdrtntc5y4600000gn/T/omp-packages 隔离 with spaces-DrsFhY/Resources",
+          "runtimeVersion": "18.3.0",
+          "protocolVersion": 2,
+          "getState": true,
+          "gateLoadControl": "refused",
+          "stop": {
+            "stopped": true,
+            "reaped": true,
+            "cleaned": true
+          },
+          "leftoverRuns": 0,
+          "childEnvironmentReadable": false
+        }
+      },
+      "planGoalRegression": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      },
+      "installedWorkflow": {
+        "verified": true,
+        "steps": {
+          "project": true,
+          "deny": true,
+          "allowOnce": true,
+          "projectTest": true,
+          "stopTree": true,
+          "recoveryNoReplay": true,
+          "freshTurn": true,
+          "defaultIsolation": true
+        },
+        "reportSha256": "afab971ea299f40607ced345e89cc4302735c90f2e0616266ba899edf06d2bd3",
+        "installerSha256": "bf84e48063cbe445df6a6b090b3ef87e114ed8a6621d4cba3fa61dd9e8d5314e",
+        "nativeFolderChooserCovered": false,
+        "nativeQuitConfirmationCovered": false
+      },
+      "maintenanceWorkflow": {
+        "verified": true,
+        "dailyReportSha256": "87ec1b49fccb03b4011a624245d5fe88234f470f59767f94ed645aa091f28cc2",
+        "upgradeReportSha256": "254d2542ab442df175ccd4771bd67499f55b0bc4a5cac98dd88151827c8c3d77",
+        "installerSha256": "bf84e48063cbe445df6a6b090b3ef87e114ed8a6621d4cba3fa61dd9e8d5314e",
+        "baselineRevision": "438b389620217a551add62ae662c17b2e3562d21",
+        "baselineInstallerSha256": "b243c9752c39d917ba3dae23b53a3f198e890be51406ea215500251eee4bec8d",
+        "dailySteps": {
+          "coding": true,
+          "concurrentProjects": true,
+          "longConversation": true,
+          "providerRecovery": true,
+          "historyNoReplay": true,
+          "freshTurn": true
+        },
+        "upgradeSteps": {
+          "baseline": true,
+          "closedBackup": true,
+          "upgradeHistoryNoReplay": true,
+          "currentVersionTurn": true,
+          "backupRestored": true,
+          "rollbackHistoryNoReplay": true,
+          "rollbackFreshTurn": true
+        },
+        "longTurns": 40,
+        "automaticUpdaterCovered": false
+      },
+      "assets": [
+        {
+          "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-macos-arm64.dmg",
+          "kind": "dmg",
+          "bytes": 224628084,
+          "sha256": "bf84e48063cbe445df6a6b090b3ef87e114ed8a6621d4cba3fa61dd9e8d5314e"
+        },
+        {
+          "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-macos-arm64.zip",
+          "kind": "zip",
+          "bytes": 223439950,
+          "sha256": "83b5dbe94bc0732b6b63c804144b93a84d8e716c091d1bb12fb202729664c026"
+        },
+        {
+          "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-darwin-arm64-validation.json.gz",
+          "kind": "validation",
+          "bytes": 408014,
+          "sha256": "303d4788aa706ff0f4777f38835e0d8e966139214028e272e305676f886bb865"
+        },
+        {
+          "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-darwin-arm64-maintenance.json.gz",
+          "kind": "maintenance",
+          "bytes": 1186951,
+          "sha256": "8e33c6ad00f9eef5e3ea182041738e7018b0e574fc81c40da50227933b9cb25e"
+        }
+      ]
+    },
+    {
+      "platform": "linux",
+      "arch": "x64",
+      "run": {
+        "id": "38717467884",
+        "attempt": "1",
+        "url": "https://github.com/MisterBowie/omp-desktop/actions/runs/38717467884"
+      },
+      "packagedRuntime": {
+        "provenance": {
+          "ompVersion": "18.3.0",
+          "desktopVersion": "0.15.3-m7.1",
+          "platform": "linux",
+          "arch": "x64",
+          "patchLevel": "62bc57b+omp-desktop.5",
+          "forkCommit": "36483311dfff67be7504f591974df93fc512a45a",
+          "binaryBytes": 244233696,
+          "binarySha256": "477bf18de1bc5c24c354e7a084d6bb25374e87e4ad5f9492fb52362db20ab713",
+          "gateBytes": 53025,
+          "gateSha256": "3dd09910f71ee63f2b1ba13e06d8655f9b73af5e88f2c4dd29a92e0f11cd528b",
+          "build": {
+            "tool": "bun",
+            "bunVersion": "1.4.2",
+            "bytecode": true
+          }
+        },
+        "acceptance": {
+          "resources": "/tmp/omp-packages 隔离 with spaces-tU2Ogr/Resources",
+          "runtimeVersion": "18.3.0",
+          "protocolVersion": 2,
+          "getState": true,
+          "gateLoadControl": "refused",
+          "stop": {
+            "stopped": true,
+            "reaped": true,
+            "cleaned": true
+          },
+          "leftoverRuns": 0,
+          "childEnvironmentReadable": true
+        }
+      },
+      "planGoalRegression": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      },
+      "installedWorkflow": {
+        "verified": true,
+        "steps": {
+          "project": true,
+          "deny": true,
+          "allowOnce": true,
+          "projectTest": true,
+          "stopTree": true,
+          "recoveryNoReplay": true,
+          "freshTurn": true,
+          "defaultIsolation": true
+        },
+        "reportSha256": "3d8fca06cdbe842670404405fc0adaf77ea5e6917841b359e1554251e0b71c9a",
+        "installerSha256": "77fc4d7a8bf3329196a38b2b4a3910bd9bd9bd05e69dd255626e3abfa5d7caa8",
+        "nativeFolderChooserCovered": false,
+        "nativeQuitConfirmationCovered": false
+      },
+      "maintenanceWorkflow": {
+        "verified": true,
+        "dailyReportSha256": "d269f440247aa1a68a71a0774f8bd1c5e0fda2cffdb17543599757cb4a98f1d2",
+        "upgradeReportSha256": "8d2da1608d92f0730c6eba01e2ffeba55fbd4239c34fcc90ce0d3163356dc15e",
+        "installerSha256": "77fc4d7a8bf3329196a38b2b4a3910bd9bd9bd05e69dd255626e3abfa5d7caa8",
+        "baselineRevision": "438b389620217a551add62ae662c17b2e3562d21",
+        "baselineInstallerSha256": "f7b5dcb1ce8c77374bf9beb99c19ac94921c8b53cc16980ee656f12852a6ba8f",
+        "dailySteps": {
+          "coding": true,
+          "concurrentProjects": true,
+          "longConversation": true,
+          "providerRecovery": true,
+          "historyNoReplay": true,
+          "freshTurn": true
+        },
+        "upgradeSteps": {
+          "baseline": true,
+          "closedBackup": true,
+          "upgradeHistoryNoReplay": true,
+          "currentVersionTurn": true,
+          "backupRestored": true,
+          "rollbackHistoryNoReplay": true,
+          "rollbackFreshTurn": true
+        },
+        "longTurns": 40,
+        "automaticUpdaterCovered": false
+      },
+      "assets": [
+        {
+          "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64.AppImage",
+          "kind": "appimage",
+          "bytes": 250508801,
+          "sha256": "77fc4d7a8bf3329196a38b2b4a3910bd9bd9bd05e69dd255626e3abfa5d7caa8"
+        },
+        {
+          "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64.deb",
+          "kind": "deb",
+          "bytes": 208062120,
+          "sha256": "6e8b1cbc75ed889257771ca14aba3a2bdb60e63ce809afd976705bf43e43ced3"
+        },
+        {
+          "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64.rpm",
+          "kind": "rpm",
+          "bytes": 188629721,
+          "sha256": "7bf491cfcd1b6691d0341a412e9d1550ae616f9817517e8f0b417cf3196f571f"
+        },
+        {
+          "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64-validation.json.gz",
+          "kind": "validation",
+          "bytes": 394224,
+          "sha256": "01d9b54fdf4b7d7c4d08421d083d33f89973af4ba8e8730a61f2d6fb46117c86"
+        },
+        {
+          "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64-maintenance.json.gz",
+          "kind": "maintenance",
+          "bytes": 1123167,
+          "sha256": "3303bba723ae9f720d1e2605749e6ee3c1acd623ccc9083f309bacdcdee9df25"
+        }
+      ]
+    },
+    {
+      "platform": "win32",
+      "arch": "x64",
+      "run": {
+        "id": "38717467884",
+        "attempt": "1",
+        "url": "https://github.com/MisterBowie/omp-desktop/actions/runs/38717467884"
+      },
+      "packagedRuntime": {
+        "provenance": {
+          "ompVersion": "18.3.0",
+          "desktopVersion": "0.15.3-m7.1",
+          "platform": "win32",
+          "arch": "x64",
+          "patchLevel": "62bc57b+omp-desktop.5",
+          "forkCommit": "36483311dfff67be7504f591974df93fc512a45a",
+          "binaryBytes": 241522176,
+          "binarySha256": "c93448156b66cb6e21f8abb6429ef11ba89170ed69ed7bfe18419a0b72fbff30",
+          "gateBytes": 53025,
+          "gateSha256": "3dd09910f71ee63f2b1ba13e06d8655f9b73af5e88f2c4dd29a92e0f11cd528b",
+          "build": {
+            "tool": "bun",
+            "bunVersion": "1.4.2",
+            "bytecode": true
+          }
+        },
+        "acceptance": {
+          "resources": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\omp-packages 隔离 with spaces-6gKM48\\Resources",
+          "runtimeVersion": "18.3.0",
+          "protocolVersion": 2,
+          "getState": true,
+          "gateLoadControl": "refused",
+          "stop": {
+            "stopped": true,
+            "reaped": true,
+            "cleaned": true
+          },
+          "leftoverRuns": 0,
+          "childEnvironmentReadable": false
+        }
+      },
+      "planGoalRegression": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      },
+      "installedWorkflow": {
+        "verified": true,
+        "steps": {
+          "project": true,
+          "deny": true,
+          "allowOnce": true,
+          "projectTest": true,
+          "stopTree": true,
+          "recoveryNoReplay": true,
+          "freshTurn": true,
+          "defaultIsolation": true
+        },
+        "reportSha256": "2c5f576bb2cfe2297c024e12e577fea1018410469e403986763f338640db4ff0",
+        "installerSha256": "3c7b6a8028d064ab743a99284c0c61947534629572904c85f22c179a38c9da14",
+        "nativeFolderChooserCovered": false,
+        "nativeQuitConfirmationCovered": false
+      },
+      "maintenanceWorkflow": {
+        "verified": true,
+        "dailyReportSha256": "bde52e379d4d7678a92c6096a1e638d1565f9f7e459aef408dfff49e1be5022e",
+        "upgradeReportSha256": "963b27aa2bb4575b79832f86a59e20b688eac7be6f14921c8ebd0e3866e07fa2",
+        "installerSha256": "3c7b6a8028d064ab743a99284c0c61947534629572904c85f22c179a38c9da14",
+        "baselineRevision": "438b389620217a551add62ae662c17b2e3562d21",
+        "baselineInstallerSha256": "7367103bbc2564c6d5051d4e652e8f196b0c02d25aaec241028595be553c332c",
+        "dailySteps": {
+          "coding": true,
+          "concurrentProjects": true,
+          "longConversation": true,
+          "providerRecovery": true,
+          "historyNoReplay": true,
+          "freshTurn": true
+        },
+        "upgradeSteps": {
+          "baseline": true,
+          "closedBackup": true,
+          "upgradeHistoryNoReplay": true,
+          "currentVersionTurn": true,
+          "backupRestored": true,
+          "rollbackHistoryNoReplay": true,
+          "rollbackFreshTurn": true
+        },
+        "longTurns": 40,
+        "automaticUpdaterCovered": false
+      },
+      "assets": [
+        {
+          "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-windows-x64-setup.exe",
+          "kind": "nsis-setup",
+          "bytes": 200454507,
+          "sha256": "3c7b6a8028d064ab743a99284c0c61947534629572904c85f22c179a38c9da14"
+        },
+        {
+          "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-windows-x64-portable.exe",
+          "kind": "portable",
+          "bytes": 200216594,
+          "sha256": "8e47022386d85f0a3d12493e24b4684612e389356de97b7f5276cf4066586e6d"
+        },
+        {
+          "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-win32-x64-validation.json.gz",
+          "kind": "validation",
+          "bytes": 317298,
+          "sha256": "99128cd6edcdb9650d7f3b5c01f6bd6ee3d60e28ce83058c55684589994cf84c"
+        },
+        {
+          "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-win32-x64-maintenance.json.gz",
+          "kind": "maintenance",
+          "bytes": 1065319,
+          "sha256": "d8ecfe5f778cd072a41223f01a1ccba35aa7fe5328eff506e802f596d357d634"
+        }
+      ]
+    }
+  ]
+}

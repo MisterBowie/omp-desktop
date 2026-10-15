@@ -1,5 +1,8 @@
 # M7 模型错误终态投影修复（2026-10-15）
 
+后续状态（2026-10-16）：完整M7已接受，见[M7最终验收](M7-native-release-20261016.md)。
+下文保留本记录形成时的真实状态与失败，不覆盖后续完成结论。
+
 状态：**M7/T24 进行中，尚未接受**。公开 M6 DMG 的真实 HTTP 401 最小复现证明：
 原生 JSONL 保存 `stopReason=error`、401 与 `M7_AUTH_TERMINAL`，但桌面 `sessionGet`
 返回 `status=complete` 空助手行且丢失 error；之后仍可新回合恢复。原始历史、公开 IPC

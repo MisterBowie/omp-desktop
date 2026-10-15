@@ -1,0 +1,57 @@
+{
+  "verified": true,
+  "productRevision": "46e7bf733367e738edb0040aa2b7004990e1f088",
+  "reviewHarnessRevision": "5c418433f360772714e899ead3609175655da488",
+  "scope": "Supplementary root Mac run of the unchanged public C installer under the committed H UI harness; not a new release or a rewritten CI proof.",
+  "installer": {
+    "kind": "dmg",
+    "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-macos-arm64.dmg",
+    "sourceName": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-macos-arm64.dmg",
+    "bytes": 224628084,
+    "sha256": "bf84e48063cbe445df6a6b090b3ef87e114ed8a6621d4cba3fa61dd9e8d5314e"
+  },
+  "installed": {
+    "verified": true,
+    "steps": {
+      "project": true,
+      "deny": true,
+      "allowOnce": true,
+      "projectTest": true,
+      "stopTree": true,
+      "recoveryNoReplay": true,
+      "freshTurn": true,
+      "defaultIsolation": true
+    },
+    "reportSha256": "1e2482e7faaf86c252d8f62a84888a128af6305ddf97017b19f454d982f79835",
+    "installerSha256": "bf84e48063cbe445df6a6b090b3ef87e114ed8a6621d4cba3fa61dd9e8d5314e",
+    "nativeFolderChooserCovered": false,
+    "nativeQuitConfirmationCovered": false
+  },
+  "maintenance": {
+    "verified": true,
+    "dailyReportSha256": "868e581955fabd2e322315b558b4d9fa156ae480dbc62f937fd1707761d53bb8",
+    "upgradeReportSha256": "9a08ccbf9d00e0228182db77972c3f1287fc8282819f2a6d9861e88ee2c9c921",
+    "installerSha256": "bf84e48063cbe445df6a6b090b3ef87e114ed8a6621d4cba3fa61dd9e8d5314e",
+    "baselineRevision": "438b389620217a551add62ae662c17b2e3562d21",
+    "baselineInstallerSha256": "b243c9752c39d917ba3dae23b53a3f198e890be51406ea215500251eee4bec8d",
+    "dailySteps": {
+      "coding": true,
+      "concurrentProjects": true,
+      "longConversation": true,
+      "providerRecovery": true,
+      "historyNoReplay": true,
+      "freshTurn": true
+    },
+    "upgradeSteps": {
+      "baseline": true,
+      "closedBackup": true,
+      "upgradeHistoryNoReplay": true,
+      "currentVersionTurn": true,
+      "backupRestored": true,
+      "rollbackHistoryNoReplay": true,
+      "rollbackFreshTurn": true
+    },
+    "longTurns": 40,
+    "automaticUpdaterCovered": false
+  }
+}

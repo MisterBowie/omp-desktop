@@ -1,0 +1,37 @@
+{
+  "reviewed": true,
+  "screenshots": [
+    {
+      "file": "darwin-m7-04-provider-error.png",
+      "bytes": 73793,
+      "sha256": "7da3d54ee3863bc18ece9c8e7765d589c2dde1945392297993a4b68fd8a392ab"
+    },
+    {
+      "file": "linux-m7-04-provider-error.png",
+      "bytes": 67585,
+      "sha256": "4d2db7de06fd8e00bca6be87bbce7a856973f22e2047811b03d17dd28b5fb1c3"
+    },
+    {
+      "file": "win32-m7-04-provider-error.png",
+      "bytes": 53146,
+      "sha256": "2adae3d3c8b41bca328998abb74537f21a6fe2e348524d311f933e5156abf6c9"
+    }
+  ],
+  "observations": [
+    "All three actual native screenshots show the OMP_MODEL_ERROR card, HTTP 401 diagnostic, and the earlier successful HTTP-recovery reply.",
+    "Windows/Linux use branded native window controls; macOS follows the inherited titlebar layout.",
+    "Linux CI screenshot shows missing glyph boxes in Chinese fixture project names. The system font stack matches pinned PI exactly; no bundled CJK font or runner CJK availability is claimed. Actual Unicode path and concurrency assertions passed."
+  ],
+  "fontStacks": [
+    {
+      "path": "/Users/vv/Documents/对话/omp-desktop-local-m7/app/apps/desktop/src/styles/tokens.css",
+      "line": 333,
+      "source": "--font-sans: -apple-system, BlinkMacSystemFont, \"Segoe UI\", system-ui, sans-serif;"
+    },
+    {
+      "path": "/Users/vv/Documents/对话/omp-desktop-local-m7/upstream/pi-desktop/apps/desktop/src/styles/tokens.css",
+      "line": 333,
+      "source": "--font-sans: -apple-system, BlinkMacSystemFont, \"Segoe UI\", system-ui, sans-serif;"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "productRevision": "46e7bf733367e738edb0040aa2b7004990e1f088",
+  "reviewHarnessRevision": "5c418433f360772714e899ead3609175655da488",
+  "verified": true,
+  "scenarios": [
+    {
+      "scenario": "public-macos-installed",
+      "steps": 8,
+      "orderedQuits": 2,
+      "remainingOwnedProcesses": 0,
+      "installerSha256": "bf84e48063cbe445df6a6b090b3ef87e114ed8a6621d4cba3fa61dd9e8d5314e"
+    },
+    {
+      "scenario": "public-macos-daily",
+      "steps": 6,
+      "orderedQuits": 2,
+      "remainingOwnedProcesses": 0,
+      "installerSha256": "bf84e48063cbe445df6a6b090b3ef87e114ed8a6621d4cba3fa61dd9e8d5314e"
+    },
+    {
+      "scenario": "public-macos-upgrade",
+      "steps": 7,
+      "orderedQuits": 3,
+      "remainingOwnedProcesses": 0,
+      "installerSha256": "bf84e48063cbe445df6a6b090b3ef87e114ed8a6621d4cba3fa61dd9e8d5314e"
+    }
+  ]
+}

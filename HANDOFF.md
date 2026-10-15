@@ -1,5 +1,22 @@
 # OMP Desktop 开发交接
 
+## 当前状态：完整 M7 已接受，目标完成（2026-10-16）
+
+M0–M7 / T01–T24 已完成。M7产品0.15.3-m7.1，固定源码46e7bf7、tag
+`m7-test-20261015-46e7bf7`，[三平台测试包](https://github.com/MisterBowie/omp-desktop/releases/tag/m7-test-20261015-46e7bf7)，原生run38717467884全部8作业success。
+三平台各严格Plan/Goal15/15、安装8/8、日常6/6、真实升级回退7/7，7次正常退出均零残留。
+根已完整下载15公开资产1,500,450,318B，核验GitHub摘要/13项SHA清单/source/tag/run/pins及
+六份原始证明。根另在macOS13.4实际运行同一公开DMG，8/6/7项全部通过并重新验证原始文件。
+
+本机显示前提修正仅属于验收器5c41843；产品字节仍为46e7bf7。报告保留真实双版本，不移动tag。
+详见[最终M7验收](docs/validation/M7-native-release-20261016.md)、[使用说明](docs/05-user-guide.md)及[维护检查单](docs/06-release-checklist.md)。
+本机整合源码位于`/Users/vv/Documents/对话/omp-desktop-local-m7`，分支`codex/m7-daily-maintenance-local`。
+原默认模型工作树6处修改/2个新文件、所有历史工作树及旧main保持原状；不创建PR、不合并main。
+根在本机执行，未调用DeepSeek或其他付费模型。仍仅排除Cursor+Plan/Goal；ADR0306和非Cursor严格契约保留。
+
+以下日期化“待验收/进行中”为历史记录，不覆盖本节。测试分发的签名、原生对话框、系统注册、
+真实付费模型和Linux截图缺字等范围边界见最终记录；没有据此冒称正式稳定发行。
+
 ## M7 本机完整流程与发布门已准备（2026-10-15，仍待最终三平台）
 
 实际0.15.3-m7.1 DMG已完成M7日常6项（含401诊断恢复/40回合/并发目录/重启无重放）及

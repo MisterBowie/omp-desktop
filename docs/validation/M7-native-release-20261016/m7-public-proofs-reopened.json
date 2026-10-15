@@ -1,0 +1,151 @@
+{
+  "candidate": "46e7bf733367e738edb0040aa2b7004990e1f088",
+  "tag": "m7-test-20261015-46e7bf7",
+  "verified": true,
+  "proofs": [
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "installed": {
+        "verified": true,
+        "steps": {
+          "project": true,
+          "deny": true,
+          "allowOnce": true,
+          "projectTest": true,
+          "stopTree": true,
+          "recoveryNoReplay": true,
+          "freshTurn": true,
+          "defaultIsolation": true
+        },
+        "reportSha256": "afab971ea299f40607ced345e89cc4302735c90f2e0616266ba899edf06d2bd3",
+        "installerSha256": "bf84e48063cbe445df6a6b090b3ef87e114ed8a6621d4cba3fa61dd9e8d5314e",
+        "nativeFolderChooserCovered": false,
+        "nativeQuitConfirmationCovered": false
+      },
+      "maintenance": {
+        "verified": true,
+        "dailyReportSha256": "87ec1b49fccb03b4011a624245d5fe88234f470f59767f94ed645aa091f28cc2",
+        "upgradeReportSha256": "254d2542ab442df175ccd4771bd67499f55b0bc4a5cac98dd88151827c8c3d77",
+        "installerSha256": "bf84e48063cbe445df6a6b090b3ef87e114ed8a6621d4cba3fa61dd9e8d5314e",
+        "baselineRevision": "438b389620217a551add62ae662c17b2e3562d21",
+        "baselineInstallerSha256": "b243c9752c39d917ba3dae23b53a3f198e890be51406ea215500251eee4bec8d",
+        "dailySteps": {
+          "coding": true,
+          "concurrentProjects": true,
+          "longConversation": true,
+          "providerRecovery": true,
+          "historyNoReplay": true,
+          "freshTurn": true
+        },
+        "upgradeSteps": {
+          "baseline": true,
+          "closedBackup": true,
+          "upgradeHistoryNoReplay": true,
+          "currentVersionTurn": true,
+          "backupRestored": true,
+          "rollbackHistoryNoReplay": true,
+          "rollbackFreshTurn": true
+        },
+        "longTurns": 40,
+        "automaticUpdaterCovered": false
+      }
+    },
+    {
+      "platform": "linux",
+      "arch": "x64",
+      "installed": {
+        "verified": true,
+        "steps": {
+          "project": true,
+          "deny": true,
+          "allowOnce": true,
+          "projectTest": true,
+          "stopTree": true,
+          "recoveryNoReplay": true,
+          "freshTurn": true,
+          "defaultIsolation": true
+        },
+        "reportSha256": "3d8fca06cdbe842670404405fc0adaf77ea5e6917841b359e1554251e0b71c9a",
+        "installerSha256": "77fc4d7a8bf3329196a38b2b4a3910bd9bd9bd05e69dd255626e3abfa5d7caa8",
+        "nativeFolderChooserCovered": false,
+        "nativeQuitConfirmationCovered": false
+      },
+      "maintenance": {
+        "verified": true,
+        "dailyReportSha256": "d269f440247aa1a68a71a0774f8bd1c5e0fda2cffdb17543599757cb4a98f1d2",
+        "upgradeReportSha256": "8d2da1608d92f0730c6eba01e2ffeba55fbd4239c34fcc90ce0d3163356dc15e",
+        "installerSha256": "77fc4d7a8bf3329196a38b2b4a3910bd9bd9bd05e69dd255626e3abfa5d7caa8",
+        "baselineRevision": "438b389620217a551add62ae662c17b2e3562d21",
+        "baselineInstallerSha256": "f7b5dcb1ce8c77374bf9beb99c19ac94921c8b53cc16980ee656f12852a6ba8f",
+        "dailySteps": {
+          "coding": true,
+          "concurrentProjects": true,
+          "longConversation": true,
+          "providerRecovery": true,
+          "historyNoReplay": true,
+          "freshTurn": true
+        },
+        "upgradeSteps": {
+          "baseline": true,
+          "closedBackup": true,
+          "upgradeHistoryNoReplay": true,
+          "currentVersionTurn": true,
+          "backupRestored": true,
+          "rollbackHistoryNoReplay": true,
+          "rollbackFreshTurn": true
+        },
+        "longTurns": 40,
+        "automaticUpdaterCovered": false
+      }
+    },
+    {
+      "platform": "win32",
+      "arch": "x64",
+      "installed": {
+        "verified": true,
+        "steps": {
+          "project": true,
+          "deny": true,
+          "allowOnce": true,
+          "projectTest": true,
+          "stopTree": true,
+          "recoveryNoReplay": true,
+          "freshTurn": true,
+          "defaultIsolation": true
+        },
+        "reportSha256": "2c5f576bb2cfe2297c024e12e577fea1018410469e403986763f338640db4ff0",
+        "installerSha256": "3c7b6a8028d064ab743a99284c0c61947534629572904c85f22c179a38c9da14",
+        "nativeFolderChooserCovered": false,
+        "nativeQuitConfirmationCovered": false
+      },
+      "maintenance": {
+        "verified": true,
+        "dailyReportSha256": "bde52e379d4d7678a92c6096a1e638d1565f9f7e459aef408dfff49e1be5022e",
+        "upgradeReportSha256": "963b27aa2bb4575b79832f86a59e20b688eac7be6f14921c8ebd0e3866e07fa2",
+        "installerSha256": "3c7b6a8028d064ab743a99284c0c61947534629572904c85f22c179a38c9da14",
+        "baselineRevision": "438b389620217a551add62ae662c17b2e3562d21",
+        "baselineInstallerSha256": "7367103bbc2564c6d5051d4e652e8f196b0c02d25aaec241028595be553c332c",
+        "dailySteps": {
+          "coding": true,
+          "concurrentProjects": true,
+          "longConversation": true,
+          "providerRecovery": true,
+          "historyNoReplay": true,
+          "freshTurn": true
+        },
+        "upgradeSteps": {
+          "baseline": true,
+          "closedBackup": true,
+          "upgradeHistoryNoReplay": true,
+          "currentVersionTurn": true,
+          "backupRestored": true,
+          "rollbackHistoryNoReplay": true,
+          "rollbackFreshTurn": true
+        },
+        "longTurns": 40,
+        "automaticUpdaterCovered": false
+      }
+    }
+  ]
+}

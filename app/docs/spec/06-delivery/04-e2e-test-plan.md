@@ -66,8 +66,10 @@ process-ownership assertion is relaxed.
 - **Automation:** `node scripts/e2e-maintenance-smoke.mjs <native-installer>
   <evidence-directory>`. Project/provider preparation uses public preload IPC;
   normal startup retains project tabs before real sidebar/Composer interactions.
-- **Status:** Harness prepared in M7; actual new-version/native qualification is
-  pending. Existing installed M6 acceptance and strict Plan/Goal gates remain.
+- **Status:** Qualified on macOS arm64, Windows x64 and Linux x64 for M7 tag
+  `m7-test-20261015-46e7bf7` (run 38717467884). Root verified every public asset
+  and raw proof, then reran the same public Mac installer with review harness
+  `5c41843`. The product revision and the review harness are recorded separately.
 - **Specs:** Agent runtime terminal projection and release runbook.
 
 ### E2E-OMP-maintenance-upgrade
@@ -89,7 +91,9 @@ process-ownership assertion is relaxed.
 - **Limits:** Manual installer/data-backup rehearsal, same pinned OMP/schema;
   no automatic updater, signed release, arbitrary-version downgrade, or native
   chooser/quit-confirmation coverage is claimed.
-- **Status:** Prepared; full native qualification remains required before M7.
+- **Status:** All three native M7 upgrade/backup/rollback workflows passed for
+  `m7-test-20261015-46e7bf7`; the root public-Mac rerun also passed. Each reads
+  unchanged history without replay and leaves no process after three quits.
 - **Specs:** Release runbook and existing data/storage compatibility contract.
 
 ### E2E-IMAGES-desktop-conversation

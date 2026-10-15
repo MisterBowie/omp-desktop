@@ -1,6 +1,7 @@
 # OMP Desktop 发布与维护检查单
 
-当前阶段：M7/T24；最终接受须同时满足本表和三平台实际发布回读。M6 的最终基线为
+当前状态：M7/T24已接受（测试分发）。本表准入已由三平台原生run及根完整回读/公开Mac复测验证；
+详见[M7最终记录](validation/M7-native-release-20261016.md)。M6 的最终基线为
 `438b389620217a551add62ae662c17b2e3562d21` / `m6-test-20261015-438b389`。
 
 | 检查 | 准入要求 |
@@ -36,13 +37,17 @@ patch `62bc57b+omp-desktop.5`。构建前通过 `OMP_SIDECAR_SOURCE` 明确选�
 
 ## 当前本机观察
 
-macOS13.4 arm64、真实新DMG、本机确定性模型：40次Composer回合耗时最小220ms、中位225ms、
-最大244ms；这包括测试驱动的UI往返，不代表真实模型推理耗时。7个Electron进程的working-set
-相加在4个采样点约778–986MiB，重启采样约907MiB；共享页可能重复计数，且不包括外部OMP/
-Rust host，不能称为系统峰值内存或与PI的性能对比。原始数据位于本机review的
-`local-resource-observations.json`，最终公开维护报告保存各平台实际采样。
+macOS13.4 arm64、实际公开M7 DMG（产品46e7bf7、验收器5c41843置前自有窗口）、本机假模型：
+40次Composer回合耗时最小219ms、中位223ms、最大252ms；包括测试驱动UI往返，
+不代表真实模型推理。7个Electron进程working-set在4个采样点相加约895–1102MiB，
+共享页可能重复计数，不包括外部OMP/Rust host，也不是系统峰值或与PI的性能对比。
+三平台原生CI和根本机的原始采样均随[M7证据](validation/M7-native-release-20261016.md)保存。
 
 UI实际截图显示OMP品牌、复用的侧栏/Composer/工具卡、两个项目并行、长会话及错误行。
 保留的限制：未签名/未公证；原生选择器/退出确认框、系统快捷方式/DEB/RPM注册、真实付费模型、
 macOS Intel/Windows ARM64没有被当前自动化证明覆盖。40回合未声称触发上下文压缩或长时间压力测试。
 本机早期ASAR缓存与验收器准备失败、一次最后空闲判定超时均保留，不用后续通过覆盖原始事实。
+
+Linux CI实际截图有中文目录名缺字，字体栈与固定PI一致、依赖系统字体；不声明已验证runner的CJK字体。
+本机DOM验收会显示/置前精确核验的自有窗口，并等待新文档load；隐藏窗口的原生回合可以完成而DOM暂停绘制，
+不能用后台DOM的瞬时空白断言消息丢失。可见性对照和旧失败均保留在[窗口复审](validation/M7-native-window-review-20261016.md)。
