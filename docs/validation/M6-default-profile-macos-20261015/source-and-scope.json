@@ -1,0 +1,9 @@
+{
+  "productBuildRevision": "de691cad8ee8ac9817528a494a31b0a03a41ba93",
+  "harnessHead": "e102e7133d18b96fb23cf82e37f415e22320abe6",
+  "defaultUserDataPassed": true,
+  "defaultProductDataPassed": true,
+  "fullM6Complete": false,
+  "nativeWindowsLinuxProfileDefaultsCovered": false,
+  "guard": "First explicit-profile launch observed native appData under canonical owned HOME; only then removed --user-data-dir. CFFIXED_USER_HOME redirects native paths for this isolated macOS fixture only."
+}
