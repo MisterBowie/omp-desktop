@@ -1,0 +1,43 @@
+{
+  "accepted": true,
+  "reviewedAt": "2026-10-15T03:27:10.593077+00:00",
+  "sourceCandidate": "bdec50076f081d5d8042fe5a58912e7743a802fe",
+  "tag": "m5-test-20261015-bdec5007",
+  "runId": 38671315205,
+  "release": "https://github.com/MisterBowie/omp-desktop/releases/tag/m5-test-20261015-bdec5007",
+  "nativePlatforms": [
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "counts": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "platform": "linux",
+      "arch": "x64",
+      "counts": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "platform": "win32",
+      "arch": "x64",
+      "counts": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      }
+    }
+  ],
+  "downloadedAssets": 9,
+  "downloadedBytes": 1500824153,
+  "allAssetDigestsVerified": true,
+  "exactSourceAndRuntimePinsVerified": true,
+  "scope": "M5 functionality plus actual three-platform test-package delivery; installed UI/M6/M7 remain",
+  "wholeGoalComplete": false
+}

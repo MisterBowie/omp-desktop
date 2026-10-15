@@ -1,0 +1,208 @@
+{
+  "schema": "omp-desktop.test-package-release/1",
+  "tag": "m5-test-20261015-bdec5007",
+  "revision": "bdec50076f081d5d8042fe5a58912e7743a802fe",
+  "version": "0.15.2",
+  "run": {
+    "url": "https://github.com/MisterBowie/omp-desktop/actions/runs/38671315205"
+  },
+  "pins": {
+    "patchLevel": "62bc57b+omp-desktop.5",
+    "forkRepository": "https://github.com/MisterBowie/oh-my-pi",
+    "forkCommit": "36483311dfff67be7504f591974df93fc512a45a",
+    "forkTree": "7ba57b6d06fb8fe7e3f6352c67692e56cf39c3cd",
+    "baseSha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+    "baseVersion": "18.3.0"
+  },
+  "platforms": [
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "run": {
+        "id": "38671315205",
+        "attempt": "1",
+        "url": "https://github.com/MisterBowie/omp-desktop/actions/runs/38671315205"
+      },
+      "packagedRuntime": {
+        "provenance": {
+          "ompVersion": "18.3.0",
+          "desktopVersion": "0.15.2",
+          "platform": "darwin",
+          "arch": "arm64",
+          "patchLevel": "62bc57b+omp-desktop.5",
+          "forkCommit": "36483311dfff67be7504f591974df93fc512a45a",
+          "binaryBytes": 219127424,
+          "binarySha256": "cc7d1740ef6584074224bc272662b2ca4d6bc76a6b8a385818b1bb95783c3133",
+          "gateBytes": 53025,
+          "gateSha256": "3dd09910f71ee63f2b1ba13e06d8655f9b73af5e88f2c4dd29a92e0f11cd528b",
+          "build": {
+            "tool": "bun",
+            "bunVersion": "1.4.2",
+            "bytecode": true
+          }
+        },
+        "acceptance": {
+          "resources": "/var/folders/nj/vtw8zd2j31d1gdrtntc5y4600000gn/T/omp-packages 隔离 with spaces-tCqk6P/Resources",
+          "runtimeVersion": "18.3.0",
+          "protocolVersion": 2,
+          "getState": true,
+          "gateLoadControl": "refused",
+          "stop": {
+            "stopped": true,
+            "reaped": true,
+            "cleaned": true
+          },
+          "leftoverRuns": 0,
+          "childEnvironmentReadable": false
+        }
+      },
+      "planGoalRegression": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      },
+      "assets": [
+        {
+          "name": "OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-macos-arm64.dmg",
+          "kind": "dmg",
+          "bytes": 227391301,
+          "sha256": "57a67c77d6abd609bf1d34c3f689852efe81e49a1e04f6ddc1627c3735012aed"
+        },
+        {
+          "name": "OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-macos-arm64.zip",
+          "kind": "zip",
+          "bytes": 224780296,
+          "sha256": "dab7c37dec0780f0c7d48f432a4ccc7562ee157db8bf3c6c4b84e898a93b9f29"
+        }
+      ]
+    },
+    {
+      "platform": "linux",
+      "arch": "x64",
+      "run": {
+        "id": "38671315205",
+        "attempt": "1",
+        "url": "https://github.com/MisterBowie/omp-desktop/actions/runs/38671315205"
+      },
+      "packagedRuntime": {
+        "provenance": {
+          "ompVersion": "18.3.0",
+          "desktopVersion": "0.15.2",
+          "platform": "linux",
+          "arch": "x64",
+          "patchLevel": "62bc57b+omp-desktop.5",
+          "forkCommit": "36483311dfff67be7504f591974df93fc512a45a",
+          "binaryBytes": 244233696,
+          "binarySha256": "477bf18de1bc5c24c354e7a084d6bb25374e87e4ad5f9492fb52362db20ab713",
+          "gateBytes": 53025,
+          "gateSha256": "3dd09910f71ee63f2b1ba13e06d8655f9b73af5e88f2c4dd29a92e0f11cd528b",
+          "build": {
+            "tool": "bun",
+            "bunVersion": "1.4.2",
+            "bytecode": true
+          }
+        },
+        "acceptance": {
+          "resources": "/tmp/omp-packages 隔离 with spaces-hu8dv6/Resources",
+          "runtimeVersion": "18.3.0",
+          "protocolVersion": 2,
+          "getState": true,
+          "gateLoadControl": "refused",
+          "stop": {
+            "stopped": true,
+            "reaped": true,
+            "cleaned": true
+          },
+          "leftoverRuns": 0,
+          "childEnvironmentReadable": true
+        }
+      },
+      "planGoalRegression": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      },
+      "assets": [
+        {
+          "name": "OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-linux-x64.AppImage",
+          "kind": "appimage",
+          "bytes": 250365381,
+          "sha256": "2ff18e6b0196dd72c21ec8e98cac001a4682cf5a4ddfe1df47675c5da3f1cfc8"
+        },
+        {
+          "name": "OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-linux-x64.deb",
+          "kind": "deb",
+          "bytes": 208366704,
+          "sha256": "8b2ac986c19f160960a4803d0e4d97608af82ffb1179749955ab771b70938c46"
+        },
+        {
+          "name": "OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-linux-x64.rpm",
+          "kind": "rpm",
+          "bytes": 188766397,
+          "sha256": "13336be354ff419e9e46ebbbb1796e65c489245fce1c80388116e148e43e8167"
+        }
+      ]
+    },
+    {
+      "platform": "win32",
+      "arch": "x64",
+      "run": {
+        "id": "38671315205",
+        "attempt": "1",
+        "url": "https://github.com/MisterBowie/omp-desktop/actions/runs/38671315205"
+      },
+      "packagedRuntime": {
+        "provenance": {
+          "ompVersion": "18.3.0",
+          "desktopVersion": "0.15.2",
+          "platform": "win32",
+          "arch": "x64",
+          "patchLevel": "62bc57b+omp-desktop.5",
+          "forkCommit": "36483311dfff67be7504f591974df93fc512a45a",
+          "binaryBytes": 241522176,
+          "binarySha256": "fbcc74b446bf7c10c6063e10204f48115f758ac03ce100871844feeff2955313",
+          "gateBytes": 53025,
+          "gateSha256": "3dd09910f71ee63f2b1ba13e06d8655f9b73af5e88f2c4dd29a92e0f11cd528b",
+          "build": {
+            "tool": "bun",
+            "bunVersion": "1.4.2",
+            "bytecode": true
+          }
+        },
+        "acceptance": {
+          "resources": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\omp-packages 隔离 with spaces-nw9dG3\\Resources",
+          "runtimeVersion": "18.3.0",
+          "protocolVersion": 2,
+          "getState": true,
+          "gateLoadControl": "refused",
+          "stop": {
+            "stopped": true,
+            "reaped": true,
+            "cleaned": true
+          },
+          "leftoverRuns": 0,
+          "childEnvironmentReadable": false
+        }
+      },
+      "planGoalRegression": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      },
+      "assets": [
+        {
+          "name": "OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-windows-x64-setup.exe",
+          "kind": "nsis-setup",
+          "bytes": 200713124,
+          "sha256": "96ffa58c75618a604370f5791c085c4b97c2992f3b60c7a2b6e5de6911b112e5"
+        },
+        {
+          "name": "OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-windows-x64-portable.exe",
+          "kind": "portable",
+          "bytes": 200433143,
+          "sha256": "1cf179462c2e4b24d37613408d23401058474a5dd41f42fa3abeaa3f5e43f990"
+        }
+      ]
+    }
+  ]
+}

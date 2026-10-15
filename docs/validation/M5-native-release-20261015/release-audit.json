@@ -1,0 +1,95 @@
+{
+  "verified": true,
+  "observedAt": "2026-10-15T03:26:37.530215+00:00",
+  "candidate": "bdec50076f081d5d8042fe5a58912e7743a802fe",
+  "tag": "m5-test-20261015-bdec5007",
+  "runId": 38671315205,
+  "runUrl": "https://github.com/MisterBowie/omp-desktop/actions/runs/38671315205",
+  "releaseUrl": "https://github.com/MisterBowie/omp-desktop/releases/tag/m5-test-20261015-bdec5007",
+  "assets": [
+    {
+      "name": "BUILD-RECORD.json",
+      "bytes": 6904,
+      "sha256": "048ebfeeaad25274bd5c89d72e2091bdfb9d63f8bcc4b354cd7c8c40538ba354",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m5-test-20261015-bdec5007/BUILD-RECORD.json"
+    },
+    {
+      "name": "OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-linux-x64.AppImage",
+      "bytes": 250365381,
+      "sha256": "2ff18e6b0196dd72c21ec8e98cac001a4682cf5a4ddfe1df47675c5da3f1cfc8",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m5-test-20261015-bdec5007/OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-linux-x64.AppImage"
+    },
+    {
+      "name": "OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-linux-x64.deb",
+      "bytes": 208366704,
+      "sha256": "8b2ac986c19f160960a4803d0e4d97608af82ffb1179749955ab771b70938c46",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m5-test-20261015-bdec5007/OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-linux-x64.deb"
+    },
+    {
+      "name": "OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-linux-x64.rpm",
+      "bytes": 188766397,
+      "sha256": "13336be354ff419e9e46ebbbb1796e65c489245fce1c80388116e148e43e8167",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m5-test-20261015-bdec5007/OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-linux-x64.rpm"
+    },
+    {
+      "name": "OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-macos-arm64.dmg",
+      "bytes": 227391301,
+      "sha256": "57a67c77d6abd609bf1d34c3f689852efe81e49a1e04f6ddc1627c3735012aed",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m5-test-20261015-bdec5007/OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-macos-arm64.dmg"
+    },
+    {
+      "name": "OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-macos-arm64.zip",
+      "bytes": 224780296,
+      "sha256": "dab7c37dec0780f0c7d48f432a4ccc7562ee157db8bf3c6c4b84e898a93b9f29",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m5-test-20261015-bdec5007/OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-macos-arm64.zip"
+    },
+    {
+      "name": "OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-windows-x64-portable.exe",
+      "bytes": 200433143,
+      "sha256": "1cf179462c2e4b24d37613408d23401058474a5dd41f42fa3abeaa3f5e43f990",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m5-test-20261015-bdec5007/OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-windows-x64-portable.exe"
+    },
+    {
+      "name": "OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-windows-x64-setup.exe",
+      "bytes": 200713124,
+      "sha256": "96ffa58c75618a604370f5791c085c4b97c2992f3b60c7a2b6e5de6911b112e5",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m5-test-20261015-bdec5007/OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-windows-x64-setup.exe"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "bytes": 903,
+      "sha256": "f0b8b0e6dfcd6572c1b71955d7e97d1fcc82749295b65738d869dbd5073e7435",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m5-test-20261015-bdec5007/SHA256SUMS.txt"
+    }
+  ],
+  "platforms": [
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "counts": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "platform": "linux",
+      "arch": "x64",
+      "counts": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "platform": "win32",
+      "arch": "x64",
+      "counts": {
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      }
+    }
+  ],
+  "scope": "Actual native M5 test-package release. Records checked against source/CI and every public asset downloaded/hash checked; installed Electron workflows/M6/M7 remain."
+}

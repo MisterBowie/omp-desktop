@@ -1,0 +1,16 @@
+{
+  "app": "/Users/vv/Documents/对话/omp-local-m5-windows-review-20261015/macos-install-copy/Applications 中文 with spaces/OMP Desktop.app",
+  "resources": "/Users/vv/Documents/对话/omp-local-m5-windows-review-20261015/macos-install-copy/Applications 中文 with spaces/OMP Desktop.app/Contents/Resources",
+  "sourceArchive": {
+    "name": "OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-macos-arm64.zip",
+    "bytes": 224780296,
+    "sha256": "dab7c37dec0780f0c7d48f432a4ccc7562ee157db8bf3c6c4b84e898a93b9f29",
+    "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m5-test-20261015-bdec5007/OMP-Desktop-0.15.2-m5-test-20261015-bdec5007-macos-arm64.zip"
+  },
+  "bundleId": "net.misterbowie.omp-desktop",
+  "displayName": "OMP Desktop",
+  "executable": "/Users/vv/Documents/对话/omp-local-m5-windows-review-20261015/macos-install-copy/Applications 中文 with spaces/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+  "arch": "arm64",
+  "appUpdate": "owner: MisterBowie\nrepo: omp-desktop\nprovider: github\nupdaterCacheDirName: '@pi-desktopdesktop-updater'\n",
+  "scope": "Actual hash-verified Mac ZIP extracted to owned non-ASCII/spaced install-copy path; no Electron user workflow claimed."
+}
