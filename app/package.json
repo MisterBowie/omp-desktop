@@ -65,6 +65,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.13",
-    "@pi-desktop/plugin-devkit": "workspace:*"
+    "@pi-desktop/plugin-devkit": "workspace:*",
+    "yaml": "2.9.0"
   }
 }

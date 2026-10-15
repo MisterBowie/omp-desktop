@@ -1,0 +1,18 @@
+[
+  {
+    "check": "desktop-typecheck",
+    "exit": 0
+  },
+  {
+    "check": "lint",
+    "exit": 0
+  },
+  {
+    "check": "docs-check",
+    "exit": 0
+  },
+  {
+    "check": "release-docs",
+    "exit": 0
+  }
+]

@@ -228,6 +228,12 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
       to: "omp-runtime",
       filter: ["**/*", "!.gitignore"],
     },
+    { from: "resources/licenses", to: "licenses" },
+    {
+      from: "resources/licenses-generated",
+      to: "licenses/dependencies",
+      filter: ["**/*", "!.gitignore"],
+    },
   ]);
   // The output directory must stay tracked so a clean checkout can build into
   // it; the filter above keeps its `.gitignore` out of the packaged resources.

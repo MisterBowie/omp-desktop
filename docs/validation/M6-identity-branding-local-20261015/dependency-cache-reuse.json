@@ -1,0 +1,9 @@
+{
+  "mode": "Independent APFS COW copy of validated M5 dependency cache; offline install was not successful because store index lacks tarballs",
+  "source": "/Users/vv/Documents/对话/omp-desktop-local-m5-windows/app",
+  "destination": "/Users/vv/Documents/对话/omp-desktop-local-m6/app",
+  "lockSha256": "502978094d6d1ff5352e848e9dcae64c95cb13664e3f8c482f172a3543e4ba31",
+  "packageManager": "10.34.5",
+  "generatedWrappersRebased": 102,
+  "productOrDependencySourceModified": false
+}

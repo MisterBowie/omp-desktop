@@ -11,6 +11,20 @@
 
 ## 1. 目标
 
+### E2E-OMP-installed-identity-and-workflow
+
+- **前置条件**：真实 OMP 安装产物、固定包内运行时、自有 HOME/profile/data/cache/temp
+  目录、中文和空格工作区、本地确定性模型夹具；不读取用户配置或真实提供方凭据。
+- **步骤**：核对安装名称、appId、架构、包元数据和更新缓存/来源；按清单验证原始声明
+  字节。启动实际应用、打开项目、发消息、拒绝和批准写入、运行工具、停止长任务、退出
+  后重启并恢复同一份原生历史。
+- **预期**：OMP 品牌与独立的数据/更新身份，不依赖全局 Bun/OMP；拒绝零写入、批准恰好
+  一次、实际取消工具、恢复不重放、自有进程树无残留。保留 Cursor + Plan/Goal 拒绝门
+  以及非 Cursor 的全部严格契约。
+- **状态**：配置/图标契约和真实 builder 元数据已有自动化。实际安装用户路径与原生
+  生命周期仍是 M6 必须通过的验收；仅构建成功不足以结项。
+- **规格**：发布手册、OMP 运行时边界与包内 sidecar ADR 0307。
+
 - 记录 MVP 必须验证的每个用户可见和协议可见的行为。
 - 提供映射到验收标准 (A–H) 和里程碑 (M1–M6) 的场景目录。
 - 作为可追溯性主干：场景 ID ↔ 验收标准 ↔ 规范。
@@ -5184,6 +5198,7 @@ eleven-tool-round desktop paths are verified by
 
 | 验收 | 应用场景 |
 |---|---|
+| A / E / F / Release — OMP 安装身份和用户流程 | E2E-OMP-installed-identity-and-workflow |
 | C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
 | C / F / Quality — Saved project isolation | E2E-SCHEDULED-manual-workspace-binding |
 | C / F / Quality — 桌面定时任务 | E2E-SCHEDULED-desktop-automation-lifecycle |

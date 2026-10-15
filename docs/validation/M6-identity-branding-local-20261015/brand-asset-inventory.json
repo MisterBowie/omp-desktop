@@ -1,0 +1,86 @@
+{
+  "assets": [
+    {
+      "name": "icon_1024.png",
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "format": "PNG",
+      "bytes": 52399,
+      "sha256": "b25b3389a238f2ce6f18623267a18ea6d55ee8dbbb4cbabd86b4adf5656ea280"
+    },
+    {
+      "name": "icon.png",
+      "dimensions": [
+        512,
+        512
+      ],
+      "format": "PNG",
+      "bytes": 23958,
+      "sha256": "5a36110e67a969f26b55e1198798bd9fe76538b5acf52d9900797d5de5846461"
+    },
+    {
+      "name": "icon.ico",
+      "dimensions": [
+        256,
+        256
+      ],
+      "format": "ICO",
+      "bytes": 30688,
+      "sha256": "93173dbff6ec71804b5f14116dca7c01bed77cc3cdf5ec948d0fdf6d1ab0bfa8"
+    },
+    {
+      "name": "icon.icns",
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "format": "ICNS",
+      "bytes": 210913,
+      "sha256": "31c50fbff605875ff3d362a1dd84fa54ddaf084a3906716838ca26d06d85ad61"
+    },
+    {
+      "name": "tray-icon-mac.png",
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "format": "PNG",
+      "bytes": 35192,
+      "sha256": "f5836b6521cf1fe738de525b359aed3ab55e846a2f693f97ec0ed02eedc85c59"
+    },
+    {
+      "name": "omp-mark-mask.png",
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "format": "PNG",
+      "bytes": 19815,
+      "sha256": "14e7d720f0c74688c1fbbb05434f46d6af413918e87081eba898a8117dcdded1"
+    },
+    {
+      "name": "dmg-background.png",
+      "dimensions": [
+        720,
+        440
+      ],
+      "format": "PNG",
+      "bytes": 203548,
+      "sha256": "d3f7745437de4ec75cbb32664402b9e3688803f20be18b87b28fb8a59aedbe48"
+    },
+    {
+      "name": "dmg-background@2x.png",
+      "dimensions": [
+        1440,
+        880
+      ],
+      "format": "PNG",
+      "bytes": 480423,
+      "sha256": "30ebc922866ba7f4239a2f0fc0e96917d480dbcb7a73205bcba27989797ad42e"
+    }
+  ],
+  "visualInspection": "Master and DMG inspected; template monochrome/alpha verified",
+  "nativeIcns": "iconutil succeeded with host build permissions; sandboxed initial conversion refused"
+}

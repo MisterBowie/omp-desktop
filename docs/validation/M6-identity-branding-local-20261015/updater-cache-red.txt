@@ -1,0 +1,32 @@
+  • electron-builder  version=26.15.3 os=22.5.0
+  • loaded configuration  file=package.json ("build" field)
+✖ installed metadata gives OMP its own updater cache through the real builder (305.916375ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 776.119041
+
+✖ failing tests:
+
+test at apps/desktop/test/installed-product-identity.test.mjs:12:1
+✖ installed metadata gives OMP its own updater cache through the real builder (305.916375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '@pi-desktopdesktop-updater'
+  - 'omp-desktop-updater'
+  
+      at TestContext.<anonymous> (file:///Users/vv/Documents/%E5%AF%B9%E8%AF%9D/omp-desktop-local-m6/app/apps/desktop/test/installed-product-identity.test.mjs:19:10)
+      at Test.run (node:internal/test_runner/test:1125:7)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '@pi-desktopdesktop-updater',
+    expected: 'omp-desktop-updater',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,33 @@
+{
+  "schema": "omp-desktop.source-notices/1",
+  "productSource": "https://github.com/MisterBowie/omp-desktop",
+  "productRevision": "The exact revision in the release BUILD-RECORD.json",
+  "ompForkCommit": "36483311dfff67be7504f591974df93fc512a45a",
+  "bunVersion": "1.4.2",
+  "files": [
+    {
+      "file": "PI-Desktop-LICENSE.txt",
+      "url": "https://github.com/vastsa/PI-Desktop/blob/0111e306c120ad5820688d7608cb37bad8fbcc1f/LICENSE",
+      "bytes": 7652,
+      "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118"
+    },
+    {
+      "file": "OMP-LICENSE.txt",
+      "url": "https://github.com/MisterBowie/oh-my-pi/blob/36483311dfff67be7504f591974df93fc512a45a/LICENSE",
+      "bytes": 1144,
+      "sha256": "16c45f9d667442781f03fa198914cc39abcaa48ec5ed8f644643e554ca2fbf63"
+    },
+    {
+      "file": "OMP-THIRD-PARTY-NOTICES.txt",
+      "url": "https://github.com/MisterBowie/oh-my-pi/blob/36483311dfff67be7504f591974df93fc512a45a/THIRD-PARTY-NOTICES.txt",
+      "bytes": 1076433,
+      "sha256": "83ed283000678eeac9c538e5b4f3710a2917e92d8f126d5b7dbfe29d494348e7"
+    },
+    {
+      "file": "Bun-LICENSE.md",
+      "url": "https://github.com/oven-sh/bun/blob/bun-v1.4.2/LICENSE.md",
+      "bytes": 5613,
+      "sha256": "b9caf52728691b4057e371232c221a132883198be2f3d2ddf92c90404c984b1a"
+    }
+  ]
+}

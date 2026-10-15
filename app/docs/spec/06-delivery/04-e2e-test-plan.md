@@ -8,6 +8,24 @@
 
 ## 1. Goals
 
+### E2E-OMP-installed-identity-and-workflow
+
+- **Preconditions:** Actual OMP installer output, fixed bundled runtime, owned
+  HOME/profile/data/cache/temp roots, non-ASCII/spaced workspace, and a local
+  deterministic model fixture. No user profile or live provider credentials.
+- **Steps:** Inspect installed name/id/architecture, package metadata and update
+  cache/feed. Check original notice bytes against their inventories. Launch the
+  actual application; open a project; submit a prompt; deny then allow a write;
+  run a tool; stop a long task; quit and reopen; recover the same native history.
+- **Expected:** OMP branding and independent storage/update names, no global
+  Bun/OMP dependency, no rejected write, exactly one allowed write, actual tool
+  cancellation, no replay after recovery, and no remaining owned process tree.
+  Keep Cursor + Plan/Goal refusal and all non-Cursor strict contracts intact.
+- **Status:** Configuration/artwork contracts and real builder metadata are
+  automated. Installed user paths and native lifecycle results remain required
+  M6 acceptance; a successful build alone is insufficient.
+- **Specs:** Release runbook, OMP runtime boundary and bundled sidecar ADR 0307.
+
 ### E2E-IMAGES-desktop-conversation
 
 - **Preconditions:** Isolated desktop profile and workspace, built image feature,
@@ -7929,6 +7947,7 @@ identify the platform validation still needed.
 
 | Acceptance | Scenarios |
 |---|---|
+| A / E / F / Release — Installed OMP identity and workflow | E2E-OMP-installed-identity-and-workflow |
 | C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
 | C / F / Quality — Saved project isolation | E2E-SCHEDULED-manual-workspace-binding |
 | C / F / Quality — Desktop automations | E2E-SCHEDULED-desktop-automation-lifecycle |

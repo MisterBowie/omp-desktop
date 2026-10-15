@@ -7,6 +7,32 @@
 > macOS signing/notarization 保留下面的详细资格通道。
 > 交叉引用：[里程碑](/zh-CN/spec/06-delivery/01-mvp-milestones) · [进程模型](/zh-CN/spec/03-runtime/07-process-model) · [安全性](/zh-CN/spec/05-security/01-security)
 
+## OMP Desktop 分发身份（M6）
+
+内部 workspace 名称仍是 `@pi-desktop/desktop`，保持导入与构建过滤器兼容。
+安装元数据通过 `build.extraMetadata.name = "omp-desktop"` 覆盖；真实 electron-builder
+在生成 `omp-desktop-updater` 前合并它，仅修改 productName 会继续共用 PI 的
+`@pi-desktopdesktop-updater` 缓存。安装产物必须保持 OMP Desktop、
+`net.misterbowie.omp-desktop`、独立的数据/profile/凭证名称，以及
+`MisterBowie/omp-desktop` 更新源。
+
+所有随包语言以 OMP Desktop 称呼当前产品；原作者、许可证、外部导入来源、内部协议
+名称和 host 可执行文件名保留。MCP 注册/握手、回调和诊断文字使用 APP_NAME；工具及
+操作 id 保持兼容。新标记来自 `apps/desktop/build/omp-mark.svg`；按顺序
+运行 `make-brand.py`、`make-icon.py`、`make-dmg-background.py` 生成主图、主题标记、
+平台图标及两图标安装背景。macOS 模板直接使用标记的 alpha 几何，不包含底板或 PI
+专用亮度裁剪。
+
+`Resources/licenses` 原样保留固定 PI-Desktop、OMP/native 与 Bun 声明、来源和摘要。
+发布入口在 sidecar 预检通过后、electron-builder 之前生成锁定 Node/Rust 依赖声明，
+失败即停止打包。`licenses/dependencies/inventory.json` 记录每份原始文件在声明包中的
+字节偏移、长度及 SHA256。构建依赖也包含在清单内，不表示每个列出的组件都会分发；
+Electron 自身许可和 Chromium 声明继续保留在其分发文件中。
+
+验收必须读取真实安装元数据、更新配置、图标与声明资源，再在自有目录中走完整的
+renderer/host/包内运行时流程。配置和图标测试不能单独完成 M6。测试 prerelease 仍未
+签名、不发布自动更新 feed；只有实际运行签名及公证后，才记录相应资格。
+
 ## 1. 构建通道
 
 | 通道 | 命令 | 签名 | 用途 |
@@ -464,18 +490,18 @@ Inter、Noto Sans SC、LXGW WenKai），因此 `out/renderer` 中只剩 KaTeX �
 
 在干净的轮廓上手动烟雾 (`PI_DESKTOP_DATA_DIR=$(mktemp -d)`)：
 
-1. `pnpm dev` 与 `PI-Desktop` 一起在 macOS 应用程序菜单中启动，
+1. `pnpm dev` 与 `OMP Desktop` 一起在 macOS 应用程序菜单中启动，
    Dock 和本机“关于”面板中的规范图标；没有 Electron 品牌
    可见。
 2. 应用程序从 DMG 安装启动，出现窗口，然后出现应用程序菜单，
    关于面板和 Dock 品牌与开发路线相匹配。
-3. 空首页和 expanded/collapsed 侧边栏显示规范的 PI-Desktop
+3. 空首页和 expanded/collapsed 侧边栏显示规范的 OMP Desktop
    标志；输入框提示行没有领先的品牌图标；新任务和
 project/Temporary 使用消息加会话图标创建控件。
 4. 出现新手引导清单；配置提供商；一轮流式聊天。
 5. 一种授权工具调用（写入）允许 + 拒绝路径。
 6. Quit/relaunch → 恢复会话历史记录，恢复窗口边界。
-7. `~/.pi-desktop/logs/` 包含 `app/`、`host/` 和 `agent/` 下分类的 NDJSON；
+7. `<isolated data root>/logs/` 包含 `app/`、`host/` 和 `agent/` 下分类的 NDJSON；
    关键的生命周期、工具、provider、plugin 和错误记录可用，不再创建独立的计时文件。
 8. 禁用网络访问后，shell 仍然启动； English/Chinese
    切换、语法高亮、shell 高亮、KaTeX、Mermaid fallback/rendering、
@@ -489,8 +515,8 @@ project/Temporary 使用消息加会话图标创建控件。
 电子更新程序清单。在该目标操作系统上运行目标命令：
 
 ```text
-macOS Apple Silicon: pnpm --filter @pi-desktop/desktop run dist:mac -- --arm64
-macOS Intel:         pnpm --filter @pi-desktop/desktop run dist:mac -- --x64
+macOS Apple Silicon: pnpm --filter @pi-desktop/desktop run dist:mac --arm64
+macOS Intel:         pnpm --filter @pi-desktop/desktop run dist:mac --x64
 Windows: pnpm --filter @pi-desktop/desktop dist:win
 Linux:   pnpm --filter @pi-desktop/desktop dist:linux
 ```

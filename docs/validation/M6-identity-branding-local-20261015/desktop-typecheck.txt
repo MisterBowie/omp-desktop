@@ -1,0 +1,4 @@
+
+> @pi-desktop/desktop@0.15.2 typecheck /Users/vv/Documents/对话/omp-desktop-local-m6/app/apps/desktop
+> tsc -p tsconfig.json --noEmit
+

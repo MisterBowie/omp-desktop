@@ -60,7 +60,7 @@ test("Windows packages pin OMP Desktop executable and shortcut names", () => {
   assert.notEqual(packageJson.build.nsis.shortcutName, "PI-Desktop");
 });
 
-test("Windows packages and windows use the canonical PI-Desktop icon", () => {
+test("Windows packages and windows use the canonical OMP Desktop icon", () => {
   assert.equal(packageJson.build.win.icon, "build/icon.ico");
   assert.deepEqual(
     packageJson.build.win.extraResources.find((resource) => resource.to === "app-icon.ico"),
@@ -87,7 +87,7 @@ test("Linux packages align the desktop entry with the Wayland app identity", () 
   assert.equal(packageJson.build.linux.executableName, "omp-desktop");
 });
 
-test("macOS development uses the canonical PI-Desktop Dock icon", () => {
+test("macOS development uses the canonical OMP Desktop Dock icon", () => {
   assert.match(
     brandingSource,
     /process\.platform !== "darwin" \|\| !isDevelopmentBuild \|\| !app\.dock/,

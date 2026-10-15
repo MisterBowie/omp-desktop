@@ -83,6 +83,7 @@
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { writeDistributionNotices } from "./distribution-notices.mjs";
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DESKTOP_DIR = join(APP_ROOT, "apps", "desktop");
@@ -457,6 +458,15 @@ export function runRelease(argv, options = {}) {
   );
   const preflight = spawn(plan.preflight.command, plan.preflight.args, spawnOptions);
   if (preflight.status !== 0) return preflight.status ?? 1;
+  try {
+    const notices = options.prepareNotices
+      ? options.prepareNotices()
+      : writeDistributionNotices(APP_ROOT, plan.target);
+    log(`RELEASE-PACKAGE: dependency notices ${JSON.stringify(notices ?? {})}`);
+  } catch (error) {
+    logError(`RELEASE-PACKAGE-FAIL dependency notices: ${error.message}`);
+    return 1;
+  }
   log(`RELEASE-PACKAGE ${plan.target.platform}/${plan.target.arch}: electron-builder ${plan.builder.args.join(" ")}`);
   const builder = spawn(plan.builder.command, plan.builder.args, {
     ...spawnOptions,

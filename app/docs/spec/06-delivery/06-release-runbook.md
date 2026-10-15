@@ -5,6 +5,41 @@
 > macOS signing/notarization remains the detailed qualification lane below.
 > Cross-references: [milestones](01-mvp-milestones.md) · [process model](../03-runtime/07-process-model.md) · [security](../05-security/01-security.md)
 
+## OMP Desktop distribution identity (M6)
+
+The OMP fork keeps the workspace name `@pi-desktop/desktop` for internal imports
+and build filters. Installed metadata uses `build.extraMetadata.name =
+"omp-desktop"`. The real electron-builder configuration loader merges that name
+before deriving `omp-desktop-updater`; changing only `productName` would retain
+PI-Desktop's `@pi-desktopdesktop-updater` cache. Installed bundles must retain
+`OMP Desktop`, `net.misterbowie.omp-desktop`, their own data/profile/credential
+names, and the `MisterBowie/omp-desktop` update source.
+
+All shipped locales name the current product OMP Desktop. Original authors,
+licenses, external import-source labels, internal protocol names and host
+executable filenames retain their original identities. MCP registration/handshake
+labels, callback copy and diagnostics use `APP_NAME`; tool and operation ids stay
+compatible. The new mark is the
+controlled vector `apps/desktop/build/omp-mark.svg`. Run `make-brand.py`,
+`make-icon.py`, and `make-dmg-background.py` in that order to derive the master,
+theme marks, platform icons and two-icon installer artwork. The macOS template
+uses the mark's alpha geometry, without a tile or a PI-specific luminance crop.
+
+`Resources/licenses` preserves the pinned PI-Desktop, OMP/native and Bun notices
+with source coordinates and byte digests. The release entry prepares frozen Node and target-host Rust dependency
+notices after the sidecar preflight and before electron-builder; failure stops
+packaging. `licenses/dependencies/inventory.json` records each published notice's
+original byte offset, length and SHA256 inside the notice bundle. Build-only
+dependencies are included and identified as such in the scope statement; their
+presence does not imply that every listed package is distributed. Electron's
+own license/Chromium notices remain in its framework distribution.
+
+Package acceptance must inspect actual installed metadata, update configuration,
+icons and notice resources, then exercise the real renderer/host/bundled-runtime
+workflow in owned data directories. Configuration and artwork checks alone do
+not close M6. Test prereleases remain unsigned and do not publish update feeds;
+Developer ID/notarization is qualified only when those signing steps really run.
+
 ## 1. Build lanes
 
 | Lane | Command | Signing | Use |
@@ -563,18 +598,18 @@ so its `woff2` row is no longer current.
 
 Manual smoke on a clean profile (`PI_DESKTOP_DATA_DIR=$(mktemp -d)`):
 
-1. `pnpm dev` launches with `PI-Desktop` in the macOS application menu and the
+1. `pnpm dev` launches with `OMP Desktop` in the macOS application menu and the
    canonical icon in both the Dock and native About panel; no Electron brand is
    visible.
 2. App launches from DMG install, window appears, and the application-menu,
    About-panel, and Dock branding match the development lane.
-3. Empty home and expanded/collapsed sidebar show the canonical PI-Desktop
+3. Empty home and expanded/collapsed sidebar show the canonical OMP Desktop
    logo; composer prompt rows have no leading brand icon; New task and
    project/Temporary create controls use the message-plus session icon.
 4. Onboarding checklist appears; configure provider; one streamed chat turn.
 5. One permissioned tool call (Write) allow + deny paths.
 6. Quit/relaunch → session history restored, window bounds restored.
-7. `~/.pi-desktop/logs/` contains categorized NDJSON under `app/`, `host/`,
+7. `<isolated data root>/logs/` contains categorized NDJSON under `app/`, `host/`,
    and `agent/`; key lifecycle, tool, provider, plugin, and error records are
    available without dedicated timing files.
 8. With network access disabled, the shell still starts; English/Chinese
@@ -590,8 +625,8 @@ runtime and Electron app. D126/D285 tag workflows publish these outputs and
 their electron-updater manifests. Run a target command on that target OS:
 
 ```text
-macOS Apple Silicon: pnpm --filter @pi-desktop/desktop run dist:mac -- --arm64
-macOS Intel:         pnpm --filter @pi-desktop/desktop run dist:mac -- --x64
+macOS Apple Silicon: pnpm --filter @pi-desktop/desktop run dist:mac --arm64
+macOS Intel:         pnpm --filter @pi-desktop/desktop run dist:mac --x64
 Windows: pnpm --filter @pi-desktop/desktop dist:win
 Linux:   pnpm --filter @pi-desktop/desktop dist:linux
 ```

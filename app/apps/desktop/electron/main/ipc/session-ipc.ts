@@ -2,6 +2,7 @@ import { shell } from "electron";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { mkdirSync } from "node:fs";
 import {
+  APP_NAME,
   ErrorCodes,
   IPC,
   modelConfigImportKey,
@@ -491,7 +492,7 @@ export function registerSessionIpc({
   });
   handle(IPC.invoke.sessionDelete, async (id: string) => {
     if (id.startsWith("native-pi:")) {
-      throw Object.assign(new Error("Native Pi sessions cannot be deleted from PI-Desktop"), {
+      throw Object.assign(new Error(`Native Pi sessions cannot be deleted from ${APP_NAME}`), {
         errorCode: ErrorCodes.INVALID_ARGUMENT,
       });
     }

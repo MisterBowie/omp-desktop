@@ -1,0 +1,11 @@
+Actual local checks, 2026-10-15 (macOS arm64)
+1. Real Packager.validateConfig/AppInfo regression: old configuration RED (1 fail), extraMetadata.name fix GREEN (1 pass).
+2. Node24 --test, 14 affected test files: 139 pass / 0 fail / 0 skipped.
+3. pnpm --filter @pi-desktop/desktop typecheck: exit0.
+4. pnpm lint: exit0. pnpm docs:check: exit0,79 locale pairs/513 pages. check-release-docs: exit0.
+5. pnpm build:js: exit0 at initial locale/artwork state; later Main/header labels passed typecheck/tests. Final production package command will rebuild before installed acceptance.
+6. make-brand.py and make-dmg-background.py: exit0; first iconutil under sandbox refused; exact native iconutil invocation with build permissions exit0. PNG/ICO/ICNS sizes/alpha inspected.
+7. Real locked dependency notice generation: 809 Node +106 Rust components,968 original notice files. Every offset/length/SHA checked; two generations identical. Frozen-lock exclusion, symlink refusal and byte preservation covered by fixture tests.
+8. Fresh offline PNPM install failed because the local store index lacks tarballs. Reused independent APFS COW copies of the validated M5 dependency tree, rebasing only generated executable wrappers. No successful fresh-install claim. Added direct build-only yaml2.9.0, already locked transitively; only 3 importer lines added to lockfile, no existing package version changed.
+No installed Electron workflow, native Windows/Linux lifecycle or M6 release claimed by this subtask.
+Git whitespace check excludes byte-preserved upstream license files and hashed raw evidence output; editable source/docs checked.

@@ -17,6 +17,7 @@
  * by a stub in tests and by the real `globalShortcut` in the app.
  */
 import {
+  APP_NAME,
   KEYBOARD_SHORTCUTS,
   isAllowedKeybinding,
   isReservedKeybinding,
@@ -132,7 +133,7 @@ export class PluginShortcutRegistry {
         { pluginId, accelerator, code: "SHORTCUT_CONFLICT" },
         new PluginShortcutError(
           "SHORTCUT_CONFLICT",
-          `${accelerator} is already used by PI-Desktop`,
+          `${accelerator} is already used by ${APP_NAME}`,
         ),
       );
     }

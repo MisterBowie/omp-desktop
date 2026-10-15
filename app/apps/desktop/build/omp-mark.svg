@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"
+     fill="none" stroke="#143D35" stroke-linecap="round" stroke-linejoin="round">
+  <title>OMP Desktop</title>
+  <polyline stroke-width="32" points="96,184 256,96 416,184 416,328 256,416 96,328 96,184"/>
+  <polyline stroke-width="28" points="184,208 232,256 184,304"/>
+  <polyline stroke-width="28" points="272,304 328,304"/>
+</svg>

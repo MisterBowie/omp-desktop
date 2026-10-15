@@ -1,0 +1,19 @@
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Progress: resolved 918, reused 0, downloaded 0, added 0
+Progress: resolved 936, reused 0, downloaded 0, added 0
+ WARN  8 deprecated subdependencies found: @xmldom/xmldom@0.8.13, @xmldom/xmldom@0.9.10, boolean@3.2.0, glob@7.2.0, inflight@1.0.6, lodash.isequal@4.5.0, node-domexception@1.0.0, rimraf@2.6.3
+Progress: resolved 936, reused 0, downloaded 0, added 0, done
+ WARN  Issues with peer dependencies found
+apps/desktop
+├─┬ @tailwindcss/vite 4.3.3
+│ └── ✕ unmet peer vite@">=6.4.3 <7": found 7.3.6
+├─┬ @vitejs/plugin-react 4.7.0
+│ └── ✕ unmet peer vite@">=6.4.3 <7": found 7.3.6
+└─┬ electron-vite 4.0.1
+  └── ✕ unmet peer vite@">=6.4.3 <7": found 7.3.6
+
+devDependencies:
++ yaml 2.9.0
+
+Already up to date
+Done in 3s using pnpm v10.34.5

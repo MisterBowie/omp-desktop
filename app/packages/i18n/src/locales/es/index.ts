@@ -2,9 +2,9 @@ import type { EnglishCatalog } from "../en/index.js";
 
 export const es = {
   "app": {
-    "shellName": "PI-Desktop",
+    "shellName": "OMP Desktop",
     "tagline": "Socio de codificación de IA local",
-    "starting": "Iniciando PI-Desktop…",
+    "starting": "Iniciando OMP Desktop…",
     "loadingView": "Cargando vista…",
     "uiCrashed": "Algo salió mal con la interfaz"
   },
@@ -26,12 +26,12 @@ export const es = {
     "unread": "Sin leer",
     "pinned": "Fijadas",
     "viewMore": "Ver más…",
-    "open": "Abrir PI-Desktop",
-    "quit": "Salir de PI-Desktop",
-    "askTitle": "¿Mantener PI-Desktop ejecutándose en segundo plano?",
-    "askBody": "Cuando cierra la ventana, PI-Desktop puede seguir ejecutándose en la bandeja del sistema para que no se pierda nada. Puedes cambiar esto en cualquier momento en Configuración.",
+    "open": "Abrir OMP Desktop",
+    "quit": "Salir de OMP Desktop",
+    "askTitle": "¿Mantener OMP Desktop ejecutándose en segundo plano?",
+    "askBody": "Cuando cierra la ventana, OMP Desktop puede seguir ejecutándose en la bandeja del sistema para que no se pierda nada. Puedes cambiar esto en cualquier momento en Configuración.",
     "closeToTray": "Cerca de la bandeja",
-    "confirmQuitTitle": "¿Salir de PI-Desktop?",
+    "confirmQuitTitle": "¿Salir de OMP Desktop?",
     "confirmQuitBody": "¿Está seguro de que desea salir? Se detendrán todas las sesiones en ejecución y es posible que se pierdan los cambios no guardados.",
     "confirmQuit": "Salir"
   },
@@ -82,7 +82,7 @@ export const es = {
     "zoomOut": "Alejar",
     "toggleFullScreen": "Alternar pantalla completa",
     "toggleDevTools": "Herramientas de desarrollador",
-    "appHelp": "Ayuda de PI-Desktop",
+    "appHelp": "Ayuda de OMP Desktop",
     "openLogs": "Abrir registros",
     "checkForUpdates": "Buscar actualizaciones…"
   },
@@ -217,7 +217,7 @@ export const es = {
     "emptyTitle": "¿Qué puedo ayudarte a construir?",
     "emptyTitleInProject": "¿Qué podemos construir en {{project}}?",
     "emptyTitleTemporary": "¿Qué te gustaría explorar temporalmente?",
-    "placeholder": "Pídale ayuda a PI-Desktop con cualquier cosa",
+    "placeholder": "Pídale ayuda a OMP Desktop con cualquier cosa",
     "placeholderHome": "Pregunte cualquier cosa",
     "placeholderHint": "Escriba / para comandos · @ para archivos",
     "placeholderHomeHint": "Escriba / para comandos · @ para archivos",
@@ -643,7 +643,7 @@ sklm: {
       "Este proveedor proviene del complemento «{{plugin}}», que proporciona su punto final y sus modelos. Actívelo o desactívelo en la página «Extensiones».",
     "pluginProviderKey": "Clave API",
     "pluginProviderKeyHint":
-      "Se guarda en PI-Desktop y lo usa el entorno de ejecución. El complemento nunca lo recibe.",
+      "Se guarda en OMP Desktop y lo usa el entorno de ejecución. El complemento nunca lo recibe.",
     "pluginProviderKeyRemove": "Eliminar clave",
     "pluginProviderKeySaved": "Clave API guardada",
     "pluginProviderKeyRemoved": "Clave API eliminada",
@@ -1385,7 +1385,7 @@ sklm: {
     "draft": "Borrador"
   },
   "scheduled": {
-    "description": "Ejecuta tareas recurrentes mientras PI-Desktop está abierto.",
+    "description": "Ejecuta tareas recurrentes mientras OMP Desktop está abierto.",
     "edit": "Editar tarea",
     "hourlyHint": "Se ejecuta cada hora, desde una hora después de guardar o activar. Reiniciar la app reinicia el intervalo.",
     "morning": "Mañana",
@@ -1399,7 +1399,7 @@ sklm: {
     "legacyHint": "Edita y guarda la programación para activar las ejecuciones automáticas.",
     "time": "Hora",
     "weekday": "Día de la semana",
-    "localTimeHint": "Usa la zona horaria local. Mantén PI-Desktop abierto; las ejecuciones omitidas no se recuperan. Las acciones restringidas requieren autorización.",
+    "localTimeHint": "Usa la zona horaria local. Mantén OMP Desktop abierto; las ejecuciones omitidas no se recuperan. Las acciones restringidas requieren autorización.",
     "projectHint": "Se guarda el proyecto actual. Se utiliza el modelo predeterminado.",
     "save": "Guardar tarea",
     "cancel": "Cancelar",
@@ -1853,8 +1853,8 @@ sklm: {
       "agent.prompt.inject": "Puede cambiar las instrucciones enviadas al agente de IA.",
       "agent.complete": "Puede gastar su cuota de modelo en una finalización única. El complemento nunca recibe sus claves API.",
       "agent.extension": "Ejecuta módulos ExtensionAPI dentro del proceso del agente con el mismo acceso que sus propias herramientas. Activa solo código en el que confíes.",
-      "provider.register": "Agregue los proveedores que define este complemento a la lista de proveedores de Configuración. El complemento aporta el punto final y los modelos; su clave API permanece en PI-Desktop.",
-      "desktop.control": "Permite invocar el catálogo de control de PI-Desktop revisado; las operaciones destructivas siguen requiriendo confirm=true y el token bearer de MCP no se expone.",
+      "provider.register": "Agregue los proveedores que define este complemento a la lista de proveedores de Configuración. El complemento aporta el punto final y los modelos; su clave API permanece en OMP Desktop.",
+      "desktop.control": "Permite invocar el catálogo de control de OMP Desktop revisado; las operaciones destructivas siguen requiriendo confirm=true y el token bearer de MCP no se expone.",
       "models.list": "Puede ver en qué modelos se ha registrado. No recibe llaves.",
       "session.read": "Puede leer la conversación en la que está operando la llamada de herramienta actual, incluidos los resultados de la herramienta.",
       "net.fetch": "Puede realizar solicitudes de red salientes.",
@@ -1867,7 +1867,7 @@ sklm: {
       "audio.capture.background": "Captura el micrófono mientras el complemento se ejecuta en segundo plano, sin ningún panel abierto.",
       "audio.playback.background": "Reproduce el audio que transmite el complemento, incluso cuando no hay ningún panel abierto.",
       "speech.adapter.register": "Puede añadir un protocolo de transcripción o voz que use tus claves de proveedor. El complemento nunca ve la clave.",
-      "keyboard.globalShortcut": "Registra atajos de teclado del sistema que activan los comandos propios de este complemento mientras PI-Desktop no tiene el foco.",
+      "keyboard.globalShortcut": "Registra atajos de teclado del sistema que activan los comandos propios de este complemento mientras OMP Desktop no tiene el foco.",
       "net.websocket": "Abre conexiones bidireccionales en tiempo real con los hosts que declara el complemento.",
       "bus.publish": "Puede enviar mensajes sobre los temas que declaró.",
       "bus.subscribe": "Puede recibir mensajes sobre los temas que declaró.",
@@ -2088,7 +2088,7 @@ sklm: {
     "unsupportedGlibc":
       "Esta versión para Linux requiere glibc 2.35 o posterior (Ubuntu 22.04, Debian 12, Fedora 36+).",
     "dbSchemaTooNew":
-      "Esta versión de PI-Desktop es más antigua que tus datos locales (esquema de datos {{found}}, esta versión admite {{supported}}). Instala la versión más reciente de PI-Desktop que abrió estos datos por última vez, o una posterior.",
+      "Esta versión de OMP Desktop es más antigua que tus datos locales (esquema de datos {{found}}, esta versión admite {{supported}}). Instala la versión más reciente de OMP Desktop que abrió estos datos por última vez, o una posterior.",
     "archMismatch":
       "Esta es la versión {{buildArch}} ejecutándose en una máquina {{machineArch}}, por lo que corre mediante traducción y es más lenta. Instala la versión {{machineArch}}.",
     "dismissArchMismatch": "Descartar",

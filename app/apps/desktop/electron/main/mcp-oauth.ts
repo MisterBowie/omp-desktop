@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import type { McpOAuthLoginEvent, McpServerRecord, McpServerStatus } from "@pi-desktop/shared";
+import { APP_NAME, type McpOAuthLoginEvent, type McpServerRecord, type McpServerStatus } from "@pi-desktop/shared";
 
 export type StoredMcpOAuthToken = {
   clientId: string;
@@ -173,7 +173,7 @@ export class McpOAuthManager {
           params: {
             protocolVersion: "2025-06-18",
             capabilities: {},
-            clientInfo: { name: "PI-Desktop", version: "1" },
+            clientInfo: { name: APP_NAME, version: "1" },
           },
         }),
       });
@@ -288,7 +288,7 @@ export class McpOAuthManager {
   async registerClient(
     registrationEndpoint: string,
     redirectUris: string | string[],
-    clientName = "PI-Desktop",
+    clientName = APP_NAME,
   ): Promise<{ clientId: string; clientSecret?: string }> {
     assertTlsProtectedUrl(registrationEndpoint, "registration_endpoint");
     const uris = Array.isArray(redirectUris) ? redirectUris : [redirectUris];
@@ -575,7 +575,7 @@ export class McpOAuthManager {
             res.end(
               this.renderHtml(
                 true,
-                "Authorization successful! You can close this tab and return to PI-Desktop.",
+                `Authorization successful! You can close this tab and return to ${APP_NAME}.`,
               ),
             );
 

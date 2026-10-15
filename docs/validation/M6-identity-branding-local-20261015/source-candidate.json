@@ -1,0 +1,281 @@
+{
+  "base": "e1c034e0451cd5af02147a19fe0e455b45e939ff",
+  "state": "Base plus the recorded task source files; code commit follows validation",
+  "files": [
+    {
+      "path": "app/apps/desktop/build/dmg-background.png",
+      "bytes": 203548,
+      "sha256": "d3f7745437de4ec75cbb32664402b9e3688803f20be18b87b28fb8a59aedbe48"
+    },
+    {
+      "path": "app/apps/desktop/build/dmg-background@2x.png",
+      "bytes": 480423,
+      "sha256": "30ebc922866ba7f4239a2f0fc0e96917d480dbcb7a73205bcba27989797ad42e"
+    },
+    {
+      "path": "app/apps/desktop/build/icon.icns",
+      "bytes": 210913,
+      "sha256": "31c50fbff605875ff3d362a1dd84fa54ddaf084a3906716838ca26d06d85ad61"
+    },
+    {
+      "path": "app/apps/desktop/build/icon.ico",
+      "bytes": 30688,
+      "sha256": "93173dbff6ec71804b5f14116dca7c01bed77cc3cdf5ec948d0fdf6d1ab0bfa8"
+    },
+    {
+      "path": "app/apps/desktop/build/icon.png",
+      "bytes": 23958,
+      "sha256": "5a36110e67a969f26b55e1198798bd9fe76538b5acf52d9900797d5de5846461"
+    },
+    {
+      "path": "app/apps/desktop/build/icon_1024.png",
+      "bytes": 52399,
+      "sha256": "b25b3389a238f2ce6f18623267a18ea6d55ee8dbbb4cbabd86b4adf5656ea280"
+    },
+    {
+      "path": "app/apps/desktop/build/logo_dark.png",
+      "bytes": 52399,
+      "sha256": "b25b3389a238f2ce6f18623267a18ea6d55ee8dbbb4cbabd86b4adf5656ea280"
+    },
+    {
+      "path": "app/apps/desktop/build/omp-mark-mask.png",
+      "bytes": 19815,
+      "sha256": "14e7d720f0c74688c1fbbb05434f46d6af413918e87081eba898a8117dcdded1"
+    },
+    {
+      "path": "app/apps/desktop/build/omp-mark.svg",
+      "bytes": 395,
+      "sha256": "ef2c1b9d5ea9251a36a66abaf0ddbdbed0787a117dfc3ec9cea78390d2746d36"
+    },
+    {
+      "path": "app/apps/desktop/build/tray-icon-mac.png",
+      "bytes": 35192,
+      "sha256": "f5836b6521cf1fe738de525b359aed3ab55e846a2f693f97ec0ed02eedc85c59"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/host-boot-diagnostics.ts",
+      "bytes": 4344,
+      "sha256": "14d9733e2831fa22a9cdb7f3b172366fc5171c1551e18f691c1e67c1e893375d"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/ipc/session-ipc.ts",
+      "bytes": 46226,
+      "sha256": "9c538566c7dfb8d4000640673b7b375c4608871b446b83ff0edeacf69168bf89"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/mcp-control.ts",
+      "bytes": 49518,
+      "sha256": "3e70cd976da7a883a8652ed2b3c9a8b21542e43147fd0aba2259a8611c089240"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/mcp-oauth.ts",
+      "bytes": 33937,
+      "sha256": "f5e3b611be4e182f558e61f0aa7937895d0e73a6519da509893134ee91f00c69"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/plugin-mcp.ts",
+      "bytes": 25720,
+      "sha256": "f3c097e5fe3481adf4c7a04929c30988d57e110c08409e9cfbd2bfe21157e039"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/plugin-shortcut-registry.ts",
+      "bytes": 10475,
+      "sha256": "6f1ec7b3fdbc87885e85114eb443eda1665478b0a2e9e164974f8bbb1409a35a"
+    },
+    {
+      "path": "app/apps/desktop/index.html",
+      "bytes": 710,
+      "sha256": "760757e5b88b1b07c346497999c7d1ad9dde8989d31d6efb8166248ca6083535"
+    },
+    {
+      "path": "app/apps/desktop/package.json",
+      "bytes": 9456,
+      "sha256": "205b9ff0d1caaf255da4c01f2603362b789f3ffca8db3dd1c9e47c3cb0d02a11"
+    },
+    {
+      "path": "app/apps/desktop/resources/licenses-generated/.gitignore",
+      "bytes": 14,
+      "sha256": "240a3e0d37d2e86b614063f5347eb02d4f99ca6c254de6b82871ff8d95532a7d"
+    },
+    {
+      "path": "app/apps/desktop/resources/licenses/Bun-LICENSE.md",
+      "bytes": 5613,
+      "sha256": "b9caf52728691b4057e371232c221a132883198be2f3d2ddf92c90404c984b1a"
+    },
+    {
+      "path": "app/apps/desktop/resources/licenses/OMP-LICENSE.txt",
+      "bytes": 1144,
+      "sha256": "16c45f9d667442781f03fa198914cc39abcaa48ec5ed8f644643e554ca2fbf63"
+    },
+    {
+      "path": "app/apps/desktop/resources/licenses/OMP-THIRD-PARTY-NOTICES.txt",
+      "bytes": 1076433,
+      "sha256": "83ed283000678eeac9c538e5b4f3710a2917e92d8f126d5b7dbfe29d494348e7"
+    },
+    {
+      "path": "app/apps/desktop/resources/licenses/PI-Desktop-LICENSE.txt",
+      "bytes": 7652,
+      "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118"
+    },
+    {
+      "path": "app/apps/desktop/resources/licenses/README.txt",
+      "bytes": 1466,
+      "sha256": "3e8a3850acb754c14fd4bab8d47143ccb699b78c339b837e027d40e5ce96eaac"
+    },
+    {
+      "path": "app/apps/desktop/resources/licenses/SHA256SUMS.txt",
+      "bytes": 502,
+      "sha256": "d19e96c90657e5c92793f13986e9f9fb08d43710ac8609cdefc8212d52b52477"
+    },
+    {
+      "path": "app/apps/desktop/resources/licenses/SOURCES.json",
+      "bytes": 1331,
+      "sha256": "b05289e4b389c0ad7d5adabc0a1558b85edb56c865d55f4c130169c22d664064"
+    },
+    {
+      "path": "app/apps/desktop/src/assets/brand/logo-dark.png",
+      "bytes": 4243,
+      "sha256": "f719c55f441d40a6fb11ab3f8a75f7d23624dcb0ad8acf994858a362aa5cbd0d"
+    },
+    {
+      "path": "app/apps/desktop/src/assets/brand/logo-light.png",
+      "bytes": 3583,
+      "sha256": "b2358422424eba485823cd0c354ab9ad37d187296c4726cb8f421c300f47d5e4"
+    },
+    {
+      "path": "app/apps/desktop/src/components/settings/ProviderHeadersEditor.tsx",
+      "bytes": 5542,
+      "sha256": "3fe1e40be60d3c9c0a38a707b1953b6f2c5e6f6c977da5db5dd12283deb48ea6"
+    },
+    {
+      "path": "app/apps/desktop/src/features/settings/SettingsPage.tsx",
+      "bytes": 22617,
+      "sha256": "eea799d7b64bf198ac5ab2cb83cfb855b6d3b82ce43707c0fc784b3e23768cd8"
+    },
+    {
+      "path": "app/apps/desktop/test/development-branding.test.mjs",
+      "bytes": 8103,
+      "sha256": "cf1d375e0465ce8e8a389c770059bc1803484958270df140a0b93e0d53889e9e"
+    },
+    {
+      "path": "app/apps/desktop/test/distribution-notices.test.mjs",
+      "bytes": 4304,
+      "sha256": "16c6327f77b164ec6cbd960ed2dce890e37be3c3fbd9718997025e73569a77c1"
+    },
+    {
+      "path": "app/apps/desktop/test/installed-product-identity.test.mjs",
+      "bytes": 1558,
+      "sha256": "51afaa79ac08526ae635f2d76706bf6a6c7240d55d2eceed26b1d1db6bdd2de8"
+    },
+    {
+      "path": "app/apps/desktop/test/omp-release-gate.test.mjs",
+      "bytes": 37675,
+      "sha256": "713e33b3cd1b052d5284018389ce40321f9b68c5b37982d34324d1ac6e135719"
+    },
+    {
+      "path": "app/apps/desktop/test/packaging-footprint.test.mjs",
+      "bytes": 15950,
+      "sha256": "5ef30b32d0e5017b9e9d35727a069ded951fef2920be1eebf2f5339024f00d22"
+    },
+    {
+      "path": "app/apps/desktop/test/renderer-branding.test.mjs",
+      "bytes": 5285,
+      "sha256": "21b6278dc058a9b5c1f4a9b0829e2c9d9e2347a896a1b650e85f992fce83babd"
+    },
+    {
+      "path": "app/docs/spec/06-delivery/04-e2e-test-plan.md",
+      "bytes": 936861,
+      "sha256": "e87013cf0e0ef690205430590e44ca803ea163dfcdc51dfa634b7ef7eec1e201"
+    },
+    {
+      "path": "app/docs/spec/06-delivery/06-release-runbook.md",
+      "bytes": 38690,
+      "sha256": "22f74d4a3cd168f07930178fef495d689dd0d28c6227f79f9aac1bae7f321849"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/06-delivery/04-e2e-test-plan.md",
+      "bytes": 640256,
+      "sha256": "ef5a081acfa633af05273639d7cf5172678f987c07d55f227b269975b3f876e2"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/06-delivery/06-release-runbook.md",
+      "bytes": 35735,
+      "sha256": "2e8c72e885c5016315ce857488c8bbd7dba972d8f1d7ddb7b20066a4285b0437"
+    },
+    {
+      "path": "app/package.json",
+      "bytes": 3953,
+      "sha256": "6e187e7ca8877db06e28867d9d040ee126f178bb3213d56d8be6988aec841f2a"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/de/index.ts",
+      "bytes": 112222,
+      "sha256": "1cb0955073bffc7b3630f9156048511c59a7f4d251463ddf2e02586e5c0c65f8"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/en/index.ts",
+      "bytes": 97611,
+      "sha256": "8848a1e67f24859740b7a3468d308e4b16c4d410e0d40d161936b70e6d299357"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/es/index.ts",
+      "bytes": 110573,
+      "sha256": "71f6eb8626ce89f64f19e37b09630fed3dfbc0d87e720bad8ceaa85feecf8d21"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/fr/index.ts",
+      "bytes": 113771,
+      "sha256": "2868e52dfbabad2fa09de70cc82d1d7c436821cf0b1068212dbb0b2335794106"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/ko/index.ts",
+      "bytes": 111889,
+      "sha256": "adf995517f40567e913dc78deaebb6eff6c255076fdd675304706a040941cdd9"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/tr/index.ts",
+      "bytes": 104254,
+      "sha256": "f9a6bc675120d59c008c03cb23956ea91efacd177f46ced31e04bf01897ef437"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/zh-CN/index.ts",
+      "bytes": 96483,
+      "sha256": "0df62b9b3029f268c1acffbad8fe435cdc463a972c02d58e4f445741045958b3"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/zh-TW/index.ts",
+      "bytes": 96891,
+      "sha256": "a60b178cb041bf0d07a906c48d8202cedd6469215dec7ffb4f5b8bf8c835c80b"
+    },
+    {
+      "path": "app/pnpm-lock.yaml",
+      "bytes": 285355,
+      "sha256": "1ecc60b0ecf85a82f86b5af1ddd0eadc618778c76826c9fc54abda57494d0d35"
+    },
+    {
+      "path": "app/scripts/distribution-notices.mjs",
+      "bytes": 8669,
+      "sha256": "632b1cd3d2cc240fbb7c4515a780dad11b6d5b45421b811e8e4cfb2c53d3f3b4"
+    },
+    {
+      "path": "app/scripts/make-brand.py",
+      "bytes": 3025,
+      "sha256": "4c819196fecad8917997fbaba314c2a68b056194bb71370f5be8eadf0141b53b"
+    },
+    {
+      "path": "app/scripts/make-dmg-background.py",
+      "bytes": 6083,
+      "sha256": "c18671191af1011c9e43923f11d60e24d19e0e615d7bf71480e39c78c9be74d3"
+    },
+    {
+      "path": "app/scripts/make-icon.py",
+      "bytes": 3598,
+      "sha256": "d9ef79a21bea1d23d4bf7e6afc08300fd71de5e0a696c0750b5655cf38324a6c"
+    },
+    {
+      "path": "app/scripts/release-package.mjs",
+      "bytes": 22486,
+      "sha256": "08d771a049f7f9cd1e13d19b4af5663fa79a34f24d92229c7ef193d695729a47"
+    }
+  ]
+}

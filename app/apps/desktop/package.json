@@ -81,6 +81,9 @@
   "build": {
     "appId": "net.misterbowie.omp-desktop",
     "productName": "OMP Desktop",
+    "extraMetadata": {
+      "name": "omp-desktop"
+    },
     "directories": {
       "output": "release"
     },
@@ -137,6 +140,18 @@
       {
         "from": "resources/omp-runtime",
         "to": "omp-runtime",
+        "filter": [
+          "**/*",
+          "!.gitignore"
+        ]
+      },
+      {
+        "from": "resources/licenses",
+        "to": "licenses"
+      },
+      {
+        "from": "resources/licenses-generated",
+        "to": "licenses/dependencies",
         "filter": [
           "**/*",
           "!.gitignore"

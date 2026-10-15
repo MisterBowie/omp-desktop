@@ -2,9 +2,9 @@ import type { EnglishCatalog } from "../en/index.js";
 
 export const zhCN = {
   app: {
-    shellName: "PI-Desktop",
+    shellName: "OMP Desktop",
     tagline: "本地 AI 编程助手",
-    starting: "正在启动 PI-Desktop…",
+    starting: "正在启动 OMP Desktop…",
     loadingView: "正在加载页面…",
     uiCrashed: "界面出现了问题",
   },
@@ -26,13 +26,13 @@ export const zhCN = {
     unread: "未读",
     pinned: "置顶",
     viewMore: "查看更多…",
-    open: "打开 PI-Desktop",
-    quit: "退出 PI-Desktop",
-    askTitle: "关闭后继续在后台运行 PI-Desktop？",
+    open: "打开 OMP Desktop",
+    quit: "退出 OMP Desktop",
+    askTitle: "关闭后继续在后台运行 OMP Desktop？",
     askBody:
-      "关闭窗口后，PI-Desktop 可以继续在系统托盘中运行，避免丢失任何内容。你随时可以在设置中更改此选项。",
+      "关闭窗口后，OMP Desktop 可以继续在系统托盘中运行，避免丢失任何内容。你随时可以在设置中更改此选项。",
     closeToTray: "关闭到托盘",
-    confirmQuitTitle: "确定退出 PI-Desktop？",
+    confirmQuitTitle: "确定退出 OMP Desktop？",
     confirmQuitBody:
       "退出将停止所有正在进行的会话，未保存的内容可能会丢失。你确定要退出吗？",
     confirmQuit: "退出",
@@ -84,7 +84,7 @@ export const zhCN = {
     zoomOut: "缩小",
     toggleFullScreen: "切换全屏",
     toggleDevTools: "开发者工具",
-    appHelp: "PI-Desktop 帮助",
+    appHelp: "OMP Desktop 帮助",
     openLogs: "打开日志",
     checkForUpdates: "检查更新…",
   },
@@ -219,7 +219,7 @@ export const zhCN = {
     emptyTitle: "今天想做点什么？",
     emptyTitleInProject: "今天想在 {{project}} 里做点什么？",
     emptyTitleTemporary: "临时聊点什么？",
-    placeholder: "让 PI-Desktop 帮你做任何事",
+    placeholder: "让 OMP Desktop 帮你做任何事",
     placeholderHome: "随便问问",
     placeholderHint: "输入 / 使用命令 · @ 引用文件",
     placeholderHomeHint: "输入 / 使用命令 · @ 引用文件",
@@ -641,7 +641,7 @@ sklm: {
     pluginProviderManaged:
       "此服务来自插件“{{plugin}}”，接口地址和模型均由该插件提供。可在“扩展”页面启用或停用。",
     pluginProviderKey: "API 密钥",
-    pluginProviderKeyHint: "保存在 PI-Desktop 中，由运行时使用。插件拿不到此密钥。",
+    pluginProviderKeyHint: "保存在 OMP Desktop 中，由运行时使用。插件拿不到此密钥。",
     pluginProviderKeyRemove: "移除密钥",
     pluginProviderKeySaved: "API 密钥已保存",
     pluginProviderKeyRemoved: "API 密钥已移除",
@@ -1398,7 +1398,7 @@ sklm: {
     legacyHint: "请编辑并保存执行周期，以启用自动执行。",
     time: "执行时间",
     weekday: "星期",
-    localTimeHint: "按电脑本地时区执行。请保持 PI-Desktop 运行；错过的任务不补跑。受限操作仍需授权。",
+    localTimeHint: "按电脑本地时区执行。请保持 OMP Desktop 运行；错过的任务不补跑。受限操作仍需授权。",
     projectHint: "保存时绑定当前项目，执行时使用默认模型。",
     save: "保存任务",
     cancel: "取消",
@@ -1852,9 +1852,9 @@ sklm: {
       "agent.prompt.inject": "可能修改发送给智能体的指令。",
       "agent.complete": "会消耗你的模型额度发起一次补全。插件拿不到 API 密钥。",
       "agent.extension": "在 agent 进程内运行 ExtensionAPI 模块，拥有与 agent 自身工具相同的权限。只启用你信任的代码。",
-      "provider.register": "把此插件定义的服务添加到设置的服务列表。接口地址和模型由插件提供，API 密钥则留在 PI-Desktop 中。",
+      "provider.register": "把此插件定义的服务添加到设置的服务列表。接口地址和模型由插件提供，API 密钥则留在 OMP Desktop 中。",
       "desktop.control":
-        "允许插件调用经过审查的 PI-Desktop 操作目录；破坏性操作仍需 confirm=true，插件永远拿不到 MCP bearer token。",
+        "允许插件调用经过审查的 OMP Desktop 操作目录；破坏性操作仍需 confirm=true，插件永远拿不到 MCP bearer token。",
       "models.list": "可以看到你已登录的模型，但拿不到密钥。",
       "session.read": "可以读取当前这次工具调用所在会话发给模型的对话，包括工具结果。",
       "net.fetch": "可发起出站网络请求。",
@@ -1867,7 +1867,7 @@ sklm: {
       "audio.capture.background": "插件在后台运行时（没有打开面板）也能采集麦克风。",
       "audio.playback.background": "即使没有打开面板，也能播放插件推送的音频。",
       "speech.adapter.register": "可以添加转写或朗读协议，复用你已有的服务密钥。插件拿不到密钥。",
-      "keyboard.globalShortcut": "注册系统级快捷键，在 PI-Desktop 未聚焦时触发本插件自己的命令。",
+      "keyboard.globalShortcut": "注册系统级快捷键，在 OMP Desktop 未聚焦时触发本插件自己的命令。",
       "net.websocket": "与插件声明的域名建立实时双向连接。",
       "bus.publish": "可在其声明的主题上发送消息。",
       "bus.subscribe": "可在其声明的主题上接收消息。",
@@ -2090,7 +2090,7 @@ sklm: {
     unsupportedGlibc:
       "当前 Linux 构建需要 glibc 2.35 或更高版本（Ubuntu 22.04、Debian 12、Fedora 36+）。",
     dbSchemaTooNew:
-      "当前 PI-Desktop 比本地数据更旧（数据库 schema {{found}}，此版本仅支持 {{supported}}）。请安装上次打开这些数据的更新版本，或更高版本。",
+      "当前 OMP Desktop 比本地数据更旧（数据库 schema {{found}}，此版本仅支持 {{supported}}）。请安装上次打开这些数据的更新版本，或更高版本。",
     archMismatch:
       "当前安装的是 {{buildArch}} 版本，而这台机器是 {{machineArch}}，需要通过转译运行，速度更慢。请改装 {{machineArch}} 版本。",
     dismissArchMismatch: "知道了",

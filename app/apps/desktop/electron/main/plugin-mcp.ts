@@ -1,6 +1,7 @@
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process";
 import { isAbsolute, resolve, sep } from "node:path";
 import type { PluginMcpServerContrib } from "@pi-desktop/plugin-sdk";
+import { APP_NAME } from "@pi-desktop/shared";
 import { minimalChildEnv } from "./child-process-env.ts";
 import { userLookupPath } from "./user-login-path.ts";
 
@@ -503,7 +504,7 @@ export class McpServerClient {
         {
           protocolVersion: MCP_PROTOCOL_VERSION,
           capabilities: {},
-          clientInfo: { name: "PI-Desktop", version: "1" },
+          clientInfo: { name: APP_NAME, version: "1" },
         },
         timeoutMs,
       );

@@ -41,8 +41,32 @@ const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = join(here, "..", "..", "..");
 const sidecarScript = join(appRoot, "scripts", "omp-sidecar.mjs");
 const packageJson = JSON.parse(readFileSync(join(here, "..", "package.json"), "utf8"));
-const { ALLOWED_CONFIG_OVERRIDES, PUBLISH_CHOICES, parseReleaseArgs, planRelease, runRelease } =
+const { ALLOWED_CONFIG_OVERRIDES, PUBLISH_CHOICES, parseReleaseArgs, planRelease, runRelease: productionRunRelease } =
   await import(pathToFileURL(join(appRoot, "scripts", "release-package.mjs")).href);
+
+// Process-boundary fixtures do not scan or write the workstation's dependency
+// tree. The real notices generator is verified against the installed tree and
+// its byte-offset inventory during package acceptance.
+const runRelease = (argv, options = {}) => productionRunRelease(argv, {
+  prepareNotices: () => ({ fixture: true }),
+  ...options,
+});
+
+test("a notice preparation failure stops packaging after runtime preflight", () => {
+  const calls = [];
+  const errors = [];
+  const status = runRelease(["--platform", "linux"], {
+    host: { platform: "linux", arch: "x64" },
+    spawn: (command, args) => { calls.push({ command, args }); return { status: 0 }; },
+    prepareNotices: () => { throw new Error("fixture notice preparation failed"); },
+    log: () => {},
+    error: (message) => errors.push(message),
+  });
+  assert.equal(status, 1);
+  assert.equal(calls.length, 1, "electron-builder must not run without notices");
+  assert.match(calls[0].args[0], /omp-sidecar\.mjs$/);
+  assert.match(errors.join("\n"), /dependency notices: fixture notice preparation failed/);
+});
 
 /** A platform that is never the host, so the cross-target path is exercised. */
 const CROSS_PLATFORM = process.platform === "win32" ? "darwin" : "win32";
