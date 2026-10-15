@@ -1,0 +1,139 @@
+{
+  "verified": true,
+  "platform": "darwin",
+  "arch": "arm64",
+  "appDir": "/Users/vv/Documents/对话/omp-desktop-local-m6/app/apps/desktop/release/mac-arm64/OMP Desktop.app",
+  "info": {
+    "NSHumanReadableCopyright": "Copyright © 2026 vastsa",
+    "CFBundleInfoDictionaryVersion": "6.0",
+    "NSAudioCaptureUsageDescription": "This app needs access to audio capture",
+    "CFBundleIconFile": "icon.icns",
+    "CFBundleName": "OMP Desktop",
+    "DTSDKName": "macosx15.5",
+    "NSSupportsAutomaticGraphicsSwitching": true,
+    "NSBluetoothAlwaysUsageDescription": "This app needs access to Bluetooth",
+    "NSPrincipalClass": "AtomApplication",
+    "LSApplicationCategoryType": "public.app-category.developer-tools",
+    "CFBundleDisplayName": "OMP Desktop",
+    "NSHighResolutionCapable": true,
+    "NSRequiresAquaSystemAppearance": false,
+    "DTSDKBuild": "24F74",
+    "NSCameraUsageDescription": "This app needs access to the camera",
+    "CFBundleShortVersionString": "0.15.2",
+    "CFBundlePackageType": "APPL",
+    "NSBluetoothPeripheralUsageDescription": "This app needs access to Bluetooth",
+    "DTXcodeBuild": "16F6",
+    "NSBonjourServices": [
+      "_http._tcp",
+      "_https._tcp"
+    ],
+    "CFBundleVersion": "0.15.2",
+    "NSPrefersDisplaySafeAreaCompatibilityMode": false,
+    "NSMainNibFile": "MainMenu",
+    "NSMicrophoneUsageDescription": "OMP Desktop plugins may use the microphone after you grant them audio access. / 在你授权后，OMP Desktop 插件可以使用麦克风。",
+    "CFBundleIdentifier": "net.misterbowie.omp-desktop",
+    "LSEnvironment": {
+      "MallocNanoZone": "0"
+    },
+    "ElectronAsarIntegrity": {
+      "Resources/app.asar": {
+        "hash": "966eb4fca09c329711e95030d0b739f1eb1292043f847974a6f12e96c91ef582",
+        "algorithm": "SHA256"
+      }
+    },
+    "DTXcode": "1640",
+    "NSQuitAlwaysKeepsWindows": false,
+    "NSAppTransportSecurity": {
+      "NSAllowsLocalNetworking": true,
+      "NSAllowsArbitraryLoads": true,
+      "NSExceptionDomains": {
+        "127.0.0.1": {
+          "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
+          "NSTemporaryExceptionRequiresForwardSecrecy": false,
+          "NSIncludesSubdomains": false,
+          "NSTemporaryExceptionMinimumTLSVersion": "1.0",
+          "NSTemporaryExceptionAllowsInsecureHTTPSLoads": false
+        },
+        "localhost": {
+          "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
+          "NSTemporaryExceptionRequiresForwardSecrecy": false,
+          "NSIncludesSubdomains": false,
+          "NSTemporaryExceptionMinimumTLSVersion": "1.0",
+          "NSTemporaryExceptionAllowsInsecureHTTPSLoads": false
+        }
+      }
+    },
+    "CFBundleExecutable": "OMP Desktop",
+    "LSMinimumSystemVersion": "12.0",
+    "NSLocalNetworkUsageDescription": "OMP Desktop needs local network access so agents can reach OpenAI-compatible providers, Ollama, and other AI endpoints running on your LAN. / OMP Desktop 需要本地网络访问权限，以便助手请求同一局域网中的 OpenAI 兼容服务、Ollama 等本地 AI 端点。",
+    "DTCompiler": "com.apple.compilers.llvm.clang.1_0"
+  },
+  "resources": "/Users/vv/Documents/对话/omp-desktop-local-m6/app/apps/desktop/release/mac-arm64/OMP Desktop.app/Contents/Resources",
+  "executable": "/Users/vv/Documents/对话/omp-desktop-local-m6/app/apps/desktop/release/mac-arm64/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+  "package": {
+    "name": "omp-desktop",
+    "version": "0.15.2",
+    "homepage": "https://github.com/MisterBowie/omp-desktop"
+  },
+  "asarSha256": "ecc8ace5cfc5a0087be6efd609f43156e7ad98ec512a9780ffa27b3290ad5206",
+  "update": {
+    "owner": "MisterBowie",
+    "repo": "omp-desktop",
+    "provider": "github",
+    "updaterCacheDirName": "omp-desktop-updater"
+  },
+  "icons": [
+    {
+      "file": "tray-icon.png",
+      "sha256": "5a36110e67a969f26b55e1198798bd9fe76538b5acf52d9900797d5de5846461"
+    },
+    {
+      "file": "icon.icns",
+      "sha256": "31c50fbff605875ff3d362a1dd84fa54ddaf084a3906716838ca26d06d85ad61"
+    },
+    {
+      "file": "tray-icon-mac.png",
+      "sha256": "f5836b6521cf1fe738de525b359aed3ab55e846a2f693f97ec0ed02eedc85c59"
+    }
+  ],
+  "licenses": {
+    "staticFiles": [
+      {
+        "file": "Bun-LICENSE.md",
+        "bytes": 5613,
+        "sha256": "b9caf52728691b4057e371232c221a132883198be2f3d2ddf92c90404c984b1a"
+      },
+      {
+        "file": "OMP-LICENSE.txt",
+        "bytes": 1144,
+        "sha256": "16c45f9d667442781f03fa198914cc39abcaa48ec5ed8f644643e554ca2fbf63"
+      },
+      {
+        "file": "OMP-THIRD-PARTY-NOTICES.txt",
+        "bytes": 1076433,
+        "sha256": "83ed283000678eeac9c538e5b4f3710a2917e92d8f126d5b7dbfe29d494348e7"
+      },
+      {
+        "file": "PI-Desktop-LICENSE.txt",
+        "bytes": 7652,
+        "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118"
+      },
+      {
+        "file": "README.txt",
+        "bytes": 1466,
+        "sha256": "3e8a3850acb754c14fd4bab8d47143ccb699b78c339b837e027d40e5ce96eaac"
+      },
+      {
+        "file": "SOURCES.json",
+        "bytes": 1331,
+        "sha256": "b05289e4b389c0ad7d5adabc0a1558b85edb56c865d55f4c130169c22d664064"
+      }
+    ],
+    "components": 915,
+    "rustComponents": 106,
+    "originalFiles": 968,
+    "noticeSha256": "3f571d5d5fcc0c353f44811a98dd8253d5c466e1a2b7b5d778198b30b60c871a",
+    "inventorySha256": "b357daebbbaf9e55acc96515d7d53571c7a10dfaea36801ddc72c110bd57f40f"
+  },
+  "scope": "Actual Electron payload metadata/resources; no installed UI workflow claimed by this inspection alone"
+}

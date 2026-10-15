@@ -2,6 +2,8 @@
 
 ## 当前执行状态（2026-10-15，本机恢复，M5交付已接受）
 
+M6 最新进展：产品构建 `de691ca` 与已提交验收器 `44da48e` 完成实际 Mac arm64 DMG 工作流；8 个步骤全部通过，包括默认数据目录隔离、真实审批/工具/三级进程 Stop、正常退出与原生历史逐字节恢复、退出零残留。详见 `docs/validation/M6-installed-macos-local-20261015.md`；这更新了下文“Mac 安装尚待执行”的旧状态。Windows/Linux 原生安装、M6 三平台发布回读和完整 M7/T24 仍须继续；当前不创建 PR 或改写 main。
+
 用户要求恢复完整目标，改由根模型在本机执行；DeepSeek/deepseek-flash恢复由用户另行通知。仅排除Cursor+Plan/Goal，ADR0306门与非Cursor严格契约、完整M6/M7和每大阶段3平台GitHub包全部保留。
 
 **M5功能与三平台测试包交付均已接受。** 功能基线860c2641；Windows路径夹具修复e52ab74，最终tag源码bdec50076f081d5d8042fe5a58912e7743a802fe。新tag `m5-test-20261015-bdec5007`、native run38671315205全部5jobs completed/success；macOS arm64、Windows x64、Linux x64各15/15、0fail/skip，包内18.3.0/protocol2/get_state、missing-gate拒绝、stopped/reaped/cleaned/leftover0。Release已实际发布，根本机完整下载9资产1500824153B，全部GitHub digest/载荷SHA清单/BUILD-RECORD/源码与fork pins一致。证据`docs/validation/M5-native-release-20261015.md`及同名目录；本机完整载荷位于`omp-local-m5-windows-review-20261015/release-download/`，不提交二进制到Git。

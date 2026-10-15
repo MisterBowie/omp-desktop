@@ -1,0 +1,19 @@
+{
+  "productBuildRevision": "de691cad8ee8ac9817528a494a31b0a03a41ba93",
+  "harnessRevision": "44da48ee9b2f6df29282a5449546951c85f9a266",
+  "baseMain": "a23bfb9befea327e7924efd3004e030a11b587d2",
+  "localMacInstalledWorkflowAccepted": true,
+  "fullM6Accepted": false,
+  "fullGoalComplete": false,
+  "pending": [
+    "Windows/Linux native installed workflow and lifecycle qualification",
+    "M6 three-platform test release and root asset audit",
+    "M7/T24 full workflow, upgrade/rollback and three-platform release"
+  ],
+  "limits": [
+    "unsigned; no notarization",
+    "native folder chooser not exercised",
+    "existing native quit confirmation bypass enabled only at teardown",
+    "local fake provider, no paid service call"
+  ]
+}

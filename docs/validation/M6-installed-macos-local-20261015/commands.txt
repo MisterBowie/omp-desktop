@@ -1,0 +1,5 @@
+cwd: omp-desktop-local-m6
+Production package: pnpm --filter @pi-desktop/desktop run dist:mac --arm64 (de691ca), exit 0
+E2E: OMP_E2E_PYTHON=<owned review venv>/bin/python node app/scripts/e2e-installed-smoke.mjs app/apps/desktop/release/OMP-Desktop-0.15.2-arm64.dmg <review>/installed-candidate-44da48e (44da48e), exit 0
+Unit/ownership: node --test --test-reporter=tap app/apps/desktop/test/e2e-cdp-transport.test.mjs app/apps/desktop/test/installed-native-observation.test.mjs app/scripts/e2e/process-ownership.test.mjs, exit 0: 26 pass, 0 fail, 4 Linux /proc skips
+Native observer: owned Python venv + psutil 7.2.2, no global Python package changes.

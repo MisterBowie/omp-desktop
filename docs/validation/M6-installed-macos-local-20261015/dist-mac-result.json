@@ -1,0 +1,8 @@
+{
+  "candidate": "de691cad8ee8ac9817528a494a31b0a03a41ba93",
+  "baseMain": "a23bfb9befea327e7924efd3004e030a11b587d2",
+  "command": "pnpm --filter @pi-desktop/desktop run dist:mac --arm64",
+  "exit": 0,
+  "seconds": 131.56,
+  "unsigned": true
+}
