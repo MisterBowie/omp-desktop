@@ -17,7 +17,7 @@
 import { randomBytes } from "node:crypto";
 import { mkdirSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, join, resolve, sep } from "node:path";
+import { basename, delimiter, join, resolve, sep, win32 } from "node:path";
 
 /**
  * Variables that would point discovery at a profile other than this run's
@@ -118,8 +118,17 @@ export type OmpRuntimeEnv = {
   home: string;
 };
 
-/** Default PATH: the launcher's own runtime first, then the system. */
-export function defaultPathEntries(home: string = homedir()): string[] {
+/** Windows environment keys are case-insensitive, including plain base copies. */
+function environmentValue(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return Object.entries(env).find(([key, value]) => key.toUpperCase() === name.toUpperCase() && value)?.[1];
+}
+
+/** Default PATH: the launcher's own runtime first, then native system tools. */
+export function defaultPathEntries(home: string = homedir(), baseEnv: NodeJS.ProcessEnv = process.env): string[] {
+  if (process.platform === "win32") {
+    const systemRoot = environmentValue(baseEnv, "SystemRoot") ?? environmentValue(baseEnv, "windir");
+    return [join(home, ".bun", "bin"), ...(systemRoot ? [join(systemRoot, "System32"), systemRoot] : [])];
+  }
   return [
     join(home, ".bun", "bin"),
     "/usr/local/bin",
@@ -148,7 +157,22 @@ export function buildOmpRuntimeEnv(options: OmpRuntimeEnvOptions): OmpRuntimeEnv
   }
 
   env.HOME = options.home;
-  env.PATH = (options.pathEntries ?? defaultPathEntries()).join(":");
+  if (process.platform === "win32") {
+    // libuv/Node's native home lookup uses USERPROFILE rather than HOME.
+    // Windows consumers must not fall back to the operator's actual profile.
+    env.USERPROFILE = options.home;
+    env.APPDATA = join(options.home, "AppData", "Roaming");
+    env.LOCALAPPDATA = join(options.home, "AppData", "Local");
+    const volume = win32.parse(options.home).root;
+    env.HOMEDRIVE = volume.slice(0, -1);
+    env.HOMEPATH = options.home.slice(volume.length - 1);
+    const systemRoot = environmentValue(base, "SystemRoot") ?? environmentValue(base, "windir");
+    if (systemRoot) {
+      env.SystemRoot = systemRoot;
+      env.windir = environmentValue(base, "windir") ?? systemRoot;
+    }
+  }
+  env.PATH = (options.pathEntries ?? defaultPathEntries(undefined, base)).join(delimiter);
   env.PI_CONFIG_DIR = configDirName;
   env.PI_CODING_AGENT_DIR = options.codingAgentDir;
   env.OMP_DEV_LAUNCH_DIR = options.launchDir;
@@ -168,14 +192,22 @@ export function buildOmpRuntimeEnv(options: OmpRuntimeEnvOptions): OmpRuntimeEnv
       ...PROXY_ENV_KEYS,
       ...STEER_VARS,
       "HOME",
+      "USERPROFILE",
+      "HOMEDRIVE",
+      "HOMEPATH",
+      "APPDATA",
+      "LOCALAPPDATA",
+      "SYSTEMROOT",
+      "WINDIR",
+      "COMSPEC",
       "PATH",
       "PI_CONFIG_DIR",
       "PI_CODING_AGENT_DIR",
       "OMP_DEV_LAUNCH_DIR",
-    ]);
+    ].map((key) => key.toUpperCase()));
     for (const [key, value] of Object.entries(options.extraEnv)) {
       if (value === undefined) continue;
-      if (reserved.has(key)) continue;
+      if (reserved.has(key.toUpperCase())) continue;
       if (CREDENTIAL_VAR_PATTERN.test(key)) continue;
       env[key] = value;
     }
@@ -188,6 +220,9 @@ export function buildOmpRuntimeEnv(options: OmpRuntimeEnvOptions): OmpRuntimeEnv
 export function prepareOmpRuntimeHome(home: string): void {
   mkdirSync(home, { recursive: true });
   for (const dir of HOME_DISCOVERY_DIRS) mkdirSync(join(home, dir), { recursive: true });
+  if (process.platform === "win32") {
+    for (const dir of ["Roaming", "Local"]) mkdirSync(join(home, "AppData", dir), { recursive: true });
+  }
 }
 
 /** True when `child` is `parent` or below it, after resolving both. */

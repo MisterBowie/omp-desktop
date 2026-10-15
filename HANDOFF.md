@@ -2,6 +2,11 @@
 
 ## 当前执行状态（2026-10-15，本机恢复，M5交付已接受）
 
+候选 9e59c932 / run38689745755 的轻量检查实际发现 Windows 原生 homedir 逃出
+合成 HOME（Mac/Linux通过），构建与发布被阻断。已修复 Windows profile/AppData、
+系统根、PATH delimiter 与大小写别名，实际 Mac bundled 回归541/541、0skip；
+下一步新候选重跑原生检查与三平台安装。证据 `M6-windows-native-home-20261015`。
+
 M6 首个原生候选 run38684841320 已终止且未通过：Windows 安装 ASAR 观察器路径错误，
 Mac/Linux 打包失败，发布 skipped。已在本机冷 Cargo 缓存复现并修复声明准备缺口，
 修正 ASAR 原生路径，并新增耗时构建前的三平台 HOME/PATH 检查。证据

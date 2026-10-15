@@ -1,0 +1,9 @@
+
+ RUN  v4.1.10 /Users/vv/Documents/对话/omp-desktop-local-m6/app/packages/omp-runtime
+
+
+ Test Files  34 passed (34)
+      Tests  541 passed (541)
+   Start at  14:04:01
+   Duration  19.08s (transform 7.13s, setup 0ms, import 15.19s, tests 64.23s, environment 2ms)
+

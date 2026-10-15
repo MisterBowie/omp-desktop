@@ -1,0 +1,34 @@
+
+> @pi-desktop/omp-runtime@0.15.2 test /Users/vv/Documents/对话/omp-desktop-local-m6/app/packages/omp-runtime
+> vitest run
+
+
+ RUN  v4.1.10 /Users/vv/Documents/对话/omp-desktop-local-m6/app/packages/omp-runtime
+
+ ❯ src/pinned-runtime.test.ts (1 test | 1 failed) 3116ms
+     × starts, negotiates v2, answers, and is reclaimed with its scratch root 3114ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/pinned-runtime.test.ts > pinned runtime smoke > starts, negotiates v2, answers, and is reclaimed with its scratch root
+OmpRuntimeError: OMP runtime reports 18.2.7, this build requires 18.3.0
+ ❯ OmpRuntimeProcess.start src/process.ts:192:15
+    190|       const mismatch = runtimeVersionMismatch(probe.version, expected);
+    191|       if (mismatch) {
+    192|         throw new OmpRuntimeError(
+       |               ^
+    193|           "version-mismatch",
+    194|           `OMP runtime reports ${mismatch.reported ?? `an unreadable v…
+ ❯ OmpRuntimeSupervisor.startRuntime src/supervisor.ts:552:23
+ ❯ OmpRuntimeSupervisor.start src/supervisor.ts:432:14
+ ❯ src/pinned-runtime.test.ts:79:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 34 passed (35)
+      Tests  1 failed | 535 passed | 6 skipped (542)
+   Start at  14:01:56
+   Duration  21.61s (transform 5.05s, setup 0ms, import 11.30s, tests 65.65s, environment 2ms)
+
+ ELIFECYCLE  Test failed. See above for more details.

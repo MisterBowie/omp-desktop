@@ -1,0 +1,33 @@
+
+ RUN  v4.1.10 /Users/vv/Documents/对话/omp-desktop-local-m6/app/packages/omp-runtime
+
+ ❯ src/isolation.test.ts (10 tests | 1 failed) 47ms
+     × extra variables cannot redirect native identity under alternate casing 9ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/isolation.test.ts > runtime environment isolation > extra variables cannot redirect native identity under alternate casing
+AssertionError: expected 'foreign-home' not to match /^foreign-/
+
+- Expected:
+/^foreign-/
+
++ Received:
+"foreign-home"
+
+ ❯ src/isolation.test.ts:60:63
+     58|       },
+     59|     });
+     60|     for (const value of Object.values(env)) expect(value).not.toMatch(…
+       |                                                               ^
+     61|   });
+     62|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 9 passed (10)
+   Start at  14:00:41
+   Duration  1.07s (transform 460ms, setup 0ms, import 922ms, tests 47ms, environment 0ms)
+

@@ -1,6 +1,7 @@
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -30,6 +31,35 @@ afterEach(() => {
 });
 
 describe("runtime environment isolation", () => {
+  it("native children resolve their home and PATH inside the owned run", () => {
+    const root = scratch("native 中文 space '");
+    const home = join(root, "home");
+    mkdirSync(home);
+    const paths = [join(root, "bin one"), join(root, "bin two")];
+    const { env } = buildOmpRuntimeEnv({ home, codingAgentDir: join(root, "agent"), launchDir: root, pathEntries: paths });
+    const result = spawnSync(process.execPath, ["-e", 'console.log(JSON.stringify({home:require("node:os").homedir(),path:process.env.PATH}))'], {
+      env, cwd: root, encoding: "utf8", timeout: 10_000,
+    });
+    expect(result.status, result.error?.message ?? result.stderr).toBe(0);
+    const observed = JSON.parse(result.stdout);
+    expect(resolve(observed.home)).toBe(resolve(home));
+    expect(observed.path.split(delimiter)).toEqual(paths);
+  });
+
+  it("extra variables cannot redirect native identity under alternate casing", () => {
+    const root = scratch("extra-native-home");
+    const { env } = buildOmpRuntimeEnv({
+      home: join(root, "home"), codingAgentDir: join(root, "agent"), launchDir: root,
+      baseEnv: {}, extraEnv: {
+        hOmE: "foreign-home", UserProfile: "foreign-profile", APPDATA: "foreign-appdata",
+        localappdata: "foreign-cache", HomeDrive: "Q:", HOMEPATH: "foreign-path",
+        SYSTEMROOT: "foreign-system", WinDir: "foreign-windows", Path: "foreign-executables",
+        http_Proxy: "foreign-proxy", pi_config_dir: "foreign-config",
+      },
+    });
+    for (const value of Object.values(env)) expect(value).not.toMatch(/^foreign-/);
+  });
+
   it("points HOME, the config root and the agent directory inside this run", () => {
     const root = scratch("env");
     const { env, configRoot, configDirName } = buildOmpRuntimeEnv({

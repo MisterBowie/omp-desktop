@@ -1378,7 +1378,12 @@ T20-B/C/D 在本门落地时尚未开始：本门是这些工作的前置条件�
 * **启动。** 启动路径在 spawn 之前探测 `--version`，并在 `ready` 之后协商协议 v2；不一致时引擎停在
   `failed`，原因为 `version-mismatch` 或 `protocol-unsupported`，且能力全部关闭，因此不会创建可用
   会话。这里复用 M1 的握手，而不是新增第二套。
-* **隔离。** bundled 产物与固定启动器使用同一套环境策略（合成 HOME、`PI_CODING_AGENT_DIR`、剥离
+* **隔离。** Windows 原生 home 查找同时绑定 `USERPROFILE` 与 `HOME`，
+  `HOMEDRIVE`/`HOMEPATH` 和 AppData 目录均留在自有 home。PATH 使用平台分隔符与
+  封闭的系统目录列表，只保留父进程的 Windows 系统查找根。额外变量不得以任何大小写
+  覆盖自有身份、路径或代理。`scripts/verify-native-isolation.mjs` 在 M6 打包前检查实际
+  原生子进程；仅设置 HOME 不能证明 Windows 隔离。
+  bundled 产物与固定启动器使用同一套环境策略（合成 HOME、`PI_CODING_AGENT_DIR`、剥离
   steering 变量/代理/凭证），stop/reclaim 会回收其进程组与自有的 run root。已用真实编译产物验证，
   见 `docs/validation/M5-bundled-sidecar.md`。
 * **打包资源验收。** `scripts/verify-packaged-runtime.mjs` 接受 electron-builder 的真实产物——打包

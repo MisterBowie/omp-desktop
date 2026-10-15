@@ -2315,6 +2315,13 @@ level `62bc57b+omp-desktop.3`, carried by the controlled fork commit recorded in
   variables, proxies and credentials), and stop/reclaim removes its process group
   and owned run root. Verified against the real compiled binary; see
   `docs/validation/M5-bundled-sidecar.md`.
+  On Windows, native home discovery is bound through `USERPROFILE` as well as
+  `HOME`; `HOMEDRIVE`/`HOMEPATH` and AppData directories stay in the owned home.
+  Native PATH uses the platform delimiter and closed system-directory entries,
+  preserving only the Windows system lookup roots from the parent. Extra
+  variables cannot override owned identity, paths or proxies under any casing.
+  `scripts/verify-native-isolation.mjs` checks an actual native child before M6
+  package builds; setting HOME alone is insufficient evidence on Windows.
 * **Packaged-resource acceptance.** `scripts/verify-packaged-runtime.mjs` takes
   the electron-builder output — a packaged application's `Resources` directory —
   and drives it through the production modules rather than a second

@@ -1,0 +1,26 @@
+[
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/9e59c9323ab18ff7138c34f368bad7f61931e8a6/.github",
+    "start_line": 16,
+    "start_column": null,
+    "end_line": 16,
+    "end_column": null,
+    "annotation_level": "failure",
+    "title": "",
+    "message": "Process completed with exit code 1.",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/9e59c9323ab18ff7138c34f368bad7f61931e8a6/.github",
+    "start_line": 6,
+    "start_column": null,
+    "end_line": 6,
+    "end_column": null,
+    "annotation_level": "failure",
+    "title": "Native runtime environment isolation",
+    "message": "AssertionError [ERR_ASSERTION]: native homedir escaped the runtime HOME\n+ actual - expected\n\n+ 'C:\\\\Users\\\\runneradmin'\n- \"C:\\\\Users\\\\RUNNER~1\\\\AppData\\\\Local\\\\Temp\\\\omp-native-home 中文 space ' -AH8Kyc\\\\runtime home\"\n\n    at file:///D:/a/omp-desktop/omp-desktop/app/scripts/verify-native-isolation.mjs:29:10\n    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)\n    at async node:internal/modules/esm/loader:647:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)",
+    "raw_details": ""
+  }
+]

@@ -21,6 +21,7 @@ try {
     const os = require("node:os");
     console.log(JSON.stringify({home:os.homedir(),HOME:process.env.HOME,
       USERPROFILE:process.env.USERPROFILE,PATH:process.env.PATH,
+      APPDATA:process.env.APPDATA,LOCALAPPDATA:process.env.LOCALAPPDATA,
       SystemRoot:process.env.SystemRoot,windir:process.env.windir}));
   `], { cwd: root, env: policy.env, encoding: "utf8", timeout: 15_000 });
   assert.equal(child.status, 0, child.error?.message ?? child.stderr);
@@ -30,9 +31,17 @@ try {
   assert.deepEqual(observation.PATH.split(delimiter), entries, "native PATH entries were corrupted");
   if (process.platform === "win32") {
     assert.equal(resolve(observation.USERPROFILE), resolve(home));
+    assert.equal(observation.APPDATA, join(home, "AppData", "Roaming"));
+    assert.equal(observation.LOCALAPPDATA, join(home, "AppData", "Local"));
     const systemRoot = Object.entries(process.env).find(([key]) => key.toUpperCase() === "SYSTEMROOT")?.[1];
     assert(systemRoot, "Windows runner has no SystemRoot");
     assert.equal(observation.SystemRoot, systemRoot, "native system DLL/tool lookup root was dropped");
+    const defaults = buildOmpRuntimeEnv({
+      home, codingAgentDir: join(home, ".omp"), launchDir: root,
+      baseEnv: { ...process.env, PATH: "foreign-user-tools" },
+    }).env.PATH.split(delimiter);
+    assert(defaults.includes(join(systemRoot, "System32")) && defaults.includes(systemRoot));
+    assert(!defaults.includes("foreign-user-tools"), "inherited user PATH escaped the closed system list");
   }
   console.log("Native runtime environment isolation passed.");
 } catch (error) {

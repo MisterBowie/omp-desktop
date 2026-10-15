@@ -1,5 +1,10 @@
 # 执行任务看板
 
+2026-10-15 M6 原生环境：9e59c932/run38689745755 的 Windows homedir 真实逃出
+合成 HOME，Mac/Linux检查通过；构建/发布被门阻断。Windows环境策略已修复，
+Mac实际bundled回归541/541、0skip，等待新候选三平台原生验收。见
+`validation/M6-windows-native-home-20261015.md`。
+
 2026-10-15 M6：首个三平台候选 run38684841320 失败、未发布。Windows 在安装
 ASAR 观察器处失败，Mac/Linux 打包失败。冷 Cargo 缓存缺口已本机复现并修复，
 ASAR 使用原生路径；新增三平台 HOME/PATH 预检，后续原生验证待跑。见

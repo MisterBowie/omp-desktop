@@ -1,0 +1,33 @@
+{
+  "baseRevision": "9e59c9323ab18ff7138c34f368bad7f61931e8a6",
+  "nativeRed": {
+    "run": 38689745755,
+    "windowsJob": 116272707988,
+    "actualHomedir": "C:\\Users\\runneradmin",
+    "expected": "owned synthetic HOME",
+    "macOS": "success",
+    "linux": "success",
+    "builds": "skipped",
+    "publish": "skipped"
+  },
+  "localRed": "alternate-cased extra HOME crossed the environment boundary",
+  "fix": "native Windows profile/AppData/system roots; native PATH delimiter and closed system entries; case-insensitive reserved identities",
+  "localBundledSuite": {
+    "files": 34,
+    "pass": 541,
+    "fail": 0,
+    "skip": 0,
+    "actualArtifact": "verified macOS 18.3.0 bundled sidecar"
+  },
+  "unpreparedReferenceSmoke": {
+    "result": "failed",
+    "observedVersion": "18.2.7",
+    "requiredVersion": "18.3.0",
+    "referenceNodeModules": "not installed",
+    "excludedFromBundledSuite": true,
+    "note": "failure retained; did not lower the version pin or modify the reference submodule"
+  },
+  "nativeWindowsGreen": "pending next controlled candidate",
+  "fullM6Complete": false,
+  "fullM7Complete": false
+}
