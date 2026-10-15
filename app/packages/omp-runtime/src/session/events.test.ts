@@ -114,6 +114,38 @@ describe("message streaming", () => {
     });
   });
 
+  it("preserves the native error on message_end after a failed stream update", () => {
+    const c = converter();
+    const message = { role: "assistant", content: [], stopReason: "error", errorMessage: "401 M7_AUTH_TERMINAL" };
+    const start = c.convert({ type: "message_start", message });
+    c.convert({ type: "message_update", message, assistantMessageEvent: { type: "error", reason: "error", error: message } });
+    const terminal = c.convert({ type: "message_end", message });
+    expect(terminal).toHaveLength(1);
+    expect(terminal[0]).toMatchObject({
+      type: "message_end",
+      message: {
+        id: start[0].type === "message_start" ? start[0].message.id : "",
+        status: "error", error: { code: "OMP_MODEL_ERROR", message: "401 M7_AUTH_TERMINAL" },
+      },
+    });
+  });
+
+  it("keeps native aborted completions distinct from successful and failed replies", () => {
+    const terminal = converter().convert({ type: "message_end", message: { role: "assistant", content: [], stopReason: "aborted" } });
+    expect(terminal[0]).toMatchObject({ message: { status: "aborted" } });
+    expect(terminal[0].type === "message_end" && terminal[0].message.error).toBeUndefined();
+  });
+
+  it("bounds a provider diagnostic while retaining its typed durable error", () => {
+    const row = converter().convertEntry({ id: "failure", message: {
+      role: "assistant", content: [], stopReason: "error", errorMessage: "错误".repeat(5000),
+    } });
+    expect(row?.status).toBe("error");
+    expect(row?.error?.code).toBe("OMP_MODEL_ERROR");
+    expect(Buffer.byteLength(JSON.stringify(row?.error?.message))).toBeLessThanOrEqual(4098);
+    expect(row?.error?.message.endsWith("…")).toBe(true);
+  });
+
   it("marks an aborted turn as aborted without inventing an error", () => {
     const c = converter();
     c.convert({ type: "message_start", message: { role: "assistant", content: [] } });

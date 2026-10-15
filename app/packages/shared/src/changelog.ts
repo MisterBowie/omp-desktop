@@ -29,6 +29,16 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    "version": "0.15.3",
+    "date": "2026-10-15",
+    "highlights": [
+      "Use OMP conversations with isolated projects, tool approvals, and recoverable native history.",
+      "Preserve provider errors and cancelled replies when reopening OMP conversations.",
+      "Keep OMP Desktop identity, bundled runtime, storage, and update source independent."
+    ]
+  },
+
+  {
     version: "0.15.2",
     date: "2026-09-21",
     highlights: [
@@ -825,6 +835,16 @@ const enEntries: ChangelogEntry[] = [
 
 const zhCNEntries: ChangelogEntry[] = [
   {
+    "version": "0.15.3",
+    "date": "2026-10-15",
+    "highlights": [
+      "使用 OMP 会话，隔离项目、审批工具并恢复原生历史。",
+      "重新打开 OMP 会话时保留提供方错误和中止的回复。",
+      "独立管理 OMP Desktop 的应用身份、内置运行时、数据和更新源。"
+    ]
+  },
+
+  {
     version: "0.15.2",
     date: "2026-09-21",
     highlights: [
@@ -1620,6 +1640,16 @@ const zhCNEntries: ChangelogEntry[] = [
 ];
 
 const zhTWEntries: ChangelogEntry[] = [
+  {
+    "version": "0.15.3",
+    "date": "2026-10-15",
+    "highlights": [
+      "使用 OMP 對話，隔離專案、審批工具並復原原生歷史。",
+      "重新開啟 OMP 對話時保留供應商錯誤與已中止的回覆。",
+      "獨立管理 OMP Desktop 的應用程式識別、內建執行環境、資料和更新來源。"
+    ]
+  },
+
   {
     version: "0.15.2",
     date: "2026-09-21",

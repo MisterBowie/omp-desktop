@@ -47,6 +47,21 @@ describe("projectOmpHistory", () => {
     expect(projection.hasMoreAfter).toBe(false);
   });
 
+  it("retains a native provider failure and an aborted reply on history reads", () => {
+    const entries = [
+      entry("user", null, textMessage("user", "show provider error")),
+      entry("failure", "user", { role: "assistant", content: [], stopReason: "error", errorStatus: 401, errorMessage: "401 M7_AUTH_TERMINAL", timestamp: 1 }),
+      entry("aborted", "failure", { role: "assistant", content: [], stopReason: "aborted", timestamp: 1 }),
+    ];
+    const before = JSON.stringify(entries);
+    const result = projectOmpHistory(entries, "aborted", { sessionId: "s" });
+    expect(result.messages[1]).toMatchObject({ status: "error", error: { code: "OMP_MODEL_ERROR", message: "401 M7_AUTH_TERMINAL" } });
+    expect(result.messages[2]).toMatchObject({ status: "aborted" });
+    expect(result.messages[2].error).toBeUndefined();
+    expect(JSON.stringify(entries)).toBe(before);
+    expect(projectOmpHistory(entries, "aborted", { sessionId: "s" })).toEqual(result);
+  });
+
   it("is stable across reads: the same transcript returns the same ids", () => {
     const entries = [
       entry("m1", null, textMessage("user", "hello")),

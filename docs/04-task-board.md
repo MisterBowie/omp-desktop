@@ -157,7 +157,7 @@ ASAR 使用原生路径；新增三平台 HOME/PATH 预检，后续原生验证�
 | T21 | M6 | OMP 运行时资源打包与版本固定 | T16 | 无全局 Bun/OMP 依赖也能启动 | **已接受**：固定资源/版本/来源，冷 Cargo 完整锁定准备；三平台包内版本/protocol/get_state、missing-gate 拒绝、停止/回收/清理与15/15回归；完整公开资产回读见 [M6 最终验收](validation/M6-native-release-20261015.md)。 |
 | T22 | M6 | 品牌、更新源、许可证及 macOS 安装产物 | T20,T21 | 新旧应用并存，发布源独立 | **已接受（测试分发）**：独立品牌/图标/appId/profile/data/凭证命名/更新源与cache、冻结第三方声明，实际 PI 并存、默认profile、Mac离线/崩溃及公开DMG工作流。unsigned/unnotarized、原生对话框未覆盖等边界见 [M6 最终验收](validation/M6-native-release-20261015.md)。 |
 | T23 | M6 | Windows/Linux 分平台验证 | T22 | 平台原生依赖、取消和路径 | **已接受（测试分发）**：三平台轻量原生检查与实际安装8/8，各2次正常退出/零残留；Windows USERPROFILE/PATH/8.3与精确handle负对照，Linux AppImage。DEB/RPM系统注册未测；Windows Bash需Git for Windows。见 [M6 最终验收](validation/M6-native-release-20261015.md)。 |
-| T24 | M7 | 日常任务验收、升级回退及维护交接 | T22 | 真实工作流、限制说明、升级演练 | 待开始 |
+| T24 | M7 | 日常任务验收、升级回退及维护交接 | T22 | 真实工作流、限制说明、升级演练 | **进行中**：本机实际示例编码/并发/40回合及断连恢复已跑；发现并修复待安装重测的终态模型错误历史投影缺陷。上游源码升级/回退演练及当前171/171通过；完整安装重测、桌面升级回退、用户交接与M7三平台发布仍须继续。 |
 
 T23 不阻塞仅面向 macOS arm64 的首次交付，但未通过前不能宣称跨平台可用。T17-T20 按用户实际功能优先级逐项开放，不要求在基本开发版之前全部完成。
 

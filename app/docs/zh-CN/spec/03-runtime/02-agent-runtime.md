@@ -25,6 +25,14 @@ apps/desktop/electron/* (supervisor)
 crates/host-core (tool execution + permissions)
 ```
 
+### OMP 终态消息投影
+
+OMP 适配器同时在实时结束帧和只读历史中读取原生助手的 `stopReason`。
+`error` 映射为包含 `OMP_MODEL_ERROR` 与原生提供方诊断的错误消息；
+`aborted` 保留中止状态，不编造提供方错误。后续 `message_end` 或历史刷新
+不得把这些状态变为成功的空回复。诊断消息内容最多保留 4096 个序列化 UTF-8
+字节，并计入既有消息总预算；投影不改写原生历史。
+
 ## 3. 核心对象
 
 ### 3. 1 PiRuntime (Node)

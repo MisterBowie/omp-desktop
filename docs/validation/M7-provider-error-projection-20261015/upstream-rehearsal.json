@@ -1,0 +1,67 @@
+{
+  "scope": "Actual owned source upgrade/patch reconstruction/rollback and current-version runtime tests. Historical 18.2.7 is not built or executed; no production pins are changed.",
+  "root": "/Users/vv/Documents/对话/omp-local-m7-review-20261015/upstream-rehearsal-5SVtla",
+  "old": {
+    "base": {
+      "submodule": "upstream/oh-my-pi",
+      "repository": "https://github.com/can1357/oh-my-pi",
+      "sha": "d49918fab2dba3986927f2d46721629ed0f3a02c",
+      "version": "18.2.7"
+    },
+    "patch": {
+      "file": "0001-rpc-host-tool-transition-contract.patch",
+      "sha256": "e08ca7fff29bbd03e298f4488888b2692adda1486e3fff80536a31dd8af6fd5c",
+      "bytes": 72978
+    },
+    "patchedTree": "f3c675bf38a2d97337a11e21d37c476b09f51cbc"
+  },
+  "current": {
+    "base": {
+      "submodule": "upstream/oh-my-pi",
+      "repository": "https://github.com/can1357/oh-my-pi",
+      "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+      "version": "18.3.0"
+    },
+    "fork": {
+      "repository": "https://github.com/MisterBowie/oh-my-pi",
+      "branch": "codex/omp-desktop-18.3.0-patch-5",
+      "commit": "36483311dfff67be7504f591974df93fc512a45a",
+      "tree": "7ba57b6d06fb8fe7e3f6352c67692e56cf39c3cd",
+      "note": "Self-maintained fork whose HEAD is exactly base.sha + this patch level. `scripts/omp-sidecar.mjs` refuses any other commit; can1357/oh-my-pi stays a read-only upstream."
+    },
+    "patch": {
+      "file": "0001-omp-desktop-runtime.patch",
+      "sha256": "645242861412c8f2810cab397824413129ccbd5e5b7a94ca70caf0e76795895b",
+      "bytes": 118548
+    }
+  },
+  "steps": [
+    "historical patch applies; reverse restores exact 18.2.7 baseline tree",
+    "current source validator refuses old baseline",
+    "18.3.0 base plus controlled patch reconstructs exact published fork tree",
+    "rollback restores exact historical source tree and current release gate refuses it",
+    "return to current controlled source passes gate"
+  ],
+  "stalePatchOnNewBase": {
+    "exitCode": 1,
+    "stderr": "error: patch failed: packages/agent/src/agent-loop.ts:3028\nerror: packages/agent/src/agent-loop.ts: patch does not apply\n"
+  },
+  "reconstructedTree": "7ba57b6d06fb8fe7e3f6352c67692e56cf39c3cd",
+  "currentTests": {
+    "exitCode": 0,
+    "summary": [
+      "(pass) agentLoop kCursorExecResolved (issue #4348) > skips execute for a toolCall block marked as already run by Cursor's exec channel [0.75ms]",
+      "(pass) speculative tool execution > skips stream speculation sessions when a message transformer is configured [0.58ms]",
+      "(pass) speculative tool execution > invalidates failed descendants without discarding independent siblings [1.11ms]",
+      " 171 pass",
+      " 0 fail",
+      "Ran 171 tests across 3 files. [7.70s]"
+    ]
+  },
+  "rollback": {
+    "head": "d49918fab2dba3986927f2d46721629ed0f3a02c",
+    "tree": "5fbd61f0d0c31bedb46d63db5ec68a5cabaaaddd",
+    "clean": true
+  },
+  "verified": true
+}

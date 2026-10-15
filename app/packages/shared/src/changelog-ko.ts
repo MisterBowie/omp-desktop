@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const koEntries: ChangelogEntry[] = [
   {
+    "version": "0.15.3",
+    "date": "2026-10-15",
+    "highlights": [
+      "격리된 프로젝트, 도구 승인, 복구 가능한 기본 기록으로 OMP 대화를 사용합니다.",
+      "OMP 대화를 다시 열 때 공급자 오류와 중단된 응답을 유지합니다.",
+      "OMP Desktop의 앱 식별자, 내장 런타임, 저장소와 업데이트 소스를 독립적으로 관리합니다."
+    ]
+  },
+
+  {
     version: "0.15.2",
     date: "2026-09-21",
     highlights: [

@@ -22,6 +22,16 @@ apps/desktop/electron/* (supervisor)
 crates/host-core (tool execution + permissions)
 ```
 
+### OMP terminal message projection
+
+The OMP adapter reads the native assistant `stopReason` on both final live
+frames and read-only history entries. `error` produces an error row with
+`OMP_MODEL_ERROR` and the native provider diagnostic; `aborted` remains aborted
+without an invented provider error. A later `message_end` or history refresh
+must not turn either state into a successful empty reply. Diagnostic message
+content is bounded to 4096 serialized UTF-8 bytes and counted in the existing
+shared row budget. The native transcript is never rewritten by projection.
+
 ## 3. Core objects
 
 ### 3.1 PiRuntime (Node)

@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const trEntries: ChangelogEntry[] = [
   {
+    "version": "0.15.3",
+    "date": "2026-10-15",
+    "highlights": [
+      "Yalıtılmış projeler, araç onayları ve kurtarılabilir yerel geçmişle OMP görüşmelerini kullanın.",
+      "OMP görüşmeleri yeniden açıldığında sağlayıcı hataları ve iptal edilen yanıtlar korunur.",
+      "OMP Desktop uygulama kimliği, yerleşik çalışma ortamı, depolama ve güncelleme kaynağını bağımsız tutar."
+    ]
+  },
+
+  {
     "version": "0.15.2",
     "date": "2026-09-21",
     "highlights": [

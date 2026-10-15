@@ -1,0 +1,23 @@
+{
+  "before": "0.15.2",
+  "after": "0.15.3-m7.1",
+  "scope": "Controlled 0.15.3-m7.1 preview of 0.15.3, with matching eight-locale 0.15.3 changelog and unchanged 0.15.x README release lines. Existing verified model catalog retained; no unrelated refresh or stable v tag.",
+  "files": [
+    "package.json",
+    "docs/package.json",
+    "apps/pi-host/package.json",
+    "apps/desktop/package.json",
+    "packages/omp-runtime/package.json",
+    "packages/host-runtime/package.json",
+    "packages/plugin-sdk/package.json",
+    "packages/shared/package.json",
+    "packages/plugin-devkit/package.json",
+    "packages/racp/package.json",
+    "packages/agent-host/package.json",
+    "packages/i18n/package.json",
+    "packages/agent-runtime/package.json",
+    "Cargo.toml",
+    "Cargo.lock",
+    "packages/shared/src/protocol.ts"
+  ]
+}

@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const esEntries: ChangelogEntry[] = [
   {
+    "version": "0.15.3",
+    "date": "2026-10-15",
+    "highlights": [
+      "Usa conversaciones OMP con proyectos aislados, aprobación de herramientas e historial recuperable.",
+      "Conserva los errores del proveedor y las respuestas canceladas al reabrir conversaciones OMP.",
+      "OMP Desktop mantiene su propia identidad, entorno de ejecución, almacenamiento y fuente de actualizaciones."
+    ]
+  },
+
+  {
     "version": "0.15.2",
     "date": "2026-09-21",
     "highlights": [

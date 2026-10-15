@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const deEntries: ChangelogEntry[] = [
   {
+    "version": "0.15.3",
+    "date": "2026-10-15",
+    "highlights": [
+      "OMP-Unterhaltungen mit getrennten Projekten, Werkzeugfreigaben und wiederherstellbarem Verlauf nutzen.",
+      "Anbieterfehler und abgebrochene Antworten bleiben beim erneuten Öffnen von OMP-Unterhaltungen erhalten.",
+      "OMP Desktop verwendet eine eigene Anwendungskennung, Laufzeit, Datenablage und Updatequelle."
+    ]
+  },
+
+  {
     "version": "0.15.2",
     "date": "2026-09-21",
     "highlights": [

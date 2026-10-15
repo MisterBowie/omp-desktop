@@ -271,7 +271,7 @@ export class OmpEventConverter {
         parsed,
       );
     }
-    return this.toUiMessage(entryId, parsed, role, "complete");
+    return this.toUiMessage(entryId, parsed, role, role === "assistant" ? assistantStatus(parsed) : "complete");
   }
 
   /** Map a `toolResult` message into a tool row the renderer already presents. */
@@ -485,7 +485,8 @@ export class OmpEventConverter {
       return [];
     }
     if (update.type === "done") {
-      return this.finishAssistant(streaming.id, update.message ?? message, "complete");
+      const finished = update.message ?? message;
+      return this.finishAssistant(streaming.id, finished, assistantStatus(finished));
     }
     if (update.type === "error") {
       const failed = update.error ?? message;
@@ -546,7 +547,7 @@ export class OmpEventConverter {
     if (role === "assistant") {
       const id = this.streaming?.role === "assistant" ? this.streaming.id : this.mintId();
       this.streaming = null;
-      return this.finishAssistant(id, message, "complete");
+      return this.finishAssistant(id, message, assistantStatus(message));
     }
     const id = this.streaming?.role === role ? this.streaming.id : this.mintId();
     this.streaming = null;
@@ -565,7 +566,6 @@ export class OmpEventConverter {
       streaming && streaming.id === id
         ? Math.max(0, this.now() - streaming.startedAt)
         : undefined;
-    if (status === "error") ui.error = appError("OMP_MODEL_ERROR", message.errorMessage ?? "the model turn failed");
     return [
       {
         type: "message_end",
@@ -602,6 +602,14 @@ export class OmpEventConverter {
       ...(this.parentToolCallId ? { parentToolCallId: this.parentToolCallId } : {}),
       ...(this.agentName ? { agentName: this.agentName } : {}),
       ...(usage ? { usage } : {}),
+      ...(role === "assistant" && status === "error" ? {
+        // Provider diagnostics are untrusted payload too. Charge a bounded
+        // diagnostic in the fixed envelope before sharing the row text budget.
+        error: appError("OMP_MODEL_ERROR", boundFieldText(
+          message.errorMessage ?? "the model turn failed",
+          { remaining: 4096, truncated: false },
+        )),
+      } : {}),
     };
     const skeleton = {
       ...fixed,
@@ -635,6 +643,13 @@ export class OmpEventConverter {
   private note(text: string): void {
     if (!this.diagnostics.notes.includes(text)) this.diagnostics.notes.push(text);
   }
+}
+
+/** A settled native assistant retains its terminal state in live and history rows. */
+function assistantStatus(message: OmpMessage): "complete" | "error" | "aborted" {
+  if (message.stopReason === "error") return "error";
+  if (message.stopReason === "aborted") return "aborted";
+  return "complete";
 }
 
 /** Flatten a runtime message body into text plus reasoning. */

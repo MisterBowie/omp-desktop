@@ -1,0 +1,1430 @@
+{
+  "session": {
+    "session": {
+      "createdAt": "2026-10-15T08:43:33.438Z",
+      "engine": "omp",
+      "id": "50764b92-2a17-408f-8648-ec13ecee544d",
+      "messageCount": 2,
+      "messages": [
+        {
+          "id": "omp:50764b92-2a17-408f-8648-ec13ecee544d:entry:d80b132b",
+          "role": "user",
+          "createdAt": "2026-10-15T08:43:37.716Z",
+          "status": "complete",
+          "content": "M7_AUTH_FAIL show provider error"
+        },
+        {
+          "id": "omp:50764b92-2a17-408f-8648-ec13ecee544d:entry:24d24577",
+          "role": "assistant",
+          "createdAt": "2026-10-15T08:43:37.747Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "4237de54-04ae-4fe3-a5d7-03deebe10ec5",
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "totalTokens": 0
+          },
+          "content": ""
+        }
+      ],
+      "mode": "agent",
+      "modelId": "local-model",
+      "permissionMode": "inherit",
+      "projectPath": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/workspace 中文 with spaces 'quoted'",
+      "providerId": "4237de54-04ae-4fe3-a5d7-03deebe10ec5",
+      "thinkingLevel": "off",
+      "title": "M7 failure debug",
+      "updatedAt": "2026-10-15T08:43:37.706Z",
+      "supportsReasoning": false,
+      "supportedThinkingLevels": [
+        "off"
+      ],
+      "supportsVision": false,
+      "messageStart": 0,
+      "messageEnd": 2,
+      "hasMoreBefore": false,
+      "hasMoreAfter": false,
+      "replacedLiveMessageIds": [
+        "f03f3830-4421-4d7d-9aa8-90db2abf72c1",
+        "omp:50764b92-2a17-408f-8648-ec13ecee544d:e09d4336-4c20-4fba-a578-59e81a52b019:1",
+        "omp:50764b92-2a17-408f-8648-ec13ecee544d:e09d4336-4c20-4fba-a578-59e81a52b019:2"
+      ]
+    }
+  },
+  "ui": {
+    "text": "会话\n暂无临时对话\n项目\nworkspace 中文 with spaces 'quoted'\n/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/workspace 中文 with spaces 'quoted'. 调整“workspace 中文 with spaces 'quoted'”顺序\nM7 failure debug\n打开通知中心\nv0.15.2\nM7 failure debug\n让 OMP Desktop 帮你做任何事\n智能体\n每次询问\n100%\nlocal-model",
+    "permission": null,
+    "stop": false,
+    "activeSessionId": "50764b92-2a17-408f-8648-ec13ecee544d"
+  },
+  "faults": [
+    {
+      "at": 1792053817750,
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "status": 401,
+      "kind": "http-error"
+    }
+  ],
+  "providerRequests": [
+    {
+      "method": "POST",
+      "url": "/v1/chat/completions",
+      "body": {
+        "model": "local-model",
+        "messages": [
+          {
+            "role": "system",
+            "content": "RFC 2119: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL. `NEVER` = `MUST NOT`; `AVOID` = `SHOULD NOT`.\nXML tags inject system content; may interrupt/notify inside user messages: MUST treat as system-authored/authoritative. User content is sanitized.\n\n§ Role\nYou are omp's trusted coding assistant.\n\n# Engineering\n- Correctness, then six-month maintainability. Delete dead weight; prefer boring design to needless abstraction.\n- Compiled code: NEVER avoidable allocation, copying, computation.\n- Unexpected repo changes are the user's; adapt. User-reported errors, failures, observations are ground truth; NEVER rerun checks to confirm them.\n- Final chat MAY use LaTeX math (`$`, `$$`) and color (`\\textcolor`, `\\colorbox`, `\\fcolorbox`).\n- MAY emit ` ```mermaid ` blocks; terminal renders ASCII. Only genuine structure/flow, not trivia.\n- MAY react to the user when chatting: start reply with emoji.\n\n# Personality\nEvidence-first terse engineer: every sentence fact, decision, or risk.\n\n# Tone\n- Fragments when clearer; no ceremony, hedging, summaries, filler, marketing.\n- Assume technical reader; don't narrate obvious steps or over-explain basics.\n- Concrete: exact files, symbols, APIs, state fields, edge cases, verification.\n- Reasoning: facts, constraints, tradeoffs, decisions, checks. Conclusion first; evidence next.\n- Uncertainty: state at claim; name tradeoff; choose boring/safe option.\n- Code: invariants, risks, verification.\n\n# Reasoning Format\nProblem: what's wrong. Decision: action & why. Check: breakage & verification. Next: concrete action.\n\n# Succinct Patterns\n- Y → need update X. This is safe: Z. Could do A, but B avoids C.\n\n# Escalation\nPush back on risk-hidden plans or wrong claims: name risk, show evidence, propose alternative. If overruled, execute user's call; don't relitigate.\n\n§ Runtime\n# Skills & Rules\n# Internal URLs\nMost FS/bash tools resolve these; other schemes/selectors: `read` docs.\n- `rule://<name>`: details.\n- `agent://<id>`: output; nested IDs dotted, `/key/index` JSON path; write = message, `agent://all` broadcast only.\n- `history://<id>`: read-only transcript; bare lists registered agents, not persisted unregistered top-level sessions.\n- `artifact://<id>`: content; `local://<name>.md`: shared artifact.\n- `proc://`: jobs/services; `proc://<id>`: read status/output, write service stdin; write `proc://<id>/kill` cancels/stops (no `content` needed).\n- `issue://<N>` / `pr://<N>` (`<owner>/<repo>/<N>` for other repos): GitHub issue/PR; bare: recent; `?state=&limit=&author=&label=`. PR diff: `pr://<N>/diff` (files), `/diff/<i>`, `/diff/all`.\n- `mcp://<uri>`: MCP resource; `omp://`: harness docs, AVOID unless asked.\n\n# Tool Inventory\n- Read: `read`\n- Bash: `bash`\n- Edit: `edit`\n- Ask: `ask`\n- Eval: `eval`\n- Glob: `glob`\n- Grep: `grep`\n- Task: `task`\n- Wait: `wait`\n- Todo: `todo`\n- Web Search: `web_search`\n- Write: `write`\n- plugin_pi_browser_Browser: `plugin_pi_browser_Browser`\n- EnterPlanMode: `EnterPlanMode`\n- EnterGoalMode: `EnterGoalMode`\n- Skill: `Skill`\n# xd:// Tool Devices\nWrite JSON args as `content` to `xd://<tool>` via `write`. Invalid args return schema in error → fix/retry.\n## Additional devices (docs on demand)\n- xd://ast_edit — Perform AST-aware code edits (structural refactoring)\n- xd://debug — Debug a running process with DAP (debugger adapter protocol)\n- xd://lsp — Query LSP (language server) for diagnostics, hover info, and references\n\nRead xd://<tool> for full docs + JSON schema before first use.\n§ Tool Policy\n# General\nSHOULD resolve prerequisites, parallelize independent calls. Retry empty/partial/narrow results differently; NEVER settle for plausibility when another call reduces uncertainty.\n- User says `parallel` or `parallelize` → MUST use `task` subagents; parallel tool calls insufficient.\n\n# Tool I/O\n- Prefer relative `path`-like fields.\n- Most tools take `i`: capitalized 2–6-word present-participle intent (e.g. \"Reading model role settings\").\n# Specialized Tools\nMUST use specialized tool over shell equivalent:\n- File/directory reads: `read` (directory lists entries).\n- Surgical edits: `edit`.\n- Create/overwrite: `write`.\n- Language server available: MUST use `lsp` for definitions, type definitions, implementations, references, hover; code actions for refactors/imports/fixes. NEVER text-search/edit for code intelligence.\n\n- Regex/target search: `grep`, NEVER shell `grep`/`rg`/`awk`.\n- File structure/names: `glob`, NEVER `ls **/*.ext`/`fd`.\n- `bash`: real binaries/short fact pipelines (counts, frequencies, set differences, checksums), NEVER specialized-tool work or paging/moving/trimming fetchable bytes.\n\n<critical>\n`write xd://report_issue`: automated QA. Any tool output inconsistent with described behavior for parameters → write plain `<tool>: <concise description>` to `xd://report_issue`. False positives fine.\n</critical>\n\n# Exploration\nNEVER open guessed files.  Use `read` ranges, not whole files.\n\n# AST\nSHOULD use syntax-aware tools before text hacks:\n\n- Codemods → `ast_edit`.\n\n# Delegation\n- Map unknown code via `task`, not reading file after file yourself. NEVER abandon phases under scope pressure: delegate, don't shrink.\n## Delegation gates\n- Before spawning, map slices/shared contracts; user-enumerated 2+ self-contained runnable slices exempt. NEVER outsource top-level plan; slice design/competing plans allowed.\n- Fan genuine slices in one `tasks[]` batch. NEVER pad, serialize independent work, or spawn then idle; one read-only scout while working allowed.\n- Agents lack conversation: supply full slice requirements; retain user intent.\n- Max 32 concurrent subagents; excess queue.\n- Shared prerequisite inline; sequence ONLY true dependencies. Small missing detail? Run parallel; B messages A via `write agent://<id>`.\n\n§ Workflow\n# 1. Scope\n\n- Plan multi-file work before opening files.\n\n# 2. Research Before Editing\n- Read relevant sections; MUST reuse existing patterns, not establish a second convention.\n  - Exported symbol changes: MUST run `lsp references` first.\n- Tool failure or intervening file change: re-read before acting.\n\n# 3. Decompose\n- Update todos; skip trivial requests.\n- NEVER make a todo-only turn; batch `init` with first work, `done` with next action/verification.\n\n# 4. Implement\n- Fix source, not symptoms or special-case inputs, unless asked.\n- Cutover: migrate every caller; remove obsolete code/comments/aliases/re-exports/deprecated paths. Prefer existing files; review as user.\n- Ask before destructive commands or deleting unrelated code you didn't write; code made obsolete by cutover is in scope.\n\n# 5. Verify\nNon-trivial work: NEVER yield without exercising the changed path. Tests alone are not proof.\n- Investigation: run it; output proves it; no tests.\n- UI: verify actual surface.\n  - Web: `browser.open` tab, direct helpers for actions, `tab.run` for custom JS; visual proof; `tab.close`. No tests unless existing suite breaks.\n  - TUI/CLI: launch actual program; observe interaction/output/state.\n  - No runtime for changed surface: throwaway script/smoke test; report visual limit.\n- Bug: reproduce before; confirm after. SHOULD keep failing-before/passing-after regression test; if impractical, smoke and report.\n- Feature/API: update broken contract tests; prove new behavior via throwaway script. New test ONLY for uncertain edge or user request.\n- Smoke: run thing; exercise changed path; observe result.\n- Permanent tests MUST catch plausible consumer-visible bugs: behavior, boundaries, invariants, transitions, precedence, errors. Follow conventions; deterministic, isolated, full-suite-safe.\n- NEVER test wiring/copies/forwarding/mock echoes/source text/incidental defaults, tautologies, bare not-throw, non-empty/length-grew, duplicate same-path rows. Use throwaway scripts.\n- Existing wording/implementation/incidental-behavior tests: MUST delete, NEVER re-pin regardless of author.\n\n# 6. Cleanup\nAfter smoke proof: permanent fix/feature MUST update docs/changelog, remove scaffolds/throwaway scripts; tests per Verify. Investigation: no tests/docs. NEVER pre-plan cleanup todos.\n\n§ Delivery\n<contract>\nInviolable.\n- NEVER yield before complete deliverable; phase boundary/todo flip/sub-step never yields: same turn.\n- NEVER fabricate output; code/tool/test/doc/source claims MUST be grounded.\n- NEVER substitute easier/familiar problem: don't infer extra scope—retries, validation, telemetry, abstraction “while you're at it”—or solve symptom—suppress warning/exception, special-case input—unless asked. Real ask only.\n- NEVER ask for tool/repo/file-provided information; NEVER punt half-solved work.\n- Default clean cutover: migrate every caller; no shims, aliases, deprecated paths.\n</contract>\n\n<completeness>\n- “Done”: specified end-to-end behavior plus every named acceptance criterion; not compiling scaffold, narrowed test, plausible subset.\n- Reduce scope only with explicit user approval in this conversation; NEVER silently shrink.\n- NEVER deliver unfinished work: stubs, placeholders, mocks, no-ops, fake fallbacks, `TODO: implement`, misleading “scaffold”/“MVP”/“v1”/“foundation”/“follow-up”. Unavailable real-implementation info → state missing prerequisite; finish all reachable work.\n</completeness>\n\n<evidence-and-output>\n- MUST match requested format; brief, complete evidence/blockers. Ground code/tool/test/doc/source claims; unobserved = `[INFERENCE]`. Report only exercised verification.\n</evidence-and-output>\n\n<yielding>\nBefore yielding: all affected callsites/tests/docs updated or intentionally unchanged; output/evidence requirements satisfied.\nBefore blocked: ensure info unreachable via tools/context; one failed check ≠ blocked. Finish reachable work; state exactly missing and tried.\n</yielding>\n\n§ Critical\n<critical>\n- NEVER yield while actionable work remains; phase boundary/todo flip/sub-step never stops: same turn.\n- NEVER narrate/consider session limits, token/tool budgets, effort estimates, or possible completion; start unbounded: execute/delegate.\n- NEVER re-audit applied edit or routinely run git subcommands for validation. Tool results are verification.\n</critical>\n\nPROJECT\n\n<workstation>\n- OS: darwin 22.5.0\n- Arch: arm64\n- Model: 4237de54-04ae-4fe3-a5d7-03deebe10ec5/local-model\n</workstation>\n<critical>\n- Each response MUST advance the task; completion only stopping condition.\n- MUST default to informed action; do not ask for confirmation when tools or repo context can answer.\n- Before yielding, MUST verify significant behavioral changes: run the specific test, command, or scenario covering the change.\n</critical>\n\n# Skills\n\nPlugins have taught you the following skills. Each entry is a set of instructions you can load with the `Skill` tool by passing its exact id. When a task matches a skill's description, load the skill first and follow it; do not guess at its content. Load each skill at most once per task.\n\n- `pi-desktop/imagegen` — imagegen: Generate or edit raster images, illustrations, photos, banners, and project assets with the configured image model. Supports reference images, edits of earlier results, variants, and batches. Prefer existing code-native tools for SVG/CSS edits.\n\nYou are operating in Agent mode. After the user approves a plan or requests implementation, carry out the requested work with the available tools and report the result clearly."
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "<system-reminder>\nToday: 2026-10-15; current working directory: '/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/workspace 中文 with spaces 'quoted''. Do not repeat this information in your reply.\n</system-reminder>"
+              },
+              {
+                "type": "text",
+                "text": "M7_AUTH_FAIL show provider error"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Recover now"
+              }
+            ]
+          }
+        ],
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        },
+        "store": false,
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "read",
+              "description": "Use `read` for static web; browser only if needed.\n\nPath suffixes: :50 or :50- starts at line 50; :50-200 inclusive; :50+150 counts lines; :-60 last 60; commas join ranges (:5-16,960-973) or individual lines (:19,59). :raw verbatim without anchors/prefixes; combine :2-4:raw or :raw:2-4. :conflicts lists one line per unresolved merge block. SVG/SVGZ default text; :img PNG, :raw original. Video requires ffmpeg/ffprobe: bare preview grid+metadata, :412 frame, :1h5m42s/:90s/:01:23 time.\n\nSources:\n- Bare code: declarations only; re-read ONLY footer-named omissions, NEVER guess `..`/`…`.\n- Selected file: `[foo.ts#1A2B]` snapshot+lines. Copy `[FILENAME#TAG]` for anchored edits; NEVER invent tag.\n- Directory: complete root; child listings cap at 12 (`… N more`), read child; page via :N-M/:-N.\n- SQLite: file.db tables; :table schema/rows; :table:key by primary key; ?limit=, ?where=, ?q=SELECT.\n- Archives: ZIP/JAR/APK/WHL, compressed TAR, RAR/7z/ISO/CAB/DEB/RPM/CPIO/AR/LZH/ARJ/ASAR, compressed streams; member via archive.ext:member/path.\n- PDF/documents: extracted text; notebooks: editable cells; images: decoded inline. URLs: reader text/markdown, :raw original HTML; bare host:port needs trailing slash.\n- Internal URI selectors: artifact://<id> spilled output (page :N-M or :raw:N-M); agent://<id> output, NOT agent://all; proc:// jobs/services, proc://<id> status/output.\n- ssh://host/<path> reads UTF-8 remote file/dir (max 1 MiB); ssh:// lists hosts; write and grep also work. Encode literal `:` `?` `#` as %3A %3F %23. Requires verified POSIX shell; Windows/unsupported: bash remote SSH command or sshfs.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "i": {
+                    "type": "string",
+                    "description": "concise intent"
+                  },
+                  "path": {
+                    "type": "string",
+                    "description": "Local path, internal URI, or URL; selectors inline."
+                  }
+                },
+                "required": [
+                  "path",
+                  "i"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "bash",
+              "description": "Persistent shell: one fact command/pipeline; dependencies use `&&`.\nScripts/heredocs/`$(…)`/complex pipelines → `eval`.\n`cwd`, not `cd`; `pty` only interactive.\nInternal URIs paths.\n`async` defers finite results; timeout unchanged.\nNo `head`/`tail`/redirection; output trunc by default, full result at `artifact://<id>`.\nLong-lived services: unique name; ready/env require name; no async/timeout. env adds variables; pty defaults true. ready needs log regex or port (both if given); host defaults 127.0.0.1, ready.timeout 30s.\nBackground results follow; NEVER poll; foreground wait unchanged.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "i": {
+                    "type": "string",
+                    "description": "concise intent"
+                  },
+                  "command": {
+                    "type": "string"
+                  },
+                  "timeout": {
+                    "type": "number",
+                    "description": "timeout in seconds; 0 disables the command deadline; nonzero values are clamped to 1-3600"
+                  },
+                  "cwd": {
+                    "type": "string"
+                  },
+                  "pty": {
+                    "type": "boolean"
+                  },
+                  "async": {
+                    "type": "boolean"
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 48
+                  },
+                  "ready": {
+                    "type": "object",
+                    "properties": {
+                      "log": {
+                        "type": "string"
+                      },
+                      "port": {
+                        "type": "number"
+                      },
+                      "host": {
+                        "type": "string"
+                      },
+                      "timeout": {
+                        "type": "number"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "env": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "command",
+                  "i"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "edit",
+              "description": "Hashline patches existing files; new files: `write`. Each file: `[PATH#TAG]`, `TAG` required 4-hex snapshot from latest `read`/`search`. Numbers: original `LINE:TEXT`, never hunk-shifted.\n\n<ops>\n`PUT N.=M:` replace inclusive N–M with `+` body (`N.=N` for one line); `PUT N*:` replace block N.\n`PUT <N:`/`PUT >N:` insert before/after N (`<1` head, `>$` tail). `PUT >N*:` insert after block N at sibling depth; inside, use `PUT >M:` at closer.\n`CUT N.=M`/`CUT N*` delete and capture, optionally as `@name`.\n`PUT <N @name`/`PUT >N @name` paste at gap (omit name for anonymous CUT); `PUT N.=M @name`/`PUT N* @name` paste over range/block (name REQUIRED). Register pastes have NO body; named registers persist across calls.\n`REM` delete file; `MV DEST` rename after prior edits (quote spaced paths).\n</ops>\n\n<rules>\n- `:` ops only: body rows `+TEXT` verbatim incl. indent; lone `+` blank. Literal `- item`/`+ item` → `+- item`/`++ item`. NEVER `-`/bare context. Body length independent of range; delete with CUT, not empty PUT.\n- Touch displayed changed lines only; `…`, `..`, collapsed `N-M:` and out-of-window lines UNSEEN. Re-read first. Tight ranges: split nonadjacent changes; NEVER include keepers or start/end mid-expression/block. Pure addition uses gap PUT.\n- `*` requires multi-line opener, NEVER closer/last/inner statement; use range/gap for one statement. Anchor first decorator/attribute/doc-comment to include it; standalone comments need explicit range.\n- Markdown heading blocks run through deeper headings until next same/higher; after section `PUT >N*:`, end body with blank line.\n- NEVER restyle unrelated code. After EVERY edit tag/numbers change: use edit response or fresh `read`; stale tag/surprise → STOP, re-read.\n</rules>\n\n<example>\n```\n[greet.py#A1B2]\nPUT 1*:\n+@cache\n+def greet(name):\n+    print(name)\n[PLAN.md#3C4D]\nPUT >2:\n+- task\n```\nCross-file move: `CUT 1* @fn` in source, then `PUT <1 @fn` in destination section.\n</example>",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "i": {
+                    "type": "string",
+                    "description": "concise intent"
+                  },
+                  "input": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "input",
+                  "i"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "ask",
+              "description": "Ask only for materially different tradeoffs the user must decide. Default: act using code/config/docs/history and conventions. Several viable choices: pick conservative/standard, proceed, state choice.\n\n<instruction>\n- Batch related questions; 2–5 distinct options each; short labels, tradeoffs in `description`.\n- `recommended` auto-adds \" (Recommended)\"; `multi: true` permits multiple selections.\n- NEVER supply \"Other\": UI adds \"Other (type your own)\". Clarifying custom input? Answer first; re-ask unresolved questions.\n</instruction>\n\n<examples>\n# Choice\n<example>\nask(i=\"…\", questions=[{\"id\": \"storage\", \"question\": \"Database?\", \"options\": [{\"label\": \"SQLite\"}, {\"label\": \"Postgres\"}], \"recommended\": 0}])\n</example>\n</examples>",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "i": {
+                    "type": "string",
+                    "description": "concise intent"
+                  },
+                  "questions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "question": {
+                          "type": "string"
+                        },
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "preview": {
+                                "type": "string",
+                                "description": "rich preview"
+                              }
+                            },
+                            "required": [
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "header": {
+                          "type": "string",
+                          "description": "display chip"
+                        },
+                        "multi": {
+                          "type": "boolean"
+                        },
+                        "recommended": {
+                          "type": "number",
+                          "description": "0-based default index"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "question",
+                        "options"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "questions",
+                  "i"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "eval",
+              "description": "One cell per call; top-level state persists, including across compaction. `agent()` children have separate kernels.\nFor 2+ independent items, use a named `workpool()`; results auto-deliver. If blocked, leave `eval` and call `wait`.\nPython: top-level `await` works; `asyncio.run(…)` fails.\nJS: Bun (`Bun.file`, `Bun.write`, `Bun.$`); top-level `await`/`return` work.\nOn error, retry only the failed step; earlier steps may have taken effect.\n\n<prelude>\nPython helpers: sync, kwargs; JS helpers: async, ONE trailing options object.\n```\ndisplay(value)  print(value, ...)  log(message)  phase(title)\nread(path, offset?, limit?)  write(path, content)  env(key?, value?)  output(*ids, format?, query?, offset?, limit?)\nawait tool.<name>(args) — session tool; `args` is its parameter object\nwait(handles, timeout?=None, raise_errors?=True) — agent/completion barrier, ordered results; JS: wait(handles, { timeout, raiseErrors }); `raise_errors=False` retains failures.\n```\n</prelude>\n\n<namespaces>\nMore globals; `read` the linked docs before first use:\n- `judge`, `judge_batch`, `completion`: classification, bulk judgment, model calls → `xd://eval/judge`\n- `%load`, `%pip`, `%bun add`, `budget`, `@tool`/`tool(fn)`: setup, installs, utilities → `xd://eval/helpers`\n- `agent`, `workpool`: background subagents, DAG waves → `xd://eval/agents`\n- `browser`: Drive real Chromium tabs from JavaScript or Python Eval with the global `browser` object. → `xd://eval/browser`\n</namespaces>\n\n<critical>\nNEVER repeat successful setup. Kernel-loss notice means reload setup.\n</critical>\n\n<examples>\n# Load a script with spaces without echoing its source\n<example>\neval(language=\"py\", code=\"%load \\\"scripts/my setup.py\\\"\")\n</example>\n</examples>",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "language": {
+                    "enum": [
+                      "py",
+                      "js"
+                    ],
+                    "type": "string",
+                    "description": "\"py\": IPython; \"js\": Bun"
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "Code or standalone % command; top-level await works."
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "Short transcript label."
+                  },
+                  "timeout": {
+                    "type": "number",
+                    "description": "Cell deadline in seconds; 0 disables it."
+                  },
+                  "reset": {
+                    "type": "boolean",
+                    "description": "Wipe only this kernel."
+                  }
+                },
+                "required": [
+                  "language",
+                  "code"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "glob",
+              "description": "Glob files/dirs: `;`-separated paths; default workspace root.\n`gitignore` and `hidden` default true; ignored dotfiles need `gitignore: false`. Newest-first by directory; dirs end `/`.\n\nMulti-round discovery → Task + scout.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "i": {
+                    "type": "string",
+                    "description": "concise intent"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "hidden": {
+                    "type": "boolean"
+                  },
+                  "gitignore": {
+                    "type": "boolean"
+                  },
+                  "limit": {
+                    "type": "number"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "i"
+                ]
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "grep",
+              "description": "Regex: Rust, then PCRE2. `path`: `;`-separated file/dir/glob/URL; default `.`. Default case-sensitive, gitignore respected; `skip` paginates files.\nFile-only selector: `src/foo.ts:50-100`. Literal `\\n`/`\\\\n` enables cross-line.\n\nMulti-round search MUST use Task + scout, not chained calls.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "i": {
+                    "type": "string",
+                    "description": "concise intent"
+                  },
+                  "pattern": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "case": {
+                    "type": "boolean"
+                  },
+                  "gitignore": {
+                    "type": "boolean"
+                  },
+                  "skip": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "pattern",
+                  "i"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "task",
+              "description": "Spawn `tasks[]` concurrently; IDs return immediately.\n\n# Results\n`outputSchema` parsed payload, even invalid: `agent://<id>` (field `/<field>`, nested `/reports/0/data`); invalid preview inline.\n\n# Delegation\nUse most specific agent. Read-only research MUST use `scout` only when files unknown. Prefer one agent to investigate + edit. Omit `agent` only for default (`task`); NEVER specify it.\nShared edits need one integration owner; siblings coordinate via `write agent://<id>`. Set interfaces in `context`. Every task MUST skip build/lint/tests/formatters mid-flight; run once afterward.\n\n# Inputs\n`name`: CamelCase ≤32, auto-generated if omitted; address agent by name. `outputSchema` overrides agent/session schemas.\n`tools`: eval-defined, run in your kernel.\n`schemaMode`: default permissive warns after retries; strict fails.\nChildren start blank; parent IRC steers immediately; large payloads via `local://<path>`, NEVER inline.\n\n# Format\n`context`: shared (`# Goal`, `# Constraints`, `# Contract` interfaces); NEVER repeat per task.\n`task`: self-contained (`# Target` files/non-goals, `# Change` steps/APIs, `# Acceptance` observable result).\n\n# Available Agents\n- `scout` (READ-ONLY; investigation only, no edits): MUST be used for exploratory codebase research, rapid code analysis, and broad pattern searches. Fast read-only scout returning compressed context for handoff.\n- `reviewer`: Code review specialist for quality/security analysis\n- `security-reviewer`: Read-only security specialist for evidence-backed repository vulnerability discovery\n- `task`: General-purpose subagent with full capabilities for delegated multi-step tasks\n- `sonic`: Low-reasoning agent for strictly mechanical updates or data collection only",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "i": {
+                    "type": "string",
+                    "description": "concise intent"
+                  },
+                  "context": {
+                    "type": "string"
+                  },
+                  "tasks": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "task": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "agent": {
+                          "type": "string",
+                          "default": "task"
+                        },
+                        "outputSchema": {
+                          "anyOf": [
+                            {
+                              "type": "object"
+                            },
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "schemaMode": {
+                          "enum": [
+                            "permissive",
+                            "strict"
+                          ],
+                          "type": "string"
+                        },
+                        "tools": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "task"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "context",
+                  "tasks",
+                  "i"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "wait",
+              "description": "Wait only when blocked with nothing else to do.\nReturns on the first background result, peer message, or steering interrupt; a safety cap returns a still-running snapshot.\nResults and messages auto-deliver. NEVER poll while work remains.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "i": {
+                    "type": "string",
+                    "description": "concise intent"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "todo",
+              "description": "Tasks identified by verbatim content, NEVER generated IDs (task-1). Unique, stable task/phase names; lost text: view, NEVER guess.\nBefore work, init for 3+ steps, requested task sets, or new instructions. MUST list EVERY user item separately (phased/numbered/bulleted/N); NEVER omit or remember leftovers.\nAfter successful mutation: no active means earliest pending starts (phase order); multiple active means only earliest stays. Blocked NEVER starts automatically; unblock returns pending. Done out of order may rewind pointer but NEVER reopen completed. Mark done immediately; follow phase order.\nExternal waits (user/agent/service): block with optional reason suppresses stop reminder, starts next pending. Unblock when actionable; append a clearing task for agent-actionable blocker.\nNEVER call todo alone: init with first work; done/start with next action.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "i": {
+                    "type": "string",
+                    "description": "concise intent"
+                  },
+                  "op": {
+                    "enum": [
+                      "init",
+                      "start",
+                      "done",
+                      "rm",
+                      "drop",
+                      "block",
+                      "unblock",
+                      "append",
+                      "view"
+                    ],
+                    "type": "string"
+                  },
+                  "list": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "phase": {
+                          "type": "string"
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "minItems": 1
+                        }
+                      },
+                      "required": [
+                        "phase",
+                        "items"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "phases for init"
+                  },
+                  "task": {
+                    "type": "string",
+                    "description": "verbatim task content"
+                  },
+                  "phase": {
+                    "type": "string"
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "tasks for flat init or append"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "blocker note for block"
+                  }
+                },
+                "required": [
+                  "op",
+                  "i"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "web_search",
+              "description": "Known URLs/programmatic data → `read`. Query: site: or -site:, after: or before: YYYY-MM-DD, inurl:, intitle:, filetype:, \"phrase\", -term, OR. Prefer primary sources; MUST link citations.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "i": {
+                    "type": "string",
+                    "description": "concise intent"
+                  },
+                  "query": {
+                    "type": "string"
+                  },
+                  "recency": {
+                    "enum": [
+                      "day",
+                      "week",
+                      "month",
+                      "year"
+                    ],
+                    "type": "string"
+                  },
+                  "limit": {
+                    "type": "number"
+                  },
+                  "max_tokens": {
+                    "type": "number"
+                  },
+                  "temperature": {
+                    "type": "number"
+                  },
+                  "num_search_results": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "query",
+                  "i"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "write",
+              "description": "SHOULD `edit` existing files; `write` for required new files or whole-file replacement. NEVER create docs or emojis unless requested.\n`archive.ext:member`: ZIP/tar families and `.asar` writable, others read-only. `db.sqlite:table`: insert; `db.sqlite:table:key`: JSON update, empty content deletes.\nCancel a job or stop a service: `{\"path\":\"proc://<id>/kill\"}` (`content` ignored). Bare `proc://<id>` writes send service stdin, including empty input. All writes except `/kill` require `content`.\n`proc://<id>/mode`: `persist`|`session`|`detached`.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "i": {
+                    "type": "string",
+                    "description": "concise intent"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "i"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "plugin_pi_browser_Browser",
+              "description": "Drive PI-Desktop's work-panel browser via CDP: snapshot the accessibility tree, click/fill by uid, screenshot, evaluate JavaScript, read console output, or send an allowlisted raw CDP method. Call ToolSearch for \"browser\" or \"cdp\" to load this tool. Use BrowserPreview to open a workspace HTML file with live reload.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "i": {
+                    "type": "string",
+                    "description": "concise intent"
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "navigate",
+                      "snapshot",
+                      "screenshot",
+                      "click",
+                      "fill",
+                      "evaluate",
+                      "console",
+                      "cdp"
+                    ],
+                    "description": "Operation to run against the visible work-panel guest."
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "http(s) URL for action=navigate."
+                  },
+                  "path": {
+                    "type": "string",
+                    "description": "Workspace-relative HTML file for action=navigate."
+                  },
+                  "uid": {
+                    "type": "string",
+                    "description": "Snapshot uid (e1, e2, …) for click/fill."
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "Text to type for action=fill."
+                  },
+                  "expression": {
+                    "type": "string",
+                    "description": "JavaScript for action=evaluate."
+                  },
+                  "method": {
+                    "type": "string",
+                    "description": "Allowlisted CDP method for action=cdp."
+                  },
+                  "params": {
+                    "type": "object",
+                    "description": "CDP parameters for action=cdp."
+                  },
+                  "fullPage": {
+                    "type": "boolean",
+                    "description": "Capture the full page for action=screenshot."
+                  },
+                  "limit": {
+                    "type": "number",
+                    "description": "Max console messages for action=console."
+                  }
+                },
+                "required": [
+                  "action",
+                  "i"
+                ]
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "EnterPlanMode",
+              "description": "Switch this same agent into Plan mode after the host confirms the durable session transition. Use when the user wants to agree on the implementation steps before any change is made.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "i": {
+                    "type": "string",
+                    "description": "concise intent"
+                  }
+                },
+                "required": [
+                  "i"
+                ]
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "EnterGoalMode",
+              "description": "Switch this same agent into Goal mode after the host confirms the durable session transition. Use when the user states an outcome and wants you to agree on the goal and its acceptance criteria, then reach it autonomously.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "i": {
+                    "type": "string",
+                    "description": "concise intent"
+                  }
+                },
+                "required": [
+                  "i"
+                ]
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "Skill",
+              "description": "Load the full instructions of one skill listed in the Skills section of your system prompt. Pass its exact id (for example \"demo.hello/release-notes\"). Returns the skill document; follow it for the current task.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "i": {
+                    "type": "string",
+                    "description": "concise intent"
+                  },
+                  "id": {
+                    "type": "string",
+                    "description": "Skill id exactly as listed in the Skills section."
+                  }
+                },
+                "required": [
+                  "id",
+                  "i"
+                ]
+              }
+            }
+          }
+        ],
+        "max_completion_tokens": 16384
+      },
+      "at": 1792053818171
+    }
+  ],
+  "recovery": {
+    "session": {
+      "createdAt": "2026-10-15T08:43:33.438Z",
+      "engine": "omp",
+      "id": "50764b92-2a17-408f-8648-ec13ecee544d",
+      "messageCount": 4,
+      "messages": [
+        {
+          "id": "omp:50764b92-2a17-408f-8648-ec13ecee544d:entry:d80b132b",
+          "role": "user",
+          "createdAt": "2026-10-15T08:43:37.716Z",
+          "status": "complete",
+          "content": "M7_AUTH_FAIL show provider error"
+        },
+        {
+          "id": "omp:50764b92-2a17-408f-8648-ec13ecee544d:entry:24d24577",
+          "role": "assistant",
+          "createdAt": "2026-10-15T08:43:37.747Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "4237de54-04ae-4fe3-a5d7-03deebe10ec5",
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "totalTokens": 0
+          },
+          "content": ""
+        },
+        {
+          "id": "omp:50764b92-2a17-408f-8648-ec13ecee544d:entry:5bb737a1",
+          "role": "user",
+          "createdAt": "2026-10-15T08:43:38.142Z",
+          "status": "complete",
+          "content": "Recover now"
+        },
+        {
+          "id": "omp:50764b92-2a17-408f-8648-ec13ecee544d:entry:0b67fbca",
+          "role": "assistant",
+          "createdAt": "2026-10-15T08:43:38.167Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "4237de54-04ae-4fe3-a5d7-03deebe10ec5",
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "totalTokens": 0
+          },
+          "content": "ok"
+        }
+      ],
+      "mode": "agent",
+      "modelId": "local-model",
+      "permissionMode": "inherit",
+      "projectPath": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/workspace 中文 with spaces 'quoted'",
+      "providerId": "4237de54-04ae-4fe3-a5d7-03deebe10ec5",
+      "thinkingLevel": "off",
+      "title": "M7 failure debug",
+      "updatedAt": "2026-10-15T08:43:37.706Z",
+      "supportsReasoning": false,
+      "supportedThinkingLevels": [
+        "off"
+      ],
+      "supportsVision": false,
+      "messageStart": 0,
+      "messageEnd": 4,
+      "hasMoreBefore": false,
+      "hasMoreAfter": false,
+      "replacedLiveMessageIds": [
+        "f03f3830-4421-4d7d-9aa8-90db2abf72c1",
+        "omp:50764b92-2a17-408f-8648-ec13ecee544d:e09d4336-4c20-4fba-a578-59e81a52b019:1",
+        "omp:50764b92-2a17-408f-8648-ec13ecee544d:e09d4336-4c20-4fba-a578-59e81a52b019:2",
+        "876765e0-4bcf-48da-9c76-90404d2b10dd",
+        "omp:50764b92-2a17-408f-8648-ec13ecee544d:e09d4336-4c20-4fba-a578-59e81a52b019:3",
+        "omp:50764b92-2a17-408f-8648-ec13ecee544d:e09d4336-4c20-4fba-a578-59e81a52b019:4"
+      ]
+    }
+  },
+  "processReports": [
+    {
+      "label": "ready",
+      "processes": [
+        {
+          "pid": 18890,
+          "ppid": 18659,
+          "pgid": 18890,
+          "starttime": "1792053808.872199",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 19150,
+          "ppid": 1,
+          "pgid": 19149,
+          "starttime": "1792053811.568432",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler"
+          ],
+          "environ": null,
+          "ownership": "argv-run-root"
+        },
+        {
+          "pid": 19151,
+          "ppid": 18890,
+          "pgid": 18890,
+          "starttime": "1792053811.590054",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 19152,
+          "ppid": 18890,
+          "pgid": 18890,
+          "starttime": "1792053811.593544",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 19153,
+          "ppid": 18890,
+          "pgid": 18890,
+          "starttime": "1792053811.694443",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 19154,
+          "ppid": 18890,
+          "pgid": 18890,
+          "starttime": "1792053811.696727",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 19156,
+          "ppid": 18890,
+          "pgid": 18890,
+          "starttime": "1792053811.745851",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 19157,
+          "ppid": 18890,
+          "pgid": 18890,
+          "starttime": "1792053812.136428",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 19158,
+          "ppid": 18890,
+          "pgid": 18890,
+          "starttime": "1792053812.210657",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 19161,
+          "ppid": 18890,
+          "pgid": 18890,
+          "starttime": "1792053812.310523",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        }
+      ],
+      "ignored": [],
+      "protectedAncestors": [
+        {
+          "pid": 24105,
+          "ppid": 23092,
+          "pgid": 23092,
+          "starttime": "1791996188.432891",
+          "state": "R",
+          "exe": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+          "comm": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+          "cmdline": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+          "argv": [
+            "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 23092,
+          "ppid": 1,
+          "pgid": 23092,
+          "starttime": "1791996177.386404",
+          "state": "R",
+          "exe": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT",
+          "comm": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT",
+          "cmdline": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT",
+          "argv": [
+            "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT"
+          ],
+          "environ": null
+        }
+      ]
+    },
+    {
+      "label": "before-ordered-quit",
+      "processes": [
+        {
+          "pid": 18890,
+          "ppid": 18659,
+          "pgid": 18890,
+          "starttime": "1792053808.872199",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 19150,
+          "ppid": 1,
+          "pgid": 19149,
+          "starttime": "1792053811.568432",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 19151,
+          "ppid": 18890,
+          "pgid": 18890,
+          "starttime": "1792053811.590054",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 19152,
+          "ppid": 18890,
+          "pgid": 18890,
+          "starttime": "1792053811.593544",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 19153,
+          "ppid": 18890,
+          "pgid": 18890,
+          "starttime": "1792053811.694443",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 19154,
+          "ppid": 18890,
+          "pgid": 18890,
+          "starttime": "1792053811.696727",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 19156,
+          "ppid": 18890,
+          "pgid": 18890,
+          "starttime": "1792053811.745851",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 19157,
+          "ppid": 18890,
+          "pgid": 18890,
+          "starttime": "1792053812.136428",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 19158,
+          "ppid": 18890,
+          "pgid": 18890,
+          "starttime": "1792053812.210657",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 19161,
+          "ppid": 18890,
+          "pgid": 18890,
+          "starttime": "1792053812.310523",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 19347,
+          "ppid": 18890,
+          "pgid": 19347,
+          "starttime": "1792053815.77211",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/omp-runtime/omp",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/omp-runtime/omp",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/omp-runtime/omp",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-ekOHbV/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/omp-runtime/omp"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        }
+      ],
+      "ignored": [],
+      "protectedAncestors": [
+        {
+          "pid": 24105,
+          "ppid": 23092,
+          "pgid": 23092,
+          "starttime": "1791996188.432891",
+          "state": "R",
+          "exe": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+          "comm": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+          "cmdline": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+          "argv": [
+            "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 23092,
+          "ppid": 1,
+          "pgid": 23092,
+          "starttime": "1791996177.386404",
+          "state": "R",
+          "exe": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT",
+          "comm": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT",
+          "cmdline": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT",
+          "argv": [
+            "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT"
+          ],
+          "environ": null
+        }
+      ]
+    },
+    {
+      "label": "wait-exit",
+      "processes": [],
+      "ignored": [
+        {
+          "pid": 18890,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19150,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19151,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19152,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19153,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19154,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19156,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19157,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19158,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19161,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19347,
+          "reason": "root-gone"
+        }
+      ],
+      "protectedAncestors": [
+        {
+          "pid": 24105,
+          "ppid": 23092,
+          "pgid": 23092,
+          "starttime": "1791996188.432891",
+          "state": "R",
+          "exe": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+          "comm": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+          "cmdline": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+          "argv": [
+            "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 23092,
+          "ppid": 1,
+          "pgid": 23092,
+          "starttime": "1791996177.386404",
+          "state": "R",
+          "exe": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT",
+          "comm": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT",
+          "cmdline": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT",
+          "argv": [
+            "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT"
+          ],
+          "environ": null
+        }
+      ]
+    },
+    {
+      "label": "ordered-quit",
+      "nativeConfirmationBypassedOnlyAtTeardown": true,
+      "noOwnedProcessesRemain": true
+    },
+    {
+      "label": "cleanup-before",
+      "processes": [],
+      "ignored": [
+        {
+          "pid": 18890,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19150,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19151,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19152,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19153,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19154,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19156,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19157,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19158,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19161,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 19347,
+          "reason": "root-gone"
+        }
+      ],
+      "protectedAncestors": [
+        {
+          "pid": 24105,
+          "ppid": 23092,
+          "pgid": 23092,
+          "starttime": "1791996188.432891",
+          "state": "R",
+          "exe": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+          "comm": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+          "cmdline": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+          "argv": [
+            "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 23092,
+          "ppid": 1,
+          "pgid": 23092,
+          "starttime": "1791996177.386404",
+          "state": "R",
+          "exe": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT",
+          "comm": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT",
+          "cmdline": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT",
+          "argv": [
+            "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT"
+          ],
+          "environ": null
+        }
+      ]
+    }
+  ],
+  "output": "Debugger listening on ws://127.0.0.1:64254/8ef09ea2-12e2-4bc1-87fe-21ea6a66ec43\nFor help, see: https://nodejs.org/learn/getting-started/debugging\nDebugger attached.\n\nDevTools listening on ws://127.0.0.1:64255/devtools/browser/03e73bb2-e78a-46a6-88d0-c9f5170e8e3b\n2026-10-15 16:43:31.669 OMP Desktop[18890:86044578] NSWindow does not support nonactivating panel styleMask 0x80\n2026-10-15 16:43:31.684 OMP Desktop[18890:86044578] NSWindow does not support nonactivating panel styleMask 0x80\n[app/updater] {\"ts\":\"2026-10-15T08:43:51.138Z\",\"level\":\"error\",\"channel\":\"app\",\"category\":\"updater\",\"event\":\"updater.diagnostic\",\"message\":\"updater diagnostic\",\"data\":{\"detail\":\"Error: Error: Cannot parse releases feed: Error: Unable to find latest version on GitHub (https://github.com/MisterBowie/omp-desktop/releases/latest), please ensure a production release exists: HttpError: 406 \\n\\\"method: GET url: https://github.com/MisterBowie/omp-desktop/releases\\\\n\\\\n          Data:\\\\n          \\\\n          \\\"\\nHeaders: {\\n  \\\"cache-control\\\": \\\"no-cache\\\",\\n  \\\"content-length\\\": \\\"0\\\",\\n  \\\"content-security-policy\\\": \\\"default-src 'none'; base-uri 'self'; child-src github.githubassets.com github.com/assets-cdn/worker/ github.com/assets/ gist.github.com/assets-cdn/worker/; connect-src 'self' uploads.github.com www.githubstatus.com collector.github.com raw.githubusercontent.com api.github.com github-cloud.s3.amazonaws.com github-production-repository-file-5c1aeb.s3.amazonaws.com github-production-upload-manifest-file-7fdce7.s3.amazonaws.com github-production-user-asset-6210df.s3.amazonaws.com *.rel.tunnels.api.visualstudio.com wss://*.rel.tunnels.api.visualstudio.com github.githubassets.com objects-origin.githubu…[truncated 24 chars]\"}}\nDebugger ending on ws://127.0.0.1:64254/8ef09ea2-12e2-4bc1-87fe-21ea6a66ec43\nFor help, see: https://nodejs.org/learn/getting-started/debugging\n"
+}
