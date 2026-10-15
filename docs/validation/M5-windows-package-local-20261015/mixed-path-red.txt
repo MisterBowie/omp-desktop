@@ -1,0 +1,34 @@
+TAP version 13
+# (node:11498) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: T20-B2 mixed batch [bash, SubmitPlan] is rejected whole, does not terminate, and ordinary tools still run
+not ok 1 - T20-B2 mixed batch [bash, SubmitPlan] is rejected whole, does not terminate, and ordinary tools still run
+  ---
+  duration_ms: 37405.073042
+  type: 'test'
+  location: '/Users/vv/Documents/对话/omp-desktop-local-m5-windows/app/apps/desktop/test/omp-plan-submit-e2e.test.mjs:627:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    ordinary tools still execute after a rejection
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/vv/Documents/%E5%AF%B9%E8%AF%9D/omp-desktop-local-m5-windows/app/apps/desktop/test/omp-plan-submit-e2e.test.mjs:674:12)
+    async Test.run (node:internal/test_runner/test:1125:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 39658.202834

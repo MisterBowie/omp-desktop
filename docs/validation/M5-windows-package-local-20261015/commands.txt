@@ -1,0 +1,13 @@
+cwd: /Users/vv/Documents/对话/omp-desktop-local-m5-windows/app
+PATH: task-local pnpm10.34.5, NVM Node24.14.0, Bun1.4.2 before inherited PATH
+pnpm install --frozen-lockfile --offline -> exit0;809 packages reused;0 downloaded
+pnpm build:js -> exit0
+cargo build --release -p host-core --locked -> exit0;58.58s
+bun install --frozen-lockfile (OMP fixed fork) -> exit0
+node scripts/omp-sidecar.mjs --build --source /Users/vv/Documents/对话/omp-runtime-fork --out apps/desktop/resources/omp-runtime -> exit0
+OMP_E2E_PACKAGED_RESOURCES=<task-app>/apps/desktop/resources node --test --test-reporter=tap --test-name-pattern 'T20-B2 mixed batch' apps/desktop/test/omp-plan-submit-e2e.test.mjs -> expected exit1; exact ordinary-tool marker assertion RED
+OMP_E2E_PACKAGED_RESOURCES=<task-app>/apps/desktop/resources node --test --test-reporter=tap apps/desktop/test/omp-plan-submit-e2e.test.mjs -> exit0;15pass/0fail/0skip/0cancelled
+node --test --test-reporter=tap apps/desktop/test/three-platform-package-workflow.test.mjs apps/desktop/test/omp-release-gate.test.mjs -> exit0;24pass/0fail/0skip
+node docs/validation/M5-windows-package-local-20261015/shell-argv-reproduction.mjs (repo root) -> exit0
+GitHub branch push dry-run -> exit0; local SSH permission available
+GitHub original CI public API read -> exit0; exact original run37135789443 confirmed completed/failure

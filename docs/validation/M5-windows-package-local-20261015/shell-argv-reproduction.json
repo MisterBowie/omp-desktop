@@ -1,0 +1,11 @@
+{
+  "platform": "darwin",
+  "expected": "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\t20b2-mixed-project-123\\control.txt",
+  "unquoted": [
+    "C:UsersrunneradminAppDataLocalTempt20b2-mixed-project-123control.txt"
+  ],
+  "quoted": [
+    "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\t20b2-mixed-project-123\\control.txt"
+  ],
+  "nativeWindowsProof": false
+}

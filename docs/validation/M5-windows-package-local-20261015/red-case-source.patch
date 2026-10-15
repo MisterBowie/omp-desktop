@@ -1,0 +1,23 @@
+diff --git a/app/apps/desktop/test/omp-plan-submit-e2e.test.mjs b/app/apps/desktop/test/omp-plan-submit-e2e.test.mjs
+index 4738f07..c94b463 100644
+--- a/app/apps/desktop/test/omp-plan-submit-e2e.test.mjs
++++ b/app/apps/desktop/test/omp-plan-submit-e2e.test.mjs
+@@ -31,7 +31,7 @@
+  */
+ import assert from "node:assert/strict";
+ import { createHash } from "node:crypto";
+-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+ import { register } from "node:module";
+ import { DatabaseSync } from "node:sqlite";
+ import { tmpdir } from "node:os";
+@@ -628,7 +628,8 @@ test(
+   "T20-B2 mixed batch [bash, SubmitPlan] is rejected whole, does not terminate, and ordinary tools still run",
+   { timeout: 600_000, skip: READY ? false : "host-core binary or patched runtime not available" },
+   async () => {
+-    const project = makeScratch("t20b2-mixed-project-");
++    const project = join(makeScratch("t20b2-mixed-project-"), "项目 with spaces 'quoted'");
++    mkdirSync(project);
+     const dataRoot = makeScratch("t20b2-mixed-data-");
+     const mixedMarker = join(project, "mixed-sibling.txt");
+     const controlMarker = join(project, "control.txt");

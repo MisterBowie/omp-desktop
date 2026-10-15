@@ -1,0 +1,116 @@
+{
+  "codeCommit": "e52ab74a9e903b6fe8eb4aec73c29de2894f15f7",
+  "base": "34aeff2329bd34a3b98a6561894a9d3273343a43",
+  "platform": "macOS arm64",
+  "node": "24.14.0",
+  "pnpm": "10.34.5",
+  "bun": "1.4.2",
+  "red": {
+    "observedAt": "2026-10-15T02:18:31.160689+00:00",
+    "candidateBase": "34aeff2329bd34a3b98a6561894a9d3273343a43",
+    "command": [
+      "/Users/vv/.nvm/versions/node/v24.14.0/bin/node",
+      "--test",
+      "--test-reporter=tap",
+      "--test-name-pattern",
+      "T20-B2 mixed batch",
+      "apps/desktop/test/omp-plan-submit-e2e.test.mjs"
+    ],
+    "exitCode": 1,
+    "summary": [
+      "# tests 1",
+      "# pass 0",
+      "# fail 1",
+      "# cancelled 0",
+      "# skipped 0"
+    ],
+    "resources": "/Users/vv/Documents/对话/omp-desktop-local-m5-windows/app/apps/desktop/resources",
+    "scope": "Real compiled .5 runtime/host/bridge with the new owned Chinese/space/quote project path; Mac only, staged Resources not an installer"
+  },
+  "green": {
+    "observedAt": "2026-10-15T02:22:32.866577+00:00",
+    "command": [
+      "/Users/vv/.nvm/versions/node/v24.14.0/bin/node",
+      "--test",
+      "--test-reporter=tap",
+      "apps/desktop/test/omp-plan-submit-e2e.test.mjs"
+    ],
+    "exitCode": 0,
+    "summary": [
+      "# tests 15",
+      "# pass 15",
+      "# fail 0",
+      "# cancelled 0",
+      "# skipped 0"
+    ],
+    "resources": "/Users/vv/Documents/对话/omp-desktop-local-m5-windows/app/apps/desktop/resources",
+    "scope": "Mac real compiled .5 runtime/host/production bridge, staged Resources; native Windows and installer proof pending"
+  },
+  "releaseGuards": {
+    "command": [
+      "/Users/vv/.nvm/versions/node/v24.14.0/bin/node",
+      "--test",
+      "--test-reporter=tap",
+      "apps/desktop/test/three-platform-package-workflow.test.mjs",
+      "apps/desktop/test/omp-release-gate.test.mjs"
+    ],
+    "exitCode": 0,
+    "summary": [
+      "# tests 24",
+      "# pass 24",
+      "# fail 0",
+      "# cancelled 0",
+      "# skipped 0"
+    ]
+  },
+  "runtime": {
+    "schema": "omp-desktop.bundled-sidecar/3",
+    "fork": {
+      "repository": "https://github.com/MisterBowie/oh-my-pi",
+      "commit": "36483311dfff67be7504f591974df93fc512a45a",
+      "tree": "7ba57b6d06fb8fe7e3f6352c67692e56cf39c3cd"
+    },
+    "upstreamBase": {
+      "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+      "version": "18.3.0"
+    },
+    "patchLevel": "62bc57b+omp-desktop.5",
+    "capabilities": [
+      "rpc-host-tool-concurrency",
+      "rpc-host-tool-sole-batch-policy",
+      "agent-tool-result-terminate",
+      "rpc-host-tool-result-terminate",
+      "extension-live-system-prompt",
+      "rpc-host-tool-settle-termination",
+      "reproducible-sidecar-build",
+      "explicit-bytecode-build-mode"
+    ],
+    "ompVersion": "18.3.0",
+    "desktopVersion": "0.15.2",
+    "platform": "darwin",
+    "arch": "arm64",
+    "binary": {
+      "filename": "omp",
+      "bytes": 218367872,
+      "sha256": "dbb6ef2acf0bd757a8a8c78478c9c52adeab9eebbe132bea1579e864e6e39633"
+    },
+    "extensions": [
+      {
+        "path": "extensions/omp-desktop-gate.js",
+        "bytes": 53025,
+        "sha256": "3dd09910f71ee63f2b1ba13e06d8655f9b73af5e88f2c4dd29a92e0f11cd528b"
+      }
+    ],
+    "build": {
+      "tool": "bun",
+      "bunVersion": "1.4.2",
+      "bytecode": true
+    }
+  },
+  "nativeAddon": {
+    "sha256": "f3eb94f58ae3d42d1e9c8b5ffe23dfe56f1b405edd15b8d2230d03daaa7eeb1a",
+    "scope": "Reused from the local fixed-base62bc native build; Rust and binding source is unchanged. The changed fork.5 embedding script ran freshly."
+  },
+  "nativeWindowsVerified": false,
+  "threePlatformReleaseComplete": false
+}
