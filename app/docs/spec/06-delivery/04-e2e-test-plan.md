@@ -45,6 +45,12 @@
 
 ### E2E-OMP-maintenance-daily
 
+Installed DOM workflows show and focus only the verified owned window before
+asserting UI state. Hidden/occluded windows can pause animation frames while the
+native agent still completes. Renderer reloads wait for `Page.loadEventFired`
+before accepting a ready Composer from the new document. No idle, replay or
+process-ownership assertion is relaxed.
+
 - **Preconditions:** Actual native installer, owned HOME/profile/data, two isolated
   projects and a loopback scripted provider with a real HTTP fault proxy.
 - **Steps:** Repair an invoice calculation and run seven real project assertions;

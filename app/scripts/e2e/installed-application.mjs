@@ -151,8 +151,19 @@ export class InstalledApplication {
     this.renderer = await CdpClient.connect(page.webSocketDebuggerUrl);
     this.progress("owned renderer connected");
     await this.renderer.send("Runtime.enable"); await this.renderer.send("Page.enable");
+    // DOM assertions need the owned window to paint, just as it does when a
+    // user opens it. An occluded macOS window can pause animation frames.
+    const windowActivation = await this.main.evaluate(`(() => {
+      const { BrowserWindow } = ${electronExpression};
+      const window = BrowserWindow.getAllWindows().find(window => window.webContents.getURL() === ${JSON.stringify(page.url)});
+      if (!window) throw new Error("Verified installed window missing");
+      window.show(); window.focus();
+      return { visible: window.isVisible(), rendererUrl: window.webContents.getURL() };
+    })()`, "Main", { awaitPromise: false });
+    assert(windowActivation.visible, "installed UI acceptance requires a visible owned window");
+    await until(() => this.renderer.evaluate('document.visibilityState === "visible"'), "owned installed window visible");
     await until(() => this.renderer.evaluate('Boolean(document.querySelector(".app-shell:not(.is-booting)")) && typeof window.piDesktop?.invoke === "function"'), "actual installed renderer ready");
-    this.launches.push({ identity: this.identity, rendererUrl: page.url });
+    this.launches.push({ identity: this.identity, rendererUrl: page.url, windowActivation });
     this.snapshot("ready");
     this.progress("ready");
     return this;

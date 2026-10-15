@@ -44,9 +44,14 @@ export async function selectSession(application, sessionId) {
   await until(async () => (await inspect(application)).activeSessionId === sessionId, "selected installed OMP session");
 }
 export async function reloadAndSelect(application, sessionId) {
-  await application.renderer.send("Page.reload");
-  await until(() => application.renderer.evaluate('Boolean(document.querySelector(".app-shell:not(.is-booting) .composer-input"))'), "reloaded composer");
-  await selectSession(application, sessionId);
+  let loaded = false;
+  const off = application.renderer.on("Page.loadEventFired", () => { loaded = true; });
+  try {
+    await application.renderer.send("Page.reload");
+    await until(() => loaded, "new installed renderer document loaded");
+    await until(() => application.renderer.evaluate('Boolean(document.querySelector(".app-shell:not(.is-booting) .composer-input"))'), "reloaded composer");
+    await selectSession(application, sessionId);
+  } finally { off(); }
 }
 export async function prompt(application, text) {
   assert(await application.renderer.evaluate(`(() => {
@@ -60,11 +65,22 @@ export async function prompt(application, text) {
   await click(application, ".composer-shell .send-btn");
 }
 export async function idle(application, sessionId, expectedText) {
-  return until(async () => {
-    const status = (await invoke(application, "agentGetStatus", [sessionId])).status;
-    const ui = await inspect(application);
-    return !status.isRunning && !ui.stop && !ui.permission && (!expectedText || ui.text.includes(expectedText)) ? ui : false;
-  }, `turn completed: ${expectedText || "stopped"}`);
+  let last;
+  try {
+    return await until(async () => {
+      const status = (await invoke(application, "agentGetStatus", [sessionId])).status;
+      const ui = await inspect(application);
+      last = { status, ui };
+      return !status.isRunning && !ui.stop && !ui.permission && (!expectedText || ui.text.includes(expectedText)) ? ui : false;
+    }, `turn completed: ${expectedText || "stopped"}`);
+  } catch (error) {
+    try {
+      const visibility = await application.renderer.evaluate('({ hidden: document.hidden, state: document.visibilityState, focused: document.hasFocus() })');
+      writeFileSync(join(application.evidenceDirectory, "turn-timeout.json"), `${JSON.stringify({ sessionId, expectedText, last, visibility }, null, 2)}\n`);
+      await application.screenshot("turn-timeout");
+    } catch (captureError) { error.captureFailure = String(captureError); }
+    throw error;
+  }
 }
 function nativeFacts(session, dataRoot) {
   assert.equal(session.engine, "omp");
