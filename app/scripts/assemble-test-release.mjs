@@ -44,6 +44,8 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { testReleaseMilestone } from "./test-release-stage.mjs";
+import { verifyInstalledEvidence } from "./installed-acceptance-record.mjs";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const defaultManifest = join(appRoot, "patches", "oh-my-pi", "manifest.json");
@@ -107,9 +109,7 @@ export function parseArgs(argv) {
   for (const field of required) {
     if (!options[field]) refuse(`--${field.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)} is required`);
   }
-  if (!options.tag.startsWith("m5-test-")) {
-    refuse(`the release tag must be the m5-test-* tag that triggered the run; got ${options.tag}`);
-  }
+  testReleaseMilestone(options.tag);
   return options;
 }
 
@@ -192,6 +192,7 @@ function assertRecordIdentity(record, manifest, options) {
  * directory is removed first and never appears among its own entries.
  */
 export function assembleRelease(options) {
+  const milestone = testReleaseMilestone(options.tag);
   const manifest = JSON.parse(readFileSync(options.manifest, "utf8"));
   const input = resolve(options.input);
   if (!existsSync(input)) refuse(`the artifact input directory does not exist: ${input}`);
@@ -230,6 +231,7 @@ export function assembleRelease(options) {
       if (PAYLOAD_PATTERN.test(name)) refuse(`${name} is in the ${record.platform}/${record.arch} artifact but no record describes it`, 1);
       refuse(`${name} is in the ${record.platform}/${record.arch} artifact but this release only publishes its payload and record`, 1);
     }
+    if (milestone >= 6) verifyInstalledEvidence(recordDir, record, options);
   }
 
   payload.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
@@ -259,6 +261,7 @@ export function assembleRelease(options) {
         run: record.run,
         packagedRuntime: record.packagedRuntime,
         planGoalRegression: record.planGoalRegression,
+        ...(record.installedWorkflow ? { installedWorkflow: record.installedWorkflow } : {}),
         assets: (record.assets ?? []).map(({ name, bytes, sha256, kind }) => ({ name, kind, bytes, sha256 })),
       }))
       .sort((a, b) => (a.platform < b.platform ? -1 : 1)),
@@ -270,12 +273,15 @@ export function assembleRelease(options) {
 
 /** The release description: what these files are, what was proven, what was not. */
 export function releaseNotes(combined) {
+  const milestone = testReleaseMilestone(combined.tag);
   const platformLabel = (platform) =>
     ({ darwin: "macOS", win32: "Windows", linux: "Linux" })[platform] ?? platform;
   const lines = [
-    `M5 test packages for macOS (Apple Silicon), Windows x64 and Linux x64.`,
+    `M${milestone} test packages for macOS (Apple Silicon), Windows x64 and Linux x64.`,
     "",
-    "These are **test packages, not a stable release**: they carry the M5 functionality the root has accepted, they are unsigned, and they publish no auto-update feeds. The previous `m5-preview` release is left untouched.",
+    milestone === 5
+      ? "These are **test packages, not a stable release**: they carry the M5 functionality the root has accepted, they are unsigned, and they publish no auto-update feeds. The previous `m5-preview` release is left untouched."
+      : "These are **M6 test packages, not a stable release**. All three native lanes retain the M5 runtime/Plan/Goal gates and additionally require the actual installed workflow. Public validation assets bind the raw native history, screenshots and process observations to each installer digest. Packages remain unsigned and publish no auto-update feed.",
     "",
     "## Build identity",
     "",
@@ -336,13 +342,17 @@ export function releaseNotes(combined) {
     "",
     "## Scope",
     "",
-    "- Proven by this release: the M5 functionality accepted at the revision above, packaged and started on each platform (runtime identity, protocol v2, tool-gate loading, process reclamation, Plan/Goal gate/bridge paths inside the package).",
-    "- Not proven by this release: installer/shortcut/desktop-entry behaviour inside a real user session (T22/T23), signing/notarization, macOS Intel, Windows ARM64, and the full T21/T22/T23/T24 scope. macOS and Windows runs come from native GitHub runners; the reports for each platform are in `BUILD-RECORD.json` and in the workflow's Actions artifacts.",
+    milestone === 5
+      ? "- Proven by this release: the M5 functionality accepted at the revision above, packaged and started on each platform (runtime identity, protocol v2, tool-gate loading, process reclamation, Plan/Goal gate/bridge paths inside the package)."
+      : "- Proven per native platform: installed OMP identity/notices/update cache, default isolated data directory, real sidebar/Composer approval and tool paths, denied write preservation, approved write, external project check, three-process Stop, ordered quit, unchanged closed native history with no replay, fresh post-restart turn, and zero owned survivors. The provider is a local deterministic fixture; it does not bypass the production runtime/gate/bridge/UI/persistence.",
+    milestone === 5
+      ? "- Not proven by this release: installer/shortcut/desktop-entry behaviour inside a real user session (T22/T23), signing/notarization, macOS Intel, Windows ARM64, and the full T21/T22/T23/T24 scope. macOS and Windows runs come from native GitHub runners; the reports for each platform are in `BUILD-RECORD.json` and in the workflow's Actions artifacts."
+      : "- Limits: unsigned/unnotarized; native folder chooser and quit confirmation dialogs, OS desktop/shortcut registration, real paid providers, macOS Intel and Windows ARM64 remain unqualified. Project/provider setup uses public preload IPC, followed by real user controls. A confirmation bypass is enabled only during teardown; production ordered shutdown still executes. Linux uses the actual extracted AppImage; no system deb/rpm installation is claimed. Full M7/T24 maintenance/upgrade/rollback acceptance remains separate.",
     "- Cursor + Plan/Goal remains unsupported and refused (ADR 0306).",
     "",
     "## 中文摘要",
     "",
-    "本 Release 为 M5 阶段测试包（macOS Apple Silicon、Windows x64、Linux x64），未签名、不含自动更新 feed、不设为 latest，旧 `m5-preview` 不受影响。所有平台来自同一已验收提交（见上表），每个包都经过包内生产运行时验收与 Plan/Goal 包内回归；逐平台结果与摘要见 `BUILD-RECORD.json` 与 `SHA256SUMS.txt`。安装身份已改为 OMP Desktop，可与 PI-Desktop 并存。",
+    `本 Release 为 M${milestone} 阶段测试包（macOS Apple Silicon、Windows x64、Linux x64），未签名、不含自动更新 feed、不设为 latest，旧 \`m5-preview\` 不受影响。各平台绑定同一提交，保留包内运行时与 Plan/Goal 回归。${milestone >= 6 ? "另强制真实安装应用的审批、工具、停止、隔离与恢复流程，并公开绑定安装器摘要的原始证据；系统选择/退出确认框、系统注册及完整 M7/T24 不在本次证明内。" : "安装身份已改为 OMP Desktop。"}逐平台结果见 \`BUILD-RECORD.json\` 与 \`SHA256SUMS.txt\`。`,
     "",
   );
   return lines.join("\n");

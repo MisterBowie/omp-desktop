@@ -1,0 +1,9 @@
+786eb8f1d2da8f1d752dab7a7d2f64bd25a3f90ea498f3230716c4dc88d062df  OMP-Desktop-0.15.2-m6-test-local-verification-darwin-arm64-validation.json.gz
+0a7056394aee86a1d826dbde4956feac4e3b393f3a9dbdf76c4c58d223cf117f  actual-native-ci-step-macos.sh.gz
+9288ca751e2284b6da3276d2e70ff6b32add47084b7cdf9ed8930ad0b1f69289  local-results.json
+7cf13256a60fb6ef4e0a9af665904640a804e603cc3ab946f3d468242fe69d4c  m6-mac-packaged-runtime.json
+9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64  m6-mac-packaged-runtime.stderr.txt.gz
+e3937661a0310811b108a57ae1695a0395431944b31045dcf4f16e834b5a5581  m6-mac-plan-goal.txt.gz
+cd9761f9ba8dfb4d30044baf4f8896933bc6d3630334c8ba394ff9a62408323e  m6-release-doc-check.txt.gz
+5fb52a2de260e46689eb82c12a9c8fde770fa433980a919b0033569692e04351  m6-release-gates-final.txt.gz
+68a8d0bdbdf8cbeb1915a44027d7a1e42c4c395acab1c88bd2692f77ccf7774d  native-macos-staged-record.json

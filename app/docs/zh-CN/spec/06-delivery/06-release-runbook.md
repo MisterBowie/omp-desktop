@@ -33,6 +33,25 @@ Electron 自身许可和 Chromium 声明继续保留在其分发文件中。
 renderer/host/包内运行时流程。配置和图标测试不能单独完成 M6。测试 prerelease 仍未
 签名、不发布自动更新 feed；只有实际运行签名及公证后，才记录相应资格。
 
+### 受控 M5/M6 测试包通道
+
+仓库根 `three-platform-test-packages.yml` 只接受已复核提交的 `m5-test-*` 与
+`m6-test-*` tag push；分支、任意 tag、手动 dispatch 和尚未具备门的 M7 tag 均不能
+发布。tag 解引用提交必须等于运行提交，三个原生平台构建全部成功后，唯一的发布
+作业才能写入 prerelease。两个阶段都保留 M5 包内运行时和 Plan/Goal 验收。
+
+M6 另对真实 DMG、NSIS 安装器或 AppImage 运行 `scripts/e2e-installed-smoke.mjs`。
+原生进程观察器固定 psutil 7.2.2，Linux 使用真实 Xvfb 显示。封闭启动环境无全局
+Bun/OMP 路径或运行时覆盖；应用自行选择测试 HOME 内的默认数据目录。必须通过
+8 个安装工作流步骤、2 次正常退出和最终零进程观察。`stage-test-package.mjs` 必须
+收到 `--installed-report`，核对同一源码/平台/版本/安装器字节，生成有大小边界的
+公开 `*-validation.json.gz`，包含报告、截图、原生记录和逐文件摘要；装配再次验证
+原始证明，不仅接受摘要标记。
+
+不发布更新 feed/blockmap，不覆盖旧 preview 或 latest。原生选择/退出确认框、系统
+快捷方式注册、签名/公证和真实付费模型兼容性不在此自动化证明内；完整 M7 维护、
+升级与回退验收仍是后续独立阶段，须具备自己的发布门。
+
 ## 1. 构建通道
 
 | 通道 | 命令 | 签名 | 用途 |
@@ -48,15 +67,15 @@ renderer/host/包内运行时流程。配置和图标测试不能单独完成 M6
 
 在 macOS 上，`pnpm dev` 创建并重用带有指纹的品牌 Electron 主机
 捆绑在 `.cache/electron-dev/` 下。它的包名称、可执行文件、标识符、
-和 ICNS 资源是仅用于开发的 PI-Desktop 值，因此 AppKit 显示
-应用程序菜单中的 PI-Desktop 并使用本机中的规范图标
+和 ICNS 资源使用 OMP Desktop 身份及 `.dev` bundle-id 后缀，因此 AppKit 显示
+应用程序菜单中的 OMP Desktop 并使用本机中的规范图标
 关于面板。运行时还将 `build/icon_1024.png` 应用于 Dock。库存
 `node_modules` 下的文件永远不会被修改。 Windows/Linux 不断发展
 正常的 electro-vite 可执行文件。尽管如此，Windows Main 还是注册了
-之前 NSIS 包使用的相同 `net.aiuo.pi-desktop` AppUserModelID
+之前 NSIS 包使用的相同 `net.misterbowie.omp-desktop` AppUserModelID
 Electron 准备就绪，防止库存主机身份拥有本机
 通知或任务栏组。 Windows 封装另外引脚
-`PI-Desktop` 可执行文件和“开始”菜单快捷方式名称。启动器设置
+`OMP Desktop` 可执行文件和“开始”菜单快捷方式名称。启动器设置
 `PI_DESKTOP_DEV=1` 因此运行时打包检查会禁用更新传送
 并保留开发人员工作区默认值，尽管有品牌可执行文件名称。
 Electron 43+ 上的首次 `pnpm dev` 会按需下载 Electron 二进制文件

@@ -49,6 +49,8 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { testReleaseMilestone } from "./test-release-stage.mjs";
+import { stageInstalledEvidence } from "./installed-acceptance-record.mjs";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const defaultManifest = join(appRoot, "patches", "oh-my-pi", "manifest.json");
@@ -155,6 +157,7 @@ export function parseArgs(argv) {
     "--run-attempt",
     "--run-url",
     "--manifest",
+    "--installed-report",
   ]);
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -302,6 +305,7 @@ function findExcluded(releaseDir) {
 }
 
 export function stagePackage(options) {
+  const milestone = testReleaseMilestone(options.stage);
   // The same two refusals the command line makes, repeated at the function
   // boundary: this entry decides which bytes become release assets, so it must
   // not depend on its caller having parsed anything.
@@ -370,6 +374,12 @@ export function stagePackage(options) {
     refuse(`unexpected package output that this release does not publish: ${strays.join(", ")}`, 1);
   }
 
+  let installedWorkflow;
+  if (milestone >= 6) {
+    const evidence = stageInstalledEvidence(options, assets);
+    installedWorkflow = evidence.summary;
+    assets.push(evidence.asset);
+  }
   const record = {
     schema: "omp-desktop.test-package/1",
     platform: options.platform,
@@ -412,6 +422,7 @@ export function stagePackage(options) {
       },
     },
     planGoalRegression: planGoal,
+    ...(installedWorkflow ? { installedWorkflow } : {}),
     excluded: findExcluded(releaseDir),
     assets,
   };

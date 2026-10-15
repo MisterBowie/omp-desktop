@@ -42,6 +42,15 @@ test.after(() => {
   for (const path of scratch.splice(0)) rmSync(path, { recursive: true, force: true });
 });
 
+test("M6 staging cannot reuse an M5 runtime-only acceptance as an installed workflow", () => {
+  const root = makeScratch("m6-missing-installed-");
+  const acceptance = fixtureAcceptance(root, { platform: "darwin", arch: "arm64" });
+  const releaseDir = fixtureReleaseDir(root, "darwin");
+  const options = stageArgs({ root, platform: "darwin", arch: "arm64", acceptance, releaseDir, log: writeTestLog(root) });
+  options.stage = "m6-test-missing-installed";
+  assert.throws(() => stageModule.stagePackage(options), /M6 requires --installed-report/);
+});
+
 const sha256 = (path) => createHash("sha256").update(readFileSync(path)).digest("hex");
 
 function write(path, content) {
@@ -425,6 +434,18 @@ function threePlatformInput(prefix) {
   fixtureStagedPlatform(input, { platform: "linux", arch: "x64" });
   return { root, input, out: join(root, "release") };
 }
+
+test("M6 assembly refuses three runtime-only platform records even when their stage labels match", () => {
+  const { input, out } = threePlatformInput("m6-missing-native-proof-");
+  const tag = "m6-test-missing-native-proof";
+  for (const entry of readdirSync(input)) {
+    const file = join(input, entry, "build-record.json");
+    const record = JSON.parse(readFileSync(file, "utf8"));
+    record.stage = tag;
+    writeFileSync(file, JSON.stringify(record));
+  }
+  assert.throws(() => assembleModule.assembleRelease({ ...assembleArgs({ input, out }), tag }), /M6 requires exactly one native installed validation asset/);
+});
 
 test("assembly requires the three-platform set and re-hashes every payload", () => {
   const { input, out } = threePlatformInput("assemble-ok-");

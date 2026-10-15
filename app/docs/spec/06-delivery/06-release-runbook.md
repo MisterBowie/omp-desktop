@@ -40,6 +40,32 @@ workflow in owned data directories. Configuration and artwork checks alone do
 not close M6. Test prereleases remain unsigned and do not publish update feeds;
 Developer ID/notarization is qualified only when those signing steps really run.
 
+### Controlled M5/M6 test-package lane
+
+The repository-root `three-platform-test-packages.yml` accepts only reviewed
+`m5-test-*` and `m6-test-*` tag pushes. A branch push, arbitrary tag, manual
+dispatch or unqualified M7 tag cannot publish. The tag's peeled commit must
+equal the run revision. All three native build jobs must succeed before the
+single prerelease job writes anything; M5's packaged runtime and Plan/Goal
+acceptance remain mandatory for both stages.
+
+M6 additionally runs `scripts/e2e-installed-smoke.mjs` against the actual DMG,
+NSIS installer or AppImage. The native process observer pins psutil 7.2.2;
+Linux uses a real Xvfb display. The closed launch environment contains no global
+Bun/OMP path or runtime override. The application chooses its own default data
+root under the test HOME. The eight installed workflow steps, two verified
+quits and final zero-process observation must pass. `stage-test-package.mjs`
+requires `--installed-report`, binds it to the same source/platform/version and
+installer bytes, and produces a bounded `*-validation.json.gz` public asset
+containing the report, screenshots and raw native history with individual
+digests. Assembly rechecks this raw proof, not only its summary.
+
+No updater feeds/blockmaps are published; the existing preview and latest
+release are untouched. Native chooser/quit confirmation dialogs, OS shortcut
+registration, signing/notarization and paid-provider compatibility are outside
+this automated proof. Full M7 maintenance/upgrade/rollback acceptance remains a
+separate stage with its own release gates.
+
 ## 1. Build lanes
 
 | Lane | Command | Signing | Use |
@@ -57,15 +83,15 @@ not pass.
 
 On macOS, `pnpm dev` creates and reuses a fingerprinted branded Electron host
 bundle under `.cache/electron-dev/`. Its bundle name, executable, identifier,
-and ICNS resource are development-only PI-Desktop values, so AppKit shows
-PI-Desktop in the application menu and uses the canonical icon in the native
+and ICNS resource use OMP Desktop identity with the `.dev` bundle-id suffix, so AppKit shows
+OMP Desktop in the application menu and uses the canonical icon in the native
 About panel. The runtime also applies `build/icon_1024.png` to the Dock. Stock
 files under `node_modules` are never modified. Windows/Linux development keeps
 the normal electron-vite executable. Windows Main nevertheless registers the
-same `net.aiuo.pi-desktop` AppUserModelID used by the NSIS package before
+same `net.misterbowie.omp-desktop` AppUserModelID used by the NSIS package before
 Electron readiness, preventing the stock host identity from owning native
 notifications or taskbar groups. The Windows package additionally pins the
-`PI-Desktop` executable and Start menu shortcut names. The launcher sets
+`OMP Desktop` executable and Start menu shortcut names. The launcher sets
 `PI_DESKTOP_DEV=1` so runtime packaging checks keep update delivery disabled
 and preserve developer workspace defaults despite the branded executable name.
 The first `pnpm dev` on Electron 43+ downloads the Electron binary on demand

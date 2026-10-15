@@ -97,11 +97,11 @@ function job(source, name) {
   return block.join("\n");
 }
 
-test("the packaging lane runs from a controlled m5-test-* tag only", async (t) => {
+test("the packaging lane runs from controlled M5/M6 test tags only", async (t) => {
   const source = await workflowSource(t);
   if (!source) return;
 
-  assert.match(source, /^on:\n  push:\n    tags: \["m5-test-\*"\]\n/m);
+  assert.match(source, /^on:\n  push:\n    tags: \["m5-test-\*", "m6-test-\*"\]\n/m);
   const executable = executableSource(source);
   // No manual dispatch: the button only exists on the default branch, which this
   // work must not write, and a branch dispatch would bind the release to no
@@ -110,7 +110,8 @@ test("the packaging lane runs from a controlled m5-test-* tag only", async (t) =
   assert.doesNotMatch(executable, /^\s+branches:/m, "a branch push must not start a package run");
 
   const guard = job(source, "guard");
-  assert.match(guard, /\[\[ "\$\{GITHUB_EVENT_NAME\}" != "push" \|\| "\$\{GITHUB_REF\}" != refs\/tags\/m5-test-\* \]\]/);
+  assert(guard.includes('if [[ "${GITHUB_EVENT_NAME}" != "push" ]] || [[ ! "${GITHUB_REF}" =~ ^refs/tags/m[56]-test-[A-Za-z0-9][A-Za-z0-9._-]*$ ]]'));
+  assert.match(guard, /testReleaseMilestone\(process\.env\.GITHUB_REF_NAME\)/);
   assert.match(guard, /git rev-parse "refs\/tags\/\$\{GITHUB_REF_NAME\}\^\{commit\}"/);
   assert.match(guard, /tag_commit" != "\$\{GITHUB_SHA\}"/);
   assert.match(guard, /echo "revision=\$\{GITHUB_SHA\}" >> "\$GITHUB_OUTPUT"/);
@@ -432,7 +433,7 @@ test("the release is one prerelease gated on all three platforms", async (t) => 
   const publish = job(source, "publish");
 
   assert.match(publish, /needs: \[guard, build\]/);
-  assert.match(publish, /if: github\.event_name == 'push' && startsWith\(github\.ref, 'refs\/tags\/m5-test-'\)/);
+  assert(publish.includes("if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/m5-test-') || startsWith(github.ref, 'refs/tags/m6-test-'))"));
   // Least privilege: the workflow default is read-only, and exactly one job
   // raises it to write (the publish job).
   assert.match(source, /^permissions:\n  contents: read\n/m, "the workflow default token stays read-only");
@@ -461,4 +462,20 @@ test("the release is one prerelease gated on all three platforms", async (t) => 
   assert.match(publish, /gh release download "\$\{\{ github\.ref_name \}\}"/);
   assert.match(publish, /sha256sum -c SHA256SUMS\.txt/);
   assert.match(publish, /--release-json/);
+});
+
+test("M6 adds native installed acceptance without weakening or broadening the M5 lane", async (t) => {
+  const source = await workflowSource(t);
+  if (!source) return;
+  const build = job(source, "build");
+  assert.match(build, /name: Exercise the actual native installed application\n\s+id: installed\n\s+if: needs\.guard\.outputs\.milestone == '6'/);
+  assert.match(build, /node scripts\/e2e-installed-smoke\.mjs "\$installer" "\$out"/);
+  for (const name of [".dmg", "Setup-${v}.exe", ".AppImage"]) assert(build.includes(name));
+  assert.match(build, /xvfb-run -a -s/);
+  assert.match(build, /python-version: '3\.12'/);
+  assert.match(build, /pip install --disable-pip-version-check -r scripts\/e2e\/requirements\.txt/);
+  assert.match(build, /--installed-report "\$\{\{ steps\.installed\.outputs\.out \}\}\/installed-smoke\.json"/);
+  // An absent conditional output must never turn an upload into `/*`.
+  assert.match(build, /name: Upload the native installed workflow evidence\n\s+if: always\(\) && steps\.installed\.outputs\.out != ''/);
+  assert.equal(build.match(/path: \$\{\{ steps\.installed\.outputs\.out \}\}\/\*/g)?.length, 1);
 });

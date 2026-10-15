@@ -1,0 +1,30 @@
+{
+  "productBuildRevision": "de691cad8ee8ac9817528a494a31b0a03a41ba93",
+  "installedHarnessRevision": "09660ba2dbcf108beee1952c288473822cb5c48c",
+  "pipelineSourceState": "uncommitted pipeline changes on 09660ba; this evidence commit preserves their implementation",
+  "localMacInstallerWorkflow": true,
+  "packagedRuntime": {
+    "version": "18.3.0",
+    "protocol": 2,
+    "getState": true,
+    "gateControl": "refused",
+    "stopped": true,
+    "reaped": true,
+    "cleaned": true,
+    "leftoverRuns": 0
+  },
+  "packagedPlanGoal": {
+    "pass": 15,
+    "fail": 0,
+    "skipped": 0
+  },
+  "releaseGates": {
+    "pass": 49,
+    "fail": 0,
+    "skipped": 0
+  },
+  "publishedRelease": false,
+  "nativeWindowsLinuxQualified": false,
+  "fullM6Complete": false,
+  "fullM7Complete": false
+}
