@@ -1,0 +1,13 @@
+{
+  "productBuildRevision": "de691cad8ee8ac9817528a494a31b0a03a41ba93",
+  "harnessHead": "f6dba8b724cac19f4040ec871bd325dbc7ea7f60",
+  "reference": "actual installed PI-Desktop 0.15.0, original bundle id net.aiuo.pi-desktop; source commit not inferred",
+  "execution": "independent isolated bundle copies; common owned HOME; explicit separate userData profiles; PI explicit data override; OMP default .omp-desktop",
+  "passed": true,
+  "fullM6Complete": false,
+  "nativeCI": {
+    "tag": "m6-test-20261015-f6dba8b7",
+    "run": 38684841320,
+    "statusAtEvidence": "in progress"
+  }
+}

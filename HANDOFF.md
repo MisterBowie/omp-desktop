@@ -2,6 +2,8 @@
 
 ## 当前执行状态（2026-10-15，本机恢复，M5交付已接受）
 
+M6 当前受控三平台候选为 `m6-test-20261015-f6dba8b7`（源码 f6dba8b7，run38684841320），已推送专用分支、原生 CI 运行中。完整 M6 尚未接受。构建期间另完成实际 PI-Desktop 0.15.0 与 M6 OMP 的本机并存：同一自有 HOME、独立 profile/data、提供方不串、OMP 退出/重启不影响同一个 PI 进程，最后双方零残留；详见 `docs/validation/M6-pi-coexistence-macos-20261015.md`。未启动/修改用户原应用与真实配置。
+
 M6 最新进展：产品构建 `de691ca` 与已提交验收器 `44da48e` 完成实际 Mac arm64 DMG 工作流；8 个步骤全部通过，包括默认数据目录隔离、真实审批/工具/三级进程 Stop、正常退出与原生历史逐字节恢复、退出零残留。详见 `docs/validation/M6-installed-macos-local-20261015.md`；这更新了下文“Mac 安装尚待执行”的旧状态。Windows/Linux 原生安装、M6 三平台发布回读和完整 M7/T24 仍须继续；当前不创建 PR 或改写 main。
 
 用户要求恢复完整目标，改由根模型在本机执行；DeepSeek/deepseek-flash恢复由用户另行通知。仅排除Cursor+Plan/Goal，ADR0306门与非Cursor严格契约、完整M6/M7和每大阶段3平台GitHub包全部保留。
