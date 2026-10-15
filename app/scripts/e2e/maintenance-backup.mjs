@@ -42,5 +42,6 @@ export function restoreClosedState(application, backup) {
     rmSync(destination, { recursive: true }); cpSync(join(backup.directory, name), destination, { recursive: true, verbatimSymlinks: true });
     assert.deepEqual(treeInventory(destination), backup.manifest[name], "restored tree differs from closed backup");
   }
-  return { verified: true, profileEntries: backup.manifest.profile.length, dataEntries: backup.manifest.data.length };
+  return { verified: true, profileEntries: backup.manifest.profile.length, dataEntries: backup.manifest.data.length,
+    manifest: { profile: treeInventory(application.profile), data: treeInventory(application.data) } };
 }

@@ -14,7 +14,7 @@ const expected = JSON.parse(readFileSync(join(DESKTOP, "package.json"), "utf8"))
 const require = createRequire(join(DESKTOP, "package.json"));
 const builderRequire = createRequire(require.resolve("electron-builder/package.json"));
 const libRequire = createRequire(builderRequire.resolve("app-builder-lib/package.json"));
-const { extractFile } = libRequire("@electron/asar");
+const { extractFile, uncache } = libRequire("@electron/asar");
 export const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const fileDigest = (path) => digest(readFileSync(path));
 
@@ -107,11 +107,18 @@ function verifyNotices(resources) {
   };
 }
 
+export function readInstalledPackageMetadata(resources) {
+  const archive = join(resources, "app.asar");
+  // The maintenance lane replaces this exact pathname with a different archive.
+  uncache(archive);
+  return JSON.parse(extractFile(archive, "package.json").toString("utf8"));
+}
+
 export function inspectInstalledProduct(appDirectory, platform = process.platform, expectedVersion = expected.version) {
   const paths = installedPaths(appDirectory, platform);
   assert(existsSync(paths.executable), "installed Electron executable is missing");
   const archive = join(paths.resources, "app.asar");
-  const metadata = JSON.parse(extractFile(archive, "package.json").toString("utf8"));
+  const metadata = readInstalledPackageMetadata(paths.resources);
   assert.equal(metadata.name, expected.build.extraMetadata.name, "installed package identity is not OMP's own");
   assert.equal(metadata.version, expectedVersion);
   assert.equal(metadata.homepage, expected.homepage);
