@@ -1,0 +1,124 @@
+TAP version 13
+# Subtest: only stages with explicit current gates are accepted
+ok 1 - only stages with explicit current gates are accepted
+  ---
+  duration_ms: 0.674208
+  type: 'test'
+  ...
+# Subtest: captured Mac installed report passes; incomplete, stale and different-byte claims fail
+ok 2 - captured Mac installed report passes; incomplete, stale and different-byte claims fail
+  ---
+  duration_ms: 9.326291
+  type: 'test'
+  ...
+# Subtest: public evidence carries exact raw history and screenshots; a forged summary is refused
+ok 3 - public evidence carries exact raw history and screenshots; a forged summary is refused
+  ---
+  duration_ms: 128.303583
+  type: 'test'
+  ...
+# Subtest: failed installed diagnostics expose bounded owned identities without argv or environment
+ok 4 - failed installed diagnostics expose bounded owned identities without argv or environment
+  ---
+  duration_ms: 36.665208
+  type: 'test'
+  ...
+# Subtest: installed roots use physical identity and distinguish an escaping alias
+ok 5 - installed roots use physical identity and distinguish an escaping alias
+  ---
+  duration_ms: 3.805333
+  type: 'test'
+  ...
+# Subtest: native process observation preserves exact Windows birth and normalizes owned executable boundaries
+ok 6 - native process observation preserves exact Windows birth and normalizes owned executable boundaries
+  ---
+  duration_ms: 1.210333
+  type: 'test'
+  ...
+# Subtest: unavailable, foreign-platform, duplicate and malformed observations fail closed
+ok 7 - unavailable, foreign-platform, duplicate and malformed observations fail closed
+  ---
+  duration_ms: 0.703458
+  type: 'test'
+  ...
+# Subtest: recorded pids with a different birth do not claim a foreign process
+ok 8 - recorded pids with a different birth do not claim a foreign process
+  ---
+  duration_ms: 0.112208
+  type: 'test'
+  ...
+# Subtest: installed architecture is read from PE/ELF bytes and corrupt headers are refused
+ok 9 - installed architecture is read from PE/ELF bytes and corrupt headers are refused
+  ---
+  duration_ms: 3.067167
+  type: 'test'
+  ...
+# Subtest: native environment probes gate all expensive builds and preserve diagnostic failures
+ok 10 - native environment probes gate all expensive builds and preserve diagnostic failures
+  ---
+  duration_ms: 4.799334
+  type: 'test'
+  ...
+# Subtest: the packaging lane runs from controlled M5/M6 test tags only
+ok 11 - the packaging lane runs from controlled M5/M6 test tags only
+  ---
+  duration_ms: 1.610042
+  type: 'test'
+  ...
+# Subtest: the matrix is the three native platforms with asserted architectures
+ok 12 - the matrix is the three native platforms with asserted architectures
+  ---
+  duration_ms: 1.309
+  type: 'test'
+  ...
+# Subtest: every build lane prepares the pinned fork and the two toolchains
+ok 13 - every build lane prepares the pinned fork and the two toolchains
+  ---
+  duration_ms: 1.249666
+  type: 'test'
+  ...
+# Subtest: every build lane packages through the product entry with publish disabled
+ok 14 - every build lane packages through the product entry with publish disabled
+  ---
+  duration_ms: 1.211333
+  type: 'test'
+  ...
+# Subtest: the packaging invocation reaches the production parser for each matrix target
+ok 15 - the packaging invocation reaches the production parser for each matrix target
+  ---
+  duration_ms: 1745.451
+  type: 'test'
+  ...
+# Subtest: the packaged Resources are verified in isolation and then exercised in-package
+ok 16 - the packaged Resources are verified in isolation and then exercised in-package
+  ---
+  duration_ms: 0.852542
+  type: 'test'
+  ...
+# Subtest: a refused package fails the lane and its diagnosis stays uploadable
+ok 17 - a refused package fails the lane and its diagnosis stays uploadable
+  ---
+  duration_ms: 0.665625
+  type: 'test'
+  ...
+# Subtest: the release is one prerelease gated on all three platforms
+ok 18 - the release is one prerelease gated on all three platforms
+  ---
+  duration_ms: 0.830042
+  type: 'test'
+  ...
+# Subtest: M6 adds native installed acceptance without weakening or broadening the M5 lane
+ok 19 - M6 adds native installed acceptance without weakening or broadening the M5 lane
+  ---
+  duration_ms: 1.069875
+  type: 'test'
+  ...
+1..19
+# tests 19
+# suites 0
+# pass 19
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1848.155667

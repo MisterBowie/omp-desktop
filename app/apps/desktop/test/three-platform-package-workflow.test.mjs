@@ -104,6 +104,8 @@ test("native environment probes gate all expensive builds and preserve diagnosti
   assert.match(probe, /needs: guard/);
   assert.match(probe, /os: \[macos-15, windows-latest, ubuntu-22.04\]/);
   assert.match(probe, /if: needs\.guard\.outputs\.milestone == '6'\n\s+run: node app\/scripts\/verify-native-isolation\.mjs/);
+  assert.match(probe, /matrix\.os == 'windows-latest'[\s\S]*?run: node app\/scripts\/verify-native-windows-harness\.mjs/);
+  assert.match(probe, /python -m pip install --disable-pip-version-check -r app\/scripts\/e2e\/requirements\.txt/);
   const build = job(source, "build");
   assert.match(build, /needs: \[guard, probe\]/);
   assert.match(build, /package_status=\$\{PIPESTATUS\[0\]\}/);

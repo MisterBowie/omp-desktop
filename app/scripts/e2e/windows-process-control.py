@@ -11,7 +11,7 @@ if sys.platform != "win32":
 
 request = json.load(sys.stdin)
 root = os.path.normcase(os.path.realpath(request["root"]))
-if len(root) < 10 or not os.path.isdir(root):
+if len(root) < 10 or not os.path.isdir(root) or not os.path.basename(root).startswith("omp-installed-"):
     raise RuntimeError("an existing unique test root is required")
 
 kernel = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -33,7 +33,9 @@ for record in request["processes"]:
     if not isinstance(pid, int) or pid <= 1 or pid in (os.getpid(), os.getppid()):
         raise RuntimeError("refusing a non-owned or observer pid")
     if os.path.commonpath([root, expected_exe]) != root or expected_exe == root:
-        raise RuntimeError("refusing an executable outside the test root")
+        results.append({"pid": pid, "terminated": False, "refusedOutsideRoot": True,
+                        "executable": expected_exe, "root": root})
+        continue
     # QUERY_LIMITED_INFORMATION | TERMINATE | SYNCHRONIZE. From this point on
     # all observations and termination use this same handle, never a bare pid.
     handle = kernel.OpenProcess(0x1000 | 0x0001 | 0x00100000, False, pid)

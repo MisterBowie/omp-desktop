@@ -66,6 +66,17 @@ installer bytes, and produces a bounded `*-validation.json.gz` public asset
 containing the report, screenshots and raw native history with individual
 digests. Assembly rechecks this raw proof, not only its summary.
 
+Windows acceptance resolves existing paths through the native filesystem API,
+so short 8.3 names, long names and junction aliases cannot create contradictory
+ownership or project identities. A cheap native probe runs before compilation:
+an actual copied Node process is started through a short alias, an exact birth
+mismatch is refused, and a sibling-prefix foreign process stays alive while the
+owned process is reclaimed through a pinned Win32 handle. Failed UI assertions
+first attempt ordered application shutdown; emergency cleanup continues to
+refuse executables outside the owned root and still requires exact birth/image
+identity. Failure annotations retain bounded owned-process metadata, never argv
+or environments.
+
 No updater feeds/blockmaps are published; the existing preview and latest
 release are untouched. Native chooser/quit confirmation dialogs, OS shortcut
 registration, signing/notarization and paid-provider compatibility are outside

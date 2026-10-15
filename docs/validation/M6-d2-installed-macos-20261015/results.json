@@ -1,0 +1,42 @@
+{
+  "sourceRevision": "d2d1dc8a43e09987bd4c2df9ebb4b77e6395fd2f",
+  "localOnly": true,
+  "actualMacDmgWorkflow": {
+    "steps": 8,
+    "launchesAndQuits": 2,
+    "remainingOwnedProcesses": 0
+  },
+  "packagedRuntime": {
+    "version": "18.3.0",
+    "protocol": 2,
+    "getState": true,
+    "missingGate": "refused",
+    "reaped": true,
+    "cleaned": true,
+    "leftoverRuns": 0
+  },
+  "packagedPlanGoal": {
+    "pass": 15,
+    "fail": 0,
+    "skip": 0
+  },
+  "localStaging": "3 assets including public installed proof; reopened and verified",
+  "noNativeCiSubstitution": true,
+  "initialLocalBuild": "failed closed because the default fork path was missing; successful rerun explicitly set OMP_SIDECAR_SOURCE to clean fixed omp-runtime-fork 36483311",
+  "signing": "unsigned; no valid signing certificate used",
+  "fullM6Complete": false,
+  "completeOmpRuntimeSuite": {
+    "files": 35,
+    "pass": 542,
+    "fail": 0,
+    "skip": 0,
+    "excluded": 0
+  },
+  "referenceEnvironmentRepair": {
+    "frozenBunInstall": "404 packages, scripts disabled",
+    "firstPartyGeneratedAsset": "bun run gen:tool-views",
+    "binding": "same native source and manifest between base/fork, APFS COW copy; SHA verified",
+    "trackedSourceAndLocks": "unchanged",
+    "referenceSmoke": "passed version/protocol/start/stop/reap"
+  }
+}

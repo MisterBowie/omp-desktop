@@ -6,6 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { FakeProvider } from "../../experiments/omp-bridge/lib/provider.mjs";
 import { until } from "./installed-application.mjs";
 import { digest } from "./installed-product.mjs";
+import { installedFilesystemPath } from "./installed-paths.mjs";
 import { readNativeProcessTable } from "./native-processes.mjs";
 
 const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
@@ -116,7 +117,7 @@ export async function exerciseInstalledWorkflow(application) {
       { marker: "INSTALLED_RESTART", turns: [{ text: "INSTALLED_RESTART_DONE", finish: "stop" }] },
     ] });
     const opened = await invoke(application, "projectSet", [project]);
-    assert.equal(opened.workspace?.path, project);
+    assert.equal(installedFilesystemPath(opened.workspace?.path), installedFilesystemPath(project));
     const createdProvider = await invoke(application, "providersCreate", [{
       name: "Installed loopback fixture", vendorKey: "custom", type: "openai_compatible", protocol: "openai_compatible",
       baseUrl: provider.baseUrl, authKind: "api_key_and_base_url", defaultModelId: "local-model",

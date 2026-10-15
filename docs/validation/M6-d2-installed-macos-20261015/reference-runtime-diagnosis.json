@@ -1,0 +1,26 @@
+{
+  "error": "OmpRuntimeError: OMP runtime exited (code 1, signal null)",
+  "status": {
+    "engine": "omp",
+    "phase": "failed",
+    "runtimeVersion": null,
+    "protocolVersion": null,
+    "reason": "start-failed",
+    "detail": "OMP runtime exited (code 1, signal null)",
+    "capabilities": {
+      "prompt": false,
+      "stop": false,
+      "resume": false,
+      "branch": false,
+      "steer": false,
+      "followUp": false,
+      "modelSwitch": false,
+      "structuredQuestions": false,
+      "toolApproval": false,
+      "subagentEvents": false,
+      "plan": false,
+      "goal": false
+    }
+  },
+  "stderr": "error: Cannot find module './tool-views.generated.js' from '/Users/vv/Documents/对话/omp-desktop-local-m6/upstream/oh-my-pi/packages/coding-agent/src/export/html/index.ts'\n"
+}

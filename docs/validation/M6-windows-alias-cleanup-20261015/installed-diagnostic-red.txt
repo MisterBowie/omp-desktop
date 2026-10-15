@@ -1,0 +1,27 @@
+TAP version 13
+# Subtest: failed installed diagnostics expose bounded owned identities without argv or environment
+not ok 1 - failed installed diagnostics expose bounded owned identities without argv or environment
+  ---
+  duration_ms: 32.53
+  type: 'test'
+  location: '/Users/vv/Documents/对话/omp-desktop-local-m6/app/apps/desktop/test/installed-ci-diagnostic.test.mjs:9:1'
+  failureType: 'testCodeFailure'
+  error: "Cannot read properties of undefined (reading 'length')"
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/vv/Documents/%E5%AF%B9%E8%AF%9D/omp-desktop-local-m6/app/apps/desktop/test/installed-ci-diagnostic.test.mjs:25:38)
+    Test.runInAsyncScope (node:async_hooks:228:14)
+    Test.run (node:internal/test_runner/test:1118:25)
+    Test.start (node:internal/test_runner/test:1015:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 82.556125

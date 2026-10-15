@@ -1,5 +1,17 @@
 # 执行任务看板
 
+2026-10-15 最新：d2d1dc8/run38690408029 失败，Mac/Linux job success，Windows
+安装后项目路径8.3别名断言失败，紧急清理拒绝根外镜像，发布 skipped。已修复
+验收器实际路径与正常退出优先，新增 Windows 轻量原生边界检查；本机19/19及
+真实 live-app cleanup 零残留。见 `validation/M6-windows-alias-cleanup-20261015.md`。
+T21–T23/M6继续原生重测，M7/T24未开始；以下“运行中”已过时。
+
+2026-10-15 最新 M6：d2d1dc8/run38690408029 三平台原生环境检查成功，Linux
+整个平台 job（打包、包内回归、实际安装工作流）success；Mac/Windows 尚在运行。
+本机新版 Mac 8项流程、2次退出零残留、包内15/15；完整OMP测试542/542、0skip/
+excluded。见 `validation/M6-d2-installed-macos-20261015.md`。完整M6未接受，
+M7/T24仍是下一大阶段，以下旧状态按本条最新进展理解。
+
 2026-10-15 M6 原生环境：9e59c932/run38689745755 的 Windows homedir 真实逃出
 合成 HOME，Mac/Linux检查通过；构建/发布被门阻断。Windows环境策略已修复，
 Mac实际bundled回归541/541、0skip，等待新候选三平台原生验收。见

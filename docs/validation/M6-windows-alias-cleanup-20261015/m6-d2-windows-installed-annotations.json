@@ -1,0 +1,26 @@
+[
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/d2d1dc8a43e09987bd4c2df9ebb4b77e6395fd2f/.github",
+    "start_line": 60,
+    "start_column": null,
+    "end_line": 60,
+    "end_column": null,
+    "annotation_level": "failure",
+    "title": "",
+    "message": "Process completed with exit code 1.",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/d2d1dc8a43e09987bd4c2df9ebb4b77e6395fd2f/.github",
+    "start_line": 59,
+    "start_column": null,
+    "end_line": 59,
+    "end_column": null,
+    "annotation_level": "failure",
+    "title": "Native installed workflow",
+    "message": "{\"platform\":\"win32\",\"arch\":\"x64\",\"sourceRevision\":\"d2d1dc8a43e09987bd4c2df9ebb4b77e6395fd2f\",\"failure\":\"AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\\n+ actual - expected\\n\\n+ \\\"C:\\\\\\\\Users\\\\\\\\runneradmin\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\omp-installed-JXN8jW\\\\\\\\workspace 中文 with spaces 'quoted'\\\"\\n- \\\"C:\\\\\\\\Users\\\\\\\\RUNNER~1\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\omp-installed-JXN8jW\\\\\\\\workspace 中文 with spaces 'quoted'\\\"\\n\\n    at exerciseInstalledWorkflow (file:///D:/a/omp-desktop/omp-desktop/app/scripts/e2e/installed-workflow.mjs:119:12)\\n    at async file:///D:/a/omp-desktop/omp-desktop/app/scripts/e2e-installed-smoke.mjs:29:21\",\"cleanupFailure\":\"Error: Command failed: C:\\\\hostedtoolcache\\\\windows\\\\Python\\\\3.12.10\\\\x64\\\\python.exe -I D:\\\\a\\\\omp-desktop\\\\omp-desktop\\\\app\\\\scripts\\\\e2e\\\\windows-process-control.py\\nTraceback (most recent call last):\\r\\n  File \\\"D:\\\\a\\\\omp-desktop\\\\omp-desktop\\\\app\\\\scripts\\\\e2e\\\\windows-process-control.py\\\", line 36, in <module>\\r\\n    raise RuntimeError(\\\"refusing an executable outside the test root\\\")\\r\\nRuntimeError: refusing an executable outside the test root\\r\\n\\n    at genericNodeError (node:internal/errors:986:15)\\n    at wrappedFn (node:internal/errors:540:14)\\n    at checkExecSyncError (node:child_process:942:11)\\n    at execFileSync (node:child_process:978:15)\\n    at reclaimWindowsProcesses (file:///D:/a/omp-desktop/omp-desktop/app/scripts/e2e/native-processes.mjs:49:21)\\n    at InstalledApplication.cleanup (file:///D:/a/omp-desktop/omp-desktop/app/scripts/e2e/installed-application.mjs:195:78)\\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\\n    at async file:///D:/a/omp-desktop/omp-desktop/app/scripts/e2e-installed-smoke.mjs:38:7\",\"applicationOutputTail\":\"\\r\\nDebugger listening on ws://127.0.0.1:56015/7db7aece-8e97-497a-9720-102538f75cb3\\r\\nFor help, see: https://nodejs.org/learn/getting-started/debugging\\r\\nDebugger attached.\\r\\n\\r\\nDevTools listening on ws://127.0.0.1:56016/devtools/browser/fa1bb3e2-d2e9-4067-8946-1cac9eb69218\\r\\n\"}",
+    "raw_details": ""
+  }
+]

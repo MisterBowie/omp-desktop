@@ -1,0 +1,11 @@
+TEST-PACKAGE-STAGED darwin/arm64 0.15.2 (m6-test-20261015-d2d1dc8)
+  revision   : d2d1dc8a43e09987bd4c2df9ebb4b77e6395fd2f
+  pins       : 62bc57b+omp-desktop.5, fork 36483311dfff67be7504f591974df93fc512a45a
+  runtime    : omp/18.3.0, protocol v2, gate control refused
+  regression : 15 passed, 0 failed, 0 skipped
+  asset      : OMP-Desktop-0.15.2-m6-test-20261015-d2d1dc8-macos-arm64.dmg (223807803 B, sha256 a53e7c5d554b22d9b2167fc97c4938210627f6212e9fc91e655759e2b5fcbd75)
+  asset      : OMP-Desktop-0.15.2-m6-test-20261015-d2d1dc8-macos-arm64.zip (222628874 B, sha256 fa8a0a32d888d39ff1b042e3643e881b19a6eaa447f315fdeead1b45ee5142ff)
+  asset      : OMP-Desktop-0.15.2-m6-test-20261015-d2d1dc8-darwin-arm64-validation.json.gz (988551 B, sha256 f3bc5e0dfc3351d4c2c068f71b5432fa06b7c107701440ebe2cc80391a92802e)
+  excluded   : OMP-Desktop-0.15.2-arm64-mac.zip.blockmap — a differential-update blockmap; this release ships no updater payload
+  excluded   : OMP-Desktop-0.15.2-arm64.dmg.blockmap — a differential-update blockmap; this release ships no updater payload
+  excluded   : latest-mac.yml — an electron-updater feed would make a test package an update source

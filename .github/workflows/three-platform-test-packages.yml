@@ -140,6 +140,9 @@ jobs:
         os: [macos-15, windows-latest, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 5
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -148,6 +151,18 @@ jobs:
       - name: Verify native runtime HOME and PATH before expensive builds
         if: needs.guard.outputs.milestone == '6'
         run: node app/scripts/verify-native-isolation.mjs
+      - uses: actions/setup-python@v6
+        if: needs.guard.outputs.milestone == '6' && matrix.os == 'windows-latest'
+        with:
+          python-version: '3.12'
+      - name: Prepare the pinned Windows observer for the cheap boundary probe
+        if: needs.guard.outputs.milestone == '6' && matrix.os == 'windows-latest'
+        run: |
+          python -m pip install --disable-pip-version-check -r app/scripts/e2e/requirements.txt
+          echo "OMP_E2E_PYTHON=$(python -c 'import sys; print(sys.executable)')" >> "$GITHUB_ENV"
+      - name: Verify Windows path aliases and exact-handle cleanup before expensive builds
+        if: needs.guard.outputs.milestone == '6' && matrix.os == 'windows-latest'
+        run: node app/scripts/verify-native-windows-harness.mjs
 
   build:
     name: Package ${{ matrix.name }}

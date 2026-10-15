@@ -42,8 +42,11 @@ for process in psutil.process_iter(["pid", "ppid", "create_time", "exe", "status
         except (ProcessLookupError, PermissionError):
             group = 0
         state = "Z" if info["status"] == psutil.STATUS_ZOMBIE else "X" if info["status"] == psutil.STATUS_DEAD else "R"
+        executable = info["exe"] or ""
+        if os.name == "nt" and executable:
+            executable = os.path.realpath(executable)
         rows.append({"pid": process.pid, "ppid": info["ppid"] or 0, "pgid": group,
-                     "starttime": birth or "", "state": state, "exe": info["exe"] or ""})
+                     "starttime": birth or "", "state": state, "exe": executable})
     except psutil.NoSuchProcess:
         continue
 print(json.dumps({"observer": "psutil/7.2.2", "platform": sys.platform, "rows": rows}))

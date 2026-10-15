@@ -1,0 +1,1278 @@
+{
+  "total_count": 8,
+  "jobs": [
+    {
+      "id": 116274738454,
+      "run_id": 38690408029,
+      "workflow_name": "Three-platform test packages",
+      "head_branch": "m6-test-20261015-d2d1dc8",
+      "run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/runs/38690408029",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUkBB8s8AAAAbEoO1Fg",
+      "head_sha": "d2d1dc8a43e09987bd4c2df9ebb4b77e6395fd2f",
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/jobs/116274738454",
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/38690408029/job/116274738454",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-15T06:05:48Z",
+      "started_at": "2026-10-15T06:05:50Z",
+      "completed_at": "2026-10-15T06:05:57Z",
+      "name": "Bind the run to the reviewed tag",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-15T06:05:50Z",
+          "completed_at": "2026-10-15T06:05:51Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-15T06:05:51Z",
+          "completed_at": "2026-10-15T06:05:54Z"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-15T06:05:54Z",
+          "completed_at": "2026-10-15T06:05:55Z"
+        },
+        {
+          "name": "Refuse every trigger except a controlled M5/M6 test tag push",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-15T06:05:55Z",
+          "completed_at": "2026-10-15T06:05:55Z"
+        },
+        {
+          "name": "Read the product version and the controlled runtime pins",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-15T06:05:55Z",
+          "completed_at": "2026-10-15T06:05:55Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-15T06:05:55Z",
+          "completed_at": "2026-10-15T06:05:55Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-15T06:05:55Z",
+          "completed_at": "2026-10-15T06:05:55Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-15T06:05:55Z",
+          "completed_at": "2026-10-15T06:05:55Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/check-runs/116274738454",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000000023,
+      "runner_name": "GitHub Actions 1000000023",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 116274786217,
+      "run_id": 38690408029,
+      "workflow_name": "Three-platform test packages",
+      "head_branch": "m6-test-20261015-d2d1dc8",
+      "run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/runs/38690408029",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUkBB8s8AAAAbEoRvqQ",
+      "head_sha": "d2d1dc8a43e09987bd4c2df9ebb4b77e6395fd2f",
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/jobs/116274786217",
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/38690408029/job/116274786217",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-15T06:05:57Z",
+      "started_at": "2026-10-15T06:06:00Z",
+      "completed_at": "2026-10-15T06:06:24Z",
+      "name": "Native environment windows-latest",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-15T06:06:01Z",
+          "completed_at": "2026-10-15T06:06:03Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-15T06:06:03Z",
+          "completed_at": "2026-10-15T06:06:12Z"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-15T06:06:12Z",
+          "completed_at": "2026-10-15T06:06:19Z"
+        },
+        {
+          "name": "Verify native runtime HOME and PATH before expensive builds",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-15T06:06:19Z",
+          "completed_at": "2026-10-15T06:06:20Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-15T06:06:20Z",
+          "completed_at": "2026-10-15T06:06:20Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-15T06:06:20Z",
+          "completed_at": "2026-10-15T06:06:23Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-15T06:06:23Z",
+          "completed_at": "2026-10-15T06:06:23Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/check-runs/116274786217",
+      "labels": [
+        "windows-latest"
+      ],
+      "runner_id": 1000000024,
+      "runner_name": "GitHub Actions 1000000024",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 116274786240,
+      "run_id": 38690408029,
+      "workflow_name": "Three-platform test packages",
+      "head_branch": "m6-test-20261015-d2d1dc8",
+      "run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/runs/38690408029",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUkBB8s8AAAAbEoRvwA",
+      "head_sha": "d2d1dc8a43e09987bd4c2df9ebb4b77e6395fd2f",
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/jobs/116274786240",
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/38690408029/job/116274786240",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-15T06:05:57Z",
+      "started_at": "2026-10-15T06:05:59Z",
+      "completed_at": "2026-10-15T06:06:10Z",
+      "name": "Native environment ubuntu-22.04",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-15T06:06:00Z",
+          "completed_at": "2026-10-15T06:06:01Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-15T06:06:01Z",
+          "completed_at": "2026-10-15T06:06:04Z"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-15T06:06:04Z",
+          "completed_at": "2026-10-15T06:06:06Z"
+        },
+        {
+          "name": "Verify native runtime HOME and PATH before expensive builds",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-15T06:06:06Z",
+          "completed_at": "2026-10-15T06:06:07Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-15T06:06:07Z",
+          "completed_at": "2026-10-15T06:06:07Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-15T06:06:07Z",
+          "completed_at": "2026-10-15T06:06:07Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-15T06:06:07Z",
+          "completed_at": "2026-10-15T06:06:07Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/check-runs/116274786240",
+      "labels": [
+        "ubuntu-22.04"
+      ],
+      "runner_id": 1000000026,
+      "runner_name": "GitHub Actions 1000000026",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 116274786254,
+      "run_id": 38690408029,
+      "workflow_name": "Three-platform test packages",
+      "head_branch": "m6-test-20261015-d2d1dc8",
+      "run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/runs/38690408029",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUkBB8s8AAAAbEoRvzg",
+      "head_sha": "d2d1dc8a43e09987bd4c2df9ebb4b77e6395fd2f",
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/jobs/116274786254",
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/38690408029/job/116274786254",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-15T06:05:57Z",
+      "started_at": "2026-10-15T06:06:04Z",
+      "completed_at": "2026-10-15T06:06:14Z",
+      "name": "Native environment macos-15",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-15T06:06:04Z",
+          "completed_at": "2026-10-15T06:06:06Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-15T06:06:06Z",
+          "completed_at": "2026-10-15T06:06:10Z"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-15T06:06:10Z",
+          "completed_at": "2026-10-15T06:06:11Z"
+        },
+        {
+          "name": "Verify native runtime HOME and PATH before expensive builds",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-15T06:06:11Z",
+          "completed_at": "2026-10-15T06:06:11Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-15T06:06:11Z",
+          "completed_at": "2026-10-15T06:06:12Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-15T06:06:12Z",
+          "completed_at": "2026-10-15T06:06:12Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-15T06:06:12Z",
+          "completed_at": "2026-10-15T06:06:12Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/check-runs/116274786254",
+      "labels": [
+        "macos-15"
+      ],
+      "runner_id": 1000000025,
+      "runner_name": "GitHub Actions 1000000025",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 116274925682,
+      "run_id": 38690408029,
+      "workflow_name": "Three-platform test packages",
+      "head_branch": "m6-test-20261015-d2d1dc8",
+      "run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/runs/38690408029",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUkBB8s8AAAAbEoaQcg",
+      "head_sha": "d2d1dc8a43e09987bd4c2df9ebb4b77e6395fd2f",
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/jobs/116274925682",
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/38690408029/job/116274925682",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-15T06:06:25Z",
+      "started_at": "2026-10-15T06:11:33Z",
+      "completed_at": "2026-10-15T06:36:27Z",
+      "name": "Package macOS arm64",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-15T06:11:34Z",
+          "completed_at": "2026-10-15T06:11:38Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-15T06:11:38Z",
+          "completed_at": "2026-10-15T06:11:43Z"
+        },
+        {
+          "name": "Verify the revision, the native platform and the architecture",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-15T06:11:43Z",
+          "completed_at": "2026-10-15T06:11:44Z"
+        },
+        {
+          "name": "Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-15T06:11:44Z",
+          "completed_at": "2026-10-15T06:11:51Z"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-15T06:11:51Z",
+          "completed_at": "2026-10-15T06:11:53Z"
+        },
+        {
+          "name": "Run actions/setup-python@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-15T06:11:53Z",
+          "completed_at": "2026-10-15T06:11:53Z"
+        },
+        {
+          "name": "Install the pinned native process observer",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-15T06:11:53Z",
+          "completed_at": "2026-10-15T06:11:55Z"
+        },
+        {
+          "name": "Prepare the Linux native display",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 8,
+          "started_at": "2026-10-15T06:11:55Z",
+          "completed_at": "2026-10-15T06:11:55Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-15T06:11:55Z",
+          "completed_at": "2026-10-15T06:12:05Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-15T06:12:05Z",
+          "completed_at": "2026-10-15T06:12:06Z"
+        },
+        {
+          "name": "Check out the pinned OMP sidecar fork",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-15T06:12:06Z",
+          "completed_at": "2026-10-15T06:13:01Z"
+        },
+        {
+          "name": "Install the fork's pinned Rust toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-15T06:13:01Z",
+          "completed_at": "2026-10-15T06:13:21Z"
+        },
+        {
+          "name": "Run oven-sh/setup-bun@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-15T06:13:21Z",
+          "completed_at": "2026-10-15T06:13:23Z"
+        },
+        {
+          "name": "Install the pinned fork dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-15T06:13:23Z",
+          "completed_at": "2026-10-15T06:13:32Z"
+        },
+        {
+          "name": "Build the fork's host native addon",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-15T06:13:32Z",
+          "completed_at": "2026-10-15T06:29:25Z"
+        },
+        {
+          "name": "Prepare package inputs",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-15T06:29:25Z",
+          "completed_at": "2026-10-15T06:31:44Z"
+        },
+        {
+          "name": "Package macOS arm64 (sidecar preflight, then electron-builder)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-15T06:31:44Z",
+          "completed_at": "2026-10-15T06:33:30Z"
+        },
+        {
+          "name": "Verify the Linux host-core glibc floor",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 18,
+          "started_at": "2026-10-15T06:33:30Z",
+          "completed_at": "2026-10-15T06:33:30Z"
+        },
+        {
+          "name": "Verify the packaged runtime from an isolated copy",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-15T06:33:30Z",
+          "completed_at": "2026-10-15T06:33:36Z"
+        },
+        {
+          "name": "Run the packaged Plan/Goal regression",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-10-15T06:33:36Z",
+          "completed_at": "2026-10-15T06:34:53Z"
+        },
+        {
+          "name": "Exercise the actual native installed application",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-10-15T06:34:53Z",
+          "completed_at": "2026-10-15T06:35:29Z"
+        },
+        {
+          "name": "Stage the release assets and the build record",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22,
+          "started_at": "2026-10-15T06:35:29Z",
+          "completed_at": "2026-10-15T06:35:30Z"
+        },
+        {
+          "name": "Upload this platform's package",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23,
+          "started_at": "2026-10-15T06:35:30Z",
+          "completed_at": "2026-10-15T06:35:38Z"
+        },
+        {
+          "name": "Report diagnostics when a step failed",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 24,
+          "started_at": "2026-10-15T06:35:38Z",
+          "completed_at": "2026-10-15T06:35:38Z"
+        },
+        {
+          "name": "Upload this platform's raw acceptance report",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-15T06:35:38Z",
+          "completed_at": "2026-10-15T06:35:39Z"
+        },
+        {
+          "name": "Upload the native installed workflow evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26,
+          "started_at": "2026-10-15T06:35:39Z",
+          "completed_at": "2026-10-15T06:35:41Z"
+        },
+        {
+          "name": "Post Run oven-sh/setup-bun@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 46,
+          "started_at": "2026-10-15T06:35:41Z",
+          "completed_at": "2026-10-15T06:35:44Z"
+        },
+        {
+          "name": "Post Check out the pinned OMP sidecar fork",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 47,
+          "started_at": "2026-10-15T06:35:44Z",
+          "completed_at": "2026-10-15T06:35:44Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 48,
+          "started_at": "2026-10-15T06:35:44Z",
+          "completed_at": "2026-10-15T06:36:00Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 49,
+          "started_at": "2026-10-15T06:36:00Z",
+          "completed_at": "2026-10-15T06:36:01Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 50,
+          "started_at": "2026-10-15T06:36:01Z",
+          "completed_at": "2026-10-15T06:36:21Z"
+        },
+        {
+          "name": "Post Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 51,
+          "started_at": "2026-10-15T06:36:21Z",
+          "completed_at": "2026-10-15T06:36:21Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 52,
+          "started_at": "2026-10-15T06:36:21Z",
+          "completed_at": "2026-10-15T06:36:22Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 53,
+          "started_at": "2026-10-15T06:36:22Z",
+          "completed_at": "2026-10-15T06:36:25Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/check-runs/116274925682",
+      "labels": [
+        "macos-15"
+      ],
+      "runner_id": 1000000030,
+      "runner_name": "GitHub Actions 1000000030",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 116274925738,
+      "run_id": 38690408029,
+      "workflow_name": "Three-platform test packages",
+      "head_branch": "m6-test-20261015-d2d1dc8",
+      "run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/runs/38690408029",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUkBB8s8AAAAbEoaQqg",
+      "head_sha": "d2d1dc8a43e09987bd4c2df9ebb4b77e6395fd2f",
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/jobs/116274925738",
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/38690408029/job/116274925738",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-15T06:06:25Z",
+      "started_at": "2026-10-15T06:06:26Z",
+      "completed_at": "2026-10-15T06:30:29Z",
+      "name": "Package Linux x64",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-15T06:06:27Z",
+          "completed_at": "2026-10-15T06:06:29Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-15T06:06:29Z",
+          "completed_at": "2026-10-15T06:06:32Z"
+        },
+        {
+          "name": "Verify the revision, the native platform and the architecture",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-15T06:06:32Z",
+          "completed_at": "2026-10-15T06:06:33Z"
+        },
+        {
+          "name": "Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-15T06:06:33Z",
+          "completed_at": "2026-10-15T06:06:39Z"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-15T06:06:39Z",
+          "completed_at": "2026-10-15T06:06:42Z"
+        },
+        {
+          "name": "Run actions/setup-python@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-15T06:06:42Z",
+          "completed_at": "2026-10-15T06:06:42Z"
+        },
+        {
+          "name": "Install the pinned native process observer",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-15T06:06:42Z",
+          "completed_at": "2026-10-15T06:06:45Z"
+        },
+        {
+          "name": "Prepare the Linux native display",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-15T06:06:45Z",
+          "completed_at": "2026-10-15T06:06:56Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-15T06:06:56Z",
+          "completed_at": "2026-10-15T06:06:56Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-15T06:06:56Z",
+          "completed_at": "2026-10-15T06:06:57Z"
+        },
+        {
+          "name": "Check out the pinned OMP sidecar fork",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-15T06:06:57Z",
+          "completed_at": "2026-10-15T06:07:38Z"
+        },
+        {
+          "name": "Install the fork's pinned Rust toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-15T06:07:38Z",
+          "completed_at": "2026-10-15T06:07:51Z"
+        },
+        {
+          "name": "Run oven-sh/setup-bun@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-15T06:07:51Z",
+          "completed_at": "2026-10-15T06:07:52Z"
+        },
+        {
+          "name": "Install the pinned fork dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-15T06:07:52Z",
+          "completed_at": "2026-10-15T06:07:56Z"
+        },
+        {
+          "name": "Build the fork's host native addon",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-15T06:07:56Z",
+          "completed_at": "2026-10-15T06:21:04Z"
+        },
+        {
+          "name": "Prepare package inputs",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-15T06:21:04Z",
+          "completed_at": "2026-10-15T06:23:02Z"
+        },
+        {
+          "name": "Package Linux x64 (sidecar preflight, then electron-builder)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-15T06:23:02Z",
+          "completed_at": "2026-10-15T06:28:00Z"
+        },
+        {
+          "name": "Verify the Linux host-core glibc floor",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-15T06:28:00Z",
+          "completed_at": "2026-10-15T06:28:00Z"
+        },
+        {
+          "name": "Verify the packaged runtime from an isolated copy",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-15T06:28:00Z",
+          "completed_at": "2026-10-15T06:28:05Z"
+        },
+        {
+          "name": "Run the packaged Plan/Goal regression",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-10-15T06:28:05Z",
+          "completed_at": "2026-10-15T06:29:34Z"
+        },
+        {
+          "name": "Exercise the actual native installed application",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-10-15T06:29:34Z",
+          "completed_at": "2026-10-15T06:29:57Z"
+        },
+        {
+          "name": "Stage the release assets and the build record",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22,
+          "started_at": "2026-10-15T06:29:57Z",
+          "completed_at": "2026-10-15T06:29:58Z"
+        },
+        {
+          "name": "Upload this platform's package",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23,
+          "started_at": "2026-10-15T06:29:58Z",
+          "completed_at": "2026-10-15T06:30:02Z"
+        },
+        {
+          "name": "Report diagnostics when a step failed",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 24,
+          "started_at": "2026-10-15T06:30:02Z",
+          "completed_at": "2026-10-15T06:30:02Z"
+        },
+        {
+          "name": "Upload this platform's raw acceptance report",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-15T06:30:02Z",
+          "completed_at": "2026-10-15T06:30:03Z"
+        },
+        {
+          "name": "Upload the native installed workflow evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26,
+          "started_at": "2026-10-15T06:30:03Z",
+          "completed_at": "2026-10-15T06:30:09Z"
+        },
+        {
+          "name": "Post Run oven-sh/setup-bun@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 46,
+          "started_at": "2026-10-15T06:30:09Z",
+          "completed_at": "2026-10-15T06:30:10Z"
+        },
+        {
+          "name": "Post Check out the pinned OMP sidecar fork",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 47,
+          "started_at": "2026-10-15T06:30:10Z",
+          "completed_at": "2026-10-15T06:30:11Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 48,
+          "started_at": "2026-10-15T06:30:11Z",
+          "completed_at": "2026-10-15T06:30:18Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 49,
+          "started_at": "2026-10-15T06:30:18Z",
+          "completed_at": "2026-10-15T06:30:18Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 50,
+          "started_at": "2026-10-15T06:30:18Z",
+          "completed_at": "2026-10-15T06:30:27Z"
+        },
+        {
+          "name": "Post Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 51,
+          "started_at": "2026-10-15T06:30:27Z",
+          "completed_at": "2026-10-15T06:30:27Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 52,
+          "started_at": "2026-10-15T06:30:27Z",
+          "completed_at": "2026-10-15T06:30:27Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 53,
+          "started_at": "2026-10-15T06:30:27Z",
+          "completed_at": "2026-10-15T06:30:27Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/check-runs/116274925738",
+      "labels": [
+        "ubuntu-22.04"
+      ],
+      "runner_id": 1000000029,
+      "runner_name": "GitHub Actions 1000000029",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 116274925751,
+      "run_id": 38690408029,
+      "workflow_name": "Three-platform test packages",
+      "head_branch": "m6-test-20261015-d2d1dc8",
+      "run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/runs/38690408029",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUkBB8s8AAAAbEoaQtw",
+      "head_sha": "d2d1dc8a43e09987bd4c2df9ebb4b77e6395fd2f",
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/jobs/116274925751",
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/38690408029/job/116274925751",
+      "status": "completed",
+      "conclusion": "failure",
+      "created_at": "2026-10-15T06:06:25Z",
+      "started_at": "2026-10-15T06:06:26Z",
+      "completed_at": "2026-10-15T06:39:41Z",
+      "name": "Package Windows x64",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-15T06:06:27Z",
+          "completed_at": "2026-10-15T06:06:29Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-15T06:06:29Z",
+          "completed_at": "2026-10-15T06:06:37Z"
+        },
+        {
+          "name": "Verify the revision, the native platform and the architecture",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-15T06:06:37Z",
+          "completed_at": "2026-10-15T06:06:40Z"
+        },
+        {
+          "name": "Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-15T06:06:40Z",
+          "completed_at": "2026-10-15T06:06:58Z"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-15T06:06:58Z",
+          "completed_at": "2026-10-15T06:07:05Z"
+        },
+        {
+          "name": "Run actions/setup-python@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-15T06:07:05Z",
+          "completed_at": "2026-10-15T06:07:05Z"
+        },
+        {
+          "name": "Install the pinned native process observer",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-15T06:07:05Z",
+          "completed_at": "2026-10-15T06:07:11Z"
+        },
+        {
+          "name": "Prepare the Linux native display",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 8,
+          "started_at": "2026-10-15T06:07:11Z",
+          "completed_at": "2026-10-15T06:07:11Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-15T06:07:11Z",
+          "completed_at": "2026-10-15T06:07:32Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-15T06:07:32Z",
+          "completed_at": "2026-10-15T06:07:34Z"
+        },
+        {
+          "name": "Check out the pinned OMP sidecar fork",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-15T06:07:34Z",
+          "completed_at": "2026-10-15T06:08:26Z"
+        },
+        {
+          "name": "Install the fork's pinned Rust toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-15T06:08:26Z",
+          "completed_at": "2026-10-15T06:09:17Z"
+        },
+        {
+          "name": "Run oven-sh/setup-bun@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-15T06:09:17Z",
+          "completed_at": "2026-10-15T06:09:19Z"
+        },
+        {
+          "name": "Install the pinned fork dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-15T06:09:19Z",
+          "completed_at": "2026-10-15T06:09:56Z"
+        },
+        {
+          "name": "Build the fork's host native addon",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-15T06:09:56Z",
+          "completed_at": "2026-10-15T06:31:43Z"
+        },
+        {
+          "name": "Prepare package inputs",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-15T06:31:43Z",
+          "completed_at": "2026-10-15T06:34:45Z"
+        },
+        {
+          "name": "Package Windows x64 (sidecar preflight, then electron-builder)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-15T06:34:45Z",
+          "completed_at": "2026-10-15T06:37:12Z"
+        },
+        {
+          "name": "Verify the Linux host-core glibc floor",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 18,
+          "started_at": "2026-10-15T06:37:12Z",
+          "completed_at": "2026-10-15T06:37:12Z"
+        },
+        {
+          "name": "Verify the packaged runtime from an isolated copy",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-15T06:37:12Z",
+          "completed_at": "2026-10-15T06:37:23Z"
+        },
+        {
+          "name": "Run the packaged Plan/Goal regression",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-10-15T06:37:23Z",
+          "completed_at": "2026-10-15T06:38:53Z"
+        },
+        {
+          "name": "Exercise the actual native installed application",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 21,
+          "started_at": "2026-10-15T06:38:53Z",
+          "completed_at": "2026-10-15T06:39:18Z"
+        },
+        {
+          "name": "Stage the release assets and the build record",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 22,
+          "started_at": "2026-10-15T06:39:18Z",
+          "completed_at": "2026-10-15T06:39:18Z"
+        },
+        {
+          "name": "Upload this platform's package",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 23,
+          "started_at": "2026-10-15T06:39:18Z",
+          "completed_at": "2026-10-15T06:39:18Z"
+        },
+        {
+          "name": "Report diagnostics when a step failed",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-10-15T06:39:18Z",
+          "completed_at": "2026-10-15T06:39:32Z"
+        },
+        {
+          "name": "Upload this platform's raw acceptance report",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 25,
+          "started_at": "2026-10-15T06:39:32Z",
+          "completed_at": "2026-10-15T06:39:32Z"
+        },
+        {
+          "name": "Upload the native installed workflow evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26,
+          "started_at": "2026-10-15T06:39:32Z",
+          "completed_at": "2026-10-15T06:39:33Z"
+        },
+        {
+          "name": "Post Run oven-sh/setup-bun@v2",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 46,
+          "started_at": "2026-10-15T06:39:33Z",
+          "completed_at": "2026-10-15T06:39:33Z"
+        },
+        {
+          "name": "Post Check out the pinned OMP sidecar fork",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 47,
+          "started_at": "2026-10-15T06:39:33Z",
+          "completed_at": "2026-10-15T06:39:36Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 48,
+          "started_at": "2026-10-15T06:39:36Z",
+          "completed_at": "2026-10-15T06:39:36Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@v6",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 49,
+          "started_at": "2026-10-15T06:39:36Z",
+          "completed_at": "2026-10-15T06:39:36Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 50,
+          "started_at": "2026-10-15T06:39:36Z",
+          "completed_at": "2026-10-15T06:39:36Z"
+        },
+        {
+          "name": "Post Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 51,
+          "started_at": "2026-10-15T06:39:36Z",
+          "completed_at": "2026-10-15T06:39:37Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 52,
+          "started_at": "2026-10-15T06:39:37Z",
+          "completed_at": "2026-10-15T06:39:39Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 53,
+          "started_at": "2026-10-15T06:39:39Z",
+          "completed_at": "2026-10-15T06:39:40Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/check-runs/116274925751",
+      "labels": [
+        "windows-latest"
+      ],
+      "runner_id": 1000000028,
+      "runner_name": "GitHub Actions 1000000028",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 116285394625,
+      "run_id": 38690408029,
+      "workflow_name": "Three-platform test packages",
+      "head_branch": "m6-test-20261015-d2d1dc8",
+      "run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/runs/38690408029",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUkBB8s8AAAAbEyZOwQ",
+      "head_sha": "d2d1dc8a43e09987bd4c2df9ebb4b77e6395fd2f",
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/jobs/116285394625",
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/38690408029/job/116285394625",
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-10-15T06:39:42Z",
+      "started_at": "2026-10-15T06:39:42Z",
+      "completed_at": "2026-10-15T06:39:41Z",
+      "name": "Publish the test prerelease",
+      "steps": [
+
+      ],
+      "check_run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/check-runs/116285394625",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": null,
+      "runner_name": null,
+      "runner_group_id": null,
+      "runner_group_name": null
+    }
+  ]
+}

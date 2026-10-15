@@ -48,6 +48,6 @@ export function reclaimWindowsProcesses(processes, root) {
   for (const key of ["SystemRoot", "WINDIR", "windir"]) if (process.env[key]) env[key] = process.env[key];
   return JSON.parse(execFileSync(python, ["-I", join(dirname(observer), "windows-process-control.py")], {
     input: JSON.stringify({ root, processes }), encoding: "utf8", timeout: 30_000,
-    maxBuffer: 1024 * 1024, env,
+    maxBuffer: 1024 * 1024, stdio: ["pipe", "pipe", "pipe"], env,
   }));
 }

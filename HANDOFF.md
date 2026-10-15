@@ -2,6 +2,20 @@
 
 ## 当前执行状态（2026-10-15，本机恢复，M5交付已接受）
 
+最新结论覆盖下方“运行中”：d2d1dc8/run38690408029 已完成但失败，Mac/Linux
+平台 job 全成功，Windows 在安装后的 projectSet 路径8.3别名比较处失败，紧急
+清理另有根外镜像拒绝，发布 skipped。验收器已统一原生实际路径、优先正常退出，
+保留精确 handle/创建时间/镜像及目录边界，新增早期 Windows 原生负对照检查。
+本机19/19、实际 live-app 正常退出零残留；Windows 新检查与完整重测待跑。见
+`M6-windows-alias-cleanup-20261015`。M6仍未接受，不进入M7实现。
+
+最新候选 d2d1dc8 / `m6-test-20261015-d2d1dc8` / run38690408029：三平台原生
+HOME/PATH 检查全过，Linux 原生打包/包内回归/完整安装工作流 job 已 success；Mac
+进入产品打包，Windows 原生编译中。新版实际本机 Mac DMG 的8项流程、2次退出
+零残留、包内15/15均通过；参考源码测试环境已修复，完整OMP测试542/542、0skip/
+excluded。详见 `M6-d2-installed-macos-20261015`。M6仍需本轮全部平台及公开资产
+回读后接受，再进入完整M7/T24；不据此提前完成目标。
+
 候选 9e59c932 / run38689745755 的轻量检查实际发现 Windows 原生 homedir 逃出
 合成 HOME（Mac/Linux通过），构建与发布被阻断。已修复 Windows profile/AppData、
 系统根、PATH delimiter 与大小写别名，实际 Mac bundled 回归541/541、0skip；

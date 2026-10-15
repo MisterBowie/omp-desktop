@@ -1,12 +1,12 @@
 /** Own one actual installed payload, isolated profile, inspectors and process tree. */
 import assert from "node:assert/strict";
 import { spawn, execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { createServer } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import { CdpClient } from "./cdp.mjs";
+import { createInstalledRunRoot, installedFilesystemPath } from "./installed-paths.mjs";
 import { digest, inspectInstalledProduct } from "./installed-product.mjs";
 import { readNativeProcessTable, ownershipPath, reclaimWindowsProcesses } from "./native-processes.mjs";
 import { collectOwnedProcesses, planSignalTargets, signalProcessPlan } from "./process-ownership.mjs";
@@ -37,7 +37,7 @@ const electronExpression = `process.getBuiltinModule("module").createRequire(pro
 
 export class InstalledApplication {
   static prepare(installer, evidenceDirectory) {
-    const root = realpathSync(mkdtempSync(join(tmpdir(), "omp-installed-")));
+    const root = createInstalledRunRoot();
     const state = new InstalledApplication(root, evidenceDirectory);
     const installDirectory = join(root, "应用 with spaces 'quoted'");
     mkdirSync(installDirectory);
@@ -149,11 +149,11 @@ export class InstalledApplication {
       dataRoot: process.env.PI_DESKTOP_DATA_DIR, electron: process.versions.electron
     }; })()`, "Main", { awaitPromise: false });
     assert(this.identity.isPackaged, "a development Electron launch is not installed acceptance");
-    assert.equal(realpathSync(this.identity.resources), realpathSync(this.payload.resources));
-    assert.equal(realpathSync(this.identity.executable), realpathSync(this.payload.executable));
-    assert.equal(realpathSync(this.identity.userData), realpathSync(this.profile));
-    assert.equal(realpathSync(this.identity.dataRoot), realpathSync(this.data));
-    assert.equal(realpathSync(this.identity.home), realpathSync(this.home));
+    assert.equal(installedFilesystemPath(this.identity.resources), installedFilesystemPath(this.payload.resources));
+    assert.equal(installedFilesystemPath(this.identity.executable), installedFilesystemPath(this.payload.executable));
+    assert.equal(installedFilesystemPath(this.identity.userData), installedFilesystemPath(this.profile));
+    assert.equal(installedFilesystemPath(this.identity.dataRoot), installedFilesystemPath(this.data));
+    assert.equal(installedFilesystemPath(this.identity.home), installedFilesystemPath(this.home));
     assert.equal(this.identity.name, "OMP Desktop"); assert.equal(this.identity.arch, process.arch);
     this.progress("installed Main identity verified");
     const page = await until(async () => {
@@ -188,6 +188,12 @@ export class InstalledApplication {
     this.reports.push({ label: "ordered-quit", nativeConfirmationBypassedOnlyAtTeardown: true, noOwnedProcessesRemain: true });
   }
   async cleanup() {
+    // Even a failed assertion should first use the actual ordered shutdown.
+    // Hard cleanup remains a fallback; it never relaxes executable boundaries.
+    if (this.main && this.child && this.child.exitCode === null && this.child.signalCode === null) {
+      try { await this.quit(); }
+      catch (error) { this.reports.push({ label: "cleanup-ordered-quit-failed", error: String(error) }); }
+    }
     await this.renderer?.close(); await this.main?.close();
     let snapshot = this.snapshot("cleanup-before");
     if (process.platform === "win32" && snapshot.processes.length) {

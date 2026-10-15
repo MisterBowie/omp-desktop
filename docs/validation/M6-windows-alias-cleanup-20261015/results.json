@@ -1,0 +1,36 @@
+{
+  "baseRevision": "d2d1dc8a43e09987bd4c2df9ebb4b77e6395fd2f",
+  "nativeRun": 38690408029,
+  "nativeResults": {
+    "macOS": "success",
+    "Linux": "success",
+    "Windows": "failed after installed Main/payload verification, at projectSet canonical-path comparison",
+    "publish": "skipped"
+  },
+  "observedAliases": [
+    "C:\\Users\\runneradmin",
+    "C:\\Users\\RUNNER~1"
+  ],
+  "cleanupFailure": "outside-root executable refused; the original annotation did not identify that executable",
+  "productCodeChanged": false,
+  "localChecks": {
+    "tests": {
+      "pass": 19,
+      "fail": 0,
+      "skip": 0
+    },
+    "liveAppCleanup": {
+      "normalQuits": 1,
+      "remainingProcesses": 0,
+      "emergencySignals": 0
+    },
+    "docs": true,
+    "syntax": true
+  },
+  "localLiveCleanupScope": "calls cleanup directly while a real installed app is live, the branch used after a workflow error; no intentional failing assertion was executed",
+  "localProbeState": "uncommitted harness changes on d2d1dc8; product DMG built at d2d1dc8",
+  "testedCleanupSourceSha256": "2993972866d64afd77d22dbb78e114740cc3b9a150d5c5f27fb3318cf3c2e34f",
+  "nativeWindowsAliasAndHandleProbe": "pending next controlled candidate",
+  "fullM6Complete": false,
+  "fullM7Complete": false
+}

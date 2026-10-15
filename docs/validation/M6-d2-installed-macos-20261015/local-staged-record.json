@@ -1,0 +1,112 @@
+{
+  "schema": "omp-desktop.test-package/1",
+  "platform": "darwin",
+  "arch": "arm64",
+  "version": "0.15.2",
+  "stage": "m6-test-20261015-d2d1dc8",
+  "revision": "d2d1dc8a43e09987bd4c2df9ebb4b77e6395fd2f",
+  "run": {
+    "id": "local-macos-d2",
+    "attempt": "1",
+    "url": "local-macos-d2"
+  },
+  "pins": {
+    "patchLevel": "62bc57b+omp-desktop.5",
+    "forkRepository": "https://github.com/MisterBowie/oh-my-pi",
+    "forkCommit": "36483311dfff67be7504f591974df93fc512a45a",
+    "forkTree": "7ba57b6d06fb8fe7e3f6352c67692e56cf39c3cd",
+    "baseSha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+    "baseVersion": "18.3.0"
+  },
+  "packagedRuntime": {
+    "provenance": {
+      "ompVersion": "18.3.0",
+      "desktopVersion": "0.15.2",
+      "platform": "darwin",
+      "arch": "arm64",
+      "patchLevel": "62bc57b+omp-desktop.5",
+      "forkCommit": "36483311dfff67be7504f591974df93fc512a45a",
+      "binaryBytes": 218367872,
+      "binarySha256": "dbb6ef2acf0bd757a8a8c78478c9c52adeab9eebbe132bea1579e864e6e39633",
+      "gateBytes": 53025,
+      "gateSha256": "3dd09910f71ee63f2b1ba13e06d8655f9b73af5e88f2c4dd29a92e0f11cd528b",
+      "build": {
+        "tool": "bun",
+        "bunVersion": "1.4.2",
+        "bytecode": true
+      }
+    },
+    "acceptance": {
+      "resources": "/Users/vv/Documents/对话/omp-desktop-local-m6/app/apps/desktop/release/mac-arm64/OMP Desktop.app/Contents/Resources",
+      "runtimeVersion": "18.3.0",
+      "protocolVersion": 2,
+      "getState": true,
+      "gateLoadControl": "refused",
+      "stop": {
+        "stopped": true,
+        "reaped": true,
+        "cleaned": true
+      },
+      "leftoverRuns": 0,
+      "childEnvironmentReadable": false
+    }
+  },
+  "planGoalRegression": {
+    "pass": 15,
+    "fail": 0,
+    "skipped": 0
+  },
+  "installedWorkflow": {
+    "verified": true,
+    "steps": {
+      "project": true,
+      "deny": true,
+      "allowOnce": true,
+      "projectTest": true,
+      "stopTree": true,
+      "recoveryNoReplay": true,
+      "freshTurn": true,
+      "defaultIsolation": true
+    },
+    "reportSha256": "b5f1f79878279b9686839ecf3f4e505351b21ea193a1294ed16ddd50407e7813",
+    "installerSha256": "a53e7c5d554b22d9b2167fc97c4938210627f6212e9fc91e655759e2b5fcbd75",
+    "nativeFolderChooserCovered": false,
+    "nativeQuitConfirmationCovered": false
+  },
+  "excluded": [
+    {
+      "name": "OMP-Desktop-0.15.2-arm64-mac.zip.blockmap",
+      "reason": "a differential-update blockmap; this release ships no updater payload"
+    },
+    {
+      "name": "OMP-Desktop-0.15.2-arm64.dmg.blockmap",
+      "reason": "a differential-update blockmap; this release ships no updater payload"
+    },
+    {
+      "name": "latest-mac.yml",
+      "reason": "an electron-updater feed would make a test package an update source"
+    }
+  ],
+  "assets": [
+    {
+      "kind": "dmg",
+      "name": "OMP-Desktop-0.15.2-m6-test-20261015-d2d1dc8-macos-arm64.dmg",
+      "bytes": 223807803,
+      "sha256": "a53e7c5d554b22d9b2167fc97c4938210627f6212e9fc91e655759e2b5fcbd75",
+      "sourceName": "OMP-Desktop-0.15.2-arm64.dmg"
+    },
+    {
+      "kind": "zip",
+      "name": "OMP-Desktop-0.15.2-m6-test-20261015-d2d1dc8-macos-arm64.zip",
+      "bytes": 222628874,
+      "sha256": "fa8a0a32d888d39ff1b042e3643e881b19a6eaa447f315fdeead1b45ee5142ff",
+      "sourceName": "OMP-Desktop-0.15.2-arm64-mac.zip"
+    },
+    {
+      "kind": "validation",
+      "name": "OMP-Desktop-0.15.2-m6-test-20261015-d2d1dc8-darwin-arm64-validation.json.gz",
+      "bytes": 988551,
+      "sha256": "f3bc5e0dfc3351d4c2c068f71b5432fa06b7c107701440ebe2cc80391a92802e"
+    }
+  ]
+}

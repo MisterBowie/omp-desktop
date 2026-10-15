@@ -1,0 +1,8 @@
+{
+  "sourceFork": "36483311dfff67be7504f591974df93fc512a45a",
+  "referenceBase": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+  "nativeSourceAndManifestDiff": "empty",
+  "method": "APFS COW copy of already native-built binding, no source or lock changes",
+  "bytes": 183817200,
+  "sha256": "f3eb94f58ae3d42d1e9c8b5ffe23dfe56f1b405edd15b8d2230d03daaa7eeb1a"
+}
