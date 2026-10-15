@@ -38,10 +38,53 @@
   permits `app.quit()` without a native confirmation dialog; ordered production
   shutdown and all owned child reaping still run. Native Windows/Linux claims
   require their own actual installer runs, not simulated platform fixtures.
-- **Status:** macOS arm64 actual DMG workflow, restart and zero-survivor cleanup
-  passed locally on 2026-10-15. Windows/Linux installed workflows remain pending
-  M6 acceptance; a successful build alone is insufficient.
+- **Status:** All three actual native installed workflows passed for M6 tag
+  `m6-test-20261015-438b389`; root downloaded and verified all public proof and
+  installer bytes. A successful build alone is insufficient.
 - **Specs:** Release runbook, OMP runtime boundary and bundled sidecar ADR 0307.
+
+### E2E-OMP-maintenance-daily
+
+- **Preconditions:** Actual native installer, owned HOME/profile/data, two isolated
+  projects and a loopback scripted provider with a real HTTP fault proxy.
+- **Steps:** Repair an invoice calculation and run seven real project assertions;
+  run tools in both projects concurrently; finish A's relative write while B
+  remains selected and running; complete 40 conversation turns; disconnect two
+  provider requests; return an HTTP 401; recover with a fresh prompt; quit/reopen.
+- **Expected:** Real project tests pass, background cwd remains bound, 40 native
+  replies occur once each, provider failure stays an error in live/history rows,
+  no model/tool replay on reopen, fresh turns work, and no owned process survives.
+  Record real screenshots, closed/reopened native history, HTTP traffic, timings
+  and Electron process resource observations. Do not claim compaction or a
+  portable performance benchmark from a bounded 40-turn fixture.
+- **Automation:** `node scripts/e2e-maintenance-smoke.mjs <native-installer>
+  <evidence-directory>`. Project/provider preparation uses public preload IPC;
+  normal startup retains project tabs before real sidebar/Composer interactions.
+- **Status:** Harness prepared in M7; actual new-version/native qualification is
+  pending. Existing installed M6 acceptance and strict Plan/Goal gates remain.
+- **Specs:** Agent runtime terminal projection and release runbook.
+
+### E2E-OMP-maintenance-upgrade
+
+- **Preconditions:** The exact root-audited public M6 installer from
+  `scripts/e2e/fixtures/m6-upgrade-baseline.json` and a distinct current desktop
+  version. Verify baseline bytes before installing; use only owned fixture data.
+- **Steps:** Use the old installed app to write a project note; quit with zero
+  survivors; back up closed profile/data with byte manifests; replace the native
+  installer; reopen the same session without replay; write a new note; quit;
+  restore the closed backup; reinstall the original baseline; reopen and prompt.
+- **Expected:** Old/new/old versions actually run at the same owned install path,
+  HOME, profile and data root. Native history matches at both read boundaries,
+  model counts do not grow while reading, the new project note stays unchanged
+  across rollback (old writes never replay), restored trees match their backup,
+  all three ordered quits leave zero processes, and old-version fresh turns work.
+- **Automation:** `node scripts/e2e-maintenance-upgrade.mjs <baseline-installer>
+  <current-installer> <evidence-directory>` with the pinned native observer.
+- **Limits:** Manual installer/data-backup rehearsal, same pinned OMP/schema;
+  no automatic updater, signed release, arbitrary-version downgrade, or native
+  chooser/quit-confirmation coverage is claimed.
+- **Status:** Prepared; full native qualification remains required before M7.
+- **Specs:** Release runbook and existing data/storage compatibility contract.
 
 ### E2E-IMAGES-desktop-conversation
 
@@ -7965,6 +8008,8 @@ identify the platform validation still needed.
 | Acceptance | Scenarios |
 |---|---|
 | A / E / F / Release — Installed OMP identity and workflow | E2E-OMP-installed-identity-and-workflow |
+| A / E / F / M7 — Installed coding, concurrency, long history and provider recovery | E2E-OMP-maintenance-daily |
+| E / F / Release / M7 — Installed manual upgrade and closed backup rollback | E2E-OMP-maintenance-upgrade |
 | C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
 | C / F / Quality — Saved project isolation | E2E-SCHEDULED-manual-workspace-binding |
 | C / F / Quality — Desktop automations | E2E-SCHEDULED-desktop-automation-lifecycle |

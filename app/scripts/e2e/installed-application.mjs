@@ -1,8 +1,8 @@
 /** Own one actual installed payload, isolated profile, inspectors and process tree. */
 import assert from "node:assert/strict";
 import { spawn, execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import { createServer } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import { CdpClient } from "./cdp.mjs";
@@ -36,39 +36,27 @@ async function targets(port) {
 const electronExpression = `process.getBuiltinModule("module").createRequire(process.resourcesPath + "/app.asar/package.json")("electron")`;
 
 export class InstalledApplication {
-  static prepare(installer, evidenceDirectory) {
+  static prepare(installer, evidenceDirectory, { expectedVersion } = {}) {
     const root = createInstalledRunRoot();
     const state = new InstalledApplication(root, evidenceDirectory);
-    const installDirectory = join(root, "应用 with spaces 'quoted'");
-    mkdirSync(installDirectory);
-    if (process.platform === "darwin" && installer.endsWith(".dmg")) {
-      const mount = join(root, "mount"); mkdirSync(mount);
-      let mounted = false;
-      try {
-        execFileSync("/usr/bin/hdiutil", ["attach", "-readonly", "-nobrowse", "-noautoopen", "-mountpoint", mount, installer]);
-        mounted = true;
-        state.appDirectory = join(installDirectory, "OMP Desktop.app");
-        execFileSync("/usr/bin/ditto", [join(mount, "OMP Desktop.app"), state.appDirectory]);
-        state.installerMethod = "read-only DMG mount and actual bundle copy into the owned Applications directory";
-      } finally {
-        if (mounted) execFileSync("/usr/bin/hdiutil", ["detach", mount]);
-      }
-    } else if (process.platform === "win32" && installer.endsWith(".exe")) {
-      state.appDirectory = join(installDirectory, "OMP Desktop");
-      execFileSync(installer, ["/S", "/currentuser", `/D=${state.appDirectory}`], { timeout: 120_000 });
-      state.installerMethod = "native NSIS silent current-user install to the owned directory";
-    } else if (process.platform === "linux" && installer.endsWith(".AppImage")) {
-      execFileSync(installer, ["--appimage-extract"], { cwd: installDirectory, timeout: 120_000, stdio: "ignore" });
-      state.appDirectory = join(installDirectory, "squashfs-root");
-      state.installerMethod = "actual AppImage extraction; no system package/desktop registration claimed";
-    } else {
-      // Other native lanes pass a directory extracted/installed from their real
-      // installer. The caller records and validates that preparation separately.
-      state.appDirectory = join(installDirectory, basename(installer));
-      cpSync(installer, state.appDirectory, { recursive: true, verbatimSymlinks: true });
-    }
-    state.payload = inspectInstalledProduct(state.appDirectory);
+    installNativePayload(state, installer, expectedVersion);
     return state;
+  }
+  async replace(installer, { expectedVersion } = {}) {
+    assert(this.child && (this.child.exitCode !== null || this.child.signalCode !== null), "close the installed application before replacement");
+    assert.equal(this.snapshot("before-installer-replacement").processes.length, 0, "installer replacement requires zero owned processes");
+    const oldDirectory = installedFilesystemPath(this.appDirectory);
+    const part = relative(installedFilesystemPath(this.root), oldDirectory);
+    assert(part && !part.startsWith("..") && !isAbsolute(part), "installer replacement escaped its owned root");
+    // NSIS performs its own in-place replacement. Directory payloads start
+    // empty, retaining the previous actual bundle inside the owned run root.
+    if (process.platform !== "win32") {
+      const retained = join(this.root, `previous-payload-${this.launches.length}`);
+      assert(!existsSync(retained)); renameSync(this.appDirectory, retained);
+    }
+    installNativePayload(this, installer, expectedVersion);
+    this.clean = false;
+    return this.payload;
   }
   constructor(root, evidenceDirectory) {
     this.root = root;
@@ -214,4 +202,36 @@ export class InstalledApplication {
     this.clean = true;
   }
   removeOwnedRoot() { assert(this.clean, "retain an unreclaimed run root"); rmSync(this.root, { recursive: true, force: true }); }
+}
+
+function installNativePayload(state, installer, expectedVersion) {
+  const installDirectory = join(state.root, "应用 with spaces 'quoted'");
+  mkdirSync(installDirectory, { recursive: true });
+  if (process.platform === "darwin" && installer.endsWith(".dmg")) {
+    const mount = join(state.root, "mount"); mkdirSync(mount, { recursive: true });
+    let mounted = false;
+    try {
+      execFileSync("/usr/bin/hdiutil", ["attach", "-readonly", "-nobrowse", "-noautoopen", "-mountpoint", mount, installer]);
+      mounted = true;
+      state.appDirectory = join(installDirectory, "OMP Desktop.app");
+      execFileSync("/usr/bin/ditto", [join(mount, "OMP Desktop.app"), state.appDirectory]);
+      state.installerMethod = "read-only DMG mount and actual bundle copy into the owned Applications directory";
+    } finally {
+      if (mounted) execFileSync("/usr/bin/hdiutil", ["detach", mount]);
+    }
+  } else if (process.platform === "win32" && installer.endsWith(".exe")) {
+    state.appDirectory = join(installDirectory, "OMP Desktop");
+    execFileSync(installer, ["/S", "/currentuser", `/D=${state.appDirectory}`], { timeout: 120_000 });
+    state.installerMethod = "native NSIS silent current-user install to the owned directory";
+  } else if (process.platform === "linux" && installer.endsWith(".AppImage")) {
+    execFileSync(installer, ["--appimage-extract"], { cwd: installDirectory, timeout: 120_000, stdio: "ignore" });
+    state.appDirectory = join(installDirectory, "squashfs-root");
+    state.installerMethod = "actual AppImage extraction; no system package/desktop registration claimed";
+  } else {
+    // Other native lanes pass a directory extracted/installed from their real
+    // installer. The caller records and validates that preparation separately.
+    state.appDirectory = join(installDirectory, basename(installer));
+    cpSync(installer, state.appDirectory, { recursive: true, verbatimSymlinks: true });
+  }
+  state.payload = inspectInstalledProduct(state.appDirectory, process.platform, expectedVersion);
 }

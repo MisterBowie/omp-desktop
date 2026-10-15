@@ -9,6 +9,23 @@
 
 ---
 
+### E2E-OMP-maintenance-daily
+
+- **前提：** 原生安装包、自有 HOME/profile/data、两个隔离项目和真实 HTTP 故障代理后的本机脚本提供方。
+- **步骤：** 修复发票计算并实际运行7项项目断言；同时运行两个项目，在 B 选中并执行时让 A 完成后续相对写入；40回合对话；两次断连、一次401及新回合恢复；正常退出重启。
+- **预期：** 项目检查通过、cwd不串、40条原生回复各一次、错误状态和诊断在实时/历史中保留、无执行重放、可继续对话且退出零残留。记录截图、原生历史、HTTP流量及限定范围的耗时/资源观察，不声称触发压缩或通用性能基准。
+- **自动化：** `node scripts/e2e-maintenance-smoke.mjs <native-installer> <evidence-directory>`。项目准备使用公开preload IPC，正常启动保留项目标签后操作侧栏/Composer。
+- **状态：** M7脚本已准备，实际新版及三平台验收仍需完成；既有M6安装和严格Plan/Goal门保留。
+
+### E2E-OMP-maintenance-upgrade
+
+- **前提：** 固定基线JSON所指向的真实公开M6安装包和不同版本的当前包；安装前核验基线完整字节，只使用自有测试数据。
+- **步骤：** 旧版创建实际项目写入→退出零残留→按字节清单备份关闭的profile/data→实际替换安装包→同一会话无重放恢复并更新项目→退出→恢复备份→重装原基线→读取并发送新回合。
+- **预期：** 实际运行旧/新/旧三个版本，安装路径、HOME/profile/data相同；原生历史在读取边界逐字节一致，模型请求数不增长；回退后项目的新文件仍保留，旧写入不重放；备份还原清单相同；3次正常退出均零残留。
+- **自动化：** `node scripts/e2e-maintenance-upgrade.mjs <baseline-installer> <current-installer> <evidence-directory>`。
+- **边界：** 人工安装包和关闭数据备份演练，固定相同OMP/schema；不声称自动更新、签名、任意版本降级或原生对话框覆盖。
+- **状态：** 已准备，M7接受前仍须完整原生验收。
+
 ## 1. 目标
 
 ### E2E-OMP-installed-identity-and-workflow
@@ -33,8 +50,8 @@
   和停止控件。原生文件夹选择器单独验证；仅退出时使用已有自动化确认旁路，正常
   产品关闭与全部自有子进程回收仍实际执行，不声称覆盖系统退出确认框。
   Windows/Linux 必须运行各自原生安装产物，合成平台夹具不算实机证明。
-- **状态**：2026-10-15 本机 macOS arm64 实际 DMG 工作流、重启恢复及无残留回收通过；
-  Windows/Linux 安装工作流仍待 M6 验收，仅构建成功不足以结项。
+- **状态**：M6 tag `m6-test-20261015-438b389` 三平台实际安装工作流均已通过；
+  根已完整下载并核验全部公开安装载荷和原始证明。仅构建成功不足以结项。
 - **规格**：发布手册、OMP 运行时边界与包内 sidecar ADR 0307。
 
 - 记录 MVP 必须验证的每个用户可见和协议可见的行为。
@@ -5211,6 +5228,8 @@ eleven-tool-round desktop paths are verified by
 | 验收 | 应用场景 |
 |---|---|
 | A / E / F / Release — OMP 安装身份和用户流程 | E2E-OMP-installed-identity-and-workflow |
+| A / E / F / M7 — 安装后的编码、并发、长历史和故障恢复 | E2E-OMP-maintenance-daily |
+| E / F / Release / M7 — 安装包升级和关闭数据备份回退 | E2E-OMP-maintenance-upgrade |
 | C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
 | C / F / Quality — Saved project isolation | E2E-SCHEDULED-manual-workspace-binding |
 | C / F / Quality — 桌面定时任务 | E2E-SCHEDULED-desktop-automation-lifecycle |

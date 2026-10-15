@@ -1,0 +1,31 @@
+{
+  "schema": "omp-desktop.upgrade-baseline/1",
+  "version": "0.15.2",
+  "revision": "438b389620217a551add62ae662c17b2e3562d21",
+  "tag": "m6-test-20261015-438b389",
+  "runId": 38695889572,
+  "releaseUrl": "https://github.com/MisterBowie/omp-desktop/releases/tag/m6-test-20261015-438b389",
+  "assets": {
+    "darwin": {
+      "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-macos-arm64.dmg",
+      "bytes": 224617896,
+      "sha256": "b243c9752c39d917ba3dae23b53a3f198e890be51406ea215500251eee4bec8d",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m6-test-20261015-438b389/OMP-Desktop-0.15.2-m6-test-20261015-438b389-macos-arm64.dmg",
+      "arch": "arm64"
+    },
+    "win32": {
+      "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-windows-x64-setup.exe",
+      "bytes": 200459885,
+      "sha256": "7367103bbc2564c6d5051d4e652e8f196b0c02d25aaec241028595be553c332c",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m6-test-20261015-438b389/OMP-Desktop-0.15.2-m6-test-20261015-438b389-windows-x64-setup.exe",
+      "arch": "x64"
+    },
+    "linux": {
+      "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64.AppImage",
+      "bytes": 250508963,
+      "sha256": "f7b5dcb1ce8c77374bf9beb99c19ac94921c8b53cc16980ee656f12852a6ba8f",
+      "url": "https://github.com/MisterBowie/omp-desktop/releases/download/m6-test-20261015-438b389/OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64.AppImage",
+      "arch": "x64"
+    }
+  }
+}

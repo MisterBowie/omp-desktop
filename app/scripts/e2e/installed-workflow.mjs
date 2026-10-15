@@ -13,16 +13,16 @@ const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
 const write = (content) => ({ toolCalls: [{ name: "write", args: { path: "answer.mjs", content } }], finish: "tool_calls" });
 const command = (value) => ({ toolCalls: [{ name: "bash", args: { command: value, timeout: 600 } }], finish: "tool_calls" });
 
-async function invoke(application, channel, args = []) {
+export async function invoke(application, channel, args = []) {
   const response = await application.renderer.evaluate(`window.piDesktop.invoke(window.piDesktop.channels.invoke[${JSON.stringify(channel)}], ...${JSON.stringify(args)})`);
   assert(response?.ok, `${channel} failed: ${JSON.stringify(response)}`);
   return response.data;
 }
-async function click(application, selector) {
+export async function click(application, selector) {
   const clicked = await application.renderer.evaluate(`(() => { const node = document.querySelector(${JSON.stringify(selector)}); if (!node || node.disabled) return false; node.click(); return true; })()`);
   assert(clicked, `visible enabled control missing: ${selector}`);
 }
-async function inspect(application) {
+export async function inspect(application) {
   return application.renderer.evaluate(`(() => {
     const visible = n => Boolean(n && n.getBoundingClientRect().width && n.getBoundingClientRect().height);
     const card = document.querySelector(".permission-card");
@@ -31,7 +31,7 @@ async function inspect(application) {
       activeSessionId: document.querySelector('[data-sidebar-session-row][aria-current="page"], [data-sidebar-session-row].active')?.getAttribute("data-sidebar-session-row") };
   })()`);
 }
-async function selectSession(application, sessionId) {
+export async function selectSession(application, sessionId) {
   await until(async () => {
     return application.renderer.evaluate(`(() => {
       for (const toggle of document.querySelectorAll('[data-action="toggle-project-collapse"][aria-expanded="false"]')) toggle.click();
@@ -43,12 +43,12 @@ async function selectSession(application, sessionId) {
   }, "actual sidebar session row");
   await until(async () => (await inspect(application)).activeSessionId === sessionId, "selected installed OMP session");
 }
-async function reloadAndSelect(application, sessionId) {
+export async function reloadAndSelect(application, sessionId) {
   await application.renderer.send("Page.reload");
   await until(() => application.renderer.evaluate('Boolean(document.querySelector(".app-shell:not(.is-booting) .composer-input"))'), "reloaded composer");
   await selectSession(application, sessionId);
 }
-async function prompt(application, text) {
+export async function prompt(application, text) {
   assert(await application.renderer.evaluate(`(() => {
     const input = document.querySelector(".composer-input");
     if (!input || input.getAttribute("contenteditable") === "false") return false;
@@ -59,7 +59,7 @@ async function prompt(application, text) {
   await until(() => application.renderer.evaluate('document.querySelector(".composer-shell .send-btn")?.disabled === false'), "Composer Send enabled");
   await click(application, ".composer-shell .send-btn");
 }
-async function idle(application, sessionId, expectedText) {
+export async function idle(application, sessionId, expectedText) {
   return until(async () => {
     const status = (await invoke(application, "agentGetStatus", [sessionId])).status;
     const ui = await inspect(application);
