@@ -1,0 +1,29 @@
+{
+  "productRevision": "f8c0e5808224fbc59201258724462d362d5b7b07",
+  "baseRevision": "a23bfb9befea327e7924efd3004e030a11b587d2",
+  "candidateTag": "release-check-0.1.0-f8c0e58",
+  "candidateRun": 38845176146,
+  "forkRevision": "d648d27bcf0db16caecb876142d891cf49a51bc2",
+  "stableVersion": "0.1.0",
+  "stablePublished": false,
+  "localDesktop": {
+    "pass": 3108,
+    "fail": 0,
+    "skip": 9
+  },
+  "localHostCore": {
+    "pass": 606,
+    "fail": 0
+  },
+  "promotionTests": {
+    "pass": 11,
+    "fail": 0
+  },
+  "controlFiles": {
+    ".github/workflows/release.yml": "ac61d8ed578c8979eb9a605eda97709ec9d11910ca1c1fc07afefcdeb6c2cf57",
+    ".github/workflows/release-publish.yml": "51c780643f91f78b4ab0c8c7ddb26fc98b22cfa2e530f674a94bb35e8b28a889",
+    ".github/workflows/publish-validated-release.yml": "6a3f81b4080a280b29f05190b2fe0f693f2410bb93e8a72eda19d2f7043bbffe",
+    "app/scripts/verify-release-candidate.mjs": "8225664a0a7e31d5e4d5c572383be5129e49a233da1a39012ffb574ef9cd97e6",
+    "app/scripts/verify-release-candidate.test.mjs": "3fee429b2241e9cdfbf4f24041c272e21c27efbb28d41250cfc74de381d5281e"
+  }
+}

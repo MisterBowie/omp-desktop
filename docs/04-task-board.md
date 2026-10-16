@@ -4,8 +4,10 @@
 `omp-desktop-v010-updates` / `codex/v010-github-updates`；81 项相关回归、实际版本重置
 保留项目、检查失败重试/新 GitHub 按钮、2 次退出零残留及最终 Mac 清单校验通过。
 未签名 Mac 手动下载，签名 Mac/NSIS/AppImage 保留自动安装；根稳定三平台流水线已准备。
-用户已授权提交/推送/发布；先同步固定 OMP 补丁，再用不可移动候选标签做原生验收，
-全部通过后在同一提交发布 v0.1.0。GitHub stable 更新清单尚未上线。见
+用户已授权提交/推送/发布；OMP d648d27 和桌面 f8c0e58 已推送，候选 run38845176146
+正在执行。本机全量 desktop 3108/0/9、host-core 606/0、固定提交实际安装复测通过。
+全目标通过后原样晋升已验收资产，在 f8c0e58 发布 v0.1.0；发布控制面另作普通提交。
+GitHub stable 更新清单尚未上线。见 [发布进展](validation/Version-010-release-promotion-20261016.md) 与
 [本机验收](validation/Version-010-github-updates-local-20261016.md)。
 
 2026-10-16（后续请求：彩色像素 π 图标）：**已完成本机交付。**

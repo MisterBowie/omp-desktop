@@ -23,7 +23,11 @@ version reset uses one manual install; automatic downgrades remain disabled.
 Use the OMP GitHub repository for downloads, updates, remote-host bundles and
 feedback. Activate a repository-root stable release workflow. Validate actual
 installer hashes and sizes, both Mac architecture feeds and the remote-host
-checksum before publishing the complete stable release. Historical test lanes
+checksum before publishing the complete stable release. An immutable promotion
+control tag may select a completed native candidate run: the shared publisher
+requires the successful jobs and artifact identities, then publishes those exact
+bytes and tags their original product commit. Publisher control code and product
+source revisions remain explicit. Historical test lanes
 and prereleases remain separate.
 
 Detect the installed Mac executable's Developer ID authority and team before

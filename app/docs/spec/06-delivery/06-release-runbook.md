@@ -31,6 +31,16 @@ artifacts without publishing. Use a validation tag before the first stable cut;
 create the stable tag at the same accepted commit. A `vX.Y.Z` tag must match
 all 16 version surfaces and the current product changelog.
 
+To publish the exact accepted candidate bytes, push an immutable
+`publish-vX.Y.Z-run-<run-id>` control tag. The promotion workflow requires the
+completed successful candidate run, its exact source revision, all four native
+acceptance jobs and eight unexpired artifacts. The shared publisher checks out
+that candidate revision, verifies the manifests and creates `vX.Y.Z` at it;
+the control tag's commit is not the product source. It preserves the native
+evidence and run receipt with the release. Tag creation uses `GITHUB_TOKEN`,
+so GitHub does not start a recursive build. Direct stable-tag builds use the
+same publisher. Existing stable tags pointing elsewhere are never moved.
+
 Unsigned or ad-hoc Mac installations use GitHub check-and-link delivery and
 never auto-download or install. Developer ID-signed Mac installations use
 download/progress/restart delivery; Windows NSIS and Linux AppImage retain

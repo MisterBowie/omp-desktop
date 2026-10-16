@@ -1,0 +1,153 @@
+name: Publish accepted OMP release bytes
+
+on:
+  workflow_call:
+    inputs:
+      source-revision:
+        required: true
+        type: string
+      artifact-run-id:
+        required: true
+        type: string
+      tag:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+defaults:
+  run:
+    shell: bash
+    working-directory: app
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    concurrency:
+      group: omp-publish-${{ inputs.tag }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      actions: read
+    env:
+      RELEASE_REVISION: ${{ inputs.source-revision }}
+      SOURCE_RUN_ID: ${{ inputs.artifact-run-id }}
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Bind the accepted source, native jobs and immutable artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REPOSITORY" == MisterBowie/omp-desktop ]]
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$RELEASE_REVISION" =~ ^[a-f0-9]{40}$ ]]
+          export RELEASE_VERSION="${RELEASE_TAG#v}"
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> "$GITHUB_ENV"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID" > "$RUNNER_TEMP/candidate-run.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/jobs?per_page=100" > "$RUNNER_TEMP/candidate-jobs.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100" > "$RUNNER_TEMP/candidate-artifacts.json"
+          node scripts/verify-release-candidate.mjs "$RUNNER_TEMP/candidate-run.json" "$RUNNER_TEMP/candidate-jobs.json" "$RUNNER_TEMP/candidate-artifacts.json" "$RUNNER_TEMP/omp-candidate-receipt.json"
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source-revision }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: app/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: release-dist
+          merge-multiple: true
+          run-id: ${{ inputs.artifact-run-id }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: validation-*
+          path: release-validation
+          run-id: ${{ inputs.artifact-run-id }}
+          github-token: ${{ github.token }}
+      - name: Preserve the accepted native evidence
+        run: |
+          set -euo pipefail
+          for target in darwin-arm64 darwin-x64 linux-x64 win32-x64; do
+            tar -czf "../release-dist/omp-desktop-validation-$RELEASE_VERSION-$target.tar.gz" -C "../release-validation/validation-$target" .
+          done
+          cp "$RUNNER_TEMP/omp-candidate-receipt.json" "../release-dist/omp-desktop-validation-$RELEASE_VERSION-build.json"
+      - name: Verify every installer hash and merge update feeds
+        run: |
+          node --input-type=module - <<'JS'
+          import { prepareGitHubRelease } from './scripts/prepare-github-release.mjs';
+          await prepareGitHubRelease({directory:process.env.GITHUB_WORKSPACE + '/release-dist', version:process.env.RELEASE_VERSION, sourceRevision:process.env.RELEASE_REVISION});
+          JS
+      - name: Prepare product release notes
+        run: |
+          pnpm --filter @pi-desktop/shared build
+          node --input-type=module - <<'JS'
+          import { writeFileSync } from 'node:fs';
+          import { formatChangelogNotes } from './packages/shared/dist/changelog.js';
+          const version = process.env.RELEASE_VERSION;
+          writeFileSync('../release-notes.md', formatChangelogNotes(version, 'en') + '\n\n' + formatChangelogNotes(version, 'zh-CN') + '\n');
+          JS
+      - name: Create or verify the stable tag at the accepted source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if existing="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha 2>/dev/null)"; then
+            [[ "$existing" == "$RELEASE_REVISION" ]]
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/$RELEASE_TAG" -f "sha=$RELEASE_REVISION" > "$RUNNER_TEMP/created-release-tag.json"
+          fi
+      - name: Publish the complete stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if draft="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2>/dev/null)"; then
+            if [[ "$draft" == true ]]; then
+              gh release upload "$RELEASE_TAG" "$GITHUB_WORKSPACE"/release-dist/* --repo "$GITHUB_REPOSITORY" --clobber
+              gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+            fi
+          else
+            gh release create "$RELEASE_TAG" "$GITHUB_WORKSPACE"/release-dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "OMP Desktop $RELEASE_VERSION" --notes-file ../release-notes.md
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          fi
+      - name: Read back the public stable update channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          [[ "$latest" == "$RELEASE_TAG" ]]
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > ../published-release.json
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync, statSync } from 'node:fs';
+          const release = JSON.parse(readFileSync('../published-release.json', 'utf8'));
+          assert.equal(release.draft, false); assert.equal(release.prerelease, false);
+          const assets = new Map(release.assets.map(asset => [asset.name, asset]));
+          const sums = readFileSync('../release-dist/SHA256SUMS.txt', 'utf8').trim().split('\n');
+          for (const line of sums) {
+            const [sha, name] = line.split('  '), asset = assets.get(name);
+            assert(asset, `missing published asset: ${name}`);
+            assert.equal(asset.size, statSync('../release-dist/' + name).size);
+            assert.equal(asset.digest, 'sha256:' + sha);
+          }
+          JS
+          for feed in latest.yml latest-linux.yml latest-mac.yml; do
+            curl --fail --location --retry 5 --retry-all-errors --retry-delay 3 --silent --show-error "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/$feed" --output "../public-$feed"
+            cmp "../public-$feed" "../release-dist/$feed"
+          done

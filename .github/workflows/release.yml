@@ -68,7 +68,7 @@ jobs:
       - run: pnpm --filter @pi-desktop/desktop typecheck
       - run: pnpm lint
       - run: pnpm -r --if-present test
-      - run: node --test scripts/prepare-github-release.test.mjs scripts/github-update-provider.test.mjs
+      - run: node --test scripts/prepare-github-release.test.mjs scripts/github-update-provider.test.mjs scripts/verify-release-candidate.test.mjs
       - run: cargo test -p host-core --locked
 
   build:
@@ -233,6 +233,7 @@ jobs:
         if: always()
         with:
           name: validation-${{ matrix.platform }}-${{ matrix.arch }}
+          include-hidden-files: true
           path: |
             app/packaged-runtime.json
             app/packaged-plan-goal.tap
@@ -241,64 +242,11 @@ jobs:
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
-    runs-on: ubuntu-22.04
     permissions:
       contents: write
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          package_json_file: app/package.json
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-      - run: pnpm install --frozen-lockfile --ignore-scripts
-      - uses: actions/download-artifact@v8
-        with:
-          pattern: release-*
-          path: release-dist
-          merge-multiple: true
-      - name: Verify every installer hash and merge update feeds
-        run: node scripts/prepare-github-release.mjs "$GITHUB_WORKSPACE/release-dist" "${GITHUB_REF_NAME#v}"
-      - name: Prepare product release notes
-        run: |
-          pnpm --filter @pi-desktop/shared build
-          node --input-type=module - <<'JS'
-          import { writeFileSync } from 'node:fs';
-          import { formatChangelogNotes } from './packages/shared/dist/changelog.js';
-          const version = process.env.GITHUB_REF_NAME.slice(1);
-          writeFileSync('../release-notes.md', formatChangelogNotes(version, 'en') + '\n\n' + formatChangelogNotes(version, 'zh-CN') + '\n');
-          JS
-      - name: Publish the complete stable release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          gh release create "$GITHUB_REF_NAME" "$GITHUB_WORKSPACE"/release-dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "OMP Desktop ${GITHUB_REF_NAME#v}" --notes-file ../release-notes.md
-          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest
-      - name: Read back the public stable update channel
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
-          [[ "$latest" == "$GITHUB_REF_NAME" ]]
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" > ../published-release.json
-          node --input-type=module - <<'JS'
-          import assert from 'node:assert/strict';
-          import { readFileSync, statSync } from 'node:fs';
-          const release = JSON.parse(readFileSync('../published-release.json', 'utf8'));
-          assert.equal(release.draft, false); assert.equal(release.prerelease, false);
-          const assets = new Map(release.assets.map(asset => [asset.name, asset]));
-          const sums = readFileSync('../release-dist/SHA256SUMS.txt', 'utf8').trim().split('\n');
-          for (const line of sums) {
-            const [sha, name] = line.split('  '), asset = assets.get(name);
-            assert(asset, `missing published asset: ${name}`);
-            assert.equal(asset.size, statSync('../release-dist/' + name).size);
-            assert.equal(asset.digest, 'sha256:' + sha);
-          }
-          JS
-          for feed in latest.yml latest-linux.yml latest-mac.yml; do
-            curl --fail --location --retry 3 --retry-delay 2 --silent --show-error "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/$feed" --output "../public-$feed"
-            cmp "../public-$feed" "../release-dist/$feed"
-          done
+      actions: read
+    uses: ./.github/workflows/release-publish.yml
+    with:
+      source-revision: ${{ github.sha }}
+      artifact-run-id: ${{ github.run_id }}
+      tag: ${{ github.ref_name }}
