@@ -1,0 +1,11 @@
+version: 0.1.0
+files:
+  - url: OMP-Desktop-0.1.0-arm64-mac.zip
+    sha512: zofV17IkVNsCc3ty1uE4H5vOADSdlFUv6sP7FN41fI4o4u/q6xv6A5FZy8qvf+F/fLTkdMdx+Pl407IqqMEzrQ==
+    size: 222240395
+  - url: OMP-Desktop-0.1.0-arm64.dmg
+    sha512: L9AdJDN0aZPSIyJK+WzcA3plamsZDw6GRLEpt5lPj8+cMANWafRigPgKWDcevPpK3hfeqmIs5ydmTLzWIbpBbg==
+    size: 223286300
+path: OMP-Desktop-0.1.0-arm64-mac.zip
+sha512: zofV17IkVNsCc3ty1uE4H5vOADSdlFUv6sP7FN41fI4o4u/q6xv6A5FZy8qvf+F/fLTkdMdx+Pl407IqqMEzrQ==
+releaseDate: 2026-10-16T02:51:17.748Z

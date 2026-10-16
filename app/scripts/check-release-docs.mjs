@@ -107,6 +107,7 @@ async function loadChangelogCatalog() {
   writeFileSync(path.join(tempDir, "package.json"), '{"type":"module"}\n', "utf8");
   const sources = [
     "packages/shared/src/changelog.ts",
+    "packages/shared/src/omp-changelog.ts",
     "packages/shared/src/changelog-de.ts",
     "packages/shared/src/changelog-es.ts",
     "packages/shared/src/changelog-fr.ts",

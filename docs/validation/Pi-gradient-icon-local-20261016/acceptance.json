@@ -1,0 +1,40 @@
+{
+  "passed": true,
+  "version": "0.15.3-icon.1",
+  "brandingTests": {
+    "passed": 21,
+    "failed": 0,
+    "skipped": 0
+  },
+  "assetVerification": "12 deterministic assets; ICNS decodes exactly to master; ICO has 6 sizes; PNG/mask/theme/doc checks pass",
+  "docs": {
+    "specificationPairs": 79,
+    "pages": 514
+  },
+  "desktopTypecheck": "passed",
+  "actualDmgInspection": {
+    "passed": true,
+    "icnsAndTrayResourcesBoundAndMatch": true,
+    "brandPngDataMatchesBothThemes": true,
+    "macSidebarHeaderExistingVisibility": "hidden; no layout change",
+    "themeProbe": "Exercise BrandLogo's existing data-theme MutationObserver; no settings or system-theme-following journey claimed",
+    "normalQuits": 1,
+    "ownedProcessSurvivors": 0
+  },
+  "preliminaryHarnessAttempts": {
+    "count": 4,
+    "normalQuits": 4,
+    "ownedProcessSurvivors": 0,
+    "failuresPreserved": true
+  },
+  "inheritedLspFork": "d648d27bcf0db16caecb876142d891cf49a51bc2",
+  "ompBinarySha256": "008c850b3f75c5a7682a83050cf145bc2fc63e3bee85daa00fb582857729f688",
+  "localOnly": true,
+  "formalCandidateCommit": "not created; task edits remain uncommitted",
+  "notRerun": [
+    "full OMP/Plan/Goal/LSP workflow suites (static icon change)",
+    "Windows/Linux native packaging",
+    "actual Dock rendering/system theme-following UI journey",
+    "paid providers"
+  ]
+}

@@ -3,6 +3,7 @@ import { esEntries } from "./changelog-es.js";
 import { frEntries } from "./changelog-fr.js";
 import { koEntries } from "./changelog-ko.js";
 import { trEntries } from "./changelog-tr.js";
+import { ompChangelog } from "./omp-changelog.js";
 
 /**
  * Shipped-locale product changelog for PI-Desktop app releases.
@@ -2447,7 +2448,8 @@ const zhTWEntries: ChangelogEntry[] = [
 ];
 
 /** Locale → newest-first product notes. */
-export const CHANGELOG: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
+/** Archived PI baseline and OMP test-build notes before the version reset. */
+export const PRE_RESET_CHANGELOG: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: enEntries,
   "zh-CN": zhCNEntries,
   "zh-TW": zhTWEntries,
@@ -2457,6 +2459,8 @@ export const CHANGELOG: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   fr: frEntries,
   ko: koEntries,
 };
+
+export const CHANGELOG = ompChangelog;
 
 /** Normalize `v0.2.7` / whitespace to the catalog key form. */
 export function normalizeChangelogVersion(

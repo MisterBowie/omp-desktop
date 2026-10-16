@@ -22,7 +22,11 @@
 set -euo pipefail
 
 RELEASE_DIR="${1:-apps/desktop/release}"
-EXPECTED_TEAM_ID="DUV63RKYTW"
+EXPECTED_TEAM_ID="${OMP_MACOS_TEAM_ID:-DUV63RKYTW}"
+if [[ ! "$EXPECTED_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]; then
+  echo "error: OMP_MACOS_TEAM_ID must be a ten-character Apple team id." >&2
+  exit 1
+fi
 # The ticket can take a moment to reach the stapler after Apple accepts, but a
 # retry is only legal once the submission returned Accepted. Overridable so
 # tests do not sleep for real.

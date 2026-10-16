@@ -23,7 +23,8 @@ import test from "node:test";
  * everywhere. The wrapper, the watchdog, the bundle inventory, the DMG
  * notarizer, and the release verifier are the real scripts; only the tools they
  * call (cargo, pnpm, electron-builder, codesign, spctl, xcrun) and the OMP
- * sidecar preflight are stubs. What the preflight inside the wrapper decides is
+ * sidecar preflight and dependency-notice input are stubs. Notice collection
+ * itself is covered by distribution-notices.test.mjs. What the preflight inside the wrapper decides is
  * covered by test/omp-release-gate.test.mjs against real fixtures; here the
  * stub records the target it was asked for and can be made to fail, which is
  * what pins "preflight before electron-builder" as behaviour rather than text.
@@ -156,6 +157,13 @@ async function runLane(t, extraEnv = {}) {
   }
   await chmod(join(repoRoot, "scripts", "release-macos.sh"), 0o755);
   await writeFile(join(repoRoot, "scripts", "omp-sidecar.mjs"), SIDECAR_STUB);
+  await writeFile(join(repoRoot, "scripts", "distribution-notices.mjs"), [
+    "import { appendFileSync } from 'node:fs';",
+    "export function writeDistributionNotices(root, target) {",
+    "  appendFileSync(process.env.PI_LANE_LOG, `notices ${target.platform}/${target.arch}\\n`);",
+    "  return { components: 1, files: 1, bytes: 8 };",
+    "}",
+  ].join("\n"));
   await writeStubs(bin, log, repoRoot);
 
   const result = spawnSync("bash", [join(repoRoot, "scripts", "release-macos.sh")], {
@@ -209,6 +217,10 @@ test("the signed local macOS lane packages through the release wrapper", async (
     `sidecar --preflight --platform darwin --arch ${HOST_ARCH}`,
   );
   const builderIndex = indexOfCall(calls, /^electron-builder /);
+  const noticesIndex = indexOfCall(calls, /^notices /);
+  assert.equal(calls[noticesIndex], `notices darwin/${HOST_ARCH}`);
+  assert.ok(noticesIndex > preflightIndex && noticesIndex < builderIndex,
+    "dependency notices are prepared after the preflight and before packaging");
   assert.ok(
     builderIndex > preflightIndex,
     `the preflight must run before electron-builder: ${JSON.stringify(calls)}`,
@@ -274,6 +286,11 @@ test("the signed local macOS lane stops before electron-builder when the preflig
   assert.ok(
     calls.some((line) => /^sidecar --preflight /.test(line)),
     "the preflight ran",
+  );
+  assert.equal(
+    calls.filter((line) => /^notices /.test(line)).length,
+    0,
+    "notice preparation must not run after a refused preflight",
   );
   assert.equal(
     calls.filter((line) => /^electron-builder /.test(line)).length,

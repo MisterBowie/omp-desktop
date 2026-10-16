@@ -1,0 +1,29 @@
+✔ Windows runtime registers the canonical native application identity (0.719708ms)
+✔ Windows packages pin OMP Desktop executable and shortcut names (0.075292ms)
+✔ Windows packages and windows use the canonical OMP Desktop icon (0.466833ms)
+✔ Linux packages align the desktop entry with the Wayland app identity (0.05975ms)
+✔ macOS development uses the canonical OMP Desktop Dock icon (0.116584ms)
+✔ macOS icon derivation preserves the canonical renderer asset (0.064791ms)
+✔ macOS development launches from a branded host bundle (0.118208ms)
+✔ development launcher can be imported without starting Electron (2.30975ms)
+✔ macOS development bundle rewrites native identity and reuses its cache (25.310417ms)
+✔ packaging installs only the updater runtime dependency (1.010833ms)
+✔ renderer output keeps its size controls (2.5425ms)
+✔ legacy font fallback stripping only removes redundant fallback sources (0.32175ms)
+✔ main bundles JavaScript dependencies and externalizes only runtime modules (0.121583ms)
+✔ sandbox preload entries use standalone shared subpath bundles (0.082209ms)
+✔ packaging keeps only shipped locales and excludes non-runtime artifacts (1.180125ms)
+✔ macOS targets follow the native architecture selected by the runner (0.12725ms)
+✔ macOS DMG is a two-icon install; ZIP keeps the unsigned helper (0.225833ms)
+✔ every installed identity is OMP's own, so PI-Desktop stays installable beside it (0.186916ms)
+✔ packaging does not include removed PTY native payload configuration (0.110541ms)
+✔ renderer surfaces the OMP Desktop product brand (0.622333ms)
+✔ app chrome uses the shared brand asset without branding the composer input (4.247667ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 97.186375

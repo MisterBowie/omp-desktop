@@ -1,0 +1,36 @@
+{
+  "version": "0.1.0",
+  "localPackages": [
+    {
+      "file": "OMP-Desktop-0.1.0-arm64-mac.zip",
+      "bytes": 222240395,
+      "sha256": "b8b5a1d1820fb2e1169a0b50fc5873a9fe59231f8b4ed1f90f858e809a64dbb2"
+    },
+    {
+      "file": "OMP-Desktop-0.1.0-arm64.dmg",
+      "bytes": 223286300,
+      "sha256": "7d750194fbc47c13323f0ac6e94f9ab93848b4d77fbd83fe1f743e32d78d1e6f"
+    }
+  ],
+  "sourceBase": "215028eaee89084018230341625abf415f080644",
+  "remoteMain": "a23bfb9befea327e7924efd3004e030a11b587d2",
+  "publicRepository": "MisterBowie/omp-desktop",
+  "releasePage": "https://github.com/MisterBowie/omp-desktop/releases/latest",
+  "publication": "not yet authorized or performed",
+  "targetedTests": 37,
+  "sharedTests": 17,
+  "realGitHubProviderTests": 2,
+  "manifestTestsIncluded": 5,
+  "realInstalledWorkflow": {
+    "projectPreservedAcrossVersionReset": true,
+    "failedCheckRetryDiscovers": "0.1.1",
+    "newGitHubLink": [
+      "https://github.com/MisterBowie/omp-desktop/releases/latest"
+    ],
+    "normalQuits": 2,
+    "survivors": 0
+  },
+  "macSigning": "unsigned local build uses manual GitHub update delivery; signed mode handoff covered by controller tests",
+  "githubConsumersTests": 25,
+  "totalRelatedTests": 81
+}

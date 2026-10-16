@@ -1,0 +1,304 @@
+name: OMP Desktop stable release
+
+on:
+  push:
+    tags: ['v*.*.*', 'release-check-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: omp-release-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+    working-directory: app
+
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: app/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app -> target
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+      - name: Prepare the fixed source-runtime test prerequisites
+        working-directory: upstream/oh-my-pi
+        run: |
+          set -euo pipefail
+          channel="$(sed -n 's/^channel[[:space:]]*=[[:space:]]*"\(.*\)"/\1/p' rust-toolchain.toml)"
+          [[ -n "$channel" ]]
+          rustup toolchain install "$channel" --profile default --no-self-update
+          bun install --frozen-lockfile
+          bun run build:native
+      - run: pnpm install --frozen-lockfile
+      - name: Require the stable version and its release notes
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            [[ "$GITHUB_REPOSITORY" == 'MisterBowie/omp-desktop' ]]
+            if [[ "$GITHUB_REF_NAME" == v* ]]; then
+              [[ "$GITHUB_REF_NAME" == "v$version" ]]
+            else
+              [[ "$GITHUB_REF_NAME" == "release-check-$version-"* ]]
+            fi
+          fi
+          pnpm check:release-docs
+      - run: pnpm build:js
+      - run: cargo build --release --locked -p host-core
+      - run: pnpm --filter @pi-desktop/desktop typecheck
+      - run: pnpm lint
+      - run: pnpm -r --if-present test
+      - run: node --test scripts/prepare-github-release.test.mjs scripts/github-update-provider.test.mjs
+      - run: cargo test -p host-core --locked
+
+  build:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            platform: darwin
+            arch: arm64
+            dist: dist:mac
+          - os: macos-15-intel
+            platform: darwin
+            arch: x64
+            dist: dist:mac
+          - os: windows-latest
+            platform: win32
+            arch: x64
+            dist: dist:win
+          - os: ubuntu-22.04
+            platform: linux
+            arch: x64
+            dist: dist:linux
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      OMP_SIDECAR_SOURCE: ${{ github.workspace }}/.omp-sidecar-source
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: app/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app -> target
+      - name: Check out the exact maintained OMP fork
+        uses: actions/checkout@v7
+        with:
+          repository: MisterBowie/oh-my-pi
+          ref: d648d27bcf0db16caecb876142d891cf49a51bc2
+          path: .omp-sidecar-source
+          fetch-depth: 0
+      - name: Install the fork's pinned Rust toolchain
+        working-directory: .omp-sidecar-source
+        run: |
+          set -euo pipefail
+          channel="$(sed -n 's/^channel[[:space:]]*=[[:space:]]*"\(.*\)"/\1/p' rust-toolchain.toml)"
+          [[ -n "$channel" ]]
+          rustup toolchain install "$channel" --profile default --no-self-update
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+      - run: bun install --frozen-lockfile
+        working-directory: .omp-sidecar-source
+      - name: Build the fork's host native addon
+        run: bun run build:native
+        working-directory: .omp-sidecar-source
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install psutil==7.2.2
+      - name: Prepare native UI prerequisites
+        if: matrix.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb libasound2 libgbm1 libgtk-3-0 libnss3
+      - run: pnpm install --frozen-lockfile
+      - name: Build all release installers
+        env:
+          CSC_LINK: ${{ matrix.platform == 'darwin' && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          OMP_MACOS_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MACOS_REQUIRE_SIGNING: ${{ vars.MACOS_REQUIRE_SIGNING }}
+        run: |
+          set -euo pipefail
+          if [[ '${{ matrix.platform }}' == darwin && "${MACOS_REQUIRE_SIGNING:-}" == true && -z "${CSC_LINK:-}" ]]; then
+            echo '::error::This release requires Mac signing, but CSC_LINK is missing.'
+            exit 1
+          fi
+          if [[ '${{ matrix.platform }}' == darwin && -n "${CSC_LINK:-}" ]]; then
+            [[ -n "${APPLE_ID:-}" && -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" && -n "${APPLE_TEAM_ID:-}" ]]
+            pnpm --filter @pi-desktop/desktop run '${{ matrix.dist }}' -- --${{ matrix.arch }} -c.mac.forceCodeSigning=true -c.mac.notarize=true
+            scripts/notarize-and-staple-macos-release-dmg.sh apps/desktop/release
+          else
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+            pnpm --filter @pi-desktop/desktop run '${{ matrix.dist }}' -- --${{ matrix.arch }}
+          fi
+      - name: Verify packaged runtime and actual installed workflow
+        run: |
+          set -euo pipefail
+          export OMP_E2E_PYTHON="$(python -c 'import sys; print(sys.executable)')"
+          case '${{ matrix.platform }}' in
+            darwin)
+              if [[ '${{ matrix.arch }}' == arm64 ]]; then mac_folder=mac-arm64; else mac_folder=mac; fi
+              resources="apps/desktop/release/$mac_folder/OMP Desktop.app/Contents/Resources"
+              installer=(apps/desktop/release/*.dmg)
+              ;;
+            win32)
+              resources='apps/desktop/release/win-unpacked/resources'
+              installer=(apps/desktop/release/OMP-Desktop-Setup-*.exe)
+              ;;
+            linux)
+              resources='apps/desktop/release/linux-unpacked/resources'
+              installer=(apps/desktop/release/*.AppImage)
+              ;;
+          esac
+          [[ ${#installer[@]} == 1 && -f "${installer[0]}" ]]
+          node scripts/verify-packaged-runtime.mjs --resources "$resources" --json > packaged-runtime.json
+          OMP_E2E_PACKAGED_RESOURCES="$resources" node --test --test-reporter=tap apps/desktop/test/omp-plan-submit-e2e.test.mjs > packaged-plan-goal.tap
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const text = readFileSync('packaged-plan-goal.tap', 'utf8');
+          for (const [key, value] of Object.entries({tests:15, pass:15, fail:0, skipped:0})) {
+            assert.match(text, new RegExp(`^# ${key} ${value}$`, 'm'), `packaged Plan/Goal ${key}`);
+          }
+          JS
+          if [[ '${{ matrix.platform }}' == linux ]]; then
+            xvfb-run -a node scripts/e2e-installed-smoke.mjs "${installer[0]}" .artifacts/stable-installed
+          else
+            node scripts/e2e-installed-smoke.mjs "${installer[0]}" .artifacts/stable-installed
+          fi
+      - name: Preserve Mac architecture feeds for validated merging
+        if: matrix.platform == 'darwin'
+        run: mv apps/desktop/release/latest-mac.yml 'apps/desktop/release/latest-mac-${{ matrix.arch }}.yml'
+      - name: Package the matching remote-host runtime
+        if: matrix.platform == 'linux'
+        run: |
+          set -euo pipefail
+          pnpm --filter @pi-desktop/pi-host build
+          node scripts/check-linux-host-glibc.mjs target/release/pi-desktop-host-core
+          node apps/pi-host/scripts/bundle.mjs --platform linux --arch x64
+          version="$(node -p "require('./apps/pi-host/package.json').version")"
+          name="pi-host-$version-linux-x64"
+          out=apps/pi-host/dist-bundle
+          tar -czf "$out/$name.tar.gz" -C "$out" "$name"
+          (cd "$out" && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256")
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.platform }}-${{ matrix.arch }}
+          if-no-files-found: error
+          path: |
+            app/apps/desktop/release/*.dmg
+            app/apps/desktop/release/*.zip
+            app/apps/desktop/release/*.exe
+            app/apps/desktop/release/*.AppImage
+            app/apps/desktop/release/*.deb
+            app/apps/desktop/release/*.rpm
+            app/apps/desktop/release/*.blockmap
+            app/apps/desktop/release/latest*.yml
+            app/apps/pi-host/dist-bundle/*.tar.gz
+            app/apps/pi-host/dist-bundle/*.tar.gz.sha256
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: validation-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            app/packaged-runtime.json
+            app/packaged-plan-goal.tap
+            app/.artifacts/stable-installed/
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: app/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: release-dist
+          merge-multiple: true
+      - name: Verify every installer hash and merge update feeds
+        run: node scripts/prepare-github-release.mjs "$GITHUB_WORKSPACE/release-dist" "${GITHUB_REF_NAME#v}"
+      - name: Prepare product release notes
+        run: |
+          pnpm --filter @pi-desktop/shared build
+          node --input-type=module - <<'JS'
+          import { writeFileSync } from 'node:fs';
+          import { formatChangelogNotes } from './packages/shared/dist/changelog.js';
+          const version = process.env.GITHUB_REF_NAME.slice(1);
+          writeFileSync('../release-notes.md', formatChangelogNotes(version, 'en') + '\n\n' + formatChangelogNotes(version, 'zh-CN') + '\n');
+          JS
+      - name: Publish the complete stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" "$GITHUB_WORKSPACE"/release-dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "OMP Desktop ${GITHUB_REF_NAME#v}" --notes-file ../release-notes.md
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+      - name: Read back the public stable update channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          [[ "$latest" == "$GITHUB_REF_NAME" ]]
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" > ../published-release.json
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync, statSync } from 'node:fs';
+          const release = JSON.parse(readFileSync('../published-release.json', 'utf8'));
+          assert.equal(release.draft, false); assert.equal(release.prerelease, false);
+          const assets = new Map(release.assets.map(asset => [asset.name, asset]));
+          const sums = readFileSync('../release-dist/SHA256SUMS.txt', 'utf8').trim().split('\n');
+          for (const line of sums) {
+            const [sha, name] = line.split('  '), asset = assets.get(name);
+            assert(asset, `missing published asset: ${name}`);
+            assert.equal(asset.size, statSync('../release-dist/' + name).size);
+            assert.equal(asset.digest, 'sha256:' + sha);
+          }
+          JS
+          for feed in latest.yml latest-linux.yml latest-mac.yml; do
+            curl --fail --location --retry 3 --retry-delay 2 --silent --show-error "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/$feed" --output "../public-$feed"
+            cmp "../public-$feed" "../release-dist/$feed"
+          done

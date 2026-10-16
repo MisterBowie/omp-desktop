@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/image/readme/logo.png" alt="PI-Desktop" width="108" />
+<img src="docs/image/readme/logo.png" alt="OMP Desktop" width="108" />
 
-# PI-Desktop
+# OMP Desktop
 
 ### 可拆卸的 AI Agent 桌面工作台
 
@@ -12,23 +12,23 @@
 
 <br />
 
-[![Release](https://img.shields.io/github/v/release/vastsa/PI-Desktop?label=release)](https://github.com/vastsa/PI-Desktop/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/vastsa/PI-Desktop/total?label=downloads)](https://github.com/vastsa/PI-Desktop/releases)
-[![Stars](https://img.shields.io/github/stars/vastsa/PI-Desktop?style=flat\&label=stars)](https://github.com/vastsa/PI-Desktop/stargazers)
-[![CI](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/vastsa/PI-Desktop)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/MisterBowie/omp-desktop?label=release)](https://github.com/MisterBowie/omp-desktop/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/MisterBowie/omp-desktop/total?label=downloads)](https://github.com/MisterBowie/omp-desktop/releases)
+[![Stars](https://img.shields.io/github/stars/MisterBowie/omp-desktop?style=flat\&label=stars)](https://github.com/MisterBowie/omp-desktop/stargazers)
+[![CI](https://github.com/MisterBowie/omp-desktop/actions/workflows/release.yml/badge.svg)](https://github.com/MisterBowie/omp-desktop/actions/workflows/release.yml)
+[![License](https://img.shields.io/github/license/MisterBowie/omp-desktop)](LICENSE)
 
 <br />
 
-**[立即下载](https://github.com/vastsa/PI-Desktop/releases/latest)** ·
-[使用文档](https://pi-docs.aiuo.net/) ·
+**[立即下载](https://github.com/MisterBowie/omp-desktop/releases/latest)** ·
+[使用文档](https://github.com/MisterBowie/omp-desktop/tree/main/app/docs) ·
 [插件开发](docs/plugin-development.md) ·
 [界面预览](docs/guide/screenshots.md) ·
 [English](README.md)
 
 <br />
 
-<img src="docs/image/readme/home.webp" alt="PI-Desktop" width="94%" />
+<img src="docs/image/readme/home.webp" alt="OMP Desktop" width="94%" />
 
 <br />
 
@@ -103,7 +103,7 @@ Subagent 与 Worker Session 可以承担独立任务并行工作。
 > [!NOTE]
 > **PI-Desktop 目前仍处于 Early Preview。** 已可用于真实开发工作流，部分 API、插件接口与桌面能力仍在持续演进。
 
-> **当前发布线：0.15.x（Early Preview）。**
+> **当前发布线：0.1.x（Early Preview）。**
 
 ---
 
@@ -564,7 +564,7 @@ Agent / Plan / Goal
 
 <div align="center">
 
-### [下载 PI-Desktop →](https://github.com/vastsa/PI-Desktop/releases/latest)
+### [下载 OMP Desktop →](https://github.com/MisterBowie/omp-desktop/releases/latest)
 
 **macOS · Windows · Linux**
 
@@ -677,7 +677,7 @@ pnpm test
 
 ### 文档
 
-[Documentation](https://pi-docs.aiuo.net/) ·
+[Documentation](https://github.com/MisterBowie/omp-desktop/tree/main/app/docs) ·
 [Architecture](docs/spec/02-architecture/01-architecture.md) ·
 [Specification](docs/spec/README.md) ·
 [Plugin Development](docs/plugin-development.md) ·
@@ -745,7 +745,7 @@ PI-Desktop 使用 **GNU Lesser General Public License v3.0**。
 
 <div align="center">
 
-<img src="docs/image/readme/logo.png" alt="PI-Desktop" width="72" />
+<img src="docs/image/readme/logo.png" alt="OMP Desktop" width="72" />
 
 ## PI-Desktop
 
@@ -755,8 +755,8 @@ PI-Desktop 使用 **GNU Lesser General Public License v3.0**。
 
 <br />
 
-**[立即下载](https://github.com/vastsa/PI-Desktop/releases/latest)** ·
-[Documentation](https://pi-docs.aiuo.net/) ·
+**[立即下载](https://github.com/MisterBowie/omp-desktop/releases/latest)** ·
+[Documentation](https://github.com/MisterBowie/omp-desktop/tree/main/app/docs) ·
 [Build a Plugin](docs/plugin-development.md)
 
 <br /><br />

@@ -122,6 +122,19 @@ test("the DMG is submitted to Apple before it is stapled", async (t) => {
   assert.match(result.stdout, /status.*Accepted/);
 });
 
+test("the OMP release operator can pin its own Apple team", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "omp-desktop-own-team-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const release = join(root, "release"), bin = join(root, "bin"), log = join(root, "notary.log");
+  await writeDmgFixture(release);
+  await writeXcrunNotaryFixture(bin);
+  const result = runNotarize(release, bin, log, {
+    OMP_MACOS_TEAM_ID: "ABCDE12345", APPLE_TEAM_ID: "ABCDE12345",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(await readFile(log, "utf8"), /--team-id ABCDE12345/);
+});
+
 test("stapling retries only after Apple accepts the DMG", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "pi-desktop-macos-dmg-retry-"));
   t.after(() => rm(root, { recursive: true, force: true }));

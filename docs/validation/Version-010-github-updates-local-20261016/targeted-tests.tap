@@ -1,0 +1,45 @@
+✔ update IPC channels are declared and whitelisted for the preload bridge (0.527583ms)
+✔ main process registers update handlers and the auto-check lifecycle (6.826333ms)
+✔ updater gates delivery mode by platform and delivery policy (0.364ms)
+✔ renderer exposes the updates API, banner and settings row (0.379334ms)
+✔ check-for-updates is reachable from the application menu (0.125292ms)
+✔ packaging publishes an electron-updater feed for GitHub Releases (0.6105ms)
+✔ shared shipped-locale changelog is the in-app notes source of truth (0.586041ms)
+✔ the DMG is submitted to Apple before it is stapled (3681.619875ms)
+✔ the OMP release operator can pin its own Apple team (2446.3175ms)
+✔ stapling retries only after Apple accepts the DMG (2666.930833ms)
+✔ a rejected DMG is never stapled and the Apple log is fetched (658.263875ms)
+✔ a failed submission fails the run and dumps the Apple log (614.0635ms)
+✔ the notarization step fails closed without team-scoped credentials (6.805333ms)
+✔ macOS release verification requires a notarized Developer ID app and DMG (2318.878625ms)
+✔ macOS release verification rejects a Developer ID app without notarization (1225.678459ms)
+✔ macOS release verification accepts the prefixed identity form (3184.669666ms)
+✔ macOS release verification rejects a different signing identity (603.3055ms)
+✔ artifact name and URLs follow the release tag layout the desktop pins (0.474ms)
+✔ resolveTarget maps uname output to a release target (0.44275ms)
+✔ resolveTarget refuses a platform or architecture the release cannot serve (0.070375ms)
+✔ isPublishedTarget matches the release matrix, which ships linux-x64 only (0.0665ms)
+✔ parseChecksumFile reads the digest of its own artifact from a sha256sum file (0.224959ms)
+✔ parseChecksumFile rejects anything that is not a full sha256 digest (0.07525ms)
+✔ normalizeChecksum accepts only a trimmed, lower-case 64-hex digest (0.070417ms)
+✔ checksumMatches compares digests case-insensitively and refuses junk (0.093666ms)
+✔ versionsMatch requires the same release, tolerating a v prefix on either side (0.112833ms)
+✔ raceWithTimeout settles without cancelling the slower work (58.241583ms)
+✔ unsigned macOS checks GitHub without downloading or installing (56.380625ms)
+✔ signed macOS completes check, progress, download and restart handoff (16.180917ms)
+✔ delivery policy keeps dev, portable and package-manager installs distinct (10.237084ms)
+✔ Developer ID probe refuses missing, adhoc and failed signatures (9.461708ms)
+✔ check failures remain visible and a retry can recover (8.528583ms)
+✔ prepares all platform feeds and merges both Mac architectures after verifying bytes (23.738083ms)
+✔ refuses tampered downloads without producing a merged update feed (5.329ms)
+✔ refuses stale versions, prereleases and missing platform manifests (5.616375ms)
+✔ refuses traversal and remote installer URLs (6.3295ms)
+✔ refuses stale non-feed assets and a mismatched remote-host checksum (6.980667ms)
+ℹ tests 37
+ℹ suites 0
+ℹ pass 37
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 17452.523958

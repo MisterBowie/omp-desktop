@@ -1,0 +1,97 @@
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { createServer } from "node:http";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { InstalledApplication, until } from "../omp-desktop-v010-updates/app/scripts/e2e/installed-application.mjs";
+import { invoke, click } from "../omp-desktop-v010-updates/app/scripts/e2e/installed-workflow.mjs";
+
+const directory = fileURLToPath(new URL(".", import.meta.url));
+const root = "/Users/vv/Documents/对话/omp-desktop-v010-updates";
+const old = "/Users/vv/Documents/对话/omp-desktop-pi-icon/app/apps/desktop/release/OMP-Desktop-0.15.3-icon.1-arm64.dmg";
+const installer = join(root, "app/apps/desktop/release/OMP-Desktop-0.1.0-arm64.dmg");
+const bytes = Buffer.from("owned future release fixture; unsigned Mac must never download this");
+const requests = [];
+let fail = true;
+const server = createServer((request, response) => {
+  requests.push(request.url);
+  if (fail) { response.writeHead(503); response.end("owned offline fixture"); return; }
+  if (request.url.startsWith("/latest-mac.yml")) {
+    const sha512 = createHash("sha512").update(bytes).digest("base64");
+    response.setHeader("content-type", "text/yaml");
+    response.end(JSON.stringify({ version: "0.1.1", files: [{ url: "OMP-Desktop-0.1.1-arm64-mac.zip", sha512, size: bytes.length }], path: "OMP-Desktop-0.1.1-arm64-mac.zip", sha512 }));
+  } else { response.writeHead(404); response.end(); }
+});
+await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+const url = `http://127.0.0.1:${server.address().port}/`;
+const electron = `process.getBuiltinModule("module").createRequire(process.resourcesPath + "/app.asar/package.json")("electron")`;
+const report = { passed: false, installer, installerSha256: createHash("sha256").update(readFileSync(installer)).digest("hex"), requests };
+let app;
+try {
+  app = InstalledApplication.prepare(old, join(directory, "installed-update"), { expectedVersion: "0.15.3-icon.1" });
+  await app.start();
+  await invoke(app, "projectSet", [app.workspace]);
+  report.oldProject = await invoke(app, "projectGet");
+  report.oldIdentity = app.identity;
+  await app.quit();
+  await app.replace(installer, { expectedVersion: "0.1.0" });
+  await app.start();
+  report.identity = app.identity;
+  assert.equal(app.identity.version, "0.1.0");
+  report.newProject = await invoke(app, "projectGet");
+  assert.deepEqual(report.newProject, report.oldProject, "version reset lost the selected project");
+  report.updateBefore = await invoke(app, "updatesGetState");
+  assert.equal(report.updateBefore.mode, "manual");
+  assert.equal(report.updateBefore.currentVersion, "0.1.0");
+  assert.equal(report.updateBefore.releasesUrl, "https://github.com/MisterBowie/omp-desktop/releases/latest");
+  report.payload = app.payload;
+  await app.main.evaluate(`(() => {
+    const require = process.getBuiltinModule("module").createRequire(process.resourcesPath + "/app.asar/package.json");
+    const { autoUpdater } = require("electron-updater");
+    autoUpdater.setFeedURL({provider:"generic", url:${JSON.stringify(url)}});
+    globalThis.__ompUpdateOpenedUrls = [];
+    ${electron}.shell.openExternal = async url => { globalThis.__ompUpdateOpenedUrls.push(url); };
+    return true;
+  })()`, "Main", { awaitPromise: false });
+  await click(app, '[data-nav="build"]');
+  report.offlineState = await until(async () => {
+    const state = await invoke(app, "updatesGetState");
+    return state.status === "error" ? state : false;
+  }, "visible failed update check");
+  await app.screenshot("01-check-error");
+  fail = false;
+  await click(app, '[data-nav="build"]');
+  report.availableState = await until(async () => {
+    const state = await invoke(app, "updatesGetState");
+    return state.status === "available" ? state : false;
+  }, "retry discovers 0.1.1");
+  await until(() => app.renderer.evaluate('document.querySelector(".update-notice[data-update-status=available]")?.textContent.includes("0.1.1")'), "actual update banner");
+  await app.screenshot("02-update-available");
+  await click(app, ".update-notice-actions button");
+  report.openedUrls = await until(async () => {
+    const values = await app.main.evaluate('globalThis.__ompUpdateOpenedUrls', "Main", { awaitPromise: false });
+    return values.length ? values : false;
+  }, "GitHub release link from actual update button");
+  assert.deepEqual(report.openedUrls, ["https://github.com/MisterBowie/omp-desktop/releases/latest"]);
+  assert.equal(requests.filter(path => path.includes(".zip")).length, 0);
+  report.sentinels = app.verifySentinels();
+  await app.quit();
+  report.passed = true;
+} catch (error) {
+  report.error = String(error?.stack ?? error);
+  if (app?.renderer) { try { await app.screenshot("failure"); } catch {} }
+  process.exitCode = 1;
+} finally {
+  if (app) {
+    try { await app.cleanup(); } catch (error) { report.cleanupError = String(error); report.passed = false; process.exitCode = 1; }
+    report.processReports = app.reports;
+    report.normalQuits = app.reports.filter(row => row.label === "ordered-quit" && row.noOwnedProcessesRemain).length;
+    report.launches = app.launches;
+    if (app.clean) app.removeOwnedRoot();
+  }
+  server.closeAllConnections();
+  await new Promise(resolve => server.close(resolve));
+  writeFileSync(join(directory, "installed-update-report.json"), JSON.stringify(report, null, 2) + "\n");
+  console.log(JSON.stringify({ passed: report.passed, normalQuits: report.normalQuits, available: report.availableState?.availableVersion, urls: report.openedUrls, error: report.error, cleanupError: report.cleanupError }, null, 2));
+}

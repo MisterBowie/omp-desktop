@@ -1,0 +1,35 @@
+{
+  "passed": true,
+  "nativeBuildTargets": [
+    {
+      "os": "macos-15",
+      "platform": "darwin",
+      "arch": "arm64",
+      "dist": "dist:mac"
+    },
+    {
+      "os": "macos-15-intel",
+      "platform": "darwin",
+      "arch": "x64",
+      "dist": "dist:mac"
+    },
+    {
+      "os": "windows-latest",
+      "platform": "win32",
+      "arch": "x64",
+      "dist": "dist:win"
+    },
+    {
+      "os": "ubuntu-22.04",
+      "platform": "linux",
+      "arch": "x64",
+      "dist": "dist:linux"
+    }
+  ],
+  "parsedBashSteps": 25,
+  "stablePublishAfterAllBuilds": true,
+  "immutableValidationTags": true,
+  "rootIssueFormsMatch": true,
+  "sourceRuntimePrerequisites": true,
+  "forkNativeAddonBuild": true
+}

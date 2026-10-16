@@ -1,0 +1,59 @@
+{
+  "passed": true,
+  "python": "3.12.0",
+  "pillow": "12.1.0",
+  "reproducibleAssets": 12,
+  "source": "apps/desktop/build/omp-mark.svg",
+  "master": {
+    "size": [
+      1024,
+      1024
+    ],
+    "sha256": "2a6176e2f47467729c64815484acc18088dabb7e0cd9238036e4fc24777a2225"
+  },
+  "macIcnsDecodesExactlyToMaster": true,
+  "windowsIcoSizes": [
+    [
+      16,
+      16
+    ],
+    [
+      32,
+      32
+    ],
+    [
+      48,
+      48
+    ],
+    [
+      64,
+      64
+    ],
+    [
+      128,
+      128
+    ],
+    [
+      256,
+      256
+    ]
+  ],
+  "transparentRendererMarksBothThemes": true,
+  "monochromeMacTemplate": true,
+  "documentationLogosMatch": true,
+  "assetSha256": {
+    "apps/desktop/build/icon.icns": "2b7027bd16358469604db5d8ce25bb16f9891a4f1b1c5095845c55d4b778cfb2",
+    "apps/desktop/build/icon.ico": "9c4611e816667d5751330c36b625af2d10e368a69a6fd5e9d65ec054dc429f68",
+    "apps/desktop/build/icon.png": "9a45a776234e72e22066abadcb45ba4ec562b34f32a596be8f3d60c869530d03",
+    "apps/desktop/build/icon_1024.png": "2a6176e2f47467729c64815484acc18088dabb7e0cd9238036e4fc24777a2225",
+    "apps/desktop/build/logo_dark.png": "2a6176e2f47467729c64815484acc18088dabb7e0cd9238036e4fc24777a2225",
+    "apps/desktop/build/omp-mark-mask.png": "51806edd0598b261ee6660c60b06a6f5a402d50297800cbf3f38cbd51442dec3",
+    "apps/desktop/build/omp-mark.svg": "2887c42d4b5e441a58624e2a26f9128ed1f1062fae6abc39abfcbada08a369fe",
+    "apps/desktop/build/tray-icon-mac.png": "f7cac2c801a7e7d1f0b9806642c0871d8aa1d9c1c3b1ad4bf0ed0da2615a29a7",
+    "apps/desktop/src/assets/brand/logo-dark.png": "bcc110d0e4c7d4cc7d40b3ae5cbc07663930cb10f2abca1ead6565b65596e0a7",
+    "apps/desktop/src/assets/brand/logo-light.png": "bcc110d0e4c7d4cc7d40b3ae5cbc07663930cb10f2abca1ead6565b65596e0a7",
+    "docs/image/readme/logo.png": "6c7b4a70fa5c74ae0f0006b99fe0ca0a748d2f18c393e71a319207ef0efe47e8",
+    "docs/public/app-icon.png": "6c7b4a70fa5c74ae0f0006b99fe0ca0a748d2f18c393e71a319207ef0efe47e8"
+  },
+  "colorComparison": "Decoded RGBA bytes match exactly (including RGB and alpha)"
+}

@@ -20,6 +20,7 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
+| 0315 | [Independent OMP versions and capability-based update delivery](0315-omp-independent-releases-and-update-delivery.md) | Accepted |
 | 0314 | [Settle OMP coding diagnostics within the owning tool](0314-omp-coding-diagnostic-settlement.md) | Accepted for local maintenance validation |
 | scheduled-desktop-automations | [Desktop automation scheduling](scheduled-desktop-automations.md) | Accepted for implementation |
 | subagent-model-fallback | [Ordered subagent model fallback](subagent-model-fallback.md) | Accepted for implementation |

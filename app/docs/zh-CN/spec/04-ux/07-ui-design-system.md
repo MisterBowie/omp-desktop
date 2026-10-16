@@ -84,25 +84,27 @@ PI-Desktop 的行为类似于桌面应用程序 shell，因此意外拖动
 
 ### 3. 3 产品标识和标志
 
-可见的产品标识是 **PI-Desktop**，即使外壳借用了
+可见的产品标识是 **OMP Desktop**，即使外壳借用了
 法典作为视觉参考。身份契约故意很小：
 
 - 侧边栏外壳名称、设置副本和输入框占位符使用
-  `PI-Desktop`； `Codex` 保留用于外部会话导入源或
+  `OMP Desktop`； `Codex` 保留用于外部会话导入源或
 历史设计参考文本。
-- `build/icon_1024.png` 是规范的 shell 徽标母版；渲染器导入由其派生的
-  192x192 标记，位于 `src/assets/brand/`（ADR 0125）。 `BrandLogo` 导入它们
+- `build/omp-mark.svg` 定义彩色像素 π。`make-brand.py` 生成黑色圆角底板的
+  `build/icon_1024.png`，以及 `src/assets/brand/` 下浅深主题共用的透明 96x96
+  彩色标记。紫蓝青横梁、青色/洋红竖笔与像素尾部在应用、文档和安装包中保持一致。
+  macOS 菜单栏模板只使用 π 的 alpha 蒙版。`BrandLogo` 导入小尺寸标记，
   通过Vite所以渲染器捆绑，开发Dock，并打包
   应用程序都使用相同的视觉资产。
-- 在 macOS 上，开发和打包发布均将 `PI-Desktop` 公开为
-  本机应用程序菜单名称。本机“关于”面板使用 PI-Desktop
+- 在 macOS 上，开发和打包发布均将 `OMP Desktop` 公开为
+  本机应用程序菜单名称。本机“关于”面板使用 OMP Desktop
   名称、版本和规范图标；没有可见库存 Electron 名称或图标。
   开发启动使用生成的品牌主机包，因为 AppKit
   从主机包而不是 Electron 运行时 API 中读取此标识。
-- 在 Windows、Electron 主寄存器上，规范的 `net.aiuo.pi-desktop`
+- 在 Windows、Electron 主寄存器上，规范的 `net.misterbowie.omp-desktop`
   准备就绪之前的 AppUserModelID。运行时 ID、打包的可执行文件名称、
   和 NSIS 快捷方式标识保持一致，以便本机通知，
-  通知设置和任务栏组将应用程序标识为 `PI-Desktop`
+  通知设置和任务栏组将应用程序标识为 `OMP Desktop`
   而不是 Electron。
 - 空首页英雄使用 100px 的 `HomeMascotLogo` GIF：由浅色和深色八帧挥手
   动作合成，首帧短暂停留后循环播放。CSS 根据

@@ -45,6 +45,13 @@ about 277 MB, so the renderer is the only part worth tuning.
    device pixel ratio. Regenerate them from the masters with `sips -Z 192`
    whenever the canonical marks change; the visual identity is unchanged.
 
+OMP fork update (2026-10-16): `make-brand.py` now renders the controlled
+`build/omp-mark.svg` pixel π into the 1024px application master and transparent
+96px renderer marks. Both themes keep the vector's colors. `make-icon.py`
+continues to derive platform resources from the master and a separate alpha
+mask for the monochrome macOS template. The original `sips -Z 192` regeneration
+instruction above records the PI baseline and no longer applies to this fork.
+
 *(Superseded by [ADR 0298](0298-remove-bundled-fonts.md): the app ships no
 fonts, so there is nothing to subset.)* The two bundled CJK faces stayed
 unsubset while they existed. ADR 0083 section 2 appended `Noto Sans SC` to

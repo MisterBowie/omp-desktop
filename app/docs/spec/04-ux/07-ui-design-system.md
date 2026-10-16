@@ -103,26 +103,29 @@ empty rail outside the panel surface.
 
 ### 3.4 Product identity and marks
 
-The visible product identity is **PI-Desktop**, even where the shell borrows
+The visible product identity is **OMP Desktop**, even where the shell borrows
 Codex as a visual reference. The identity contract is deliberately small:
 
 - The sidebar shell name, settings copy, and composer placeholder use
-  `PI-Desktop`; `Codex` is reserved for the external session-import source or
+  `OMP Desktop`; `Codex` is reserved for the external session-import source or
   historical design-reference text.
-- `build/icon_1024.png` is the canonical shell logo master; the renderer
-  imports the 192x192 marks derived from it under `src/assets/brand/`
-  (ADR 0125). `BrandLogo` imports those
+- `build/omp-mark.svg` defines the colored pixel π. `make-brand.py` renders
+  the black rounded application tile to `build/icon_1024.png` and derives
+  transparent 96x96 marks under `src/assets/brand/` for both themes. The
+  violet–blue–cyan crossbar, cyan/magenta legs and pixel tail stay consistent
+  across the application, documentation and installer. The macOS menu-bar
+  template uses only the π alpha mask. `BrandLogo` imports its small marks
   through Vite so the renderer bundle, development Dock, and packaged
   application all use the same visual asset.
-- On macOS, both development and packaged launches expose `PI-Desktop` as the
-  native application-menu name. The native About panel uses the PI-Desktop
+- On macOS, both development and packaged launches expose `OMP Desktop` as the
+  native application-menu name. The native About panel uses the OMP Desktop
   name, version, and canonical icon; no stock Electron name or icon is visible.
   Development launches use a generated branded host bundle because AppKit
   reads this identity from the host bundle rather than Electron runtime APIs.
-- On Windows, Electron Main registers the canonical `net.aiuo.pi-desktop`
+- On Windows, Electron Main registers the canonical `net.misterbowie.omp-desktop`
   AppUserModelID before readiness. The runtime ID, packaged executable name,
   and NSIS shortcut identity stay aligned so native notifications,
-  notification settings, and taskbar groups identify the app as `PI-Desktop`
+  notification settings, and taskbar groups identify the app as `OMP Desktop`
   rather than Electron.
 - The empty-home hero uses a 100px `HomeMascotLogo` GIF: an eight-frame waving
   mascot compiled from the supplied light and dark action sets, with a short

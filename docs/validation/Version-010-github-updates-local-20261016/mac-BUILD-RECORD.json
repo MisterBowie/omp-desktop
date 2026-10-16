@@ -1,0 +1,44 @@
+{
+  "schema": "omp-desktop.github-release/1",
+  "version": "0.1.0",
+  "sourceRevision": null,
+  "repository": "MisterBowie/omp-desktop",
+  "platforms": [
+    "darwin"
+  ],
+  "macArchitectures": [
+    "arm64"
+  ],
+  "verifiedUpdateArtifacts": {
+    "OMP-Desktop-0.1.0-arm64-mac.zip": {
+      "bytes": 222240395,
+      "sha512": "zofV17IkVNsCc3ty1uE4H5vOADSdlFUv6sP7FN41fI4o4u/q6xv6A5FZy8qvf+F/fLTkdMdx+Pl407IqqMEzrQ=="
+    },
+    "OMP-Desktop-0.1.0-arm64.dmg": {
+      "bytes": 223286300,
+      "sha512": "L9AdJDN0aZPSIyJK+WzcA3plamsZDw6GRLEpt5lPj8+cMANWafRigPgKWDcevPpK3hfeqmIs5ydmTLzWIbpBbg=="
+    }
+  },
+  "files": [
+    {
+      "name": "OMP-Desktop-0.1.0-arm64-mac.zip",
+      "bytes": 222240395,
+      "sha256": "b8b5a1d1820fb2e1169a0b50fc5873a9fe59231f8b4ed1f90f858e809a64dbb2"
+    },
+    {
+      "name": "OMP-Desktop-0.1.0-arm64.dmg",
+      "bytes": 223286300,
+      "sha256": "7d750194fbc47c13323f0ac6e94f9ab93848b4d77fbd83fe1f743e32d78d1e6f"
+    },
+    {
+      "name": "latest-mac-arm64.yml",
+      "bytes": 517,
+      "sha256": "bd5d2e7617d7b144120644d62dce09e0554e0cf13f61b7ca11028afde7dacdf0"
+    },
+    {
+      "name": "latest-mac.yml",
+      "bytes": 515,
+      "sha256": "bd3d1420c8906ee122d962e94cb9619f91183fbccceba5356fd976c370bd5a83"
+    }
+  ]
+}

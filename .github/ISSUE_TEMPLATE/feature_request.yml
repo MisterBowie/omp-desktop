@@ -1,0 +1,36 @@
+name: Feature request / 功能请求
+description: Suggest an enhancement. 建议新功能。
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem this feature would solve, then the change you want.
+        先说明要解决的问题，再描述期望的改动。
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / 问题
+      description: What is hard or missing today?
+      placeholder: I cannot set a different model per session.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change / 期望改动
+      description: What should the product do instead?
+      placeholder: Add a per-session model override in the composer menu.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives / 其他方案
+      description: Optional. What else did you consider?
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context / 补充信息
+      description: Optional. Sketches, screenshots, or related issues.

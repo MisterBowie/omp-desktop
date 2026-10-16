@@ -9,6 +9,35 @@
 
 ## OMP Desktop 分发身份（M6）
 
+### 从 0.1.0 开始的 OMP 独立版本
+
+OMP Desktop 的公开版本与应用内更新记录从 **0.1.0** 开始。重置前 PI/OMP 测试版本的
+记录保留在 `PRE_RESET_CHANGELOG`，不混入当前产品目录；存储、协议和数据库 schema
+版本不变。从 0.15.x 测试包切换时先手动安装一次 0.1.0，更新器不会为此启用降级。
+
+当前产品下载页、更新源和远程主机资源统一使用
+`https://github.com/MisterBowie/omp-desktop`。稳定更新跟随 `releases/latest`，忽略
+历史测试预发行，需要对应的 `latest.yml`、`latest-linux.yml` 或 `latest-mac.yml` 及安装资产。
+
+实际发布入口是仓库根 `.github/workflows/release.yml`；`app/.github/workflows/release.yml`
+保留为 PI 参考。入口构建 Mac 两种架构、Windows x64、Linux x64，检查包内运行时、
+严格 Plan/Goal 与实际安装流程；在校验安装包 SHA512/体积和远程主机 SHA256 后合并 Mac
+更新源。全部构建成功后才把完整 draft 发布为稳定版本。分支手动运行和不可移动的
+`release-check-X.Y.Z-<candidate>` 标签只产出资产，不发布。首次稳定发行先验证候选，
+再在同一已验收提交创建稳定标签；
+`vX.Y.Z` 标签必须与全部 16 个版本入口和当前产品更新记录一致。
+
+未签名或 ad-hoc Mac 只检查更新并打开 GitHub，不自动下载或安装；Developer ID 签名 Mac
+提供下载、进度和重启安装。Windows NSIS 与 Linux AppImage 保留应用内更新；Windows
+便携版、deb/rpm 保留检查加链接。OMP 稳定版签名可选，以实际安装签名决定模式。
+配置签名时，OMP 使用自己的 Apple 凭据，并给 DMG 公证脚本传递
+`OMP_MACOS_TEAM_ID=APPLE_TEAM_ID`，不声称使用 PI 发布者身份。下方历史 PI 签名资格
+章节不代表未签名 OMP 包已签名。
+启用签名后设置仓库变量 `MACOS_REQUIRE_SIGNING=true`，在签名 secret 缺失时阻断后续发布。
+
+正式发布前，CI 必须能获取 `patches/oh-my-pi/manifest.json` 中固定的维护 fork 提交。
+渲染器 IPC 不能传入更新源地址或 GitHub 凭据。
+
 内部 workspace 名称仍是 `@pi-desktop/desktop`，保持导入与构建过滤器兼容。
 安装元数据通过 `build.extraMetadata.name = "omp-desktop"` 覆盖；真实 electron-builder
 在生成 `omp-desktop-updater` 前合并它，仅修改 productName 会继续共用 PI 的
@@ -18,8 +47,10 @@
 
 所有随包语言以 OMP Desktop 称呼当前产品；原作者、许可证、外部导入来源、内部协议
 名称和 host 可执行文件名保留。MCP 注册/握手、回调和诊断文字使用 APP_NAME；工具及
-操作 id 保持兼容。新标记来自 `apps/desktop/build/omp-mark.svg`；按顺序
-运行 `make-brand.py`、`make-icon.py`、`make-dmg-background.py` 生成主图、主题标记、
+操作 id 保持兼容。新标记来自 `apps/desktop/build/omp-mark.svg`：像素风 π，
+横梁为紫蓝青阶梯渐变，竖笔使用青色与洋红，并带棋盘格尾部。应用底板为黑色，
+外部圆角透明；浅深主题的透明渲染标记使用相同彩色图形。按顺序
+运行 `make-brand.py`、`make-icon.py`、`make-dmg-background.py` 生成主图、主题标记、文档标志、
 平台图标及两图标安装背景。macOS 模板直接使用标记的 alpha 几何，不包含底板或 PI
 专用亮度裁剪。
 
@@ -611,6 +642,6 @@ electron PI-Desktop-<version>-linux-x64.asar
 
 ## 7. 已知限制
 
-- Linux deb/rpm 和 Windows 便携版 exe 仍保持通知和链接更新模式。打包的 macOS、Windows NSIS 和 Linux AppImage 使用应用内 `electron-updater`。
+- Linux deb/rpm、未签名 macOS 和 Windows 便携版 exe 保持通知和链接更新模式。Developer ID 签名 macOS、Windows NSIS 和 Linux AppImage 使用应用内 `electron-updater`。
 - Linux x64 包在 Ubuntu 22.04 上构建，因此 host-core 需要 glibc 2.35 或更高版本（Ubuntu 22.04、Debian 12、Fedora 36+）。标签作业运行 `scripts/check-linux-host-glibc.mjs`，拒绝需要更新 glibc 的二进制文件。
 - 回滚、分阶段部署和预发布渠道政策仍是开放的发布工作。现有未签名 macOS 安装可能需要先手动安装一次已签名 DMG，之后应用内更新才能成功。

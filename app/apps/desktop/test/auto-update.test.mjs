@@ -96,9 +96,9 @@ test("updater gates delivery mode by platform and delivery policy", () => {
   assert.match(updaterSource, /if \(!isPackaged\) return "disabled"/);
   assert.match(updaterSource, /win32.*in-app|in-app.*win32/s);
   assert.match(updaterSource, /PORTABLE_EXECUTABLE_FILE \? "manual"/);
-  assert.match(updaterSource, /platform === "darwin"[\s\S]*return "in-app"/);
+  assert.match(updaterSource, /platform === "darwin"[\s\S]*macosSigned \? "in-app" : "manual"/);
   assert.match(updaterSource, /APPIMAGE/);
-  assert.match(updaterSource, /autoInstallOnAppQuit = true/);
+  assert.match(updaterSource, /autoInstallOnAppQuit = this.state.mode === "in-app"/);
   assert.match(
     updaterSource,
     /allowPrerelease = false/,

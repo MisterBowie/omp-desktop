@@ -1,0 +1,35 @@
+✔ blank GitHub issues stay disabled (0.471ms)
+✔ bug report form requires triage fields (0.540459ms)
+✔ feature request form requires a problem and a proposal (0.117417ms)
+✔ Settings Info exposes a Main-owned GitHub feedback action (0.818125ms)
+✔ shellQuote produces a single-quoted literal that cannot escape (0.476458ms)
+✔ buildBootstrapScript interpolates every input as a quoted literal (0.582041ms)
+✔ the generated script is valid POSIX shell, even with hostile inputs (11.931583ms)
+✔ a hostile version stays one literal value when the assignments run (3.957083ms)
+tar: Failed to set default locale
+✔ the generated script installs, starts, and prints the ready/pairing lines (4560.450625ms)
+tar: Failed to set default locale
+✔ a checksum mismatch fails the script before anything is installed (3732.142875ms)
+✔ parseBootstrapOutput reads the ready and pairing lines (0.192958ms)
+✔ parseBootstrapOutput collects step lines and ignores interleaved noise (0.082083ms)
+✔ parseBootstrapOutput reports the failing step and ignores unrelated failures (0.117584ms)
+✔ parseBootstrapOutput refuses a ready line with an unusable port (0.174917ms)
+✔ bootstrap probes, installs, forwards, and pairs in order (2.221833ms)
+✔ a remote host running a different release is refused before the forward (0.3625ms)
+✔ an unpublished target fails without downloading anything (0.160458ms)
+✔ a checksum file with no digest for this artifact fails the bootstrap (0.165083ms)
+✔ a failed remote script reports the step it failed at (0.23725ms)
+✔ a missing remote Node.js is reported as a Node version requirement (0.178083ms)
+✔ a failed pairing exchange closes the forward it can no longer use (0.21325ms)
+✔ arguments that would reach the ssh argv are refused before any transport exists (0.281291ms)
+✔ synthesizeSshHostKey folds an IPv6 literal and is stable (0.102708ms)
+✔ sshMetadataOf parses the descriptor a bootstrapped host is stored with (0.398209ms)
+✔ sshMetadataOf refuses direct, missing, and malformed descriptors (0.191792ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8435.514417

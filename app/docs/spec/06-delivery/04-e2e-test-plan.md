@@ -3015,11 +3015,17 @@ identify the platform validation still needed.
 - **Milestone**: M5
 - **Status**: Unit-covered (`tools::shell::tests`); scenario Documented
 
-#### E2E-044: Development launch uses PI-Desktop Dock branding
+#### E2E-044: Development and installed launches use OMP Desktop π branding
 
 - **Preconditions**: macOS development checkout with canonical `build/icon_1024.png`.
 - **Steps**: 1) Run `pnpm dev`. 2) Inspect the running application's Dock icon.
-- **Expected**: The Dock shows the PI-Desktop brand icon, not Electron's default icon; packaged builds continue to use `build/icon.icns`.
+  3) Install a local package in an owned directory and inspect its bound ICNS,
+  application metadata, sidebar mark resources in both themes and two-icon DMG
+  artwork. Preserve existing platform visibility rules for the sidebar brand.
+- **Expected**: The colored pixel π matches the canonical master in development,
+  installed resources and renderer marks. Packaged builds bind `build/icon.icns`;
+  the macOS menu-bar template keeps the same geometry in monochrome. No model
+  request is needed to inspect branding.
 - **Specs linked**: `06-delivery/06-release-runbook.md`
 - **Acceptance**: Quality (development shell matches release branding)
 - **Milestone**: M5
@@ -4250,12 +4256,18 @@ identify the platform validation still needed.
   automatic check or invoke Check for Updates from the application menu /
   Settings → Info.
 - **Expected**: Update state reports `available` (manual platforms) or
-  advances through in-app download for packaged macOS, Windows NSIS, and
+  advances through in-app download for Developer ID-signed macOS, Windows NSIS, and
   Linux AppImage with `availableVersion` equal to the newer stable tag. A
   Windows portable run (`PORTABLE_EXECUTABLE_FILE`) stays on the manual
   notify-and-link path and must not download or run the NSIS installer. The
   client must not report up-to-date merely because no newer release shares the
   same `rc` prerelease channel.
+- **OMP 0.1 path**: Install 0.1.0 over the 0.15.x test build and retain its
+  selected project. Drive the actual check button through a failed feed and a
+  successful retry advertising 0.1.1. The unsigned Mac build shows an available
+  banner and opens the OMP GitHub release URL without downloading a ZIP. A
+  signed controller covers progress, downloaded state and restart handoff.
+  Historical test prereleases must never become the stable update target.
 - **Specs linked**: `04-ux/09-interaction-patterns.md`,
   `05-security/01-security.md`, `08-meta/decisions-log.md` (D120),
   ADR 0022

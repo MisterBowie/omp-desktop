@@ -1,0 +1,63 @@
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { InstalledApplication, until } from "../omp-desktop-pi-icon/app/scripts/e2e/installed-application.mjs";
+
+const directory = fileURLToPath(new URL(".", import.meta.url));
+const root = "/Users/vv/Documents/对话/omp-desktop-pi-icon";
+const installer = join(root, "app/apps/desktop/release/OMP-Desktop-0.15.3-icon.1-arm64.dmg");
+const sha256 = bytes => createHash("sha256").update(bytes).digest("hex");
+const report = { passed: false, installer, installerSha256: sha256(readFileSync(installer)), themes: [], themeProbe: "Exercise BrandLogo's existing data-theme MutationObserver; no settings or system-theme-following journey claimed" };
+let app;
+try {
+  app = InstalledApplication.prepare(installer, join(directory, "installed"));
+  report.payload = app.payload;
+  await app.start();
+  report.identity = app.identity;
+  report.initialDom = await app.renderer.evaluate(`({ text: document.body.innerText.slice(0,2000), images: [...document.querySelectorAll("img")].map(n => ({class: n.className, src: n.currentSrc.slice(0,100), width:n.naturalWidth, cssWidth:n.getBoundingClientRect().width})), buttons: [...document.querySelectorAll("button")].slice(0,30).map(n => ({label:n.getAttribute("aria-label"), title:n.title, text:n.textContent.slice(0,60)})) })`);
+  writeFileSync(join(directory, "installed-initial-dom.json"), JSON.stringify(report.initialDom, null, 2));
+  await app.screenshot("initial");
+  for (const theme of ["dark", "light"]) {
+    await app.renderer.evaluate(`(() => { document.documentElement.dataset.theme = ${JSON.stringify(theme)}; return true; })()`);
+    await until(() => app.renderer.evaluate(`document.documentElement.dataset.theme === ${JSON.stringify(theme)}`), `${theme} brand theme`, 10_000);
+    const mark = await until(() => app.renderer.evaluate(`(async () => {
+      const image = document.querySelector("img.brand-logo");
+      if (!image || !image.complete || image.naturalWidth !== 96) return false;
+      const prefix = "data:image/png;base64,";
+      if (!image.currentSrc.startsWith(prefix)) throw new Error("Expected Vite's inlined brand PNG");
+      return { theme: document.documentElement.dataset.theme, width: image.naturalWidth,
+        height: image.naturalHeight, cssWidth: image.getBoundingClientRect().width,
+        ariaHidden: image.getAttribute("aria-hidden"), parentDisplay: getComputedStyle(image.parentElement).display,
+        png: image.currentSrc.slice(prefix.length) };
+    })()`), `loaded ${theme} sidebar mark`);
+    const hash = sha256(Buffer.from(mark.png, "base64"));
+    const expected = sha256(readFileSync(join(root, `app/apps/desktop/src/assets/brand/logo-${theme}.png`)));
+    assert.equal(hash, expected);
+    assert.equal(mark.ariaHidden, "true");
+    delete mark.png;
+    report.themes.push({ ...mark, sha256: hash, matchesSource: true });
+    await app.screenshot(`sidebar-${theme}`);
+  }
+  report.sentinels = app.verifySentinels();
+  await app.quit();
+  report.passed = true;
+} catch (error) {
+  report.error = String(error?.stack ?? error);
+  process.exitCode = 1;
+  if (app?.renderer) {
+    try { await app.screenshot("failure"); } catch {}
+  }
+} finally {
+  if (app) {
+    try { await app.cleanup(); }
+    catch (error) { report.cleanupError = String(error); report.passed = false; process.exitCode = 1; }
+    report.processReports = app.reports;
+    report.launches = app.launches;
+    report.normalQuits = app.reports.filter(r => r.label === "ordered-quit" && r.noOwnedProcessesRemain).length;
+    if (app.clean) app.removeOwnedRoot();
+  }
+  writeFileSync(join(directory, "installed-icon-review.json"), JSON.stringify(report, null, 2) + "\n");
+  console.log(JSON.stringify({ passed: report.passed, normalQuits: report.normalQuits, themes: report.themes, error: report.error, cleanupError: report.cleanupError }, null, 2));
+}

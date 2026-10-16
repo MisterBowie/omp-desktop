@@ -74,6 +74,11 @@ download-and-install flow.
 
 ## Amendment (D450 / ADR 0289)
 
+For OMP Desktop, [ADR 0315](0315-omp-independent-releases-and-update-delivery.md)
+amends this qualification: only actual Developer ID-signed Mac installs use
+in-app delivery. Unsigned/ad-hoc OMP builds use the product's GitHub release
+page. The independent OMP release series begins at 0.1.0.
+
 Official GitHub tag macOS artifacts are Developer ID-signed, notarized, and
 stapled. Packaged macOS therefore uses the same in-app `electron-updater` lane
 as Windows NSIS and Linux AppImage. Local unsigned packaging without a

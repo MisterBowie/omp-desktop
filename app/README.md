@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/image/readme/logo.png" alt="PI-Desktop" width="108" />
+<img src="docs/image/readme/logo.png" alt="OMP Desktop" width="108" />
 
-# PI-Desktop
+# OMP Desktop
 
 ### A modular desktop workspace for AI agents
 
@@ -12,23 +12,23 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 <br />
 
-[![Release](https://img.shields.io/github/v/release/vastsa/PI-Desktop?label=release)](https://github.com/vastsa/PI-Desktop/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/vastsa/PI-Desktop/total?label=downloads)](https://github.com/vastsa/PI-Desktop/releases)
-[![Stars](https://img.shields.io/github/stars/vastsa/PI-Desktop?style=flat\&label=stars)](https://github.com/vastsa/PI-Desktop/stargazers)
-[![CI](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/vastsa/PI-Desktop)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/MisterBowie/omp-desktop?label=release)](https://github.com/MisterBowie/omp-desktop/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/MisterBowie/omp-desktop/total?label=downloads)](https://github.com/MisterBowie/omp-desktop/releases)
+[![Stars](https://img.shields.io/github/stars/MisterBowie/omp-desktop?style=flat\&label=stars)](https://github.com/MisterBowie/omp-desktop/stargazers)
+[![CI](https://github.com/MisterBowie/omp-desktop/actions/workflows/release.yml/badge.svg)](https://github.com/MisterBowie/omp-desktop/actions/workflows/release.yml)
+[![License](https://img.shields.io/github/license/MisterBowie/omp-desktop)](LICENSE)
 
 <br />
 
-**[Download](https://github.com/vastsa/PI-Desktop/releases/latest)** ·
-[Documentation](https://pi-docs.aiuo.net/) ·
+**[Download](https://github.com/MisterBowie/omp-desktop/releases/latest)** ·
+[Documentation](https://github.com/MisterBowie/omp-desktop/tree/main/app/docs) ·
 [Build a Plugin](docs/plugin-development.md) ·
 [Screenshots](docs/guide/screenshots.md) ·
 [简体中文](README.zh-CN.md)
 
 <br />
 
-<img src="docs/image/readme/home.webp" alt="PI-Desktop" width="94%" />
+<img src="docs/image/readme/home.webp" alt="OMP Desktop" width="94%" />
 
 <br />
 
@@ -36,7 +36,7 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 </div>
 
-> **Current release line: 0.15.x (Early Preview).**
+> **Current release line: 0.1.x (Early Preview).**
 
 ---
 
@@ -561,7 +561,7 @@ Agent / Plan / Goal
 
 <div align="center">
 
-### [Download PI-Desktop →](https://github.com/vastsa/PI-Desktop/releases/latest)
+### [Download OMP Desktop →](https://github.com/MisterBowie/omp-desktop/releases/latest)
 
 **macOS · Windows · Linux**
 
@@ -674,7 +674,7 @@ pnpm test
 
 ### Documentation
 
-[Documentation](https://pi-docs.aiuo.net/) ·
+[Documentation](https://github.com/MisterBowie/omp-desktop/tree/main/app/docs) ·
 [Architecture](docs/spec/02-architecture/01-architecture.md) ·
 [Specification](docs/spec/README.md) ·
 [Plugin Development](docs/plugin-development.md) ·
@@ -742,7 +742,7 @@ See [LICENSE](LICENSE) for details.
 
 <div align="center">
 
-<img src="docs/image/readme/logo.png" alt="PI-Desktop" width="72" />
+<img src="docs/image/readme/logo.png" alt="OMP Desktop" width="72" />
 
 ## PI-Desktop
 
@@ -752,8 +752,8 @@ See [LICENSE](LICENSE) for details.
 
 <br />
 
-**[Download](https://github.com/vastsa/PI-Desktop/releases/latest)** ·
-[Documentation](https://pi-docs.aiuo.net/) ·
+**[Download](https://github.com/MisterBowie/omp-desktop/releases/latest)** ·
+[Documentation](https://github.com/MisterBowie/omp-desktop/tree/main/app/docs) ·
 [Build a Plugin](docs/plugin-development.md)
 
 <br /><br />

@@ -1,0 +1,20 @@
+{
+  "version": "0.15.3-icon.1",
+  "sourceBaseHead": "215028eaee89084018230341625abf415f080644",
+  "originMain": "a23bfb9befea327e7924efd3004e030a11b587d2",
+  "productPatchSha256": "bc0da2970d35d83ae7ca5ad0be6b5c688d6bd6a4c60a5c57c3d2a0aabdce5a10",
+  "sourceState": "uncommitted task worktree; no tag, push, PR or main merge",
+  "versionPackages": 13,
+  "packages": [
+    {
+      "path": "/Users/vv/Documents/对话/omp-desktop-pi-icon/app/apps/desktop/release/OMP-Desktop-0.15.3-icon.1-arm64-mac.zip",
+      "bytes": 222452719,
+      "sha256": "20f554a4007262bf232cbb3c1d9698c799ca31ce98f9c880c35b71558abc91fa"
+    },
+    {
+      "path": "/Users/vv/Documents/对话/omp-desktop-pi-icon/app/apps/desktop/release/OMP-Desktop-0.15.3-icon.1-arm64.dmg",
+      "bytes": 223499768,
+      "sha256": "4b0bac0b2dd47dd235af9af19fbcb1f573832f259435a72498cc2edf4e4b03fe"
+    }
+  ]
+}

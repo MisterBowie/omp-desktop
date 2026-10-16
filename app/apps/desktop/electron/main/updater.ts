@@ -5,14 +5,16 @@
  * .github/workflows/release.yml. Discovery always tracks the latest stable
  * release (`allowPrerelease = false`) so RC installs still graduate to newer
  * stables. Delivery mode per install:
- *  - Windows NSIS / Linux AppImage / packaged macOS → full in-app flow: silent
+ *  - Windows NSIS / Linux AppImage / Developer ID-signed macOS → full in-app flow: silent
  *    background download, "restart to update" prompt, install-on-quit fallback.
  *  - Windows portable (`PORTABLE_EXECUTABLE_FILE`) → notify + link. The
  *    NSIS installer must not replace a no-install run.
  *  - Linux deb (no $APPIMAGE in env) → notify + link.
+ *  - Unsigned/ad-hoc macOS → notify + GitHub link; Squirrel requires signing.
  *  - Unpackaged dev runs → disabled (no app-update.yml in resources).
  */
 import { app, shell } from "electron";
+import { spawnSync } from "node:child_process";
 import electronUpdaterPkg from "electron-updater";
 import type { UpdateInfo, ProgressInfo } from "electron-updater";
 import {
@@ -60,12 +62,26 @@ export type UpdaterOptions = {
   /** Overrides for tests. */
   platform?: NodeJS.Platform;
   isPackaged?: boolean;
+  macosSigned?: boolean;
 };
+
+/** Delivery capability only; Squirrel still validates the downloaded signature. */
+export function hasDeveloperIdSignature(executable: string): boolean {
+  const result = spawnSync(
+    "/usr/bin/codesign",
+    ["--display", "--verbose=4", executable],
+    { encoding: "utf8", timeout: 2_000, windowsHide: true },
+  );
+  return result.status === 0 &&
+    /^Authority=Developer ID Application: .+$/m.test(result.stderr ?? "") &&
+    /^TeamIdentifier=[A-Z0-9]{10}$/m.test(result.stderr ?? "");
+}
 
 export function resolveUpdateMode(
   platform: NodeJS.Platform,
   isPackaged: boolean,
   env: NodeJS.ProcessEnv = process.env,
+  macosSigned = false,
 ): UpdateMode {
   if (!isPackaged) return "disabled";
   // No release channel for this product yet: a packaged build must not check
@@ -74,7 +90,7 @@ export function resolveUpdateMode(
   if (platform === "win32") {
     return env.PORTABLE_EXECUTABLE_FILE ? "manual" : "in-app";
   }
-  if (platform === "darwin") return "in-app";
+  if (platform === "darwin") return macosSigned ? "in-app" : "manual";
   if (platform === "linux" && env.APPIMAGE) return "in-app";
   // non-AppImage linux installs
   return "manual";
@@ -102,9 +118,14 @@ export class AppUpdaterController {
     this.logger = options.logger;
     this.send = options.send;
     this.getLocale = options.getLocale ?? (() => "en");
+    const platform = options.platform ?? process.platform;
+    const packaged = options.isPackaged ?? app.isPackaged;
     const mode = resolveUpdateMode(
-      options.platform ?? process.platform,
-      options.isPackaged ?? app.isPackaged,
+      platform,
+      packaged,
+      process.env,
+      options.macosSigned ?? (platform === "darwin" && packaged &&
+        hasDeveloperIdSignature(process.execPath)),
     );
     this.state = {
       mode,
@@ -132,9 +153,10 @@ export class AppUpdaterController {
     // newer stable release such as 0.2.2. Always track GitHub's latest
     // stable release so RC installs can graduate to stable.
     autoUpdater.allowPrerelease = false;
+    autoUpdater.allowDowngrade = false;
     // Even if the user ignores the restart prompt, a downloaded update
     // lands on the next normal quit.
-    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.autoInstallOnAppQuit = this.state.mode === "in-app";
     autoUpdater.logger = {
       info: (m: unknown) =>
         this.logger.app("updater", "info", "updater diagnostic", {
@@ -294,7 +316,7 @@ export class AppUpdaterController {
 
   /** Quit and install a downloaded update (in-app mode). */
   install(): void {
-    if (this.state.status !== "downloaded") {
+    if (this.state.mode !== "in-app" || this.state.status !== "downloaded") {
       throw new Error("no downloaded update to install");
     }
     // Marked before the call: quitAndInstall spawns the installer itself, so

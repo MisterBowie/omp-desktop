@@ -1,0 +1,10 @@
+✔ the real GitHub provider selects the new stable series ahead of historical test releases (3.701708ms)
+✔ a missing stable release is an error, never a fallback into a historical test package (0.800209ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 90.05

@@ -1,0 +1,4 @@
+# Issue picker behaviour for this repository.
+# Only GitHub issue forms are allowed; blank issues stay disabled.
+
+blank_issues_enabled: false

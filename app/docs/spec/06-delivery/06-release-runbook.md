@@ -7,6 +7,46 @@
 
 ## OMP Desktop distribution identity (M6)
 
+### Independent OMP releases from 0.1.0
+
+OMP Desktop's public versions and in-app changelog start at **0.1.0**. The
+pre-reset PI/OMP test-build history remains in `PRE_RESET_CHANGELOG`, outside
+the current product catalog. Existing storage and protocol/schema versions do
+not change. Install 0.1.0 manually once over a 0.15.x test build; the updater
+does not enable downgrades to cross the reset.
+
+The current product's download page, updater and remote-host assets all use
+`https://github.com/MisterBowie/omp-desktop`. Stable updates follow
+`releases/latest`, ignore historical test prereleases and require the matching
+`latest.yml`, `latest-linux.yml` or `latest-mac.yml` plus installer assets.
+
+The active release workflow is the repository-root `.github/workflows/release.yml`;
+the nested `app/.github/workflows/release.yml` is the retained PI reference.
+The active workflow builds both Mac architectures, Windows x64 and Linux x64,
+checks packaged runtime/strict Plan/Goal/installed workflows, and validates
+installer SHA512/size and remote-host SHA256 before merging Mac feeds. Only
+after every build succeeds is a complete draft published as a stable release.
+Branch dispatch and immutable `release-check-X.Y.Z-<candidate>` tags build
+artifacts without publishing. Use a validation tag before the first stable cut;
+create the stable tag at the same accepted commit. A `vX.Y.Z` tag must match
+all 16 version surfaces and the current product changelog.
+
+Unsigned or ad-hoc Mac installations use GitHub check-and-link delivery and
+never auto-download or install. Developer ID-signed Mac installations use
+download/progress/restart delivery; Windows NSIS and Linux AppImage retain
+in-app updates. Portable Windows and deb/rpm remain check-and-link. Signing
+is optional for OMP's stable release, and the actual installed signature decides
+the mode. When configured, the OMP workflow uses its own Apple credentials and
+passes `OMP_MACOS_TEAM_ID=APPLE_TEAM_ID` to the DMG notarization helper; it does
+not claim or reuse the PI publisher's signing identity. The following historical
+PI signing qualification sections do not make an unsigned OMP build signed.
+After enabling signing, set the repository variable `MACOS_REQUIRE_SIGNING=true`
+to stop a later release if the signing secret is missing.
+
+Publishing the local maintained OMP fork revision is a release prerequisite:
+CI must be able to fetch the exact commit in `patches/oh-my-pi/manifest.json`.
+No feed URL or GitHub credential can be supplied through renderer IPC.
+
 The OMP fork keeps the workspace name `@pi-desktop/desktop` for internal imports
 and build filters. Installed metadata uses `build.extraMetadata.name =
 "omp-desktop"`. The real electron-builder configuration loader merges that name
@@ -20,9 +60,12 @@ licenses, external import-source labels, internal protocol names and host
 executable filenames retain their original identities. MCP registration/handshake
 labels, callback copy and diagnostics use `APP_NAME`; tool and operation ids stay
 compatible. The new mark is the
-controlled vector `apps/desktop/build/omp-mark.svg`. Run `make-brand.py`,
+controlled vector `apps/desktop/build/omp-mark.svg`: a pixel-style π with a
+stepped violet–blue–cyan crossbar, cyan/magenta legs and a checkerboard tail.
+The application tile is black with transparent outer corners; the transparent
+renderer marks retain the same colors in both themes. Run `make-brand.py`,
 `make-icon.py`, and `make-dmg-background.py` in that order to derive the master,
-theme marks, platform icons and two-icon installer artwork. The macOS template
+theme marks, documentation logos, platform icons and two-icon installer artwork. The macOS template
 uses the mark's alpha geometry, without a tile or a PI-specific luminance crop.
 
 `Resources/licenses` preserves the pinned PI-Desktop, OMP/native and Bun notices
@@ -749,8 +792,8 @@ Shell smoke on each native runner:
 
 ## 7. Known limitations
 
-- Linux deb/rpm and the Windows portable exe remain notify-and-link update
-  modes. Packaged macOS, Windows NSIS, and Linux AppImage use in-app
+- Linux deb/rpm, unsigned macOS and the Windows portable exe remain notify-and-link update
+  modes. Developer ID-signed macOS, Windows NSIS, and Linux AppImage use in-app
   `electron-updater`.
 - Linux x64 packages are built on Ubuntu 22.04 so host-core needs glibc 2.35
   or newer (Ubuntu 22.04, Debian 12, Fedora 36+). The tag job runs

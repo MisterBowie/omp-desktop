@@ -2,7 +2,10 @@
 
 目标：以 `vastsa/PI-Desktop` 为桌面产品基线，保留其界面和主要交互，接入 `can1357/oh-my-pi` 的 Agent 能力，再按需求增加或修改功能。
 
-本工作区交付的是 **源码基线、实施规划和模型执行说明**。尚未实现 OMP 接入，不能将当前 `app/` 当作已经可用的 OMP Desktop。
+当前产品从 **0.1.0** 开始独立版本线，包含彩色像素 π 图标、OMP 会话与编码 LSP 修复。
+下载与更新统一使用 [GitHub Releases](https://github.com/MisterBowie/omp-desktop/releases/latest)。
+本机代码与安装包已准备；公开稳定更新源须在 GitHub 发布 `v0.1.0` 及其更新清单后生效。
+应用内更新和平台签名前提见 [发布手册](app/docs/zh-CN/spec/06-delivery/06-release-runbook.md)。
 
 项目仓库：[MisterBowie/omp-desktop](https://github.com/MisterBowie/omp-desktop)。克隆完整项目：
 
@@ -55,7 +58,7 @@ omp-desktop/
 - 产品路线：fork PI-Desktop + 独立 OMP 适配层。
 - 运行时首选验证路径：OMP 独立进程及 `rpc-ui`，结合已有审批机制和受信扩展；是否需要 SDK 桥接由实验决定。
 - 旧 Pi 引擎先保留作为对照；未经能力验证的功能不宣称支持。
-- 不在本轮安装依赖、调用付费模型、修改应用功能或发布产品。
+- 当前开发与验证在专用本机工作树执行，不调用付费模型。GitHub 正式发布单独授权。
 
 ## 文档导航
 
@@ -72,4 +75,4 @@ omp-desktop/
 
 文档中的“拟新增”路径是设计建议，不代表当前已有实现。最终以锁定提交的源码和验证记录为准。
 
-`app/` 的上游代码遵循 [LGPL-3.0](app/LICENSE)，OMP 主项目遵循其 [MIT 许可证](upstream/oh-my-pi/LICENSE)，第三方组件另有声明。仓库上传不代表已完成 OMP 接入或产品发布。
+`app/` 的上游代码遵循 [LGPL-3.0](app/LICENSE)，OMP 主项目遵循其 [MIT 许可证](upstream/oh-my-pi/LICENSE)，第三方组件另有声明。当前验收状态以 [HANDOFF.md](HANDOFF.md) 与日期化验证记录为准。

@@ -1,0 +1,13 @@
+
+> pi-desktop@0.1.0 lint /Users/vv/Documents/对话/omp-desktop-v010-updates/app
+> pnpm lint:biome && pnpm -r --if-present lint
+
+
+> pi-desktop@0.1.0 lint:biome /Users/vv/Documents/对话/omp-desktop-v010-updates/app
+> biome lint
+
+Checked 88 files in 81ms. No fixes applied.
+Scope: 12 of 13 workspace projects
+apps/desktop lint$ node ../../scripts/check-style-tokens.mjs
+apps/desktop lint: style tokens OK
+apps/desktop lint: Done

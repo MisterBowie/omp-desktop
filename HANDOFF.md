@@ -1,5 +1,25 @@
 # OMP Desktop 开发交接
 
+## 0.1.0 与 GitHub 更新本机部分已完成，已授权公开发布（2026-10-16）
+
+工作树 `/Users/vv/Documents/对话/omp-desktop-v010-updates`，分支 `codex/v010-github-updates`。
+16 版本入口、八语言更新记录从 0.1.0 开始；下载/更新/主机资源/反馈改为用户自己的 GitHub。
+继承 π 图标与 LSP 修复。37+17+2+25 项回归、实际旧包→0.1.0 项目保留与更新失败重试、
+新 GitHub 按钮、2 次退出零残留，以及类型/lint/发布文档/真实清单校验均通过。
+用户已明确授权提交、推送固定 OMP 补丁和桌面源码、三平台验收及 v0.1.0 稳定发布。
+正先同步 OMP 固定提交 d648d27，再以 release-check 标签验收候选；全部通过后
+在同一提交创建 v0.1.0 并发布。尚未将远程构建或发布记为完成。未签名 Mac 走 GitHub
+手动更新，签名 Mac 才自动安装。详见 [本机验收](docs/validation/Version-010-github-updates-local-20261016.md)。
+
+## 彩色像素 π 图标已本机交付（2026-10-16）
+
+按用户参考图更换为紫蓝青/洋红渐变像素 π，含棋盘格尾部、黑色圆角底板。
+版本 `0.15.3-icon.1`，工作树 `/Users/vv/Documents/对话/omp-desktop-pi-icon`，
+分支 `codex/pi-gradient-icon`，继承下方已验收 LSP 修复。应用、渲染标记、文档和安装
+图标同步；21 品牌检查、资源重建、类型/文档、实际 DMG 资源核对及正常退出通过。
+仅本机保存未提交修改及 DMG/ZIP，未推送、发版或合并 main。
+见 [π 图标交付](docs/validation/Pi-gradient-icon-local-20261016.md)。
+
 ## 本机 LSP 专项修复已验收（2026-10-16）
 
 `0.15.3-lsp.1` 源码 `8260c37`，分支 `codex/lsp-coding-integration`，位于
