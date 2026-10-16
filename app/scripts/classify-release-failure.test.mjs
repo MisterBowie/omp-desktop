@@ -23,3 +23,8 @@ test("dependency classes are limited to committed public lockfile identities",()
  assert.deepEqual(result.publicDependencyClasses,["MISSING_LOCKED_DEPENDENCY:semver"]);
  const output=JSON.stringify(result);assert(!output.includes("/private"));assert(!output.includes("private-secret-package"));
 });
+test("a release classification excludes setup and post-job cleanup failures",()=>{
+ const result=classifyReleaseFailure("ENOENT open '/private/node_modules/semver/index.js'\n> @pi-desktop/desktop@0.1.0 dist:mac /private/app\nRELEASE-PACKAGE darwin/arm64: preflight\ncertificate target not a file\n##[error]Process completed with exit code 1.\nENOENT open '/private/node_modules/pnpm/bin/pnpm.cjs'");
+ assert.deepEqual(result.classes,["NOT_A_REGULAR_FILE"]);
+ assert.equal(result.publicDependencyClasses,undefined);
+});

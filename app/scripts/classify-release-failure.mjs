@@ -8,7 +8,11 @@ const publicDependencies=[...new Set([...lockSection.matchAll(/^  ['"]?((?:@[^/\
 
 /** Return fixed classes and public locked identities; never captured log text. */
 export function classifyReleaseFailure(input) {
-  const text=String(input).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "");
+  const clean=String(input).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "");
+  // Job downloads also contain setup and post-job cleanup failures. Diagnose
+  // only the real pnpm release invocation when its output is present.
+  const start=clean.search(/>\s*@pi-desktop\/desktop@[\w.+-]+\s+dist:(?:mac|win|linux)\b/);
+  const text=start<0?clean:clean.slice(start).split("##[error]Process completed with exit code")[0];
   const known=[
     ["FORK_DIRTY", /source checkout has uncommitted changes/],
     ["FORK_ORIGIN_MISMATCH", /OMP-SIDECAR-FAIL source origin is/],
@@ -77,6 +81,8 @@ export function classifyReleaseFailure(input) {
     ["UPDATE_CONFIG_MISSING", /ENOENT[^\r\n]*app-update\.yml/],
     ["BUILDER_EXECUTION_FAILED", /ERR_ELECTRON_BUILDER_CANNOT_EXECUTE/],
     ["CERTIFICATE_IMPORT_FAILED", /SecKeychainItemImport|certificate.*import|Invalid CSC_LINK|Env CSC_LINK is not correct/],
+    ["NOT_A_REGULAR_FILE", /not a file|not a regular file/],
+    ["PACKAGE_MANAGER_FILE_MISSING", /ENOENT[^\r\n]*(?:pnpm|corepack|npm\.cjs)/],
     ["SIGNING_FAILED", /cannot find signing|No valid identity|code signing.*failed/],
     ["MISSING_FILE", /ENOENT|No such file or directory/],
     ["PERMISSION_DENIED", /EACCES|Permission denied/],
