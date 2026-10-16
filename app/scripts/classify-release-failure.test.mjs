@@ -14,14 +14,14 @@ test("unknown failures disclose only a fixed enum and phase booleans",()=>{
 test("module and missing-file categories disclose no captured path or dependency name",()=>{
  const input="Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'yaml' imported from /private/secret\nError: ENOENT: no such file or directory, open 'C:\\private\\OMP Desktop.exe'";
  const result=classifyReleaseFailure(input);
- assert.deepEqual(result.classes,["BUNDLER_MODULE_MISSING","NODE_ESM_MODULE_MISSING","YAML_IMPORT_MISSING","APP_EXECUTABLE_MISSING","OPEN_FILE_MISSING","MISSING_FILE"]);
+ assert.deepEqual(result.classes,["BUNDLER_MODULE_MISSING","NODE_ESM_MODULE_MISSING","MISSING_FILE"]);
  assert(!JSON.stringify(result).includes("private"));
  assert(!JSON.stringify(result).includes("yaml"));
 });
-test("dependency classes are limited to committed public lockfile identities",()=>{
+test("file failures never disclose public or private dependency names",()=>{
  const result=classifyReleaseFailure("ENOENT: open '/private/secret/node_modules/semver/index.js'\nENOENT: open '/private/secret/node_modules/private-secret-package/index.js'");
- assert.deepEqual(result.publicDependencyClasses,["MISSING_LOCKED_DEPENDENCY:semver"]);
- const output=JSON.stringify(result);assert(!output.includes("/private"));assert(!output.includes("private-secret-package"));
+ assert.deepEqual(result.classes,["MISSING_FILE"]);assert.equal(result.publicDependencyClasses,undefined);
+ const output=JSON.stringify(result);assert(!output.includes("/private"));assert(!output.includes("private-secret-package"));assert(!output.includes("semver"));
 });
 test("a release classification excludes setup and post-job cleanup failures",()=>{
  const result=classifyReleaseFailure("ENOENT open '/private/node_modules/semver/index.js'\n> @pi-desktop/desktop@0.1.0 dist:mac /private/app\nRELEASE-PACKAGE darwin/arm64: preflight\ncertificate target not a file\n##[error]Process completed with exit code 1.\nENOENT open '/private/node_modules/pnpm/bin/pnpm.cjs'");

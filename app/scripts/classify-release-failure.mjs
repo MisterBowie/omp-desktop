@@ -2,11 +2,7 @@ import {readFileSync} from "node:fs";
 import {resolve} from "node:path";
 import {pathToFileURL} from "node:url";
 
-// These identities come only from the committed public lockfile, never logs.
-const lockSection=readFileSync(new URL("../pnpm-lock.yaml",import.meta.url),"utf8").split("\npackages:\n")[1].split("\nsnapshots:\n")[0];
-const publicDependencies=[...new Set([...lockSection.matchAll(/^  ['"]?((?:@[^/\s]+\/)?[^@'"\s:]+)@\d[^\n]*:\s*$/gm)].map(match=>match[1]))];
-
-/** Return fixed classes and public locked identities; never captured log text. */
+/** Never return log text, paths, URLs, dependency names or captured strings. */
 export function classifyReleaseFailure(input) {
   const clean=String(input).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "");
   // Job downloads also contain setup and post-job cleanup failures. Diagnose
@@ -29,69 +25,17 @@ export function classifyReleaseFailure(input) {
     ["BUNDLER_MODULE_MISSING", /Could not resolve|Cannot find module|Cannot find package/],
     ["NODE_ESM_MODULE_MISSING", /ERR_MODULE_NOT_FOUND/],
     ["NODE_CJS_MODULE_MISSING", /\bMODULE_NOT_FOUND\b/],
-    ["YAML_IMPORT_MISSING", /Cannot find (?:package|module) ['"]yaml(?:['"/])/],
-    ["WORKSPACE_IMPORT_MISSING", /Cannot find (?:package|module) ['"]@pi-desktop\//],
-    ["OPTIONAL_NATIVE_MODULE_MISSING", /Cannot find (?:package|module) ['"]@(?:rollup|esbuild|tailwindcss|oxc-parser)\//],
-    ["RELEASE_ENTRY_MISSING", /Cannot find module ['"][^'"\r\n]*[\\/]scripts[\\/]release-package\.mjs/],
-    ["PRELOAD_SCRIPT_MISSING", /ENOENT[^\r\n]*preload/],
-    ["HOST_EXECUTABLE_MISSING", /ENOENT[^\r\n]*pi-desktop-host-core/],
-    ["SIDECAR_RESOURCE_MISSING", /ENOENT[^\r\n]*omp-runtime/],
-    ["ICON_RESOURCE_MISSING", /ENOENT[^\r\n]*\.(?:ico|icns|png)['"\s]/],
-    ["APP_EXECUTABLE_MISSING", /ENOENT[^\r\n]*(?:OMP Desktop\.exe|electron\.exe)/],
-    ["NSIS_TOOL_MISSING", /ENOENT[^\r\n]*(?:makensis|nsis)/],
-    ["SIGNING_TOOL_MISSING", /ENOENT[^\r\n]*(?:signtool|rcedit)/],
-    ["ARCHIVE_TOOL_MISSING", /ENOENT[^\r\n]*(?:7za|7z\.exe|app-builder)/],
-    ["SPAWN_FILE_MISSING", /spawn[^\r\n]*ENOENT/],
-    ["OPEN_FILE_MISSING", /ENOENT[^\r\n]*\bopen\b/],
-    ["EMPTY_FILE_PATH", /ENOENT[^\r\n]*\bopen ['"]['"]/],
-    ["STAT_FILE_MISSING", /ENOENT[^\r\n]*\b(?:stat|lstat)\b/],
-    ["RENAME_FILE_MISSING", /ENOENT[^\r\n]*\brename\b/],
-    ["MAC_CERTIFICATE_STACK", /codeSign[\\/]macCodeSign|codeSign[\\/]codesign|createKeychain/],
-    ["MAC_PACKAGE_STACK", /app-builder-lib[\\/]out[\\/]macPackager/],
-    ["MAC_SIGN_STACK", /@electron[\\/]osx-sign|electron-osx-sign/],
-    ["DMG_PACKAGE_STACK", /dmg-builder[\\/].*(?:dmg|dmgUtil)\.js/],
-    ["ASAR_PACKAGE_STACK", /asar[\\/].*(?:asar|disk|filesystem)\.js/],
-    ["DEPENDENCY_SCAN_STACK", /node-module-collector|dependencyWalker|fileMatcher|nodeModuleCopyHelper/],
-    ["PNPM_MODULE_FILE_MISSING", /ENOENT[^\r\n]*node_modules/],
-    ["BUILDER_DEPENDENCY_FILE_MISSING", /ENOENT[^\r\n]*(?:app-builder-lib|builder-util|electron-builder)/],
-    ["UPDATER_DEPENDENCY_FILE_MISSING", /ENOENT[^\r\n]*electron-updater/],
-    ["DMG_DEPENDENCY_FILE_MISSING", /ENOENT[^\r\n]*(?:dmg-builder|dmg-license|iconv-corefoundation|plist)/],
-    ["ELECTRON_DEPENDENCY_FILE_MISSING", /ENOENT[^\r\n]*[\\/]electron[\\/]/],
-    ["ARCHIVE_DEPENDENCY_FILE_MISSING", /ENOENT[^\r\n]*(?:7zip-bin|app-builder-bin|@electron[\\/]asar)/],
-    ["FILESYSTEM_DEPENDENCY_FILE_MISSING", /ENOENT[^\r\n]*(?:fs-extra|graceful-fs|jsonfile)/],
-    ["LICENSE_DEPENDENCY_FILE_MISSING", /ENOENT[^\r\n]*[\\/](?:LICEN[CS]E|NOTICE|COPYING)/i],
-    ["JAVASCRIPT_DEPENDENCY_FILE_MISSING", /ENOENT[^\r\n]*\.(?:js|cjs|mjs)['"\s]/],
-    ["RUNTIME_ARGPARSE_MISSING", /ENOENT[^\r\n]*argparse/],
-    ["RUNTIME_YAML_MISSING", /ENOENT[^\r\n]*js-yaml/],
-    ["RUNTIME_LAZY_VALUE_MISSING", /ENOENT[^\r\n]*lazy-val/],
-    ["RUNTIME_LODASH_MISSING", /ENOENT[^\r\n]*lodash\.(?:escaperegexp|isequal)/],
-    ["RUNTIME_SEMVER_MISSING", /ENOENT[^\r\n]*semver/],
-    ["RUNTIME_EMITTER_MISSING", /ENOENT[^\r\n]*tiny-typed-emitter/],
-    ["RUNTIME_DEBUG_MISSING", /ENOENT[^\r\n]*[\\/]debug[\\/]/],
-    ["RUNTIME_DURATION_MISSING", /ENOENT[^\r\n]*[\\/]ms[\\/]/],
-    ["RUNTIME_XML_MISSING", /ENOENT[^\r\n]*[\\/]sax[\\/]/],
-    ["RUNTIME_UNIVERSALIFY_MISSING", /ENOENT[^\r\n]*universalify/],
-    ["NATIVE_DEPENDENCY_FILE_MISSING", /ENOENT[^\r\n]*\.(?:node|dylib|dll)['"\s]/],
-    ["PACKAGE_MANIFEST_MISSING", /ENOENT[^\r\n]*package\.json/],
-    ["MAC_PLIST_MISSING", /ENOENT[^\r\n]*\.plist/],
     ["MAC_P12_MISSING", /ENOENT[^\r\n]*\.(?:p12|pfx)/],
-    ["MAC_APP_BINARY_MISSING", /ENOENT[^\r\n]*Contents[\\/]MacOS/],
-    ["MAC_HELPER_MISSING", /ENOENT[^\r\n]*OMP-Desktop-macOS/],
-    ["ASAR_FILE_MISSING", /ENOENT[^\r\n]*\.asar/],
-    ["UPDATE_CONFIG_MISSING", /ENOENT[^\r\n]*app-update\.yml/],
     ["BUILDER_EXECUTION_FAILED", /ERR_ELECTRON_BUILDER_CANNOT_EXECUTE/],
     ["CERTIFICATE_IMPORT_FAILED", /SecKeychainItemImport|certificate.*import|Invalid CSC_LINK|Env CSC_LINK is not correct/],
     ["NOT_A_REGULAR_FILE", /not a file|not a regular file/],
-    ["PACKAGE_MANAGER_FILE_MISSING", /ENOENT[^\r\n]*(?:pnpm|corepack|npm\.cjs)/],
     ["SIGNING_FAILED", /cannot find signing|No valid identity|code signing.*failed/],
     ["MISSING_FILE", /ENOENT|No such file or directory/],
     ["PERMISSION_DENIED", /EACCES|Permission denied/],
     ["TYPE_ERROR", /TypeError:/],
   ];
   const classes=known.filter(([,pattern])=>pattern.test(text)).map(([name])=>name);
-  const missingLines=text.split(/\r?\n/).filter(line=>line.includes("ENOENT")).map(line=>line.replaceAll("\\","/"));
-  const publicDependencyClasses=publicDependencies.filter(name=>missingLines.some(line=>line.includes("/node_modules/"+name+"/"))).slice(0,4).map(name=>"MISSING_LOCKED_DEPENDENCY:"+name);
-  return {classes:classes.length?classes:["UNCLASSIFIED"],...(publicDependencyClasses.length?{publicDependencyClasses}:{}),phase:{preflight:/RELEASE-PACKAGE [a-z0-9]+\/[a-z0-9]+: preflight/.test(text),notices:/RELEASE-PACKAGE: dependency notices/.test(text),builder:/RELEASE-PACKAGE [a-z0-9]+\/[a-z0-9]+: electron-builder/.test(text)}};
+  return {classes:classes.length?classes:["UNCLASSIFIED"],phase:{preflight:/RELEASE-PACKAGE [a-z0-9]+\/[a-z0-9]+: preflight/.test(text),notices:/RELEASE-PACKAGE: dependency notices/.test(text),builder:/RELEASE-PACKAGE [a-z0-9]+\/[a-z0-9]+: electron-builder/.test(text)}};
 }
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){

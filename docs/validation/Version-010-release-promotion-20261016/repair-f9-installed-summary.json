@@ -1,0 +1,15 @@
+{
+  "sourceRevision": "f9a1675",
+  "packageExit": 0,
+  "installedUpdateWorkflowPassed": true,
+  "installerSha256": "92a5addd3c8e1e118f7a16f4293fe8c5b9952807e68a011562d15f6609ac2d7d",
+  "oldProjectPreserved": true,
+  "currentVersion": "0.1.0",
+  "updateMode": "manual",
+  "futureFixtureVersion": "0.1.1",
+  "githubUrls": [
+    "https://github.com/MisterBowie/omp-desktop/releases/latest"
+  ],
+  "normalQuits": 2,
+  "reportSha256": "dbdf1f2b1de939cfaa417988354f598c81df1deb0fb8746906a5d5b01e4c43ef"
+}

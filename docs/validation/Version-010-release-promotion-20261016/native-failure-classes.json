@@ -1,0 +1,12 @@
+{
+  "sourceRun": 38850057597,
+  "diagnosticVersion": "8dc5e01",
+  "messages": [
+    "{\"classes\":[\"NOT_A_REGULAR_FILE\"],\"phase\":{\"preflight\":true,\"notices\":true,\"builder\":true}}",
+    "116809299982",
+    "{\"classes\":[\"BUNDLER_MODULE_MISSING\"],\"phase\":{\"preflight\":false,\"notices\":false,\"builder\":false}}",
+    "116809299917",
+    "{\"classes\":[\"NOT_A_REGULAR_FILE\"],\"phase\":{\"preflight\":true,\"notices\":true,\"builder\":true}}",
+    "116809299891"
+  ]
+}
