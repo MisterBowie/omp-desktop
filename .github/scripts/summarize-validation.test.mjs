@@ -16,6 +16,9 @@ test("summaries expose fixed fields without private report strings",t=>{
 });
 test("failed TAP assertions expose coordinates and bounded values only",()=>{
  const tap=`# Subtest: private-title\nnot ok 5 - private-title\n  ---\n  failureType: 'testCodeFailure'\n  error: 'private-message'\n  code: 'ERR_ASSERTION'\n  expected: 'completed'\n  actual: 'running'\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file:///private/secret/omp-plan-submit-e2e.test.mjs:941:12)\n  ...\n# Subtest: next-private\nnot ok 6 - next-private\n  ---\n  code: 'PRIVATE_CODE'\n  expected: 'private-value'\n  actual: false\n  stack: |-\n    TestContext.<anonymous> (file:///private/secret/omp-plan-submit-e2e.test.mjs:1064:14)\n  ...\n1..6\n`;
- assert.deepEqual(summarizeStrictFailures(tap),[{number:5,failureType:"testCodeFailure",code:"ERR_ASSERTION",operator:"strictEqual",lines:[{line:941,column:12}],expected:"completed",actual:"running"},{number:6,lines:[{line:1064,column:14}],actual:false}]);
+ assert.deepEqual(summarizeStrictFailures(tap),[{number:5,source:[],diagnosticCodes:["ERR_ASSERTION"],failureType:"testCodeFailure",code:"ERR_ASSERTION",operator:"strictEqual",lines:[{line:941,column:12}],expected:"completed",actual:"running"},{number:6,source:[],diagnosticCodes:[],lines:[{line:1064,column:14}],actual:false}]);
  assert(!JSON.stringify(summarizeStrictFailures(tap)).includes("private"));
+ const nested=tap.replace("private-message","OMP_RESTORE_FAILED").replace("file:///private/secret/omp-plan-submit-e2e.test.mjs:941:12","file:///private/secret/omp-session.ts:1412:9");
+ assert.deepEqual(summarizeStrictFailures(nested)[0].source,[{file:"omp-session.ts",line:1412,column:9}]);
+ assert(summarizeStrictFailures(nested)[0].diagnosticCodes.includes("OMP_RESTORE_FAILED"));
 });

@@ -15,11 +15,15 @@ const errors=[
  ["OWNERSHIP_FAILURE",/owned process|observed as owned|ownership/], ["MISSING_FILE",/ENOENT/],
  ["CONNECTION_CLOSED",/ECONNRESET|ECONNREFUSED|WebSocket.*closed|socket.*closed/i],
 ];
+const diagnosticCodes=["OMP_RESTORE_FAILED","OMP_CAPABILITY_STATE_FAILED","OMP_HOST_TURN_FAILED","OMP_SESSION_CREATE_FAILED","OMP_HOST_TOOL_REGISTRATION_FAILED","OMP_HISTORY_READ_FAILED","NOT_STARTED","ERR_ASSERTION"];
+const sourceFiles=["omp-session.ts","session.ts","protocol.ts","supervisor.ts","process.ts","installed-product.mjs","installed-application.mjs","installed-payload.mjs","installed-workflow.mjs","e2e-installed-smoke.mjs"];
+function coordinates(text){return sourceFiles.flatMap(file=>[...text.matchAll(new RegExp("(?:[/\\\\]|^)"+file.replaceAll(".","\\.")+":(\\d+):(\\d+)","g"))].map(match=>({file,line:Number(match[1]),column:Number(match[2])})));}
 /** TAP diagnostics are untrusted: return only source coordinates and enums. */
 export function summarizeStrictFailures(text){
  const failures=[];
  for(const match of text.matchAll(/^not ok (\d+) - [^\n]*\n([\s\S]*?)(?=^(?:# Subtest:|(?:not )?ok \d+ - |1\.\.)|$(?![\s\S]))/gm)){
   const block=match[2],result={number:Number(match[1])};
+  result.source=coordinates(block);result.diagnosticCodes=diagnosticCodes.filter(code=>block.includes(code));
   const allowed={failureType:["testCodeFailure","testTimeoutFailure","cancelledByParent"],code:["ERR_ASSERTION","SQLITE_ERROR","ERR_SQLITE_ERROR","ENOENT","ETIMEDOUT"],operator:["strictEqual","deepStrictEqual","equal","ok","match","rejects"]};
   for(const [key,values] of Object.entries(allowed)){const value=new RegExp("^\\s+"+key+": ['\"]?([^'\"\\r\\n]+)","m").exec(block)?.[1];if(values.includes(value))result[key]=value;}
   result.lines=[...block.matchAll(/omp-plan-submit-e2e\.test\.mjs:(\d+):(\d+)/g)].map(item=>({line:Number(item[1]),column:Number(item[2])}));
@@ -41,6 +45,7 @@ export function summarizeValidation(directory){
   const runtime=json("packaged-runtime.json"),smoke=json("installed-smoke.json"),facts=json("workflow-facts.json"),progress=json("progress.json"),turn=json("turn-timeout.json");
   const failure=String(smoke?.failure??"")+"\n"+String(smoke?.cleanupFailure??"");
   const summary={target,runtimeReportValid:Boolean(runtime),runtimeGetState:runtime?.run?.getState===true,smokeReportExists:Boolean(smoke),cleaned:smoke?.cleaned===true,orderedQuit:smoke?.bootAndOrderedQuit===true,completedChecks:facts?.checks?.length??0,steps:Object.fromEntries(steps.map(key=>[key,facts?.steps?.[key]===true])),progress:stages.includes(progress?.label)?progress.label:"UNKNOWN",errorClasses:errors.filter(([,pattern])=>pattern.test(failure)).map(([code])=>code),normalQuits:smoke?.processReports?.filter(item=>item.label==="ordered-quit"&&item.noOwnedProcessesRemain===true).length??0};
+  summary.failureSource=coordinates(failure);summary.diagnosticCodes=diagnosticCodes.filter(code=>failure.includes(code));
   if(turn)summary.turn={expectedMarker:markers.includes(turn.expectedText)?turn.expectedText:"UNKNOWN",running:turn.last?.status?.isRunning===true,hasSessionError:Boolean(turn.last?.status?.lastError),stopVisible:turn.last?.ui?.stop===true,approvalVisible:Boolean(turn.last?.ui?.permission),documentVisible:turn.visibility?.state==="visible"};
   const tap=find("packaged-plan-goal.tap");if(tap){const text=readFileSync(tap,"utf8");summary.strict=Object.fromEntries(["tests","pass","fail","skipped"].map(key=>[key,Number(new RegExp("^# "+key+" (\\d+)$","m").exec(text)?.[1]??-1)]));summary.failedStrictNumbers=[...text.matchAll(/^\s*not ok (\d+) - /gm)].map(match=>Number(match[1]));summary.strictFailures=summarizeStrictFailures(text);}
   result.push(summary);
