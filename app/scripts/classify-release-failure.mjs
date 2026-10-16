@@ -2,7 +2,11 @@ import {readFileSync} from "node:fs";
 import {resolve} from "node:path";
 import {pathToFileURL} from "node:url";
 
-/** Never return log text, paths, URLs, names or arbitrary captured strings. */
+// These identities come only from the committed public lockfile, never logs.
+const lockSection=readFileSync(new URL("../pnpm-lock.yaml",import.meta.url),"utf8").split("\npackages:\n")[1].split("\nsnapshots:\n")[0];
+const publicDependencies=[...new Set([...lockSection.matchAll(/^  ['"]?((?:@[^/\s]+\/)?[^@'"\s:]+)@\d[^\n]*:\s*$/gm)].map(match=>match[1]))];
+
+/** Return fixed classes and public locked identities; never captured log text. */
 export function classifyReleaseFailure(input) {
   const text=String(input).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "");
   const known=[
@@ -79,7 +83,9 @@ export function classifyReleaseFailure(input) {
     ["TYPE_ERROR", /TypeError:/],
   ];
   const classes=known.filter(([,pattern])=>pattern.test(text)).map(([name])=>name);
-  return {classes:classes.length?classes:["UNCLASSIFIED"],phase:{preflight:/RELEASE-PACKAGE [a-z0-9]+\/[a-z0-9]+: preflight/.test(text),notices:/RELEASE-PACKAGE: dependency notices/.test(text),builder:/RELEASE-PACKAGE [a-z0-9]+\/[a-z0-9]+: electron-builder/.test(text)}};
+  const missingLines=text.split(/\r?\n/).filter(line=>line.includes("ENOENT")).map(line=>line.replaceAll("\\","/"));
+  const publicDependencyClasses=publicDependencies.filter(name=>missingLines.some(line=>line.includes("/node_modules/"+name+"/"))).slice(0,4).map(name=>"MISSING_LOCKED_DEPENDENCY:"+name);
+  return {classes:classes.length?classes:["UNCLASSIFIED"],...(publicDependencyClasses.length?{publicDependencyClasses}:{}),phase:{preflight:/RELEASE-PACKAGE [a-z0-9]+\/[a-z0-9]+: preflight/.test(text),notices:/RELEASE-PACKAGE: dependency notices/.test(text),builder:/RELEASE-PACKAGE [a-z0-9]+\/[a-z0-9]+: electron-builder/.test(text)}};
 }
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){

@@ -18,3 +18,8 @@ test("module and missing-file categories disclose no captured path or dependency
  assert(!JSON.stringify(result).includes("private"));
  assert(!JSON.stringify(result).includes("yaml"));
 });
+test("dependency classes are limited to committed public lockfile identities",()=>{
+ const result=classifyReleaseFailure("ENOENT: open '/private/secret/node_modules/semver/index.js'\nENOENT: open '/private/secret/node_modules/private-secret-package/index.js'");
+ assert.deepEqual(result.publicDependencyClasses,["MISSING_LOCKED_DEPENDENCY:semver"]);
+ const output=JSON.stringify(result);assert(!output.includes("/private"));assert(!output.includes("private-secret-package"));
+});
