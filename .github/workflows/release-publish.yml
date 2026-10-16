@@ -102,7 +102,17 @@ jobs:
           import { writeFileSync } from 'node:fs';
           import { formatChangelogNotes } from './packages/shared/dist/changelog.js';
           const version = process.env.RELEASE_VERSION;
-          writeFileSync('../release-notes.md', formatChangelogNotes(version, 'en') + '\n\n' + formatChangelogNotes(version, 'zh-CN') + '\n');
+          const installation = [
+            '### Installation and updates / 安装与更新',
+            '',
+            '- Install 0.1.0 manually once over a 0.15.x test build because the version sequence has restarted. Existing OMP data stays in its own directory.',
+            '- 从 0.15.x 测试版首次切换到 0.1.0 需手动安装；原有 OMP 数据目录保留。',
+            '- Unsigned macOS builds use the GitHub download button for updates. If macOS blocks the first launch, follow OMP-Desktop-macOS-opening-help.txt in the ZIP package.',
+            '- 未签名 macOS 通过 GitHub 下载按钮更新；首次启动被系统阻止时，请按 ZIP 中的 OMP-Desktop-macOS-opening-help.txt 操作。',
+            '- The Windows installer and Linux AppImage support in-app updates. Portable Windows, Debian and RPM packages use manual downloads.',
+            '- Windows 安装版和 Linux AppImage 支持应用内更新；Windows 便携版、Debian 和 RPM 使用手动下载。',
+          ].join('\n');
+          writeFileSync('../release-notes.md', formatChangelogNotes(version, 'en') + '\n\n' + formatChangelogNotes(version, 'zh-CN') + '\n\n' + installation + '\n');
           JS
       - name: Create or verify the stable tag at the accepted source
         env:
