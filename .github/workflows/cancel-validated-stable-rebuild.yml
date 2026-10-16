@@ -1,0 +1,41 @@
+name: Cancel only the redundant accepted-source stable rebuild
+
+on:
+  push:
+    tags: ['cancel-validated-stable-*']
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  cancel-duplicate:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Revalidate the accepted source before selecting exactly one duplicate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: 0.1.0
+          RELEASE_REVISION: 154bc03dfb619b5c219b5e3cf1e08ae1672bcec6
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REPOSITORY" == MisterBowie/omp-desktop ]]
+          [[ "$GITHUB_REF_NAME" =~ ^cancel-validated-stable-([0-9]+)$ ]]
+          duplicate="${BASH_REMATCH[1]}"
+          source_run=38862126801
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$source_run" > "$RUNNER_TEMP/source.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$source_run/jobs?per_page=100" > "$RUNNER_TEMP/jobs.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$source_run/artifacts?per_page=100" > "$RUNNER_TEMP/artifacts.json"
+          node app/scripts/verify-release-candidate.mjs "$RUNNER_TEMP/source.json" "$RUNNER_TEMP/jobs.json" "$RUNNER_TEMP/artifacts.json" "$RUNNER_TEMP/accepted.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$duplicate" > "$RUNNER_TEMP/duplicate.json"
+          target="$(node .github/scripts/validated-stable-rebuild.mjs "$RUNNER_TEMP/accepted.json" "$RUNNER_TEMP/duplicate.json")"
+          if [[ "$target" != none ]]; then
+            [[ "$target" == "$duplicate" ]]
+            gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$target/cancel" > "$RUNNER_TEMP/cancel.json"
+            echo "::notice::Cancelled only the redundant stable rebuild of the already accepted source."
+          fi
