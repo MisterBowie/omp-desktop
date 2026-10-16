@@ -1,0 +1,79 @@
+{
+  "schema": "omp-desktop.accepted-release-candidate/1",
+  "version": "0.1.0",
+  "sourceRevision": "154bc03dfb619b5c219b5e3cf1e08ae1672bcec6",
+  "runId": 38862126801,
+  "runUrl": "https://github.com/MisterBowie/omp-desktop/actions/runs/38862126801",
+  "nativeJobs": [
+    {
+      "id": 116846622873,
+      "name": "build (macos-15, darwin, arm64, dist:mac)",
+      "conclusion": "success"
+    },
+    {
+      "id": 116846622953,
+      "name": "build (macos-15-intel, darwin, x64, dist:mac)",
+      "conclusion": "success"
+    },
+    {
+      "id": 116846622964,
+      "name": "build (windows-latest, win32, x64, dist:win)",
+      "conclusion": "success"
+    },
+    {
+      "id": 116846622997,
+      "name": "build (ubuntu-22.04, linux, x64, dist:linux)",
+      "conclusion": "success"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 12031385063,
+      "name": "release-win32-x64",
+      "digest": "sha256:5d81483d23cc115bddf71e5bce3d817583ceebe2f33f4f40a0c3f5343a290a65",
+      "bytes": 400429713
+    },
+    {
+      "id": 12031325083,
+      "name": "validation-win32-x64",
+      "digest": "sha256:07730e1a1f50e43b0be8cd1c1c22280f9f66ddedca7377ed60201d8e0c241efe",
+      "bytes": 318676
+    },
+    {
+      "id": 12031317388,
+      "name": "validation-darwin-x64",
+      "digest": "sha256:72c800779d281ced0c57c51a588a65ebf2fbb0b9e9f327f0b723bd4206021048",
+      "bytes": 459007
+    },
+    {
+      "id": 12030858753,
+      "name": "release-darwin-x64",
+      "digest": "sha256:4cce13ff6ecf0b06b88196fa1e736626167cb527aea11833bc6d27c3e5909fe4",
+      "bytes": 462555917
+    },
+    {
+      "id": 12030550673,
+      "name": "release-darwin-arm64",
+      "digest": "sha256:c83f9d6965600b79a15f90b3a33fecfc5c61fd809ec66ca6d7b640cfc2d4f7bb",
+      "bytes": 446784356
+    },
+    {
+      "id": 12030328066,
+      "name": "validation-darwin-arm64",
+      "digest": "sha256:23f051868cd6f08373611d1edc6f0a70d02cbbafb5e74b2524a452f94c52ae05",
+      "bytes": 405464
+    },
+    {
+      "id": 12030053565,
+      "name": "validation-linux-x64",
+      "digest": "sha256:e787b3e857031a5e4b709ad75052e1281b61012928821ad7fb04f9faf2e5c0d8",
+      "bytes": 396715
+    },
+    {
+      "id": 12029828942,
+      "name": "release-linux-x64",
+      "digest": "sha256:0c9e0bada5d6e944a75461dad6968577cf794d3d7b1bbeec4ac2a84ee2e87005",
+      "bytes": 670792616
+    }
+  ]
+}

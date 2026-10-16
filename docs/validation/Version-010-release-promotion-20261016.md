@@ -1,19 +1,11 @@
 # 0.1.0 固定候选与原样发布（2026-10-16，进行中）
 
-最新进展：第五轮候选 `154bc03dfb619b5c219b5e3cf1e08ae1672bcec6` /
+最新进展：候选 `154bc03dfb619b5c219b5e3cf1e08ae1672bcec6` /
 [run38862126801](https://github.com/MisterBowie/omp-desktop/actions/runs/38862126801)
-的guard与源码门通过，四目标原生编译中；稳定版尚未发布。
-旧Windows第8项安全报告显示已有审批请求且errors=[]，与短路径错误触发额外read审批
-一致；真实Windows重跑仍是通过依据，不用推断替代结果。
-
-
-用户已授权“提交、推送并发布 v0.1.0”。当前候选为 `154bc03`，标签
-`release-check-0.1.0-154bc03`；guard 与源码门通过，四目标仍在原生编译。
-完整源码基线为 ae173d3 / run38856995305；该轮 Mac ARM/Linux 全通过，但 Windows
-短路径夹具及 Intel Mac 架构名断言失败。当前候选保留全部15/8项断言，修正验收器后重跑。
-第三轮 f9a1675 / run38854346905 完整源码门在 workspace test 失败，四原生目标未启动。
-前两轮 `f8c0e58` / run38845176146 和 `e691772` / run38850057597 均失败并保留。
-尚未创建稳定标签或发布公开更新清单，不能用旧候选单个平台通过替代本轮完整验收。
+整轮success，四目标各严格15/15、安装8项与退出清理通过，八份固定来源制品已由门接受。
+首次晋升run38866649933在Linux更新清单校验被阻断，稳定标签和Release尚未创建。
+发布控制面已修复Debian暂存改名对应的清单引用，35项交付回归通过，准备重试同一制品。
+历史失败候选与晋升标签保留，不用新结果覆盖失败事实。
 
 固定 OMP fork `d648d27` 已非强制推送至用户自己的维护分支，并经 GitHub API
 回读确认提交与树摘要。桌面源码已提交并推送；原默认模型及所有既有工作树保持原状。
@@ -136,3 +128,16 @@ TEMP 8.3短名，与 host-core 持久长路径不相等；改为 native realpath
 
 修复后本机实际打包运行时严格契约15/15、0失败/跳过；测试夹具清理正常完成。
 本轮原始日志仅本机保留，仓库记录 [计数与摘要](Version-010-release-promotion-20261016/native-harness-repair-summary.json)。
+
+## 原生接受与首次晋升阻断
+
+run38862126801整轮success，四目标原生作业通过；本机严格门读取最新run/jobs/artifacts，
+接受八份非空、未过期、SHA256完整且head_sha一致的资产。见[接受回执](Version-010-release-promotion-20261016/accepted-candidate.json)。
+首次晋升run38866649933完成下载、暂存与原生证据保存，但prepare-github-release:26/58
+拒绝latest-linux.yml的不安全或旧名称；后续稳定tag与Release步骤均skipped。
+实际electron-builder26.15.3会合并AppImage/Deb/RPM条目，暂存仅改Debian文件名而未改引用。
+真实writer→暂存→严格validator及复制到临时目录的CLI回归，原提交3通过/2失败，
+修复后5/5；恶意URL与篡改SHA512仍拒绝。安装器字节不变，只改准确Debian引用并记录
+原始/暂存清单摘要。35项交付回归和4YAML/36Bash通过。
+发布额外记录控制面commit/ref、暂存脚本摘要、候选run与发布run，明确产品来源与发布控制面。
+本轮原始测试日志仅本机保留，仓库记录[计数和摘要](Version-010-release-promotion-20261016/publication-feed-repair-summary.json)。

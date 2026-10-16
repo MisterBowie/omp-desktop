@@ -56,6 +56,12 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100" > "$RUNNER_TEMP/candidate-artifacts.json"
           node scripts/verify-release-candidate.mjs "$RUNNER_TEMP/candidate-run.json" "$RUNNER_TEMP/candidate-jobs.json" "$RUNNER_TEMP/candidate-artifacts.json" "$RUNNER_TEMP/omp-candidate-receipt.json"
           cp scripts/stage-release-inputs.mjs "$RUNNER_TEMP/stage-release-inputs.mjs"
+          node --input-type=module - <<'JS'
+          import {readFileSync,writeFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const e=process.env;
+          writeFileSync(e.RUNNER_TEMP+'/omp-publication-control.json',JSON.stringify({schema:'omp-desktop.publication-control/1',version:e.RELEASE_VERSION,sourceRevision:e.RELEASE_REVISION,controllerRevision:e.GITHUB_SHA,controllerRef:e.GITHUB_REF_NAME,candidateRunId:Number(e.SOURCE_RUN_ID),publicationRunId:Number(e.GITHUB_RUN_ID),stagingScriptSha256:createHash('sha256').update(readFileSync(e.RUNNER_TEMP+'/stage-release-inputs.mjs')).digest('hex')},null,2)+'\n');
+          JS
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source-revision }}
@@ -89,6 +95,7 @@ jobs:
             tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -cf - -C "../release-validation/validation-$target" . | gzip -n > "../release-dist/omp-desktop-validation-$RELEASE_VERSION-$target.tar.gz"
           done
           cp "$RUNNER_TEMP/omp-candidate-receipt.json" "../release-dist/omp-desktop-validation-$RELEASE_VERSION-build.json"
+          cp "$RUNNER_TEMP/omp-publication-control.json" "../release-dist/omp-desktop-validation-$RELEASE_VERSION-publication.json"
       - name: Verify every installer hash and merge update feeds
         run: |
           node --input-type=module - <<'JS'

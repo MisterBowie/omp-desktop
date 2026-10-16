@@ -1,0 +1,42 @@
+{
+  "schema": "omp-desktop.publication-feed-repair/1",
+  "acceptedSource": "154bc03dfb619b5c219b5e3cf1e08ae1672bcec6",
+  "acceptedRun": 38862126801,
+  "failedPublicationRun": 38866649933,
+  "stableTagCreationSkipped": true,
+  "rootCause": "Debian canonical staging renamed the payload without rewriting the builder merged Linux feed references.",
+  "productBytesChanged": false,
+  "evidence": {
+    "linux-feed-staging-red.tap": {
+      "sha256": "0a4a9d786afe6d046f6a2e98a1f52418b398e9780b3c7ea470ea446d46fe52e0",
+      "counts": {
+        "tests": 5,
+        "pass": 3,
+        "fail": 2,
+        "skipped": 0
+      }
+    },
+    "linux-feed-staging-green.tap": {
+      "sha256": "7fa24bbdd9ad64d0306e4d9f005bfb8157f7b488834cf42799b8bb1ead77507e",
+      "counts": {
+        "tests": 5,
+        "pass": 5,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    "publication-feed-repair-tests.tap": {
+      "sha256": "4fbe0d1adfe35f99c85b096ae3614bbb0a9999668e826df69e9dac46747ff37b",
+      "counts": {
+        "tests": 35,
+        "pass": 35,
+        "fail": 0,
+        "skipped": 0
+      }
+    }
+  },
+  "syntax": {
+    "yaml": 4,
+    "bash": 36
+  }
+}

@@ -4,12 +4,11 @@
 `omp-desktop-v010-updates` / `codex/v010-github-updates`；81 项相关回归、实际版本重置
 保留项目、检查失败重试/新 GitHub 按钮、2 次退出零残留及最终 Mac 清单校验通过。
 未签名 Mac 手动下载，签名 Mac/NSIS/AppImage 保留自动安装；根稳定三平台流水线已准备。
-用户已授权提交/推送/发布；固定 OMP d648d27 已同步。最新候选
-`154bc03dfb619b5c219b5e3cf1e08ae1672bcec6` / run38862126801 已启动，guard 与源码门通过。
-完整源码基线 ae173d3 已通过全部六步，当前仅验收器/文档/发布脚本不同；每个原生目标
-仍重新打包、执行严格15项与实际安装8项。前轮 Windows 短路径夹具、Mac Intel 架构名
-误判已定位修复，本机15项与33项交付回归通过；Windows 最终结果以本轮原生实测为准。
-全目标通过后原样晋升该候选的已验收资产并发布 v0.1.0。
+用户已授权提交/推送/发布；固定OMP d648d27已同步。候选154bc03 / run38862126801
+整轮success，四目标各严格15项、实际安装8项及退出清理通过，八份资产来源与摘要门接受。
+首次晋升run38866649933被Linux清单旧Debian名称阻断，稳定tag和Release未创建；
+发布器已同步改名引用，真实writer/复制CLI回归5项及完整交付35项通过。
+重试将原样发布同一批安装包，并保留产品源码与发布控制面分别的来源回执。
 GitHub stable 更新清单尚未上线。见 [发布进展](validation/Version-010-release-promotion-20261016.md) 与
 [本机验收](validation/Version-010-github-updates-local-20261016.md)。
 

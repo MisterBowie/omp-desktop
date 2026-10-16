@@ -46,7 +46,11 @@ Artifact downloads may retain a common directory root. The publisher stages
 their original bytes under unique basenames, records their source paths and
 hashes, and gives the Debian installer the canonical
 `OMP-Desktop-X.Y.Z-x64.deb` name so every installer is covered by the checksum
-record. Collisions, symlinks, stale versions and unrelated input files fail
+record. The real builder merges AppImage, Debian and RPM entries into one Linux
+feed. Staging also rewrites exact Debian references in `files[].url` and legacy
+`path`, retaining every declared SHA512/size and recording original and staged
+feed digests. The strict validator then checks every referenced installer.
+Collisions, symlinks, stale versions and unrelated input files fail
 before publication.
 
 The initial 0.1.0 source gates passed at `f8c0e58` in run `38845176146`.
