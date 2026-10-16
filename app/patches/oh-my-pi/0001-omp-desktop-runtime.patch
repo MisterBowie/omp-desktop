@@ -19,6 +19,28 @@ index 8e85d7c..b3bdb3a 100644
  `getServiceTiers()` returns a detached snapshot of the session's live per-family tier map. `setServiceTier(family, tier)` changes one family for subsequent requests; pass `undefined` to clear that session override. OpenAI accepts `auto`, `default`, `flex`, `scale`, or `priority`; Anthropic accepts `priority`; Google accepts `flex` or `priority`. Changes made while a response is streaming do not alter that in-flight request.
  
  ### Provider registration
+diff --git a/docs/lsp-config.md b/docs/lsp-config.md
+index f5d8328..e6bfc33 100644
+--- a/docs/lsp-config.md
++++ b/docs/lsp-config.md
+@@ -8,6 +8,17 @@ Source of truth in code:
+ - Config loader: `packages/coding-agent/src/lsp/config.ts`
+ - Built-in server definitions: `packages/coding-agent/src/lsp/defaults.json`
+ 
++## Diagnostic delivery
++
++`lsp.diagnosticsOnWrite` enables checking newly written files;
++`lsp.diagnosticsOnEdit` enables checking edits to existing files.
++`lsp.diagnosticsDeferred` defaults to `true`, preserving asynchronous late
++diagnostics for interactive sessions. An RPC host that completes its turn at
++`agent_end` can set it to `false`: write/edit then return diagnostics in their
++own tool result using the existing bounded diagnostic pipeline and caller
++cancellation. Slow or failed servers remain observable in that result; they
++do not start a later unowned model continuation.
++
+ ## Auto-detection
+ 
+ When no config file contributes a server override, OMP auto-detects built-in servers by intersecting two conditions:
 diff --git a/docs/rpc.md b/docs/rpc.md
 index 49a7454..fd6badd 100644
 --- a/docs/rpc.md
@@ -1599,6 +1621,22 @@ index 0eeda6d..bdb5715 100644
  			minify: {
  				identifiers: options.minifyIdentifiers ?? false,
  				keepNames: true,
+diff --git a/packages/coding-agent/src/config/settings-schema.ts b/packages/coding-agent/src/config/settings-schema.ts
+index 165ed57..d3e1f87 100644
+--- a/packages/coding-agent/src/config/settings-schema.ts
++++ b/packages/coding-agent/src/config/settings-schema.ts
+@@ -3881,6 +3881,11 @@ export const SETTINGS_SCHEMA = {
+ 		},
+ 	},
+ 
++	"lsp.diagnosticsDeferred": {
++		type: "boolean",
++		default: true,
++	},
++
+ 	"lsp.diagnosticsDeduplicate": {
+ 		type: "boolean",
+ 		default: true,
 diff --git a/packages/coding-agent/src/extensibility/extensions/loader.ts b/packages/coding-agent/src/extensibility/extensions/loader.ts
 index e277e6d..906425e 100644
 --- a/packages/coding-agent/src/extensibility/extensions/loader.ts
@@ -1695,6 +1733,31 @@ index 1ce7ddd..b5c05b1 100644
  	getCommands: GetCommandsHandler;
  	setModel: SetModelHandler;
  	getThinkingLevel: GetThinkingLevelHandler;
+diff --git a/packages/coding-agent/src/lsp/deferred-diagnostics.ts b/packages/coding-agent/src/lsp/deferred-diagnostics.ts
+index dc4c4f4..9fa2be9 100644
+--- a/packages/coding-agent/src/lsp/deferred-diagnostics.ts
++++ b/packages/coding-agent/src/lsp/deferred-diagnostics.ts
+@@ -14,15 +14,18 @@ export class DeferredDiagnostics {
+ 	) {}
+ 
+ 	/** Begin a file mutation and return the handle consumed by LSP writethrough. */
+-	begin(path: string): WritethroughDeferredHandle {
++	begin(path: string): WritethroughDeferredHandle | undefined {
+ 		const existing = this.#pendingFetches.get(path);
+ 		if (existing) {
+ 			existing.abort();
+ 			this.#pendingFetches.delete(path);
+ 		}
+ 
+-		const controller = new AbortController();
+ 		const mutationVersion = this.#bumpVersion(path);
++		// RPC hosts may close the owning turn before an idle injection arrives.
++		// Keep diagnostics in the tool's bounded, cancellable writethrough there.
++		if (!this.session.settings.get("lsp.diagnosticsDeferred")) return undefined;
++		const controller = new AbortController();
+ 		return {
+ 			onDeferredDiagnostics: diagnostics => {
+ 				this.#pendingFetches.delete(path);
 diff --git a/packages/coding-agent/src/modes/rpc/host-tools.ts b/packages/coding-agent/src/modes/rpc/host-tools.ts
 index 62be077..4536eac 100644
 --- a/packages/coding-agent/src/modes/rpc/host-tools.ts
@@ -2635,6 +2698,51 @@ index f3c807d..b367d78 100644
 +		}
 +	});
  });
+diff --git a/packages/coding-agent/test/tools/lsp-diagnostics-freshness.test.ts b/packages/coding-agent/test/tools/lsp-diagnostics-freshness.test.ts
+index 2d26e69..0e77e1e 100644
+--- a/packages/coding-agent/test/tools/lsp-diagnostics-freshness.test.ts
++++ b/packages/coding-agent/test/tools/lsp-diagnostics-freshness.test.ts
+@@ -732,7 +732,7 @@ describe("LSP diagnostics freshness", () => {
+ 		expect(await Bun.file(filePath).text()).toBe("export const value: number = 'x';\n");
+ 	});
+ 
+-	it("returns the write tool result before slow diagnostics and queues them for the agent", async () => {
++	it.each([true, false])("settles slow write diagnostics with deferred delivery=%s", async deferred => {
+ 		const filePath = path.join(tempDir.path(), "write-tool.ts");
+ 		const uri = fileToUri(filePath);
+ 		const client = createClient(tempDir.path(), TEST_SERVER);
+@@ -763,6 +763,7 @@ describe("LSP diagnostics freshness", () => {
+ 				"lsp.formatOnWrite": false,
+ 				"lsp.diagnosticsOnWrite": true,
+ 				"lsp.diagnosticsDeduplicate": true,
++				"lsp.diagnosticsDeferred": deferred,
+ 			}),
+ 			enableLsp: true,
+ 			queueDeferredDiagnostics: entry => queued.resolve(entry),
+@@ -779,11 +780,18 @@ describe("LSP diagnostics freshness", () => {
+ 			content: "export const value: number = 'x';\n",
+ 		});
+ 
+-		expect(result.details?.diagnostics).toBeUndefined();
+-		const late = await queued.promise;
+-		expect(late.isStale()).toBe(false);
+-		expect(late.errored).toBe(true);
+-		expect(late.messages.some(message => message.includes("write tool deferred error"))).toBe(true);
++		if (deferred) {
++			expect(result.details?.diagnostics).toBeUndefined();
++			const late = await queued.promise;
++			expect(late.isStale()).toBe(false);
++			expect(late.errored).toBe(true);
++			expect(late.messages.some(message => message.includes("write tool deferred error"))).toBe(true);
++		} else {
++			expect(result.details?.diagnostics?.errored).toBe(true);
++			expect(
++				result.details?.diagnostics?.messages.some(message => message.includes("write tool deferred error")),
++			).toBe(true);
++		}
+ 		expect(await Bun.file(filePath).text()).toBe("export const value: number = 'x';\n");
+ 	});
+ 
 diff --git a/packages/natives/scripts/embed-native.ts b/packages/natives/scripts/embed-native.ts
 index e04c39a..af0f208 100644
 --- a/packages/natives/scripts/embed-native.ts

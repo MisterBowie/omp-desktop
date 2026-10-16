@@ -11,6 +11,7 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 
 | 决策 | 说明 |
 |---|---|
+| [ADR 0314：OMP 编码诊断结算](/adr/0314-omp-coding-diagnostic-settlement) | 写入/编辑在所属工具中完成 LSP 诊断，并在工具卡显示编译发现 |
 | [ADR 0001：Electron 桌面壳](/adr/0001-use-electron) | 桌面窗口与平台能力的承载层 |
 | [ADR 0005：本地插件系统](/adr/0005-user-installable-plugin-system) | 用户安装插件的第一阶段边界 |
 | [ADR 0009：English-first 全球化](/adr/0009-english-first-globalization) | 源语言、术语和协作规则 |

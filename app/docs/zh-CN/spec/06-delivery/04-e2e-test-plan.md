@@ -9,6 +9,20 @@
 
 ---
 
+### E2E-OMP-coding-LSP
+
+- **前提：** 已核验的原生 OMP 资源、真实 TypeScript 语言服务器和编译器、隔离的 HOME/项目、
+  生产 runner 和审批门、本机脚本模型；不调用付费模型。
+- **步骤：** 新写入带类型错误的文件；读取已有文件并用默认 hashline 编辑引入错误；读取
+  `xd://lsp` 发现工具；跨文件解析导入符号的定义；停止运行时。
+- **预期：** 两次修改均在工具结果中返回真实 2322 诊断，先于回合完成，后续模型请求和桌面
+  事件均能读取；定义指向导出文件，审批有效，语言服务器进程随运行时清理。
+- **自动化：** 设置 `OMP_BUNDLED_RESOURCES`、`OMP_LSP_TYPESCRIPT_SERVER` 后运行
+  `node --test apps/desktop/test/omp-lsp-coding-e2e.test.mjs`；编译器安装在服务器旁。
+  `OMP_LSP_EVIDENCE` 可保存真实协议轨迹。
+- **边界：** 各项目需提供相应语言服务器。本例在原生 `.omp/lsp.json` 中显式指定 Node，
+  保持运行时 PATH/HOME 隔离；不据此宣称自动安装服务器或真实付费模型必然选择语义工具。
+
 ### E2E-OMP-maintenance-daily
 
 安装后的DOM流程先显示并置前经过身份核验的自有窗口；隐藏/遮挡窗口可能暂停动画帧，

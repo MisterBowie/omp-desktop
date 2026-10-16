@@ -2485,3 +2485,27 @@ Text and timestamps are never consulted, so two prompts with byte-identical text
 remain two rows with two ids, and a duplicate can never be collapsed into one.
 `SessionDetail.replacedLiveMessageIds` is optional; engines whose live and durable
 rows already share an id (Pi native, desktop) never set it.
+
+
+## 19. Native coding diagnostics (ADR 0314)
+
+OMP owns LSP discovery, clients and the `lsp` tool. Desktop enables diagnostics
+for existing-file edits with `lsp.diagnosticsOnEdit: true` and settles write/edit
+findings within the owning tool via `lsp.diagnosticsDeferred: false` in the
+run-scoped overlay. Patch 6 adds that optional setting with standalone default
+`true`. The existing bounded diagnostic pipeline, cancellation, mutation-version
+freshness, tool approvals and process cleanup remain in force. No late LSP model
+continuation is scheduled by these mutation tools in Desktop mode.
+
+The native `lsp.enabled` switch still applies. Auto-detection requires matching
+project-root markers and a runnable server; `.omp/lsp.json` can configure an
+explicit interpreter and server command when the isolated PATH lacks a runtime.
+Language servers are project prerequisites. Semantic navigation remains
+discoverable through `read xd://lsp`; registering it does not force model choice.
+No automatic server installation or formatting is introduced. The real-server
+acceptance scenario is E2E-OMP-coding-LSP.
+
+The native Write tool card displays diagnostic metadata beside its written
+source using the same diagnostic blocks as Edit. Compiler errors do not turn a
+successful filesystem mutation into a failed tool execution. Both live and
+recovered rows retain the findings.

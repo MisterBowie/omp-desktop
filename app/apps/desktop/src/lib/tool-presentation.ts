@@ -842,9 +842,9 @@ function ompDebugBlocks(
   return blocks.length > 0 ? blocks : null;
 }
 
-/** Patch/per-file diagnostics: each message is a note, the summary/server and
+/** Coding diagnostics: each message is a note, the summary/server and
  * any unknown diagnostic field keep the generic renderer. */
-function ompEditDiagnosticBlocks(
+function ompCodingDiagnosticBlocks(
   diagnostics: Record<string, unknown> | null,
 ): ToolBlock[] {
   if (!diagnostics) return [];
@@ -1020,7 +1020,7 @@ function ompEditFileBlocks(file: Record<string, unknown>): ToolBlock[] {
 
   const diagnostics = asRecord(file.diagnostics);
   if (diagnostics) {
-    blocks.push(...ompEditDiagnosticBlocks(diagnostics));
+    blocks.push(...ompCodingDiagnosticBlocks(diagnostics));
     consumed.diagnostics = true;
   }
 
@@ -1081,7 +1081,7 @@ function ompEditBlocks(details: Record<string, unknown>): ToolBlock[] {
     // early return. A malformed aggregate value (a non-string `diff`, a
     // non-numeric `firstChangedLine`) was never represented, so it stays too.
     const diagnostics = asRecord(details.diagnostics);
-    if (diagnostics) blocks.push(...ompEditDiagnosticBlocks(diagnostics));
+    if (diagnostics) blocks.push(...ompCodingDiagnosticBlocks(diagnostics));
     const consumed: Record<string, true> = { perFileResults: true };
     if (typeof details.diff === "string") consumed.diff = true;
     if (typeof details.firstChangedLine === "number") consumed.firstChangedLine = true;
@@ -1154,6 +1154,9 @@ function resultBlocks(
       if (content !== null) {
         const path = stringAt(args, "path") ?? stringAt(details, "path");
         blocks.push(codeBlock("written", content, langForPath(path)));
+      }
+      if (ompToolBareName(message.toolName) === "write") {
+        blocks.push(...ompCodingDiagnosticBlocks(asRecord(details?.diagnostics)));
       }
       break;
     }

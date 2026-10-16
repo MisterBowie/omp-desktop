@@ -26,6 +26,10 @@
  * supervisor's owned cleanup removes it with the run root on stop, reclaim,
  * and failed starts. It is never a static constructor argument and never
  * touches the user's real configuration.
+ *
+ * Coding diagnostics are also settled here: existing-file edits enable
+ * diagnostics, and findings return within the tool owned by the current turn
+ * instead of an idle model continuation after completion (ADR 0314).
  */
 import { rmSync, writeFileSync } from "node:fs";
 
@@ -42,6 +46,10 @@ export function sourceIsolationOverlayYaml(): string {
     "# The pinned runtime merges this above the global and project config layers; the",
     "# workspace cannot re-open these sources. Desktop-owned equivalents are exposed once",
     "# through the host-tool RPC boundary (T19-B) and the trusted gate (T19-C).",
+    "# Keep code diagnostics inside the tool result owned by the current turn.",
+    "lsp:",
+    "  diagnosticsOnEdit: true",
+    "  diagnosticsDeferred: false",
     "mcp:",
     "  enableProjectConfig: false",
     "memory:",

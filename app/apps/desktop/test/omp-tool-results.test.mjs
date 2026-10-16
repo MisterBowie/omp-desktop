@@ -42,6 +42,18 @@ const fieldValues = (blocks) =>
     .flatMap((block) => block.rows.map((row) => `${row.label}: ${row.value}`));
 const allText = (blocks) => JSON.stringify(blocks);
 
+test("native write keeps compiler diagnostics beside the written source", () => {
+  const row = converter.convertEntry(tool("write", [{ type: "text", text: "Successfully wrote source\nLSP Diagnostics (1 error(s)): 2322" }], {
+    resolvedPath: "/repo/written.ts",
+    diagnostics: { server: "typescript-language-server", summary: "1 error(s)", errored: true,
+      messages: ["written.ts:1:14 [error] [typescript] Type 'string' is not assignable to type 'number'. (2322)"] },
+  }));
+  const blocks = buildToolPresentation({ ...row, toolArgs: { path: "written.ts", content: 'export const value: number = "wrong";\n' } });
+  assert.equal(byRole(blocks, "written").length, 1);
+  assert.match(allText(byRole(blocks, "error")), /2322/);
+  assert.equal(runOutcome(row), "ok", "a successful write with compiler findings is not a failed mutation");
+});
+
 test("LSP diagnostics text is visible and is not read as a tool failure", () => {
   const row = converter.convertEntry(
     tool("lsp", [{ type: "text", text: "Diagnostics: 1 error(s)\nsrc/example.ts:1:7 [error] [ts] Type 'number' is not assignable to type 'string'. (2322)" }], {

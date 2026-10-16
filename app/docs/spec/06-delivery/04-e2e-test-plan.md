@@ -8,6 +8,27 @@
 
 ## 1. Goals
 
+### E2E-OMP-coding-LSP
+
+- **Preconditions:** Verified native OMP resources, real TypeScript language
+  server and compiler, isolated HOME/project, production runner and approval
+  gate, local scripted model; no paid provider.
+- **Steps:** Write an invalid typed declaration; read an existing file; change
+  it with the default hashline editor; discover `xd://lsp`; resolve an imported
+  symbol across files; stop the runtime.
+- **Expected:** Both mutations return real diagnostic 2322 within their tool
+  results before completion. Findings reach model continuation and Desktop
+  projection; semantic definition points to the exporting file. Tool approvals
+  remain active, and all owned language-server processes are reaped.
+- **Automation:** `OMP_BUNDLED_RESOURCES=<resources>
+  OMP_LSP_TYPESCRIPT_SERVER=<absolute-cli.mjs> node --test
+  apps/desktop/test/omp-lsp-coding-e2e.test.mjs`. The compiler is installed beside
+  the language server. `OMP_LSP_EVIDENCE=<file>` saves the real protocol trace.
+- **Boundary:** Project language servers are separate prerequisites. This lane
+  uses an explicit Node interpreter in native `.omp/lsp.json` because Desktop
+  keeps its runtime PATH and HOME isolated. It does not prove automatic server
+  installation or paid-model tool selection.
+
 ### E2E-OMP-installed-identity-and-workflow
 
 - **Preconditions:** Actual OMP installer output, fixed bundled runtime, owned

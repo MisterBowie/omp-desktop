@@ -21,6 +21,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { parse as parseYaml } from "yaml";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
@@ -87,8 +88,9 @@ test("every packaging lane checks out the pinned fork the manifest names", () =>
       /can1357/,
       `${name}: can1357/oh-my-pi stays a read-only upstream, never a build source`,
     );
-    // No lane may substitute an upstream release asset for the controlled build.
-    assert.doesNotMatch(job, /can1357|gh release download/, `${name}: no upstream asset download`);
+    // Maintenance lanes download an older Desktop package for upgrade tests.
+    // The OMP build source still must be the controlled checkout above.
+    assert.doesNotMatch(job, /can1357/, `${name}: no upstream asset download`);
   }
 });
 
@@ -117,9 +119,12 @@ test("every packaging lane installs the pinned Bun and frozen fork dependencies"
       ),
       `${name}: the fork's dependencies must be installed from its lockfile`,
     );
-    const prepare = job.indexOf("bun install --frozen-lockfile");
-    const packaging = job.search(/run: pnpm (?:--filter @pi-desktop\/desktop )?run (?:dist:|dist\b|\$\{\{ matrix\.dist \}\})/);
-    assert.ok(packaging > 0, `${name}: the packaging step is missing`);
+    // Read actual run values: native release jobs also use multiline shell
+    // blocks, where `run: pnpm ...` is not the serialized YAML spelling.
+    const steps = parseYaml(source).jobs.build.steps;
+    const prepare = steps.findIndex((step) => step.run?.includes("bun install --frozen-lockfile"));
+    const packaging = steps.findIndex((step) => /pnpm (?:--filter @pi-desktop\/desktop )?run (?:dist:|dist\b|\$\{\{ matrix\.dist \}\})/.test(step.run ?? ""));
+    assert.ok(prepare >= 0 && packaging >= 0, `${name}: the preparation or packaging step is missing`);
     assert.ok(
       prepare < packaging,
       `${name}: the sidecar source must be prepared before the release entry runs`,

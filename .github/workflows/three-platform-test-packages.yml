@@ -301,7 +301,7 @@ jobs:
           # release asset; `apps/desktop/test/packaging-sidecar-source.test.mjs`
           # compares these fields against the manifest.
           repository: MisterBowie/oh-my-pi
-          ref: 36483311dfff67be7504f591974df93fc512a45a
+          ref: d648d27bcf0db16caecb876142d891cf49a51bc2
           path: .omp-sidecar-source
           # The build re-proves HEAD == base + patch level with
           # `git diff <base> HEAD` and `git apply --check --reverse`, so the base

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "patchLevel": "62bc57b+omp-desktop.5",
-  "description": "OMP Desktop patch set for the pinned upstream OMP runtime: RPC host-tool scheduling and batch policy, settle-time run termination (result flag and per-tool settlement declaration), the all-toolCall batch count, an optional live system-prompt action for a host-confirmed mid-turn mode transition, a deterministic native-addon archive, and an explicit bytecode switch on the build entry. Risk reduction and release-build reproducibility only: it does NOT make the sole-batch contract strict \u2014 see status.",
+  "patchLevel": "62bc57b+omp-desktop.6",
+  "description": "OMP Desktop patch set for the pinned upstream OMP runtime: RPC host-tool scheduling and batch policy, settle-time run termination (result flag and per-tool settlement declaration), the all-toolCall batch count, an optional live system-prompt action for a host-confirmed mid-turn mode transition, a deterministic native-addon archive, and an explicit bytecode switch on the build entry. Risk reduction and release-build reproducibility only: it does NOT make the sole-batch contract strict — see status. Adds optional inline LSP diagnostic settlement for RPC hosts; standalone deferred delivery remains the default.",
   "base": {
     "submodule": "upstream/oh-my-pi",
     "repository": "https://github.com/can1357/oh-my-pi",
@@ -10,15 +10,15 @@
   },
   "fork": {
     "repository": "https://github.com/MisterBowie/oh-my-pi",
-    "branch": "codex/omp-desktop-18.3.0-patch-5",
-    "commit": "36483311dfff67be7504f591974df93fc512a45a",
-    "tree": "7ba57b6d06fb8fe7e3f6352c67692e56cf39c3cd",
+    "branch": "codex/omp-desktop-18.3.0-patch-6",
+    "commit": "d648d27bcf0db16caecb876142d891cf49a51bc2",
+    "tree": "dab846754da313b09470a5d37aa1e255633d58cb",
     "note": "Self-maintained fork whose HEAD is exactly base.sha + this patch level. `scripts/omp-sidecar.mjs` refuses any other commit; can1357/oh-my-pi stays a read-only upstream."
   },
   "patch": {
     "file": "0001-omp-desktop-runtime.patch",
-    "sha256": "645242861412c8f2810cab397824413129ccbd5e5b7a94ca70caf0e76795895b",
-    "bytes": 118548
+    "sha256": "530d083f8cba5a82800aaf9e56acd72dd6d23e657acaa733c385724f436d002d",
+    "bytes": 123397
   },
   "capabilities": [
     "rpc-host-tool-concurrency",
@@ -28,10 +28,12 @@
     "extension-live-system-prompt",
     "rpc-host-tool-settle-termination",
     "reproducible-sidecar-build",
-    "explicit-bytecode-build-mode"
+    "explicit-bytecode-build-mode",
+    "inline-lsp-diagnostics"
   ],
   "files": [
     "docs/extensions.md",
+    "docs/lsp-config.md",
     "docs/rpc.md",
     "packages/agent/src/agent-loop.ts",
     "packages/agent/src/telemetry.ts",
@@ -39,9 +41,11 @@
     "packages/agent/test/agent-loop.test.ts",
     "packages/coding-agent/scripts/build-binary.ts",
     "packages/coding-agent/scripts/compile-binary.ts",
+    "packages/coding-agent/src/config/settings-schema.ts",
     "packages/coding-agent/src/extensibility/extensions/loader.ts",
     "packages/coding-agent/src/extensibility/extensions/runner.ts",
     "packages/coding-agent/src/extensibility/extensions/types.ts",
+    "packages/coding-agent/src/lsp/deferred-diagnostics.ts",
     "packages/coding-agent/src/modes/rpc/host-tools.ts",
     "packages/coding-agent/src/modes/rpc/rpc-client.ts",
     "packages/coding-agent/src/modes/rpc/rpc-mode.ts",
@@ -52,6 +56,7 @@
     "packages/coding-agent/test/build-binary-bytecode.test.ts",
     "packages/coding-agent/test/extensions-runner.test.ts",
     "packages/coding-agent/test/rpc-host-tools.test.ts",
+    "packages/coding-agent/test/tools/lsp-diagnostics-freshness.test.ts",
     "packages/natives/scripts/embed-native.ts",
     "packages/natives/test/embed-native.test.ts"
   ],
@@ -63,7 +68,8 @@
     "invalidDeclaration": "set_host_tools request is rejected; the value never degrades to the default",
     "invalidDeclarationDetail": "RpcHostToolDefinition.concurrency/batchPolicy/terminateOnSettle values outside their union throw in normalizeHostToolPolicy, which the set_host_tools command and the host-tool adapter both call",
     "bytecodeBuildEntry": "packages/coding-agent/scripts/build-binary.ts accepts exactly `--bytecode`/`--no-bytecode` (default on, one declaration, anything else exits 2); `compileCodingAgent` takes it as the typed option `CodingAgentCompileOptions.bytecode`, never from the environment",
-    "liveSystemPromptAction": "ExtensionAPI.setTurnSystemPrompt(prompt: string[]) \u2014 optional; a host that does not provide it rejects the call, and the desktop gate treats absence as a failed transition"
+    "liveSystemPromptAction": "ExtensionAPI.setTurnSystemPrompt(prompt: string[]) — optional; a host that does not provide it rejects the call, and the desktop gate treats absence as a failed transition",
+    "lspDiagnosticDelivery": "lsp.diagnosticsDeferred defaults true; false settles write/edit diagnostics within the bounded, cancellable tool result"
   },
   "verification": {
     "patchCheck": "node scripts/omp-patch.mjs --check",
@@ -80,7 +86,11 @@
       "packages/coding-agent/test/agent-session-turn-system-prompt.test.ts",
       "packages/coding-agent/test/extensions-runner.test.ts",
       "packages/coding-agent/test/rpc-host-tools.test.ts",
-      "packages/coding-agent/test/rpc-input-frame.test.ts"
+      "packages/coding-agent/test/rpc-input-frame.test.ts",
+      "packages/coding-agent/test/tools/lsp-diagnostics-freshness.test.ts",
+      "packages/coding-agent/test/tools/lsp-diagnostics-dedup.test.ts",
+      "packages/coding-agent/test/tools/lsp-batching.test.ts",
+      "packages/coding-agent/test/tools/lsp-regressions.test.ts"
     ],
     "reproducibilitySuites": [
       "packages/natives/test/embed-native.test.ts",
@@ -88,6 +98,62 @@
     ]
   },
   "history": [
+    {
+      "patchLevel": "62bc57b+omp-desktop.5",
+      "base": {
+        "submodule": "upstream/oh-my-pi",
+        "repository": "https://github.com/can1357/oh-my-pi",
+        "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+        "version": "18.3.0"
+      },
+      "fork": {
+        "repository": "https://github.com/MisterBowie/oh-my-pi",
+        "branch": "codex/omp-desktop-18.3.0-patch-5",
+        "commit": "36483311dfff67be7504f591974df93fc512a45a",
+        "tree": "7ba57b6d06fb8fe7e3f6352c67692e56cf39c3cd",
+        "note": "Self-maintained fork whose HEAD is exactly base.sha + this patch level. `scripts/omp-sidecar.mjs` refuses any other commit; can1357/oh-my-pi stays a read-only upstream."
+      },
+      "patch": {
+        "file": "0001-omp-desktop-runtime.patch",
+        "sha256": "645242861412c8f2810cab397824413129ccbd5e5b7a94ca70caf0e76795895b",
+        "bytes": 118548
+      },
+      "capabilities": [
+        "rpc-host-tool-concurrency",
+        "rpc-host-tool-sole-batch-policy",
+        "agent-tool-result-terminate",
+        "rpc-host-tool-result-terminate",
+        "extension-live-system-prompt",
+        "rpc-host-tool-settle-termination",
+        "reproducible-sidecar-build",
+        "explicit-bytecode-build-mode"
+      ],
+      "files": [
+        "docs/extensions.md",
+        "docs/rpc.md",
+        "packages/agent/src/agent-loop.ts",
+        "packages/agent/src/telemetry.ts",
+        "packages/agent/src/types.ts",
+        "packages/agent/test/agent-loop.test.ts",
+        "packages/coding-agent/scripts/build-binary.ts",
+        "packages/coding-agent/scripts/compile-binary.ts",
+        "packages/coding-agent/src/extensibility/extensions/loader.ts",
+        "packages/coding-agent/src/extensibility/extensions/runner.ts",
+        "packages/coding-agent/src/extensibility/extensions/types.ts",
+        "packages/coding-agent/src/modes/rpc/host-tools.ts",
+        "packages/coding-agent/src/modes/rpc/rpc-client.ts",
+        "packages/coding-agent/src/modes/rpc/rpc-mode.ts",
+        "packages/coding-agent/src/modes/rpc/rpc-types.ts",
+        "packages/coding-agent/src/modes/runtime-init.ts",
+        "packages/coding-agent/src/session/agent-session.ts",
+        "packages/coding-agent/test/agent-session-turn-system-prompt.test.ts",
+        "packages/coding-agent/test/build-binary-bytecode.test.ts",
+        "packages/coding-agent/test/extensions-runner.test.ts",
+        "packages/coding-agent/test/rpc-host-tools.test.ts",
+        "packages/natives/scripts/embed-native.ts",
+        "packages/natives/test/embed-native.test.ts"
+      ]
+    },
     {
       "patchLevel": "62bc57b+omp-desktop.4",
       "base": {
@@ -163,7 +229,7 @@
     "The .5 patch artifact was regenerated on 2026-10-03 from fork commit 22f565c9403b5d5ce1870462529292d7a32fd550; it adds the optional ExtensionAPI.setTurnSystemPrompt action (AgentSession.setTurnSystemPrompt) so a trusted host with a host-confirmed mid-turn contract change (M5/T20-D's Agent -> Plan/Goal entry) can move the live run's system prompt before the next provider request. The action is optional and absent from every other ExtensionActions provider; ordinary runs are unchanged.",
     "The .4 patch artifact was regenerated on 2026-10-03 from fork commit 512370a1b177cf45e4d12781104506ea372fb8a9; it adds the settle-time termination declaration (AgentTool.terminateOnSettle, RpcHostToolDefinition.terminateOnSettle) enforced at the loop's single settlement boundary, so a schema-validation rejection, a pre-execution hook rejection, an execution throw, a host error and a success all terminate identically for a declared tool.",
     "The zero-side-effect property of a rejected mixed batch is unchanged by .4: a batch carrying a sole tool plus any sibling is still rejected whole with terminate false so the model can correct.",
-    "reproducible-sidecar-build: embed-native.ts writes the embedded addon tar.gz with fixed entry timestamps and a recomputed header checksum, because Bun.Archive stamps each entry with the current time. Without it, two builds of one fork commit produced different binaries \u2014 measured at T20-R4-3 on Bun 1.4.2 (first difference at byte 81260680).",
+    "reproducible-sidecar-build: embed-native.ts writes the embedded addon tar.gz with fixed entry timestamps and a recomputed header checksum, because Bun.Archive stamps each entry with the current time. Without it, two builds of one fork commit produced different binaries — measured at T20-R4-3 on Bun 1.4.2 (first difference at byte 81260680).",
     "explicit-bytecode-build-mode: bytecode stays on by default (upstream release behavior and the fast boot path). The desktop sidecar build passes `--bytecode` explicitly and records it as `build.bytecode` in the provenance manifest; measured reproducibility holds for bytecode on and off once the archive is deterministic."
   ],
   "status": {
