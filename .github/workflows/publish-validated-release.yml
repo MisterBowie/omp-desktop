@@ -29,7 +29,7 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$GITHUB_REPOSITORY" == MisterBowie/omp-desktop ]]
-          [[ "$GITHUB_REF_NAME" =~ ^publish-(v[0-9]+\.[0-9]+\.[0-9]+)-run-([0-9]+)$ ]]
+          [[ "$GITHUB_REF_NAME" =~ ^publish-(v[0-9]+\.[0-9]+\.[0-9]+)-run-([0-9]+)(-attempt-[0-9]+)?$ ]]
           release_tag="${BASH_REMATCH[1]}"
           source_run="${BASH_REMATCH[2]}"
           [[ "$release_tag" == "v$(node -p "require('./app/package.json').version")" ]]

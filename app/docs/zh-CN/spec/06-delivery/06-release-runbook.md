@@ -33,6 +33,7 @@ OMP Desktop 的公开版本与应用内更新记录从 **0.1.0** 开始。重置
 在候选提交创建 `vX.Y.Z`；控制标签提交不是产品源码。原生证据与运行回执随包保留。
 创建标签使用 `GITHUB_TOKEN`，GitHub 不会递归启动构建；直接稳定标签构建也调用同一
 发布器。已有稳定标签指向不同提交时拒绝发布，不移动标签。
+操作重试可另建带 `-attempt-N` 后缀的控制标签，不移动原控制标签或稳定标签。
 
 未签名或 ad-hoc Mac 只检查更新并打开 GitHub，不自动下载或安装；Developer ID 签名 Mac
 提供下载、进度和重启安装。Windows NSIS 与 Linux AppImage 保留应用内更新；Windows

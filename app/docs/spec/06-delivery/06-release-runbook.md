@@ -40,6 +40,8 @@ the control tag's commit is not the product source. It preserves the native
 evidence and run receipt with the release. Tag creation uses `GITHUB_TOKEN`,
 so GitHub does not start a recursive build. Direct stable-tag builds use the
 same publisher. Existing stable tags pointing elsewhere are never moved.
+An operational retry may append `-attempt-N` to a new control tag; it never
+requires moving the original control or stable tag.
 
 Unsigned or ad-hoc Mac installations use GitHub check-and-link delivery and
 never auto-download or install. Developer ID-signed Mac installations use
