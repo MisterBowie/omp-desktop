@@ -55,6 +55,7 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/jobs?per_page=100" > "$RUNNER_TEMP/candidate-jobs.json"
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100" > "$RUNNER_TEMP/candidate-artifacts.json"
           node scripts/verify-release-candidate.mjs "$RUNNER_TEMP/candidate-run.json" "$RUNNER_TEMP/candidate-jobs.json" "$RUNNER_TEMP/candidate-artifacts.json" "$RUNNER_TEMP/omp-candidate-receipt.json"
+          cp scripts/stage-release-inputs.mjs "$RUNNER_TEMP/stage-release-inputs.mjs"
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source-revision }}
@@ -69,10 +70,12 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           pattern: release-*
-          path: release-dist
+          path: release-inputs
           merge-multiple: true
           run-id: ${{ inputs.artifact-run-id }}
           github-token: ${{ github.token }}
+      - name: Stage every candidate artifact in the published namespace
+        run: node "$RUNNER_TEMP/stage-release-inputs.mjs" "$GITHUB_WORKSPACE/release-inputs" "$GITHUB_WORKSPACE/release-dist" "$RELEASE_VERSION"
       - uses: actions/download-artifact@v8
         with:
           pattern: validation-*

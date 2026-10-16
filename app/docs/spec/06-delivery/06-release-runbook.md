@@ -42,6 +42,12 @@ so GitHub does not start a recursive build. Direct stable-tag builds use the
 same publisher. Existing stable tags pointing elsewhere are never moved.
 An operational retry may append `-attempt-N` to a new control tag; it never
 requires moving the original control or stable tag.
+Artifact downloads may retain a common directory root. The publisher stages
+their original bytes under unique basenames, records their source paths and
+hashes, and gives the Debian installer the canonical
+`OMP-Desktop-X.Y.Z-x64.deb` name so every installer is covered by the checksum
+record. Collisions, symlinks, stale versions and unrelated input files fail
+before publication.
 
 Unsigned or ad-hoc Mac installations use GitHub check-and-link delivery and
 never auto-download or install. Developer ID-signed Mac installations use

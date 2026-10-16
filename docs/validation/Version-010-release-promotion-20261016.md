@@ -41,3 +41,9 @@
 未调用 DeepSeek 或其它付费模型，不合并 main，不改写已有标签。
 
 原始证据与摘要：[SHA256SUMS.txt](Version-010-release-promotion-20261016/SHA256SUMS.txt)。
+
+发布前追加：处理 upload-artifact 的共同根目录布局，按唯一文件名原样暂存；Debian
+`omp-desktop_0.1.0_amd64.deb` 仅重命名为 `OMP-Desktop-0.1.0-x64.deb`，字节保持不变，
+从而纳入原有版本摘要命名空间。源路径、原始 SHA256 和发布名另有暂存回执。
+新增重名、链接、旧版本与已有目录拒绝测试后，发布相关合计 14 通过、0 失败/跳过；
+三份 YAML / 30 段 Bash 通过。证据归档采用确定性时间戳和 gzip header，允许安全重试。

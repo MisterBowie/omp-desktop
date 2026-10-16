@@ -68,7 +68,7 @@ jobs:
       - run: pnpm --filter @pi-desktop/desktop typecheck
       - run: pnpm lint
       - run: pnpm -r --if-present test
-      - run: node --test scripts/prepare-github-release.test.mjs scripts/github-update-provider.test.mjs scripts/verify-release-candidate.test.mjs
+      - run: node --test scripts/prepare-github-release.test.mjs scripts/github-update-provider.test.mjs scripts/verify-release-candidate.test.mjs scripts/stage-release-inputs.test.mjs
       - run: cargo test -p host-core --locked
 
   build:
