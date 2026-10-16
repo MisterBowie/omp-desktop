@@ -13,6 +13,10 @@ export function classifyPublicationFailure(input){
   ["HOST_SHA256",/remote-host SHA256 mismatch/],["STALE_ARTIFACT",/stale release artifact/],
   ["UNEXPECTED_ENTRY",/unexpected release entry/],["MISSING_FILE",/ENOENT/],
   ["ASSERTION",/ERR_ASSERTION/],["MODULE_MISSING",/ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND/],
+  ["API_FORBIDDEN",/HTTP 403|Resource not accessible by integration/],
+  ["API_UNAUTHORIZED",/HTTP 401/],["API_REF_VALIDATION",/HTTP 422|Reference already exists/],
+  ["API_SERVER_ERROR",/HTTP 50[0234]/],
+  ["WORKFLOW_PERMISSION",/refusing to allow.*workflow|workflows permission|workflow scope|without.*workflow/i],
  ];
  const classes=known.filter(([,pattern])=>pattern.test(text)).map(([code])=>code);
  const feeds=["latest.yml","latest-linux.yml","latest-mac.yml","latest-mac-arm64.yml","latest-mac-x64.yml"].filter(name=>text.includes(name));
