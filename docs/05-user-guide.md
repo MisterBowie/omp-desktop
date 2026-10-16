@@ -1,21 +1,21 @@
 # OMP Desktop 使用说明
 
-本项目在 PI-Desktop 界面基础上接入完整 OMP 运行时。`0.1.0` 已完成本机实现，
-正在四目标原生验收，稳定版尚未发布。上一份公开测试版仍为
-[M7 0.15.3-m7.1](https://github.com/MisterBowie/omp-desktop/releases/tag/m7-test-20261015-46e7bf7)。
-正式发布后从 [OMP Desktop 下载](https://github.com/MisterBowie/omp-desktop/releases/latest)
-选择对应平台；该地址属于本项目。
+本项目在 PI-Desktop 界面基础上接入完整 OMP 运行时。当前版本为 **0.1.0**，
+从 [OMP Desktop 稳定版](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.0)
+或 [最新下载](https://github.com/MisterBowie/omp-desktop/releases/latest) 选择对应平台。
+彩色像素π图标、Write/Edit后的LSP诊断及自己的GitHub更新源均包含在内。
 
 ## 安装与开始使用
 
 | 平台 | 测试产物 | 已执行的安装路径 |
 | --- | --- | --- |
-| macOS Apple Silicon / arm64 | DMG；ZIP 为另一份分发格式 | DMG 内实际应用复制后运行 |
+| macOS Apple Silicon / arm64、Intel / x64 | DMG；ZIP 为另一份分发格式 | 两种架构各自从DMG复制实际应用后运行 |
 | Windows x64 | setup EXE；portable EXE 为另一份分发格式 | NSIS 安装器实际安装后运行 |
 | Linux x64 | AppImage；另提供 DEB/RPM | 实际 AppImage 提取后运行 |
 
-这是未签名测试分发；Mac 未公证。Mac 首次打开的说明随 ZIP 一起提供。M6 已完成上述
-三平台安装流程；M7三平台的安装、日常使用和真实升级回退也全部通过，根已完整回读公开资产及原始证明，见[M7验收](validation/M7-native-release-20261016.md)。没有用构建成功代替安装验收，
+当前Mac分发未公证，未签名或临时签名包使用手动更新。首次打开说明随ZIP提供。
+0.1.0的Mac双架构、Windows、Linux各自通过包内严格15项和实际安装8项；
+先前M7的日常使用与真实升级回退记录见[M7验收](validation/M7-native-release-20261016.md)。没有用构建成功代替安装验收，
 也没有把 DEB/RPM 系统注册、portable 的独立用户流程或其他CPU架构写成已验证。
 Windows 的 Bash 工具沿用 PI 的 Git for Windows 前提；项目本身使用的语言工具仍由项目提供。
 Linux使用系统sans字体；CI截图的中文项目名出现缺字方框，未证明CJK字体在该runner可用，
@@ -30,9 +30,9 @@ Linux使用系统sans字体；CI截图的中文项目名出现缺字方框，未
 
 ## 编码时的 LSP
 
-`0.1.0` 候选已包含此前 `0.15.3-lsp.1` 的修复，会在写入和编辑匹配语言的代码文件后自动获取 LSP 诊断，
+`0.1.0` 已包含此前 `0.15.3-lsp.1` 的修复，会在写入和编辑匹配语言的代码文件后自动获取 LSP 诊断，
 在工具完成前返回给模型，并在 Write/Edit 工具卡中显示。旧公开 `0.15.3-m7.1` 的
-编辑后检查默认关闭，Write 卡也会遗漏诊断；该旧测试版尚未被稳定版替换。
+编辑后检查默认关闭，Write 卡也会遗漏诊断；0.1.0已成为新的稳定下载入口，旧M7测试版保留作历史。
 
 项目需要可运行的对应语言服务器和正确的项目根标记，例如 TypeScript 项目的
 `package.json` / `tsconfig.json`。OMP 保留原生自动发现和 `lsp.enabled` 开关；
@@ -77,7 +77,7 @@ Plan/Goal 仅在已经验证的非 Cursor 路线开放，保留整批工具零�
 ## 0.1.0 的版本重置与更新
 
 从 `0.15.x` 测试版首次切换到 `0.1.0` 需要手动安装；版本序列重新开始，应用不会自动降级。
-本机实际覆盖安装已验证原有 OMP 项目保留。后续版本在设置/版本入口手动检查更新，
+本机macOS实际覆盖安装已验证原有OMP项目保留。后续版本在设置/版本入口手动检查更新，
 更新来源固定为本项目的 GitHub 稳定发布，历史测试版不会被当作稳定更新。
 
 | 安装形式 | 更新方式 |
@@ -103,7 +103,8 @@ M7 人工演练使用固定公开 M6 `0.15.2` 安装包，实际替换为 `0.15.
 
 恢复备份会让应用历史回到备份时刻；项目文件继续保持实际文件状态。需要回退项目代码时，
 由项目自己的 Git/备份处理。该演练使用相同 OMP/schema，不能据此推定任意未来版本都可降级；
-测试包没有发布自动更新 feed，因此这里验证的是人工安装包和数据备份流程。
+该M7测试包没有发布自动更新feed，因此上述演练验证的是人工安装包和数据备份流程；
+0.1.0开始使用自己的GitHub稳定更新清单。
 
 ## 故障与维护信息
 

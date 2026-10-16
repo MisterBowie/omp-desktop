@@ -1,5 +1,18 @@
 # OMP Desktop 开发交接
 
+## 0.1.0 已稳定发布并通过本机真实更新检查（2026-10-16）
+
+[公开v0.1.0](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.0)，产品源码
+154bc03dfb619b5c219b5e3cf1e08ae1672bcec6；原生run38862126801整轮success，
+Mac ARM/Intel、Windows、Linux各严格15/15、实际安装8项、两次正常退出零残留。
+最终发布run38869364763 success，控制面06a85f8；原样发布已接受安装包，
+Linux清单只同步Debian改名，SHA512/size及安装包字节保留。30项公开资产约1.98GB。
+本机已运行公开ARM DMG，真实GitHub检查返回0.1.0/up-to-date/manual，
+一次正常退出零残留。API摘要、控制面/暂存来源及四份原始验收证明回读通过；
+全部公开格式仍在逐字节续传核验，最终完整下载回执归档尚在收尾，不提前记为全量完成。
+0.15.x首次切换0.1.0需手动安装；当前Mac未签名/临时签名走手动GitHub更新。
+见[发布记录](docs/validation/Version-010-release-promotion-20261016.md)。下列为过程历史。
+
 ## 0.1.0 原生候选已接受，发布清单修复中（2026-10-16，尚未发布）
 
 候选154bc03dfb619b5c219b5e3cf1e08ae1672bcec6 / run38862126801整轮success。

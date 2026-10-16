@@ -37,11 +37,19 @@ completed successful candidate run, its exact source revision, all four native
 acceptance jobs and eight unexpired artifacts. The shared publisher checks out
 that candidate revision, verifies the manifests and creates `vX.Y.Z` at it;
 the control tag's commit is not the product source. It preserves the native
-evidence and run receipt with the release. Tag creation uses `GITHUB_TOKEN`,
+evidence and run receipt with the release. When permitted, token-based tag creation uses `GITHUB_TOKEN`,
 so GitHub does not start a recursive build. Direct stable-tag builds use the
 same publisher. Existing stable tags pointing elsewhere are never moved.
 An operational retry may append `-attempt-N` to a new control tag; it never
-requires moving the original control or stable tag.
+requires moving the original control or stable tag. If the tag API refuses creation, an
+already-authorized authenticated Git push can create the tag at the accepted
+source. The one-time `cancel-validated-stable-*` control first reruns the strict
+candidate gate and then permits cancellation only of the exact same-source
+`v0.1.0` rebuild selected by its run id; other sources, jobs and repositories
+are refused. Publication still uses the original eight accepted artifacts.
+The publication receipt records the controller commit/ref and staging-script
+SHA256 separately from the accepted product source.
+
 Artifact downloads may retain a common directory root. The publisher stages
 their original bytes under unique basenames, records their source paths and
 hashes, and gives the Debian installer the canonical

@@ -1,11 +1,11 @@
-# 0.1.0 固定候选与原样发布（2026-10-16，进行中）
+# 0.1.0 固定候选与原样发布（2026-10-16，公开回读收尾中）
 
-最新进展：候选 `154bc03dfb619b5c219b5e3cf1e08ae1672bcec6` /
-[run38862126801](https://github.com/MisterBowie/omp-desktop/actions/runs/38862126801)
-整轮success，四目标各严格15/15、安装8项与退出清理通过，八份固定来源制品已由门接受。
-首次晋升run38866649933在Linux更新清单校验被阻断，稳定标签和Release尚未创建。
-发布控制面已修复Debian暂存改名对应的清单引用，35项交付回归通过，准备重试同一制品。
-历史失败候选与晋升标签保留，不用新结果覆盖失败事实。
+最新进展：[v0.1.0已稳定发布](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.0)。
+产品源码154bc03 / 原生run38862126801整轮success；最终发布run38869364763 success。
+四目标严格15/15、安装8项与两次正常退出零残留；同批安装包原样发布。
+本机公开ARM DMG真实GitHub检查up-to-date/currentVersion0.1.0/manual，一次正常退出零残留。
+API摘要与四份原始验收证明已回读；30份公开资产的本机全量下载仍在续传核验，
+尚未将全量字节回读记为完成。以下保留全部候选和晋升失败过程，不覆盖历史事实。
 
 固定 OMP fork `d648d27` 已非强制推送至用户自己的维护分支，并经 GitHub API
 回读确认提交与树摘要。桌面源码已提交并推送；原默认模型及所有既有工作树保持原状。
@@ -141,3 +141,22 @@ run38862126801整轮success，四目标原生作业通过；本机严格门读�
 原始/暂存清单摘要。35项交付回归和4YAML/36Bash通过。
 发布额外记录控制面commit/ref、暂存脚本摘要、候选run与发布run，明确产品来源与发布控制面。
 本轮原始测试日志仅本机保留，仓库记录[计数和摘要](Version-010-release-promotion-20261016/publication-feed-repair-summary.json)。
+
+## 公开稳定版与本机真实更新检查
+
+晋升第二次run38868283977通过全部清单摘要后，在创建稳定tag时遇到API403；
+随后用已授权Git SSH将v0.1.0固定在154bc03，远端回读一致。该push触发的重复
+run38869227396由受控run38869402506重新验证接受回执后取消，最终为cancelled；
+原已接受run38862126801仍为success。第三次晋升run38869364763完整success，
+正式发布[OMP Desktop v0.1.0](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.0)，
+共30项公开资产、1,984,514,132字节，draft/prerelease均false。
+
+本机完整下载公开ARM DMG，224,145,172字节，SHA256
+`02aabb1ce1e7675b3d1486fdfc13e1a6834e86fc10fce45ffdf5594cc0a89cdf`，
+与GitHub API及发布校验记录一致。实际安装到隔离目录并启动，点击版本入口，
+通过真实GitHub稳定源返回currentVersion=0.1.0/status=up-to-date/manual=true，
+mode=manual符合当前未签名或临时签名Mac；未使用测试feed覆盖。一次正常退出，
+零自有残留，预置PI/OMP哨兵不变。[回执摘要](Version-010-release-promotion-20261016/public-installed-update-summary.json)。
+截图仅证明实际公开窗口中的v0.1.0；更新结果以生产IPC回执记录，不把截图当作可见状态提示证明。
+
+其余公开安装格式仍在逐字节下载和摘要核验，待完整回读通过后归档最终结果。

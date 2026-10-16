@@ -1,11 +1,13 @@
 # OMP Desktop 发布与维护检查单
 
-当前 `0.1.0` 尚在原生发布验收：候选154bc03 / run38862126801，源码门已通过。
-正式发布须四目标（Mac ARM/Intel、Windows x64、Linux x64）各包内15项及实际安装8项通过，
-同批资产原样晋升 stable/latest，完整公开下载校验与真实 GitHub 更新检查后才完成。
-固定运行时为 fork `d648d27bcf0db16caecb876142d891cf49a51bc2` / tree `dab846754da313b09470a5d37aa1e255633d58cb`，
-补丁 `62bc57b+omp-desktop.6`，包含默认编辑后 LSP 诊断。未签名 Mac 使用手动更新；
-0.15.x 首次切换0.1.0需手动安装。进展与失败记录见[0.1.0发布记录](validation/Version-010-release-promotion-20261016.md)。
+当前 `0.1.0` 已发布：[稳定版](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.0)。
+固定源码154bc03 / 原生run38862126801全部成功；发布run38869364763成功，
+四目标（Mac ARM/Intel、Windows x64、Linux x64）各包内15项与实际安装8项通过。
+本机公开ARM包真实GitHub更新检查通过，当前未签名/临时签名Mac为manual；
+30份公开资产全量下载尚在续传核验，最终完整下载回执待归档。
+固定运行时为fork `d648d27bcf0db16caecb876142d891cf49a51bc2` / tree `dab846754da313b09470a5d37aa1e255633d58cb`，
+补丁 `62bc57b+omp-desktop.6`，包含默认编辑后LSP诊断。0.15.x首次切换0.1.0需手动安装。
+来源、失败、重试、重复构建受控取消及当前回读见[0.1.0发布记录](validation/Version-010-release-promotion-20261016.md)。
 
 以下为已接受的 **M7 测试分发基线**及历史维护证据，不表示0.1.0已经发布。
 

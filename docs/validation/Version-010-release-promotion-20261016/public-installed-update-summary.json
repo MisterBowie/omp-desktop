@@ -1,0 +1,30 @@
+{
+  "schema": "omp-desktop.public-installed-update/1",
+  "passed": true,
+  "sourceRevision": "154bc03dfb619b5c219b5e3cf1e08ae1672bcec6",
+  "installerSha256": "02aabb1ce1e7675b3d1486fdfc13e1a6834e86fc10fce45ffdf5594cc0a89cdf",
+  "identity": {
+    "name": "OMP Desktop",
+    "version": "0.1.0",
+    "arch": "arm64",
+    "isPackaged": true
+  },
+  "publicUpdateState": {
+    "mode": "manual",
+    "status": "up-to-date",
+    "currentVersion": "0.1.0",
+    "releasesUrl": "https://github.com/MisterBowie/omp-desktop/releases/latest",
+    "manual": true
+  },
+  "noFeedOverride": true,
+  "networkTransport": "updater netSession HTTP proxy; unchanged GitHub feed",
+  "normalQuits": 1,
+  "noOwnedProcessesRemain": true,
+  "sentinelHashesVerified": true,
+  "screenshot": {
+    "file": "public-installed-version.png",
+    "sha256": "69c68660721ba880e84d7bbb5dc8043a7da9cd6a803e3ffbfb24879fb75fdfb4",
+    "observed": "Actual public application window shows v0.1.0; update state is recorded in the production IPC receipt."
+  },
+  "rawReportSha256": "dfb4b6fb78099d4e6ca49ddf040e0700e83bdf186e137256b27fe3de3ca2bfaf"
+}
