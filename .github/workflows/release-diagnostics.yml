@@ -25,7 +25,10 @@ jobs:
           node -e 'for(const job of JSON.parse(require("fs").readFileSync(process.env.RUNNER_TEMP+"/jobs.json")).jobs)if(job.conclusion==="failure")console.log(job.id)' > "$RUNNER_TEMP/failed-jobs.txt"
           while read -r job; do
             [[ "$job" =~ ^[0-9]+$ ]]
-            gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$job/logs" > "$RUNNER_TEMP/failed-job.log"
+            if ! gh api -H 'X-GitHub-Api-Version: 2026-03-10' "repos/$GITHUB_REPOSITORY/actions/jobs/$job/logs" > "$RUNNER_TEMP/failed-job.log" 2> "$RUNNER_TEMP/log-access-error.txt"; then
+              node -e 'const text=require("fs").readFileSync(process.env.RUNNER_TEMP+"/log-access-error.txt","utf8");const code=/403/.test(text)?"LOG_ACCESS_FORBIDDEN":/404|410/.test(text)?"LOG_NOT_READY_OR_MISSING":"LOG_ACCESS_UNAVAILABLE";console.log("::notice title=Safe log access status::"+code);'
+              continue
+            fi
             DIAGNOSTIC_JOB="$job" node --input-type=module - <<'JS'
           import {readFileSync} from 'node:fs';
           const text=readFileSync(process.env.RUNNER_TEMP+'/failed-job.log','utf8').replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g,'');
