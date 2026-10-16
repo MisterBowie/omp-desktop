@@ -1,0 +1,10 @@
+{
+  "schema": "omp-desktop.publication-control/1",
+  "version": "0.1.0",
+  "sourceRevision": "154bc03dfb619b5c219b5e3cf1e08ae1672bcec6",
+  "controllerRevision": "06a85f8b2cda0e70e16af7678628cd3f0d24f42d",
+  "controllerRef": "publish-v0.1.0-run-38862126801-attempt-3",
+  "candidateRunId": 38862126801,
+  "publicationRunId": 38869364763,
+  "stagingScriptSha256": "eb8b07d2c795af4e6405252e4602d5b8f9d75d278dcbb7f143678da3c470461b"
+}

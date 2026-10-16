@@ -1,0 +1,42 @@
+{
+  "passed": true,
+  "feeds": [
+    {
+      "feed": "latest.yml",
+      "files": [
+        "OMP-Desktop-Setup-0.1.0.exe"
+      ]
+    },
+    {
+      "feed": "latest-linux.yml",
+      "files": [
+        "OMP-Desktop-0.1.0-x86_64.AppImage",
+        "OMP-Desktop-0.1.0-x64.deb",
+        "omp-desktop-0.1.0-x86_64.rpm"
+      ]
+    },
+    {
+      "feed": "latest-mac.yml",
+      "files": [
+        "OMP-Desktop-0.1.0-arm64-mac.zip",
+        "OMP-Desktop-0.1.0-arm64.dmg",
+        "OMP-Desktop-0.1.0-x64-mac.zip",
+        "OMP-Desktop-0.1.0-x64.dmg"
+      ]
+    },
+    {
+      "feed": "latest-mac-arm64.yml",
+      "files": [
+        "OMP-Desktop-0.1.0-arm64-mac.zip",
+        "OMP-Desktop-0.1.0-arm64.dmg"
+      ]
+    },
+    {
+      "feed": "latest-mac-x64.yml",
+      "files": [
+        "OMP-Desktop-0.1.0-x64-mac.zip",
+        "OMP-Desktop-0.1.0-x64.dmg"
+      ]
+    }
+  ]
+}

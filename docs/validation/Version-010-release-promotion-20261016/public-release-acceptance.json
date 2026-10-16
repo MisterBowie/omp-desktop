@@ -1,0 +1,114 @@
+{
+  "passed": true,
+  "downloadedAssetBytes": 1984514132,
+  "releaseUrl": "https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.0",
+  "sourceRevision": "154bc03dfb619b5c219b5e3cf1e08ae1672bcec6",
+  "candidateRun": 38862126801,
+  "publicationRun": 38869364763,
+  "controllerRevision": "06a85f8b2cda0e70e16af7678628cd3f0d24f42d",
+  "publishedAssets": 30,
+  "apiDigestsVerified": 29,
+  "nativeProofs": [
+    {
+      "target": "darwin-arm64",
+      "strictPlanGoalPassed": 15,
+      "strictPlanGoalSkipped": 0,
+      "installedChecks": 8,
+      "normalQuits": 2,
+      "installer": "OMP-Desktop-0.1.0-arm64.dmg",
+      "installerSha256": "02aabb1ce1e7675b3d1486fdfc13e1a6834e86fc10fce45ffdf5594cc0a89cdf",
+      "runtimeKeys": [
+        "mode",
+        "resources",
+        "binary",
+        "gate",
+        "provenance",
+        "run"
+      ]
+    },
+    {
+      "target": "darwin-x64",
+      "strictPlanGoalPassed": 15,
+      "strictPlanGoalSkipped": 0,
+      "installedChecks": 8,
+      "normalQuits": 2,
+      "installer": "OMP-Desktop-0.1.0-x64.dmg",
+      "installerSha256": "0f387c9e40a504cad57bbd744d85c9edfa444fc2929fca8e0ef37cc6a0cbb8d5",
+      "runtimeKeys": [
+        "mode",
+        "resources",
+        "binary",
+        "gate",
+        "provenance",
+        "run"
+      ]
+    },
+    {
+      "target": "win32-x64",
+      "strictPlanGoalPassed": 15,
+      "strictPlanGoalSkipped": 0,
+      "installedChecks": 8,
+      "normalQuits": 2,
+      "installer": "OMP-Desktop-Setup-0.1.0.exe",
+      "installerSha256": "7e23ed5213bc4fde7e90bfca6de39d234b3949f41ad76e4fee050fae75c65d09",
+      "runtimeKeys": [
+        "mode",
+        "resources",
+        "binary",
+        "gate",
+        "provenance",
+        "run"
+      ]
+    },
+    {
+      "target": "linux-x64",
+      "strictPlanGoalPassed": 15,
+      "strictPlanGoalSkipped": 0,
+      "installedChecks": 8,
+      "normalQuits": 2,
+      "installer": "OMP-Desktop-0.1.0-x86_64.AppImage",
+      "installerSha256": "4a165e18ea59e3603cbf85d274a5f60f553282e925b4b17626739275e946a875",
+      "runtimeKeys": [
+        "mode",
+        "resources",
+        "binary",
+        "gate",
+        "provenance",
+        "run"
+      ]
+    }
+  ],
+  "downloadedFiles": [
+    "BUILD-RECORD.json",
+    "OMP-Desktop-0.1.0-arm64-mac.zip",
+    "OMP-Desktop-0.1.0-arm64-mac.zip.blockmap",
+    "OMP-Desktop-0.1.0-arm64.dmg",
+    "OMP-Desktop-0.1.0-arm64.dmg.blockmap",
+    "OMP-Desktop-0.1.0-x64-mac.zip",
+    "OMP-Desktop-0.1.0-x64-mac.zip.blockmap",
+    "OMP-Desktop-0.1.0-x64.deb",
+    "OMP-Desktop-0.1.0-x64.dmg",
+    "OMP-Desktop-0.1.0-x64.dmg.blockmap",
+    "OMP-Desktop-0.1.0-x86_64.AppImage",
+    "OMP-Desktop-Portable-0.1.0.exe",
+    "OMP-Desktop-Setup-0.1.0.exe",
+    "OMP-Desktop-Setup-0.1.0.exe.blockmap",
+    "SHA256SUMS.txt",
+    "latest-linux.yml",
+    "latest-mac-arm64.yml",
+    "latest-mac-x64.yml",
+    "latest-mac.yml",
+    "latest.yml",
+    "omp-desktop-0.1.0-x86_64.rpm",
+    "omp-desktop-validation-0.1.0-build.json",
+    "omp-desktop-validation-0.1.0-darwin-arm64.tar.gz",
+    "omp-desktop-validation-0.1.0-darwin-x64.tar.gz",
+    "omp-desktop-validation-0.1.0-linux-x64.tar.gz",
+    "omp-desktop-validation-0.1.0-publication.json",
+    "omp-desktop-validation-0.1.0-staging.json",
+    "omp-desktop-validation-0.1.0-win32-x64.tar.gz",
+    "pi-host-0.1.0-linux-x64.tar.gz",
+    "pi-host-0.1.0-linux-x64.tar.gz.sha256",
+    "release-api.json"
+  ]
+}

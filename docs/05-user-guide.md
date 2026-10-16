@@ -7,7 +7,7 @@
 
 ## 安装与开始使用
 
-| 平台 | 测试产物 | 已执行的安装路径 |
+| 平台 | 分发格式 | 已执行的安装路径 |
 | --- | --- | --- |
 | macOS Apple Silicon / arm64、Intel / x64 | DMG；ZIP 为另一份分发格式 | 两种架构各自从DMG复制实际应用后运行 |
 | Windows x64 | setup EXE；portable EXE 为另一份分发格式 | NSIS 安装器实际安装后运行 |

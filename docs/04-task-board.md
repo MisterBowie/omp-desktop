@@ -1,14 +1,14 @@
 # 执行任务看板
 
-2026-10-16（0.1.0 + GitHub 更新）：**稳定版已发布，本机真实更新检查通过，全量公开下载收尾中。**
+2026-10-16（0.1.0 + GitHub 更新）：**已完成稳定发布、真实更新检查与全量公开资产回读。**
 [下载v0.1.0](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.0)，源码154bc03，
 原生run38862126801及发布run38869364763均success。Mac双架构、Windows、Linux
 各包内严格15项/0skip、实际安装8项、两次正常退出零残留；同批安装包原样晋升。
 包括彩色像素π、已验收LSP修复、0.1.0版本线及自己的GitHub下载/更新源。
 公开ARM DMG已本机安装实测GitHub up-to-date/currentVersion0.1.0/manual，
 一次正常退出无残留；预置PI/OMP哨兵不变。0.15.x首次需手动安装，未签名Mac后续手动更新。
-30项资产、1,984,514,132字节的API摘要与四份原始证明已核对，全部格式的本机下载
-仍在续传，不记为全量字节校验完成。详情见[发布记录](validation/Version-010-release-promotion-20261016.md)。
+30项公开资产、1,984,514,132字节均已完整下载，API摘要、SHA清单、来源和四份
+原始证明核对通过；五份公开feed的实际SHA512/大小与双Mac合并通过。详情见[发布记录](validation/Version-010-release-promotion-20261016.md)。
 
 2026-10-16（后续请求：彩色像素 π 图标）：**已完成本机交付。**
 专用工作树 `omp-desktop-pi-icon` / `codex/pi-gradient-icon`，版本 `0.15.3-icon.1`，

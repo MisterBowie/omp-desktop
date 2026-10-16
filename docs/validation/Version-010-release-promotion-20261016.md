@@ -1,11 +1,12 @@
-# 0.1.0 固定候选与原样发布（2026-10-16，公开回读收尾中）
+# 0.1.0 固定候选与原样发布（2026-10-16，已完成）
 
-最新进展：[v0.1.0已稳定发布](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.0)。
+最新进展：[v0.1.0稳定发布及本轮目标均已完成](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.0)。
 产品源码154bc03 / 原生run38862126801整轮success；最终发布run38869364763 success。
-四目标严格15/15、安装8项与两次正常退出零残留；同批安装包原样发布。
+Mac ARM/Intel、Windows、Linux各严格15/15、0skip、安装8项、两次正常退出零残留。
+30/30公开资产共1,984,514,132字节完整下载并核验大小、GitHub摘要和SHA清单；
+五份公开更新清单实际SHA512/大小及Mac双架构合并通过，产品/控制面/暂存来源一致。
 本机公开ARM DMG真实GitHub检查up-to-date/currentVersion0.1.0/manual，一次正常退出零残留。
-API摘要与四份原始验收证明已回读；30份公开资产的本机全量下载仍在续传核验，
-尚未将全量字节回读记为完成。以下保留全部候选和晋升失败过程，不覆盖历史事实。
+以下保留全部候选与晋升失败过程，不覆盖历史事实。
 
 固定 OMP fork `d648d27` 已非强制推送至用户自己的维护分支，并经 GitHub API
 回读确认提交与树摘要。桌面源码已提交并推送；原默认模型及所有既有工作树保持原状。
@@ -159,4 +160,31 @@ mode=manual符合当前未签名或临时签名Mac；未使用测试feed覆盖�
 零自有残留，预置PI/OMP哨兵不变。[回执摘要](Version-010-release-promotion-20261016/public-installed-update-summary.json)。
 截图仅证明实际公开窗口中的v0.1.0；更新结果以生产IPC回执记录，不把截图当作可见状态提示证明。
 
-其余公开安装格式仍在逐字节下载和摘要核验，待完整回读通过后归档最终结果。
+全量公开资产回读现已完成，见下一节。
+
+## 最终公开回读与交接
+
+- 完整30项资产、1,984,514,132字节均已收到。每个文件大小和GitHub API SHA256
+  均匹配；SHA清单含另外29项，清单自身也通过API摘要。不是仅比较服务器摘要。
+- 四份原始证明重新解析：每目标严格15/15、0fail/skip、实际安装8项、两次正常退出
+  无残留；真实安装器摘要和大小逐一对应本次公开文件。fork d648d27 / patch .6 /
+  OMP18.3.0 / protocol2、get_state、missing-gate拒绝及stop/reap/cleanup均通过。
+- 三份正式feed及两份Mac架构feed共五份，逐条以本机公开文件计算SHA512/大小；
+  合并Mac清单恰好包含ARM与Intel原清单条目，legacy path/hash匹配。
+- 发布控制面06a85f8b2cda0e70e16af7678628cd3f0d24f42d、原生run38862126801、
+  发布run38869364763、暂存脚本SHA和Debian改名元数据的原始/发布摘要均一致。
+- 本机公开DMG的真实GitHub检查和一次正常退出已通过；源码阶段的0.15.x→0.1.0
+  手动替换保留项目、检查失败重试与未来版本夹具见此前本机记录。没有将夹具升级
+  声称为真实未来Windows/Linux自动升级，也没有声明Developer ID签名包已发布。
+
+回执：[公开资产](Version-010-release-promotion-20261016/public-release-acceptance.json)、
+[公开清单](Version-010-release-promotion-20261016/public-feed-acceptance.json)、
+[发布控制面](Version-010-release-promotion-20261016/public-publication-control.json)、
+[暂存转换](Version-010-release-promotion-20261016/public-staging-receipt.json)、
+[公开SHA清单](Version-010-release-promotion-20261016/public-SHA256SUMS.txt)。
+网络续传仅影响接收时间，完整摘要通过后才作为正式文件保存；没有更改发布资产或放宽校验。
+
+安装说明和任务看板已同步。0.15.x首次需手动安装；当前未签名/临时签名Mac后续使用GitHub
+手动更新，Windows NSIS与Linux AppImage支持应用内更新。真实付费模型、原生选择器/退出
+确认框、portable独立用户流程及DEB/RPM系统注册不是本轮新增验收声称。
+源码、原始本机报告与完整安装器均保存在本机；原有工作树及用户其它任务保持原状。

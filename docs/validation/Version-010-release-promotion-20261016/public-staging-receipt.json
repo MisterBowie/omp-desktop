@@ -1,0 +1,128 @@
+{
+  "version": "0.1.0",
+  "files": [
+    {
+      "input": "desktop/release/OMP-Desktop-0.1.0-arm64-mac.zip",
+      "name": "OMP-Desktop-0.1.0-arm64-mac.zip",
+      "bytes": 223047413,
+      "sha256": "c8717bf042a1139d0701f1fbf6625e2bcaaa21c162cb7dce8fb921425640e725"
+    },
+    {
+      "input": "desktop/release/OMP-Desktop-0.1.0-arm64-mac.zip.blockmap",
+      "name": "OMP-Desktop-0.1.0-arm64-mac.zip.blockmap",
+      "bytes": 232087,
+      "sha256": "498a3d9d8b8b7eaa30ceb2d302ee491299f0e22eb0b38b4503bf39065db5e549"
+    },
+    {
+      "input": "desktop/release/OMP-Desktop-0.1.0-arm64.dmg",
+      "name": "OMP-Desktop-0.1.0-arm64.dmg",
+      "bytes": 224145172,
+      "sha256": "02aabb1ce1e7675b3d1486fdfc13e1a6834e86fc10fce45ffdf5594cc0a89cdf"
+    },
+    {
+      "input": "desktop/release/OMP-Desktop-0.1.0-arm64.dmg.blockmap",
+      "name": "OMP-Desktop-0.1.0-arm64.dmg.blockmap",
+      "bytes": 236939,
+      "sha256": "2b61eb6ea9ddc6d1014440d328438f34fc4d932ba81cc9c691d943f8e8ed48d0"
+    },
+    {
+      "input": "desktop/release/OMP-Desktop-0.1.0-x64-mac.zip",
+      "name": "OMP-Desktop-0.1.0-x64-mac.zip",
+      "bytes": 230955741,
+      "sha256": "a0be2073650a14aa7ee6f81fb9f8e71c0e4b22a66e14cc06cde6b8416f85d427"
+    },
+    {
+      "input": "desktop/release/OMP-Desktop-0.1.0-x64-mac.zip.blockmap",
+      "name": "OMP-Desktop-0.1.0-x64-mac.zip.blockmap",
+      "bytes": 241866,
+      "sha256": "3c63feddd9605b1fd8948b2411020a9427d11bbbcc790aca555097c9cec602c9"
+    },
+    {
+      "input": "desktop/release/OMP-Desktop-0.1.0-x64.dmg",
+      "name": "OMP-Desktop-0.1.0-x64.dmg",
+      "bytes": 231908248,
+      "sha256": "0f387c9e40a504cad57bbd744d85c9edfa444fc2929fca8e0ef37cc6a0cbb8d5"
+    },
+    {
+      "input": "desktop/release/OMP-Desktop-0.1.0-x64.dmg.blockmap",
+      "name": "OMP-Desktop-0.1.0-x64.dmg.blockmap",
+      "bytes": 242056,
+      "sha256": "054c2342fa22159ae18622e8e65f8f579b046fe2622405a5bc7ab3f6b61a87a6"
+    },
+    {
+      "input": "desktop/release/OMP-Desktop-0.1.0-x86_64.AppImage",
+      "name": "OMP-Desktop-0.1.0-x86_64.AppImage",
+      "bytes": 250271819,
+      "sha256": "4a165e18ea59e3603cbf85d274a5f60f553282e925b4b17626739275e946a875"
+    },
+    {
+      "input": "desktop/release/OMP-Desktop-Portable-0.1.0.exe",
+      "name": "OMP-Desktop-Portable-0.1.0.exe",
+      "bytes": 199970686,
+      "sha256": "95dd3d0cd11713c2c81e713d776d5733ea887595a56856b5f24f8eba81d26269"
+    },
+    {
+      "input": "desktop/release/OMP-Desktop-Setup-0.1.0.exe",
+      "name": "OMP-Desktop-Setup-0.1.0.exe",
+      "bytes": 200190910,
+      "sha256": "7e23ed5213bc4fde7e90bfca6de39d234b3949f41ad76e4fee050fae75c65d09"
+    },
+    {
+      "input": "desktop/release/OMP-Desktop-Setup-0.1.0.exe.blockmap",
+      "name": "OMP-Desktop-Setup-0.1.0.exe.blockmap",
+      "bytes": 207528,
+      "sha256": "7dda13a34e7f43d9b9fdc015064498fea7a9d075b65dde14e46dd1ed406b5acd"
+    },
+    {
+      "input": "desktop/release/latest-linux.yml",
+      "name": "latest-linux.yml",
+      "bytes": 705,
+      "sha256": "fb5959acc65b35f487c32d00a98e6e1bad2622a72045aca2e23c659c94a0d898",
+      "publishedSha256": "a29d9436a5e6f2865d5e37cf1bf26cb0de2176d4243e17ebd49b1d851acd9a82",
+      "publishedBytes": 701,
+      "renamedReferences": 1
+    },
+    {
+      "input": "desktop/release/latest-mac-arm64.yml",
+      "name": "latest-mac-arm64.yml",
+      "bytes": 517,
+      "sha256": "6af670ec0f10dc13f0bf6c01a803e34956f384d785bee7dba2a30ba6e1d79a7c"
+    },
+    {
+      "input": "desktop/release/latest-mac-x64.yml",
+      "name": "latest-mac-x64.yml",
+      "bytes": 511,
+      "sha256": "1a7de8125eba35380050e56aba4f065ab46c335c48f1c1cf62a97a80ddb5e915"
+    },
+    {
+      "input": "desktop/release/latest.yml",
+      "name": "latest.yml",
+      "bytes": 351,
+      "sha256": "7ed4ff3653068581967be110b8cb5d6e3acdc1108b99797b085910f58ea3ef18"
+    },
+    {
+      "input": "desktop/release/omp-desktop-0.1.0-x86_64.rpm",
+      "name": "omp-desktop-0.1.0-x86_64.rpm",
+      "bytes": 188532717,
+      "sha256": "ccce820f0d3104b71cdad71a1030257af5f631e15f3a23a60833dc7ccd4b7b09"
+    },
+    {
+      "input": "desktop/release/omp-desktop_0.1.0_amd64.deb",
+      "name": "OMP-Desktop-0.1.0-x64.deb",
+      "bytes": 207841848,
+      "sha256": "38ae897d228cacf9792f3e14d77a48e2cb0f659168b2a29def5f165bea01f625"
+    },
+    {
+      "input": "pi-host/dist-bundle/pi-host-0.1.0-linux-x64.tar.gz",
+      "name": "pi-host-0.1.0-linux-x64.tar.gz",
+      "bytes": 24929516,
+      "sha256": "fe2c3d29b9a6e98b6a6c49514783bfa23e2977111bde23f17c5a39d207a7604a"
+    },
+    {
+      "input": "pi-host/dist-bundle/pi-host-0.1.0-linux-x64.tar.gz.sha256",
+      "name": "pi-host-0.1.0-linux-x64.tar.gz.sha256",
+      "bytes": 97,
+      "sha256": "5c20c7fbc33be647f241c1d928a753bdd6bde773db09e8a2556aef4cab216e95"
+    }
+  ]
+}
