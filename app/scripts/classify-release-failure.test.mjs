@@ -11,3 +11,10 @@ test("unknown failures disclose only a fixed enum and phase booleans",()=>{
  const result=classifyReleaseFailure("confidential-hostname confidential-user private text");
  assert.deepEqual(result,{classes:["UNCLASSIFIED"],phase:{preflight:false,notices:false,builder:false}});
 });
+test("module and missing-file categories disclose no captured path or dependency name",()=>{
+ const input="Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'yaml' imported from /private/secret\nError: ENOENT: no such file or directory, open 'C:\\private\\OMP Desktop.exe'";
+ const result=classifyReleaseFailure(input);
+ assert.deepEqual(result.classes,["BUNDLER_MODULE_MISSING","NODE_ESM_MODULE_MISSING","YAML_IMPORT_MISSING","APP_EXECUTABLE_MISSING","OPEN_FILE_MISSING","MISSING_FILE"]);
+ assert(!JSON.stringify(result).includes("private"));
+ assert(!JSON.stringify(result).includes("yaml"));
+});
