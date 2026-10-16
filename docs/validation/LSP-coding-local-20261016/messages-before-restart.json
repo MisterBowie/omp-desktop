@@ -1,0 +1,394 @@
+[
+  {
+    "id": "omp:84cb2f8d-2e37-4210-9cfe-bdd1a2387d86:entry:d77803fc",
+    "role": "user",
+    "createdAt": "2026-10-16T01:32:44.999Z",
+    "status": "complete",
+    "content": "LSP_WRITE_COMPLETE"
+  },
+  {
+    "id": "omp:84cb2f8d-2e37-4210-9cfe-bdd1a2387d86:entry:2ea10d7c",
+    "role": "assistant",
+    "createdAt": "2026-10-16T01:32:45.030Z",
+    "status": "complete",
+    "modelId": "local-model",
+    "providerId": "98f580a3-677c-4d30-8ee6-0eea5a6b2ead",
+    "usage": {
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "totalTokens": 0
+    },
+    "content": ""
+  },
+  {
+    "id": "call_fake_1_0",
+    "role": "tool",
+    "createdAt": "2026-10-16T01:32:46.286Z",
+    "toolCallId": "call_fake_1_0",
+    "toolName": "write",
+    "toolStatus": "success",
+    "isError": false,
+    "status": "complete",
+    "content": "",
+    "toolResult": {
+      "content": [
+        {
+          "type": "text",
+          "text": "[written.ts#A0FF]\nSuccessfully wrote 45 bytes to written.ts\n\nLSP Diagnostics (1 error(s)):\n# written.ts\n  1:14 [error] [typescript] Type 'string' is not assignable to type 'number'. (2322)"
+        }
+      ],
+      "details": {
+        "resolvedPath": "/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-9mtvfg/workspace 中文 with spaces 'quoted'/written.ts",
+        "diagnostics": {
+          "server": "typescript-language-server",
+          "messages": [
+            "written.ts:1:14 [error] [typescript] Type 'string' is not assignable to type 'number'. (2322)"
+          ],
+          "summary": "1 error(s)",
+          "errored": true
+        },
+        "meta": {
+          "diagnostics": {
+            "summary": "1 error(s)",
+            "messages": [
+              "written.ts:1:14 [error] [typescript] Type 'string' is not assignable to type 'number'. (2322)"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "omp:84cb2f8d-2e37-4210-9cfe-bdd1a2387d86:entry:cbab7026",
+    "role": "assistant",
+    "createdAt": "2026-10-16T01:32:46.314Z",
+    "status": "complete",
+    "modelId": "local-model",
+    "providerId": "98f580a3-677c-4d30-8ee6-0eea5a6b2ead",
+    "usage": {
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "totalTokens": 0
+    },
+    "content": "LSP_WRITE_COMPLETE"
+  },
+  {
+    "id": "omp:84cb2f8d-2e37-4210-9cfe-bdd1a2387d86:entry:e8eafdd3",
+    "role": "user",
+    "createdAt": "2026-10-16T01:33:04.486Z",
+    "status": "complete",
+    "content": "LSP_READ_COMPLETE"
+  },
+  {
+    "id": "omp:84cb2f8d-2e37-4210-9cfe-bdd1a2387d86:entry:7b41a047",
+    "role": "assistant",
+    "createdAt": "2026-10-16T01:33:04.510Z",
+    "status": "complete",
+    "modelId": "local-model",
+    "providerId": "98f580a3-677c-4d30-8ee6-0eea5a6b2ead",
+    "usage": {
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "totalTokens": 0
+    },
+    "content": ""
+  },
+  {
+    "id": "call_fake_3_0",
+    "role": "tool",
+    "createdAt": "2026-10-16T01:33:04.517Z",
+    "toolCallId": "call_fake_3_0",
+    "toolName": "read",
+    "toolStatus": "success",
+    "isError": false,
+    "status": "complete",
+    "content": "",
+    "toolResult": {
+      "content": [
+        {
+          "type": "text",
+          "text": "[existing.ts#5492]\n1:export const editedValue: number = 42;"
+        }
+      ],
+      "details": {
+        "totalLines": 1,
+        "displayContent": {
+          "text": "export const editedValue: number = 42;",
+          "startLine": 1,
+          "lineNumbers": [
+            1
+          ]
+        },
+        "fileSize": 39,
+        "meta": {
+          "source": {
+            "type": "path",
+            "value": "/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-9mtvfg/workspace 中文 with spaces 'quoted'/existing.ts"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "omp:84cb2f8d-2e37-4210-9cfe-bdd1a2387d86:entry:611d6137",
+    "role": "assistant",
+    "createdAt": "2026-10-16T01:33:04.520Z",
+    "status": "complete",
+    "modelId": "local-model",
+    "providerId": "98f580a3-677c-4d30-8ee6-0eea5a6b2ead",
+    "usage": {
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "totalTokens": 0
+    },
+    "content": "LSP_READ_COMPLETE"
+  },
+  {
+    "id": "omp:84cb2f8d-2e37-4210-9cfe-bdd1a2387d86:entry:9bfa0725",
+    "role": "user",
+    "createdAt": "2026-10-16T01:33:04.707Z",
+    "status": "complete",
+    "content": "LSP_EDIT_COMPLETE"
+  },
+  {
+    "id": "omp:84cb2f8d-2e37-4210-9cfe-bdd1a2387d86:entry:00eea311",
+    "role": "assistant",
+    "createdAt": "2026-10-16T01:33:04.731Z",
+    "status": "complete",
+    "modelId": "local-model",
+    "providerId": "98f580a3-677c-4d30-8ee6-0eea5a6b2ead",
+    "usage": {
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "totalTokens": 0
+    },
+    "content": ""
+  },
+  {
+    "id": "call_fake_5_0",
+    "role": "tool",
+    "createdAt": "2026-10-16T01:33:05.523Z",
+    "toolCallId": "call_fake_5_0",
+    "toolName": "edit",
+    "toolStatus": "success",
+    "isError": false,
+    "status": "complete",
+    "content": "",
+    "toolResult": {
+      "content": [
+        {
+          "type": "text",
+          "text": "[existing.ts#EF37]\n1:export const editedValue: number = \"wrong\";\n\nLSP Diagnostics (1 error(s)):\n# existing.ts\n  1:14 [error] [typescript] Type 'string' is not assignable to type 'number'. (2322)"
+        }
+      ],
+      "details": {
+        "diff": "-1|export const editedValue: number = 42;\n+1|export const editedValue: number = \"wrong\";",
+        "firstChangedLine": 1,
+        "diagnostics": {
+          "server": "typescript-language-server",
+          "messages": [
+            "existing.ts:1:14 [error] [typescript] Type 'string' is not assignable to type 'number'. (2322)"
+          ],
+          "summary": "1 error(s)",
+          "errored": true
+        },
+        "op": "update",
+        "path": "/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-9mtvfg/workspace 中文 with spaces 'quoted'/existing.ts",
+        "oldText": "export const editedValue: number = 42;\n",
+        "newText": "export const editedValue: number = \"wrong\";\n",
+        "meta": {
+          "diagnostics": {
+            "summary": "1 error(s)",
+            "messages": [
+              "existing.ts:1:14 [error] [typescript] Type 'string' is not assignable to type 'number'. (2322)"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "omp:84cb2f8d-2e37-4210-9cfe-bdd1a2387d86:entry:71c20ae4",
+    "role": "assistant",
+    "createdAt": "2026-10-16T01:33:05.546Z",
+    "status": "complete",
+    "modelId": "local-model",
+    "providerId": "98f580a3-677c-4d30-8ee6-0eea5a6b2ead",
+    "usage": {
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "totalTokens": 0
+    },
+    "content": "LSP_EDIT_COMPLETE"
+  },
+  {
+    "id": "omp:84cb2f8d-2e37-4210-9cfe-bdd1a2387d86:entry:ec7be8ee",
+    "role": "user",
+    "createdAt": "2026-10-16T01:33:05.961Z",
+    "status": "complete",
+    "content": "LSP_DEFINITION_COMPLETE"
+  },
+  {
+    "id": "omp:84cb2f8d-2e37-4210-9cfe-bdd1a2387d86:entry:5aca74d9",
+    "role": "assistant",
+    "createdAt": "2026-10-16T01:33:05.994Z",
+    "status": "complete",
+    "modelId": "local-model",
+    "providerId": "98f580a3-677c-4d30-8ee6-0eea5a6b2ead",
+    "usage": {
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "totalTokens": 0
+    },
+    "content": ""
+  },
+  {
+    "id": "call_fake_7_0",
+    "role": "tool",
+    "createdAt": "2026-10-16T01:33:05.999Z",
+    "toolCallId": "call_fake_7_0",
+    "toolName": "read",
+    "toolStatus": "success",
+    "isError": false,
+    "status": "complete",
+    "content": "",
+    "toolResult": {
+      "content": [
+        {
+          "type": "text",
+          "text": "# lsp — LSP\n\nSymbol-aware code intelligence from language servers — navigation, refactors, and diagnostics where text tools miss callsites.\n\n<operations>\n- Position-based: `file` + `line` + `symbol` (substring; `#N` for Nth match). `line` is 1-indexed.\n- `rename` — applies by default; `apply: false` previews. Project-aware lookups ERROR without `symbol` — no silent fallback on missing/ambiguous matches.\n- `code_actions` — lists by default; apply ONE with `apply: true` + `query` (title substring or index).\n- `rename_file` — moves file AND rewrites all imports/references; applies by default.\n- `diagnostics` — path, glob (`src/**/*.ts`), or `file: \"*\"` for workspace.\n- `symbols` — `file` lists file symbols; `file: \"*\"` + `query` searches workspace.\n- `reload` — restart one server (`file`) or all (`*`); `reload *` re-reads LSP config.\n- `request` — raw: `query` = method, `payload` = JSON params (else auto-built).\n</operations>\n\n<critical>\n- Symbol-aware work (rename, references, definition, code actions) MUST use `lsp` whenever a server is available.\n  It follows shadowing, re-exports, and cross-file usages text tools miss.\n- NEVER do a cross-file rename with `ast_edit`/`sed`/hand edits when `lsp` `rename`/`rename_file` can — text renames silently drop callsites.\n- Reach for `code_actions` on imports, quick-fixes, and server-known refactors before editing by hand.\n</critical>\n\n## Schema\n```ts\ntype Args = {\n  action: \"diagnostics\" | \"definition\" | \"references\" | \"hover\" | \"symbols\" | \"rename\" | \"rename_file\" | \"code_actions\" | \"type_definition\" | \"implementation\" | \"status\" | \"reload\" | \"capabilities\" | \"request\";\n  file?: string;\n  line?: number;\n  symbol?: string;\n  query?: string;\n  new_name?: string;\n  apply?: boolean;\n  /** Timeout in seconds (default 20; range 5–300). */\n  timeout?: number;\n  payload?: string;\n};\n```\nExecute by writing JSON to xd://lsp."
+        }
+      ],
+      "details": {
+        "contentType": "text/plain",
+        "totalLines": 38,
+        "displayContent": {
+          "text": "# lsp — LSP\n\nSymbol-aware code intelligence from language servers — navigation, refactors, and diagnostics where text tools miss callsites.\n\n<operations>\n- Position-based: `file` + `line` + `symbol` (substring; `#N` for Nth match). `line` is 1-indexed.\n- `rename` — applies by default; `apply: false` previews. Project-aware lookups ERROR without `symbol` — no silent fallback on missing/ambiguous matches.\n- `code_actions` — lists by default; apply ONE with `apply: true` + `query` (title substring or index).\n- `rename_file` — moves file AND rewrites all imports/references; applies by default.\n- `diagnostics` — path, glob (`src/**/*.ts`), or `file: \"*\"` for workspace.\n- `symbols` — `file` lists file symbols; `file: \"*\"` + `query` searches workspace.\n- `reload` — restart one server (`file`) or all (`*`); `reload *` re-reads LSP config.\n- `request` — raw: `query` = method, `payload` = JSON params (else auto-built).\n</operations>\n\n<critical>\n- Symbol-aware work (rename, references, definition, code actions) MUST use `lsp` whenever a server is available.\n  It follows shadowing, re-exports, and cross-file usages text tools miss.\n- NEVER do a cross-file rename with `ast_edit`/`sed`/hand edits when `lsp` `rename`/`rename_file` can — text renames silently drop callsites.\n- Reach for `code_actions` on imports, quick-fixes, and server-known refactors before editing by hand.\n</critical>\n\n## Schema\n```ts\ntype Args = {\n  action: \"diagnostics\" | \"definition\" | \"references\" | \"hover\" | \"symbols\" | \"rename\" | \"rename_file\" | \"code_actions\" | \"type_definition\" | \"implementation\" | \"status\" | \"reload\" | \"capabilities\" | \"request\";\n  file?: string;\n  line?: number;\n  symbol?: string;\n  query?: string;\n  new_name?: string;\n  apply?: boolean;\n  /** Timeout in seconds (default 20; range 5–300). */\n  timeout?: number;\n  payload?: string;\n};\n```\nExecute by writing JSON to xd://lsp.",
+          "startLine": 1,
+          "lineNumbers": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38
+          ]
+        },
+        "meta": {
+          "source": {
+            "type": "internal",
+            "value": "xd://lsp"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "omp:84cb2f8d-2e37-4210-9cfe-bdd1a2387d86:entry:90e160e5",
+    "role": "assistant",
+    "createdAt": "2026-10-16T01:33:06.001Z",
+    "status": "complete",
+    "modelId": "local-model",
+    "providerId": "98f580a3-677c-4d30-8ee6-0eea5a6b2ead",
+    "usage": {
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "totalTokens": 0
+    },
+    "content": ""
+  },
+  {
+    "id": "call_fake_8_0",
+    "role": "tool",
+    "createdAt": "2026-10-16T01:33:06.011Z",
+    "toolCallId": "call_fake_8_0",
+    "toolName": "lsp",
+    "toolStatus": "success",
+    "isError": false,
+    "status": "complete",
+    "content": "",
+    "toolResult": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Found 1 definition(s):\n  existing.ts:1:14\n    1: export const editedValue: number = \"wrong\";\n    2: "
+        }
+      ],
+      "details": {
+        "serverName": "typescript-language-server",
+        "action": "definition",
+        "success": true,
+        "request": {
+          "action": "definition",
+          "file": "usage.ts",
+          "line": 2,
+          "symbol": "editedValue"
+        }
+      }
+    }
+  },
+  {
+    "id": "omp:84cb2f8d-2e37-4210-9cfe-bdd1a2387d86:entry:e00125b1",
+    "role": "assistant",
+    "createdAt": "2026-10-16T01:33:06.014Z",
+    "status": "complete",
+    "modelId": "local-model",
+    "providerId": "98f580a3-677c-4d30-8ee6-0eea5a6b2ead",
+    "usage": {
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "totalTokens": 0
+    },
+    "content": "LSP_DEFINITION_COMPLETE"
+  }
+]

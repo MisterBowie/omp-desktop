@@ -22,6 +22,9 @@
   `OMP_LSP_EVIDENCE` 可保存真实协议轨迹。
 - **边界：** 各项目需提供相应语言服务器。本例在原生 `.omp/lsp.json` 中显式指定 Node，
   保持运行时 PATH/HOME 隔离；不据此宣称自动安装服务器或真实付费模型必然选择语义工具。
+- **实际安装界面：** `node scripts/e2e-installed-lsp.mjs <installer> <evidence-dir>
+  <absolute-cli.mjs>` 通过真实输入框、单次审批和工具卡验收 Write/Edit 诊断，随后测试
+  定义跳转及退出重开；历史消息一致且无模型重放，两次正常退出均无自有进程残留。
 
 ### E2E-OMP-maintenance-daily
 

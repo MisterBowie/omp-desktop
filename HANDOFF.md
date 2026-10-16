@@ -1,5 +1,18 @@
 # OMP Desktop 开发交接
 
+## 本机 LSP 专项修复已验收（2026-10-16）
+
+`0.15.3-lsp.1` 源码 `8260c37`，分支 `codex/lsp-coding-integration`，位于
+`/Users/vv/Documents/对话/omp-desktop-lsp-coding`；受控原生 fork 位于
+`/Users/vv/Documents/对话/omp-runtime-lsp`，固定 `d648d27` / 补丁 `.6`。
+已开启已有文件编辑后的 LSP 检查，诊断在所属工具中完成，并修复 Write 卡不显示诊断。
+真实 TypeScript LSP、实际 DMG 输入框/审批/诊断/跨文件定义/重启均通过，
+两次正常退出无残留；546 运行时、161 原生 LSP、81 展示/来源、15 包内严格契约均通过。
+见 [专项验收](docs/validation/LSP-coding-local-20261016.md) 与
+[配置前提](docs/05-user-guide.md#编码时的-lsp)。项目仍需对应语言服务器。
+本轮只在本机执行和保存源码/包，未推送、未发版、未触发 Actions、未合 main，未调用 DeepSeek。
+公开 M7 及原默认模型工作树保留；以下 M7 状态是此前范围的验收，不代表旧包已包含此次修复。
+
 ## 当前状态：完整 M7 已接受，目标完成（2026-10-16）
 
 M0–M7 / T01–T24 已完成。M7产品0.15.3-m7.1，固定源码46e7bf7、tag

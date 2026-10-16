@@ -26,6 +26,39 @@ Linux使用系统sans字体；CI截图的中文项目名出现缺字方框，未
 4. 用 Stop 结束执行中的回合。应用保留原生历史；重新打开会话读取历史不会重新执行工具。
 5. 可以切换到另一项目继续工作。后台会话的相对路径仍绑定它自己的项目。
 
+## 编码时的 LSP
+
+本机修复版 `0.15.3-lsp.1` 会在写入和编辑匹配语言的代码文件后自动获取 LSP 诊断，
+在工具完成前返回给模型，并在 Write/Edit 工具卡中显示。旧公开 `0.15.3-m7.1` 的
+编辑后检查默认关闭，Write 卡也会遗漏诊断；本机修复包尚未替换该公开发布。
+
+项目需要可运行的对应语言服务器和正确的项目根标记，例如 TypeScript 项目的
+`package.json` / `tsconfig.json`。OMP 保留原生自动发现和 `lsp.enabled` 开关；
+没有服务器时，工具注册本身不能提供语义分析。本次不自动安装各语言服务器。
+
+运行时使用隔离的 HOME 和 PATH；NVM 等用户 shell 路径不会直接继承。可以在所选
+项目根的 `.omp/lsp.json` 中明确指定本机解释器及服务器，示例中的路径应替换为实际路径：
+
+```json
+{
+  "servers": {
+    "typescript-language-server": {
+      "command": "/absolute/path/to/node",
+      "args": ["/absolute/path/to/typescript-language-server/lib/cli.mjs", "--stdio"],
+      "rootMarkers": ["package.json", "tsconfig.json"]
+    }
+  }
+}
+```
+
+TypeScript 编译器需与服务器一起安装。修改服务器配置后重新建立运行时会话，或使用原生
+`lsp reload`；服务端状态、诊断、定义、引用等功能可通过 `read xd://lsp` 发现。
+自动写入/编辑诊断由运行时执行，不要求模型每次再主动调用一次 `lsp diagnostics`。
+语义导航工具的选择仍由模型决定，不保证每一回合都产生独立 `lsp` 工具调用。
+
+本次真实 TypeScript 服务端、安装包界面和重启历史的验证记录见
+[LSP 本机专项验收](validation/LSP-coding-local-20261016.md)。
+
 ## 与 PI 界面的关系
 
 布局、Composer、审批卡、侧栏和工具展示继续复用 PI 结构。应用名称、图标、appId、更新来源、

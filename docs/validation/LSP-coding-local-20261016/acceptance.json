@@ -1,0 +1,130 @@
+{
+  "schema": "omp-desktop.lsp-local-acceptance/1",
+  "date": "2026-10-16",
+  "productVersion": "0.15.3-lsp.1",
+  "productSourceRevision": "8260c37193b64ad7e2a4b99e17e6fa64b9f7723f",
+  "parentAcceptedRevision": "e9878d29a0747c0ae30b2aeb6a848788a6fbc7b6",
+  "originMain": "a23bfb9befea327e7924efd3004e030a11b587d2",
+  "forkCommit": "d648d27bcf0db16caecb876142d891cf49a51bc2",
+  "forkTree": "dab846754da313b09470a5d37aa1e255633d58cb",
+  "patchLevel": "62bc57b+omp-desktop.6",
+  "installer": {
+    "path": "/Users/vv/Documents/对话/omp-desktop-lsp-coding/app/apps/desktop/release/OMP-Desktop-0.15.3-lsp.1-arm64.dmg",
+    "bytes": 223825116,
+    "sha256": "90bd95b36ba06eaba027b8c7e438aac483f2fa6047c51fddaf1a393baf466d25"
+  },
+  "installedLspChecks": [
+    "real installed Composer write displays TypeScript 2322 after allow-once",
+    "real default hashline edit returns and displays TypeScript 2322",
+    "native deferred LSP discovery resolves the imported definition across files",
+    "restart preserves compiler results and semantic navigation without model/tool replay"
+  ],
+  "installedLaunches": 2,
+  "orderedQuits": [
+    {
+      "label": "ordered-quit",
+      "nativeConfirmationBypassedOnlyAtTeardown": true,
+      "noOwnedProcessesRemain": true
+    },
+    {
+      "label": "ordered-quit",
+      "nativeConfirmationBypassedOnlyAtTeardown": true,
+      "noOwnedProcessesRemain": true
+    }
+  ],
+  "finalOwnedProcesses": [],
+  "protocolChecks": [
+    "write returns real TypeScript 2322",
+    "default hashline edit returns real TypeScript 2322",
+    "deferred lsp discovery and cross-file definition execute against the real server",
+    "diagnostics reach both model continuation and desktop projection"
+  ],
+  "protocolCleanup": {
+    "stopped": true,
+    "reaped": true,
+    "cleaned": true,
+    "steps": [
+      "abort acknowledged",
+      "closed stdin",
+      "exited after stdin closed",
+      "group empty",
+      "run root removed"
+    ],
+    "errors": []
+  },
+  "servers": {
+    "typescript-language-server": "5.0.0",
+    "typescript": "5.9.3",
+    "node": "24.14.0"
+  },
+  "commandSummaries": [
+    {
+      "command": "bun test (four native LSP freshness/dedup/batching/regression suites)",
+      "pass": 161,
+      "fail": 0,
+      "kind": "observed-command-summary"
+    },
+    {
+      "command": "OMP_SIDECAR_TEST_RESOURCES=<actual packaged Resources> pnpm --filter @pi-desktop/omp-runtime test",
+      "pass": 546,
+      "fail": 0,
+      "skip": 0,
+      "kind": "observed-command-summary"
+    },
+    {
+      "command": "node --test (omp-tool-results, omp-tool-results-render, tool-presentation, packaging-sidecar-source, omp-sidecar)",
+      "pass": 81,
+      "fail": 0,
+      "skip": 0,
+      "kind": "observed-command-summary"
+    },
+    {
+      "command": "OMP_E2E_PACKAGED_RESOURCES=<actual packaged Resources> node --test --test-reporter=tap apps/desktop/test/omp-plan-submit-e2e.test.mjs",
+      "pass": 15,
+      "fail": 0,
+      "skip": 0,
+      "rawLog": "plan-goal-final.tap"
+    },
+    {
+      "command": "node --test apps/desktop/test/omp-lsp-coding-e2e.test.mjs (explicit real server and packaged resources)",
+      "pass": 1,
+      "fail": 0,
+      "skip": 0,
+      "rawLog": "lsp-protocol-final.txt"
+    },
+    {
+      "command": "pnpm --filter @pi-desktop/desktop typecheck",
+      "exit": 0,
+      "kind": "observed-command-summary"
+    },
+    {
+      "command": "pnpm lint; pnpm docs:check; node scripts/check-release-docs.mjs 0.15.3",
+      "exit": 0,
+      "biomeFiles": 88,
+      "specPairs": 79,
+      "docsPages": 514,
+      "kind": "observed-command-summary"
+    },
+    {
+      "command": "bun run --filter './packages/*' --sequential --if-present check:types",
+      "exit": 0,
+      "kind": "observed-command-summary"
+    },
+    {
+      "command": "oxlint + oxfmt --check (the three changed native TypeScript files)",
+      "exit": 0,
+      "kind": "observed-command-summary"
+    }
+  ],
+  "checkLimits": {
+    "nativeBunCheck": "Full command failed on pre-existing formatting in packages/agent/src/agent-loop.ts and packages/agent/test/agent-loop.test.ts. Confirmed against unchanged patch-5 checkout; changed files and all package type checks passed.",
+    "unrun": "Windows/Linux native LSP UI, real paid model tool selection, arbitrary language server installation, all M7 upgrade/daily scenarios"
+  },
+  "delivery": {
+    "localOnly": true,
+    "remotePush": false,
+    "releaseOrActions": false,
+    "mainChanged": false,
+    "deepseekCalled": false
+  }
+}

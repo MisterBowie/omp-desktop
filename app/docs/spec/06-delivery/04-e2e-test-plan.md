@@ -28,6 +28,11 @@
   uses an explicit Node interpreter in native `.omp/lsp.json` because Desktop
   keeps its runtime PATH and HOME isolated. It does not prove automatic server
   installation or paid-model tool selection.
+- **Installed UI:** `node scripts/e2e-installed-lsp.mjs <installer> <evidence-dir>
+  <absolute-cli.mjs>` drives the real Composer, allow-once cards and visible
+  Write/Edit diagnostics, then semantic definition and quit/reopen. Recovered
+  messages must match and provider requests must not increase on history reads;
+  two ordered quits must leave no owned process.
 
 ### E2E-OMP-installed-identity-and-workflow
 
