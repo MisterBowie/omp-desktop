@@ -32,6 +32,7 @@ jobs:
               continue
             fi
             node app/scripts/classify-release-failure.mjs "$RUNNER_TEMP/failed-job.log"
+            node .github/scripts/classify-publication-failure.mjs "$RUNNER_TEMP/failed-job.log"
           done < "$RUNNER_TEMP/failed-jobs.txt"
           if gh run download "$source_run" --repo "$GITHUB_REPOSITORY" --pattern 'validation-*' --dir "$RUNNER_TEMP/native-validation" > "$RUNNER_TEMP/validation-access.txt" 2>&1; then
             node .github/scripts/summarize-validation.mjs "$RUNNER_TEMP/native-validation"
