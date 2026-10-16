@@ -1,24 +1,15 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import "../../../scripts/check-workspace-build.test.mjs";
 
 const desktopPackageUrl = new URL("../package.json", import.meta.url);
-const dependencyBuild = "pnpm --filter '@pi-desktop/desktop^...' build";
 const depsScript = "pnpm run build:deps";
 
 const readScripts = async () => {
   const pkg = JSON.parse(await readFile(desktopPackageUrl, "utf8"));
   return pkg.scripts ?? {};
 };
-
-test("build:deps rebuilds every workspace dependency consumed by Electron", async () => {
-  const scripts = await readScripts();
-
-  assert.ok(
-    (scripts["build:deps"] ?? "").includes(dependencyBuild),
-    "build:deps must rebuild every workspace dependency consumed by Electron",
-  );
-});
 
 test("desktop dev builds all workspace dependencies before Electron starts", async () => {
   const scripts = await readScripts();

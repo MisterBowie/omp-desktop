@@ -18,7 +18,28 @@ defaults:
     working-directory: app
 
 jobs:
+  guard:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Validate the owned stable-version candidate
+        working-directory: .
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REPOSITORY" == MisterBowie/omp-desktop ]]
+          version="$(node -p "require('./app/package.json').version")"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            [[ "$GITHUB_REF_NAME" == "v$version" || "$GITHUB_REF_NAME" == "release-check-$version-"* ]]
+          else
+            [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]
+          fi
+
   verify:
+    needs: guard
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -101,7 +122,7 @@ jobs:
         if: steps.source.outputs.reuse != 'true'
 
   build:
-    needs: verify
+    needs: guard
     strategy:
       fail-fast: false
       matrix:
@@ -283,7 +304,7 @@ jobs:
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [verify, build]
     permissions:
       contents: write
       actions: read

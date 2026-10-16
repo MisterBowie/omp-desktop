@@ -1,0 +1,28 @@
+{
+  "schema": "omp-desktop.local-workspace-repair/1",
+  "baseRevision": "967389254bdb0342f00462415bb53cd2ede372e1",
+  "testedInputDiffSha256": "48f4ead94fdd97502f66cd6293125b1418426d3f5c532c23976dbb663aac480b",
+  "workspaceExit": 0,
+  "desktop": {
+    "pass": 3108,
+    "fail": 0,
+    "skipped": 9
+  },
+  "ompRuntime": {
+    "pass": 540,
+    "fail": 0,
+    "skipped": 6
+  },
+  "delivery": {
+    "pass": 31,
+    "fail": 0,
+    "skipped": 0
+  },
+  "buildContract": {
+    "pass": 4,
+    "fail": 0
+  },
+  "workflowYamlParsed": 4,
+  "bashScriptsParsed": 35,
+  "rawWorkspaceLogSha256": "69e9b60e89b5fa4e2c3afe85b651910c2624c116f8ab1de636f2184f55a8b210"
+}
