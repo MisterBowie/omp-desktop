@@ -1,8 +1,10 @@
 # OMP Desktop 使用说明
 
-本项目在 PI-Desktop 界面基础上接入完整 OMP 运行时。当前维护预览版本为
-`0.15.3-m7.1`；测试包从 [M7三平台测试发布](https://github.com/MisterBowie/omp-desktop/releases/tag/m7-test-20261015-46e7bf7)
-取得，按对应阶段 tag 及平台选择，不使用上游 PI 的下载按钮替代本项目产物。
+本项目在 PI-Desktop 界面基础上接入完整 OMP 运行时。`0.1.0` 已完成本机实现，
+正在四目标原生验收，稳定版尚未发布。上一份公开测试版仍为
+[M7 0.15.3-m7.1](https://github.com/MisterBowie/omp-desktop/releases/tag/m7-test-20261015-46e7bf7)。
+正式发布后从 [OMP Desktop 下载](https://github.com/MisterBowie/omp-desktop/releases/latest)
+选择对应平台；该地址属于本项目。
 
 ## 安装与开始使用
 
@@ -28,9 +30,9 @@ Linux使用系统sans字体；CI截图的中文项目名出现缺字方框，未
 
 ## 编码时的 LSP
 
-本机修复版 `0.15.3-lsp.1` 会在写入和编辑匹配语言的代码文件后自动获取 LSP 诊断，
+`0.1.0` 候选已包含此前 `0.15.3-lsp.1` 的修复，会在写入和编辑匹配语言的代码文件后自动获取 LSP 诊断，
 在工具完成前返回给模型，并在 Write/Edit 工具卡中显示。旧公开 `0.15.3-m7.1` 的
-编辑后检查默认关闭，Write 卡也会遗漏诊断；本机修复包尚未替换该公开发布。
+编辑后检查默认关闭，Write 卡也会遗漏诊断；该旧测试版尚未被稳定版替换。
 
 项目需要可运行的对应语言服务器和正确的项目根标记，例如 TypeScript 项目的
 `package.json` / `tsconfig.json`。OMP 保留原生自动发现和 `lsp.enabled` 开关；
@@ -71,6 +73,22 @@ OMP 特有工具和子代理结构通过适配层显示；没有专用展示的�
 
 Plan/Goal 仅在已经验证的非 Cursor 路线开放，保留整批工具零副作用等严格契约。
 **Cursor + Plan/Goal 明确不支持并拒绝**；桌面当前也没有接通 Cursor 传输。
+
+## 0.1.0 的版本重置与更新
+
+从 `0.15.x` 测试版首次切换到 `0.1.0` 需要手动安装；版本序列重新开始，应用不会自动降级。
+本机实际覆盖安装已验证原有 OMP 项目保留。后续版本在设置/版本入口手动检查更新，
+更新来源固定为本项目的 GitHub 稳定发布，历史测试版不会被当作稳定更新。
+
+| 安装形式 | 更新方式 |
+| --- | --- |
+| 未签名或临时签名 macOS | 检查 GitHub 后打开下载页，手动替换 |
+| Developer ID 签名 macOS | 下载进度与重启安装；当前未声称真实签名包已发布 |
+| Windows NSIS 安装版、Linux AppImage | 应用内下载与安装/重启 |
+| Windows portable、Debian、RPM | 检查后手动下载 |
+
+Mac 未公证版本首次启动如被系统拦截，按 ZIP 中的 `OMP-Desktop-macOS-opening-help.txt`
+操作。更新检查失败可以重试；只下载到完整安装包后才允许触发安装。
 
 ## 备份、升级与回退
 

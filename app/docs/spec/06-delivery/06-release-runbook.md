@@ -50,10 +50,13 @@ record. Collisions, symlinks, stale versions and unrelated input files fail
 before publication.
 
 The initial 0.1.0 source gates passed at `f8c0e58` in run `38845176146`.
-For delivery-only corrections, source verification can reuse that completed
-job only after comparing every tracked product input and fixed submodule at
+The later full-source run at `ae173d3` / `38856995305` is the current pinned
+receipt. For delivery-only corrections, source verification can reuse that
+completed job only after comparing every tracked product input and fixed submodule at
 the repository root. The exceptions are documentation and an explicit list of
-publication-only scripts/tests. Runtime, version, lockfile, build-entry or
+publication scripts and native acceptance harnesses. Those harnesses are
+rerun on the new native candidates; they are not product build inputs. Runtime,
+version, lockfile, build-entry or
 submodule changes require the full source suites again; missing receipts also
 fall back to full checks. Delivery tests and all four native package/installed
 acceptances always run at the new candidate. Source-check reuse never means
