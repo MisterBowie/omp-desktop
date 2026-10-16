@@ -12,6 +12,7 @@ jobs:
   diagnose:
     runs-on: ubuntu-22.04
     steps:
+      - uses: actions/checkout@v7
       - name: Read failed job logs without changing the candidate
         env:
           GH_TOKEN: ${{ github.token }}
@@ -25,41 +26,9 @@ jobs:
           node -e 'for(const job of JSON.parse(require("fs").readFileSync(process.env.RUNNER_TEMP+"/jobs.json")).jobs)if(job.conclusion==="failure")console.log(job.id)' > "$RUNNER_TEMP/failed-jobs.txt"
           while read -r job; do
             [[ "$job" =~ ^[0-9]+$ ]]
-            if ! gh api -H 'X-GitHub-Api-Version: 2026-03-10' "repos/$GITHUB_REPOSITORY/actions/jobs/$job/logs" > "$RUNNER_TEMP/failed-job.log" 2> "$RUNNER_TEMP/log-access-error.txt"; then
-              node -e 'const text=require("fs").readFileSync(process.env.RUNNER_TEMP+"/log-access-error.txt","utf8");const code=/403/.test(text)?"LOG_ACCESS_FORBIDDEN":/404|410/.test(text)?"LOG_NOT_READY_OR_MISSING":"LOG_ACCESS_UNAVAILABLE";console.log("::notice title=Safe log access status::"+code);'
+            if ! curl --fail --location --compressed --retry 2 --connect-timeout 10 --max-time 60 --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/jobs/$job/logs" --output "$RUNNER_TEMP/failed-job.log" 2> "$RUNNER_TEMP/log-access-error.txt"; then
+              node -e 'const text=require("fs").readFileSync(process.env.RUNNER_TEMP+"/log-access-error.txt","utf8");const statuses=[400,401,403,404,410,422,429,500,502,503];const status=statuses.find(code=>text.includes(String(code)));const code=status?"HTTP_"+status:/TLS|SSL|certificate/i.test(text)?"TLS_ERROR":/timeout|timed out/i.test(text)?"NETWORK_TIMEOUT":"LOG_ACCESS_UNAVAILABLE";console.log("::notice title=Safe log access status::"+code);'
               continue
             fi
-            DIAGNOSTIC_JOB="$job" node --input-type=module - <<'JS'
-          import {readFileSync} from 'node:fs';
-          const text=readFileSync(process.env.RUNNER_TEMP+'/failed-job.log','utf8').replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g,'');
-          // Only these fixed enum labels and booleans may leave the private log.
-          // Never emit a substring, path, URL, dependency name or error message.
-          const classes=[
-            ['FORK_DIRTY',/source checkout has uncommitted changes/],
-            ['FORK_ORIGIN_MISMATCH',/OMP-SIDECAR-FAIL source origin is/],
-            ['FORK_COMMIT_MISMATCH',/OMP-SIDECAR-FAIL source HEAD is/],
-            ['FORK_FILE_SET_MISMATCH',/OMP-SIDECAR-FAIL source differs from base/],
-            ['FORK_SOURCE_MISSING',/source checkout does not exist|source does not look like the OMP checkout/],
-            ['REVERSE_PATCH_FAILED',/OMP-SIDECAR-FAIL git .*apply.*exited/],
-            ['SIDECAR_BUILD_FAILED',/OMP-SIDECAR-FAIL sidecar build failed/],
-            ['SIDECAR_OUTPUT_MISSING',/OMP build did not produce/],
-            ['SIDECAR_VERSION_PROBE_FAILED',/built sidecar reported/],
-            ['GATE_BUNDLE_FAILED',/tool gate bundle failed|tool gate still contains relative imports/],
-            ['RUNTIME_VERIFIER_NOT_BUILT',/runtime verifier is not built/],
-            ['STAGED_RUNTIME_INVALID',/staged bundled runtime .* does not match/],
-            ['NOTICES_FAILED',/RELEASE-PACKAGE-FAIL dependency notices/],
-            ['NOTICE_VARIANTS_DISAGREE',/dependency variants disagree on notices/],
-            ['CARGO_METADATA_UNAVAILABLE',/Rust notice metadata unavailable/],
-            ['NOTICE_ESCAPES_PACKAGE',/notice leaves its published package/],
-            ['RELEASE_ARGUMENT_REJECTED',/RELEASE-PACKAGE-FAIL .*argument|standalone.*--/],
-            ['BUNDLER_MODULE_MISSING',/Could not resolve|Cannot find module|Cannot find package/],
-            ['BUILDER_EXECUTION_FAILED',/ERR_ELECTRON_BUILDER_CANNOT_EXECUTE/],
-            ['SIGNING_FAILED',/cannot find signing|No valid identity|code signing.*failed/],
-            ['MISSING_FILE',/ENOENT|No such file or directory/],
-            ['PERMISSION_DENIED',/EACCES|Permission denied/],
-          ];
-          const matched=classes.filter(([,pattern])=>pattern.test(text)).map(([name])=>name);
-          const phase={preflight:/RELEASE-PACKAGE [a-z0-9]+\/[a-z0-9]+: preflight/.test(text),notices:/RELEASE-PACKAGE: dependency notices/.test(text),builder:/RELEASE-PACKAGE [a-z0-9]+\/[a-z0-9]+: electron-builder/.test(text)};
-          console.log('::notice title=Safe native failure classification::'+JSON.stringify({classes:matched.length?matched:['UNCLASSIFIED'],phase}));
-          JS
+            node app/scripts/classify-release-failure.mjs "$RUNNER_TEMP/failed-job.log"
           done < "$RUNNER_TEMP/failed-jobs.txt"

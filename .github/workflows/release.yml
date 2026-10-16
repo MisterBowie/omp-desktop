@@ -96,7 +96,7 @@ jobs:
         if: steps.source.outputs.reuse != 'true'
       - run: pnpm -r --if-present test
         if: steps.source.outputs.reuse != 'true'
-      - run: node --test scripts/prepare-github-release.test.mjs scripts/github-update-provider.test.mjs scripts/verify-release-candidate.test.mjs scripts/stage-release-inputs.test.mjs scripts/reuse-source-verification.test.mjs scripts/check-release-workflows.test.mjs
+      - run: node --test scripts/prepare-github-release.test.mjs scripts/github-update-provider.test.mjs scripts/verify-release-candidate.test.mjs scripts/stage-release-inputs.test.mjs scripts/reuse-source-verification.test.mjs scripts/check-release-workflows.test.mjs scripts/classify-release-failure.test.mjs
       - run: cargo test -p host-core --locked
         if: steps.source.outputs.reuse != 'true'
 
@@ -187,7 +187,7 @@ jobs:
             package_status=${PIPESTATUS[0]}
             set -e
             if [[ "$package_status" != 0 ]]; then
-              node --input-type=module -e 'import {readFileSync} from "node:fs";import{join}from"node:path";const tail=readFileSync(join(process.env.RUNNER_TEMP,"omp-package.log"),"utf8").slice(-8000).replaceAll("%","%25").replaceAll("\r","%0D").replaceAll("\n","%0A");console.log(`::error title=Native package build::${tail}`);'
+              node scripts/classify-release-failure.mjs "$RUNNER_TEMP/omp-package.log"
             fi
             return "$package_status"
           }
@@ -200,6 +200,7 @@ jobs:
             package_release -c.mac.forceCodeSigning=true -c.mac.notarize=true
             scripts/notarize-and-staple-macos-release-dmg.sh apps/desktop/release
           else
+            unset CSC_LINK CSC_KEY_PASSWORD CSC_INSTALLER_LINK CSC_INSTALLER_KEY_PASSWORD WIN_CSC_LINK WIN_CSC_KEY_PASSWORD
             export CSC_IDENTITY_AUTO_DISCOVERY=false
             package_release
           fi

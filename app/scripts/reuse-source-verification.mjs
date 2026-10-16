@@ -10,6 +10,7 @@ const DELIVERY_FILES = new Set([
   "app/scripts/stage-release-inputs.mjs", "app/scripts/stage-release-inputs.test.mjs",
   "app/scripts/reuse-source-verification.mjs", "app/scripts/reuse-source-verification.test.mjs",
   "app/scripts/check-release-workflows.test.mjs",
+  "app/scripts/classify-release-failure.mjs", "app/scripts/classify-release-failure.test.mjs",
 ]);
 const CHECKS = [
   "Require the stable version and its release notes", "Run pnpm build:js",
