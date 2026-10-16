@@ -20,10 +20,13 @@ defaults:
 jobs:
   verify:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v7
         with:
-          submodules: recursive
+          fetch-depth: 0
       - uses: pnpm/action-setup@v6
         with:
           package_json_file: app/package.json
@@ -32,14 +35,34 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: app/pnpm-lock.yaml
+      - name: Reuse completed source gates only for unchanged product inputs
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          reuse=false
+          if gh api "repos/$GITHUB_REPOSITORY/actions/runs/38845176146" > "$RUNNER_TEMP/source-run.json" && gh api "repos/$GITHUB_REPOSITORY/actions/runs/38845176146/jobs?per_page=100" > "$RUNNER_TEMP/source-jobs.json"; then
+            reuse="$(node scripts/reuse-source-verification.mjs "$RUNNER_TEMP/source-run.json" "$RUNNER_TEMP/source-jobs.json")" || reuse=false
+          fi
+          echo "reuse=$reuse" >> "$GITHUB_OUTPUT"
+          echo "Product inputs unchanged and completed source gates reusable: $reuse"
+      - name: Prepare fixed reference submodules for full source verification
+        if: steps.source.outputs.reuse != 'true'
+        working-directory: .
+        run: git submodule update --init --recursive --depth=1
       - uses: dtolnay/rust-toolchain@stable
+        if: steps.source.outputs.reuse != 'true'
       - uses: Swatinem/rust-cache@v2
+        if: steps.source.outputs.reuse != 'true'
         with:
           workspaces: app -> target
       - uses: oven-sh/setup-bun@v2
+        if: steps.source.outputs.reuse != 'true'
         with:
           bun-version: '1.4.2'
       - name: Prepare the fixed source-runtime test prerequisites
+        if: steps.source.outputs.reuse != 'true'
         working-directory: upstream/oh-my-pi
         run: |
           set -euo pipefail
@@ -64,12 +87,18 @@ jobs:
           fi
           pnpm check:release-docs
       - run: pnpm build:js
+        if: steps.source.outputs.reuse != 'true'
       - run: cargo build --release --locked -p host-core
+        if: steps.source.outputs.reuse != 'true'
       - run: pnpm --filter @pi-desktop/desktop typecheck
+        if: steps.source.outputs.reuse != 'true'
       - run: pnpm lint
+        if: steps.source.outputs.reuse != 'true'
       - run: pnpm -r --if-present test
-      - run: node --test scripts/prepare-github-release.test.mjs scripts/github-update-provider.test.mjs scripts/verify-release-candidate.test.mjs scripts/stage-release-inputs.test.mjs
+        if: steps.source.outputs.reuse != 'true'
+      - run: node --test scripts/prepare-github-release.test.mjs scripts/github-update-provider.test.mjs scripts/verify-release-candidate.test.mjs scripts/stage-release-inputs.test.mjs scripts/reuse-source-verification.test.mjs scripts/check-release-workflows.test.mjs
       - run: cargo test -p host-core --locked
+        if: steps.source.outputs.reuse != 'true'
 
   build:
     needs: verify
@@ -152,17 +181,27 @@ jobs:
           MACOS_REQUIRE_SIGNING: ${{ vars.MACOS_REQUIRE_SIGNING }}
         run: |
           set -euo pipefail
+          package_release() {
+            set +e
+            pnpm --filter @pi-desktop/desktop run '${{ matrix.dist }}' --${{ matrix.arch }} "$@" 2>&1 | tee "$RUNNER_TEMP/omp-package.log"
+            package_status=${PIPESTATUS[0]}
+            set -e
+            if [[ "$package_status" != 0 ]]; then
+              node --input-type=module -e 'import {readFileSync} from "node:fs";import{join}from"node:path";const tail=readFileSync(join(process.env.RUNNER_TEMP,"omp-package.log"),"utf8").slice(-8000).replaceAll("%","%25").replaceAll("\r","%0D").replaceAll("\n","%0A");console.log(`::error title=Native package build::${tail}`);'
+            fi
+            return "$package_status"
+          }
           if [[ '${{ matrix.platform }}' == darwin && "${MACOS_REQUIRE_SIGNING:-}" == true && -z "${CSC_LINK:-}" ]]; then
             echo '::error::This release requires Mac signing, but CSC_LINK is missing.'
             exit 1
           fi
           if [[ '${{ matrix.platform }}' == darwin && -n "${CSC_LINK:-}" ]]; then
             [[ -n "${APPLE_ID:-}" && -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" && -n "${APPLE_TEAM_ID:-}" ]]
-            pnpm --filter @pi-desktop/desktop run '${{ matrix.dist }}' -- --${{ matrix.arch }} -c.mac.forceCodeSigning=true -c.mac.notarize=true
+            package_release -c.mac.forceCodeSigning=true -c.mac.notarize=true
             scripts/notarize-and-staple-macos-release-dmg.sh apps/desktop/release
           else
             export CSC_IDENTITY_AUTO_DISCOVERY=false
-            pnpm --filter @pi-desktop/desktop run '${{ matrix.dist }}' -- --${{ matrix.arch }}
+            package_release
           fi
       - name: Verify packaged runtime and actual installed workflow
         run: |
