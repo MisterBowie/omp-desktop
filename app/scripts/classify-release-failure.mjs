@@ -35,6 +35,7 @@ export function classifyReleaseFailure(input) {
     ["ARCHIVE_TOOL_MISSING", /ENOENT[^\r\n]*(?:7za|7z\.exe|app-builder)/],
     ["SPAWN_FILE_MISSING", /spawn[^\r\n]*ENOENT/],
     ["OPEN_FILE_MISSING", /ENOENT[^\r\n]*\bopen\b/],
+    ["EMPTY_FILE_PATH", /ENOENT[^\r\n]*\bopen ['"]['"]/],
     ["STAT_FILE_MISSING", /ENOENT[^\r\n]*\b(?:stat|lstat)\b/],
     ["RENAME_FILE_MISSING", /ENOENT[^\r\n]*\brename\b/],
     ["BUILDER_EXECUTION_FAILED", /ERR_ELECTRON_BUILDER_CANNOT_EXECUTE/],
