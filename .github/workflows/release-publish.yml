@@ -83,7 +83,7 @@ jobs:
         run: |
           set -euo pipefail
           for target in darwin-arm64 darwin-x64 linux-x64 win32-x64; do
-            tar -czf "../release-dist/omp-desktop-validation-$RELEASE_VERSION-$target.tar.gz" -C "../release-validation/validation-$target" .
+            tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -cf - -C "../release-validation/validation-$target" . | gzip -n > "../release-dist/omp-desktop-validation-$RELEASE_VERSION-$target.tar.gz"
           done
           cp "$RUNNER_TEMP/omp-candidate-receipt.json" "../release-dist/omp-desktop-validation-$RELEASE_VERSION-build.json"
       - name: Verify every installer hash and merge update feeds
