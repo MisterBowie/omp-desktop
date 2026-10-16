@@ -63,7 +63,7 @@ jobs:
         run: |
           set -euo pipefail
           reuse=false
-          if gh api "repos/$GITHUB_REPOSITORY/actions/runs/38845176146" > "$RUNNER_TEMP/source-run.json" && gh api "repos/$GITHUB_REPOSITORY/actions/runs/38845176146/jobs?per_page=100" > "$RUNNER_TEMP/source-jobs.json"; then
+          if gh api "repos/$GITHUB_REPOSITORY/actions/runs/38856995305" > "$RUNNER_TEMP/source-run.json" && gh api "repos/$GITHUB_REPOSITORY/actions/runs/38856995305/jobs?per_page=100" > "$RUNNER_TEMP/source-jobs.json"; then
             reuse="$(node scripts/reuse-source-verification.mjs "$RUNNER_TEMP/source-run.json" "$RUNNER_TEMP/source-jobs.json")" || reuse=false
           fi
           echo "reuse=$reuse" >> "$GITHUB_OUTPUT"
@@ -117,7 +117,7 @@ jobs:
         if: steps.source.outputs.reuse != 'true'
       - run: pnpm -r --if-present test
         if: steps.source.outputs.reuse != 'true'
-      - run: node --test scripts/prepare-github-release.test.mjs scripts/github-update-provider.test.mjs scripts/verify-release-candidate.test.mjs scripts/stage-release-inputs.test.mjs scripts/reuse-source-verification.test.mjs scripts/check-release-workflows.test.mjs scripts/classify-release-failure.test.mjs scripts/check-workspace-build.test.mjs
+      - run: node --test scripts/prepare-github-release.test.mjs scripts/github-update-provider.test.mjs scripts/verify-release-candidate.test.mjs scripts/stage-release-inputs.test.mjs scripts/reuse-source-verification.test.mjs scripts/check-release-workflows.test.mjs scripts/classify-release-failure.test.mjs scripts/check-workspace-build.test.mjs scripts/e2e/installed-product.test.mjs
       - run: cargo test -p host-core --locked
         if: steps.source.outputs.reuse != 'true'
 
@@ -193,6 +193,8 @@ jobs:
         if: matrix.platform == 'linux'
         run: sudo apt-get update && sudo apt-get install -y xvfb libasound2 libgbm1 libgtk-3-0 libnss3
       - run: pnpm install --frozen-lockfile
+      - name: Verify native executable architecture inspection
+        run: node --test scripts/e2e/installed-product.test.mjs
       - name: Build all release installers
         env:
           CSC_LINK: ${{ matrix.platform == 'darwin' && secrets.CSC_LINK || '' }}

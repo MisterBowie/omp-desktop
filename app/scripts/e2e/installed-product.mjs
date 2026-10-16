@@ -20,7 +20,8 @@ const fileDigest = (path) => digest(readFileSync(path));
 
 export function executableArchitecture(path, platform) {
   if (platform === "darwin") {
-    return execFileSync("/usr/bin/lipo", ["-archs", path], { encoding: "utf8" }).trim();
+    const architecture = execFileSync("/usr/bin/lipo", ["-archs", path], { encoding: "utf8" }).trim();
+    return { x86_64: "x64", i386: "ia32" }[architecture] ?? architecture;
   }
   const descriptor = openSync(path, "r");
   const header = Buffer.alloc(64 * 1024);

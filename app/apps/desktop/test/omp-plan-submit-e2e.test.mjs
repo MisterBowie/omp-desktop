@@ -73,7 +73,9 @@ const { composeModeSystemPrompt, DEFAULT_RUNTIME_SYSTEM_PROMPT } = await import(
 /** Every temporary thing this file creates, removed in `after`. */
 const scratch = [];
 function makeScratch(prefix) {
-  const path = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
+  // Match host-core's physical Windows path; the JS realpath fallback can
+  // retain an 8.3 TEMP alias and create a false project/permission boundary.
+  const path = realpathSync.native(mkdtempSync(join(tmpdir(), prefix)));
   scratch.push(path);
   return path;
 }

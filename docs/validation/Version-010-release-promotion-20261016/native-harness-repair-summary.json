@@ -1,0 +1,51 @@
+{
+  "schema": "omp-desktop.native-harness-repair/1",
+  "productSource": "ae173d361370b1840f6781d8822186d743dce06b",
+  "evidence": {
+    "intel-architecture-red.tap": {
+      "sha256": "c656cdb627b45ee49c474348a3b4be29488c7ebdd8c3f5328d4070aa2f5d927b",
+      "counts": {
+        "tests": 2,
+        "pass": 1,
+        "fail": 1,
+        "skipped": 0
+      }
+    },
+    "intel-architecture-green.tap": {
+      "sha256": "052336197ad2d4f387f0e8abaaa69e0ee81c7a599e2536c8904cda1ab6cbdcf6",
+      "counts": {
+        "tests": 2,
+        "pass": 2,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    "native-path-strict-mac.tap": {
+      "sha256": "7e1dda7bcd7055675feec11d4263c3a8cc5167b1b1de61c7df331f2dea805417",
+      "counts": {
+        "tests": 15,
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    "native-harness-delivery-tests.tap": {
+      "sha256": "326836ebf12f25221fa67dabd737b2007aee10c58e14de424653005a8d5d5129",
+      "counts": {
+        "tests": 33,
+        "pass": 33,
+        "fail": 0,
+        "skipped": 0
+      }
+    }
+  },
+  "syntax": {
+    "yaml": 4,
+    "bash": 36
+  },
+  "privacyTests": {
+    "pass": 2,
+    "fail": 0
+  },
+  "nativeWindowsRerun": "pending"
+}

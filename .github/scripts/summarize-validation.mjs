@@ -23,6 +23,7 @@ export function summarizeStrictFailures(text){
  const failures=[];
  for(const match of text.matchAll(/^not ok (\d+) - [^\n]*\n([\s\S]*?)(?=^(?:# Subtest:|(?:not )?ok \d+ - |1\.\.)|$(?![\s\S]))/gm)){
   const block=match[2],result={number:Number(match[1])};
+  result.approvalInTimeline=/timeline:[^\n]*tool_permission_request/.test(block);result.noReportedErrors=/errors: \[\]/.test(block);
   result.source=coordinates(block);result.diagnosticCodes=diagnosticCodes.filter(code=>block.includes(code));
   const allowed={failureType:["testCodeFailure","testTimeoutFailure","cancelledByParent"],code:["ERR_ASSERTION","SQLITE_ERROR","ERR_SQLITE_ERROR","ENOENT","ETIMEDOUT"],operator:["strictEqual","deepStrictEqual","equal","ok","match","rejects"]};
   for(const [key,values] of Object.entries(allowed)){const value=new RegExp("^\\s+"+key+": ['\"]?([^'\"\\r\\n]+)","m").exec(block)?.[1];if(values.includes(value))result[key]=value;}

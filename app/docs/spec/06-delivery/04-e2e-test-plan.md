@@ -36,6 +36,13 @@
 
 ### E2E-OMP-installed-identity-and-workflow
 
+- **Native path and architecture:** Scratch projects use native realpath so
+  Windows 8.3 TEMP aliases agree with host-core's persisted project identity
+  and do not introduce an unrelated read approval. macOS `lipo` architecture
+  names map to Node's names (`x86_64` -> `x64`), while universal or foreign
+  binaries still fail the single-target check. Real native executable and
+  cross-compiled Intel/ARM Mach-O tests run before packaging; all 15 packaged
+  strict contracts and eight installed workflow assertions remain required.
 - **Preconditions:** Actual OMP installer output, fixed bundled runtime, owned
   HOME/profile/data/cache/temp roots, non-ASCII/spaced workspace, and a local
   deterministic model fixture. No user profile or live provider credentials.
