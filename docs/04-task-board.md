@@ -7,6 +7,8 @@
 会话，历史超限图片不自动改写。见[验证记录](validation/Browser-screenshot-bounds-20261017.md)。
 用户已追加授权提交 GitHub 打包并保持 0.1.0；四目标构建增加原生截图门，
 10 项发布回归及版本/基线检查通过，构建结果待同候选 run 验收。
+首轮 19f38e5 / run39043492205 新增截图门因 Electron 开发 dist 缺失而失败，
+已补官方安装步骤并前移预检；本机相同缺失场景恢复后默认路径六项通过。
 
 2026-10-16（0.1.0 + GitHub 更新）：**已完成稳定发布、真实更新检查与全量公开资产回读。**
 [下载v0.1.0](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.0)，源码154bc03，

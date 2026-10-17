@@ -25,7 +25,9 @@
   The fixture bundles current production source, creates an isolated window,
   and quits normally. Existing history and installed applications are untouched.
 - **Native release gate:** Each macOS ARM/Intel, Windows and Linux build runs
-  the fixture before packaging. Linux uses Xvfb. The generated images and
+  the fixture before native compilation and packaging. The pinned Electron
+  package's official installer explicitly prepares its development binary;
+  a successful dependency install alone is insufficient. Linux uses Xvfb. The generated images and
   JSON report are retained in that target's validation artifact.
 
 ### E2E-OMP-coding-LSP

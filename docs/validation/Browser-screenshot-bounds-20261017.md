@@ -89,3 +89,19 @@ Linux 原生安装验证；本次生产变化只涉及 Electron 截图参数。
 
 原始日志、官方源码快照、源码摘要和原生图片在本机
 `omp-image-review-20261017/`；精简证据见同名子目录。
+
+## 同版本 GitHub 打包首轮阻断与修复
+
+已提交、推送 19f38e52db3a4dbb8fb6dc051297436f1d9e2ebc，使用
+`release-check-0.1.0-19f38e5` 触发
+[run39043492205](https://github.com/MisterBowie/omp-desktop/actions/runs/39043492205)。
+Linux / Mac ARM 在新增截图门失败，尚未进入安装包构建。Linux 精确错误为
+`Electron binary missing`，来自开发依赖的 `electron/dist/electron` 缺失，
+并未运行图片尺寸断言。无登录 API 返回 403，已通过用户现有 Chrome GitHub
+登录态只读展开该失败步骤确认原因。
+
+修复仅调整 CI 准备：显式执行锁定 Electron 包自带的 `install.js`，沿用官方
+下载、缓存、摘要校验和解压逻辑。将 SDK 准备及截图预检移到 OMP 原生编译之前，
+不改图片断言、产品源码或版本。对本机同样缺失 dist 的安装执行该命令后，
+无需 `PI_BROWSER_SCREENSHOT_ELECTRON` 覆盖的原生六项全部通过。
+首轮失败保留，不能将它记为打包完成。

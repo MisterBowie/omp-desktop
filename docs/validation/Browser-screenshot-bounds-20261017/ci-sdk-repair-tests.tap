@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: native release shell forwards a valid target for darwin/arm64
+ok 1 - native release shell forwards a valid target for darwin/arm64
+  ---
+  duration_ms: 3337.730416
+  type: 'test'
+  ...
+# Subtest: native release shell forwards a valid target for darwin/x64
+ok 2 - native release shell forwards a valid target for darwin/x64
+  ---
+  duration_ms: 993.48725
+  type: 'test'
+  ...
+# Subtest: native release shell forwards a valid target for win32/x64
+ok 3 - native release shell forwards a valid target for win32/x64
+  ---
+  duration_ms: 999.429375
+  type: 'test'
+  ...
+# Subtest: native release shell forwards a valid target for linux/x64
+ok 4 - native release shell forwards a valid target for linux/x64
+  ---
+  duration_ms: 990.583917
+  type: 'test'
+  ...
+# Subtest: native release shell forwards a valid target for darwin/arm64 signed
+ok 5 - native release shell forwards a valid target for darwin/arm64 signed
+  ---
+  duration_ms: 990.074917
+  type: 'test'
+  ...
+# Subtest: native release shell forwards a valid target for darwin/x64 signed
+ok 6 - native release shell forwards a valid target for darwin/x64 signed
+  ---
+  duration_ms: 978.692125
+  type: 'test'
+  ...
+# Subtest: accepts the exact fully tested candidate and keeps its source revision
+ok 7 - accepts the exact fully tested candidate and keeps its source revision
+  ---
+  duration_ms: 1.63125
+  type: 'test'
+  ...
+# Subtest: refuses an unfinished, failed or different-source candidate
+ok 8 - refuses an unfinished, failed or different-source candidate
+  ---
+  duration_ms: 1.405917
+  type: 'test'
+  ...
+# Subtest: refuses a skipped native acceptance, missing target or stale artifact
+ok 9 - refuses a skipped native acceptance, missing target or stale artifact
+  ---
+  duration_ms: 0.908708
+  type: 'test'
+  ...
+# Subtest: a current stable run may publish only after all its native jobs passed
+ok 10 - a current stable run may publish only after all its native jobs passed
+  ---
+  duration_ms: 0.163709
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8393.772208
