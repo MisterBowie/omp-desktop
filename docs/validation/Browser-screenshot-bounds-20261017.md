@@ -6,14 +6,11 @@
 整页截图不裁剪，等比缩小至宽 1280、高 2048 CSS 像素以内，不放大小页面。
 实际编码尺寸包含设备缩放比；2 倍屏的高度上限为 4096 像素。
 
-这是本机源码交付，版本仍为 0.1.0；没有提交、推送、发布、更新远端已安装程序，
-也没有重写用户的历史图片。已有超限图片仍需单独恢复。任意附件、原始 CDP 调用
-和其他工具的图片不在本次捕获边界修复范围内；未调用真实模型验证或产生模型费用。
-
-以上为最初修复阶段状态。用户随后明确授权提交 GitHub 打包，要求版本不变。
-本次保持 0.1.0，并在原生工作流增加截图验证，Linux 使用 Xvfb，四目标均保留
-生成图片及原始报告。独立 `release-check-0.1.0-*` 构建标记不会改写既有稳定 tag
-或覆盖稳定发布；GitHub 构建结果必须单独验收，不以本机通过代替。
+用户随后授权提交 GitHub 打包，要求版本不变。最终源码 `08987f9` 已推送，
+四目标构建及安装验收完成，版本仍为 **0.1.0**；最终 run、制品与回执见末节。
+既有稳定 Release、远端已安装程序及历史图片未修改。已有超限图片仍需单独恢复。
+任意附件、原始 CDP 调用和其他工具的图片不在本次捕获边界修复范围内；未调用
+真实模型验证或产生模型费用。以下保留本机验证和前两轮失败的过程记录。
 
 ## 原因与上游依据
 
@@ -84,8 +81,8 @@ Node 24.14.0、pnpm 10.34.5、Electron 43.6.0、macOS arm64。
 真实 Electron 验证初次受沙箱阻止，授权后继续。夹具曾使用原生设备模拟 API 导致
 崩溃，最终改用测试专属 CDP metrics；增加绘制完成同步，并按 Chromium 文档尺寸
 至少包含视口的事实修正小页面夹具。最终结果来自当前夹具和生产源码，未放宽
-双轴边界或页尾完整性断言。未运行无关完整工作区/Rust 测试、`verify:ui:*` 或
-Linux 原生安装验证；本次生产变化只涉及 Electron 截图参数。
+双轴边界或页尾完整性断言。本机阶段未运行完整工作区/Rust 测试、`verify:ui:*`
+或 Linux 原生安装；后续最终 GitHub 候选已通过完整源码及四目标安装验收。
 
 原始日志、官方源码快照、源码摘要和原生图片在本机
 `omp-image-review-20261017/`；精简证据见同名子目录。
@@ -118,3 +115,33 @@ SDK 准备已恢复，Mac ARM/Intel 截图门通过。用户提供的 Linux 完�
 target 生命周期混入截图参数验收。增加固定阶段日志和 renderer 退出原因，保留
 45 秒上限、全部尺寸与颜色断言。生产 CDP 代码和版本均未修改；本机默认路径
 六场景再次通过。此项改动仍需新轮 Linux/Windows 结果，不能把本机通过当作修复证明。
+
+## 最终同版本 GitHub 打包已验收（2026-10-18）
+
+- 产品源码：`08987f90f918a2946f4762988762e69cd7e72200`；分支 `codex/image-dimension-guard`。
+- 固定标记：`release-check-0.1.0-08987f9`，版本仍为 `0.1.0`。
+- [最终 run39045810964](https://github.com/MisterBowie/omp-desktop/actions/runs/39045810964)：`completed/success`。
+  guard、verify 及四目标 build 全成功；publish 按候选标记设计为 skipped。
+- 完整源码门实际执行并通过 JS 构建、host-core release 构建、桌面类型检查、lint、
+  workspace 测试、发布脚本回归及 host-core Rust 测试，没有复用旧产品的源码结果。
+- 四目标各自的锁定 Electron 准备、真实截图六场景、OMP fork 原生编译、
+  全部安装包构建及包内/实际安装验收步骤均 success。第二轮 Linux target closed /
+  Windows SIGTERM 未在最终候选复现；原有断言与 45 秒夹具上限保留。
+
+| 目标 | 安装包制品 | 验收制品 |
+| --- | --- | --- |
+| macOS ARM64 | `release-darwin-arm64` | `validation-darwin-arm64` |
+| macOS Intel | `release-darwin-x64` | `validation-darwin-x64` |
+| Linux x64 | `release-linux-x64` | `validation-linux-x64` |
+| Windows x64 | `release-win32-x64` | `validation-win32-x64` |
+
+八份制品共 **1,982,280,495 字节**。通过已有 `verifyReleaseCandidate`：严格核对仓库、
+工作流、push tag、精确源码、整轮/源码/四原生作业和关键步骤成功、八份完整名称、
+非空、未过期、同源码来源及 GitHub SHA256 摘要；额外核对四份截图门和 SDK 准备
+均成功、publish skipped。回执见同名目录 `accepted-candidate.json`，API 作业与
+步骤摘要见 `github-build-summary.json`。本机仅核验不可变制品元数据，未下载八份
+ZIP 逐字节复核；不将其写成已经完成的验证。
+
+安装包从该 run 的 Artifacts 手动下载。既有稳定 `v0.1.0` 仍指向 `154bc03`，
+未覆盖其资产或更新清单；同版本不会触发更高版本更新。未合并 main，未安装到
+192.168.3.21，未改写既有报错会话。当前提交/打包请求已完成。

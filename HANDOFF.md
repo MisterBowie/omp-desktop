@@ -1,5 +1,21 @@
 # OMP Desktop 开发交接
 
+## 超长截图修复已提交并完成四目标 GitHub 打包（2026-10-18）
+
+版本保持 **0.1.0**，源码 `08987f90f918a2946f4762988762e69cd7e72200`，
+分支 `codex/image-dimension-guard`，固定 tag `release-check-0.1.0-08987f9`。
+[run39045810964](https://github.com/MisterBowie/omp-desktop/actions/runs/39045810964)
+整轮 success：完整源码检查，以及 Mac ARM/Intel、Windows x64、Linux x64 的
+截图六场景、安装包构建、包内严格检查和实际安装流程步骤均 success。
+八份制品的固定来源、非空/未过期状态及 GitHub SHA256 摘要经现有候选验收器接受。
+记录保留前两轮失败；本机未下载八份 ZIP 逐字节复核，不冒称已完成该项。
+
+安装包位于本次 run 的 Artifacts（`release-<平台>-<架构>`），验收制品为对应
+`validation-*`。既有 v0.1.0 稳定 tag/Release 未覆盖；同版本需要手动下载安装，
+不会被更新比较识别为更高版本。远端安装和已有超限会话图片未改写。
+见[最终验收记录](docs/validation/Browser-screenshot-bounds-20261017.md)。
+下列本机阶段和失败轮次叙述保留为过程历史，以本节最终状态为准。
+
 ## 超长浏览器截图已按官方逻辑本机修复（2026-10-17）
 
 新请求工作树 `omp-desktop-image-guard` / `codex/image-dimension-guard`，先从最新
