@@ -22,7 +22,8 @@
   The 2x long-page output is 146 by 4096 pixels; viewport size is unchanged.
 - **Automation:** `node scripts/e2e-browser-screenshot.mjs <evidence-dir>`.
   `PI_BROWSER_SCREENSHOT_ELECTRON` may select an existing Electron binary.
-  The fixture bundles current production source, creates an isolated window,
+  The fixture bundles current production source, shows/focuses an isolated window,
+  and changes dimensions in one generated document without navigating between cases,
   and quits normally. Existing history and installed applications are untouched.
 - **Native release gate:** Each macOS ARM/Intel, Windows and Linux build runs
   the fixture before native compilation and packaging. The pinned Electron

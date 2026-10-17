@@ -10,14 +10,25 @@ import { onLoad } from "../../apps/desktop/resources/plugins/pi.browser/main.js"
 const evidence = process.env.PI_BROWSER_SCREENSHOT_EVIDENCE;
 app.setPath("userData", join(evidence, "profile"));
 let window;
+let phase;
+function markPhase(value) {
+  phase = value;
+  console.log("BROWSER_SCREENSHOT_PHASE", value);
+}
 
 async function run() {
+  markPhase("app-ready");
   await app.whenReady();
   window = new BrowserWindow({
-    width: 345, height: 720, useContentSize: true, show: false,
+    width: 345, height: 720, useContentSize: true, show: true,
     webPreferences: {
       sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false,
     },
+  });
+  window.show();
+  window.focus();
+  window.webContents.on("render-process-gone", (_event, details) => {
+    console.error("BROWSER_SCREENSHOT_RENDERER_EXIT", details.reason, details.exitCode);
   });
   const host = new BrowserHost({
     pane: { getWebContents: () => window.webContents },
@@ -33,6 +44,11 @@ async function run() {
   };
   await onLoad();
   assert.equal(tool.name, "Browser");
+  markPhase("load-page");
+  const html = `<style>html,body{margin:0;overflow:hidden}
+    #page{background:linear-gradient(to bottom,rgb(240,20,20) 0% 33%,
+    rgb(20,240,20) 33% 66%,rgb(20,20,240) 66% 100%)}</style><div id="page"></div>`;
+  await window.loadURL(`data:text/html,${encodeURIComponent(html)}`);
   const captures = [];
   for (const [name, width, height, deviceScaleFactor] of [
     ["reported-long-page", 345, 9663, 1],
@@ -41,17 +57,22 @@ async function run() {
     ["small-page", 800, 900, 1],
     ["long-page-hidpi", 345, 9663, 2],
   ]) {
-    const html = `<style>html,body{margin:0;width:${width}px;height:${height}px;overflow:hidden}
-      #page{width:${width}px;height:${height}px;background:linear-gradient(to bottom,
-      rgb(240,20,20) 0% 33%,rgb(20,240,20) 33% 66%,rgb(20,20,240) 66% 100%)}</style><div id="page"></div>`;
-    await window.loadURL(`data:text/html,${encodeURIComponent(html)}`);
+    markPhase(`${name}:layout`);
+    await window.webContents.executeJavaScript(`(() => {
+      for (const element of [document.documentElement, document.body, document.getElementById('page')]) {
+        element.style.width = '${width}px'; element.style.height = '${height}px';
+      }
+    })()`);
     if (!window.webContents.debugger.isAttached()) window.webContents.debugger.attach("1.3");
+    markPhase(`${name}:metrics`);
     await window.webContents.debugger.sendCommand("Emulation.setDeviceMetricsOverride", {
       width: 345, height: 720, deviceScaleFactor, mobile: false,
     });
+    markPhase(`${name}:paint`);
     await window.webContents.executeJavaScript(
       "new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))",
     );
+    markPhase(`${name}:capture`);
     const result = await tool.execute({ action: "screenshot", fullPage: true });
     assert.equal(result.ok, true);
     assert.equal(result.images.length, 1);
@@ -78,6 +99,7 @@ async function run() {
     }
     captures.push({ name, original: { width, height }, deviceScaleFactor, actual: size, bytes: bytes.length });
   }
+  markPhase("viewport:capture");
   const viewport = await tool.execute({ action: "screenshot", fullPage: false });
   const viewportSize = nativeImage.createFromBuffer(Buffer.from(viewport.images[0].data, "base64")).getSize();
   assert.deepEqual(viewportSize, { width: 690, height: 1440 });
@@ -91,6 +113,7 @@ run().then(() => {
   window.destroy();
   app.quit();
 }).catch((error) => {
+  console.error("BROWSER_SCREENSHOT_FAILED_PHASE", phase);
   console.error(error);
   window?.destroy();
   app.exit(1);

@@ -105,3 +105,16 @@ Linux / Mac ARM 在新增截图门失败，尚未进入安装包构建。Linux �
 不改图片断言、产品源码或版本。对本机同样缺失 dist 的安装执行该命令后，
 无需 `PI_BROWSER_SCREENSHOT_ELECTRON` 覆盖的原生六项全部通过。
 首轮失败保留，不能将它记为打包完成。
+
+第二轮 d268777b73dcbb8b88bd452f25bf2495794d149d /
+[run39045061849](https://github.com/MisterBowie/omp-desktop/actions/runs/39045061849)
+SDK 准备已恢复，Mac ARM/Intel 截图门通过。用户提供的 Linux 完整错误为
+`target closed while handling command`；Windows 为 45 秒夹具超时后 SIGTERM，
+尚无尺寸断言失败证据。字体与 D-Bus 的警告不是已证明的原因。浏览器日志读取
+随后持续超时，未通过系统命令或读取浏览器凭据绕过。
+
+夹具采用本项目实际安装验证已有的可见/聚焦窗口做法，避免隐藏窗口的绘制等待；
+测试窗口只包含生成的颜色页面。一次导航后在同一页面修改尺寸，避免把跨导航
+target 生命周期混入截图参数验收。增加固定阶段日志和 renderer 退出原因，保留
+45 秒上限、全部尺寸与颜色断言。生产 CDP 代码和版本均未修改；本机默认路径
+六场景再次通过。此项改动仍需新轮 Linux/Windows 结果，不能把本机通过当作修复证明。

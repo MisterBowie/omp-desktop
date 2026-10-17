@@ -19,7 +19,7 @@
   2 倍屏长页面输出 146 × 4096 像素，普通视口尺寸不变。
 - **自动化：** `node scripts/e2e-browser-screenshot.mjs <evidence-dir>`；
   `PI_BROWSER_SCREENSHOT_ELECTRON` 可选择已有 Electron。夹具打包当前生产源码，
-  创建隔离窗口并正常退出，不修改已安装应用或历史。
+  显示/聚焦隔离窗口，在同一生成页面调整尺寸后正常退出，不修改已安装应用或历史。
 - **原生发布门：** Mac ARM/Intel、Windows、Linux 各构建在原生编译和打包前运行此
   夹具，显式执行锁定 Electron 包的官方安装脚本，不能仅凭依赖安装成功假定开发
   运行时存在。Linux 使用 Xvfb；生成的图片和 JSON 报告保存在各目标的验证制品中。

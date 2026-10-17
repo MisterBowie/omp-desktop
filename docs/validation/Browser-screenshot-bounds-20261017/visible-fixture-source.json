@@ -1,0 +1,5 @@
+{
+  "app/apps/desktop/electron/main/browser-cdp.ts": "d02b934e169a09f4ee2714d7a44cfc55bd1f93717479e38c4efbd96e374fa4d9",
+  "app/scripts/e2e/browser-screenshot.mjs": "b0d4baa4e93e6d29895d996ca57b32d7de4ab751579105216fc6443d27b7fd04",
+  "app/scripts/e2e-browser-screenshot.mjs": "bcdf866104253555e51984082d472a489a59a45a90ac437330f0204f3bb4bac5"
+}
