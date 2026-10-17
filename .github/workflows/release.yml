@@ -195,6 +195,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Verify native executable architecture inspection
         run: node --test scripts/e2e/installed-product.test.mjs
+      - name: Verify bounded browser screenshots on native Electron
+        run: |
+          set -euo pipefail
+          if [[ '${{ matrix.platform }}' == linux ]]; then
+            xvfb-run -a node scripts/e2e-browser-screenshot.mjs .artifacts/browser-screenshot
+          else
+            node scripts/e2e-browser-screenshot.mjs .artifacts/browser-screenshot
+          fi
       - name: Build all release installers
         env:
           CSC_LINK: ${{ matrix.platform == 'darwin' && secrets.CSC_LINK || '' }}
@@ -302,6 +310,7 @@ jobs:
           path: |
             app/packaged-runtime.json
             app/packaged-plan-goal.tap
+            app/.artifacts/browser-screenshot/
             app/.artifacts/stable-installed/
 
   publish:

@@ -41,13 +41,14 @@ disagrees, so a green `check:release-docs` is a precondition, not a substitute.
 
 ## End-to-end
 
-Do not run these from an agent session, and do not trigger the remote jobs by
-hand, unless the request explicitly asks for it (see `AGENTS.md`). The scenarios
-they cover are specified in
+Follow `AGENTS.md`: run the smallest relevant isolated E2E for a code change;
+`verify:ui:*` still requires an explicit request. Remote jobs are opt-in.
+The scenarios these scripts cover are specified in
 [the E2E test plan](../docs/spec/06-delivery/04-e2e-test-plan.md).
 
 | Script | Alias | Purpose |
 |---|---|---|
+| `e2e-browser-screenshot.mjs` | `node scripts/e2e-browser-screenshot.mjs <evidence-dir>` | Bundled Browser tool, real CDP/JPEG capture, full-page bounds, saved image identity, and normal/2x pixel output in an isolated Electron fixture; no model |
 | `e2e-smoke.mjs` | `pnpm test:e2e` | Protocol-level E2E against host-core, plus an optional live model |
 | `e2e-plan.mjs` | `pnpm test:e2e:plan` | Plan state, checkpoint artifact, and approval transitions |
 | `e2e-plan-ui.mjs` | `pnpm test:e2e:plan-ui` | Plan approval through the rendered UI |

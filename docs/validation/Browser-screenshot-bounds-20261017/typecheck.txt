@@ -1,0 +1,2 @@
+> @pi-desktop/desktop@0.1.0 typecheck /Users/vv/Documents/对话/omp-desktop-image-guard/app/apps/desktop
+> tsc -p tsconfig.json --noEmit

@@ -1,5 +1,20 @@
 # OMP Desktop 开发交接
 
+## 超长浏览器截图已按官方逻辑本机修复（2026-10-17）
+
+新请求工作树 `omp-desktop-image-guard` / `codex/image-dimension-guard`，先从最新
+origin/main 创建，再快进至已交付的 f8a130d，保留全部 0.1.0 功能。已核对两份
+最新官方源码：PI Desktop e219a3e 的整页截图已同时约束宽 1280、高 2048 CSS 像素；
+OMP 58195a4 原生浏览器另有双轴缩放/压缩。当前缺陷在桌面 BrowserHost/CDP 路径，
+直接同步 PI 官方截图方法，函数逐字一致。22 项回归、真实 Electron 六场景、
+桌面类型检查、lint 和双语文档检查通过。仅源码本机交付，未提交、推送、发布或
+修改远端安装/会话历史。见[验证记录](docs/validation/Browser-screenshot-bounds-20261017.md)。
+
+用户随后授权提交 GitHub 并打包，要求版本不变。版本仍为 0.1.0，原生发布工作流
+增加四目标截图夹具门及验证制品归档；10 项发布脚本回归、主分支包含检查、版本/
+发布文档检查和四路 Bash 解析通过。使用独立 `release-check-0.1.0-*` 标记构建，
+不移动既有稳定 tag；构建、安装验收和产物结果以本次 run 实际状态为准。
+
 ## 0.1.0 稳定版与更新功能已完成（2026-10-16）
 
 [公开v0.1.0](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.0)，产品源码

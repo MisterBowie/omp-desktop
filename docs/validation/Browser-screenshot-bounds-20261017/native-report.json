@@ -1,0 +1,78 @@
+{
+  "status": "passed",
+  "electron": "43.6.0",
+  "captures": [
+    {
+      "name": "reported-long-page",
+      "original": {
+        "width": 345,
+        "height": 9663
+      },
+      "deviceScaleFactor": 1,
+      "actual": {
+        "width": 73,
+        "height": 2048
+      },
+      "bytes": 1447
+    },
+    {
+      "name": "wide-page",
+      "original": {
+        "width": 10000,
+        "height": 800
+      },
+      "deviceScaleFactor": 1,
+      "actual": {
+        "width": 1280,
+        "height": 102
+      },
+      "bytes": 5038
+    },
+    {
+      "name": "both-axes",
+      "original": {
+        "width": 5000,
+        "height": 12000
+      },
+      "deviceScaleFactor": 1,
+      "actual": {
+        "width": 853,
+        "height": 2048
+      },
+      "bytes": 12024
+    },
+    {
+      "name": "small-page",
+      "original": {
+        "width": 800,
+        "height": 900
+      },
+      "deviceScaleFactor": 1,
+      "actual": {
+        "width": 800,
+        "height": 900
+      },
+      "bytes": 7498
+    },
+    {
+      "name": "long-page-hidpi",
+      "original": {
+        "width": 345,
+        "height": 9663
+      },
+      "deviceScaleFactor": 2,
+      "actual": {
+        "width": 146,
+        "height": 4096
+      },
+      "bytes": 5003
+    },
+    {
+      "name": "viewport",
+      "actual": {
+        "width": 690,
+        "height": 1440
+      }
+    }
+  ]
+}

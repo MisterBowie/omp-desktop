@@ -1,0 +1,87 @@
+✖ full-page screenshot bounds reported long page without cropping or upscaling (5.601583ms)
+✔ full-page screenshot bounds wide page without cropping or upscaling (0.140583ms)
+✖ full-page screenshot bounds large page on both axes without cropping or upscaling (0.23425ms)
+✔ full-page screenshot bounds page already at the limits without cropping or upscaling (0.102625ms)
+✔ full-page screenshot bounds small page without cropping or upscaling (0.085459ms)
+✖ full-page screenshot prefers CSS metrics over device-pixel metrics (0.187458ms)
+✖ full-page screenshot supports legacy content metrics (0.162458ms)
+✔ viewport screenshot preserves its existing capture behavior (0.109791ms)
+✔ empty screenshot remains an observable error (0.27775ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 5
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 110.664333
+
+✖ failing tests:
+
+test at test/browser-screenshot.test.mjs:36:3
+✖ full-page screenshot bounds reported long page without cropping or upscaling (5.601583ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+    assert.ok(height * params.clip.scale <= 2048)
+
+      at TestContext.<anonymous> (file:///Users/vv/Documents/%E5%AF%B9%E8%AF%9D/omp-desktop-image-guard/app/apps/desktop/test/browser-screenshot.test.mjs:52:14)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test/browser-screenshot.test.mjs:36:3
+✖ full-page screenshot bounds large page on both axes without cropping or upscaling (0.23425ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+    assert.ok(height * params.clip.scale <= 2048)
+
+      at TestContext.<anonymous> (file:///Users/vv/Documents/%E5%AF%B9%E8%AF%9D/omp-desktop-image-guard/app/apps/desktop/test/browser-screenshot.test.mjs:52:14)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test/browser-screenshot.test.mjs:60:1
+✖ full-page screenshot prefers CSS metrics over device-pixel metrics (0.187458ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+    assert.ok(clip.height * clip.scale <= 2048)
+
+      at TestContext.<anonymous> (file:///Users/vv/Documents/%E5%AF%B9%E8%AF%9D/omp-desktop-image-guard/app/apps/desktop/test/browser-screenshot.test.mjs:71:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test/browser-screenshot.test.mjs:77:1
+✖ full-page screenshot supports legacy content metrics (0.162458ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+    assert.ok(clip.height * clip.scale <= 2048)
+
+      at TestContext.<anonymous> (file:///Users/vv/Documents/%E5%AF%B9%E8%AF%9D/omp-desktop-image-guard/app/apps/desktop/test/browser-screenshot.test.mjs:84:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

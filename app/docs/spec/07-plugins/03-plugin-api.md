@@ -644,6 +644,14 @@ pi.browser.cdp(input: { method: string; params?: unknown }): Promise<unknown>
 ```
 
 The guest page is a host-owned `WebContentsView` (`persist:work-browser`).
+For `screenshot({ fullPage: true })`, the complete page is uniformly scaled
+to fit 1280 by 2048 CSS pixels without upscaling or cropping. This follows
+PI-Desktop's upstream CDP capture policy. Encoded pixel dimensions also
+reflect the guest's device scale factor (for example, the 2048 CSS-pixel
+height cap produces 4096 pixels at 2x). Viewport captures keep their existing
+behavior. The saved JPEG and the image returned to the agent are identical.
+This capture-time policy does not rewrite images already stored in history.
+
 `setBounds` is content-relative to the calling plugin view and is clamped so
 the guest cannot cover chat/composer. `cdp` is deny-by-default; cookie,
 storage, target, and network-interception methods fail with

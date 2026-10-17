@@ -1,0 +1,142 @@
+TAP version 13
+# Subtest: CDP allowlist denies cookies, storage, and target methods
+ok 1 - CDP allowlist denies cookies, storage, and target methods
+  ---
+  duration_ms: 0.457
+  type: 'test'
+  ...
+# Subtest: guest bounds are clamped to the plugin view rect
+ok 2 - guest bounds are clamped to the plugin view rect
+  ---
+  duration_ms: 0.406125
+  type: 'test'
+  ...
+# Subtest: snapshot uids are stable eN handles mapped to backend nodes
+ok 3 - snapshot uids are stable eN handles mapped to backend nodes
+  ---
+  duration_ms: 0.173958
+  type: 'test'
+  ...
+# Subtest: in-flight tool.execute session survives the child host-api round trip
+ok 4 - in-flight tool.execute session survives the child host-api round trip
+  ---
+  duration_ms: 0.153833
+  type: 'test'
+  ...
+# Subtest: legacy renderer browser IPC cannot place an unclamped guest
+ok 5 - legacy renderer browser IPC cannot place an unclamped guest
+  ---
+  duration_ms: 0.371458
+  type: 'test'
+  ...
+# Subtest: opening two session previews and switching back never reveals the previous session while loading
+ok 6 - opening two session previews and switching back never reveals the previous session while loading
+  ---
+  duration_ms: 3.45525
+  type: 'test'
+  ...
+# Subtest: an older root lookup cannot navigate over a newer session
+ok 7 - an older root lookup cannot navigate over a newer session
+  ---
+  duration_ms: 0.42525
+  type: 'test'
+  ...
+# Subtest: a previous session's load completion cannot reveal its guest while the new root is pending
+ok 8 - a previous session's load completion cannot reveal its guest while the new root is pending
+  ---
+  duration_ms: 0.427333
+  type: 'test'
+  ...
+# Subtest: a session without a remembered preview cannot expose the previous guest
+ok 9 - a session without a remembered preview cannot expose the previous guest
+  ---
+  duration_ms: 0.34825
+  type: 'test'
+  ...
+# Subtest: same-session navigation supersedes a pending restore and keeps existing content during normal navigation
+ok 10 - same-session navigation supersedes a pending restore and keeps existing content during normal navigation
+  ---
+  duration_ms: 0.516417
+  type: 'test'
+  ...
+# Subtest: closing the panel during a load keeps it hidden when the load completes
+ok 11 - closing the panel during a load keeps it hidden when the load completes
+  ---
+  duration_ms: 0.283209
+  type: 'test'
+  ...
+# Subtest: disposing the guest invalidates pending roots and prevents its recreation
+ok 12 - disposing the guest invalidates pending roots and prevents its recreation
+  ---
+  duration_ms: 0.381917
+  type: 'test'
+  ...
+# Subtest: a failed replacement load leaves the previous session hidden
+ok 13 - a failed replacement load leaves the previous session hidden
+  ---
+  duration_ms: 0.379417
+  type: 'test'
+  ...
+# Subtest: full-page screenshot bounds reported long page without cropping or upscaling
+ok 14 - full-page screenshot bounds reported long page without cropping or upscaling
+  ---
+  duration_ms: 0.997917
+  type: 'test'
+  ...
+# Subtest: full-page screenshot bounds wide page without cropping or upscaling
+ok 15 - full-page screenshot bounds wide page without cropping or upscaling
+  ---
+  duration_ms: 0.113917
+  type: 'test'
+  ...
+# Subtest: full-page screenshot bounds large page on both axes without cropping or upscaling
+ok 16 - full-page screenshot bounds large page on both axes without cropping or upscaling
+  ---
+  duration_ms: 0.577666
+  type: 'test'
+  ...
+# Subtest: full-page screenshot bounds page already at the limits without cropping or upscaling
+ok 17 - full-page screenshot bounds page already at the limits without cropping or upscaling
+  ---
+  duration_ms: 0.101625
+  type: 'test'
+  ...
+# Subtest: full-page screenshot bounds small page without cropping or upscaling
+ok 18 - full-page screenshot bounds small page without cropping or upscaling
+  ---
+  duration_ms: 0.091166
+  type: 'test'
+  ...
+# Subtest: full-page screenshot prefers CSS metrics over device-pixel metrics
+ok 19 - full-page screenshot prefers CSS metrics over device-pixel metrics
+  ---
+  duration_ms: 0.111041
+  type: 'test'
+  ...
+# Subtest: full-page screenshot supports legacy content metrics
+ok 20 - full-page screenshot supports legacy content metrics
+  ---
+  duration_ms: 0.095084
+  type: 'test'
+  ...
+# Subtest: viewport screenshot preserves its existing capture behavior
+ok 21 - viewport screenshot preserves its existing capture behavior
+  ---
+  duration_ms: 0.098917
+  type: 'test'
+  ...
+# Subtest: empty screenshot remains an observable error
+ok 22 - empty screenshot remains an observable error
+  ---
+  duration_ms: 0.303666
+  type: 'test'
+  ...
+1..22
+# tests 22
+# suites 0
+# pass 22
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 96.382209

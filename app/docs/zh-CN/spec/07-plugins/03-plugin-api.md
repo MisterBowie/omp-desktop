@@ -521,6 +521,12 @@ pi.browser.cdp(input: { method: string; params?: unknown }): Promise<unknown>
 ```
 
 访客页是宿主拥有的 `WebContentsView`（`persist:work-browser`）。
+`screenshot({ fullPage: true })` 沿用 PI-Desktop 官方 CDP 策略，将完整页面等比
+缩小至 1280 × 2048 CSS 像素以内，不放大小页面，也不裁掉页尾。编码后的像素尺寸
+还受访客页设备缩放比影响，例如 2 倍屏的高度上限为 4096 像素。普通视口截图行为
+保持不变；保存的 JPEG 与返回给代理的图片字节一致。该捕获时策略不改写历史中
+已经保存的图片。
+
 `setBounds` 相对调用插件视图的内容区，并被夹紧，因此访客页不能盖住聊天/输入框。
 `cdp` 默认拒绝；cookie、storage、target 和网络拦截方法以 `PERMISSION_DENIED` 失败。
 代理调用的会话身份来自进行中的 `plugins.execute` `sessionId`，而不是插件参数（D333 / ADR 0170）。

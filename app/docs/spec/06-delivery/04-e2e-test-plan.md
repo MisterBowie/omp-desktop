@@ -8,6 +8,26 @@
 
 ## 1. Goals
 
+### E2E-browser-full-page-screenshot-bounds
+
+- **Preconditions:** Electron and a fixture-owned profile, scratch directory,
+  and generated page; no model or user profile.
+- **Steps:** Invoke the bundled Browser tool's screenshot action through the
+  production BrowserHost/CDP implementation on a 345 by 9663 page, a wide
+  page, a page large on both axes, a page within the limits, and a 2x guest.
+  Capture the viewport separately.
+- **Expected:** Full-page images fit 1280 by 2048 CSS pixels, preserve aspect
+  ratio and top/middle/bottom content, and never upscale small pages. Decode
+  the actual JPEG and compare saved bytes with the model-facing image.
+  The 2x long-page output is 146 by 4096 pixels; viewport size is unchanged.
+- **Automation:** `node scripts/e2e-browser-screenshot.mjs <evidence-dir>`.
+  `PI_BROWSER_SCREENSHOT_ELECTRON` may select an existing Electron binary.
+  The fixture bundles current production source, creates an isolated window,
+  and quits normally. Existing history and installed applications are untouched.
+- **Native release gate:** Each macOS ARM/Intel, Windows and Linux build runs
+  the fixture before packaging. Linux uses Xvfb. The generated images and
+  JSON report are retained in that target's validation artifact.
+
 ### E2E-OMP-coding-LSP
 
 - **Preconditions:** Verified native OMP resources, real TypeScript language

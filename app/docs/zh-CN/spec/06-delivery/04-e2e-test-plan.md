@@ -9,6 +9,20 @@
 
 ---
 
+### E2E-browser-full-page-screenshot-bounds
+
+- **前提：** Electron、夹具独有的配置和暂存目录，以及生成的页面；不调用模型或用户配置。
+- **步骤：** 经内置 Browser 工具和生产 BrowserHost/CDP 捕获 345 × 9663 长页面、
+  宽页面、双轴大页面、限制内页面与 2 倍屏页面；另行捕获普通视口。
+- **预期：** 整页图片处于 1280 × 2048 CSS 像素以内，保持比例、顶部/中部/页尾内容，
+  不放大小页面。实际解码 JPEG，核对保存文件与模型图片字节相同。
+  2 倍屏长页面输出 146 × 4096 像素，普通视口尺寸不变。
+- **自动化：** `node scripts/e2e-browser-screenshot.mjs <evidence-dir>`；
+  `PI_BROWSER_SCREENSHOT_ELECTRON` 可选择已有 Electron。夹具打包当前生产源码，
+  创建隔离窗口并正常退出，不修改已安装应用或历史。
+- **原生发布门：** Mac ARM/Intel、Windows、Linux 各构建在打包前运行此夹具，
+  Linux 使用 Xvfb；生成的图片和 JSON 报告保存在各目标的验证制品中。
+
 ### E2E-OMP-coding-LSP
 
 - **前提：** 已核验的原生 OMP 资源、真实 TypeScript 语言服务器和编译器、隔离的 HOME/项目、

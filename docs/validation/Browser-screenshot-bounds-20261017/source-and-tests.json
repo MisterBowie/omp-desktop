@@ -1,0 +1,36 @@
+{
+  "baseMain": "a23bfb9befea327e7924efd3004e030a11b587d2",
+  "baseHead": "f8a130d6174f33ff8f032905578576ee2798ad1b",
+  "branch": "codex/image-dimension-guard",
+  "node": "24.14.0",
+  "electron": "43.6.0",
+  "unitRed": {
+    "tests": 9,
+    "pass": 5,
+    "fail": 4
+  },
+  "unitGreen": {
+    "tests": 22,
+    "pass": 22,
+    "fail": 0,
+    "skipped": 0
+  },
+  "sourceSha256": {
+    "app/apps/desktop/electron/main/browser-cdp.ts": "d02b934e169a09f4ee2714d7a44cfc55bd1f93717479e38c4efbd96e374fa4d9",
+    "app/apps/desktop/test/browser-screenshot.test.mjs": "c23ecdb3564d665beaf36b678ea8401a10ab305cca7c88b2f33cb715371ea5ad",
+    "app/scripts/e2e-browser-screenshot.mjs": "bcdf866104253555e51984082d472a489a59a45a90ac437330f0204f3bb4bac5",
+    "app/scripts/e2e/browser-screenshot.mjs": "a91063909d4be97fec21aee4fbbc5cc48f0d21f7fbb5b2f2667bcaba9479feb3"
+  },
+  "upstreams": [
+    {
+      "repo": "vastsa/PI-Desktop",
+      "sha": "e219a3e4c0e4cc73ddacde78005987a85d5977d6",
+      "date": "2026-10-17T13:19:51Z"
+    },
+    {
+      "repo": "can1357/oh-my-pi",
+      "sha": "58195a453b8627421f1119a60586e3c17d76a27e",
+      "date": "2026-10-17T12:00:32Z"
+    }
+  ]
+}
