@@ -875,3 +875,8 @@ before running the isolated installed scenarios. Only fixed check IDs, bounded
 numeric window observations and statuses are published on a separate result
 branch. Raw logs and local fixture paths are excluded. A single-monitor runner
 does not qualify the physical dual-monitor fullscreen regression.
+
+The `readback-v0.1.1-*` workflow downloads every public v0.1.1 asset on an
+independent runner, verifies GitHub SHA256/size, checksum and build records,
+candidate/controller provenance and updater SHA512. Its result branch contains
+only public asset names, digests, byte counts and bounded verification facts.

@@ -33,7 +33,7 @@ jobs:
           [[ "$(node -p "require('./package.json').version")" == 0.1.1 ]]
           git diff --exit-code v0.1.1 HEAD -- apps/desktop/electron apps/desktop/src packages crates
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @pi-desktop/shared --filter @pi-desktop/host-runtime build
+      - run: pnpm build:js
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
