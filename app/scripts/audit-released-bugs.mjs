@@ -294,7 +294,7 @@ test("B08 Host Read: preserve BOM UTF-16 text instead of treating it as binary",
     args: { path: "utf16.txt" },
     mode: "agent",
   });
-  assert.equal(result.ok, true, "Read must accept BOM UTF-16 text");
+  assert.equal(result.ok, true, `Read must accept BOM UTF-16 text: ${JSON.stringify(result)}`);
   assert.match(JSON.stringify(result.content), /UTF16_MARKER/);
 });
 test("B09 Context: output tokens already include reasoning tokens", async () => {
@@ -333,7 +333,7 @@ test("B10 Host Edit: moving to a normalized alias preserves the source bytes", {
     providerId: "audit",
     modelId: "audit-model",
   });
-  await host.call("session.configure", { id: session.id, mode: "agent", permissionMode: "full" });
+  await host.call("session.configure", { id: session.id, mode: "agent", permissionMode: "auto" });
   const read = await host.call("tools.execute", {
     sessionId: session.id,
     toolCallId: "read-move",
@@ -392,7 +392,7 @@ test("B11 OMP native Read: BOM UTF-16 reaches the model correctly", {
     appPath: root,
     sessionDir,
     gateResolver: () => findGateExtension(root),
-    sessionPolicy: { policy: async () => ({ mode: "agent", permissionMode: "full" }) },
+    sessionPolicy: { policy: async () => ({ mode: "agent", permissionMode: "auto" }) },
     emitAgentEvent: (e) => {
       if (e.event.type === "agent_end") ended();
     },

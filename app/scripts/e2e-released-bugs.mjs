@@ -107,7 +107,7 @@ try {
       providerId: "audit",
       modelId: "audit-model",
     });
-    await host.call("session.configure", { id: session.id, mode: "agent", permissionMode: "full" });
+    await host.call("session.configure", { id: session.id, mode: "agent", permissionMode: "auto" });
     await check("UTF16-HOST-READ", async () => {
       writeFileSync(
         join(project, "utf16.txt"),
