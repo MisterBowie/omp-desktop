@@ -11,6 +11,16 @@ export type SidebarSessionOutcome = Extract<
 
 export { latestSessionOutcomes } from "@pi-desktop/shared";
 
+/** Summarize every session, including those hidden by the group's row limit. */
+export function sidebarProjectActivity(
+  sessions: readonly { id: string }[],
+  running: Record<string, boolean>,
+  pending: Record<string, readonly unknown[]>,
+): "permission" | "running" | null {
+  if (sessions.some(({ id }) => pending[id]?.length)) return "permission";
+  return sessions.some(({ id }) => running[id]) ? "running" : null;
+}
+
 export function sidebarSessionStatus({
   running,
   selected,

@@ -1,3 +1,4 @@
+import { createOmpSessionServices } from "./bootstrap/omp-sessions";
 import {
   app,
   BrowserWindow,
@@ -41,6 +42,7 @@ import { isTemplateName, scaffold } from "@pi-desktop/plugin-devkit";
 import { HostProcess } from "./host-process";
 import {
   knownProjectGroups,
+  withGitBranch,
   pluginWorkspaceInfo,
   refreshProjectGroups,
 } from "./workspace-roots";
@@ -54,6 +56,8 @@ import { Logger, ignoreBrokenStdio } from "./logger";
 import { installMainProcessErrorHandlers } from "./main-process-errors";
 import {
   isDbSchemaTooNewError,
+  describeError,
+  isHostUnavailable,
 } from "./host-boot-diagnostics";
 import {
   ModelsDevCatalog,
@@ -100,11 +104,6 @@ import type { AgentHostBridge } from "./agent-host-bridge";
 import { registerAppIpc } from "./ipc/app-ipc";
 import { registerNotificationIpc } from "./ipc/notification-ipc";
 import { registerSessionIpc } from "./ipc/session-ipc";
-import { createDesktopEngineRuntimeForApp } from "./runtime/engine-runtime";
-import { wireOmpSessions } from "./runtime/omp-session-wiring";
-import { createOmpHostToolAdapter, createHostPlansEndpoints } from "./runtime/omp-host-tools";
-import { createOmpDesktopCapabilities } from "./runtime/omp-desktop-capabilities";
-import { loadBuiltinSkillBody } from "./builtin-skills";
 import { registerSettingsIpc } from "./ipc/settings-ipc";
 import { registerProviderIpc } from "./ipc/provider-ipc";
 import {
@@ -795,25 +794,6 @@ function setCurrentWorkspacePath(path: string | null): void {
   }
 }
 
-/** One-line message for an error of unknown shape, for user-facing lists. */
-function describeError(error: unknown): string {
-  if (error instanceof Error) return error.message.slice(0, 300);
-  return String(error).slice(0, 300);
-}
-
-/**
- * True when a rejection only says the host transport is gone (D080): the call
- * lost a race with shutdown, a crash, or a supervised restart. Every such
- * rejection carries `HOST_UNAVAILABLE`, whether it was refused before it was
- * sent or was in flight when the transport closed.
- */
-function isHostUnavailable(error: unknown): boolean {
-  return (
-    (error as { errorCode?: string } | null | undefined)?.errorCode ===
-    ErrorCodes.HOST_UNAVAILABLE
-  );
-}
-
 /** Pull the user's MCP server records from host-core into the local runtime. */
 function sendToRenderer(channel: string, payload: unknown) {
   applicationLifecycle?.traySessions.observeEvent(channel, payload);
@@ -1064,24 +1044,6 @@ const {
   isStaleTerminalEvent,
 } = sessionCoordination;
 
-async function withGitBranch<T extends { path?: string; name?: string } | null | undefined>(
-  workspace: T,
-): Promise<T> {
-  if (!workspace || !workspace.path) return workspace;
-  try {
-    const { readFile } = await import("node:fs/promises");
-    const { join } = await import("node:path");
-    const head = await readFile(join(workspace.path, ".git/HEAD"), "utf8");
-    const match = head.match(/ref:\s*refs\/heads\/(.+)$/m);
-    return {
-      ...workspace,
-      branch: match?.[1]?.trim() || "detached",
-    };
-  } catch {
-    return { ...workspace, branch: undefined };
-  }
-}
-
 /**
  * Applies a close-behavior choice. The tray icon is owned by D216 and stays
  * resident on every platform, so switching to "quit" must not destroy it —
@@ -1254,68 +1216,23 @@ runtimeLifecycle = createRuntimeLifecycle({
 });
 const { bootHostStatus, runtimeArch, bootBackends } = runtimeLifecycle;
 
-const engineRuntime = createDesktopEngineRuntimeForApp({ dataRoot: dataDir, app, getHost: () => host, piRuntimeLive: () => host !== null && sidecar !== null }); // engine gate + owned runtime (ADR 0300)
-// The OMP conversation registry (M4): one runtime per session, each with its
-// own supervisor, project directory, native transcript and model projection.
-// The desktop's plugin/MCP tools ride the host-tool RPC bridge (M5/T19-B):
-// each session exposes its own project's catalog, executed with live re-checks
-// — the turn-dispatch gate is the bridge's per-entry closure over its runner,
-// and the plugin lifecycle broadcast is the Pi host's `session:turnEnded`
-// (`announceTurnEnded`).
-const ompSessions = wireOmpSessions({
+const { engineRuntime, ompSessions } = createOmpSessionServices({
   dataRoot: dataDir,
+  app,
   host: () => host,
-  engineRuntime,
+  piRuntimeLive: () => host !== null && sidecar !== null,
   logger,
-  isPackaged: app.isPackaged,
-  resourcesPath: process.resourcesPath ?? null,
-  appPath: app.getAppPath(),
-  // OMP terminal envelopes must not pass through the Pi turn-ownership guard
-  // (M5/T20-D): the bridge's runner emits only for the live generation and
-  // drops late frames itself, while an OMP session never has a Pi `activeTurns`
-  // entry — the guard would drop every OMP `agent_end`/`error` and leave the
-  // renderer's running state stuck on a turn that already ended.
-  emitAgentEvent: (envelope) => emitAgentEvent(envelope, { guardPiTurnOwnership: false }),
-  hostTools: createOmpHostToolAdapter({
-    plugins,
-    userMcp,
-    pluginActiveInProject,
-    // The host's Plan/Goal submission endpoint (M5/T20-B2). The executor
-    // supplies the durable identity from the run binding; this closure only
-    // reaches the host RPC, and `plans.submit` itself enforces the kind /
-    // mode / live-turn / single-pending rules.
-    plans: createHostPlansEndpoints(() => host),
-    // The on-demand Skill path (M5/T19-C) reads bodies live with the exact
-    // PI precedence: builtin first, then the user's own (scope re-checked),
-    // then the plugin's — the same readers the Pi sidecar's local tool uses.
-    loadBuiltinSkillBody,
-    loadUserSkillBody,
-    activeUserSkills,
-    // The same post-execution toast drain `host.ts` performs after
-    // `plugins.execute`; a tool's toasts are never silently dropped, and a
-    // failing drain never changes the tool result (the adapter isolates it).
-    drainToasts: () => plugins.drainToasts(),
-    emitToast: (message) => sendToRenderer(IPC.event.toast, { message }),
-    log: (level, message, data) => logger.app("runtime", level, message, { data }),
-  }),
-  // The desktop's live skill catalog and project memory (M5/T19-C): one
-  // loader, refreshed per prompt into the run-scoped state the gate reads.
-  capabilities: createOmpDesktopCapabilities({
-    host: () => host,
-    plugins,
-    pluginActiveInProject,
-    activeUserSkills,
-    log: logger,
-  }),
-  onTurnEnd: (info) => {
-    announceTurnEnded(info);
-    // The Pi path finishes an approved execution from its persisted agent_end
-    // (`event-persistence.ts`). OMP events never enter that path (M2: the
-    // native JSONL is the only transcript writer), so the plan runtime
-    // settles an approved execution from this durable-turn-keyed announcement.
-    settleOmpTurnEnd(info);
-  },
-}).bridge;
+  plugins,
+  userMcp,
+  pluginActiveInProject,
+  loadUserSkillBody,
+  activeUserSkills,
+  emitAgentEvent,
+  emitToast: (message) => sendToRenderer(IPC.event.toast, { message }),
+  getAgentHostBridge: () => agentHostBridge,
+  announceTurnEnded,
+  settleOmpTurnEnd,
+});
 function registerIpc() {
   return registerIpcHandlers({
     traySessions: applicationLifecycle!.traySessions,
@@ -1466,7 +1383,7 @@ registerApplicationStartup({
   modelsDevCatalog,
   plugins,
   activeTurns,
-  isSessionBusy,
+  isSessionBusy: (sessionId) => isSessionBusy(sessionId) || ompSessions.isBusy(sessionId),
   getHost: () => host,
   getMainWindow: () => mainWindow,
   sendToRenderer,

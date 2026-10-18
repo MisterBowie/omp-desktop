@@ -88,6 +88,7 @@ const { registerIpcHandlers } = load("../electron/main/ipc/register.ts", {
   "./remote-host-ipc": { registerRemoteHostIpc: noopRegister },
   "../skill-market-catalog": { fetchSkillMarketDocument: noop, searchSkillMarket: noop },
   "./window-ipc": { registerWindowIpc: noopRegister },
+  "./worktree-ipc": { registerWorktreeIpc: noopRegister },
   "./workspace-ipc": { createComposerTemplateLoader: () => noop, registerWorkspaceIpc: noopRegister },
   "./composer-ipc": { registerComposerIpc: noopRegister },
   "./speech-ipc": { registerSpeechIpc: noopRegister },

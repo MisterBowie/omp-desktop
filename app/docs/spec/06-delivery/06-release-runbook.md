@@ -7,6 +7,20 @@
 
 ## OMP Desktop distribution identity (M6)
 
+### 0.1.1 session and worktree release
+
+Version 0.1.1 ships native Todo projection, `/skill:` commands, sidebar reply
+dates/activity/copy actions, text steering, durable follow-ups, cancellable
+manual compaction and local session worktrees. It also includes the bounded
+browser screenshots. Full native conversation forks, per-child stop,
+background-command controls and worktree setup/include/port/child isolation
+remain unavailable.
+
+The host upgrades schema 21 to 22 with a pre-migration database backup. Existing
+sessions and native references are preserved. Returning to 0.1.0 requires closing
+the application and restoring that backup; an old binary cannot read schema 22.
+The native runtime stays at 18.3.0 / `62bc57b+omp-desktop.6`.
+
 ### Independent OMP releases from 0.1.0
 
 OMP Desktop's public versions and in-app changelog start at **0.1.0**. The

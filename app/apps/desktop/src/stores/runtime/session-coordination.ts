@@ -1,3 +1,4 @@
+import i18n from "i18next";
 import type {
   ContextCompactionRecord,
   SessionDetail,
@@ -33,6 +34,7 @@ import type { StoreAccess } from "../slices/types";
 import { switchWorkPanelSession } from "../slices/work-panel-slice";
 
 export type PersistSessionOptions = {
+  isolated?: boolean;
   intent?: number;
   projectPath?: string | null;
   draftConfiguration?: DraftSessionConfiguration | null;
@@ -300,6 +302,7 @@ export function createSessionCoordination({
     let created: Awaited<ReturnType<typeof api.createSession>>;
     try {
       created = await api.createSession({
+        ...(options.isolated ? {isolated: true, engine: "omp" as const} : {}),
         title: untitledTaskTitle(),
         mode: draftConfig?.mode ?? normalizeMode(settings?.defaultMode),
         thinkingLevel: draftConfig?.thinkingLevel ?? defaultThinkingLevel,
@@ -315,6 +318,9 @@ export function createSessionCoordination({
         });
       }
       throw error;
+    }
+    if (created.worktree?.projectHadUncommittedChanges) {
+      get().showToast(i18n.t("worktree.uncommittedNotIncluded"), {variant: "info"});
     }
     const sessionId = created.session.id;
     if (!runtime.navigationIntentIsCurrent(active)) {

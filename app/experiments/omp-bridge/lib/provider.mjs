@@ -172,6 +172,7 @@ export class FakeProvider {
           })),
         });
       }
+      if (turn.waitFor) await turn.waitFor;
       if (turn.delayMs) await new Promise((r) => setTimeout(r, turn.delayMs));
       const finish = turn.finish ?? (turn.toolCalls?.length ? "tool_calls" : "stop");
       send({}, finish);

@@ -1,5 +1,5 @@
 export const PROTOCOL_VERSION = 11 as const;
-export const SCHEMA_VERSION = 16 as const;
+export const SCHEMA_VERSION = 22 as const;
 /**
  * Product name and reverse-DNS application id.
  *
@@ -10,7 +10,7 @@ export const SCHEMA_VERSION = 16 as const;
  */
 export const APP_ID = "net.misterbowie.omp-desktop";
 export const APP_NAME = "OMP Desktop";
-export const APP_VERSION = "0.1.0";
+export const APP_VERSION = "0.1.1";
 
 export const APP_MENU_COMMANDS = [
   "newTask",
@@ -94,6 +94,12 @@ export const IPC = {
     agentInstructionsGet: "pi-desktop/agent/instructions/get",
     agentInstructionsSave: "pi-desktop/agent/instructions/save",
     sessionList: "pi-desktop/session/list",
+    worktreeProbe: "pi-desktop/worktree/probe",
+    worktreePreview: "pi-desktop/worktree/preview",
+    worktreeMerge: "pi-desktop/worktree/merge",
+    worktreeSync: "pi-desktop/worktree/sync",
+    worktreePendingWork: "pi-desktop/worktree/pendingWork",
+    worktreeReveal: "pi-desktop/worktree/reveal",
     sessionCreate: "pi-desktop/session/create",
     sessionFork: "pi-desktop/session/fork",
     sessionMoveProject: "pi-desktop/session/moveProject",

@@ -46,6 +46,7 @@ import {
   MAX_DESKTOP_STATE_SKILLS,
   MAX_MEMORY_CHARS,
   OmpSessionRunner,
+  OmpManualCompaction,
   OmpRuntimeError,
   descriptorRisk,
   findGateExtension,
@@ -98,6 +99,7 @@ export type OmpSessionRuntimeSpec = {
   sessionId: string;
   /** Absolute project directory the runtime runs in (validated by the registry). */
   projectDirectory: string;
+  executionDirectory?: string;
   providerId: string | null;
   modelId: string | null;
   thinkingLevel: string | null;
@@ -136,6 +138,7 @@ export type OmpHostTurnLifecycle = {
 };
 
 export type OmpSessionBridgeOptions = {
+  resolveExecutionRoot?: (sessionId: string, projectDirectory: string) => Promise<string>;
   /**
    * Create a fresh supervisor per session (M4: one runtime per session). The
    * factory receives the session's fixed project and model binding and returns
@@ -225,6 +228,8 @@ export type OmpSessionBridgeOptions = {
    * tool call learns its end — the same lifecycle Pi's `finishTurn` provides.
    */
   onTurnEnd?: (info: OmpTurnEndInfo) => void;
+  /** Retry queued admission after preparation or cleanup releases a session. */
+  onIdle?: (sessionId: string) => void;
   /** Test seams. */
   runnerFactory?: (options: ConstructorParameters<typeof OmpSessionRunner>[0]) => OmpSessionRunner;
   gateResolver?: (startDir: string) => string | null;
@@ -334,6 +339,8 @@ export type OmpPromptResult = {
 export type OmpPromptInput = {
   sessionId: string;
   content: string;
+  /** An explicitly selected desktop skill must have its loader for this turn. */
+  requiresSkill?: boolean;
   projectPath: string | null;
   providerId?: string | null;
   modelId?: string | null;
@@ -398,6 +405,7 @@ export type OmpHistoryInput = {
  */
 export type OmpHistoryRead = {
   messages: UiMessage[];
+  todoPhases: import("@pi-desktop/shared").SessionTodoPhase[];
   messageCount: number;
   messageStart: number;
   messageEnd: number;
@@ -686,9 +694,22 @@ export function validateEngineVersions(
   }
 }
 
+export type OperationContext = {
+  projectPath?: string | null;
+  providerId?: string | null;
+  modelId?: string | null;
+  thinkingLevel?: string | null;
+  nativeSessionId?: string | null;
+  nativeSessionPath?: string | null;
+  adapterVersion?: number | null;
+  runtimeVersion?: string | null;
+};
+
 export type OmpSessionBridge = {
   gatePath(): string | null;
   prompt(input: OmpPromptInput): Promise<OmpPromptResult>;
+  steer(sessionId: string, content: string, expectedTurnId: string, userMessageId?: string | null, requiresSkill?: boolean): Promise<{ accepted: true; turnId: string }>;
+  compact(sessionId: string, context: OperationContext): Promise<{ accepted: true }>;
   /**
    * Read one session's native transcript, read-only and without a turn.
    *
@@ -721,9 +742,12 @@ export type OmpSessionBridge = {
   resolvePermission(requestId: string, decision: OmpUiDecision): OmpResolution;
   resolveAsk(resolution: AskToolResolution): OmpResolution;
   status(sessionId: string): OmpSessionStatus;
+  isBusy(sessionId: string): boolean;
+  isCurrentTurn(sessionId: string, turnId: string): boolean;
   hasPendingRequest(requestId: string): boolean;
   hasKnownRequest(requestId: string): boolean;
   workingDirectory(sessionId: string): string | null;
+  projectDirectory(sessionId: string): string | null;
   /** Live child list (opaque ids, never a native path). */
   listSubagents(sessionId: string): Promise<SubagentListEntry[]>;
   /** Bounded child-transcript read by opaque id (native `sessionFile` stays internal). */
@@ -776,8 +800,53 @@ type PendingDialog = { request: OmpUiRequest; sessionId: string; generation: num
  * another session's pending state, process or working directory.
  */
 class SessionEntry {
+  private preparingPrompt = false;
+  private compaction: OmpManualCompaction | null = null;
+
+  isCompacting(): boolean { return this.compaction?.active ?? false; }
+  isBusy(): boolean { return this.preparingPrompt || this.compaction?.busy === true || this.stopping !== null || this.runnerState() !== "idle"; }
+  isCurrentTurn(turnId: string): boolean {
+    return this.runner?.status().currentTurnId === turnId || this.hostTurn?.hostTurnId === turnId;
+  }
+
+  async steer(content: string, expectedTurnId: string, userMessageId?: string | null, requiresSkill = false): Promise<{ accepted: true; turnId: string }> {
+    this.assertOpen();
+    this.assertNotCompacting();
+    const runner = this.activeRunner();
+    if (!runner || this.stopping || !runner.canSteer(expectedTurnId)) throw Object.assign(new Error("The target turn has ended"), { errorCode: ErrorCodes.TURN_NOT_FOUND });
+    if (requiresSkill) this.assertSkillLoader();
+    if (userMessageId) this.notePromptUserRow(userMessageId);
+    return runner.steer(content, expectedTurnId, userMessageId);
+  }
+
+  assertNotCompacting(): void {
+    if (this.compaction?.busy) throw Object.assign(new Error("The session is compacting or awaiting reclamation"), { errorCode: ErrorCodes.AGENT_BUSY });
+  }
+
+  private assertSkillLoader(): void {
+    if (!this.hostTools || !this.lastSkillsPresent) throw Object.assign(new Error("The Skill loader is unavailable for this turn; queue the command for a new turn"), { errorCode: ErrorCodes.INVALID_ARGUMENT });
+  }
+
+  async compact(gate: string, spec: OmpSessionRuntimeSpec): Promise<{ accepted: true }> {
+    this.assertOpen();
+    this.assertNotCompacting();
+    if (this.stopping || this.preparingPrompt || this.runnerState() !== "idle") {
+      throw Object.assign(new Error("Cannot compact a busy session"), { errorCode: ErrorCodes.AGENT_BUSY });
+    }
+    const epoch = this.stopEpoch;
+    this.compaction = new OmpManualCompaction({
+      emit: (event) => this.emitAgentEvent({ sessionId: this.sessionId, ts: this.now(), event }),
+      reclaim: () => this.supervisor.stop({ abortBash: false }),
+    });
+    return this.compaction.run(async () => {
+      await this.ensureNativeSession(gate, spec);
+      if (this.closed || this.stopEpoch !== epoch) throw new Error("Compaction cancelled during preparation");
+      return this.runtimeHandle();
+    });
+  }
   readonly sessionId: string;
   readonly projectDirectory: string;
+  readonly executionDirectory: string;
   private readonly supervisor: OmpRuntimeSupervisor;
   private readonly emitAgentEvent: (envelope: AgentEventEnvelope) => void;
   private readonly recordLiveRow: (envelope: AgentEventEnvelope) => void;
@@ -941,6 +1010,7 @@ class SessionEntry {
   constructor(deps: {
     sessionId: string;
     projectDirectory: string;
+    executionDirectory?: string;
     supervisor: OmpRuntimeSupervisor;
     emitAgentEvent: (envelope: AgentEventEnvelope) => void;
     logger: OmpSessionBridgeLogger | undefined;
@@ -973,6 +1043,7 @@ class SessionEntry {
   }) {
     this.sessionId = deps.sessionId;
     this.projectDirectory = deps.projectDirectory;
+    this.executionDirectory = deps.executionDirectory ?? deps.projectDirectory;
     this.supervisor = deps.supervisor;
     this.emitAgentEvent = deps.emitAgentEvent;
     this.recordLiveRow = deps.recordLiveRow;
@@ -1258,7 +1329,7 @@ class SessionEntry {
 
   /** Start the runtime (once) and construct the runner over it. */
   private async buildRunner(gate: string): Promise<OmpSessionRunner> {
-    this.supervisor.setWorkingDirectory(this.projectDirectory);
+    this.supervisor.setWorkingDirectory(this.executionDirectory);
     if (this.supervisor.status().phase !== "idle") {
       await this.supervisor.start();
     }
@@ -1548,8 +1619,13 @@ class SessionEntry {
     content: string,
     onHostTurnBound?: (hostTurnId: string) => void,
     userMessageId?: string | null,
+    requiresSkill = false,
   ): Promise<OmpPromptResult> {
     this.assertOpen();
+    this.assertNotCompacting();
+    if (this.preparingPrompt) throw Object.assign(new Error("A prompt is being prepared"), { errorCode: ErrorCodes.AGENT_BUSY });
+    this.preparingPrompt = true;
+    try {
     const epoch = this.stopEpoch;
     // The mode is read before anything starts: it decides whether this prompt
     // is the contract-mode → Agent transition that must rebuild the runtime
@@ -1599,6 +1675,7 @@ class SessionEntry {
     const runtimeState = await this.refreshDesktopState(catalog, policy);
     if (policy) this.lastPromptMode = policy.mode;
     this.lastSkillsPresent = runtimeState.skillsPresent;
+    if (requiresSkill) this.assertSkillLoader();
     // The session's desktop tools are (re)registered before every prompt, the
     // way the Pi host reassembles its catalog per launch: a changed catalog —
     // a plugin installed/unloaded, a scope edit, an MCP change, a changed
@@ -1731,6 +1808,9 @@ class SessionEntry {
     this.admittedTurnPolicy =
       started.accepted && policy ? { turnId: started.turnId, mode: policy.mode } : null;
     return { accepted: started.accepted, turnId: started.turnId, hostTurnId };
+    } finally {
+      this.preparingPrompt = false;
+    }
   }
 
   /**
@@ -2176,6 +2256,7 @@ class SessionEntry {
     // late host-tool execution must not resolve a mode through it.
     this.stopEpoch += 1;
     this.admittedTurnPolicy = null;
+    if (this.compaction?.busy) return this.compaction.stop();
     if (this.runnerBuild) await this.runnerBuild.catch(() => undefined);
     if (this.nativeSessionBuild) await this.nativeSessionBuild.catch(() => undefined);
     if (!this.runner) {
@@ -2208,6 +2289,7 @@ class SessionEntry {
     // not overlap on the same runner/supervisor; admission stays closed via
     // `closed` for the whole span.
     if (this.stopping) await this.stopping.catch(() => undefined);
+    if (this.compaction?.busy) await this.compaction.stop();
     if (this.runnerBuild) await this.runnerBuild.catch(() => undefined);
     if (this.nativeSessionBuild) await this.nativeSessionBuild.catch(() => undefined);
     if (this.runner) this.runner.dispose(reason);
@@ -2469,7 +2551,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     };
     const existing = entries.get(spec.sessionId);
     if (existing) {
-      if (existing.projectDirectory !== spec.projectDirectory) {
+      if (existing.projectDirectory !== spec.projectDirectory || (spec.executionDirectory !== undefined && existing.executionDirectory !== spec.executionDirectory)) {
         throw Object.assign(
           new Error(`this OMP session already runs in ${existing.projectDirectory}; a different project directory is not supported`),
           { errorCode: REFUSAL },
@@ -2495,6 +2577,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     const entry = new SessionEntry({
       sessionId: spec.sessionId,
       projectDirectory: spec.projectDirectory,
+      executionDirectory: spec.executionDirectory,
       supervisor,
       emitAgentEvent: options.emitAgentEvent,
       recordLiveRow: noteLiveRow,
@@ -2523,6 +2606,12 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     return entries.get(sessionId) ?? null;
   }
 
+  function wakeQueueIfIdle(entry: SessionEntry): void {
+    if (entry.isBusy()) return;
+    try { options.onIdle?.(entry.sessionId); }
+    catch { logger?.app("omp", "warn", "queue wake failed", { data: { sessionId: entry.sessionId } }); }
+  }
+
   async function prompt(input: OmpPromptInput): Promise<OmpPromptResult> {
     requireLauncher();
     const gate = requireGate();
@@ -2538,8 +2627,13 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       adapterVersion: input.adapterVersion ?? null,
       runtimeVersion: input.runtimeVersion ?? null,
     };
+    if (options.resolveExecutionRoot) spec.executionDirectory = resolveProjectDirectory(await options.resolveExecutionRoot(spec.sessionId, spec.projectDirectory));
     const entry = entryFor(spec);
-    return entry.prompt(gate, spec, input.content, input.onHostTurnBound, input.userMessageId ?? null);
+    try {
+      return await entry.prompt(gate, spec, input.content, input.onHostTurnBound, input.userMessageId ?? null, input.requiresSkill);
+    } finally {
+      wakeQueueIfIdle(entry);
+    }
   }
 
   /**
@@ -2593,6 +2687,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       return {
         messages: [],
         messageCount: 0,
+        todoPhases: [],
         messageStart: 0,
         messageEnd: 0,
         hasMoreBefore: false,
@@ -2635,6 +2730,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     });
     return {
       messages: projection.messages,
+      todoPhases: projection.todoPhases,
       messageCount: projection.messageCount,
       messageStart: projection.messageStart,
       messageEnd: projection.messageEnd,
@@ -2648,18 +2744,6 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
   function runtimeOf(entry: SessionEntry): OmpSessionRuntime {
     return entry.runtimeHandle();
   }
-
-  /** The session context a control operation needs to (re)start a runtime. */
-  type OperationContext = {
-    projectPath?: string | null;
-    providerId?: string | null;
-    modelId?: string | null;
-    thinkingLevel?: string | null;
-    nativeSessionId?: string | null;
-    nativeSessionPath?: string | null;
-    adapterVersion?: number | null;
-    runtimeVersion?: string | null;
-  };
 
   /**
    * Establish the entry and its native session for a control operation that may
@@ -2688,13 +2772,39 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       adapterVersion: context.adapterVersion ?? null,
       runtimeVersion: context.runtimeVersion ?? null,
     };
+    if (options.resolveExecutionRoot) spec.executionDirectory = resolveProjectDirectory(await options.resolveExecutionRoot(sessionId, projectDirectory));
     const existing = entries.get(sessionId);
     const hadRunner = existing?.activeRunner() != null;
     const entry = entryFor(spec);
+    entry.assertNotCompacting();
     if (!entry.nativeSessionId && spec.nativeSessionPath) {
       await entry.ensureNativeSession(gate, spec);
     }
     return { entry, startedForOperation: !hadRunner };
+  }
+
+  async function compact(sessionId: string, context: OperationContext): Promise<{ accepted: true }> {
+    const gate = requireGate();
+    requireLauncher();
+    const projectDirectory = resolveProjectDirectory(context.projectPath ?? null);
+    const spec: OmpSessionRuntimeSpec = {
+      sessionId, projectDirectory,
+      providerId: context.providerId ?? null,
+      modelId: context.modelId ?? null,
+      thinkingLevel: context.thinkingLevel ?? null,
+      nativeSessionId: context.nativeSessionId ?? null,
+      nativeSessionPath: context.nativeSessionPath ?? null,
+      adapterVersion: context.adapterVersion ?? null,
+      runtimeVersion: context.runtimeVersion ?? null,
+    };
+    if (options.resolveExecutionRoot) spec.executionDirectory = resolveProjectDirectory(await options.resolveExecutionRoot(spec.sessionId, spec.projectDirectory));
+    return entryFor(spec).compact(gate, spec);
+  }
+
+  async function steer(sessionId: string, content: string, expectedTurnId: string, userMessageId?: string | null, requiresSkill = false): Promise<{ accepted: true; turnId: string }> {
+    const entry = entryOf(sessionId);
+    if (!entry) throw Object.assign(new Error("The target turn has ended"), { errorCode: ErrorCodes.TURN_NOT_FOUND });
+    return entry.steer(content, expectedTurnId, userMessageId, requiresSkill);
   }
 
   async function rename(
@@ -2807,6 +2917,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       return { ok: false, reason: "configuration persistence is not wired in this build" };
     }
     const entry = entryOf(sessionId);
+    entry?.assertNotCompacting();
     const providerId = config.providerId ?? null;
     const modelId = config.modelId ?? null;
     const thinkingLevel = config.thinkingLevel ?? null;
@@ -3040,6 +3151,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       return { aborted: false, abortBashSent: false, converged: true, toreDown: false, steps: ["nothing running"], errors: [] };
     }
     const outcome = await entry.stop();
+    wakeQueueIfIdle(entry);
     logger?.app("omp", "info", "omp stop finished", {
       data: { sessionId, converged: outcome.converged, toreDown: outcome.toreDown, steps: outcome.steps, errors: outcome.errors },
     });
@@ -3048,6 +3160,9 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
 
   function status(sessionId: string): OmpSessionStatus {
     const entry = entryOf(sessionId);
+    if (entry?.isCompacting()) {
+      return { isRunning: true, pendingToolConfirmations: 0, engine: "omp", state: "running" };
+    }
     const runner = entry?.activeRunner() ?? null;
     if (!entry || !runner) {
       return { isRunning: false, pendingToolConfirmations: 0, engine: "omp", state: "idle" };
@@ -3077,7 +3192,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
   }
 
   function workingDirectory(sessionId: string): string | null {
-    return entryOf(sessionId)?.projectDirectory ?? null;
+    return entryOf(sessionId)?.executionDirectory ?? null;
   }
 
   async function listSubagents(sessionId: string): Promise<SubagentListEntry[]> {
@@ -3248,6 +3363,8 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     gatePath,
     prompt,
     readHistory,
+    compact,
+    steer,
     rename,
     branch,
     configure,
@@ -3257,9 +3374,12 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     resolvePermission,
     resolveAsk,
     status,
+    isBusy: (sessionId) => entryOf(sessionId)?.isBusy() ?? false,
+    isCurrentTurn: (sessionId, turnId) => entryOf(sessionId)?.isCurrentTurn(turnId) ?? false,
     hasPendingRequest,
     hasKnownRequest,
     workingDirectory,
+    projectDirectory: (sessionId) => entryOf(sessionId)?.projectDirectory ?? null,
     listSubagents,
     readSubagentTranscript,
     stopSubagent,

@@ -9,6 +9,41 @@
 
 ---
 
+### E2E-OMP-session-controls
+
+- **前提：** 经校验的 OMP 18.3.0 打包资源、夹具独有 HOME/项目和本机脚本模型，
+  不读取用户数据、不调用付费服务。
+- **步骤：** 暂停模型流，在当前回合发送文本插话，创建并完成原生 Todo，排队一条
+  `/skill:` 跟进后释放模型流。通过一行历史分页恢复 Todo。压缩原生上下文，从摘要
+  继续对话；再次发起压缩并取消。
+- **预期：** 两条乐观输入分别归一化；插话沿用原宿主回合；FIFO 先持久化再经
+  OMP 派发，后续请求包含插话和跟进。原生历史包含压缩条目，后续请求使用摘要。
+  Todo 快照独立于返回分页，Skill 正文在跟进回复前经真实宿主工具按需读取。
+  取消压缩不显示成功，所有自有进程均回收。旧回合 ID 不能停止其他操作；不需要
+  Pi sidecar。
+- **自动化：** `OMP_BUNDLED_RESOURCES=<resources> node --test
+  apps/desktop/test/omp-session-operations-e2e.test.mjs`。
+- **补充契约：** 运行时测试覆盖迟到终止帧、准备期取消、不确定接纳、回收保留与
+  重试；IPC 测试证明附件在写入队列之前拒绝。
+- **边界：** 仅文本操作；完整分支与单独停止子代理仍明确不可用。跨平台安装态
+  界面验收须另行执行。宿主持久化 RPC 使用受控夹具；本场景验证先写入再派发
+  的顺序，不验收数据库重启恢复。
+- **规格：** 运行时规格 OMP 会话操作修订与对应 ADR。
+
+### E2E-OMP-session-ui
+
+- **步骤：** 展开清单，接收后台/子代理结果并切换会话；在原生历史读取完成前收到
+  新的 Todo 更新。经输入框 Hook 和 Store 提交运行中插话与跟进。在命令目录查询
+  期间切换会话；折叠含运行中隐藏行的项目组，查看会话日期并使用普通复制菜单。
+- **预期：** 展开后可滚动读取全部任务和阻塞原因。后台和子代理结果不覆盖其他
+  会话清单；新实时状态优先于迟到历史。插话使用当前回合且只有一条乐观输入，跟进
+  显示在所属队列。迟到命令查询不派发并保留原草稿。折叠项目仍显示运行状态，日期
+  本地化；临时会话不提供空项目路径复制。
+- **自动化：** `session-controls-ui.test.mjs`、`sidebar-session-metadata.test.mjs`、
+  `sidebar-session-date.test.mjs`、`skill-command-routing.test.mjs`；属于组件、Store、
+  SSR 和 IPC 契约验收，不代表安装态界面或截图验收。
+- **规格：** UI 信息架构、内置命令 Skill 修订、OMP 会话操作 ADR。
+
 ### E2E-browser-full-page-screenshot-bounds
 
 - **前提：** Electron、夹具独有的配置和暂存目录，以及生成的页面；不调用模型或用户配置。
@@ -5270,6 +5305,9 @@ eleven-tool-round desktop paths are verified by
 
 | 验收 | 应用场景 |
 |---|---|
+| A / E / F — OMP 隔离会话工作树 | E2E-OMP-WT |
+| A / E / F — OMP 文本操作与取消 | E2E-OMP-session-controls |
+| A / E / F — 会话 Todo、Skill 与侧栏交互 | E2E-OMP-session-ui |
 | A / E / F / Release — OMP 安装身份和用户流程 | E2E-OMP-installed-identity-and-workflow |
 | A / E / F / M7 — 安装后的编码、并发、长历史和故障恢复 | E2E-OMP-maintenance-daily |
 | E / F / Release / M7 — 安装包升级和关闭数据备份回退 | E2E-OMP-maintenance-upgrade |
@@ -8602,3 +8640,14 @@ the latest destination. These assertions measure work counts, not device FPS.
   `providers::tests::a_stored_array_survives_an_entry_that_lost_a_field`）；
   宿主 RPC 路径由 `scripts/e2e-smoke.mjs` 覆盖提供商的创建与列举，但没有套件
   驱动手工编辑的 `config_json`。
+
+### E2E-OMP-WT：隔离会话生命周期
+
+- **前提**：当前宿主已构建、已验证的 OMP 资源、临时本地 Git 仓库与回环 FakeProvider。
+- **步骤**：通过项目菜单创建隔离会话；拒绝并批准原生写入；切换项目；取消真实子进程；重启宿主及 OMP；恢复历史；预览并确认合并；删除会话。
+- **预期**：创建全新会话及工作树，项目配置作用域不变；拒绝无副作用，批准只写工作树；取消回收子进程；目录缺失不回退原项目；原生历史继续绑定同一工作树；预览不改项目；合并要求当前令牌；只删除自有路径。宿主回归另覆盖脏项目、过期预览、冲突、升级备份、创建中/缺失状态及工具/回合独占。
+- **关联规格**：运行时执行目录补充、隔离会话 UI 补充及 ADR omp-session-worktrees。
+- **验收标准**：会话隔离、权限、持久化与取消。
+- **阶段**：T26 本机源码验收。
+- **状态**：组件/Store/IPC/真实宿主及原生进程边界已自动化；安装态 Electron UI、Windows/Linux 尚未运行。
+- **命令**：`node --test apps/desktop/test/worktree-*.test.mjs`；`OMP_BUNDLED_RESOURCES=<已验证资源> node --test apps/desktop/test/omp-worktree-e2e.test.mjs`；`cargo test -p host-core --locked`。

@@ -1,4 +1,4 @@
-import { IPC, trustedExtensionCommandId, type ComposerCommand } from "@pi-desktop/shared";
+import { IPC, skillCommandName, trustedExtensionCommandId, type ComposerCommand } from "@pi-desktop/shared";
 import { builtinSkills } from "../builtin-skills";
 import { builtinComposerCommands } from "../builtin-commands";
 import type { AgentExtensionBridge } from "../agent-extensions";
@@ -63,7 +63,7 @@ export function createComposerCommandService({
       seen.add(skill.id);
       return [
         {
-          name: skill.id,
+          name: skillCommandName(skill.id),
           kind: "skill" as const,
           title: skill.name,
           ...(skill.description ? { description: skill.description } : {}),
@@ -111,6 +111,7 @@ export function createComposerCommandService({
       ...extensionCommands,
       ...skillCommands,
     ]) {
+      if (command.kind !== "skill" && command.name.startsWith("skill:")) continue;
       if (!merged.has(command.name)) merged.set(command.name, command);
     }
     return [...merged.values()];

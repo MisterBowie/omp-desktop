@@ -112,8 +112,10 @@ jobs:
           const installation = [
             '### Installation and updates / 安装与更新',
             '',
-            '- Install 0.1.0 manually once over a 0.15.x test build because the version sequence has restarted. Existing OMP data stays in its own directory.',
-            '- 从 0.15.x 测试版首次切换到 0.1.0 需手动安装；原有 OMP 数据目录保留。',
+            `- Install ${version} manually once over a 0.15.x test build because the version sequence has restarted. Existing OMP data stays in its own directory.`,
+            `- 从 0.15.x 测试版首次切换到 ${version} 需手动安装；原有 OMP 数据目录保留。`,
+            '- 0.1.1 upgrades storage schema 21 to 22 after creating a backup. To return to 0.1.0, restore that backup while the app is closed. Full conversation branching, per-child stop and background-command controls are not included.',
+            '- 0.1.1 将存储 schema 21 升级至 22，升级前自动备份；回退 0.1.0 时需关闭应用并恢复该备份。本版不含完整会话分支、单独停止子代理及后台命令控制。',
             '- Unsigned macOS builds use the GitHub download button for updates. If macOS blocks the first launch, follow OMP-Desktop-macOS-opening-help.txt in the ZIP package.',
             '- 未签名 macOS 通过 GitHub 下载按钮更新；首次启动被系统阻止时，请按 ZIP 中的 OMP-Desktop-macOS-opening-help.txt 操作。',
             '- The Windows installer and Linux AppImage support in-app updates. Portable Windows, Debian and RPM packages use manual downloads.',

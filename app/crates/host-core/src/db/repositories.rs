@@ -225,7 +225,7 @@ impl Database {
                 archive_legacy_db(path, legacy)?;
                 return Self::open(path);
             }
-            SCHEMA_VERSION => {}
+            21 | SCHEMA_VERSION => {}
             other => {
                 // Unreachable: the version check above already refused anything
                 // newer than `SCHEMA_VERSION`. Kept as a typed refusal so a
@@ -259,6 +259,11 @@ impl Database {
         if migrated_version == 20 {
             migrate_v20_to_v21(&conn, path)?;
         }
+        let current: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        if current == 21 {
+            migrate_v21_to_v22(&conn, path)?;
+        }
+        conn.execute_batch(super::worktree_migration::WORKTREE_DDL)?;
         let db = Self { conn, data_dir };
         // The Plan/Goal × Cursor write guard is installed on this connection as
         // TEMP triggers, not as schema state: it lives and dies with the

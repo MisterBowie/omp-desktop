@@ -21,6 +21,7 @@ mod scratch;
 mod secrets;
 mod session_collaboration;
 mod session_search;
+mod session_worktrees;
 mod sessions;
 mod state;
 mod tool_budget;
@@ -75,6 +76,11 @@ async fn main() -> anyhow::Result<()> {
     std::fs::create_dir_all(data_dir.join("scratch"))?;
 
     let state = Arc::new(Mutex::new(AppState::open(&data_dir)?));
+    session_worktrees::lifecycle::reconcile(
+        state.clone(),
+        session_worktrees::git::GitRunner::default(),
+    )
+    .await;
     tracing::info!(path = %data_dir.display(), "host-core starting");
     {
         // Sweep orphaned/stale session scratch dirs left behind by crashes or

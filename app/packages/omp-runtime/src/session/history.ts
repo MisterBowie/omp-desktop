@@ -33,6 +33,7 @@
  *     last stored entry is never guessed as the branch tip.
  */
 import type { UiMessage } from "@pi-desktop/shared";
+import { readTodoPhases, todoPhasesFromResult, type SessionTodoPhase } from "@pi-desktop/shared";
 
 import { OmpEventConverter } from "./events.js";
 
@@ -68,6 +69,7 @@ export type OmpHistoryWindow = {
 
 export type OmpHistoryProjection = OmpHistoryWindow & {
   messages: UiMessage[];
+  todoPhases: SessionTodoPhase[];
   /** Entry ids of the branch's message entries, in branch order (all rows). */
   entryIds: string[];
 };
@@ -108,6 +110,17 @@ export function projectOmpHistory(
   const parsed = parseEntries(entries);
   const leaf = parseLeafId(leafId);
   const branch = activeBranch(parsed, leaf);
+  let todoPhases: SessionTodoPhase[] = [];
+  for (const entry of branch) {
+    const message = entry.message as Record<string, unknown> | undefined;
+    const data = entry.data as Record<string, unknown> | undefined;
+    const snapshot = entry.type === "custom" && entry.customType === "user_todo_edit"
+      ? readTodoPhases(data?.phases)
+      : entry.type === "message" && message?.role === "toolResult"
+        ? todoPhasesFromResult(typeof message.toolName === "string" ? message.toolName : undefined, message, message.isError === true)
+        : undefined;
+    if (snapshot !== undefined) todoPhases = snapshot;
+  }
 
   const converter = new OmpEventConverter({ sessionId: options.sessionId });
   const all: UiMessage[] = [];
@@ -163,6 +176,7 @@ export function projectOmpHistory(
   );
   return {
     messages,
+    todoPhases,
     entryIds,
     messageStart: start,
     messageEnd: end,

@@ -116,6 +116,80 @@ function harness(
   return { runtime, envelopes, requests, runner };
 }
 
+describe("active OMP text steering", () => {
+  it("reclaims an uncertain steering command before admitting another turn", async () => {
+    let reclaim!: (result: { reaped: boolean; cleaned: boolean }) => void;
+    const { runner, runtime, envelopes } = harness({ teardown: () => new Promise((resolve) => { reclaim = resolve; }) });
+    const run = await runner.prompt("first");
+    runtime.push({ type: "agent_start" });
+    const request = runtime.request.bind(runtime);
+    runtime.request = async (command) => {
+      if (command.type === "steer") throw new OmpRuntimeError("request-timeout", "unknown admission");
+      return request(command);
+    };
+    const input = runner.steer("correction", run.turnId);
+    const rejected = expect(input).rejects.toMatchObject({ code: "request-timeout" });
+    await Promise.resolve();
+    await expect(runner.prompt("successor")).rejects.toBeDefined();
+    reclaim({ reaped: true, cleaned: true });
+    await rejected;
+    expect(envelopes.filter(({ event }) => event.type === "error")).toHaveLength(1);
+    expect(runner.status().isRunning).toBe(false);
+    runner.dispose();
+  });
+  it("refuses stale or not-yet-started turns before sending input", async () => {
+    const { runner, runtime } = harness();
+    const run = await runner.prompt("first");
+    await expect(runner.steer("late", run.turnId)).rejects.toMatchObject({ errorCode: "TURN_NOT_FOUND" });
+    runtime.push({ type: "agent_start" });
+    await expect(runner.steer("late", "another-turn")).rejects.toMatchObject({ errorCode: "TURN_NOT_FOUND" });
+    expect(runtime.commands).toEqual(["prompt"]);
+    runner.dispose();
+  });
+
+  it("reconciles original and steering bubbles separately within one turn", async () => {
+    const { runner, runtime, envelopes } = harness();
+    const run = await runner.prompt("first", { userMessageId: "original-row" });
+    runtime.push({ type: "agent_start" });
+    const request = runtime.request.bind(runtime);
+    runtime.request = async (command) => {
+      if (command.type !== "steer") return request(command);
+      for (const content of ["first", "correction"]) {
+        runtime.push({ type: "message_start", message: { role: "user", content } });
+        runtime.push({ type: "message_end", message: { role: "user", content } });
+      }
+      return { success: true };
+    };
+    await runner.steer("correction", run.turnId, "steering-row");
+    const rows = envelopes.flatMap(({ event }) => event.type === "user_message_persisted" ? [event] : []);
+    expect(rows.map((event) => [event.optimisticMessageId, event.message.content])).toEqual([
+      ["original-row", "first"], ["steering-row", "correction"],
+    ]);
+    expect(new Set(envelopes.map((event) => event.turnId))).toEqual(new Set([run.turnId]));
+    runner.dispose();
+  });
+
+  it("holds the terminal boundary until native steering settles", async () => {
+    const { runner, runtime, envelopes } = harness();
+    const run = await runner.prompt("first");
+    runtime.push({ type: "agent_start" });
+    let settle!: (response: { success: true }) => void;
+    const request = runtime.request.bind(runtime);
+    runtime.request = (command) => command.type === "steer"
+      ? new Promise((resolve) => { settle = resolve; }) : request(command);
+    const input = runner.steer("correction", run.turnId);
+    runtime.push({ type: "agent_end" });
+    expect(runner.status().isRunning).toBe(true);
+    expect(envelopes.filter(({ event }) => event.type === "agent_end")).toHaveLength(0);
+    await expect(runner.prompt("successor")).rejects.toBeDefined();
+    settle({ success: true });
+    await input;
+    expect(runner.status().isRunning).toBe(false);
+    expect(envelopes.filter(({ event }) => event.type === "agent_end")).toHaveLength(1);
+    runner.dispose();
+  });
+});
+
 function approvalFrame(id = "ui-1") {
   return {
     type: "extension_ui_request",
@@ -151,7 +225,7 @@ describe("prompting", () => {
 
     runtime.push({ type: "agent_start" });
     runtime.push({ type: "message_start", message: { role: "assistant", content: [{ type: "text", text: "hi" }] } });
-    expect(envelopes.map((e) => e.event.type)).toEqual(["agent_start", "message_start"]);
+    expect(envelopes.map((e) => e.event.type)).toEqual(["agent_start", "status", "message_start"]);
     expect(envelopes.every((e) => e.sessionId === "omp-1" && e.turnId === started.turnId)).toBe(true);
   });
 

@@ -349,3 +349,5 @@ Each ADR includes:
 | registry-header-variable-spelling | [Remote header variables accept the registry's `{name}` spelling](registry-header-variable-spelling.md) | Proposed |
 | provider-system-certificates | [Desktop sidecar uses OS-trusted certificates](provider-system-certificates.md) | Accepted |
 | image-generation-capability | [Image generation as a configured Agent capability](image-generation-capability.md) | Accepted |
+| omp-session-controls | [OMP text steering, follow-up turns and manual compaction](omp-session-controls.md) | Accepted (text controls; fork and child stop remain closed) |
+| omp-session-worktrees | [OMP session worktrees retain project identity](omp-session-worktrees.md) | Accepted (local OMP session worktrees) |

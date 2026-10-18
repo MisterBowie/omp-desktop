@@ -1196,6 +1196,14 @@ fn first_user_title(db: &Database, session_id: &str) -> Result<Option<String>> {
     }))
 }
 
+pub fn session_summary(db: &Database, id: &str) -> Result<Option<SessionSummary>> {
+    let sql = format!("{SUMMARY_SELECT} AND s.id = ?1");
+    Ok(db
+        .conn()
+        .query_row(&sql, params![id], summary_from_row)
+        .optional()?)
+}
+
 pub fn list_sessions(db: &Database) -> Result<Vec<SessionSummary>> {
     let sql = format!("{SUMMARY_SELECT} ORDER BY s.updated_at DESC");
     let mut stmt = db.conn().prepare_cached(&sql)?;

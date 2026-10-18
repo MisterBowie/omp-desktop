@@ -168,6 +168,8 @@ export class AgentHost {
   private readonly states = new Map<string, SessionState>();
   private readonly turnIndex = new Map<string, string>();
   private readonly runtimeAliases = new Map<string, string>();
+  /** Queue record that owns events emitted before runtime.prompt answers. */
+  private readonly dispatchingRuntimeTurns = new Map<string, string>();
   private readonly idempotency = new Map<string, IdempotencyEntry>();
   private readonly draining = new Set<string>();
   /** A pass that arrived while one was running: the queue must be looked at again. */
@@ -505,13 +507,17 @@ export class AgentHost {
         principal,
       });
       turn = this.ensureTurn(state, started.turnId);
-      if (!isActive(turn.status)) turn.status = "running";
+      if (!isTerminal(turn.status)) {
+        if (!isActive(turn.status)) turn.status = "running";
+        state.activeTurnId = turn.id;
+        state.status = "running";
+      } else {
+        void this.drain(state.id);
+      }
       turn.admission = admission;
       turn.effectivePermissionMode = effectivePermissionMode;
       turn.idempotencyKey = idempotencyKey;
       turn.principalSubject = principal.subject;
-      state.activeTurnId = turn.id;
-      state.status = "running";
     }
     if (idempotencyKey) this.rememberIdempotency(`${principal.subject}|${idempotencyKey}`, { turnId: turn.id, inputHash });
     return { accepted: true, turn: this.toRacpTurn(state, turn), cursor: this.hub.stream(state.id).cursor() };
@@ -808,6 +814,7 @@ export class AgentHost {
         const record = await this.queue.shift(sessionId);
         if (!record) return;
         const turn = this.ensureTurn(state, record.id);
+        this.dispatchingRuntimeTurns.set(sessionId, turn.id);
         try {
           const started = await this.runtime.prompt({
             sessionId,
@@ -821,12 +828,17 @@ export class AgentHost {
           });
           turn.runtimeTurnId = started.turnId;
           this.runtimeAliases.set(started.turnId, turn.id);
+          if (isTerminal(turn.status)) {
+            turn.queuePosition = undefined;
+            this.renumberQueue(state);
+            this.notifyQueue(sessionId);
+            continue;
+          }
           if (!isActive(turn.status)) turn.status = "running";
           turn.queuePosition = undefined;
           turn.startedAt = turn.startedAt ?? new Date(this.clock.now()).toISOString();
           state.activeTurnId = turn.id;
           state.status = "running";
-          this.renumberQueue(state);
           this.renumberQueue(state);
           this.notifyQueue(sessionId);
           // The rest of the promoted block joins this turn as user input, so the
@@ -846,6 +858,8 @@ export class AgentHost {
           this.emit(state, "turn.failed", { turn: this.toRacpTurn(state, turn) }, { turnId: turn.id });
           this.renumberQueue(state);
           this.notifyQueue(sessionId);
+        } finally {
+          if (this.dispatchingRuntimeTurns.get(sessionId) === turn.id) this.dispatchingRuntimeTurns.delete(sessionId);
         }
       }
   }
@@ -1174,12 +1188,8 @@ export class AgentHost {
   private resolveTurnId(state: SessionState, runtimeTurnId: string): string {
     const alias = this.runtimeAliases.get(runtimeTurnId);
     if (alias) return alias;
-    // A queued turn that started before its prompt() call returned: adopt
-    // the runtime id for the head record so the two never diverge.
-    const head = this.queue.peek(state.id);
-    if (head && state.activeTurnId === undefined && !state.turns.has(runtimeTurnId) && this.draining.has(state.id)) {
-      return head.id;
-    }
+    const admitted = this.dispatchingRuntimeTurns.get(state.id);
+    if (admitted && !state.turns.has(runtimeTurnId)) return admitted;
     return runtimeTurnId;
   }
 

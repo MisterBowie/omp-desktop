@@ -82,6 +82,7 @@ pub struct ToolBudgetSnapshot {
 
 #[derive(Clone)]
 pub struct ToolBudget {
+    held: Arc<std::sync::Mutex<std::collections::HashSet<String>>>,
     total: Arc<Semaphore>,
     reads: Arc<Semaphore>,
     mutations: Arc<Semaphore>,
@@ -92,9 +93,44 @@ pub struct ToolBudget {
     queued: Arc<AtomicUsize>,
 }
 
+pub struct SessionExclusivePermit {
+    _permit: OwnedSemaphorePermit,
+    held: Arc<std::sync::Mutex<std::collections::HashSet<String>>>,
+    session_id: String,
+}
+impl Drop for SessionExclusivePermit {
+    fn drop(&mut self) {
+        self.held.lock().unwrap().remove(&self.session_id);
+    }
+}
 impl ToolBudget {
+    pub fn session_is_held(&self, session_id: &str) -> bool {
+        self.held.lock().unwrap().contains(session_id)
+    }
+    pub async fn acquire_session_exclusive(
+        &self,
+        session_id: &str,
+        wait: Duration,
+    ) -> Option<SessionExclusivePermit> {
+        let semaphore = self.session_semaphore(session_id).await;
+        let permit = tokio::time::timeout(
+            wait,
+            semaphore.acquire_many_owned(MAX_IN_FLIGHT_PER_SESSION as u32),
+        )
+        .await
+        .ok()?
+        .ok()?;
+        self.held.lock().unwrap().insert(session_id.to_string());
+        Some(SessionExclusivePermit {
+            _permit: permit,
+            held: self.held.clone(),
+            session_id: session_id.to_string(),
+        })
+    }
+
     pub fn new() -> Self {
         Self {
+            held: Arc::new(std::sync::Mutex::new(std::collections::HashSet::new())),
             total: Arc::new(Semaphore::new(MAX_IN_FLIGHT_TOOLS)),
             reads: Arc::new(Semaphore::new(MAX_IN_FLIGHT_READS)),
             mutations: Arc::new(Semaphore::new(MAX_IN_FLIGHT_MUTATIONS)),

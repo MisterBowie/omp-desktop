@@ -142,15 +142,17 @@ export const PI_ENGINE_CAPABILITIES: EngineCapabilities = {
  *     in-process state. Until the adapter carries entry ids and a faithful
  *     full-fork, an OMP fork is refused rather than silently producing the
  *     wrong child.
- *   - `steer`/`followUp`/`compact` are not wired to the OMP RPC queue.
+ * Follow-up turns use the desktop's durable FIFO and the ordinary OMP prompt
+ * admission. Text steering stays on the active native run; manual compaction
+ * has separate cancellation ownership and never enters the Pi sidecar.
  */
 export const OMP_ENGINE_CAPABILITIES: EngineCapabilities = {
   prompt: true,
   stop: true,
   resume: true,
   branch: false,
-  steer: false,
-  followUp: false,
+  steer: true,
+  followUp: true,
   modelSwitch: true,
   structuredQuestions: true,
   toolApproval: true,

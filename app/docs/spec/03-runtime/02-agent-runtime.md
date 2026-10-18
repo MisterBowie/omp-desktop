@@ -1,5 +1,33 @@
 # 02. Agent Runtime
 
+## OMP session controls (2026-10-18 amendment)
+
+OMP 18.3.0 with patch level `62bc57b+omp-desktop.6` supports Desktop text
+steering, host-queued follow-up turns and manual context compaction. This
+amendment supersedes earlier closed-capability descriptions for these paths.
+
+- Steering requires the active live turn id and a started, non-stopping run.
+  Original and steering user bubbles reconcile independently. A terminal frame
+  waits for an admitted steering command to settle; an uncertain response
+  retires the process before a successor turn can consume stale input. Active
+  status events carry the turn id the Composer needs for Alt+Enter.
+- Follow-ups stay in the existing host-owned persistent FIFO. Reorder, remove
+  and prioritize retain their existing semantics. Dispatch uses the ordinary
+  OMP prompt boundary and current durable session policy. It never calls native
+  `follow_up`, the Pi sidecar or a second scheduler for an OMP turn.
+- Manual compaction restores the bound native session and calls native
+  `compact`. Preparation, compaction and Stop exclude overlapping operations.
+  Native abort precedes bounded process reclamation; cancellation cannot
+  become success through a delayed result. Failed reclamation blocks reuse
+  and remains retryable through Stop. Start/end events drive the existing
+  localized UI. Summary history stays native; no desktop checkpoint is invented.
+- Text-only controls reject attachments before queue admission or native
+  dispatch. `branch` and individual child stop remain unavailable: native
+  redo-from-user branching and parent abort do not satisfy those contracts.
+
+See [OMP session controls ADR](../../adr/omp-session-controls.md) and
+`E2E-OMP-session-controls` in the delivery E2E plan.
+
 ## 1. Goal
 
 Applied decisions: **D002/D003/D008/D158/D189/D190/D193/D194/D278/D378**.
@@ -2509,3 +2537,14 @@ The native Write tool card displays diagnostic metadata beside its written
 source using the same diagnostic blocks as Edit. Compiler errors do not turn a
 successful filesystem mutation into a failed tool execution. Both live and
 recovered rows retain the findings.
+
+## OMP isolated session execution roots (2026-10-18)
+
+Local OMP sessions may be created with `isolated: true`. Host schema v22 owns
+worktree metadata and Git operations; `session.projectPath` remains the original
+configuration scope. `session.executionRoot` supplies the checked execution root
+to the OMP boundary. Missing/creating roots refuse without project fallback.
+Native history stays in the same versioned OMP reference. Host file tools and
+plan artifacts use the execution root; Skills, memory, MCP and plugin activation
+use project identity. Main and host reservations prevent merge/sync/removal from
+interleaving with a running turn or tool. See [the worktree ADR](../../adr/omp-session-worktrees.md).

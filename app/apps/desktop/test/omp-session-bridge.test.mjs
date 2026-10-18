@@ -226,6 +226,50 @@ function bridgeHarness({ gate = "/repo/app/packages/omp-runtime/extensions/omp-d
   return { bridge, runtime: firstRuntime, supervisor: firstSupervisor, runtimes, supervisors, envelopes, logs, sessionDir, nativeSessionId, nativeSessionPath };
 }
 
+test("explicit Skill commands refuse a missing loader before prompt or steering admission", async () => {
+  const h = bridgeHarness(); const projectPath = makeProject();
+  await assert.rejects(h.bridge.prompt({ sessionId: OMP_SESSION, projectPath, content: "skill request", requiresSkill: true }),
+    (error) => error.errorCode === ErrorCodes.INVALID_ARGUMENT);
+  assert.ok(!h.runtime.commands.includes("prompt"));
+  const started = await h.bridge.prompt({ sessionId: OMP_SESSION, projectPath, content: "normal text" });
+  h.runtime.push({ type: "agent_start" });
+  await assert.rejects(h.bridge.steer(OMP_SESSION, "skill correction", started.turnId, null, true),
+    (error) => error.errorCode === ErrorCodes.INVALID_ARGUMENT);
+  assert.ok(!h.runtime.commands.includes("steer"));
+  await h.bridge.dispose();
+});
+
+test("manual compaction owns busy state and cancellation independently of an agent turn", async () => {
+  const h = bridgeHarness();
+  const projectPath = makeProject();
+  let submitted;
+  const started = new Promise((resolve) => { submitted = resolve; });
+  let finish;
+  const response = new Promise((resolve) => { finish = resolve; });
+  const request = h.runtime.request.bind(h.runtime);
+  h.runtime.request = (command) => {
+    if (command.type === "compact") { submitted(); return response; }
+    if (command.type === "abort") finish({ success: true });
+    return request(command);
+  };
+  const operation = h.bridge.compact(OMP_SESSION, { projectPath });
+  const rejected = assert.rejects(operation, (error) => error.errorCode === "CONTEXT_COMPACTION_FAILED");
+  await started;
+  assert.equal(h.bridge.status(OMP_SESSION).isRunning, true);
+  assert.equal(h.bridge.isBusy(OMP_SESSION), true);
+  await assert.rejects(h.bridge.prompt({ sessionId: OMP_SESSION, content: "overlap", projectPath }),
+    (error) => error.errorCode === ErrorCodes.AGENT_BUSY);
+  const stopped = await h.bridge.stop(OMP_SESSION);
+  await rejected;
+  assert.equal(stopped.converged, true);
+  assert.equal(h.bridge.status(OMP_SESSION).isRunning, false);
+  assert.equal(h.bridge.isBusy(OMP_SESSION), false);
+  assert.deepEqual(h.envelopes.map(({ event }) => event.type), ["compaction_start", "compaction_end"]);
+  assert.equal(h.envelopes.at(-1).event.ok, false);
+  assert.ok(!h.runtime.commands.includes("prompt"));
+  await h.bridge.dispose();
+});
+
 const APPROVAL_FRAME = {
   type: "extension_ui_request",
   id: "ui-1",
@@ -286,7 +330,8 @@ test("starts the runtime once and streams the run under one turn id", async () =
   runtime.push({ type: "agent_end", messages: [] });
 
   const kinds = envelopes.map((entry) => entry.event.type);
-  assert.deepEqual(kinds, ["agent_start", "message_start", "agent_end"]);
+  assert.deepEqual(kinds, ["agent_start", "status", "message_start", "agent_end"]);
+  assert.equal(envelopes[1].event.status.currentTurnId, first.turnId);
   assert.ok(envelopes.every((entry) => entry.sessionId === OMP_SESSION));
   assert.ok(envelopes.every((entry) => entry.turnId === first.turnId));
   assert.equal(bridge.status(OMP_SESSION).isRunning, false);
@@ -2038,7 +2083,7 @@ test("two concurrent prompts share one runtime and only one starts a run", async
   assert.equal(accepted.length, 1, "exactly one of the concurrent prompts starts the run");
   assert.equal(refused.length, 1, "the other concurrent prompt is refused while the run is busy");
   assert.equal(accepted[0].value.accepted, true);
-  assert.equal(refused[0].reason.code ?? refused[0].reason.errorCode, "not-started");
+  assert.equal(refused[0].reason.code ?? refused[0].reason.errorCode, ErrorCodes.AGENT_BUSY);
   assert.equal(supervisor.started, 1, "concurrent prompts must not start a second runtime");
 });
 

@@ -91,6 +91,7 @@ export type SessionSliceDependencies = StoreAccess & {
   ) => void;
   persistSessionAndSelect: (options: {
     intent: number;
+    isolated?: boolean;
     projectPath?: string | null;
     draftConfiguration?: DraftSessionConfiguration | null;
   }) => Promise<string | null>;
@@ -473,7 +474,7 @@ export function createSessionSlice({
         options && "projectPath" in options
           ? options.projectPath ?? null
           : get().workspace?.path ?? null;
-      const scopeKey = runtime.newSessionScopeKey(requestedProjectPath);
+      const scopeKey = runtime.newSessionScopeKey(requestedProjectPath) + (options?.isolated ? ":isolated" : "");
       const pending = runtime.pendingNewSessionRequests.get(scopeKey);
       if (pending) {
         await pending;
@@ -506,7 +507,7 @@ export function createSessionSlice({
           get().sessionMeta,
         );
         if (
-          latest &&
+          !options?.isolated && latest && !latest.worktree &&
           sessionIsReusableEmpty(latest, {
             running: get().runningSessions[latest.id] === true,
             liveMessageCount: runtime.liveMessageCountForSession(latest.id, get()),
@@ -521,6 +522,7 @@ export function createSessionSlice({
         await persistSessionAndSelect({
           intent,
           projectPath: requestedProjectPath,
+          isolated: options?.isolated,
           draftConfiguration: null,
         });
       })();

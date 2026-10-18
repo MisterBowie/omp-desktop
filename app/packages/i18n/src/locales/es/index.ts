@@ -1,6 +1,85 @@
 import type { EnglishCatalog } from "../en/index.js";
 
 export const es = {
+  "worktree": {
+    "menu": { "group": "Git" },
+    "newIsolatedSession": "Nueva sesión aislada",
+    "uncommittedNotIncluded": "Los cambios sin confirmar del proyecto no se incluyen en la sesión aislada.",
+    "reveal": "Mostrar carpeta del worktree",
+    "deleteLoss": "Se perderá el trabajo sin fusionar",
+    "badge": {
+      "isolated": "Aislada",
+      "conflict": "Conflicto",
+      "missing": "Falta la carpeta",
+      "setupFailed": "Falló la preparación",
+      "title": "Se ejecuta en su propio worktree de git en {{branch}}",
+      "behind": "↓{{count}}",
+      "behindTitle": "El proyecto tiene {{count}} commit(s) nuevo(s). Usa «Sincronizar desde el proyecto» para traerlos a esta sesión.",
+    },
+    "merge": {
+      "menu": "Fusionar en el proyecto…",
+      "title": "Fusionar en el proyecto",
+      "description": "Lleva los commits de {{branch}} a {{ownerBranch}} del proyecto.",
+      "commits": "Commits: {{count}}",
+      "files": "Archivos modificados: {{count}}",
+      "uncommittedFile": "aún sin confirmar",
+      "uncommittedNote": "Los cambios sin confirmar se confirman primero en la rama de la sesión.",
+      "resolving": "La sesión tiene una resolución de conflictos en curso; se completa al fusionar.",
+      "confirm": "Fusionar",
+      "merging": "Fusionando…",
+      "success": "Fusionado en {{branch}}",
+      "nothing": "No hay nada que fusionar.",
+      "conflict": "Estos archivos entran en conflicto con el proyecto. Resuélvelos en la sesión y vuelve a fusionar:",
+    },
+    "sync": {
+      "menu": "Sincronizar desde el proyecto",
+      "menuBehind": "Sincronizar desde el proyecto ({{count}} nuevos)",
+      "upToDate": "La sesión ya tiene el código más reciente del proyecto.",
+      "resolveFirst": "Resuelve primero el conflicto en la sesión y luego vuelve a fusionar o sincronizar.",
+      "success": "Se incorporaron {{count}} commit(s) nuevos del proyecto a la sesión.",
+      "conflict": "Estos archivos entran en conflicto con el proyecto. Resuélvelos en la sesión: {{files}}",
+    },
+    "setupCommand": {
+      "menu": "Comando de preparación del worktree…",
+      "title": "Comando de preparación del worktree",
+      "description": "Se ejecuta en cada nuevo worktree aislado de este proyecto, por ejemplo para instalar dependencias. Un fallo se muestra, pero no detiene la sesión.",
+      "label": "Comando",
+      "hint": "Variables: PI_PROJECT_ROOT, PI_WORKTREE_ROOT, PI_PORT. Primero se copian los archivos ignorados listados en .worktreeinclude.",
+      "placeholder": "pnpm install",
+      "saved": "Comando de preparación guardado",
+    },
+    "setupLog": {
+      "menu": "Registro de preparación",
+      "title": "Registro de preparación del worktree",
+      "running": "El comando de preparación se está ejecutando.",
+      "ok": "El comando de preparación terminó.",
+      "failed": "El comando de preparación falló.",
+      "none": "No se ejecutó ningún comando de preparación.",
+    },
+    "errors": {
+      "notGit": "Este proyecto no es un repositorio git.",
+      "noCommits": "El repositorio aún no tiene commits. Haz un primer commit para usar sesiones aisladas.",
+      "detachedHead": "El proyecto no está en una rama. Cambia primero a una rama.",
+      "gitMissing": "No se encontró Git. Instala Git para usar sesiones aisladas.",
+      "gitTooOld": "Las sesiones aisladas requieren Git 2.29 o posterior.",
+      "branchNamespaceTaken": "Existe una rama llamada omp-desktop. Cámbiale el nombre para usar sesiones aisladas.",
+      "busy": "La sesión sigue en ejecución. Espera a que termine.",
+      "changedSincePreview": "La sesión o la rama del proyecto cambió después de la vista previa. Revisa los cambios actualizados.",
+      "ownerBranchChanged": "El proyecto ya no está en la rama donde empezó esta sesión. Vuelve a ella para fusionar.",
+      "sessionBranchChanged": "El worktree de la sesión ya no está en su propia rama. Vuelve a ella para fusionar o sincronizar.",
+      "projectDirty": "Se sobrescribirían cambios sin confirmar del proyecto. Confírmalos o guárdalos con stash y vuelve a fusionar.",
+      "missing": "La carpeta del worktree aislado ya no existe. Elimina esta sesión.",
+      "commitFailed": "Git no pudo confirmar los cambios de la sesión.",
+      "moveUnsupported": "Una sesión aislada no se puede mover a otro proyecto.",
+      "mergeFailed": "Git no pudo combinar los cambios del proyecto con la sesión, por ejemplo porque un archivo lo impide. La sesión no cambió.",
+      "pathExists": "Ya existe un worktree o una rama con este nombre. Vuelve a intentarlo o elimina el resto.",
+      "notReady": "El worktree aislado aún se está preparando. Vuelve a intentarlo en un momento.",
+      "notIsolated": "Esta sesión no tiene un worktree aislado.",
+      "gitFailed": "Falló un comando de git. Revisa el repositorio y vuelve a intentarlo.",
+      "gitTimeout": "Git no respondió a tiempo. Vuelve a intentarlo.",
+      "remoteUnsupported": "Las sesiones aisladas no están disponibles para proyectos remotos.",
+    },
+  },
   "app": {
     "shellName": "OMP Desktop",
     "tagline": "Socio de codificación de IA local",
@@ -110,6 +189,13 @@ export const es = {
     "devDisabled": "Las actualizaciones están deshabilitadas en las compilaciones de desarrollo."
   },
   "nav": {
+    "sessionPermission": "Permiso necesario",
+    "lastReplyDate": "Última respuesta: {{date}}",
+    "copySession": {
+      "title": "Copiar título",
+      "projectPath": "Copiar ruta del proyecto",
+      "id": "Copiar ID de sesión"
+    },
     "pinnedSessions": "Fijadas",
     "home": "Inicio",
     "newTask": "Nueva tarea",
@@ -204,6 +290,19 @@ export const es = {
     sessionMissing: "Esa sesión ya no existe",
   },
   "chat": {
+    "todo": {
+      "title": "Lista de tareas",
+      "progress": "Tareas {{completed}}/{{total}}",
+      "expand": "Expandir lista",
+      "collapse": "Contraer lista",
+      "status": {
+        "pending": "Pendiente",
+        "in_progress": "En curso",
+        "completed": "Completada",
+        "abandoned": "Abandonada",
+        "blocked": "Bloqueada"
+      }
+    },
     imagePreview: {
       title: "Vista previa de imagen",
       download: "Descargar imagen",

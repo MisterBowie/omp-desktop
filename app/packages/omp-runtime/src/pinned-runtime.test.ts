@@ -21,9 +21,13 @@ import { OMP_RUNTIME_VERSION } from "@pi-desktop/shared";
 
 import { OmpRuntimeSupervisor, RUN_ROOT_PREFIX } from "./supervisor.js";
 import { findPinnedLauncher } from "./launcher.js";
+import { verifyBundledRuntime } from "./bundled.js";
 
 const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const LAUNCHER = findPinnedLauncher(PACKAGE_ROOT);
+// Nested worktrees may discover an unbuilt source launcher in their ancestor.
+// An explicitly supplied bundle must pass the production provenance verifier.
+const resources = process.env.OMP_SIDECAR_TEST_RESOURCES;
+const LAUNCHER = resources ? verifyBundledRuntime({ resourcesPath: resources }).path : findPinnedLauncher(PACKAGE_ROOT);
 const dataRoot = join(tmpdir(), `omp-runtime-smoke-${process.pid}`);
 
 /**

@@ -162,6 +162,7 @@ export type SessionIpcDependencies = {
       contentLimit?: number;
     }): Promise<{
       messages: Array<Record<string, unknown>>;
+      todoPhases?: import("@pi-desktop/shared").SessionTodoPhase[];
       messageCount: number;
       messageStart: number;
       messageEnd: number;
@@ -252,6 +253,7 @@ export function registerSessionIpc({
     return {
       ...session,
       messages: history.messages,
+      todoPhases: history.todoPhases,
       messageCount: history.messageCount,
       messageStart: history.messageStart,
       messageEnd: history.messageEnd,
@@ -497,6 +499,8 @@ export function registerSessionIpc({
       });
     }
     if (!host) throw new Error("host unavailable");
+    const release = await acquireSessionOperation(id);
+    try {
     // The engine must be resolved BEFORE the host row is deleted: a row that is
     // gone can no longer tell the router it is OMP. Resolution failure is fail
     // closed — an unidentified session must not be deleted as if it were Pi.
@@ -542,6 +546,7 @@ export function registerSessionIpc({
     sessionProjects.delete(id);
     logger.app("session", "info", "session deleted", { sessionId: id });
     return res;
+    } finally { release(); }
   });
   handle(IPC.invoke.sessionArchive, async (id: string) => {
     // Archive is a product-visible state change. For an OMP session it must

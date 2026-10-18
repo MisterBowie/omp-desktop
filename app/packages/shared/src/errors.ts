@@ -93,6 +93,10 @@ export const ErrorCodes = {
    */
   SUBAGENT_CONTEXT_OVERFLOW: "SUBAGENT_CONTEXT_OVERFLOW",
   WORKSPACE_REQUIRED: "WORKSPACE_REQUIRED",
+  /** A worktree operation owns the session's execution directory. */
+  WORKTREE_BUSY: "WORKTREE_BUSY",
+  /** An isolated session must retain its original project identity. */
+  WORKTREE_MOVE_UNSUPPORTED: "WORKTREE_MOVE_UNSUPPORTED",
   PATH_OUTSIDE_WORKSPACE: "PATH_OUTSIDE_WORKSPACE",
   TOOL_NOT_FOUND: "TOOL_NOT_FOUND",
   TOOL_DENIED: "TOOL_DENIED",

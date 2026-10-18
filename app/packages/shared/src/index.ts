@@ -6,6 +6,8 @@ export * from "./errors.js";
 export * from "./rpc-error.js";
 export * from "./certificate-errors.js";
 export * from "./types.js";
+export * from "./session-todos.js";
+export * from "./skill-command.js";
 export * from "./transcript-truncation.js";
 export * from "./keyboard-shortcuts.js";
 export * from "./changelog.js";
@@ -67,3 +69,5 @@ export * from "./tray-sessions.js";
 export * from "./window-chrome.js";
 export * from "./prompt-enhancement.js";
 export * from "./native-web-search.js";
+
+export * from "./types/worktree.js";

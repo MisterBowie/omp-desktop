@@ -147,6 +147,39 @@ function build(options: { permissionMode?: SessionSummary["permissionMode"]; que
   return { runtime, sessions, approvals, clock, host, received, sub };
 }
 
+describe("native prompt response ordering", () => {
+  it("does not resurrect a directly admitted turn that ended before prompt answered", async () => {
+    const { host, runtime } = build();
+    runtime.prompt = async () => {
+      host.ingest(envelope("s1", "fast", { type: "agent_start" }));
+      host.ingest(envelope("s1", "fast", { type: "agent_end", messageIds: [] }));
+      return { turnId: "fast" };
+    };
+    const result = await host.startTurn(owner, { sessionId: "s1", input: { text: "fast" }, context: { requestId: "fast" } });
+    expect(result.turn.status).toBe("completed");
+    expect((await host.snapshot("s1")).session.status).toBe("idle");
+  });
+
+  it("attributes early queued events to their admitted record and drains the next record", async () => {
+    const { host, runtime } = build();
+    host.ingest(envelope("s1", "parent", { type: "agent_start" }));
+    const first = await host.startTurn(owner, { sessionId: "s1", admission: "queue", input: { text: "first" }, context: { requestId: "first" } });
+    const second = await host.startTurn(owner, { sessionId: "s1", admission: "queue", input: { text: "second" }, context: { requestId: "second" } });
+    runtime.prompt = async (request) => {
+      runtime.prompts.push(request);
+      const turnId = `fast-${runtime.prompts.length}`;
+      host.ingest(envelope("s1", turnId, { type: "agent_start" }));
+      host.ingest(envelope("s1", turnId, { type: "agent_end", messageIds: [] }));
+      return { turnId };
+    };
+    host.ingest(envelope("s1", "parent", { type: "agent_end", messageIds: [] }));
+    await vi.waitFor(() => expect(runtime.prompts.map((request) => request.content)).toEqual(["first", "second"]));
+    expect(host.getTurn(first.turn.id).status).toBe("completed");
+    expect(host.getTurn(second.turn.id).status).toBe("completed");
+    expect(host.queueEntries("s1")).toEqual([]);
+  });
+});
+
 describe("AgentHost ingest", () => {
   it("reconciles only a matching optimistic user item and ignores duplicate, unknown and wrong-turn acknowledgements", async () => {
     const { host, received, sessions } = build();

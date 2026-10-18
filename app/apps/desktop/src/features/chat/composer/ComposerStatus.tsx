@@ -1,4 +1,6 @@
 import type { TFunction } from "i18next";
+import { TodoDock } from "../../../components/TodoDock";
+import { useAppStore } from "../../../stores/app-store";
 import { TooltipButton } from "../../../components/ui";
 import {
   IconArrowDown,
@@ -47,8 +49,10 @@ export function ComposerStatus({
   insertDroppedDirectoryPaths,
   dismissDroppedDirectories,
 }: ComposerStatusProps) {
+  const sessionId = useAppStore((state) => state.activeSessionId);
   return (
     <>
+      {sessionId ? <TodoDock key={sessionId} sessionId={sessionId} /> : null}
       {queuedPrompts.length ? (
         <div
           className="composer-queued-prompts"

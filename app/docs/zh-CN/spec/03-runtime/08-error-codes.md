@@ -128,6 +128,8 @@ Cursor 模型不支持 Plan 与 Goal 模式（M5/T20-R3C，用户确认的产品
 | 代码 | 可重审的 | 意义 |
 |---|---|---|
 | `WORKSPACE_REQUIRED` | 不 | 无工作空间限制 |
+| `WORKTREE_BUSY` | 是 | 工作树操作正在占用此会话，操作结束后重试 |
+| `WORKTREE_MOVE_UNSUPPORTED` | 不 | 隔离会话不能移动到另一个项目 |
 | `PATH_OUTSIDE_WORKSPACE` | 不 | 在显式外部路径权限决策之前路径逃逸沙箱，或提示词附件位于其会话 scratch/project/attachment 根目录之外 |
 | `WORKSPACE_PATH_DENIED` | 不 | 显式的 `Read`/`Write`/`Edit` 路径命中了始终开启的安全拒绝名单（私钥、`.env` 文件、凭证包、`.git/objects`）；外部路径授权不会解除它（规格 15 §3） |
 | `READ_PATH_IS_DIRECTORY` | 不 | `Read` 拿到的是目录；结果附带一条 `Glob` 建议 |

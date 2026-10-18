@@ -106,7 +106,7 @@ test("OMP status comes from its runtime, and unshipped capabilities stay closed"
   // are open, and the rest are refused even with the runtime up.
   assert.equal(idleOmp.engineRouter.require({ engine: "omp" }, "prompt"), "omp");
   assert.throws(
-    () => idleOmp.engineRouter.require({ engine: "omp" }, "steer"),
+    () => idleOmp.engineRouter.require({ engine: "omp" }, "branch"),
     (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
   );
 
@@ -161,15 +161,15 @@ test("boot wiring reads the engine from the host and gates id-only callers", asy
   // An OMP session is refused for a capability this release has not shipped,
   // with the engine and capability named, before any runtime call could happen.
   await assert.rejects(
-    () => runtime.engineRouter.requireForSession("omp-session", "steer"),
+    () => runtime.engineRouter.requireForSession("omp-session", "branch"),
     (error) => {
       assert.equal(error.errorCode, ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE);
       assert.equal(error.engine, "omp");
-      assert.equal(error.capability, "steer");
+      assert.equal(error.capability, "branch");
       return true;
     },
   );
-  await assert.rejects(() => runtime.engineRouter.requireForSession("omp-session", "followUp"));
+  assert.equal(await runtime.engineRouter.requireForSession("omp-session", "followUp"), "omp");
   // The capabilities M3 does ship pass the gate for the same session.
   assert.equal(await runtime.engineRouter.requireForSession("omp-session", "stop"), "omp");
   // The lookup itself is the only RPC made: the gate never reached a runtime,

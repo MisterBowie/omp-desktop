@@ -8,6 +8,51 @@
 
 ## 1. Goals
 
+### E2E-OMP-session-controls
+
+- **Preconditions:** Verified OMP 18.3.0 packaged resources, fixture-owned
+  HOME/project and a scripted loopback model. No user data or paid provider.
+- **Steps:** Hold a model stream, send a text correction to its live turn,
+  create and complete a native Todo, enqueue a `/skill:` follow-up and release
+  the stream. Restore the Todo through a one-row history page. Compact the native context and
+  continue from its summary. Start another compaction and cancel it.
+- **Expected:** Separate optimistic echoes; steering retains the original
+  durable turn; the FIFO persists before execution and drains through OMP;
+  the next request contains the correction and the follow-up. Native history
+  retains the Todo snapshot independently of the returned page. The Skill body
+  loads through the real host tool before the follow-up reply. Native history
+  contains a compaction entry and the subsequent request uses its summary.
+  Cancelled compaction ends unsuccessfully and all owned processes are reaped.
+  Stale turn identities cannot abort another operation. No Pi sidecar is needed.
+- **Automation:** `OMP_BUNDLED_RESOURCES=<resources> node --test
+  apps/desktop/test/omp-session-operations-e2e.test.mjs`.
+- **Additional contracts:** Runtime tests cover delayed terminal frames,
+  preparation cancellation, uncertain admission, retained reclamation and retry.
+  IPC tests reject unsupported attachments before durable queue admission.
+- **Boundary:** Text controls only; full-fork and individual child stop remain
+  explicitly unavailable. Host persistence RPC uses a controlled fixture; this
+  scenario checks write-before-dispatch ordering, not database restart recovery.
+  Cross-platform installed UI acceptance is separate.
+- **Specs:** Runtime spec OMP session-controls amendment; OMP session-controls ADR.
+
+### E2E-OMP-session-ui
+
+- **Steps:** Expand a session's Todo, receive background/child results, switch
+  sessions, and resolve an older history read after a live mutation. Submit a
+  running correction and follow-up through the Composer hook and Store. Switch
+  sessions during slash discovery. Fold a project with a running hidden row;
+  reveal session dates and activate normal Copy actions.
+- **Expected:** Every task/blocker remains readable in the expanded scrollport.
+  Child/background state never replaces another session's Todo. Live state
+  wins over the stale read. Steering uses the active turn and one optimistic
+  row; follow-up appears in its owning queue. Late command discovery sends
+  nothing and keeps the source draft. Folded project activity and localized
+  dates are visible; temporary sessions offer no empty project-path copy.
+- **Automation:** `session-controls-ui.test.mjs`, `sidebar-session-metadata.test.mjs`,
+  `sidebar-session-date.test.mjs`, `skill-command-routing.test.mjs`; component,
+  Store, SSR and IPC contracts, not an installed GUI/screenshot claim.
+- **Specs:** UI IA, builtin-command Skill amendment, OMP session-controls ADR.
+
 ### E2E-browser-full-page-screenshot-bounds
 
 - **Preconditions:** Electron and a fixture-owned profile, scratch directory,
@@ -8085,6 +8130,9 @@ identify the platform validation still needed.
 
 | Acceptance | Scenarios |
 |---|---|
+| A / E / F — Isolated OMP session worktrees | E2E-OMP-WT |
+| A / E / F — OMP text controls and cancellation | E2E-OMP-session-controls |
+| A / E / F — Session Todo, Skill and sidebar interactions | E2E-OMP-session-ui |
 | A / E / F / Release — Installed OMP identity and workflow | E2E-OMP-installed-identity-and-workflow |
 | A / E / F / M7 — Installed coding, concurrency, long history and provider recovery | E2E-OMP-maintenance-daily |
 | E / F / Release / M7 — Installed manual upgrade and closed backup rollback | E2E-OMP-maintenance-upgrade |
@@ -14506,3 +14554,14 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Status:** Automated by `node --experimental-strip-types
   scripts/e2e-scheduled-workspace.mjs`, using production Electron dispatch and
   real Rust/stdio/SQLite. Only external inference is replaced with an observer.
+
+### E2E-OMP-WT: Isolated session lifecycle
+
+- **Preconditions**: Built current host, verified OMP resources, temporary local Git repository, loopback FakeProvider.
+- **Steps**: Create an isolated OMP session from the project menu; deny then approve a native write; switch projects; stop a real child command; restart host and OMP; restore history; preview and confirm merge; delete the session.
+- **Expected**: Fresh session and worktree, unchanged project configuration scope, denied write has zero effect, approved write only in the worktree, cancelled child is reaped, missing root never falls back, native history resumes the same worktree, preview does not mutate the project, merge requires a current token, deletion removes only owned paths. Host tests also cover dirty-project, stale preview, conflicts, upgrade backup, creating/missing state and tool/turn reservations.
+- **Specs linked**: Runtime OMP execution-root amendment; UI isolated-session amendment; ADR omp-session-worktrees.
+- **Acceptance criterion**: Session isolation, permissions, persistence and cancellation.
+- **Milestone**: T26 local source acceptance.
+- **Status**: Automated at component/Store/IPC/real host/native process boundaries; installed Electron UI and Windows/Linux acceptance remain unrun.
+- **Commands**: `node --test apps/desktop/test/worktree-*.test.mjs`; `OMP_BUNDLED_RESOURCES=<verified-resources> node --test apps/desktop/test/omp-worktree-e2e.test.mjs`; `cargo test -p host-core --locked`.
