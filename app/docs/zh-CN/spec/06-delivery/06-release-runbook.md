@@ -673,3 +673,15 @@ electron PI-Desktop-<version>-linux-x64.asar
 - Linux deb/rpm、未签名 macOS 和 Windows 便携版 exe 保持通知和链接更新模式。Developer ID 签名 macOS、Windows NSIS 和 Linux AppImage 使用应用内 `electron-updater`。
 - Linux x64 包在 Ubuntu 22.04 上构建，因此 host-core 需要 glibc 2.35 或更高版本（Ubuntu 22.04、Debian 12、Fedora 36+）。标签作业运行 `scripts/check-linux-host-glibc.mjs`，拒绝需要更新 glibc 的二进制文件。
 - 回滚、分阶段部署和预发布渠道政策仍是开放的发布工作。现有未签名 macOS 安装可能需要先手动安装一次已签名 DMG，之后应用内更新才能成功。
+
+## 发布后的 Bug 复测
+
+按需运行 `scripts/audit-released-bugs.mjs` 复测发布后的回归场景。先使用
+Node 24 执行 `pnpm build:js`，将 `OMP_RELEASE_HOST_BINARY` 指向公开安装包中的
+宿主可执行文件，将 `OMP_BUNDLED_RESOURCES` 指向同包的 Resources 目录。测试
+使用独立临时项目与本地/模拟提供方。失败断言代表缺陷复现，不得记为发布检查通过。
+
+`bug-check-v*` 工作流目前在 Windows 复测公开 v0.1.1：要求产品源码树与稳定
+tag 相同，并核对官方安装器摘要后运行隔离安装场景。独立结果分支只发布固定检查
+标识、有界数值窗口观察和状态，不发布原始日志或本机夹具路径。单显示器运行器
+不能作为真实双屏全屏回归已通过的证据。

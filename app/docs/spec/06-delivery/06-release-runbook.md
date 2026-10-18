@@ -859,3 +859,19 @@ Shell smoke on each native runner:
 - Rollback, staged rollout, and prerelease channel policy remain open release
   work. Existing unsigned macOS installs may need one manual signed DMG before
   in-app updates succeed.
+
+## Post-publication bug audit
+
+The on-demand `scripts/audit-released-bugs.mjs` exercises regression scenarios
+after publication. Run it with Node 24 after `pnpm build:js`, setting
+`OMP_RELEASE_HOST_BINARY` to the published host executable and
+`OMP_BUNDLED_RESOURCES` to the matching installed Resources directory. It uses
+owned temporary projects and loopback/mock providers. A failing assertion is
+a reproduced defect; it must not be reported as a passing release check.
+
+The `bug-check-v*` workflow currently audits published v0.1.1 on Windows. It
+requires an unchanged product tree and verifies the official installer digest
+before running the isolated installed scenarios. Only fixed check IDs, bounded
+numeric window observations and statuses are published on a separate result
+branch. Raw logs and local fixture paths are excluded. A single-monitor runner
+does not qualify the physical dual-monitor fullscreen regression.
