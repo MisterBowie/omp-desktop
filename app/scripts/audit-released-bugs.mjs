@@ -418,9 +418,13 @@ test("B11 OMP native Read: BOM UTF-16 reaches the model correctly", {
     modelId: "local-model",
   });
   await finished;
+  assert.equal(bridge.workingDirectory("audit-encoding"), project);
+  const toolMessages = provider.requests.flatMap(
+    (r) => r.body?.messages?.filter((m) => m.role === "tool") ?? [],
+  );
   assert.ok(
     provider.requests.some((r) => JSON.stringify(r.body).includes("UTF16_MARKER")),
-    "native Read result must decode UTF-16",
+    `native Read result must decode UTF-16: ${JSON.stringify(toolMessages)}`,
   );
 });
 test("B12 Review diff: never execute a project-configured Git textconv helper", async (t) => {

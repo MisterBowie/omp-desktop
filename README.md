@@ -2,9 +2,11 @@
 
 目标：以 `vastsa/PI-Desktop` 为桌面产品基线，保留其界面和主要交互，接入 `can1357/oh-my-pi` 的 Agent 能力，再按需求增加或修改功能。
 
-当前准备发布 **0.1.1**，包含会话 Todo、Skill、插话/跟进、侧栏和本地 worktree 核心流程，继承彩色像素 π、LSP 与截图修复。
+当前稳定版 **0.1.1** 已发布，包含会话 Todo、Skill、插话/跟进、侧栏和本地 worktree 核心流程，继承彩色像素 π、LSP 与截图修复。
 下载与更新统一使用 [GitHub Releases](https://github.com/MisterBowie/omp-desktop/releases/latest)。
-公开 0.1.0 保留；0.1.1 以固定候选的源码与四目标安装验收全部通过为发布前提。
+0.1.1 已通过完整源码与四目标安装验收，30 项公开资产回读完成。
+发布后仍有未通过场景和依赖告警，见[Bug 复测记录](docs/validation/Version-011-bug-audit-20261019.md)。
+从 schema 22 回退 0.1.0 需先关闭应用并恢复升级前备份。
 应用内更新和平台签名前提见 [发布手册](app/docs/zh-CN/spec/06-delivery/06-release-runbook.md)。
 
 项目仓库：[MisterBowie/omp-desktop](https://github.com/MisterBowie/omp-desktop)。克隆完整项目：

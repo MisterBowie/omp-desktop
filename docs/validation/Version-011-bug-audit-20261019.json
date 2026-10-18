@@ -1,0 +1,394 @@
+{
+  "version": "0.1.1",
+  "date": "2026-10-19",
+  "sourceRevision": "00c96c551755a238902c061dd0833c85d39ab075",
+  "tag": "v0.1.1",
+  "releaseUrl": "https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.1",
+  "publishedAt": "2026-10-18T17:50:30Z",
+  "releaseValidation": {
+    "candidateRunId": 39147487467,
+    "publicationRunId": 39151304224,
+    "nativeTargets": [
+      "darwin-arm64",
+      "darwin-x64",
+      "win32-x64",
+      "linux-x64"
+    ],
+    "allSuccessful": true
+  },
+  "publicAssetReadback": {
+    "version": "0.1.1",
+    "sourceRevision": "00c96c551755a238902c061dd0833c85d39ab075",
+    "candidateRunId": 39147487467,
+    "publicationRunId": 39151304224,
+    "readbackRunId": 39152299594,
+    "assetCount": 30,
+    "assetBytes": 1988005616,
+    "checksumManifest": true,
+    "buildRecord": true,
+    "sourceReceipts": true,
+    "verifiedUpdateArtifacts": 8,
+    "mergedMacFeedIdentical": true
+  },
+  "publicAssetReceiptUrl": "https://github.com/MisterBowie/omp-desktop/blob/codex/public-asset-readback-39152299594/docs/validation/Published-011-assets-39152299594.json",
+  "environment": {
+    "node": "24.14.0",
+    "pnpm": "10.34.5",
+    "electron": "43.6.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "omp": "18.3.0",
+    "ompPatch": "62bc57b+omp-desktop.6",
+    "ompFork": "d648d27bcf0db16caecb876142d891cf49a51bc2"
+  },
+  "officialMacInstaller": {
+    "name": "OMP-Desktop-0.1.1-arm64.dmg",
+    "bytes": 224485431,
+    "sha256": "ddb6fa85d3f4d7bd54a3748faf8cef150d64495867b87556cb85d83be6eaad89",
+    "matchesOfficialAsset": true
+  },
+  "desktopRegressions": {
+    "suiteFiles": 48,
+    "tests": 419,
+    "pass": 419,
+    "fail": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "cwd": "app/apps/desktop",
+    "files": [
+      "test/browser-cdp.test.mjs",
+      "test/browser-preview-tool.test.mjs",
+      "test/browser-screenshot.test.mjs",
+      "test/builtin-commands.test.mjs",
+      "test/composer-draft-cache.test.mjs",
+      "test/composer-drag-drop.test.mjs",
+      "test/composer-paste-files.test.mjs",
+      "test/composer-smart-stop.test.mjs",
+      "test/context-compaction.test.mjs",
+      "test/context-usage.test.mjs",
+      "test/markdown-link-menu.test.mjs",
+      "test/mcp-control-wiring.test.mjs",
+      "test/mcp-control.test.mjs",
+      "test/mcp-market-panel.test.mjs",
+      "test/mcp-oauth.test.mjs",
+      "test/mcp-registry-catalog.test.mjs",
+      "test/model-binding-catalog-source.test.mjs",
+      "test/omp-tool-results.test.mjs",
+      "test/omp-tool-row-mounted.test.mjs",
+      "test/plan-artifact-contract.test.mjs",
+      "test/plugin-mcp.test.mjs",
+      "test/provider-api-style.test.mjs",
+      "test/provider-model-config.test.mjs",
+      "test/queued-turn-finalization.test.mjs",
+      "test/session-controls-ui.test.mjs",
+      "test/session-message-input.test.mjs",
+      "test/session-transcript.test.mjs",
+      "test/sidebar-session-date.test.mjs",
+      "test/sidebar-session-metadata.test.mjs",
+      "test/sidebar-session-status.test.mjs",
+      "test/skill-command-routing.test.mjs",
+      "test/subagent-transcript.test.mjs",
+      "test/thinking-commit-queue.test.mjs",
+      "test/transcript-disclosure-reading.test.mjs",
+      "test/transcript-file-chips.test.mjs",
+      "test/transcript-reading.test.mjs",
+      "test/transcript-scroll.test.mjs",
+      "test/transcript-search-focus.test.mjs",
+      "test/transcript-search-rendering.test.mjs",
+      "test/transcript-settle.test.mjs",
+      "test/transcript-style.test.mjs",
+      "test/transcript-window.test.mjs",
+      "test/user-mcp.test.mjs",
+      "test/window-menu.test.mjs",
+      "test/windows-host-runtime.test.mjs",
+      "test/worktree-files-ipc.test.mjs",
+      "test/worktree-ipc.test.mjs",
+      "test/worktree-user-path.test.mjs"
+    ]
+  },
+  "runtimeRegressions": {
+    "suiteFiles": 9,
+    "tests": 119,
+    "pass": 119,
+    "fail": 0,
+    "skipped": 0
+  },
+  "nativeControlsAndWorktrees": {
+    "tests": 2,
+    "pass": 2,
+    "fail": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "publishedHostSha256": "b0a3b9bcdeaa4a7699d026ea1239ae152d9d711e70ac310c592ff9b859cb0617",
+    "ownedSurvivors": 0
+  },
+  "installedFresh": {
+    "version": "0.1.1",
+    "steps": {
+      "project": true,
+      "deny": true,
+      "allowOnce": true,
+      "projectTest": true,
+      "stopTree": true,
+      "recoveryNoReplay": true,
+      "freshTurn": true,
+      "defaultIsolation": true
+    },
+    "orderedQuits": 2,
+    "cleaned": true
+  },
+  "upgradeAndRollback": {
+    "versions": [
+      "0.1.0",
+      "0.1.1",
+      "0.1.0"
+    ],
+    "checks": [
+      "closed 0.1.0 fixture backed up byte-for-byte",
+      "0.1.1 preserved project and native history after schema migration",
+      "restoring the closed backup allowed real 0.1.0 rollback with identical history"
+    ],
+    "schema21BackupCount": 1,
+    "orderedQuits": 4,
+    "ownedSurvivors": 0,
+    "cleaned": true,
+    "updater": {
+      "currentVersion": "0.1.1",
+      "status": "up-to-date",
+      "mode": "manual",
+      "passed": true
+    }
+  },
+  "browserScreenshots": {
+    "status": "passed",
+    "scenarios": 6,
+    "electron": "43.6.0",
+    "boundary": "matching Electron SDK with unchanged published product screenshot source"
+  },
+  "targetedAudit": {
+    "tests": 13,
+    "pass": 3,
+    "fail": 10,
+    "skipped": 0,
+    "cancelled": 0,
+    "cases": [
+      {
+        "id": "B01",
+        "scope": "Pi compatible runtime",
+        "status": "failed",
+        "observed": "循环上下文与持久状态共享消息数组；长度由1变2",
+        "code": "array-alias"
+      },
+      {
+        "id": "B02",
+        "scope": "Pi instruction loader",
+        "status": "failed",
+        "observed": "32KiB全局规则使项目AGENTS内容缺失",
+        "code": "project-rules-starved"
+      },
+      {
+        "id": "B03",
+        "scope": "Desktop Browser CDP",
+        "status": "failed",
+        "observed": "模拟推进5分钟后调用仍pending",
+        "code": "unbounded-wait"
+      },
+      {
+        "id": "B04",
+        "scope": "Desktop MCP HTTP",
+        "status": "failed",
+        "observed": "完整SSE回复已到达，仍等待流关闭并初始化超时",
+        "code": "TIMEOUT"
+      },
+      {
+        "id": "B05",
+        "scope": "Desktop MCP HTTP",
+        "status": "failed",
+        "observed": "工具调用超时返回时，HTTP信号尚未abort",
+        "code": "transport-not-aborted"
+      },
+      {
+        "id": "B06",
+        "scope": "Pi native history reader",
+        "status": "passed",
+        "observed": "损坏的非UTF8尾行未丢失前面的有效消息"
+      },
+      {
+        "id": "B07",
+        "scope": "Pi provider request adapter",
+        "status": "passed",
+        "observed": "DeepSeek模拟请求未发送不支持的reasoning_effort"
+      },
+      {
+        "id": "B08",
+        "scope": "Published host Read",
+        "status": "failed",
+        "observed": "带BOM的UTF16被判定为二进制并拒绝读取",
+        "code": "TOOL_BINARY_CONTENT"
+      },
+      {
+        "id": "B09",
+        "scope": "Context usage display",
+        "status": "failed",
+        "observed": "应为130的输入输出占用被显示为140",
+        "code": "reasoning-double-count"
+      },
+      {
+        "id": "B10",
+        "scope": "Published host Edit",
+        "status": "failed",
+        "observed": "有效tag的MV ./source.txt返回成功，随后源文件不存在",
+        "code": "ENOENT"
+      },
+      {
+        "id": "B11",
+        "scope": "Published native OMP Read",
+        "status": "failed",
+        "observed": "执行目录正确；工具明确拒绝非UTF8文本，未自动解码UTF16",
+        "code": "UTF8-only-capability-gap"
+      },
+      {
+        "id": "B12",
+        "scope": "Work panel collectWorkspaceDiff",
+        "status": "failed",
+        "observed": "打开差异执行了仓库配置的textconv转换程序",
+        "code": "textconv-executed"
+      },
+      {
+        "id": "B13",
+        "scope": "Published host durable queue",
+        "status": "passed",
+        "observed": "真实宿主重启后附件记录与原文件内容一致"
+      }
+    ],
+    "note": "B11另跑诊断确认执行目录和原生拒绝回包；重复运行不增加独立场景数。"
+  },
+  "windowsInstalledAudit": {
+    "runId": 39152641469,
+    "version": "0.1.1",
+    "platform": "win32",
+    "arch": "x64",
+    "monitorCount": 1,
+    "dualMonitorQualified": false,
+    "cleaned": true,
+    "checks": [
+      {
+        "id": "WIN-FULLSCREEN-MAXIMIZED",
+        "status": "passed",
+        "facts": {
+          "colors": 256,
+          "bytes": 3188736
+        }
+      },
+      {
+        "id": "WIN-TASKBAR-RESTORE",
+        "status": "passed",
+        "facts": {
+          "bounds": {
+            "x": -8,
+            "y": -8,
+            "width": 1040,
+            "height": 736
+          },
+          "workArea": {
+            "x": 0,
+            "y": 0,
+            "width": 1024,
+            "height": 720
+          },
+          "maximized": true
+        }
+      },
+      {
+        "id": "UTF16-HOST-READ",
+        "status": "failed",
+        "errorType": "AssertionError"
+      },
+      {
+        "id": "POWERSHELL-OUTPUT-EXIT",
+        "status": "passed",
+        "facts": {
+          "outputPreserved": true,
+          "exitCode": 7
+        }
+      },
+      {
+        "id": "ORDERED-EXIT",
+        "status": "passed",
+        "facts": {
+          "noOwnedProcesses": true
+        }
+      }
+    ],
+    "fullscreenObservation": {
+      "maximized": false,
+      "painted": true,
+      "colors": 256,
+      "bytes": 3188736
+    },
+    "restoreObservation": {
+      "bounds": {
+        "x": -8,
+        "y": -8,
+        "width": 1040,
+        "height": 736
+      },
+      "workArea": {
+        "x": 0,
+        "y": 0,
+        "width": 1024,
+        "height": 720
+      },
+      "maximized": true
+    },
+    "receiptUrl": "https://github.com/MisterBowie/omp-desktop/blob/codex/published-bug-results-39152641469/docs/validation/Published-011-windows-39152641469.json"
+  },
+  "dependencyAuditSummary": {
+    "registry": "https://registry.npmjs.org",
+    "fullWorkspace": {
+      "records": 61,
+      "uniqueAdvisoryUrls": 42,
+      "severities": {
+        "info": 0,
+        "low": 7,
+        "moderate": 17,
+        "high": 37,
+        "critical": 0
+      }
+    },
+    "pnpmProdScope": {
+      "records": 14,
+      "uniqueAdvisoryUrls": 14,
+      "severities": {
+        "info": 0,
+        "low": 3,
+        "moderate": 6,
+        "high": 5,
+        "critical": 0
+      },
+      "packages": [
+        "brace-expansion",
+        "js-yaml",
+        "undici"
+      ]
+    },
+    "exploitabilityAssessed": false,
+    "lockfileChanged": false,
+    "bunAndRustDependenciesAudited": false
+  },
+  "fixtureCorrections": [
+    "桌面测试CWD已修正，最终419项通过",
+    "Windows按既有build:js构建完整工作区依赖",
+    "文件探针使用受支持的auto模式且仅作用于临时测试项目",
+    "初次同一DMG并发挂载资源忙，随后顺序提取"
+  ],
+  "knownCoverageLimits": [
+    "未覆盖Windows真实双屏全屏问题",
+    "未做长会话FPS或跨DPI视觉基准",
+    "未逐一复刻所有历史归档/旧链接迁移及消息删除合并变体",
+    "未调用真实付费模型",
+    "未逐条确认安装包中的依赖告警可达性"
+  ],
+  "rawLogsPublic": false,
+  "productChangesAfterPublication": false
+}

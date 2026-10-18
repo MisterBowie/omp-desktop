@@ -1,5 +1,16 @@
 # OMP Desktop 发布与维护检查单
 
+当前 **0.1.1 已发布**：[稳定版](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.1)。
+源码 `00c96c5`，完整候选 run39147487467、正式发布 run39151304224 均成功。
+四目标构建、包内严格契约与实际安装通过；独立 run39152299594 完整回读
+30 项公开资产、1,988,005,616 字节及更新清单摘要/大小/来源。
+发布后新安装、升级回退、真实 GitHub 检查和原生会话/worktree 通过。
+定向 Bug 场景仍有 10 项未通过；单屏 Windows 4/5 通过，双屏未覆盖；依赖有告警。
+这些未通过项未修复，见[复测记录](validation/Version-011-bug-audit-20261019.md)。
+schema 21→22 自动备份已实测，回退旧版必须关闭应用并恢复备份。
+
+## 0.1.0 历史发布记录
+
 当前 `0.1.0` 已发布：[稳定版](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.0)。
 固定源码154bc03 / 原生run38862126801全部成功；发布run38869364763成功，
 四目标（Mac ARM/Intel、Windows x64、Linux x64）各包内15项与实际安装8项通过。
