@@ -19,6 +19,25 @@ refresh retains one known build-tool advisory without an upstream fix.
 The immutable candidate must pass complete source and all four native gates
 before publication. A local missing-runtime smoke is not a passing gate.
 
+### Same-version Skill guidance revision
+
+The 2026-10-19 Skill guidance correction keeps application version **0.1.2**.
+After complete source and all four native gates pass, the dedicated
+`publish-skill-v0.1.2-run-<run-id>` controller publishes the accepted bytes under
+`v0.1.2+skill.<full-source-revision>`. This stable release has source-bound build
+metadata. The original `v0.1.2` source and public asset ids, sizes and SHA256
+digests are captured before publication and checked afterward. Ordinary
+publication still accepts only a plain stable-version tag; the revision path
+must be explicitly selected and cannot target that old tag.
+
+The new release becomes `releases/latest`, but feeds and installers still say
+0.1.2. Existing 0.1.2 installations therefore require a manual download and
+reinstall. The real GitHub update-provider fixture verifies the build tag's
+asset URLs and equal-version comparison. The linked readback job downloads
+every public asset, verifies source receipts and updater hashes, and checks
+that the original release is unchanged. Version, runtime pin, storage schema
+and historical artifacts retain their existing values.
+
 ### 0.1.1 session and worktree release
 
 Version 0.1.1 ships native Todo projection, `/skill:` commands, sidebar reply
