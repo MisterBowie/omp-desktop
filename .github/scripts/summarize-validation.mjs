@@ -17,7 +17,7 @@ const errors=[
 ];
 const diagnosticCodes=["OMP_RESTORE_FAILED","OMP_CAPABILITY_STATE_FAILED","OMP_HOST_TURN_FAILED","OMP_SESSION_CREATE_FAILED","OMP_HOST_TOOL_REGISTRATION_FAILED","OMP_HISTORY_READ_FAILED","NOT_STARTED","ERR_ASSERTION"];
 const sourceFiles=["omp-session.ts","session.ts","protocol.ts","supervisor.ts","process.ts","installed-product.mjs","installed-application.mjs","installed-payload.mjs","installed-workflow.mjs","e2e-installed-smoke.mjs"];
-const publicImages=["omp desktop.exe","pi-desktop-host-core.exe","omp.exe","conhost.exe","python.exe","cmd.exe","powershell.exe","node.exe"];
+const publicImages=["omp desktop.exe","pi-desktop-host-core.exe","omp.exe","conhost.exe","python.exe","cmd.exe","powershell.exe","node.exe","werfault.exe","wermgr.exe","msmpeng.exe","mpcmdrun.exe","svchost.exe","rundll32.exe","dllhost.exe"];
 /** Only fixed process roles and bounded control outcomes leave the runner. */
 export function summarizeProcessCleanup(smoke){
  const reports=Array.isArray(smoke?.processReports)?smoke.processReports:[];
@@ -27,7 +27,11 @@ export function summarizeProcessCleanup(smoke){
  const last=snapshots.at(-1);
  const processes=(last?.processes??[]).slice(0,32).map(p=>{
   const exe=normalize(p.exe),image=exe.split("/").at(-1);
-  return {image:publicImages.includes(image)?image:"OTHER",state:["R","Z","X"].includes(p.state)?p.state:"UNKNOWN",hasIdentity:typeof p.starttime==="string"&&/^\d+(?:\.\d+)?$/.test(p.starttime),executableUnderRunRoot:root.length>=10&&exe.startsWith(root+"/")};
+  const first=reports.find(r=>Array.isArray(r.processes)&&r.processes.some(x=>x.pid===p.pid&&x.starttime===p.starttime));
+  const original=first?.processes.find(x=>x.pid===p.pid&&x.starttime===p.starttime),parent=first?.processes.find(x=>x.pid===original?.ppid);
+  const knownBirth=value=>typeof value==="string"&&/^\d+$/.test(value);
+  const childPredatesParent=knownBirth(original?.starttime)&&knownBirth(parent?.starttime)?BigInt(original.starttime)<BigInt(parent.starttime):null;
+  return {image:publicImages.includes(image)?image:"OTHER",state:["R","Z","X"].includes(p.state)?p.state:"UNKNOWN",hasIdentity:typeof p.starttime==="string"&&/^\d+(?:\.\d+)?$/.test(p.starttime),executableUnderRunRoot:root.length>=10&&exe.startsWith(root+"/"),firstOwnership:["root","descendant","argv-run-root","environ-run-root"].includes(original?.ownership)?original.ownership:"UNKNOWN",parentObserved:Boolean(parent),childPredatesParent};
  });
  const controls=reports.filter(r=>r.label==="cleanup-pinned-Windows-handles").slice(-3).map(r=>(Array.isArray(r.result?.results)?r.result.results:[]).slice(0,32).map(p=>({terminated:p.terminated===true,refusedOutsideRoot:p.refusedOutsideRoot===true,identityMismatch:p.identityMismatch===true,openError:[5,6,87].includes(p.openError)?p.openError:null,waitStatus:[0,258,4294967295].includes(p.waitStatus)?p.waitStatus:null})));
  return {lastSnapshot:last?.label??"NONE",survivorCount:last?.processes?.length??0,processes,controls};

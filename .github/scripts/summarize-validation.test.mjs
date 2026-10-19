@@ -20,7 +20,7 @@ test("process cleanup diagnostics retain roles and outcomes without executable p
   {label:"cleanup-pinned-Windows-handles",result:{results:[{pid:1234,terminated:true,waitStatus:0,executable:"PRIVATE_VALUE"},{pid:4567,refusedOutsideRoot:true,openError:99999}]}},
   {label:"after-Windows-handle-reclaim",processes:[{pid:1234,exe:"C:\\PRIVATE\\omp-installed-fixture\\OMP Desktop.exe",state:"R",starttime:"123456"},{pid:4567,exe:"C:\\Windows\\System32\\conhost.exe",state:"R",starttime:"234567"},{exe:"C:\\PRIVATE\\secret.exe",state:"PRIVATE_STATE",starttime:"PRIVATE_BIRTH"}]},
  ]});
- assert.deepEqual(result,{lastSnapshot:"after-Windows-handle-reclaim",survivorCount:3,processes:[{image:"omp desktop.exe",state:"R",hasIdentity:true,executableUnderRunRoot:true},{image:"conhost.exe",state:"R",hasIdentity:true,executableUnderRunRoot:false},{image:"OTHER",state:"UNKNOWN",hasIdentity:false,executableUnderRunRoot:false}],controls:[[{terminated:true,refusedOutsideRoot:false,identityMismatch:false,openError:null,waitStatus:0},{terminated:false,refusedOutsideRoot:true,identityMismatch:false,openError:null,waitStatus:null}]]});
+ assert.deepEqual(result,{lastSnapshot:"after-Windows-handle-reclaim",survivorCount:3,processes:[{image:"omp desktop.exe",state:"R",hasIdentity:true,executableUnderRunRoot:true,firstOwnership:"UNKNOWN",parentObserved:false,childPredatesParent:null},{image:"conhost.exe",state:"R",hasIdentity:true,executableUnderRunRoot:false,firstOwnership:"UNKNOWN",parentObserved:false,childPredatesParent:null},{image:"OTHER",state:"UNKNOWN",hasIdentity:false,executableUnderRunRoot:false,firstOwnership:"UNKNOWN",parentObserved:false,childPredatesParent:null}],controls:[[{terminated:true,refusedOutsideRoot:false,identityMismatch:false,openError:null,waitStatus:0},{terminated:false,refusedOutsideRoot:true,identityMismatch:false,openError:null,waitStatus:null}]]});
  assert.doesNotMatch(JSON.stringify(result),/PRIVATE|1234|4567|99999|System32|secret/);
 });
 test("failed TAP assertions expose coordinates and bounded values only",()=>{
@@ -30,4 +30,15 @@ test("failed TAP assertions expose coordinates and bounded values only",()=>{
  const nested=tap.replace("private-message","OMP_RESTORE_FAILED").replace("file:///private/secret/omp-plan-submit-e2e.test.mjs:941:12","file:///private/secret/omp-session.ts:1412:9");
  assert.deepEqual(summarizeStrictFailures(nested)[0].source,[{file:"omp-session.ts",line:1412,column:9}]);
  assert(summarizeStrictFailures(nested)[0].diagnosticCodes.includes("OMP_RESTORE_FAILED"));
+});
+
+test("process ancestry diagnostics detect a reused parent id without publishing identities",()=>{
+ const root="C:/PRIVATE/omp-installed-fixture";
+ const child={pid:1234,ppid:5678,exe:"C:/PRIVATE/foreign.exe",state:"R",starttime:"133000000000000001",ownership:"descendant"};
+ const parent={pid:5678,ppid:1,exe:root+"/OMP Desktop.exe",state:"R",starttime:"133000000000000002",ownership:"root"};
+ const result=summarizeProcessCleanup({runRoot:root,processReports:[{label:"before-ordered-quit",processes:[parent,child]},{label:"cleanup-before",processes:[{...child,ownership:"root"}]}]});
+ assert.equal(result.processes[0].firstOwnership,"descendant");
+ assert.equal(result.processes[0].parentObserved,true);
+ assert.equal(result.processes[0].childPredatesParent,true);
+ assert.doesNotMatch(JSON.stringify(result),/PRIVATE|1234|5678|133000/);
 });
