@@ -1451,6 +1451,14 @@ fn tool_edit(
             let (code, message) = ignore_rules::denied_error(dest);
             return Err(hashline::ToolError::new(code, message));
         }
+        // Both paths have passed canonical resolution and permission checks.
+        // Writing an alias, then unlinking the source, would delete that file.
+        if dest_resolved == resolved {
+            return Err(hashline::ToolError::new(
+                "EDIT_NO_CHANGE",
+                "MV destination resolves to the source file; choose a different destination",
+            ));
+        }
         if let Some(parent) = dest_resolved.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
                 hashline::ToolError::new("TOOL_FAILED", format!("mkdir failed: {e}"))
@@ -4397,6 +4405,128 @@ mod tests {
         .await;
         assert_eq!(native.content["exitCode"], 7);
     }
+    #[tokio::test]
+    async fn bom_utf16_read_edit_preserves_byte_order_and_line_endings() {
+        for little_endian in [true, false] {
+            for ending in ["\n", "\r\n"] {
+                let dir = tempfile::tempdir().unwrap();
+                let target = dir.path().join("status.log");
+                let encode = |text: &str| {
+                    let mut bytes = if little_endian {
+                        vec![0xff, 0xfe]
+                    } else {
+                        vec![0xfe, 0xff]
+                    };
+                    for unit in text.encode_utf16() {
+                        bytes.extend(if little_endian {
+                            unit.to_le_bytes()
+                        } else {
+                            unit.to_be_bytes()
+                        });
+                    }
+                    bytes
+                };
+                std::fs::write(&target, encode(&format!("开始{ending}完成🙂{ending}"))).unwrap();
+                let read = execute_tool(
+                    Some(dir.path()),
+                    None,
+                    "Read",
+                    &json!({ "path": "status.log" }),
+                    5_000,
+                )
+                .await;
+                assert!(read.ok, "Read failed: {:?}", read.content);
+                let content = read.content["content"].as_str().unwrap();
+                assert!(content.contains("1:开始"));
+                assert!(content.contains("2:完成🙂"));
+                let edit = execute_tool(
+                    Some(dir.path()),
+                    None,
+                    "Edit",
+                    &json!({
+                        "path": "status.log", "tag": read.content["tag"],
+                        "ops": "PUT 2.=2:\n+已完成🙂\n",
+                    }),
+                    5_000,
+                )
+                .await;
+                assert!(edit.ok, "Edit failed: {:?}", edit.content);
+                assert_eq!(
+                    std::fs::read(&target).unwrap(),
+                    encode(&format!("开始{ending}已完成🙂{ending}")),
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn edit_move_aliases_refuse_before_any_file_write() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = std::fs::canonicalize(dir.path()).unwrap();
+        let target = root.join("source.txt");
+        std::fs::create_dir(root.join("nested")).unwrap();
+        std::fs::write(&target, "original\n").unwrap();
+        let read = execute_tool(
+            Some(&root),
+            None,
+            "Read",
+            &json!({ "path": "source.txt" }),
+            5_000,
+        )
+        .await;
+        assert!(read.ok);
+        let mut aliases = vec![
+            "source.txt".to_string(),
+            "./source.txt".to_string(),
+            "nested/../source.txt".to_string(),
+            target.to_string_lossy().into_owned(),
+        ];
+        if root.join("SOURCE.txt").exists() {
+            aliases.push("SOURCE.txt".into());
+        }
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&root, root.join("alias")).unwrap();
+            aliases.push("alias/source.txt".into());
+        }
+        for alias in aliases {
+            for ops in [
+                format!("MV {alias}\n"),
+                format!("PUT 1.=1:\n+changed\nMV {alias}\n"),
+            ] {
+                let edit = execute_tool(
+                    Some(&root),
+                    None,
+                    "Edit",
+                    &json!({ "path": "source.txt", "tag": read.content["tag"], "ops": ops }),
+                    5_000,
+                )
+                .await;
+                assert_eq!(
+                    edit.error_code.as_deref(),
+                    Some("EDIT_NO_CHANGE"),
+                    "{alias}: {:?}",
+                    edit.content
+                );
+                assert_eq!(std::fs::read(&target).unwrap(), b"original\n");
+            }
+        }
+        let moved = execute_tool(
+            Some(&root),
+            None,
+            "Edit",
+            &json!({ "path": "source.txt", "tag": read.content["tag"], "ops": "MV moved.txt\n" }),
+            5_000,
+        )
+        .await;
+        assert!(moved.ok, "distinct move failed: {:?}", moved.content);
+        assert!(!target.exists());
+        assert_eq!(
+            std::fs::read(root.join("moved.txt")).unwrap(),
+            b"original\n"
+        );
+    }
+
     #[tokio::test]
     async fn edit_preserves_crlf_line_endings() {
         let dir = tempfile::tempdir().unwrap();

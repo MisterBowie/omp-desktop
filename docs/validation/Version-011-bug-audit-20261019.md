@@ -14,7 +14,7 @@
 - [资产回读 39152299594](https://github.com/MisterBowie/omp-desktop/actions/runs/39152299594)：独立 CI 完整下载 30 项公开资产，共 **1,988,005,616 字节**；GitHub SHA256/大小、SHA256SUMS、BUILD-RECORD、候选/控制面来源全部通过。五份更新清单一致，八项更新安装器的 SHA512/大小通过。
 - [公开资产回执](https://github.com/MisterBowie/omp-desktop/blob/codex/public-asset-readback-39152299594/docs/validation/Published-011-assets-39152299594.json)。本机仅完整下载并验证所用 ARM DMG；全量字节回读由上述 CI 执行。
 
-本机使用 Node 24.14.0、pnpm 10.34.5、Electron 43.6.0。OMP 为 18.3.0 / `62bc57b+omp-desktop.6`，固定 fork `d648d27bcf0db16caecb876142d891cf49a51bc2`。
+首次发布后验证使用 Node 24.14.0、pnpm 10.34.5、Electron 43.6.0。OMP 为 18.3.0 / `62bc57b+omp-desktop.6`，固定 fork `d648d27bcf0db16caecb876142d891cf49a51bc2`。
 正式 ARM DMG 为 224,485,431 字节，SHA256 `ddb6fa85d3f4d7bd54a3748faf8cef150d64495867b87556cb85d83be6eaad89`。
 
 ## 已通过的发布后回归
@@ -38,14 +38,14 @@
 | --- | --- | --- | --- |
 | B01 | Pi 兼容运行时 | 未通过 | 循环上下文与持久状态共享消息数组，修改上下文使状态长度由 1 变 2；复现共享数组缺陷，未声称真实服务已返回 HTTP 400 |
 | B02 | Pi 规则加载 | 未通过 | 32KiB 全局 AGENTS 消耗预算后，项目规则标记缺失 |
-| B03 | 桌面 Browser CDP | 未通过 | 模拟推进五分钟，悬挂的 CDP 调用仍为 pending |
+| B03 | 桌面 BrowserHost → CDP | 未通过 | 从公开 BrowserHost 入口确认命令已到达 CDP，模拟推进五分钟后仍为 pending |
 | B04 | 桌面 MCP HTTP | 未通过 | 完整 SSE JSON-RPC 回复已到达，但未关闭流时仍等待，最终初始化超时 |
-| B05 | 桌面 MCP HTTP | 未通过 | 工具调用超时已返回，底层 HTTP 请求尚未 abort |
+| B05 | 桌面 MCP HTTP | 未通过 | 工具调用返回 TIMEOUT，却没有发送同一请求的 `notifications/cancelled`；HTTP 未立即 abort 仅保留为附加观察 |
 | B06 | Pi 原生历史读取 | 通过 | 损坏的非 UTF-8 尾行没有丢掉此前有效消息 |
 | B07 | Pi 模型请求适配 | 通过 | DeepSeek 请求经过实际适配器与受控 fetch，没有发送不支持的 reasoning_effort；没有调用真实模型 |
-| B08 | 正式宿主 Read | 未通过 | 带 BOM 的 UTF-16 文本返回 `TOOL_BINARY_CONTENT` |
+| B08 | Pi 兼容路径／正式宿主 Read | 未通过 | 带 BOM 的 UTF-16 文本返回 `TOOL_BINARY_CONTENT` |
 | B09 | 上下文占用显示 | 未通过 | 输入 100、输出 30（包含思考 10）、总数 130，被计成 140 |
-| B10 | 正式宿主 Edit | **未通过** | Read 获得有效 tag 后执行 `MV ./source.txt` 返回成功，随后原文件读取为 `ENOENT`；源文件已消失 |
+| B10 | Pi 兼容路径／正式宿主 Edit | **未通过** | Read 获得有效 tag 后执行 `MV ./source.txt` 返回成功，随后原文件读取为 `ENOENT`；源文件已消失 |
 | B11 | 正式 OMP 原生 Read | 未通过（能力差距） | 确认执行目录正确，真实工具回包明确拒绝非 UTF-8 文本，未自动解码 UTF-16；不是成功读取 |
 | B12 | 工作面板 collectWorkspaceDiff | **未通过** | 差异采集实际执行了仓库配置的 textconv 辅助程序，测试标记文件被写入 |
 | B13 | 正式宿主持久队列 | 通过 | 宿主进程真实退出并重启后，附件记录和附件文件内容一致 |
@@ -55,6 +55,34 @@ B08/B10 是宿主文件工具，B11 是 OMP 自己的 Read。UTF-16 Edit 的编�
 B12 针对工作面板差异采集；worktree 合并使用的 Rust 差异命令已带 `--no-textconv`，两条路径应分别看待。
 
 已通过 Git 比较确认：宿主文件工具、MCP、规则链、Token 显示、工作面板 Git diff 的相关源文件与公开 0.1.0 完全相同；这是现有缺陷/未同步能力的证据，不把它们记成本轮会话功能修复完成。
+
+## 与 PI 官方修复逐项对照（本轮复跑）
+
+本轮将 OMP 0.1.1 的实际失败与 PI 官方 PR／版本记录对应。**9 个失败场景对应 PI 已修复的问题，另 1 个是 OMP 原生 UTF-16 能力差距；不能把 10 个失败都算作默认 OMP 引擎的 Bug。**
+PI 对照目标为 [0.21.0-beta.3](https://github.com/vastsa/PI-Desktop/releases/tag/v0.21.0-beta.3)，下表以该版本之前的官方修复记录为依据；没有运行 PI 的安装包，不声称完成两个安装包的并行对测。
+
+| 场景 | PI 官方修复 | OMP 0.1.1 的匹配证据与影响路径 |
+| --- | --- | --- |
+| B01 上下文数组共享 | [#856](https://github.com/vastsa/PI-Desktop/pull/856) | Pi 兼容运行时仍把持久消息活数组交给循环，复现同一根因；未实测真实服务的 HTTP 400 |
+| B02 项目规则被全局规则挤掉 | [#1495](https://github.com/vastsa/PI-Desktop/pull/1495) | Pi 规则加载仍共用 32KiB 预算，项目标记缺失；未将结果外推到 OMP 自己的规则加载器 |
+| B03 浏览器调用无限等待 | [#1619](https://github.com/vastsa/PI-Desktop/pull/1619) | 共享桌面 BrowserHost 的非截图 CDP 调用没有截止时间；尺寸限制修复不等于挂起恢复修复 |
+| B04 SSE 回复等到断流才交付 | [#1189](https://github.com/vastsa/PI-Desktop/pull/1189) | 共享桌面 MCP HTTP 收到完整回复后仍等 EOF，初始化超时 |
+| B05 超时不通知服务端取消 | [#1552](https://github.com/vastsa/PI-Desktop/pull/1552) | 共享桌面 MCP 返回 TIMEOUT，发送记录中取消通知为空；与 B04 是两个不同故障 |
+| B08 UTF-16 被误判为二进制 | [#1445](https://github.com/vastsa/PI-Desktop/pull/1445) | Pi 兼容宿主 Read 未先解码 BOM；Mac／Windows 结果相同。编码回写没有单独通过证据 |
+| B09 思考 Token 重复计入占用 | [#1553](https://github.com/vastsa/PI-Desktop/pull/1553) | 通用 UI 计算器在含 reasoningTokens 时把 130 算成 140；OMP 事件目前不提供该字段，未在默认 OMP 会话中复现显示超算 |
+| B10 等价路径移动删除源文件 | [#1451](https://github.com/vastsa/PI-Desktop/pull/1451) | Pi 兼容宿主 Edit 的有效 tagged MV 实际删除了临时源文件；优先修复数据丢失 |
+| B12 查看差异执行 textconv | [#1660](https://github.com/vastsa/PI-Desktop/pull/1660) | 共享工作面板差异采集缺少 `--no-textconv`，辅助程序确实执行；优先修复执行边界 |
+
+B11 与 B08 的用户症状同为无法直接读取 UTF-16，但 B11 来自 OMP 原生工具主动限制为 UTF-8，属于不同实现的能力差距，不冒充 PI 宿主的同一根因。
+B06 损坏历史尾行、B07 DeepSeek 请求参数、B13 队列附件重启保留这三个选定场景通过；不能因此宣称覆盖了它们所属的全部历史／模型／队列变体。
+
+本轮先复跑既有场景，再按上游实际契约收紧两项断言：B03 改走公开 BrowserHost，并确认已发送目标命令；B05 改查同一请求 id 的取消通知，而不把 HTTP abort 当作该 PR 的验收标准。两个辅助探针仅确认 B03/B05，不增加独立问题数量。
+OMP 原生 steer／Todo／Skill followUp／压缩，以及 worktree 两个流程再次通过。所有原生探针仍使用正式包中的宿主／OMP 与隔离临时目录，未请求付费模型；归属进程全部清理。重跑不与首次结果相加计数。
+
+本轮仅调整复测脚本与记录；产品源码、固定运行时、稳定 tag 和已发布安装包不变。新断言及本轮运行摘要见[结构化证据](Version-011-bug-audit-20261019.json)的 `upstreamComparison`。
+本轮 Node 仍为 24.14.0，最终定向命令退出 1（13 项，3 通过／10 失败／零跳过），原生两流程命令退出 0。另两个辅助探针退出 1，仅复核 B03/B05。
+脚本 `node --check` 与 `git diff --check` 退出 0。项目现有 Biome 配置排除了这份手动审计脚本，命令未处理文件并退出 1，不记为 lint 通过，也没有扩大配置范围。
+本轮尝试重新构建 JS，但全局 pnpm 已变为 11，获取项目固定版本失败，回退调用拒绝自动清空依赖；没有把构建记为通过。可选临时工具下载已停止且无残留。本轮使用既有已验证构建与正式原生包，相关产品源码与稳定 tag 的 Git 比较退出 0；未改锁文件或接受依赖重装。
 
 ## Windows 正式包专项
 

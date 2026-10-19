@@ -213,7 +213,7 @@ Cursor 模型不支持 Plan 与 Goal 模式（M5/T20-R3C，用户确认的产品
 | `EDIT_REGISTER_EMPTY` | 否 | 从未设置的寄存器粘贴 |
 | `EDIT_REGISTER_AMBIGUOUS` | 否 | 存在多个待粘贴的匿名捕获时进行匿名粘贴 |
 | `EDIT_REPAIR_AMBIGUOUS` | 否 | 边界修复候选在最小代价上并列 |
-| `EDIT_NO_CHANGE` | 否 | 应用产生了与输入完全相同的文本 |
+| `EDIT_NO_CHANGE` | 否 | 应用产生了与输入完全相同的文本，或 `MV` 解析为源路径 |
 | `EDIT_AMPLIFICATION_LIMIT` | 否 | 下降展开超过膨胀上限 |
 
 当消息报告 reveal 完整时，`EDIT_LINES_UNSEEN` **无需**再次 `Read` 即可重试：

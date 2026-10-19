@@ -1170,3 +1170,12 @@ one at runtime.
 
 All high-risk entry points assert declared+granted permissions and emit audit log lines.
 Plugin panels no longer receive the full `pi` object; they use `window.pluginBridge.invoke`.
+
+## Browser CDP deadline (2026-10-19)
+
+Snapshot, screenshot, click, fill, evaluate and allowed raw CDP operations
+have a 30-second deadline covering debugger attachment and command execution.
+Expiry returns typed `TIMEOUT` and detaches the debugger, invalidating prior
+UIDs. Late replies cannot resume a timed-out action after reattachment. A
+healthy completion clears its deadline. The method allowlist and screenshot
+dimension policy remain in force.

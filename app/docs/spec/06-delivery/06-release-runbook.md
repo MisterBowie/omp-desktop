@@ -7,6 +7,18 @@
 
 ## OMP Desktop distribution identity (M6)
 
+### 0.1.2 maintenance release
+
+Version 0.1.2 ships the nine desktop/Pi-compatible bug fixes documented in the
+2026-10-19 regression record: message ownership, instruction budgets, CDP
+lifecycle, MCP streaming/cancellation, host UTF-16 editing, token accounting,
+canonical same-path moves and textconv-free workspace diffs. Native OMP remains
+18.3.0 / `62bc57b+omp-desktop.6`; native UTF-16 support is not added. Storage
+stays at schema 22, so 0.1.1 to 0.1.2 needs no schema migration. The dependency
+refresh retains one known build-tool advisory without an upstream fix.
+The immutable candidate must pass complete source and all four native gates
+before publication. A local missing-runtime smoke is not a passing gate.
+
 ### 0.1.1 session and worktree release
 
 Version 0.1.1 ships native Todo projection, `/skill:` commands, sidebar reply

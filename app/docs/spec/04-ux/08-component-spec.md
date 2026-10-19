@@ -1763,7 +1763,7 @@ Single message render — either user (plaintext) or assistant (markdown streami
   capacity, used/window counts, turn total, and provider
   input/output/cache/reasoning/hit-rate are that turn's newest usage-bearing
   assistant message (the last model request), using
-  `input + output + reasoning + cacheRead + cacheWrite` (D355). They are not
+  `input + output + cacheRead + cacheWrite` (D355). They are not
   the sum of every model call in the visual tool-loop. It is hidden until that
   usage exists. The trigger keeps a small capacity ring beside the
   percentage and omits the redundant `Context` label; the leading figure
@@ -3825,3 +3825,10 @@ Input, selection, submission and dismissal semantics remain unchanged.
 Project-delete descriptions and plugin dialog headings/outcomes also wrap long
 project or plugin names instead of overflowing their existing widths. Project
 instructions, memory and OAuth dialogs retain their existing bounded layouts.
+
+### Context occupancy correction (2026-10-19)
+
+Reasoning tokens are a subset of output tokens. The context inspector includes
+them once through output; its reasoning breakdown remains visible and billing
+rollups remain unchanged. Native OMP events currently omit `reasoningTokens`,
+so this correction primarily affects the generic/Pi-compatible usage path.

@@ -5940,7 +5940,8 @@ Delegation rules:
     this.setAgentMessages(messages);
     this.agent.state.tools = tools;
     return {
-      messages: this.agent.state.messages,
+      // The loop appends its messages; the message_end listener owns state.
+      messages: [...this.agent.state.messages],
       tools,
       systemPrompt: this.agent.state.systemPrompt,
     } as AgentContext;

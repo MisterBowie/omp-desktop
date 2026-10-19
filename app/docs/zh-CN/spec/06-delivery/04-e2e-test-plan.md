@@ -8651,3 +8651,17 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **阶段**：T26 本机源码验收。
 - **状态**：组件/Store/IPC/真实宿主及原生进程边界已自动化；安装态 Electron UI、Windows/Linux 尚未运行。
 - **命令**：`node --test apps/desktop/test/worktree-*.test.mjs`；`OMP_BUNDLED_RESOURCES=<已验证资源> node --test apps/desktop/test/omp-worktree-e2e.test.mjs`；`cargo test -p host-core --locked`。
+
+## 发布后缺陷回归（2026-10-19）
+
+先将 `scripts/audit-released-bugs.mjs` 指向已发布源码及宿主，记录失败基线，
+再指向候选源码及新编译宿主复测。仅排除需要 OMP 原生缺失能力的
+`B11 OMP native Read`。12 个适用场景覆盖 SDK 循环所有权与提供方 wire ID、
+独立 AGENTS 预算、BrowserHost CDP 时限、增量 MCP SSE、超时取消通知、
+UTF-16 Read/Edit、上下文计数、规范路径同源移动和 Git textconv 禁用，另有
+历史尾部、提供方参数及附件持久化对照项。
+
+回归通过真实 Pi 适配器、Git 仓库和宿主 RPC，以及公开 BrowserHost/MCP 客户端
+执行，只在外部浏览器或网络边界受控替代。浏览器超时恢复还须验证新连接后拒绝
+旧回复。保留有效编码及权限检查。源码候选测试不代表已安装发行包或跨平台 GUI
+验收；两者单独记录。无需付费提供方。

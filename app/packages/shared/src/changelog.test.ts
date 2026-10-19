@@ -13,9 +13,10 @@ const STABLE_FROM = "0.1.1";
 describe("changelog catalog", () => {
   it("keeps OMP releases newest-first in every shipped locale", () => {
     for (const catalog of Object.values(CHANGELOG)) {
-      expect(catalog.map(entry => entry.version)).toEqual(["0.1.1", "0.1.0"]);
+      expect(catalog.map(entry => entry.version)).toEqual(["0.1.2", "0.1.1", "0.1.0"]);
       expect(catalog[0].highlights).toHaveLength(5);
-      expect(catalog[1].highlights).toHaveLength(3);
+      expect(catalog[1].highlights).toHaveLength(5);
+      expect(catalog[2].highlights).toHaveLength(3);
     }
     expect(getChangelogEntry("0.15.3")).toBeUndefined();
     expect(formatChangelogNotes("0.1.0", "zh-CN")).toContain("GitHub");

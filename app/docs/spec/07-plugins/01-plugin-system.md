@@ -640,3 +640,13 @@ That is:
 Example plugin in the repo:
 
 - `examples/plugins/hello`
+
+## MCP response deadlines (2026-10-19)
+
+Streamable HTTP dispatches complete SSE messages as they arrive, without
+waiting for EOF. UTF-8 and CRLF may span chunks; total HTTP response bytes are
+bounded to 4 MiB. Each HTTP request uses its own client deadline (including the
+longer tool-call budget). Timeout sends a best-effort MCP
+`notifications/cancelled` with the request ID and reason `timeout` on both
+HTTP and stdio, except for `initialize`. Failure to notify does not replace the
+original `TIMEOUT`; timed-out tool calls are never replayed.

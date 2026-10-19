@@ -523,3 +523,13 @@ Not enforced yet:
   user unchecking them at install
 - A `userSelected` root does not survive a restart, so a plugin has to ask again
   each session
+
+## Read-only diff and transport bounds (2026-10-19)
+
+Workspace diff collection passes both `--no-ext-diff` and `--no-textconv`
+for tracked and untracked files: displaying a patch never executes a
+repository-provided converter. MCP HTTP responses share the 4 MiB bound with
+stdio lines; HTTP uses the actual per-request deadline. A timed-out request
+also notifies the server of cancellation as specified in the plugin-system
+spec. Cancellation is best-effort and is not proof that a server has undone a
+mutation.

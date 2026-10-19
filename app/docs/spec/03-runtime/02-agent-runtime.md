@@ -1414,9 +1414,12 @@ tool continues with the runtime's base/root chain rather than waiting for the
 general host RPC timeout. A failed resolution never leaves a previously
 resolved sibling-directory chain active.
 
-All discovery stays within the session project root. Empty, unreadable, and
-out-of-root files are skipped. The combined UTF-8 content is capped at 32 KiB
-and source paths are labelled under `# Project instructions`.
+Project discovery stays within the session project root. Empty, unreadable, and
+out-of-root files are skipped. Global instructions and the project chain each
+have an independent 32 KiB UTF-8 content budget. Truncation preserves complete
+UTF-8 characters, labels the source and retained/total bytes, and stops further
+project-chain discovery after a truncated file. Source paths are labelled under
+`# Project instructions`.
 The sidecar never reads workspace instructions directly. A changed root chain
 recreates an idle runtime on its next prompt; nested instructions are resolved
 again when a relevant file tool runs. The resolver's timeout and fallback
@@ -2548,3 +2551,13 @@ Native history stays in the same versioned OMP reference. Host file tools and
 plan artifacts use the execution root; Skills, memory, MCP and plugin activation
 use project identity. Main and host reservations prevent merge/sync/removal from
 interleaving with a running turn or tool. See [the worktree ADR](../../adr/omp-session-worktrees.md).
+
+## Pi-compatible loop context ownership (2026-10-19)
+
+Each main or delegated agent loop owns a shallow copy of the durable message
+array. The SDK may append to its loop context without appending a second time
+to `agent.state.messages`. At the provider boundary, replayed tool calls are
+compared by their wire ID (before `|`); an assistant message containing only
+replayed calls is dropped as a whole, and corresponding results use the
+original call's ID. Legitimate new calls remain. This does not change the native
+OMP runtime or its history ownership.

@@ -188,9 +188,9 @@
       },
       {
         "id": "B03",
-        "scope": "Desktop Browser CDP",
+        "scope": "Desktop BrowserHost public CDP call",
         "status": "failed",
-        "observed": "模拟推进5分钟后调用仍pending",
+        "observed": "公开BrowserHost确认命令进入CDP后，模拟5分钟仍pending",
         "code": "unbounded-wait"
       },
       {
@@ -204,8 +204,8 @@
         "id": "B05",
         "scope": "Desktop MCP HTTP",
         "status": "failed",
-        "observed": "工具调用超时返回时，HTTP信号尚未abort",
-        "code": "transport-not-aborted"
+        "observed": "tools/call返回TIMEOUT，没有同一请求id的notifications/cancelled；HTTP未立即abort仅作为附加观察",
+        "code": "timeout-cancellation-not-sent"
       },
       {
         "id": "B06",
@@ -221,7 +221,7 @@
       },
       {
         "id": "B08",
-        "scope": "Published host Read",
+        "scope": "Pi compatible published host Read",
         "status": "failed",
         "observed": "带BOM的UTF16被判定为二进制并拒绝读取",
         "code": "TOOL_BINARY_CONTENT"
@@ -235,7 +235,7 @@
       },
       {
         "id": "B10",
-        "scope": "Published host Edit",
+        "scope": "Pi compatible published host Edit",
         "status": "failed",
         "observed": "有效tag的MV ./source.txt返回成功，随后源文件不存在",
         "code": "ENOENT"
@@ -390,5 +390,124 @@
     "未逐条确认安装包中的依赖告警可达性"
   ],
   "rawLogsPublic": false,
-  "productChangesAfterPublication": false
+  "productChangesAfterPublication": false,
+  "upstreamComparison": {
+    "date": "2026-10-19",
+    "ompProductTag": "v0.1.1",
+    "ompProductRevision": "00c96c551755a238902c061dd0833c85d39ab075",
+    "piReferenceTag": "v0.21.0-beta.3",
+    "piReferenceUrl": "https://github.com/vastsa/PI-Desktop/releases/tag/v0.21.0-beta.3",
+    "piInstalledBinaryExecuted": false,
+    "testedCheckoutHead": "8233c81398c170808c99aedc7bb525b47eeac467",
+    "testScriptChanges": "uncommitted comparison-only refinements; no product changes",
+    "testFileSha256": {
+      "app/scripts/audit-released-bugs.mjs": "6021bedd79453385d019b36cb350f399f62947c1f9a793e18b425dbc691ca6f4",
+      "app/apps/desktop/test/omp-session-operations-e2e.test.mjs": "c6425f7de951952494b908ec5c1f8cd20eeadb46c0c9817eec27e382068fe102",
+      "app/apps/desktop/test/omp-worktree-e2e.test.mjs": "bee056c0b8191f738f9f3d06f072295fe75f783426c241901f9f85f76f1774ce"
+    },
+    "node": "24.14.0",
+    "targetedAudit": {
+      "tests": 13,
+      "pass": 3,
+      "fail": 10,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "targetedAuditExitCode": 1,
+    "matchingUpstreamFixedScenarios": [
+      {
+        "id": "B01",
+        "fixUrl": "https://github.com/vastsa/PI-Desktop/pull/856"
+      },
+      {
+        "id": "B02",
+        "fixUrl": "https://github.com/vastsa/PI-Desktop/pull/1495"
+      },
+      {
+        "id": "B03",
+        "fixUrl": "https://github.com/vastsa/PI-Desktop/pull/1619"
+      },
+      {
+        "id": "B04",
+        "fixUrl": "https://github.com/vastsa/PI-Desktop/pull/1189"
+      },
+      {
+        "id": "B05",
+        "fixUrl": "https://github.com/vastsa/PI-Desktop/pull/1552"
+      },
+      {
+        "id": "B08",
+        "fixUrl": "https://github.com/vastsa/PI-Desktop/pull/1445"
+      },
+      {
+        "id": "B09",
+        "fixUrl": "https://github.com/vastsa/PI-Desktop/pull/1553"
+      },
+      {
+        "id": "B10",
+        "fixUrl": "https://github.com/vastsa/PI-Desktop/pull/1451"
+      },
+      {
+        "id": "B12",
+        "fixUrl": "https://github.com/vastsa/PI-Desktop/pull/1660"
+      }
+    ],
+    "nativeCapabilityGaps": [
+      "B11"
+    ],
+    "passedSelectedScenarios": [
+      "B06",
+      "B07",
+      "B13"
+    ],
+    "assertionRefinements": {
+      "B03": "Use public BrowserHost.cdpCommand and assert the target CDP command was reached before advancing the clock.",
+      "B05": "Assert notifications/cancelled carries the timed-out tools/call id and reason timeout. HTTP abort is diagnostic, not the upstream fix acceptance condition."
+    },
+    "auxiliaryConfirmations": {
+      "tests": 2,
+      "pass": 0,
+      "fail": 2,
+      "additionalDistinctBugs": 0
+    },
+    "nativeControlsAndWorktrees": {
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "exitCode": 0
+    },
+    "publishedHostSha256": "b0a3b9bcdeaa4a7699d026ea1239ae152d9d711e70ac310c592ff9b859cb0617",
+    "cleaned": true,
+    "ownedSurvivors": 0,
+    "productionSourcesEqualStableTag": true,
+    "freshJsBuild": {
+      "passed": false,
+      "usedExistingValidatedBuild": true,
+      "reason": "Global pnpm 11 differs from the fixed 10.34.5. First invocation failed fetching the fixed manager; the fallback refused automatic module purging. Optional private manager download was cancelled after tests completed. No dependency/lockfile changes accepted."
+    },
+    "scopeNotes": [
+      "B01/B02/B08/B10 concern Pi compatibility paths; they do not prove the same default native OMP failure.",
+      "B09 is the shared UI helper when reasoningTokens is present; the OMP event adapter omits that field.",
+      "B11 is a distinct native UTF8-only capability gap, not the same implementation defect as B08.",
+      "B12 affects work-panel diff collection. Rust worktree merge already disables textconv.",
+      "Reruns and auxiliary probes are not added to distinct scenario totals."
+    ],
+    "staticChecks": {
+      "nodeCheck": {
+        "exitCode": 0,
+        "passed": true
+      },
+      "gitDiffCheck": {
+        "exitCode": 0,
+        "passed": true
+      },
+      "biome": {
+        "exitCode": 1,
+        "processedFiles": 0,
+        "passed": false,
+        "reason": "The existing project configuration excludes scripts/audit-released-bugs.mjs. No lint result is claimed."
+      }
+    }
+  }
 }

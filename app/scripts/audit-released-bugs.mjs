@@ -10,7 +10,7 @@ register(pathToFileURL(join(root, "apps/desktop/test/helpers/ts-import-hooks.mjs
 const load = (p) => import(pathToFileURL(join(root, p)));
 const { DesktopAgentRuntime } = await load("packages/agent-runtime/dist/runtime.js");
 const { loadInstructionChain } = await load("packages/agent-runtime/dist/project-instructions.js");
-const { BrowserCdp } = await load("apps/desktop/electron/main/browser-cdp.ts");
+const { BrowserHost } = await load("apps/desktop/electron/main/browser-host.ts");
 const { McpServerClient } = await load("apps/desktop/electron/main/plugin-mcp.ts");
 const { NativePiSessionService } = await load("packages/agent-runtime/dist/native-pi-session.js");
 const auditRoots = [];
@@ -71,8 +71,9 @@ test("B02 Pi: a full global instruction budget must retain project rules", async
     "global AGENTS must not starve project instructions",
   );
 });
-test("B03 Browser: every CDP operation has a bounded wait", async (t) => {
+test("B03 Browser: public host CDP operations have a bounded wait", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
+  let commandCount = 0;
   const wc = {
     id: 91,
     isDestroyed: () => false,
@@ -82,20 +83,29 @@ test("B03 Browser: every CDP operation has a bounded wait", async (t) => {
       detach() {},
       on() {},
       off() {},
-      sendCommand: (method) =>
-        method.endsWith(".enable") ? Promise.resolve({}) : new Promise(() => {}),
+      sendCommand: (method) => {
+        if (method.endsWith(".enable")) return Promise.resolve({});
+        commandCount += 1;
+        return new Promise(() => {});
+      },
     },
   };
-  const cdp = new BrowserCdp();
+  const host = new BrowserHost({
+    pane: { getWebContents: () => wc },
+    isPluginLoaded: () => true,
+    getFileRoot: async () => null,
+    onState() {},
+  });
   let outcome = "pending";
-  cdp.send(wc, "Runtime.evaluate", { expression: "1" }).then(
+  host.cdpCommand("Runtime.evaluate", { expression: "1" }).then(
     () => (outcome = "resolved"),
     () => (outcome = "rejected"),
   );
-  for (let n = 0; n < 12; n++) await Promise.resolve();
+  for (let n = 0; n < 30; n++) await Promise.resolve();
+  assert.equal(commandCount, 1, "the public host must reach the CDP command");
   t.mock.timers.tick(300000);
-  for (let n = 0; n < 12; n++) await Promise.resolve();
-  cdp.detach(wc);
+  for (let n = 0; n < 30; n++) await Promise.resolve();
+  wc.debugger.detach();
   assert.equal(outcome, "rejected", "CDP call must settle after five simulated minutes");
 });
 const json = (id, result) =>
@@ -141,16 +151,20 @@ test("B04 MCP: consume a complete SSE reply before the stream closes", async (t)
   const tools = await instance.connect();
   assert.equal(tools[0].name, "echo");
 });
-test("B05 MCP: tool timeout aborts its HTTP request immediately", async (t) => {
+test("B05 MCP: tool timeout notifies the server to cancel the request", async (t) => {
   let aborted = false;
+  let toolRequestId;
+  const sent = [];
   const instance = client(
     async (_url, request) => {
       const message = JSON.parse(request.body);
+      sent.push(message);
       if (message.id === undefined) return new Response(null, { status: 202 });
       if (message.method === "initialize")
         return json(message.id, { protocolVersion: "2025-06-18", capabilities: { tools: {} } });
       if (message.method === "tools/list")
         return json(message.id, { tools: [{ name: "echo", inputSchema: { type: "object" } }] });
+      toolRequestId = message.id;
       return new Promise((_, reject) =>
         request.signal.addEventListener(
           "abort",
@@ -166,11 +180,15 @@ test("B05 MCP: tool timeout aborts its HTTP request immediately", async (t) => {
   );
   t.after(() => instance.close());
   await instance.connect();
-  await assert.rejects(instance.callTool("echo", {}));
-  assert.equal(
-    aborted,
-    true,
-    "the call timeout must cancel transport work, not only reject the caller",
+  await assert.rejects(instance.callTool("echo", {}), (error) => error.code === "TIMEOUT");
+  await new Promise(setImmediate);
+  const cancellations = sent.filter((message) => message.method === "notifications/cancelled");
+  t.diagnostic(JSON.stringify({ toolRequestId, cancellations, transportAborted: aborted }));
+  assert.ok(
+    cancellations.some(
+      (message) => message.params?.requestId === toolRequestId && message.params?.reason === "timeout",
+    ),
+    "the timeout must notify the server with the matching request id",
   );
 });
 test("B06 Pi history: torn non-UTF8 tail must preserve preceding valid messages", async (t) => {
@@ -350,9 +368,19 @@ test("B10 Host Edit: moving to a normalized alias preserves the source bytes", {
     args: { path: "source.txt", tag: read.content.tag, ops: "MV ./source.txt" },
     mode: "agent",
   });
-  assert.equal(moved.ok, true, "the valid tagged move must reach the move operation");
+  assert.equal(moved.ok, false, "an alias of the source must be rejected before mutation");
+  assert.equal(moved.errorCode, "EDIT_NO_CHANGE");
   const { readFile } = await import("node:fs/promises");
   assert.equal(await readFile(file, "utf8"), "SOURCE_MUST_SURVIVE\n");
+  const edited = await host.call("tools.execute", {
+    sessionId: session.id,
+    toolCallId: "edit-after-rejected-move",
+    toolName: "Edit",
+    args: { path: "source.txt", tag: read.content.tag, ops: "PUT 1.=1:\n+ORIGINAL_TAG_STILL_VALID\n" },
+    mode: "agent",
+  });
+  assert.equal(edited.ok, true, "refusal must preserve the original Read provenance");
+  assert.equal(await readFile(file, "utf8"), "ORIGINAL_TAG_STILL_VALID\n");
 });
 test("B11 OMP native Read: BOM UTF-16 reaches the model correctly", {
   timeout: 90000,

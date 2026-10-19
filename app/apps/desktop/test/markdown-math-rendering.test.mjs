@@ -108,6 +108,17 @@ test("TeX bracket math renders through the production Markdown pipeline", async 
     const listStar = render("\\[\n*\na\n\\]");
     assert.match(listStar, /katex-display/);
     assert.doesNotMatch(listStar, /<(ul|ol|li)[ >]/);
+
+    // Updating KaTeX must not enable its opt-in trusted HTML/URL commands.
+    for (const tex of [
+      "\\href{javascript:alert(1)}{x}",
+      "\\htmlData{fixture=unsafe}{x}",
+      "\\includegraphics{https://example.invalid/probe.png}",
+    ]) {
+      const html = render(`$${tex}$`);
+      assert.match(html, /katex/);
+      assert.doesNotMatch(html, /href="javascript:|data-fixture=|<img\b/i);
+    }
   } finally {
     globalThis.document = originalDocument;
     await server.close();

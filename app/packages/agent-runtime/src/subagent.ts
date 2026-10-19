@@ -389,7 +389,7 @@ export class SubagentRun {
     }
     return {
       context: {
-        messages: this.agent.state.messages,
+        messages: [...this.agent.state.messages],
         tools: this.agent.state.tools,
       },
     };

@@ -32,8 +32,8 @@ export function usageTokenTotal(usage: MessageUsage): number {
 export function contextOccupancyTokens(usage: MessageUsage): number {
   const occupancy =
     positiveTokenCount(usage.inputTokens) +
+    // Provider output already includes its reasoning subset.
     positiveTokenCount(usage.outputTokens) +
-    positiveTokenCount(usage.reasoningTokens) +
     positiveTokenCount(usage.cacheReadTokens) +
     positiveTokenCount(usage.cacheWriteTokens);
   return occupancy > 0 ? occupancy : usageTokenTotal(usage);

@@ -131,6 +131,7 @@ function consoleText(args: unknown): string {
  */
 export class BrowserCdp {
   private attachedId: number | null = null;
+  private attachmentEpoch = 0;
   private uids = new Map<string, number>();
   private messages: BrowserConsoleMessage[] = [];
   private onDebuggerMessage?: (
@@ -172,14 +173,15 @@ export class BrowserCdp {
       if (this.messages.length > MAX_CONSOLE_MESSAGES) this.messages.shift();
     };
     wc.debugger.on("message", this.onDebuggerMessage);
-    await wc.debugger.sendCommand("Runtime.enable");
-    await wc.debugger.sendCommand("Console.enable");
-    await wc.debugger.sendCommand("Page.enable");
-    await wc.debugger.sendCommand("DOM.enable");
-    await wc.debugger.sendCommand("Accessibility.enable");
+    await this.command(wc, "Runtime.enable");
+    await this.command(wc, "Console.enable");
+    await this.command(wc, "Page.enable");
+    await this.command(wc, "DOM.enable");
+    await this.command(wc, "Accessibility.enable");
   }
 
   detach(wc?: WebContents): void {
+    this.attachmentEpoch += 1;
     const target = wc && !wc.isDestroyed() ? wc : null;
     if (target?.debugger.isAttached()) {
       if (this.onDebuggerMessage) {
@@ -196,6 +198,20 @@ export class BrowserCdp {
     this.uids.clear();
   }
 
+  /** A detached request must not resume actions after another call reattaches. */
+  private async command(
+    wc: WebContents,
+    method: string,
+    params?: Record<string, unknown>,
+  ): Promise<unknown> {
+    const epoch = this.attachmentEpoch;
+    const result = await wc.debugger.sendCommand(method, params);
+    if (epoch !== this.attachmentEpoch) {
+      throw Object.assign(new Error("browser debugger session changed"), { code: "UNAVAILABLE" });
+    }
+    return result;
+  }
+
   async send(wc: WebContents, method: string, params?: unknown): Promise<unknown> {
     if (!isAllowedCdpMethod(method)) {
       throw Object.assign(new Error(`CDP method not allowed: ${method}`), {
@@ -203,7 +219,7 @@ export class BrowserCdp {
       });
     }
     await this.attach(wc);
-    return wc.debugger.sendCommand(
+    return this.command(wc,
       method,
       (params && typeof params === "object" ? params : {}) as Record<string, unknown>,
     );
@@ -211,7 +227,7 @@ export class BrowserCdp {
 
   async snapshot(wc: WebContents): Promise<SnapshotResult> {
     await this.attach(wc);
-    const raw = (await wc.debugger.sendCommand("Accessibility.getFullAXTree")) as {
+    const raw = (await this.command(wc, "Accessibility.getFullAXTree")) as {
       nodes?: AxNode[];
     };
     const flattened = flattenAxTree(Array.isArray(raw?.nodes) ? raw.nodes : []);
@@ -230,7 +246,7 @@ export class BrowserCdp {
     await this.attach(wc);
     let clip: { x: number; y: number; width: number; height: number; scale: number } | undefined;
     if (input.fullPage) {
-      const metrics = (await wc.debugger.sendCommand("Page.getLayoutMetrics")) as {
+      const metrics = (await this.command(wc, "Page.getLayoutMetrics")) as {
         contentSize?: { width?: number; height?: number };
         cssContentSize?: { width?: number; height?: number };
       };
@@ -244,7 +260,7 @@ export class BrowserCdp {
       );
       clip = { x: 0, y: 0, width, height, scale };
     }
-    const result = (await wc.debugger.sendCommand("Page.captureScreenshot", {
+    const result = (await this.command(wc, "Page.captureScreenshot", {
       format: "jpeg",
       quality: 70,
       ...(clip ? { clip, captureBeyondViewport: true } : {}),
@@ -258,8 +274,8 @@ export class BrowserCdp {
   async click(wc: WebContents, uid: string): Promise<void> {
     const backendNodeId = this.requireUid(uid);
     await this.attach(wc);
-    await wc.debugger.sendCommand("DOM.scrollIntoViewIfNeeded", { backendNodeId });
-    const model = (await wc.debugger.sendCommand("DOM.getBoxModel", { backendNodeId })) as {
+    await this.command(wc, "DOM.scrollIntoViewIfNeeded", { backendNodeId });
+    const model = (await this.command(wc, "DOM.getBoxModel", { backendNodeId })) as {
       model?: { content?: number[] };
     };
     const quad = model.model?.content;
@@ -268,14 +284,14 @@ export class BrowserCdp {
     }
     const x = (quad[0] + quad[2] + quad[4] + quad[6]) / 4;
     const y = (quad[1] + quad[3] + quad[5] + quad[7]) / 4;
-    await wc.debugger.sendCommand("Input.dispatchMouseEvent", {
+    await this.command(wc, "Input.dispatchMouseEvent", {
       type: "mousePressed",
       x,
       y,
       button: "left",
       clickCount: 1,
     });
-    await wc.debugger.sendCommand("Input.dispatchMouseEvent", {
+    await this.command(wc, "Input.dispatchMouseEvent", {
       type: "mouseReleased",
       x,
       y,
@@ -287,14 +303,14 @@ export class BrowserCdp {
   async fill(wc: WebContents, uid: string, text: string): Promise<void> {
     const backendNodeId = this.requireUid(uid);
     await this.attach(wc);
-    const resolved = (await wc.debugger.sendCommand("DOM.resolveNode", { backendNodeId })) as {
+    const resolved = (await this.command(wc, "DOM.resolveNode", { backendNodeId })) as {
       object?: { objectId?: string };
     };
     const objectId = resolved.object?.objectId;
     if (!objectId) {
       throw Object.assign(new Error(`could not resolve ${uid}`), { code: "NOT_FOUND" });
     }
-    await wc.debugger.sendCommand("Runtime.callFunctionOn", {
+    await this.command(wc, "Runtime.callFunctionOn", {
       objectId,
       functionDeclaration: `function (value) {
         this.focus();
@@ -313,7 +329,7 @@ export class BrowserCdp {
 
   async evaluate(wc: WebContents, expression: string): Promise<unknown> {
     await this.attach(wc);
-    const result = (await wc.debugger.sendCommand("Runtime.evaluate", {
+    const result = (await this.command(wc, "Runtime.evaluate", {
       expression,
       returnByValue: true,
       awaitPromise: true,

@@ -14565,3 +14565,21 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Milestone**: T26 local source acceptance.
 - **Status**: Automated at component/Store/IPC/real host/native process boundaries; installed Electron UI and Windows/Linux acceptance remain unrun.
 - **Commands**: `node --test apps/desktop/test/worktree-*.test.mjs`; `OMP_BUNDLED_RESOURCES=<verified-resources> node --test apps/desktop/test/omp-worktree-e2e.test.mjs`; `cargo test -p host-core --locked`.
+
+## Post-release bug regression (2026-10-19)
+
+Run `scripts/audit-released-bugs.mjs` against the released source/host as the
+failing baseline, then the candidate source/newly built host. Exclude only
+`B11 OMP native Read`, which requires unsupported native OMP functionality.
+The twelve applicable scenarios cover SDK loop ownership and provider wire
+IDs, independent AGENTS budgets, bounded BrowserHost CDP calls, incremental
+MCP SSE, timeout cancellation notifications, UTF-16 Read/Edit, context token
+accounting, canonical same-path moves, and Git textconv suppression, plus the
+history-tail, provider-parameter and persisted-attachment controls.
+
+Regression suites exercise real Pi adapter wiring, real Git repositories and
+host RPC, and public BrowserHost/MCP clients with controlled external browser
+or network edges. Browser deadline recovery must also reject late replies
+after a new debugger attachment. Preserve valid encoding and permission
+checks. Source-level candidate tests do not qualify an installed release or
+cross-platform GUI; record those separately. No paid provider is needed.
