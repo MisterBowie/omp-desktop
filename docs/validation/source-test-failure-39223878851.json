@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "categories": [
+    "ASSERTION"
+  ],
+  "locations": [
+    {
+      "path": "app/apps/desktop/test/omp-desktop-capabilities.test.mjs",
+      "lines": [
+        216
+      ]
+    }
+  ]
+}
