@@ -30,8 +30,8 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$GITHUB_REPOSITORY" == MisterBowie/omp-desktop ]]
-          [[ "$(node -p "require('./package.json').version")" == 0.1.1 ]]
-          git diff --exit-code v0.1.1 HEAD -- apps/desktop/electron apps/desktop/src packages crates
+          [[ "$(node -p "require('./package.json').version")" == 0.1.2 ]]
+          git diff --exit-code v0.1.2 HEAD -- apps/desktop/electron apps/desktop/src packages crates
       - run: pnpm install --frozen-lockfile
       - run: pnpm build:js
       - uses: actions/setup-python@v6
@@ -43,15 +43,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api repos/MisterBowie/omp-desktop/releases/tags/v0.1.1 > "$RUNNER_TEMP/published-release.json"
-          gh release download v0.1.1 --repo MisterBowie/omp-desktop --pattern 'OMP-Desktop-Setup-0.1.1.exe' --dir .artifacts/published-installer
+          gh api repos/MisterBowie/omp-desktop/releases/tags/v0.1.2 > "$RUNNER_TEMP/published-release.json"
+          gh release download v0.1.2 --repo MisterBowie/omp-desktop --pattern 'OMP-Desktop-Setup-0.1.2.exe' --dir .artifacts/published-installer
           node --input-type=module - <<'JS'
           import assert from 'node:assert/strict';
           import {readFileSync} from 'node:fs';
           import {createHash} from 'node:crypto';
           const release=JSON.parse(readFileSync(process.env.RUNNER_TEMP+'/published-release.json'));
           assert.equal(release.draft,false);assert.equal(release.prerelease,false);
-          const asset=release.assets.find(a=>a.name==='OMP-Desktop-Setup-0.1.1.exe');assert(asset);
+          const asset=release.assets.find(a=>a.name==='OMP-Desktop-Setup-0.1.2.exe');assert(asset);
           const bytes=readFileSync('.artifacts/published-installer/'+asset.name);
           assert.equal(bytes.length,asset.size);assert.equal('sha256:'+createHash('sha256').update(bytes).digest('hex'),asset.digest);
           console.log('Verified published Windows installer digest');
@@ -59,7 +59,7 @@ jobs:
       - name: Run isolated installed bug scenarios
         run: |
           export OMP_E2E_PYTHON="$(python -c 'import sys; print(sys.executable)')"
-          node scripts/e2e-released-bugs.mjs .artifacts/published-installer/OMP-Desktop-Setup-0.1.1.exe .artifacts/published-bug-checks
+          node scripts/e2e-released-bugs.mjs .artifacts/published-installer/OMP-Desktop-Setup-0.1.2.exe .artifacts/published-bug-checks
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -77,7 +77,7 @@ jobs:
           import assert from 'node:assert/strict';
           import {readFileSync,writeFileSync} from 'node:fs';
           const r=JSON.parse(readFileSync('.artifacts/published-bug-checks/public-report.json'));
-          assert.equal(r.version,'0.1.1');assert.equal(r.actualVersion,'0.1.1');assert.equal(r.platform,'win32');assert.equal(r.arch,'x64');
+          assert.equal(r.version,'0.1.2');assert.equal(r.actualVersion,'0.1.2');assert.equal(r.platform,'win32');assert.equal(r.arch,'x64');
           const allowed=new Set(['WIN-FULLSCREEN-MAXIMIZED','WIN-TASKBAR-RESTORE','UTF16-HOST-READ','POWERSHELL-OUTPUT-EXIT','ORDERED-EXIT']);
           const number=n=>{assert(Number.isFinite(n)&&Math.abs(n)<1000000000);return n;};
           const rect=r=>Object.fromEntries(['x','y','width','height'].map(k=>[k,number(r[k])]));
@@ -101,4 +101,4 @@ jobs:
           JS
           result_branch="codex/published-bug-results-$GITHUB_RUN_ID"
           gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/heads/$result_branch" -f sha="$GITHUB_SHA" --silent
-          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/docs/validation/Published-011-windows-$GITHUB_RUN_ID.json" --input "$RUNNER_TEMP/safe-bug-result.json" --silent
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/docs/validation/Published-012-windows-$GITHUB_RUN_ID.json" --input "$RUNNER_TEMP/safe-bug-result.json" --silent

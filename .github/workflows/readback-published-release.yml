@@ -1,7 +1,7 @@
-name: Read back all public OMP 0.1.1 assets
+name: Read back all public OMP 0.1.2 assets
 on:
   push:
-    tags: ['readback-v0.1.1-*']
+    tags: ['readback-v0.1.2-*']
 permissions:
   contents: read
   actions: read
@@ -17,8 +17,8 @@ jobs:
       contents: write
       actions: read
     env:
-      RELEASE_VERSION: 0.1.1
-      RELEASE_REVISION: 00c96c551755a238902c061dd0833c85d39ab075
+      RELEASE_VERSION: 0.1.2
+      RELEASE_REVISION: 21969e58f7d97177795ce06f393e8853c45cfb20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -38,14 +38,14 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$GITHUB_REPOSITORY" == MisterBowie/omp-desktop ]]
-          git diff --exit-code v0.1.1 HEAD -- apps/desktop/electron apps/desktop/src packages crates
+          git diff --exit-code v0.1.2 HEAD -- apps/desktop/electron apps/desktop/src packages crates
           mkdir -p .artifacts/published-readback/assets
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v0.1.1" > .artifacts/published-readback/release.json
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/39147487467" > .artifacts/published-readback/run.json
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/39147487467/jobs?per_page=100" > .artifacts/published-readback/jobs.json
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/39147487467/artifacts?per_page=100" > .artifacts/published-readback/artifacts.json
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v0.1.2" > .artifacts/published-readback/release.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/39191848177" > .artifacts/published-readback/run.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/39191848177/jobs?per_page=100" > .artifacts/published-readback/jobs.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/39191848177/artifacts?per_page=100" > .artifacts/published-readback/artifacts.json
           node scripts/verify-release-candidate.mjs .artifacts/published-readback/run.json .artifacts/published-readback/jobs.json .artifacts/published-readback/artifacts.json .artifacts/published-readback/accepted.json
-          gh release download v0.1.1 --repo "$GITHUB_REPOSITORY" --dir .artifacts/published-readback/assets
+          gh release download v0.1.2 --repo "$GITHUB_REPOSITORY" --dir .artifacts/published-readback/assets
       - name: Verify actual public bytes, manifests, source receipts and feeds
         run: |
           node --input-type=module - <<'JS'
@@ -58,8 +58,8 @@ jobs:
           const root='.artifacts/published-readback',dir=join(root,'assets'),revision=process.env.RELEASE_REVISION;
           const read=name=>JSON.parse(readFileSync(join(dir,name),'utf8'));
           const release=JSON.parse(readFileSync(join(root,'release.json'),'utf8'));
-          assert.equal(release.tag_name,'v0.1.1');assert.equal(release.draft,false);assert.equal(release.prerelease,false);
-          assert.equal(execFileSync('git',['rev-parse','v0.1.1^{commit}'],{encoding:'utf8'}).trim(),revision);
+          assert.equal(release.tag_name,'v0.1.2');assert.equal(release.draft,false);assert.equal(release.prerelease,false);
+          assert.equal(execFileSync('git',['rev-parse','v0.1.2^{commit}'],{encoding:'utf8'}).trim(),revision);
           const assets=new Map();
           for(const a of release.assets){
             assert.match(a.name,/^[A-Za-z0-9._-]{1,160}$/);assert.equal(a.name,basename(a.name));assert(!assets.has(a.name));
@@ -69,23 +69,23 @@ jobs:
             assets.set(a.name,{name:a.name,bytes:a.size,sha256});
           }
           for(const line of readFileSync(join(dir,'SHA256SUMS.txt'),'utf8').trim().split('\n')){const [sha,name]=line.split('  ');assert.equal(assets.get(name)?.sha256,sha,name);}
-          const build=read('BUILD-RECORD.json');assert.equal(build.version,'0.1.1');assert.equal(build.sourceRevision,revision);
+          const build=read('BUILD-RECORD.json');assert.equal(build.version,'0.1.2');assert.equal(build.sourceRevision,revision);
           for(const f of build.files){assert.equal(assets.get(f.name)?.sha256,f.sha256);assert.equal(assets.get(f.name)?.bytes,f.bytes);}
-          const accepted=read('omp-desktop-validation-0.1.1-build.json');const local=JSON.parse(readFileSync(join(root,'accepted.json'),'utf8'));
+          const accepted=read('omp-desktop-validation-0.1.2-build.json');const local=JSON.parse(readFileSync(join(root,'accepted.json'),'utf8'));
           const sorted=(a,key)=>[...a].sort((a,b)=>String(a[key]).localeCompare(String(b[key])));
-          assert.equal(accepted.sourceRevision,revision);assert.equal(accepted.runId,39147487467);
+          assert.equal(accepted.sourceRevision,revision);assert.equal(accepted.runId,39191848177);
           assert.deepEqual(sorted(accepted.artifacts,'name'),sorted(local.artifacts,'name'));assert.deepEqual(sorted(accepted.nativeJobs,'name'),sorted(local.nativeJobs,'name'));
-          const control=read('omp-desktop-validation-0.1.1-publication.json');assert.equal(control.version,'0.1.1');assert.equal(control.sourceRevision,revision);assert.equal(control.candidateRunId,39147487467);
-          assert.match(control.controllerRef,/^publish-v0\.1\.1-run-39147487467(?:-attempt-\d+)?$/);
+          const control=read('omp-desktop-validation-0.1.2-publication.json');assert.equal(control.version,'0.1.2');assert.equal(control.sourceRevision,revision);assert.equal(control.candidateRunId,39191848177);
+          assert.match(control.controllerRef,/^publish-v0\.1\.2-run-39191848177(?:-attempt-\d+)?$/);
           assert.equal(execFileSync('git',['rev-parse',control.controllerRef+'^{commit}'],{encoding:'utf8'}).trim(),control.controllerRevision);
           const script=execFileSync('git',['show',control.controllerRevision+':app/scripts/stage-release-inputs.mjs']);assert.equal(createHash('sha256').update(script).digest('hex'),control.stagingScriptSha256);
           const staging=join(root,'feed-validation');mkdirSync(staging);
           for(const a of assets.values()){const src=join(dir,a.name),dest=join(staging,a.name);if(a.bytes<1048576)copyFileSync(src,dest);else linkSync(src,dest);}
-          const feeds=await prepareGitHubRelease({directory:staging,version:'0.1.1',sourceRevision:revision});
+          const feeds=await prepareGitHubRelease({directory:staging,version:'0.1.2',sourceRevision:revision});
           assert.deepEqual(readFileSync(join(staging,'latest-mac.yml')),readFileSync(join(dir,'latest-mac.yml')));
-          const report={version:'0.1.1',sourceRevision:revision,candidateRunId:39147487467,publicationRunId:control.publicationRunId,readbackRunId:Number(process.env.GITHUB_RUN_ID),assetCount:assets.size,assetBytes:[...assets.values()].reduce((n,a)=>n+a.bytes,0),checksumManifest:true,buildRecord:true,sourceReceipts:true,verifiedUpdateArtifacts:Object.keys(feeds.verifiedUpdateArtifacts).length,mergedMacFeedIdentical:true,assets:[...assets.values()]};
+          const report={version:'0.1.2',sourceRevision:revision,candidateRunId:39191848177,publicationRunId:control.publicationRunId,readbackRunId:Number(process.env.GITHUB_RUN_ID),assetCount:assets.size,assetBytes:[...assets.values()].reduce((n,a)=>n+a.bytes,0),checksumManifest:true,buildRecord:true,sourceReceipts:true,verifiedUpdateArtifacts:Object.keys(feeds.verifiedUpdateArtifacts).length,mergedMacFeedIdentical:true,assets:[...assets.values()]};
           writeFileSync(join(root,'public-report.json'),JSON.stringify(report,null,2)+'\n');
-          writeFileSync(join(root,'publish-input.json'),JSON.stringify({message:'test: record complete public 0.1.1 asset readback',content:Buffer.from(JSON.stringify(report,null,2)+'\n').toString('base64'),branch:'codex/public-asset-readback-'+process.env.GITHUB_RUN_ID}));
+          writeFileSync(join(root,'publish-input.json'),JSON.stringify({message:'test: record complete public 0.1.2 asset readback',content:Buffer.from(JSON.stringify(report,null,2)+'\n').toString('base64'),branch:'codex/public-asset-readback-'+process.env.GITHUB_RUN_ID}));
           console.log('Verified '+report.assetCount+' public assets and all updater feeds');
           JS
       - name: Publish only the public asset receipt
@@ -94,10 +94,10 @@ jobs:
         run: |
           set -euo pipefail
           gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/heads/codex/public-asset-readback-$GITHUB_RUN_ID" -f sha="$GITHUB_SHA" --silent
-          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/docs/validation/Published-011-assets-$GITHUB_RUN_ID.json" --input .artifacts/published-readback/publish-input.json --silent
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/docs/validation/Published-012-assets-$GITHUB_RUN_ID.json" --input .artifacts/published-readback/publish-input.json --silent
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: published-0.1.1-asset-receipt
+          name: published-0.1.2-asset-receipt
           if-no-files-found: error
           path: app/.artifacts/published-readback/public-report.json

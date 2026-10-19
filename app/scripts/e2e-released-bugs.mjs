@@ -10,7 +10,7 @@ const [installer, output] = process.argv.slice(2);
 assert(installer && output);
 mkdirSync(output, { recursive: true });
 const application = InstalledApplication.prepare(resolve(installer), resolve(output), {
-  expectedVersion: "0.1.1",
+  expectedVersion: "0.1.2",
 });
 const electron =
   'process.getBuiltinModule("module").createRequire(process.resourcesPath+"/app.asar/package.json")("electron")';
@@ -18,7 +18,7 @@ const expression = (body) =>
   `(()=>{const {BrowserWindow,screen}=${electron};const window=BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes('app.asar/out/renderer/index.html')&&!w.webContents.getURL().includes('surface='));if(!window)throw Error('owned window unavailable');${body}})()`;
 const main = (body) => application.main.evaluate(expression(body), "Main", { awaitPromise: false });
 const report = {
-  version: "0.1.1",
+  version: "0.1.2",
   platform: process.platform,
   arch: process.arch,
   checks: [],
@@ -35,7 +35,7 @@ const check = async (id, body) => {
 try {
   await application.start();
   report.actualVersion = application.identity.version;
-  assert.equal(report.actualVersion, "0.1.1");
+  assert.equal(report.actualVersion, "0.1.2");
   report.monitorCount = await main("return screen.getAllDisplays().length;");
   await check("WIN-FULLSCREEN-MAXIMIZED", async () => {
     if (await main("return window.isFullScreen();"))
