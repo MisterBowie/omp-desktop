@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "categories": [
+    "ASSERTION"
+  ],
+  "locations": [
+    {
+      "path": "app/packages/shared/src/racp.test.ts",
+      "lines": [
+        146
+      ]
+    },
+    {
+      "path": "app/packages/agent-runtime/src/native-pi-session.test.ts",
+      "lines": [
+        750,
+        760,
+        792,
+        804
+      ]
+    },
+    {
+      "path": "app/apps/desktop/test/omp-plan-submit-e2e.test.mjs",
+      "lines": [
+        1783,
+        1863
+      ]
+    }
+  ]
+}
