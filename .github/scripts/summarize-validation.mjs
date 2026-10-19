@@ -28,7 +28,8 @@ export function summarizeProcessCleanup(smoke){
  const processes=(last?.processes??[]).slice(0,32).map(p=>{
   const exe=normalize(p.exe),image=exe.split("/").at(-1);
   const first=reports.find(r=>Array.isArray(r.processes)&&r.processes.some(x=>x.pid===p.pid&&x.starttime===p.starttime));
-  const original=first?.processes.find(x=>x.pid===p.pid&&x.starttime===p.starttime),parent=first?.processes.find(x=>x.pid===original?.ppid);
+  const original=first?.processes.find(x=>x.pid===p.pid&&x.starttime===p.starttime);
+  const parent=Number.isInteger(original?.ppid)&&original.ppid>0&&original.ppid!==original.pid?first?.processes.find(x=>x.pid===original.ppid):undefined;
   const knownBirth=value=>typeof value==="string"&&/^\d+$/.test(value);
   const childPredatesParent=knownBirth(original?.starttime)&&knownBirth(parent?.starttime)?BigInt(original.starttime)<BigInt(parent.starttime):null;
   return {image:publicImages.includes(image)?image:"OTHER",state:["R","Z","X"].includes(p.state)?p.state:"UNKNOWN",hasIdentity:typeof p.starttime==="string"&&/^\d+(?:\.\d+)?$/.test(p.starttime),executableUnderRunRoot:root.length>=10&&exe.startsWith(root+"/"),firstOwnership:["root","descendant","argv-run-root","environ-run-root"].includes(original?.ownership)?original.ownership:"UNKNOWN",parentObserved:Boolean(parent),childPredatesParent};
