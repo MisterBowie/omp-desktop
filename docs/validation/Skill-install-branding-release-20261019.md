@@ -1,8 +1,26 @@
 # 0.1.2 Skill 提示同版本修订发布（2026-10-19）
 
-用户明确授权提交并发版，要求版本号不变。修正后的候选源码
+用户明确授权提交并发版，要求版本号不变。现已正式发布并完成公开验收。最终源码
 `05cda4fb1b680656090bd6a8953913db4118c279` 已推送到
 `codex/skill-install-branding`。应用、安装包和更新清单仍为 **0.1.2**。
+
+## 最终发布验收
+
+- 发布：[0.1.2 Skill 提示修订版](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.2%2Bskill.05cda4fb1b680656090bd6a8953913db4118c279)，Release ID **417222661**，stable/latest，非草稿、非预发布。
+- 源码：`05cda4fb1b680656090bd6a8953913db4118c279`；产品品牌修正原始提交 `058658d`，提交和推送均完成。
+- 候选：[run39238725050](https://github.com/MisterBowie/omp-desktop/actions/runs/39238725050)，完整源码与 Mac ARM、Intel Mac、Windows、Linux 原生构建/真实安装全部成功；严格校验同源八份制品。
+- 发布控制：`8471412c74e5fdfb617d215bc08be3a38972cb03`，控制标签 `publish-skill-v0.1.2-run-39238725050-attempt-2`。
+- 晋升与全量回读：[run39246092021](https://github.com/MisterBowie/omp-desktop/actions/runs/39246092021) 全部成功；公开发布时间 `2026-10-19T11:40:13Z`。
+- 公开资产：**30 项 / 1,988,207,883 字节**全部下载并校验 SHA256/大小、SHA256SUMS、BUILD-RECORD、源码/原生/控制回执；八项更新安装器 SHA512 与五份清单通过，合并 Mac 清单逐字一致。
+- 保护：原 `v0.1.2` 源码 `21969e5` / Release 416884992 与原版 30 项资产 id、大小、SHA256，均与本任务开始快照完全一致。
+- 收据：[本地归档](Skill-install-branding-release-20261019.json)；[公开字节回读](https://github.com/MisterBowie/omp-desktop/blob/codex/public-asset-readback-39246092021/docs/validation/Published-012-assets-39246092021.json)。
+
+应用、安装包和 feed 内部版本均为 **0.1.2**，现有同版本用户需手动覆盖安装；
+原生 OMP 18.3.0 / `62bc57b+omp-desktop.6` / fork d648d27 和 schema 22 均未变。
+外部 Skill 正文、用户自定义人设和兼容标识保留；没有调用真实付费模型，未把真实
+模型措辞验收记为完成。原版能力边界见原 0.1.2 验收，不新增相应能力声明。
+
+以下各节保留当时的验证、失败及修正过程，不能将历史“待发布”状态当作最终结果。
 
 ## 发布标识与保护
 
@@ -32,7 +50,7 @@ Node 24.14.0 / pnpm 10.34.5；日志保持在忽略的本机目录。
 发布控制提交只涉及交付脚本、工作流及说明；产品运行时、UI、资源、Rust、锁文件
 与版本仍来自固定产品提交，不把控制提交当作安装包源码。
 
-## 远程状态
+## 首轮远程状态（历史）
 
 候选标记：`release-check-0.1.2-skill-058658d`；运行
 [39223878851](https://github.com/MisterBowie/omp-desktop/actions/runs/39223878851)。
@@ -139,4 +157,32 @@ lint、79 对规格/517 页检查退出 0；修改后的发布工作流 YAML/Bas
 `release-check-0.1.2-skill-ancestry`；应用版本仍为 0.1.2。所有源码与四个原生
 构建/安装门重新执行；不晋升第三候选或重复使用失败运行的产物。
 
-第四候选运行 [39238725050](https://github.com/MisterBowie/omp-desktop/actions/runs/39238725050) 已启动，尚未验收或发布。
+第四候选运行 [39238725050](https://github.com/MisterBowie/omp-desktop/actions/runs/39238725050) 已全部通过；最终发布见文首。
+
+## 发布权限与入口记录
+
+首轮晋升 run39245487590 在创建新源码标签时被工作流 Token 的 GitHub 403 拒绝，
+当时尚未发布 Release；诊断 run39245751368 仅披露固定分类 API_FORBIDDEN。
+随后使用本项目已有 SSH 用户权限创建同一源码的独立标签，核对原 v0.1.2 未移动，
+再以 attempt-2 控制标签重试，同一已验收的八份制品没有重建或替换。
+
+SSH 标签事件触发的普通稳定入口 run39246071801 按既有纯版本规则拒绝构建元数据
+标签：仅 guard 失败，verify/build/publish 均跳过。没有放宽这个入口；正式晋升依据
+独立候选 run39238725050 的完整成功记录，发布与全量回读 run39246092021 均成功。
+
+首轮 Windows 误报亦经 run39239873061 复核，首次归属为 descendant 且创建时间
+早于“父进程”，与第三轮同源；新候选 Windows 已完整通过重启、退出和清理。
+
+交付已完成，无未完成的发布步骤；同版本下载安装由用户自行进行。本轮未合并
+本地 main、重写历史标签、迁移用户数据或更改原生运行时。日志仍在忽略目录，
+未随代码或 Release 上传原始日志、用户路径和进程身份。
+
+## 最终命令核对
+
+- `node app/scripts/verify-release-candidate.mjs <run> <jobs> <artifacts> <receipt>`：
+  退出 0，接受 run39238725050，四个原生目标与八份不可变制品。
+- `node --input-type=module`（公开收据/API 资产哈希/源码标签/原版快照断言）：
+  Node 24.14.0，退出 0，30 项 / 1,988,207,883 字节，八项更新安装器，原版不变。
+- `python3`（最终 JSON 绑定及新增文档链接断言）、`git diff --check`：退出 0。
+- 最终提交只更新项目交接、看板、入口与验收文档；应用源码仍为已验收的 05cda4f，
+  发布控制标签仍固定至 8471412，不改变已发布资产或来源回执。
