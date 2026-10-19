@@ -117,7 +117,7 @@ jobs:
         if: steps.source.outputs.reuse != 'true'
       - run: pnpm -r --if-present test
         if: steps.source.outputs.reuse != 'true'
-      - run: node --test scripts/prepare-github-release.test.mjs scripts/github-update-provider.test.mjs scripts/verify-release-candidate.test.mjs scripts/stage-release-inputs.test.mjs scripts/reuse-source-verification.test.mjs scripts/check-release-workflows.test.mjs scripts/classify-release-failure.test.mjs scripts/check-workspace-build.test.mjs scripts/e2e/installed-product.test.mjs
+      - run: node --test scripts/prepare-github-release.test.mjs scripts/github-update-provider.test.mjs scripts/verify-release-candidate.test.mjs scripts/stage-release-inputs.test.mjs scripts/reuse-source-verification.test.mjs scripts/check-release-workflows.test.mjs scripts/classify-release-failure.test.mjs scripts/check-workspace-build.test.mjs scripts/e2e/installed-product.test.mjs scripts/e2e/process-ownership.test.mjs
       - run: cargo test -p host-core --locked
         if: steps.source.outputs.reuse != 'true'
 
@@ -144,7 +144,7 @@ jobs:
             arch: x64
             dist: dist:linux
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       OMP_SIDECAR_SOURCE: ${{ github.workspace }}/.omp-sidecar-source
     steps:

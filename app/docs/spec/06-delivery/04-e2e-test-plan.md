@@ -8,6 +8,21 @@
 
 ## 1. Goals
 
+### E2E-installed-process-ownership
+
+- **Preconditions:** A fixture-owned install root and native process identities,
+  including exact Windows FILETIME creation stamps; no user processes are targets.
+- **Steps:** Reuse an exited parent's PID while an older unrelated process retains
+  that parent number. Include genuine children with equal/later creation times,
+  missing identities, decimal stamps and independently owned detached remnants.
+- **Expected:** Parent edges require verifiable chronological creation times,
+  compared without numeric rounding. The older process is never claimed or killed;
+  genuine children and unique run-root evidence remain attributable. Executables
+  outside the owned root retain the existing Win32 reclamation refusal.
+- **Automation:** `scripts/e2e/process-ownership.test.mjs` and
+  `apps/desktop/test/installed-native-observation.test.mjs`; full native installer
+  acceptance still proves ordered exit and zero owned survivors on every target.
+
 ### E2E-OMP-session-controls
 
 - **Preconditions:** Verified OMP 18.3.0 packaged resources, fixture-owned
