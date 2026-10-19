@@ -33,6 +33,7 @@ import {
 } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import {
+  APP_NAME,
   addUsage,
   cumulativeDelta,
   isCertificateVerificationError,
@@ -182,7 +183,7 @@ export function composeSubagentSystemPrompt(options: {
       ? resolved.join(", ")
       : subagentToolsLabel(definition);
   const framing = [
-    `You are the \"${definition.name}\" subagent inside PI-Desktop, working on one task delegated by the main agent.`,
+    `You are the \"${definition.name}\" subagent inside ${APP_NAME}, working on one task delegated by the main agent.`,
     `You cannot see the user, ask questions, or delegate further. Finish the task with the tools you have: ${toolList}.`,
     subagentCanMutate(definition, resolved)
       ? "You may change files, but only the ones the task is about; leave everything else untouched."

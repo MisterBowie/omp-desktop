@@ -1,5 +1,12 @@
 # OMP Desktop 开发交接
 
+2026-10-19（Skill 安装提示名称修正）：已在 `codex/skill-install-branding` 专用工作树
+修正桌面自有系统提示、子代理/项目说明、插件辅助工具及内置 Skill 的旧品牌文案。
+原生 OMP 空基础提示也标明 `OMP Desktop (omp-desktop)`；兼容 id、安装路径和外部
+正文保留。完整 JS 构建、275 运行时/40 桌面相关回归、类型/lint/79 对规格检查通过。
+当前为未提交源码修正，版本仍为 0.1.2；尚未包含在已发布安装包中。
+见[验证与边界](docs/validation/Skill-install-branding-20261019.md)。
+
 2026-10-19：**九项修复已提交并正式发布 [v0.1.2](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.2)。**
 产品源码 `21969e5`，完整源码与四目标原生/安装验收成功；Windows 实际安装五项
 缺陷复测全通过（单屏，含宿主 UTF-16）。同一候选原样晋升，30 项公开资产共

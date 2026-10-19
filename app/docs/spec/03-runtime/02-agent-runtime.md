@@ -1198,6 +1198,16 @@ same gateway backend as the conversation it summarizes.
 
 ## 7. System prompt composition
 
+Desktop-owned prompts use the shared `APP_NAME` (`OMP Desktop`). Every mode
+composition also identifies the host application as `OMP Desktop (omp-desktop)`,
+including the empty-base block injected into native OMP sessions, so skill
+installation guidance and status replies use the current application name.
+This host context remains when a custom `SYSTEM.md` replaces the persona.
+Project-instruction headers, delegate introductions, plugin helper descriptions,
+and the bundled plugin-development skill use the same product name. Legacy
+package names and skill ids remain compatibility identifiers; imported skill
+bodies and user-authored instructions are not rewritten.
+
 ```text
 [base product prompt in English]
 + [operating-state prompt: agent/plan/goal]

@@ -872,6 +872,13 @@ agent 运行时的职责，与官方 Pi 编码 agent 的归属层保持一致；
 
 ## 7. 系统提示组成
 
+桌面自有提示使用共享的 `APP_NAME`（`OMP Desktop`）。每种模式的提示拼装都会标明
+宿主应用为 `OMP Desktop (omp-desktop)`，包括注入原生 OMP 会话的空基础提示块，
+让 Skill 安装说明和状态回复使用当前应用名称。自定义 `SYSTEM.md` 替换角色设定时，
+这段宿主上下文仍然保留。项目指令标题、子代理身份、插件辅助工具说明及内置插件
+开发 Skill 也使用该产品名。历史包名和 Skill id 保留为兼容标识；不改写导入 Skill
+正文或用户编写的指令。
+
 ```text
 [base product prompt in English]
 + [operating-state prompt: agent/plan/goal]

@@ -14583,3 +14583,18 @@ or network edges. Browser deadline recovery must also reject late replies
 after a new debugger attachment. Preserve valid encoding and permission
 checks. Source-level candidate tests do not qualify an installed release or
 cross-platform GUI; record those separately. No paid provider is needed.
+
+#### E2E-OMP-skill-install-branding: Skill guidance uses the current host name
+
+- **Steps**: Inspect composed Agent, Plan and Goal prompts with the default
+  persona, a custom persona and an empty base (the native OMP injection path).
+  Inspect plugin helper descriptions and load the bundled plugin-development
+  skill, then request a skill installation in an isolated test conversation.
+- **Expected**: Desktop-owned identity and installation guidance name
+  `OMP Desktop (omp-desktop)` rather than the legacy application. A custom
+  persona is preserved while host context remains. Skill ids, package names,
+  installation locations, permissions and external skill bodies are unchanged.
+- **Coverage**: Existing mode/custom-persona/runtime and skill-loading tests,
+  plus a local compiled-prompt probe. Live-model reply wording remains Draft;
+  no paid-model request is needed for the prompt checks.
+- **Specs linked**: `03-runtime/02-agent-runtime.md` (§7).
