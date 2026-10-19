@@ -4,8 +4,8 @@
 
 本次维护版本 **0.1.2** 修复消息/指令、CDP/MCP、宿主 UTF-16、Token、移动文件和 Git 差异问题；保留 0.1.1 的 Todo、Skill、插话/跟进、侧栏和 worktree 核心流程。下载以 [GitHub 稳定发布](https://github.com/MisterBowie/omp-desktop/releases/latest) 为准。
 下载与更新统一使用 [GitHub Releases](https://github.com/MisterBowie/omp-desktop/releases/latest)。
-0.1.2 发布门要求完整源码与四目标安装验收通过后，才晋升同一候选产物。此前 0.1.1 的 30 项资产回读属于历史证据。
-发布后仍有未通过场景和依赖告警，见[Bug 复测记录](docs/validation/Version-011-bug-audit-20261019.md)。
+0.1.2 已通过完整源码、四目标原生/实际安装验收及 Windows 五项缺陷复测，并原样发布同一候选产物；30 项公开资产全量回读与更新清单校验通过。见 [发布验收记录](docs/validation/Version-012-release-20261019.md)。
+原生 OMP UTF-16、Windows 物理双屏和剩余构建依赖告警的边界见上述记录；[0.1.1 Bug 复测](docs/validation/Version-011-bug-audit-20261019.md) 保留为历史。
 从 schema 22 回退 0.1.0 需先关闭应用并恢复升级前备份。
 应用内更新和平台签名前提见 [发布手册](app/docs/zh-CN/spec/06-delivery/06-release-runbook.md)。
 

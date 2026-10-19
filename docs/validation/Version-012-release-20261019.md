@@ -22,13 +22,53 @@ OMP 其余 549 项通过、6 项缺少捆绑资源跳过，历史失败保持记
 
 0.1.2 版本化后的冻结安装、完整 JS 构建、桌面类型、lint、79 对中英规格检查、
 497 项 shared 源码、38 项发布链路测试、新宿主构建及 12 个适用审计场景全部通过
-（命令退出 0，审计零跳过）；原生 OMP 资源测试仍等待远程新构建。
-远程候选必须重新准备固定 OMP 源码依赖并运行完整源码门，以及 macOS arm64/x64、
-Windows x64、Linux x64 四目标的真实构建、捆绑与安装验收。本机缺少资源的验证
-不替代远程原生门，不复用 0.1.1 安装包或更改 provenance。
+（命令退出 0，审计零跳过）。Node 为 24.14.0、pnpm 为 10.34.5；桌面宿主使用
+stable Rust 1.98.1 构建。此前修复阶段的 fmt/clippy 使用 nightly，不冒称运行过
+本机未安装的 stable fmt/clippy。
 
-## 发布进度
+固定候选 [39191848177](https://github.com/MisterBowie/omp-desktop/actions/runs/39191848177)
+已整轮成功：重新准备固定 OMP 参考源码依赖，完成冻结安装、完整 JS/Rust 构建、
+类型、lint、全部工作区测试、发布链路回归与 Rust 测试；macOS arm64/x64、Windows x64、
+Linux x64 四目标均完成六种真实截图夹具、原生模块构建、安装包、包内严格检查与
+实际安装流程验收。远程已完成本机未能执行的完整源码门和安装门；不改写本机
+失败，也不将此前六项资源测试跳过计为通过。
 
-状态：版本与说明已准备，尚未发布。待本机必要检查完成后提交固定候选并推送
-`release-check-0.1.2-*`，候选完整通过才以 `publish-v0.1.2-run-*` 晋升原样产物。
-不移动旧稳定标签，不合并本地 main，不提交原始日志或私有数据。
+使用现有 `verify-release-candidate.mjs`（Node 24.14.0，退出 0）接受八份非空、
+未过期且 SHA256/源码绑定齐全的制品。候选标签为 `release-check-0.1.2-21969e58`，
+产品源码为 `21969e58f7d97177795ce06f393e8853c45cfb20`。没有复用 0.1.1 安装包、
+放宽来源或原生权限校验，没有调用付费模型或迁移用户数据。
+
+## Windows 安装态缺陷复测
+
+[39196263052](https://github.com/MisterBowie/omp-desktop/actions/runs/39196263052) 成功。
+先核对已验收候选的 Windows ZIP 实际 SHA256，再从中提取 0.1.2 安装器并隔离安装；
+全屏绘制、任务栏/窗口恢复、宿主 UTF-16 读取、PowerShell 输出/退出码、有序退出
+五项全部通过，退出后无自有进程残留。单屏 CI（1 个显示器），未验收物理双屏。
+宿主 UTF-16 通过不代表 B11 原生 OMP 工具已经支持。
+
+验证控制提交为 `c124831d74cd811a58b90f82019932540ac55bf3`，只增加/更新验证工作流
+和测试驱动的版本绑定；与产品源码提交的运行时代码、UI、包和 Rust 代码树相同。
+不把验证控制提交或后续交接文档提交冒充安装包源码。
+
+## 正式发布与公开资产回读
+
+**已正式发布 [v0.1.2](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.2)。**
+发布运行 [39196683475](https://github.com/MisterBowie/omp-desktop/actions/runs/39196683475)
+成功，控制标签 `publish-v0.1.2-run-39191848177` 原样晋升同一候选。公开 Release
+为 stable、非 draft，`latest` 返回同一 Release（416884992）。已通过 SSH 获取并
+核对稳定 tag，准确指向产品源码 `21969e58f7d97177795ce06f393e8853c45cfb20`。
+
+独立 [39197020014](https://github.com/MisterBowie/omp-desktop/actions/runs/39197020014)
+在 CI 中完整下载全部 **30 项公开资产、1,988,212,725 字节**，逐项 SHA256/大小、
+SHA256SUMS、BUILD-RECORD、源码/候选/原生来源回执均通过；八项更新安装器
+SHA512/大小通过，五份更新清单通过，合并 Mac 清单实际字节一致。本机读取并逐项
+比对了公开摘要与资产回执，未冒称本机完整下载约 1.99 GB 文件。
+
+四目标制品摘要、全部公开资产摘要、Windows 五项结果、运行编号和本机门退出状态
+见[结构化验收记录](Version-012-release-20261019.json)。公开独立证据：
+[Windows 回执](https://github.com/MisterBowie/omp-desktop/blob/codex/published-bug-results-39196263052/docs/validation/Candidate-012-windows-39196263052.json)、
+[资产回读回执](https://github.com/MisterBowie/omp-desktop/blob/codex/public-asset-readback-39197020014/docs/validation/Published-012-assets-39197020014.json)。
+
+原始日志、截图和依赖缓存保持私有；其他工作树的已有改动保留。没有移动旧稳定
+标签、合并本地 main、修改原生 fork 或迁移用户安装态数据。B11、物理双屏与剩余
+构建依赖告警仍按上文边界记录；本次没有自动开展 T25-B 或 T27。
