@@ -33,7 +33,7 @@ jobs:
           source_run="${BASH_REMATCH[1]}"
           [[ "$(node -p "require('./app/package.json').version")" == 0.1.2 ]]
           revision="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$source_run" --jq .head_sha)"
-          [[ "$revision" == 058658d8d689b6d1b6746ab78416f655480c04a2 ]]
+          [[ "$revision" == 47f34c09d003c06972788a68130e2317c286d5a9 ]]
           [[ "$(gh api "repos/$GITHUB_REPOSITORY/commits/v0.1.2" --jq .sha)" == 21969e58f7d97177795ce06f393e8853c45cfb20 ]]
           [[ "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/v0.1.2" --jq .id)" == 416884992 ]]
           echo "revision=$revision" >> "$GITHUB_OUTPUT"
