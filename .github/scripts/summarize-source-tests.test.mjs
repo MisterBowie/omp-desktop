@@ -16,12 +16,14 @@ test("only public tracked test paths and fixed categories survive", () => {
 
 test("stack frames reveal only tracked test coordinates, never paths or values", () => {
   const path = "app/apps/desktop/test/omp-plan-submit-e2e.test.mjs";
+  const passing = "app/packages/shared/src/racp.test.ts";
   const result = summarizeSourceTests([
+    "packages/shared test: at TestContext.<anonymous> (file:///PRIVATE/root/src/racp.test.ts:146:12)",
     "apps/desktop test: test at test/omp-plan-submit-e2e.test.mjs:1783:1",
     "apps/desktop test:   at TestContext.<anonymous> (file:///PRIVATE/root/app/apps/desktop/test/omp-plan-submit-e2e.test.mjs:1863:12)",
     "apps/desktop test:   at secret (file:///PRIVATE/root/test/secret.test.mjs:99:1)",
     "apps/desktop test: actual: PRIVATE_VALUE",
-  ].join("\n"), [path]);
+  ].join("\n"), [path, passing]);
   assert.deepEqual(result.locations, [{ path, lines: [1783, 1863] }]);
   assert.doesNotMatch(JSON.stringify(result), /PRIVATE|secret|actual|file:/);
 });

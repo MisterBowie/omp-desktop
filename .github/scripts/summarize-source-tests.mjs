@@ -14,7 +14,8 @@ export function summarizeSourceTests(input, tracked) {
       const path = `app/${owner}/${match[1]}`;
       if (!allowed.has(path)) continue;
       const line = Math.min(1_000_000, Number(match[2] ?? 0));
-      if (!/FAIL|✖|❯|test at|\bat\s+/.test(row)) continue;
+      const failureMarker = /FAIL|✖|❯|test at/.test(row);
+      if (!failureMarker && !(/\bat\s+/.test(row) && locations.has(path))) continue;
       const previous = locations.get(path) ?? new Set();
       previous.add(line);
       locations.set(path, previous);
