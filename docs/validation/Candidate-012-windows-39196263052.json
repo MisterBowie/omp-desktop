@@ -1,0 +1,82 @@
+{
+  "sourceRevision": "21969e58f7d97177795ce06f393e8853c45cfb20",
+  "candidateRunId": 39191848177,
+  "version": "0.1.2",
+  "platform": "win32",
+  "arch": "x64",
+  "monitorCount": 1,
+  "dualMonitorQualified": false,
+  "cleaned": true,
+  "checks": [
+    {
+      "id": "WIN-FULLSCREEN-MAXIMIZED",
+      "status": "passed",
+      "facts": {
+        "colors": 256,
+        "bytes": 3188736
+      }
+    },
+    {
+      "id": "WIN-TASKBAR-RESTORE",
+      "status": "passed",
+      "facts": {
+        "bounds": {
+          "x": -8,
+          "y": -8,
+          "width": 1040,
+          "height": 736
+        },
+        "workArea": {
+          "x": 0,
+          "y": 0,
+          "width": 1024,
+          "height": 720
+        },
+        "maximized": true
+      }
+    },
+    {
+      "id": "UTF16-HOST-READ",
+      "status": "passed",
+      "facts": {
+        "preserved": true
+      }
+    },
+    {
+      "id": "POWERSHELL-OUTPUT-EXIT",
+      "status": "passed",
+      "facts": {
+        "outputPreserved": true,
+        "exitCode": 7
+      }
+    },
+    {
+      "id": "ORDERED-EXIT",
+      "status": "passed",
+      "facts": {
+        "noOwnedProcesses": true
+      }
+    }
+  ],
+  "fullscreenObservation": {
+    "maximized": false,
+    "painted": true,
+    "colors": 256,
+    "bytes": 3188736
+  },
+  "restoreObservation": {
+    "bounds": {
+      "x": -8,
+      "y": -8,
+      "width": 1040,
+      "height": 736
+    },
+    "workArea": {
+      "x": 0,
+      "y": 0,
+      "width": 1024,
+      "height": 720
+    },
+    "maximized": true
+  }
+}
