@@ -1,0 +1,129 @@
+{
+  "baseCommit": "bd3e641663fd0dbbe3af457af310fce361fd0f56",
+  "files": [
+    {
+      "path": ".github/workflows/mac-preview-package.yml",
+      "sha256": "40f04d1b58efdd27b73d671fe6c3624f452223c9dcd84e989d7cac34ce5f6718"
+    },
+    {
+      "path": ".github/workflows/publish-validated-release.yml",
+      "sha256": "f0453dedeb137f6236be7deee1fe581b161a47bee3790c95b77195b3b243ba02"
+    },
+    {
+      "path": ".github/workflows/readback-published-release.yml",
+      "sha256": "60e8d4af4ab4d4b6cc4fb1c17961bed4b3ac5bffa750193481ee922932698a8f"
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "sha256": "da11dc4a36cf31f17ae68b03f3c523ac35609570ee0adfccc1405fd2d5e10225"
+    },
+    {
+      "path": ".github/workflows/three-platform-test-packages.yml",
+      "sha256": "f87d8c25731c241e9e9123462e06786b5c83e9e7bb534125336c9a1d014680eb"
+    },
+    {
+      "path": "app/.github/workflows/linux-package.yml",
+      "sha256": "2d7b81f6f6fcf3f8035d950b8af3f6f34dabeff241ecb19670b8488665dfd75c"
+    },
+    {
+      "path": "app/.github/workflows/release.yml",
+      "sha256": "149bc633145ad091b063f9b1bdd4583d9008dba84600cffe2fb512283e1ae7cb"
+    },
+    {
+      "path": "app/Cargo.lock",
+      "sha256": "7249f192c57c328d301e267d92e929466b09baa6b946407a3b65b2c0ce89fda6"
+    },
+    {
+      "path": "app/Cargo.toml",
+      "sha256": "4fab4d989180497c619abdb6d6b782e86abbb33237084afb0102f9c6f1b176b2"
+    },
+    {
+      "path": "app/apps/desktop/package.json",
+      "sha256": "5b2cd9cee211aab85c5f2fe6c0b5baac46be776ef2c4a2d1364c782cb1771f09"
+    },
+    {
+      "path": "app/apps/desktop/resources/models.dev/api.json",
+      "sha256": "d8eabed250a4d817be7a6049185d71a042fef732aded4bd724a1d557b2c83e06"
+    },
+    {
+      "path": "app/apps/desktop/test/omp-memory-native-e2e.test.mjs",
+      "sha256": "243768a666cce76e870ba0404e642d9a431c7417bdf593b6b5da35bba0a03862"
+    },
+    {
+      "path": "app/apps/pi-host/package.json",
+      "sha256": "1607d3a051cef56766b62fc76542bd4fcee8a8642eea37958bf878e294552f33"
+    },
+    {
+      "path": "app/docs/adr/0330-omp-automatic-memory.md",
+      "sha256": "42113a98ca7b90c95fd969b04c3cff7ecb5188f7de7b8d01f40870dc60c6f75c"
+    },
+    {
+      "path": "app/docs/adr/README.md",
+      "sha256": "1122d9916e0c819d71c487ae2b7785d49fdfd2ccaa46cec64e76322897a16952"
+    },
+    {
+      "path": "app/docs/package.json",
+      "sha256": "d3d337d326b3e4d469cebdf8c05844cb2d2659003809d650ec02c5cc0b674df6"
+    },
+    {
+      "path": "app/package.json",
+      "sha256": "a8be754e663c5187c0069c0d120ea428f3a193e052c8b40c94fa7b011976d6c4"
+    },
+    {
+      "path": "app/packages/agent-host/package.json",
+      "sha256": "f48a741e8088aac8b215fc7481a999ac59ce73b3a5df7ad26ff7aaadaaa7c806"
+    },
+    {
+      "path": "app/packages/agent-runtime/package.json",
+      "sha256": "124f09363455070974eaaa72221163bbe24f3fcc6d67da56e953dcf1ba5e3ef8"
+    },
+    {
+      "path": "app/packages/host-runtime/package.json",
+      "sha256": "bb7908121f4cd79baf8479163fa610e345266347a126496b14b4611ec40ba8c0"
+    },
+    {
+      "path": "app/packages/i18n/package.json",
+      "sha256": "c52b8095bca3b18094314afe3baee79704b277b5e18d01208c94edd0b62f5f54"
+    },
+    {
+      "path": "app/packages/omp-runtime/package.json",
+      "sha256": "43a71ec47c99e11f2501f525f39e06207dd7802b4595411f5d5126f3e5441b02"
+    },
+    {
+      "path": "app/packages/plugin-devkit/package.json",
+      "sha256": "588819a4fd688a1a331c9b8cd31961ca7c4c736b705f2ac9cd9cfd9a2d56a30f"
+    },
+    {
+      "path": "app/packages/plugin-sdk/package.json",
+      "sha256": "174b9658ce391338f9d5899be4f7e14e39d425f5abd962f684d9a01d3f1ae1de"
+    },
+    {
+      "path": "app/packages/racp/package.json",
+      "sha256": "117d59393546e0fb2fb80de7c77fa3b3840cb75fab4024b91698bd92cf23f43f"
+    },
+    {
+      "path": "app/packages/shared/package.json",
+      "sha256": "0ee1a44aab4fe4c267ffe8253d87952467abc3fa462449db5d35b789f2ca3223"
+    },
+    {
+      "path": "app/packages/shared/src/changelog.test.ts",
+      "sha256": "af9089e0fb784f2a7ca1cfbff2f612ec2bbaae2b2fdd5b1cedaee4c837e34b9c"
+    },
+    {
+      "path": "app/packages/shared/src/omp-changelog.ts",
+      "sha256": "d8f21177b553729522bb9e0dac375eb51edb324ea4248b20869cf65bb455b605"
+    },
+    {
+      "path": "app/packages/shared/src/protocol.ts",
+      "sha256": "5a7e06444a73a8499441be39798de5e30a73baeef7ff97c3876328e904f434bc"
+    },
+    {
+      "path": "app/patches/oh-my-pi/manifest.json",
+      "sha256": "8e9ad58fd72f33b2380c63af3a50c7809bded82cc0a2f9fcbe09f64e709340a3"
+    },
+    {
+      "path": "app/scripts/readback-workflow.test.mjs",
+      "sha256": "29051ed81d9ea2a28526d82d8747c11149970ad0b9da0d6509a48c7ee888ead5"
+    }
+  ]
+}

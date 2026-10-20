@@ -309,7 +309,7 @@
     "The zero-side-effect property of a rejected mixed batch is unchanged by .4: a batch carrying a sole tool plus any sibling is still rejected whole with terminate false so the model can correct.",
     "reproducible-sidecar-build: embed-native.ts writes the embedded addon tar.gz with fixed entry timestamps and a recomputed header checksum, because Bun.Archive stamps each entry with the current time. Without it, two builds of one fork commit produced different binaries \u2014 measured at T20-R4-3 on Bun 1.4.2 (first difference at byte 81260680).",
     "explicit-bytecode-build-mode: bytecode stays on by default (upstream release behavior and the fast boot path). The desktop sidecar build passes `--bytecode` explicitly and records it as `build.bytecode` in the provenance manifest; measured reproducibility holds for bytecode on and off once the archive is deterministic.",
-    "2026-10-20: .7 promotes the validated automatic-memory candidate after explicit authorization for a local native commit. It has not been pushed or published; no upstream version, application version or storage schema changed."
+    "2026-10-20: .7 promotes the validated automatic-memory candidate after explicit authorization for a local native commit. The controlled commit was subsequently pushed for the combined 0.1.3 release. The native patch changes neither upstream version nor storage schema."
   ],
   "status": {
     "soleBatchContract": "not-strict",

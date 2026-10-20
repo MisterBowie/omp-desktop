@@ -10,7 +10,7 @@ export const SCHEMA_VERSION = 22 as const;
  */
 export const APP_ID = "net.misterbowie.omp-desktop";
 export const APP_NAME = "OMP Desktop";
-export const APP_VERSION = "0.1.2";
+export const APP_VERSION = "0.1.3";
 
 export const APP_MENU_COMMANDS = [
   "newTask",

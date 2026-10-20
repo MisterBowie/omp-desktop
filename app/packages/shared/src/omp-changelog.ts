@@ -1,5 +1,48 @@
 import type { ChangelogEntry, ChangelogLocale } from "./changelog.js";
 
+const memoryAndModels: Record<ChangelogLocale, string[]> = {
+  "en": [
+    "Choose automatic memory saving and recall independently in Settings, both off by default.",
+    "Browse, search and clear memories isolated by project and worktree; disabling memory keeps saved data.",
+    "Use provider-published context and output token limits while preserving manual overrides."
+  ],
+  "zh-CN": [
+    "在设置中分别开启自动保存和自动读取记忆，两个开关默认关闭。",
+    "按项目和 worktree 隔离记忆，支持查看、搜索与清空；关闭后保留已有数据。",
+    "正确采用供应商发布的上下文与输出 Token 上限，并保留手动覆盖值。"
+  ],
+  "zh-TW": [
+    "在設定中分別開啟自動儲存與自動讀取記憶，兩個開關預設關閉。",
+    "依專案與 worktree 隔離記憶，支援檢視、搜尋與清除；關閉後保留已有資料。",
+    "正確採用供應商公布的上下文與輸出 Token 上限，並保留手動覆寫值。"
+  ],
+  "de": [
+    "Automatisches Speichern und Abrufen von Erinnerungen in den Einstellungen getrennt aktivieren; beide sind standardmäßig aus.",
+    "Erinnerungen nach Projekt und Worktree getrennt durchsuchen und löschen; beim Deaktivieren bleiben die Daten erhalten.",
+    "Veröffentlichte Kontext- und Ausgabelimits des Anbieters verwenden und manuelle Werte beibehalten."
+  ],
+  "es": [
+    "Activa por separado el guardado y la recuperación automáticos de memoria en Ajustes; ambos están desactivados inicialmente.",
+    "Consulta, busca y borra memorias aisladas por proyecto y worktree; desactivarlas conserva los datos.",
+    "Usa los límites de contexto y salida publicados por el proveedor y conserva los ajustes manuales."
+  ],
+  "fr": [
+    "Activez séparément la sauvegarde et le rappel automatiques de mémoire dans les réglages, désactivés par défaut.",
+    "Consultez, recherchez et effacez les mémoires isolées par projet et worktree ; la désactivation conserve les données.",
+    "Utilisez les limites de contexte et de sortie publiées par le fournisseur en conservant les valeurs manuelles."
+  ],
+  "ko": [
+    "설정에서 자동 메모리 저장과 불러오기를 각각 켤 수 있으며 기본값은 모두 꺼짐입니다.",
+    "프로젝트와 worktree별로 분리된 메모리를 조회, 검색, 삭제할 수 있고 기능을 꺼도 데이터는 유지됩니다.",
+    "공급자가 공개한 컨텍스트 및 출력 토큰 제한을 사용하고 수동 설정값은 유지합니다."
+  ],
+  "tr": [
+    "Otomatik bellek kaydını ve geri çağırmayı Ayarlar bölümünden ayrı ayrı açın; ikisi de varsayılan olarak kapalıdır.",
+    "Proje ve worktree bazında yalıtılmış anıları görüntüleyin, arayın ve temizleyin; kapatmak kayıtlı verileri korur.",
+    "Sağlayıcının yayımladığı bağlam ve çıktı token sınırlarını kullanın, elle girilen değerleri koruyun."
+  ]
+};
+
 const fixes: Record<ChangelogLocale, string[]> = {
   "en": [
     "Prevent same-path host moves from deleting files and stop workspace diffs from executing Git text converters.",
@@ -60,6 +103,7 @@ const fixes: Record<ChangelogLocale, string[]> = {
 };
 
 const release = (locale: ChangelogLocale, highlights: string[], previous: string[]): readonly ChangelogEntry[] => [
+  { version: "0.1.3", date: "2026-10-20", highlights: memoryAndModels[locale] },
   { version: "0.1.2", date: "2026-10-19", highlights: fixes[locale] },
   { version: "0.1.1", date: "2026-10-19", highlights },
   { version: "0.1.0", date: "2026-10-16", highlights: previous },

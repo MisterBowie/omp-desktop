@@ -1,6 +1,6 @@
 # ADR 0330: Native Mnemopi with desktop-owned preferences
 
-- Status: Accepted (local native .7 build validated; not published).
+- Status: Accepted.
 
 ## Context
 
@@ -30,7 +30,7 @@ The native patch is committed as `edec3898d44071206ec201beebea432a2786bd8c`
 after explicit user authorization and promoted to the normal `.7` provenance
 manifest. The previous `.6` identity and the hashed development snapshot remain
 available as history. The standard sidecar build produces the same binary and
-gate bytes as the tested candidate. This is a local implementation; the fork
-commit has not been pushed and no installer has been published.
+gate bytes as the tested candidate. The release pipeline builds and accepts
+installers from this controlled commit.
 
 See [the runtime contract](../spec/03-runtime/22-automatic-memory.md).

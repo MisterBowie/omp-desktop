@@ -16,7 +16,7 @@ const { OmpRuntimeSupervisor, ensureSessionStateDir, ompMemoryDirectory } = awai
 const { createOmpMemoryService } = await import("../electron/main/runtime/omp-memory.ts");
 
 test("native Mnemopi persists across processes, isolates projects, obeys switches and clears without restoring old history", {
-  skip: !process.env.OMP_MEMORY_TEST_RUNTIME && "requires the memory candidate binary",
+  skip: !process.env.OMP_MEMORY_TEST_RUNTIME && "requires OMP_MEMORY_TEST_RUNTIME",
   timeout: 90000,
 }, async (t) => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "omp-memory-native-e2e-")));

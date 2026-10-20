@@ -117,7 +117,7 @@ jobs:
         if: steps.source.outputs.reuse != 'true'
       - run: pnpm -r --if-present test
         if: steps.source.outputs.reuse != 'true'
-      - run: node --test scripts/prepare-github-release.test.mjs scripts/github-update-provider.test.mjs scripts/verify-release-candidate.test.mjs scripts/stage-release-inputs.test.mjs scripts/reuse-source-verification.test.mjs scripts/check-release-workflows.test.mjs scripts/classify-release-failure.test.mjs scripts/check-workspace-build.test.mjs scripts/e2e/installed-product.test.mjs scripts/e2e/process-ownership.test.mjs
+      - run: node --test scripts/prepare-github-release.test.mjs scripts/github-update-provider.test.mjs scripts/verify-release-candidate.test.mjs scripts/stage-release-inputs.test.mjs scripts/reuse-source-verification.test.mjs scripts/check-release-workflows.test.mjs scripts/classify-release-failure.test.mjs scripts/readback-workflow.test.mjs scripts/publication-tag.test.mjs scripts/check-workspace-build.test.mjs scripts/e2e/installed-product.test.mjs scripts/e2e/process-ownership.test.mjs
       - run: cargo test -p host-core --locked
         if: steps.source.outputs.reuse != 'true'
 
@@ -181,7 +181,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: MisterBowie/oh-my-pi
-          ref: d648d27bcf0db16caecb876142d891cf49a51bc2
+          ref: edec3898d44071206ec201beebea432a2786bd8c
           path: .omp-sidecar-source
           fetch-depth: 0
       - name: Install the fork's pinned Rust toolchain
@@ -269,6 +269,21 @@ jobs:
             assert.match(text, new RegExp(`^# ${key} ${value}$`, 'm'), `packaged Plan/Goal ${key}`);
           }
           JS
+          mkdir -p .artifacts/automatic-memory
+          export OMP_MEMORY_TEST_RUNTIME="$(node -p 'require("node:path").resolve(process.argv[1], "omp-runtime", process.platform === "win32" ? "omp.exe" : "omp")' "$resources")"
+          export PI_DESKTOP_HOST_BIN="$(node -p 'require("node:path").resolve("target/release", process.platform === "win32" ? "pi-desktop-host-core.exe" : "pi-desktop-host-core")')"
+          node --test --test-reporter=tap apps/desktop/test/omp-memory-native-e2e.test.mjs > .artifacts/automatic-memory/native.tap
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          const text=readFileSync('.artifacts/automatic-memory/native.tap','utf8');
+          for (const [key,value] of Object.entries({tests:1,pass:1,fail:0,skipped:0})) assert.match(text,new RegExp('^# '+key+' '+value+'$','m'));
+          JS
+          if [[ '${{ matrix.platform }}' == linux ]]; then
+            xvfb-run -a node scripts/e2e-memory-settings.mjs > .artifacts/automatic-memory/ui.txt
+          else
+            node scripts/e2e-memory-settings.mjs > .artifacts/automatic-memory/ui.txt
+          fi
           if [[ '${{ matrix.platform }}' == linux ]]; then
             xvfb-run -a node scripts/e2e-installed-smoke.mjs "${installer[0]}" .artifacts/stable-installed
           else
@@ -313,6 +328,7 @@ jobs:
             app/packaged-runtime.json
             app/packaged-plan-goal.tap
             app/.artifacts/browser-screenshot/
+            app/.artifacts/automatic-memory/
             app/.artifacts/stable-installed/
 
   publish:
