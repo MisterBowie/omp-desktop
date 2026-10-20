@@ -8,3 +8,8 @@ test("publication diagnostics expose only enums, known feeds and numeric coordin
  assert.deepEqual(classifyPublicationFailure("unknown private-message"),{classes:["UNCLASSIFIED"],feeds:[],source:[]});
  assert.deepEqual(classifyPublicationFailure("gh: Resource not accessible by integration (HTTP 403) /private/token").classes,["API_FORBIDDEN"]);
 });
+
+test("missing memory fixture files expose only public names and source coordinates",()=>{
+ const text="Error: ENOENT: PRIVATE_MESSAGE\n path: 'C:\\PRIVATE\\tokens.css'\n at read (file:///PRIVATE/e2e-memory-settings.mjs:55:9)\n path: '/PRIVATE/secret-file'";
+ const result=classifyPublicationFailure(text);assert.deepEqual(result.missingFiles,["tokens.css","OTHER"]);assert.deepEqual(result.source,[{file:"e2e-memory-settings.mjs",line:55,column:9}]);assert.doesNotMatch(JSON.stringify(result),/PRIVATE|secret-file/);
+});

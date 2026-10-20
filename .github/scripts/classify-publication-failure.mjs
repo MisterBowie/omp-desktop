@@ -20,8 +20,13 @@ export function classifyPublicationFailure(input){
  ];
  const classes=known.filter(([,pattern])=>pattern.test(text)).map(([code])=>code);
  const feeds=["latest.yml","latest-linux.yml","latest-mac.yml","latest-mac-arm64.yml","latest-mac-x64.yml"].filter(name=>text.includes(name));
- const source=["prepare-github-release.mjs","stage-release-inputs.mjs"].flatMap(file=>[...text.matchAll(new RegExp(file.replaceAll(".","\\.")+":(\\d+):(\\d+)","g"))].map(match=>({file,line:Number(match[1]),column:Number(match[2])})));
- return {classes:classes.length?classes:["UNCLASSIFIED"],feeds,source};
+ const source=["prepare-github-release.mjs","stage-release-inputs.mjs","e2e-memory-settings.mjs","omp-memory-native-e2e.test.mjs","host.mjs","process.ts"].flatMap(file=>[...text.matchAll(new RegExp(file.replaceAll(".","\\.")+":(\\d+):(\\d+)","g"))].map(match=>({file,line:Number(match[1]),column:Number(match[2])})));
+ const result={classes:classes.length?classes:["UNCLASSIFIED"],feeds,source};
+ if(text.includes("ENOENT")){
+  const known=["omp","omp.exe","electron.exe","pi-desktop-host-core","pi-desktop-host-core.exe","renderer.js","renderer.css","tokens.css","index.html","index.cjs","models.yml","memory.db","memory.beam.db"];
+  result.missingFiles=[...new Set([...text.matchAll(/\bpath:\s*['"]([^'"\r\n]+)['"]/g)].map(match=>{const name=match[1].replaceAll("\\","/").split("/").at(-1);return known.includes(name)?name:"OTHER";}))].slice(0,8);
+ }
+ return result;
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  let result;try{result=classifyPublicationFailure(readFileSync(process.argv[2],"utf8"));}catch{result={classes:["LOG_FILE_UNAVAILABLE"]};}

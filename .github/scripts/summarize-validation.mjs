@@ -39,7 +39,8 @@ export function summarizeProcessCleanup(smoke){
 }
 function coordinates(text){return sourceFiles.flatMap(file=>[...text.matchAll(new RegExp("(?:[/\\\\]|^)"+file.replaceAll(".","\\.")+":(\\d+):(\\d+)","g"))].map(match=>({file,line:Number(match[1]),column:Number(match[2])})));}
 /** TAP diagnostics are untrusted: return only source coordinates and enums. */
-export function summarizeStrictFailures(text){
+export function summarizeStrictFailures(text,kind="plan"){
+ const testFile=kind==="memory"?"omp-memory-native-e2e.test.mjs":"omp-plan-submit-e2e.test.mjs";
  const failures=[];
  for(const match of text.matchAll(/^not ok (\d+) - [^\n]*\n([\s\S]*?)(?=^(?:# Subtest:|(?:not )?ok \d+ - |1\.\.)|$(?![\s\S]))/gm)){
   const block=match[2],result={number:Number(match[1])};
@@ -47,7 +48,7 @@ export function summarizeStrictFailures(text){
   result.source=coordinates(block);result.diagnosticCodes=diagnosticCodes.filter(code=>block.includes(code));
   const allowed={failureType:["testCodeFailure","testTimeoutFailure","cancelledByParent"],code:["ERR_ASSERTION","SQLITE_ERROR","ERR_SQLITE_ERROR","ENOENT","ETIMEDOUT"],operator:["strictEqual","deepStrictEqual","equal","ok","match","rejects"]};
   for(const [key,values] of Object.entries(allowed)){const value=new RegExp("^\\s+"+key+": ['\"]?([^'\"\\r\\n]+)","m").exec(block)?.[1];if(values.includes(value))result[key]=value;}
-  result.lines=[...block.matchAll(/omp-plan-submit-e2e\.test\.mjs:(\d+):(\d+)/g)].map(item=>({line:Number(item[1]),column:Number(item[2])}));
+  result.lines=[...block.matchAll(new RegExp(testFile.replaceAll(".","\\.")+":(\\d+):(\\d+)","g"))].map(item=>({line:Math.min(1_000_000,Number(item[1])),column:Math.min(1_000_000,Number(item[2]))}));
   for(const key of ["expected","actual"]){const value=new RegExp("^\\s+"+key+": (.+)$","m").exec(block)?.[1];if(/^(?:true|false|null|-?\d+(?:\.\d+)?)$/.test(value??""))result[key]=JSON.parse(value);else if(["'running'","'completed'","'aborted'","'interrupted'"].includes(value))result[key]=value.slice(1,-1);}
   failures.push(result);
  }
@@ -70,6 +71,10 @@ export function summarizeValidation(directory){
   if(target==="win32-x64"&&smoke)summary.processCleanup=summarizeProcessCleanup(smoke);
   if(turn)summary.turn={expectedMarker:markers.includes(turn.expectedText)?turn.expectedText:"UNKNOWN",running:turn.last?.status?.isRunning===true,hasSessionError:Boolean(turn.last?.status?.lastError),stopVisible:turn.last?.ui?.stop===true,approvalVisible:Boolean(turn.last?.ui?.permission),documentVisible:turn.visibility?.state==="visible"};
   const tap=find("packaged-plan-goal.tap");if(tap){const text=readFileSync(tap,"utf8");summary.strict=Object.fromEntries(["tests","pass","fail","skipped"].map(key=>[key,Number(new RegExp("^# "+key+" (\\d+)$","m").exec(text)?.[1]??-1)]));summary.failedStrictNumbers=[...text.matchAll(/^\s*not ok (\d+) - /gm)].map(match=>Number(match[1]));summary.strictFailures=summarizeStrictFailures(text);}
+  const memory=owned.find(path=>path.replaceAll("\\","/").endsWith("/automatic-memory/native.tap"));
+  if(memory){const text=readFileSync(memory,"utf8");summary.memory={...Object.fromEntries(["tests","pass","fail","skipped"].map(key=>[key,Number(new RegExp("^# "+key+" (\\d+)$","m").exec(text)?.[1]??-1)])),failures:summarizeStrictFailures(text,"memory")};}
+  const memoryUi=owned.find(path=>path.replaceAll("\\","/").endsWith("/automatic-memory/ui.txt"));
+  if(memoryUi){let probe;try{probe=JSON.parse(/MEMORY_SETTINGS_PROBE (\{[^\r\n]*\})/.exec(readFileSync(memoryUi,"utf8"))?.[1]??"null");}catch{}summary.memoryUi={ok:probe?.ok===true,restart:probe?.restart===true};}
   result.push(summary);
  }
  return result;

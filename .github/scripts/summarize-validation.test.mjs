@@ -42,3 +42,11 @@ test("process ancestry diagnostics detect a reused parent id without publishing 
  assert.equal(result.processes[0].childPredatesParent,true);
  assert.doesNotMatch(JSON.stringify(result),/PRIVATE|1234|5678|133000/);
 });
+
+test("memory diagnostics reveal counts and source lines without saved memory content",t=>{
+ const root=mkdtempSync(join(tmpdir(),"omp-memory-summary-"));t.after(()=>rmSync(root,{recursive:true,force:true}));
+ const dir=join(root,"validation-win32-x64",".artifacts","automatic-memory");mkdirSync(dir,{recursive:true});
+ writeFileSync(join(dir,"native.tap"),"not ok 1 - PRIVATE_TITLE\n  ---\n  error: 'PRIVATE_MEMORY'\n  code: 'ENOENT'\n  stack: |-\n    file:///PRIVATE_PATH/omp-memory-native-e2e.test.mjs:92:8\n  ...\n1..1\n# tests 1\n# pass 0\n# fail 1\n# skipped 0\n");
+ writeFileSync(join(dir,"ui.txt"),'MEMORY_SETTINGS_PROBE {"ok":true,"restart":true,"private":"PRIVATE_MEMORY"}\n');
+ const [result]=summarizeValidation(root);assert.equal(result.memory.fail,1);assert.equal(result.memory.failures[0].code,"ENOENT");assert.deepEqual(result.memory.failures[0].lines,[{line:92,column:8}]);assert.deepEqual(result.memoryUi,{ok:true,restart:true});assert.doesNotMatch(JSON.stringify(result),/PRIVATE/);
+});
