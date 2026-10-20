@@ -230,6 +230,7 @@ export type OmpSessionBridgeOptions = {
   onTurnEnd?: (info: OmpTurnEndInfo) => void;
   /** Retry queued admission after preparation or cleanup releases a session. */
   onIdle?: (sessionId: string) => void;
+  onMemoryMaintenanceIdle?: () => void;
   /** Test seams. */
   runnerFactory?: (options: ConstructorParameters<typeof OmpSessionRunner>[0]) => OmpSessionRunner;
   gateResolver?: (startDir: string) => string | null;
@@ -743,6 +744,7 @@ export type OmpSessionBridge = {
   resolveAsk(resolution: AskToolResolution): OmpResolution;
   status(sessionId: string): OmpSessionStatus;
   isBusy(sessionId: string): boolean;
+  withIdleRuntimes<T>(operation: () => Promise<T>): Promise<T>;
   isCurrentTurn(sessionId: string, turnId: string): boolean;
   hasPendingRequest(requestId: string): boolean;
   hasKnownRequest(requestId: string): boolean;
@@ -2462,6 +2464,12 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
    * does not set this: a later operation may still create a fresh entry.
    */
   let shuttingDown = false;
+  let memoryMaintenance = false;
+  let memoryMaintenanceDone = Promise.resolve();
+  let releaseMemoryMaintenance: (() => void) | null = null;
+  async function waitForMemoryMaintenance(): Promise<void> {
+    while (memoryMaintenance) await memoryMaintenanceDone;
+  }
 
   /**
    * The gate this session will load, or null when this build has none.
@@ -2515,6 +2523,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
   }
 
   function requireLauncher(): void {
+    if (memoryMaintenance) throw Object.assign(new Error("Memory maintenance in progress"), { errorCode: "CONFLICT" });
     if (options.launcher) return;
     // A packaged build with no runtime has to explain itself: the adapter's
     // resolution error already names the file and the failure kind.
@@ -2538,7 +2547,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     // check placed after the existing-entry return would let exactly that
     // happen: the sweep disposes entries sequentially, so a session later in
     // the snapshot would still admit content mid-shutdown.
-    if (shuttingDown) {
+    if (shuttingDown || memoryMaintenance) {
       throw Object.assign(
         new Error("the OMP runtime is shutting down; no session can start or continue"),
         { errorCode: ErrorCodes.ENGINE_UNAVAILABLE },
@@ -2613,6 +2622,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
   }
 
   async function prompt(input: OmpPromptInput): Promise<OmpPromptResult> {
+    if (memoryMaintenance) await waitForMemoryMaintenance();
     requireLauncher();
     const gate = requireGate();
     const projectDirectory = resolveProjectDirectory(input.projectPath);
@@ -2628,6 +2638,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       runtimeVersion: input.runtimeVersion ?? null,
     };
     if (options.resolveExecutionRoot) spec.executionDirectory = resolveProjectDirectory(await options.resolveExecutionRoot(spec.sessionId, spec.projectDirectory));
+    if (memoryMaintenance) await waitForMemoryMaintenance();
     const entry = entryFor(spec);
     try {
       return await entry.prompt(gate, spec, input.content, input.onHostTurnBound, input.userMessageId ?? null, input.requiresSkill);
@@ -2758,6 +2769,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     sessionId: string,
     context: OperationContext,
   ): Promise<{ entry: SessionEntry; startedForOperation: boolean }> {
+    if (memoryMaintenance) await waitForMemoryMaintenance();
     const gate = requireGate();
     requireLauncher();
     const projectDirectory = resolveProjectDirectory(context.projectPath ?? null);
@@ -3375,6 +3387,34 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     resolveAsk,
     status,
     isBusy: (sessionId) => entryOf(sessionId)?.isBusy() ?? false,
+    withIdleRuntimes: async <T>(operation: () => Promise<T>): Promise<T> => {
+      if (shuttingDown || memoryMaintenance || [...entries.values()].some(entry => entry.isBusy())) {
+        throw Object.assign(new Error("Wait for OMP sessions to finish before changing memory"), { errorCode: "CONFLICT" });
+      }
+      memoryMaintenance = true;
+      memoryMaintenanceDone = new Promise<void>(resolve => { releaseMemoryMaintenance = resolve; });
+      try {
+        for (const entry of entries.values()) {
+          const runtime = entry.supervisorHandle().currentRuntime();
+          if (!runtime) continue;
+          const state = await runtime.request({ type: "get_state" });
+          if (!state.success || Reflect.get(state.data ?? {}, "memoryMaintenanceSafe") !== true) {
+            throw Object.assign(new Error("OMP background work must finish before changing memory"), { errorCode: "CONFLICT" });
+          }
+        }
+        for (const id of [...entries.keys()]) {
+          const result = await disposeSession(id, "memory preferences changed");
+          if (!result.ok) throw new Error("OMP runtime reclaim incomplete; memory was not changed");
+        }
+        return await operation();
+      } finally {
+        memoryMaintenance = false;
+        releaseMemoryMaintenance?.();
+        releaseMemoryMaintenance = null;
+        try { options.onMemoryMaintenanceIdle?.(); }
+        catch { logger?.app("omp", "warn", "memory queue wake failed"); }
+      }
+    },
     isCurrentTurn: (sessionId, turnId) => entryOf(sessionId)?.isCurrentTurn(turnId) ?? false,
     hasPendingRequest,
     hasKnownRequest,

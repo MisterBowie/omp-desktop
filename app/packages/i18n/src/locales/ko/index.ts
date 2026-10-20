@@ -1,6 +1,35 @@
 import type { EnglishCatalog } from "../en/index.js";
 
 export const ko = {
+  memory: {
+    "title": "Memory",
+    "description": "OMP Mnemopi stores memories locally. Manual project notes remain separate.",
+    "autoSave": "Automatically save memories",
+    "autoRead": "Automatically recall memories",
+    "autoSaveDescription": "Retain new content every four user turns; normal app exit flushes the rest. Existing history is not imported when enabling or clearing memory.",
+    "autoReadDescription": "Recall relevant memories in the first turn of a session and during context compaction.",
+    "costHint": "Saving and consolidation may call the chat’s configured model and use additional tokens. Search currently uses local text retrieval without downloading embedding models.",
+    "scopeHint": "Preferences apply to OMP chats. Each working directory, including each worktree, has an isolated store. Turning switches off keeps existing memories. Auto-Learn stays off.",
+    "browse": "View and search memories",
+    "browseHint": "Entries include conversation excerpts and extracted facts. Long content is shown partially.",
+    "project": "Project",
+    "chooseProject": "Choose a project",
+    "temporary": "Temporary chat",
+    "search": "Search",
+    "refresh": "Refresh",
+    "loading": "Loading memories…",
+    "count": "{{count}} memories",
+    "empty": "No saved memories. Enabling automatic saving starts with subsequent turns.",
+    "previous": "Previous",
+    "next": "Next",
+    "clear": "Clear this project’s memories",
+    "confirmClear": "Click again to clear memories",
+    "clearHint": "This permanently deletes this directory’s automatic memories. Manual project notes and conversations are preserved.",
+    "cancel": "Cancel",
+    "waitForIdle": "Wait for OMP chats and queued follow-ups to finish, then retry.",
+    "operationFailed": "Memory operation failed. Check that the host and the OMP memory runtime are up to date."
+},
+
   worktree: {
     menu: { group: "Git" },
     newIsolatedSession: "새 격리 세션",

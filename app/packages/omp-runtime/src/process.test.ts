@@ -43,6 +43,30 @@ describe("runtime startup", () => {
     });
   });
 
+  it("refuses an old runtime before enabling memory and reclaims the process", async () => {
+    const layout = makeMockLayout("memory-protocol-missing");
+    try {
+      await expect(OmpRuntimeProcess.start({
+        launcher: MOCK_LAUNCHER, cwd: layout.cwd, env: layout.env,
+        expectedRuntimeVersion: MOCK_VERSION, memoryProtocolRequired: true,
+        probeVersion: fakeVersionProbe(MOCK_VERSION, `omp/${MOCK_VERSION}`),
+      })).rejects.toMatchObject({ code: "protocol-unsupported" });
+      for (const pid of recordedPids(layout)) expect(processAlive(pid)).toBe(false);
+    } finally { removeRoot(layout.root); }
+  });
+
+  it("refuses a memory store that did not initialize and reclaims the child", async () => {
+    const layout = makeMockLayout("memory-inactive");
+    try {
+      await expect(OmpRuntimeProcess.start({
+        launcher: MOCK_LAUNCHER, cwd: layout.cwd, env: layout.env,
+        expectedRuntimeVersion: MOCK_VERSION, memoryActiveRequired: true,
+        probeVersion: fakeVersionProbe(MOCK_VERSION, `omp/${MOCK_VERSION}`),
+      })).rejects.toMatchObject({ code: "not-started" });
+      for (const pid of recordedPids(layout)) expect(processAlive(pid)).toBe(false);
+    } finally { removeRoot(layout.root); }
+  });
+
   it("refuses a runtime that reports a different version", async () => {
     const layout = makeMockLayout("version-mismatch", { version: "omp/17.0.0" });
     try {

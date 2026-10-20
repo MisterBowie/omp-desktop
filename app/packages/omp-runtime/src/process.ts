@@ -96,6 +96,8 @@ export type OmpSpawnOptions = {
 };
 
 export type OmpRuntimeProcessOptions = {
+  memoryProtocolRequired?: boolean;
+  memoryActiveRequired?: boolean;
   /** Absolute path to the executable; never resolved from PATH. */
   launcher: string;
   /** Extra arguments after `--mode rpc-ui`. */
@@ -239,6 +241,18 @@ export class OmpRuntimeProcess {
       }
       runtime.readyFrame = checked.ready;
       await runtime.negotiateProtocol();
+      if (options.memoryProtocolRequired) {
+        const memory = await runtime.transport.request({ type: "get_state" });
+        if (!memory.success || Reflect.get(memory.data ?? {}, "memoryRpcVersion") !== 1) {
+          throw new OmpRuntimeError("protocol-unsupported", "This OMP runtime does not support desktop memory controls");
+        }
+      }
+      if (options.memoryActiveRequired) {
+        const memory = await runtime.transport.request({ type: "memory", action: "status" });
+        if (!memory.success || Reflect.get(memory.data ?? {}, "active") !== true) {
+          throw new OmpRuntimeError("not-started", "The native memory store could not be initialized");
+        }
+      }
       runtime.phase = "idle";
       return runtime;
     } catch (error) {

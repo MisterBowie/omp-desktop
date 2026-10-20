@@ -14,6 +14,8 @@
  *      are persisted through `session.bindEngine`; renames, model switches and
  *      branches go through the host so a restart restores the same identity.
  */
+import { ompMemoryDirectory } from "@pi-desktop/omp-runtime";
+import { parseOmpMemorySettings, type OmpMemorySettings } from "@pi-desktop/shared";
 import { join } from "node:path";
 import { writeFileSync } from "node:fs";
 
@@ -72,6 +74,7 @@ export type OmpSessionWiringDeps = {
   /** The desktop's `session:turnEnded` broadcast (plugin lifecycle, M5/T19-B). */
   onTurnEnd?: (info: OmpTurnEndInfo) => void;
   onIdle?: (sessionId: string) => void;
+  onMemoryMaintenanceIdle?: () => void;
 };
 
 function hostOrThrow(host: () => HostProcess | null): HostProcess {
@@ -227,6 +230,7 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
     resourcesPath: deps.resourcesPath ?? null,
     appPath: deps.appPath,
     sessionDir,
+    onMemoryMaintenanceIdle: deps.onMemoryMaintenanceIdle,
     resolveExecutionRoot: createOmpExecutionRootResolver(deps.host),
     // The session's mode and effective permission mode, read from the host
     // session row on every prompt (M5/T20-B1). `inherit` is resolved here,
@@ -255,6 +259,10 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
     createSupervisor: (spec: OmpSessionRuntimeSpec) =>
       engineRuntime.ompRuntime.createSupervisor({
         sessionDir,
+        memory: async () => {
+          const settings = await hostOrThrow(deps.host).call<OmpMemorySettings>("memory.settings.get");
+          return { ...parseOmpMemorySettings(settings), dbPath: join(ompMemoryDirectory(dataRoot, spec.executionDirectory ?? spec.projectDirectory), "memory.db"), modelSelector: spec.providerId && spec.modelId ? `${spec.providerId}/${spec.modelId}` : undefined };
+        },
         // This bridge always wires a session policy and writes a valid state
         // before every prompt, so the runtime carries the mandatory channel:
         // the gate refuses a turn whose state cannot be read back as

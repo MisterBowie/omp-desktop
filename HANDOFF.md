@@ -1,5 +1,13 @@
 # OMP Desktop 开发交接
 
+2026-10-20（自动记忆）：**Mnemopi 自动保存/读取、隔离记忆库与管理页面已完成本机源码验收。**
+入口“设置 → 记忆”，两个开关默认关闭；支持项目/worktree/临时会话查看、搜索、刷新和确认清空。
+原生 102、runtime 565、桌面 142、Rust 647 项及真实原生/Electron 流程通过；
+JS 构建、类型、lint 与 80 对/520 页文档通过。标准原生构建与最终 .7 原生/页面流程通过，shared 994 / i18n 25 项通过。
+用户已授权本地原生提交：`edec389`，受控补丁推进到 `.7`，此前 `.6` 保留历史。
+应用仍 0.1.2 / schema 22，桌面未提交，原生未推送，未发布或改安装态数据。
+工作树 `.worktrees/mnemopi-memory`，不自动进入其他阶段。见[验收与后续](docs/validation/OMP-automatic-memory-20261020.md)。
+
 2026-10-19（Skill 安装提示同版本修订）：**代码已提交并正式发布 [0.1.2 修订版](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.2%2Bskill.05cda4fb1b680656090bd6a8953913db4118c279)。**
 应用、安装包与更新清单仍为 **0.1.2**；Skill 安装提示和桌面自有 Agent 身份改为
 `OMP Desktop (omp-desktop)`，兼容 id、路径与外部正文保留。同版本需手动下载安装。

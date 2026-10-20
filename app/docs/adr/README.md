@@ -20,6 +20,7 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
+| 0330 | [Native Mnemopi with desktop-owned preferences](0330-omp-automatic-memory.md) | Accepted (local native .7 build) |
 | 0315 | [Independent OMP versions and capability-based update delivery](0315-omp-independent-releases-and-update-delivery.md) | Accepted |
 | 0314 | [Settle OMP coding diagnostics within the owning tool](0314-omp-coding-diagnostic-settlement.md) | Accepted for local maintenance validation |
 | scheduled-desktop-automations | [Desktop automation scheduling](scheduled-desktop-automations.md) | Accepted for implementation |

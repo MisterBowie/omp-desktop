@@ -71,3 +71,4 @@ export * from "./prompt-enhancement.js";
 export * from "./native-web-search.js";
 
 export * from "./types/worktree.js";
+export * from "./omp-memory.js";

@@ -1719,6 +1719,27 @@ async fn handle_request(
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "removed": removed, "sessionsRemoved": sessions_removed }))
         }
+        "memory.settings.get" => {
+            let st = state.lock().await;
+            Ok(st
+                .db
+                .kv_get("ompMemory", "settings")
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                .unwrap_or_else(|| json!({"autoSave": false, "autoRead": false})))
+        }
+        "memory.settings.set" => {
+            let valid = params.as_object().is_some_and(|object| object.len() == 2)
+                && params.get("autoSave").is_some_and(Value::is_boolean)
+                && params.get("autoRead").is_some_and(Value::is_boolean);
+            if !valid {
+                return Err(rpc_err(1002, "Invalid memory settings", "INVALID_PARAMS"));
+            }
+            let st = state.lock().await;
+            st.db
+                .kv_set("ompMemory", "settings", &params)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(params)
+        }
         "project.memory.get" => {
             let path = params
                 .get("path")
@@ -6206,6 +6227,50 @@ mod tests {
         assert!(content.contains("temporary"), "{content}");
         assert_eq!(read.content["tag"].as_str().unwrap().len(), 4);
         assert!(!active_project.join("notes.txt").exists());
+    }
+
+    #[tokio::test]
+    async fn memory_settings_roundtrip_and_validation() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let defaults = handle_request(state.clone(), "memory.settings.get", json!({}), tx.clone())
+            .await
+            .unwrap();
+        assert_eq!(defaults, json!({"autoSave": false, "autoRead": false}));
+        for value in [
+            json!({"autoSave": "yes", "autoRead": false}),
+            json!({"autoSave": true}),
+            json!({"autoSave": true, "autoRead": false, "dbPath": "/tmp"}),
+        ] {
+            assert!(
+                handle_request(state.clone(), "memory.settings.set", value, tx.clone())
+                    .await
+                    .is_err()
+            );
+        }
+        let expected = json!({"autoSave": true, "autoRead": false});
+        handle_request(
+            state.clone(),
+            "memory.settings.set",
+            expected.clone(),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            handle_request(state.clone(), "memory.settings.get", json!({}), tx.clone())
+                .await
+                .unwrap(),
+            expected
+        );
+        let reopened = AppState::open(data_dir.path()).unwrap();
+        assert_eq!(
+            reopened.db.kv_get("ompMemory", "settings").unwrap(),
+            Some(expected)
+        );
     }
 
     #[tokio::test]

@@ -343,3 +343,12 @@ Evidence: `docs/validation/M5-capability-user-paths.md`.
   through `before_agent_start` `systemPrompt` appends — never as transcript
   messages — so no provider request duplicates them into history.
 - T20 is the next task.
+
+### 6. Automatic memory opt-in (ADR 0330)
+
+The earlier blanket-off statements describe the pre-opt-in boundary. Automatic
+memory is now an explicit desktop-owned preference, projected into one native
+Mnemopi backend and a persistent, execution-directory-isolated store. It does not
+read global CLI configuration or duplicate the backend in host-core. Manual
+project notes remain host-owned. Defaults remain off; Auto-Learn stays off.
+The native memory candidate must be promoted before shipping enabled memory.

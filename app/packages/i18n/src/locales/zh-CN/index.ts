@@ -1,6 +1,35 @@
 import type { EnglishCatalog } from "../en/index.js";
 
 export const zhCN = {
+  memory: {
+    "title": "记忆",
+    "description": "OMP Mnemopi 在本地保存记忆，手动项目记忆独立保留。",
+    "autoSave": "自动保存记忆",
+    "autoRead": "自动读取记忆",
+    "autoSaveDescription": "默认每 4 个用户轮次保存，正常退出应用时会补存剩余内容。开启或清空后，不会自动导入旧历史。",
+    "autoReadDescription": "在新会话首轮及压缩上下文时检索相关记忆。",
+    "costHint": "保存和整理可能调用对应会话的模型，产生额外 Token。当前使用本地文本检索，不下载向量模型。",
+    "scopeHint": "开关作用于 OMP 会话。每个工作目录（包括 worktree）独立保存。关闭开关保留已有记忆；Auto-Learn 保持关闭。",
+    "browse": "查看和搜索记忆",
+    "browseHint": "条目包括对话片段和提炼事实；较长内容仅展示部分。",
+    "project": "项目",
+    "chooseProject": "选择项目",
+    "temporary": "临时对话",
+    "search": "搜索",
+    "refresh": "刷新",
+    "loading": "正在读取记忆…",
+    "count": "{{count}} 条记忆",
+    "empty": "暂无已保存的记忆。开启自动保存后，从后续聊天开始积累。",
+    "previous": "上一页",
+    "next": "下一页",
+    "clear": "清空此项目的记忆",
+    "confirmClear": "再次点击以清空记忆",
+    "clearHint": "永久删除此工作目录的自动记忆，手动项目记忆与聊天记录保留。",
+    "cancel": "取消",
+    "waitForIdle": "请等待 OMP 会话及排队跟进完成后重试。",
+    "operationFailed": "记忆操作失败，请确认宿主与 OMP 记忆运行时已更新。"
+},
+
   worktree: {
     menu: { group: "Git" },
     newIsolatedSession: "新建隔离会话",

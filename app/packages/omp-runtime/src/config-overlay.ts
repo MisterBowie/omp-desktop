@@ -16,11 +16,11 @@
  *     (native, standalone, or another tool's) can connect and register tools.
  *     The desktop-owned MCP equivalent arrives once through the host-tool RPC
  *     boundary in T19-B.
- *   - `memory.backend: off` — no OMP memory backend can read or write memory
- *     files or inject them into the prompt, whatever a lower-priority global
- *     or workspace config says. Desktop project memory arrives through the
- *     trusted gate with the existing `projectMemoryPrompt()` semantics in
- *     T19-C.
+ *   - Memory is off by default. An explicit desktop opt-in projects one
+ *     native Mnemopi backend, a persistent desktop-owned path, and fixed
+ *     save/recall choices. Ambient global/project settings cannot reopen
+ *     other sources. Manual project notes still arrive through the trusted
+ *     gate with the existing `projectMemoryPrompt()` semantics.
  *
  * The file is a property of one run: it lives inside the run root, and the
  * supervisor's owned cleanup removes it with the run root on stop, reclaim,
@@ -32,6 +32,7 @@
  * instead of an idle model continuation after completion (ADR 0314).
  */
 import { rmSync, writeFileSync } from "node:fs";
+import { memoryOverlayLines, type OmpMemoryLaunchConfig } from "./memory-config.js";
 
 /** File name of the run-scoped overlay inside each run root. */
 export const CONFIG_OVERLAY_FILE = "config-overlay.yml";
@@ -40,7 +41,7 @@ export const CONFIG_OVERLAY_FILE = "config-overlay.yml";
  * The overlay content, with the forced settings last so they are the final
  * word of the document if future phases append entries ahead of them.
  */
-export function sourceIsolationOverlayYaml(): string {
+export function sourceIsolationOverlayYaml(memory?: OmpMemoryLaunchConfig): string {
   return [
     "# Run-scoped capability-source boundary, written by the OMP Desktop runtime supervisor (M5/T19-A).",
     "# The pinned runtime merges this above the global and project config layers; the",
@@ -52,8 +53,7 @@ export function sourceIsolationOverlayYaml(): string {
     "  diagnosticsDeferred: false",
     "mcp:",
     "  enableProjectConfig: false",
-    "memory:",
-    "  backend: off",
+    ...memoryOverlayLines(memory),
     "",
   ].join("\n");
 }
@@ -80,9 +80,9 @@ export function sourceIsolationOverlayYaml(): string {
  * supervisor's canonical-location check but before this write (the
  * exclusive create cannot detect a parent-directory swap).
  */
-export function writeSourceIsolationOverlay(path: string): void {
+export function writeSourceIsolationOverlay(path: string, memory?: OmpMemoryLaunchConfig): void {
   rmSync(path, { recursive: true, force: true });
-  writeFileSync(path, sourceIsolationOverlayYaml(), {
+  writeFileSync(path, sourceIsolationOverlayYaml(memory), {
     encoding: "utf8",
     flag: "wx",
     mode: 0o600,

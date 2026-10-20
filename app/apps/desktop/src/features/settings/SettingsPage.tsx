@@ -1,21 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useTranslation } from "react-i18next";
-import { APP_NAME } from "@pi-desktop/shared";
 import type {
   AppSettings,
   GlobalPermissionMode,
   PluginScenicThemesDestinationMeta,
   ShortcutPlatform,
 } from "@pi-desktop/shared";
-import { useAppStore } from "../../stores/app-store";
-import { api } from "../../lib/api";
-import {
-  isSettingsDestinationHidden,
-  SETTINGS_NAV_GROUP_LABELS,
-  visibleSettingsNav,
-  type SettingsNavGroupId,
-} from "../../lib/settings-search";
-import { pluginViewIcon } from "../../lib/plugin-view-icons";
+import { APP_NAME } from "@pi-desktop/shared";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   IconArchive,
   IconBookOpen,
@@ -32,21 +23,35 @@ import {
   IconSliders,
   IconSparkles,
 } from "../../components/icons";
-import { Badge, Button, cx } from "../../components/ui";
-import { ModelConfigPage } from "../../components/settings/ModelConfigPage";
-import { KeyboardShortcutsSection } from "../../components/settings/KeyboardShortcutsSection";
+import { AgentMcpPage } from "../../components/settings/AgentMcpPage";
+import { AgentSkillsPage } from "../../components/settings/AgentSkillsPage";
+import { AgentSubagentsPage } from "../../components/settings/AgentSubagentsPage";
 import { FontFamilyRow } from "../../components/settings/FontFamilyRow";
-import { ThinkingDisplayModeRow } from "../../components/settings/ThinkingDisplayModeRow";
 import { FontSizeRow } from "../../components/settings/FontSizeRow";
+import { KeyboardShortcutsSection } from "../../components/settings/KeyboardShortcutsSection";
 import { LanguageRow } from "../../components/settings/LanguageRow";
+import { ModelConfigPage } from "../../components/settings/ModelConfigPage";
+import { NetworkProxySection } from "../../components/settings/NetworkProxySection";
+import { PluginScenicThemesDestination } from "../../components/settings/PluginScenicThemesDestination";
+import { RemoteHostsPage } from "../../components/settings/RemoteHostsPage";
 import { SettingsMenuSelect } from "../../components/settings/SettingsMenuSelect";
 import { ThemeRow } from "../../components/settings/ThemeRow";
-import { NetworkProxySection } from "../../components/settings/NetworkProxySection";
+import { ThinkingDisplayModeRow } from "../../components/settings/ThinkingDisplayModeRow";
+import { Badge, Button, cx } from "../../components/ui";
+import { api } from "../../lib/api";
+import { pluginViewIcon } from "../../lib/plugin-view-icons";
+import {
+  isSettingsDestinationHidden,
+  SETTINGS_NAV_GROUP_LABELS,
+  type SettingsNavGroupId,
+  visibleSettingsNav,
+} from "../../lib/settings-search";
 import { ProjectsPage } from "../../pages/ProjectsPage";
-import { AgentSkillsPage } from "../../components/settings/AgentSkillsPage";
-import { AgentMcpPage } from "../../components/settings/AgentMcpPage";
-import { AgentSubagentsPage } from "../../components/settings/AgentSubagentsPage";
-import { RemoteHostsPage } from "../../components/settings/RemoteHostsPage";
+import { useAppStore } from "../../stores/app-store";
+import { AgentInstructionsSection, UpdatesRow } from "./agent-sections";
+import { CloseBehaviorSection, DeveloperSection } from "./developer-sections";
+import { ImportSection } from "./import-page";
+import { MemorySettingsPage } from "./MemorySettingsPage";
 import {
   CommandShellRow,
   ContextUsageDisplayRow,
@@ -55,11 +60,7 @@ import {
   SettingsCard,
   SettingsRow,
 } from "./primitives";
-import { AgentInstructionsSection, UpdatesRow } from "./agent-sections";
-import { ImportSection } from "./import-page";
 import { PromptEnhancementCard } from "./prompt-enhancement-card";
-import { CloseBehaviorSection, DeveloperSection } from "./developer-sections";
-import { PluginScenicThemesDestination } from "../../components/settings/PluginScenicThemesDestination";
 
 type SettingsTab = ReturnType<typeof useAppStore.getState>["settingsTab"];
 
@@ -204,6 +205,7 @@ export function SettingsPage() {
       mcp: <IconServer size={14} />,
       subagents: <IconBot size={14} />,
       import: <IconDownload size={14} />,
+      memory: <IconBookOpen size={14} />,
       projects: <IconArchive size={14} />,
       remoteHosts: <IconGlobe size={14} />,
       about: <IconInfo size={14} />,
@@ -519,6 +521,7 @@ export function SettingsPage() {
 
           {tab === "import" && <ImportSection />}
 
+          {tab === "memory" && <MemorySettingsPage />}
           {tab === "projects" && <ProjectsPage />}
 
           {tab === "remoteHosts" && !tabHidden && <RemoteHostsPage />}

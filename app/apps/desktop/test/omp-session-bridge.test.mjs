@@ -2644,3 +2644,27 @@ test("a recreated bridge mints live ids that do not collide with a retained repl
     for (const supervisor of [...first.supervisors, ...second.supervisors]) await supervisor.reclaimAll().catch(() => undefined);
   }
 });
+
+test("memory maintenance refuses live turns and native background work before retiring an idle writer", async () => {
+  const h = bridgeHarness();
+  const projectPath = makeProject();
+  let reclaims = 0;
+  const reclaim = h.supervisor.reclaimAll.bind(h.supervisor);
+  h.supervisor.reclaimAll = async () => { reclaims++; return reclaim(); };
+  try {
+    await h.bridge.prompt({ sessionId: OMP_SESSION, projectPath, content: "memory lifecycle" });
+    await assert.rejects(h.bridge.withIdleRuntimes(async () => {}), /finish before changing memory/);
+    h.runtime.push({ type: "agent_start" });
+    h.runtime.push({ type: "agent_end", messages: [] });
+    assert.equal(h.bridge.isBusy(OMP_SESSION), false);
+    h.runtime.stateResponse.data.memoryMaintenanceSafe = false;
+    const before = reclaims;
+    await assert.rejects(h.bridge.withIdleRuntimes(async () => {}), /background work/);
+    assert.equal(reclaims, before, "background work must not be killed to change memory");
+    h.runtime.stateResponse.data.memoryMaintenanceSafe = true;
+    let changed = false;
+    await h.bridge.withIdleRuntimes(async () => { assert.ok(reclaims > before); changed = true; });
+    assert.equal(changed, true);
+    assert.equal(h.bridge.diagnostics().sessions.length, 0);
+  } finally { await h.bridge.dispose(); }
+});

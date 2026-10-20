@@ -1,0 +1,49 @@
+{
+  "schema": "omp-desktop.bundled-sidecar/3",
+  "fork": {
+    "repository": "https://github.com/MisterBowie/oh-my-pi",
+    "commit": "edec3898d44071206ec201beebea432a2786bd8c",
+    "tree": "d7b02053ea0735d8405c56ca499372414c96503c"
+  },
+  "upstreamBase": {
+    "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+    "version": "18.3.0"
+  },
+  "patchLevel": "62bc57b+omp-desktop.7",
+  "capabilities": [
+    "rpc-host-tool-concurrency",
+    "rpc-host-tool-sole-batch-policy",
+    "agent-tool-result-terminate",
+    "rpc-host-tool-result-terminate",
+    "extension-live-system-prompt",
+    "rpc-host-tool-settle-termination",
+    "reproducible-sidecar-build",
+    "explicit-bytecode-build-mode",
+    "inline-lsp-diagnostics",
+    "mnemopi-memory-management-rpc-v1",
+    "mnemopi-retention-baseline",
+    "mnemopi-compaction-recall-opt-out",
+    "rpc-memory-maintenance-safety"
+  ],
+  "ompVersion": "18.3.0",
+  "desktopVersion": "0.1.2",
+  "platform": "darwin",
+  "arch": "arm64",
+  "binary": {
+    "filename": "omp",
+    "bytes": 216468992,
+    "sha256": "45ff07e13e2b2404f03b1b385b6dfe1a450e5f290e42a5fb13c94405307146a4"
+  },
+  "extensions": [
+    {
+      "path": "extensions/omp-desktop-gate.js",
+      "bytes": 53747,
+      "sha256": "449b291e08f0a01ad186cd1be30441b540ce20725b639ec62f6d2df82bff82de"
+    }
+  ],
+  "build": {
+    "tool": "bun",
+    "bunVersion": "1.4.2",
+    "bytecode": true
+  }
+}

@@ -604,6 +604,10 @@ export const api = {
     ),
   runImportModelConfigs: (items: ModelConfigImportCandidate[]) =>
     invoke<ImportRunResult>(IPC.invoke.modelConfigImportRun, items),
+  getOmpMemorySettings: () => invoke<import("@pi-desktop/shared").OmpMemorySettings>(IPC.invoke.ompMemorySettingsGet),
+  setOmpMemorySettings: (settings: import("@pi-desktop/shared").OmpMemorySettings) => invoke<import("@pi-desktop/shared").OmpMemorySettings>(IPC.invoke.ompMemorySettingsSet, settings),
+  queryOmpMemory: (input: { projectPath?: string; sessionId?: string; query?: string; offset?: number }) => invoke<import("@pi-desktop/shared").OmpMemoryPage>(IPC.invoke.ompMemoryQuery, input),
+  clearOmpMemory: (scope: { projectPath?: string; sessionId?: string }) => invoke<{ cleared: true }>(IPC.invoke.ompMemoryClear, { ...scope, confirmed: true }),
   getSettings: () => invoke<AppSettings>(IPC.invoke.settingsGet).then(normalizeSettings),
   setSettings: (settings: AppSettings) =>
     invoke(IPC.invoke.settingsSet, validateSettingsWrite(settings)),

@@ -1216,7 +1216,7 @@ runtimeLifecycle = createRuntimeLifecycle({
 });
 const { bootHostStatus, runtimeArch, bootBackends } = runtimeLifecycle;
 
-const { engineRuntime, ompSessions } = createOmpSessionServices({
+const { engineRuntime, ompSessions, ompMemory } = createOmpSessionServices({
   dataRoot: dataDir,
   app,
   host: () => host,
@@ -1243,6 +1243,7 @@ function registerIpc() {
     getAgentHostBridge: () => agentHostBridge,
     engineRouter: engineRuntime.engineRouter,
     ompSessions,
+    ompMemory,
     getBackendRouter: () => startupState.backendRouter,
     getNotificationViewingSessionId: () => notificationViewingSessionId,
     setNotificationViewingSessionId: (sessionId: string | null) => {

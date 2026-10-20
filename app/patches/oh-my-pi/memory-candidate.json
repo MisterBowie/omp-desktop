@@ -1,0 +1,49 @@
+{
+  "schema": "omp-desktop.memory-candidate/1",
+  "release": false,
+  "baseForkCommit": "d648d27bcf0db16caecb876142d891cf49a51bc2",
+  "patch": {
+    "file": "0002-omp-desktop-memory-candidate.patch",
+    "sha256": "44cc1755fbf289c12d4b82b382cc4675ba272403623358c5ea826fab7a80672a",
+    "bytes": 17410
+  },
+  "files": [
+    {
+      "path": "docs/rpc.md",
+      "sha256": "af924193709e586d710aaddba462d90c4ec9632b87b9a81a0f8a419be82a81ac"
+    },
+    {
+      "path": "packages/coding-agent/src/config/settings-schema.ts",
+      "sha256": "cd57fd6add2e441e498a4e7cdaec05d5e07d362d0389e374f6a4d35e08040d4e"
+    },
+    {
+      "path": "packages/coding-agent/src/mnemopi/config.ts",
+      "sha256": "2295763c6dd83480f40ef27dc5dac739b9c80ee3e56ce4270c39fbe884d18aff"
+    },
+    {
+      "path": "packages/coding-agent/src/mnemopi/state.ts",
+      "sha256": "7195771793799f94456b7a3011966852350ee342a7ea72df6d96c077cbc619f3"
+    },
+    {
+      "path": "packages/coding-agent/src/modes/rpc/rpc-memory.ts",
+      "sha256": "4de68bd5ec6c232bc3af2f52637258cb1e1a66f012135ef9ca41845ad4ab00f8"
+    },
+    {
+      "path": "packages/coding-agent/src/modes/rpc/rpc-mode.ts",
+      "sha256": "83a65184a1a92c8dc41f06a5796f0d153f8b995d5f15d492a96f3c56fa0d376e"
+    },
+    {
+      "path": "packages/coding-agent/src/modes/rpc/rpc-types.ts",
+      "sha256": "7db6723d40c9cf530a02d979f3b9666ae2b526c98346fca63d9f00d54082e22f"
+    },
+    {
+      "path": "packages/coding-agent/src/session/agent-session.ts",
+      "sha256": "7f5946f2d40c23d1810fe645184c053b2b54fafc2948d4044d5988093242eed4"
+    },
+    {
+      "path": "packages/coding-agent/test/agent-session-memory-backend.test.ts",
+      "sha256": "adec1ffe908717ccecb810e19e7d90eaeb8f0335db7635066126a70b48072eb6"
+    }
+  ],
+  "promotedForkCommit": "edec3898d44071206ec201beebea432a2786bd8c"
+}

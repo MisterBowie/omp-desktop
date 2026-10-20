@@ -14613,3 +14613,17 @@ cross-platform GUI; record those separately. No paid provider is needed.
   plus a local compiled-prompt probe. Live-model reply wording remains Draft;
   no paid-model request is needed for the prompt checks.
 - **Specs linked**: `03-runtime/02-agent-runtime.md` (§7).
+
+## OMP automatic memory
+
+Run `node scripts/e2e-memory-settings.mjs` with `OMP_MEMORY_TEST_RUNTIME` pointing
+to the memory candidate. Use an isolated Electron profile and Rust host. Verify
+both defaults off, independent switches, project selection, empty browsing,
+clear/cancel/confirm, and persistence across host/renderer restart. Never attach
+the user's running desktop.
+
+Run `OMP_MEMORY_TEST_RUNTIME=<candidate> node --test
+apps/desktop/test/omp-memory-native-e2e.test.mjs` against a local scripted provider.
+Verify automatic retention, cross-process recall, worktree isolation, read/save
+disabling, credential-free management, and native clear. Native session tests
+also cover resumed-history baselines and no compaction recall while disabled.

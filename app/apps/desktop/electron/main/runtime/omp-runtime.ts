@@ -32,6 +32,7 @@ import {
   type BundledSidecarProvenance,
   type OmpReclaimResult,
   type OmpRunPaths,
+  type OmpMemoryLaunchConfig,
 } from "@pi-desktop/omp-runtime";
 
 /**
@@ -183,6 +184,7 @@ export type OmpRuntimeAdapter = {
    * user's real directories is copied.
    */
   createSupervisor(options?: {
+    memory?: () => Promise<OmpMemoryLaunchConfig>;
     sessionDir?: string | null;
     prepareRun?: (paths: OmpRunPaths) => void | Promise<void>;
     extraEnv?: NodeJS.ProcessEnv;
@@ -225,6 +227,7 @@ export function createOmpRuntimeAdapter(
       : baseArgs;
     return factory({
       dataRoot: options.dataRoot,
+      memory: createOptions.memory,
       launcherPath: resolved.path,
       expectedRuntimeVersion: options.expectedRuntimeVersion,
       ...(resolutionError ? { launcherResolutionError: resolutionError } : {}),

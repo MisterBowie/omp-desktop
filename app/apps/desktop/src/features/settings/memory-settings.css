@@ -1,0 +1,15 @@
+.memory-settings-search {
+  display: flex;
+  gap: var(--space-2);
+  margin-block: var(--space-3);
+  flex-wrap: wrap;
+}
+.memory-settings-results {
+  display: grid;
+  gap: var(--space-2);
+  margin-block: var(--space-3);
+}
+.memory-settings-content {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

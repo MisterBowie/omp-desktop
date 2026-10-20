@@ -1,4 +1,5 @@
 /** Product composition for OMP sessions; the application entry only supplies services. */
+import { createOmpMemoryService } from "../runtime/omp-memory";
 import { createDesktopEngineRuntimeForApp } from "../runtime/engine-runtime";
 import { wireOmpSessions, type OmpSessionWiringDeps } from "../runtime/omp-session-wiring";
 import { createOmpHostToolAdapter, createHostPlansEndpoints, type OmpHostToolAdapterDeps } from "../runtime/omp-host-tools";
@@ -61,6 +62,11 @@ export function createOmpSessionServices(deps: OmpSessionServicesDeps) {
       log: deps.logger,
     }),
     onIdle: (sessionId) => deps.getAgentHostBridge()?.agentHost.kick(sessionId),
+    onMemoryMaintenanceIdle: () => {
+      void deps.host()?.call<{ sessions?: Array<{ id: string }> }>("session.list", {}).then(result => {
+        for (const session of result.sessions ?? []) deps.getAgentHostBridge()?.agentHost.kick(session.id);
+      }).catch(() => deps.logger.app("runtime", "warn", "memory queue wake failed"));
+    },
     onTurnEnd: (info) => {
       deps.announceTurnEnded(info);
       deps.getAgentHostBridge()?.endTurn(info.sessionId, info.turnId,
@@ -69,5 +75,18 @@ export function createOmpSessionServices(deps: OmpSessionServicesDeps) {
       deps.settleOmpTurnEnd(info);
     },
   });
-  return { engineRuntime, ompSessions };
+  const ompMemory = createOmpMemoryService({
+    dataRoot: deps.dataRoot, host: deps.host, sessions: ompSessions,
+    createSupervisor: options => engineRuntime.ompRuntime.createSupervisor(options),
+  });
+  const sessionsWithMemoryShutdown = {
+    ...ompSessions,
+    dispose: async (reason?: string) => {
+      let memoryFailed = false;
+      try { await ompMemory.dispose(); } catch { memoryFailed = true; }
+      const result = await ompSessions.dispose(reason);
+      return memoryFailed ? { ok: false, failures: [...result.failures, { sessionId: "omp-memory-service", detail: "memory runtime reclaim incomplete" }] } : result;
+    },
+  };
+  return { engineRuntime, ompSessions: sessionsWithMemoryShutdown, ompMemory };
 }
