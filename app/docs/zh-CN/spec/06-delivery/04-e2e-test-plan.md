@@ -8215,6 +8215,19 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   F (unread persistence), Quality (bounded localized menu).
 - **Milestone**: Post-M6 desktop shell maintenance.
 - **Status**: Draft; native E2E requires an explicitly authorized run.
+#### E2E-MODEL-provider-token-limits-survive-selection-and-restart
+
+- **步骤**：测试端点返回 `context_window: 872000`、`max_output_tokens: 128000`，
+  获取列表、选中、保存并重新读取。分别覆盖目录已知模型、网关未知 ID、历史继承的
+  128k 和 Advanced 手动 128k。端点改报 931000，再保存并核对运行时配置。
+- **预期**：新选择上下文为 872000、输出为 128000；缓存不请求网络。端点窗口以
+  `provider` 来源保存并跨运行时解析保留；刷新可更新继承值，用户及旧版显式值保留。
+  非正整数、超范围或非法限制忽略，不把输出值作为上下文。
+- **规格**：`03-runtime/13-model-catalog-and-selection.md`、
+  `03-runtime/12-provider-config-schema.md`、ADR `provider-published-token-limits`。
+- **状态**：发现、IPC、共享解析和宿主配置边界已自动化，覆盖见英文同名场景。
+  安装态 GUI/实际重启仍为手动场景；夹具不调用付费推理。
+
 #### E2E-MODEL-catalog-window-correction-reaches-saved-bindings：目录修正回流已保存绑定，且不覆盖用户手改值
 
 - **目标**：models.dev 修正某模型上限后回流到已保存的绑定（不必删除重建），

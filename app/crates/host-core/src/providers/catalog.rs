@@ -8,9 +8,9 @@ pub(crate) const PROVIDER_SELECT: &str =
 pub(crate) const CANONICAL_THINKING_LEVELS: &[&str] =
     &["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 /// Recognised context-window provenance markers. Anything else is dropped so a
-/// row always falls back to the documented rule instead of a third state no
+/// row always falls back to the documented rule instead of an unknown state no
 /// reader understands.
-const CONTEXT_WINDOW_SOURCES: &[&str] = &["catalog", "user"];
+const CONTEXT_WINDOW_SOURCES: &[&str] = &["catalog", "provider", "user"];
 pub(crate) const DEFAULT_CONTEXT_WINDOW: u32 = 128_000;
 pub(crate) const DEFAULT_MAX_TOKENS: u32 = 8_192;
 
@@ -406,6 +406,20 @@ mod tests {
             read(&saved)[0].context_window_source.as_deref(),
             Some("user")
         );
+    }
+
+    #[test]
+    fn a_provider_sourced_binding_survives_the_config_round_trip() {
+        let raw = r#"{"models":[{"id":"gateway/claude","contextWindow":872000,
+            "maxTokens":128000,"contextWindowSource":"provider"}]}"#;
+        let saved = config_with_model_bindings("{}", &read(raw)).unwrap();
+        let restored = read(&saved);
+        assert_eq!(
+            restored[0].context_window_source.as_deref(),
+            Some("provider")
+        );
+        assert_eq!(restored[0].context_window, 872_000);
+        assert_eq!(restored[0].max_tokens, 128_000);
     }
 
     /// Records written before the marker name no source. They stay `None` so

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   bindingForCustomModel,
   bindingFromModelInfo,
+  bindingWithModelInfo,
   bindingSupportsDocuments,
   effectiveContextWindow,
   bindingSupportsImages,
@@ -91,6 +92,29 @@ describe("binding context-window provenance", () => {
     expect(effectiveContextWindow(1_050_000, edited.contextWindow, edited.contextWindowSource)).toBe(
       256_000,
     );
+  });
+});
+
+describe("endpoint-published context windows", () => {
+  const model = { ...textModel(), contextWindow: 872_000, maxTokens: 128_000, contextWindowSource: "provider" as const };
+
+  it("saves endpoint provenance and keeps it above generic and catalog defaults", () => {
+    const binding = bindingFromModelInfo(model);
+    expect(binding.contextWindowSource).toBe("provider");
+    expect(binding.maxTokens).toBe(128_000);
+    expect(effectiveContextWindow(128_000, binding.contextWindow, "provider")).toBe(872_000);
+    expect(effectiveContextWindow(1_000_000, binding.contextWindow, "provider")).toBe(872_000);
+    expect(effectiveContextWindow(1_000_000, 128_000, "provider")).toBe(128_000);
+  });
+
+  it("refreshes inherited bindings but preserves explicit and legacy overrides", () => {
+    const binding = bindingForCustomModel(model.modelId);
+    expect(bindingWithModelInfo(binding, model).contextWindow).toBe(872_000);
+    expect(bindingWithModelInfo({ ...binding, contextWindow: 931_000, contextWindowSource: "provider" }, model).contextWindow).toBe(872_000);
+    const user = { ...binding, contextWindowSource: "user" as const };
+    expect(bindingWithModelInfo(user, model)).toBe(user);
+    const legacy = { ...binding, contextWindow: 256_000, contextWindowSource: undefined };
+    expect(bindingWithModelInfo(legacy, model)).toBe(legacy);
   });
 });
 

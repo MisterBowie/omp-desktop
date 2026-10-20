@@ -352,3 +352,4 @@ Each ADR includes:
 | image-generation-capability | [Image generation as a configured Agent capability](image-generation-capability.md) | Accepted |
 | omp-session-controls | [OMP text steering, follow-up turns and manual compaction](omp-session-controls.md) | Accepted (text controls; fork and child stop remain closed) |
 | omp-session-worktrees | [OMP session worktrees retain project identity](omp-session-worktrees.md) | Accepted (local OMP session worktrees) |
+| provider-published-token-limits | [Preserve endpoint-published token limits](provider-published-token-limits.md) | Accepted |

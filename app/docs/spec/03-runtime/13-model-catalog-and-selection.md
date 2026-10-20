@@ -20,6 +20,15 @@ presented as a browsable list of every published model — a deployment does not
 necessarily host everything its vendor publishes, and a key is not necessarily
 entitled to it.
 
+Endpoint-published token limits take precedence over the catalog baseline.
+Discovery preserves positive integer `context_window`, `context_length`, or
+`max_input_tokens` and `max_output_tokens`; Google uses `inputTokenLimit` and
+`outputTokenLimit`. Output limits never become context windows. Inherited
+selections adopt a fresh endpoint window on save; explicit Advanced values stay
+unchanged. Selected endpoint windows use `contextWindowSource: "provider"` so
+generic defaults and later models.dev resolution cannot replace them. Only raw
+endpoint rows enter the host cache, before defaults and user overrides.
+
 ### Settings: one provider form
 
 `ProviderSetupDialog` is a single form, not a wizard:
@@ -245,11 +254,11 @@ Provider model loading remains stale-while-revalidate:
    Rust-owned SQLite without provider network access.
 2. The renderer can show those rows immediately in the Composer and provider
    dialog.
-3. `source: "refresh"` uses the bundled/in-memory models.dev catalog first and
-   probes a provider endpoint only to discover IDs that models.dev does not
-   expose.
+3. `source: "refresh"` probes the provider endpoint first, then enriches its
+   returned IDs through the bundled/in-memory models.dev catalog.
 4. Successful provider discovery may update the Rust-owned normalized cache;
-   it cannot replace a matching models.dev record or its metadata.
+   validated endpoint token limits replace the catalog baseline. Other metadata
+   continues to come from models.dev.
 5. Configured `ModelBinding` IDs are retained when discovery is partial or
    unavailable, and an ID absent from models.dev receives generic metadata.
 
@@ -326,12 +335,14 @@ model window. Every binding records where its `contextWindow` came from
 - `user` — the number was entered through the per-model Advanced control (or the
   preset ladder in it) and is never replaced by the catalog, including the
   `128,000` value that is otherwise the generic seed.
+- `provider` — the endpoint published this window. It survives catalog/generic
+  resolution and can update from a fresh model-list response on Settings save.
 
 Bindings written before the marker name no source. They keep the historical rule,
 deterministically: a published `limit.context` replaces exactly the generic
 `128,000` seed, and every other stored value stays the explicit value. Unknown
-models still use the conservative 128k generic window and are never promoted from
-an ID pattern alone. The marker is optional in the persisted record, so a config
+models with no endpoint-published window still use the conservative 128k generic
+window and are never promoted from an ID pattern alone. The marker is optional in the persisted record, so a config
 written by an older version stays readable and a downgrade ignores it.
 
 The configured user value remains persisted and visible in Advanced settings, but

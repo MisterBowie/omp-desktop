@@ -14086,6 +14086,25 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   project. The two-live-sessions desktop journey and the panel step are Draft
   (run only in a capable environment when this surface changes)
 
+#### E2E-MODEL-provider-token-limits-survive-selection-and-restart
+
+- **Steps**: With a fixture endpoint returning `context_window: 872000` and
+  `max_output_tokens: 128000`, fetch the list, select a model, save and reload.
+  Repeat with a matching models.dev record, an unknown gateway ID, an old
+  inherited 128k binding, and an explicit Advanced 128k binding. Refresh the
+  endpoint to 931000, save again, and inspect runtime model resolution.
+- **Expected**: Context is 872000 and output is 128000 for new selections.
+  Cache hydration makes no network request. The selected endpoint window keeps
+  `provider` provenance through save/read and runtime resolution; refreshing
+  updates inherited context while user/legacy overrides remain unchanged.
+  Invalid, fractional, non-positive and overflowing limits are ignored.
+- **Specs linked**: `03-runtime/13-model-catalog-and-selection.md` §2/§9.1,
+  `03-runtime/12-provider-config-schema.md` §2, ADR `provider-published-token-limits`.
+- **Status**: Automated at discovery/IPC/shared/host configuration boundaries in
+  `provider-discovery-limits.test.mjs`, `model-discovery.test.mjs`, shared catalog
+  tests and Rust provider tests. Installed GUI/restart validation remains manual;
+  no paid inference is required or executed by these fixtures.
+
 #### E2E-MODEL-catalog-window-correction-reaches-saved-bindings
 
 - **Goal**: a models.dev limit correction reaches an already saved binding without

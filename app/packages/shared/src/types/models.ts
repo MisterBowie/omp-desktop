@@ -79,8 +79,9 @@ export function modelIdsMatch(candidate: string, requested: string): boolean {
  * `catalog` is a metadata snapshot: the value follows the published models.dev
  * record, so a later catalog correction still reaches an already saved binding.
  * `user` is the user's own number and is never overwritten by the catalog.
+ * `provider` is an endpoint-published limit saved with this provider binding.
  */
-export type ContextWindowSource = "catalog" | "user";
+export type ContextWindowSource = "catalog" | "provider" | "user";
 
 /** Provider-local model settings persisted with the provider configuration. */
 export type ModelBinding = {
@@ -200,6 +201,7 @@ export type ModelInfo = {
   experimental?: ModelExperimentalMetadata;
   /** Convenience values retained for existing UI and cache consumers. */
   contextWindow?: number;
+  contextWindowSource?: ContextWindowSource;
   maxTokens?: number;
   capabilities: Array<
     | "text"

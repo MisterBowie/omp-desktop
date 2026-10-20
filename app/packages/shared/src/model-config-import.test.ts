@@ -172,6 +172,14 @@ requires_openai_auth = true
 });
 
 describe("parsePiModelConfig", () => {
+  it("preserves endpoint context provenance when importing a model binding", () => {
+    const [draft] = parsePiModelConfig({ providers: { fixture: {
+      baseUrl: "https://provider.invalid/v1",
+      models: [{ id: "gateway-model", contextWindow: 872_000, maxTokens: 128_000, contextWindowSource: "provider" }],
+    } } });
+    expect(draft.models[0]).toMatchObject({ contextWindow: 872_000, contextWindowSource: "provider" });
+  });
+
   it("reads ~/.pi/agent/models.json providers, env: keys, and limits", () => {
     const drafts = parsePiModelConfig(
       {

@@ -32,6 +32,57 @@ test("anthropic lists keep display names", () => {
   ]);
 });
 
+for (const apiStyle of ["chat_completions", "responses", "anthropic_messages"]) {
+  test(`${apiStyle} preserves provider context and output limits separately`, () => {
+    const [model] = normalizeModelList(apiStyle, {
+      data: [{
+        id: "factory/claude-opus-5-5",
+        context_window: 872_000,
+        context_length: 872_000,
+        max_input_tokens: 872_000,
+        max_output_tokens: 128_000,
+      }],
+    });
+    assert.equal(model.contextWindow, 872_000);
+    assert.equal(model.maxTokens, 128_000);
+  });
+}
+
+test("discovery accepts supported limit aliases and rejects invalid counts", () => {
+  const models = normalizeModelList("responses", [{
+    id: "context-length", context_length: 931_000, max_output_tokens: 64_000,
+  }, {
+    id: "input-only", max_input_tokens: 200_000,
+  }, {
+    id: "invalid", context_window: -1, context_length: "1000000",
+    max_input_tokens: Number.POSITIVE_INFINITY, max_output_tokens: 1.5,
+  }]);
+  assert.equal(models.find((model) => model.modelId === "context-length").contextWindow, 931_000);
+  assert.equal(models.find((model) => model.modelId === "input-only").contextWindow, 200_000);
+  assert.deepEqual(models.find((model) => model.modelId === "invalid"), {
+    modelId: "invalid", displayName: "invalid",
+  });
+});
+
+test("Google discovery preserves input and output token limits", () => {
+  const [model] = normalizeModelList("google_generative_ai", {
+    models: [{ name: "models/gemini-fixture", inputTokenLimit: 1_048_576, outputTokenLimit: 65_536 }],
+  });
+  assert.equal(model.contextWindow, 1_048_576);
+  assert.equal(model.maxTokens, 65_536);
+});
+
+test("explicit context wins and output-only or overflowing limits cannot supply a window", () => {
+  const models = normalizeModelList("responses", [{
+    id: "precedence", context_window: 872_000, context_length: 931_000, max_input_tokens: 1_000_000,
+  }, { id: "output-only", max_output_tokens: 128_000 }, {
+    id: "overflow", context_window: 0x1_0000_0000, max_output_tokens: 0x1_0000_0000,
+  }]);
+  assert.equal(models.find((model) => model.modelId === "precedence").contextWindow, 872_000);
+  assert.equal(models.find((model) => model.modelId === "output-only").contextWindow, undefined);
+  assert.deepEqual(models.find((model) => model.modelId === "overflow"), { modelId: "overflow", displayName: "overflow" });
+});
+
 test("google lists strip the models/ prefix", () => {
   const models = normalizeModelList("google_generative_ai", {
     models: [
