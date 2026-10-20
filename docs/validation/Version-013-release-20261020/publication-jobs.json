@@ -1,0 +1,433 @@
+{
+  "total_count": 3,
+  "jobs": [
+    {
+      "id": 118472031978,
+      "run_id": 39375317391,
+      "workflow_name": "Promote an accepted OMP candidate",
+      "head_branch": "publish-v0.1.3-run-39371606683",
+      "run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/runs/39375317391",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUkBB8s8AAAAblXu-6g",
+      "head_sha": "979585c69ed0e91bd097d66cf66c27642d74d0b4",
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/jobs/118472031978",
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/39375317391/job/118472031978",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-20T05:31:05Z",
+      "started_at": "2026-10-20T05:31:07Z",
+      "completed_at": "2026-10-20T05:31:17Z",
+      "name": "bind",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-20T05:31:07Z",
+          "completed_at": "2026-10-20T05:31:08Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-20T05:31:08Z",
+          "completed_at": "2026-10-20T05:31:11Z"
+        },
+        {
+          "name": "Read the immutable candidate selected by the publication tag",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-20T05:31:11Z",
+          "completed_at": "2026-10-20T05:31:15Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-20T05:31:15Z",
+          "completed_at": "2026-10-20T05:31:15Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-20T05:31:15Z",
+          "completed_at": "2026-10-20T05:31:15Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/check-runs/118472031978",
+      "labels": [
+        "ubuntu-22.04"
+      ],
+      "runner_id": 1000000209,
+      "runner_name": "GitHub Actions 1000000209",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 118472091286,
+      "run_id": 39375317391,
+      "workflow_name": "Promote an accepted OMP candidate",
+      "head_branch": "publish-v0.1.3-run-39371606683",
+      "run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/runs/39375317391",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUkBB8s8AAAAblXymlg",
+      "head_sha": "979585c69ed0e91bd097d66cf66c27642d74d0b4",
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/jobs/118472091286",
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/39375317391/job/118472091286",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-20T05:31:18Z",
+      "started_at": "2026-10-20T05:31:19Z",
+      "completed_at": "2026-10-20T05:32:55Z",
+      "name": "publish / publish",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-20T05:31:20Z",
+          "completed_at": "2026-10-20T05:31:21Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-20T05:31:21Z",
+          "completed_at": "2026-10-20T05:31:24Z"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-20T05:31:24Z",
+          "completed_at": "2026-10-20T05:31:31Z"
+        },
+        {
+          "name": "Verify publication tag and original-release protection",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-20T05:31:31Z",
+          "completed_at": "2026-10-20T05:31:32Z"
+        },
+        {
+          "name": "Bind the accepted source, native jobs and immutable artifacts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-20T05:31:32Z",
+          "completed_at": "2026-10-20T05:31:33Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-20T05:31:33Z",
+          "completed_at": "2026-10-20T05:31:36Z"
+        },
+        {
+          "name": "Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-20T05:31:36Z",
+          "completed_at": "2026-10-20T05:31:41Z"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-20T05:31:41Z",
+          "completed_at": "2026-10-20T05:31:42Z"
+        },
+        {
+          "name": "Run pnpm install --frozen-lockfile --ignore-scripts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-20T05:31:42Z",
+          "completed_at": "2026-10-20T05:31:50Z"
+        },
+        {
+          "name": "Run actions/download-artifact@v8",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-20T05:31:50Z",
+          "completed_at": "2026-10-20T05:32:08Z"
+        },
+        {
+          "name": "Stage every candidate artifact in the published namespace",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-20T05:32:08Z",
+          "completed_at": "2026-10-20T05:32:15Z"
+        },
+        {
+          "name": "Run actions/download-artifact@v8",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-20T05:32:15Z",
+          "completed_at": "2026-10-20T05:32:16Z"
+        },
+        {
+          "name": "Preserve the accepted native evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-20T05:32:16Z",
+          "completed_at": "2026-10-20T05:32:16Z"
+        },
+        {
+          "name": "Verify every installer hash and merge update feeds",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-20T05:32:16Z",
+          "completed_at": "2026-10-20T05:32:21Z"
+        },
+        {
+          "name": "Prepare product release notes",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-20T05:32:21Z",
+          "completed_at": "2026-10-20T05:32:25Z"
+        },
+        {
+          "name": "Create or verify the stable tag at the accepted source",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-20T05:32:25Z",
+          "completed_at": "2026-10-20T05:32:26Z"
+        },
+        {
+          "name": "Publish the complete stable release",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-20T05:32:26Z",
+          "completed_at": "2026-10-20T05:32:51Z"
+        },
+        {
+          "name": "Read back the public stable update channel",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-20T05:32:51Z",
+          "completed_at": "2026-10-20T05:32:52Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 32,
+          "started_at": "2026-10-20T05:32:52Z",
+          "completed_at": "2026-10-20T05:32:52Z"
+        },
+        {
+          "name": "Post Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 33,
+          "started_at": "2026-10-20T05:32:52Z",
+          "completed_at": "2026-10-20T05:32:52Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 34,
+          "started_at": "2026-10-20T05:32:52Z",
+          "completed_at": "2026-10-20T05:32:53Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 35,
+          "started_at": "2026-10-20T05:32:53Z",
+          "completed_at": "2026-10-20T05:32:53Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 36,
+          "started_at": "2026-10-20T05:32:53Z",
+          "completed_at": "2026-10-20T05:32:53Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 37,
+          "started_at": "2026-10-20T05:32:53Z",
+          "completed_at": "2026-10-20T05:32:53Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/check-runs/118472091286",
+      "labels": [
+        "ubuntu-22.04"
+      ],
+      "runner_id": 1000000210,
+      "runner_name": "GitHub Actions 1000000210",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 118472537716,
+      "run_id": 39375317391,
+      "workflow_name": "Promote an accepted OMP candidate",
+      "head_branch": "publish-v0.1.3-run-39371606683",
+      "run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/runs/39375317391",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUkBB8s8AAAAblYN2dA",
+      "head_sha": "979585c69ed0e91bd097d66cf66c27642d74d0b4",
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/jobs/118472537716",
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/39375317391/job/118472537716",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-20T05:32:55Z",
+      "started_at": "2026-10-20T05:32:57Z",
+      "completed_at": "2026-10-20T05:33:45Z",
+      "name": "readback / readback",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-20T05:32:57Z",
+          "completed_at": "2026-10-20T05:32:59Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-20T05:32:59Z",
+          "completed_at": "2026-10-20T05:33:01Z"
+        },
+        {
+          "name": "Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-20T05:33:01Z",
+          "completed_at": "2026-10-20T05:33:07Z"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-20T05:33:07Z",
+          "completed_at": "2026-10-20T05:33:12Z"
+        },
+        {
+          "name": "Run pnpm install --frozen-lockfile --ignore-scripts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-20T05:33:12Z",
+          "completed_at": "2026-10-20T05:33:19Z"
+        },
+        {
+          "name": "Bind the requested release version",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-20T05:33:19Z",
+          "completed_at": "2026-10-20T05:33:19Z"
+        },
+        {
+          "name": "Download the complete published release and revalidate its candidate",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-20T05:33:19Z",
+          "completed_at": "2026-10-20T05:33:29Z"
+        },
+        {
+          "name": "Verify actual public bytes, manifests, source receipts and feeds",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-20T05:33:29Z",
+          "completed_at": "2026-10-20T05:33:36Z"
+        },
+        {
+          "name": "Publish only the public asset receipt",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-20T05:33:36Z",
+          "completed_at": "2026-10-20T05:33:39Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-20T05:33:39Z",
+          "completed_at": "2026-10-20T05:33:39Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-20T05:33:39Z",
+          "completed_at": "2026-10-20T05:33:44Z"
+        },
+        {
+          "name": "Post Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-20T05:33:44Z",
+          "completed_at": "2026-10-20T05:33:44Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-10-20T05:33:44Z",
+          "completed_at": "2026-10-20T05:33:44Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-10-20T05:33:44Z",
+          "completed_at": "2026-10-20T05:33:44Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/check-runs/118472537716",
+      "labels": [
+        "ubuntu-22.04"
+      ],
+      "runner_id": 1000000211,
+      "runner_name": "GitHub Actions 1000000211",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}

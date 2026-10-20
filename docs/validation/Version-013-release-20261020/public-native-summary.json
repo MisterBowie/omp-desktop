@@ -1,0 +1,184 @@
+[
+  {
+    "target": "darwin-arm64",
+    "runtimeReportValid": true,
+    "runtimeGetState": true,
+    "smokeReportExists": true,
+    "cleaned": true,
+    "orderedQuit": true,
+    "completedChecks": 8,
+    "steps": {
+      "project": true,
+      "deny": true,
+      "allowOnce": true,
+      "projectTest": true,
+      "stopTree": true,
+      "recoveryNoReplay": true,
+      "freshTurn": true,
+      "defaultIsolation": true
+    },
+    "progress": "ready",
+    "errorClasses": [],
+    "normalQuits": 2,
+    "failureSource": [],
+    "diagnosticCodes": [],
+    "strict": {
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0
+    },
+    "failedStrictNumbers": [],
+    "strictFailures": [],
+    "memory": {
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "failures": [],
+      "stages": []
+    },
+    "memoryUi": {
+      "ok": true,
+      "restart": true
+    }
+  },
+  {
+    "target": "darwin-x64",
+    "runtimeReportValid": true,
+    "runtimeGetState": true,
+    "smokeReportExists": true,
+    "cleaned": true,
+    "orderedQuit": true,
+    "completedChecks": 8,
+    "steps": {
+      "project": true,
+      "deny": true,
+      "allowOnce": true,
+      "projectTest": true,
+      "stopTree": true,
+      "recoveryNoReplay": true,
+      "freshTurn": true,
+      "defaultIsolation": true
+    },
+    "progress": "ready",
+    "errorClasses": [],
+    "normalQuits": 2,
+    "failureSource": [],
+    "diagnosticCodes": [],
+    "strict": {
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0
+    },
+    "failedStrictNumbers": [],
+    "strictFailures": [],
+    "memory": {
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "failures": [],
+      "stages": []
+    },
+    "memoryUi": {
+      "ok": true,
+      "restart": true
+    }
+  },
+  {
+    "target": "win32-x64",
+    "runtimeReportValid": true,
+    "runtimeGetState": true,
+    "smokeReportExists": true,
+    "cleaned": true,
+    "orderedQuit": true,
+    "completedChecks": 8,
+    "steps": {
+      "project": true,
+      "deny": true,
+      "allowOnce": true,
+      "projectTest": true,
+      "stopTree": true,
+      "recoveryNoReplay": true,
+      "freshTurn": true,
+      "defaultIsolation": true
+    },
+    "progress": "ready",
+    "errorClasses": [],
+    "normalQuits": 2,
+    "failureSource": [],
+    "diagnosticCodes": [],
+    "processCleanup": {
+      "lastSnapshot": "cleanup-before",
+      "survivorCount": 0,
+      "processes": [],
+      "controls": []
+    },
+    "strict": {
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0
+    },
+    "failedStrictNumbers": [],
+    "strictFailures": [],
+    "memory": {
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "failures": [],
+      "stages": []
+    },
+    "memoryUi": {
+      "ok": true,
+      "restart": true
+    }
+  },
+  {
+    "target": "linux-x64",
+    "runtimeReportValid": true,
+    "runtimeGetState": true,
+    "smokeReportExists": true,
+    "cleaned": true,
+    "orderedQuit": true,
+    "completedChecks": 8,
+    "steps": {
+      "project": true,
+      "deny": true,
+      "allowOnce": true,
+      "projectTest": true,
+      "stopTree": true,
+      "recoveryNoReplay": true,
+      "freshTurn": true,
+      "defaultIsolation": true
+    },
+    "progress": "ready",
+    "errorClasses": [],
+    "normalQuits": 2,
+    "failureSource": [],
+    "diagnosticCodes": [],
+    "strict": {
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0
+    },
+    "failedStrictNumbers": [],
+    "strictFailures": [],
+    "memory": {
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "failures": [],
+      "stages": []
+    },
+    "memoryUi": {
+      "ok": true,
+      "restart": true
+    }
+  }
+]

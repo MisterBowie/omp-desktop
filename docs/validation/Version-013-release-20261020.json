@@ -2,7 +2,7 @@
   "schema": "omp-desktop.release-progress/1",
   "date": "2026-10-20",
   "version": "0.1.3",
-  "status": "first-source-gate-failed-fixture-repaired",
+  "status": "published-complete-public-byte-readback-passed",
   "branch": "codex/mnemopi-memory",
   "includedThread": {
     "id": "01a1574a-a5fe-7633-a5c2-53c9e0df2043",
@@ -189,7 +189,7 @@
     }
   ],
   "candidateRun": 39369317625,
-  "published": false,
+  "published": true,
   "paidModelCalled": false,
   "userDataMigrated": false,
   "userConfirmedVersion": true,
@@ -245,5 +245,457 @@
     },
     "productRuntimeChanged": false,
     "note": "Explicitly unset memory-test overrides in the parent shell before the installed smoke. InstalledApplication already uses a separate allowlisted child environment; no prior installed-host contamination is claimed."
-  }
+  },
+  "candidate": {
+    "source": "e4f04720031d87148f92d4bd2048fe2609b117eb",
+    "tag": "release-check-0.1.3-memory-ipc-e4f04720",
+    "run": 39371606683,
+    "conclusion": "success",
+    "nativeTargets": 4,
+    "artifacts": 8,
+    "artifactBytes": 1986130842
+  },
+  "publication": {
+    "controller": "979585c69ed0e91bd097d66cf66c27642d74d0b4",
+    "tag": "publish-v0.1.3-run-39371606683",
+    "run": 39375317391,
+    "status": "completed",
+    "conclusion": "success",
+    "releaseTag": "v0.1.3",
+    "releaseId": 418039584,
+    "url": "https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.3",
+    "latest": true
+  },
+  "firstCandidate": {
+    "source": "5c27bd59f242e0f7429d52794170964b4cb529ac",
+    "run": 39369317625,
+    "windowsMemory": "90-second test timeout, original strict 15/15 passed",
+    "otherNativeTargets": "success",
+    "published": false,
+    "sourceFailure": "old IPC Result fixture missing memory registrar mock"
+  },
+  "diagnosticCandidate": {
+    "source": "979585c69ed0e91bd097d66cf66c27642d74d0b4",
+    "run": 39373809832,
+    "publicationSource": false
+  },
+  "publicReadback": {
+    "version": "0.1.3",
+    "releaseTag": "v0.1.3",
+    "sourceRevision": "e4f04720031d87148f92d4bd2048fe2609b117eb",
+    "candidateRunId": 39371606683,
+    "publicationRunId": 39375317391,
+    "readbackRunId": 39375317391,
+    "assetCount": 30,
+    "assetBytes": 1988441504,
+    "checksumManifest": true,
+    "buildRecord": true,
+    "sourceReceipts": true,
+    "verifiedUpdateArtifacts": 8,
+    "mergedMacFeedIdentical": true,
+    "protectedStableUnchanged": null,
+    "assets": [
+      {
+        "name": "BUILD-RECORD.json",
+        "bytes": 6498,
+        "sha256": "4b2514be85f2e4b694d8f8729f515078e9dcaae6d511f5582089bc0aff4c495d"
+      },
+      {
+        "name": "latest-linux.yml",
+        "bytes": 701,
+        "sha256": "39ba24ea0791f735fb320a5fdc14ceaa1468caf3dd455f4df96577b60add15a5"
+      },
+      {
+        "name": "latest-mac-arm64.yml",
+        "bytes": 517,
+        "sha256": "46daa392b450eb3a02b0d331a21fa316519b97085137fa872d6577e1a9c94cce"
+      },
+      {
+        "name": "latest-mac-x64.yml",
+        "bytes": 511,
+        "sha256": "e695db6b66d7625fdbbff3abc8b5fa9911c3762cc6e145caf8bfd34878b9f36f"
+      },
+      {
+        "name": "latest-mac.yml",
+        "bytes": 831,
+        "sha256": "43ba8428fb7efb235ee42eaabfc217714e50fe1c9ebfdf771c956a985961752a"
+      },
+      {
+        "name": "latest.yml",
+        "bytes": 351,
+        "sha256": "e49a98029deba0b36b498a3e017fbb6860b47d6d8b75c900334128547ba31c7a"
+      },
+      {
+        "name": "OMP-Desktop-0.1.3-arm64-mac.zip",
+        "bytes": 223436738,
+        "sha256": "e886e32c7caa278103cf11fe3a45398c2590178e2f7e16ffa4bd376d48392c90"
+      },
+      {
+        "name": "OMP-Desktop-0.1.3-arm64-mac.zip.blockmap",
+        "bytes": 232060,
+        "sha256": "87215b04ac2e09f1b29062d8ef41b1cfcd72b7d810e3d9560c9c7d1a142169d0"
+      },
+      {
+        "name": "OMP-Desktop-0.1.3-arm64.dmg",
+        "bytes": 224514246,
+        "sha256": "13e0e36a58ec3ba30f089cb1b69b724e1d9980dee20acbbbcd879d96f0d68a2f"
+      },
+      {
+        "name": "OMP-Desktop-0.1.3-arm64.dmg.blockmap",
+        "bytes": 235036,
+        "sha256": "a2f25acc493fa779cca862661631b9e15f31643597c3c61b979208212f285c34"
+      },
+      {
+        "name": "OMP-Desktop-0.1.3-x64-mac.zip",
+        "bytes": 231375288,
+        "sha256": "e502855c7dcc0606d38a71cedac7bf7999e0ad25e9bcd8b059f43688826655bb"
+      },
+      {
+        "name": "OMP-Desktop-0.1.3-x64-mac.zip.blockmap",
+        "bytes": 242035,
+        "sha256": "81c640b023c2170b9bf04e9d860e42217ddce05df4cacf458fb402ddce357498"
+      },
+      {
+        "name": "OMP-Desktop-0.1.3-x64.deb",
+        "bytes": 208115048,
+        "sha256": "99b2de4016e670312520f4c8f1a866209655925f904881a2eb0b41a42994de5f"
+      },
+      {
+        "name": "OMP-Desktop-0.1.3-x64.dmg",
+        "bytes": 232338634,
+        "sha256": "4505a73d19333bf788ea27b4a3c1fff2a21cf936b4d4787acbfa09defc0669c7"
+      },
+      {
+        "name": "OMP-Desktop-0.1.3-x64.dmg.blockmap",
+        "bytes": 240707,
+        "sha256": "4c581a6db8eae3f47e90dec931ea4214ed391d7f2d27736c76b5810f9005f88b"
+      },
+      {
+        "name": "OMP-Desktop-0.1.3-x86_64.AppImage",
+        "bytes": 250706452,
+        "sha256": "70be36c92c8570500a3144276235e7cadc97806353321aa5afb0ceba5980918c"
+      },
+      {
+        "name": "omp-desktop-0.1.3-x86_64.rpm",
+        "bytes": 188796713,
+        "sha256": "c87b6bb7d504dcabd2812c2a25ec244170320b950ea1f65e2f9348f77bdf9696"
+      },
+      {
+        "name": "OMP-Desktop-Portable-0.1.3.exe",
+        "bytes": 200260799,
+        "sha256": "e39b63a38be88edda694f9d87e1ae275323bd156e067672afff0152396f18050"
+      },
+      {
+        "name": "OMP-Desktop-Setup-0.1.3.exe",
+        "bytes": 200481026,
+        "sha256": "2d5163e52fd108410e7c7e3ada7e62861e5523d196f70b810d037c4fcb9ad9f2"
+      },
+      {
+        "name": "OMP-Desktop-Setup-0.1.3.exe.blockmap",
+        "bytes": 207701,
+        "sha256": "64c855fef15377e91180dfaa6808f65cdf927f52611228785dd4a0a18b3b8917"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.3-build.json",
+        "bytes": 2337,
+        "sha256": "8c399111dc5d1d1036cdc6b455e6afad8b9c217a4d97c0e93164ebad2acec2e0"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.3-darwin-arm64.tar.gz",
+        "bytes": 419560,
+        "sha256": "873ddfcaf3b01b605c2305711bb3bb5ee580c679a9e1f8d29bd9b4a5b529f7cf"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.3-darwin-x64.tar.gz",
+        "bytes": 470896,
+        "sha256": "af4ca2ec00fd9387046f2bc43e6327e7b7b99d4332a3f1fbe997a815a7fe11fc"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.3-linux-x64.tar.gz",
+        "bytes": 850823,
+        "sha256": "b9a8c92c94162bc6ef6f14984304a4b04178472889341ccdafbfc7c3f1b781b2"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.3-publication.json",
+        "bytes": 605,
+        "sha256": "6c4121415ff249a4280d7cf1c04c1d0492bc25dafb400b84360a4a9ebb588f68"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.3-staging.json",
+        "bytes": 4797,
+        "sha256": "f5e51912e7d9a73386991b38753859d14b1b653e99ab80911cd4ee02b3eec18d"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.3-win32-x64.tar.gz",
+        "bytes": 334602,
+        "sha256": "6372787c0c47a53a562951d0bb6d2eda1d827171aadfc39b3099bc6ba4482680"
+      },
+      {
+        "name": "pi-host-0.1.3-linux-x64.tar.gz",
+        "bytes": 25163042,
+        "sha256": "2f2f94415865b276d8d5c16635e9d129caf028550bda8086596217224bda5a3a"
+      },
+      {
+        "name": "pi-host-0.1.3-linux-x64.tar.gz.sha256",
+        "bytes": 97,
+        "sha256": "ee916e704ac7c9d226cdc73c2aca121b86824242e3f2c8f5377e5d7e311e7d24"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "bytes": 2853,
+        "sha256": "3f072b80d5204801393a6497da3d20f0a5930dc2195a91764597becbafde821d"
+      }
+    ]
+  },
+  "nativeValidation": [
+    {
+      "target": "darwin-arm64",
+      "runtimeReportValid": true,
+      "runtimeGetState": true,
+      "smokeReportExists": true,
+      "cleaned": true,
+      "orderedQuit": true,
+      "completedChecks": 8,
+      "steps": {
+        "project": true,
+        "deny": true,
+        "allowOnce": true,
+        "projectTest": true,
+        "stopTree": true,
+        "recoveryNoReplay": true,
+        "freshTurn": true,
+        "defaultIsolation": true
+      },
+      "progress": "ready",
+      "errorClasses": [],
+      "normalQuits": 2,
+      "failureSource": [],
+      "diagnosticCodes": [],
+      "strict": {
+        "tests": 15,
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      },
+      "failedStrictNumbers": [],
+      "strictFailures": [],
+      "memory": {
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "skipped": 0,
+        "failures": [],
+        "stages": []
+      },
+      "memoryUi": {
+        "ok": true,
+        "restart": true
+      }
+    },
+    {
+      "target": "darwin-x64",
+      "runtimeReportValid": true,
+      "runtimeGetState": true,
+      "smokeReportExists": true,
+      "cleaned": true,
+      "orderedQuit": true,
+      "completedChecks": 8,
+      "steps": {
+        "project": true,
+        "deny": true,
+        "allowOnce": true,
+        "projectTest": true,
+        "stopTree": true,
+        "recoveryNoReplay": true,
+        "freshTurn": true,
+        "defaultIsolation": true
+      },
+      "progress": "ready",
+      "errorClasses": [],
+      "normalQuits": 2,
+      "failureSource": [],
+      "diagnosticCodes": [],
+      "strict": {
+        "tests": 15,
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      },
+      "failedStrictNumbers": [],
+      "strictFailures": [],
+      "memory": {
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "skipped": 0,
+        "failures": [],
+        "stages": []
+      },
+      "memoryUi": {
+        "ok": true,
+        "restart": true
+      }
+    },
+    {
+      "target": "win32-x64",
+      "runtimeReportValid": true,
+      "runtimeGetState": true,
+      "smokeReportExists": true,
+      "cleaned": true,
+      "orderedQuit": true,
+      "completedChecks": 8,
+      "steps": {
+        "project": true,
+        "deny": true,
+        "allowOnce": true,
+        "projectTest": true,
+        "stopTree": true,
+        "recoveryNoReplay": true,
+        "freshTurn": true,
+        "defaultIsolation": true
+      },
+      "progress": "ready",
+      "errorClasses": [],
+      "normalQuits": 2,
+      "failureSource": [],
+      "diagnosticCodes": [],
+      "processCleanup": {
+        "lastSnapshot": "cleanup-before",
+        "survivorCount": 0,
+        "processes": [],
+        "controls": []
+      },
+      "strict": {
+        "tests": 15,
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      },
+      "failedStrictNumbers": [],
+      "strictFailures": [],
+      "memory": {
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "skipped": 0,
+        "failures": [],
+        "stages": []
+      },
+      "memoryUi": {
+        "ok": true,
+        "restart": true
+      }
+    },
+    {
+      "target": "linux-x64",
+      "runtimeReportValid": true,
+      "runtimeGetState": true,
+      "smokeReportExists": true,
+      "cleaned": true,
+      "orderedQuit": true,
+      "completedChecks": 8,
+      "steps": {
+        "project": true,
+        "deny": true,
+        "allowOnce": true,
+        "projectTest": true,
+        "stopTree": true,
+        "recoveryNoReplay": true,
+        "freshTurn": true,
+        "defaultIsolation": true
+      },
+      "progress": "ready",
+      "errorClasses": [],
+      "normalQuits": 2,
+      "failureSource": [],
+      "diagnosticCodes": [],
+      "strict": {
+        "tests": 15,
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0
+      },
+      "failedStrictNumbers": [],
+      "strictFailures": [],
+      "memory": {
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "skipped": 0,
+        "failures": [],
+        "stages": []
+      },
+      "memoryUi": {
+        "ok": true,
+        "restart": true
+      }
+    }
+  ],
+  "proofs": [
+    {
+      "file": "Version-013-release-20261020/accepted-artifacts.json",
+      "bytes": 7196,
+      "sha256": "67550e262bf94fe6a7676df4d4edb990fe0fad9986f184625e7f7bbf4494868e"
+    },
+    {
+      "file": "Version-013-release-20261020/accepted-jobs.json",
+      "bytes": 52114,
+      "sha256": "0de435d3099973399a6844700a0919837fe5f254c79016f837ee4ed9a2b0d487"
+    },
+    {
+      "file": "Version-013-release-20261020/accepted-run.json",
+      "bytes": 14553,
+      "sha256": "2f7f36a071ffe66a66e98edd36f905c80bc7c71cc8df7a9de0e9f87ccbb67b42"
+    },
+    {
+      "file": "Version-013-release-20261020/accepted.json",
+      "bytes": 2337,
+      "sha256": "8c399111dc5d1d1036cdc6b455e6afad8b9c217a4d97c0e93164ebad2acec2e0"
+    },
+    {
+      "file": "Version-013-release-20261020/first-native-safe-diagnostic.json",
+      "bytes": 5174,
+      "sha256": "da034d07f72df0938561476d271908995ac6e9a6f778d3596a97118818264be1"
+    },
+    {
+      "file": "Version-013-release-20261020/public-asset-readback.json",
+      "bytes": 5493,
+      "sha256": "563d07d660583d40bb073b44412fceb68802a55b512ad128008b0f8f68a93f71"
+    },
+    {
+      "file": "Version-013-release-20261020/public-native-summary.json",
+      "bytes": 3768,
+      "sha256": "e91f83565112c4d916313e8361301938474633d2864e0a8758d5908e5866efe5"
+    },
+    {
+      "file": "Version-013-release-20261020/publication-jobs.json",
+      "bytes": 14922,
+      "sha256": "15c4b9944f37d34012a156ccfa1f3e36ef8965426df59e9bc1bd467821084861"
+    },
+    {
+      "file": "Version-013-release-20261020/publication-run.json",
+      "bytes": 14610,
+      "sha256": "baa059f4d20c561920190e112fe81853839f599ed07d935f8a30fc5e457b12de"
+    },
+    {
+      "file": "Version-013-release-20261020/published-release.json",
+      "bytes": 63763,
+      "sha256": "26146dc0cbb965aededd3cfcd22bd1537ab210725d8c6e04d639396897822589"
+    },
+    {
+      "file": "Version-013-release-20261020/source-failure-39369317625.json",
+      "bytes": 215,
+      "sha256": "bb7e03a568cfddc255f8355edf4347e5c082c3ce6b0f0492cc280e15cad1533d"
+    },
+    {
+      "file": "Version-013-release-20261020/source-postimages.json",
+      "bytes": 4690,
+      "sha256": "238a1eedba5cb6e0fab7668662a2d22919d4100de571b00a783555d72cf4546b"
+    }
+  ],
+  "limitations": [
+    "The first Windows memory test hit its unchanged 90-second deadline; the exact operation was not recorded. The accepted candidate passed the same deadline and all four target gates.",
+    "The additional stage-diagnostic run is not a publication source.",
+    "No paid model calls or installed-user-data changes were made."
+  ]
 }

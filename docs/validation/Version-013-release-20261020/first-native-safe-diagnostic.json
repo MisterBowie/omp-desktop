@@ -1,0 +1,86 @@
+[
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/1417a880123b5574032371df9e08cf3e0c686695/.github",
+    "start_line": 33,
+    "start_column": null,
+    "end_line": 33,
+    "end_column": null,
+    "annotation_level": "notice",
+    "title": "Safe native validation summary",
+    "message": "[{\"target\":\"darwin-arm64\",\"runtimeReportValid\":true,\"runtimeGetState\":true,\"smokeReportExists\":true,\"cleaned\":true,\"orderedQuit\":true,\"completedChecks\":8,\"steps\":{\"project\":true,\"deny\":true,\"allowOnce\":true,\"projectTest\":true,\"stopTree\":true,\"recoveryNoReplay\":true,\"freshTurn\":true,\"defaultIsolation\":true},\"progress\":\"ready\",\"errorClasses\":[],\"normalQuits\":2,\"failureSource\":[],\"diagnosticCodes\":[],\"strict\":{\"tests\":15,\"pass\":15,\"fail\":0,\"skipped\":0},\"failedStrictNumbers\":[],\"strictFailures\":[],\"memory\":{\"tests\":1,\"pass\":1,\"fail\":0,\"skipped\":0,\"failures\":[]},\"memoryUi\":{\"ok\":true,\"restart\":true}},{\"target\":\"win32-x64\",\"runtimeReportValid\":true,\"runtimeGetState\":true,\"smokeReportExists\":false,\"cleaned\":false,\"orderedQuit\":false,\"completedChecks\":0,\"steps\":{\"project\":false,\"deny\":false,\"allowOnce\":false,\"projectTest\":false,\"stopTree\":false,\"recoveryNoReplay\":false,\"freshTurn\":false,\"defaultIsolation\":false},\"progress\":\"UNKNOWN\",\"errorClasses\":[],\"normalQuits\":0,\"failureSource\":[],\"diagnosticCodes\":[],\"strict\":{\"tests\":15,\"pass\":15,\"fail\":0,\"skipped\":0},\"failedStrictNumbers\":[],\"strictFailures\":[],\"memory\":{\"tests\":1,\"pass\":0,\"fail\":0,\"skipped\":0,\"failures\":[{\"number\":1,\"approvalInTimeline\":false,\"noReportedErrors\":false,\"source\":[],\"diagnosticCodes\":[],\"failureType\":\"testTimeoutFailure\",\"lines\":[{\"line\":18,\"column\":1}]}]}},{\"target\":\"linux-x64\",\"runtimeReportValid\":true,\"runtimeGetState\":true,\"smokeReportExists\":true,\"cleaned\":true,\"orderedQuit\":true,\"completedChecks\":8,\"steps\":{\"project\":true,\"deny\":true,\"allowOnce\":true,\"projectTest\":true,\"stopTree\":true,\"recoveryNoReplay\":true,\"freshTurn\":true,\"defaultIsolation\":true},\"progress\":\"ready\",\"errorClasses\":[],\"normalQuits\":2,\"failureSource\":[],\"diagnosticCodes\":[],\"strict\":{\"tests\":15,\"pass\":15,\"fail\":0,\"skipped\":0},\"failedStrictNumbers\":[],\"strictFailures\":[],\"memory\":{\"tests\":1,\"pass\":1,\"fail\":0,\"skipped\":0,\"failures\":[]},\"memoryUi\":{\"ok\":true,\"restart\":true}}]",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/1417a880123b5574032371df9e08cf3e0c686695/.github",
+    "start_line": 32,
+    "start_column": null,
+    "end_line": 32,
+    "end_column": null,
+    "annotation_level": "notice",
+    "title": "Safe publication failure classification",
+    "message": "{\"classes\":[\"MISSING_FILE\"],\"feeds\":[],\"source\":[],\"missingFiles\":[]}",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/1417a880123b5574032371df9e08cf3e0c686695/.github",
+    "start_line": 31,
+    "start_column": null,
+    "end_line": 31,
+    "end_column": null,
+    "annotation_level": "notice",
+    "title": "Safe native failure classification",
+    "message": "{\"classes\":[\"UNCLASSIFIED\"],\"phase\":{\"preflight\":true,\"notices\":true,\"builder\":true}}",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/1417a880123b5574032371df9e08cf3e0c686695/.github",
+    "start_line": 30,
+    "start_column": null,
+    "end_line": 30,
+    "end_column": null,
+    "annotation_level": "notice",
+    "title": "Failed job identifier",
+    "message": "118453391031",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/1417a880123b5574032371df9e08cf3e0c686695/.github",
+    "start_line": 29,
+    "start_column": null,
+    "end_line": 29,
+    "end_column": null,
+    "annotation_level": "notice",
+    "title": "Safe publication failure classification",
+    "message": "{\"classes\":[\"FEED_MISSING_FILES\",\"MISSING_FILE\",\"ASSERTION\",\"API_UNAUTHORIZED\"],\"feeds\":[],\"source\":[],\"missingFiles\":[]}",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/1417a880123b5574032371df9e08cf3e0c686695/.github",
+    "start_line": 28,
+    "start_column": null,
+    "end_line": 28,
+    "end_column": null,
+    "annotation_level": "notice",
+    "title": "Safe native failure classification",
+    "message": "{\"classes\":[\"MISSING_FILE\"],\"phase\":{\"preflight\":true,\"notices\":true,\"builder\":true}}",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/1417a880123b5574032371df9e08cf3e0c686695/.github",
+    "start_line": 27,
+    "start_column": null,
+    "end_line": 27,
+    "end_column": null,
+    "annotation_level": "notice",
+    "title": "Failed job identifier",
+    "message": "118453390959",
+    "raw_details": ""
+  }
+]
