@@ -19,6 +19,16 @@ test("native Mnemopi persists across processes, isolates projects, obeys switche
   skip: !process.env.OMP_MEMORY_TEST_RUNTIME && "requires OMP_MEMORY_TEST_RUNTIME",
   timeout: 90000,
 }, async (t) => {
+  const began = performance.now();
+  const trace = async (stage, operation) => {
+    // Fixed stage names and elapsed times only; never emit paths or memory text.
+    const mark = (event) => console.log("MEMORY_NATIVE_STAGE " + JSON.stringify({
+      stage, event, elapsedMs: Math.round(performance.now() - began),
+    }));
+    mark("begin");
+    try { return await operation(); } finally { mark("end"); }
+  };
+  let promptNumber = 0;
   const root = realpathSync(mkdtempSync(join(tmpdir(), "omp-memory-native-e2e-")));
   const project = join(root, "project");
   mkdirSync(project);
@@ -26,8 +36,10 @@ test("native Mnemopi persists across processes, isolates projects, obeys switche
   mkdirSync(other);
   const provider = await FakeProvider.start();
   const supervisors = [];
+  const stop = (supervisor) => trace("stop-" + (supervisors.indexOf(supervisor) + 1),
+    () => supervisor.stop({ abortBash: false }));
   t.after(async () => {
-    for (const supervisor of supervisors) await supervisor.stop({ abortBash: false });
+    for (const supervisor of supervisors) await stop(supervisor);
     await provider.close();
     rmSync(root, { recursive: true, force: true });
   });
@@ -48,7 +60,7 @@ test("native Mnemopi persists across processes, isolates projects, obeys switche
       prepareRun: (paths) => writeModelsConfig(paths.agentDir, { baseUrl: provider.baseUrl }),
     });
     supervisors.push(supervisor);
-    await supervisor.start();
+    await trace("start-" + supervisors.length, () => supervisor.start());
     const runtime = supervisor.currentRuntime();
     assert.ok(runtime);
     const state = await runtime.request({ type: "get_state" });
@@ -69,9 +81,11 @@ test("native Mnemopi persists across processes, isolates projects, obeys switche
       });
     });
     try {
-      const accepted = await runtime.request({ type: "prompt", message: text });
-      assert.equal(accepted.success, true);
-      await end;
+      await trace("prompt-" + (++promptNumber), async () => {
+        const accepted = await runtime.request({ type: "prompt", message: text });
+        assert.equal(accepted.success, true);
+        await end;
+      });
     } finally {
       detach?.();
     }
@@ -91,7 +105,7 @@ test("native Mnemopi persists across processes, isolates projects, obeys switche
   assert.equal(page.success, true);
   assert.ok(page.data.total > 0);
   assert.match(JSON.stringify(page.data.items), /atlas-memory-saved-marker/);
-  await first.supervisor.stop({ abortBash: false });
+  await stop(first.supervisor);
   const read = await start(project, false, true, true);
   await ask(read.runtime, "atlas-memory-saved-marker database");
   const recalled = provider.requests.filter((request) => request.url.endsWith("/chat/completions")).at(-1)
@@ -100,22 +114,22 @@ test("native Mnemopi persists across processes, isolates projects, obeys switche
     JSON.stringify(recalled.filter((message) => message.role === "system" || message.role === "developer")),
     /atlas-memory-saved-marker/,
   );
-  await read.supervisor.stop({ abortBash: false });
+  await stop(read.supervisor);
   const partialPath = join(root, "partial-project");
   mkdirSync(partialPath);
   const partial = await start(partialPath, true, false);
   await ask(partial.runtime, "Remember single-turn-shutdown-marker");
   assert.equal((await partial.runtime.request({ type: "memory", action: "list" })).data.total, 0);
-  await partial.supervisor.stop({ abortBash: false });
+  await stop(partial.supervisor);
   const restoredPartial = await start(partialPath, false, true);
   assert.match(
     JSON.stringify((await restoredPartial.runtime.request({ type: "memory", action: "list" })).data.items),
     /single-turn-shutdown-marker/,
   );
-  await restoredPartial.supervisor.stop({ abortBash: false });
+  await stop(restoredPartial.supervisor);
   const isolated = await start(other, false, true);
   assert.equal((await isolated.runtime.request({ type: "memory", action: "list" })).data.total, 0);
-  await isolated.supervisor.stop({ abortBash: false });
+  await stop(isolated.supervisor);
   const disabled = await start(project, false, false);
   await ask(disabled.runtime, "atlas-memory-saved-marker database");
   const absent = provider.requests.filter((request) => request.url.endsWith("/chat/completions")).at(-1)
@@ -128,7 +142,7 @@ test("native Mnemopi persists across processes, isolates projects, obeys switche
     (await disabled.runtime.request({ type: "memory", action: "list" })).data.total,
     page.data.total,
   );
-  await disabled.supervisor.stop({ abortBash: false });
+  await stop(disabled.supervisor);
   let settings = { autoSave: false, autoRead: false };
   const service = createOmpMemoryService({
     dataRoot: root,
@@ -142,14 +156,14 @@ test("native Mnemopi persists across processes, isolates projects, obeys switche
       }),
   });
   try {
-    assert.deepEqual(await service.setSettings({ autoSave: true, autoRead: true }), {
+    assert.deepEqual(await trace("settings", () => service.setSettings({ autoSave: true, autoRead: true })), {
       autoSave: true,
       autoRead: true,
     });
-    assert.ok((await service.query({ projectPath: project })).total > 0);
-    assert.ok((await service.query({ projectPath: project, query: "数据库" })).items.length > 0);
-    assert.deepEqual(await service.clear({ projectPath: project, confirmed: true }), { cleared: true });
-    assert.equal((await service.query({ projectPath: project })).total, 0);
+    assert.ok((await trace("list", () => service.query({ projectPath: project }))).total > 0);
+    assert.ok((await trace("search", () => service.query({ projectPath: project, query: "数据库" }))).items.length > 0);
+    assert.deepEqual(await trace("clear", () => service.clear({ projectPath: project, confirmed: true })), { cleared: true });
+    assert.equal((await trace("empty", () => service.query({ projectPath: project }))).total, 0);
   } finally {
     await service.dispose();
   }

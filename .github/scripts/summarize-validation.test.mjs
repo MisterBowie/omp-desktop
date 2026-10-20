@@ -48,5 +48,6 @@ test("memory diagnostics reveal counts and source lines without saved memory con
  const dir=join(root,"validation-win32-x64",".artifacts","automatic-memory");mkdirSync(dir,{recursive:true});
  writeFileSync(join(dir,"native.tap"),"not ok 1 - PRIVATE_TITLE\n  ---\n  error: 'PRIVATE_MEMORY'\n  code: 'ENOENT'\n  stack: |-\n    file:///PRIVATE_PATH/omp-memory-native-e2e.test.mjs:92:8\n  ...\n1..1\n# tests 1\n# pass 0\n# fail 1\n# skipped 0\n");
  writeFileSync(join(dir,"ui.txt"),'MEMORY_SETTINGS_PROBE {"ok":true,"restart":true,"private":"PRIVATE_MEMORY"}\n');
- const [result]=summarizeValidation(root);assert.equal(result.memory.fail,1);assert.equal(result.memory.failures[0].code,"ENOENT");assert.deepEqual(result.memory.failures[0].lines,[{line:92,column:8}]);assert.deepEqual(result.memoryUi,{ok:true,restart:true});assert.doesNotMatch(JSON.stringify(result),/PRIVATE/);
+ writeFileSync(join(dir,"native.tap"),'# MEMORY_NATIVE_STAGE {"stage":"start-1","event":"begin","elapsedMs":1,"private":"PRIVATE"}\n# MEMORY_NATIVE_STAGE {"stage":"PRIVATE","event":"begin","elapsedMs":1}\n',{flag:"a"});
+ const [result]=summarizeValidation(root);assert.equal(result.memory.fail,1);assert.equal(result.memory.failures[0].code,"ENOENT");assert.deepEqual(result.memory.failures[0].lines,[{line:92,column:8}]);assert.deepEqual(result.memory.stages,[{stage:"start-1",event:"begin",elapsedMs:1}]);assert.deepEqual(result.memoryUi,{ok:true,restart:true});assert.doesNotMatch(JSON.stringify(result),/PRIVATE/);
 });
