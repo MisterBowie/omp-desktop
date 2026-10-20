@@ -284,6 +284,7 @@ jobs:
           else
             node scripts/e2e-memory-settings.mjs > .artifacts/automatic-memory/ui.txt
           fi
+          unset OMP_MEMORY_TEST_RUNTIME PI_DESKTOP_HOST_BIN
           if [[ '${{ matrix.platform }}' == linux ]]; then
             xvfb-run -a node scripts/e2e-installed-smoke.mjs "${installer[0]}" .artifacts/stable-installed
           else

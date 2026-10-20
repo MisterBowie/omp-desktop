@@ -2,7 +2,7 @@
   "schema": "omp-desktop.release-progress/1",
   "date": "2026-10-20",
   "version": "0.1.3",
-  "status": "local-source-validated-remote-candidate-pending",
+  "status": "first-source-gate-failed-fixture-repaired",
   "branch": "codex/mnemopi-memory",
   "includedThread": {
     "id": "01a1574a-a5fe-7633-a5c2-53c9e0df2043",
@@ -188,8 +188,62 @@
       "uncompressedSha256": "04d81aab3d221d14d139db991fbbe956afe86bcc936d2e759d684972879e208b"
     }
   ],
-  "candidateRun": null,
+  "candidateRun": 39369317625,
   "published": false,
   "paidModelCalled": false,
-  "userDataMigrated": false
+  "userDataMigrated": false,
+  "userConfirmedVersion": true,
+  "candidateRuns": [
+    {
+      "id": 39369317625,
+      "sourceRevision": "5c27bd59f242e0f7429d52794170964b4cb529ac",
+      "tag": "release-check-0.1.3-memory-models-5c27bd59",
+      "sourceGate": "failure",
+      "failedTest": "app/apps/desktop/test/omp-session-ipc-result.test.mjs",
+      "diagnosticBranch": "codex/source-test-diagnostic-39369317625",
+      "cause": "Sibling IPC registrar mock omitted the newly imported memory registrar.",
+      "repair": "Add the explicit no-op sibling registrar; keep all existing real Result/error and Cursor-gate assertions.",
+      "published": false,
+      "nativeJobs": "Mac ARM success observed; other targets still running at repair time."
+    }
+  ],
+  "fixedLocalCandidate": {
+    "sourceRevision": "5c27bd59f242e0f7429d52794170964b4cb529ac",
+    "integration": {
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    "electronUi": {
+      "ok": true,
+      "restart": true
+    },
+    "strictPlanGoal": {
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "repairValidation": {
+    "ipcBefore": {
+      "passed": 0,
+      "failed": 1
+    },
+    "ipcAfter": {
+      "passed": 6,
+      "failed": 0
+    },
+    "combinedTargeted": {
+      "passed": 23,
+      "failed": 0,
+      "skipped": 0
+    },
+    "workflowSyntax": {
+      "yaml": 7,
+      "bash": 100,
+      "inlineJs": 4
+    },
+    "productRuntimeChanged": false,
+    "note": "Explicitly unset memory-test overrides in the parent shell before the installed smoke. InstalledApplication already uses a separate allowlisted child environment; no prior installed-host contamination is claimed."
+  }
 }

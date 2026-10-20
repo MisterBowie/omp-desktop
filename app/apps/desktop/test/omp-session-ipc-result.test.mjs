@@ -73,6 +73,7 @@ const { registerIpcHandlers } = load("../electron/main/ipc/register.ts", {
   "./app-ipc": { registerAppIpc: noopRegister },
   "./diagnostics-ipc": { registerDiagnosticsIpc: noopRegister },
   "./market-ipc": { registerMarketIpc: noopRegister },
+  "./memory-ipc": { registerMemoryIpc: noopRegister },
   "./mcp-ipc": { registerMcpIpc: noopRegister },
   "../mcp-registry-catalog": { searchMcpMarket: noop },
   "./notification-ipc": { registerNotificationIpc: noopRegister },

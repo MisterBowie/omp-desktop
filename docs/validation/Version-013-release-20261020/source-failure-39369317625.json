@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "categories": [
+    "ASSERTION"
+  ],
+  "locations": [
+    {
+      "path": "app/apps/desktop/test/omp-session-ipc-result.test.mjs",
+      "lines": [
+        0,
+        1
+      ]
+    }
+  ]
+}
