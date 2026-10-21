@@ -34,7 +34,7 @@ registerHooks({ resolve(specifier, context, next) {
   return specifier === "electron" ? { url: electron, shortCircuit: true } : next(specifier, context);
 } });
 register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
-const { BrowserPane } = await import("../electron/main/browser-view.ts");
+const { BrowserPane, resolveLocalFile, selectBrowserFileRoot } = await import("../electron/main/browser-view.ts");
 const { WebContentsView } = await import("electron");
 const settled = () => new Promise(setImmediate);
 
@@ -99,4 +99,34 @@ test("late native navigation events cannot publish after the session is invalida
   wc.emit("did-navigate", {}, "https://fixture.invalid/second");
   assert.equal(published.length, 1);
   assert.equal(published[0].url, "https://fixture.invalid/second");
+});
+
+test("explicit HTML references select only an authorized project or session root", async (t) => {
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { pathToFileURL } = await import("node:url");
+  const base = mkdtempSync(join(tmpdir(), "omp-html-roots-"));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const roots = ["project", "sibling", "scratch", "outside"].map((name) => join(base, name));
+  roots.forEach((root) => { mkdirSync(root); writeFileSync(join(root, "page.html"), "<title>owned</title>"); });
+  const [project, sibling, scratch, outside] = roots;
+  assert.equal(selectBrowserFileRoot(join(project, "page.html"), project, [sibling, scratch]), project);
+  assert.equal(selectBrowserFileRoot(join(sibling, "page.html"), project, [sibling, scratch]), sibling);
+  assert.equal(selectBrowserFileRoot(pathToFileURL(join(scratch, "page.html")).href, project, [sibling, scratch]), scratch);
+  assert.equal(selectBrowserFileRoot(join(outside, "page.html"), project, [sibling, scratch]), null);
+  assert.equal(resolveLocalFile(join(outside, "page.html"), project), null);
+  assert.equal(selectBrowserFileRoot(join(scratch, "page.html"), null, [scratch]), scratch);
+  assert.equal(selectBrowserFileRoot("page.html", project, [sibling, scratch]), project);
+  assert.equal(resolveLocalFile(join(scratch, "page.html"), project), null, "Agent BrowserPreview stays workspace-scoped");
+  symlinkSync(outside, join(project, "escape"), process.platform === "win32" ? "junction" : "dir");
+  assert.equal(resolveLocalFile(join(project, "escape/page.html"), project), null, "symlink escape must be refused");
+});
+
+test("a refused explicit file cannot fall through to an HTTP navigation", async (t) => {
+  const { pane, wc, request } = harness(t);
+  t.mock.timers.tick(100); await request;
+  const pending = wc.pendingLoads.length;
+  assert.equal(await pane.navigateAndWait("/outside/missing.html", "/project"), null);
+  assert.equal(wc.pendingLoads.length, pending);
 });

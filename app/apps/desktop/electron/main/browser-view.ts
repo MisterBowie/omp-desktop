@@ -1,5 +1,5 @@
 import { shell, WebContentsView, type BrowserWindow } from "electron";
-import { statSync, watch, type FSWatcher } from "node:fs";
+import { realpathSync, statSync, watch, type FSWatcher } from "node:fs";
 import { dirname, isAbsolute, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { BrowserState } from "@pi-desktop/shared";
@@ -38,16 +38,30 @@ export function normalizeUrl(raw: string): string | null {
 }
 
 function isWithinRoot(path: string, root: string): boolean {
-  const resolvedRoot = resolve(root);
-  return path === resolvedRoot || path.startsWith(resolvedRoot + sep);
+  try {
+    const realRoot = realpathSync(resolve(root));
+    const realPath = realpathSync(resolve(path));
+    return realPath === realRoot || realPath.startsWith(realRoot + sep);
+  } catch {
+    const resolvedRoot = resolve(root);
+    const resolvedPath = resolve(path);
+    return resolvedPath === resolvedRoot || resolvedPath.startsWith(resolvedRoot + sep);
+  }
+}
+
+function resolveExistingFile(candidate: string): string | null {
+  try {
+    const real = realpathSync(resolve(candidate));
+    return statSync(real).isFile() ? real : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Resolve user input to a previewable file inside the workspace: a file://
- * URL, an absolute path, or a workspace-relative path (./demo/index.html,
- * index.html). Returns null unless the target exists as a file within the
- * root — inputs like "localhost:3000/a.html" then fall through to URL
- * handling instead of a broken file load.
+ * Resolve a BrowserPreview input to a previewable file inside the workspace.
+ * It accepts a file:// URL, absolute path, or workspace-relative path. This
+ * stays workspace-scoped for the Agent BrowserPreview tool and sidecar.
  */
 export function resolveLocalFile(raw: string, root: string | null): string | null {
   const trimmed = raw.trim();
@@ -65,14 +79,23 @@ export function resolveLocalFile(raw: string, root: string | null): string | nul
     candidate = resolve(root, trimmed);
   }
   if (!candidate) return null;
-  const resolved = resolve(candidate);
-  if (!isWithinRoot(resolved, root)) return null;
-  try {
-    if (!statSync(resolved).isFile()) return null;
-  } catch {
-    return null;
+  if (!isWithinRoot(candidate, root)) return null;
+  const real = resolveExistingFile(candidate);
+  return real && isWithinRoot(real, root) ? real : null;
+}
+
+/** Select one already-authorized root for an explicit HTML file reference. */
+export function selectBrowserFileRoot(
+  target: string,
+  primary: string | null,
+  allowedRoots: readonly string[],
+): string | null {
+  const raw = target.trim();
+  if (!isAbsolute(raw) && !/^file:/i.test(raw)) return primary;
+  for (const root of new Set([...(primary ? [primary] : []), ...allowedRoots])) {
+    if (resolveLocalFile(raw, root)) return root;
   }
-  return resolved;
+  return null;
 }
 
 export class BrowserPane {
@@ -146,6 +169,7 @@ export class BrowserPane {
       if (this.visible) this.attach();
       return this.getState();
     }
+    if (isAbsolute(raw.trim()) || /^file:/i.test(raw.trim())) return this.getState();
     const url = normalizeUrl(raw);
     if (!url) return this.getState();
     const epoch = this.beginManagedNavigation();
@@ -168,6 +192,7 @@ export class BrowserPane {
   ): Promise<BrowserState | null> {
     if (fileRoot) this.fileRoot = fileRoot;
     const localPath = resolveLocalFile(raw, this.fileRoot);
+    if (!localPath && (isAbsolute(raw.trim()) || /^file:/i.test(raw.trim()))) return null;
     const target = localPath
       ? pathToFileURL(localPath).toString()
       : normalizeUrl(raw);

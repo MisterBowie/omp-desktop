@@ -61,8 +61,9 @@ let resolveFails = false;
 const workPanelTabs = loadModule("../src/lib/work-panel-tabs.ts", {});
 const { useOpenPreviewTarget } = loadModule("../src/hooks/use-preview-target.ts", {
   react: React,
+  "@pi-desktop/shared": await import("@pi-desktop/shared"),
   "react-i18next": { useTranslation: () => ({ t: (key, values) => `${key}:${values?.name ?? ""}` }) },
-  "../stores/app-store": { useAppStore: (selector) => selector(state) },
+  "../stores/app-store": { useAppStore: Object.assign((selector) => selector(state), { getState: () => state }) },
   "../lib/api": {
     api: {
       fsResolveRef: async (ref) => {
@@ -192,7 +193,7 @@ test("a failing resolve is reported instead of opening a panel", async () => {
   await click({ kind: "file", path: "src/dir/a.ts" });
   assert.deepEqual(calls.tabs, []);
   assert.deepEqual(calls.files, []);
-  assert.equal(calls.toasts[0][0], "chat.fileRefMissing:src/dir/a.ts");
+  assert.equal(calls.toasts[0][0], "chat.fileRefLookupFailed:");
 });
 
 test("a URL target keeps the embedded browser and never reaches file resolution", async () => {

@@ -48,6 +48,7 @@ The scenarios these scripts cover are specified in
 
 | Script | Alias | Purpose |
 |---|---|---|
+| `e2e-chat-html-open-with.mjs` | `node scripts/e2e-chat-html-open-with.mjs <evidence-dir>` | Real Electron/React HTML context menus, three destinations, file-reference entry points, keyboard focus and missing-reference handling; production BrowserPane loads project/sibling/scratch files within authorized roots; owned profile, preload IPC stub, no model or external browser |
 | `e2e-browser-screenshot.mjs` | `node scripts/e2e-browser-screenshot.mjs <evidence-dir>` | Bundled Browser tool, real CDP/JPEG capture, full-page bounds, saved image identity, and normal/2x pixel output in an isolated Electron fixture; no model |
 | `e2e-smoke.mjs` | `pnpm test:e2e` | Protocol-level E2E against host-core, plus an optional live model |
 | `e2e-plan.mjs` | `pnpm test:e2e:plan` | Plan state, checkpoint artifact, and approval transitions |

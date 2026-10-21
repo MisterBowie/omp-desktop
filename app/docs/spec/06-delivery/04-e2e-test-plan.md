@@ -11059,6 +11059,19 @@ are withdrawn with ADR 0165.
     (ADR 0263).
   - The persisted user message still contains the canonical `@path` text for
     the agent.
+- **HTML context-menu extension**: Right-click HTML Markdown links, inline
+  paths, file chips, tool-row summaries and tool file lists. Choose each of the
+  three Open with destinations and verify the exact resolved file. Exercise
+  ArrowRight/Escape focus restoration and a missing reference; no lookalike or
+  alternate destination may open. `node scripts/e2e-chat-html-open-with.mjs
+  <evidence-dir>` runs this subset with real React/store/menu code in an owned
+  Electron window. Only preload IPC is stubbed; it records OS handoff instead
+  of launching the user's browser. The same Electron fixture loads project,
+  sibling-folder and scratch HTML through the production BrowserPane and
+  rejects an outside root; unit cases also reject symlink escapes and prevent
+  rejected file inputs from becoming HTTP requests. Agent preview remains
+  workspace-scoped. The baseline click/composer journey below retains its
+  separate coverage status.
 - **Specs linked**: `04-ux/08-component-spec.md` §8.3 / §11.8,
   `04-ux/09-interaction-patterns.md` §8a.2, `03-runtime/01-ipc-protocol.md`,
   ADR 0163, ADR 0241, ADR 0262, ADR 0263, `08-meta/decisions-log.md` (D320)

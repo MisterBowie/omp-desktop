@@ -173,6 +173,15 @@ jobs:
           else
             node scripts/e2e-browser-screenshot.mjs .artifacts/browser-screenshot
           fi
+      - name: Verify HTML open-with on native Electron
+        run: |
+          set -euo pipefail
+          pnpm --filter @pi-desktop/desktop build:deps
+          if [[ '${{ matrix.platform }}' == linux ]]; then
+            xvfb-run -a node scripts/e2e-chat-html-open-with.mjs .artifacts/chat-html-open-with
+          else
+            node scripts/e2e-chat-html-open-with.mjs .artifacts/chat-html-open-with
+          fi
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -313,6 +322,7 @@ jobs:
             app/packaged-runtime.json
             app/packaged-plan-goal.tap
             app/.artifacts/browser-screenshot/
+            app/.artifacts/chat-html-open-with/
             app/.artifacts/stable-installed/
 
   publish:

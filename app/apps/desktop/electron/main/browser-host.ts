@@ -2,7 +2,7 @@ import type { BrowserState } from "@pi-desktop/shared";
 import type { BrowserPane } from "./browser-view";
 import { BrowserCdp } from "./browser-cdp";
 import { writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 
 export const BROWSER_PLUGIN_ID = "pi.browser";
 export const BROWSER_VIEW_ID = "browser";
@@ -56,7 +56,7 @@ function asRect(value: unknown): BrowserRect | null {
 export type BrowserHostDeps = {
   pane: BrowserPane;
   isPluginLoaded: (pluginId: string) => boolean;
-  getFileRoot: (sessionId?: string) => Promise<string | null>;
+  getFileRoot: (sessionId?: string, target?: string) => Promise<string | null>;
   getScratchDir?: (sessionId?: string) => string | null;
   onState: (state: BrowserState) => void;
 };
@@ -156,7 +156,7 @@ export class BrowserHost {
     if (background) return this.pane.getState();
     const state = await this.navigateGuest(
       target,
-      this.deps.getFileRoot(sessionId ?? this.chromeSessionId ?? undefined),
+      this.deps.getFileRoot(sessionId ?? this.chromeSessionId ?? undefined, target),
     );
     if (state) this.deps.onState(state);
     return state;
@@ -271,7 +271,7 @@ export class BrowserHost {
   private async rebindSession(sessionId: string): Promise<void> {
     const location = this.locations.get(sessionId);
     if (!location) return;
-    await this.navigateGuest(location, this.deps.getFileRoot(sessionId));
+    await this.navigateGuest(location, this.deps.getFileRoot(sessionId, location));
   }
 
   private async navigateGuest(
@@ -281,6 +281,7 @@ export class BrowserHost {
     const epoch = ++this.navigationEpoch;
     const fileRoot = await root;
     if (epoch !== this.navigationEpoch) return null;
+    if ((isAbsolute(target) || /^file:/i.test(target)) && !fileRoot) return null;
     const state = await this.pane.navigateAndWait(target, fileRoot);
     if (epoch !== this.navigationEpoch) return null;
     // A failed or timed-out load is not evidence that the previous session's

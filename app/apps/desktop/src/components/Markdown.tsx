@@ -53,6 +53,7 @@ import { useAppStore } from "../stores/app-store";
 import { useReferencedImageDataUrl } from "../lib/use-referenced-image-data-url";
 import { absoluteImagePath, remarkLocalImagePaths } from "../lib/markdown-image-paths";
 import { useOpenChatFileRef } from "../hooks/use-preview-target";
+import { useChatFileMenu } from "../hooks/use-chat-file-menu";
 import {
   remarkChatFileLinks,
   resolvePreviewTarget,
@@ -399,6 +400,7 @@ const MarkdownBlockContext = createContext({
 });
 
 const MarkdownBaseDirContext = createContext("");
+const MarkdownFileMenuContext = createContext<ReturnType<typeof useChatFileMenu>["openFileMenu"] | null>(null);
 
 function extractCode(children: ReactNode): { code: string; lang: string } | null {
   const element = Array.isArray(children)
@@ -457,6 +459,7 @@ function InlineCode({
   const root = useAppStore((s) => s.workspace?.path);
   const baseDir = useContext(MarkdownBaseDirContext);
   const openFileRef = useOpenChatFileRef();
+  const openFileMenu = useContext(MarkdownFileMenuContext);
   const text = typeof children === "string" ? children : null;
   const target =
     text && !className && !text.includes("\n")
@@ -476,6 +479,9 @@ function InlineCode({
       type="button"
       className="chat-code-link"
       title={target.kind === "file" ? fileTitle : urlTitle}
+      onContextMenu={target.kind === "file"
+        ? (event) => openFileMenu?.(event, { path: text ?? target.path, baseDir })
+        : undefined}
       onClick={() =>
         target.kind === "file"
           ? openFileRef(text ?? target.path, baseDir)
@@ -499,6 +505,7 @@ function Anchor({
   const root = useAppStore((s) => s.workspace?.path);
   const baseDir = useContext(MarkdownBaseDirContext);
   const openFileRef = useOpenChatFileRef();
+  const openFileMenu = useContext(MarkdownFileMenuContext);
   const openUrl = useAppStore((s) => s.openUrlInWorkPanel);
   const showToast = useAppStore((s) => s.showToast);
 
@@ -530,7 +537,14 @@ function Anchor({
     link-specific.
   */
   const onContextMenu = (event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!href || !/^https?:\/\//i.test(href)) return;
+    if (!href) return;
+    if (!/^https?:\/\//i.test(href)) {
+      const decoded = safeDecodeUri(href);
+      const path = toWorkspaceRel(decoded, root, baseDir)
+        ?? (/^(?:\/|[a-z]:[\\/])/i.test(decoded) ? decoded : null);
+      if (path) openFileMenu?.(event, { path, baseDir });
+      return;
+    }
     const target = href;
     openContextMenu(event, {
       items: [
@@ -612,6 +626,7 @@ function MarkdownImage({
   const root = useAppStore((s) => s.workspace?.path);
   const baseDir = useContext(MarkdownBaseDirContext);
   const openFileRef = useOpenChatFileRef();
+  const openFileMenu = useContext(MarkdownFileMenuContext);
   const fileTitle = usePreviewTitle("file");
   const urlTitle = usePreviewTitle("url");
   const source = typeof src === "string" ? src : "";
@@ -647,6 +662,7 @@ function MarkdownImage({
         className="chat-image-local"
         title={rel ? fileTitle : source}
         onClick={localRef ? () => openFileRef(localRef, baseDir) : undefined}
+        onContextMenu={localRef ? (event) => openFileMenu?.(event, { path: localRef, baseDir }) : undefined}
       />
     );
   }
@@ -658,6 +674,7 @@ function MarkdownImage({
         {...sourcePositionProps(rest)}
         title={fileTitle}
         onClick={() => openFileRef(localRef, baseDir)}
+        onContextMenu={(event) => openFileMenu?.(event, { path: localRef, baseDir })}
       >
         <IconImage size={14} aria-hidden />
         <span>{alt || localRef.split("/").pop()}</span>
@@ -861,6 +878,7 @@ export const Markdown = memo(function Markdown({
   baseDir?: string;
 }) {
   const workspaceRoot = useAppStore((s) => s.workspace?.path);
+  const { fileMenu, openFileMenu, closeFileMenu } = useChatFileMenu();
   // Normalize once at the source level: marked's block lexer runs on the raw
   // text and would otherwise split `\[ … \]` display math whose body puts a
   // lone `=`/`-` (setext underline) or `+`/`*` (list marker) on its own line,
@@ -878,22 +896,25 @@ export const Markdown = memo(function Markdown({
   let sourceOffset = 0;
   return (
     <MarkdownBaseDirContext.Provider value={baseDir ?? ""}>
-      {blocks.map((raw, i) => {
-        const start = sourceOffset;
-        sourceOffset = start + raw.length;
-        const originalRaw = source.slice(start, start + raw.length);
-        return (
-          <Block
-            key={i}
-            raw={raw}
-            originalRaw={originalRaw}
-            sourceOffset={start}
-            renderDiagrams={renderDiagrams}
-            workspaceRoot={workspaceRoot}
-            baseDir={baseDir}
-          />
-        );
-      })}
+      <MarkdownFileMenuContext.Provider value={openFileMenu}>
+        {blocks.map((raw, i) => {
+          const start = sourceOffset;
+          sourceOffset = start + raw.length;
+          const originalRaw = source.slice(start, start + raw.length);
+          return (
+            <Block
+              key={i}
+              raw={raw}
+              originalRaw={originalRaw}
+              sourceOffset={start}
+              renderDiagrams={renderDiagrams}
+              workspaceRoot={workspaceRoot}
+              baseDir={baseDir}
+            />
+          );
+        })}
+        <ContextMenu state={fileMenu} onClose={closeFileMenu} />
+      </MarkdownFileMenuContext.Provider>
     </MarkdownBaseDirContext.Provider>
   );
 });

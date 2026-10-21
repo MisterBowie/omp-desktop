@@ -1,3 +1,5 @@
+import { ContextMenu } from "../../../components/ContextMenu";
+import { useChatFileMenu } from "../../../hooks/use-chat-file-menu";
 import { GeneratedImages } from "./GeneratedImages";
 import "../../../styles/generated-images.css";
 import {
@@ -154,6 +156,7 @@ export const ToolRow = memo(function ToolRow({
   const detailsId = useId();
   const root = useAppStore((s) => s.workspace?.path);
   const openTarget = useOpenPreviewTarget();
+  const { fileMenu, openFileMenu, closeFileMenu } = useChatFileMenu();
   const toggleSubagentPanel = useAppStore((s) => s.toggleSubagentPanel);
   const subagentPanel = useAppStore((s) => s.subagentPanel);
   const status = message.toolStatus;
@@ -446,6 +449,9 @@ export const ToolRow = memo(function ToolRow({
             {summary ? (
               <span
                 className={`tool-row-summary${previewTarget ? " linked" : ""}`}
+                onContextMenu={previewTarget?.kind === "file"
+                  ? (event) => openFileMenu(event, { path: previewTarget.path })
+                  : undefined}
                 title={
                   previewTarget
                     ? previewTarget.kind === "file"
@@ -537,6 +543,7 @@ export const ToolRow = memo(function ToolRow({
           onCollapse={collapseRow}
         />
       ) : null}
+      <ContextMenu state={fileMenu} onClose={closeFileMenu} />
     </div>
   );
 }, toolRowPropsEqual);

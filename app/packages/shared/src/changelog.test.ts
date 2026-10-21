@@ -14,7 +14,7 @@ describe("changelog catalog", () => {
   it("starts OMP's independent history at 0.1.0 in every shipped locale", () => {
     for (const catalog of Object.values(CHANGELOG)) {
       expect(catalog.map(entry => entry.version)).toEqual(["0.1.0"]);
-      expect(catalog[0].highlights).toHaveLength(3);
+      expect(catalog[0].highlights).toHaveLength(4);
     }
     expect(getChangelogEntry("0.15.3")).toBeUndefined();
     expect(formatChangelogNotes("0.1.0", "zh-CN")).toContain("GitHub");

@@ -1262,6 +1262,25 @@ Project drag/drop follows these patterns:
   its own, and a reference it cannot resolve reports itself instead of opening a
   panel.
 
+- Right-clicking a conversation file reference offers Copy full path and Copy
+  relative path. For `.html` / `.htm`, **Open with** adds File Manager,
+  built-in browser and default browser, following PI-Desktop #1713. Each action
+  completes the same reference first and opens the exact resolved file. An
+  explicit choice does not change the normal-click destination. The default
+  browser choice uses the existing `fs/open` OS association; it does not force
+  a particular browser. Missing references and failed destinations report an
+  error without trying a different file or destination. A session/project
+  change during resolution or plugin loading cancels the stale open.
+- The single-level submenu supports pointer activation, ArrowRight to enter,
+  ArrowLeft/Escape to return to the parent, and Escape again to dismiss. The
+  File Manager choice may restore its bundled view only within its existing
+  project scope and `ui.view` grant; an unavailable Browser is reported.
+- Explicit local Browser navigation selects one containing root from the
+  registered project folders, current-session scratch directory and attachment
+  store. Real-path containment rejects symlink escapes and outside files; a
+  rejected absolute/file URL never falls through to HTTP. Agent BrowserPreview
+  remains scoped to its workspace root.
+
 ### 8a.3 Keyboard while open
 
 - ↑/↓ move the highlight with wraparound; Home/End are left to the textarea.

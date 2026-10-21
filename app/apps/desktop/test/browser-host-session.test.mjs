@@ -46,9 +46,9 @@ function harness() {
   const host = new BrowserHost({
     pane,
     isPluginLoaded: () => true,
-    getFileRoot(sessionId) {
+    getFileRoot(sessionId, target) {
       const root = deferred();
-      roots.push({ sessionId, ...root });
+      roots.push({ sessionId, target, ...root });
       return root.promise;
     },
     onState: (value) => published.push(value),
@@ -216,4 +216,20 @@ test("a failed replacement load leaves the previous session hidden", async () =>
   await settled();
   h.hole();
   assert.equal(h.visible, false);
+});
+
+test("explicit browser files carry their target into the session-root resolver", async () => {
+  const h = harness();
+  const request = h.host.navigate({ path: "/scratch/A/page.html" }, "A");
+  assert.equal(h.roots.at(-1).target, "/scratch/A/page.html");
+  h.roots.at(-1).resolve("/scratch/A");
+  await settled();
+  assert.equal(h.loads.at(-1).root, "/scratch/A");
+  h.loads.at(-1).finish(); await request;
+});
+test("an explicit file with no authorized root cannot reuse a previous session root", async () => {
+  const h = harness();
+  const request = h.host.navigate({ path: "/outside/page.html" }, "A");
+  h.roots.at(-1).resolve(null); await request;
+  assert.equal(h.loads.length, 0);
 });
