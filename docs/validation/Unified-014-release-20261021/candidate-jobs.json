@@ -1,0 +1,1542 @@
+{
+  "total_count": 7,
+  "jobs": [
+    {
+      "id": 119255523560,
+      "run_id": 39609842689,
+      "workflow_name": "OMP Desktop stable release",
+      "head_branch": "release-check-0.1.4-final",
+      "run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/runs/39609842689",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUkBB8s8AAAAbxC7g6A",
+      "head_sha": "87894e73dbc85d65555d3bf61c7d84caa2245a8b",
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/jobs/119255523560",
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/39609842689/job/119255523560",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-21T13:39:04Z",
+      "started_at": "2026-10-21T13:39:07Z",
+      "completed_at": "2026-10-21T13:39:18Z",
+      "name": "guard",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-21T13:39:07Z",
+          "completed_at": "2026-10-21T13:39:08Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-21T13:39:08Z",
+          "completed_at": "2026-10-21T13:39:12Z"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-21T13:39:12Z",
+          "completed_at": "2026-10-21T13:39:15Z"
+        },
+        {
+          "name": "Validate the owned stable-version candidate",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-21T13:39:15Z",
+          "completed_at": "2026-10-21T13:39:15Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-21T13:39:15Z",
+          "completed_at": "2026-10-21T13:39:15Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-21T13:39:15Z",
+          "completed_at": "2026-10-21T13:39:15Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-21T13:39:15Z",
+          "completed_at": "2026-10-21T13:39:15Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/check-runs/119255523560",
+      "labels": [
+        "ubuntu-22.04"
+      ],
+      "runner_id": 1000000256,
+      "runner_name": "GitHub Actions 1000000256",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 119255636355,
+      "run_id": 39609842689,
+      "workflow_name": "OMP Desktop stable release",
+      "head_branch": "release-check-0.1.4-final",
+      "run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/runs/39609842689",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUkBB8s8AAAAbxDCZgw",
+      "head_sha": "87894e73dbc85d65555d3bf61c7d84caa2245a8b",
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/jobs/119255636355",
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/39609842689/job/119255636355",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-21T13:39:18Z",
+      "started_at": "2026-10-21T13:39:20Z",
+      "completed_at": "2026-10-21T14:04:27Z",
+      "name": "verify",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-21T13:39:20Z",
+          "completed_at": "2026-10-21T13:39:22Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-21T13:39:22Z",
+          "completed_at": "2026-10-21T13:39:25Z"
+        },
+        {
+          "name": "Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-21T13:39:25Z",
+          "completed_at": "2026-10-21T13:39:33Z"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-21T13:39:33Z",
+          "completed_at": "2026-10-21T13:39:34Z"
+        },
+        {
+          "name": "Reuse completed source gates only for unchanged product inputs",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-21T13:39:34Z",
+          "completed_at": "2026-10-21T13:39:37Z"
+        },
+        {
+          "name": "Prepare fixed reference submodules for full source verification",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-21T13:39:37Z",
+          "completed_at": "2026-10-21T13:39:54Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-21T13:39:54Z",
+          "completed_at": "2026-10-21T13:39:55Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-21T13:39:55Z",
+          "completed_at": "2026-10-21T13:39:55Z"
+        },
+        {
+          "name": "Run oven-sh/setup-bun@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-21T13:39:55Z",
+          "completed_at": "2026-10-21T13:39:57Z"
+        },
+        {
+          "name": "Prepare the fixed source-runtime test prerequisites",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-21T13:39:57Z",
+          "completed_at": "2026-10-21T13:53:15Z"
+        },
+        {
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-21T13:53:15Z",
+          "completed_at": "2026-10-21T13:53:30Z"
+        },
+        {
+          "name": "Require the stable version and its release notes",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-21T13:53:30Z",
+          "completed_at": "2026-10-21T13:53:31Z"
+        },
+        {
+          "name": "Run pnpm build:js",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-21T13:53:31Z",
+          "completed_at": "2026-10-21T13:55:02Z"
+        },
+        {
+          "name": "Run cargo build --release --locked -p host-core",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-21T13:55:02Z",
+          "completed_at": "2026-10-21T13:56:41Z"
+        },
+        {
+          "name": "Run pnpm --filter @pi-desktop/desktop typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-21T13:56:41Z",
+          "completed_at": "2026-10-21T13:56:57Z"
+        },
+        {
+          "name": "Run pnpm lint",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-21T13:56:57Z",
+          "completed_at": "2026-10-21T13:56:58Z"
+        },
+        {
+          "name": "Run pnpm -r --if-present test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-21T13:56:58Z",
+          "completed_at": "2026-10-21T14:02:48Z"
+        },
+        {
+          "name": "Run node --test scripts/prepare-github-release.test.mjs scripts/github-update-provider.test.mjs scripts/verify-release-candidate.test.mjs scripts/stage-release-inputs.test.mjs scripts/reuse-source-verification.test.mjs scripts/check-release-workflows.test.mjs scripts/classify-release-failure.test.mjs scripts/readback-workflow.test.mjs scripts/publication-tag.test.mjs scripts/check-workspace-build.test.mjs scripts/e2e/installed-product.test.mjs scripts/e2e/process-ownership.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-21T14:02:48Z",
+          "completed_at": "2026-10-21T14:02:52Z"
+        },
+        {
+          "name": "Run cargo test -p host-core --locked",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-21T14:02:52Z",
+          "completed_at": "2026-10-21T14:04:08Z"
+        },
+        {
+          "name": "Post Run oven-sh/setup-bun@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 34,
+          "started_at": "2026-10-21T14:04:08Z",
+          "completed_at": "2026-10-21T14:04:09Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 35,
+          "started_at": "2026-10-21T14:04:09Z",
+          "completed_at": "2026-10-21T14:04:16Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 36,
+          "started_at": "2026-10-21T14:04:16Z",
+          "completed_at": "2026-10-21T14:04:25Z"
+        },
+        {
+          "name": "Post Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 37,
+          "started_at": "2026-10-21T14:04:25Z",
+          "completed_at": "2026-10-21T14:04:25Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 38,
+          "started_at": "2026-10-21T14:04:25Z",
+          "completed_at": "2026-10-21T14:04:26Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 39,
+          "started_at": "2026-10-21T14:04:26Z",
+          "completed_at": "2026-10-21T14:04:26Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/check-runs/119255636355",
+      "labels": [
+        "ubuntu-22.04"
+      ],
+      "runner_id": 1000000259,
+      "runner_name": "GitHub Actions 1000000259",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 119255636359,
+      "run_id": 39609842689,
+      "workflow_name": "OMP Desktop stable release",
+      "head_branch": "release-check-0.1.4-final",
+      "run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/runs/39609842689",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUkBB8s8AAAAbxDCZhw",
+      "head_sha": "87894e73dbc85d65555d3bf61c7d84caa2245a8b",
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/jobs/119255636359",
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/39609842689/job/119255636359",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-21T13:39:18Z",
+      "started_at": "2026-10-21T13:39:20Z",
+      "completed_at": "2026-10-21T14:01:30Z",
+      "name": "build (ubuntu-22.04, linux, x64, dist:linux)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-21T13:39:21Z",
+          "completed_at": "2026-10-21T13:39:23Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-21T13:39:23Z",
+          "completed_at": "2026-10-21T13:39:26Z"
+        },
+        {
+          "name": "Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-21T13:39:26Z",
+          "completed_at": "2026-10-21T13:39:30Z"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-21T13:39:30Z",
+          "completed_at": "2026-10-21T13:39:33Z"
+        },
+        {
+          "name": "Verify native package dependency selection",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-21T13:39:33Z",
+          "completed_at": "2026-10-21T13:39:33Z"
+        },
+        {
+          "name": "Prepare native UI prerequisites",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-21T13:39:33Z",
+          "completed_at": "2026-10-21T13:39:40Z"
+        },
+        {
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-21T13:39:40Z",
+          "completed_at": "2026-10-21T13:39:52Z"
+        },
+        {
+          "name": "Prepare the locked Electron development runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-21T13:39:52Z",
+          "completed_at": "2026-10-21T13:39:54Z"
+        },
+        {
+          "name": "Verify bounded browser screenshots on native Electron",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-21T13:39:54Z",
+          "completed_at": "2026-10-21T13:39:56Z"
+        },
+        {
+          "name": "Verify HTML open-with on native Electron",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-21T13:39:56Z",
+          "completed_at": "2026-10-21T13:40:17Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-21T13:40:17Z",
+          "completed_at": "2026-10-21T13:40:18Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-21T13:40:18Z",
+          "completed_at": "2026-10-21T13:40:21Z"
+        },
+        {
+          "name": "Check out the exact maintained OMP fork",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-21T13:40:21Z",
+          "completed_at": "2026-10-21T13:40:58Z"
+        },
+        {
+          "name": "Install the fork's pinned Rust toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-21T13:40:58Z",
+          "completed_at": "2026-10-21T13:41:11Z"
+        },
+        {
+          "name": "Run oven-sh/setup-bun@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-21T13:41:11Z",
+          "completed_at": "2026-10-21T13:41:12Z"
+        },
+        {
+          "name": "Run bun install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-21T13:41:12Z",
+          "completed_at": "2026-10-21T13:41:15Z"
+        },
+        {
+          "name": "Build the fork's host native addon",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-21T13:41:15Z",
+          "completed_at": "2026-10-21T13:52:10Z"
+        },
+        {
+          "name": "Run actions/setup-python@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-21T13:52:10Z",
+          "completed_at": "2026-10-21T13:52:10Z"
+        },
+        {
+          "name": "Run python -m pip install psutil==7.2.2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-21T13:52:10Z",
+          "completed_at": "2026-10-21T13:52:14Z"
+        },
+        {
+          "name": "Verify native executable architecture inspection",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-10-21T13:52:14Z",
+          "completed_at": "2026-10-21T13:52:15Z"
+        },
+        {
+          "name": "Build all release installers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-10-21T13:52:15Z",
+          "completed_at": "2026-10-21T13:58:20Z"
+        },
+        {
+          "name": "Verify packaged runtime and actual installed workflow",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22,
+          "started_at": "2026-10-21T13:58:20Z",
+          "completed_at": "2026-10-21T14:00:46Z"
+        },
+        {
+          "name": "Preserve Mac architecture feeds for validated merging",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 23,
+          "started_at": "2026-10-21T14:00:46Z",
+          "completed_at": "2026-10-21T14:00:46Z"
+        },
+        {
+          "name": "Verify Linux host compatibility",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-10-21T14:00:46Z",
+          "completed_at": "2026-10-21T14:00:47Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-21T14:00:47Z",
+          "completed_at": "2026-10-21T14:01:05Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26,
+          "started_at": "2026-10-21T14:01:05Z",
+          "completed_at": "2026-10-21T14:01:07Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 46,
+          "started_at": "2026-10-21T14:01:07Z",
+          "completed_at": "2026-10-21T14:01:07Z"
+        },
+        {
+          "name": "Post Run oven-sh/setup-bun@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 47,
+          "started_at": "2026-10-21T14:01:07Z",
+          "completed_at": "2026-10-21T14:01:09Z"
+        },
+        {
+          "name": "Post Check out the exact maintained OMP fork",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 48,
+          "started_at": "2026-10-21T14:01:09Z",
+          "completed_at": "2026-10-21T14:01:09Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 49,
+          "started_at": "2026-10-21T14:01:09Z",
+          "completed_at": "2026-10-21T14:01:17Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 50,
+          "started_at": "2026-10-21T14:01:17Z",
+          "completed_at": "2026-10-21T14:01:27Z"
+        },
+        {
+          "name": "Post Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 51,
+          "started_at": "2026-10-21T14:01:27Z",
+          "completed_at": "2026-10-21T14:01:28Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 52,
+          "started_at": "2026-10-21T14:01:28Z",
+          "completed_at": "2026-10-21T14:01:28Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 53,
+          "started_at": "2026-10-21T14:01:28Z",
+          "completed_at": "2026-10-21T14:01:28Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/check-runs/119255636359",
+      "labels": [
+        "ubuntu-22.04"
+      ],
+      "runner_id": 1000000258,
+      "runner_name": "GitHub Actions 1000000258",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 119255636391,
+      "run_id": 39609842689,
+      "workflow_name": "OMP Desktop stable release",
+      "head_branch": "release-check-0.1.4-final",
+      "run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/runs/39609842689",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUkBB8s8AAAAbxDCZpw",
+      "head_sha": "87894e73dbc85d65555d3bf61c7d84caa2245a8b",
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/jobs/119255636391",
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/39609842689/job/119255636391",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-21T13:39:18Z",
+      "started_at": "2026-10-21T13:39:25Z",
+      "completed_at": "2026-10-21T14:07:40Z",
+      "name": "build (macos-15, darwin, arm64, dist:mac)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-21T13:39:26Z",
+          "completed_at": "2026-10-21T13:39:30Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-21T13:39:30Z",
+          "completed_at": "2026-10-21T13:39:34Z"
+        },
+        {
+          "name": "Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-21T13:39:34Z",
+          "completed_at": "2026-10-21T13:39:41Z"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-21T13:39:41Z",
+          "completed_at": "2026-10-21T13:39:43Z"
+        },
+        {
+          "name": "Verify native package dependency selection",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-21T13:39:43Z",
+          "completed_at": "2026-10-21T13:39:44Z"
+        },
+        {
+          "name": "Prepare native UI prerequisites",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6,
+          "started_at": "2026-10-21T13:39:44Z",
+          "completed_at": "2026-10-21T13:39:44Z"
+        },
+        {
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-21T13:39:44Z",
+          "completed_at": "2026-10-21T13:40:13Z"
+        },
+        {
+          "name": "Prepare the locked Electron development runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-21T13:40:13Z",
+          "completed_at": "2026-10-21T13:40:16Z"
+        },
+        {
+          "name": "Verify bounded browser screenshots on native Electron",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-21T13:40:16Z",
+          "completed_at": "2026-10-21T13:40:21Z"
+        },
+        {
+          "name": "Verify HTML open-with on native Electron",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-21T13:40:21Z",
+          "completed_at": "2026-10-21T13:40:53Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-21T13:40:53Z",
+          "completed_at": "2026-10-21T13:41:06Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-21T13:41:06Z",
+          "completed_at": "2026-10-21T13:41:16Z"
+        },
+        {
+          "name": "Check out the exact maintained OMP fork",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-21T13:41:16Z",
+          "completed_at": "2026-10-21T13:42:29Z"
+        },
+        {
+          "name": "Install the fork's pinned Rust toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-21T13:42:29Z",
+          "completed_at": "2026-10-21T13:42:47Z"
+        },
+        {
+          "name": "Run oven-sh/setup-bun@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-21T13:42:47Z",
+          "completed_at": "2026-10-21T13:42:49Z"
+        },
+        {
+          "name": "Run bun install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-21T13:42:49Z",
+          "completed_at": "2026-10-21T13:42:59Z"
+        },
+        {
+          "name": "Build the fork's host native addon",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-21T13:42:59Z",
+          "completed_at": "2026-10-21T13:59:04Z"
+        },
+        {
+          "name": "Run actions/setup-python@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-21T13:59:04Z",
+          "completed_at": "2026-10-21T13:59:05Z"
+        },
+        {
+          "name": "Run python -m pip install psutil==7.2.2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-21T13:59:05Z",
+          "completed_at": "2026-10-21T13:59:07Z"
+        },
+        {
+          "name": "Verify native executable architecture inspection",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-10-21T13:59:07Z",
+          "completed_at": "2026-10-21T13:59:12Z"
+        },
+        {
+          "name": "Build all release installers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-10-21T13:59:12Z",
+          "completed_at": "2026-10-21T14:03:27Z"
+        },
+        {
+          "name": "Verify packaged runtime and actual installed workflow",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22,
+          "started_at": "2026-10-21T14:03:27Z",
+          "completed_at": "2026-10-21T14:06:26Z"
+        },
+        {
+          "name": "Preserve Mac architecture feeds for validated merging",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23,
+          "started_at": "2026-10-21T14:06:26Z",
+          "completed_at": "2026-10-21T14:06:26Z"
+        },
+        {
+          "name": "Verify Linux host compatibility",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 24,
+          "started_at": "2026-10-21T14:06:26Z",
+          "completed_at": "2026-10-21T14:06:26Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-21T14:06:26Z",
+          "completed_at": "2026-10-21T14:06:42Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26,
+          "started_at": "2026-10-21T14:06:42Z",
+          "completed_at": "2026-10-21T14:06:44Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 46,
+          "started_at": "2026-10-21T14:06:44Z",
+          "completed_at": "2026-10-21T14:06:44Z"
+        },
+        {
+          "name": "Post Run oven-sh/setup-bun@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 47,
+          "started_at": "2026-10-21T14:06:44Z",
+          "completed_at": "2026-10-21T14:06:47Z"
+        },
+        {
+          "name": "Post Check out the exact maintained OMP fork",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 48,
+          "started_at": "2026-10-21T14:06:47Z",
+          "completed_at": "2026-10-21T14:06:47Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 49,
+          "started_at": "2026-10-21T14:06:47Z",
+          "completed_at": "2026-10-21T14:07:05Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 50,
+          "started_at": "2026-10-21T14:07:05Z",
+          "completed_at": "2026-10-21T14:07:32Z"
+        },
+        {
+          "name": "Post Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 51,
+          "started_at": "2026-10-21T14:07:32Z",
+          "completed_at": "2026-10-21T14:07:33Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 52,
+          "started_at": "2026-10-21T14:07:33Z",
+          "completed_at": "2026-10-21T14:07:34Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 53,
+          "started_at": "2026-10-21T14:07:34Z",
+          "completed_at": "2026-10-21T14:07:38Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/check-runs/119255636391",
+      "labels": [
+        "macos-15"
+      ],
+      "runner_id": 1000000257,
+      "runner_name": "GitHub Actions 1000000257",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 119255636480,
+      "run_id": 39609842689,
+      "workflow_name": "OMP Desktop stable release",
+      "head_branch": "release-check-0.1.4-final",
+      "run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/runs/39609842689",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUkBB8s8AAAAbxDCaAA",
+      "head_sha": "87894e73dbc85d65555d3bf61c7d84caa2245a8b",
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/jobs/119255636480",
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/39609842689/job/119255636480",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-21T13:39:18Z",
+      "started_at": "2026-10-21T13:39:20Z",
+      "completed_at": "2026-10-21T14:21:34Z",
+      "name": "build (windows-latest, win32, x64, dist:win)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-21T13:39:21Z",
+          "completed_at": "2026-10-21T13:39:23Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-21T13:39:23Z",
+          "completed_at": "2026-10-21T13:39:32Z"
+        },
+        {
+          "name": "Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-21T13:39:32Z",
+          "completed_at": "2026-10-21T13:40:00Z"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-21T13:40:00Z",
+          "completed_at": "2026-10-21T13:40:07Z"
+        },
+        {
+          "name": "Verify native package dependency selection",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-21T13:40:07Z",
+          "completed_at": "2026-10-21T13:40:08Z"
+        },
+        {
+          "name": "Prepare native UI prerequisites",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6,
+          "started_at": "2026-10-21T13:40:08Z",
+          "completed_at": "2026-10-21T13:40:08Z"
+        },
+        {
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-21T13:40:08Z",
+          "completed_at": "2026-10-21T13:40:32Z"
+        },
+        {
+          "name": "Prepare the locked Electron development runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-21T13:40:32Z",
+          "completed_at": "2026-10-21T13:40:36Z"
+        },
+        {
+          "name": "Verify bounded browser screenshots on native Electron",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-21T13:40:36Z",
+          "completed_at": "2026-10-21T13:40:38Z"
+        },
+        {
+          "name": "Verify HTML open-with on native Electron",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-21T13:40:38Z",
+          "completed_at": "2026-10-21T13:41:10Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-21T13:41:10Z",
+          "completed_at": "2026-10-21T13:41:31Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-21T13:41:31Z",
+          "completed_at": "2026-10-21T13:41:41Z"
+        },
+        {
+          "name": "Check out the exact maintained OMP fork",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-21T13:41:41Z",
+          "completed_at": "2026-10-21T13:42:32Z"
+        },
+        {
+          "name": "Install the fork's pinned Rust toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-21T13:42:32Z",
+          "completed_at": "2026-10-21T13:43:32Z"
+        },
+        {
+          "name": "Run oven-sh/setup-bun@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-21T13:43:32Z",
+          "completed_at": "2026-10-21T13:43:35Z"
+        },
+        {
+          "name": "Run bun install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-21T13:43:35Z",
+          "completed_at": "2026-10-21T13:44:17Z"
+        },
+        {
+          "name": "Build the fork's host native addon",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-21T13:44:17Z",
+          "completed_at": "2026-10-21T14:06:00Z"
+        },
+        {
+          "name": "Run actions/setup-python@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-21T14:06:00Z",
+          "completed_at": "2026-10-21T14:06:01Z"
+        },
+        {
+          "name": "Run python -m pip install psutil==7.2.2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-21T14:06:01Z",
+          "completed_at": "2026-10-21T14:06:07Z"
+        },
+        {
+          "name": "Verify native executable architecture inspection",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-10-21T14:06:07Z",
+          "completed_at": "2026-10-21T14:06:08Z"
+        },
+        {
+          "name": "Build all release installers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-10-21T14:06:08Z",
+          "completed_at": "2026-10-21T14:11:09Z"
+        },
+        {
+          "name": "Verify packaged runtime and actual installed workflow",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22,
+          "started_at": "2026-10-21T14:11:09Z",
+          "completed_at": "2026-10-21T14:19:10Z"
+        },
+        {
+          "name": "Preserve Mac architecture feeds for validated merging",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 23,
+          "started_at": "2026-10-21T14:19:10Z",
+          "completed_at": "2026-10-21T14:19:10Z"
+        },
+        {
+          "name": "Verify Linux host compatibility",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 24,
+          "started_at": "2026-10-21T14:19:10Z",
+          "completed_at": "2026-10-21T14:19:10Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-21T14:19:10Z",
+          "completed_at": "2026-10-21T14:19:29Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26,
+          "started_at": "2026-10-21T14:19:29Z",
+          "completed_at": "2026-10-21T14:19:31Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 46,
+          "started_at": "2026-10-21T14:19:31Z",
+          "completed_at": "2026-10-21T14:19:31Z"
+        },
+        {
+          "name": "Post Run oven-sh/setup-bun@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 47,
+          "started_at": "2026-10-21T14:19:31Z",
+          "completed_at": "2026-10-21T14:19:46Z"
+        },
+        {
+          "name": "Post Check out the exact maintained OMP fork",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 48,
+          "started_at": "2026-10-21T14:19:46Z",
+          "completed_at": "2026-10-21T14:19:49Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 49,
+          "started_at": "2026-10-21T14:19:49Z",
+          "completed_at": "2026-10-21T14:20:59Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 50,
+          "started_at": "2026-10-21T14:20:59Z",
+          "completed_at": "2026-10-21T14:21:30Z"
+        },
+        {
+          "name": "Post Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 51,
+          "started_at": "2026-10-21T14:21:30Z",
+          "completed_at": "2026-10-21T14:21:30Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 52,
+          "started_at": "2026-10-21T14:21:30Z",
+          "completed_at": "2026-10-21T14:21:32Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 53,
+          "started_at": "2026-10-21T14:21:32Z",
+          "completed_at": "2026-10-21T14:21:33Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/check-runs/119255636480",
+      "labels": [
+        "windows-latest"
+      ],
+      "runner_id": 1000000260,
+      "runner_name": "GitHub Actions 1000000260",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 119255636502,
+      "run_id": 39609842689,
+      "workflow_name": "OMP Desktop stable release",
+      "head_branch": "release-check-0.1.4-final",
+      "run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/runs/39609842689",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUkBB8s8AAAAbxDCaFg",
+      "head_sha": "87894e73dbc85d65555d3bf61c7d84caa2245a8b",
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/jobs/119255636502",
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/39609842689/job/119255636502",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-21T13:39:18Z",
+      "started_at": "2026-10-21T13:39:22Z",
+      "completed_at": "2026-10-21T14:34:24Z",
+      "name": "build (macos-15-intel, darwin, x64, dist:mac)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-21T13:39:23Z",
+          "completed_at": "2026-10-21T13:39:31Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-21T13:39:31Z",
+          "completed_at": "2026-10-21T13:39:41Z"
+        },
+        {
+          "name": "Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-21T13:39:41Z",
+          "completed_at": "2026-10-21T13:39:57Z"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-21T13:39:57Z",
+          "completed_at": "2026-10-21T13:40:00Z"
+        },
+        {
+          "name": "Verify native package dependency selection",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-21T13:40:00Z",
+          "completed_at": "2026-10-21T13:40:03Z"
+        },
+        {
+          "name": "Prepare native UI prerequisites",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6,
+          "started_at": "2026-10-21T13:40:03Z",
+          "completed_at": "2026-10-21T13:40:03Z"
+        },
+        {
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-21T13:40:03Z",
+          "completed_at": "2026-10-21T13:41:03Z"
+        },
+        {
+          "name": "Prepare the locked Electron development runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-21T13:41:03Z",
+          "completed_at": "2026-10-21T13:41:09Z"
+        },
+        {
+          "name": "Verify bounded browser screenshots on native Electron",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-21T13:41:09Z",
+          "completed_at": "2026-10-21T13:41:14Z"
+        },
+        {
+          "name": "Verify HTML open-with on native Electron",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-21T13:41:14Z",
+          "completed_at": "2026-10-21T13:42:20Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-21T13:42:20Z",
+          "completed_at": "2026-10-21T13:42:41Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-21T13:42:41Z",
+          "completed_at": "2026-10-21T13:43:00Z"
+        },
+        {
+          "name": "Check out the exact maintained OMP fork",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-21T13:43:00Z",
+          "completed_at": "2026-10-21T13:44:48Z"
+        },
+        {
+          "name": "Install the fork's pinned Rust toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-21T13:44:48Z",
+          "completed_at": "2026-10-21T13:45:54Z"
+        },
+        {
+          "name": "Run oven-sh/setup-bun@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-21T13:45:54Z",
+          "completed_at": "2026-10-21T13:45:56Z"
+        },
+        {
+          "name": "Run bun install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-21T13:45:56Z",
+          "completed_at": "2026-10-21T13:46:30Z"
+        },
+        {
+          "name": "Build the fork's host native addon",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-21T13:46:30Z",
+          "completed_at": "2026-10-21T14:17:28Z"
+        },
+        {
+          "name": "Run actions/setup-python@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-21T14:17:28Z",
+          "completed_at": "2026-10-21T14:17:30Z"
+        },
+        {
+          "name": "Run python -m pip install psutil==7.2.2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-21T14:17:30Z",
+          "completed_at": "2026-10-21T14:17:35Z"
+        },
+        {
+          "name": "Verify native executable architecture inspection",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-10-21T14:17:35Z",
+          "completed_at": "2026-10-21T14:17:40Z"
+        },
+        {
+          "name": "Build all release installers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-10-21T14:17:40Z",
+          "completed_at": "2026-10-21T14:25:01Z"
+        },
+        {
+          "name": "Verify packaged runtime and actual installed workflow",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22,
+          "started_at": "2026-10-21T14:25:01Z",
+          "completed_at": "2026-10-21T14:31:40Z"
+        },
+        {
+          "name": "Preserve Mac architecture feeds for validated merging",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23,
+          "started_at": "2026-10-21T14:31:40Z",
+          "completed_at": "2026-10-21T14:31:41Z"
+        },
+        {
+          "name": "Verify Linux host compatibility",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 24,
+          "started_at": "2026-10-21T14:31:41Z",
+          "completed_at": "2026-10-21T14:31:41Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-21T14:31:41Z",
+          "completed_at": "2026-10-21T14:32:11Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26,
+          "started_at": "2026-10-21T14:32:11Z",
+          "completed_at": "2026-10-21T14:32:13Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 46,
+          "started_at": "2026-10-21T14:32:13Z",
+          "completed_at": "2026-10-21T14:32:14Z"
+        },
+        {
+          "name": "Post Run oven-sh/setup-bun@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 47,
+          "started_at": "2026-10-21T14:32:14Z",
+          "completed_at": "2026-10-21T14:32:16Z"
+        },
+        {
+          "name": "Post Check out the exact maintained OMP fork",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 48,
+          "started_at": "2026-10-21T14:32:16Z",
+          "completed_at": "2026-10-21T14:32:18Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 49,
+          "started_at": "2026-10-21T14:32:18Z",
+          "completed_at": "2026-10-21T14:33:25Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 50,
+          "started_at": "2026-10-21T14:33:25Z",
+          "completed_at": "2026-10-21T14:34:19Z"
+        },
+        {
+          "name": "Post Run pnpm/action-setup@v6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 51,
+          "started_at": "2026-10-21T14:34:19Z",
+          "completed_at": "2026-10-21T14:34:19Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 52,
+          "started_at": "2026-10-21T14:34:19Z",
+          "completed_at": "2026-10-21T14:34:21Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 53,
+          "started_at": "2026-10-21T14:34:21Z",
+          "completed_at": "2026-10-21T14:34:22Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/check-runs/119255636502",
+      "labels": [
+        "macos-15-intel"
+      ],
+      "runner_id": 1000000261,
+      "runner_name": "GitHub Actions 1000000261",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 119283776687,
+      "run_id": 39609842689,
+      "workflow_name": "OMP Desktop stable release",
+      "head_branch": "release-check-0.1.4-final",
+      "run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/runs/39609842689",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUkBB8s8AAAAbxd38rw",
+      "head_sha": "87894e73dbc85d65555d3bf61c7d84caa2245a8b",
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/jobs/119283776687",
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/39609842689/job/119283776687",
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-10-21T14:34:25Z",
+      "started_at": "2026-10-21T14:34:25Z",
+      "completed_at": "2026-10-21T14:34:24Z",
+      "name": "publish",
+      "steps": [],
+      "check_run_url": "https://api.github.com/repos/MisterBowie/omp-desktop/check-runs/119283776687",
+      "labels": [],
+      "runner_id": null,
+      "runner_name": null,
+      "runner_group_id": null,
+      "runner_group_name": null
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+[
+  {
+    "name": "memory-settings-layout",
+    "head": "4f5eb9c59bdb554450180a49bc5d1d921bab2eed",
+    "snapshotBase": "4f5eb9c59bdb554450180a49bc5d1d921bab2eed",
+    "checkedFiles": 24,
+    "changedSinceSnapshot": []
+  },
+  {
+    "name": "release-0.1.1",
+    "head": "8233c81398c170808c99aedc7bb525b47eeac467",
+    "snapshotBase": "8233c81398c170808c99aedc7bb525b47eeac467",
+    "checkedFiles": 5,
+    "changedSinceSnapshot": []
+  },
+  {
+    "name": "provider-context-window",
+    "head": "8233c81398c170808c99aedc7bb525b47eeac467",
+    "snapshotBase": "8233c81398c170808c99aedc7bb525b47eeac467",
+    "checkedFiles": 79,
+    "changedSinceSnapshot": []
+  }
+]

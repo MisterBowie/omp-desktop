@@ -1,0 +1,79 @@
+{
+  "schema": "omp-desktop.accepted-release-candidate/1",
+  "version": "0.1.4",
+  "sourceRevision": "87894e73dbc85d65555d3bf61c7d84caa2245a8b",
+  "runId": 39609842689,
+  "runUrl": "https://github.com/MisterBowie/omp-desktop/actions/runs/39609842689",
+  "nativeJobs": [
+    {
+      "id": 119255636359,
+      "name": "build (ubuntu-22.04, linux, x64, dist:linux)",
+      "conclusion": "success"
+    },
+    {
+      "id": 119255636391,
+      "name": "build (macos-15, darwin, arm64, dist:mac)",
+      "conclusion": "success"
+    },
+    {
+      "id": 119255636480,
+      "name": "build (windows-latest, win32, x64, dist:win)",
+      "conclusion": "success"
+    },
+    {
+      "id": 119255636502,
+      "name": "build (macos-15-intel, darwin, x64, dist:mac)",
+      "conclusion": "success"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 12353646761,
+      "name": "validation-darwin-x64",
+      "digest": "sha256:1beaaa6586fe97d681c007293bea367518c078ad32c6df8b6e5ef6c2d632ef15",
+      "bytes": 2896456
+    },
+    {
+      "id": 12353112023,
+      "name": "release-darwin-x64",
+      "digest": "sha256:ad2300cbdcf2a5f37c555f8656f1356737ca231a814a2e1ec4b858ef99f7a8e7",
+      "bytes": 457533168
+    },
+    {
+      "id": 12352586343,
+      "name": "validation-win32-x64",
+      "digest": "sha256:95847cb7a9e3aa4f10b61e5757834413a58477c6e38aaeeb1461fb76f0aa19b3",
+      "bytes": 2749445
+    },
+    {
+      "id": 12352225520,
+      "name": "release-linux-x64",
+      "digest": "sha256:fea2614ce593edcb39a1362847fb5723cb9dd02491efde9f98d9e7c68c9fae45",
+      "bytes": 639574549
+    },
+    {
+      "id": 12351414947,
+      "name": "release-win32-x64",
+      "digest": "sha256:c55f92227209885439c0b1dc4171d7f7bdcf510a2d69aaa4068eaf053213a8e0",
+      "bytes": 396433057
+    },
+    {
+      "id": 12350997453,
+      "name": "validation-linux-x64",
+      "digest": "sha256:244c63803d4b6a1892b6a4bc48c2fb1b4c0c22f85d91485e6479a93814a0f99f",
+      "bytes": 3919800
+    },
+    {
+      "id": 12350819264,
+      "name": "release-darwin-arm64",
+      "digest": "sha256:6b0eff3755e3f60fa96ae8358a9fc230c5da9645c18d0022ad5fa5ffdf30f123",
+      "bytes": 441705513
+    },
+    {
+      "id": 12350369210,
+      "name": "validation-darwin-arm64",
+      "digest": "sha256:c083a3eb9695c3945299f9a8681108da229372f5047296e8ea0d0bcd370adf13",
+      "bytes": 2842414
+    }
+  ]
+}
