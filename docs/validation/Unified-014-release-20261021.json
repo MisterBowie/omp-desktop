@@ -1,7 +1,7 @@
 {
   "date": "2026-10-21",
   "version": "0.1.4",
-  "status": "first-candidate-rejected-stale-pi-recovery-test-corrected",
+  "status": "strict-callback-correction-verified-awaiting-new-candidate",
   "base": "eeaff809d1427eb4d9c620d283541955a8556443",
   "branch": "codex/fix-memory-capture",
   "runtime": {
@@ -152,6 +152,40 @@
       "fail": 0,
       "skipped": 0,
       "redExit": 1
+    },
+    {
+      "id": "full-js-source-suite",
+      "command": "pnpm -r --if-present test",
+      "exit": 0,
+      "revision": "771d4f723e6c92fffd8436404ee3d5ce3c94ce37",
+      "desktop": {
+        "tests": 3214,
+        "pass": 3202,
+        "fail": 0,
+        "skipped": 12
+      },
+      "log": "Unified-014-release-20261021/omp-unified-full-source-verified.log.gz",
+      "sharedDistDuplicates": true
+    },
+    {
+      "id": "strict-plan-goal-source-runtime",
+      "command": "PI_DESKTOP_HOST_BIN=<current isolated 0.1.4 debug host> node --test apps/desktop/test/omp-plan-submit-e2e.test.mjs",
+      "exit": 0,
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0,
+      "runtime": "prepared pinned patched source runtime .7; OMP_PLAN_TEST_RUNTIME was supplied but is not consumed by this fixture",
+      "installerAcceptance": false
+    },
+    {
+      "id": "settlement-bridge-unit",
+      "command": "node --test apps/desktop/test/omp-session-bridge.test.mjs",
+      "exit": 0,
+      "tests": 57,
+      "pass": 57,
+      "fail": 0,
+      "skipped": 0
     }
   ],
   "sourceFiles": [
@@ -514,6 +548,10 @@
       "sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
     },
     {
+      "path": "Unified-014-release-20261021/omp-unified-full-source-verified.log.gz",
+      "sha256": "9040b1ccbf4d735a032337c8925e6e755cac290939bd5b630c218da92b3475c5"
+    },
+    {
       "path": "Unified-014-release-20261021/omp-unified-full-source.log.gz",
       "sha256": "ec92fc698c3104d101ac2fa43ed7ec3a5c0957a633823ff050fcf4c7246ee119"
     },
@@ -578,6 +616,14 @@
       "sha256": "de1702012582672fad3c052249c49913d26003533da5d777e0f0ad93152bbddf"
     },
     {
+      "path": "Unified-014-release-20261021/omp-unified-safe-native-diagnostics.log.gz",
+      "sha256": "ca663bf4e4a91fba555f267affc5e07fb3cd69864e6e088070f838f0308cc7a0"
+    },
+    {
+      "path": "Unified-014-release-20261021/omp-unified-settlement-unit.log.gz",
+      "sha256": "dcd1c8b693044a2ea1e2a1949afec38b07e7ab614143f3d00115485f02da8cd8"
+    },
+    {
       "path": "Unified-014-release-20261021/omp-unified-shared-build.log.gz",
       "sha256": "91fe91b33ce4f657f9bcfca31279f690cf1456cec4f2fc3ac18dd942bdddb102"
     },
@@ -588,6 +634,10 @@
     {
       "path": "Unified-014-release-20261021/omp-unified-shared.log.gz",
       "sha256": "39f3f93e8cc9f7050e2ba491a8dc3bc345ada6d055ea351837feee06c5fe0675"
+    },
+    {
+      "path": "Unified-014-release-20261021/omp-unified-strict-callback-verified.log.gz",
+      "sha256": "eb80b8ba08c4bd7ae130a6a740e44bc5d270c94d73fed30b76cd975be5608799"
     },
     {
       "path": "Unified-014-release-20261021/omp-unified-targeted.log.gz",
@@ -611,15 +661,6 @@
     "public release and asset readback",
     "real paid provider requests"
   ],
-  "candidate": {
-    "revision": "119e2d290a26019b358bbfa0348ec9414220acb2",
-    "tag": "release-check-0.1.4-119e2d2",
-    "runId": 39603239076,
-    "url": "https://github.com/MisterBowie/omp-desktop/actions/runs/39603239076",
-    "status": "not-publishable",
-    "sourceGate": "failure",
-    "failure": "stale assertion requiring retired Pi checkpoint recovery"
-  },
   "localMemoryUi": {
     "ok": true,
     "restart": true,
@@ -632,6 +673,39 @@
   "localSourceSuiteAttempt": {
     "exit": 1,
     "cause": "sandbox denied loopback sockets; retry with approved permissions in progress",
-    "log": "Unified-014-release-20261021/omp-unified-full-source.log.gz"
+    "log": "Unified-014-release-20261021/omp-unified-full-source.log.gz",
+    "retryExit": 0
+  },
+  "previousCandidates": [
+    {
+      "revision": "119e2d290a26019b358bbfa0348ec9414220acb2",
+      "tag": "release-check-0.1.4-119e2d2",
+      "runId": 39603239076,
+      "url": "https://github.com/MisterBowie/omp-desktop/actions/runs/39603239076",
+      "status": "not-publishable",
+      "sourceGate": "failure",
+      "failure": "stale assertion requiring retired Pi checkpoint recovery"
+    }
+  ],
+  "candidate": {
+    "revision": "771d4f723e6c92fffd8436404ee3d5ce3c94ce37",
+    "tag": "release-check-0.1.4-771d4f7",
+    "runId": 39607580096,
+    "url": "https://github.com/MisterBowie/omp-desktop/actions/runs/39607580096",
+    "status": "superseded-awaiting-strict-callback-test-correction"
+  },
+  "nativeFailure": {
+    "sourceRunId": 39603239076,
+    "target": "win32-x64",
+    "strict": {
+      "tests": 15,
+      "pass": 14,
+      "fail": 1,
+      "skipped": 0
+    },
+    "failure": "test checked callback before asynchronous durable settlement announcement",
+    "productCodeChanged": false,
+    "waitBudgetIncreased": false,
+    "safeReport": "Unified-014-release-20261021/native-failure-39603239076.json"
   }
 }

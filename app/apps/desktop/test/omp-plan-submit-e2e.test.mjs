@@ -1060,7 +1060,9 @@ test(
 
       provider.script([{ text: "REAL-INITIAL", finish: "stop" }]);
       const prompt = await promptThrough(host, bridge, sessionId, `initial ${strategy}`);
-      assert.equal(await waitFor(() => bridge.status(sessionId).isRunning === false), true);
+      // Runner idle precedes the durable settlement announcement. Synchronize
+      // on that public callback before inspecting its identity and count.
+      assert.equal(await waitFor(() => bridge.status(sessionId).isRunning === false && ends.length === 1), true);
       assert.equal(prompt.accepted, true);
       assert.equal(providerCount(), 1);
       assert.equal(turns().length, 1);
@@ -1094,7 +1096,7 @@ test(
         runtimeVersion: engineRef?.runtimeVersion ?? null,
       });
       assert.equal(recovery.accepted, true);
-      assert.equal(await waitFor(() => bridge.status(sessionId).isRunning === false), true);
+      assert.equal(await waitFor(() => bridge.status(sessionId).isRunning === false && ends.length === 2), true);
       assert.equal(providerCount(), 2);
       assert.equal(turns().length, 2);
       assert.equal(turns()[1].status, "completed");
@@ -2111,6 +2113,7 @@ test(
     for (const [label, candidate] of [["plan", plan], ["goal", goal], ["agent-again", agentAgain], ["plan-again", planAgain]]) {
       assert.ok(candidate.prefix.trim().length > 0, `the ${label} turn carries no native base prompt`);
     }
+    assert.equal(await waitFor(() => ends.length === 5), true, "every mode turn announces its durable settlement");
     assert.equal(ends.length, 5, "every mode turn settles exactly once");
     assert.equal(turns().length, 5);
     assert.ok(turns().every((row) => row.status === "completed"));
