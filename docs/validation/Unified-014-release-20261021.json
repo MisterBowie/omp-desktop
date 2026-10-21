@@ -1,7 +1,7 @@
 {
   "date": "2026-10-21",
   "version": "0.1.4",
-  "status": "local-candidate-before-remote-validation",
+  "status": "first-candidate-rejected-stale-pi-recovery-test-corrected",
   "base": "eeaff809d1427eb4d9c620d283541955a8556443",
   "branch": "codex/fix-memory-capture",
   "runtime": {
@@ -142,6 +142,16 @@
       "command": "node scripts/verify-provider-capabilities.mjs <verified .7>/omp",
       "exit": 0,
       "log": "Unified-014-release-20261021/omp-unified-provider-native.log.gz"
+    },
+    {
+      "id": "outbox-omp-recovery-contract",
+      "command": "node --test apps/desktop/test/persistence-outbox.test.mjs apps/desktop/test/omp-only-product.test.mjs",
+      "exit": 0,
+      "tests": 10,
+      "pass": 10,
+      "fail": 0,
+      "skipped": 0,
+      "redExit": 1
     }
   ],
   "sourceFiles": [
@@ -480,6 +490,10 @@
       "sha256": "30b43e7a019b721db490621bd72cf1884f1b7cba84b4666cef76069d7576a867"
     },
     {
+      "path": "Unified-014-release-20261021/omp-unified-docs-candidate.log.gz",
+      "sha256": "957b5ac20ce845ea19194f60d5141fd2c04b389eb2e34c849095567cdc3ab90b"
+    },
+    {
       "path": "Unified-014-release-20261021/omp-unified-docs-final.log.gz",
       "sha256": "957b5ac20ce845ea19194f60d5141fd2c04b389eb2e34c849095567cdc3ab90b"
     },
@@ -492,8 +506,20 @@
       "sha256": "c493cb001fc8fd4f89c8c86aacb99c6640e3e051e7553623c04460896c7e8592"
     },
     {
+      "path": "Unified-014-release-20261021/omp-unified-electron-prepare.log.gz",
+      "sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
       "path": "Unified-014-release-20261021/omp-unified-fmt.log.gz",
       "sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "path": "Unified-014-release-20261021/omp-unified-full-source.log.gz",
+      "sha256": "ec92fc698c3104d101ac2fa43ed7ec3a5c0957a633823ff050fcf4c7246ee119"
+    },
+    {
+      "path": "Unified-014-release-20261021/omp-unified-host-build.log.gz",
+      "sha256": "b107c0ab017ad5a30053298702064697fffdcdbbc63a96d09be68af641279a2d"
     },
     {
       "path": "Unified-014-release-20261021/omp-unified-host.log.gz",
@@ -512,6 +538,22 @@
       "sha256": "1a89481e66d7444263061d09178a15b4cf54824b13533f68860a6c27a939801b"
     },
     {
+      "path": "Unified-014-release-20261021/omp-unified-memory-ui-verified.log.gz",
+      "sha256": "a831fcabe71ada140c7e11394ad10760b12642c6ad2159dc03db8c30fdef6f11"
+    },
+    {
+      "path": "Unified-014-release-20261021/omp-unified-memory-ui.log.gz",
+      "sha256": "ba423d326a580e9d61ddc2c02e4fae4f41885e7e29770e0a4147172980d168db"
+    },
+    {
+      "path": "Unified-014-release-20261021/omp-unified-outbox-green.log.gz",
+      "sha256": "17f5d344b164a9fdd0c64a6e1bb9e30fc2db155e5ee6bc50000b4bf6946d030b"
+    },
+    {
+      "path": "Unified-014-release-20261021/omp-unified-outbox-red.log.gz",
+      "sha256": "2bf450f943605bdd00f2bf41c7fbcacb77c91d6718f6a7b45a97f18177ed2b62"
+    },
+    {
       "path": "Unified-014-release-20261021/omp-unified-pi-assets-green.log.gz",
       "sha256": "25bb0f7d67263c38eeb94e13fb04390041fcee46d34bec7acde67da9b24becb3"
     },
@@ -522,6 +564,10 @@
     {
       "path": "Unified-014-release-20261021/omp-unified-provider-native.log.gz",
       "sha256": "d9767be0f1fc7d231aac2c3b88c7c0eb107e7e0f0d3350e02fb1c7de7eb2a20a"
+    },
+    {
+      "path": "Unified-014-release-20261021/omp-unified-release-docs-candidate.log.gz",
+      "sha256": "f8417daeeb4828ee458dfb0895254f5092d07bbd311ae8053494e4751ad41ded"
     },
     {
       "path": "Unified-014-release-20261021/omp-unified-release-docs.log.gz",
@@ -564,5 +610,28 @@
     "remote four-target candidate gates",
     "public release and asset readback",
     "real paid provider requests"
-  ]
+  ],
+  "candidate": {
+    "revision": "119e2d290a26019b358bbfa0348ec9414220acb2",
+    "tag": "release-check-0.1.4-119e2d2",
+    "runId": 39603239076,
+    "url": "https://github.com/MisterBowie/omp-desktop/actions/runs/39603239076",
+    "status": "not-publishable",
+    "sourceGate": "failure",
+    "failure": "stale assertion requiring retired Pi checkpoint recovery"
+  },
+  "localMemoryUi": {
+    "ok": true,
+    "restart": true,
+    "isolatedProfile": true,
+    "hostVersion": "0.1.4",
+    "runtimeDesktopBuild": "0.1.3",
+    "patchLevel": ".7",
+    "installerAcceptance": false
+  },
+  "localSourceSuiteAttempt": {
+    "exit": 1,
+    "cause": "sandbox denied loopback sockets; retry with approved permissions in progress",
+    "log": "Unified-014-release-20261021/omp-unified-full-source.log.gz"
+  }
 }

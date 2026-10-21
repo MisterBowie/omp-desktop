@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "categories": [
+    "ASSERTION"
+  ],
+  "locations": [
+    {
+      "path": "app/apps/desktop/test/persistence-outbox.test.mjs",
+      "lines": [
+        16,
+        20
+      ]
+    }
+  ]
+}

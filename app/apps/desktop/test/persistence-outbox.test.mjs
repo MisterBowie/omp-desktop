@@ -14,10 +14,11 @@ test("session delete drops the outbox for that session (D318)", async () => {
 });
 
 test("handshake drains the outbox before the renderer can hydrate (D327)", async () => {
-  const main = await readMainSource();
-  assert.match(main, /await persistenceOutbox\.flush\(\(\) => host\)/);
-  assert.doesNotMatch(main, /void persistenceOutbox\.flush\(\(\) => host\)/);
-  assert.match(main, /session\.recoverInflightMessages/);
+  const host = await readFile(new URL("../electron/main/runtime/host.ts", import.meta.url), "utf8");
+  assert.match(host, /await h\.handshake\(\)[\s\S]*await persistenceOutbox\.flush\(\(\) => runtimeState\.host\)/);
+  assert.doesNotMatch(host, /void persistenceOutbox\.flush/);
+  // OMP owns native recovery; boot must never import retired Pi checkpoints.
+  assert.doesNotMatch(host, /session\.recoverInflightMessages/);
 });
 
 test("message_end checkpoints the finished snapshot before settling (D327)", async () => {
