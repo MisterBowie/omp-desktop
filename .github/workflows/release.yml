@@ -302,18 +302,11 @@ jobs:
       - name: Preserve Mac architecture feeds for validated merging
         if: matrix.platform == 'darwin'
         run: mv apps/desktop/release/latest-mac.yml 'apps/desktop/release/latest-mac-${{ matrix.arch }}.yml'
-      - name: Package the matching remote-host runtime
+      - name: Verify Linux host compatibility
         if: matrix.platform == 'linux'
         run: |
           set -euo pipefail
-          pnpm --filter @pi-desktop/pi-host build
           node scripts/check-linux-host-glibc.mjs target/release/pi-desktop-host-core
-          node apps/pi-host/scripts/bundle.mjs --platform linux --arch x64
-          version="$(node -p "require('./apps/pi-host/package.json').version")"
-          name="pi-host-$version-linux-x64"
-          out=apps/pi-host/dist-bundle
-          tar -czf "$out/$name.tar.gz" -C "$out" "$name"
-          (cd "$out" && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256")
       - uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.platform }}-${{ matrix.arch }}
@@ -327,8 +320,6 @@ jobs:
             app/apps/desktop/release/*.rpm
             app/apps/desktop/release/*.blockmap
             app/apps/desktop/release/latest*.yml
-            app/apps/pi-host/dist-bundle/*.tar.gz
-            app/apps/pi-host/dist-bundle/*.tar.gz.sha256
       - uses: actions/upload-artifact@v7
         if: always()
         with:

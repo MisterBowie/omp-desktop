@@ -1,0 +1,63 @@
+   Compiling host-core v0.1.1 (/Users/vv/person/omp-desktop/.worktrees/provider-context-window/app/crates/host-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.04s
+     Running unittests src/main.rs (target/debug/build/host-core/efb97e82518abb5e/out/pi_desktop_host_core-efb97e82518abb5e)
+
+running 53 tests
+test plugins::providers::tests::a_malformed_thinking_levels_field_is_ignored ... ok
+test plugins::providers::tests::a_default_outside_the_declared_list_is_dropped ... ok
+test plugins::providers::tests::declared_thinking_levels_are_normalized ... ok
+test plugins::providers::tests::declared_providers_reads_the_manifest ... ok
+test plugins::providers::tests::a_new_database_carries_the_owner_column_at_the_current_schema_version ... ok
+test plugins::providers::tests::declared_thinking_levels_survive_into_the_row ... ok
+test plugins::providers::tests::a_disabled_plugin_writes_its_rows_off ... ok
+test plugins::providers::tests::dropping_the_api_key_auth_kind_clears_the_stored_key ... ok
+test plugins::providers::tests::a_shrinking_declaration_keeps_the_survivors ... ok
+test plugins::providers::tests::disabling_and_removing_a_plugin_take_its_rows_with_it ... ok
+test plugins::providers::tests::sync_is_declarative_and_drops_a_removed_declaration ... ok
+test plugins::providers::tests::a_row_another_owner_holds_makes_the_sync_fail_rather_than_no_op ... ok
+test plugins::providers::tests::the_declaration_requires_the_permission ... ok
+test providers::catalog::tests::a_binding_without_a_source_stays_unmarked ... ok
+test providers::catalog::tests::a_binding_without_limits_keeps_its_siblings ... ok
+test providers::catalog::tests::a_non_array_models_value_reads_the_legacy_binding ... ok
+test providers::catalog::tests::a_catalog_sourced_binding_survives_the_config_round_trip ... ok
+test providers::catalog::tests::a_provider_sourced_binding_survives_the_config_round_trip ... ok
+test providers::catalog::tests::an_all_unreadable_array_still_reads_the_legacy_binding ... ok
+test providers::catalog::tests::an_empty_models_array_reads_the_legacy_binding ... ok
+test providers::catalog::tests::an_unknown_source_is_dropped_instead_of_persisted ... ok
+test providers::catalog::tests::an_unreadable_binding_costs_only_itself ... ok
+test providers::catalog::tests::omit_default_survives_on_reasoning_bindings_only ... ok
+test providers::catalog::tests::malformed_model_storage_is_explicitly_degraded ... ok
+test providers::catalog::tests::zero_limits_still_fall_back_to_the_generic_defaults ... ok
+test plugins::providers::tests::the_declaration_shape_is_validated ... ok
+test plugins::providers::tests::a_user_row_is_never_adopted_or_removed ... ok
+test plugins::providers::tests::sync_keeps_provider_config_it_does_not_own ... ok
+test providers::tests::alias_length_is_limited_to_sixty_characters ... ok
+test plugins::providers::tests::sync_writes_rows_owned_by_the_plugin ... ok
+test providers::tests::alias_survives_the_provider_config_round_trip ... ok
+test plugins::providers::tests::the_user_path_refuses_a_plugin_owned_row ... ok
+test providers::tests::a_provider_can_hold_both_an_api_key_and_a_vendor_account ... ok
+test providers::tests::a_stored_array_survives_an_entry_that_lost_a_field ... ok
+test plugins::providers::tests::the_user_can_supply_the_key_a_plugin_row_asks_for ... ok
+test plugins::providers::tests::startup_reconciliation_removes_a_row_whose_plugin_is_gone ... ok
+test providers::order_tests::provider_order_is_applied_on_read_and_survives_reopening ... ok
+test providers::order_tests::provider_order_rejects_stale_moves_and_ignores_deleted_ids_on_read ... ok
+test providers::tests::normalize_model_bindings_trims_aliases_and_drops_blank_ones ... ok
+test providers::order_tests::provider_moves_preserve_configuration_and_new_or_disabled_rows ... ok
+test providers::tests::alias_survives_provider_create_and_update ... ok
+test providers::tests::an_oauth_credential_alone_makes_the_provider_ready ... ok
+test providers::tests::degraded_model_array_cannot_be_overwritten_by_update ... ok
+test providers::tests::discovered_models_are_cached_without_overwriting_user_rows ... ok
+test providers::tests::discovered_capabilities_and_overrides_survive_reopening_and_clean_up_on_delete ... ok
+test providers::tests::over_long_alias_is_rejected_by_the_write_paths ... ok
+test providers::tests::headers_roundtrip_migrate_user_agent_clear_and_reject ... ok
+test providers::tests::model_bindings_roundtrip_and_legacy_model_migrates_on_read ... ok
+test providers::tests::limit_overrides_roundtrip_and_clear_with_zero ... ok
+test providers::tests::over_long_alias_leaves_stored_secrets_untouched ... ok
+test providers::tests::provider_without_override_omits_reasoning_capability ... ok
+test providers::tests::reasoning_override_roundtrips_and_preserves_provider_config ... ok
+test providers::tests::thinking_levels_override_normalizes_and_can_clear ... ok
+
+test result: ok. 53 passed; 0 failed; 0 ignored; 0 measured; 592 filtered out; finished in 0.38s
+
+
+EXIT=0

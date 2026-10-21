@@ -9,9 +9,12 @@
 import {
   apiStyleForAdapter,
   bindingForCustomModel,
+  providerCapabilitiesFromUnknown,
   type CatalogApiStyle,
 } from "./model-catalog.js";
 import { matchNamedPreset, normalizeEndpointUrl } from "./provider-presets.js";
+import { THINKING_LEVELS } from "./types.js";
+import { isSessionThinkingLevel, resolveBindingDefaultThinkingLevel } from "./thinking-levels.js";
 import type {
   ContextWindowSource,
   ModelBinding,
@@ -819,6 +822,11 @@ function bindingFromGenericModel(
   const maxTokens = positiveInt(
     record?.maxTokens ?? record?.max_tokens ?? record?.maxOutputTokens ?? limit?.output,
   );
+  const providerCapabilities = providerCapabilitiesFromUnknown(record?.providerCapabilities);
+  const levels = record?.thinkingLevels;
+  const thinkingLevels = Array.isArray(levels)
+    ? THINKING_LEVELS.filter((level) => levels.includes(level))
+    : [...(providerCapabilities?.thinkingLevels ?? base.thinkingLevels)];
   return {
     ...base,
     contextWindow: contextWindow ?? base.contextWindow,
@@ -828,6 +836,17 @@ function bindingFromGenericModel(
       importedContextWindowSource(record?.contextWindowSource) ??
       (contextWindow === undefined ? base.contextWindowSource : "user"),
     maxTokens: maxTokens ?? base.maxTokens,
+    thinkingLevels,
+    defaultThinkingLevel: resolveBindingDefaultThinkingLevel(
+      isSessionThinkingLevel(record?.defaultThinkingLevel) ? record.defaultThinkingLevel : null, thinkingLevels,
+    ),
+    ...(providerCapabilities ? { providerCapabilities } : {}),
+    ...(record?.thinkingLevelsSource === "provider" || record?.thinkingLevelsSource === "user"
+      ? { thinkingLevelsSource: record.thinkingLevelsSource }
+      : Array.isArray(levels) ? { thinkingLevelsSource: "user" as const } : {}),
+    ...(typeof record?.supportsImages === "boolean" ? { supportsImages: record.supportsImages } : {}),
+    ...(typeof record?.supportsDocuments === "boolean" ? { supportsDocuments: record.supportsDocuments } : {}),
+    ...(typeof record?.availableForSubagents === "boolean" ? { availableForSubagents: record.availableForSubagents } : {}),
     ...(record?.nativeWebSearch === true || record?.native_web_search === true
       ? { nativeWebSearch: true }
       : {}),
@@ -851,7 +870,7 @@ function bindingFromPiModel(value: unknown): ModelBinding | null {
   if (!binding) return null;
   const input = Array.isArray(record?.input) ? record.input : [];
   const supportsImages = input.includes("image") ? true : binding.supportsImages;
-  if (record?.reasoning === true) {
+  if (record?.reasoning === true && !Array.isArray(record.thinkingLevels)) {
     return {
       ...binding,
       thinkingLevels: ["off", "low", "medium", "high"] satisfies ThinkingLevel[],

@@ -3,6 +3,7 @@ import {
   THINKING_LEVELS,
   type SessionThinkingLevel,
   type ThinkingLevel,
+  type ProviderModelCapabilities,
 } from "./types.js";
 
 export function isSessionThinkingLevel(value: unknown): value is SessionThinkingLevel {
@@ -113,6 +114,7 @@ export type PublishedThinkingSource = {
   reasoning?: boolean;
   supportedThinkingLevels?: readonly ThinkingLevel[];
   thinkingLevelMap?: Partial<Record<ThinkingLevel, string | null>>;
+  providerCapabilities?: ProviderModelCapabilities;
 };
 
 /**
@@ -131,6 +133,9 @@ export function publishedThinkingLevels(
   // Capability projections spell a non-reasoning model as `["off"]`, which would
   // otherwise surface as one enableable level.
   if (model.reasoning === false) return [];
+  if (model.providerCapabilities?.thinkingLevels !== undefined) {
+    return THINKING_LEVELS.filter((level) => model.providerCapabilities?.thinkingLevels?.includes(level));
+  }
   const published = new Set<ThinkingLevel>(model.supportedThinkingLevels ?? []);
   if (published.size === 0 && model.thinkingLevelMap) {
     for (const [level, value] of Object.entries(model.thinkingLevelMap)) {

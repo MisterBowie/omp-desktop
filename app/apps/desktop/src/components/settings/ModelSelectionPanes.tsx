@@ -799,6 +799,7 @@ export function ModelSelectionPanes({
                                   : [...binding.thinkingLevels, level];
                                 updateBinding(binding.id, {
                                   thinkingLevels: next,
+                                  thinkingLevelsSource: "user",
                                   defaultThinkingLevel: resolveBindingDefaultThinkingLevel(
                                     binding.defaultThinkingLevel,
                                     sortThinkingLevels(next),
@@ -811,6 +812,13 @@ export function ModelSelectionPanes({
                           );
                         })}
                       </div>
+                      {info?.providerCapabilities?.unsupportedThinkingLevels?.length ? (
+                        <p className="provider-chosen-thinking-hint">
+                          {t("settings.unsupportedPublishedThinkingLevels", {
+                            levels: info.providerCapabilities.unsupportedThinkingLevels.join(", "),
+                          })}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="provider-chosen-capabilities">
                       <span className="provider-chosen-thinking-label">
@@ -868,6 +876,10 @@ export function ModelSelectionPanes({
                               }
                             />
                             <span>{t("settings.nativeWebSearch")}</span>
+                            {info?.providerCapabilities?.webSearch !== undefined ? (
+                              <HelpIcon label={t(info.providerCapabilities.webSearch
+                                ? "settings.providerCapabilitySupported" : "settings.providerCapabilityUnsupported")} />
+                            ) : null}
                           </label>
                           <Tooltip
                             className="provider-chosen-delegation-help"

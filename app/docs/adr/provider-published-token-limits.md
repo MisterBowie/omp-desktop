@@ -1,8 +1,8 @@
-# ADR: Preserve endpoint-published token limits
+# ADR: Preserve endpoint-published model limits and capabilities
 
 - Status: Accepted
 - Date: 2026-10-20
-- Amends: ADR 0134 (token limits only)
+- Amends: ADR 0134 (published limits, thinking controls and input capabilities)
 
 ## Context
 
@@ -33,6 +33,38 @@ are applied. The existing host cache retains context; a selected binding retains
 both context and output. No database column, schema version, or host protocol
 version changes. Existing caches refresh through Fetch list. A downgraded host
 may drop the new marker but retains its numeric limit under the legacy rule.
+
+## Capability extension (2026-10-21)
+
+The same discovery boundary also discarded `reasoning`, `reasoning_levels`,
+`supported_reasoning_levels` and `modalities`. Keep their validated normalized
+facts in optional `providerCapabilities` on `ModelInfo` and saved bindings.
+Explicit false wins; omitted fields keep the catalog baseline. Recognized effort
+names remain canonical, `none` maps to `off` with its wire spelling, and unknown
+levels remain visible as unsupported metadata rather than a fabricated level.
+
+`thinkingLevelsSource: provider | user` separates inherited enabled levels from
+manual edits. Refresh inherited levels, including old unmarked empty defaults;
+preserve marked user sets (including an empty set), defaults that remain legal,
+legacy non-empty choices, attachment overrides, and delegation/search opt-ins.
+Null attachment overrides follow endpoint metadata even before cache hydration.
+
+Rust stores capability snapshots in existing `kv` namespace
+`provider-model-capabilities`, keyed by provider ID and then model ID, within the
+same transaction as the normalized model cache. Existing `max_output_tokens`
+stores the output limit. Deleting a provider clears its cache atomically with
+the row; user-owned model rows remain authoritative. This adds no SQL columns,
+database schema version, runtime pin, or inference call.
+
+The Node model configuration applies facts before user overrides. The OMP YAML
+projection now carries reasoning, image input, and maximum output; explicitly
+published OpenAI-compatible effort controls carry their ladder and mappings.
+Other APIs keep OMP's native budget/adaptive/Google mode resolution. Native OMP
+does not support `ultra`; it is reported, never silently mapped to `max`.
+
+PDF and native web search require explicit publication before being reported as
+detected. Published search support does not enable searches. AI delegation is a
+local user opt-in and is never derived from provider metadata.
 
 ## Consequences
 

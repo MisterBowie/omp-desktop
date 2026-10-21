@@ -119,6 +119,29 @@ pub struct ProviderUpdateInput {
     pub enabled: Option<bool>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderModelCapabilities {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking_levels: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking_level_map: Option<BTreeMap<String, Option<String>>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unsupported_thinking_levels: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_modalities: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_modalities: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supports_images: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supports_documents: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub web_search: Option<bool>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelBinding {
@@ -148,6 +171,10 @@ pub struct ModelBinding {
     pub max_tokens: u32,
     #[serde(default)]
     pub thinking_levels: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking_levels_source: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_capabilities: Option<ProviderModelCapabilities>,
     pub default_thinking_level: Option<String>,
     /// Attachment capability overrides. `None` follows the published catalog
     /// capability, so a models.dev correction still reaches a saved binding.
@@ -177,6 +204,10 @@ pub struct ModelCatalogItem {
     pub capabilities: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_window: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_capabilities: Option<ProviderModelCapabilities>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -188,4 +219,8 @@ pub struct DiscoveredModelInput {
     pub capabilities: Vec<String>,
     #[serde(default)]
     pub context_window: Option<u32>,
+    #[serde(default)]
+    pub max_tokens: Option<u32>,
+    #[serde(default)]
+    pub provider_capabilities: Option<ProviderModelCapabilities>,
 }

@@ -3,6 +3,7 @@ import {
   bindingForCustomModel,
   bindingFromModelInfo,
   bindingWithModelInfo,
+  providerCapabilitiesFromUnknown,
   bindingSupportsDocuments,
   effectiveContextWindow,
   bindingSupportsImages,
@@ -115,6 +116,44 @@ describe("endpoint-published context windows", () => {
     expect(bindingWithModelInfo(user, model)).toBe(user);
     const legacy = { ...binding, contextWindow: 256_000, contextWindowSource: undefined };
     expect(bindingWithModelInfo(legacy, model)).toBe(legacy);
+  });
+});
+
+describe("provider capability snapshots", () => {
+  const model: ModelInfo = {
+    ...textModel(), reasoning: true, supportedThinkingLevels: ["low", "high", "max"],
+    providerCapabilities: { reasoning: true, thinkingLevels: ["low", "high", "max"], inputModalities: ["text", "image"], webSearch: true },
+  };
+
+  it("seeds published thinking without enabling delegation or provider searches", () => {
+    const binding = bindingFromModelInfo(model);
+    expect(binding.thinkingLevels).toEqual(["low", "high", "max"]);
+    expect(binding.thinkingLevelsSource).toBe("provider");
+    expect(binding.availableForSubagents).toBeUndefined();
+    expect(binding.nativeWebSearch).toBeUndefined();
+    expect(binding.supportsImages).toBeNull();
+    expect(JSON.parse(JSON.stringify(binding)).providerCapabilities.inputModalities).toContain("image");
+    expect(bindingSupportsImages(binding)).toBe(true);
+    expect(bindingSupportsDocuments(binding)).toBe(false);
+    expect(bindingSupportsImages({ ...binding, supportsImages: false })).toBe(false);
+  });
+
+  it("refreshes inherited metadata and preserves manual levels, attachment and delegation choices", () => {
+    const binding = { ...bindingFromModelInfo(model), thinkingLevels: [], thinkingLevelsSource: "user" as const, supportsImages: false, supportsDocuments: true, availableForSubagents: true };
+    const refreshed = bindingWithModelInfo(binding, model);
+    expect(refreshed.thinkingLevels).toEqual([]);
+    expect(refreshed.supportsImages).toBe(false);
+    expect(refreshed.supportsDocuments).toBe(true);
+    expect(refreshed.availableForSubagents).toBe(true);
+    const legacy = bindingForCustomModel(model.modelId);
+    expect(bindingWithModelInfo(legacy, model).thinkingLevels).toEqual(["low", "high", "max"]);
+    expect(bindingWithModelInfo({ ...legacy, thinkingLevels: ["medium"] }, model).thinkingLevels).toEqual(["medium"]);
+  });
+
+  it("validates snapshots and keeps unknown levels separate from executable choices", () => {
+    expect(providerCapabilitiesFromUnknown({ reasoning: "true", availableForSubagents: true })).toBeUndefined();
+    expect(providerCapabilitiesFromUnknown({ reasoning: false, thinkingLevels: ["max", "ultra"], supportsImages: false, webSearch: false })).toMatchObject({ reasoning: false, thinkingLevels: [], supportsImages: false, webSearch: false });
+    expect(bindingFromModelInfo({ ...model, reasoning: false }).thinkingLevels).toEqual([]);
   });
 });
 

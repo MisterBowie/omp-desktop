@@ -32,6 +32,37 @@ test("anthropic lists keep display names", () => {
   ]);
 });
 
+test("discovery retains published thinking levels and attachment modalities", () => {
+  const [model] = normalizeModelList("responses", { data: [{
+    id: "gateway/claude", reasoning: true,
+    reasoning_levels: ["low", "medium", "high", "xhigh", "max"],
+    supported_reasoning_levels: [{ effort: "low" }, { effort: "max" }],
+    modalities: { input: ["text", "image", "pdf"], output: ["text"] },
+  }] });
+  assert.equal(model.providerCapabilities.reasoning, true);
+  assert.deepEqual(model.providerCapabilities.thinkingLevels, ["low", "medium", "high", "xhigh", "max"]);
+  assert.deepEqual(model.providerCapabilities.inputModalities, ["text", "image", "pdf"]);
+});
+
+test("explicit false and unknown thinking levels never become invented capabilities", () => {
+  const models = normalizeModelList("responses", [{
+    id: "future", reasoning_levels: ["none", "low", "ultra"], supports_pdf: true, supports_web_search: true,
+    available_for_subagents: true,
+  }, { id: "disabled", reasoning: false, reasoning_levels: ["high"], supports_images: false, supports_web_search: false }]);
+  const future = models.find((model) => model.modelId === "future").providerCapabilities;
+  assert.deepEqual(future.thinkingLevels, ["off", "low"]);
+  assert.equal(future.thinkingLevelMap.off, "none");
+  assert.deepEqual(future.unsupportedThinkingLevels, ["ultra"]);
+  assert.equal(future.supportsDocuments, true);
+  assert.equal(future.webSearch, true);
+  assert.equal(future.availableForSubagents, undefined, "delegation is a local user choice");
+  const disabled = models.find((model) => model.modelId === "disabled").providerCapabilities;
+  assert.equal(disabled.reasoning, false);
+  assert.deepEqual(disabled.thinkingLevels, []);
+  assert.equal(disabled.supportsImages, false);
+  assert.equal(disabled.webSearch, false);
+});
+
 for (const apiStyle of ["chat_completions", "responses", "anthropic_messages"]) {
   test(`${apiStyle} preserves provider context and output limits separately`, () => {
     const [model] = normalizeModelList(apiStyle, {

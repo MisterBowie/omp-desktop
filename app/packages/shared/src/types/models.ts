@@ -83,6 +83,19 @@ export function modelIdsMatch(candidate: string, requested: string): boolean {
  */
 export type ContextWindowSource = "catalog" | "provider" | "user";
 
+/** Endpoint-published facts; delegation and search opt-ins remain user-owned. */
+export type ProviderModelCapabilities = {
+  reasoning?: boolean;
+  thinkingLevels?: readonly ThinkingLevel[];
+  thinkingLevelMap?: Partial<Record<ThinkingLevel, string | null>>;
+  unsupportedThinkingLevels?: readonly string[];
+  inputModalities?: readonly ModelModality[];
+  outputModalities?: readonly ModelModality[];
+  supportsImages?: boolean;
+  supportsDocuments?: boolean;
+  webSearch?: boolean;
+};
+
 /** Provider-local model settings persisted with the provider configuration. */
 export type ModelBinding = {
   id: string;
@@ -96,6 +109,8 @@ export type ModelBinding = {
   contextWindowSource?: ContextWindowSource;
   maxTokens: number;
   thinkingLevels: ThinkingLevel[];
+  thinkingLevelsSource?: "provider" | "user";
+  providerCapabilities?: ProviderModelCapabilities;
   /** Canonical enabled level, or `omit` when new sessions should send no override. */
   defaultThinkingLevel: SessionThinkingLevel | null;
   /**
@@ -203,6 +218,7 @@ export type ModelInfo = {
   contextWindow?: number;
   contextWindowSource?: ContextWindowSource;
   maxTokens?: number;
+  providerCapabilities?: ProviderModelCapabilities;
   capabilities: Array<
     | "text"
     | "tools"

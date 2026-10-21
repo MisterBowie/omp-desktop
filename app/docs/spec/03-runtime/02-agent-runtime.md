@@ -2589,3 +2589,15 @@ compared by their wire ID (before `|`); an assistant message containing only
 replayed calls is dropped as a whole, and corresponding results use the
 original call's ID. Legitimate new calls remain. This does not change the native
 OMP runtime or its history ownership.
+
+
+### Endpoint capability projection (2026-10-21)
+
+Selected bindings retain validated endpoint facts in `providerCapabilities`.
+Node model resolution applies those facts before explicit thinking/attachment
+choices. OMP model YAML carries reasoning, text/image input and maximum output.
+Published OpenAI-compatible effort controls carry their canonical ladder and
+wire map; other APIs retain OMP's native budget/adaptive/Google mode resolution.
+Unknown levels are reported without being projected as executable choices.
+Capability publication never enables AI delegation or native searches. Model
+facts and local opt-ins remain separate; no runtime pin or user profile changes.

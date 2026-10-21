@@ -56,9 +56,6 @@ export async function prepareGitHubRelease({ directory, version, platforms = ["d
   }
   if (platforms.includes("linux")) {
     await feed("latest-linux.yml", ".AppImage");
-    const name = `pi-host-${version}-linux-x64.tar.gz`;
-    const checksum = readFileSync(join(directory, `${name}.sha256`), "utf8").trim();
-    assert.equal(checksum, `${await digest(join(directory, name), "sha256")}  ${name}`, "remote-host SHA256 mismatch");
   }
   // Commit the merged feed only after every platform and digest passed.
   if (macFeed) {
@@ -68,7 +65,8 @@ export async function prepareGitHubRelease({ directory, version, platforms = ["d
   }
   const files = [];
   for (const name of readdirSync(directory).sort()) {
-    if (!/^(?:OMP-Desktop-|omp-desktop-|pi-host-|latest(?:-[a-z0-9]+)*\.yml$)/.test(name)) continue;
+    assert(!name.startsWith("pi-host-"), "retired Pi host is not a product release asset");
+    if (!/^(?:OMP-Desktop-|omp-desktop-|latest(?:-[a-z0-9]+)*\.yml$)/.test(name)) continue;
     if (!name.startsWith("latest")) assert(name.includes(`-${version}`), `stale release artifact: ${name}`);
     const path = join(directory, name);
     assert(lstatSync(path).isFile(), `unexpected release entry: ${name}`);

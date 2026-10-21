@@ -21,8 +21,8 @@ mod validation;
 pub use catalog::{cache_discovered_models, list_models};
 pub use credentials::get_secret_for_provider;
 pub use model::{
-    DiscoveredModelInput, ModelBinding, ModelCatalogItem, ProviderCreateInput, ProviderPublic,
-    ProviderUpdateInput,
+    DiscoveredModelInput, ModelBinding, ModelCatalogItem, ProviderCreateInput,
+    ProviderModelCapabilities, ProviderPublic, ProviderUpdateInput,
 };
 pub use order::{reorder_providers, ProviderReorderInput};
 pub use repository::{

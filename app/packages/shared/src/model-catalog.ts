@@ -11,11 +11,15 @@
  * tests share one implementation instead of re-deriving these rules per surface.
  */
 
-import { publishedThinkingLevels } from "./thinking-levels.js";
+import { publishedThinkingLevels, resolveBindingDefaultThinkingLevel } from "./thinking-levels.js";
+import { MODEL_MODALITIES, THINKING_LEVELS } from "./types.js";
 import type {
   ContextWindowSource,
   ModelBinding,
   ModelInfo,
+  ModelModalities,
+  ModelModality,
+  ProviderModelCapabilities,
   ThinkingLevel,
 } from "./types.js";
 
@@ -103,20 +107,27 @@ export function modelMatchesFilter(model: ModelInfo, filter: ModelFilter): boole
  * gate cannot drift into three different answers.
  */
 export function bindingSupportsImages(
-  binding?: Pick<ModelBinding, "supportsImages"> | null,
+  binding?: Pick<ModelBinding, "supportsImages" | "providerCapabilities"> | null,
   model?: ModelInfo | null,
 ): boolean {
   if (typeof binding?.supportsImages === "boolean") return binding.supportsImages;
-  return model ? modelMatchesFilter(model, "vision") : false;
+  return publishedAttachmentSupport("image", model?.providerCapabilities ?? binding?.providerCapabilities, model);
 }
 
 /** Effective document (PDF) input for a binding, override first. */
 export function bindingSupportsDocuments(
-  binding?: Pick<ModelBinding, "supportsDocuments"> | null,
+  binding?: Pick<ModelBinding, "supportsDocuments" | "providerCapabilities"> | null,
   model?: ModelInfo | null,
 ): boolean {
   if (typeof binding?.supportsDocuments === "boolean") return binding.supportsDocuments;
-  return model ? modelMatchesFilter(model, "pdf") : false;
+  return publishedAttachmentSupport("pdf", model?.providerCapabilities ?? binding?.providerCapabilities, model);
+}
+
+function publishedAttachmentSupport(modality: "image" | "pdf", published?: ProviderModelCapabilities, model?: ModelInfo | null): boolean {
+  const explicit = modality === "image" ? published?.supportsImages : published?.supportsDocuments;
+  if (typeof explicit === "boolean") return explicit;
+  if (published?.inputModalities !== undefined) return published.inputModalities.includes(modality);
+  return model ? modelMatchesFilter(model, modality === "image" ? "vision" : "pdf") : false;
 }
 
 const THINKING_ORDER: readonly ThinkingLevel[] = [
@@ -233,7 +244,8 @@ export function resolveBindingContextWindow(
  * manual token entry; the user can still configure the endpoint explicitly.
  */
 export function bindingFromModelInfo(model: ModelInfo): ModelBinding {
-  const thinkingLevels = sortThinkingLevels(publishedThinkingLevels(model));
+  const thinkingLevels = sortThinkingLevels(model.reasoning === false || model.providerCapabilities?.reasoning === false
+    ? [] : model.providerCapabilities?.thinkingLevels ?? publishedThinkingLevels(model));
   return {
     id: model.modelId,
     contextWindow:
@@ -242,6 +254,9 @@ export function bindingFromModelInfo(model: ModelInfo): ModelBinding {
     contextWindowSource: model.contextWindowSource ?? "catalog",
     maxTokens: model.maxTokens || model.limit?.output || CATALOG_DEFAULT_MAX_TOKENS,
     thinkingLevels,
+    ...(model.providerCapabilities ? { providerCapabilities: model.providerCapabilities } : {}),
+    ...(model.providerCapabilities?.reasoning !== undefined || model.providerCapabilities?.thinkingLevels !== undefined
+      ? { thinkingLevelsSource: "provider" as const } : {}),
     defaultThinkingLevel: thinkingLevels.includes("medium")
       ? "medium"
       : (thinkingLevels[0] ?? null),
@@ -252,19 +267,81 @@ export function bindingFromModelInfo(model: ModelInfo): ModelBinding {
   };
 }
 
-/** Adopt a refreshed endpoint limit without replacing an Advanced override. */
+/** Adopt refreshed endpoint facts while preserving explicit local overrides. */
 export function bindingWithModelInfo(
   binding: ModelBinding,
-  model?: Pick<ModelInfo, "contextWindow" | "contextWindowSource">,
+  model?: Pick<ModelInfo, "contextWindow" | "contextWindowSource" | "providerCapabilities">,
 ): ModelBinding {
-  if (model?.contextWindowSource !== "provider" || !model.contextWindow) return binding;
-  if (binding.contextWindowSource === "user") return binding;
-  if (!binding.contextWindowSource && binding.contextWindow !== CATALOG_DEFAULT_CONTEXT_WINDOW) return binding;
-  return {
-    ...binding,
-    contextWindow: model.contextWindow,
-    contextWindowSource: "provider",
-  };
+  let next = binding;
+  if (model?.contextWindowSource === "provider" && model.contextWindow &&
+      binding.contextWindowSource !== "user" &&
+      (binding.contextWindowSource || binding.contextWindow === CATALOG_DEFAULT_CONTEXT_WINDOW)) {
+    next = { ...next, contextWindow: model.contextWindow, contextWindowSource: "provider" };
+  }
+  const capabilities = model?.providerCapabilities;
+  if (!capabilities) return next;
+  next = { ...next, providerCapabilities: { ...binding.providerCapabilities, ...capabilities } };
+  const publishesThinking = capabilities.reasoning !== undefined || capabilities.thinkingLevels !== undefined;
+  const followsProvider = binding.thinkingLevelsSource === "provider" ||
+    (!binding.thinkingLevelsSource && binding.thinkingLevels.length === 0);
+  if (publishesThinking && followsProvider) {
+    const thinkingLevels = capabilities.reasoning === false ? [] : sortThinkingLevels(
+      capabilities.thinkingLevels ?? publishedThinkingLevels({ reasoning: capabilities.reasoning }),
+    );
+    const preferred = binding.defaultThinkingLevel ?? (thinkingLevels.includes("medium") ? "medium" : thinkingLevels[0] ?? null);
+    next = {
+      ...next, thinkingLevels, thinkingLevelsSource: "provider",
+      defaultThinkingLevel: resolveBindingDefaultThinkingLevel(preferred, thinkingLevels),
+    };
+  }
+  return next;
+}
+
+/** Apply only published modality fields, keeping omitted catalog fields intact. */
+export function modalitiesWithProviderCapabilities(
+  baseline?: ModelModalities,
+  capabilities?: ProviderModelCapabilities,
+): ModelModalities {
+  const input = new Set<ModelModality>(capabilities?.inputModalities ?? baseline?.input ?? ["text"]);
+  for (const [modality, override] of [["image", capabilities?.supportsImages], ["pdf", capabilities?.supportsDocuments]] as const) {
+    if (override === true) input.add(modality);
+    if (override === false) input.delete(modality);
+  }
+  return { input: [...input], output: [...(capabilities?.outputModalities ?? baseline?.output ?? ["text"])] };
+}
+
+/** Validate a persisted/public capability snapshot without accepting local opt-ins. */
+export function providerCapabilitiesFromUnknown(value: unknown): ProviderModelCapabilities | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const result: ProviderModelCapabilities = {};
+  for (const key of ["reasoning", "supportsImages", "supportsDocuments", "webSearch"] as const) {
+    if (typeof record[key] === "boolean") result[key] = record[key];
+  }
+  for (const key of ["inputModalities", "outputModalities"] as const) {
+    const values = record[key];
+    if (Array.isArray(values)) result[key] = MODEL_MODALITIES.filter((modality) => values.includes(modality));
+  }
+  if (Array.isArray(record.thinkingLevels)) {
+    const values = record.thinkingLevels;
+    result.thinkingLevels = THINKING_LEVELS.filter((level) => values.includes(level));
+  }
+  if (result.reasoning === false) result.thinkingLevels = [];
+  const rawMap = record.thinkingLevelMap;
+  if (rawMap && typeof rawMap === "object" && !Array.isArray(rawMap)) {
+    const map: Partial<Record<ThinkingLevel, string | null>> = {};
+    for (const [level, wire] of Object.entries(rawMap)) {
+      if ((THINKING_LEVELS as readonly string[]).includes(level) &&
+          (wire === null || (typeof wire === "string" && wire.length <= 64))) map[level as ThinkingLevel] = wire;
+    }
+    if (Object.keys(map).length) result.thinkingLevelMap = map;
+  }
+  if (Array.isArray(record.unsupportedThinkingLevels)) {
+    const values = record.unsupportedThinkingLevels.filter((value): value is string =>
+      typeof value === "string" && value.length > 0 && value.length <= 64 && !(THINKING_LEVELS as readonly string[]).includes(value));
+    if (values.length) result.unsupportedThinkingLevels = [...new Set(values)].slice(0, 32);
+  }
+  return Object.keys(result).length ? result : undefined;
 }
 
 /** Binding for a model id the catalog does not publish. */

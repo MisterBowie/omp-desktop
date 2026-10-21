@@ -9,11 +9,14 @@
  *  - google_generative_ai        → GET {base}/models?key=…
  */
 
+import { THINKING_LEVELS, MODEL_MODALITIES, providerCapabilitiesFromUnknown, type ThinkingLevel, type ModelModality, type ProviderModelCapabilities } from "@pi-desktop/shared";
+
 export type DiscoveredModel = {
   modelId: string;
   displayName: string;
   contextWindow?: number;
   maxTokens?: number;
+  providerCapabilities?: ProviderModelCapabilities;
 };
 
 const DISCOVERY_TIMEOUT_MS = 10_000;
@@ -78,6 +81,51 @@ function modelLimits(item: Record<string, unknown> | null): Pick<DiscoveredModel
   };
 }
 
+function publishedModalities(value: unknown): ModelModality[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const result = MODEL_MODALITIES.filter((modality) => value.includes(modality));
+  return result.length || value.length === 0 ? result : undefined;
+}
+
+/** Normalize endpoint facts without treating local opt-ins as capabilities. */
+function modelCapabilities(item: Record<string, unknown> | null): Pick<DiscoveredModel, "providerCapabilities"> {
+  if (!item) return {};
+  const capabilities: ProviderModelCapabilities = {};
+  if (typeof item.reasoning === "boolean") capabilities.reasoning = item.reasoning;
+  const rawLevels = [item.reasoning_levels, item.supported_reasoning_levels].flatMap((value) => Array.isArray(value) ? value : []);
+  const levels = new Set<ThinkingLevel>();
+  const unsupported = new Set<string>();
+  const map: Partial<Record<ThinkingLevel, string | null>> = {};
+  for (const raw of rawLevels.slice(0, 64)) {
+    const value = typeof raw === "string" ? raw : asRecord(raw)?.effort;
+    if (typeof value !== "string" || !value.trim() || value.length > 64) continue;
+    const wire = value.trim().toLowerCase();
+    const level = wire === "none" ? "off" : wire;
+    if ((THINKING_LEVELS as readonly string[]).includes(level)) {
+      levels.add(level as ThinkingLevel);
+      map[level as ThinkingLevel] = wire;
+    } else unsupported.add(wire);
+  }
+  if (rawLevels.length) {
+    capabilities.thinkingLevels = capabilities.reasoning === false ? [] : THINKING_LEVELS.filter((level) => levels.has(level));
+    if (capabilities.reasoning === undefined && levels.size) capabilities.reasoning = [...levels].some((level) => level !== "off");
+    if (Object.keys(map).length) capabilities.thinkingLevelMap = map;
+  }
+  if (capabilities.reasoning === false) capabilities.thinkingLevels = [];
+  if (unsupported.size) capabilities.unsupportedThinkingLevels = [...unsupported];
+  const modalities = asRecord(item.modalities);
+  const input = publishedModalities(modalities?.input ?? item.input_modalities);
+  const output = publishedModalities(modalities?.output ?? item.output_modalities);
+  if (input !== undefined) capabilities.inputModalities = input;
+  if (output !== undefined) capabilities.outputModalities = output;
+  if (typeof item.supports_images === "boolean") capabilities.supportsImages = item.supports_images;
+  if (typeof item.supports_pdf === "boolean") capabilities.supportsDocuments = item.supports_pdf;
+  const webSearch = [item.supports_web_search, item.web_search, item.native_web_search].find((value) => typeof value === "boolean");
+  if (typeof webSearch === "boolean") capabilities.webSearch = webSearch;
+  const normalized = providerCapabilitiesFromUnknown(capabilities);
+  return normalized ? { providerCapabilities: normalized } : {};
+}
+
 function dedupeSort(models: DiscoveredModel[]): DiscoveredModel[] {
   const seen = new Map<string, DiscoveredModel>();
   for (const model of models) {
@@ -106,7 +154,7 @@ export function normalizeModelList(
           typeof item?.displayName === "string" && item.displayName
             ? item.displayName
             : modelId;
-        return [{ modelId, displayName, ...modelLimits(item) }];
+        return [{ modelId, displayName, ...modelLimits(item), ...modelCapabilities(item) }];
       }),
     );
   }
@@ -126,7 +174,7 @@ export function normalizeModelList(
         typeof item?.display_name === "string" && item.display_name
           ? item.display_name
           : modelId;
-      return [{ modelId, displayName, ...modelLimits(item) }];
+      return [{ modelId, displayName, ...modelLimits(item), ...modelCapabilities(item) }];
     }),
   );
 }

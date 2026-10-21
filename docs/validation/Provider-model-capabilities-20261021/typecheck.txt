@@ -1,0 +1,6 @@
+
+> @pi-desktop/desktop@0.1.1 typecheck /Users/vv/person/omp-desktop/.worktrees/provider-context-window/app/apps/desktop
+> tsc -p tsconfig.json --noEmit
+
+
+EXIT=0

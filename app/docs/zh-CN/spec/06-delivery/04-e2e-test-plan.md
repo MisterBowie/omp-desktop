@@ -8225,6 +8225,21 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   F (unread persistence), Quality (bounded localized menu).
 - **Milestone**: Post-M6 desktop shell maintenance.
 - **Status**: Draft; native E2E requires an explicitly authorized run.
+#### E2E-MODEL-provider-capabilities-survive-selection-and-native-projection
+
+- **步骤**：夹具发布思考五档、text/image/pdf，获取列表、选择、保存、离线读取，
+  解析运行时并检查 OMP YAML。重复手动禁用附件、显式空思考集合及已有调度/搜索
+  开关，再重新打开实际临时宿主数据库。
+- **预期**：已发布事实跨各边界及缓存加载前保留；用户选择保留，不因能力声明自动
+  打开调度或搜索；未知档位只提示不支持。OMP 收到 reasoning/image/output 和已发布
+  OpenAI effort 控制，其他接口继续使用原生控制模式。删除提供商清理能力缓存。
+  未发布 PDF/搜索时不推断为支持。
+- **自动化**：英文同名场景列出桌面/shared/runtime/Rust 覆盖；
+  `scripts/verify-provider-capabilities.mjs` 接受显式 OMP 二进制，在隔离 HOME 内仅查询
+  模型及状态 RPC，不发送提示词或推理，不启动安装态 GUI。
+- **规格**：`03-runtime/12-provider-config-schema.md`、
+  `03-runtime/13-model-catalog-and-selection.md`、ADR `provider-published-token-limits`。
+
 #### E2E-MODEL-provider-token-limits-survive-selection-and-restart
 
 - **步骤**：测试端点返回 `context_window: 872000`、`max_output_tokens: 128000`，
@@ -8730,3 +8745,11 @@ worker；旧 Pi 会话不能执行、认领 Plan 或修改队列。列表/搜索
 选择 worktree、临时 OMP 会话后，查询保持对应会话 id 并显示该范围已保存条目。
 原生记忆测试采用正常模型提炼配置，仅提供方为本地模拟服务；固定运行时继续验证
 工具审批、取消、队列/Plan、恢复、并发项目绑定及独立工作树完整流程。
+
+
+## OMP 记忆页布局验收
+
+布局调整使用真实组件和构建后的生产 CSS，以模拟数据渲染 1024、720、390 CSS 像素宽度。
+检查项目字段、搜索框与按钮的对齐及间距、卡片内边距、分页和清空操作互不重叠，
+以及长文本和清空确认不横向溢出；页面标题只出现一次。记录空状态与有内容状态截图，
+不接触真实记忆库或付费模型。

@@ -26,6 +26,24 @@ function knownModel(): ModelConfig {
 }
 
 describe("main-supplied model capabilities", () => {
+  it("restores endpoint capabilities before applying manual overrides", () => {
+    const binding = {
+      contextWindow: 872_000, maxTokens: 128_000, thinkingLevels: ["low", "high", "max"] as ThinkingLevel[],
+      providerCapabilities: { reasoning: true, thinkingLevels: ["low", "high", "max"] as ThinkingLevel[],
+        inputModalities: ["text", "image", "pdf"] as const, thinkingLevelMap: { max: "max" }, webSearch: true },
+    };
+    const restored = modelConfigWithBinding(genericModelConfig("gateway/claude"), binding);
+    expect(restored.reasoning).toBe(true);
+    expect(restored.supportedThinkingLevels).toEqual(["low", "high", "max"]);
+    expect(restored.input).toEqual(["text", "image"]);
+    expect(restored.modalities?.input).toContain("pdf");
+    expect(restored.thinkingLevelMap?.max).toBe("max");
+    expect(restored.webSearch).toBeUndefined();
+    const manual = modelConfigWithBinding(genericModelConfig("gateway/claude"), { ...binding, thinkingLevels: [], supportsImages: false, supportsDocuments: false });
+    expect(manual.reasoning).toBe(false);
+    expect(manual.input).toEqual(["text"]);
+    expect(manual.modalities?.input).not.toContain("pdf");
+  });
   it("uses models.dev modalities for visual transport", () => {
     expect(visionFromModelConfig(knownModel())).toBe(true);
     expect(

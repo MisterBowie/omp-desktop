@@ -7,6 +7,16 @@
 
 ## OMP Desktop distribution identity (M6)
 
+### 0.1.4 OMP-only consolidated release
+
+Version 0.1.4 consolidates OMP-only creation and memory retention, responsive
+memory settings, endpoint model capabilities, HTML open-with and durable
+completion notifications. Pi workers and standalone Pi Host archives are absent
+from installers and release assets; staging/publication refuse retired archives.
+Installer/feed integrity and all four native gates remain required. Storage stays
+at schema 22 and native OMP at 18.3.0 / `62bc57b+omp-desktop.7`.
+No Pi history import or migration is offered.
+
 ### 0.1.2 maintenance release
 
 Version 0.1.2 ships the nine desktop/Pi-compatible bug fixes documented in the

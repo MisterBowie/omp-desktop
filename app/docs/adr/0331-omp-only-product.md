@@ -18,7 +18,9 @@ wire identifier remains recognizable as retired data, with every capability clos
 it cannot acquire execution by omission, a live status, a queue or an approval.
 
 The composition root no longer constructs the Pi worker. Boot/restart cannot start
-it, and desktop installers omit its resource bundle. OMP session supervisors retain
+it, and desktop installers omit its resource bundle. Release artifacts also omit
+standalone Pi Host archives; staging and publication refuse retired archives.
+OMP session supervisors retain
 exclusive ownership of native execution, tools, cancellation and structured events.
 Reusable model transport utilities and upstream licensing remain intact.
 

@@ -14102,6 +14102,27 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   project. The two-live-sessions desktop journey and the panel step are Draft
   (run only in a capable environment when this surface changes)
 
+#### E2E-MODEL-provider-capabilities-survive-selection-and-native-projection
+
+- **Steps**: Return reasoning with low/medium/high/xhigh/max and text/image/PDF
+  modalities from a fixture endpoint. Discover, choose, save, hydrate offline,
+  resolve runtime configuration and inspect projected OMP YAML. Repeat with
+  manual attachment false, explicitly empty user thinking levels and existing
+  delegation/search choices. Reopen the actual temporary host database.
+- **Expected**: Published facts survive each boundary, including before cache
+  hydration. Explicit user choices remain intact; no delegation or search is
+  enabled by publication. Unknown effort names remain unsupported metadata.
+  OMP gets reasoning/image/output fields and published OpenAI effort controls;
+  other APIs retain native control-mode resolution. Provider deletion also
+  removes cached capabilities. Missing PDF/search publication never becomes true.
+- **Automation**: `provider-discovery-limits`, `model-discovery`,
+  `omp-model-projection` desktop tests, shared/runtime capability tests and Rust
+  provider reopen/delete coverage. `scripts/verify-provider-capabilities.mjs`
+  accepts an explicit native binary and performs catalog/state RPC only in an
+  isolated HOME, without a prompt, inference, or installed desktop UI.
+- **Specs**: `03-runtime/12-provider-config-schema.md`,
+  `03-runtime/13-model-catalog-and-selection.md`, ADR `provider-published-token-limits`.
+
 #### E2E-MODEL-provider-token-limits-survive-selection-and-restart
 
 - **Steps**: With a fixture endpoint returning `context_window: 872000` and
@@ -14656,6 +14677,13 @@ to the memory candidate. Use an isolated Electron profile and Rust host. Verify
 both defaults off, independent switches, project selection, empty browsing,
 clear/cancel/confirm, and persistence across host/renderer restart. Never attach
 the user's running desktop.
+
+For layout-only changes, render the real component with built production CSS
+and fixture-only data at 1024, 720 and 390 CSS-pixel viewports. Check the project
+field, input/button alignment and gaps, card insets, non-overlapping footer
+actions, and horizontal containment of long text and clear confirmation. The
+page title appears once. Capture empty and populated states; do not use real
+memory databases or paid models.
 
 Run `OMP_MEMORY_TEST_RUNTIME=<candidate> node --test
 apps/desktop/test/omp-memory-native-e2e.test.mjs` against a local scripted provider.

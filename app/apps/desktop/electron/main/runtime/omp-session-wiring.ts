@@ -40,6 +40,7 @@ import {
   projectionError,
   projectModelsYaml,
   resolveProviderProjection,
+  type ProviderProjectionSource,
 } from "./omp-model-projection";
 
 /** A provider row with the fields the projection resolver needs. */
@@ -53,7 +54,7 @@ type ProjectionProvider = {
   hasSecret?: boolean | null;
   hasOauth?: boolean | null;
   headers?: Record<string, string> | null;
-  models?: Array<{ id: string; contextWindow?: number | null; maxTokens?: number | null; thinkingLevels?: string[] }>;
+  models?: ProviderProjectionSource["models"];
   defaultModelId?: string | null;
 };
 

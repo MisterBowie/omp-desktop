@@ -12,6 +12,12 @@ project. See [ADR 0331](../../adr/0331-omp-only-product.md).
 
 Settings > Memory exposes the two switches, project/worktree selection,
 paginated browsing of conversation excerpts and extracted facts, local text search, refresh, and scope-bound clear confirmation.
+The browser uses the shared project field, a padded content area and spaced search controls.
+Search and refresh remain beside the input when space allows; narrow content
+places the input above the buttons. Pagination and destructive clear actions
+occupy separate footer groups, and long memory text wraps within the card.
+The destination owns the page heading; the switch card does not repeat it.
+
 Preferences are global to local OMP chats. Stores are isolated by the exact
 session execution directory, including worktrees, under
 `<desktopData>/omp-memory/<sha256(normalizedAbsoluteExecutionDirectory)>/memory.db`.

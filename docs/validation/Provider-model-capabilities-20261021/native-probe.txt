@@ -1,0 +1,37 @@
+{
+  "runtimeVersion": "18.3.0",
+  "patchLevel": "62bc57b+omp-desktop.7",
+  "runtimeSha256": "c64e04c04cf7a357d97062a9a5aff0fa602b715b5ac22b0ae0cadb7daab10e03",
+  "model": {
+    "id": "gateway/capability-fixture",
+    "reasoning": true,
+    "input": [
+      "text",
+      "image"
+    ],
+    "contextWindow": 872000,
+    "maxTokens": 128000,
+    "thinking": {
+      "mode": "effort",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "effortMap": {
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "xhigh": "xhigh",
+        "max": "max"
+      }
+    }
+  },
+  "thinkingLevel": "low",
+  "inferenceRequests": 0,
+  "cleanup": "reaped-and-cleaned"
+}
+
+EXIT=0

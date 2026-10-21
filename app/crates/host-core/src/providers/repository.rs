@@ -316,10 +316,12 @@ pub(crate) fn delete_provider_row(db: &Database, secrets: &SecretStore, id: &str
             .prepare_cached("DELETE FROM secrets_meta WHERE secret_ref = ?1")?
             .execute(params![sref])?;
     }
-    let n = db
-        .conn()
+    let tx = db.conn().unchecked_transaction()?;
+    db.kv_delete(super::catalog::PROVIDER_CAPABILITIES_CACHE, id)?;
+    let n = tx
         .prepare_cached("DELETE FROM providers WHERE id = ?1")?
         .execute(params![id])?;
+    tx.commit()?;
     Ok(n > 0)
 }
 

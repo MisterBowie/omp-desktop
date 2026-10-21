@@ -1,0 +1,11 @@
+
+ RUN  v4.1.10 /Users/vv/person/omp-desktop/.worktrees/provider-context-window/app/packages/shared
+
+
+ Test Files  45 passed (45)
+      Tests  504 passed (504)
+   Start at  11:16:10
+   Duration  1.04s (transform 2.36s, setup 0ms, import 3.65s, tests 249ms, environment 3ms)
+
+
+EXIT=0

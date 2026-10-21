@@ -150,6 +150,9 @@ PI-Desktop 不得把用户永久限制在一份简短的固定模型列表上。
 ### 6.2 目录职责
 1. **models.dev**（`https://models.dev/api.json`）提供模型元数据基线。
    经校验的端点上下文与输出限制可覆盖目录限制，其他元数据仍使用目录。
+
+1. **models.dev**（`https://models.dev/api.json`）提供模型元数据基线。
+   经校验的端点限制、思考与输入能力可覆盖目录对应字段，其他元数据仍使用目录。
    Electron main 在开发时读取签入仓库的发布资源
    `apps/desktop/resources/models.dev/api.json`，在发布构建中读取打包后的
    `resources/models.dev/api.json` 路径。它绝不会把提供商凭据发给目录。
@@ -166,6 +169,10 @@ PI-Desktop 不得把用户永久限制在一份简短的固定模型列表上。
    解析模型元数据——而适配器本身保留自己的传输身份。发现保留端点发布的 Token
    限制，其他模型元数据不替换。已配置的自由格式 id 在 models.dev 中不存在时，仍可选中，
    并使用通用的纯文本、非推理基线。对于目录尚不认识的端点，设置里依然允许
+
+   解析模型元数据——而适配器本身保留自己的传输身份。发现保留端点发布的 Token
+   限制、思考和输入能力，其他模型元数据不替换。已配置的自由格式 id 仍可选中；
+   没有目录或端点事实时，使用通用的纯文本、非推理基线。对于目录尚不认识的端点，设置里依然允许
    显式覆盖思考级别。
 4. models.dev 记录把 `id`、`name`、`description`、`family`、`attachment`、
    `reasoning`、`reasoning_options`、`tool_call`、`structured_output`、

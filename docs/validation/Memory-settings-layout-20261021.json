@@ -1,0 +1,126 @@
+{
+  "date": "2026-10-21",
+  "branch": "codex/memory-settings-layout",
+  "base": "4f5eb9c59bdb554450180a49bc5d1d921bab2eed",
+  "version": "0.1.3",
+  "status": "source-layout-fix-validated-not-committed-or-published",
+  "runtime": {
+    "node": "24.14.0",
+    "pnpm": "10.34.5",
+    "electron": "43.6.0",
+    "platform": "darwin-arm64"
+  },
+  "checks": {
+    "javascriptBuild": 0,
+    "desktopBuild": 0,
+    "typecheck": 0,
+    "lint": 0,
+    "docs": 0,
+    "regression": {
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0
+    },
+    "render": {
+      "cases": 7,
+      "baselineCases": 3,
+      "fixedCases": 4,
+      "widths": [
+        1024,
+        720,
+        390
+      ],
+      "emptyAndLongText": true,
+      "clearConfirmation": true,
+      "overlap": false,
+      "horizontalOverflow": false
+    }
+  },
+  "sourcePostimages": [
+    {
+      "file": "app/apps/desktop/src/features/settings/MemorySettingsPage.tsx",
+      "sha256": "7b67b3a6073d8e47e42c03299055f352ea5087f85fd98a94d430cdb8f3f64dcc"
+    },
+    {
+      "file": "app/apps/desktop/src/features/settings/memory-settings.css",
+      "sha256": "07667353841f3c271d53ac9dd511569e86580741a13bf9f6f852eeeaac082e0b"
+    }
+  ],
+  "evidence": [
+    {
+      "file": "after-narrow-confirmation.png",
+      "bytes": 210592,
+      "sha256": "8df76a50a84a0abad93e727cb909e646b5c7387af96affbd5a2366746c6115a4"
+    },
+    {
+      "file": "after-narrow.png",
+      "bytes": 128772,
+      "sha256": "4e3165142b024e528e8af97116ae4c4363171b9ea2d3978d9e5bc7fbe9475ad3"
+    },
+    {
+      "file": "after-wide.png",
+      "bytes": 143632,
+      "sha256": "1ab3171adc05e83402515c91c497d684b64e22d10e65511cfcc490e79d546505"
+    },
+    {
+      "file": "before-wide.png",
+      "bytes": 154355,
+      "sha256": "852bfe647e83bb71fbcf2bed9ac183a62c47860730d55de1271f443241815e3c"
+    },
+    {
+      "file": "build.log.gz",
+      "bytes": 4551,
+      "sha256": "24e7158c3f3ec1b349b651d8a7ff78c06a826c535b35b6372d2cf49b334fa515"
+    },
+    {
+      "file": "capture.mjs.gz",
+      "bytes": 2443,
+      "sha256": "1493a534329e042eb98ad420347e35ef0e14fef7a9c428a80ff64f1406d83ea3"
+    },
+    {
+      "file": "docs.log.gz",
+      "bytes": 423,
+      "sha256": "b94623ba4c275b5bf20c1040ec84724f97129ba05c217f299cf7501dd9292621"
+    },
+    {
+      "file": "lint.log.gz",
+      "bytes": 252,
+      "sha256": "a4fac24c294303e535dbbd84843229fb318036c13ec15bda0caedb3dfa33ffe5"
+    },
+    {
+      "file": "regression.log.gz",
+      "bytes": 435,
+      "sha256": "ada7c5a24a7d0d42e5f077e86ff9dc2a8cf65e7ecda4d4998560c15574b0d19b"
+    },
+    {
+      "file": "render.log.gz",
+      "bytes": 53,
+      "sha256": "0b1cefa86ce0b269f117044de4f1b3161aeda177dd24c4cf0160e46b76bbf4ef"
+    },
+    {
+      "file": "rendered-layout.json",
+      "bytes": 15333,
+      "sha256": "e5f7914a148ba78e53da7e7dadba49b36f3f1d0ec865e667c62061d600f336f3"
+    },
+    {
+      "file": "renderer-build.log.gz",
+      "bytes": 4102,
+      "sha256": "0d8c3a1ebdc07d98b340eeed378ba31b380feef340319d74bd216b85ff63ef20"
+    },
+    {
+      "file": "renderer.tsx.gz",
+      "bytes": 1614,
+      "sha256": "4a8586ed606ada52e5ab542fc4527a7e4d6ed12f3fc2f050276773977f2ccfab"
+    },
+    {
+      "file": "typecheck.log.gz",
+      "bytes": 135,
+      "sha256": "cdbcfae878091ca5d86a8f767240fac01973e35589e546cf688e45c7c2b59f4a"
+    }
+  ],
+  "limitations": [
+    "Renderer fixture on macOS only; no Windows/Linux native package checks in this layout-only task.",
+    "No native/runtime/IPC or memory semantics were changed. No installed app or real user data was touched.",
+    "Source-only fix; application version remains 0.1.3 and no new release was published."
+  ]
+}

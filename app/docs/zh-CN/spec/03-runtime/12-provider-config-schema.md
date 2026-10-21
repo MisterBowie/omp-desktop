@@ -88,6 +88,21 @@
           "alias": { "type": "string", "maxLength": 60 },
           "contextWindow": { "type": "integer", "minimum": 0 },
           "contextWindowSource": { "enum": ["catalog", "provider", "user"] },
+          "thinkingLevelsSource": { "enum": ["provider", "user"] },
+          "providerCapabilities": {
+            "type": "object",
+            "properties": {
+              "reasoning": { "type": "boolean" },
+              "thinkingLevels": { "type": "array", "items": { "enum": ["off", "minimal", "low", "medium", "high", "xhigh", "max"] } },
+              "thinkingLevelMap": { "type": "object", "additionalProperties": { "type": ["string", "null"] } },
+              "unsupportedThinkingLevels": { "type": "array", "maxItems": 32, "items": { "type": "string", "maxLength": 64 } },
+              "inputModalities": { "type": "array", "items": { "enum": ["text", "image", "pdf", "audio", "video"] } },
+              "outputModalities": { "type": "array", "items": { "enum": ["text", "image", "pdf", "audio", "video"] } },
+              "supportsImages": { "type": "boolean" },
+              "supportsDocuments": { "type": "boolean" },
+              "webSearch": { "type": "boolean" }
+            }
+          },
           "maxTokens": { "type": "integer", "minimum": 0 },
           "thinkingLevels": {
             "type": "array",
@@ -142,6 +157,13 @@ models.dev 快照，之后的目录修正可以替换它；`provider` 保留端�
 因此早于该标记写出的配置仍可读，旧客户端会忽略它。host-core 保留这三个取值，
 丢弃其它值。解析规则见
 [13-model-catalog-and-selection](13-model-catalog-and-selection.md) §9.1。
+
+`providerCapabilities` 保存校验后的端点能力快照，与附件手动覆盖、自动调度及联网
+搜索的本地开关分开。`thinkingLevelsSource` 区分 `provider` 继承档位和 `user`
+手动档位；手动编辑也会记录空集合。旧版无来源的空集合按通用初始值处理，非空
+旧选择保持不变。Rust 在绑定 JSON 及已有 `provider-model-capabilities` 缓存 KV
+中保存快照，输出限制使用现有 `max_output_tokens` 列；删除提供商时与行删除同一
+事务清理该 KV。数据库与协议版本不变。
 
 `compatibility.supportsReasoning` 和
 `compatibility.supportedThinkingLevels` 对于存储的记录保持可读状态

@@ -4,6 +4,7 @@ import {
   resolveBindingContextWindow,
   bindingWithModelInfo,
   type ContextWindowSource,
+  type ProviderModelCapabilities,
   type ModelBinding,
   type ProviderReorderInput,
   type OAuthRespondInput,
@@ -11,7 +12,7 @@ import {
 } from "@pi-desktop/shared";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
 import { discoverProviderModels } from "../model-discovery";
-import { genericModelConfig, modelConfigWithBinding, mergeProviderHeaders } from "@pi-desktop/agent-runtime";
+import { genericModelConfig, modelConfigWithBinding, modelConfigWithProviderCapabilities, mergeProviderHeaders } from "@pi-desktop/agent-runtime";
 import { modelConfigFromModelsDev, modelInfoFromModelsDev, type ModelsDevCatalog } from "../models-dev-catalog";
 import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
@@ -260,6 +261,7 @@ export function registerProviderIpc({
           contextWindow?: number;
           contextWindowSource?: ContextWindowSource;
           maxTokens?: number;
+          providerCapabilities?: ProviderModelCapabilities;
           source?: "bundled" | "discovered" | "user";
         },
         // Vendor accounts can span wire APIs, so a model may need a style of
@@ -271,9 +273,13 @@ export function registerProviderIpc({
           baseUrl,
           modelId: model.modelId,
         });
-        const baseline = modelsDevModel
+        const savedBinding = provider ? bindingForModel(provider, model.modelId) : undefined;
+        const providerCapabilities = model.providerCapabilities
+          ? { ...savedBinding?.providerCapabilities, ...model.providerCapabilities }
+          : savedBinding?.providerCapabilities;
+        const baseline = modelConfigWithProviderCapabilities(modelsDevModel
           ? modelConfigFromModelsDev(modelsDevModel, baseUrl)
-          : genericModelConfig(model.modelId, baseUrl);
+          : genericModelConfig(model.modelId, baseUrl), providerCapabilities);
         const providerWindow = model.contextWindowSource === "provider" ? model.contextWindow : undefined;
         const catalogModelConfig = {
           ...baseline,
@@ -285,8 +291,7 @@ export function registerProviderIpc({
             ...(model.maxTokens !== undefined ? { output: model.maxTokens } : {}),
           },
         };
-        const savedBinding = provider ? bindingForModel(provider, model.modelId) : undefined;
-        const storedModel = savedBinding ? bindingWithModelInfo(savedBinding, model) : undefined;
+        const storedModel = savedBinding ? bindingWithModelInfo(savedBinding, { ...model, providerCapabilities }) : undefined;
         const resolvedModel = resolveBindingContextWindow(catalogModelConfig, storedModel);
         const modelConfig = modelConfigWithBinding(
           resolvedModel.catalogConfig,
@@ -306,6 +311,15 @@ export function registerProviderIpc({
               supportedThinkingLevels: [] as ThinkingLevel[],
               source: model.source ?? ("discovered" as const),
             };
+        const publishedCapabilities = new Set(info.capabilities);
+        for (const [capability, supported] of [
+          ["vision", catalogModelConfig.modalities?.input.includes("image")],
+          ["pdf", catalogModelConfig.modalities?.input.includes("pdf")],
+          ["reasoning", catalogModelConfig.reasoning],
+        ] as const) {
+          if (supported) publishedCapabilities.add(capability);
+          else publishedCapabilities.delete(capability);
+        }
         return {
           ...info,
           modelId: model.modelId,
@@ -315,6 +329,11 @@ export function registerProviderIpc({
           ...(contextWindowSource ? { contextWindowSource } : {}),
           maxTokens: modelConfig.maxTokens,
           limit: catalogModelConfig.limit,
+          ...(providerCapabilities ? { providerCapabilities } : {}),
+          reasoning: catalogModelConfig.reasoning,
+          supportedThinkingLevels: [...(catalogModelConfig.supportedThinkingLevels ?? [])],
+          ...(catalogModelConfig.thinkingLevelMap ? { thinkingLevelMap: catalogModelConfig.thinkingLevelMap } : {}),
+          capabilities: [...publishedCapabilities],
           // Published modalities, taken before the binding is applied. This
           // record is what the settings panel compares its checkboxes against,
           // so letting a stored override shape it would make the override its
@@ -423,6 +442,8 @@ export function registerProviderIpc({
             displayName: string;
             capabilities?: string[];
             contextWindow?: number;
+            maxTokens?: number;
+            providerCapabilities?: ProviderModelCapabilities;
             source?: "bundled" | "discovered" | "user";
           }>;
         }>("providers.listModels", { providerId: provider.id });

@@ -1,10 +1,12 @@
 import {
   effectiveContextWindow,
+  modalitiesWithProviderCapabilities,
   THINKING_LEVELS,
   type ModelBinding,
   type ModelInfo,
   type ModelModality,
   type ThinkingLevel,
+  type ProviderModelCapabilities,
 } from "@pi-desktop/shared";
 import type { ModelConfig, ThinkingCapabilitySet } from "./thinking-level.js";
 
@@ -79,10 +81,12 @@ export function modelConfigWithBinding(
         | "supportsImages"
         | "supportsDocuments"
         | "nativeWebSearch"
+        | "providerCapabilities"
       >
     | null,
 ): ModelConfig {
   if (!binding) return model;
+  model = modelConfigWithProviderCapabilities(model, binding.providerCapabilities);
   const enabledThinkingLevels = THINKING_LEVELS.filter((level) =>
     binding.thinkingLevels.includes(level),
   );
@@ -120,6 +124,24 @@ export function modelConfigWithBinding(
     ...(Object.keys(thinkingLevelMap).length > 0 ? { thinkingLevelMap } : {}),
     ...modalityOverride(model, binding),
     ...(binding.nativeWebSearch === true ? { webSearch: true } : {}),
+  };
+}
+
+/** Endpoint facts enrich the baseline before explicit binding overrides apply. */
+export function modelConfigWithProviderCapabilities(
+  model: ModelConfig,
+  capabilities?: ProviderModelCapabilities,
+): ModelConfig {
+  if (!capabilities) return model;
+  const modalities = modalitiesWithProviderCapabilities(model.modalities, capabilities);
+  const reasoning = capabilities.reasoning ??
+    (capabilities.thinkingLevels !== undefined ? capabilities.thinkingLevels.some((level) => level !== "off") : model.reasoning);
+  return {
+    ...model, modalities, reasoning,
+    input: modalities.input.filter((value): value is "text" | "image" => value === "text" || value === "image"),
+    ...(capabilities.thinkingLevels !== undefined ? { supportedThinkingLevels: [...capabilities.thinkingLevels] } : {}),
+    ...(capabilities.thinkingLevelMap ? { thinkingLevelMap: { ...capabilities.thinkingLevelMap } } : {}),
+    ...(!reasoning ? { supportedThinkingLevels: [] } : {}),
   };
 }
 

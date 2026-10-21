@@ -1,0 +1,15 @@
+
+> @pi-desktop/i18n@0.1.1 test /Users/vv/person/omp-desktop/.worktrees/provider-context-window/app/packages/i18n
+> vitest run
+
+
+ RUN  v4.1.10 /Users/vv/person/omp-desktop/.worktrees/provider-context-window/app/packages/i18n
+
+
+ Test Files  3 passed (3)
+      Tests  25 passed (25)
+   Start at  11:02:03
+   Duration  430ms (transform 673ms, setup 0ms, import 862ms, tests 81ms, environment 0ms)
+
+
+EXIT=0

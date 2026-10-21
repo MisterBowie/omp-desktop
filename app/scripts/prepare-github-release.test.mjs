@@ -22,9 +22,6 @@ function fixture(t) {
     const sha512 = createHash("sha512").update(bytes).digest("base64");
     writeFileSync(join(directory, name), stringify({ version: "0.1.0", files: [{ url, sha512, size: bytes.length }], path: url, sha512 }));
   }
-  const host = "pi-host-0.1.0-linux-x64.tar.gz", bytes = Buffer.from("owned headless fixture");
-  writeFileSync(join(directory, host), bytes);
-  writeFileSync(join(directory, `${host}.sha256`), createHash("sha256").update(bytes).digest("hex") + `  ${host}\n`);
   return { directory, definitions, run: () => prepareGitHubRelease({ directory, version: "0.1.0" }) };
 }
 
@@ -36,6 +33,17 @@ test("prepares all platform feeds and merges both Mac architectures after verify
   assert(mac.files.some(file => file.url.includes("arm64")));
   assert(mac.files.some(file => file.url.includes("x64")));
   assert(existsSync(join(f.directory, "SHA256SUMS.txt")));
+});
+
+test("an OMP release requires no retired Pi host and refuses one in the publication namespace", async t => {
+  const f = fixture(t);
+  const name = "pi-host-0.1.0-linux-x64.tar.gz";
+  rmSync(join(f.directory, name), { force: true });
+  rmSync(join(f.directory, name + ".sha256"), { force: true });
+  const result = await f.run();
+  assert(result.files.every(file => !file.name.startsWith("pi-host-")));
+  writeFileSync(join(f.directory, name), "retired fixture");
+  await assert.rejects(f.run(), /retired Pi host/);
 });
 
 test("refuses tampered downloads without producing a merged update feed", async t => {
@@ -64,12 +72,12 @@ test("refuses traversal and remote installer URLs", async t => {
   }
 });
 
-test("refuses stale non-feed assets and a mismatched remote-host checksum", async t => {
+test("refuses stale non-feed assets and retired remote-host files", async t => {
   const f = fixture(t);
   const stale = join(f.directory, "OMP-Desktop-0.15.3-arm64.dmg");
   writeFileSync(stale, "old build");
   await assert.rejects(f.run(), /stale release artifact/);
   rmSync(stale);
   writeFileSync(join(f.directory, "pi-host-0.1.0-linux-x64.tar.gz.sha256"), "wrong");
-  await assert.rejects(f.run(), /remote-host SHA256 mismatch/);
+  await assert.rejects(f.run(), /retired Pi host/);
 });

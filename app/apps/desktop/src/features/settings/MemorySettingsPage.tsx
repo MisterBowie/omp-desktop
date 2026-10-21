@@ -2,7 +2,7 @@ import { DEFAULT_OMP_MEMORY, type OmpMemoryPage, type OmpMemorySettings } from "
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAgentProjects } from "../../components/settings/AgentCapabilityLayout";
-import { Button, Input } from "../../components/ui";
+import { Button, Input, Select } from "../../components/ui";
 import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
 import { SettingsCard, SettingsRow } from "./primitives";
@@ -127,9 +127,9 @@ export function MemorySettingsPage() {
     if (selectedProjectPath) void load(selectedProjectPath, query.trim());
   }
   return (
-    <>
-      <SettingsCard title={t("memory.title")}>
-        <p>{t("memory.description")}</p>
+    <div className="memory-settings-page">
+      <SettingsCard>
+        <p className="memory-settings-description">{t("memory.description")}</p>
         {(["autoSave", "autoRead"] as const).map((key) => (
           <SettingsRow key={key} title={t(`memory.${key}`)} description={t(`memory.${key}Description`)}>
             <button
@@ -145,89 +145,99 @@ export function MemorySettingsPage() {
             </button>
           </SettingsRow>
         ))}
-        <p>{t("memory.costHint")}</p>
-        <p>{t("memory.scopeHint")}</p>
+        <div className="memory-settings-notes">
+          <p>{t("memory.costHint")}</p>
+          <p>{t("memory.scopeHint")}</p>
+        </div>
       </SettingsCard>
       <SettingsCard title={t("memory.browse")}>
-        <p>{t("memory.browseHint")}</p>
-        <label>
-          {t("memory.project")}
-          <select
-            aria-label={t("memory.project")}
-            value={selectedProjectPath ?? ""}
-            disabled={saving}
-            onChange={(event) => setSelectedProjectPath(event.target.value || null)}
-          >
-            <option value="">{t("memory.chooseProject")}</option>
-            {options
-              .filter((option) => option.path)
-              .map((option) => (
-                <option key={option.path} value={option.path ?? ""}>
-                  {option.name}
-                </option>
-              ))}
-          </select>
-        </label>
-        <form className="memory-settings-search" onSubmit={search}>
-          <Input
-            aria-label={t("memory.search")}
-            placeholder={t("memory.search")}
-            value={query}
-            maxLength={2000}
-            onChange={(event) => setQuery(event.target.value)}
-            disabled={!selectedProjectPath || busy}
-          />
-          <Button type="submit" disabled={!selectedProjectPath || busy}>
-            {t("memory.search")}
-          </Button>
-          <Button
-            disabled={!selectedProjectPath || busy}
-            onClick={() => {
-              setQuery("");
-              if (selectedProjectPath) void load(selectedProjectPath);
-            }}
-          >
-            {t("memory.refresh")}
-          </Button>
-        </form>
-        <div aria-live="polite">{busy ? t("memory.loading") : t("memory.count", { count: page.total })}</div>
-        {!busy && !page.items.length && <p>{t("memory.empty")}</p>}
-        <div className="memory-settings-results" aria-label={t("memory.browse")}>
-          {page.items.map((item) => (
-            <article key={item.id} className="settings-panel">
-              <p className="memory-settings-content">{item.content}</p>
-            </article>
-          ))}
-        </div>
-        {!appliedQuery && (
-          <div className="memory-settings-search">
-            <Button
-              disabled={busy || page.offset === 0}
-              onClick={() =>
-                selectedProjectPath && void load(selectedProjectPath, "", Math.max(0, page.offset - 50))
-              }
+        <div className="memory-settings-browser">
+          <p className="memory-settings-description">{t("memory.browseHint")}</p>
+          <label className="memory-settings-project">
+            <span>{t("memory.project")}</span>
+            <Select
+              aria-label={t("memory.project")}
+              value={selectedProjectPath ?? ""}
+              disabled={saving}
+              onChange={(event) => setSelectedProjectPath(event.target.value || null)}
             >
-              {t("memory.previous")}
+              <option value="">{t("memory.chooseProject")}</option>
+              {options
+                .filter((option) => option.path)
+                .map((option) => (
+                  <option key={option.path} value={option.path ?? ""}>
+                    {option.name}
+                  </option>
+                ))}
+            </Select>
+          </label>
+          <form className="memory-settings-search" onSubmit={search}>
+            <Input
+              aria-label={t("memory.search")}
+              placeholder={t("memory.search")}
+              value={query}
+              maxLength={2000}
+              onChange={(event) => setQuery(event.target.value)}
+              disabled={!selectedProjectPath || busy}
+            />
+            <Button type="submit" disabled={!selectedProjectPath || busy}>
+              {t("memory.search")}
             </Button>
             <Button
-              disabled={busy || page.offset + page.items.length >= page.total}
-              onClick={() => selectedProjectPath && void load(selectedProjectPath, "", page.offset + 50)}
+              disabled={!selectedProjectPath || busy}
+              onClick={() => {
+                setQuery("");
+                if (selectedProjectPath) void load(selectedProjectPath);
+              }}
             >
-              {t("memory.next")}
+              {t("memory.refresh")}
             </Button>
+          </form>
+          <div className="memory-settings-count" aria-live="polite">
+            {busy ? t("memory.loading") : t("memory.count", { count: page.total })}
           </div>
-        )}
-        <Button disabled={!selectedProjectPath || busy || saving} onClick={() => void clear()}>
-          {t(clearArmed ? "memory.confirmClear" : "memory.clear")}
-        </Button>
-        {clearArmed && (
-          <>
-            <p>{t("memory.clearHint")}</p>
-            <Button onClick={() => setArmed(null)}>{t("memory.cancel")}</Button>
-          </>
-        )}
+          {!busy && !page.items.length && <p className="memory-settings-empty">{t("memory.empty")}</p>}
+          <div className="memory-settings-results" aria-label={t("memory.browse")}>
+            {page.items.map((item) => (
+              <article key={item.id} className="memory-settings-item">
+                <p className="memory-settings-content">{item.content}</p>
+              </article>
+            ))}
+          </div>
+          <div className="memory-settings-footer">
+            {!appliedQuery && (
+              <div className="memory-settings-pagination">
+                <Button
+                  disabled={busy || page.offset === 0}
+                  onClick={() =>
+                    selectedProjectPath && void load(selectedProjectPath, "", Math.max(0, page.offset - 50))
+                  }
+                >
+                  {t("memory.previous")}
+                </Button>
+                <Button
+                  disabled={busy || page.offset + page.items.length >= page.total}
+                  onClick={() => selectedProjectPath && void load(selectedProjectPath, "", page.offset + 50)}
+                >
+                  {t("memory.next")}
+                </Button>
+              </div>
+            )}
+            <div className="memory-settings-clear-actions">
+              <Button
+                className="memory-settings-clear"
+                disabled={!selectedProjectPath || busy || saving}
+                onClick={() => void clear()}
+              >
+                {t(clearArmed ? "memory.confirmClear" : "memory.clear")}
+              </Button>
+              {clearArmed && <Button onClick={() => setArmed(null)}>{t("memory.cancel")}</Button>}
+            </div>
+          </div>
+          {clearArmed && <p className="memory-settings-description">{t("memory.clearHint")}</p>}
+        </div>
       </SettingsCard>
       {error && <p role="alert">{error}</p>}
-    </>
+    </div>
   );
 }

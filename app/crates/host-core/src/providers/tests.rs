@@ -10,6 +10,49 @@ fn test_context() -> (tempfile::TempDir, Database, SecretStore) {
 }
 
 #[test]
+fn discovered_capabilities_and_overrides_survive_reopening_and_clean_up_on_delete() {
+    let (dir, db, secrets) = test_context();
+    let input: ProviderCreateInput = serde_json::from_value(json!({
+        "name": "Capability fixture", "baseUrl": "https://provider.invalid/v1", "authKind": "none",
+        "models": [{"id":"gateway/claude", "contextWindow":872000, "maxTokens":128000,
+            "thinkingLevels": [], "thinkingLevelsSource":"user", "supportsImages":false,
+            "availableForSubagents":true, "nativeWebSearch":false,
+            "providerCapabilities":{"reasoning":true,"thinkingLevels":["low","high","max"],"inputModalities":["text","image"]}}]
+    })).unwrap();
+    let provider = create_provider(&db, &secrets, input).unwrap();
+    let discovered: DiscoveredModelInput = serde_json::from_value(json!({
+        "modelId":"gateway/claude", "displayName":"Claude", "contextWindow":872000,"maxTokens":128000,
+        "providerCapabilities":{"reasoning":true,"thinkingLevels":["low","high","max"],"inputModalities":["text","image"],"webSearch":false}
+    })).unwrap();
+    cache_discovered_models(&db, &provider.id, &[discovered]).unwrap();
+    drop(db);
+    let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+    let models = list_models(&db, Some(&provider.id)).unwrap();
+    assert_eq!(models[0].max_tokens, Some(128_000));
+    let published = models[0].provider_capabilities.as_ref().unwrap();
+    assert_eq!(published.reasoning, Some(true));
+    assert_eq!(published.web_search, Some(false));
+    assert_eq!(
+        published.thinking_levels.as_ref().unwrap(),
+        &["low", "high", "max"]
+    );
+    let restored = get_provider(&db, &secrets, &provider.id).unwrap().unwrap();
+    assert_eq!(
+        restored.models[0].thinking_levels_source.as_deref(),
+        Some("user")
+    );
+    assert!(restored.models[0].thinking_levels.is_empty());
+    assert_eq!(restored.models[0].supports_images, Some(false));
+    assert_eq!(restored.models[0].available_for_subagents, Some(true));
+    assert!(restored.models[0].provider_capabilities.is_some());
+    delete_provider(&db, &secrets, &provider.id).unwrap();
+    assert!(db
+        .kv_get(super::catalog::PROVIDER_CAPABILITIES_CACHE, &provider.id)
+        .unwrap()
+        .is_none());
+}
+
+#[test]
 fn reasoning_override_roundtrips_and_preserves_provider_config() {
     let (_dir, db, secrets) = test_context();
     let provider = create_provider(
@@ -163,6 +206,8 @@ fn model_bindings_roundtrip_and_legacy_model_migrates_on_read() {
                     id: "reasoning-model".into(),
                     alias: Some("pro".into()),
                     context_window_source: None,
+                    thinking_levels_source: None,
+                    provider_capabilities: None,
                     context_window: 256_000,
                     max_tokens: 16_000,
                     thinking_levels: vec!["high".into(), "medium".into()],
@@ -176,6 +221,8 @@ fn model_bindings_roundtrip_and_legacy_model_migrates_on_read() {
                     id: "plain-model".into(),
                     alias: None,
                     context_window_source: None,
+                    thinking_levels_source: None,
+                    provider_capabilities: None,
                     context_window: 128_000,
                     max_tokens: 8_192,
                     thinking_levels: vec![],
@@ -283,6 +330,8 @@ fn binding_with_alias(id: &str, alias: Option<&str>) -> ModelBinding {
         id: id.into(),
         alias: alias.map(str::to_string),
         context_window_source: None,
+        thinking_levels_source: None,
+        provider_capabilities: None,
         context_window: DEFAULT_CONTEXT_WINDOW,
         max_tokens: DEFAULT_MAX_TOKENS,
         thinking_levels: Vec::new(),
@@ -835,12 +884,16 @@ fn discovered_models_are_cached_without_overwriting_user_rows() {
                 display_name: "Beta".into(),
                 capabilities: vec!["text".into()],
                 context_window: None,
+                max_tokens: None,
+                provider_capabilities: None,
             },
             DiscoveredModelInput {
                 model_id: "model-a".into(),
                 display_name: "Alpha".into(),
                 capabilities: vec!["text".into()],
                 context_window: Some(128_000),
+                max_tokens: None,
+                provider_capabilities: None,
             },
         ],
     )
@@ -856,12 +909,16 @@ fn discovered_models_are_cached_without_overwriting_user_rows() {
                 display_name: "Alpha updated".into(),
                 capabilities: vec!["text".into(), "reasoning".into()],
                 context_window: Some(256_000),
+                max_tokens: None,
+                provider_capabilities: None,
             },
             DiscoveredModelInput {
                 model_id: "user-model".into(),
                 display_name: "Remote label".into(),
                 capabilities: vec!["text".into()],
                 context_window: None,
+                max_tokens: None,
+                provider_capabilities: None,
             },
         ],
     )
@@ -1179,6 +1236,8 @@ fn binding_with_limits(id: &str, context_window: u32, max_tokens: u32) -> ModelB
         id: id.into(),
         alias: None,
         context_window_source: None,
+        thinking_levels_source: None,
+        provider_capabilities: None,
         context_window,
         max_tokens,
         thinking_levels: Vec::new(),

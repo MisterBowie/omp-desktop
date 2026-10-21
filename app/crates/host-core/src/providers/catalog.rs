@@ -13,6 +13,46 @@ pub(crate) const CANONICAL_THINKING_LEVELS: &[&str] =
 const CONTEXT_WINDOW_SOURCES: &[&str] = &["catalog", "provider", "user"];
 pub(crate) const DEFAULT_CONTEXT_WINDOW: u32 = 128_000;
 pub(crate) const DEFAULT_MAX_TOKENS: u32 = 8_192;
+pub(crate) const PROVIDER_CAPABILITIES_CACHE: &str = "provider-model-capabilities";
+
+fn normalized_capabilities(value: &ProviderModelCapabilities) -> ProviderModelCapabilities {
+    let mut value = value.clone();
+    value.thinking_levels = value
+        .thinking_levels
+        .map(|levels| normalize_thinking_levels(&levels));
+    if value.reasoning == Some(false) {
+        value.thinking_levels = Some(Vec::new());
+    }
+    if let Some(map) = &mut value.thinking_level_map {
+        map.retain(|key, wire| {
+            CANONICAL_THINKING_LEVELS.contains(&key.as_str())
+                && wire.as_ref().is_none_or(|value| value.len() <= 64)
+        });
+    }
+    for values in [&mut value.input_modalities, &mut value.output_modalities]
+        .into_iter()
+        .flatten()
+    {
+        values.retain(|value| ["text", "image", "pdf", "audio", "video"].contains(&value.as_str()));
+        values.truncate(5);
+    }
+    if let Some(levels) = &mut value.unsupported_thinking_levels {
+        levels.retain(|value| !value.is_empty() && value.len() <= 64);
+        levels.truncate(32);
+    }
+    value
+}
+
+fn cached_capabilities(
+    db: &Database,
+    provider_id: &str,
+) -> Result<BTreeMap<String, ProviderModelCapabilities>> {
+    db.kv_get(PROVIDER_CAPABILITIES_CACHE, provider_id)?
+        .map(serde_json::from_value)
+        .transpose()
+        .map(|value| value.unwrap_or_default())
+        .map_err(Into::into)
+}
 
 fn normalize_context_window_source(value: Option<&str>) -> Option<String> {
     let trimmed = value?.trim().to_ascii_lowercase();
@@ -66,6 +106,15 @@ pub(crate) fn normalize_model_bindings(bindings: &[ModelBinding]) -> Vec<ModelBi
                     binding.max_tokens
                 },
                 thinking_levels,
+                thinking_levels_source: binding
+                    .thinking_levels_source
+                    .as_deref()
+                    .filter(|source| ["provider", "user"].contains(source))
+                    .map(str::to_string),
+                provider_capabilities: binding
+                    .provider_capabilities
+                    .as_ref()
+                    .map(normalized_capabilities),
                 default_thinking_level,
                 supports_images: binding.supports_images,
                 supports_documents: binding.supports_documents,
@@ -87,6 +136,8 @@ fn legacy_model_binding(model_id: Option<String>) -> Vec<ModelBinding> {
                 context_window: DEFAULT_CONTEXT_WINDOW,
                 max_tokens: DEFAULT_MAX_TOKENS,
                 thinking_levels: Vec::new(),
+                thinking_levels_source: None,
+                provider_capabilities: None,
                 default_thinking_level: None,
                 supports_images: None,
                 supports_documents: None,
@@ -273,7 +324,7 @@ pub fn list_models(db: &Database, provider_id: Option<&str>) -> Result<Vec<Model
     let (sql, bind_provider) = match provider_id {
         Some(id) => (
             "SELECT provider_id, model_id, display_name, source,
-                capabilities_json, context_window
+                capabilities_json, context_window, max_output_tokens
          FROM models
          WHERE provider_id = ?1
          ORDER BY display_name COLLATE NOCASE, model_id",
@@ -281,7 +332,7 @@ pub fn list_models(db: &Database, provider_id: Option<&str>) -> Result<Vec<Model
         ),
         None => (
             "SELECT provider_id, model_id, display_name, source,
-                capabilities_json, context_window
+                capabilities_json, context_window, max_output_tokens
          FROM models
          ORDER BY provider_id, display_name COLLATE NOCASE, model_id",
             None,
@@ -300,6 +351,10 @@ pub fn list_models(db: &Database, provider_id: Option<&str>) -> Result<Vec<Model
             context_window: row
                 .get::<_, Option<i64>>(5)?
                 .and_then(|value| u32::try_from(value).ok()),
+            max_tokens: row
+                .get::<_, Option<i64>>(6)?
+                .and_then(|value| u32::try_from(value).ok()),
+            provider_capabilities: None,
         })
     };
     let rows = if let Some(id) = bind_provider {
@@ -307,7 +362,24 @@ pub fn list_models(db: &Database, provider_id: Option<&str>) -> Result<Vec<Model
     } else {
         stmt.query_map([], parse)?
     };
-    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    let mut models = rows.collect::<rusqlite::Result<Vec<_>>>()?;
+    let mut by_provider = BTreeMap::new();
+    for model in &mut models {
+        if model.source != "discovered" {
+            continue;
+        }
+        if !by_provider.contains_key(&model.provider_id) {
+            by_provider.insert(
+                model.provider_id.clone(),
+                cached_capabilities(db, &model.provider_id)?,
+            );
+        }
+        model.provider_capabilities = by_provider
+            .get(&model.provider_id)
+            .and_then(|models| models.get(&model.model_id))
+            .cloned();
+    }
+    Ok(models)
 }
 
 /// Merge live discovery results into the durable catalog cache. User-created
@@ -320,16 +392,18 @@ pub fn cache_discovered_models(
     let tx = db.conn().unchecked_transaction()?;
     let now = now_ms();
     let mut changed = 0;
+    let mut published = cached_capabilities(db, provider_id)?;
     {
         let mut stmt = tx.prepare_cached(
             "INSERT INTO models (
             provider_id, model_id, display_name, source,
-            capabilities_json, context_window, updated_at
-         ) VALUES (?1, ?2, ?3, 'discovered', ?4, ?5, ?6)
+            capabilities_json, context_window, max_output_tokens, updated_at
+         ) VALUES (?1, ?2, ?3, 'discovered', ?4, ?5, ?6, ?7)
          ON CONFLICT(provider_id, model_id) DO UPDATE SET
             display_name = excluded.display_name,
             capabilities_json = excluded.capabilities_json,
             context_window = excluded.context_window,
+            max_output_tokens = excluded.max_output_tokens,
             updated_at = excluded.updated_at
          WHERE models.source != 'user'",
         )?;
@@ -344,16 +418,30 @@ pub fn cache_discovered_models(
             } else {
                 display_name
             };
-            changed += stmt.execute(params![
+            let affected = stmt.execute(params![
                 provider_id,
                 model_id,
                 display_name,
                 serde_json::to_string(&model.capabilities)?,
                 model.context_window,
+                model.max_tokens,
                 now,
             ])?;
+            changed += affected;
+            if affected > 0 {
+                if let Some(capabilities) = &model.provider_capabilities {
+                    published.insert(model_id.to_string(), normalized_capabilities(capabilities));
+                } else {
+                    published.remove(model_id);
+                }
+            }
         }
     }
+    db.kv_set(
+        PROVIDER_CAPABILITIES_CACHE,
+        provider_id,
+        &serde_json::to_value(published)?,
+    )?;
     tx.commit()?;
     Ok(changed)
 }
@@ -370,6 +458,8 @@ mod tests {
             context_window_source: None,
             max_tokens: DEFAULT_MAX_TOKENS,
             thinking_levels: Vec::new(),
+            thinking_levels_source: None,
+            provider_capabilities: None,
             default_thinking_level: None,
             supports_images: None,
             supports_documents: None,

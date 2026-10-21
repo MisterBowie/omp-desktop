@@ -97,6 +97,21 @@ Tables (canonical DDL in [04-data-storage](04-data-storage.md) §4.3–4.4, §4.
             "items": { "enum": ["off", "minimal", "low", "medium", "high", "xhigh", "max"] },
             "uniqueItems": true
           },
+          "thinkingLevelsSource": { "enum": ["provider", "user"] },
+          "providerCapabilities": {
+            "type": "object",
+            "properties": {
+              "reasoning": { "type": "boolean" },
+              "thinkingLevels": { "type": "array", "items": { "enum": ["off", "minimal", "low", "medium", "high", "xhigh", "max"] } },
+              "thinkingLevelMap": { "type": "object", "additionalProperties": { "type": ["string", "null"] } },
+              "unsupportedThinkingLevels": { "type": "array", "maxItems": 32, "items": { "type": "string", "maxLength": 64 } },
+              "inputModalities": { "type": "array", "items": { "enum": ["text", "image", "pdf", "audio", "video"] } },
+              "outputModalities": { "type": "array", "items": { "enum": ["text", "image", "pdf", "audio", "video"] } },
+              "supportsImages": { "type": "boolean" },
+              "supportsDocuments": { "type": "boolean" },
+              "webSearch": { "type": "boolean" }
+            }
+          },
           "defaultThinkingLevel": {
             "type": ["string", "null"],
             "enum": ["off", "minimal", "low", "medium", "high", "xhigh", "max", "omit", null]
@@ -129,6 +144,16 @@ property is optional, so a config written before the marker stays readable and
 older clients ignore it. Host-core keeps these three values and drops anything
 else. The resolution rule
 is specified in [13-model-catalog-and-selection](13-model-catalog-and-selection.md) §9.1.
+
+`providerCapabilities` is a validated endpoint snapshot, separate from attachment
+overrides and local delegation/search opt-ins. `thinkingLevelsSource` distinguishes
+inherited provider levels from a user's enabled set. Manual chip edits stamp
+`user`, including an empty set; `provider` follows refreshed facts. Old unmarked
+empty sets are generic defaults, while unmarked non-empty choices stay unchanged.
+Rust persists snapshots in binding JSON and in existing cache KV namespace
+`provider-model-capabilities`; model output uses the existing `max_output_tokens`
+column. Provider deletion clears its KV snapshot in the same transaction as the
+provider row. Database and protocol versions stay unchanged.
 
 `compatibility.supportsReasoning` and
 `compatibility.supportedThinkingLevels` remain readable for stored-record and

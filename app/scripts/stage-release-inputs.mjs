@@ -25,7 +25,7 @@ export function stageReleaseInputs(source, destination, version) {
         name = `OMP-Desktop-${version}-x64.deb`;
       }
       const feed = /^latest(?:-linux|-mac(?:-arm64|-x64)?)?\.yml$/.test(name);
-      assert(feed || /^(?:OMP-Desktop-|omp-desktop-|pi-host-)/.test(name), `unexpected release input: ${name}`);
+      assert(feed || /^(?:OMP-Desktop-|omp-desktop-)/.test(name), `unexpected release input: ${name}`);
       assert(feed || name.includes(`-${version}`), `stale release input: ${name}`);
       assert(!names.has(name), `duplicate release basename: ${name}`); names.add(name);
       files.push({ input: relative(source, path).split(sep).join("/"), name, bytes: stat.size, sha256: createHash("sha256").update(readFileSync(path)).digest("hex") });

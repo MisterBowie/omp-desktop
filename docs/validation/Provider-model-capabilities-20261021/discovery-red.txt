@@ -1,0 +1,48 @@
+✔ openai-style lists normalize, dedupe, and sort (15.508792ms)
+✔ anthropic lists keep display names (0.127708ms)
+✖ discovery retains published thinking levels and attachment modalities (0.153458ms)
+✖ explicit false and unknown thinking levels never become invented capabilities (0.111416ms)
+✔ chat_completions preserves provider context and output limits separately (0.092708ms)
+✔ responses preserves provider context and output limits separately (0.083875ms)
+✔ anthropic_messages preserves provider context and output limits separately (0.058ms)
+✔ discovery accepts supported limit aliases and rejects invalid counts (0.115584ms)
+✔ Google discovery preserves input and output token limits (0.815209ms)
+✔ explicit context wins and output-only or overflowing limits cannot supply a window (0.2095ms)
+✔ google lists strip the models/ prefix (0.173167ms)
+✔ requests use per-style endpoints and auth headers (0.363458ms)
+✔ OpenCode Go uses its fixed OpenAI-compatible model endpoint (0.056625ms)
+✔ optional custom headers are attached to discovery requests (0.117916ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 12
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 117.884541
+
+✖ failing tests:
+
+test at app/apps/desktop/test/model-discovery.test.mjs:35:1
+✖ discovery retains published thinking levels and attachment modalities (0.153458ms)
+  TypeError: Cannot read properties of undefined (reading 'reasoning')
+      at TestContext.<anonymous> (file:///Users/vv/person/omp-desktop/.worktrees/provider-context-window/app/apps/desktop/test/model-discovery.test.mjs:42:43)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+
+test at app/apps/desktop/test/model-discovery.test.mjs:47:1
+✖ explicit false and unknown thinking levels never become invented capabilities (0.111416ms)
+  TypeError: Cannot read properties of undefined (reading 'thinkingLevels')
+      at TestContext.<anonymous> (file:///Users/vv/person/omp-desktop/.worktrees/provider-context-window/app/apps/desktop/test/model-discovery.test.mjs:53:27)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+
+EXIT=1

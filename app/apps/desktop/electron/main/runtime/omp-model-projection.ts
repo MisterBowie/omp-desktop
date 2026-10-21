@@ -15,6 +15,8 @@
  * any other state.
  */
 
+import { THINKING_LEVELS, modalitiesWithProviderCapabilities, type ProviderModelCapabilities } from "@pi-desktop/shared";
+
 /** The OMP `Api` values this build knows how to project from a PI `apiStyle`. */
 const PI_STYLE_TO_OMP_API: Record<string, string> = {
   chat_completions: "openai-completions",
@@ -44,6 +46,9 @@ export type OmpModelProjection = {
   headers?: Record<string, string>;
   contextWindow?: number;
   maxTokens?: number;
+  reasoning?: boolean;
+  input?: Array<"text" | "image">;
+  thinking?: { mode: "effort"; efforts: string[]; effortMap?: Record<string, string> };
 };
 
 export type OmpModelProjectionError = {
@@ -62,7 +67,10 @@ export type ProviderProjectionSource = {
   hasOauth?: boolean | null;
   baseUrl?: string | null;
   headers?: Record<string, string> | null;
-  models?: Array<{ id: string; contextWindow?: number | null; maxTokens?: number | null; thinkingLevels?: string[] }>;
+  models?: Array<{
+    id: string; contextWindow?: number | null; maxTokens?: number | null; thinkingLevels?: string[];
+    supportsImages?: boolean | null; providerCapabilities?: ProviderModelCapabilities;
+  }>;
   defaultModelId?: string | null;
   supportedThinkingLevels?: string[];
 };
@@ -125,6 +133,15 @@ export function resolveProviderProjection(
     return { ok: false, error: { errorCode: "OMP_PROJECTION_INVALID", message: `thinking level ${thinkingLevel} is not supported by model ${modelId}` } };
   }
   const baseUrl = typeof source.baseUrl === "string" ? source.baseUrl.trim() : "";
+  const capabilities = model.providerCapabilities;
+  const efforts = THINKING_LEVELS.filter((level) => level !== "off" &&
+    (model.thinkingLevels ?? capabilities?.thinkingLevels ?? []).includes(level));
+  const reasoning = model.thinkingLevels !== undefined ? efforts.length > 0 : capabilities?.reasoning;
+  const publishedInput = capabilities?.inputModalities !== undefined || capabilities?.supportsImages !== undefined;
+  const modalities = modalitiesWithProviderCapabilities(undefined, capabilities);
+  const imageInput = typeof model.supportsImages === "boolean" ? model.supportsImages : modalities.input.includes("image");
+  const effortMap = Object.fromEntries(Object.entries(capabilities?.thinkingLevelMap ?? {})
+    .filter(([level, value]) => efforts.includes(level as typeof efforts[number]) && typeof value === "string")) as Record<string, string>;
   const projection: OmpModelProjection = {
     providerId: source.id,
     modelId,
@@ -134,6 +151,12 @@ export function resolveProviderProjection(
     ...(source.headers && Object.keys(source.headers).length > 0 ? { headers: source.headers } : {}),
     ...(model.contextWindow ? { contextWindow: model.contextWindow } : {}),
     ...(model.maxTokens ? { maxTokens: model.maxTokens } : {}),
+    ...(reasoning !== undefined ? { reasoning } : {}),
+    ...(publishedInput || typeof model.supportsImages === "boolean" ? { input: imageInput ? ["text", "image"] : ["text"] } : {}),
+    // Other transports keep OMP's native budget/adaptive/Google mode resolution.
+    ...(reasoning && efforts.length && (capabilities?.thinkingLevels !== undefined || capabilities?.thinkingLevelMap !== undefined) &&
+      (api === "openai-completions" || api === "openai-responses")
+      ? { thinking: { mode: "effort" as const, efforts, ...(Object.keys(effortMap).length ? { effortMap } : {}) } } : {}),
   };
   return { ok: true, projection, needsKey };
 }
@@ -220,6 +243,18 @@ export function projectModelsYaml(projection: OmpModelProjection): string {
   lines.push(`        ${yamlField(0, "api", projection.api).trim()}`);
   if (projection.contextWindow !== undefined && projection.contextWindow > 0) {
     lines.push(`        ${yamlField(0, "contextWindow", projection.contextWindow).trim()}`);
+  }
+  if (projection.maxTokens !== undefined && projection.maxTokens > 0) lines.push(yamlField(8, "maxTokens", projection.maxTokens));
+  if (projection.reasoning !== undefined) lines.push(yamlField(8, "reasoning", projection.reasoning));
+  if (projection.input) lines.push(`        input: ${JSON.stringify(projection.input)}`);
+  if (projection.thinking) {
+    lines.push("        thinking:");
+    lines.push(yamlField(10, "mode", projection.thinking.mode));
+    lines.push(`          efforts: ${JSON.stringify(projection.thinking.efforts)}`);
+    if (projection.thinking.effortMap) {
+      lines.push("          effortMap:");
+      for (const [level, value] of Object.entries(projection.thinking.effortMap)) lines.push(yamlField(12, level, value));
+    }
   }
   lines.push("        cost:");
   lines.push("          input: 0");

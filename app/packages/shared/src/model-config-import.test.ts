@@ -180,6 +180,17 @@ describe("parsePiModelConfig", () => {
     expect(draft.models[0]).toMatchObject({ contextWindow: 872_000, contextWindowSource: "provider" });
   });
 
+  it("imports published capabilities without replacing explicit local opt-ins", () => {
+    const [draft] = parsePiModelConfig({ providers: { fixture: {
+      baseUrl: "https://provider.invalid/v1", models: [{ id: "gateway-model", thinkingLevels: [], thinkingLevelsSource: "user",
+        supportsImages: false, availableForSubagents: true,
+        providerCapabilities: { reasoning: true, thinkingLevels: ["low", "high"], inputModalities: ["text", "image"] },
+      }],
+    } } });
+    expect(draft.models[0]).toMatchObject({ thinkingLevels: [], thinkingLevelsSource: "user", supportsImages: false, availableForSubagents: true,
+      providerCapabilities: { reasoning: true, thinkingLevels: ["low", "high"], inputModalities: ["text", "image"] } });
+  });
+
   it("reads ~/.pi/agent/models.json providers, env: keys, and limits", () => {
     const drafts = parsePiModelConfig(
       {

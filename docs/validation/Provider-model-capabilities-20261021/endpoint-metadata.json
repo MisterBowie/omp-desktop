@@ -1,0 +1,1224 @@
+{
+  "endpoint": "http://127.0.0.1:3425/v1/models",
+  "method": "GET",
+  "summary": {
+    "modelCount": 43,
+    "reasoningModels": 43,
+    "imageModels": 41,
+    "pdfModels": 0,
+    "publishedWebSearch": 0
+  },
+  "models": [
+    {
+      "modelId": "codex/gpt-5.6-luna",
+      "contextWindow": 272000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "codex/gpt-5.6-sol",
+      "contextWindow": 272000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "unsupportedThinkingLevels": [
+          "ultra"
+        ]
+      }
+    },
+    {
+      "modelId": "codex/gpt-5.6-terra",
+      "contextWindow": 272000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "unsupportedThinkingLevels": [
+          "ultra"
+        ]
+      }
+    },
+    {
+      "modelId": "codex/gpt-6-astra",
+      "contextWindow": 272000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "unsupportedThinkingLevels": [
+          "ultra"
+        ]
+      }
+    },
+    {
+      "modelId": "codex/gpt-6-luna",
+      "contextWindow": 272000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "codex/gpt-6-sol",
+      "contextWindow": 272000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "unsupportedThinkingLevels": [
+          "ultra"
+        ]
+      }
+    },
+    {
+      "modelId": "codex/gpt-6.1-sol",
+      "contextWindow": 500000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "unsupportedThinkingLevels": [
+          "ultra"
+        ]
+      }
+    },
+    {
+      "modelId": "factory/claude-fable-5",
+      "contextWindow": 867000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "factory/claude-fable-5.1",
+      "contextWindow": 867000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "factory/claude-haiku-4-5-20251001",
+      "contextWindow": 200000,
+      "maxTokens": 64000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high"
+        }
+      }
+    },
+    {
+      "modelId": "factory/claude-haiku-5-5",
+      "contextWindow": 872000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "factory/claude-opus-4-8",
+      "contextWindow": 867000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "factory/claude-opus-5",
+      "contextWindow": 867000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "factory/claude-opus-5-5",
+      "contextWindow": 872000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "factory/claude-sonnet-4-6",
+      "contextWindow": 931000,
+      "maxTokens": 64000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "factory/claude-sonnet-5",
+      "contextWindow": 872000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "factory/claude-sonnet-5-5",
+      "contextWindow": 872000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "factory/glm-5.3",
+      "contextWindow": 1040000,
+      "maxTokens": 131072,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "high",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "high": "high",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "factory/glm-5.3-flash",
+      "contextWindow": 1048576,
+      "maxTokens": 131072,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "high",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "high": "high",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "factory/gpt-5.3-codex",
+      "contextWindow": 400000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh"
+        }
+      }
+    },
+    {
+      "modelId": "factory/gpt-5.4",
+      "contextWindow": 1050000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh"
+        }
+      }
+    },
+    {
+      "modelId": "factory/gpt-5.5",
+      "contextWindow": 1050000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh"
+        }
+      }
+    },
+    {
+      "modelId": "factory/gpt-5.6-luna",
+      "contextWindow": 1050000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "off",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "off": "none",
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "factory/gpt-5.6-sol",
+      "contextWindow": 1050000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "off",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "off": "none",
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "unsupportedThinkingLevels": [
+          "ultra"
+        ]
+      }
+    },
+    {
+      "modelId": "factory/gpt-5.6-terra",
+      "contextWindow": 1050000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "off",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "off": "none",
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "unsupportedThinkingLevels": [
+          "ultra"
+        ]
+      }
+    },
+    {
+      "modelId": "factory/gpt-6-astra",
+      "contextWindow": 1050000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "unsupportedThinkingLevels": [
+          "ultra"
+        ]
+      }
+    },
+    {
+      "modelId": "factory/gpt-6-luna",
+      "contextWindow": 1050000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "off",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "off": "none",
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "factory/gpt-6-sol",
+      "contextWindow": 1050000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "off",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "off": "none",
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "unsupportedThinkingLevels": [
+          "ultra"
+        ]
+      }
+    },
+    {
+      "modelId": "factory/gpt-6.1-sol",
+      "contextWindow": 1050000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "unsupportedThinkingLevels": [
+          "ultra"
+        ]
+      }
+    },
+    {
+      "modelId": "factory/grok-4.6",
+      "contextWindow": 200000,
+      "maxTokens": 63356,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh"
+        }
+      }
+    },
+    {
+      "modelId": "factory/grok-4.7",
+      "contextWindow": 500000,
+      "maxTokens": 63356,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh"
+        }
+      }
+    },
+    {
+      "modelId": "group/auto-claude-fable-5-1",
+      "contextWindow": 867000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "group/auto-claude-opus-5-5",
+      "contextWindow": 872000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "group/auto-claude-sonnet-5-5",
+      "contextWindow": 872000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "group/auto-glm-5-3",
+      "contextWindow": 1040000,
+      "maxTokens": 131072,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text"
+        ],
+        "thinkingLevels": [
+          "low",
+          "high",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "high": "high",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "group/auto-glm-5-3-flash",
+      "contextWindow": 1048576,
+      "maxTokens": 131072,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "thinkingLevels": [
+          "low",
+          "high",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "high": "high",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "group/auto-gpt-5-6-luna",
+      "contextWindow": 1050000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "group/auto-gpt-5-6-sol",
+      "contextWindow": 1050000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "unsupportedThinkingLevels": [
+          "ultra"
+        ]
+      }
+    },
+    {
+      "modelId": "group/auto-gpt-5-6-terra",
+      "contextWindow": 1050000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "unsupportedThinkingLevels": [
+          "ultra"
+        ]
+      }
+    },
+    {
+      "modelId": "group/auto-gpt-6-1-sol",
+      "contextWindow": 1050000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "unsupportedThinkingLevels": [
+          "ultra"
+        ]
+      }
+    },
+    {
+      "modelId": "group/auto-gpt-6-astra",
+      "contextWindow": 1050000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "unsupportedThinkingLevels": [
+          "ultra"
+        ]
+      }
+    },
+    {
+      "modelId": "group/auto-gpt-6-luna",
+      "contextWindow": 1050000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        }
+      }
+    },
+    {
+      "modelId": "group/auto-gpt-6-sol",
+      "contextWindow": 1050000,
+      "maxTokens": 128000,
+      "providerCapabilities": {
+        "reasoning": true,
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "thinkingLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "thinkingLevelMap": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high",
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "unsupportedThinkingLevels": [
+          "ultra"
+        ]
+      }
+    }
+  ]
+}

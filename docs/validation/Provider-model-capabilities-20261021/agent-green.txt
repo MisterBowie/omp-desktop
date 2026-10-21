@@ -1,0 +1,11 @@
+
+ RUN  v4.1.10 /Users/vv/person/omp-desktop/.worktrees/provider-context-window/app/packages/agent-runtime
+
+
+ Test Files  3 passed (3)
+      Tests  47 passed (47)
+   Start at  11:16:12
+   Duration  689ms (transform 582ms, setup 0ms, import 1.35s, tests 91ms, environment 0ms)
+
+
+EXIT=0

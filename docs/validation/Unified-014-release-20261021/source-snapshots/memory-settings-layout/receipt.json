@@ -1,0 +1,126 @@
+{
+  "sourceWorktree": "/Users/vv/person/omp-desktop/.worktrees/memory-settings-layout",
+  "base": "4f5eb9c59bdb554450180a49bc5d1d921bab2eed",
+  "files": [
+    {
+      "path": "HANDOFF.md",
+      "sha256": "58ac43ffac8ee4ec393bdf2b2ab34446b085f198b7057fe36d15e5b776c9e5f3",
+      "tracked": true
+    },
+    {
+      "path": "app/apps/desktop/src/features/settings/MemorySettingsPage.tsx",
+      "sha256": "7b67b3a6073d8e47e42c03299055f352ea5087f85fd98a94d430cdb8f3f64dcc",
+      "tracked": true
+    },
+    {
+      "path": "app/apps/desktop/src/features/settings/memory-settings.css",
+      "sha256": "07667353841f3c271d53ac9dd511569e86580741a13bf9f6f852eeeaac082e0b",
+      "tracked": true
+    },
+    {
+      "path": "app/docs/spec/03-runtime/22-automatic-memory.md",
+      "sha256": "3d7f969e1e8a288a94846e8032524d43b016c58c4b1a1cb3d5aab87ab6dc983a",
+      "tracked": true
+    },
+    {
+      "path": "app/docs/spec/06-delivery/04-e2e-test-plan.md",
+      "sha256": "fed4a48ddb585dd557bcb21b478126b76120fc0a58bdd707dd2ff2d188c72398",
+      "tracked": true
+    },
+    {
+      "path": "app/docs/zh-CN/spec/03-runtime/22-automatic-memory.md",
+      "sha256": "129822efc991f1830e08bc12f527d50ff88b70e1240ec94e7af9b9ca65f488c5",
+      "tracked": true
+    },
+    {
+      "path": "app/docs/zh-CN/spec/06-delivery/04-e2e-test-plan.md",
+      "sha256": "9e2a9a8063118296166552d4ee8f9255f51865b467025cb5668328a3b4dfb471",
+      "tracked": true
+    },
+    {
+      "path": "docs/04-task-board.md",
+      "sha256": "6a578d2130cfa3fe2c1a4ca02a2dfcbd074708ea7bcefd7f91cc1a7b0e655f69",
+      "tracked": true
+    },
+    {
+      "path": "docs/validation/Memory-settings-layout-20261021.json",
+      "sha256": "1149d45bff401f9fa65a2b4e3e9f959f910525b32c50a14e07bef318b9efcc46",
+      "tracked": false
+    },
+    {
+      "path": "docs/validation/Memory-settings-layout-20261021.md",
+      "sha256": "e41880111d68c6fcc87962ed0ad792a8a62ecb05fba12775ca994d3360b75657",
+      "tracked": false
+    },
+    {
+      "path": "docs/validation/Memory-settings-layout-20261021/after-narrow-confirmation.png",
+      "sha256": "8df76a50a84a0abad93e727cb909e646b5c7387af96affbd5a2366746c6115a4",
+      "tracked": false
+    },
+    {
+      "path": "docs/validation/Memory-settings-layout-20261021/after-narrow.png",
+      "sha256": "4e3165142b024e528e8af97116ae4c4363171b9ea2d3978d9e5bc7fbe9475ad3",
+      "tracked": false
+    },
+    {
+      "path": "docs/validation/Memory-settings-layout-20261021/after-wide.png",
+      "sha256": "1ab3171adc05e83402515c91c497d684b64e22d10e65511cfcc490e79d546505",
+      "tracked": false
+    },
+    {
+      "path": "docs/validation/Memory-settings-layout-20261021/before-wide.png",
+      "sha256": "852bfe647e83bb71fbcf2bed9ac183a62c47860730d55de1271f443241815e3c",
+      "tracked": false
+    },
+    {
+      "path": "docs/validation/Memory-settings-layout-20261021/build.log.gz",
+      "sha256": "24e7158c3f3ec1b349b651d8a7ff78c06a826c535b35b6372d2cf49b334fa515",
+      "tracked": false
+    },
+    {
+      "path": "docs/validation/Memory-settings-layout-20261021/capture.mjs.gz",
+      "sha256": "1493a534329e042eb98ad420347e35ef0e14fef7a9c428a80ff64f1406d83ea3",
+      "tracked": false
+    },
+    {
+      "path": "docs/validation/Memory-settings-layout-20261021/docs.log.gz",
+      "sha256": "b94623ba4c275b5bf20c1040ec84724f97129ba05c217f299cf7501dd9292621",
+      "tracked": false
+    },
+    {
+      "path": "docs/validation/Memory-settings-layout-20261021/lint.log.gz",
+      "sha256": "a4fac24c294303e535dbbd84843229fb318036c13ec15bda0caedb3dfa33ffe5",
+      "tracked": false
+    },
+    {
+      "path": "docs/validation/Memory-settings-layout-20261021/regression.log.gz",
+      "sha256": "ada7c5a24a7d0d42e5f077e86ff9dc2a8cf65e7ecda4d4998560c15574b0d19b",
+      "tracked": false
+    },
+    {
+      "path": "docs/validation/Memory-settings-layout-20261021/render.log.gz",
+      "sha256": "0b1cefa86ce0b269f117044de4f1b3161aeda177dd24c4cf0160e46b76bbf4ef",
+      "tracked": false
+    },
+    {
+      "path": "docs/validation/Memory-settings-layout-20261021/rendered-layout.json",
+      "sha256": "e5f7914a148ba78e53da7e7dadba49b36f3f1d0ec865e667c62061d600f336f3",
+      "tracked": false
+    },
+    {
+      "path": "docs/validation/Memory-settings-layout-20261021/renderer-build.log.gz",
+      "sha256": "0d8c3a1ebdc07d98b340eeed378ba31b380feef340319d74bd216b85ff63ef20",
+      "tracked": false
+    },
+    {
+      "path": "docs/validation/Memory-settings-layout-20261021/renderer.tsx.gz",
+      "sha256": "4a8586ed606ada52e5ab542fc4527a7e4d6ed12f3fc2f050276773977f2ccfab",
+      "tracked": false
+    },
+    {
+      "path": "docs/validation/Memory-settings-layout-20261021/typecheck.log.gz",
+      "sha256": "cdbcfae878091ca5d86a8f767240fac01973e35589e546cf688e45c7c2b59f4a",
+      "tracked": false
+    }
+  ]
+}

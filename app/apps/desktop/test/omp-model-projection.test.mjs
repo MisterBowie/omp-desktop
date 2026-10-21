@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { parse as parseYaml } from "yaml";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { register } from "node:module";
@@ -20,6 +21,39 @@ const {
 } = await import("../electron/main/runtime/omp-model-projection.ts");
 
 const CANARY = "omp-m4-canary-not-a-real-key";
+
+test("projects published reasoning and image support into the actual OMP model document", () => {
+  const source = {
+    id: "fixture", baseUrl: "https://provider.invalid/v1", apiStyle: "chat_completions", authKind: "none",
+    models: [{ id: "gateway/claude", contextWindow: 872_000, maxTokens: 128_000,
+      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+      providerCapabilities: { reasoning: true, inputModalities: ["text", "image"], thinkingLevelMap: { max: "max" } },
+    }],
+  };
+  const result = resolveProviderProjection(source, "gateway/claude", "low");
+  assert.equal(result.ok, true);
+  const model = parseYaml(projectModelsYaml(result.projection)).providers.fixture.models[0];
+  assert.equal(model.reasoning, true);
+  assert.deepEqual(model.input, ["text", "image"]);
+  assert.equal(model.maxTokens, 128_000);
+  assert.deepEqual(model.thinking.efforts, ["low", "medium", "high", "xhigh", "max"]);
+  assert.equal(model.thinking.effortMap.max, "max");
+  source.models[0].supportsImages = false;
+  source.models[0].thinkingLevels = [];
+  const manual = resolveProviderProjection(source, "gateway/claude", "off");
+  const narrowed = parseYaml(projectModelsYaml(manual.projection)).providers.fixture.models[0];
+  assert.equal(narrowed.reasoning, false);
+  assert.deepEqual(narrowed.input, ["text"]);
+  assert.equal(narrowed.thinking, undefined);
+  source.apiStyle = "anthropic_messages";
+  source.models[0].thinkingLevels = ["low", "high"];
+  const anthropic = resolveProviderProjection(source, "gateway/claude", "low");
+  assert.equal(anthropic.projection.thinking, undefined, "the native adapter owns its budget/adaptive control mode");
+  source.apiStyle = "chat_completions";
+  source.models[0].providerCapabilities = undefined;
+  const legacy = resolveProviderProjection(source, "gateway/claude", "low");
+  assert.equal(legacy.projection.thinking, undefined, "bindings without published endpoint controls keep native mode resolution");
+});
 
 test("maps the supported PI api styles to OMP api values", () => {
   assert.equal(ompApiForStyle("chat_completions"), "openai-completions");

@@ -29,6 +29,26 @@ unchanged. Selected endpoint windows use `contextWindowSource: "provider"` so
 generic defaults and later models.dev resolution cannot replace them. Only raw
 endpoint rows enter the host cache, before defaults and user overrides.
 
+Discovery also preserves `reasoning`, canonical values in `reasoning_levels`
+and `{ effort }` entries in `supported_reasoning_levels`, input/output
+`modalities`, explicit `supports_images`/`supports_pdf`, and boolean native search
+support. `none` retains its wire spelling while mapping to canonical `off`.
+Unknown efforts such as `ultra` are reported as unsupported by the current
+runtime; they never become a different executable level.
+
+`providerCapabilities` carries these facts through cache and saved bindings.
+Thinking sets marked `provider` follow refreshed facts; manual chip edits mark
+them `user`, including an intentionally empty set. Old unmarked empty sets are
+treated as generic defaults; unmarked non-empty choices remain unchanged.
+Attachment overrides stay tri-state: null follows endpoint/catalog metadata,
+and a saved true/false wins even when metadata changes. Saved facts also resolve
+image/PDF input before discovery hydration.
+
+AI delegation remains an explicit local opt-in, preserving existing choices.
+Native web search support is reported when published, but never enables a search
+request by itself; the user's separate switch and wire-style gate still apply.
+No PDF or search support is inferred from a model name or image support.
+
 ### Settings: one provider form
 
 `ProviderSetupDialog` is a single form, not a wizard:
@@ -259,6 +279,11 @@ Provider model loading remains stale-while-revalidate:
 4. Successful provider discovery may update the Rust-owned normalized cache;
    validated endpoint token limits replace the catalog baseline. Other metadata
    continues to come from models.dev.
+
+   validated endpoint limits/thinking/input facts replace their catalog baseline.
+   Remaining metadata continues to come from models.dev. Rust keeps capability
+   snapshots in provider-scoped cache KV and output in the existing model column;
+   no schema migration is required.
 5. Configured `ModelBinding` IDs are retained when discovery is partial or
    unavailable, and an ID absent from models.dev receives generic metadata.
 

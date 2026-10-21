@@ -42,6 +42,9 @@ Settings / UI
   → ModelCatalogService
       ├─ models.dev snapshot (model metadata baseline)
       ├─ runtime/provider discovery (IDs and published token limits)
+
+      ├─ models.dev snapshot (model metadata baseline)
+      ├─ runtime/provider discovery (IDs, limits, thinking and input capabilities)
       └─ Rust-owned provider cache
 ```
 
@@ -159,6 +162,12 @@ PI-Desktop must not permanently restrict users to a short fixed model list.
    baseline. Validated endpoint-published token limits can override its limits;
    see [ADR: Preserve endpoint-published token limits](../../adr/provider-published-token-limits.md).
    Electron main reads the checked-in release resource at
+
+1. **models.dev** (`https://models.dev/api.json`) supplies the model metadata
+   baseline. Validated endpoint-published limits, thinking and input capabilities
+   can override the corresponding fields; see
+   [ADR: Preserve endpoint-published model metadata](../../adr/provider-published-token-limits.md).
+   Electron main reads the checked-in release resource at
    `apps/desktop/resources/models.dev/api.json` in development and the
    packaged `resources/models.dev/api.json` path in released builds. It never
    sends provider credentials to the catalog.
@@ -178,6 +187,11 @@ PI-Desktop must not permanently restrict users to a short fixed model list.
    while the adapter keeps its own transport identity. Discovery preserves
    published token limits; other metadata is not replaced. A configured free-form ID remains selectable with
    the generic text-only, non-reasoning baseline when it is absent from
+
+   while the adapter keeps its own transport identity. Discovery preserves
+   published limits, thinking and input capabilities; other metadata is not replaced.
+   A configured free-form ID remains selectable. The generic text-only,
+   non-reasoning baseline is used only without endpoint facts or a record from
    models.dev. Settings still permits an explicit thinking-level override for
    an endpoint the catalog does not know yet.
 4. The models.dev record maps `id`, `name`, `description`, `family`,

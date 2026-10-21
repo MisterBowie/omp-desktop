@@ -1,6 +1,6 @@
 {
   "name": "@pi-desktop/desktop",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "desktopName": "omp-desktop.desktop",
   "private": true,
   "description": "OMP Desktop Electron application",

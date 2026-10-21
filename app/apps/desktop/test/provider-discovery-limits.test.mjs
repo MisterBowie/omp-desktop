@@ -55,7 +55,7 @@ function settingsSelection(models, bindings) {
   return selection;
 }
 
-async function harness(t, { binding, known = false } = {}) {
+async function harness(t, { binding, known = false, fields = {} } = {}) {
   const modelId = "factory/claude-fixture";
   const directory = mkdtempSync(join(tmpdir(), "omp-provider-limits-"));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
@@ -80,9 +80,7 @@ async function harness(t, { binding, known = false } = {}) {
     if (method === "providers.getSecret") return {};
     if (method === "providers.listModels") return { models: cached };
     if (method === "providers.cacheModels") {
-      // Match the durable host cache's existing wire contract: it retains the
-      // endpoint window, while selected bindings retain the output limit.
-      cached = input.models.map(({ modelId, displayName, contextWindow }) => ({ modelId, displayName, contextWindow, source: "discovered" }));
+      cached = input.models.map((model) => ({ ...structuredClone(model), source: "discovered" }));
       return { ok: true };
     }
     assert.fail(`unexpected host request: ${method}`);
@@ -99,7 +97,7 @@ async function harness(t, { binding, known = false } = {}) {
   t.mock.method(globalThis, "fetch", async (url) => {
     assert.equal(url, "https://provider.invalid/v1/models");
     requests++;
-    return new Response(JSON.stringify({ data: [{ id: modelId, context_window: window, max_output_tokens: 128_000 }] }));
+    return new Response(JSON.stringify({ data: [{ id: modelId, context_window: window, max_output_tokens: 128_000, ...fields }] }));
   });
   return {
     modelId, provider, runtime,
@@ -155,4 +153,59 @@ test("refresh repairs the old inherited 128k seed and preserves a manual 128k ov
   const manualSelection = settingsSelection([manual], h.provider.models);
   assert.equal(manualSelection.models[0].contextWindow, 128_000);
   assert.equal(manualSelection.bindingsToPersist[0].contextWindowSource, "user");
+});
+
+for (const known of [false, true]) {
+  test(`thinking and attachments survive the settings/cache/runtime path (catalog match: ${known})`, async (t) => {
+    const h = await harness(t, { known, fields: {
+      reasoning: true, reasoning_levels: ["low", "medium", "high", "xhigh", "max", "ultra"],
+      modalities: { input: ["text", "image", "pdf"] }, supports_web_search: true,
+    } });
+    const live = (await h.list()).models[0];
+    assert.deepEqual(live.supportedThinkingLevels, ["low", "medium", "high", "xhigh", "max"]);
+    assert.deepEqual(live.providerCapabilities.unsupportedThinkingLevels, ["ultra"]);
+    assert.equal(shared.modelMatchesFilter(live, "vision"), true);
+    assert.equal(shared.modelMatchesFilter(live, "pdf"), true);
+    h.provider.models = [JSON.parse(JSON.stringify(shared.bindingFromModelInfo(live)))];
+    const selected = settingsSelection([live], h.provider.models);
+    h.provider.models = selected.bindingsToPersist;
+    assert.deepEqual(h.provider.models[0].thinkingLevels, live.supportedThinkingLevels);
+    assert.equal(h.provider.models[0].availableForSubagents, undefined);
+    assert.equal(h.provider.models[0].nativeWebSearch, undefined, "published support does not opt into searches");
+    const cached = (await h.list("cache")).models[0];
+    assert.deepEqual(cached.supportedThinkingLevels, live.supportedThinkingLevels);
+    assert.equal(h.requestCount(), 1);
+    h.clearCache();
+    const restored = (await h.list("cache")).models[0];
+    assert.equal(shared.modelMatchesFilter(restored, "vision"), true);
+    const effective = h.runtime.effectiveSubagentModelConfig(h.provider, h.modelId, agentRuntime.genericModelConfig(h.modelId));
+    assert.equal(effective.modelConfig.reasoning, true);
+    assert.ok(effective.modelConfig.input.includes("image"));
+    assert.ok(effective.modelConfig.modalities.input.includes("pdf"));
+    assert.equal(effective.modelConfig.thinkingLevelMap.max, "max");
+    assert.equal(effective.modelConfig.webSearch, undefined);
+    assert.equal(h.runtime.enrichProvider(h.provider).supportsVision, true);
+    h.provider.models = [{ ...h.provider.models[0], thinkingLevels: [], thinkingLevelsSource: "user", supportsImages: false, supportsDocuments: false, availableForSubagents: true }];
+    const manual = settingsSelection([(await h.list()).models[0]], h.provider.models).bindingsToPersist[0];
+    assert.deepEqual(manual.thinkingLevels, []);
+    assert.equal(manual.supportsImages, false);
+    assert.equal(manual.supportsDocuments, false);
+    assert.equal(manual.availableForSubagents, true);
+    const userConfig = agentRuntime.modelConfigWithBinding(agentRuntime.genericModelConfig(h.modelId), manual);
+    assert.equal(userConfig.reasoning, false);
+    assert.equal(userConfig.input.includes("image"), false);
+  });
+}
+
+test("refresh seeds an old empty reasoning default without changing local opt-ins", async (t) => {
+  const h = await harness(t, { binding: {
+    contextWindow: 128_000, maxTokens: 8_192, thinkingLevels: [], defaultThinkingLevel: null,
+    availableForSubagents: false, nativeWebSearch: true, supportsImages: null,
+  }, fields: { reasoning: true, reasoning_levels: ["low", "high", "max"], modalities: { input: ["text", "image"] } } });
+  const selected = settingsSelection((await h.list()).models, h.provider.models).bindingsToPersist[0];
+  assert.deepEqual(selected.thinkingLevels, ["low", "high", "max"]);
+  assert.equal(selected.thinkingLevelsSource, "provider");
+  assert.equal(selected.availableForSubagents, false);
+  assert.equal(selected.nativeWebSearch, true);
+  assert.equal(selected.supportsImages, null);
 });

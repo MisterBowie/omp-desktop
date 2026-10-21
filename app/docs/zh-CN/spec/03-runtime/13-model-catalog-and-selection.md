@@ -23,6 +23,19 @@ Google 对应 `inputTokenLimit` 和 `outputTokenLimit`。输出限制不作为�
 `contextWindowSource: "provider"` 保存，避免运行时被通用 128k 或目录覆盖。
 宿主缓存只保存原始端点结果；已选绑定保存上下文与输出限制。不按模型名猜测 1M。
 
+发现同时保留 `reasoning`、`reasoning_levels`、`supported_reasoning_levels` 中的
+`effort`、输入/输出 `modalities`、明确的 `supports_images`/`supports_pdf` 和联网
+搜索支持布尔值。`none` 映射到 `off`，保留原始线值；`ultra` 等不受当前运行时支持
+的档位会提示，不伪装成其它可执行档位。
+
+能力通过 `providerCapabilities` 跨缓存和已选绑定保存；思考集合的来源为
+`provider` 时随新发布值更新，手动编辑标为 `user`（包括空集合）。旧版无来源的空
+集合按通用默认处理，非空选择保持不变。附件的 null 继续跟随发布事实，显式 true/
+false 保留；缓存尚未加载时也可使用已保存的能力快照。
+
+“可供 AI 自动调度”保持本地手动选择，保留已有选择。原生联网搜索的支持声明不会
+自动打开搜索；仍需用户开关和接口风格允许。不根据模型名或图片支持推断 PDF/搜索。
+
 ### 模型选择器字段
 - 搜索框
 - 提供商过滤器

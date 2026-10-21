@@ -23,11 +23,9 @@ function fixture(t) {
 test("preserves nested candidate bytes and includes Debian installers in the canonical checksum namespace", t => {
   const f = fixture(t); f.put("desktop/release/OMP-Desktop-0.1.0-x64.AppImage", "appimage");
   const deb = f.put("desktop/release/omp-desktop_0.1.0_amd64.deb", "deb");
-  f.put("pi-host/dist-bundle/pi-host-0.1.0-linux-x64.tar.gz", "host");
   f.put("desktop/release/latest-linux.yml", stringify({version:"0.1.0",files:[]}));
-  const files = f.run(); assert.equal(files.length, 4);
+  const files = f.run(); assert.equal(files.length, 3);
   assert.deepEqual(readFileSync(join(f.out, "OMP-Desktop-0.1.0-x64.deb")), readFileSync(deb));
-  assert.equal(readFileSync(join(f.out, "pi-host-0.1.0-linux-x64.tar.gz"), "utf8"), "host");
   assert(files.every(file => /^[a-f0-9]{64}$/.test(file.sha256)));
 });
 async function linuxFixture(t,debFirst=false){
@@ -39,7 +37,6 @@ async function linuxFixture(t,debFirst=false){
   return {file:join(f.source,"desktop/release/latest-linux.yml"),arch:1,publishConfiguration:{provider:"github",owner:"MisterBowie",repo:"omp-desktop"},info:{version:"0.1.0",files:[{url:name,sha512,size:bytes.length}],path:name,sha512}};
  });
  await writeUpdateInfoFiles(tasks,{emitArtifactCreated:async()=>{}});
- const host="pi-host-0.1.0-linux-x64.tar.gz",bytes=Buffer.from("owned host");f.put("pi-host/dist-bundle/"+host,bytes);f.put("pi-host/dist-bundle/"+host+".sha256",createHash("sha256").update(bytes).digest("hex")+"  "+host+"\n");
  return f;
 }
 test("the real builder's mixed Linux feed follows Debian renaming without changing installer bytes or hashes",async t=>{
@@ -65,6 +62,13 @@ test("copied staging CLI resolves workspace YAML and retains hash and URL refusa
 test("refuses basename collisions before producing output", t => {
   const f = fixture(t); f.put("one/latest.yml"); f.put("two/latest.yml");
   assert.throws(f.run, /duplicate/); assert.equal(existsSync(f.out), false);
+});
+
+test("refuses retired Pi host archives before staging any output", t => {
+  const f = fixture(t);
+  f.put("pi-host/dist-bundle/pi-host-0.1.0-linux-x64.tar.gz", "retired fixture");
+  assert.throws(f.run, /unexpected release input/);
+  assert.equal(existsSync(f.out), false);
 });
 test("refuses linked, stale, unknown or mixed prior staging inputs", t => {
   for (const kind of ["link", "stale", "unknown", "prior"]) {
