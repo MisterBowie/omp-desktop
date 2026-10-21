@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-export const VERIFIED_SOURCE = "ae173d361370b1840f6781d8822186d743dce06b";
+export const VERIFIED_SOURCE = "4885554fea179ef72f2bc15d92b2e563c7b1b037";
 const DELIVERY_FILES = new Set([
   "app/scripts/verify-release-candidate.mjs", "app/scripts/verify-release-candidate.test.mjs",
   "app/scripts/stage-release-inputs.mjs", "app/scripts/stage-release-inputs.test.mjs",
@@ -13,6 +13,7 @@ const DELIVERY_FILES = new Set([
   "app/scripts/classify-release-failure.mjs", "app/scripts/classify-release-failure.test.mjs",
   "app/scripts/e2e/installed-product.mjs", "app/scripts/e2e/installed-product.test.mjs",
   "app/apps/desktop/test/omp-plan-submit-e2e.test.mjs",
+  "app/apps/desktop/test/omp-memory-native-e2e.test.mjs",
 ]);
 const CHECKS = [
   "Require the stable version and its release notes", "Run pnpm build:js",

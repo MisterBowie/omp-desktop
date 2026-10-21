@@ -1,0 +1,7 @@
+{
+  "menuHookMatchesUpstreamVerbatim": true,
+  "fileManagerRestoreMatchesUpstreamVerbatim": true,
+  "scopedFileResolverMatchesUpstreamVerbatim": true,
+  "upstreamRevision": "589e5803a7a9f4ebf7ec1e8849c43e44b4a198f7",
+  "upstreamPR": 1713
+}

@@ -1,0 +1,156 @@
+{
+  "branch": "codex/html-open-with",
+  "head": "31acbf9cda5abe01342f534a7f41d1e3ae52cf7f",
+  "baseMain": "a23bfb9befea327e7924efd3004e030a11b587d2",
+  "state": "f5e2b334 product candidate plus bounded fixture event diagnostics; version 0.1.0",
+  "files": [
+    {
+      "path": "app/apps/desktop/electron/main/browser-host.ts",
+      "sha256": "230b44e1ce7cef220582843d2397be42c7712206215bed7dfecbd9b0539c499a"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/browser-view.ts",
+      "sha256": "ff6ba40f16ffcfb79add4016bdd9ed35a1a7e76c0c86097b0b2dd0fd2132ef38"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/services/plugin-services.ts",
+      "sha256": "79397fdc6399963792da19097aade00df13f309fa98c147d373441883a3678f4"
+    },
+    {
+      "path": "app/apps/desktop/src/components/ContextMenu.tsx",
+      "sha256": "0e88ddaffde015bdbc3da94c6196e7c683ee89977a8cf11b57901ea668b496fa"
+    },
+    {
+      "path": "app/apps/desktop/src/components/Markdown.tsx",
+      "sha256": "1f53f785835ec5a1a10c076e533e087255811ca19674fe9d53e7801a8214d1b1"
+    },
+    {
+      "path": "app/apps/desktop/src/components/ToolDetails.tsx",
+      "sha256": "852b0bec8d45042b3c6d1345a6cbf5600a0c2a848c596937063ebd468d40bb24"
+    },
+    {
+      "path": "app/apps/desktop/src/features/chat/transcript/ToolRow.tsx",
+      "sha256": "175c44157441394bd1bb9914330251591233da7c6f1abd3707e709d9d88732b6"
+    },
+    {
+      "path": "app/apps/desktop/src/features/chat/transcript/shared.tsx",
+      "sha256": "30a1520a866998e723abb3a1e2b47c9b8e7ae7a019c21fce5d543236c2acb2e2"
+    },
+    {
+      "path": "app/apps/desktop/src/hooks/use-chat-file-menu.tsx",
+      "sha256": "e682aaddfc6cd69d01a463b5ccb0fdbaa4042d565644cb5f65d52cb6bc2772b0"
+    },
+    {
+      "path": "app/apps/desktop/src/hooks/use-chat-session-capability.ts",
+      "sha256": "c71bfc6242a42322fa785440e3d6202362924e3b22d242525ed404db931c4196"
+    },
+    {
+      "path": "app/apps/desktop/src/hooks/use-preview-target.ts",
+      "sha256": "bd9d87a10813f04d4d816895658e8fdb97985bff6172f0e9f7c6fabb7b682a49"
+    },
+    {
+      "path": "app/apps/desktop/src/styles/ui-kit.css",
+      "sha256": "90e946d07f18f636eab33d7bde2b920c5892b04efd40eed92fa96287d843c9fa"
+    },
+    {
+      "path": "app/apps/desktop/test/browser-host-session.test.mjs",
+      "sha256": "dd37e5e0d44f5b348314d533a4c2f093131eb40484235cebc95b497f522c5db1"
+    },
+    {
+      "path": "app/apps/desktop/test/browser-pane-navigation.test.mjs",
+      "sha256": "0209611da7d81dfa09c8c734d1c9f1bcfcfa590994c7527d753e4e8eb5a452ff"
+    },
+    {
+      "path": "app/apps/desktop/test/chat-context-menu-surface.test.mjs",
+      "sha256": "12735c7c0f4ce9767f059dd49e756df86e4bafc812443579a9fa7bffdf13a219"
+    },
+    {
+      "path": "app/apps/desktop/test/chat-file-open-with.test.mjs",
+      "sha256": "ac2d2d1af48a73f0880fca2f6baee140bb7f632ad330ce67deada89de3ffb09d"
+    },
+    {
+      "path": "app/apps/desktop/test/tool-row-file-refs.test.mjs",
+      "sha256": "48a6d8d8dfecd99fc2882c53acdea7ccec3bda79d57ef0532e96fe49146637c7"
+    },
+    {
+      "path": "app/apps/desktop/test/transcript-file-chips.test.mjs",
+      "sha256": "a6533b523300fc30b22dc87be96621ce4b4c1e63dbc41314be283cbd55465edc"
+    },
+    {
+      "path": "app/docs/adr/0262-chat-file-refs-open-in-the-file-view.md",
+      "sha256": "4681ace3a8c6019edff20e97e127dd8f2b765b38b1b43bd225831d971c22f4cc"
+    },
+    {
+      "path": "app/docs/spec/04-ux/09-interaction-patterns.md",
+      "sha256": "3ebaf4464e34600c10e3632ae50ab4689ddb39cce6670a8d393831d514ffaf4e"
+    },
+    {
+      "path": "app/docs/spec/06-delivery/04-e2e-test-plan.md",
+      "sha256": "8491a0ea8ba3e522b14567847794d85f1265fc8aa2706c81a49618e7aab312ad"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/04-ux/09-interaction-patterns.md",
+      "sha256": "352dffaa314044c55aa2b690985f40afb44c06915ffbea18f9edb76f37af331f"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/06-delivery/04-e2e-test-plan.md",
+      "sha256": "0aab0eadf45196023a25cbf94d0af3f526f599cf6ca93126f18d6c9e3df317b7"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/de/index.ts",
+      "sha256": "034f3fd5ef0835cb4d44036a6e944d1b29caa86e2d98cc87c8288299558a3795"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/en/index.ts",
+      "sha256": "884eb280c35058d605bd4fe641727f3ed9d65c586f2d1da1a8336a201d0277da"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/es/index.ts",
+      "sha256": "7a82058c1fc4ceb414a8599640f1e235e0e7fa52d2714d0f861eeff35d53e699"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/fr/index.ts",
+      "sha256": "b5e1696897b09c3529e5d084d539c0496f879614598cff5b8b00f8d564488ef5"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/ko/index.ts",
+      "sha256": "031fb4fd62ae52b59c391a09bc0815b74a01e14fad63cb9aaa76fdff73e236c7"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/tr/index.ts",
+      "sha256": "59563e512d8311a7be1561cf7650ae3f762435b96064b7ae5f2de6395a3e2605"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/zh-CN/index.ts",
+      "sha256": "983b0adabfb98614fdd7d4cceb275ccc8c04aee6832113508c710051e9cd9947"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/zh-TW/index.ts",
+      "sha256": "c068cac7de2b4d09621db1585d88b62c1ef088bbaa5e17eac236adb4f185d0a8"
+    },
+    {
+      "path": "app/packages/shared/src/changelog.test.ts",
+      "sha256": "98c7abbd98028254f39bbd698b01a18695a80f8d34b660d4d503cc732b520a46"
+    },
+    {
+      "path": "app/packages/shared/src/omp-changelog.ts",
+      "sha256": "98e68831d076650912722489699f0e4ce124a758a7906be7ea21059d81bfba13"
+    },
+    {
+      "path": "app/scripts/README.md",
+      "sha256": "b98ae8dbe8c6afd99e708a3ef08f17386a974619f4597abc19f1371aca7b5907"
+    },
+    {
+      "path": "app/scripts/e2e-chat-html-open-with.mjs",
+      "sha256": "13225c8b7959c550b311c7d177bfb344b6557c1127a834c409c1670cea3db6ac"
+    },
+    {
+      "path": "app/scripts/e2e/chat-html-open-with.tsx",
+      "sha256": "6a6870bf1d8249ddb03dfc2acd4e77b9cde55951f177ca0ad2a5eddee685ad3b"
+    },
+    {
+      "path": "docs/05-user-guide.md",
+      "sha256": "98b538552a505c4c84bcf781b0f23f971db9fb2f45194c8bfc49df988b016355"
+    }
+  ]
+}

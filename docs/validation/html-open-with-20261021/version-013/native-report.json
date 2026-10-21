@@ -1,0 +1,22 @@
+{
+  "status": "passed",
+  "checks": [
+    "external: [data-fixture=\"markdown\"] a",
+    "external: [data-fixture=\"markdown\"] .chat-code-link",
+    "external: [data-fixture=\"chip\"] .chat-file-chip",
+    "external: [data-fixture=\"tool\"] .tool-row-summary.linked",
+    "external: [data-fixture=\"files\"] .tool-file-item.is-linked",
+    "built-in browser uses resolved absolute path",
+    "File Manager uses resolved project path",
+    "keyboard submenu navigation and Escape focus restoration",
+    "missing reference opens nothing"
+  ],
+  "externalHandoffs": 5,
+  "externalBoundary": "preload IPC stub; no OS browser launched",
+  "electron": "43.6.0",
+  "nativeFilePreviews": [
+    "project",
+    "sibling",
+    "scratch"
+  ]
+}

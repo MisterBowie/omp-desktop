@@ -11122,6 +11122,19 @@ are withdrawn with ADR 0165.
     (ADR 0263).
   - The persisted user message still contains the canonical `@path` text for
     the agent.
+- **HTML context-menu extension**: Right-click HTML Markdown links, inline
+  paths, file chips, tool-row summaries and tool file lists. Choose each of the
+  three Open with destinations and verify the exact resolved file. Exercise
+  ArrowRight/Escape focus restoration and a missing reference; no lookalike or
+  alternate destination may open. `node scripts/e2e-chat-html-open-with.mjs
+  <evidence-dir>` runs this subset with real React/store/menu code in an owned
+  Electron window. Only preload IPC is stubbed; it records OS handoff instead
+  of launching the user's browser. The same Electron fixture loads project,
+  sibling-folder and scratch HTML through the production BrowserPane and
+  rejects an outside root; unit cases also reject symlink escapes and prevent
+  rejected file inputs from becoming HTTP requests. Agent preview remains
+  workspace-scoped. The baseline click/composer journey below retains its
+  separate coverage status.
 - **Specs linked**: `04-ux/08-component-spec.md` §8.3 / §11.8,
   `04-ux/09-interaction-patterns.md` §8a.2, `03-runtime/01-ipc-protocol.md`,
   ADR 0163, ADR 0241, ADR 0262, ADR 0263, `08-meta/decisions-log.md` (D320)
@@ -13858,13 +13871,16 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   `error`. A turn that never started emits nothing, and no plugin receives two
   events for one turn even when the terminal event arrives more than once.
   Step 5 shows no new permission review, and subscribing to an unknown event
-  name does not surface an error.
+  name does not surface an error. For OMP, hold the durable end request in the
+  module harness: no announcement may precede its settlement, duplicate terminal
+  frames still announce once, and another session may settle independently.
 - **Specs linked**: `07-plugins/03-plugin-api.md`, `07-plugins/13-plugin-permissions-matrix.md`,
   ADR 0252
 - **Acceptance**: Quality (protocol and plugin contract)
 - **Milestone**: M6+
 - **Status**: Module-covered (`apps/desktop/test/session-turn-ended.test.mjs`,
-  `apps/desktop/test/queued-turn-finalization.test.mjs`); desktop journey Draft
+  `apps/desktop/test/queued-turn-finalization.test.mjs`,
+  `apps/desktop/test/omp-session-bridge.test.mjs`); desktop journey Draft
   (run only in a capable environment when this surface changes)
 
 ### E2E-SESSION-native-pi-continue-appends-original-jsonl

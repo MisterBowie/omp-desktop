@@ -2,41 +2,57 @@ import type { ChangelogEntry, ChangelogLocale } from "./changelog.js";
 
 const memoryAndModels: Record<ChangelogLocale, string[]> = {
   "en": [
+    "Wait for durable turn settlement before announcing completion to plugins.",
+    "Right-click HTML file references to choose the file manager, built-in browser or system default application.",
     "Choose automatic memory saving and recall independently in Settings, both off by default.",
     "Browse, search and clear memories isolated by project and worktree; disabling memory keeps saved data.",
     "Use provider-published context and output token limits while preserving manual overrides."
   ],
   "zh-CN": [
+    "回合持久化结算后再通知插件完成，修复恢复流程的状态竞态。",
+    "右键 HTML 文件引用，可选择文件管理器、内置浏览器或系统默认应用打开。",
     "在设置中分别开启自动保存和自动读取记忆，两个开关默认关闭。",
     "按项目和 worktree 隔离记忆，支持查看、搜索与清空；关闭后保留已有数据。",
     "正确采用供应商发布的上下文与输出 Token 上限，并保留手动覆盖值。"
   ],
   "zh-TW": [
+    "回合持久化結算後再通知外掛完成，修正復原流程的狀態競態。",
+    "右鍵 HTML 檔案參照，可選擇檔案管理員、內建瀏覽器或系統預設應用程式開啟。",
     "在設定中分別開啟自動儲存與自動讀取記憶，兩個開關預設關閉。",
     "依專案與 worktree 隔離記憶，支援檢視、搜尋與清除；關閉後保留已有資料。",
     "正確採用供應商公布的上下文與輸出 Token 上限，並保留手動覆寫值。"
   ],
   "de": [
+    "Plugins werden erst nach dem dauerhaften Abschluss des Durchlaufs benachrichtigt.",
+    "HTML-Dateiverweise per Rechtsklick im Dateimanager, integrierten Browser oder mit der Systemstandardanwendung öffnen.",
     "Automatisches Speichern und Abrufen von Erinnerungen in den Einstellungen getrennt aktivieren; beide sind standardmäßig aus.",
     "Erinnerungen nach Projekt und Worktree getrennt durchsuchen und löschen; beim Deaktivieren bleiben die Daten erhalten.",
     "Veröffentlichte Kontext- und Ausgabelimits des Anbieters verwenden und manuelle Werte beibehalten."
   ],
   "es": [
+    "La finalización se notifica a los plugins después de guardar el estado del turno.",
+    "Haz clic derecho en las referencias HTML para abrirlas en el gestor de archivos, el navegador integrado o la aplicación predeterminada del sistema.",
     "Activa por separado el guardado y la recuperación automáticos de memoria en Ajustes; ambos están desactivados inicialmente.",
     "Consulta, busca y borra memorias aisladas por proyecto y worktree; desactivarlas conserva los datos.",
     "Usa los límites de contexto y salida publicados por el proveedor y conserva los ajustes manuales."
   ],
   "fr": [
+    "La fin du tour est annoncée aux extensions après la validation de son état persistant.",
+    "Ouvrez les références HTML par clic droit dans le gestionnaire de fichiers, le navigateur intégré ou l’application système par défaut.",
     "Activez séparément la sauvegarde et le rappel automatiques de mémoire dans les réglages, désactivés par défaut.",
     "Consultez, recherchez et effacez les mémoires isolées par projet et worktree ; la désactivation conserve les données.",
     "Utilisez les limites de contexte et de sortie publiées par le fournisseur en conservant les valeurs manuelles."
   ],
   "ko": [
+    "턴 상태를 영구 저장한 후 플러그인에 완료를 알립니다.",
+    "HTML 파일 참조를 마우스 오른쪽 버튼으로 클릭해 파일 관리자, 내장 브라우저 또는 시스템 기본 앱으로 여세요.",
     "설정에서 자동 메모리 저장과 불러오기를 각각 켤 수 있으며 기본값은 모두 꺼짐입니다.",
     "프로젝트와 worktree별로 분리된 메모리를 조회, 검색, 삭제할 수 있고 기능을 꺼도 데이터는 유지됩니다.",
     "공급자가 공개한 컨텍스트 및 출력 토큰 제한을 사용하고 수동 설정값은 유지합니다."
   ],
   "tr": [
+    "Turun kalıcı durumu kaydedildikten sonra eklentilere tamamlanma bildirimi gönderilir.",
+    "HTML dosya başvurularına sağ tıklayarak dosya yöneticisi, yerleşik tarayıcı veya sistemin varsayılan uygulamasıyla açın.",
     "Otomatik bellek kaydını ve geri çağırmayı Ayarlar bölümünden ayrı ayrı açın; ikisi de varsayılan olarak kapalıdır.",
     "Proje ve worktree bazında yalıtılmış anıları görüntüleyin, arayın ve temizleyin; kapatmak kayıtlı verileri korur.",
     "Sağlayıcının yayımladığı bağlam ve çıktı token sınırlarını kullanın, elle girilen değerleri koruyun."

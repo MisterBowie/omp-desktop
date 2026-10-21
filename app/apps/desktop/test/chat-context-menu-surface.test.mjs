@@ -34,7 +34,7 @@ test("the pointer-anchored menu portals, measures, and closes without trapping f
   assert.match(menuSource, /live\.isCollapsed/);
   assert.match(menuSource, /root\.contains\(anchorNode\)/);
   assert.match(menuSource, /root\.contains\(focusNode\)/);
-  assert.match(menuSource, /item\.onSelect\(state\.selection\)/);
+  assert.match(menuSource, /item\.onSelect\?\.\(state\.selection\)/);
   assert.match(menuSource, /if \(!request\.items\.length\) return;/);
 });
 

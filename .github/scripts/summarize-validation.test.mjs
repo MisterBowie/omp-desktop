@@ -51,3 +51,14 @@ test("memory diagnostics reveal counts and source lines without saved memory con
  writeFileSync(join(dir,"native.tap"),'# MEMORY_NATIVE_STAGE {"stage":"start-1","event":"begin","elapsedMs":1,"private":"PRIVATE"}\n# MEMORY_NATIVE_STAGE {"stage":"PRIVATE","event":"begin","elapsedMs":1}\n',{flag:"a"});
  const [result]=summarizeValidation(root);assert.equal(result.memory.fail,1);assert.equal(result.memory.failures[0].code,"ENOENT");assert.deepEqual(result.memory.failures[0].lines,[{line:92,column:8}]);assert.deepEqual(result.memory.stages,[{stage:"start-1",event:"begin",elapsedMs:1}]);assert.deepEqual(result.memoryUi,{ok:true,restart:true});assert.doesNotMatch(JSON.stringify(result),/PRIVATE/);
 });
+
+test("memory validation exposes only fixed outcomes and public source coordinates",t=>{
+ const root=mkdtempSync(join(tmpdir(),"omp-memory-summary-"));t.after(()=>rmSync(root,{recursive:true,force:true}));
+ const dir=join(root,"validation-win32-x64","automatic-memory");mkdirSync(dir,{recursive:true});
+ writeFileSync(join(dir,"native.tap"),"# tests 1\n# pass 0\n# fail 1\n# skipped 0\nnot ok 1 - native Mnemopi persists across processes, isolates projects, obeys switches and clears without restoring old history\n  code: 'ENOENT'\n  error: PRIVATE_SECRET\n  stack: /PRIVATE/omp-memory-native-e2e.test.mjs:152:12\n");
+ writeFileSync(join(dir,"ui.txt"),'MEMORY_SETTINGS_PROBE '+JSON.stringify({ok:false,error:"PRIVATE_SECRET",restart:true}));
+ const [summary]=summarizeValidation(root);
+ assert.equal(summary.memory.nativePassed,false);assert.equal(summary.memory.uiPassed,false);assert.equal(summary.memory.uiRestart,true);
+ assert.deepEqual(summary.memory.nativeErrors,["ENOENT"]);assert(summary.memory.nativeSource.some(item=>item.line===152));
+ assert.doesNotMatch(JSON.stringify(summary),/PRIVATE|SECRET|restoring old history/);
+});

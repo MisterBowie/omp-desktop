@@ -1,0 +1,16 @@
+TAP version 13
+# Subtest: native Mnemopi persists across processes, isolates projects, obeys switches and clears without restoring old history
+ok 1 - native Mnemopi persists across processes, isolates projects, obeys switches and clears without restoring old history
+  ---
+  duration_ms: 81308.53
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 82997.0475

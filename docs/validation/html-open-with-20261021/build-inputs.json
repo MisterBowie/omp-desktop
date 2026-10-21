@@ -1,0 +1,5 @@
+{
+  "version": "0.1.0",
+  "workflowSha256": "336f49e16dc24a5826a81fb338123ba16240d8cf6d32f547d9b8a399f9faf70a",
+  "htmlGate": "Verify HTML open-with on native Electron"
+}

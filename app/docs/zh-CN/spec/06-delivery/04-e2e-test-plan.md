@@ -6933,6 +6933,14 @@ eleven-tool-round desktop paths are verified by
   - 点击临时目录芯片时，文件在宿主的 `file:` 选项卡中按其绝对路径打开——它位于文件管理器项目根之外。
   - 点击项目第二个文件夹里那个文件的芯片时，该文件在文件管理器视图中打开：补全会搜索整个项目组、主文件夹优先，同级文件夹里的文件用绝对路径寻址，因为相对路径永远指主文件夹（ADR 0263）。
   - 持久化用户消息仍包含给模型用的规范 `@path` 文本。
+- **HTML 右键菜单扩展**：右键 HTML Markdown 链接、行内路径、文件芯片、工具行摘要
+  和工具文件列表；选择三种打开方式并核对命中的确切文件。验证右方向键/Escape 的
+  焦点恢复，以及引用不存在时不打开同名文件或其他目的地。
+  `node scripts/e2e-chat-html-open-with.mjs <evidence-dir>` 在独有 Electron 窗口运行
+  真实 React/store/menu；仅替代 preload IPC 边界，记录 OS 交接而不启动用户浏览器。
+  同一 Electron 夹具还通过生产 BrowserPane 加载项目、同级文件夹和临时目录中的
+  HTML，并拒绝范围外根；单元用例另验证符号链接越界和被拒绝文件不得转为 HTTP。
+  Agent 预览仍限于工作区。原有点击与输入框完整流程的覆盖状态单独保留。
 - **链接规格**：`04-ux/08-component-spec.md` §8.3 / §11.8、
   `04-ux/09-interaction-patterns.md` §8a.2、`03-runtime/01-ipc-protocol.md`、
   ADR 0163、ADR 0241、ADR 0262、ADR 0263、`08-meta/decisions-log.md`（D320）
@@ -8103,10 +8111,12 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   4. 再发一条会失败的提示，使回合以错误结束。
   5. 在插件设置页检查是否出现新的权限复核。
 - **预期**：步骤 2 只收到一次 `session:turnEnded`，`reason` 为 `completed`，且其 `turnId` 与工具上下文的 `turnId` 相同。步骤 3 只收到一次事件且 `reason` 为 `aborted` —— 中止之后不会再出现第二次 `completed`。步骤 4 只收到一次事件且 `reason` 为 `error`。从未开始的回合不产生事件；即使终态事件到达多次，任何插件也不会在同一回合收到两次事件。步骤 5 不出现新的权限复核，订阅未知事件名也不会报错。
+- **OMP 结算顺序**：模块夹具保持持久化结束请求未完成时，不得先发出通知；重复终态
+  仍只通知一次，另一会话可独立完成结算。
 - **链接规格**：`07-plugins/03-plugin-api.md`、`07-plugins/13-plugin-permissions-matrix.md`、ADR 0252
 - **验收**：品质（协议与插件契约）
 - **里程碑**：M6+
-- **状态**：由模块测试覆盖（`apps/desktop/test/session-turn-ended.test.mjs`、`apps/desktop/test/queued-turn-finalization.test.mjs`）；桌面旅程为草稿（该表面变更时需在具备条件的环境中运行）
+- **状态**：由模块测试覆盖（`apps/desktop/test/session-turn-ended.test.mjs`、`apps/desktop/test/queued-turn-finalization.test.mjs`、`apps/desktop/test/omp-session-bridge.test.mjs`）；桌面旅程为草稿（该表面变更时需在具备条件的环境中运行）
 
 #### E2E-CHAT-disclosure-toggle-keeps-reading-position
 

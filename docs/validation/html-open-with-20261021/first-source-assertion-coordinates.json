@@ -1,0 +1,74 @@
+[
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/2642cce33d5b25364507ca345bebe10f67300b87/.github",
+    "start_line": 33,
+    "start_column": null,
+    "end_line": 33,
+    "end_column": null,
+    "annotation_level": "notice",
+    "title": "Safe native validation summary",
+    "message": "[{\"target\":\"darwin-arm64\",\"runtimeReportValid\":true,\"runtimeGetState\":true,\"smokeReportExists\":true,\"cleaned\":true,\"orderedQuit\":true,\"completedChecks\":8,\"steps\":{\"project\":true,\"deny\":true,\"allowOnce\":true,\"projectTest\":true,\"stopTree\":true,\"recoveryNoReplay\":true,\"freshTurn\":true,\"defaultIsolation\":true},\"progress\":\"ready\",\"errorClasses\":[],\"normalQuits\":2,\"failureSource\":[],\"diagnosticCodes\":[],\"strict\":{\"tests\":15,\"pass\":15,\"fail\":0,\"skipped\":0},\"failedStrictNumbers\":[],\"strictFailures\":[]},{\"target\":\"win32-x64\",\"runtimeReportValid\":true,\"runtimeGetState\":true,\"smokeReportExists\":true,\"cleaned\":true,\"orderedQuit\":true,\"completedChecks\":8,\"steps\":{\"project\":true,\"deny\":true,\"allowOnce\":true,\"projectTest\":true,\"stopTree\":true,\"recoveryNoReplay\":true,\"freshTurn\":true,\"defaultIsolation\":true},\"progress\":\"ready\",\"errorClasses\":[],\"normalQuits\":2,\"failureSource\":[],\"diagnosticCodes\":[],\"strict\":{\"tests\":15,\"pass\":15,\"fail\":0,\"skipped\":0},\"failedStrictNumbers\":[],\"strictFailures\":[]},{\"target\":\"linux-x64\",\"runtimeReportValid\":true,\"runtimeGetState\":true,\"smokeReportExists\":true,\"cleaned\":true,\"orderedQuit\":true,\"completedChecks\":8,\"steps\":{\"project\":true,\"deny\":true,\"allowOnce\":true,\"projectTest\":true,\"stopTree\":true,\"recoveryNoReplay\":true,\"freshTurn\":true,\"defaultIsolation\":true},\"progress\":\"ready\",\"errorClasses\":[],\"normalQuits\":2,\"failureSource\":[],\"diagnosticCodes\":[],\"strict\":{\"tests\":15,\"pass\":15,\"fail\":0,\"skipped\":0},\"failedStrictNumbers\":[],\"strictFailures\":[]}]",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/2642cce33d5b25364507ca345bebe10f67300b87/.github",
+    "start_line": 32,
+    "start_column": null,
+    "end_line": 32,
+    "end_column": null,
+    "annotation_level": "notice",
+    "title": "Safe publication failure classification",
+    "message": "{\"classes\":[\"FEED_MISSING_FILES\",\"MISSING_FILE\",\"ASSERTION\",\"API_UNAUTHORIZED\"],\"feeds\":[],\"source\":[]}",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/2642cce33d5b25364507ca345bebe10f67300b87/.github",
+    "start_line": 31,
+    "start_column": null,
+    "end_line": 31,
+    "end_column": null,
+    "annotation_level": "notice",
+    "title": "Safe native failure classification",
+    "message": "{\"classes\":[\"MISSING_FILE\"],\"phase\":{\"preflight\":true,\"notices\":true,\"builder\":true}}",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/2642cce33d5b25364507ca345bebe10f67300b87/.github",
+    "start_line": 30,
+    "start_column": null,
+    "end_line": 30,
+    "end_column": null,
+    "annotation_level": "notice",
+    "title": "Known failing public test source",
+    "message": "app/apps/desktop/test/omp-plan-submit-e2e.test.mjs:1779",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/2642cce33d5b25364507ca345bebe10f67300b87/.github",
+    "start_line": 29,
+    "start_column": null,
+    "end_line": 29,
+    "end_column": null,
+    "annotation_level": "notice",
+    "title": "Known failing public test source",
+    "message": "app/apps/desktop/test/omp-plan-submit-e2e.test.mjs:1671",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/MisterBowie/omp-desktop/blob/2642cce33d5b25364507ca345bebe10f67300b87/.github",
+    "start_line": 28,
+    "start_column": null,
+    "end_line": 28,
+    "end_column": null,
+    "annotation_level": "notice",
+    "title": "Failed job identifier",
+    "message": "119063891017",
+    "raw_details": ""
+  }
+]

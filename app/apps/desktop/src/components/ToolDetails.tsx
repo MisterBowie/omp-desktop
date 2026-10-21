@@ -1,3 +1,5 @@
+import { ContextMenu } from "./ContextMenu";
+import { useChatFileMenu } from "../hooks/use-chat-file-menu";
 import { useTranslation } from "react-i18next";
 import { HighlightedCode, useCopy } from "./Markdown";
 import { IconCheck, IconCircleAlert, IconCopy, IconInfo } from "./icons";
@@ -84,8 +86,10 @@ function FileList({ paths }: { paths: string[] }) {
   const { t } = useTranslation();
   const root = useAppStore((s) => s.workspace?.path);
   const openTarget = useOpenPreviewTarget();
+  const { fileMenu, openFileMenu, closeFileMenu } = useChatFileMenu();
   return (
     <div className="tool-file-list">
+      <ContextMenu state={fileMenu} onClose={closeFileMenu} />
       {paths.map((path, index) => {
         const rel = toWorkspaceRel(path, root);
         if (!rel) {
@@ -102,6 +106,7 @@ function FileList({ paths }: { paths: string[] }) {
             key={`${path}-${index}`}
             tooltip={t("chat.previewFile")}
             onClick={() => openTarget({ kind: "file", path: rel })}
+            onContextMenu={(event) => openFileMenu(event, { path: rel })}
           >
             {path}
           </TooltipButton>
@@ -116,8 +121,10 @@ function MatchList({ block }: { block: Extract<ToolBlock, { kind: "matches" }> }
   const { t } = useTranslation();
   const root = useAppStore((s) => s.workspace?.path);
   const openTarget = useOpenPreviewTarget();
+  const { fileMenu, openFileMenu, closeFileMenu } = useChatFileMenu();
   return (
     <div className="tool-match-list">
+      <ContextMenu state={fileMenu} onClose={closeFileMenu} />
       {block.groups.map((group, index) => {
         const rel = toWorkspaceRel(group.path, root);
         return (
@@ -128,6 +135,7 @@ function MatchList({ block }: { block: Extract<ToolBlock, { kind: "matches" }> }
                 className="tool-match-path is-linked"
                 tooltip={t("chat.previewFile")}
                 onClick={() => openTarget({ kind: "file", path: rel })}
+                onContextMenu={(event) => openFileMenu(event, { path: rel })}
               >
                 {group.path}
               </TooltipButton>

@@ -1,3 +1,5 @@
+import { ContextMenu } from "../../../components/ContextMenu";
+import { useChatFileMenu } from "../../../hooks/use-chat-file-menu";
 import {
   memo,
   useCallback,
@@ -366,22 +368,27 @@ export function FileRefChip({
   onOpen: (path: string) => void;
 } & SourcePositionProps) {
   const { t } = useTranslation();
+  const { fileMenu, openFileMenu, closeFileMenu } = useChatFileMenu();
   const Icon = fileChipIcon(name, kind);
   const html = isHtmlFilePath(path) || isHtmlFilePath(name);
   return (
-    <button
-      type="button"
-      className="composer-chip chat-file-chip"
-      {...position}
-      title={`${html ? t("chat.previewUrl") : t("chat.openFile")} — ${path}`}
-      aria-label={`${name} — ${path}`}
-      onClick={() => onOpen(path)}
-    >
-      <span className="composer-chip-icon" aria-hidden>
-        <Icon size={13} />
-      </span>
-      <span className="composer-chip-name">{name}</span>
-    </button>
+    <>
+      <button
+        type="button"
+        className="composer-chip chat-file-chip"
+        {...position}
+        title={`${html ? t("chat.previewUrl") : t("chat.openFile")} — ${path}`}
+        aria-label={`${name} — ${path}`}
+        onClick={() => onOpen(path)}
+        onContextMenu={(event) => openFileMenu(event, { path })}
+      >
+        <span className="composer-chip-icon" aria-hidden>
+          <Icon size={13} />
+        </span>
+        <span className="composer-chip-name">{name}</span>
+      </button>
+      <ContextMenu state={fileMenu} onClose={closeFileMenu} />
+    </>
   );
 }
 

@@ -137,3 +137,17 @@ the same reason, and one contract is easier to reason about than two.
 Rejected: it is not the right panel, and it is what the request replaces. The
 action survives in the file view's context menu, which is where the file is
 already on screen.
+
+## 2026-10-21: Explicit HTML open destinations
+
+PI-Desktop #1713 adds a transcript **Open with** submenu for HTML references.
+The OMP Desktop port follows that resolver-first destination flow: File Manager,
+built-in browser, or the existing `fs/open` OS association. This amends the
+historical statement that the transcript never calls `fs/open`: it does so only
+for an explicit default-browser choice. Plain clicks retain this release's
+existing destination contract. For an explicit local browser target, Electron
+main selects one containing root from the registered project folders, the current
+session scratch directory and attachment store. The upstream real-path resolver
+rejects outside paths and symlink escapes; a rejected file input cannot fall
+through to HTTP. Agent BrowserPreview retains its workspace root. No IPC schema,
+plugin permission, data ownership or persistence boundary changes.

@@ -1,6 +1,7 @@
 import {readFileSync,readdirSync,lstatSync} from "node:fs";
 import {join,basename,resolve} from "node:path";
 import {pathToFileURL} from "node:url";
+import {identifyPublicTestFailures} from "./identify-public-test-failures.mjs";
 
 const stages=["spawn","Main inspector connected","installed Main identity verified","owned renderer connected","ready","installed deny","installed allow once","installed project test","installed process stop","restart same installed payload/profile"];
 const steps=["project","deny","allowOnce","projectTest","stopTree","recoveryNoReplay","freshTurn","defaultIsolation"];
@@ -75,8 +76,17 @@ export function summarizeValidation(directory){
   if(memory){const text=readFileSync(memory,"utf8");summary.memory={...Object.fromEntries(["tests","pass","fail","skipped"].map(key=>[key,Number(new RegExp("^# "+key+" (\\d+)$","m").exec(text)?.[1]??-1)])),failures:summarizeStrictFailures(text,"memory")};
    summary.memory.stages=[...text.matchAll(/MEMORY_NATIVE_STAGE (\{[^\r\n]*\})/g)].flatMap(match=>{try{const item=JSON.parse(match[1]);return /^(?:(?:start|stop)-[1-6]|prompt-[1-7]|settings|list|search|clear|empty)$/.test(item.stage)&&["begin","end"].includes(item.event)&&Number.isInteger(item.elapsedMs)&&item.elapsedMs>=0&&item.elapsedMs<=1_000_000?[{stage:item.stage,event:item.event,elapsedMs:item.elapsedMs}]:[];}catch{return[];}}).slice(0,80);
   }
+  const memoryTap=owned.find(path=>path.replaceAll("\\","/").endsWith("/automatic-memory/native.tap"));
   const memoryUi=owned.find(path=>path.replaceAll("\\","/").endsWith("/automatic-memory/ui.txt"));
-  if(memoryUi){let probe;try{probe=JSON.parse(/MEMORY_SETTINGS_PROBE (\{[^\r\n]*\})/.exec(readFileSync(memoryUi,"utf8"))?.[1]??"null");}catch{}summary.memoryUi={ok:probe?.ok===true,restart:probe?.restart===true};}
+  if(memoryTap||memoryUi){
+   const text=memoryTap?readFileSync(memoryTap,"utf8"):"";
+   const testPath="app/apps/desktop/test/omp-memory-native-e2e.test.mjs";
+   const source=readFileSync(new URL("../../"+testPath,import.meta.url),"utf8");
+   const ui=memoryUi?readFileSync(memoryUi,"utf8"):"";
+   let probe=null;try{probe=JSON.parse(ui.split(/\r?\n/).find(line=>line.startsWith("MEMORY_SETTINGS_PROBE "))?.slice(22));}catch{}
+   summary.memory={...summary.memory,nativePresent:Boolean(memoryTap),nativePassed:["tests 1","pass 1","fail 0","skipped 0"].every(value=>text.split(/\r?\n/).includes("# "+value)),nativeSource:identifyPublicTestFailures(text,new Map([[testPath,source]])),nativeErrors:["ERR_ASSERTION","ENOENT","EPERM","EACCES","ETIMEDOUT"].filter(code=>text.includes(code)),nativeTimeout:/testTimeoutFailure/.test(text),nativePhase:["initial-auto-save","cross-process-recall","shutdown-partial-save","restore-partial-save","isolated-worktree","disabled-snapshot","management-clear"].filter(phase=>text.includes("MEMORY_PHASE "+phase)).at(-1)??"UNKNOWN",uiPresent:Boolean(memoryUi),uiProbePresent:Boolean(probe),uiPassed:probe?.ok===true,uiRestart:probe?.restart===true,uiErrors:["ERR_ASSERTION","ENOENT","EPERM","EACCES","ETIMEDOUT"].filter(code=>ui.includes(code))};
+  }
+  if(memoryUi)summary.memoryUi={ok:summary.memory.uiPassed,restart:summary.memory.uiRestart};
   result.push(summary);
  }
  return result;

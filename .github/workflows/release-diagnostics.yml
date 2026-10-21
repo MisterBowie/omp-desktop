@@ -31,6 +31,7 @@ jobs:
               node -e 'const text=require("fs").readFileSync(process.env.RUNNER_TEMP+"/log-access-error.txt","utf8");const statuses=[400,401,403,404,410,422,429,500,502,503];const status=statuses.find(code=>text.includes(String(code)));const code=status?"HTTP_"+status:/TLS|SSL|certificate/i.test(text)?"TLS_ERROR":/timeout|timed out/i.test(text)?"NETWORK_TIMEOUT":"LOG_ACCESS_UNAVAILABLE";console.log("::notice title=Safe log access status::"+code);'
               continue
             fi
+            node .github/scripts/identify-public-test-failures.mjs "$RUNNER_TEMP/failed-job.log"
             node app/scripts/classify-release-failure.mjs "$RUNNER_TEMP/failed-job.log"
             node .github/scripts/classify-publication-failure.mjs "$RUNNER_TEMP/failed-job.log"
           done < "$RUNNER_TEMP/failed-jobs.txt"

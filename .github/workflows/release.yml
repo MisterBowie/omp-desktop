@@ -63,7 +63,7 @@ jobs:
         run: |
           set -euo pipefail
           reuse=false
-          if gh api "repos/$GITHUB_REPOSITORY/actions/runs/38856995305" > "$RUNNER_TEMP/source-run.json" && gh api "repos/$GITHUB_REPOSITORY/actions/runs/38856995305/jobs?per_page=100" > "$RUNNER_TEMP/source-jobs.json"; then
+          if gh api "repos/$GITHUB_REPOSITORY/actions/runs/39560139852" > "$RUNNER_TEMP/source-run.json" && gh api "repos/$GITHUB_REPOSITORY/actions/runs/39560139852/jobs?per_page=100" > "$RUNNER_TEMP/source-jobs.json"; then
             reuse="$(node scripts/reuse-source-verification.mjs "$RUNNER_TEMP/source-run.json" "$RUNNER_TEMP/source-jobs.json")" || reuse=false
           fi
           echo "reuse=$reuse" >> "$GITHUB_OUTPUT"
@@ -172,6 +172,15 @@ jobs:
             xvfb-run -a node scripts/e2e-browser-screenshot.mjs .artifacts/browser-screenshot
           else
             node scripts/e2e-browser-screenshot.mjs .artifacts/browser-screenshot
+          fi
+      - name: Verify HTML open-with on native Electron
+        run: |
+          set -euo pipefail
+          pnpm --filter @pi-desktop/desktop build:deps
+          if [[ '${{ matrix.platform }}' == linux ]]; then
+            xvfb-run -a node scripts/e2e-chat-html-open-with.mjs .artifacts/chat-html-open-with
+          else
+            node scripts/e2e-chat-html-open-with.mjs .artifacts/chat-html-open-with
           fi
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -329,6 +338,7 @@ jobs:
             app/packaged-runtime.json
             app/packaged-plan-goal.tap
             app/.artifacts/browser-screenshot/
+            app/.artifacts/chat-html-open-with/
             app/.artifacts/automatic-memory/
             app/.artifacts/stable-installed/
 

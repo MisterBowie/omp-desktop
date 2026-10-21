@@ -46,7 +46,7 @@ import {
 import { McpOAuthManager } from "../mcp-oauth";
 import { PluginPanelHost } from "../plugin-panel-host";
 import { PluginViewHost } from "../plugin-view-host";
-import { BrowserPane } from "../browser-view";
+import { BrowserPane, selectBrowserFileRoot } from "../browser-view";
 import { BrowserHost, BROWSER_PLUGIN_ID } from "../browser-host";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
 import type { AgentExtensionBridge } from "../agent-extensions";
@@ -558,19 +558,24 @@ export function createPluginServices({
   const browserHost = new BrowserHost({
     pane: browserPane,
     isPluginLoaded: (pluginId) => Boolean(plugins.getLoaded(pluginId)),
-    getFileRoot: async (sessionId) => {
+    getFileRoot: async (sessionId, target) => {
+      let root = getWorkspacePath();
       if (sessionId) {
         try {
           const res = (await getHost()?.call("session.get", { id: sessionId })) as
             | { session: { projectPath?: string } | null }
             | undefined;
           const path = res?.session?.projectPath?.trim();
-          if (path) return path;
+          if (path) root = path;
         } catch {
           // Fall through to the visible workspace.
         }
       }
-      return getWorkspacePath();
+      if (!target) return root;
+      const roots = (pluginWorkspaceInfo(root)?.roots ?? []).map((entry) => entry.path);
+      if (sessionId) roots.push(join(dataDir, "scratch", sessionId));
+      roots.push(join(dataDir, "attachments"));
+      return selectBrowserFileRoot(target, root, roots);
     },
     getScratchDir: (sessionId) => {
       if (!sessionId) return null;
