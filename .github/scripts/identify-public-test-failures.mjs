@@ -14,8 +14,17 @@ export function identifyPublicTestFailures(log, sources) {
       try { title = match[1][0] === '"' ? JSON.parse(match[1]) : match[1].slice(1, -1); }
       catch { continue; }
       if (title.length < 10 || !failures.some((line) => line.includes(title))) continue;
-      matches.push({ path, line: source.slice(0, match.index).split("\n").length });
-      if (matches.length === 30) return matches;
+      const lines = new Set([source.slice(0, match.index).split("\n").length]);
+      const maxLine = source.split("\n").length;
+      const basename = path.split("/").at(-1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      for (const frame of log.matchAll(new RegExp(basename + ":(\\d+):\\d+", "g"))) {
+        const line = Number(frame[1]);
+        if (Number.isInteger(line) && line > 0 && line <= maxLine) lines.add(line);
+      }
+      for (const line of lines) {
+        matches.push({ path, line });
+        if (matches.length === 30) return matches;
+      }
     }
   }
   return matches;

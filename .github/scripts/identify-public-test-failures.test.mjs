@@ -17,3 +17,9 @@ test("untrusted paths are refused and the output is bounded", () => {
   assert.equal(matches.length, 30);
   assert(matches.every((entry) => /^app\/fixture-\d+\.test.ts$/.test(entry.path)));
 });
+
+test("stack frames can select only existing lines of the allowlisted public file", () => {
+  const sources = new Map([["app/example.test.mjs", '\ntest("known failing example", () => {});\nthrow Error("fixture");']]);
+  const log = "✖ known failing example\nat fn (/runner/example.test.mjs:3:1)\nat fn (/runner/example.test.mjs:999999:1)\nsecret=do-not-publish";
+  assert.deepEqual(identifyPublicTestFailures(log, sources), [{ path: "app/example.test.mjs", line: 2 }, { path: "app/example.test.mjs", line: 3 }]);
+});
