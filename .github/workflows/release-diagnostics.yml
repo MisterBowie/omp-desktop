@@ -5,7 +5,7 @@ on:
     tags: ['diagnose-release-*']
 
 permissions:
-  contents: read
+  contents: write
   actions: read
 
 jobs:
@@ -37,6 +37,15 @@ jobs:
           done < "$RUNNER_TEMP/failed-jobs.txt"
           if gh run download "$source_run" --repo "$GITHUB_REPOSITORY" --pattern 'validation-*' --dir "$RUNNER_TEMP/native-validation" > "$RUNNER_TEMP/validation-access.txt" 2>&1; then
             node .github/scripts/summarize-validation.mjs "$RUNNER_TEMP/native-validation"
+            # Annotations truncate long multi-platform summaries. Persist only
+            # the same allowlisted fields, never raw validation files or logs.
+            output="docs/validation/native-failure-$source_run.json"
+            node --input-type=module -e 'import {writeFileSync} from "node:fs"; import {summarizeValidation} from "./.github/scripts/summarize-validation.mjs"; writeFileSync(process.argv[2],JSON.stringify(summarizeValidation(process.argv[1]),null,2)+"\n")' "$RUNNER_TEMP/native-validation" "$output"
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add "$output"
+            git commit -m "docs(validation): record bounded native failure facts" -m "Retain only the tested allowlist of public source coordinates, fixed categories and bounded outcomes. Raw logs remain on the runner."
+            git push origin "HEAD:refs/heads/codex/native-diagnostic-${GITHUB_REF_NAME#diagnose-release-}"
           else
             echo '::notice title=Safe native validation summary::VALIDATION_DOWNLOAD_UNAVAILABLE'
           fi
