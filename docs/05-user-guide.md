@@ -1,5 +1,13 @@
 # OMP Desktop 使用说明
 
+## 当前版本：0.1.3
+
+[正式 0.1.3](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.3) 已包含
+自动记忆、供应商模型 Token 限制以及此前的会话/worktree 功能。下方阶段记录中的
+“尚未发布”描述的是当时状态，不能据此判断当前版本。
+本次 HTML 打开方式在同版本 0.1.3 候选重新打包，验收与下载位置见
+[本次记录](validation/HTML-open-with-upstream-20261021.md)。
+
 ## 自动记忆（2026-10-20 本机源码，尚未发布）
 
 新入口为左下角齿轮 → “记忆”。本轮源码位于 `codex/mnemopi-memory`；

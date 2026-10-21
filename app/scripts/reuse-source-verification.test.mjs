@@ -27,3 +27,10 @@ test("running from app still compares product paths at the repository root",t=>{
  assert.deepEqual(trackedProductChanges(base,join(root,"app")),["app/packages/runtime.ts"]);
  const f=fixture();f.changedPaths=trackedProductChanges(base,join(root,"app"));assert.equal(canReuseSourceVerification(f),false);
 });
+
+test("native memory fixture changes reuse source checks while all native acceptance gates rerun",()=>{
+ const f=fixture();f.changedPaths.push("app/apps/desktop/test/omp-memory-native-e2e.test.mjs");
+ assert.equal(canReuseSourceVerification(f),true);
+ f.changedPaths.push("app/apps/desktop/electron/main/runtime/omp-memory.ts");
+ assert.equal(canReuseSourceVerification(f),false);
+});

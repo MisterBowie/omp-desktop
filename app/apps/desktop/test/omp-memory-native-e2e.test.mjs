@@ -17,7 +17,9 @@ const { createOmpMemoryService } = await import("../electron/main/runtime/omp-me
 
 test("native Mnemopi persists across processes, isolates projects, obeys switches and clears without restoring old history", {
   skip: !process.env.OMP_MEMORY_TEST_RUNTIME && "requires OMP_MEMORY_TEST_RUNTIME",
-  timeout: 90000,
+  // The released Windows fixture took 81.3s across serial native process lifecycles.
+  // Allow scheduling margin without changing runtime request or readiness deadlines.
+  timeout: process.platform === "win32" ? 180000 : 90000,
 }, async (t) => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "omp-memory-native-e2e-")));
   const project = join(root, "project");
@@ -76,6 +78,7 @@ test("native Mnemopi persists across processes, isolates projects, obeys switche
       detach?.();
     }
   }
+  t.diagnostic("MEMORY_PHASE initial-auto-save");
   const first = await start(project, true, false);
   if (process.platform !== "win32") {
     const bash = first.runtime.request({ type: "bash", command: "sleep 10" });
@@ -92,6 +95,7 @@ test("native Mnemopi persists across processes, isolates projects, obeys switche
   assert.ok(page.data.total > 0);
   assert.match(JSON.stringify(page.data.items), /atlas-memory-saved-marker/);
   await first.supervisor.stop({ abortBash: false });
+  t.diagnostic("MEMORY_PHASE cross-process-recall");
   const read = await start(project, false, true, true);
   await ask(read.runtime, "atlas-memory-saved-marker database");
   const recalled = provider.requests.filter((request) => request.url.endsWith("/chat/completions")).at(-1)
@@ -101,21 +105,25 @@ test("native Mnemopi persists across processes, isolates projects, obeys switche
     /atlas-memory-saved-marker/,
   );
   await read.supervisor.stop({ abortBash: false });
+  t.diagnostic("MEMORY_PHASE shutdown-partial-save");
   const partialPath = join(root, "partial-project");
   mkdirSync(partialPath);
   const partial = await start(partialPath, true, false);
   await ask(partial.runtime, "Remember single-turn-shutdown-marker");
   assert.equal((await partial.runtime.request({ type: "memory", action: "list" })).data.total, 0);
   await partial.supervisor.stop({ abortBash: false });
+  t.diagnostic("MEMORY_PHASE restore-partial-save");
   const restoredPartial = await start(partialPath, false, true);
   assert.match(
     JSON.stringify((await restoredPartial.runtime.request({ type: "memory", action: "list" })).data.items),
     /single-turn-shutdown-marker/,
   );
   await restoredPartial.supervisor.stop({ abortBash: false });
+  t.diagnostic("MEMORY_PHASE isolated-worktree");
   const isolated = await start(other, false, true);
   assert.equal((await isolated.runtime.request({ type: "memory", action: "list" })).data.total, 0);
   await isolated.supervisor.stop({ abortBash: false });
+  t.diagnostic("MEMORY_PHASE disabled-snapshot");
   const disabled = await start(project, false, false);
   await ask(disabled.runtime, "atlas-memory-saved-marker database");
   const absent = provider.requests.filter((request) => request.url.endsWith("/chat/completions")).at(-1)
@@ -129,6 +137,7 @@ test("native Mnemopi persists across processes, isolates projects, obeys switche
     page.data.total,
   );
   await disabled.supervisor.stop({ abortBash: false });
+  t.diagnostic("MEMORY_PHASE management-clear");
   let settings = { autoSave: false, autoRead: false };
   const service = createOmpMemoryService({
     dataRoot: root,

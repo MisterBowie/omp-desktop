@@ -63,7 +63,7 @@ jobs:
         run: |
           set -euo pipefail
           reuse=false
-          if gh api "repos/$GITHUB_REPOSITORY/actions/runs/38856995305" > "$RUNNER_TEMP/source-run.json" && gh api "repos/$GITHUB_REPOSITORY/actions/runs/38856995305/jobs?per_page=100" > "$RUNNER_TEMP/source-jobs.json"; then
+          if gh api "repos/$GITHUB_REPOSITORY/actions/runs/39560139852" > "$RUNNER_TEMP/source-run.json" && gh api "repos/$GITHUB_REPOSITORY/actions/runs/39560139852/jobs?per_page=100" > "$RUNNER_TEMP/source-jobs.json"; then
             reuse="$(node scripts/reuse-source-verification.mjs "$RUNNER_TEMP/source-run.json" "$RUNNER_TEMP/source-jobs.json")" || reuse=false
           fi
           echo "reuse=$reuse" >> "$GITHUB_OUTPUT"
