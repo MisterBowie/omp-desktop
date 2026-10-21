@@ -2,7 +2,7 @@
   "branch": "codex/html-open-with",
   "head": "31acbf9cda5abe01342f534a7f41d1e3ae52cf7f",
   "baseMain": "a23bfb9befea327e7924efd3004e030a11b587d2",
-  "state": "uncommitted task candidate; source-only delivery",
+  "state": "f5e2b334 product candidate plus bounded fixture event diagnostics; version 0.1.0",
   "files": [
     {
       "path": "app/apps/desktop/electron/main/browser-host.ts",
@@ -146,7 +146,7 @@
     },
     {
       "path": "app/scripts/e2e/chat-html-open-with.tsx",
-      "sha256": "88e6b16cfcca3d962d3aaa123bebca6e8eab2f90f4c904747fa9434a210a5532"
+      "sha256": "6a6870bf1d8249ddb03dfc2acd4e77b9cde55951f177ca0ad2a5eddee685ad3b"
     },
     {
       "path": "docs/05-user-guide.md",

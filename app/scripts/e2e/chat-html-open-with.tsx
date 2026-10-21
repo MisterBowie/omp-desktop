@@ -23,6 +23,14 @@ globalThis.htmlOpenWithProbe = async (projectRoot) => {
   const destination = `${projectRoot}/pages/page.html`;
   const external: string[] = [];
   const checks: string[] = [];
+  const events: string[] = [];
+  for (const type of ["mouseenter", "focusin", "blur", "scroll"]) {
+    window.addEventListener(type, (event) => {
+      const node = event.target as HTMLElement | null;
+      events.push(`${type}:${node?.dataset?.contextMenuItem ?? node?.tagName ?? "window"}`);
+      if (events.length > 20) events.shift();
+    }, true);
+  }
   let missing = false;
   Object.defineProperty(window, "piDesktop", {
     configurable: true,
@@ -94,7 +102,7 @@ globalThis.htmlOpenWithProbe = async (projectRoot) => {
     flushSync(() => trigger.click());
     await paint();
     const choice = item(`open-with-${target}`);
-    assert(choice, `submenu did not show ${target}`);
+    assert(choice, `submenu did not show ${target}; root=${!!item("open-with")}; events=${events.join(",")}`);
     const rect = choice.getBoundingClientRect();
     assert(rect.left >= 0 && rect.right <= window.innerWidth && rect.bottom <= window.innerHeight, "submenu escaped viewport");
     flushSync(() => choice.click());
