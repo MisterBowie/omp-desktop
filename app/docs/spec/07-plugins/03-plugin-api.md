@@ -973,7 +973,10 @@ Delivered today:
 - `session:turnEnded` — payload is
   `{ sessionId: string; turnId: string; reason: "completed" | "aborted" | "error" }`,
   sent once per host turn at the end of its teardown, after the durable
-  `session.endTurn` attempt. A turn is the one `session.beginTurn` created: a
+  `session.endTurn` attempt settles. OMP uses the same ordering, including its
+  bounded persistence retries; another session is not held by that wait. The
+  notification remains advisory if persistence fails. A turn is the one
+  `session.beginTurn` created: a
   user submission, an approved plan execution, or a scheduled run, and a queued
   item that never started produces no event. `completed`, `aborted`, and
   `error` are the three terminal reasons. The event carries the `turnId` the

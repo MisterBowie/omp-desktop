@@ -786,7 +786,9 @@ pi.events.off(event, handler)
   `session.configure` 改变 provider、模型或 thinking level 之后发送
 - `session:turnEnded` —— 载荷为
   `{ sessionId: string; turnId: string; reason: "completed" | "aborted" | "error" }`，
-  在每个宿主回合的拆除结束时发送一次，位于持久化的 `session.endTurn` 尝试之后。
+  在每个宿主回合的拆除结束时发送一次，等待持久化的 `session.endTurn` 尝试结算。
+  OMP 同样等待已有的有限持久化重试；该等待不阻塞其他会话。持久化失败时，通知仍
+  为告知性质。
   “回合”指 `session.beginTurn` 创建的那个回合：一次用户提交、一次已批准的计划执行、
   或一次定时运行；排队但从未开始的项目不会产生事件。`completed`、`aborted`、`error`
   是三种终止原因。事件携带终止运行时事件本身标识的 `turnId`，而不是恰好处于活动

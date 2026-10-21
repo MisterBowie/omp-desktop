@@ -1741,8 +1741,8 @@ class SessionEntry {
    * being retried forever (the next prompt's `beginTurn` then refuses, which is
    * the fail-closed answer).
    */
-  private endHostTurn(hostTurnId: string, status: "completed" | "aborted" | "error"): void {
-    if (!this.hostTurns || this.settledHostTurns.has(hostTurnId)) return;
+  private endHostTurn(hostTurnId: string, status: "completed" | "aborted" | "error"): Promise<void> | null {
+    if (!this.hostTurns || this.settledHostTurns.has(hostTurnId)) return null;
     this.settledHostTurns.add(hostTurnId);
     const lifecycle = this.hostTurns;
     const attempt = async (remaining: number): Promise<void> => {
@@ -1762,6 +1762,7 @@ class SessionEntry {
     };
     const pending = attempt(1);
     this.pendingHostTurnEnds.push(pending);
+    return pending;
   }
 
   /** A refused prompt carrying the run-scoped-state error code. */
@@ -2135,6 +2136,7 @@ class SessionEntry {
     // matches nothing.
     const hostTurn = this.hostTurn;
     let hostTurnId: string | null = null;
+    let settlement: Promise<void> | null = null;
     if (
       hostTurn &&
       (hostTurn.liveTurnId === turnId ||
@@ -2142,16 +2144,23 @@ class SessionEntry {
     ) {
       hostTurnId = hostTurn.hostTurnId;
       this.hostTurn = null;
-      this.endHostTurn(hostTurnId, reason);
+      settlement = this.endHostTurn(hostTurnId, reason);
     }
     if (!this.onTurnEnd || this.announcedTurnEnds.has(turnId)) return;
     this.announcedTurnEnds.add(turnId);
-    try {
-      this.onTurnEnd({ sessionId: this.sessionId, turnId, hostTurnId, reason });
-    } catch {
-      // The announcement is advisory: its failure must never disturb the
-      // runner close or the renderer's event fan-out.
-    }
+    const announce = () => {
+      try {
+        this.onTurnEnd?.({ sessionId: this.sessionId, turnId, hostTurnId, reason });
+      } catch {
+        // The announcement is advisory: its failure must never disturb the
+        // runner close or the renderer's event fan-out.
+      }
+    };
+    // Match PI finishTurn: observers must not read a still-running durable row
+    // after receiving its terminal announcement. Reserve the once guard above
+    // before waiting, and keep separate sessions independent.
+    if (settlement) void settlement.then(announce, announce);
+    else announce();
   }
 
   async stop(): Promise<OmpStopOutcome> {

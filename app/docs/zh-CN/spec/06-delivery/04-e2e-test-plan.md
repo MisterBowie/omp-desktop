@@ -8060,10 +8060,12 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   4. 再发一条会失败的提示，使回合以错误结束。
   5. 在插件设置页检查是否出现新的权限复核。
 - **预期**：步骤 2 只收到一次 `session:turnEnded`，`reason` 为 `completed`，且其 `turnId` 与工具上下文的 `turnId` 相同。步骤 3 只收到一次事件且 `reason` 为 `aborted` —— 中止之后不会再出现第二次 `completed`。步骤 4 只收到一次事件且 `reason` 为 `error`。从未开始的回合不产生事件；即使终态事件到达多次，任何插件也不会在同一回合收到两次事件。步骤 5 不出现新的权限复核，订阅未知事件名也不会报错。
+- **OMP 结算顺序**：模块夹具保持持久化结束请求未完成时，不得先发出通知；重复终态
+  仍只通知一次，另一会话可独立完成结算。
 - **链接规格**：`07-plugins/03-plugin-api.md`、`07-plugins/13-plugin-permissions-matrix.md`、ADR 0252
 - **验收**：品质（协议与插件契约）
 - **里程碑**：M6+
-- **状态**：由模块测试覆盖（`apps/desktop/test/session-turn-ended.test.mjs`、`apps/desktop/test/queued-turn-finalization.test.mjs`）；桌面旅程为草稿（该表面变更时需在具备条件的环境中运行）
+- **状态**：由模块测试覆盖（`apps/desktop/test/session-turn-ended.test.mjs`、`apps/desktop/test/queued-turn-finalization.test.mjs`、`apps/desktop/test/omp-session-bridge.test.mjs`）；桌面旅程为草稿（该表面变更时需在具备条件的环境中运行）
 
 #### E2E-CHAT-disclosure-toggle-keeps-reading-position
 

@@ -181,7 +181,7 @@ function fakeSupervisor(runtime) {
   };
 }
 
-function bridgeHarness({ gate = "/repo/app/packages/omp-runtime/extensions/omp-desktop-gate.ts", launcher = "/repo/upstream/oh-my-pi/packages/coding-agent/scripts/omp" } = {}) {
+function bridgeHarness({ gate = "/repo/app/packages/omp-runtime/extensions/omp-desktop-gate.ts", launcher = "/repo/upstream/oh-my-pi/packages/coding-agent/scripts/omp", hostTurns, onTurnEnd } = {}) {
   const runtimes = [];
   const supervisors = [];
   const envelopes = [];
@@ -222,6 +222,8 @@ function bridgeHarness({ gate = "/repo/app/packages/omp-runtime/extensions/omp-d
     emitAgentEvent: (envelope) => envelopes.push(envelope),
     logger: { app: (scope, level, message, fields) => logs.push({ scope, level, message, fields }) },
     gateResolver: () => gate,
+    ...(hostTurns ? { hostTurns } : {}),
+    ...(onTurnEnd ? { onTurnEnd } : {}),
   });
   return { bridge, runtime: firstRuntime, supervisor: firstSupervisor, runtimes, supervisors, envelopes, logs, sessionDir, nativeSessionId, nativeSessionPath };
 }
@@ -2598,4 +2600,50 @@ test("a recreated bridge mints live ids that do not collide with a retained repl
     await second.bridge.dispose("bridge b cleanup").catch(() => undefined);
     for (const supervisor of [...first.supervisors, ...second.supervisors]) await supervisor.reclaimAll().catch(() => undefined);
   }
+});
+
+test("turn-end announcements wait for durable host settlement", async () => {
+  const ends = [];
+  const writes = [];
+  const held = Promise.withResolvers();
+  const { bridge, runtime } = bridgeHarness({
+    hostTurns: {
+      begin: async () => "durable-turn",
+      end: async (input) => { writes.push(input); await held.promise; },
+    },
+    onTurnEnd: (info) => ends.push(info),
+  });
+  const started = await bridge.prompt({ sessionId: OMP_SESSION, content: "complete", projectPath: makeProject() });
+  runtime.push({ type: "agent_end", messages: [] });
+  runtime.push({ type: "agent_end", messages: [] });
+  assert.equal(bridge.status(OMP_SESSION).isRunning, false);
+  assert.equal(writes.length, 1);
+  assert.deepEqual(ends, [], "the database is still running while its write is held");
+  held.resolve();
+  await new Promise(setImmediate);
+  assert.deepEqual(ends, [{ sessionId: OMP_SESSION, turnId: started.turnId, hostTurnId: "durable-turn", reason: "completed" }]);
+  await bridge.dispose();
+});
+
+test("independent host settlements never hold another session's announcement", async () => {
+  const ends = [];
+  const held = Promise.withResolvers();
+  const { bridge, runtime, runtimes } = bridgeHarness({
+    hostTurns: {
+      begin: async ({ sessionId }) => `durable-${sessionId}`,
+      end: async ({ sessionId }) => { if (sessionId === OMP_SESSION) await held.promise; },
+    },
+    onTurnEnd: (info) => ends.push(info),
+  });
+  const projectPath = makeProject();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "first", projectPath });
+  await bridge.prompt({ sessionId: "other", content: "second", projectPath });
+  runtime.push({ type: "agent_end", messages: [] });
+  runtimes[1].push({ type: "agent_end", messages: [] });
+  await new Promise(setImmediate);
+  assert.deepEqual(ends.map((info) => info.sessionId), ["other"]);
+  held.resolve();
+  await new Promise(setImmediate);
+  assert.deepEqual(ends.map((info) => info.sessionId), ["other", OMP_SESSION]);
+  await bridge.dispose();
 });

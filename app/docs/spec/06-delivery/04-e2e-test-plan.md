@@ -13808,13 +13808,16 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   `error`. A turn that never started emits nothing, and no plugin receives two
   events for one turn even when the terminal event arrives more than once.
   Step 5 shows no new permission review, and subscribing to an unknown event
-  name does not surface an error.
+  name does not surface an error. For OMP, hold the durable end request in the
+  module harness: no announcement may precede its settlement, duplicate terminal
+  frames still announce once, and another session may settle independently.
 - **Specs linked**: `07-plugins/03-plugin-api.md`, `07-plugins/13-plugin-permissions-matrix.md`,
   ADR 0252
 - **Acceptance**: Quality (protocol and plugin contract)
 - **Milestone**: M6+
 - **Status**: Module-covered (`apps/desktop/test/session-turn-ended.test.mjs`,
-  `apps/desktop/test/queued-turn-finalization.test.mjs`); desktop journey Draft
+  `apps/desktop/test/queued-turn-finalization.test.mjs`,
+  `apps/desktop/test/omp-session-bridge.test.mjs`); desktop journey Draft
   (run only in a capable environment when this surface changes)
 
 ### E2E-SESSION-native-pi-continue-appends-original-jsonl

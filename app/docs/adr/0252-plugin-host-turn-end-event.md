@@ -103,3 +103,18 @@ completion signal a GUI plugin exists to deliver.
   the abort lock, and the shared busy check
 - `apps/desktop/electron/main/services/plugin-services.ts` — `announceTurnEnded`
 - `apps/desktop/electron/main/plugin-runtime.ts` — `broadcastEvent`
+
+## 2026-10-21: OMP parity with durable PI finalization
+
+The OMP bridge used to dispatch its advisory notification synchronously while
+its durable `session.endTurn` request was still in flight. A Plan recovery
+regression observed `running` after the notification, despite the documented
+post-persistence boundary. PI-Desktop beta.4 (`589e5803`, `runtime/plans.ts`,
+`finishTurn`) awaits that request before `announceTurnEnded`.
+
+OMP now retains that existing settlement promise and dispatches its notification
+after it settles. The once guard is claimed synchronously before waiting;
+different sessions remain independent. Existing retry limits and advisory
+handling of persistence/delivery errors are unchanged. No IPC, SDK, permission
+or database contract changes. A controlled held-write regression proves the
+ordering without waiting an arbitrary amount of time.
