@@ -19,11 +19,7 @@ import {
   type SessionThinkingLevel,
 } from "@pi-desktop/shared";
 import {
-  convertSession,
-  scanAllSources,
   scanModelConfigs,
-  type ExternalSessionSummary,
-  type ExternalSource,
 } from "../importers";
 import type { AgentSidecar } from "../agent-sidecar";
 import type { HostProcess } from "../host-process";
@@ -48,30 +44,7 @@ type ImportableModelConfig = ModelConfigImportDraft & {
   secretValue?: string;
 };
 
-let scannedImportSessions = new Map<string, ExternalSessionSummary>();
 let scannedModelConfigs = new Map<string, ModelConfigImportDraft>();
-
-const IMPORT_SOURCES = new Set<ExternalSource>([
-  "claude-code",
-  "opencode",
-  "codex",
-  "pi",
-]);
-
-function importSelectionKey(value: unknown): string | null {
-  if (!value || typeof value !== "object") return null;
-  const source = Reflect.get(value, "source");
-  const externalId = Reflect.get(value, "externalId");
-  if (
-    typeof source !== "string" ||
-    !IMPORT_SOURCES.has(source as ExternalSource) ||
-    typeof externalId !== "string" ||
-    !externalId
-  ) {
-    return null;
-  }
-  return `${source}:${externalId}`;
-}
 
 function rejectNativeMutation(sessionId: unknown, action: string): void {
   if (typeof sessionId === "string" && sessionId.startsWith("native-pi:")) {
@@ -222,6 +195,11 @@ export function registerSessionIpc({
     sessionId: string,
     window: { messageBefore?: number; messageAround?: string; messageLimit?: number; contentLimit?: number },
   ): Promise<RuntimeSession> {
+    if (session.engine === "pi") {
+      throw Object.assign(new Error("Pi sessions are not supported; create an OMP chat"), {
+        errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+      });
+    }
     if (!engineRouter?.engineForSession || !ompSessions?.readHistory) return session;
     const engine = await engineRouter.engineForSession(sessionId);
     if (engine !== "omp") return session;
@@ -273,26 +251,25 @@ export function registerSessionIpc({
   });
   handle(IPC.invoke.sessionList, async () => {
     if (!host) throw new Error("host unavailable");
-    const [result, native, { providers, defaults }] = await Promise.all([
+    const [result, { providers, defaults }] = await Promise.all([
       host.call<{ sessions: RuntimeSession[] }>("session.list"),
-      sidecar
-        ? sidecar.call<{ sessions: RuntimeSession[] }>("native.session.list").catch(() => ({ sessions: [] }))
-        : Promise.resolve({ sessions: [] }),
       sessionCapabilityContext(),
     ]);
     return {
       ...result,
-      sessions: [
-        ...result.sessions.map((session) => ({
-          ...enrichSession(session, providers, defaults),
-          source: "desktop",
-        })),
-        ...native.sessions,
-      ].sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))),
+      sessions: result.sessions.filter((session) => session.engine !== "pi").map((session) => ({
+        ...enrichSession(session, providers, defaults), source: "desktop",
+      })).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))),
     };
   });
   handle(IPC.invoke.sessionCreate, async (input = {}) => {
     if (!host) throw new Error("host unavailable");
+    if (input.engine !== undefined && input.engine !== "omp") {
+      throw Object.assign(new Error("Only the OMP engine is supported"), {
+        errorCode: ErrorCodes.INVALID_ARGUMENT,
+      });
+    }
+    input = { ...input, engine: "omp" };
     // Plan/Goal × Cursor product gate (T20-R3C): a new session is created with
     // the mode and binding the composer inherited, so it is the third boundary
     // that can accept the combination. Refuse it here rather than persisting a
@@ -327,32 +304,7 @@ export function registerSessionIpc({
       input: { sessionId?: string; title?: string; throughMessageId?: string } = {},
     ) => {
       const sessionId = String(input.sessionId ?? "").trim();
-      if (sessionId.startsWith("native-pi:")) {
-        // Native forks read the canonical JSONL and publish a new child file in
-        // the sidecar; the Rust host and the Desktop queue are never involved.
-        if (!sidecar) throw new Error("sidecar unavailable");
-        const title = typeof input.title === "string" ? input.title.trim().replace(/\s+/g, " ").slice(0, 200) : "";
-        const throughMessageId =
-          typeof input.throughMessageId === "string" ? input.throughMessageId.trim() : "";
-        if (throughMessageId.length > 256) {
-          throw Object.assign(new Error("throughMessageId is too long"), {
-            errorCode: ErrorCodes.INVALID_ARGUMENT,
-          });
-        }
-        const result = await sidecar.call<{ session?: RuntimeSession | null }>(
-          "native.session.fork",
-          {
-            id: sessionId,
-            ...(title ? { title } : {}),
-            ...(throughMessageId ? { throughMessageId } : {}),
-          },
-        );
-        logger.app("session", "info", "native session forked", {
-          sessionId: (result.session as { id?: string } | null)?.id,
-          data: { sourceSessionId: sessionId },
-        });
-        return result;
-      }
+      rejectNativeMutation(sessionId, "fork");
       if (!host) throw new Error("host unavailable");
       if (!sessionId) {
         throw Object.assign(new Error("sessionId required"), {
@@ -365,7 +317,7 @@ export function registerSessionIpc({
       // cannot yet map a renderer message to an OMP entry id. The gate refuses an
       // OMP fork here with ENGINE_CAPABILITY_UNAVAILABLE rather than silently
       // producing a wrong child.
-      const forkEngine = engineRouter ? await engineRouter.requireForSession(sessionId, "branch") : "pi";
+      const forkEngine = engineRouter ? await engineRouter.requireForSession(sessionId, "branch") : "omp";
       if (forkEngine === "omp") {
         throw Object.assign(new Error("branching is not available for OMP sessions in this build"), {
           errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
@@ -425,10 +377,7 @@ export function registerSessionIpc({
       const request = typeof input === "string" ? { id: input } : input ?? {};
       const id = String(request.id ?? "").trim();
       if (!id) throw new Error("session id required");
-      if (id.startsWith("native-pi:")) {
-        if (!sidecar) throw new Error("sidecar unavailable");
-        return sidecar.call("native.session.get", { id, ...request });
-      }
+      rejectNativeMutation(id, "read");
       // The host row supplies the session's metadata; for an OMP session the
       // transcript itself lives in the native session file (the host never
       // double-writes one), so the messages come from the session's own
@@ -473,10 +422,7 @@ export function registerSessionIpc({
     if (!host) throw new Error("host unavailable");
     const sessionId = String(rawSessionId ?? "").trim();
     if (!sessionId) throw new Error("session id required");
-    if (sessionId.startsWith("native-pi:")) {
-      if (!sidecar) throw new Error("sidecar unavailable");
-      return sidecar.call("native.session.get", { id: sessionId, messageLimit: 1 });
-    }
+    rejectNativeMutation(sessionId, "open");
     const [result, { providers, defaults }] = await Promise.all([
       host.call<{ session?: RuntimeSession | null }>("session.get", {
         id: sessionId,
@@ -586,7 +532,7 @@ export function registerSessionIpc({
     // and only on its success is the desktop title persisted. Rename works in
     // every state (active, idle, restart): the bridge briefly restores the
     // native session when needed and disposes it again afterwards.
-    const engine = engineRouter ? await engineRouter.requireForSession(id, "prompt") : "pi";
+    const engine = engineRouter ? await engineRouter.requireForSession(id, "prompt") : "omp";
     if (engine === "omp") {
       // A session that is OMP but has no wired bridge must fail closed: its
       // name lives in the native transcript, and renaming the desktop row
@@ -646,7 +592,7 @@ export function registerSessionIpc({
       // native header retains the original cwd). Moving the desktop row alone
       // would fork the host projectPath from the runtime's actual cwd.
       refuseOmpSessionAction(
-        engineRouter ? await engineRouter.engineForSession(sessionId) : "pi",
+        engineRouter ? await engineRouter.engineForSession(sessionId) : "omp",
         "moving a session between projects",
       );
       const releaseSessionOperation = await acquireSessionOperation(sessionId);
@@ -710,7 +656,7 @@ export function registerSessionIpc({
       // transcript is a Pi projection. Replacing messages in the host row for
       // an OMP session would fork the two.
       refuseOmpSessionAction(
-        engineRouter ? await engineRouter.engineForSession(sessionId) : "pi",
+        engineRouter ? await engineRouter.engineForSession(sessionId) : "omp",
         "transcript replacement",
       );
       // Drop the live pi-agent so the next prompt reseeds from the truncated
@@ -742,7 +688,7 @@ export function registerSessionIpc({
       // never rewrites; a host-side revision save would create a second,
       // divergent history.
       refuseOmpSessionAction(
-        engineRouter ? await engineRouter.engineForSession(String(input?.sessionId || "")) : "pi",
+        engineRouter ? await engineRouter.engineForSession(String(input?.sessionId || "")) : "omp",
         "saving a transcript revision",
       );
       return host.call("session.saveRevision", {
@@ -762,7 +708,7 @@ export function registerSessionIpc({
       // has no host-side revision list to read, and masquerading an empty one
       // would hide the native history.
       refuseOmpSessionAction(
-        engineRouter ? await engineRouter.engineForSession(String(input?.sessionId || "")) : "pi",
+        engineRouter ? await engineRouter.engineForSession(String(input?.sessionId || "")) : "omp",
         "listing transcript revisions",
       );
       return host.call("session.listRevisions", {
@@ -786,7 +732,7 @@ export function registerSessionIpc({
       // corresponding native operation, so the desktop must not masquerade a
       // host-only activation for it.
       refuseOmpSessionAction(
-        engineRouter ? await engineRouter.engineForSession(sessionId) : "pi",
+        engineRouter ? await engineRouter.engineForSession(sessionId) : "omp",
         "activating a transcript revision",
       );
       if (sidecar) {
@@ -855,7 +801,7 @@ export function registerSessionIpc({
       // runtime (re-projects for model, applies for thinking) and persists it
       // through its own callbacks; a failed persist is reverted rather than left
       // forked. The Pi path below is the plain host write.
-      const engine = engineRouter ? await engineRouter.requireForSession(id, "modelSwitch") : "pi";
+      const engine = engineRouter ? await engineRouter.requireForSession(id, "modelSwitch") : "omp";
       // Plan/Goal × Cursor product gate (T20-R3C): the only desktop writer of
       // mode/provider/model refuses the combination before any persistence, so
       // the durable record cannot gain it by entering Plan/Goal on a
@@ -941,56 +887,12 @@ export function registerSessionIpc({
     },
   );
 
-  handle(IPC.invoke.sessionImportScan, async () => {
-    const { sessions, truncated } = await scanAllSources();
-    scannedImportSessions = new Map(
-      sessions.map((session) => [`${session.source}:${session.externalId}`, session]),
-    );
-    return {
-      sessions: sessions.map(({ filePath: _filePath, ...candidate }) => candidate),
-      ...(Object.keys(truncated).length > 0 ? { truncated } : {}),
-    };
+  handle(IPC.invoke.sessionImportScan, async () => ({ sessions: [] }));
+  handle(IPC.invoke.sessionImportRun, async () => {
+    throw Object.assign(new Error("Session import is not supported; start a new OMP chat"), {
+      errorCode: ErrorCodes.INVALID_ARGUMENT,
+    });
   });
-
-  handle(
-    IPC.invoke.sessionImportRun,
-    async (selections: unknown) => {
-      if (!host) throw new Error("host unavailable");
-      let imported = 0;
-      let skipped = 0;
-      let failed = 0;
-      const items = Array.isArray(selections) ? selections : [];
-      for (const selection of items) {
-        const key = importSelectionKey(selection);
-        const item = key ? scannedImportSessions.get(key) : undefined;
-        if (!item) {
-          failed += 1;
-          logger.app("session", "warn", "session import selection rejected", {
-            data: { reason: "candidate was not returned by the latest scan" },
-          });
-          continue;
-        }
-        try {
-          const converted = await convertSession(item);
-          const res = await host.call<{ imported?: boolean }>("session.import", {
-            session: converted.session,
-            messages: converted.messages,
-          });
-          if (res.imported) imported += 1;
-          else skipped += 1;
-        } catch (e) {
-          failed += 1;
-          logger.app("session", "warn", "session import failed", {
-            data: { source: item?.source, externalId: item?.externalId, error: String(e) },
-          });
-        }
-      }
-      logger.app("session", "info", "session import finished", {
-        data: { imported, skipped, failed },
-      });
-      return { imported, skipped, failed };
-    },
-  );
 
   handle(IPC.invoke.modelConfigImportScan, async () => {
     const drafts = await scanModelConfigs();

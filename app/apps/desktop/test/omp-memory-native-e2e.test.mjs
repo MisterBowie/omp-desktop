@@ -43,7 +43,7 @@ test("native Mnemopi persists across processes, isolates projects, obeys switche
     await provider.close();
     rmSync(root, { recursive: true, force: true });
   });
-  async function start(path, autoSave, autoRead, normal = false) {
+  async function start(path, autoSave, autoRead, normal = true) {
     const supervisor = new OmpRuntimeSupervisor({
       dataRoot: root,
       cwd: path,
@@ -67,7 +67,7 @@ test("native Mnemopi persists across processes, isolates projects, obeys switche
     assert.equal(state.data.memoryRpcVersion, 1);
     assert.equal(state.data.memoryMaintenanceSafe, true);
     const status = await runtime.request({ type: "memory", action: "status" });
-    assert.equal(status.data.active, true);
+    assert.equal(status.data.active, autoSave || autoRead || !normal);
     return { supervisor, runtime };
   }
   async function ask(runtime, text) {
@@ -130,7 +130,9 @@ test("native Mnemopi persists across processes, isolates projects, obeys switche
   const isolated = await start(other, false, true);
   assert.equal((await isolated.runtime.request({ type: "memory", action: "list" })).data.total, 0);
   await stop(isolated.supervisor);
-  const disabled = await start(project, false, false);
+  // Management keeps the backend available for listing preserved records while
+  // both automatic flags are off. Normal disabled chats do not open Mnemopi.
+  const disabled = await start(project, false, false, false);
   await ask(disabled.runtime, "atlas-memory-saved-marker database");
   const absent = provider.requests.filter((request) => request.url.endsWith("/chat/completions")).at(-1)
     .body.messages;

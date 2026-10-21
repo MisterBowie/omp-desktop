@@ -284,7 +284,7 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
  * absent rather than disabled.
  */
 export function visibleSettingsNav(developerMode: boolean): SettingsNavEntry[] {
-  return SETTINGS_NAV.filter((entry) => entry.developerOnly !== true || developerMode);
+  return SETTINGS_NAV.filter((entry) => entry.id !== "remoteHosts" && (entry.developerOnly !== true || developerMode));
 }
 
 /**
@@ -296,6 +296,7 @@ export function isSettingsDestinationHidden(
   tab: SettingsTabId,
   developerMode: boolean,
 ): boolean {
+  if (tab === "remoteHosts") return true;
   const entry = SETTINGS_NAV.find((candidate) => candidate.id === tab);
   return entry?.developerOnly === true && !developerMode;
 }

@@ -318,14 +318,17 @@ fn schema_v15_upgrade_preserves_sessions_and_adds_the_ledger() {
             .unwrap();
     }
     let db = Database::open(&path).unwrap();
-    assert_eq!(
-        sessions::get_session(&db, &id)
-            .unwrap()
-            .unwrap()
-            .summary
-            .title,
-        "Existing user session"
-    );
+    // Historical records remain on disk; the OMP product does not load Pi chats.
+    assert!(sessions::get_session(&db, &id).unwrap().is_none());
+    let retained: String = db
+        .conn()
+        .query_row(
+            "SELECT title FROM sessions WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(retained, "Existing user session");
     // A v15 file walks every later step in the same launch, so it lands on the
     // current version rather than the one this migration happens to produce.
     assert_eq!(

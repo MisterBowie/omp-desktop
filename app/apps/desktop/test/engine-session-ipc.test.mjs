@@ -101,45 +101,25 @@ test("an explicit engine choice reaches the host unchanged", async () => {
   assert.equal(created.session.engine, "omp");
 });
 
-test("a caller that names no engine sends none, so the host default decides", async () => {
-  const { handlers, calls } = harness(async () => ({ session: { id: "s2", title: "New task", engine: "pi" } }));
-  const created = await handlers.get(IPC.invoke.sessionCreate)({ title: "New task" });
-  assert.equal("engine" in calls[0].input, false);
-  assert.equal(created.session.engine, "pi");
+test("an omitted engine is explicitly projected as OMP", async () => {
+  const {handlers, calls} = harness(async () => ({session: {id: "new", engine: "omp"}}));
+  assert.equal((await handlers.get(IPC.invoke.sessionCreate)({title: "New task"})).session.engine, "omp");
+  assert.equal(calls[0].input.engine, "omp");
 });
 
-test("session.list keeps each session's engine, desktop and native alike", async () => {
-  const { handlers } = harness(async (method) =>
-    method === "session.list"
-      ? {
-          sessions: [
-            { id: "desktop-1", title: "Pi session", engine: "pi" },
-            { id: "desktop-2", title: "OMP session", engine: "omp" },
-          ],
-        }
-      : {},
-  );
-  const list = await handlers.get(IPC.invoke.sessionList)();
-  const byId = new Map(list.sessions.map((session) => [session.id, session]));
-  assert.equal(byId.get("desktop-1").engine, "pi");
-  assert.equal(byId.get("desktop-2").engine, "omp");
-  assert.equal(byId.get("desktop-1").source, "desktop");
-  // A native Pi record carries no engine from the host and must not gain one.
-  assert.equal(byId.get("native-pi:1").engine, undefined);
+test("session.list excludes Pi records and never discovers ambient Pi history", async () => {
+  const {handlers} = harness(async () => ({sessions: [
+    {id: "old", engine: "pi"}, {id: "new", engine: "omp"},
+  ]}));
+  assert.deepEqual((await handlers.get(IPC.invoke.sessionList)()).sessions.map((s) => s.id), ["new"]);
 });
 
-test("an unknown engine is rejected by the host, not rewritten here", async () => {
-  const { handlers, calls } = harness(async (method) => {
-    if (method !== "session.create") return {};
-    throw Object.assign(new Error("engine must be one of pi, omp, got claude"), {
-      errorCode: ErrorCodes.INVALID_ARGUMENT,
-    });
-  });
-  await assert.rejects(
-    () => handlers.get(IPC.invoke.sessionCreate)({ engine: "claude" }),
-    /engine must be one of/,
+test("explicit Pi and unknown engines are refused before a host write", async () => {
+  const {handlers, calls} = harness(async () => { throw new Error("must not write"); });
+  for (const engine of ["pi", "claude"]) await assert.rejects(
+    handlers.get(IPC.invoke.sessionCreate)({engine}), /Only the OMP engine/,
   );
-  assert.equal(calls[0].input.engine, "claude");
+  assert.deepEqual(calls, []);
 });
 
 test("a Plan/Goal mode the engine does not declare is refused before any write", async () => {
@@ -147,7 +127,7 @@ test("a Plan/Goal mode the engine does not declare is refused before any write",
   // router: this is the branch a future engine (or a reduced build) takes, and
   // hiding the composer chip must not be the only thing standing in the way.
   const closed = {
-    ...(await import("../../../packages/shared/src/engine.ts")).PI_ENGINE_CAPABILITIES,
+    ...(await import("../../../packages/shared/src/engine.ts")).OMP_ENGINE_CAPABILITIES,
     plan: false,
     goal: false,
   };
@@ -161,7 +141,7 @@ test("a Plan/Goal mode the engine does not declare is refused before any write",
       capabilities: closed,
     }),
     capabilities: () => closed,
-    sessionEngine: async () => "pi",
+    sessionEngine: async () => "omp",
   });
 
   // session.create: refused before the host ever sees the request.
@@ -180,8 +160,8 @@ test("a Plan/Goal mode the engine does not declare is refused before any write",
   const configured = harness(
     async (method) =>
       method === "session.get"
-        ? { session: { id: "s1", engine: "pi", mode: "agent", providerId: null } }
-        : { session: { id: "s1", engine: "pi", mode: "plan", providerId: null } },
+        ? { session: { id: "s1", engine: "omp", mode: "agent", providerId: null } }
+        : { session: { id: "s1", engine: "omp", mode: "plan", providerId: null } },
     router,
   );
   await assert.rejects(
@@ -200,18 +180,20 @@ test("a Plan/Goal mode the engine does not declare is refused before any write",
       reason: null,
       capabilities: shared.engineCapabilities(engine),
     }),
-    sessionEngine: async () => "pi",
+    sessionEngine: async () => "omp",
   });
+  let configuredMode = "agent";
   const allowed = harness(
     async (method) =>
       method === "session.get"
-        ? { session: { id: "s2", engine: "pi", mode: "agent", providerId: null } }
-        : { session: { id: "s2", engine: "pi", mode: "plan", providerId: null } },
+        ? { session: { id: "s2", engine: "omp", mode: configuredMode, providerId: null } }
+        : { session: { id: "s2", engine: "omp", mode: "plan", providerId: null } },
     open,
+    { configure: async (_id, config) => { configuredMode = config.mode; return {ok: true}; } },
   );
   const result = await allowed.handlers.get(IPC.invoke.sessionConfigure)("s2", { mode: "plan" });
   assert.equal(result.session.mode, "plan");
-  assert.deepEqual(allowed.calls.map((call) => call.method), ["session.get", "session.configure"]);
+  assert.deepEqual(allowed.calls.map((call) => call.method), ["session.get", "session.get"]);
 });
 
 /* ------------------------------------------------------------------------- */

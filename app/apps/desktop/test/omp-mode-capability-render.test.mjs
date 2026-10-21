@@ -110,10 +110,8 @@ test("the composer mode chip is driven by the engine's declared modes", async ()
       submit: async () => {},
     };
 
-    // Both shipped engines declare the whole cycle, so a real session offers it.
-    for (const engine of ["pi", "omp"]) {
-      assert.deepEqual(offeredModes(engine), ["agent", "plan", "goal"], engine);
-    }
+    assert.deepEqual(offeredModes("omp"), ["agent", "plan", "goal"]);
+    assert.deepEqual(offeredModes("pi"), ["agent"], "retired Pi cannot offer contract modes");
 
     // Full cycle: the chip cycles Agent → Plan → Goal → Agent (unchanged
     // production behavior), and a stale mode outside the cycle lands on it.

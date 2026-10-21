@@ -5,6 +5,11 @@ OMP owns the Mnemopi database and all memory reads/writes. Rust host-core owns
 storage-schema migration is needed. Both `autoSave` and `autoRead` default off;
 manual project notes, transcripts and upstream CLI data stay independent.
 
+All product chats execute on OMP, including project, temporary and isolated
+creation. Pi chats are not continued or migrated. Worktree and temporary-chat
+selections remain valid browsing scopes instead of falling back to the primary
+project. See [ADR 0331](../../adr/0331-omp-only-product.md).
+
 Settings > Memory exposes the two switches, project/worktree selection,
 paginated browsing of conversation excerpts and extracted facts, local text search, refresh, and scope-bound clear confirmation.
 Preferences are global to local OMP chats. Stores are isolated by the exact

@@ -73,27 +73,8 @@ impl AppState {
     pub fn open(data_dir: &std::path::Path) -> Result<Self> {
         let db = Database::open_in_dir(data_dir)?;
         crate::scheduled::automation::recover(&db)?;
-        // Replies that were still streaming when the previous process ended
-        // are promoted into their transcripts before any client can read them
-        // (D299). The turn sweep inside `open` has already marked those turns
-        // aborted, so the promoted rows land under an aborted turn.
-        match crate::sessions::recover_orphaned_sessions(&db) {
-            Ok(restored) if restored > 0 => {
-                tracing::info!(
-                    count = restored,
-                    "restored orphaned session rows from transcripts"
-                );
-            }
-            Ok(_) => {}
-            Err(error) => tracing::warn!(%error, "orphaned session sweep failed"),
-        }
-        match crate::sessions::recover_inflight_messages(&db, false) {
-            Ok(recovered) if !recovered.is_empty() => {
-                tracing::info!(count = recovered.len(), "recovered in-flight replies");
-            }
-            Ok(_) => {}
-            Err(error) => tracing::warn!(%error, "in-flight reply sweep failed"),
-        }
+        // OMP restores its own native transcript. Never promote orphaned Pi
+        // transcripts or checkpoints into new OMP rows during product boot.
         let secrets = SecretStore::open(data_dir)?;
         // The marketplace channel is read before the manager builds its first
         // catalog, so a source configured for networks without GitHub access
@@ -302,6 +283,34 @@ impl AppState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn omp_only_boot_does_not_import_orphaned_host_transcripts() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let (id, transcript, original) = {
+            let db = Database::open_in_dir(data_dir.path()).unwrap();
+            let session =
+                crate::sessions::create_session(&db, None, None, None, None, None).unwrap();
+            let message = serde_json::from_value(serde_json::json!({
+                "id": "legacy-message", "role": "user", "content": "retained fixture",
+                "createdAt": "2026-10-21T00:00:00Z"
+            }))
+            .unwrap();
+            crate::sessions::append_message(&db, &session.id, &message, None).unwrap();
+            let transcript =
+                crate::transcripts::transcript_path(data_dir.path(), &session.id).unwrap();
+            let original = std::fs::read(&transcript).unwrap();
+            db.conn()
+                .execute("DELETE FROM sessions WHERE id = ?1", [&session.id])
+                .unwrap();
+            (session.id, transcript, original)
+        };
+        let state = AppState::open(data_dir.path()).unwrap();
+        assert!(crate::sessions::get_session(&state.db, &id)
+            .unwrap()
+            .is_none());
+        assert_eq!(std::fs::read(transcript).unwrap(), original);
+    }
 
     #[test]
     fn shutdown_cancels_pending_permissions_and_active_bash() {

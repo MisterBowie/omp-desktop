@@ -194,7 +194,7 @@ test("a queued execution for an OMP session claims once and prompts the bridge, 
   assert.match(prompts[0].content, /\.pi\/plans\/plan\.md/);
 });
 
-test("a queued execution for a Pi session still dispatches", async () => {
+test("a queued Pi execution cannot be claimed or dispatched", async () => {
   const { dependencies, hostCalls, sidecarCalls } = harness({
     queued: [queuedExecution(PI_SESSION)],
     engineFor: async () => "pi",
@@ -202,12 +202,9 @@ test("a queued execution for a Pi session still dispatches", async () => {
   await createPlanRuntime(dependencies).drainApprovedPlanExecutions();
 
   const methods = methodsOf(hostCalls);
-  assert.ok(methods.includes("plans.claimExecution"), methods.join(","));
-  assert.ok(methods.includes("session.beginTurn"), methods.join(","));
-  assert.deepEqual(
-    sidecarCalls.map((entry) => entry.method),
-    ["agent.executeApprovedPlan"],
-  );
+  assert.equal(methods.includes("plans.claimExecution"), false);
+  assert.equal(methods.includes("session.beginTurn"), false);
+  assert.deepEqual(sidecarCalls, []);
 });
 
 test("a composition without the engine gate claims nothing", async () => {

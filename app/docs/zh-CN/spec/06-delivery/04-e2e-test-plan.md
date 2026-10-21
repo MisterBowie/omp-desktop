@@ -8703,3 +8703,20 @@ UTF-16 Read/Edit、上下文计数、规范路径同源移动和 Git textconv �
 - **覆盖**：已有模式、自定义角色、运行时和 Skill 加载测试，加上本机编译提示探针。
   真实模型回复措辞仍为 Draft；提示检查不需要调用付费模型。
 - **关联规格**：`03-runtime/02-agent-runtime.md`（§7）。
+
+### 仅 OMP 创建、启动与记忆回归
+
+执行 `node --test apps/desktop/test/omp-only-product.test.mjs
+apps/desktop/test/omp-chat-creation.test.mjs
+apps/desktop/test/memory-settings-user-path.test.mjs`。普通项目、临时和独立工作树
+会话均创建为 OMP，不复用空 Pi 记录。Pi 执行能力全部关闭，启动/重启不创建 Pi
+worker；旧 Pi 会话不能执行、认领 Plan 或修改队列。列表/搜索不发现原生 Pi；
+读取、分支和历史导入在副作用前拒绝。宿主验证旧 Pi 记录不加载且未改写。
+桌面/插件导入和旧检查点恢复 RPC 在写入前拒绝；启动保留孤立宿主 transcript，
+不据此生成新 OMP 行。
+打包清单不含 Pi worker，远程 Pi 启动关闭，设置目的地始终隐藏。带来源元数据的
+跨会话输入在丢失来源或展开斜杠命令前明确拒绝。
+
+选择 worktree、临时 OMP 会话后，查询保持对应会话 id 并显示该范围已保存条目。
+原生记忆测试采用正常模型提炼配置，仅提供方为本地模拟服务；固定运行时继续验证
+工具审批、取消、队列/Plan、恢复、并发项目绑定及独立工作树完整流程。

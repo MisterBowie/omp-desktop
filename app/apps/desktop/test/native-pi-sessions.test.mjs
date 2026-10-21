@@ -141,20 +141,16 @@ test("queue remove/prioritize preserve the Desktop opaque host turnId contract",
   assert.deepEqual(calls, [["remove", "host-turn"], ["prioritize", "host-turn"]]);
 });
 
-test("native prompt only dispatches sidecar and cannot create a host queue entry", async () => {
-  const handlers = new Map();
-  const forbidden = () => assert.fail("native prompt reached Desktop host/queue");
-  const backend = new Proxy({}, { get: () => forbidden });
-  const calls = [];
-  registerAgentIpc({
-    registrar: { handle: (channel, handler) => handlers.set(channel, handler) },
-    getHost: () => backend, getAgentHostBridge: () => backend, setNotificationViewingSessionId() {},
-    getSidecar: () => ({ call: async (...args) => { calls.push(args); return { accepted: true, turnId: "native-turn" }; } }),
+test("native Pi prompts are refused without contacting any runtime", async () => {
+  const handlers = new Map(); const calls = [];
+  const forbidden = () => assert.fail("retired Pi prompt reached a backend");
+  registerAgentIpc({registrar: {handle: (channel, handler) => handlers.set(channel, handler)},
+    getHost: () => new Proxy({}, {get: () => forbidden}), getAgentHostBridge: () => null,
+    getSidecar: () => ({call: async (...args) => calls.push(args)}),
   });
-  await handlers.get(IPC.invoke.agentPrompt)({ sessionId: "native-pi:fixture", content: "prompt", messageId: "optimistic" });
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0][0], "agent.prompt");
-  assert.equal(calls[0][1].userMessageId, "optimistic");
+  await assert.rejects(handlers.get(IPC.invoke.agentPrompt)({sessionId: "native-pi:fixture", content: "prompt"}),
+    {errorCode: "ENGINE_CAPABILITY_UNAVAILABLE"});
+  assert.deepEqual(calls, []);
 });
 
 
@@ -257,7 +253,7 @@ const searchSession = (id, updatedAt) => ({
   matches: [],
 });
 
-test("global session search merges native sidecar hits with Desktop results", async () => {
+test("global session search never reads ambient Pi sources", async () => {
   const nativeHit = searchSession("native-pi:child", "2026-09-14T00:00:02.000Z");
   const desktopHit = searchSession("desktop-session", "2026-09-14T00:00:01.000Z");
   const { search, hostCalls, sidecarCalls } = forkHarness({
@@ -275,32 +271,18 @@ test("global session search merges native sidecar hits with Desktop results", as
     }),
   });
   const result = await search({ query: "side chat", offset: 0 });
-  assert.deepEqual(result.hits.map((hit) => hit.session.id), ["native-pi:child", "desktop-session"]);
-  assert.deepEqual(sidecarCalls, [{ method: "native.session.search", input: { query: "side chat" } }]);
+  assert.deepEqual(result.hits.map((hit) => hit.session.id), ["desktop-session"]);
+  assert.deepEqual(sidecarCalls, []);
   assert.deepEqual(hostCalls, [{ method: "search.sessions", input: { query: "side chat", offset: 0 } }]);
 });
 
-test("native fork routes to the sidecar and never to the Desktop host", async () => {
-  const { handle, hostCalls, sidecarCalls } = forkHarness({
-    host: () => ({ call: () => { throw new Error("native fork must not call the host"); } }),
-    sidecar: (calls) => ({
-      call: async (method, input) => {
-        calls.push({ method, input });
-        return { session: { id: "native-pi:child", title: "Side chat" } };
-      },
-    }),
+test("native Pi forks are refused before touching files or runtimes", async () => {
+  const {handle, hostCalls, sidecarCalls} = forkHarness({
+    host: () => ({call: () => assert.fail("must not call host")}),
+    sidecar: (calls) => ({call: async (...args) => calls.push(args)}),
   });
-  const result = await handle({
-    sessionId: " native-pi:parent ",
-    title: " Side  chat ",
-    throughMessageId: " a1 ",
-  });
-  assert.equal(result.session.id, "native-pi:child");
-  assert.deepEqual(sidecarCalls, [{
-    method: "native.session.fork",
-    input: { id: "native-pi:parent", title: "Side chat", throughMessageId: "a1" },
-  }]);
-  assert.deepEqual(hostCalls, []);
+  await assert.rejects(handle({sessionId: "native-pi:parent", title: "Child"}), {errorCode: "INVALID_ARGUMENT"});
+  assert.deepEqual(hostCalls, []); assert.deepEqual(sidecarCalls, []);
 });
 
 test("native fork rejects an oversized anchor before calling the sidecar", async () => {
@@ -314,22 +296,13 @@ test("native fork rejects an oversized anchor before calling the sidecar", async
   assert.deepEqual(sidecarCalls, []);
 });
 
-test("desktop session fork keeps the existing host contract", async () => {
-  const { handle, hostCalls } = forkHarness({
-    host: (calls) => ({
-      call: async (method, input) => {
-        calls.push({ method, input });
-        return { session: { id: "desktop-child", title: "Child" } };
-      },
-    }),
-    sidecar: () => ({ call: () => { throw new Error("desktop fork must not call the sidecar"); } }),
+test("OMP forks remain refused until native copy-through-history is supported", async () => {
+  const {handle, hostCalls} = forkHarness({
+    host: (calls) => ({call: async (...args) => calls.push(args)}),
+    sidecar: () => ({call: () => assert.fail("must not call Pi")}),
   });
-  const result = await handle({ sessionId: "desktop-parent", title: "Child", throughMessageId: "m1" });
-  assert.equal(result.session.id, "desktop-child");
-  assert.deepEqual(hostCalls, [{
-    method: "session.fork",
-    input: { sessionId: "desktop-parent", title: "Child", throughMessageId: "m1" },
-  }]);
+  await assert.rejects(handle({sessionId: "desktop-parent", title: "Child"}), {errorCode: "ENGINE_CAPABILITY_UNAVAILABLE"});
+  assert.deepEqual(hostCalls, []);
 });
 
 const assistantRow = (id, status, content = "part") => ({

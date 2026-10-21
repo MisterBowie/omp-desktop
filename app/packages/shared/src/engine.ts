@@ -6,29 +6,21 @@
  * axis from `SessionSource` (`desktop` | `pi-native` | `remote`), which answers
  * "who owns this transcript": a remote or native session is still executed by an
  * engine, and neither `pi-native` nor `remote` names one. Keeping the axes
- * separate is what stops the new engine field from re-routing native Pi or
- * remote sessions.
+ * separate prevents a source identifier from selecting an execution runtime.
  *
- * Only the two engines this product actually ships are declared. A third engine
- * needs its own capability evidence, not a new string in this union.
+ * OMP is the product runtime. The Pi wire identifier remains recognizable so
+ * retired records receive an explicit refusal instead of being rerouted.
  */
 
 import { ErrorCodes } from "./errors.js";
 
 export type EngineId = "pi" | "omp";
 
-/** Every engine this build knows, in navigation order. */
+/** Recognized wire identifiers, including the retired Pi identifier. */
 export const ENGINE_IDS = ["pi", "omp"] as const satisfies readonly EngineId[];
 
-/**
- * The engine of a session that predates the engine field, and of every session
- * created without an explicit choice.
- *
- * Legacy records must resolve here: an absent field means "Pi created it", not
- * "pick the newest engine". `normalizeEngineId` therefore never returns `omp`
- * for an unknown input.
- */
-export const DEFAULT_ENGINE_ID: EngineId = "pi";
+/** OMP is the only executing engine. Pi identifiers are recognized only to refuse retired records. */
+export const DEFAULT_ENGINE_ID: EngineId = "omp";
 
 export function isEngineId(value: unknown): value is EngineId {
   return value === "pi" || value === "omp";
@@ -98,23 +90,10 @@ export const ENGINE_CAPABILITY_KEYS = [
 export type EngineCapabilities = Readonly<Record<EngineCapability, boolean>>;
 
 /**
- * The Pi engine is the product's long-standing engine (agent sidecar over the
- * Rust host); every capability above exists on it today.
+ * The retired Pi identifier has no execution capabilities. No runtime fallback
+ * or historical-session continuation is supported.
  */
-export const PI_ENGINE_CAPABILITIES: EngineCapabilities = {
-  prompt: true,
-  stop: true,
-  resume: true,
-  branch: true,
-  steer: true,
-  followUp: true,
-  modelSwitch: true,
-  structuredQuestions: true,
-  toolApproval: true,
-  subagentEvents: true,
-  plan: true,
-  goal: true,
-};
+export const PI_ENGINE_CAPABILITIES: EngineCapabilities = closedEngineCapabilities();
 
 /**
  * M5 truth for the OMP engine: prompting, stopping, questions, approvals,
@@ -274,7 +253,7 @@ function nullableString(value: unknown): string | null {
 /**
  * Build a reference from persisted or partial input.
  *
- * A missing or unknown engine resolves to Pi (legacy records), a missing
+ * A missing or unknown engine resolves to the OMP default, a missing
  * adapter version resolves to the current one, and unknown fields are dropped —
  * the result is always a complete, typed reference.
  */

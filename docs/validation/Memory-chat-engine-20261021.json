@@ -1,0 +1,200 @@
+{
+  "date": "2026-10-21",
+  "baseCommit": "4f5eb9c59bdb554450180a49bc5d1d921bab2eed",
+  "branch": "codex/fix-memory-capture",
+  "delivery": "local-uncommitted-source-only",
+  "environment": {
+    "node": "24.14.0",
+    "pnpm": "10.34.5",
+    "platform": "darwin-arm64"
+  },
+  "diagnosis": {
+    "screenshotProjectPresent": true,
+    "autoSave": true,
+    "autoRead": true,
+    "sessionEngines": {
+      "pi": 3,
+      "omp": 0
+    },
+    "readOnly": true,
+    "chatTextRead": false
+  },
+  "nativeRuntime": {
+    "patchLevel": "62bc57b+omp-desktop.7",
+    "sha256": "45ff07e13e2b2404f03b1b385b6dfe1a450e5f290e42a5fb13c94405307146a4"
+  },
+  "checks": [
+    {
+      "id": "creation-red",
+      "command": "node --test apps/desktop/test/omp-chat-creation.test.mjs",
+      "exit": 1,
+      "log": "Memory-chat-engine-20261021/omp-chat-creation-red.log.gz",
+      "logSha256": "677b4f02fa23e14ba599c2a28cca797c298a6c8b1eb9554dcde974c6e56ac647"
+    },
+    {
+      "id": "scope-red",
+      "command": "node --test apps/desktop/test/memory-settings-user-path.test.mjs (original scope logic restored temporarily, then fixed source restored)",
+      "exit": 1,
+      "log": "Memory-chat-engine-20261021/omp-memory-scope-red.log.gz",
+      "logSha256": "85e3f187b09be28c7f22189df4e820610ac514ff74e555f6ae7e7aa1b72435bb"
+    },
+    {
+      "id": "targeted",
+      "command": "node --test apps/desktop/test/{omp-chat-creation,memory-settings-user-path,session-create,engine-session-ipc,omp-memory,session-configuration-staging,worktree-user-path,session-model,temporary-session-workspace}.test.mjs",
+      "exit": 0,
+      "pass": 35,
+      "skip": 0,
+      "log": "Memory-chat-engine-20261021/omp-memory-targeted.log.gz",
+      "logSha256": "2e05c7e2c34ffee20f96e0d1f83edbb85d1461c6dfe2d116661440b8e84a990c"
+    },
+    {
+      "id": "native",
+      "command": "OMP_MEMORY_TEST_RUNTIME=<verified .7 runtime>/omp node --test apps/desktop/test/omp-memory-native-e2e.test.mjs",
+      "exit": 0,
+      "pass": 1,
+      "skip": 0,
+      "log": "Memory-chat-engine-20261021/omp-memory-native-green.log.gz",
+      "logSha256": "0a7fc8379682fd691796e1fde15eeca7484b4fab81339f8649484ca385e283fd"
+    },
+    {
+      "id": "memory-config",
+      "command": "pnpm --filter @pi-desktop/omp-runtime exec vitest run src/memory-config.test.ts --maxWorkers 2",
+      "exit": 0,
+      "pass": 7,
+      "log": "Memory-chat-engine-20261021/omp-memory-memory-config.log.gz",
+      "logSha256": "4559938fdd10130082e9ed90ac252c48a0bc2fb881ba846885fbda0865a6dbfe"
+    },
+    {
+      "id": "i18n",
+      "command": "pnpm --filter @pi-desktop/i18n test",
+      "exit": 0,
+      "pass": 25,
+      "log": "Memory-chat-engine-20261021/omp-memory-i18n.log.gz",
+      "logSha256": "6490072590bb935c320acee709d44048a209d3a7f761c4a82df324f260ecf132"
+    },
+    {
+      "id": "typecheck",
+      "command": "pnpm --filter @pi-desktop/desktop typecheck",
+      "exit": 0,
+      "log": "Memory-chat-engine-20261021/omp-memory-typecheck.log.gz",
+      "logSha256": "4d62ddfbcdf592b18d39ae0effca100274f4e51fe96470fc4cb2ef9e73d11a10"
+    },
+    {
+      "id": "lint",
+      "command": "pnpm lint",
+      "exit": 0,
+      "log": "Memory-chat-engine-20261021/omp-memory-lint.log.gz",
+      "logSha256": "755bd8a4b163d5240a4a4d1f80c57c09a44cc4401375100670c2cf5f8338e1a1"
+    },
+    {
+      "id": "docs",
+      "command": "pnpm docs:check",
+      "exit": 0,
+      "log": "Memory-chat-engine-20261021/omp-memory-docs.log.gz",
+      "logSha256": "500d6a1f1a6d459b7a5d80a4321386daadc539b3f47c7bbb6ddd8b91df82092d"
+    },
+    {
+      "id": "build",
+      "command": "pnpm build:js",
+      "exit": 0,
+      "log": "Memory-chat-engine-20261021/omp-memory-final-build.log.gz",
+      "logSha256": "4b9f632d2baa664b645716695d88a792b9410aa3687d680be71245439a442f46"
+    }
+  ],
+  "testedSourceFiles": [
+    {
+      "path": "HANDOFF.md",
+      "sha256": "9e40a11988210b0b1f330eb5937a6acb9d3835fbcb3073405b8230a63ab8d871"
+    },
+    {
+      "path": "app/apps/desktop/src/components/settings/AgentCapabilityLayout.tsx",
+      "sha256": "e8d286daca0d162e08cf7f5aae9803593c18f974b57f3a46ce43142b7c97c9e5"
+    },
+    {
+      "path": "app/apps/desktop/src/features/settings/MemorySettingsPage.tsx",
+      "sha256": "dd96921f25822d01add878b627df963de798f392f91a4d0fcc2d4c65c607b38d"
+    },
+    {
+      "path": "app/apps/desktop/src/stores/runtime/session-coordination.ts",
+      "sha256": "1536d8c0700af85680082ef2dcdd21ea35430e0588ad530c2055ce7b65ef1ab4"
+    },
+    {
+      "path": "app/apps/desktop/src/stores/slices/session-slice.ts",
+      "sha256": "b4fecd7e5231eecd1187b2061f47e96d5580f77e964acd0f81c80da1f3a7fd8b"
+    },
+    {
+      "path": "app/apps/desktop/test/memory-settings-user-path.test.mjs",
+      "sha256": "79a1ac3d21dbfb3ca0f329a7453e2b4733f4512f985e461172a05a33ad880a03"
+    },
+    {
+      "path": "app/apps/desktop/test/omp-chat-creation.test.mjs",
+      "sha256": "5cbdd15f58efe4b67bf6410e7dab8cf3046f2ccb66d982c5b50d493060ef34af"
+    },
+    {
+      "path": "app/apps/desktop/test/omp-memory-native-e2e.test.mjs",
+      "sha256": "4f2e8d3cda01e9fef1556b2a09333e41195124994429bba76f9d3cb5dec77b92"
+    },
+    {
+      "path": "app/docs/spec/03-runtime/22-automatic-memory.md",
+      "sha256": "5a491124ae6061f9d13edfa6d600ec5cd3b6d281573854fc0d6e642576903b90"
+    },
+    {
+      "path": "app/docs/spec/06-delivery/04-e2e-test-plan.md",
+      "sha256": "e3109bd3c1057ad5dd1e3f6c34b6b89f428b143979b0421acbbe1299ab16a5c6"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/03-runtime/22-automatic-memory.md",
+      "sha256": "85c1fb8c77f1597a3e3fa87bf5f12327eb0c29af448f8375142f4e875b02d9b5"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/06-delivery/04-e2e-test-plan.md",
+      "sha256": "45713b0e2dcfffb53319e749e9b9abcdc99466e886569a3ea8a69b6e0a460de5"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/de/index.ts",
+      "sha256": "4fa29b968ac0ff2f293a7df6434bdd73dc8c76335056197e7f188653adce3dbd"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/en/index.ts",
+      "sha256": "3708133e8ff9ea93565c511b87ed5254c3618a894ad4a92a158e0615102e8627"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/es/index.ts",
+      "sha256": "fa3447a574b1b4038152855cc3b8118b6cc42549949c35ca739cf1a5eb90bc61"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/fr/index.ts",
+      "sha256": "8ad27342f2dfcea46328c07fb813e7757d36c2d4cf56975afa037bd886d80a99"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/ko/index.ts",
+      "sha256": "ed4240bf45ac9b65fd45cd80532906d884b1977902251c1c4a51de33ab971e74"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/tr/index.ts",
+      "sha256": "5e2220a09a6e0125a5e8a064e3ed447e45604e23cf5a922089947ee93ea57b1c"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/zh-CN/index.ts",
+      "sha256": "05e01d5b898fa0c3f4acebf7bdef25f7ef0fa579c60790c7d115685af3f3ae10"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/zh-TW/index.ts",
+      "sha256": "d6f5f13f18681577b90f8074a8cf151cc8dec9802713aaa628a0c972862b7f44"
+    },
+    {
+      "path": "docs/04-task-board.md",
+      "sha256": "ac9997805d9ea6f381b2c48ef7b90800d5e603478f58c9c999b6c36df078124c"
+    },
+    {
+      "path": "docs/05-user-guide.md",
+      "sha256": "bc4566f9295df009814208e7884578dcd1d651b7edcdccfbef737c3b865654f7"
+    }
+  ],
+  "notRun": [
+    "installed GUI",
+    "installer build",
+    "other platforms",
+    "real paid providers"
+  ]
+}

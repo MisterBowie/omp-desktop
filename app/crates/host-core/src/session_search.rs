@@ -88,7 +88,7 @@ pub fn search(db: &Database, query: &str, offset: i64) -> Result<SearchPage> {
                  OR pi_search_contains(p.path, ?1)) AS metadata_match
          FROM sessions s LEFT JOIN projects p ON p.id = s.project_id
          LEFT JOIN matched ON matched.session_id = s.id
-         WHERE s.deleted_at IS NULL AND (matched.count > 0 OR metadata_match)
+         WHERE s.deleted_at IS NULL AND s.engine = 'omp' AND (matched.count > 0 OR metadata_match)
          ORDER BY s.updated_at DESC, s.id ASC LIMIT 31 OFFSET ?3"
     );
     let mut hits = db

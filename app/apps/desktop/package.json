@@ -23,15 +23,14 @@
     "lint": "node ../../scripts/check-style-tokens.mjs",
     "clean": "node -e \"fs.rmSync('out',{recursive:true,force:true});fs.rmSync('dist',{recursive:true,force:true})\"",
     "build:host-release": "cargo fetch --locked --manifest-path ../../Cargo.toml && cargo build --release --locked --manifest-path ../../Cargo.toml -p host-core",
-    "bundle:runtime": "pnpm -C ../../packages/agent-runtime bundle",
     "build:sidecar": "node ../../scripts/omp-sidecar.mjs --build",
     "verify:sidecar": "node ../../scripts/omp-sidecar.mjs --preflight",
     "verify:packaged-runtime": "node ../../scripts/verify-packaged-runtime.mjs",
-    "pack": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/release-package.mjs --dir",
-    "dist": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/release-package.mjs --publish never",
-    "dist:mac": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/release-package.mjs --platform darwin --publish never",
-    "dist:win": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/release-package.mjs --platform win32 --publish never",
-    "dist:linux": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/release-package.mjs --platform linux --publish never"
+    "pack": "pnpm run build:deps && pnpm run build:host-release && electron-vite build && node ../../scripts/release-package.mjs --dir",
+    "dist": "pnpm run build:deps && pnpm run build:host-release && electron-vite build && node ../../scripts/release-package.mjs --publish never",
+    "dist:mac": "pnpm run build:deps && pnpm run build:host-release && electron-vite build && node ../../scripts/release-package.mjs --platform darwin --publish never",
+    "dist:win": "pnpm run build:deps && pnpm run build:host-release && electron-vite build && node ../../scripts/release-package.mjs --platform win32 --publish never",
+    "dist:linux": "pnpm run build:deps && pnpm run build:host-release && electron-vite build && node ../../scripts/release-package.mjs --platform linux --publish never"
   },
   "dependencies": {
     "electron-updater": "^6.8.9"
@@ -120,10 +119,6 @@
       {
         "from": "build/icon.png",
         "to": "tray-icon.png"
-      },
-      {
-        "from": "../../packages/agent-runtime/dist-bundle",
-        "to": "agent-runtime"
       },
       {
         "from": "resources/skills",

@@ -357,19 +357,9 @@ export function createHostRuntime({
       data: { generation: h.generation },
     });
     void importLegacyScheduled();
-    // Drain before the renderer can session.get. Assistant/tool rows live in
-    // this outbox until host-core appends them; a cold start that raced the
-    // flush showed only user prompts (issue #42 / D327). Boot leaves
-    // completed checkpoints in place so this drain can land the finished
-    // row first; leftovers are then promoted as complete.
+    // Drain pending host writes before renderer reads. Native transcript
+    // restoration belongs exclusively to OMP, not the retired host sweeps.
     await persistenceOutbox.flush(() => runtimeState.host);
-    try {
-      await h.call("session.recoverInflightMessages");
-    } catch (error) {
-      logger.app("persistence", "warn", "in-flight reply recovery after outbox drain failed", {
-        data: String(error),
-      });
-    }
   } catch (error) {
     if (runtimeState.host === h) runtimeState.host = null;
     logger.flushChild("host");

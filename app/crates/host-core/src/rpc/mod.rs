@@ -1417,6 +1417,20 @@ async fn handle_request(
         }
     }
 
+    if matches!(
+        method,
+        "session.import"
+            | "plugin.session.import"
+            | "plugin.session.importBatch"
+            | "session.recoverInflightMessages"
+    ) {
+        return Err(rpc_err(
+            1003,
+            "Host transcript import and recovery are unavailable; start a new OMP chat",
+            "UNSUPPORTED",
+        ));
+    }
+
     match method {
         method if method.starts_with("session.collaboration.") => {
             let st = state.lock().await;
@@ -5559,7 +5573,39 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn plugin_session_rpc_routes_the_full_p0_p1_surface() {
+    async fn omp_only_import_rpc_refuses_before_any_write() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+        for method in [
+            "session.import",
+            "plugin.session.import",
+            "plugin.session.importBatch",
+            "session.recoverInflightMessages",
+        ] {
+            let error = handle_request(state.clone(), method, json!({}), tx.clone())
+                .await
+                .unwrap_err();
+            assert_eq!(error.data.unwrap()["errorCode"], "UNSUPPORTED");
+        }
+        let st = state.lock().await;
+        let count: i64 = st
+            .db
+            .conn()
+            .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
+        assert!(
+            crate::transcripts::list_transcript_sessions(data_dir.path())
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn plugin_session_rpc_reads_and_manages_archival_fixtures() {
         let data_dir = tempfile::tempdir().unwrap();
         let mut app_state = AppState::open(data_dir.path()).unwrap();
         app_state.handshook = true;
@@ -5579,10 +5625,12 @@ mod tests {
             })
         };
 
-        let imported = handle_request(
-            state.clone(),
-            "plugin.session.import",
-            json!({
+        // Seed archival fixtures below the retired import RPC boundary. Reads,
+        // ownership checks and explicit cleanup retain their domain coverage.
+        let imported = crate::plugin_sessions::import(
+            &state.lock().await.db,
+            "plugin.one",
+            &json!({
                 "pluginId": "plugin.one",
                 "source": "legacy",
                 "sourceLabel": "Legacy",
@@ -5596,23 +5644,19 @@ mod tests {
                     "createdAt": "2026-01-01T00:00:00Z"
                 }]
             }),
-            tx.clone(),
         )
-        .await
         .unwrap();
         let session_id = imported["sessionId"].as_str().unwrap().to_string();
 
-        let batch = handle_request(
-            state.clone(),
-            "plugin.session.importBatch",
-            json!({
+        let batch = crate::plugin_sessions::import_batch(
+            &state.lock().await.db,
+            "plugin.one",
+            &json!({
                 "pluginId": "plugin.one",
                 "source": "legacy",
                 "sessions": [item("two"), item("three")]
             }),
-            tx.clone(),
         )
-        .await
         .unwrap();
         assert_eq!(batch["imported"], 2);
 

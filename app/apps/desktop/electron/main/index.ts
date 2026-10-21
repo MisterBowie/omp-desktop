@@ -51,7 +51,7 @@ import {
   shouldShowNativeNotification,
 } from "./notification-policy";
 import { PersistenceOutbox } from "./persistence-outbox";
-import { AgentSidecar } from "./agent-sidecar";
+import type { AgentSidecar } from "./agent-sidecar";
 import { Logger, ignoreBrokenStdio } from "./logger";
 import { installMainProcessErrorHandlers } from "./main-process-errors";
 import {
@@ -123,8 +123,7 @@ import {
 import { registerApplicationActivation } from "./bootstrap/app-activation";
 import type { RuntimeState } from "./runtime/context";
 import { createHostRuntime } from "./runtime/host";
-import { createSidecarRuntime } from "./runtime/sidecar";
-import { createEventPersistence } from "./runtime/event-persistence";
+import { createAgentEventFanout } from "./runtime/agent-event-fanout";
 import { createPlanRuntime, type PlanRuntimeState } from "./runtime/plans";
 import { createRuntimeLifecycle } from "./runtime/lifecycle";
 import {
@@ -1119,59 +1118,11 @@ const {
   settleOmpTurnEnd,
 } = planRuntime;
 
-const eventPersistence = createEventPersistence({
-  runtimeState,
-  steeringReplies,
-  activeTurns,
-  activeToolCalls,
-  activeToolCallKey,
-  approvedExecutionIdsBySession,
-  approvedExecutionTurns,
-  pendingExecutionFinishes,
-  planSubmissionTurnIds,
-  planSubmissionTurnKey,
-  inflightCheckpointer,
-  persistenceOutbox,
-  addActiveTurnUsage,
-  logger,
-  finishTurn,
+emitAgentEvent = createAgentEventFanout({
   isStaleTerminalEvent,
-  finishApprovedExecution,
-  emitAgentEvent: (envelope) => emitAgentEvent(envelope),
+  ingest: (envelope) => runtimeState.agentHostBridge?.ingest(envelope),
+  send: (envelope) => sendToRenderer(IPC.event.agentMessage, envelope),
 });
-const { persistAgentEvent } = eventPersistence;
-
-const sidecarRuntime = createSidecarRuntime({
-  runtimeState,
-  steeringReplies,
-  logger,
-  sendToRenderer,
-  persistAgentEvent,
-  activeTurns,
-  approvedExecutionIdsBySession,
-  claimedExecutionSessions,
-  inflightCheckpointer,
-  finishTurn,
-  isStaleTerminalEvent,
-  finishApprovedExecution,
-  superviseRestart,
-  isQuitting: () => quitting,
-  dataDir,
-  agentExtensions,
-  vendorOAuth,
-  listRuntimeProviders,
-  modelsDevCatalog,
-  effectiveSubagentModelConfig,
-  browserHost,
-  plugins,
-  sessionProjects,
-  loadUserSkillBody,
-  activeUserSkills,
-  pluginActiveInProject,
-  currentNetworkProxy,
-});
-emitAgentEvent = sidecarRuntime.emitAgentEvent;
-const { wireSidecar, startSidecar } = sidecarRuntime;
 
 const { wireHost, startHost } = createHostRuntime({
   runtimeState,
@@ -1204,7 +1155,6 @@ runtimeLifecycle = createRuntimeLifecycle({
   logger,
   sendToRenderer,
   startHost,
-  startSidecar,
   drainApprovedPlanExecutions,
   applyNetworkProxyFromAppSettings,
   plugins,

@@ -121,18 +121,6 @@ test("the composition root passes every required factory dependency", () => {
     "createPlanRuntime",
   );
   assertPassesRequiredKeys(
-    read("runtime/event-persistence.ts"),
-    "EventPersistenceDependencies",
-    index,
-    "createEventPersistence",
-  );
-  assertPassesRequiredKeys(
-    read("runtime/sidecar.ts"),
-    "SidecarRuntimeDependencies",
-    index,
-    "createSidecarRuntime",
-  );
-  assertPassesRequiredKeys(
     read("runtime/host.ts"),
     "HostRuntimeDependencies",
     index,
@@ -153,18 +141,6 @@ test("no factory dependency is wired as an explicit undefined", () => {
     "PlanRuntimeDependencies",
     index,
     "createPlanRuntime",
-  );
-  assertNoUndefinedMember(
-    read("runtime/event-persistence.ts"),
-    "EventPersistenceDependencies",
-    index,
-    "createEventPersistence",
-  );
-  assertNoUndefinedMember(
-    read("runtime/sidecar.ts"),
-    "SidecarRuntimeDependencies",
-    index,
-    "createSidecarRuntime",
   );
   assertNoUndefinedMember(
     read("runtime/host.ts"),
@@ -234,12 +210,7 @@ test("the OMP registry emits agent events without the Pi turn-ownership guard", 
     /emitAgentEvent: \(event\) => deps\.emitAgentEvent\(event, \{ guardPiTurnOwnership: false \}\)/,
     "wireOmpSessions must fan out OMP envelopes with the Pi guard disabled",
   );
-  // The Pi paths keep the guarded default.
-  const sidecarCall = callArgument(index, "createSidecarRuntime");
-  assert.match(sidecarCall, /isStaleTerminalEvent,/);
-  assert.doesNotMatch(
-    sidecarCall,
-    /guardPiTurnOwnership/,
-    "the Pi sidecar runtime must keep the ownership guard",
-  );
+  const fanout = callArgument(index, "createAgentEventFanout");
+  assert.match(fanout, /isStaleTerminalEvent,/);
+  assert.doesNotMatch(index, /createSidecarRuntime|createEventPersistence|new AgentSidecar|startSidecar/);
 });

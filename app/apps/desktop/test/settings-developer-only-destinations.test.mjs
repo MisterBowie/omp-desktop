@@ -27,12 +27,12 @@ const searchDialog = readFileSync(
 
 const identity = (key) => key;
 
-test("developer mode alone decides which destinations exist", () => {
+test("remote Pi hosts are unavailable in every product mode", () => {
   const off = visibleSettingsNav(false).map((entry) => entry.id);
   const on = visibleSettingsNav(true).map((entry) => entry.id);
 
   assert.equal(off.includes("remoteHosts"), false);
-  assert.equal(on.includes("remoteHosts"), true);
+  assert.equal(on.includes("remoteHosts"), false);
   assert.deepEqual(off, on.filter((id) => id !== "remoteHosts"));
   // Remote Hosts is the only gated destination today, and it carries the
   // Experimental badge that the rail renders.
@@ -45,13 +45,13 @@ test("developer mode alone decides which destinations exist", () => {
 test("settings search mirrors the rail", () => {
   assert.deepEqual(searchSettings("remotehosts", identity, { developerMode: false }), []);
   const hits = searchSettings("remotehosts", identity, { developerMode: true });
-  assert.ok(hits.some((hit) => hit.tab === "remoteHosts"));
+  assert.equal(hits.some((hit) => hit.tab === "remoteHosts"), false);
   assert.equal(searchSettings("settings", identity, { limit: 2 }).length, 2);
 });
 
 test("a stale developer-only selection is reported as hidden", () => {
   assert.equal(isSettingsDestinationHidden("remoteHosts", false), true);
-  assert.equal(isSettingsDestinationHidden("remoteHosts", true), false);
+  assert.equal(isSettingsDestinationHidden("remoteHosts", true), true);
   assert.equal(isSettingsDestinationHidden("general", false), false);
 });
 

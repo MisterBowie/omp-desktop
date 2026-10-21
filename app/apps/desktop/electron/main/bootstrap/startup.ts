@@ -1,4 +1,4 @@
-import { app, BrowserWindow, crashReporter, Menu, safeStorage } from "electron";
+import { app, BrowserWindow, crashReporter, Menu } from "electron";
 import { createScheduledRunner } from "../runtime/scheduled-runner";
 import {
   APP_NAME,
@@ -18,8 +18,8 @@ import {
 import { applyNetworkProxyFromAppSettings } from "../network-proxy";
 import { readCloseBehavior } from "../window-preferences";
 import { createAgentHostBridge, type AgentHostBridge } from "../agent-host-bridge";
-import { createBackendRouter, type BackendRouter } from "../remote/backend-router";
-import { createRemoteHostsBoot, setActiveRemoteHostsBoot } from "./remote-hosts";
+import type { BackendRouter } from "../remote/backend-router";
+import { setActiveRemoteHostsBoot } from "./remote-hosts";
 import {
   createMcpControlController,
   McpControlServer,
@@ -42,23 +42,6 @@ type IpcInvoker = (
   channel: string,
   args?: readonly unknown[],
 ) => Promise<unknown>;
-
-/**
- * The remote-host modules pass their log `data` as a structured object (e.g.
- * `{hostKey, error}`); a bare `String(data)` prints `[object Object]` and
- * loses the context. Errors keep their `String(error)` shape ("Error: ..."),
- * plain strings pass through, everything else JSON-stringifies.
- */
-function formatRemoteLogData(data: unknown): string | undefined {
-  if (data === undefined) return undefined;
-  if (typeof data === "string") return data;
-  if (data instanceof Error) return String(data);
-  try {
-    return JSON.stringify(data);
-  } catch {
-    return String(data);
-  }
-}
 
 export type StartupState = {
   applicationBooted: boolean;
@@ -211,43 +194,9 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
     // not race the renderer allocation just because backend startup was slow.
     prewarmPluginLauncher();
     const invokeIpc = registerIpc();
-    // The backend router is the single seam that forwards a renderer IPC call
-    // to a paired remote host; with no remote session registered it returns
-    // ROUTE_LOCAL and the local handler runs unchanged. Assigned before the
-    // first window can issue IPC. Remote host connections register their
-    // sessions here once paired (later stages).
-    state.backendRouter = createBackendRouter({
-      log: (level, message, data) =>
-        logger.app("runtime", level, message, { data: formatRemoteLogData(data) }),
-    });
-    // Every paired remote `pi-host` opens against the router this boot just
-    // created. An empty registry (default install with no user pairing) makes
-    // this a full no-op — nothing connects, no backend registers, every
-    // renderer call keeps hitting the local handler byte-for-byte.
-    const remoteHostsBoot = createRemoteHostsBoot({
-      dataDir,
-      encryption: {
-        // Electron's safeStorage exposes `isEncryptionAvailable`; the port
-        // keeps the shorter `isAvailable` name so a Node-side test can drop
-        // in a fake without pulling in the Electron type.
-        isAvailable: () => safeStorage.isEncryptionAvailable(),
-        encryptString: (plain) => safeStorage.encryptString(plain),
-        decryptString: (buffer) => safeStorage.decryptString(buffer),
-      },
-      router: state.backendRouter,
-      emit: sendToRenderer,
-      clientInfo: { name: APP_NAME, version: APP_VERSION },
-      log: (level, message, data) =>
-        logger.app("runtime", level, message, { data: formatRemoteLogData(data) }),
-    });
-    setActiveRemoteHostsBoot(remoteHostsBoot);
-    // Boot in the background: a slow or unreachable host must not delay the
-    // first window. Failures for individual hosts are logged inside `open()`.
-    void remoteHostsBoot.open().then((opened) => {
-      if (opened > 0) {
-        logger.app("runtime", "info", "remote hosts connected", { data: String(opened) });
-      }
-    });
+    // This product runs local OMP only. Do not restore or connect Pi hosts.
+    state.backendRouter = null;
+    setActiveRemoteHostsBoot(null);
     state.agentHostBridge = createAgentHostBridge({
       invoke: invokeIpc,
       channels: IPC.invoke,

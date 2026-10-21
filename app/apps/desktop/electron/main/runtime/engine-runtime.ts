@@ -12,10 +12,7 @@
  * ships the boundary, not a conversation surface, so nothing is spawned at boot.
  */
 import {
-  APP_VERSION,
   OMP_RUNTIME_VERSION,
-  PROTOCOL_VERSION,
-  PI_ENGINE_CAPABILITIES,
   closedEngineCapabilities,
   type EngineId,
   type EngineRuntimeStatus,
@@ -208,21 +205,19 @@ export function createDesktopEngineRuntime(
   });
 
   /**
-   * Pi's runtime is the agent sidecar over host-core: both have to be up before
-   * a Pi session can do anything, so their presence *is* its phase. OMP's comes
-   * from its supervisor, which knows whether it started, failed, or is running.
+   * OMP status comes from its supervisor. The retired Pi identifier always
+   * reports stopped with closed capabilities, regardless of host liveness.
    */
   const status = (engine: EngineId): EngineRuntimeStatus => {
     if (engine === "omp") return ompRuntime.status();
-    const live = dependencies.piRuntimeLive();
     return {
       engine: "pi",
-      phase: live ? "idle" : "stopped",
-      runtimeVersion: APP_VERSION,
-      protocolVersion: PROTOCOL_VERSION,
-      reason: live ? null : "not-started",
-      detail: live ? undefined : "the Pi runtime is not running",
-      capabilities: live ? PI_ENGINE_CAPABILITIES : closedEngineCapabilities(),
+      phase: "stopped",
+      runtimeVersion: null,
+      protocolVersion: null,
+      reason: "not-started",
+      detail: "Pi execution is retired; this product uses OMP",
+      capabilities: closedEngineCapabilities(),
     };
   };
 

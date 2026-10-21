@@ -34,7 +34,7 @@ export function projectDisplayName(path: string, fallback?: string): string {
 }
 
 /** Recent projects plus the project currently open in the window. */
-export function useAgentProjects() {
+export function useAgentProjects(additionalOptions?: readonly AgentProjectOption[]) {
   const currentProjectPath = useAppStore((state) => state.workspace?.path ?? null);
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectPath, setSelectedProjectPath] = useState<string | null>(
@@ -74,8 +74,9 @@ export function useAgentProjects() {
     };
     add(currentProjectPath);
     for (const project of projects) add(project.path, project.name);
+    for (const option of additionalOptions ?? []) add(option.path, option.name);
     return result;
-  }, [currentProjectPath, projects]);
+  }, [currentProjectPath, projects, additionalOptions]);
 
   useEffect(() => {
     if (options.length === 0) {

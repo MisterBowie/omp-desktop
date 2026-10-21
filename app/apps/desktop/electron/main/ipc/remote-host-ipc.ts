@@ -47,8 +47,8 @@ export type RegisterRemoteHostIpcOptions = {
 
 function requireBoot(boot: RemoteHostsBoot | null): RemoteHostsBoot {
   if (!boot) {
-    throw Object.assign(new Error("remote hosts are not ready yet"), {
-      errorCode: ErrorCodes.AGENT_UNAVAILABLE,
+    throw Object.assign(new Error("Remote Pi hosts are not supported by this OMP product"), {
+      errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
     });
   }
   return boot;
@@ -97,8 +97,8 @@ export function registerRemoteHostIpc(options: RegisterRemoteHostIpcOptions): vo
   registrar.handle(
     IPC.invoke.remoteHostList,
     async (): Promise<{ hosts: RemoteHostSummary[] }> => {
-      const boot = requireBoot(getRemoteHostsBoot());
-      return { hosts: await boot.list() };
+      const boot = getRemoteHostsBoot();
+      return { hosts: boot ? await boot.list() : [] };
     },
   );
 

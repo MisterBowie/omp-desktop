@@ -73,55 +73,25 @@ test("collaboration dispatch cannot acquire human edit, regenerate or attachment
   }
 });
 
-test("prompt IPC persists original session text, skips slash expansion and binds its durable ID", async () => {
-  const handlers = new Map();
-  const calls = [];
-  const events = [];
-  const sidecarCalls = [];
-  const host = {
-    async call(method, params) {
-      calls.push({ method, params });
-      if (method === "session.collaboration.message") return { message };
-      if (method === "settings.get") return {};
-      if (method === "session.get") return { session: { id: "target", engine: "pi", messages: [] } };
-      if (method === "session.beginTurn") return { turnId: "turn-1" };
-      if (method === "session.appendMessage") return {};
-      assert.fail(`unexpected RPC ${method}`);
-    },
-  };
-  let released = false;
+test("OMP refuses collaboration delivery before losing its structured origin", async () => {
+  const handlers = new Map(); const calls = []; const sidecarCalls = [];
   registerAgentIpc({
-    registrar: { handle: (channel, handler) => handlers.set(channel, handler) },
-    getHost: () => host,
-    getSidecar: () => ({
-      setProjectInstructionRoot() {},
-      async call(method, params) { sidecarCalls.push({ method, params }); return { accepted: true, turnId: "turn-1" }; },
-    }),
-    getAgentHostBridge: () => null,
-    engineRouter,
-    logger: { app() {} }, vendorOAuth: {}, agentExtensions: {}, cancelSessionTools() {},
-    persistenceOutbox: {}, dataDir: "/unused-for-no-attachments",
-    activeTurns: new Map(), activeTurnUsages: new Map(), approvedExecutionIdsBySession: new Map(), claimedExecutionSessions: new Map(),
-    resolveAgentRuntimeLaunch: async () => ({
-      providerId: "provider", modelId: "model",
-      sidecarParams: { sessionId: "target", provider: { modelConfig: { input: ["text"] } } },
-    }),
-    acquireSessionOperation: async () => () => { released = true; },
-    finishTurn: async () => { assert.fail("the prompt should succeed"); },
-    emitAgentEvent: (event) => events.push(event), setNotificationViewingSessionId() {},
-    optionalWorkspaceRoot: async () => { assert.fail("session text must not expand slash commands"); },
-    composerCommandService: { buildComposerCommands: async () => { assert.fail("session text must not expand slash commands"); } },
-    loadComposerTemplatesCached: async () => { assert.fail("session text must not expand slash commands"); },
+    registrar: {handle: (channel, handler) => handlers.set(channel, handler)},
+    getHost: () => ({call: async (method) => {
+      calls.push(method);
+      if (method === "session.collaboration.message") return {message};
+      if (method === "settings.get") return {};
+      if (method === "session.get") return {session: {id: "target", engine: "omp", messages: []}};
+      assert.fail(`Unexpected host mutation ${method}`);
+    }}),
+    getSidecar: () => ({call: async (...args) => sidecarCalls.push(args)}),
+    getAgentHostBridge: () => null, engineRouter,
+    acquireSessionOperation: async () => () => {}, setNotificationViewingSessionId() {},
+    ompSessions: {prompt: async () => assert.fail("must not submit text without its provenance")},
   });
-  assert.deepEqual(await handlers.get(IPC.invoke.agentPrompt)(request), { accepted: true, turnId: "turn-1" });
-  const begin = calls.find((entry) => entry.method === "session.beginTurn");
-  assert.equal(begin.params.sessionMessageId, message.id);
-  const row = calls.find((entry) => entry.method === "session.appendMessage").params.message;
-  assert.equal(row.content, message.content);
-  assert.deepEqual(row.sessionMessage, origin);
-  assert.equal(row.command, undefined);
-  assert.equal(sidecarCalls[0].params.content, message.content);
-  assert.deepEqual(sidecarCalls[0].params.sessionMessage, origin);
-  assert.equal(events.length, 2);
-  assert.equal(released, true);
+  await assert.rejects(handlers.get(IPC.invoke.agentPrompt)(request), {
+    errorCode: "ENGINE_CAPABILITY_UNAVAILABLE", area: "session collaboration",
+  });
+  assert.deepEqual(sidecarCalls, []);
+  assert.equal(calls.some((method) => /beginTurn|appendMessage/.test(method)), false);
 });

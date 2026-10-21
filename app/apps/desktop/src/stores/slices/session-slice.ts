@@ -507,7 +507,7 @@ export function createSessionSlice({
           get().sessionMeta,
         );
         if (
-          !options?.isolated && latest && !latest.worktree &&
+          !options?.isolated && latest?.engine === "omp" && !latest.worktree &&
           sessionIsReusableEmpty(latest, {
             running: get().runningSessions[latest.id] === true,
             liveMessageCount: runtime.liveMessageCountForSession(latest.id, get()),

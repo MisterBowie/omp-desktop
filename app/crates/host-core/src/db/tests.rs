@@ -178,6 +178,12 @@ fn v20_database_migrates_to_native_session_reference() {
             crate::sessions::create_session(&db, Some("existing".into()), None, None, None, None)
                 .unwrap();
         session_id = session.id;
+        db.conn()
+            .execute(
+                "UPDATE sessions SET engine = 'pi' WHERE id = ?1",
+                params![session_id],
+            )
+            .unwrap();
         // Recreate the pre-v21 shape: the four reference columns did not exist.
         db.conn()
             .execute_batch(
@@ -252,6 +258,12 @@ fn bind_engine_ref_refuses_pi_sessions_and_blank_handles() {
     let path = dir.path().join("pi.sqlite");
     let db = Database::open(&path).unwrap();
     let pi = crate::sessions::create_session(&db, Some("pi task".into()), None, None, None, None)
+        .unwrap();
+    db.conn()
+        .execute(
+            "UPDATE sessions SET engine = 'pi' WHERE id = ?1",
+            params![pi.id],
+        )
         .unwrap();
     let omp = crate::sessions::create_session_with_options(
         &db,

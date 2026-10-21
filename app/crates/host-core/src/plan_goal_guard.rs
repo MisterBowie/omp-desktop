@@ -197,7 +197,7 @@ pub(crate) fn plant_legacy_contract_cursor_session(db: &Database, id: &str) -> R
             id, title, provider_id, model_id, mode, thinking_level, permission_mode,
             engine, created_at, updated_at
          ) VALUES (?1, 'Legacy', ?2, 'claude-4.6-opus-high', 'plan', 'off', 'inherit',
-                   'pi', 1, 1)",
+                   'omp', 1, 1)",
         rusqlite::params![id, CURSOR_PROVIDER_ID],
     )?;
     install(db)

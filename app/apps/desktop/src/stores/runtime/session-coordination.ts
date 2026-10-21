@@ -302,7 +302,8 @@ export function createSessionCoordination({
     let created: Awaited<ReturnType<typeof api.createSession>>;
     try {
       created = await api.createSession({
-        ...(options.isolated ? {isolated: true, engine: "omp" as const} : {}),
+        engine: "omp",
+        ...(options.isolated ? {isolated: true} : {}),
         title: untitledTaskTitle(),
         mode: draftConfig?.mode ?? normalizeMode(settings?.defaultMode),
         thinkingLevel: draftConfig?.thinkingLevel ?? defaultThinkingLevel,

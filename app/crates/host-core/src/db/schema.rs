@@ -66,7 +66,7 @@ CREATE TABLE sessions (
   permission_mode TEXT NOT NULL DEFAULT 'inherit'
                 CHECK (permission_mode IN ('inherit', 'ask', 'accept-edits', 'auto')),
   source      TEXT,
-  engine      TEXT NOT NULL DEFAULT 'pi',
+  engine      TEXT NOT NULL DEFAULT 'omp',
   engine_adapter_version INTEGER,
   engine_runtime_version  TEXT,
   native_session_id       TEXT,

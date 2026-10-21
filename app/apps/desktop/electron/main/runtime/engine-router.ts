@@ -16,14 +16,14 @@
  * A caller that has only a session id needs the persisted record, so it hands
  * the router a lookup. That lookup is the one place where a *failure* could be
  * mistaken for "a legacy session": it must not be. Only a successful read of a
- * record without an engine field is Pi; a read that failed, or that returned a
+ * record without an engine field uses the OMP default; a read that failed, or that returned a
  * value this build does not understand, refuses the operation instead — the
  * alternative is routing a session nobody could identify into a runtime that
  * does not own it.
  *
  * The gate judges the *declaration*: can this engine serve this capability at
  * all? Whether its runtime is up right now is a different question with its own
- * answer on each path (the Pi paths check their sidecar and say so), and folding
+ * answer from its supervisor, and folding
  * the two together would turn a temporary outage into a permanent refusal — the
  * turn queue exists precisely to hold work while a runtime restarts. Liveness
  * still shapes `liveCapabilities()` and `EngineRuntimeStatus`, which is what a
@@ -76,7 +76,7 @@ export function refuseOutsidePiRuntime(engine: EngineId, area: string): void {
 /**
  * Persisted engine of a session, read from the product's single durable source.
  *
- * `null`/`undefined` means a record that predates the engine field (Pi); an
+ * `null`/`undefined` uses the product's OMP default; an
  * unknown string is a value this build cannot route, and a rejection is a
  * lookup failure. The router tells the two apart, so an unreadable record never
  * degrades into a guess.
@@ -93,10 +93,8 @@ export type EngineRefusal = Error & {
 
 export type EngineRouter = {
   /**
-   * The engine a session record belongs to. Absent means Pi: records that
-   * predate the engine field were created by the Pi engine, and treating
-   * absence as "the newest engine" would move a user's existing sessions onto
-   * a runtime that has never seen them.
+   * The engine a session record belongs to. Absent uses the OMP default;
+   * explicit Pi remains retired and never acquires OMP execution capabilities.
    */
   engineOf(session: EngineSessionRecord): EngineId;
   /** Declared capabilities of an engine, independent of whether it is running. */
@@ -109,9 +107,9 @@ export type EngineRouter = {
   /**
    * Engine of a session the caller has only an id for.
    *
-   * Reads the persisted record: a record without an engine field is Pi, a value
+   * Reads the persisted record: a record without an engine field uses OMP, a value
    * this build does not know or a record it cannot read is `ENGINE_UNAVAILABLE`.
-   * There is no "unknown therefore Pi" path.
+   * Lookup failure or an unknown persisted identifier never selects an engine.
    */
   engineForSession(sessionId: string): Promise<EngineId>;
   /** `require` for a caller that has an id rather than a record. */
@@ -156,7 +154,7 @@ export function createEngineRouter(options: {
    * Persisted engine of a session, when the caller has only its id.
    *
    * Required for {@link EngineRouter.requireForSession}: a router that cannot
-   * read the record must refuse rather than assume Pi.
+   * read the record must refuse rather than assume an engine.
    */
   sessionEngine?: EngineSessionLookup;
   /**
@@ -203,12 +201,11 @@ export function createEngineRouter(options: {
       try {
         persisted = await options.sessionEngine(sessionId);
       } catch (error) {
-        // Not a legacy record: the engine is unknown, and an unknown engine
-        // must never be served by the Pi runtime.
+        // Lookup failure must never select a runtime by default.
         throw lookupFailure(sessionId, `the session record could not be read: ${String((error as Error)?.message ?? error)}`);
       }
       if (persisted === undefined || persisted === null || persisted === "") {
-        // A record that predates the engine field was created by Pi.
+        // Fresh product callers use OMP when the field is omitted.
         return normalizeEngineId(undefined);
       }
       if (!isEngineId(persisted)) {

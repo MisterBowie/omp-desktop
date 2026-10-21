@@ -1,5 +1,23 @@
 # 02. Agent Runtime
 
+
+## OMP-only product (2026-10-21 amendment)
+
+OMP is the only executing engine. This amendment supersedes earlier dual-engine
+and native Pi continuation descriptions; see [ADR 0331](../../adr/0331-omp-only-product.md).
+Host creation, omitted engine values and all desktop creation paths select OMP.
+An explicit Pi create request is refused. Retired Pi records have no capabilities,
+are not listed/opened/searched, and are never relabeled or imported. No history
+migration runs. Desktop and plugin transcript import RPCs refuse before writes;
+host boot does not resurrect orphaned host transcripts or promote Pi checkpoints.
+Boot does not construct a Pi worker, installers omit that worker,
+and old remote Pi hosts are neither bootstrapped nor automatically connected.
+The old remote-host settings destination is hidden. General provider/model transport
+helpers and required upstream copyright remain; they do not execute Pi sessions.
+OMP's existing supervision, permission checks, durable FIFO, project binding,
+structured tools, compaction and stop semantics remain authoritative.
+
+
 ## OMP session controls (2026-10-18 amendment)
 
 OMP 18.3.0 with patch level `62bc57b+omp-desktop.6` supports Desktop text

@@ -13,14 +13,12 @@ use crate::transcripts::{self, CompactionRecord, MessageRecord, RevisionRecord};
 
 pub const MODES: [&str; 3] = ["plan", "goal", "agent"];
 
-/// Engines a session may be created on (M2/T08). The set lives here so an
-/// unknown engine is rejected at the boundary instead of being stored and
-/// silently served by the Pi path later.
-pub const ENGINES: [&str; 2] = ["pi", "omp"];
+/// Engines available for new product sessions. Retired identifiers are
+/// rejected before a row is stored.
+pub const ENGINES: [&str; 1] = ["omp"];
 
-/// Engine of every session created without an explicit choice, and of every
-/// session that predates the field.
-pub const DEFAULT_ENGINE: &str = "pi";
+/// Engine of every new session created without an explicit choice.
+pub const DEFAULT_ENGINE: &str = "omp";
 
 /// The session-engine adapter version this build persists (matches the shared
 /// `ENGINE_ADAPTER_VERSION`). A bind that carries a larger value describes a
@@ -31,7 +29,7 @@ pub fn is_valid_engine(engine: &str) -> bool {
     ENGINES.contains(&engine)
 }
 
-/// The engine to persist for a create request: absent means Pi, and a value
+/// The engine to persist for a create request: absent means OMP, and a value
 /// that is present must be one this build knows.
 pub fn normalize_engine(engine: Option<&str>) -> Result<String> {
     match engine.map(str::trim).filter(|value| !value.is_empty()) {
@@ -1099,6 +1097,7 @@ pub fn restore_orphaned_session(db: &Database, session_id: &str) -> Result<bool>
 
 /// Boot sweep: every live transcript whose sessions row is gone is reinserted
 /// so the sidebar and the persistence outbox can see it again (D318).
+#[cfg(test)]
 pub fn recover_orphaned_sessions(db: &Database) -> Result<usize> {
     let mut restored = 0;
     for session_id in transcripts::list_transcript_sessions(db.data_dir())? {
@@ -1151,7 +1150,7 @@ const SUMMARY_SELECT: &str =
     "SELECT s.id, s.title, s.last_seq, p.path, s.model_id, s.provider_id, s.mode,
             s.thinking_level, s.permission_mode, s.engine, s.updated_at, s.created_at
      FROM sessions s LEFT JOIN projects p ON p.id = s.project_id
-     WHERE s.deleted_at IS NULL";
+     WHERE s.deleted_at IS NULL AND s.engine = 'omp'";
 
 pub(crate) fn summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionSummary> {
     Ok(SessionSummary {
@@ -3837,11 +3836,11 @@ mod tests {
     fn engine_is_persisted_defaulted_and_inherited() {
         let db = test_db();
 
-        // No engine asked for: the historical default, never the newest engine.
+        // Every new product session executes on OMP, including omitted engines.
         let plain = create_session_with_options(&db, SessionCreateOptions::default()).unwrap();
-        assert_eq!(plain.engine, "pi");
+        assert_eq!(plain.engine, "omp");
         let reloaded = get_session(&db, &plain.id).unwrap().unwrap();
-        assert_eq!(reloaded.summary.engine, "pi");
+        assert_eq!(reloaded.summary.engine, "omp");
 
         let explicit = create_session_with_options(
             &db,
@@ -3874,6 +3873,15 @@ mod tests {
             .to_string()
             .contains("engine must be one of"));
 
+        assert!(create_session_with_options(
+            &db,
+            SessionCreateOptions {
+                engine: Some("pi".into()),
+                ..Default::default()
+            },
+        )
+        .is_err());
+
         // Blank is the same as absent.
         let blank = create_session_with_options(
             &db,
@@ -3883,13 +3891,48 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(blank.engine, "pi");
+        assert_eq!(blank.engine, "omp");
 
         let fork = fork_session_through(&db, &explicit.id, None, None).unwrap();
         let ForkSessionResult::Created(branch) = fork else {
             panic!("expected a forked session, got a different result");
         };
         assert_eq!(branch.summary.engine, "omp");
+    }
+
+    #[test]
+    fn retired_pi_records_are_not_loaded_or_rewritten() {
+        let db = test_db();
+        let session = create_session(
+            &db,
+            Some("retained-pi-marker".into()),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        db.conn()
+            .execute(
+                "UPDATE sessions SET engine = 'pi' WHERE id = ?1",
+                params![session.id],
+            )
+            .unwrap();
+        assert!(get_session(&db, &session.id).unwrap().is_none());
+        assert!(list_sessions(&db).unwrap().is_empty());
+        assert!(crate::session_search::search(&db, "retained-pi-marker", 0)
+            .unwrap()
+            .hits
+            .is_empty());
+        let stored: (String, String) = db
+            .conn()
+            .query_row(
+                "SELECT engine, title FROM sessions WHERE id = ?1",
+                params![session.id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(stored, ("pi".into(), "retained-pi-marker".into()));
     }
 
     fn user_msg(id: &str, content: &str, ts: &str) -> UiMessage {

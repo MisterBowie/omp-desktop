@@ -28,7 +28,6 @@ export type RuntimeLifecycleDependencies = {
   logger: Logger;
   sendToRenderer: (channel: string, payload: unknown) => void;
   startHost: () => Promise<void>;
-  startSidecar: () => Promise<void>;
   drainApprovedPlanExecutions: () => Promise<void>;
   applyNetworkProxyFromAppSettings: (settings: unknown) => Promise<unknown>;
   plugins: PluginRuntime;
@@ -52,7 +51,6 @@ export function createRuntimeLifecycle({
   logger,
   sendToRenderer,
   startHost,
-  startSidecar,
   drainApprovedPlanExecutions,
   applyNetworkProxyFromAppSettings,
   plugins,
@@ -117,7 +115,7 @@ export function createRuntimeLifecycle({
         // nothing else re-applies settings after a crash.
         await syncPluginDisplayLocale(host, getDisplayLocale());
       },
-      sidecar: startSidecar,
+      sidecar: async () => { throw new Error("Pi runtime is retired; this product uses OMP"); },
     },
     afterRestart: () => drainApprovedPlanExecutions(),
     isUnrecoverable: (error) => Boolean(schemaTooNewOf(error)) || isGlibcUnsupportedError(error),
@@ -167,8 +165,10 @@ export function createRuntimeLifecycle({
     },
   });
 
-  const superviseRestart = (kind: RestartKind): Promise<void> =>
-    supervisor.superviseRestart(kind);
+  const superviseRestart = (kind: RestartKind): Promise<void> => {
+    if (kind === "sidecar") return Promise.reject(new Error("Pi runtime is retired; this product uses OMP"));
+    return supervisor.superviseRestart(kind);
+  };
 
   /**
    * Boot outcome pushed once the renderer has mounted. Known unrecoverable
@@ -230,7 +230,7 @@ export function createRuntimeLifecycle({
     } catch {
       await applyNetworkProxyFromAppSettings({ mode: "system" });
     }
-    await startSidecar();
+    // OMP conversation processes are owned and started by the OMP supervisor.
 
     // Keep plugin host services wired to live workspace / app metadata.
     plugins.setServices({

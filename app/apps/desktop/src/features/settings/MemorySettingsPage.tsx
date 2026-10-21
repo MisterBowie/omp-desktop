@@ -1,5 +1,5 @@
 import { DEFAULT_OMP_MEMORY, type OmpMemoryPage, type OmpMemorySettings } from "@pi-desktop/shared";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAgentProjects } from "../../components/settings/AgentCapabilityLayout";
 import { Button, Input } from "../../components/ui";
@@ -10,8 +10,14 @@ import "./memory-settings.css";
 
 export function MemorySettingsPage() {
   const { t } = useTranslation();
-  const { selectedProjectPath, setSelectedProjectPath, options } = useAgentProjects();
   const sessions = useAppStore((state) => state.sessions);
+  const sessionOptions = useMemo(() => sessions
+    .filter((session) => session.engine === "omp" && (session.worktree || !session.projectPath))
+    .map((session) => ({
+      path: `session:${session.id}`,
+      name: `${session.title ?? session.id} · ${session.worktree?.branch ?? t("memory.temporary")}`,
+    })), [sessions, t]);
+  const { selectedProjectPath, setSelectedProjectPath, options } = useAgentProjects(sessionOptions);
   const scope = (path: string) =>
     path.startsWith("session:") ? { sessionId: path.slice(8) } : { projectPath: path };
   const [settings, setSettings] = useState<OmpMemorySettings>(DEFAULT_OMP_MEMORY);
@@ -158,13 +164,6 @@ export function MemorySettingsPage() {
               .map((option) => (
                 <option key={option.path} value={option.path ?? ""}>
                   {option.name}
-                </option>
-              ))}
-            {sessions
-              .filter((session) => session.engine === "omp" && (session.worktree || !session.projectPath))
-              .map((session) => (
-                <option key={session.id} value={`session:${session.id}`}>
-                  {session.title ?? session.id} · {session.worktree?.branch ?? t("memory.temporary")}
                 </option>
               ))}
           </select>

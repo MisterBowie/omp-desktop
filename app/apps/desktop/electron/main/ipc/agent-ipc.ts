@@ -330,19 +330,8 @@ export function registerAgentIpc({
 
   handle(IPC.invoke.agentPrompt, async (req: AgentPromptRequest) => {
     if (req.sessionId.startsWith("native-pi:")) {
-      // A native Pi session is Pi by construction; it has no engine choice to
-      // read, so the Pi runtime is required first.
-      if (!sidecar) throw new Error("sidecar unavailable");
-      if (req.sessionMessageId || req.truncateFromMessageId || req.truncateBefore !== undefined || req.attachments?.length) {
-        throw Object.assign(new Error("Native Pi continuation currently supports text prompts only"), {
-          errorCode: ErrorCodes.INVALID_ARGUMENT,
-        });
-      }
-      setNotificationViewingSessionId(req.sessionId);
-      return sidecar.call("agent.prompt", {
-        sessionId: req.sessionId,
-        content: req.content,
-        userMessageId: req.messageId,
+      throw Object.assign(new Error("Pi sessions are not supported; create an OMP chat"), {
+        errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
       });
     }
     if (!host) throw new Error("host unavailable");
@@ -393,6 +382,12 @@ export function registerAgentIpc({
       throw planGoalCursorError(planGoalRefusal);
     }
     if (promptEngine === "omp") {
+      if (sessionMessage) {
+        throw Object.assign(new Error("OMP does not yet persist collaboration-message origins"), {
+          errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+          engine: "omp", area: "session collaboration",
+        });
+      }
       // The OMP runtime owns this session's transcript, its tools and its
       // approvals. Queued inputs return through this same engine boundary;
       // the Pi sidecar is never entered. The user's optimistic row settles,

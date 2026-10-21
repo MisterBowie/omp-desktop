@@ -30,9 +30,9 @@ import type { SessionSource } from "./types/sessions.js";
 import { PROPOSAL_KINDS } from "./types.js";
 
 describe("engine identity", () => {
-  it("resolves every unknown or absent value to Pi, never to a newer engine", () => {
+  it("defaults new and absent engine values to OMP", () => {
     for (const value of [undefined, null, "", "PI", "OMP", "pi-native", "remote", "claude", 7, {}]) {
-      expect(normalizeEngineId(value)).toBe("pi");
+      expect(normalizeEngineId(value)).toBe("omp");
     }
     expect(normalizeEngineId("pi")).toBe("pi");
     expect(normalizeEngineId("omp")).toBe("omp");
@@ -89,15 +89,15 @@ describe("engine capabilities", () => {
       goal: true,
     };
     for (const key of ENGINE_CAPABILITY_KEYS) {
-      expect(PI_ENGINE_CAPABILITIES[key], `pi.${key}`).toBe(true);
+      expect(PI_ENGINE_CAPABILITIES[key], `pi.${key}`).toBe(false);
       expect(OMP_ENGINE_CAPABILITIES[key], `omp.${key}`).toBe(shipped[key] === true);
     }
   });
 
   it("gates contract modes by the engine declaration, never by the runtime phase", () => {
     for (const engine of ENGINE_IDS) {
-      expect(engineSupportsContractMode(engine, "plan")).toBe(true);
-      expect(engineSupportsContractMode(engine, "goal")).toBe(true);
+      expect(engineSupportsContractMode(engine, "plan")).toBe(engine === "omp");
+      expect(engineSupportsContractMode(engine, "goal")).toBe(engine === "omp");
       // Agent names no contract mode: there is nothing to declare.
       expect(engineSupportsContractMode(engine, "agent")).toBe(true);
       expect(engineSupportsContractMode(engine, "chat")).toBe(true);
@@ -115,7 +115,7 @@ describe("engine capabilities", () => {
       expect(contractModeCapability(kind)).toBe(kind);
     }
     // What the shipped engines actually gate is read from the same keys.
-    expect(PI_ENGINE_CAPABILITIES.plan && PI_ENGINE_CAPABILITIES.goal).toBe(true);
+    expect(PI_ENGINE_CAPABILITIES.plan && PI_ENGINE_CAPABILITIES.goal).toBe(false);
     expect(OMP_ENGINE_CAPABILITIES.plan && OMP_ENGINE_CAPABILITIES.goal).toBe(true);
   });
 
@@ -135,7 +135,7 @@ describe("engine capabilities", () => {
 
   it("closes capabilities whenever the runtime is not up", () => {
     const idle = liveEngineCapabilities("pi", "idle");
-    expect(idle.prompt).toBe(true);
+    expect(idle.prompt).toBe(false);
     for (const phase of ["stopped", "starting", "failed"] as const) {
       const closed = liveEngineCapabilities("pi", phase);
       for (const key of ENGINE_CAPABILITY_KEYS) {
@@ -150,7 +150,7 @@ describe("engine capabilities", () => {
 describe("session engine references", () => {
   it("builds a complete reference from partial input", () => {
     expect(sessionEngineRef()).toEqual({
-      engine: "pi",
+      engine: "omp",
       adapterVersion: ENGINE_ADAPTER_VERSION,
       runtimeVersion: null,
       nativeSessionId: null,
@@ -158,13 +158,13 @@ describe("session engine references", () => {
     });
   });
 
-  it("treats a legacy record as Pi and keeps native handles", () => {
+  it("defaults a partial native reference to OMP", () => {
     const ref = sessionEngineRef({
       runtimeVersion: "18.3.0",
       nativeSessionId: "abc",
       nativeSessionPath: "/tmp/abc.jsonl",
     });
-    expect(ref.engine).toBe("pi");
+    expect(ref.engine).toBe("omp");
     expect(ref.runtimeVersion).toBe("18.3.0");
     expect(ref.nativeSessionId).toBe("abc");
     expect(ref.nativeSessionPath).toBe("/tmp/abc.jsonl");

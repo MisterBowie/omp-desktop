@@ -1,0 +1,658 @@
+{
+  "date": "2026-10-21",
+  "scope": "Fresh OMP-only product; no Pi history or credential migration",
+  "supersedes": "Memory-chat-engine-20261021.json compatibility-stage receipt",
+  "delivery": "local-uncommitted-source-only; no installer, installation, push or release",
+  "baseCommit": "4f5eb9c59bdb554450180a49bc5d1d921bab2eed",
+  "originMainAtPreparation": "a23bfb9befea327e7924efd3004e030a11b587d2",
+  "branch": "codex/fix-memory-capture",
+  "worktree": "/Users/vv/person/omp-desktop/.worktrees/fix-memory-capture",
+  "environment": {
+    "node": "24.14.0",
+    "pnpm": "10.34.5",
+    "platform": "darwin-arm64",
+    "rust": "nightly-2026-08-12 (1.99.0-nightly 3d6c19bb9)"
+  },
+  "version": "0.1.3",
+  "schemaVersion": 22,
+  "submodules": [
+    "62bc57be1b03ef0802a33cf7f5f530e534527531 upstream/oh-my-pi (62bc57b)",
+    " 0111e306c120ad5820688d7608cb37bad8fbcc1f upstream/pi-desktop (0111e30)"
+  ],
+  "nativeRuntime": {
+    "version": "18.3.0",
+    "patchLevel": "62bc57b+omp-desktop.7",
+    "forkCommit": "edec3898d44071206ec201beebea432a2786bd8c",
+    "binarySha256": "45ff07e13e2b2404f03b1b385b6dfe1a450e5f290e42a5fb13c94405307146a4",
+    "resources": "/Users/vv/person/omp-desktop/.worktrees/mnemopi-memory/app/.artifacts/omp-013-runtime",
+    "usedReadOnly": true
+  },
+  "checks": [
+    {
+      "id": "omp-only-red",
+      "command": "node --test apps/desktop/test/omp-only-product.test.mjs",
+      "cwd": "app",
+      "exit": 1,
+      "log": "OMP-only-product-20261021/omp-only-red.log.gz",
+      "logSha256": "72f2771c28c9fa3446c636d1efe69c634f92af0f3fd259f721a412d3facf5c70",
+      "tests": 2,
+      "pass": 0,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "id": "omp-only-green",
+      "command": "node --test apps/desktop/test/omp-only-product.test.mjs",
+      "cwd": "app",
+      "exit": 0,
+      "log": "OMP-only-product-20261021/omp-only-green.log.gz",
+      "logSha256": "7e2c743470fadc6a1ee1ba5d149a947cffa05957c881571353160963f114d668",
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "id": "first-host",
+      "command": "cargo test -p host-core --locked",
+      "cwd": "app",
+      "exit": 101,
+      "log": "OMP-only-product-20261021/omp-only-host.log.gz",
+      "logSha256": "f57e732db416f308dd784179e2a1384e38e52d0ff6f398df5f2d20ce75f84a09",
+      "passCount": 646,
+      "failCount": 2
+    },
+    {
+      "id": "host-before-final-closure",
+      "command": "cargo test -p host-core --locked",
+      "cwd": "app",
+      "exit": 0,
+      "log": "OMP-only-product-20261021/omp-only-host-final.log.gz",
+      "logSha256": "f68407217b86ccc5a2d0d87286285ec43076baa3c03efd645201b27b262ecd29",
+      "passCount": 649,
+      "failCount": 0
+    },
+    {
+      "id": "host",
+      "command": "cargo test -p host-core --locked",
+      "cwd": "app",
+      "exit": 0,
+      "log": "OMP-only-product-20261021/omp-only-host-verified.log.gz",
+      "logSha256": "5893eccf38c0171d21bf883bfb8ff7aeebe0ced57c4e1b78a3815f9d6e59f898",
+      "passCount": 651,
+      "failCount": 0
+    },
+    {
+      "id": "host-build",
+      "command": "cargo build -p host-core --locked",
+      "cwd": "app",
+      "exit": 0,
+      "log": "OMP-only-product-20261021/omp-only-host-build-accepted.log.gz",
+      "logSha256": "f88ca1e61fdee7d05e993fd8039508bb0950f9e8e67715ee8da9a705edba967a"
+    },
+    {
+      "id": "shared",
+      "command": "pnpm --filter @pi-desktop/shared test",
+      "cwd": "app",
+      "exit": 0,
+      "log": "OMP-only-product-20261021/omp-only-shared-final.log.gz",
+      "logSha256": "71ab12eb629d2296c8165e88d004106c59f2e7bdc986d67dae9d24ff74d8c4af",
+      "passCount": 1000,
+      "distinctSourceTests": 500,
+      "includesGeneratedDistCopies": true
+    },
+    {
+      "id": "first-desktop-full",
+      "command": "node --test --test-concurrency=2 test/*.test.mjs",
+      "cwd": "app/apps/desktop",
+      "exit": 1,
+      "log": "OMP-only-product-20261021/omp-only-desktop-full.log.gz",
+      "logSha256": "646fa44c86fcab720921c90dd6f6d2eca327859e77a9187cbe2879304856a9da",
+      "tests": 3178,
+      "pass": 3108,
+      "fail": 43,
+      "cancelled": 0,
+      "skipped": 27
+    },
+    {
+      "id": "native-enabled-desktop-before-fixture-fix",
+      "command": "OMP_BUNDLED_RESOURCES=/Users/vv/person/omp-desktop/.worktrees/mnemopi-memory/app/.artifacts/omp-013-runtime OMP_E2E_PACKAGED_RESOURCES=/Users/vv/person/omp-desktop/.worktrees/mnemopi-memory/app/.artifacts/omp-013-runtime OMP_MEMORY_TEST_RUNTIME=/Users/vv/person/omp-desktop/.worktrees/mnemopi-memory/app/.artifacts/omp-013-runtime/omp-runtime/omp node --test --test-concurrency=2 test/*.test.mjs",
+      "cwd": "app/apps/desktop",
+      "exit": 1,
+      "log": "OMP-only-product-20261021/omp-only-desktop-full-final.log.gz",
+      "logSha256": "0477e33947c407e5187f2069e37c9141f623c07204e1fe9beb309d780488a419",
+      "tests": 3178,
+      "pass": 3168,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 9
+    },
+    {
+      "id": "final-targeted",
+      "command": "node --test apps/desktop/test/omp-only-product.test.mjs apps/desktop/test/omp-mode-capability-render.test.mjs apps/desktop/test/main-wiring-contract.test.mjs apps/desktop/test/engine-session-ipc.test.mjs apps/desktop/test/engine-router.test.mjs apps/desktop/test/engine-runtime.test.mjs apps/desktop/test/engine-ipc-gates.test.mjs apps/desktop/test/omp-release-gate.test.mjs apps/desktop/test/agent-runtime-bundle-package.test.mjs apps/desktop/test/packaging-footprint.test.mjs apps/desktop/test/native-pi-sessions.test.mjs apps/desktop/test/plan-drain-engine-gate.test.mjs apps/desktop/test/session-message-input.test.mjs apps/desktop/test/settings-developer-only-destinations.test.mjs apps/desktop/test/thinking-ui.test.mjs apps/desktop/test/memory-settings-user-path.test.mjs apps/desktop/test/omp-chat-creation.test.mjs apps/desktop/test/omp-memory.test.mjs",
+      "cwd": "app",
+      "exit": 0,
+      "log": "OMP-only-product-20261021/omp-only-final-targeted.log.gz",
+      "logSha256": "a84f6ed980c371370b8b86073c86b9648bc64f15ef2b26a5f7ce05579ca8582c",
+      "tests": 147,
+      "pass": 147,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "id": "final-remote-boundary",
+      "command": "node --test apps/desktop/test/omp-only-product.test.mjs apps/desktop/test/omp-only-remote-hosts.test.mjs apps/desktop/test/engine-router.test.mjs apps/desktop/test/engine-runtime.test.mjs",
+      "cwd": "app",
+      "exit": 0,
+      "log": "OMP-only-product-20261021/omp-only-final-remote.log.gz",
+      "logSha256": "713d2f46ee20fa4b625908a3923fcc1032d9896333bd31a066b74f8f8bd91bac",
+      "tests": 25,
+      "pass": 25,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "id": "sandbox-retry-interrupted",
+      "command": "OMP_BUNDLED_RESOURCES=/Users/vv/person/omp-desktop/.worktrees/mnemopi-memory/app/.artifacts/omp-013-runtime OMP_E2E_PACKAGED_RESOURCES=/Users/vv/person/omp-desktop/.worktrees/mnemopi-memory/app/.artifacts/omp-013-runtime OMP_MEMORY_TEST_RUNTIME=/Users/vv/person/omp-desktop/.worktrees/mnemopi-memory/app/.artifacts/omp-013-runtime/omp-runtime/omp node --test --test-concurrency=2 test/*.test.mjs",
+      "cwd": "app/apps/desktop",
+      "exit": 1,
+      "log": "OMP-only-product-20261021/omp-only-desktop-accepted.log.gz",
+      "logSha256": "d36746f4d5012f794dad63411641b2946b0739e64dd2503f902888548c8d2fd3",
+      "reason": "Sandbox rejected localhost listeners with EPERM; this run was interrupted.",
+      "tests": 1310,
+      "pass": 1000,
+      "fail": 35,
+      "cancelled": 275,
+      "skipped": 0
+    },
+    {
+      "id": "full-native-enabled-desktop-before-final-host-closure",
+      "command": "OMP_BUNDLED_RESOURCES=/Users/vv/person/omp-desktop/.worktrees/mnemopi-memory/app/.artifacts/omp-013-runtime OMP_E2E_PACKAGED_RESOURCES=/Users/vv/person/omp-desktop/.worktrees/mnemopi-memory/app/.artifacts/omp-013-runtime OMP_MEMORY_TEST_RUNTIME=/Users/vv/person/omp-desktop/.worktrees/mnemopi-memory/app/.artifacts/omp-013-runtime/omp-runtime/omp node --test --test-concurrency=2 test/*.test.mjs",
+      "cwd": "app/apps/desktop",
+      "exit": 0,
+      "log": "OMP-only-product-20261021/omp-only-desktop-verified.log.gz",
+      "logSha256": "84715b2bb7008c1a0e45db2c71c37d9c2acd93554f4d35c6ad6a09034a48553e",
+      "sandbox": "approved localhost test execution",
+      "tests": 3179,
+      "pass": 3170,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 9
+    },
+    {
+      "id": "final-host-no-import-red",
+      "command": "cargo test -p host-core --locked omp_only_",
+      "cwd": "app",
+      "exit": 101,
+      "log": "OMP-only-product-20261021/omp-only-no-import-red.log.gz",
+      "logSha256": "36586716c65a0c4f98c8e1920aa7e478e99f4fb720ea292b77b83a9abf103243",
+      "passCount": 0,
+      "failCount": 2
+    },
+    {
+      "id": "final-host-fixture-compile-failure",
+      "command": "cargo test -p host-core --locked",
+      "cwd": "app",
+      "exit": 101,
+      "log": "OMP-only-product-20261021/omp-only-no-import-compile.log.gz",
+      "logSha256": "27914617782f3a365448066c18fee9685284913bccdff9eb20f0a60bffd9c58d",
+      "reason": "New test fixture missing crate qualifier; corrected before final host run."
+    },
+    {
+      "id": "final-host-wiring-desktop",
+      "command": "node --test apps/desktop/test/main-wiring-contract.test.mjs apps/desktop/test/omp-only-product.test.mjs apps/desktop/test/plugin-session-refresh.test.mjs",
+      "cwd": "app",
+      "exit": 0,
+      "log": "OMP-only-product-20261021/omp-only-no-import-desktop.log.gz",
+      "logSha256": "c07487cd5a7bcff8b56cb393ee76d35744bed9192d2089218b8f0d6f8b14ef63",
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "id": "final-native",
+      "command": "OMP_BUNDLED_RESOURCES=/Users/vv/person/omp-desktop/.worktrees/mnemopi-memory/app/.artifacts/omp-013-runtime OMP_E2E_PACKAGED_RESOURCES=/Users/vv/person/omp-desktop/.worktrees/mnemopi-memory/app/.artifacts/omp-013-runtime OMP_MEMORY_TEST_RUNTIME=/Users/vv/person/omp-desktop/.worktrees/mnemopi-memory/app/.artifacts/omp-013-runtime/omp-runtime/omp node --test --test-concurrency=2 test/omp-memory-native-e2e.test.mjs test/omp-session-persistence-e2e.test.mjs test/omp-worktree-e2e.test.mjs",
+      "cwd": "app/apps/desktop",
+      "exit": 0,
+      "log": "OMP-only-product-20261021/omp-only-final-native.log.gz",
+      "logSha256": "36ae736a68aed9268cb4b43035fc26a6f2969448b5897ada74739b056154299a",
+      "tests": 3,
+      "pass": 3,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "id": "build-js",
+      "command": "pnpm build:js",
+      "cwd": "app",
+      "exit": 0,
+      "log": "OMP-only-product-20261021/omp-only-build-verified.log.gz",
+      "logSha256": "7355408651706524f33228bc4d802202a999f7435f51ad736b1cd2977c63479b"
+    },
+    {
+      "id": "final-desktop-build",
+      "command": "pnpm --filter @pi-desktop/desktop build",
+      "cwd": "app",
+      "exit": 0,
+      "log": "OMP-only-product-20261021/omp-only-build-host-final.log.gz",
+      "logSha256": "755ef5878fac526e3282c349f9bb8916abe1f12ba1287ec8c777a1b3185eefb4"
+    },
+    {
+      "id": "typecheck",
+      "command": "pnpm --filter @pi-desktop/desktop typecheck",
+      "cwd": "app",
+      "exit": 0,
+      "log": "OMP-only-product-20261021/omp-only-typecheck-host-final.log.gz",
+      "logSha256": "4d62ddfbcdf592b18d39ae0effca100274f4e51fe96470fc4cb2ef9e73d11a10"
+    },
+    {
+      "id": "lint",
+      "command": "pnpm lint",
+      "cwd": "app",
+      "exit": 0,
+      "log": "OMP-only-product-20261021/omp-only-lint-host-final.log.gz",
+      "logSha256": "59e521446c301208e5da9c103ea799bfae3a736df05819dbbd76fe2bff572f5b"
+    },
+    {
+      "id": "docs",
+      "command": "pnpm docs:check",
+      "cwd": "app",
+      "exit": 0,
+      "log": "OMP-only-product-20261021/omp-only-docs-host-final.log.gz",
+      "logSha256": "645322c50c49eddaf3a53438fe1b3b0610ed5aab2d2916e19231002a1556cfe2",
+      "specPairs": 80,
+      "pages": 522
+    },
+    {
+      "id": "fmt",
+      "command": "cargo fmt --check",
+      "cwd": "app",
+      "exit": 0,
+      "log": "OMP-only-product-20261021/omp-only-fmt-accepted.log.gz",
+      "logSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "id": "clippy",
+      "command": "cargo clippy -p host-core --all-targets --locked",
+      "cwd": "app",
+      "exit": 0,
+      "log": "OMP-only-product-20261021/omp-only-clippy-accepted.log.gz",
+      "logSha256": "4104e8ae32c2ab0a4bd0bbcff23fb78f233a8ff0f9893446544dd908bc2a8f73"
+    },
+    {
+      "id": "production-bundle-and-package",
+      "command": "node --input-type=module -e <assert built Main excludes AgentSidecar/createSidecarRuntime/createEventPersistence; assert extraResources excludes agent-runtime and scripts exclude bundle:runtime>",
+      "cwd": "app",
+      "exit": 0,
+      "log": "OMP-only-product-20261021/omp-only-bundle-verified.log.gz",
+      "logSha256": "3a8c56cc2b6150435297de299726bf406e164121f6ca8d83e34412277bcbfc26"
+    }
+  ],
+  "supportingLogs": [
+    {
+      "name": "omp-only-build",
+      "log": "OMP-only-product-20261021/omp-only-build.log.gz",
+      "logSha256": "3f9f55e631aca708b58f9dd833335d361325caa0a06fd5b48ae424e56789ce3e"
+    },
+    {
+      "name": "omp-only-clippy-host-final",
+      "log": "OMP-only-product-20261021/omp-only-clippy-host-final.log.gz",
+      "logSha256": "bbd471434d3856b2d87023673238259e5f98921ed93595d773a531e6f26c5436"
+    },
+    {
+      "name": "omp-only-clippy-verified",
+      "log": "OMP-only-product-20261021/omp-only-clippy-verified.log.gz",
+      "logSha256": "da47ae2d693bb3b641e54a5d799a4685054609c89c2edf0695d836fb4f8cabd9"
+    },
+    {
+      "name": "omp-only-clippy",
+      "log": "OMP-only-product-20261021/omp-only-clippy.log.gz",
+      "logSha256": "9ecf36ae32acb9a302b489c05c389d94f6631eac4f5ca2e6c75cfc254b886fbe"
+    },
+    {
+      "name": "omp-only-desktop-repair",
+      "log": "OMP-only-product-20261021/omp-only-desktop-repair.log.gz",
+      "logSha256": "7167b46c886c97ba45bccee8863ca4bdb847083a8b1588e1af428d9519239081"
+    },
+    {
+      "name": "omp-only-desktop",
+      "log": "OMP-only-product-20261021/omp-only-desktop.log.gz",
+      "logSha256": "3c48000c6c7b9daca4e8dd2a90232c29c25a67bdcb7b4b0207bad4fdbfc4a0b3"
+    },
+    {
+      "name": "omp-only-diff-check",
+      "log": "OMP-only-product-20261021/omp-only-diff-check.log.gz",
+      "logSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "name": "omp-only-docs-verified",
+      "log": "OMP-only-product-20261021/omp-only-docs-verified.log.gz",
+      "logSha256": "645322c50c49eddaf3a53438fe1b3b0610ed5aab2d2916e19231002a1556cfe2"
+    },
+    {
+      "name": "omp-only-docs",
+      "log": "OMP-only-product-20261021/omp-only-docs.log.gz",
+      "logSha256": "645322c50c49eddaf3a53438fe1b3b0610ed5aab2d2916e19231002a1556cfe2"
+    },
+    {
+      "name": "omp-only-fmt-host-final",
+      "log": "OMP-only-product-20261021/omp-only-fmt-host-final.log.gz",
+      "logSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "name": "omp-only-fmt-verified",
+      "log": "OMP-only-product-20261021/omp-only-fmt-verified.log.gz",
+      "logSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "name": "omp-only-host-build-verified",
+      "log": "OMP-only-product-20261021/omp-only-host-build-verified.log.gz",
+      "logSha256": "acce87f247c071570ebced03d440c616a1391d77b82962702116e560f1c6b0a6"
+    },
+    {
+      "name": "omp-only-host-build",
+      "log": "OMP-only-product-20261021/omp-only-host-build.log.gz",
+      "logSha256": "05fb970ceaafc407ee9bf54bed59c0211b816a09646d26f44dff28a6fb6bf934"
+    },
+    {
+      "name": "omp-only-lint-verified",
+      "log": "OMP-only-product-20261021/omp-only-lint-verified.log.gz",
+      "logSha256": "c33501cfe34957a937bd9dec3b144f0bd1b082dd59a95652176125074dce31e5"
+    },
+    {
+      "name": "omp-only-lint",
+      "log": "OMP-only-product-20261021/omp-only-lint.log.gz",
+      "logSha256": "583f42d071f29e3df66800e6b64e30ee1e90f44ed3849afbdf9d2027c7ceea04"
+    },
+    {
+      "name": "omp-only-policy-tests",
+      "log": "OMP-only-product-20261021/omp-only-policy-tests.log.gz",
+      "logSha256": "daf6ed1927a4066e4707ee25d25301a66a82eac89e6e1a2350ac14a327329108"
+    },
+    {
+      "name": "omp-only-rust-fmt-final",
+      "log": "OMP-only-product-20261021/omp-only-rust-fmt-final.log.gz",
+      "logSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "name": "omp-only-rust-fmt",
+      "log": "OMP-only-product-20261021/omp-only-rust-fmt.log.gz",
+      "logSha256": "a4fabaf004eaa0e3fae353e60d43954378c43290f135ab2989a4ce6ca140c173"
+    },
+    {
+      "name": "omp-only-shared",
+      "log": "OMP-only-product-20261021/omp-only-shared.log.gz",
+      "logSha256": "4512be4e9ff9525e7d124b3f01258dbf759f0da0840a3964eff40a7d7cbbf094"
+    },
+    {
+      "name": "omp-only-typecheck-final",
+      "log": "OMP-only-product-20261021/omp-only-typecheck-final.log.gz",
+      "logSha256": "4d62ddfbcdf592b18d39ae0effca100274f4e51fe96470fc4cb2ef9e73d11a10"
+    },
+    {
+      "name": "omp-only-typecheck-verified",
+      "log": "OMP-only-product-20261021/omp-only-typecheck-verified.log.gz",
+      "logSha256": "4d62ddfbcdf592b18d39ae0effca100274f4e51fe96470fc4cb2ef9e73d11a10"
+    },
+    {
+      "name": "omp-only-typecheck",
+      "log": "OMP-only-product-20261021/omp-only-typecheck.log.gz",
+      "logSha256": "4d62ddfbcdf592b18d39ae0effca100274f4e51fe96470fc4cb2ef9e73d11a10"
+    }
+  ],
+  "testedSourceManifestSha256": "b2a66132ace0b630245a6c6ab867597ca2a1370871be0b3be848a07b8cf326e0",
+  "testedSourceFiles": [
+    {
+      "path": "HANDOFF.md",
+      "sha256": "9f73cf6a080e38974cbb6fbbaf54b05acd69def7153e62d41617b283b9059ef4"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/bootstrap/startup.ts",
+      "sha256": "1b2b285a878c23bcd9cfdd4a79322635c1a6e7ca29687c050eec98a7444e7f7b"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/index.ts",
+      "sha256": "fa4bf9cdccc72fc2daea5f629cc69a9af5d29099f2f443856a7b20a914eafde3"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/ipc/agent-ipc.ts",
+      "sha256": "019d0ed056c20aafa1abc2c413ccf03051bf11d9bf94b0620075dcc840aa84ab"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/ipc/remote-host-ipc.ts",
+      "sha256": "96f56b52ebc77fa294a13a162492208896c0b69c430cfa92ed789589dd82339c"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/ipc/session-ipc.ts",
+      "sha256": "aa1ff400a9a09ae25ef6c143b5dedaacbf266e9a7c52737bade3884fd4acdaf3"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/runtime/engine-router.ts",
+      "sha256": "440e55d727c2ef7e598938385c809e3a03e3ae03bc453dddbd90b7e0e3651a0e"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/runtime/engine-runtime.ts",
+      "sha256": "350321db4002fdf32f8fa6df8c3ad2ca27e83f50e6b1c9fb8e2d1f853105e1ab"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/runtime/host.ts",
+      "sha256": "4df9e4154417f530695a7129b144d77ce8143f81a7254191cd1d7886e41c9d03"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/runtime/lifecycle.ts",
+      "sha256": "db186014128d5a6c2bbb57715b5ca6fab72b3d8db7732770d9eb9f00b0c1cb57"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/services/session-search.ts",
+      "sha256": "98ef5f03f06cc416c837ec8c36bd795e40f85550265d71235c3c0fdc551bfdc7"
+    },
+    {
+      "path": "app/apps/desktop/package.json",
+      "sha256": "bf3ed3a6035e8741e355a66d197bdc599cae45f89a408b566ee2aff30e7c843a"
+    },
+    {
+      "path": "app/apps/desktop/src/components/settings/AgentCapabilityLayout.tsx",
+      "sha256": "e8d286daca0d162e08cf7f5aae9803593c18f974b57f3a46ce43142b7c97c9e5"
+    },
+    {
+      "path": "app/apps/desktop/src/features/settings/MemorySettingsPage.tsx",
+      "sha256": "a56cc844615f37db6c36a943754dd00e3b70bb0243ee633b8c2a9aadf23e2292"
+    },
+    {
+      "path": "app/apps/desktop/src/lib/settings-search.ts",
+      "sha256": "61c7aac21cdbb03f99e86330f186d3610b4c4098839287a8b05865a4965c59c7"
+    },
+    {
+      "path": "app/apps/desktop/src/stores/runtime/session-coordination.ts",
+      "sha256": "1536d8c0700af85680082ef2dcdd21ea35430e0588ad530c2055ce7b65ef1ab4"
+    },
+    {
+      "path": "app/apps/desktop/src/stores/slices/session-slice.ts",
+      "sha256": "b4fecd7e5231eecd1187b2061f47e96d5580f77e964acd0f81c80da1f3a7fd8b"
+    },
+    {
+      "path": "app/apps/desktop/test/agent-runtime-bundle-package.test.mjs",
+      "sha256": "6973727dae46df20004535b11fd459a3e94dd835c497994f60e6cf183cde0593"
+    },
+    {
+      "path": "app/apps/desktop/test/engine-ipc-gates.test.mjs",
+      "sha256": "c266159b140391980e9b850ca4de359d1830e2449386089091b5c8743e8c41b6"
+    },
+    {
+      "path": "app/apps/desktop/test/engine-router.test.mjs",
+      "sha256": "a29ee44c0710be014edc4200e6d7d7cbb400b3d806d4ea78066e2a6333f76bc6"
+    },
+    {
+      "path": "app/apps/desktop/test/engine-runtime.test.mjs",
+      "sha256": "f9a9037111d840b9b85a7e1e5e10f6a1311cf6f6c2cb437023954d0fc1cd5238"
+    },
+    {
+      "path": "app/apps/desktop/test/engine-session-ipc.test.mjs",
+      "sha256": "e2e166e18eea8d7a87f42bccf62c019baedecc93ccda08f61d9ac29c9d396c54"
+    },
+    {
+      "path": "app/apps/desktop/test/main-wiring-contract.test.mjs",
+      "sha256": "ed1c892679f1dd735e8ce28be174e24e1516a527468d4283e3330c80f2b5fcd5"
+    },
+    {
+      "path": "app/apps/desktop/test/memory-settings-user-path.test.mjs",
+      "sha256": "4413f54c5025a573aa708cb23d62f3f0326a1abf2018b4d85c80e5b991f29ce2"
+    },
+    {
+      "path": "app/apps/desktop/test/native-pi-sessions.test.mjs",
+      "sha256": "ae4c0d42f90ce49aff35c5bd41532c895c59cd9ae59827b5d95acda4c2c5eed9"
+    },
+    {
+      "path": "app/apps/desktop/test/omp-chat-creation.test.mjs",
+      "sha256": "5cbdd15f58efe4b67bf6410e7dab8cf3046f2ccb66d982c5b50d493060ef34af"
+    },
+    {
+      "path": "app/apps/desktop/test/omp-memory-native-e2e.test.mjs",
+      "sha256": "4f2e8d3cda01e9fef1556b2a09333e41195124994429bba76f9d3cb5dec77b92"
+    },
+    {
+      "path": "app/apps/desktop/test/omp-mode-capability-render.test.mjs",
+      "sha256": "5ef478565f93663cd5b4de3d748636d4d1a73d21e301f99961a401aff0084701"
+    },
+    {
+      "path": "app/apps/desktop/test/omp-only-product.test.mjs",
+      "sha256": "64d9030b0c1d058f26b3a3ce0b60edad55caf13366f67c12207965b7d8e829ad"
+    },
+    {
+      "path": "app/apps/desktop/test/omp-only-remote-hosts.test.mjs",
+      "sha256": "109bd732260dce3d1f3b00a2ba227ad15ed13406b821c4ea3c8117ad20ac7791"
+    },
+    {
+      "path": "app/apps/desktop/test/omp-release-gate.test.mjs",
+      "sha256": "4c89a767a05bcc9e02b4fcb6e74debf080f64f974374cf0764bebd52792effda"
+    },
+    {
+      "path": "app/apps/desktop/test/packaging-footprint.test.mjs",
+      "sha256": "0ff9551fc1b3e15f0718d8b7debaa6a41dffd12ff9d78b98e90f73cebee7b57a"
+    },
+    {
+      "path": "app/apps/desktop/test/plan-drain-engine-gate.test.mjs",
+      "sha256": "196a20fe0a27fcd4932ec4f3785a0097f33bddd84fd4e671f51176d1c9565dd7"
+    },
+    {
+      "path": "app/apps/desktop/test/session-message-input.test.mjs",
+      "sha256": "c7196b0a9714e75da7d5ee26d791788210cd599d1a6fd8edbd2d432524176195"
+    },
+    {
+      "path": "app/apps/desktop/test/settings-developer-only-destinations.test.mjs",
+      "sha256": "3cd147027e53faea6ec02c34273a56bc21445d97e99e689e321b38bb4f536814"
+    },
+    {
+      "path": "app/apps/desktop/test/thinking-ui.test.mjs",
+      "sha256": "52d2217228b7f6cb94f39b35d547ee09abe7b2e1e518b804fb4c48a77d519881"
+    },
+    {
+      "path": "app/crates/host-core/src/db/schema.rs",
+      "sha256": "8604228670f009b1fc65ed48052ed4b448340e0f8c5e49fcc216742533a7cc30"
+    },
+    {
+      "path": "app/crates/host-core/src/db/tests.rs",
+      "sha256": "5893d456ada0a87667b258b79cd6c867c0d8989f0a9d374a75e6b5585b9a1f2c"
+    },
+    {
+      "path": "app/crates/host-core/src/plan_goal_guard.rs",
+      "sha256": "6f9e6543bf703100acba98fc43821871aaabe1b87f3c2216e3f84f0ddba82636"
+    },
+    {
+      "path": "app/crates/host-core/src/rpc/mod.rs",
+      "sha256": "e0531bb750d7d8ef7433c5b3c4227eef2538663277691622deaae02cb1a45ee2"
+    },
+    {
+      "path": "app/crates/host-core/src/session_collaboration/tests.rs",
+      "sha256": "e3e17679dd4e4ee3eb068675adc75e360228a6bb0798572dfc766e3c17560da9"
+    },
+    {
+      "path": "app/crates/host-core/src/session_search.rs",
+      "sha256": "ed7663e40a0c676ac05ee4e041ec5e73b7375ac7c48c819560e4b9cd8d69a257"
+    },
+    {
+      "path": "app/crates/host-core/src/sessions.rs",
+      "sha256": "52c49f0bee7aebcb2b7bc0735d355b84deffa99a666727dec077027ed581e9a5"
+    },
+    {
+      "path": "app/crates/host-core/src/state.rs",
+      "sha256": "6faa8943d689136064e9ab1f909c427059a4671a3a568f9da119c8258ed5357a"
+    },
+    {
+      "path": "app/crates/host-core/src/transcripts.rs",
+      "sha256": "75a8269b2de27d7153d5a658ab37977cf8139102e3aaf9b913c91fe00a9ff5f5"
+    },
+    {
+      "path": "app/docs/adr/0331-omp-only-product.md",
+      "sha256": "3df6a9d43f443740c1b58aa67c09bf71c2aaf4aafe461c1faac6f2af6f81c546"
+    },
+    {
+      "path": "app/docs/adr/README.md",
+      "sha256": "f13f9dd8780d391f5f364f2820b6dd734d48fdca285e40babcda534802a8c02c"
+    },
+    {
+      "path": "app/docs/spec/03-runtime/02-agent-runtime.md",
+      "sha256": "3d2015d5e2be22d4f7a3f44047f542f7451b17dc84bb5a29271a06d006fec6b2"
+    },
+    {
+      "path": "app/docs/spec/03-runtime/22-automatic-memory.md",
+      "sha256": "ddc25a9bc253a16dcdceea9be23ccd54b25fb6551f90a42d663e8ce7db4a536f"
+    },
+    {
+      "path": "app/docs/spec/06-delivery/04-e2e-test-plan.md",
+      "sha256": "6db5a5f19521e98e010fd94d13c37826300e4cce7d4325dc525e544611aa4593"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/03-runtime/02-agent-runtime.md",
+      "sha256": "cae223dfd2db534a99f951d2419e496c3d2a9f173dedf2d7cd5eeca3316b248e"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/03-runtime/22-automatic-memory.md",
+      "sha256": "5a4d22f044db0342e2bf57d96040744ccf01e35cac880ecdbfd2c225cd4c50dc"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/06-delivery/04-e2e-test-plan.md",
+      "sha256": "edff3860bef68e75ab15f09e3117d16fe012fda76214afb7d4378852a8e9354f"
+    },
+    {
+      "path": "app/packages/shared/src/engine.test.ts",
+      "sha256": "94f00348ec78c2d6277bfe9a374db7aaf806c1779b0e59c27206bae29f7df237"
+    },
+    {
+      "path": "app/packages/shared/src/engine.ts",
+      "sha256": "f7682ca1e33e9ebfc5f96e594127aa10cc61bd135a78b46dced085df70db0878"
+    },
+    {
+      "path": "docs/00-scope-and-decisions.md",
+      "sha256": "064bd54162aa625b2e8ee857b5b1faada7e43afe3940b084e909538ac4f3c1c2"
+    },
+    {
+      "path": "docs/04-task-board.md",
+      "sha256": "2698b2b981a8c5d7f08842232ae45f22c74345f420f62ecbfdc682b29426a1ed"
+    },
+    {
+      "path": "docs/05-user-guide.md",
+      "sha256": "6ca01c3ee55e3dd310041843e7925ededcec2e96f8bcbc7bc385ee2ef3ce934f"
+    }
+  ],
+  "validationComposition": "Full desktop ran before final Rust import/recovery closure. Final source then passed full host, Main wiring, typecheck/lint/docs/build and 3 native E2Es; the full desktop suite was not rerun after that narrow closure.",
+  "overlapNotice": "Targeted combinations overlap the full desktop run; shared includes generated copies.",
+  "skippedFinalDesktop": [
+    "1 native LSP scenario requires real typescript-language-server",
+    "8 packaged-resource tamper acceptance cases require OMP_T21_RESOURCES"
+  ],
+  "notRun": [
+    "installer build",
+    "installed GUI",
+    "other platforms",
+    "real paid providers"
+  ],
+  "existingData": "No installed data writes; retired Pi rows/files remain untouched, hidden from product history."
+}

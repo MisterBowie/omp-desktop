@@ -110,7 +110,7 @@ function preflightArgs({ fixture, manifestPath }, out) {
   ];
 }
 
-test("every release command bundles the runtime, then runs the target-aware packaging step", () => {
+test("every release command builds the OMP desktop without bundling a Pi worker", () => {
   const steps = {
     pack: null,
     dist: null,
@@ -123,12 +123,8 @@ test("every release command bundles the runtime, then runs the target-aware pack
     assert.ok(command, `${script} must exist`);
     const bundle = command.indexOf("bundle:runtime");
     const wrapper = command.indexOf("release-package.mjs");
-    assert.ok(bundle > 0, `${script} must bundle the runtime`);
+    assert.equal(bundle, -1, `${script} must not bundle the retired Pi worker`);
     assert.ok(wrapper > 0, `${script} must run scripts/release-package.mjs`);
-    assert.ok(
-      bundle < wrapper,
-      `${script}: the runtime step (bundle:runtime) must precede the packaging step`,
-    );
     if (platform) {
       assert.ok(
         command.includes(`--platform ${platform}`),

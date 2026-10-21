@@ -567,6 +567,7 @@ pub fn list_inflight_sessions(data_dir: &Path) -> Result<Vec<String>> {
 
 /// Session ids that still have a live transcript file. Used to restore a
 /// missing SQLite sessions row after a WAL/index loss (D318).
+#[cfg(test)]
 pub fn list_transcript_sessions(data_dir: &Path) -> Result<Vec<String>> {
     let dir = base_dir(data_dir);
     let entries = match fs::read_dir(&dir) {

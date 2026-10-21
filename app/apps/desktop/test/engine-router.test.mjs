@@ -43,50 +43,28 @@ function routerWith(phases = {}) {
   });
 }
 
-test("a session without an engine belongs to Pi", async () => {
+test("a session without an engine defaults to OMP", () => {
   const router = routerWith();
-  assert.equal(router.engineOf({}), "pi");
-  assert.equal(router.engineOf({ engine: undefined }), "pi");
-  assert.equal(router.engineOf(null), "pi");
-  assert.equal(router.engineOf(undefined), "pi");
-  // A value this build does not know must not become the newest engine.
-  assert.equal(router.engineOf({ engine: "claude" }), "pi");
-  assert.equal(router.engineOf({ engine: "OMP" }), "pi");
-  assert.equal(router.engineOf({ engine: "omp" }), "omp");
+  for (const record of [{}, {engine: undefined}, null, undefined]) assert.equal(router.engineOf(record), "omp");
 });
 
-test("a transcript source is never read as an engine", async () => {
-  const router = routerWith();
-  // `source` answers "who owns the transcript"; feeding it to the router must
-  // not move a native or remote session onto another engine.
-  for (const source of ["desktop", "pi-native", "remote"]) {
-    assert.equal(router.engineOf({ source }), "pi", source);
-  }
+test("transcript source never selects an execution engine", () => {
+  for (const source of ["desktop", "pi-native", "remote"])
+    assert.equal(routerWith().engineOf({source}), "omp");
 });
 
-test("Pi keeps every capability open while its runtime is up", async () => {
-  const router = routerWith();
-  for (const capability of ENGINE_CAPABILITY_KEYS) {
-    assert.equal(router.require({}, capability), "pi", capability);
-  }
-});
-
-test("a stopped runtime is reported as such without reclassifying the engine", async () => {
-  const router = routerWith({ pi: "stopped" });
-  // The status surface and the affordances it feeds report the outage.
-  assert.equal(router.status("pi").phase, "stopped");
-  assert.deepEqual(router.liveCapabilities("pi"), closedEngineCapabilities());
-  // The gate itself answers a different question — whether Pi can serve a
-  // prompt at all — so a runtime that is merely down is not read as an engine
-  // that cannot serve the capability. Each path checks its own runtime and
-  // reports "sidecar unavailable"; a queued message stays queueable while the
-  // runtime restarts.
-  assert.equal(router.require({}, "prompt"), "pi");
-  // An engine whose *declaration* closes the capability is still refused.
-  assert.throws(
-    () => router.require({ engine: "omp" }, "branch"),
-    (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
+test("Pi is refused even if a retired status provider says idle", () => {
+  for (const capability of ENGINE_CAPABILITY_KEYS) assert.throws(
+    () => routerWith().require({engine: "pi"}, capability),
+    {errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE},
   );
+});
+
+test("a stopped OMP runtime retains its declared prompt capability", () => {
+  const router = routerWith({omp: "stopped"});
+  assert.equal(router.status("omp").phase, "stopped");
+  assert.deepEqual(router.liveCapabilities("omp"), closedEngineCapabilities());
+  assert.equal(router.require({}, "prompt"), "omp");
 });
 
 test("an OMP session is refused every capability this release has not shipped", async () => {
@@ -125,7 +103,7 @@ test("supports() answers without throwing, for UI affordances", async () => {
 
 test("requireContractMode refuses a declared-closed Plan/Goal before anything writes", async () => {
   // The shipped table declares both modes on both engines...
-  for (const engine of ["pi", "omp"]) {
+  for (const engine of ["omp"]) {
     for (const mode of ["plan", "goal"]) routerWith().requireContractMode(engine, mode);
   }
   // ...and a runtime that is merely stopped is an outage, not a closed
@@ -134,7 +112,7 @@ test("requireContractMode refuses a declared-closed Plan/Goal before anything wr
 
   // An engine whose declaration omits Plan is refused, with the engine, the
   // capability and the shared refusal code intact.
-  const closedPlan = { ...engineCapabilities("pi"), plan: false };
+  const closedPlan = { ...engineCapabilities("omp"), plan: false };
   const router = createEngineRouter({
     status: idleStatus,
     capabilities: (engine) => (engine === "omp" ? closedPlan : engineCapabilities(engine)),
@@ -175,18 +153,18 @@ test("a persisted Pi session is still Pi, and an OMP one is OMP", async () => {
     () => router.requireForSession("omp-session", "branch"),
     (error) => error.errorCode === ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE,
   );
-  assert.equal(await router.requireForSession("legacy-session", "prompt"), "pi");
+  await assert.rejects(router.requireForSession("legacy-session", "prompt"), {errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE});
 });
 
-test("a record without an engine field is a legacy Pi session", async () => {
+test("an omitted engine resolves to the OMP product default", async () => {
   // The only case that may read as Pi: the read succeeded and the record
   // predates the engine field.
   const router = createEngineRouter({
     status: idleStatus,
     sessionEngine: async () => null,
   });
-  assert.equal(await router.engineForSession("legacy"), "pi");
-  assert.equal(await router.requireForSession("legacy", "prompt"), "pi");
+  assert.equal(await router.engineForSession("legacy"), "omp");
+  assert.equal(await router.requireForSession("legacy", "prompt"), "omp");
 });
 
 test("a failed engine lookup refuses instead of assuming Pi", async () => {
@@ -267,5 +245,5 @@ test("engine capability declarations stay complete for both engines", async () =
   assert.equal(router.capabilities("pi"), PI_ENGINE_CAPABILITIES);
   assert.equal(router.capabilities("omp"), OMP_ENGINE_CAPABILITIES);
   // An engine the router does not know reads as Pi's declaration, never OMP's.
-  assert.equal(router.capabilities("bogus"), PI_ENGINE_CAPABILITIES);
+  assert.equal(router.capabilities("bogus"), OMP_ENGINE_CAPABILITIES);
 });

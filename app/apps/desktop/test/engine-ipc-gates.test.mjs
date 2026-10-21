@@ -164,7 +164,7 @@ test("agentGetStatus answers without the Pi runtime for an OMP session", async (
   assert.deepEqual(sidecarCalls, [], "status must not be read from a runtime that does not own the session");
 });
 
-test("the shared queue controls OMP and Pi turns after checking their durable owner", async () => {
+test("the shared queue controls OMP and refuses retired Pi owners", async () => {
   const queue = {
     sessionOf: (turnId) => (turnId === "omp-turn" ? OMP_SESSION : PI_SESSION),
   };
@@ -180,31 +180,20 @@ test("the shared queue controls OMP and Pi turns after checking their durable ow
   assert.deepEqual(listed.entries, [{ id: "queued-1" }]);
   assert.deepEqual(bridgeCalls.map((entry) => entry.op), ["push", "remove", "prioritize", "list"]);
 
-  // A Pi session still reaches the queue.
-  await handlers.get(IPC.invoke.agentQueuePush)({ sessionId: PI_SESSION, content: "hello" });
-  assert.equal(bridgeCalls.at(-1).op, "push");
+  await assert.rejects(handlers.get(IPC.invoke.agentQueuePush)({sessionId: PI_SESSION, content: "hello"}),
+    {errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE});
+  assert.equal(bridgeCalls.length, 4);
 });
 
-test("queue reorder keeps both engines in the same persisted FIFO", async () => {
-  const queue = {
-    sessionOf: (turnId) => (turnId === "omp-turn" ? OMP_SESSION : PI_SESSION),
-  };
-  const { handlers, bridgeCalls } = harness({
-    engineFor: async (id) => (id === OMP_SESSION ? "omp" : "pi"),
-    queue,
+test("queue reorder refuses a Pi owner before mutating its FIFO", async () => {
+  const {handlers, bridgeCalls} = harness({
+    engineFor: async (id) => id === OMP_SESSION ? "omp" : "pi",
+    queue: {sessionOf: (turnId) => turnId === "omp-turn" ? OMP_SESSION : PI_SESSION},
   });
-  const reorderCalls = () => bridgeCalls.filter((entry) => entry.op === "reorder");
-
-  await handlers.get(IPC.invoke.agentQueueReorder)({ turnId: "omp-turn", direction: "up" });
-
-  const moved = await handlers.get(IPC.invoke.agentQueueReorder)(
-    { turnId: "pi-turn", direction: "down" },
-  );
-  assert.deepEqual(moved, { moved: true });
-  assert.deepEqual(reorderCalls(), [
-    { op: "reorder", turnId: "omp-turn", direction: "up" },
-    { op: "reorder", turnId: "pi-turn", direction: "down" },
-  ]);
+  await handlers.get(IPC.invoke.agentQueueReorder)({turnId: "omp-turn", direction: "up"});
+  await assert.rejects(handlers.get(IPC.invoke.agentQueueReorder)({turnId: "pi-turn", direction: "down"}),
+    {errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE});
+  assert.deepEqual(bridgeCalls.filter((e) => e.op === "reorder"), [{op: "reorder", turnId: "omp-turn", direction: "up"}]);
 });
 
 test("OMP text controls work without a Pi sidecar and reject unsupported queued attachments", async () => {
@@ -267,24 +256,15 @@ test("a rejection still follows the host's own semantics", async () => {
   assert.equal(settlements.length, 1);
 });
 
-test("an approval for a Pi session still runs the transaction and dispatches", async () => {
-  const { handlers, hostCalls, settlements, dispatched } = harness({
-    engineFor: async () => "pi",
-  });
-  await handlers.get(IPC.invoke.plansResolve)({
-    proposalId: "proposal-3",
-    sessionId: PI_SESSION,
-    turnId: "turn-1",
-    toolCallId: "call-1",
-    action: "approve",
-    targetPermissionMode: "accept-edits",
-  });
-  assert.deepEqual(
-    hostCalls.filter((entry) => entry.method === "plans.resolve").map((entry) => entry.params.action),
-    ["approve"],
-  );
-  assert.equal(settlements.length, 1);
-  assert.equal(dispatched.length, 1);
+test("a Pi plan approval is refused before the transaction or dispatch", async () => {
+  const {handlers, hostCalls, settlements, dispatched} = harness({engineFor: async () => "pi"});
+  await assert.rejects(handlers.get(IPC.invoke.plansResolve)({
+    proposalId: "proposal-3", sessionId: PI_SESSION, turnId: "turn-1", toolCallId: "call-1",
+    action: "approve", targetPermissionMode: "accept-edits",
+  }), {errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE});
+  assert.deepEqual(hostCalls.filter((entry) => entry.method === "plans.resolve"), []);
+  assert.deepEqual(settlements, []);
+  assert.deepEqual(dispatched, []);
 });
 
 test("an OMP session is refused even when the Pi runtime is absent", async () => {
@@ -341,17 +321,17 @@ test("an OMP session is refused even when the Pi runtime is absent", async () =>
   assert.deepEqual(listed.entries, []);
 });
 
-test("a Pi session still reports its own runtime's absence", async () => {
+test("Pi execution remains refused when no worker is present", async () => {
   const withNothing = harness({ engineFor: async () => "pi", withSidecar: false, withBridge: false });
   // The Pi-specific availability message is preserved: the engine is Pi, the
   // capability is supported, and what is missing is the runtime.
   await assert.rejects(
     () => withNothing.handlers.get(IPC.invoke.agentAbort)({ sessionId: PI_SESSION }),
-    /sidecar unavailable/,
+    {errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE},
   );
   await assert.rejects(
     () => withNothing.handlers.get(IPC.invoke.agentQueuePush)({ sessionId: PI_SESSION, content: "x" }),
-    /agent host unavailable/,
+    {errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE},
   );
 });
 

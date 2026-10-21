@@ -198,10 +198,6 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
       from: "build/icon.png",
       to: "tray-icon.png",
     },
-    {
-      from: "../../packages/agent-runtime/dist-bundle",
-      to: "agent-runtime",
-    },
     // Built-in skills stay outside the asar so they read as plain files.
     {
       from: "resources/skills",

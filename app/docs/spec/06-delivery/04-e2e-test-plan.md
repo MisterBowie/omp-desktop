@@ -14646,3 +14646,25 @@ apps/desktop/test/omp-memory-native-e2e.test.mjs` against a local scripted provi
 Verify automatic retention, cross-process recall, worktree isolation, read/save
 disabling, credential-free management, and native clear. Native session tests
 also cover resumed-history baselines and no compaction recall while disabled.
+
+### OMP-only creation, startup and memory regression
+
+Run `node --test apps/desktop/test/omp-only-product.test.mjs
+apps/desktop/test/omp-chat-creation.test.mjs
+apps/desktop/test/memory-settings-user-path.test.mjs`. New project, temporary
+and isolated chats must select OMP; an empty Pi record must not be reused.
+Pi capabilities are closed, startup/restart cannot start a Pi worker, and a
+retired Pi owner cannot execute, claim a queued plan, or mutate a queue.
+Listing/search do not discover native Pi sessions; read/fork/import is refused
+without side effects. Host tests verify retained Pi rows are neither loaded nor
+rewritten. Desktop/plugin import and checkpoint recovery RPCs refuse before writes;
+boot leaves orphaned host transcripts untouched instead of generating OMP rows.
+Packaging excludes the Pi worker. Remote Pi boot is disabled and its
+settings destination stays hidden in every mode. Origin-bearing collaboration
+inputs fail explicitly before dropping provenance or dispatching a slash command.
+
+Select a worktree and then a temporary OMP chat in memory settings; each query
+uses the session id and retains that scope’s saved entry. Run the native memory
+E2E with the ordinary model-enabled configuration and only the provider replaced
+by the local fixture. Recheck native approval, cancellation, queue/Plan, restart,
+concurrent project binding, and worktree workflows against the pinned runtime.

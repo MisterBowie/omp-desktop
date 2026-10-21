@@ -29,19 +29,11 @@ const agentRuntimePackageJson = JSON.parse(
 
 const bundleScript = agentRuntimePackageJson.scripts.bundle ?? "";
 
-test("desktop packaging ships the whole agent-runtime dist-bundle directory", () => {
-  const entry = desktopPackageJson.build.extraResources.find(
-    (resource) => resource.to === "agent-runtime",
-  );
-
-  assert.deepEqual(
-    entry,
-    {
-      from: "../../packages/agent-runtime/dist-bundle",
-      to: "agent-runtime",
-    },
-    "extraResources must copy dist-bundle (including its package.json) to resources/agent-runtime",
-  );
+test("desktop packaging ships OMP and excludes the retired Pi worker", () => {
+  assert.equal(desktopPackageJson.build.extraResources.some((r) => r.to === "agent-runtime"), false);
+  assert.equal(desktopPackageJson.build.extraResources.some((r) => r.to === "omp-runtime"), true);
+  for (const name of ["pack", "dist", "dist:mac", "dist:win", "dist:linux"])
+    assert.doesNotMatch(desktopPackageJson.scripts[name], /bundle:runtime/);
 });
 
 test("agent-runtime bundle emits an ESM sidecar entry", () => {
