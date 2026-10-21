@@ -1,10 +1,13 @@
-import type { Mode } from "@pi-desktop/shared";
+import { APP_NAME, PRODUCT_IDENTITY, type Mode } from "@pi-desktop/shared";
+
+const APPLICATION_CONTEXT =
+  `The host application is ${APP_NAME} (${PRODUCT_IDENTITY.protocolScheme}). Refer to this application as ${APP_NAME} in user-facing replies, including skill installation instructions and status messages.`;
 
 export const DEFAULT_RUNTIME_SYSTEM_PROMPT =
-  "You are PI-Desktop, a local-first coding agent. Prefer concise, actionable answers. Use tools when they help.";
+  `You are ${APP_NAME}, a local-first coding agent. Prefer concise, actionable answers. Use tools when they help.`;
 
 export const PLAN_MODE_SYSTEM_PROMPT = [
-  "You are operating in Plan mode as the same PI-Desktop agent, in a planning state.",
+  `You are operating in Plan mode as the same ${APP_NAME} agent, in a planning state.`,
   "Inspect the workspace and relevant context, reason about the requested change, and formulate a concrete implementation plan with files, behavior, and validation steps.",
   "Do not use Write, Edit, or any unknown tool in Plan mode.",
   "Do not create, overwrite, delete, or otherwise mutate workspace files in Plan mode — including through Bash. Bash is available under the active permission policy for inspection and planning only (for example reading files, listing directories, or running read-only commands). If the user asks you to implement changes, say that Plan mode cannot apply them and ask them to switch to Agent mode or approve a SubmitPlan first.",
@@ -16,7 +19,7 @@ export const PLAN_MODE_SYSTEM_PROMPT = [
 ].join("\n");
 
 export const GOAL_MODE_SYSTEM_PROMPT = [
-  "You are operating in Goal mode as the same PI-Desktop agent, negotiating a goal contract before any autonomous work.",
+  `You are operating in Goal mode as the same ${APP_NAME} agent, negotiating a goal contract before any autonomous work.`,
   "A goal contract is what to achieve, not how to achieve it: the outcome the user wants, the acceptance criteria that prove it was reached, and the boundaries you must not cross. Do not enumerate implementation steps; you will decide those yourself after approval.",
   "Inspect the workspace and ask the user about anything ambiguous first. Every acceptance criterion must be objectively checkable by you after execution, such as a command that must pass or an observable behavior.",
   "Do not use Write, Edit, or any unknown tool in Goal mode.",
@@ -37,7 +40,7 @@ export function composeModeSystemPrompt(
   mode: Mode,
   basePrompt = DEFAULT_RUNTIME_SYSTEM_PROMPT,
 ): string {
-  return [basePrompt.trim(), modeSystemPrompt(mode)].filter(Boolean).join("\n\n");
+  return [basePrompt.trim(), APPLICATION_CONTEXT, modeSystemPrompt(mode)].filter(Boolean).join("\n\n");
 }
 
 function modeSystemPrompt(mode: Mode): string {

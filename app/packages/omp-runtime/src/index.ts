@@ -300,3 +300,5 @@ export {
   type OmpTurnFailure,
   type OmpTurnFailureCode,
 } from "./session/turn-failure.js";
+export { OmpManualCompaction } from "./session/compaction.js";
+export { ompMemoryDirectory, type OmpMemoryLaunchConfig } from "./memory-config.js";

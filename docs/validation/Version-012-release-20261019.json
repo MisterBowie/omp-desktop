@@ -1,0 +1,489 @@
+{
+  "version": "0.1.2",
+  "date": "2026-10-19",
+  "status": "published-and-validated",
+  "sourceRevision": "21969e58f7d97177795ce06f393e8853c45cfb20",
+  "verificationControllerRevision": "c124831d74cd811a58b90f82019932540ac55bf3",
+  "branch": "codex/fix-post-release-bugs",
+  "baseMainRevision": "a23bfb9befea327e7924efd3004e030a11b587d2",
+  "release": {
+    "id": 416884992,
+    "url": "https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.2",
+    "tag": "v0.1.2",
+    "tagRevision": "21969e58f7d97177795ce06f393e8853c45cfb20",
+    "publishedAt": "2026-10-19T03:53:48Z",
+    "draft": false,
+    "prerelease": false,
+    "latestMatches": true,
+    "assetCount": 30,
+    "assetBytes": 1988212725
+  },
+  "runtime": {
+    "ompVersion": "18.3.0",
+    "revision": "62bc57b+omp-desktop.6",
+    "forkRevision": "d648d27bcf0db16caecb876142d891cf49a51bc2",
+    "storageSchema": 22,
+    "schemaMigrationFrom011": false
+  },
+  "scope": {
+    "fixedBugIds": [
+      "B01",
+      "B02",
+      "B03",
+      "B04",
+      "B05",
+      "B08",
+      "B09",
+      "B10",
+      "B12"
+    ],
+    "excludedBugIds": [
+      "B11"
+    ],
+    "newFeatureStages": []
+  },
+  "runs": {
+    "candidate": {
+      "id": 39191848177,
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/39191848177",
+      "head_branch": "release-check-0.1.2-21969e58",
+      "head_sha": "21969e58f7d97177795ce06f393e8853c45cfb20",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    "windows": {
+      "id": 39196263052,
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/39196263052",
+      "head_branch": "candidate-bug-check-v0.1.2-run-39191848177",
+      "head_sha": "c124831d74cd811a58b90f82019932540ac55bf3",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    "publication": {
+      "id": 39196683475,
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/39196683475",
+      "head_branch": "publish-v0.1.2-run-39191848177",
+      "head_sha": "c124831d74cd811a58b90f82019932540ac55bf3",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    "readback": {
+      "id": 39197020014,
+      "html_url": "https://github.com/MisterBowie/omp-desktop/actions/runs/39197020014",
+      "head_branch": "readback-v0.1.2-run-39191848177",
+      "head_sha": "c124831d74cd811a58b90f82019932540ac55bf3",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  },
+  "acceptedCandidate": {
+    "schema": "omp-desktop.accepted-release-candidate/1",
+    "version": "0.1.2",
+    "sourceRevision": "21969e58f7d97177795ce06f393e8853c45cfb20",
+    "runId": 39191848177,
+    "runUrl": "https://github.com/MisterBowie/omp-desktop/actions/runs/39191848177",
+    "nativeJobs": [
+      {
+        "id": 117866210221,
+        "name": "build (macos-15, darwin, arm64, dist:mac)",
+        "conclusion": "success"
+      },
+      {
+        "id": 117866210270,
+        "name": "build (windows-latest, win32, x64, dist:win)",
+        "conclusion": "success"
+      },
+      {
+        "id": 117866210274,
+        "name": "build (ubuntu-22.04, linux, x64, dist:linux)",
+        "conclusion": "success"
+      },
+      {
+        "id": 117866210280,
+        "name": "build (macos-15-intel, darwin, x64, dist:mac)",
+        "conclusion": "success"
+      }
+    ],
+    "artifacts": [
+      {
+        "id": 12161957649,
+        "name": "release-darwin-x64",
+        "digest": "sha256:cfea3d993afec4375531bf07212de70ab48df99fbbad33cb636a45661a45fe88",
+        "bytes": 463319353
+      },
+      {
+        "id": 12161857988,
+        "name": "validation-darwin-x64",
+        "digest": "sha256:b138c41d9aa70664e3a305c189f4091f6108c2eaafd637cd0b5f43c5fc55e5fc",
+        "bytes": 493988
+      },
+      {
+        "id": 12161141808,
+        "name": "validation-win32-x64",
+        "digest": "sha256:ce58afdba805110eff116d2592e6afbc129bb858f0d88bc09edacb4e54260521",
+        "bytes": 351309
+      },
+      {
+        "id": 12160996545,
+        "name": "validation-darwin-arm64",
+        "digest": "sha256:5a12c2ee41418534a8f8b472292d457add6889446abeacb204cdea47199c50e5",
+        "bytes": 438320
+      },
+      {
+        "id": 12160798397,
+        "name": "release-win32-x64",
+        "digest": "sha256:f68937922e23c6e8b36ad031b7eb05482afa9bc788445fd1719c68a4c1532f00",
+        "bytes": 400982346
+      },
+      {
+        "id": 12160569185,
+        "name": "release-linux-x64",
+        "digest": "sha256:52a21cb2cf275d79dded916460c004759b46121d82318ec796e994056e071d6a",
+        "bytes": 671921246
+      },
+      {
+        "id": 12160474518,
+        "name": "validation-linux-x64",
+        "digest": "sha256:ca821f5ed9aa383d008a75cbd96f9a5227d29722c2538523a6c4c3d3a6856bd3",
+        "bytes": 869223
+      },
+      {
+        "id": 12160378566,
+        "name": "release-darwin-arm64",
+        "digest": "sha256:f4a242512af0cbc9900fff17bd8bbb02955cb1a51bed16a4a1ceec069caaf8d3",
+        "bytes": 447500770
+      }
+    ]
+  },
+  "localCandidateVerifierExitCode": 0,
+  "sourceGateSteps": [
+    {
+      "name": "Prepare the fixed source-runtime test prerequisites",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run pnpm install --frozen-lockfile",
+      "conclusion": "success"
+    },
+    {
+      "name": "Require the stable version and its release notes",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run pnpm build:js",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run cargo build --release --locked -p host-core",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run pnpm --filter @pi-desktop/desktop typecheck",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run pnpm lint",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run pnpm -r --if-present test",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run cargo test -p host-core --locked",
+      "conclusion": "success"
+    }
+  ],
+  "localFinalGates": {
+    "node": "24.14.0",
+    "pnpm": "10.34.5",
+    "desktopHostRust": "stable 1.98.1",
+    "exitCodes": {
+      "versionGates": {
+        "install": 0,
+        "buildJs": 0,
+        "typecheck": 0,
+        "sharedTests": 0,
+        "releaseDocs": 0
+      },
+      "releaseGates": {
+        "lint": 0,
+        "docsCheck": 0,
+        "releaseTests": 0
+      },
+      "hostGates": {
+        "hostBuild": 0,
+        "bugAudit": 0
+      }
+    },
+    "sharedSourceTestsPassed": 497,
+    "releaseChainTestsPassed": 38,
+    "applicableBugAudit": {
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "nativeOmpUtf16ExcludedFromSuite": true
+    }
+  },
+  "windowsInstalledBugChecks": {
+    "sourceRevision": "21969e58f7d97177795ce06f393e8853c45cfb20",
+    "candidateRunId": 39191848177,
+    "version": "0.1.2",
+    "platform": "win32",
+    "arch": "x64",
+    "monitorCount": 1,
+    "dualMonitorQualified": false,
+    "cleaned": true,
+    "checks": [
+      {
+        "id": "WIN-FULLSCREEN-MAXIMIZED",
+        "status": "passed",
+        "facts": {
+          "colors": 256,
+          "bytes": 3188736
+        }
+      },
+      {
+        "id": "WIN-TASKBAR-RESTORE",
+        "status": "passed",
+        "facts": {
+          "bounds": {
+            "x": -8,
+            "y": -8,
+            "width": 1040,
+            "height": 736
+          },
+          "workArea": {
+            "x": 0,
+            "y": 0,
+            "width": 1024,
+            "height": 720
+          },
+          "maximized": true
+        }
+      },
+      {
+        "id": "UTF16-HOST-READ",
+        "status": "passed",
+        "facts": {
+          "preserved": true
+        }
+      },
+      {
+        "id": "POWERSHELL-OUTPUT-EXIT",
+        "status": "passed",
+        "facts": {
+          "outputPreserved": true,
+          "exitCode": 7
+        }
+      },
+      {
+        "id": "ORDERED-EXIT",
+        "status": "passed",
+        "facts": {
+          "noOwnedProcesses": true
+        }
+      }
+    ],
+    "fullscreenObservation": {
+      "maximized": false,
+      "painted": true,
+      "colors": 256,
+      "bytes": 3188736
+    },
+    "restoreObservation": {
+      "bounds": {
+        "x": -8,
+        "y": -8,
+        "width": 1040,
+        "height": 736
+      },
+      "workArea": {
+        "x": 0,
+        "y": 0,
+        "width": 1024,
+        "height": 720
+      },
+      "maximized": true
+    }
+  },
+  "publicAssetReadback": {
+    "version": "0.1.2",
+    "sourceRevision": "21969e58f7d97177795ce06f393e8853c45cfb20",
+    "candidateRunId": 39191848177,
+    "publicationRunId": 39196683475,
+    "readbackRunId": 39197020014,
+    "assetCount": 30,
+    "assetBytes": 1988212725,
+    "checksumManifest": true,
+    "buildRecord": true,
+    "sourceReceipts": true,
+    "verifiedUpdateArtifacts": 8,
+    "mergedMacFeedIdentical": true,
+    "assets": [
+      {
+        "name": "BUILD-RECORD.json",
+        "bytes": 6498,
+        "sha256": "a1bbf45796c765966aa5169d4eaf5b5db5e782252d4afaf8ec164d3d56a44408"
+      },
+      {
+        "name": "latest-linux.yml",
+        "bytes": 701,
+        "sha256": "c646e9096fc065e7a8e151b2b9d465530363da713f64257d9acd6f59c2418976"
+      },
+      {
+        "name": "latest-mac-arm64.yml",
+        "bytes": 517,
+        "sha256": "88143293c7bcdf6b19f8992531e6c130f3f1971cf4424b8f7c0666aa4962008d"
+      },
+      {
+        "name": "latest-mac-x64.yml",
+        "bytes": 511,
+        "sha256": "30949d43a4c43849d5c91a878d5dc846570eda52a7ac316890492d2a5554f80c"
+      },
+      {
+        "name": "latest-mac.yml",
+        "bytes": 831,
+        "sha256": "323448056886323a595fea10bf90c3b84b536d9cec50963ac9ae58e0e58a4570"
+      },
+      {
+        "name": "latest.yml",
+        "bytes": 351,
+        "sha256": "bbc24fadaf6622a85a69e61fa96168cb6cb8c2f5f2dfaf95e46f85f657439595"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-arm64-mac.zip",
+        "bytes": 223409457,
+        "sha256": "6d6f1d5069ee2bb53e4c934232f9d7705f751d36f2909e192ef18d5ef130d39c"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-arm64-mac.zip.blockmap",
+        "bytes": 231576,
+        "sha256": "bed047522813c4904655474b6f8666e64db1e6ab86fff853f325bf4bc8322d77"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-arm64.dmg",
+        "bytes": 224506103,
+        "sha256": "a49f9ec36cc12399e148d3168f472cbe4b6f24f1c90ad493fa4d70fb99cbf783"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-arm64.dmg.blockmap",
+        "bytes": 235905,
+        "sha256": "64e6544448d85119e6103b14589531f4e86c085c09518f95553566eb84c87a62"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-x64-mac.zip",
+        "bytes": 231339539,
+        "sha256": "eddc3a1be0354eddfeef5685f04bcdc5b66fa80241262d9468d4e08651e4a7a2"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-x64-mac.zip.blockmap",
+        "bytes": 242311,
+        "sha256": "da738041447f525f7498e49fcfdb5a2dad9ace7c3791bfc6821ad1b271412576"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-x64.deb",
+        "bytes": 208093644,
+        "sha256": "975e481ba89c6cc3e8eb813b3925a6b220a31c863fd66c3477f85bfa60977b5f"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-x64.dmg",
+        "bytes": 232281981,
+        "sha256": "0a2183ea4287df2ad155a5ae4dfefa922ffe160362a993aff9a0f678336f6d5f"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-x64.dmg.blockmap",
+        "bytes": 242168,
+        "sha256": "627e1c6010aef9501051b6c5887ebcc419c2072882d04301f7767279d56ad4dd"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-x86_64.AppImage",
+        "bytes": 250677297,
+        "sha256": "6aa72b0ab494767e7778d5ce941fa3b368e0da381cf3b4565084365183e597a8"
+      },
+      {
+        "name": "omp-desktop-0.1.2-x86_64.rpm",
+        "bytes": 188773241,
+        "sha256": "e8046ad23bb0813abdba57bd06ad589bbf659061c0b8317ac730c71243d73301"
+      },
+      {
+        "name": "OMP-Desktop-Portable-0.1.2.exe",
+        "bytes": 200245992,
+        "sha256": "7186db34a047a921bee70dd8848b559e4d7ca3351f7f37b10e483ee644c9fabb"
+      },
+      {
+        "name": "OMP-Desktop-Setup-0.1.2.exe",
+        "bytes": 200466234,
+        "sha256": "33199f171c9ae644574ea80344063a12e87ca74d955ceb1964e19e4286a36d91"
+      },
+      {
+        "name": "OMP-Desktop-Setup-0.1.2.exe.blockmap",
+        "bytes": 208391,
+        "sha256": "9d5add277fb1133a1fd14c75f388a0c170afe10ae734439ad0def5fbaefb1495"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.2-build.json",
+        "bytes": 2337,
+        "sha256": "fb95239b48a01e83be6a4d2ba2f422980be24dc49a58b63e138dc44bdc437654"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.2-darwin-arm64.tar.gz",
+        "bytes": 418746,
+        "sha256": "161c181866bccb392cbe2f138a520827c96ed4fb7fb9c672b7c5a4a61b2786b3"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.2-darwin-x64.tar.gz",
+        "bytes": 472654,
+        "sha256": "edbcdf4d5b06bc5d3ccd3e913097e9d5ac174bf5f865a04561c5f8a51decdcc3"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.2-linux-x64.tar.gz",
+        "bytes": 850496,
+        "sha256": "e38223d7e33be11005bd69255a288906b175744977326264e08611abd84162f0"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.2-publication.json",
+        "bytes": 420,
+        "sha256": "2a70c005513a921d9c17d83ad3050ae287f768dbeebfe0ac6588bfc9e6625042"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.2-staging.json",
+        "bytes": 4797,
+        "sha256": "5104ef6c2b8dc08bcdeb9f03a63dbc9b4adb28e14284e35853722c5e0466bc14"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.2-win32-x64.tar.gz",
+        "bytes": 333167,
+        "sha256": "e64845bd9a0874afb1b4eeff7c6cfc5a18effdefa823d9491e2d570e41d305d9"
+      },
+      {
+        "name": "pi-host-0.1.2-linux-x64.tar.gz",
+        "bytes": 25163910,
+        "sha256": "e0e90c6a5d24df85aa7411b5c1e179b02d5d2e3b48a6676fb3aab8d5ba9a1e86"
+      },
+      {
+        "name": "pi-host-0.1.2-linux-x64.tar.gz.sha256",
+        "bytes": 97,
+        "sha256": "42154774cfd03c0d363522208facd68705f63685748695ddfbb33654950c998b"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "bytes": 2853,
+        "sha256": "0d53f0d7bd6ab6cded0eb2fc78e05f31077b8c368a77aca5d840bfc268fe7c99"
+      }
+    ]
+  },
+  "evidenceLocations": {
+    "windows": "https://github.com/MisterBowie/omp-desktop/blob/codex/published-bug-results-39196263052/docs/validation/Candidate-012-windows-39196263052.json",
+    "publicAssets": "https://github.com/MisterBowie/omp-desktop/blob/codex/public-asset-readback-39197020014/docs/validation/Published-012-assets-39197020014.json"
+  },
+  "limitations": [
+    "B11 native OMP UTF-16 remains excluded; host UTF-16 passed.",
+    "Windows has one CI monitor; physical dual-monitor behavior is not qualified.",
+    "One moderate sprintf-js build-chain advisory remains without an official fixed version; prod-manifest scope had zero findings, which does not prove all shipped code is advisory-free.",
+    "Prior local full-recursive failure and six resource-test skips remain historical results; they are not counted as passes.",
+    "Local stable fmt/clippy were not run; earlier fmt/clippy validation used nightly.",
+    "Complete public asset byte downloads occurred in CI, not on the local machine.",
+    "No new T25-B or T27 feature delivery; no paid-model calls or user data migration."
+  ]
+}

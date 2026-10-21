@@ -238,6 +238,7 @@ export async function collectWorkspaceDiff(cwd: string): Promise<WorkspaceDiff> 
     base,
     "--no-color",
     "--no-ext-diff",
+    "--no-textconv",
     "-M",
     "--unified=3",
   ]);
@@ -255,6 +256,7 @@ export async function collectWorkspaceDiff(cwd: string): Promise<WorkspaceDiff> 
       "diff",
       "--no-color",
       "--no-ext-diff",
+      "--no-textconv",
       "--unified=3",
       "--no-index",
       "--",

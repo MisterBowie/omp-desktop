@@ -8,6 +8,7 @@ import type {
 import {
   applyMessageUpdate,
   mergeAgentEventEnvelopes,
+  todoPhasesFromResult,
 } from "@pi-desktop/shared";
 import { createFrameBatcher } from "../../lib/frame-batcher";
 import {
@@ -357,6 +358,10 @@ export function createEventsSlice({
           ...(envelope.agentName ? { agentName: envelope.agentName } : {}),
         });
       } else if (event.type === "tool_end") {
+        if (!envelope.parentToolCallId && !envelope.agentName) {
+          const phases = todoPhasesFromResult(runtime.getToolStart(event.toolCallId)?.toolName, event.result, event.isError);
+          if (phases !== undefined) set((state) => ({ sessionTodos: { ...state.sessionTodos, [envelope.sessionId]: phases } }));
+        }
         // A tool result never opens or activates a work-panel tab: Review is a
         // user-opened surface (panel toggle or New launcher), so an agent edit
         // cannot reveal the panel even in its own session.

@@ -42,7 +42,7 @@ index f5d8328..e6bfc33 100644
  
  When no config file contributes a server override, OMP auto-detects built-in servers by intersecting two conditions:
 diff --git a/docs/rpc.md b/docs/rpc.md
-index 49a7454..fd6badd 100644
+index 49a7454..8202f97 100644
 --- a/docs/rpc.md
 +++ b/docs/rpc.md
 @@ -445,6 +445,36 @@ Definitions also accept `hidden?: boolean` and
@@ -114,6 +114,31 @@ index 49a7454..fd6badd 100644
  ## Host URI Sub-Protocol
  
  RPC hosts can also own custom URL schemes (virtual files). After
+@@ -924,3 +979,24 @@ with RpcClient(provider="anthropic", model="claude-sonnet-4-5") as client:
+ ```
+ 
+ By default, `RpcClient` starts `omp --mode rpc`; pass `command=[...]` to own the exact child command. It handles request correlation, typed notifications, v2 negotiation and chunk reassembly, message pagination, extension UI, and host-owned tools and URI schemes. The Python package owns that client API and process lifecycle; this document and `rpc-types.ts` remain the canonical wire contract. Use raw protocol frames when a client library does not wrap the surface you need.
++
++### Desktop memory management (candidate)
++
++`get_state` advertises `memoryRpcVersion: 1` and `memoryMaintenanceSafe`.
++The latter is false while streaming, compacting, queued prompts, background jobs,
++pending async delivery, or child agents can still use the runtime.
++
++The `memory` command accepts `action: "status" | "list" | "search" | "clear"`.
++`list` uses an optional `offset` (0–100000) and `limit` (1–100, default 50).
++`search` requires a nonempty `query` of at most 2000 characters. Responses use
++the usual RPC response envelope. Browsing returns `{ backend, total, offset,
++items }`, with bounded content from active working, episodic and extracted fact records.
++Management requires an idle session and does not append a model turn. Desktop
++hosts use a separate credential-free process with auto-retain and auto-recall
++disabled, and reclaim all writers before clearing a project store.
++
++`mnemopi.retainFromSessionStart` defaults to false for CLI compatibility. When
++true, enabling/resuming starts automatic retention after the transcript already
++loaded into the session. Clearing and rebinding also establish this baseline so
++old messages are not silently imported again. `mnemopi.autoRecall: false` also
++suppresses recall during compaction.
 diff --git a/packages/agent/src/agent-loop.ts b/packages/agent/src/agent-loop.ts
 index 3443692..209e89a 100644
 --- a/packages/agent/src/agent-loop.ts
@@ -1622,10 +1647,18 @@ index 0eeda6d..bdb5715 100644
  				identifiers: options.minifyIdentifiers ?? false,
  				keepNames: true,
 diff --git a/packages/coding-agent/src/config/settings-schema.ts b/packages/coding-agent/src/config/settings-schema.ts
-index 165ed57..d3e1f87 100644
+index 165ed57..694781a 100644
 --- a/packages/coding-agent/src/config/settings-schema.ts
 +++ b/packages/coding-agent/src/config/settings-schema.ts
-@@ -3881,6 +3881,11 @@ export const SETTINGS_SCHEMA = {
+@@ -3286,6 +3286,7 @@ export const SETTINGS_SCHEMA = {
+ 			condition: "mnemopiActive",
+ 		},
+ 	},
++	"mnemopi.retainFromSessionStart": { type: "boolean", default: false },
+ 	"mnemopi.retainEveryNTurns": { type: "number", default: 4 },
+ 	"mnemopi.recallLimit": { type: "number", default: 8 },
+ 	"mnemopi.recallContextTurns": { type: "number", default: 3 },
+@@ -3881,6 +3882,11 @@ export const SETTINGS_SCHEMA = {
  		},
  	},
  
@@ -1758,6 +1791,71 @@ index dc4c4f4..9fa2be9 100644
  		return {
  			onDeferredDiagnostics: diagnostics => {
  				this.#pendingFetches.delete(path);
+diff --git a/packages/coding-agent/src/mnemopi/config.ts b/packages/coding-agent/src/mnemopi/config.ts
+index ff00587..b04f4e3 100644
+--- a/packages/coding-agent/src/mnemopi/config.ts
++++ b/packages/coding-agent/src/mnemopi/config.ts
+@@ -24,6 +24,7 @@ export interface MnemopiBackendConfig {
+ 	scoping?: MnemopiScoping;
+ 	autoRecall: boolean;
+ 	autoRetain: boolean;
++	retainFromSessionStart?: boolean;
+ 	polyphonicRecall: boolean;
+ 	enhancedRecall: boolean;
+ 	proactiveLinking: boolean;
+@@ -72,6 +73,7 @@ export function loadMnemopiConfig(settings: Settings, agentDir: string): Mnemopi
+ 		scoping,
+ 		autoRecall: settings.get("mnemopi.autoRecall"),
+ 		autoRetain: settings.get("mnemopi.autoRetain"),
++		retainFromSessionStart: settings.get("mnemopi.retainFromSessionStart"),
+ 		polyphonicRecall: settings.get("mnemopi.polyphonicRecall"),
+ 		enhancedRecall: settings.get("mnemopi.enhancedRecall"),
+ 		proactiveLinking: settings.get("mnemopi.proactiveLinking"),
+diff --git a/packages/coding-agent/src/mnemopi/state.ts b/packages/coding-agent/src/mnemopi/state.ts
+index 9094ab7..de92c7a 100644
+--- a/packages/coding-agent/src/mnemopi/state.ts
++++ b/packages/coding-agent/src/mnemopi/state.ts
+@@ -250,7 +250,11 @@ export class MnemopiSessionState {
+ 		this.config = options.config;
+ 		this.session = options.session;
+ 		this.aliasOf = options.aliasOf;
+-		this.lastRetainedTurn = options.lastRetainedTurn ?? 0;
++		this.lastRetainedTurn =
++			options.lastRetainedTurn ??
++			(options.config.retainFromSessionStart
++				? extractMessages(options.session.sessionManager).filter(message => message.role === "user").length
++				: 0);
+ 		this.hasRecalledForFirstTurn = options.hasRecalledForFirstTurn ?? false;
+ 		this.scoped = options.aliasOf?.scoped ?? createScopedResources(options.config);
+ 		this.memory = this.scoped.retain.memory;
+@@ -261,13 +265,17 @@ export class MnemopiSessionState {
+ 		if (this.sessionId === sessionId) return;
+ 		this.#recallGeneration++;
+ 		this.sessionId = sessionId;
+-		this.lastRetainedTurn = 0;
++		this.lastRetainedTurn = this.config.retainFromSessionStart
++			? extractMessages(this.session.sessionManager).filter(message => message.role === "user").length
++			: 0;
+ 		this.#retentionCursorLoaded = false;
+ 	}
+ 
+ 	resetConversationTracking(): void {
+ 		this.#recallGeneration++;
+-		this.lastRetainedTurn = 0;
++		this.lastRetainedTurn = this.config.retainFromSessionStart
++			? extractMessages(this.session.sessionManager).filter(message => message.role === "user").length
++			: 0;
+ 		this.#retentionCursorLoaded = false;
+ 		this.hasRecalledForFirstTurn = false;
+ 		this.lastRecallSnippet = undefined;
+@@ -503,6 +511,7 @@ export class MnemopiSessionState {
+ 	}
+ 
+ 	async recallForCompaction(messages: AgentMessage[]): Promise<string | undefined> {
++		if (!this.config.autoRecall) return undefined;
+ 		const flat = flattenAgentMessages(messages);
+ 		const lastUser = flat.findLast(message => message.role === "user");
+ 		if (!lastUser) return undefined;
 diff --git a/packages/coding-agent/src/modes/rpc/host-tools.ts b/packages/coding-agent/src/modes/rpc/host-tools.ts
 index 62be077..4536eac 100644
 --- a/packages/coding-agent/src/modes/rpc/host-tools.ts
@@ -1924,11 +2022,93 @@ index 09e6c7e..37ea0e6 100644
  		}));
  		const response = await this.#send({ type: "set_host_tools", tools: definitions });
  		return this.#getData<{ toolNames: string[] }>(response).toolNames;
+diff --git a/packages/coding-agent/src/modes/rpc/rpc-memory.ts b/packages/coding-agent/src/modes/rpc/rpc-memory.ts
+new file mode 100644
+index 0000000..c6ffc5b
+--- /dev/null
++++ b/packages/coding-agent/src/modes/rpc/rpc-memory.ts
+@@ -0,0 +1,76 @@
++/** Native memory management; no model turn or transcript append is performed. */
++import { getAgentDir } from "@oh-my-pi/pi-utils";
++import { resolveMemoryBackend } from "../../memory-backend/resolve";
++import { getMnemopiSessionState } from "../../mnemopi/state";
++import type { AgentSession } from "../../session/agent-session";
++
++export async function executeMemoryRpc(
++	session: AgentSession,
++	input: {
++		action: string;
++		query?: unknown;
++		limit?: unknown;
++		offset?: unknown;
++	},
++): Promise<object> {
++	if (!["status", "list", "search", "clear"].includes(input.action)) throw new Error("Invalid memory action");
++	const limit = input.limit ?? 50;
++	const offset = input.offset ?? 0;
++	if (
++		typeof limit !== "number" ||
++		!Number.isInteger(limit) ||
++		limit < 1 ||
++		limit > 100 ||
++		typeof offset !== "number" ||
++		!Number.isInteger(offset) ||
++		offset < 0 ||
++		offset > 100000
++	)
++		throw new Error("Invalid memory page");
++	if (input.query !== undefined && (typeof input.query !== "string" || input.query.length > 2000))
++		throw new Error("Invalid memory query");
++	if (
++		session.isBashRunning ||
++		session.isEvalRunning ||
++		session.isGeneratingHandoff ||
++		session.isStreaming ||
++		session.isCompacting ||
++		session.queuedMessageCount > 0 ||
++		(session.getAsyncJobSnapshot()?.running.length ?? 0) > 0 ||
++		(session.getAsyncJobSnapshot()?.delivery.queued ?? 0) > 0 ||
++		session.getAsyncJobSnapshot()?.delivery.delivering
++	)
++		throw new Error("Memory management requires an idle session");
++	await session.waitForMemoryBackend();
++	const backend = await resolveMemoryBackend(session.settings);
++	const context = { agentDir: getAgentDir(), cwd: session.sessionManager.getCwd(), session };
++	if (input.action === "status")
++		return backend.status ? await backend.status(context) : { backend: backend.id, active: false };
++	if (input.action === "clear") {
++		await backend.clear(context.agentDir, context.cwd, session);
++		return { cleared: true };
++	}
++	if (input.action === "search") {
++		const query = typeof input.query === "string" ? input.query.trim() : "";
++		if (!query) throw new Error("Memory search requires a query");
++		if (!backend.search) throw new Error("Memory backend does not support search");
++		return await backend.search(context, query, { limit });
++	}
++	if (backend.id !== "mnemopi") throw new Error("Memory browsing requires Mnemopi");
++	const state = getMnemopiSessionState(session);
++	if (!state) throw new Error("Mnemopi is not initialized");
++	const db = (state.aliasOf ?? state).memory.beam.db;
++	const rows = `SELECT id, content, source, timestamp, created_at FROM working_memory
++  WHERE superseded_by IS NULL AND (valid_until IS NULL OR datetime(valid_until) > datetime('now'))
++  UNION ALL SELECT id, content, source, timestamp, created_at FROM episodic_memory
++  WHERE superseded_by IS NULL AND (valid_until IS NULL OR datetime(valid_until) > datetime('now'))
++  UNION ALL SELECT fact_id AS id, subject || ' ' || predicate || ' ' || object AS content,
++    'facts' AS source, timestamp, created_at FROM facts`;
++	const total = db.query<{ total: number }, []>(`SELECT count(*) AS total FROM (${rows})`).get()?.total ?? 0;
++	const items = db
++		.query<{ id: string; content: string; source: string | null; timestamp: string | null }, [number, number]>(
++			`SELECT id, substr(content, 1, 16000) AS content, source, timestamp FROM (${rows}) ORDER BY created_at DESC, id LIMIT ? OFFSET ?`,
++		)
++		.all(limit, offset);
++	return { backend: "mnemopi", total, offset, items };
++}
 diff --git a/packages/coding-agent/src/modes/rpc/rpc-mode.ts b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
-index 3e2900a..fe7c467 100644
+index 3e2900a..094fc45 100644
 --- a/packages/coding-agent/src/modes/rpc/rpc-mode.ts
 +++ b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
-@@ -42,7 +42,7 @@ import { selectRpcEntries } from "./rpc-compat";
+@@ -42,12 +42,13 @@ import { selectRpcEntries } from "./rpc-compat";
  import { calculateTokensPerSecond } from "../../utils/token-rate";
  import { formatPersistenceDurabilityFailure, formatPersistenceFailure } from "../persistence-failure";
  import { initializeExtensions } from "../runtime-init";
@@ -1937,7 +2117,13 @@ index 3e2900a..fe7c467 100644
  import { isRpcHostUriResult, RpcHostUriBridge } from "./host-uris";
  import { MAX_RPC_FRAME_BYTES, MAX_RPC_REASSEMBLED_BYTES, RpcFrameEncoder } from "./rpc-frame";
  import { claimRpcInput, readRpcInputFrames } from "./rpc-input";
-@@ -574,7 +574,12 @@ export async function handleRpcSessionChange(
+ import { pageRpcMessages, RPC_MESSAGES_PAGE_BUSY_ERROR, RpcMessagesPageError } from "./rpc-messages";
+ import { RpcOutputWriter } from "./rpc-output";
++import { executeMemoryRpc } from "./rpc-memory";
+ import { RpcSubagentRegistry, readRpcSubagentTranscript } from "./rpc-subagents";
+ import type {
+ 	RpcCommand,
+@@ -574,7 +575,12 @@ export async function handleRpcSessionChange(
  	throw new Error("Unsupported RPC session change command");
  }
  
@@ -1951,7 +2137,7 @@ index 3e2900a..fe7c467 100644
  	return tools.map((tool, index) => {
  		const name = typeof tool.name === "string" ? tool.name.trim() : "";
  		if (!name) {
-@@ -588,6 +593,7 @@ function normalizeHostToolDefinitions(tools: RpcHostToolDefinition[]): RpcHostTo
+@@ -588,6 +594,7 @@ function normalizeHostToolDefinitions(tools: RpcHostToolDefinition[]): RpcHostTo
  			throw new Error(`Host tool "${name}" must provide a JSON Schema object`);
  		}
  		const label = typeof tool.label === "string" && tool.label.trim() ? tool.label.trim() : name;
@@ -1959,7 +2145,7 @@ index 3e2900a..fe7c467 100644
  		return {
  			name,
  			label,
-@@ -596,6 +602,7 @@ function normalizeHostToolDefinitions(tools: RpcHostToolDefinition[]): RpcHostTo
+@@ -596,6 +603,7 @@ function normalizeHostToolDefinitions(tools: RpcHostToolDefinition[]): RpcHostTo
  			hidden: tool.hidden === true,
  			loadMode: defaultLoadModeForToolName(name, tool.loadMode),
  			readsSkillUris: tool.readsSkillUris,
@@ -1967,11 +2153,78 @@ index 3e2900a..fe7c467 100644
  		};
  	});
  }
+@@ -1174,6 +1182,9 @@ export async function runRpcMode(
+ 		const id = command.id;
+ 
+ 		switch (command.type) {
++			case "memory": {
++				return success(id, "memory", await executeMemoryRpc(session, command));
++			}
+ 			case "negotiate_protocol": {
+ 				if (command.protocolVersion !== 2)
+ 					return error(id, "negotiate_protocol", `Unsupported RPC protocol version: ${command.protocolVersion}`);
+@@ -1284,7 +1295,24 @@ export async function runRpcMode(
+ 			// =================================================================
+ 
+ 			case "get_state": {
++				const memoryJobs = session.getAsyncJobSnapshot();
+ 				const state: RpcSessionState = {
++					memoryRpcVersion: 1,
++					memoryMaintenanceSafe:
++						!session.isStreaming &&
++						!session.isBashRunning &&
++						!session.isEvalRunning &&
++						!session.isGeneratingHandoff &&
++						!session.isCompacting &&
++						session.queuedMessageCount === 0 &&
++						(memoryJobs?.running.length ?? 0) === 0 &&
++						(memoryJobs?.delivery.queued ?? 0) === 0 &&
++						!memoryJobs?.delivery.delivering &&
++						!(
++							subagentRegistry
++								?.getSubagents()
++								.some(child => child.status === "running" || child.status === "pending") ?? false
++						),
+ 					model: session.model,
+ 					thinkingLevel: session.thinkingLevel,
+ 					isStreaming: session.isStreaming,
 diff --git a/packages/coding-agent/src/modes/rpc/rpc-types.ts b/packages/coding-agent/src/modes/rpc/rpc-types.ts
-index 062949c..323a953 100644
+index 062949c..639a519 100644
 --- a/packages/coding-agent/src/modes/rpc/rpc-types.ts
 +++ b/packages/coding-agent/src/modes/rpc/rpc-types.ts
-@@ -471,6 +471,32 @@ export interface RpcHostToolDefinition {
+@@ -35,6 +35,14 @@ export type RpcCommand =
+ 
+ 	// State
+ 	| { id?: string; type: "get_state" }
++	| {
++			id?: string;
++			type: "memory";
++			action: "status" | "list" | "search" | "clear";
++			query?: string;
++			offset?: number;
++			limit?: number;
++	  }
+ 	| { id?: string; type: "set_fast_mode"; enabled: boolean }
+ 	| { id?: string; type: "get_available_commands" }
+ 	| { id?: string; type: "get_entries"; since?: string }
+@@ -96,6 +104,8 @@ export type RpcCommand =
+ // ============================================================================
+ 
+ export interface RpcSessionState {
++	memoryRpcVersion?: 1;
++	memoryMaintenanceSafe?: boolean;
+ 	model?: Model;
+ 	thinkingLevel: ThinkingLevel | undefined;
+ 	isStreaming: boolean;
+@@ -212,6 +222,7 @@ export type RpcResponse =
+ 
+ 	// State
+ 	| { id?: string; type: "response"; command: "get_state"; success: true; data: RpcSessionState }
++	| { id?: string; type: "response"; command: "memory"; success: true; data: object }
+ 	| {
+ 			id?: string;
+ 			type: "response";
+@@ -471,6 +482,32 @@ export interface RpcHostToolDefinition {
  	hidden?: boolean;
  	/** How this host tool is presented when enabled; omission normalizes to `"discoverable"` at the adapter boundary. */
  	loadMode?: ToolLoadMode;
@@ -2004,7 +2257,7 @@ index 062949c..323a953 100644
  	/** Whether this host tool can read `skill://` instruction content. */
  	readsSkillUris?: boolean;
  }
-@@ -502,7 +528,19 @@ export interface RpcHostToolUpdate {
+@@ -502,7 +539,19 @@ export interface RpcHostToolUpdate {
  export interface RpcHostToolResult {
  	type: "host_tool_result";
  	id: string;
@@ -2042,7 +2295,7 @@ index 8d27338..5e02d32 100644
  			setModel: model => runExtensionSetModel(session, model),
  			getThinkingLevel: () => session.thinkingLevel,
 diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
-index 398a2ec..42b5722 100644
+index 398a2ec..7a2e0dd 100644
 --- a/packages/coding-agent/src/session/agent-session.ts
 +++ b/packages/coding-agent/src/session/agent-session.ts
 @@ -5432,6 +5432,24 @@ export class AgentSession {
@@ -2070,6 +2323,83 @@ index 398a2ec..42b5722 100644
  	/** Marks streamed text as committed or buffered for turn-recovery replay decisions. */
  	setTextOutputCommitted(committed: boolean): void {
  		this.#textOutputCommitted = committed;
+@@ -5629,6 +5647,11 @@ export class AgentSession {
+ 		this.#memory.endLocalMemoryStartup(signal);
+ 	}
+ 
++	/** Wait for startup and settings-driven memory transitions without restarting the backend. */
++	waitForMemoryBackend(): Promise<void> {
++		return this.#memory.transition;
++	}
++
+ 	/** Apply the backend; cwd rebinding can skip Mnemopi auto-retention while still draining writes. */
+ 	applyMemoryBackend(options: { retainMnemopi?: boolean } = {}): Promise<void> {
+ 		if (!this.memoryEnabled) return Promise.resolve();
+diff --git a/packages/coding-agent/test/agent-session-memory-backend.test.ts b/packages/coding-agent/test/agent-session-memory-backend.test.ts
+index 9c2f124..13b2c3f 100644
+--- a/packages/coding-agent/test/agent-session-memory-backend.test.ts
++++ b/packages/coding-agent/test/agent-session-memory-backend.test.ts
+@@ -11,6 +11,7 @@ import { rebindMemoryBackendForCwd } from "@oh-my-pi/pi-coding-agent/hindsight/b
+ import { MEMORY_BACKEND_TOOL_NAMES } from "@oh-my-pi/pi-coding-agent/memory-backend/tool-names";
+ import { computeMnemopiBankScope } from "@oh-my-pi/pi-coding-agent/mnemopi/config";
+ import { getMnemopiSessionState } from "@oh-my-pi/pi-coding-agent/mnemopi/state";
++import { executeMemoryRpc } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-memory";
+ import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
+ import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
+ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
+@@ -95,6 +96,52 @@ describe("AgentSession memory backend lifecycle", () => {
+ 		return session;
+ 	}
+ 
++	it("desktop memory keeps later turns, supports browsing/search/clear, and does not resurrect cleared history", async () => {
++		settings.override("memory.backend", "mnemopi");
++		settings.override("mnemopi.dbPath", path.join(tempDir.path(), "desktop.db"));
++		settings.override("mnemopi.scoping", "global");
++		settings.override("mnemopi.retainFromSessionStart", true);
++		settings.override("mnemopi.retainEveryNTurns", 1);
++		settings.override("mnemopi.autoRecall", false);
++		const current = createSession(async () => []);
++		current.sessionManager.appendMessage({ role: "user", content: "old-history-marker", timestamp: 1 });
++		await current.applyMemoryBackend();
++		const state = getMnemopiSessionState(current)!;
++		expect(state.lastRetainedTurn).toBe(1);
++		current.sessionManager.appendMessage({
++			role: "user",
++			content: "Remember desktop-memory-marker for this project",
++			timestamp: 2,
++		});
++		await state.maybeRetainOnAgentEnd([]);
++		const page = (await executeMemoryRpc(current, { action: "list" })) as {
++			total: number;
++			items: Array<{ content: string }>;
++		};
++		expect(page.total).toBeGreaterThan(0);
++		expect(JSON.stringify(page.items)).toContain("desktop-memory-marker");
++		expect(JSON.stringify(page.items)).not.toContain("old-history-marker");
++		state.memory.beam.db.run(
++			"INSERT INTO facts (fact_id, session_id, subject, predicate, object) VALUES (?, ?, ?, ?, ?)",
++			["desktop-fact", current.sessionId, "database", "uses", "native-fact-marker"],
++		);
++		const withFacts = (await executeMemoryRpc(current, { action: "list" })) as { items: Array<{ content: string }> };
++		expect(JSON.stringify(withFacts.items)).toContain("native-fact-marker");
++		const found = (await executeMemoryRpc(current, { action: "search", query: "desktop-memory-marker" })) as {
++			items: unknown[];
++		};
++		expect(found.items.length).toBeGreaterThan(0);
++		expect(await state.beforeAgentStartPrompt("desktop-memory-marker")).toBeUndefined();
++		expect(
++			await state.recallForCompaction([{ role: "user", content: "desktop-memory-marker", timestamp: 3 }]),
++		).toBeUndefined();
++		expect(await executeMemoryRpc(current, { action: "clear" })).toEqual({ cleared: true });
++		await getMnemopiSessionState(current)!.maybeRetainOnAgentEnd([]);
++		expect(((await executeMemoryRpc(current, { action: "list" })) as { total: number }).total).toBe(0);
++		await expect(executeMemoryRpc(current, { action: "list", limit: 0 })).rejects.toThrow("Invalid memory page");
++		await expect(executeMemoryRpc(current, { action: "search", query: {} })).rejects.toThrow("Invalid memory query");
++	});
++
+ 	it("removes unusable Hindsight tools after a cwd reload clears the URL and restores them when configured", async () => {
+ 		const apiUrl = "http://127.0.0.1:1";
+ 		settings.override("memory.backend", "hindsight");
 diff --git a/packages/coding-agent/test/agent-session-turn-system-prompt.test.ts b/packages/coding-agent/test/agent-session-turn-system-prompt.test.ts
 new file mode 100644
 index 0000000..40ad50b

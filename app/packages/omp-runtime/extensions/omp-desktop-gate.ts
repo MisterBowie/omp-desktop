@@ -118,6 +118,7 @@
  * and its token is echoed by every start refusal so a
  * replayed descriptor from an earlier generation can never close a newer one.
  */
+import { memoryToolRefusal } from "../src/memory-policy.js";
 import {
   OMP_APPROVAL_OPTIONS,
   encodeApprovalDescriptor,
@@ -1825,6 +1826,8 @@ export default function ompDesktopGate(pi: ExtensionAPI): void {
    * the legacy disk-driven behavior (including the delegate cache).
    */
   pi.on("tool_call", async (event, context) => {
+    const memoryRefusal = memoryToolRefusal(event.toolName, event.input, process.env);
+    if (memoryRefusal) return { block: true, reason: memoryRefusal };
     const now = Date.now();
     const required = isDesktopStateRequired(env?.OMP_DESKTOP_STATE_REQUIRED);
     let snapshot: ToolCallPolicySnapshot | undefined;

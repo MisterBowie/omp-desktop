@@ -43,7 +43,9 @@ Three properties are enforced, in this order, before any byte is written:
 
 Before hashing, and before any line is addressed, file text is normalized:
 
-1. A leading UTF-8 BOM is stripped and retained for restoration on write.
+1. A leading UTF-8 BOM, or a valid BOM-marked UTF-16 LE/BE encoding, is
+   decoded and retained for restoration on write. Malformed UTF-16, NUL text,
+   and binary files remain rejected by `Read`.
 2. Line endings are detected and normalized to `LF`; the dominant original
    ending is retained for restoration on write.
 3. Trailing `[ \t\r]` is removed from every line, including the last.
@@ -260,6 +262,11 @@ dest       := path | quoted_path
 | `PUT N.=M @name` / `PUT N* @name` | none | Paste a register over the range or resolved block. `@name` is mandatory in the span form. |
 | `REM` | none | Delete the file named by `path`. |
 | `MV DEST` | none | Move/rename to `DEST` after applying every other op to the source. |
+
+After canonical path resolution and permission checks, `MV` whose destination
+is the source (including normalized, case, or symlink aliases) returns
+`EDIT_NO_CHANGE` before any filesystem mutation. Combined `PUT` + `MV` is also
+rejected atomically; source bytes and its prior Read provenance remain valid.
 
 ### 7.3 Anchoring rules
 
@@ -527,7 +534,7 @@ Recovery warnings distinguish cause, because the corrective action differs:
 | `EDIT_REGISTER_EMPTY` | no | paste from an unset register |
 | `EDIT_REGISTER_AMBIGUOUS` | no | anonymous paste with more than one pending anonymous capture |
 | `EDIT_REPAIR_AMBIGUOUS` | no | boundary repair candidates tied at minimum cost |
-| `EDIT_NO_CHANGE` | no | apply produced identical text |
+| `EDIT_NO_CHANGE` | no | apply produced identical text, or `MV` resolves to the source |
 | `EDIT_AMPLIFICATION_LIMIT` | no | lowering exceeded the expansion cap |
 
 All of these are `Edit`-scoped and additive to

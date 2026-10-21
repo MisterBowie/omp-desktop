@@ -12,6 +12,10 @@ on:
       tag:
         required: true
         type: string
+      same-version-revision:
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -35,32 +39,42 @@ jobs:
       RELEASE_REVISION: ${{ inputs.source-revision }}
       SOURCE_RUN_ID: ${{ inputs.artifact-run-id }}
       RELEASE_TAG: ${{ inputs.tag }}
+      SAME_VERSION_REVISION: ${{ inputs.same-version-revision }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+      - name: Verify publication tag and original-release protection
+        run: node --test scripts/publication-tag.test.mjs
       - name: Bind the accepted source, native jobs and immutable artifacts
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           [[ "$GITHUB_REPOSITORY" == MisterBowie/omp-desktop ]]
-          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]]
           [[ "$RELEASE_REVISION" =~ ^[a-f0-9]{40}$ ]]
-          export RELEASE_VERSION="${RELEASE_TAG#v}"
+          node scripts/publication-tag.mjs "$RELEASE_TAG" "$RELEASE_REVISION" "$SAME_VERSION_REVISION" > "$RUNNER_TEMP/publication-tag.json"
+          export RELEASE_VERSION="$(node -p 'JSON.parse(require("fs").readFileSync(process.env.RUNNER_TEMP+"/publication-tag.json")).version')"
           echo "RELEASE_VERSION=$RELEASE_VERSION" >> "$GITHUB_ENV"
+          if [[ "$SAME_VERSION_REVISION" == true ]]; then
+            gh api "repos/$GITHUB_REPOSITORY/commits/v$RELEASE_VERSION" > "$RUNNER_TEMP/protected-stable-tag.json"
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$RELEASE_VERSION" > "$RUNNER_TEMP/protected-stable-release.json"
+          fi
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID" > "$RUNNER_TEMP/candidate-run.json"
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/jobs?per_page=100" > "$RUNNER_TEMP/candidate-jobs.json"
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100" > "$RUNNER_TEMP/candidate-artifacts.json"
           node scripts/verify-release-candidate.mjs "$RUNNER_TEMP/candidate-run.json" "$RUNNER_TEMP/candidate-jobs.json" "$RUNNER_TEMP/candidate-artifacts.json" "$RUNNER_TEMP/omp-candidate-receipt.json"
           cp scripts/stage-release-inputs.mjs "$RUNNER_TEMP/stage-release-inputs.mjs"
+          cp scripts/publication-tag.mjs "$RUNNER_TEMP/publication-tag.mjs"
           node --input-type=module - <<'JS'
           import {readFileSync,writeFileSync} from 'node:fs';
           import {createHash} from 'node:crypto';
+          import {stableReleaseSnapshot} from './scripts/publication-tag.mjs';
           const e=process.env;
-          writeFileSync(e.RUNNER_TEMP+'/omp-publication-control.json',JSON.stringify({schema:'omp-desktop.publication-control/1',version:e.RELEASE_VERSION,sourceRevision:e.RELEASE_REVISION,controllerRevision:e.GITHUB_SHA,controllerRef:e.GITHUB_REF_NAME,candidateRunId:Number(e.SOURCE_RUN_ID),publicationRunId:Number(e.GITHUB_RUN_ID),stagingScriptSha256:createHash('sha256').update(readFileSync(e.RUNNER_TEMP+'/stage-release-inputs.mjs')).digest('hex')},null,2)+'\n');
+          const protectedStable=e.SAME_VERSION_REVISION==='true'?stableReleaseSnapshot('v'+e.RELEASE_VERSION,JSON.parse(readFileSync(e.RUNNER_TEMP+'/protected-stable-tag.json')).sha,JSON.parse(readFileSync(e.RUNNER_TEMP+'/protected-stable-release.json'))):null;
+          writeFileSync(e.RUNNER_TEMP+'/omp-publication-control.json',JSON.stringify({schema:'omp-desktop.publication-control/1',version:e.RELEASE_VERSION,releaseTag:e.RELEASE_TAG,sameVersionRevision:e.SAME_VERSION_REVISION==='true',sourceRevision:e.RELEASE_REVISION,controllerRevision:e.GITHUB_SHA,controllerRef:e.GITHUB_REF_NAME,candidateRunId:Number(e.SOURCE_RUN_ID),publicationRunId:Number(e.GITHUB_RUN_ID),stagingScriptSha256:createHash('sha256').update(readFileSync(e.RUNNER_TEMP+'/stage-release-inputs.mjs')).digest('hex'),publicationTagScriptSha256:createHash('sha256').update(readFileSync(e.RUNNER_TEMP+'/publication-tag.mjs')).digest('hex'),protectedStable},null,2)+'\n');
           JS
       - uses: actions/checkout@v7
         with:
@@ -109,17 +123,28 @@ jobs:
           import { writeFileSync } from 'node:fs';
           import { formatChangelogNotes } from './packages/shared/dist/changelog.js';
           const version = process.env.RELEASE_VERSION;
+          const revision = process.env.SAME_VERSION_REVISION === 'true' ? [
+            '### Skill installation guidance revision / Skill 安装提示修正版',
+            '',
+            '- Skill installation guidance, built-in plugin skills and desktop-owned agent identity now use OMP Desktop (omp-desktop).',
+            '- Skill 安装说明、内置插件 Skill 和桌面自有 Agent 身份统一使用 OMP Desktop（omp-desktop）。',
+            `- The application version remains ${version}. This source-bound build has its own release tag; install it manually over ${version}, because the updater does not offer a higher version. Existing stable tags and files remain available.`,
+            `- 应用版本仍为 ${version}。本修订使用绑定源码的独立发布标签；同版本请手动覆盖安装，自动更新不会提示更高版本。原稳定标签和文件保留。`,
+            '',
+          ].join('\n') : '';
           const installation = [
             '### Installation and updates / 安装与更新',
             '',
-            '- Install 0.1.0 manually once over a 0.15.x test build because the version sequence has restarted. Existing OMP data stays in its own directory.',
-            '- 从 0.15.x 测试版首次切换到 0.1.0 需手动安装；原有 OMP 数据目录保留。',
+            `- Install ${version} manually once over a 0.15.x test build because the version sequence has restarted. Existing OMP data stays in its own directory.`,
+            `- 从 0.15.x 测试版首次切换到 ${version} 需手动安装；原有 OMP 数据目录保留。`,
+            '- 0.1.1 upgrades storage schema 21 to 22 after creating a backup. To return to 0.1.0, restore that backup while the app is closed. Full conversation branching, per-child stop and background-command controls are not included.',
+            '- 0.1.1 将存储 schema 21 升级至 22，升级前自动备份；回退 0.1.0 时需关闭应用并恢复该备份。本版不含完整会话分支、单独停止子代理及后台命令控制。',
             '- Unsigned macOS builds use the GitHub download button for updates. If macOS blocks the first launch, follow OMP-Desktop-macOS-opening-help.txt in the ZIP package.',
             '- 未签名 macOS 通过 GitHub 下载按钮更新；首次启动被系统阻止时，请按 ZIP 中的 OMP-Desktop-macOS-opening-help.txt 操作。',
             '- The Windows installer and Linux AppImage support in-app updates. Portable Windows, Debian and RPM packages use manual downloads.',
             '- Windows 安装版和 Linux AppImage 支持应用内更新；Windows 便携版、Debian 和 RPM 使用手动下载。',
           ].join('\n');
-          writeFileSync('../release-notes.md', formatChangelogNotes(version, 'en') + '\n\n' + formatChangelogNotes(version, 'zh-CN') + '\n\n' + installation + '\n');
+          writeFileSync('../release-notes.md', revision + formatChangelogNotes(version, 'en') + '\n\n' + formatChangelogNotes(version, 'zh-CN') + '\n\n' + installation + '\n');
           JS
       - name: Create or verify the stable tag at the accepted source
         env:
@@ -142,7 +167,9 @@ jobs:
               gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
             fi
           else
-            gh release create "$RELEASE_TAG" "$GITHUB_WORKSPACE"/release-dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "OMP Desktop $RELEASE_VERSION" --notes-file ../release-notes.md
+            title="OMP Desktop $RELEASE_VERSION"
+            if [[ "$SAME_VERSION_REVISION" == true ]]; then title="$title — Skill guidance revision"; fi
+            gh release create "$RELEASE_TAG" "$GITHUB_WORKSPACE"/release-dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "$title" --notes-file ../release-notes.md
             gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
           fi
       - name: Read back the public stable update channel
@@ -171,3 +198,17 @@ jobs:
             curl --fail --location --retry 5 --retry-all-errors --retry-delay 3 --silent --show-error "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/$feed" --output "../public-$feed"
             cmp "../public-$feed" "../release-dist/$feed"
           done
+          if [[ "$SAME_VERSION_REVISION" == true ]]; then
+            gh api "repos/$GITHUB_REPOSITORY/commits/v$RELEASE_VERSION" > "$RUNNER_TEMP/protected-stable-tag-after.json"
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$RELEASE_VERSION" > "$RUNNER_TEMP/protected-stable-release-after.json"
+            node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {pathToFileURL} from 'node:url';
+          const e=process.env;
+          const {stableReleaseSnapshot}=await import(pathToFileURL(e.RUNNER_TEMP+'/publication-tag.mjs'));
+          const original=JSON.parse(readFileSync(e.RUNNER_TEMP+'/omp-publication-control.json')).protectedStable;
+          const actual=stableReleaseSnapshot('v'+e.RELEASE_VERSION,JSON.parse(readFileSync(e.RUNNER_TEMP+'/protected-stable-tag-after.json')).sha,JSON.parse(readFileSync(e.RUNNER_TEMP+'/protected-stable-release-after.json')));
+          assert.deepEqual(actual,original,'original stable tag or assets changed');
+          JS
+          fi

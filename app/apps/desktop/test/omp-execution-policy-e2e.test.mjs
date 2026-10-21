@@ -106,7 +106,7 @@ test(
     assert.ok(GATE, "the shipped tool gate must be present");
     assert.ok(existsSync(BUN), "Bun must be installed for the patched runtime");
 
-    const prepared = await preparePatchedTree({ prepareBuild: true, keep: true });
+    const prepared = await preparePatchedTree({ source: process.env.OMP_TEST_SOURCE, prepareBuild: true, keep: true });
     t.after(() => prepared.cleanup());
     const LAUNCHER = join(prepared.tree, "packages", "coding-agent", "scripts", "omp");
     assert.ok(existsSync(LAUNCHER), "the patched launcher must exist");
@@ -203,6 +203,11 @@ test(
         switch (method) {
           case "session.get":
             return { session: hostSessions.get(params.id) ?? null };
+          case "session.executionRoot": {
+            const session = hostSessions.get(params.sessionId);
+            if (!session?.projectPath) throw Object.assign(new Error("session execution root unavailable"), { errorCode: "NOT_FOUND" });
+            return { path: session.projectPath };
+          }
           case "settings.get":
             return { ...hostSettings };
           case "session.beginTurn":

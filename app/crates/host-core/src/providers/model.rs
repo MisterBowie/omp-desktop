@@ -129,7 +129,8 @@ pub struct ModelBinding {
     pub alias: Option<String>,
     /// Provenance of `context_window`. `catalog` values follow the published
     /// models.dev record, so a catalog correction still reaches a saved binding;
-    /// `user` values are the user's own number. Absent means the record predates
+    /// `provider` values keep the endpoint's published limit and `user` values
+    /// are the user's own number. Absent means the record predates
     /// the marker and readers apply the historical rule (only the generic 128k
     /// seed is inherited).
     #[serde(default, skip_serializing_if = "Option::is_none")]

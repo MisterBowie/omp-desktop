@@ -35,6 +35,19 @@ test("recorded pids with a different birth do not claim a foreign process", () =
   assert.equal(owned.ignored[0].reason, "root-reused");
 });
 
+test("a reused Windows parent id cannot claim an older foreign process", () => {
+  const root = "D:\\Temp\\应用 with spaces 'quoted'";
+  const parentBirth = "133000000000000002";
+  const table = nativeProcessTable(observed([
+    row(20, `${root}\\OMP Desktop.exe`, parentBirth),
+    { ...row(21, `${root}\\omp.exe`, "133000000000000003"), ppid: 20 },
+    { ...row(30, "C:\\Windows\\foreign.exe", "133000000000000001"), ppid: 20 },
+  ]), "win32");
+  const owned = collectOwnedProcesses({ table, selfPid: 100, roots: [{ pid: 20, starttime: parentBirth }], runRoots: [ownershipPath(root, "win32")] });
+  assert.deepEqual(owned.processes.map(p => p.pid), [20, 21]);
+  assert.ok(owned.ignored.some(p => p.pid === 30 && p.reason === "parent-reused"));
+});
+
 test("installed architecture is read from PE/ELF bytes and corrupt headers are refused", () => {
   const root = mkdtempSync(join(tmpdir(), "omp-arch-"));
   const file = join(root, "payload");

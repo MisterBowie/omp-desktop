@@ -45,7 +45,7 @@ test("a catalog-derived list is reported as such, not as the service's answer", 
   // The live branch keeps its own distinct source value. What it returns may be
   // widened with the user's configured bindings, but only the rows the endpoint
   // actually served are cached, which the next test pins.
-  const liveReturn = handler.slice(handler.indexOf("await cacheForCurrentProvider(models);"));
+  const liveReturn = handler.slice(handler.indexOf("await cacheForCurrentProvider(discovered);"));
   assert.match(liveReturn.slice(0, 240), /source: "remote" as const/);
 });
 
@@ -62,7 +62,7 @@ test("every returned model is enriched through models.dev regardless of origin",
   // `decorate` is what attaches published limits, modalities and thinking
   // levels, so all three branches must route through it.
   assert.match(handler, /const modelsDevModel = modelsDevCatalog\.findModel\(/);
-  assert.match(handler, /discovered\.map\(\(model\) => decorate\(model\)\)/);
+  assert.match(handler, /discovered\.map\(\(model\) => decorate\(/);
   assert.match(handler, /catalogModels\.map\(\(model\) => decorate\(model\)\)/);
 });
 

@@ -20,6 +20,7 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
+| 0330 | [Native Mnemopi with desktop-owned preferences](0330-omp-automatic-memory.md) | Accepted |
 | 0315 | [Independent OMP versions and capability-based update delivery](0315-omp-independent-releases-and-update-delivery.md) | Accepted |
 | 0314 | [Settle OMP coding diagnostics within the owning tool](0314-omp-coding-diagnostic-settlement.md) | Accepted for local maintenance validation |
 | scheduled-desktop-automations | [Desktop automation scheduling](scheduled-desktop-automations.md) | Accepted for implementation |
@@ -349,3 +350,6 @@ Each ADR includes:
 | registry-header-variable-spelling | [Remote header variables accept the registry's `{name}` spelling](registry-header-variable-spelling.md) | Proposed |
 | provider-system-certificates | [Desktop sidecar uses OS-trusted certificates](provider-system-certificates.md) | Accepted |
 | image-generation-capability | [Image generation as a configured Agent capability](image-generation-capability.md) | Accepted |
+| omp-session-controls | [OMP text steering, follow-up turns and manual compaction](omp-session-controls.md) | Accepted (text controls; fork and child stop remain closed) |
+| omp-session-worktrees | [OMP session worktrees retain project identity](omp-session-worktrees.md) | Accepted (local OMP session worktrees) |
+| provider-published-token-limits | [Preserve endpoint-published token limits](provider-published-token-limits.md) | Accepted |

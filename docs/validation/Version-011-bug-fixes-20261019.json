@@ -1,0 +1,357 @@
+{
+  "date": "2026-10-19",
+  "status": "nine_fixes_validated_uncommitted_unpublished",
+  "branch": "codex/fix-post-release-bugs",
+  "head": "8233c81398c170808c99aedc7bb525b47eeac467",
+  "baseMain": "a23bfb9befea327e7924efd3004e030a11b587d2",
+  "workingTreeChanges": true,
+  "appVersion": "0.1.1",
+  "publishedArtifactsModified": false,
+  "environment": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "24.14.0",
+    "pnpm": "10.34.5",
+    "electron": "43.6.0",
+    "rustDefault": "1.99.0-nightly (2026-08-11)",
+    "rustStable": "1.98.1",
+    "omp": "18.3.0",
+    "ompPatch": "62bc57b+omp-desktop.6",
+    "ompFork": "d648d27bcf0db16caecb876142d891cf49a51bc2"
+  },
+  "fixedScenarios": [
+    "B01",
+    "B02",
+    "B03",
+    "B04",
+    "B05",
+    "B08",
+    "B09",
+    "B10",
+    "B12"
+  ],
+  "excludedNativeCapability": [
+    "B11"
+  ],
+  "passingControls": [
+    "B06",
+    "B07",
+    "B13"
+  ],
+  "baselineAudit": {
+    "result": {
+      "tests": 13,
+      "pass": 3,
+      "fail": 9,
+      "cancelled": 0,
+      "skipped": 1,
+      "todo": 0
+    },
+    "exitCode": 1,
+    "nativeB11Skipped": true
+  },
+  "candidateAudit": {
+    "result": {
+      "tests": 12,
+      "pass": 12,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "exitCode": 0,
+    "nativeB11ExcludedByCli": true,
+    "hostSha256": "173a1f240e4bf640f314d3e16f3098a9f88fd7dd10bb0c4e52f3c607c62424a5"
+  },
+  "desktopRegression": {
+    "result": {
+      "tests": 458,
+      "pass": 458,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "exitCode": 0,
+    "cwd": "app/apps/desktop",
+    "files": [
+      "test/browser-cdp-deadline.test.mjs",
+      "test/browser-cdp.test.mjs",
+      "test/browser-host-session.test.mjs",
+      "test/browser-preview-tool.test.mjs",
+      "test/browser-screenshot.test.mjs",
+      "test/builtin-commands.test.mjs",
+      "test/composer-draft-cache.test.mjs",
+      "test/composer-drag-drop.test.mjs",
+      "test/composer-paste-files.test.mjs",
+      "test/composer-smart-stop.test.mjs",
+      "test/context-compaction.test.mjs",
+      "test/context-usage.test.mjs",
+      "test/latex-math.test.mjs",
+      "test/markdown-image-paths.test.mjs",
+      "test/markdown-link-menu.test.mjs",
+      "test/markdown-math-rendering.test.mjs",
+      "test/markdown-prose-style.test.mjs",
+      "test/mcp-control-wiring.test.mjs",
+      "test/mcp-control.test.mjs",
+      "test/mcp-market-panel.test.mjs",
+      "test/mcp-oauth.test.mjs",
+      "test/mcp-registry-catalog.test.mjs",
+      "test/mermaid-rendering.test.mjs",
+      "test/model-binding-catalog-source.test.mjs",
+      "test/omp-tool-results.test.mjs",
+      "test/omp-tool-row-mounted.test.mjs",
+      "test/plan-artifact-contract.test.mjs",
+      "test/plugin-mcp-deadlines.test.mjs",
+      "test/plugin-mcp.test.mjs",
+      "test/provider-api-style.test.mjs",
+      "test/provider-model-config.test.mjs",
+      "test/queued-turn-finalization.test.mjs",
+      "test/session-controls-ui.test.mjs",
+      "test/session-message-input.test.mjs",
+      "test/session-transcript.test.mjs",
+      "test/sidebar-session-date.test.mjs",
+      "test/sidebar-session-metadata.test.mjs",
+      "test/sidebar-session-status.test.mjs",
+      "test/skill-command-routing.test.mjs",
+      "test/subagent-transcript.test.mjs",
+      "test/thinking-commit-queue.test.mjs",
+      "test/transcript-disclosure-reading.test.mjs",
+      "test/transcript-file-chips.test.mjs",
+      "test/transcript-reading.test.mjs",
+      "test/transcript-scroll.test.mjs",
+      "test/transcript-search-focus.test.mjs",
+      "test/transcript-search-rendering.test.mjs",
+      "test/transcript-settle.test.mjs",
+      "test/transcript-style.test.mjs",
+      "test/transcript-window.test.mjs",
+      "test/user-mcp.test.mjs",
+      "test/window-menu.test.mjs",
+      "test/windows-host-runtime.test.mjs",
+      "test/worktree-files-ipc.test.mjs",
+      "test/worktree-ipc.test.mjs",
+      "test/worktree-user-path.test.mjs"
+    ]
+  },
+  "runtimeRegression": {
+    "tests": 774,
+    "files": 54,
+    "exitCode": 0
+  },
+  "hostRuntimeRegression": {
+    "tests": 36,
+    "files": 7,
+    "exitCode": 0
+  },
+  "rustRegression": {
+    "tests": 646,
+    "nightlyExitCode": 0,
+    "stableExitCode": 0,
+    "stableHostBuildExitCode": 0,
+    "nightlyFmtExitCode": 0,
+    "nightlyClippyStrictExitCode": 0,
+    "stableFmtAndClippy": "components not installed; commands exited 1; not claimed as passing"
+  },
+  "workspaceRegression": {
+    "initialRecursiveExitCode": 1,
+    "failure": "native pinned-runtime smoke found an unbuilt ancestor source launcher; version probe exited 1",
+    "remainingRecursiveExitCode": 0,
+    "remainingCommand": "pnpm -r --filter '!@pi-desktop/desktop' --filter '!@pi-desktop/omp-runtime' --if-present test",
+    "noUniqueCombinedTestTotalClaimed": true,
+    "packageScriptsMayDiscoverCompiledTestCopies": true
+  },
+  "ompBoundaryRegression": {
+    "command": "pnpm exec vitest run --exclude src/pinned-runtime.test.ts",
+    "exitCode": 0,
+    "pass": 549,
+    "skip": 6,
+    "fail": 0,
+    "excludedNativeSmoke": 1,
+    "skipReason": "six real bundled-sidecar tests require current verified resources",
+    "installedBundleDesktopVersion": "0.1.0",
+    "installedBundleUsedAsCurrentCandidate": false,
+    "verificationWeakened": false
+  },
+  "checks": {
+    "frozenInstallIgnoreScriptsExitCode": 0,
+    "buildJsExitCode": 0,
+    "desktopTypecheckExitCode": 0,
+    "lintExitCode": 0,
+    "docsCheckExitCode": 0,
+    "specLocalePairs": 79,
+    "documentationPages": 517,
+    "nodeSyntaxExitCode": 0,
+    "gitDiffCheckExitCode": 0
+  },
+  "browserScreenshot": {
+    "status": "passed",
+    "electron": "43.6.0",
+    "captures": [
+      {
+        "name": "reported-long-page",
+        "original": {
+          "width": 345,
+          "height": 9663
+        },
+        "deviceScaleFactor": 1,
+        "actual": {
+          "width": 73,
+          "height": 2048
+        },
+        "bytes": 1447
+      },
+      {
+        "name": "wide-page",
+        "original": {
+          "width": 10000,
+          "height": 800
+        },
+        "deviceScaleFactor": 1,
+        "actual": {
+          "width": 1280,
+          "height": 102
+        },
+        "bytes": 5038
+      },
+      {
+        "name": "both-axes",
+        "original": {
+          "width": 5000,
+          "height": 12000
+        },
+        "deviceScaleFactor": 1,
+        "actual": {
+          "width": 853,
+          "height": 2048
+        },
+        "bytes": 12024
+      },
+      {
+        "name": "small-page",
+        "original": {
+          "width": 800,
+          "height": 900
+        },
+        "deviceScaleFactor": 1,
+        "actual": {
+          "width": 800,
+          "height": 900
+        },
+        "bytes": 7498
+      },
+      {
+        "name": "long-page-hidpi",
+        "original": {
+          "width": 345,
+          "height": 9663
+        },
+        "deviceScaleFactor": 2,
+        "actual": {
+          "width": 146,
+          "height": 4096
+        },
+        "bytes": 5003
+      },
+      {
+        "name": "viewport",
+        "actual": {
+          "width": 690,
+          "height": 1440
+        }
+      }
+    ]
+  },
+  "dependencyAudit": {
+    "registry": "https://registry.npmjs.org",
+    "before": {
+      "records": 61,
+      "severities": {
+        "info": 0,
+        "low": 7,
+        "moderate": 17,
+        "high": 37,
+        "critical": 0
+      }
+    },
+    "after": {
+      "records": 1,
+      "severities": {
+        "info": 0,
+        "low": 0,
+        "moderate": 1,
+        "high": 0,
+        "critical": 0
+      },
+      "exitCode": 1
+    },
+    "prod": {
+      "records": 0,
+      "severities": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0
+      },
+      "exitCode": 0
+    },
+    "remaining": [
+      {
+        "module_name": "sprintf-js",
+        "severity": "moderate",
+        "url": "https://github.com/advisories/GHSA-hp3w-g68c-fv3c",
+        "vulnerable_versions": "<=1.1.3",
+        "patched_versions": "<0.0.0",
+        "findings": [
+          {
+            "version": "1.1.3",
+            "paths": [
+              "apps__desktop>electron-builder>app-builder-lib>@electron/get>global-agent>roarr>sprintf-js"
+            ]
+          }
+        ]
+      }
+    ],
+    "muted": [],
+    "bunAndRustAudited": false,
+    "prodManifestScopeIsNotAllBundledRendererDependencies": true,
+    "katex": "0.18.2",
+    "katexDeprecated01811Avoided": true
+  },
+  "paidProviderCalls": false,
+  "rawLogsPublic": false,
+  "sourceFileSha256": {
+    "app/apps/desktop/electron/main/browser-cdp.ts": "977df27fc29897dba73332a4d3b1537509c6e54653bbb973e8b6da502f5be26f",
+    "app/apps/desktop/electron/main/browser-host.ts": "59327d2390fb0a697eb56d27b7dd60b2915436413ce78487dd7b26bb69181418",
+    "app/apps/desktop/electron/main/plugin-mcp.ts": "95affa8899e20795c4b83d6559851f12165acc5c01afc774faba7e6ca6a3fe38",
+    "app/apps/desktop/package.json": "ac3dc8ca260643be42022fa021839e8cbbb7aa6a5f3dd45019301e914aab10c1",
+    "app/apps/desktop/src/lib/context-usage.ts": "aa43aa3421f6d68748820c8c889ba8b01adffc8955a253c7428c8e70c7befc36",
+    "app/apps/desktop/test/browser-cdp-deadline.test.mjs": "eca718243a2cea6c2086404a93c460b4f6cde9b8911d2cd9442bd915958fa870",
+    "app/apps/desktop/test/context-usage.test.mjs": "2985ab8c4bc89e64469c0c1f7a3b3d18789bbdf28006db73a5f316a0e1e6938c",
+    "app/apps/desktop/test/markdown-math-rendering.test.mjs": "1238d88c24665997b5f8cad180075b5085a2720a4fa1c1b5d4f68aeeb1447456",
+    "app/apps/desktop/test/plugin-mcp-deadlines.test.mjs": "f864ff8f94179c924d27ce8e5f560ffc73e1a1edd71104207cf9cfdb7fe2d8e2",
+    "app/apps/desktop/test/plugin-mcp.test.mjs": "939ed75a70ff43fc5dcccb57ab30bc1897265bb259d6631e58932b5a6e039af5",
+    "app/crates/host-core/src/tools/hashline/apply.rs": "257924098ab70da09d3199774f1fa3e39fbfa196f4002794e62642a0e6b6f37c",
+    "app/crates/host-core/src/tools/hashline/tag.rs": "0b16172adeb1ec8b2bd25154fc6902cef3a29230cedf548df358d4f119ea9ae2",
+    "app/crates/host-core/src/tools/mod.rs": "9fdfcf9281c5d6091e613cd1263b58f71116ff880ffaa08c51829d78b0b52cd3",
+    "app/crates/host-core/src/user_skills.rs": "72ca474950c8c1e6a3414cb04f2974094443295e02ec49ba8e1c73ab39b1eb92",
+    "app/packages/agent-runtime/src/project-instructions.test.ts": "9b55058633e5237a342ae189979937fbbf581b987056fa55b46e2c49784a5a56",
+    "app/packages/agent-runtime/src/project-instructions.ts": "09111004fd2aecbdfbf802ed42c189a472ed726d7983e65876e4d7d1c62993b0",
+    "app/packages/agent-runtime/src/runtime.ts": "4c52b3b6c32dddb39bae1c5dcd727fd99a928c63f6e97be369505b40f1efcc2e",
+    "app/packages/agent-runtime/src/subagent-loop-context.test.ts": "ec348ddb952a1a05d55e7961d9236b9642762d7a1fe4b6300f13fa6bbdec0358",
+    "app/packages/agent-runtime/src/subagent.ts": "7fcf785515a31cdd697a28fd7e92d8fb91d78643de6356e5886b7440165f2459",
+    "app/packages/agent-runtime/src/tool-call-dedupe.test.ts": "144d5e631a1dc8e3ace41f5c57a4a07ab9c4f73d01322cde0cc9accbb107d832",
+    "app/packages/agent-runtime/src/tool-call-dedupe.ts": "c6fe07273369a35e666f6f8ace788d62456c59e1a8645c1a6fad71c42951962e",
+    "app/packages/host-runtime/src/workspace-diff.test.ts": "15f5b44406b73a748220bf6e94804668b918f2dcd1f49ef07621a1ebb48b55d7",
+    "app/packages/host-runtime/src/workspace-diff.ts": "c6bbad3adff0a8210e18efba3b47a8d7f8da6e6363235a59fe3c2d4dae01b365",
+    "app/pnpm-lock.yaml": "be882aacbaafce1d18e4610898fea486c840b75b5e0f3e91846e7319efc4b2e6",
+    "app/pnpm-workspace.yaml": "fbe4dd58406871624d67f2ed41e184bceb39394e4bd2719d6d7f5c6ee1ba793f",
+    "app/scripts/audit-released-bugs.mjs": "a05ba0cad750142050194e92e1caffcfe8c3a9fcc5fed1b533e838a23f43372f"
+  },
+  "coverageLimits": [
+    "No newly installed or published candidate",
+    "No current verified 0.1.1 bundle available for native OMP smoke/E2E",
+    "Windows physical dual-monitor not tested",
+    "No native OMP source or runtime pin changed"
+  ]
+}

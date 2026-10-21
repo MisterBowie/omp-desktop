@@ -164,8 +164,14 @@ export function createSessionRuntime({ get, set }: StoreAccess): SessionRuntime 
   ) {
     const active = sessionDetailLoads.get(id);
     if (active && options?.messageBefore === undefined) return active;
+    const todosAtRead = get().sessionTodos?.[id];
     const request = api.getSession(id, options).then((detail) => {
       if (detail.session && options?.messageBefore === undefined) {
+        // A late history read must not overwrite a newer live Todo mutation.
+        if (detail.session.todoPhases !== undefined && get().sessionTodos?.[id] === todosAtRead) {
+          const todoPhases = detail.session.todoPhases;
+          set((state) => ({ sessionTodos: { ...state.sessionTodos, [id]: todoPhases } }));
+        }
         const state = get();
         const liveMessages =
           sessionTranscriptCache.get(id) ?? state.retainedTranscripts[id];

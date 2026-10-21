@@ -1,0 +1,65 @@
+ M HANDOFF.md
+ M app/apps/desktop/electron/main/bootstrap/omp-sessions.ts
+ M app/apps/desktop/electron/main/index.ts
+ M app/apps/desktop/electron/main/ipc/register.ts
+ M app/apps/desktop/electron/main/runtime/omp-runtime.ts
+ M app/apps/desktop/electron/main/runtime/omp-session-wiring.ts
+ M app/apps/desktop/electron/main/runtime/omp-session.ts
+ M app/apps/desktop/src/features/settings/SettingsPage.tsx
+ M app/apps/desktop/src/lib/api.ts
+ M app/apps/desktop/src/lib/settings-search.ts
+ M app/apps/desktop/test/omp-session-bridge.test.mjs
+ M app/crates/host-core/src/rpc/mod.rs
+ M app/docs/adr/0304-omp-capability-source-ownership.md
+ M app/docs/adr/README.md
+ M app/docs/spec/03-runtime/README.md
+ M app/docs/spec/04-ux/06-settings-ia.md
+ M app/docs/spec/06-delivery/04-e2e-test-plan.md
+ M app/docs/spec/NAV.md
+ M app/docs/zh-CN/spec/03-runtime/README.md
+ M app/docs/zh-CN/spec/04-ux/06-settings-ia.md
+ M app/docs/zh-CN/spec/NAV.md
+ M app/packages/i18n/src/locales/de/index.ts
+ M app/packages/i18n/src/locales/en/index.ts
+ M app/packages/i18n/src/locales/es/index.ts
+ M app/packages/i18n/src/locales/fr/index.ts
+ M app/packages/i18n/src/locales/ko/index.ts
+ M app/packages/i18n/src/locales/tr/index.ts
+ M app/packages/i18n/src/locales/zh-CN/index.ts
+ M app/packages/i18n/src/locales/zh-TW/index.ts
+ M app/packages/omp-runtime/extensions/omp-desktop-gate.ts
+ M app/packages/omp-runtime/src/bundled.test.ts
+ M app/packages/omp-runtime/src/config-overlay.ts
+ M app/packages/omp-runtime/src/index.ts
+ M app/packages/omp-runtime/src/process.test.ts
+ M app/packages/omp-runtime/src/process.ts
+ M app/packages/omp-runtime/src/supervisor.ts
+ M app/packages/shared/src/engine.ts
+ M app/packages/shared/src/index.ts
+ M app/packages/shared/src/protocol.ts
+ M app/patches/oh-my-pi/0001-omp-desktop-runtime.patch
+ M app/patches/oh-my-pi/manifest.json
+ M docs/04-task-board.md
+ M docs/05-user-guide.md
+?? app/apps/desktop/electron/main/ipc/memory-ipc.ts
+?? app/apps/desktop/electron/main/runtime/omp-memory.ts
+?? app/apps/desktop/src/features/settings/MemorySettingsPage.tsx
+?? app/apps/desktop/src/features/settings/memory-settings.css
+?? app/apps/desktop/test/omp-memory-native-e2e.test.mjs
+?? app/apps/desktop/test/omp-memory.test.mjs
+?? app/docs/adr/0330-omp-automatic-memory.md
+?? app/docs/spec/03-runtime/22-automatic-memory.md
+?? app/docs/zh-CN/spec/03-runtime/22-automatic-memory.md
+?? app/packages/omp-runtime/src/memory-config.test.ts
+?? app/packages/omp-runtime/src/memory-config.ts
+?? app/packages/omp-runtime/src/memory-policy.ts
+?? app/packages/shared/src/omp-memory.ts
+?? app/patches/oh-my-pi/0002-omp-desktop-memory-candidate.patch
+?? app/patches/oh-my-pi/memory-candidate.json
+?? app/scripts/e2e-memory-settings.mjs
+?? app/scripts/e2e/memory-settings.tsx
+?? app/scripts/omp-memory-candidate.mjs
+?? app/scripts/omp-memory-candidate.test.mjs
+?? docs/validation/OMP-automatic-memory-20261020.json
+?? docs/validation/OMP-automatic-memory-20261020.md
+?? docs/validation/OMP-automatic-memory-20261020/

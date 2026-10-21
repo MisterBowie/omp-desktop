@@ -187,6 +187,19 @@ destination, chat as the home surface, tools and permissions inline.
 
 ### 3.2 Sidebar project groups
 
+Session-controls amendment (2026-10-18): session rows show localized last-reply
+calendar dates from `updatedAt`. Project headers summarize running/permission
+state across their full session list, including folded rows; permissions take
+precedence. Conversation menus expose Copy title, Copy project path (only when
+present), and Copy session ID without requiring developer mode. These actions
+do not change project ownership or conversation selection.
+
+The composer status stack also contains the session's native Todo dock. It is
+collapsed initially, shows progress/current work, and expands to a bounded
+scrollport containing every phase, task status and blocker. Switching sessions
+resets disclosure and shows only that session's list. It is a read-only native
+projection; it does not introduce an editable host-owned task list.
+
 - **Sections**: the compact `Sessions` heading precedes `Projects` and owns
   path-less conversation creation plus the existing sort/archive-view menu. Its
   toolbar places sorting before new-session creation. Both headings keep quiet
@@ -447,3 +460,15 @@ shared capability contract:
 English is the source locale. Shipped translations (zh-CN, zh-TW, Turkish, German, Spanish, French, and
 Korean) cover shell chrome; labels are asserted by US-UI e2e scenarios.
 Copy rules live in [02-i18n-english-first](02-i18n-english-first.md).
+
+## Isolated OMP sessions (2026-10-18)
+
+The project overflow menu offers **New isolated session** after a local Git
+probe. It always creates a fresh OMP session, including when a reusable empty
+session exists. Rows show an isolation/conflict/missing badge. Their menu offers
+merge, sync and reveal; running or unavailable sessions cannot merge or sync.
+The merge dialog previews commits and files and requires confirmation. A stale
+preview reloads; conflicts stay in the worktree. Files and chat links for an
+isolated session use its execution root. Delete first warns about unmerged work.
+Automatic setup, include-file copying, port allocation and per-subagent
+worktrees are not exposed in this slice.

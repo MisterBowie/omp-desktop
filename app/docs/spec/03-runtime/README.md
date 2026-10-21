@@ -24,3 +24,4 @@
 | [20-speech.md](20-speech.md) | Host speech (ASR/TTS) |
 
 - [Image generation and editing](21-image-generation.md)
+| [22-automatic-memory.md](22-automatic-memory.md) | OMP automatic memory / OMP 自动记忆 |

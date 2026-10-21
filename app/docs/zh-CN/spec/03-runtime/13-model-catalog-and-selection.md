@@ -16,6 +16,13 @@
 
 ## 2. 选择用户体验
 
+端点发布的 Token 限制优先于目录基线。发现保留正整数 `context_window`、
+`context_length` 或 `max_input_tokens`，输出限制使用 `max_output_tokens`；
+Google 对应 `inputTokenLimit` 和 `outputTokenLimit`。输出限制不作为上下文。
+保存设置时，继承值采用新端点窗口，Advanced 手动值保留。已选模型的窗口以
+`contextWindowSource: "provider"` 保存，避免运行时被通用 128k 或目录覆盖。
+宿主缓存只保存原始端点结果；已选绑定保存上下文与输出限制。不按模型名猜测 1M。
+
 ### 模型选择器字段
 - 搜索框
 - 提供商过滤器

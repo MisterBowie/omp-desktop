@@ -74,6 +74,7 @@ export function ensureSessionStateDir(dataRoot: string): string {
 }
 
 export type OmpRuntimeSupervisorOptions = {
+  memory?: () => Promise<import("./memory-config.js").OmpMemoryLaunchConfig>;
   /** Product data root; run directories live below it and nothing else is touched. */
   dataRoot: string;
   /** Explicit runtime path (development override or user configuration). */
@@ -545,12 +546,23 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
       // the same cleanup path as every other start failure: the run root
       // (and any partial overlay) is removed and `lastFailure` records the
       // reason.
-      (this.options.writeOverlay ?? writeSourceIsolationOverlay)(configOverlay);
+      const memory = await this.options.memory?.();
+      if (memory && (memory.autoSave || memory.autoRead || memory.management)) {
+        if (!isPathInside(resolve(memory.dbPath), resolve(this.options.dataRoot, "omp-memory"))) {
+          throw new Error("Memory database must stay inside the desktop memory directory");
+        }
+        mkdirSync(dirname(memory.dbPath), { recursive: true, mode: 0o700 });
+      }
+      if (this.options.writeOverlay) this.options.writeOverlay(configOverlay);
+      else writeSourceIsolationOverlay(configOverlay, memory);
+      env.OMP_DESKTOP_MEMORY_AUTO_SAVE = memory?.autoSave === true ? "1" : "0";
+      env.OMP_DESKTOP_MEMORY_AUTO_READ = memory?.autoRead === true ? "1" : "0";
       const runtimeFactory =
         this.options.runtimeFactory ??
         ((options: OmpRuntimeProcessOptions) => OmpRuntimeProcess.start(options));
       const runtime = await runtimeFactory({
         launcher,
+        ...(memory && (memory.autoSave || memory.autoRead || memory.management) ? { memoryProtocolRequired: true, memoryActiveRequired: !memory.management } : {}),
         ...(launchArgs.length > 0 ? { args: launchArgs } : {}),
         cwd: this.workingDirectory ?? this.options.cwd ?? launchDir,
         env,

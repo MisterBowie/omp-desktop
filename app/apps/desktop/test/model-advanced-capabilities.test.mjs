@@ -141,9 +141,9 @@ test("a configured model keeps its published record when discovery omits it", ()
   assert.ok(unions.length >= 3, `expected 3+ union sites, saw ${unions.length}`);
   // Discovery stays the authority on what the service offers: only the rows it
   // returned are cached as discovered.
-  const liveReturn = mainSource.slice(
-    mainSource.indexOf("await cacheForCurrentProvider(models);"),
-  );
+  const cacheWrite = mainSource.indexOf("await cacheForCurrentProvider(discovered);");
+  assert.notEqual(cacheWrite, -1, "the raw endpoint answer must be cached");
+  const liveReturn = mainSource.slice(cacheWrite);
   assert.match(liveReturn.slice(0, 260), /models: withConfiguredBindings\(models\)/);
 });
 

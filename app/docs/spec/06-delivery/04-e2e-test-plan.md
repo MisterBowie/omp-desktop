@@ -8,6 +8,66 @@
 
 ## 1. Goals
 
+### E2E-installed-process-ownership
+
+- **Preconditions:** A fixture-owned install root and native process identities,
+  including exact Windows FILETIME creation stamps; no user processes are targets.
+- **Steps:** Reuse an exited parent's PID while an older unrelated process retains
+  that parent number. Include genuine children with equal/later creation times,
+  missing identities, decimal stamps and independently owned detached remnants.
+- **Expected:** Parent edges require verifiable chronological creation times,
+  compared without numeric rounding. The older process is never claimed or killed;
+  genuine children and unique run-root evidence remain attributable. Executables
+  outside the owned root retain the existing Win32 reclamation refusal.
+- **Automation:** `scripts/e2e/process-ownership.test.mjs` and
+  `apps/desktop/test/installed-native-observation.test.mjs`; full native installer
+  acceptance still proves ordered exit and zero owned survivors on every target.
+
+### E2E-OMP-session-controls
+
+- **Preconditions:** Verified OMP 18.3.0 packaged resources, fixture-owned
+  HOME/project and a scripted loopback model. No user data or paid provider.
+- **Steps:** Hold a model stream, send a text correction to its live turn,
+  create and complete a native Todo, enqueue a `/skill:` follow-up and release
+  the stream. Restore the Todo through a one-row history page. Compact the native context and
+  continue from its summary. Start another compaction and cancel it.
+- **Expected:** Separate optimistic echoes; steering retains the original
+  durable turn; the FIFO persists before execution and drains through OMP;
+  the next request contains the correction and the follow-up. Native history
+  retains the Todo snapshot independently of the returned page. The Skill body
+  loads through the real host tool before the follow-up reply. Native history
+  contains a compaction entry and the subsequent request uses its summary.
+  Cancelled compaction ends unsuccessfully and all owned processes are reaped.
+  Stale turn identities cannot abort another operation. No Pi sidecar is needed.
+- **Automation:** `OMP_BUNDLED_RESOURCES=<resources> node --test
+  apps/desktop/test/omp-session-operations-e2e.test.mjs`.
+- **Additional contracts:** Runtime tests cover delayed terminal frames,
+  preparation cancellation, uncertain admission, retained reclamation and retry.
+  IPC tests reject unsupported attachments before durable queue admission.
+- **Boundary:** Text controls only; full-fork and individual child stop remain
+  explicitly unavailable. Host persistence RPC uses a controlled fixture; this
+  scenario checks write-before-dispatch ordering, not database restart recovery.
+  Cross-platform installed UI acceptance is separate.
+- **Specs:** Runtime spec OMP session-controls amendment; OMP session-controls ADR.
+
+### E2E-OMP-session-ui
+
+- **Steps:** Expand a session's Todo, receive background/child results, switch
+  sessions, and resolve an older history read after a live mutation. Submit a
+  running correction and follow-up through the Composer hook and Store. Switch
+  sessions during slash discovery. Fold a project with a running hidden row;
+  reveal session dates and activate normal Copy actions.
+- **Expected:** Every task/blocker remains readable in the expanded scrollport.
+  Child/background state never replaces another session's Todo. Live state
+  wins over the stale read. Steering uses the active turn and one optimistic
+  row; follow-up appears in its owning queue. Late command discovery sends
+  nothing and keeps the source draft. Folded project activity and localized
+  dates are visible; temporary sessions offer no empty project-path copy.
+- **Automation:** `session-controls-ui.test.mjs`, `sidebar-session-metadata.test.mjs`,
+  `sidebar-session-date.test.mjs`, `skill-command-routing.test.mjs`; component,
+  Store, SSR and IPC contracts, not an installed GUI/screenshot claim.
+- **Specs:** UI IA, builtin-command Skill amendment, OMP session-controls ADR.
+
 ### E2E-browser-full-page-screenshot-bounds
 
 - **Preconditions:** Electron and a fixture-owned profile, scratch directory,
@@ -8085,6 +8145,9 @@ identify the platform validation still needed.
 
 | Acceptance | Scenarios |
 |---|---|
+| A / E / F — Isolated OMP session worktrees | E2E-OMP-WT |
+| A / E / F — OMP text controls and cancellation | E2E-OMP-session-controls |
+| A / E / F — Session Todo, Skill and sidebar interactions | E2E-OMP-session-ui |
 | A / E / F / Release — Installed OMP identity and workflow | E2E-OMP-installed-identity-and-workflow |
 | A / E / F / M7 — Installed coding, concurrency, long history and provider recovery | E2E-OMP-maintenance-daily |
 | E / F / Release / M7 — Installed manual upgrade and closed backup rollback | E2E-OMP-maintenance-upgrade |
@@ -14039,6 +14102,25 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   project. The two-live-sessions desktop journey and the panel step are Draft
   (run only in a capable environment when this surface changes)
 
+#### E2E-MODEL-provider-token-limits-survive-selection-and-restart
+
+- **Steps**: With a fixture endpoint returning `context_window: 872000` and
+  `max_output_tokens: 128000`, fetch the list, select a model, save and reload.
+  Repeat with a matching models.dev record, an unknown gateway ID, an old
+  inherited 128k binding, and an explicit Advanced 128k binding. Refresh the
+  endpoint to 931000, save again, and inspect runtime model resolution.
+- **Expected**: Context is 872000 and output is 128000 for new selections.
+  Cache hydration makes no network request. The selected endpoint window keeps
+  `provider` provenance through save/read and runtime resolution; refreshing
+  updates inherited context while user/legacy overrides remain unchanged.
+  Invalid, fractional, non-positive and overflowing limits are ignored.
+- **Specs linked**: `03-runtime/13-model-catalog-and-selection.md` §2/§9.1,
+  `03-runtime/12-provider-config-schema.md` §2, ADR `provider-published-token-limits`.
+- **Status**: Automated at discovery/IPC/shared/host configuration boundaries in
+  `provider-discovery-limits.test.mjs`, `model-discovery.test.mjs`, shared catalog
+  tests and Rust provider tests. Installed GUI/restart validation remains manual;
+  no paid inference is required or executed by these fixtures.
+
 #### E2E-MODEL-catalog-window-correction-reaches-saved-bindings
 
 - **Goal**: a models.dev limit correction reaches an already saved binding without
@@ -14522,3 +14604,61 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Status:** Automated by `node --experimental-strip-types
   scripts/e2e-scheduled-workspace.mjs`, using production Electron dispatch and
   real Rust/stdio/SQLite. Only external inference is replaced with an observer.
+
+### E2E-OMP-WT: Isolated session lifecycle
+
+- **Preconditions**: Built current host, verified OMP resources, temporary local Git repository, loopback FakeProvider.
+- **Steps**: Create an isolated OMP session from the project menu; deny then approve a native write; switch projects; stop a real child command; restart host and OMP; restore history; preview and confirm merge; delete the session.
+- **Expected**: Fresh session and worktree, unchanged project configuration scope, denied write has zero effect, approved write only in the worktree, cancelled child is reaped, missing root never falls back, native history resumes the same worktree, preview does not mutate the project, merge requires a current token, deletion removes only owned paths. Host tests also cover dirty-project, stale preview, conflicts, upgrade backup, creating/missing state and tool/turn reservations.
+- **Specs linked**: Runtime OMP execution-root amendment; UI isolated-session amendment; ADR omp-session-worktrees.
+- **Acceptance criterion**: Session isolation, permissions, persistence and cancellation.
+- **Milestone**: T26 local source acceptance.
+- **Status**: Automated at component/Store/IPC/real host/native process boundaries; installed Electron UI and Windows/Linux acceptance remain unrun.
+- **Commands**: `node --test apps/desktop/test/worktree-*.test.mjs`; `OMP_BUNDLED_RESOURCES=<verified-resources> node --test apps/desktop/test/omp-worktree-e2e.test.mjs`; `cargo test -p host-core --locked`.
+
+## Post-release bug regression (2026-10-19)
+
+Run `scripts/audit-released-bugs.mjs` against the released source/host as the
+failing baseline, then the candidate source/newly built host. Exclude only
+`B11 OMP native Read`, which requires unsupported native OMP functionality.
+The twelve applicable scenarios cover SDK loop ownership and provider wire
+IDs, independent AGENTS budgets, bounded BrowserHost CDP calls, incremental
+MCP SSE, timeout cancellation notifications, UTF-16 Read/Edit, context token
+accounting, canonical same-path moves, and Git textconv suppression, plus the
+history-tail, provider-parameter and persisted-attachment controls.
+
+Regression suites exercise real Pi adapter wiring, real Git repositories and
+host RPC, and public BrowserHost/MCP clients with controlled external browser
+or network edges. Browser deadline recovery must also reject late replies
+after a new debugger attachment. Preserve valid encoding and permission
+checks. Source-level candidate tests do not qualify an installed release or
+cross-platform GUI; record those separately. No paid provider is needed.
+
+#### E2E-OMP-skill-install-branding: Skill guidance uses the current host name
+
+- **Steps**: Inspect composed Agent, Plan and Goal prompts with the default
+  persona, a custom persona and an empty base (the native OMP injection path).
+  Inspect plugin helper descriptions and load the bundled plugin-development
+  skill, then request a skill installation in an isolated test conversation.
+- **Expected**: Desktop-owned identity and installation guidance name
+  `OMP Desktop (omp-desktop)` rather than the legacy application. A custom
+  persona is preserved while host context remains. Skill ids, package names,
+  installation locations, permissions and external skill bodies are unchanged.
+- **Coverage**: Existing mode/custom-persona/runtime and skill-loading tests,
+  plus a local compiled-prompt probe. Live-model reply wording remains Draft;
+  no paid-model request is needed for the prompt checks.
+- **Specs linked**: `03-runtime/02-agent-runtime.md` (§7).
+
+## OMP automatic memory
+
+Run `node scripts/e2e-memory-settings.mjs` with `OMP_MEMORY_TEST_RUNTIME` pointing
+to the memory candidate. Use an isolated Electron profile and Rust host. Verify
+both defaults off, independent switches, project selection, empty browsing,
+clear/cancel/confirm, and persistence across host/renderer restart. Never attach
+the user's running desktop.
+
+Run `OMP_MEMORY_TEST_RUNTIME=<candidate> node --test
+apps/desktop/test/omp-memory-native-e2e.test.mjs` against a local scripted provider.
+Verify automatic retention, cross-process recall, worktree isolation, read/save
+disabling, credential-free management, and native clear. Native session tests
+also cover resumed-history baselines and no compaction recall while disabled.

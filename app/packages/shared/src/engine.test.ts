@@ -73,13 +73,14 @@ describe("engine capabilities", () => {
     // M4 ships prompting, stopping, restore, model/thinking switch, approval and
     // questions; M5/T17 adds subagentEvents; M5/T20 adds the Plan/Goal contract
     // modes (mode state, contract catalogue, submit/approve/dispatch, model-side
-    // entry). Branching, steering, follow-up and compaction stay closed until
-    // their behaviour exists: an open capability is a promise that there is an
-    // implementation behind the entry point.
+    // entry). T25 opens text steering and host-queued follow-ups. Branching
+    // remains closed until a faithful copy-through-message operation exists.
     const shipped: Record<string, boolean> = {
       prompt: true,
       stop: true,
       resume: true,
+      followUp: true,
+      steer: true,
       modelSwitch: true,
       structuredQuestions: true,
       toolApproval: true,
@@ -122,13 +123,14 @@ describe("engine capabilities", () => {
     expect(engineSupports("omp", "prompt")).toBe(true);
     expect(engineSupports("omp", "toolApproval")).toBe(true);
     expect(engineSupports("omp", "resume")).toBe(true);
-    expect(engineSupports("omp", "steer")).toBe(false);
-    const refusal = engineCapabilityRefusal("omp", "steer");
+    expect(engineSupports("omp", "steer")).toBe(true);
+    expect(engineSupports("omp", "branch")).toBe(false);
+    const refusal = engineCapabilityRefusal("omp", "branch");
     expect(refusal.errorCode).toBe(ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE);
     expect(refusal.engine).toBe("omp");
-    expect(refusal.capability).toBe("steer");
+    expect(refusal.capability).toBe("branch");
     expect(refusal.message).toContain("omp");
-    expect(refusal.message).toContain("steer");
+    expect(refusal.message).toContain("branch");
   });
 
   it("closes capabilities whenever the runtime is not up", () => {

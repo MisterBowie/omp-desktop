@@ -142,15 +142,17 @@ export const PI_ENGINE_CAPABILITIES: EngineCapabilities = {
  *     in-process state. Until the adapter carries entry ids and a faithful
  *     full-fork, an OMP fork is refused rather than silently producing the
  *     wrong child.
- *   - `steer`/`followUp`/`compact` are not wired to the OMP RPC queue.
+ * Follow-up turns use the desktop's durable FIFO and the ordinary OMP prompt
+ * admission. Text steering stays on the active native run; manual compaction
+ * has separate cancellation ownership and never enters the Pi sidecar.
  */
 export const OMP_ENGINE_CAPABILITIES: EngineCapabilities = {
   prompt: true,
   stop: true,
   resume: true,
   branch: false,
-  steer: false,
-  followUp: false,
+  steer: true,
+  followUp: true,
   modelSwitch: true,
   structuredQuestions: true,
   toolApproval: true,
@@ -401,9 +403,9 @@ export const OMP_RUNTIME_VERSION = "18.3.0";
  * constants equal the manifest's `base.sha` / `patchLevel` / `fork.*` values.
  */
 export const OMP_RUNTIME_BASE_SHA = "62bc57be1b03ef0802a33cf7f5f530e534527531";
-export const OMP_RUNTIME_PATCH_LEVEL = "62bc57b+omp-desktop.6";
+export const OMP_RUNTIME_PATCH_LEVEL = "62bc57b+omp-desktop.7";
 export const OMP_RUNTIME_FORK_REPOSITORY = "https://github.com/MisterBowie/oh-my-pi";
-export const OMP_RUNTIME_FORK_COMMIT = "d648d27bcf0db16caecb876142d891cf49a51bc2";
+export const OMP_RUNTIME_FORK_COMMIT = "edec3898d44071206ec201beebea432a2786bd8c";
 
 /** One JSONL frame, newline included (`rpc-frame.ts` MAX_RPC_FRAME_BYTES). */
 export const OMP_MAX_FRAME_BYTES = 1024 * 1024;

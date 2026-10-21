@@ -10,7 +10,18 @@
  */
 import { execFileSync } from "node:child_process";
 import { machine as osMachine } from "node:os";
-import { APP_NAME } from "@pi-desktop/shared";
+import { APP_NAME, ErrorCodes } from "@pi-desktop/shared";
+
+/** One-line error text used by host-backed user-facing lists. */
+export function describeError(error: unknown): string {
+  if (error instanceof Error) return error.message.slice(0, 300);
+  return String(error).slice(0, 300);
+}
+
+/** A request that lost its race with host shutdown or restart. */
+export function isHostUnavailable(error: unknown): boolean {
+  return (error as { errorCode?: string } | null | undefined)?.errorCode === ErrorCodes.HOST_UNAVAILABLE;
+}
 
 export const DB_SCHEMA_TOO_NEW_STATUS = "DB_SCHEMA_TOO_NEW";
 export const ARCH_MISMATCH_STATUS = "ARCH_MISMATCH";

@@ -1,5 +1,33 @@
 # 02. Agent Runtime
 
+## OMP session controls (2026-10-18 amendment)
+
+OMP 18.3.0 with patch level `62bc57b+omp-desktop.6` supports Desktop text
+steering, host-queued follow-up turns and manual context compaction. This
+amendment supersedes earlier closed-capability descriptions for these paths.
+
+- Steering requires the active live turn id and a started, non-stopping run.
+  Original and steering user bubbles reconcile independently. A terminal frame
+  waits for an admitted steering command to settle; an uncertain response
+  retires the process before a successor turn can consume stale input. Active
+  status events carry the turn id the Composer needs for Alt+Enter.
+- Follow-ups stay in the existing host-owned persistent FIFO. Reorder, remove
+  and prioritize retain their existing semantics. Dispatch uses the ordinary
+  OMP prompt boundary and current durable session policy. It never calls native
+  `follow_up`, the Pi sidecar or a second scheduler for an OMP turn.
+- Manual compaction restores the bound native session and calls native
+  `compact`. Preparation, compaction and Stop exclude overlapping operations.
+  Native abort precedes bounded process reclamation; cancellation cannot
+  become success through a delayed result. Failed reclamation blocks reuse
+  and remains retryable through Stop. Start/end events drive the existing
+  localized UI. Summary history stays native; no desktop checkpoint is invented.
+- Text-only controls reject attachments before queue admission or native
+  dispatch. `branch` and individual child stop remain unavailable: native
+  redo-from-user branching and parent abort do not satisfy those contracts.
+
+See [OMP session controls ADR](../../adr/omp-session-controls.md) and
+`E2E-OMP-session-controls` in the delivery E2E plan.
+
 ## 1. Goal
 
 Applied decisions: **D002/D003/D008/D158/D189/D190/D193/D194/D278/D378**.
@@ -1170,6 +1198,16 @@ same gateway backend as the conversation it summarizes.
 
 ## 7. System prompt composition
 
+Desktop-owned prompts use the shared `APP_NAME` (`OMP Desktop`). Every mode
+composition also identifies the host application as `OMP Desktop (omp-desktop)`,
+including the empty-base block injected into native OMP sessions, so skill
+installation guidance and status replies use the current application name.
+This host context remains when a custom `SYSTEM.md` replaces the persona.
+Project-instruction headers, delegate introductions, plugin helper descriptions,
+and the bundled plugin-development skill use the same product name. Legacy
+package names and skill ids remain compatibility identifiers; imported skill
+bodies and user-authored instructions are not rewritten.
+
 ```text
 [base product prompt in English]
 + [operating-state prompt: agent/plan/goal]
@@ -1386,9 +1424,12 @@ tool continues with the runtime's base/root chain rather than waiting for the
 general host RPC timeout. A failed resolution never leaves a previously
 resolved sibling-directory chain active.
 
-All discovery stays within the session project root. Empty, unreadable, and
-out-of-root files are skipped. The combined UTF-8 content is capped at 32 KiB
-and source paths are labelled under `# Project instructions`.
+Project discovery stays within the session project root. Empty, unreadable, and
+out-of-root files are skipped. Global instructions and the project chain each
+have an independent 32 KiB UTF-8 content budget. Truncation preserves complete
+UTF-8 characters, labels the source and retained/total bytes, and stops further
+project-chain discovery after a truncated file. Source paths are labelled under
+`# Project instructions`.
 The sidecar never reads workspace instructions directly. A changed root chain
 recreates an idle runtime on its next prompt; nested instructions are resolved
 again when a relevant file tool runs. The resolver's timeout and fallback
@@ -2509,3 +2550,24 @@ The native Write tool card displays diagnostic metadata beside its written
 source using the same diagnostic blocks as Edit. Compiler errors do not turn a
 successful filesystem mutation into a failed tool execution. Both live and
 recovered rows retain the findings.
+
+## OMP isolated session execution roots (2026-10-18)
+
+Local OMP sessions may be created with `isolated: true`. Host schema v22 owns
+worktree metadata and Git operations; `session.projectPath` remains the original
+configuration scope. `session.executionRoot` supplies the checked execution root
+to the OMP boundary. Missing/creating roots refuse without project fallback.
+Native history stays in the same versioned OMP reference. Host file tools and
+plan artifacts use the execution root; Skills, memory, MCP and plugin activation
+use project identity. Main and host reservations prevent merge/sync/removal from
+interleaving with a running turn or tool. See [the worktree ADR](../../adr/omp-session-worktrees.md).
+
+## Pi-compatible loop context ownership (2026-10-19)
+
+Each main or delegated agent loop owns a shallow copy of the durable message
+array. The SDK may append to its loop context without appending a second time
+to `agent.state.messages`. At the provider boundary, replayed tool calls are
+compared by their wire ID (before `|`); an assistant message containing only
+replayed calls is dropped as a whole, and corresponding results use the
+original call's ID. Legitimate new calls remain. This does not change the native
+OMP runtime or its history ownership.

@@ -22,7 +22,9 @@ import { registerPluginUiIpc } from "./plugin-ui-ipc";
 import { registerProviderIpc } from "./provider-ipc";
 import { registerPullsIpc } from "./pulls-ipc";
 import { registerScheduledIpc } from "./scheduled-ipc";
+import { registerWorktreeIpc } from "./worktree-ipc";
 import { registerSessionIpc } from "./session-ipc";
+import { registerMemoryIpc } from "./memory-ipc";
 import { registerSettingsIpc } from "./settings-ipc";
 import { registerSkillsIpc } from "./skills-ipc";
 import { registerAgentImportIpc } from "./agent-import-ipc";
@@ -54,6 +56,7 @@ export type RegisterIpcDependencies = {
   engineRouter: EngineRouter;
   /** OMP conversation bridge (M3/T11-T13); absent in builds without a runtime. */
   ompSessions?: OmpSessionBridge | null;
+  ompMemory?: import("../runtime/omp-memory").OmpMemoryService;
   getNotificationViewingSessionId: () => string | null;
   setNotificationViewingSessionId: (sessionId: string | null) => void;
   activeUserSubagentDocuments: (...args: any[]) => Promise<any>;
@@ -238,6 +241,8 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     setViewingSessionId: setNotificationViewingSessionId,
     sendToRenderer,
   });
+  registerWorktreeIpc({registrar, getHost, ompSessions, acquireSessionOperation});
+  if (dependencies.ompMemory) registerMemoryIpc(registrar, dependencies.ompMemory);
   registerSessionIpc({
     registrar,
     getHost,

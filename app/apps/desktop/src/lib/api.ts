@@ -530,8 +530,14 @@ export const api = {
       ...result,
       sessions: result.sessions.map(normalizeSession),
     })),
-  createSession: (input?: Partial<SessionSummary>) =>
-    invoke<{ session: SessionSummary }>(IPC.invoke.sessionCreate, input ?? {}).then(
+  probeWorktree: (projectPath: string) => invoke<import("@pi-desktop/shared").WorktreeProbeResult>(IPC.invoke.worktreeProbe, { projectPath }),
+  previewWorktreeMerge: (sessionId: string) => invoke<import("@pi-desktop/shared").WorktreeMergePreview>(IPC.invoke.worktreePreview, { sessionId }),
+  mergeWorktree: (sessionId: string, previewToken: string) => invoke<import("@pi-desktop/shared").WorktreeMergeOutcome>(IPC.invoke.worktreeMerge, { sessionId, previewToken }),
+  syncWorktree: (sessionId: string) => invoke<import("@pi-desktop/shared").WorktreeSyncOutcome>(IPC.invoke.worktreeSync, { sessionId }),
+  getWorktreePendingWork: (sessionId: string) => invoke<import("@pi-desktop/shared").WorktreePendingWork>(IPC.invoke.worktreePendingWork, { sessionId }),
+  revealWorktree: (sessionId: string) => invoke(IPC.invoke.worktreeReveal, { sessionId }),
+  createSession: (input?: Partial<SessionSummary> & { isolated?: boolean }) =>
+    invoke<{ session: SessionSummary; worktree?: import("@pi-desktop/shared").CreatedSessionWorktree }>(IPC.invoke.sessionCreate, input ?? {}).then(
       (result) => ({ ...result, session: normalizeSession(result.session) }),
     ),
   forkSession: (sessionId: string, title?: string, throughMessageId?: string) =>
@@ -598,6 +604,10 @@ export const api = {
     ),
   runImportModelConfigs: (items: ModelConfigImportCandidate[]) =>
     invoke<ImportRunResult>(IPC.invoke.modelConfigImportRun, items),
+  getOmpMemorySettings: () => invoke<import("@pi-desktop/shared").OmpMemorySettings>(IPC.invoke.ompMemorySettingsGet),
+  setOmpMemorySettings: (settings: import("@pi-desktop/shared").OmpMemorySettings) => invoke<import("@pi-desktop/shared").OmpMemorySettings>(IPC.invoke.ompMemorySettingsSet, settings),
+  queryOmpMemory: (input: { projectPath?: string; sessionId?: string; query?: string; offset?: number }) => invoke<import("@pi-desktop/shared").OmpMemoryPage>(IPC.invoke.ompMemoryQuery, input),
+  clearOmpMemory: (scope: { projectPath?: string; sessionId?: string }) => invoke<{ cleared: true }>(IPC.invoke.ompMemoryClear, { ...scope, confirmed: true }),
   getSettings: () => invoke<AppSettings>(IPC.invoke.settingsGet).then(normalizeSettings),
   setSettings: (settings: AppSettings) =>
     invoke(IPC.invoke.settingsSet, validateSettingsWrite(settings)),
@@ -1248,11 +1258,11 @@ export const api = {
     invoke(IPC.invoke.browserOpenExternal, url ? { url } : {}),
   browserGetState: () =>
     invoke<BrowserState | null>(IPC.invoke.browserGetState),
-  fsList: (path?: string) =>
-    invoke<{ entries: FsEntry[] }>(IPC.invoke.fsList, { path: path ?? "" }),
-  fsRead: (path: string, mimeType?: string) =>
+  fsList: (path?: string, sessionId?: string) =>
+    invoke<{ entries: FsEntry[] }>(IPC.invoke.fsList, { path: path ?? "", ...(sessionId ? {sessionId} : {}) }),
+  fsRead: (path: string, mimeType?: string, sessionId?: string) =>
     invoke<FsReadResult>(IPC.invoke.fsRead, {
-      path,
+      path, ...(sessionId ? {sessionId} : {}),
       ...(mimeType ? { mimeType } : {}),
     }),
   fsReadImageDataUrl: (ref: string, mimeType?: string) =>
@@ -1260,7 +1270,7 @@ export const api = {
       ref,
       ...(mimeType ? { mimeType } : {}),
     }),
-  fsReveal: (path: string) => invoke(IPC.invoke.fsReveal, { path }),
+  fsReveal: (path: string, sessionId?: string) => invoke(IPC.invoke.fsReveal, { path, ...(sessionId ? {sessionId} : {}) }),
   fsOpen: (path: string) => invoke(IPC.invoke.fsOpen, { path }),
   fsIndex: () => invoke<FsIndexResult>(IPC.invoke.fsIndex),
   /**

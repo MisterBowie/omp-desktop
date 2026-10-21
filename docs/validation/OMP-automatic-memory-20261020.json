@@ -1,0 +1,537 @@
+{
+  "schema": "omp-desktop.automatic-memory-validation/1",
+  "date": "2026-10-20",
+  "status": "local-implementation-validated-native-committed-and-pinned",
+  "branch": "codex/mnemopi-memory",
+  "worktree": "/Users/vv/person/omp-desktop/.worktrees/mnemopi-memory",
+  "baseCommit": "df784ba4764133b4b8d3350ec7c8c1eb61861f05",
+  "appVersion": "0.1.2",
+  "storageSchema": 22,
+  "nativeBaseCommit": "d648d27bcf0db16caecb876142d891cf49a51bc2",
+  "nativeCandidate": {
+    "schema": "omp-desktop.memory-candidate/1",
+    "release": false,
+    "baseForkCommit": "d648d27bcf0db16caecb876142d891cf49a51bc2",
+    "patchSha256": "44cc1755fbf289c12d4b82b382cc4675ba272403623358c5ea826fab7a80672a",
+    "binarySha256": "45ff07e13e2b2404f03b1b385b6dfe1a450e5f290e42a5fb13c94405307146a4",
+    "gateSha256": "449b291e08f0a01ad186cd1be30441b540ce20725b639ec62f6d2df82bff82de"
+  },
+  "toolchains": {
+    "node": "24.14.0",
+    "pnpm": "10.34.5",
+    "bun": "1.4.2",
+    "rustc": "1.99.0-nightly (3d6c19bb9 2026-08-11)",
+    "cargo": "1.99.0-nightly (b07e5a086 2026-08-07)",
+    "platform": "darwin-arm64"
+  },
+  "checks": [
+    {
+      "id": "native-types",
+      "command": "bun run --filter @oh-my-pi/pi-coding-agent check:types",
+      "cwd": ".omp-sidecar-source",
+      "exitCode": 0
+    },
+    {
+      "id": "native-tests",
+      "command": "bun test packages/coding-agent/test/memory-tools.test.ts packages/coding-agent/test/agent-session-memory-backend.test.ts packages/coding-agent/test/mnemopi-bank-derivation.test.ts packages/coding-agent/test/memory-backend-resolve.test.ts packages/coding-agent/test/memory-redaction.test.ts",
+      "cwd": ".omp-sidecar-source",
+      "exitCode": 0,
+      "passed": 102,
+      "failed": 0,
+      "files": 5
+    },
+    {
+      "id": "candidate-build",
+      "command": "node scripts/omp-memory-candidate.mjs --source ../.omp-sidecar-source --build",
+      "cwd": "app",
+      "exitCode": 0,
+      "release": false
+    },
+    {
+      "id": "runtime-tests-before-promotion",
+      "command": "OMP_SIDECAR_TEST_RESOURCES=$PWD/.artifacts/memory-baseline-reference pnpm --filter @pi-desktop/omp-runtime exec vitest run --maxWorkers 2",
+      "cwd": "app",
+      "exitCode": 0,
+      "passed": 565,
+      "failed": 0,
+      "files": 38,
+      "note": "Bundled runtime regression uses a separately rebuilt clean .6 / desktop 0.1.2 reference; new memory behavior uses the separately identified candidate E2E."
+    },
+    {
+      "id": "desktop-regression-before-promotion",
+      "command": "node --test --test-concurrency=2 apps/desktop/test/omp-memory.test.mjs apps/desktop/test/omp-session-bridge.test.mjs apps/desktop/test/omp-session-ownership.test.mjs apps/desktop/test/omp-session-configure.test.mjs apps/desktop/test/omp-session-failclosed.test.mjs apps/desktop/test/project-memory.test.mjs apps/desktop/test/settings-roundtrip.test.mjs apps/desktop/test/settings-project-archive.test.mjs apps/desktop/test/settings-general.test.mjs apps/desktop/test/sidebar-settings-return.test.mjs scripts/omp-memory-candidate.test.mjs",
+      "cwd": "app",
+      "exitCode": 0,
+      "passed": 132,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "id": "host-tests",
+      "command": "cargo test -p host-core --locked",
+      "cwd": "app",
+      "exitCode": 0,
+      "passed": 647,
+      "failed": 0
+    },
+    {
+      "id": "host-clippy",
+      "command": "cargo clippy -p host-core --all-targets --locked -- -D warnings",
+      "cwd": "app",
+      "exitCode": 0
+    },
+    {
+      "id": "host-format",
+      "command": "cargo fmt --all --check",
+      "cwd": "app",
+      "exitCode": 0
+    },
+    {
+      "id": "js-build",
+      "command": "pnpm build:js",
+      "cwd": "app",
+      "exitCode": 0
+    },
+    {
+      "id": "desktop-types",
+      "command": "pnpm --filter @pi-desktop/desktop typecheck",
+      "cwd": "app",
+      "exitCode": 0
+    },
+    {
+      "id": "lint",
+      "command": "pnpm lint",
+      "cwd": "app",
+      "exitCode": 0
+    },
+    {
+      "id": "native-e2e",
+      "command": "OMP_MEMORY_TEST_RUNTIME=$PWD/.artifacts/omp-memory-native/omp node --test apps/desktop/test/omp-memory-native-e2e.test.mjs",
+      "cwd": "app",
+      "exitCode": 0,
+      "passed": 1,
+      "failed": 0,
+      "realNativeProcess": true,
+      "realPaidModel": false
+    },
+    {
+      "id": "electron-ui-e2e",
+      "command": "OMP_MEMORY_TEST_RUNTIME=$PWD/.artifacts/omp-memory-native/omp node scripts/e2e-memory-settings.mjs",
+      "cwd": "app",
+      "exitCode": 0,
+      "result": {
+        "ok": true,
+        "restart": true
+      },
+      "realElectron": true,
+      "realHostCore": true,
+      "realNativeProcess": true,
+      "realPaidModel": false
+    },
+    {
+      "id": "docs",
+      "command": "pnpm docs:check",
+      "cwd": "app",
+      "exitCode": 0,
+      "localePairs": 80,
+      "pages": 520
+    },
+    {
+      "id": "whitespace",
+      "command": "git diff --check",
+      "cwd": ".",
+      "exitCode": 0
+    },
+    {
+      "id": "standard-native-build",
+      "command": "node scripts/omp-sidecar.mjs --build --source ../.omp-sidecar-source --out .artifacts/omp-memory-production/omp-runtime --json",
+      "cwd": "app",
+      "exitCode": 0
+    },
+    {
+      "id": "promoted-patch-check",
+      "command": "node scripts/omp-patch.mjs --check --source /Users/vv/person/omp-desktop/upstream/oh-my-pi --json",
+      "cwd": "app",
+      "exitCode": 0
+    },
+    {
+      "id": "runtime-tests",
+      "command": "OMP_SIDECAR_TEST_RESOURCES=$PWD/.artifacts/omp-memory-production pnpm --filter @pi-desktop/omp-runtime exec vitest run --maxWorkers 2",
+      "cwd": "app",
+      "exitCode": 0,
+      "passed": 565,
+      "failed": 0,
+      "files": 38,
+      "runtimePatchLevel": "62bc57b+omp-desktop.7"
+    },
+    {
+      "id": "desktop-regression",
+      "command": "node --test --test-concurrency=2 apps/desktop/test/omp-memory.test.mjs apps/desktop/test/omp-session-bridge.test.mjs apps/desktop/test/omp-session-ownership.test.mjs apps/desktop/test/omp-session-configure.test.mjs apps/desktop/test/omp-session-failclosed.test.mjs apps/desktop/test/project-memory.test.mjs apps/desktop/test/settings-roundtrip.test.mjs apps/desktop/test/settings-project-archive.test.mjs apps/desktop/test/settings-general.test.mjs apps/desktop/test/sidebar-settings-return.test.mjs apps/desktop/test/omp-sidecar.test.mjs scripts/omp-memory-candidate.test.mjs",
+      "cwd": "app",
+      "exitCode": 0,
+      "passed": 142,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "id": "shared",
+      "command": "pnpm --filter @pi-desktop/shared test",
+      "cwd": "app",
+      "exitCode": 0,
+      "passed": 994,
+      "failed": 0,
+      "files": 90
+    },
+    {
+      "id": "i18n",
+      "command": "pnpm --filter @pi-desktop/i18n test",
+      "cwd": "app",
+      "exitCode": 0,
+      "passed": 25,
+      "failed": 0,
+      "files": 3
+    },
+    {
+      "id": "native-e2e-standard-build",
+      "command": "OMP_MEMORY_TEST_RUNTIME=$PWD/.artifacts/omp-memory-production/omp-runtime/omp node --test apps/desktop/test/omp-memory-native-e2e.test.mjs",
+      "cwd": "app",
+      "exitCode": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "realNativeProcess": true,
+      "realPaidModel": false
+    },
+    {
+      "id": "electron-ui-e2e-standard-build",
+      "command": "OMP_MEMORY_TEST_RUNTIME=$PWD/.artifacts/omp-memory-production/omp-runtime/omp node scripts/e2e-memory-settings.mjs",
+      "cwd": "app",
+      "exitCode": 0,
+      "result": {
+        "ok": true,
+        "restart": true
+      },
+      "realElectron": true,
+      "realHostCore": true,
+      "realNativeProcess": true,
+      "realPaidModel": false
+    }
+  ],
+  "evidence": [
+    {
+      "file": "OMP-automatic-memory-20261020/candidate-build.log.gz",
+      "bytes": 277,
+      "sha256": "f09f2df72994833b22bde7fb9342fddf4b57bd00be894e3490bc76e0bce9f22f",
+      "uncompressedBytes": 373,
+      "uncompressedSha256": "cf91a9dadd2db8d01db74971f13df25f5ae1e5747c3c0c6eae6127a2357413a5"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/desktop-regression.log.gz",
+      "bytes": 4309,
+      "sha256": "3fccde7d8f46743f75369705dfea796285afe87fb8cee1b3e611b82364297656",
+      "uncompressedBytes": 11672,
+      "uncompressedSha256": "93db6496c97256debafe47d8ce3e0c6a5ba2f950d85451fd4e2d1d5460666b90"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/desktop-source-snapshot.json",
+      "bytes": 9457,
+      "sha256": "8f60c7ce9c1aa217ea01598bf49c392d09d9e6f47c38148e5aabdf20be4be8e2"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/docs-check-final.log.gz",
+      "bytes": 417,
+      "sha256": "0ed03ebac49720974a2cd74b07d2104867e3f94f6cfa346e3fe9cb0c3bab35f6",
+      "uncompressedBytes": 1129,
+      "uncompressedSha256": "e8c0fca34a5b30e0eec32781c8a3015de05f98084ea3a58c52722b8c0f4eaa3c"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/docs-check.log.gz",
+      "bytes": 313,
+      "sha256": "a7a6738be8263cda250a9cf5c40bf572f67cf12958ab76847b08cc0831ceb364",
+      "uncompressedBytes": 627,
+      "uncompressedSha256": "124b6d8bae78a7fb69a03c1c34145923225926c721f8671f2580cfd48cdae1a7"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/final-build.log.gz",
+      "bytes": 4547,
+      "sha256": "198db6f97009b403ad3bee8af81eb94c3c31c904ae892ebd5c0beb86fffdeffb",
+      "uncompressedBytes": 19729,
+      "uncompressedSha256": "a7e7e650405abea54153174ab007b960f0e58e76cd47bc1329f42c4f9d912661"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/final-types.log.gz",
+      "bytes": 129,
+      "sha256": "97b183ddd95d4463c070b0e50552de4e1e05b92f2259efe2dd41ae26987c078a",
+      "uncompressedBytes": 144,
+      "uncompressedSha256": "2d6472d338aca6c442fdace31c8a5ca48ccbef3ebd20e2142e52ee67376e775a"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/host-clippy-final.log.gz",
+      "bytes": 164,
+      "sha256": "eb6efa1e7189f0d099e92a8a770c35399a5fc881b7ceffe6638049eac2530d62",
+      "uncompressedBytes": 181,
+      "uncompressedSha256": "f636ac3cd0c1f1742c6f9903f8681a60f9ea471072b5bc900d7c906e3447c25b"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/host-clippy.log.gz",
+      "bytes": 1024,
+      "sha256": "741ed4be732480b3bcc6b17530dc66320b1e86928cebd50a6d9b4ae624c93de8",
+      "uncompressedBytes": 2951,
+      "uncompressedSha256": "cffb2cb3870e449bcc03c7f7011926fa218f28dacfc735d9e7cf0f68a230c606"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/host-tests.log.gz",
+      "bytes": 13000,
+      "sha256": "2fbc9cf1356c67373e820815cb4c6d99c229d83a90ccbbf2347fd0b7f05e046f",
+      "uncompressedBytes": 53019,
+      "uncompressedSha256": "bf46b51d4d15e88b23e48e12f525a1efbb4502c68b1eb434972ffb8c649badde"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/i18n-final.log.gz",
+      "bytes": 236,
+      "sha256": "4fb37005f8d399d41c8ee87eea06a35970cb084d298073a03a08ab1064ed50a7",
+      "uncompressedBytes": 376,
+      "uncompressedSha256": "a0da9c680be0891df7d076769c8b1779eab5a3a146718af6a176d87aee96270f"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/lint.log.gz",
+      "bytes": 246,
+      "sha256": "89e770a7f9ae6481eb0e74bf74cd69f792ebcbc86d60bdb203fc1a90373daa3c",
+      "uncompressedBytes": 436,
+      "uncompressedSha256": "6ded1e13e6d2cbd72172c4069505f50984b03a8f299fdf5f037078321cfa2e14"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/native-check.log.gz",
+      "bytes": 525,
+      "sha256": "1b9a991642f19015d4fefb0c9340118ed501b76fe33f72b57b71bfda2219591e",
+      "uncompressedBytes": 1123,
+      "uncompressedSha256": "3838102c40770678548d3e6f806a0316deafc53b2feb697efc33eaedce13bb81"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/native-e2e-final.log.gz",
+      "bytes": 203,
+      "sha256": "5d36c4a5998dcc08699e0d718678f0fb4550939f7d6d3feb1689dba6c8ce2866",
+      "uncompressedBytes": 255,
+      "uncompressedSha256": "250a5c07b1800246d90ee479f7464d323255b0f92bd03d19971ddf45b39e609d"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/native-final.log.gz",
+      "bytes": 3261,
+      "sha256": "4f8b7e56f3825c4f75aaa49421528b4c9e986ff0c5925aab00d0cb2ccf2f712e",
+      "uncompressedBytes": 11739,
+      "uncompressedSha256": "56b7819038c0242031fde0d27979aba5a59a5b1457b098b29b80900ef4a09b37"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/native-manifest.json",
+      "bytes": 20366,
+      "sha256": "ab031bc058d3ed2925b580fecda863028f1ccb2537f75c67d2cc517235156e78"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/native-types.log.gz",
+      "bytes": 77,
+      "sha256": "409f22fcfbdfd13e041a607cfd5a512bbbc03049fe4da89fb767aa494576b041",
+      "uncompressedBytes": 58,
+      "uncompressedSha256": "b3dfd80b4eee36ea9b0815740d598cecd9ae77be79b63346483f38bdf66454f6"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/production-build.log.gz",
+      "bytes": 681,
+      "sha256": "0eb3df67ac30df79efe74ea0c1da930f58268f340afd412b7f61d10584067fc9",
+      "uncompressedBytes": 1167,
+      "uncompressedSha256": "a338394b5e147e2eff6ba71625c7e31ee8e0794ff83ed7c7c61227d744e2fc95"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/promoted-build.log.gz",
+      "bytes": 4549,
+      "sha256": "35c2a36b79a33914e16de3db7e66cb7d4c31842f94fe3d971ca1a3c3b32970f0",
+      "uncompressedBytes": 19729,
+      "uncompressedSha256": "45ef4e5bda1f89a84f02aefbc43cce091ae2c336c38c6b49254a631b77a895a1"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/promoted-desktop.log.gz",
+      "bytes": 4651,
+      "sha256": "0a25c53476ca023493139b307283537b9fc470a93c87f603f226869eeb6deb4b",
+      "uncompressedBytes": 12510,
+      "uncompressedSha256": "2e7208d12e14728fd3441c91674a1eb5ead648ce005a9185125ec6701bcf1c31"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/promoted-docs.log.gz",
+      "bytes": 417,
+      "sha256": "0ed03ebac49720974a2cd74b07d2104867e3f94f6cfa346e3fe9cb0c3bab35f6",
+      "uncompressedBytes": 1129,
+      "uncompressedSha256": "e8c0fca34a5b30e0eec32781c8a3015de05f98084ea3a58c52722b8c0f4eaa3c"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/promoted-lint.log.gz",
+      "bytes": 245,
+      "sha256": "b241d3d3148253425ea013a285988b62764ad222c3020a9ec628b9424ee8043f",
+      "uncompressedBytes": 436,
+      "uncompressedSha256": "f88bf0c57da11cde367b9e630d721b0eac8ca115497078e05a2423a14336971d"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/promoted-native-e2e.log.gz",
+      "bytes": 200,
+      "sha256": "6fe01bc134f95f76009ef07d52469517901ae28f7cc4f2d665dd8faff0b62d42",
+      "uncompressedBytes": 252,
+      "uncompressedSha256": "6dab1d359e42d524b1cc53465b88b5077647a8b32256e732420be4aa4b7b2974"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/promoted-patch-check.log.gz",
+      "bytes": 436,
+      "sha256": "bd428ad2f833b4476ac12d9b32938c6b2193f44a310b60280f6aa44c8154de56",
+      "uncompressedBytes": 727,
+      "uncompressedSha256": "cfd95cc4d5a544bed3431c7d2827a383f3eb10415c4364bfa9e4ae9796235a9f"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/promoted-runtime.log.gz",
+      "bytes": 329,
+      "sha256": "6949b94c57d4adb94ee1f6c7459bad1d561878cfbd99f0dd6b330e982cc91032",
+      "uncompressedBytes": 452,
+      "uncompressedSha256": "e6e214772f625007c10aa40b5f497fdcfa3bfac35521e7e7888e936db0a55f46"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/promoted-types.log.gz",
+      "bytes": 129,
+      "sha256": "97b183ddd95d4463c070b0e50552de4e1e05b92f2259efe2dd41ae26987c078a",
+      "uncompressedBytes": 144,
+      "uncompressedSha256": "2d6472d338aca6c442fdace31c8a5ca48ccbef3ebd20e2142e52ee67376e775a"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/promoted-ui-e2e.log.gz",
+      "bytes": 64,
+      "sha256": "a831fcabe71ada140c7e11394ad10760b12642c6ad2159dc03db8c30fdef6f11",
+      "uncompressedBytes": 49,
+      "uncompressedSha256": "04d81aab3d221d14d139db991fbbe956afe86bcc936d2e759d684972879e208b"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/runtime-final.log.gz",
+      "bytes": 330,
+      "sha256": "54ecbdbd4592687c36aca2d7e819bd62ba9c042c51f2e6c5f3125884265b7f99",
+      "uncompressedBytes": 452,
+      "uncompressedSha256": "f4ec04f7c6871b7bd23f332e8d1e660b45cb524488f429232f57d52828435ebd"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/runtime-verified-bundle.log.gz",
+      "bytes": 1170,
+      "sha256": "fef14d8e57383eb2e98e9c95ed19752849605023b44c66bccdb0062d0f6cb9f0",
+      "uncompressedBytes": 5694,
+      "uncompressedSha256": "40babd625cf82d22929085d23ab71bd36e8ea5e142b5f0cdf59abf951eebcb91"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/rust-fmt-final.log.gz",
+      "bytes": 20,
+      "sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "uncompressedBytes": 0,
+      "uncompressedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/shared-final.log.gz",
+      "bytes": 243,
+      "sha256": "c79337c3ed23e8f1a2b5bf101d24c4ab4dc9f7c5e0fe363f43020aec8f5327bc",
+      "uncompressedBytes": 387,
+      "uncompressedSha256": "05d71369a0328fe6e0a237faef9b797b3de18817cf6f998c112b228db598bcee"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/standard-provenance.json",
+      "bytes": 1399,
+      "sha256": "c58569eb0a988cb7f6b196f2f26f1b0b0bcdc9936891274687ac5e13458e171d"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/ui-e2e-final.log.gz",
+      "bytes": 64,
+      "sha256": "a831fcabe71ada140c7e11394ad10760b12642c6ad2159dc03db8c30fdef6f11",
+      "uncompressedBytes": 49,
+      "uncompressedSha256": "04d81aab3d221d14d139db991fbbe956afe86bcc936d2e759d684972879e208b"
+    },
+    {
+      "file": "OMP-automatic-memory-20261020/worktree-status.txt",
+      "bytes": 3000,
+      "sha256": "e31034599713a0d6915188beffb0e947b264e058f1044998e3c6697a71c8d189"
+    }
+  ],
+  "boundaries": {
+    "pushed": false,
+    "published": false,
+    "installedAppChanged": false,
+    "userDataChanged": false,
+    "paidModelCalled": false,
+    "productionNativePinPromoted": true,
+    "windowsTested": false,
+    "linuxTested": false,
+    "macIntelTested": false,
+    "nativeCommitted": true,
+    "desktopCommitted": false
+  },
+  "remaining": [
+    "Desktop source remains uncommitted because only the native commit was authorized.",
+    "The native commit is local only. Any remote build/release needs the authorized fork push, desktop commit and the normal multi-platform delivery validation."
+  ],
+  "nativePromotion": {
+    "authorizedByUser": true,
+    "authorizationScope": "Local native commit and desktop native pin update only; no push or publication.",
+    "patchLevel": "62bc57b+omp-desktop.7",
+    "fork": {
+      "repository": "https://github.com/MisterBowie/oh-my-pi",
+      "branch": "codex/mnemopi-memory",
+      "commit": "edec3898d44071206ec201beebea432a2786bd8c",
+      "tree": "d7b02053ea0735d8405c56ca499372414c96503c",
+      "note": "Self-maintained fork whose HEAD is exactly base.sha + this patch level. `scripts/omp-sidecar.mjs` refuses any other commit; can1357/oh-my-pi stays a read-only upstream."
+    },
+    "patch": {
+      "file": "0001-omp-desktop-runtime.patch",
+      "sha256": "e951f63ae360212df37f83a7c4a965baad3d27ab05276136950c601c7441e5c0",
+      "bytes": 139512
+    },
+    "standardBuildProvenance": {
+      "schema": "omp-desktop.bundled-sidecar/3",
+      "fork": {
+        "repository": "https://github.com/MisterBowie/oh-my-pi",
+        "commit": "edec3898d44071206ec201beebea432a2786bd8c",
+        "tree": "d7b02053ea0735d8405c56ca499372414c96503c"
+      },
+      "upstreamBase": {
+        "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+        "version": "18.3.0"
+      },
+      "patchLevel": "62bc57b+omp-desktop.7",
+      "capabilities": [
+        "rpc-host-tool-concurrency",
+        "rpc-host-tool-sole-batch-policy",
+        "agent-tool-result-terminate",
+        "rpc-host-tool-result-terminate",
+        "extension-live-system-prompt",
+        "rpc-host-tool-settle-termination",
+        "reproducible-sidecar-build",
+        "explicit-bytecode-build-mode",
+        "inline-lsp-diagnostics",
+        "mnemopi-memory-management-rpc-v1",
+        "mnemopi-retention-baseline",
+        "mnemopi-compaction-recall-opt-out",
+        "rpc-memory-maintenance-safety"
+      ],
+      "ompVersion": "18.3.0",
+      "desktopVersion": "0.1.2",
+      "platform": "darwin",
+      "arch": "arm64",
+      "binary": {
+        "filename": "omp",
+        "bytes": 216468992,
+        "sha256": "45ff07e13e2b2404f03b1b385b6dfe1a450e5f290e42a5fb13c94405307146a4"
+      },
+      "extensions": [
+        {
+          "path": "extensions/omp-desktop-gate.js",
+          "bytes": 53747,
+          "sha256": "449b291e08f0a01ad186cd1be30441b540ce20725b639ec62f6d2df82bff82de"
+        }
+      ],
+      "build": {
+        "tool": "bun",
+        "bunVersion": "1.4.2",
+        "bytecode": true
+      }
+    },
+    "candidateBinaryIdentical": true,
+    "candidateGateIdentical": true
+  }
+}

@@ -1,0 +1,37 @@
+name: Identify failed public source tests safely
+on:
+  push:
+    tags: ['diagnose-source-tests-*']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  summarize:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Validate the disclosure boundary
+        run: node --test .github/scripts/summarize-source-tests.test.mjs
+      - name: Publish only tracked test paths and fixed error categories
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REPOSITORY" == MisterBowie/omp-desktop ]]
+          [[ "$GITHUB_REF_NAME" =~ ^diagnose-source-tests-([0-9]+)(-attempt-[0-9]+)?$ ]]
+          run="${BASH_REMATCH[1]}"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/jobs?per_page=100" > "$RUNNER_TEMP/jobs.json"
+          job="$(node -e 'const j=JSON.parse(require("fs").readFileSync(process.env.RUNNER_TEMP+"/jobs.json")).jobs.find(j=>j.name==="verify"&&j.conclusion==="failure");if(!j)process.exit(1);console.log(j.id)')"
+          [[ "$job" =~ ^[0-9]+$ ]]
+          curl --fail --location --silent --show-error -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/jobs/$job/logs" -o "$RUNNER_TEMP/source-test.log"
+          output="docs/validation/source-test-failure-$run.json"
+          node .github/scripts/summarize-source-tests.mjs "$RUNNER_TEMP/source-test.log" "$output"
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add "$output"
+          git commit -m "docs(validation): identify failed source tests" -m "Record only tracked public test paths and fixed error categories. Keep raw logs within the runner."
+          git push origin "HEAD:refs/heads/codex/source-test-diagnostic-${GITHUB_REF_NAME#diagnose-source-tests-}"

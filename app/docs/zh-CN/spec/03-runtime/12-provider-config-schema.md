@@ -87,7 +87,7 @@
           "id": { "type": "string", "minLength": 1 },
           "alias": { "type": "string", "maxLength": 60 },
           "contextWindow": { "type": "integer", "minimum": 0 },
-          "contextWindowSource": { "enum": ["catalog", "user"] },
+          "contextWindowSource": { "enum": ["catalog", "provider", "user"] },
           "maxTokens": { "type": "integer", "minimum": 0 },
           "thinkingLevels": {
             "type": "array",
@@ -137,9 +137,10 @@ JSON、根节点非对象、`models` 非数组，或任一条目不可读，都�
 `MODEL_BINDINGS_DEGRADED` 拒绝显式替换模型数组；不涉及模型数组的提供商字段仍可更新。
 
 `models[].contextWindowSource` 记录存储的 `contextWindow` 来自哪里：`catalog` 表示
-models.dev 快照，之后的目录修正可以替换它；`user` 表示用户在设置中手改的值，永不被
-替换。该字段可选，因此早于该标记写出的配置仍可读，旧客户端会忽略它。host-core 只
-保留这两个取值、丢弃其它值，避免出现第三种无人识别的状态。解析规则见
+models.dev 快照，之后的目录修正可以替换它；`provider` 保留端点发布的窗口，保存设置时
+可跟随最新端点响应；`user` 表示用户在设置中手改的值，永不被替换。该字段可选，
+因此早于该标记写出的配置仍可读，旧客户端会忽略它。host-core 保留这三个取值，
+丢弃其它值。解析规则见
 [13-model-catalog-and-selection](13-model-catalog-and-selection.md) §9.1。
 
 `compatibility.supportsReasoning` 和

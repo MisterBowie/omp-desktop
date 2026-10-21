@@ -17,6 +17,26 @@ const errors=[
 ];
 const diagnosticCodes=["OMP_RESTORE_FAILED","OMP_CAPABILITY_STATE_FAILED","OMP_HOST_TURN_FAILED","OMP_SESSION_CREATE_FAILED","OMP_HOST_TOOL_REGISTRATION_FAILED","OMP_HISTORY_READ_FAILED","NOT_STARTED","ERR_ASSERTION"];
 const sourceFiles=["omp-session.ts","session.ts","protocol.ts","supervisor.ts","process.ts","installed-product.mjs","installed-application.mjs","installed-payload.mjs","installed-workflow.mjs","e2e-installed-smoke.mjs"];
+const publicImages=["omp desktop.exe","pi-desktop-host-core.exe","omp.exe","conhost.exe","python.exe","cmd.exe","powershell.exe","node.exe","werfault.exe","wermgr.exe","msmpeng.exe","mpcmdrun.exe","svchost.exe","rundll32.exe","dllhost.exe"];
+/** Only fixed process roles and bounded control outcomes leave the runner. */
+export function summarizeProcessCleanup(smoke){
+ const reports=Array.isArray(smoke?.processReports)?smoke.processReports:[];
+ const normalize=value=>String(value??"").replaceAll("\\","/").toLowerCase();
+ const root=normalize(smoke?.runRoot).replace(/\/$/,"");
+ const snapshots=reports.filter(r=>["before-ordered-quit","wait-exit","cleanup-before","after-Windows-handle-reclaim"].includes(r.label)&&Array.isArray(r.processes));
+ const last=snapshots.at(-1);
+ const processes=(last?.processes??[]).slice(0,32).map(p=>{
+  const exe=normalize(p.exe),image=exe.split("/").at(-1);
+  const first=reports.find(r=>Array.isArray(r.processes)&&r.processes.some(x=>x.pid===p.pid&&x.starttime===p.starttime));
+  const original=first?.processes.find(x=>x.pid===p.pid&&x.starttime===p.starttime);
+  const parent=Number.isInteger(original?.ppid)&&original.ppid>0&&original.ppid!==original.pid?first?.processes.find(x=>x.pid===original.ppid):undefined;
+  const knownBirth=value=>typeof value==="string"&&/^\d+$/.test(value);
+  const childPredatesParent=knownBirth(original?.starttime)&&knownBirth(parent?.starttime)?BigInt(original.starttime)<BigInt(parent.starttime):null;
+  return {image:publicImages.includes(image)?image:"OTHER",state:["R","Z","X"].includes(p.state)?p.state:"UNKNOWN",hasIdentity:typeof p.starttime==="string"&&/^\d+(?:\.\d+)?$/.test(p.starttime),executableUnderRunRoot:root.length>=10&&exe.startsWith(root+"/"),firstOwnership:["root","descendant","argv-run-root","environ-run-root"].includes(original?.ownership)?original.ownership:"UNKNOWN",parentObserved:Boolean(parent),childPredatesParent};
+ });
+ const controls=reports.filter(r=>r.label==="cleanup-pinned-Windows-handles").slice(-3).map(r=>(Array.isArray(r.result?.results)?r.result.results:[]).slice(0,32).map(p=>({terminated:p.terminated===true,refusedOutsideRoot:p.refusedOutsideRoot===true,identityMismatch:p.identityMismatch===true,openError:[5,6,87].includes(p.openError)?p.openError:null,waitStatus:[0,258,4294967295].includes(p.waitStatus)?p.waitStatus:null})));
+ return {lastSnapshot:last?.label??"NONE",survivorCount:last?.processes?.length??0,processes,controls};
+}
 function coordinates(text){return sourceFiles.flatMap(file=>[...text.matchAll(new RegExp("(?:[/\\\\]|^)"+file.replaceAll(".","\\.")+":(\\d+):(\\d+)","g"))].map(match=>({file,line:Number(match[1]),column:Number(match[2])})));}
 /** TAP diagnostics are untrusted: return only source coordinates and enums. */
 export function summarizeStrictFailures(text){
@@ -47,6 +67,7 @@ export function summarizeValidation(directory){
   const failure=String(smoke?.failure??"")+"\n"+String(smoke?.cleanupFailure??"");
   const summary={target,runtimeReportValid:Boolean(runtime),runtimeGetState:runtime?.run?.getState===true,smokeReportExists:Boolean(smoke),cleaned:smoke?.cleaned===true,orderedQuit:smoke?.bootAndOrderedQuit===true,completedChecks:facts?.checks?.length??0,steps:Object.fromEntries(steps.map(key=>[key,facts?.steps?.[key]===true])),progress:stages.includes(progress?.label)?progress.label:"UNKNOWN",errorClasses:errors.filter(([,pattern])=>pattern.test(failure)).map(([code])=>code),normalQuits:smoke?.processReports?.filter(item=>item.label==="ordered-quit"&&item.noOwnedProcessesRemain===true).length??0};
   summary.failureSource=coordinates(failure);summary.diagnosticCodes=diagnosticCodes.filter(code=>failure.includes(code));
+  if(target==="win32-x64"&&smoke)summary.processCleanup=summarizeProcessCleanup(smoke);
   if(turn)summary.turn={expectedMarker:markers.includes(turn.expectedText)?turn.expectedText:"UNKNOWN",running:turn.last?.status?.isRunning===true,hasSessionError:Boolean(turn.last?.status?.lastError),stopVisible:turn.last?.ui?.stop===true,approvalVisible:Boolean(turn.last?.ui?.permission),documentVisible:turn.visibility?.state==="visible"};
   const tap=find("packaged-plan-goal.tap");if(tap){const text=readFileSync(tap,"utf8");summary.strict=Object.fromEntries(["tests","pass","fail","skipped"].map(key=>[key,Number(new RegExp("^# "+key+" (\\d+)$","m").exec(text)?.[1]??-1)]));summary.failedStrictNumbers=[...text.matchAll(/^\s*not ok (\d+) - /gm)].map(match=>Number(match[1]));summary.strictFailures=summarizeStrictFailures(text);}
   result.push(summary);

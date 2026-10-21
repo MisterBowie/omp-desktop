@@ -1,0 +1,332 @@
+{
+  "schemaVersion": 1,
+  "patchLevel": "62bc57b+omp-desktop.7",
+  "description": "OMP Desktop patch set for the pinned upstream OMP runtime: RPC host-tool scheduling and batch policy, settle-time run termination (result flag and per-tool settlement declaration), the all-toolCall batch count, an optional live system-prompt action for a host-confirmed mid-turn mode transition, a deterministic native-addon archive, and an explicit bytecode switch on the build entry. Risk reduction and release-build reproducibility only: it does NOT make the sole-batch contract strict \u2014 see status. Adds optional inline LSP diagnostic settlement for RPC hosts; standalone deferred delivery remains the default. Adds native Mnemopi management RPC, explicit protocol/startup readiness and background-work safety, opt-in retention baselines and compaction recall gating for desktop automatic memory.",
+  "base": {
+    "submodule": "upstream/oh-my-pi",
+    "repository": "https://github.com/can1357/oh-my-pi",
+    "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+    "version": "18.3.0"
+  },
+  "fork": {
+    "repository": "https://github.com/MisterBowie/oh-my-pi",
+    "branch": "codex/mnemopi-memory",
+    "commit": "edec3898d44071206ec201beebea432a2786bd8c",
+    "tree": "d7b02053ea0735d8405c56ca499372414c96503c",
+    "note": "Self-maintained fork whose HEAD is exactly base.sha + this patch level. `scripts/omp-sidecar.mjs` refuses any other commit; can1357/oh-my-pi stays a read-only upstream."
+  },
+  "patch": {
+    "file": "0001-omp-desktop-runtime.patch",
+    "sha256": "e951f63ae360212df37f83a7c4a965baad3d27ab05276136950c601c7441e5c0",
+    "bytes": 139512
+  },
+  "capabilities": [
+    "rpc-host-tool-concurrency",
+    "rpc-host-tool-sole-batch-policy",
+    "agent-tool-result-terminate",
+    "rpc-host-tool-result-terminate",
+    "extension-live-system-prompt",
+    "rpc-host-tool-settle-termination",
+    "reproducible-sidecar-build",
+    "explicit-bytecode-build-mode",
+    "inline-lsp-diagnostics",
+    "mnemopi-memory-management-rpc-v1",
+    "mnemopi-retention-baseline",
+    "mnemopi-compaction-recall-opt-out",
+    "rpc-memory-maintenance-safety"
+  ],
+  "files": [
+    "docs/extensions.md",
+    "docs/lsp-config.md",
+    "docs/rpc.md",
+    "packages/agent/src/agent-loop.ts",
+    "packages/agent/src/telemetry.ts",
+    "packages/agent/src/types.ts",
+    "packages/agent/test/agent-loop.test.ts",
+    "packages/coding-agent/scripts/build-binary.ts",
+    "packages/coding-agent/scripts/compile-binary.ts",
+    "packages/coding-agent/src/config/settings-schema.ts",
+    "packages/coding-agent/src/extensibility/extensions/loader.ts",
+    "packages/coding-agent/src/extensibility/extensions/runner.ts",
+    "packages/coding-agent/src/extensibility/extensions/types.ts",
+    "packages/coding-agent/src/lsp/deferred-diagnostics.ts",
+    "packages/coding-agent/src/mnemopi/config.ts",
+    "packages/coding-agent/src/mnemopi/state.ts",
+    "packages/coding-agent/src/modes/rpc/host-tools.ts",
+    "packages/coding-agent/src/modes/rpc/rpc-client.ts",
+    "packages/coding-agent/src/modes/rpc/rpc-memory.ts",
+    "packages/coding-agent/src/modes/rpc/rpc-mode.ts",
+    "packages/coding-agent/src/modes/rpc/rpc-types.ts",
+    "packages/coding-agent/src/modes/runtime-init.ts",
+    "packages/coding-agent/src/session/agent-session.ts",
+    "packages/coding-agent/test/agent-session-memory-backend.test.ts",
+    "packages/coding-agent/test/agent-session-turn-system-prompt.test.ts",
+    "packages/coding-agent/test/build-binary-bytecode.test.ts",
+    "packages/coding-agent/test/extensions-runner.test.ts",
+    "packages/coding-agent/test/rpc-host-tools.test.ts",
+    "packages/coding-agent/test/tools/lsp-diagnostics-freshness.test.ts",
+    "packages/natives/scripts/embed-native.ts",
+    "packages/natives/test/embed-native.test.ts"
+  ],
+  "contract": {
+    "concurrencyField": "RpcHostToolDefinition.concurrency",
+    "batchPolicyField": "RpcHostToolDefinition.batchPolicy",
+    "settleTerminationField": "AgentTool.terminateOnSettle / RpcHostToolDefinition.terminateOnSettle",
+    "terminateField": "AgentToolResult.terminate",
+    "invalidDeclaration": "set_host_tools request is rejected; the value never degrades to the default",
+    "invalidDeclarationDetail": "RpcHostToolDefinition.concurrency/batchPolicy/terminateOnSettle values outside their union throw in normalizeHostToolPolicy, which the set_host_tools command and the host-tool adapter both call",
+    "bytecodeBuildEntry": "packages/coding-agent/scripts/build-binary.ts accepts exactly `--bytecode`/`--no-bytecode` (default on, one declaration, anything else exits 2); `compileCodingAgent` takes it as the typed option `CodingAgentCompileOptions.bytecode`, never from the environment",
+    "liveSystemPromptAction": "ExtensionAPI.setTurnSystemPrompt(prompt: string[]) \u2014 optional; a host that does not provide it rejects the call, and the desktop gate treats absence as a failed transition",
+    "lspDiagnosticDelivery": "lsp.diagnosticsDeferred defaults true; false settles write/edit diagnostics within the bounded, cancellable tool result",
+    "memoryManagement": "memory RPC v1 provides bounded status/list/search/clear; get_state exposes memoryRpcVersion and memoryMaintenanceSafe",
+    "memoryRetention": "mnemopi.retainFromSessionStart excludes loaded transcript history from automatic retention; autoRecall=false also suppresses compaction recall"
+  },
+  "verification": {
+    "patchCheck": "node scripts/omp-patch.mjs --check",
+    "prepareAndVerify": "node scripts/omp-patch.mjs --apply --out <dir> --prepare-build --verify",
+    "suites": [
+      "packages/agent/test/agent-loop.test.ts",
+      "packages/coding-agent/test/rpc-host-tools.test.ts",
+      "packages/coding-agent/test/agent-session-turn-system-prompt.test.ts"
+    ],
+    "spike": "node experiments/omp-bridge/t20-feasibility.mjs --patched",
+    "targetedSuites": [
+      "packages/agent/test/agent-loop.test.ts",
+      "packages/coding-agent/test/agent-session-before-agent-start-prompt-override.test.ts",
+      "packages/coding-agent/test/agent-session-turn-system-prompt.test.ts",
+      "packages/coding-agent/test/extensions-runner.test.ts",
+      "packages/coding-agent/test/rpc-host-tools.test.ts",
+      "packages/coding-agent/test/rpc-input-frame.test.ts",
+      "packages/coding-agent/test/tools/lsp-diagnostics-freshness.test.ts",
+      "packages/coding-agent/test/tools/lsp-diagnostics-dedup.test.ts",
+      "packages/coding-agent/test/tools/lsp-batching.test.ts",
+      "packages/coding-agent/test/tools/lsp-regressions.test.ts",
+      "packages/coding-agent/test/agent-session-memory-backend.test.ts",
+      "packages/coding-agent/test/memory-tools.test.ts",
+      "packages/coding-agent/test/mnemopi-bank-derivation.test.ts",
+      "packages/coding-agent/test/memory-backend-resolve.test.ts",
+      "packages/coding-agent/test/memory-redaction.test.ts"
+    ],
+    "reproducibilitySuites": [
+      "packages/natives/test/embed-native.test.ts",
+      "packages/coding-agent/test/build-binary-bytecode.test.ts"
+    ]
+  },
+  "history": [
+    {
+      "patchLevel": "62bc57b+omp-desktop.6",
+      "base": {
+        "submodule": "upstream/oh-my-pi",
+        "repository": "https://github.com/can1357/oh-my-pi",
+        "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+        "version": "18.3.0"
+      },
+      "fork": {
+        "repository": "https://github.com/MisterBowie/oh-my-pi",
+        "branch": "codex/omp-desktop-18.3.0-patch-6",
+        "commit": "d648d27bcf0db16caecb876142d891cf49a51bc2",
+        "tree": "dab846754da313b09470a5d37aa1e255633d58cb",
+        "note": "Self-maintained fork whose HEAD is exactly base.sha + this patch level. `scripts/omp-sidecar.mjs` refuses any other commit; can1357/oh-my-pi stays a read-only upstream."
+      },
+      "patch": {
+        "file": "0001-omp-desktop-runtime.patch",
+        "sha256": "530d083f8cba5a82800aaf9e56acd72dd6d23e657acaa733c385724f436d002d",
+        "bytes": 123397
+      },
+      "capabilities": [
+        "rpc-host-tool-concurrency",
+        "rpc-host-tool-sole-batch-policy",
+        "agent-tool-result-terminate",
+        "rpc-host-tool-result-terminate",
+        "extension-live-system-prompt",
+        "rpc-host-tool-settle-termination",
+        "reproducible-sidecar-build",
+        "explicit-bytecode-build-mode",
+        "inline-lsp-diagnostics"
+      ],
+      "files": [
+        "docs/extensions.md",
+        "docs/lsp-config.md",
+        "docs/rpc.md",
+        "packages/agent/src/agent-loop.ts",
+        "packages/agent/src/telemetry.ts",
+        "packages/agent/src/types.ts",
+        "packages/agent/test/agent-loop.test.ts",
+        "packages/coding-agent/scripts/build-binary.ts",
+        "packages/coding-agent/scripts/compile-binary.ts",
+        "packages/coding-agent/src/config/settings-schema.ts",
+        "packages/coding-agent/src/extensibility/extensions/loader.ts",
+        "packages/coding-agent/src/extensibility/extensions/runner.ts",
+        "packages/coding-agent/src/extensibility/extensions/types.ts",
+        "packages/coding-agent/src/lsp/deferred-diagnostics.ts",
+        "packages/coding-agent/src/modes/rpc/host-tools.ts",
+        "packages/coding-agent/src/modes/rpc/rpc-client.ts",
+        "packages/coding-agent/src/modes/rpc/rpc-mode.ts",
+        "packages/coding-agent/src/modes/rpc/rpc-types.ts",
+        "packages/coding-agent/src/modes/runtime-init.ts",
+        "packages/coding-agent/src/session/agent-session.ts",
+        "packages/coding-agent/test/agent-session-turn-system-prompt.test.ts",
+        "packages/coding-agent/test/build-binary-bytecode.test.ts",
+        "packages/coding-agent/test/extensions-runner.test.ts",
+        "packages/coding-agent/test/rpc-host-tools.test.ts",
+        "packages/coding-agent/test/tools/lsp-diagnostics-freshness.test.ts",
+        "packages/natives/scripts/embed-native.ts",
+        "packages/natives/test/embed-native.test.ts"
+      ],
+      "retired": "2026-10-20",
+      "retiredReason": "Native automatic-memory management, startup capability, writer safety and retention/recall controls require a new controlled tree. The .6 identity is preserved here."
+    },
+    {
+      "patchLevel": "62bc57b+omp-desktop.5",
+      "base": {
+        "submodule": "upstream/oh-my-pi",
+        "repository": "https://github.com/can1357/oh-my-pi",
+        "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+        "version": "18.3.0"
+      },
+      "fork": {
+        "repository": "https://github.com/MisterBowie/oh-my-pi",
+        "branch": "codex/omp-desktop-18.3.0-patch-5",
+        "commit": "36483311dfff67be7504f591974df93fc512a45a",
+        "tree": "7ba57b6d06fb8fe7e3f6352c67692e56cf39c3cd",
+        "note": "Self-maintained fork whose HEAD is exactly base.sha + this patch level. `scripts/omp-sidecar.mjs` refuses any other commit; can1357/oh-my-pi stays a read-only upstream."
+      },
+      "patch": {
+        "file": "0001-omp-desktop-runtime.patch",
+        "sha256": "645242861412c8f2810cab397824413129ccbd5e5b7a94ca70caf0e76795895b",
+        "bytes": 118548
+      },
+      "capabilities": [
+        "rpc-host-tool-concurrency",
+        "rpc-host-tool-sole-batch-policy",
+        "agent-tool-result-terminate",
+        "rpc-host-tool-result-terminate",
+        "extension-live-system-prompt",
+        "rpc-host-tool-settle-termination",
+        "reproducible-sidecar-build",
+        "explicit-bytecode-build-mode"
+      ],
+      "files": [
+        "docs/extensions.md",
+        "docs/rpc.md",
+        "packages/agent/src/agent-loop.ts",
+        "packages/agent/src/telemetry.ts",
+        "packages/agent/src/types.ts",
+        "packages/agent/test/agent-loop.test.ts",
+        "packages/coding-agent/scripts/build-binary.ts",
+        "packages/coding-agent/scripts/compile-binary.ts",
+        "packages/coding-agent/src/extensibility/extensions/loader.ts",
+        "packages/coding-agent/src/extensibility/extensions/runner.ts",
+        "packages/coding-agent/src/extensibility/extensions/types.ts",
+        "packages/coding-agent/src/modes/rpc/host-tools.ts",
+        "packages/coding-agent/src/modes/rpc/rpc-client.ts",
+        "packages/coding-agent/src/modes/rpc/rpc-mode.ts",
+        "packages/coding-agent/src/modes/rpc/rpc-types.ts",
+        "packages/coding-agent/src/modes/runtime-init.ts",
+        "packages/coding-agent/src/session/agent-session.ts",
+        "packages/coding-agent/test/agent-session-turn-system-prompt.test.ts",
+        "packages/coding-agent/test/build-binary-bytecode.test.ts",
+        "packages/coding-agent/test/extensions-runner.test.ts",
+        "packages/coding-agent/test/rpc-host-tools.test.ts",
+        "packages/natives/scripts/embed-native.ts",
+        "packages/natives/test/embed-native.test.ts"
+      ]
+    },
+    {
+      "patchLevel": "62bc57b+omp-desktop.4",
+      "base": {
+        "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+        "version": "18.3.0"
+      },
+      "patch": {
+        "file": "0001-omp-desktop-runtime.patch",
+        "sha256": "d6d30785389a2ffc84bdff8ac72a4cea27c2abc50e14d709397f23dd2362882f",
+        "bytes": 101113
+      },
+      "fork": {
+        "repository": "https://github.com/MisterBowie/oh-my-pi",
+        "branch": "codex/omp-desktop-18.3.0-patch-4",
+        "commit": "512370a1b177cf45e4d12781104506ea372fb8a9",
+        "tree": "78886eaf82d4145521369b9e734cfff53f53fb54"
+      },
+      "retired": "2026-10-03",
+      "retiredReason": "T20-D-Enter added the optional live system-prompt extension action, which changed the patched tree; the .4 artifact bytes and fork coordinates are kept here as history."
+    },
+    {
+      "patchLevel": "62bc57b+omp-desktop.3",
+      "base": {
+        "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+        "version": "18.3.0"
+      },
+      "patch": {
+        "file": "0001-omp-desktop-runtime.patch",
+        "sha256": "ad63ced9f7488ff088194754b4902732e1e7ebd0bdfa10a7926b3c5dc1beeaa9",
+        "bytes": 87190
+      },
+      "fork": {
+        "repository": "https://github.com/MisterBowie/oh-my-pi",
+        "branch": "codex/omp-desktop-18.3.0-patch-3",
+        "commit": "6226f805e92654344de04def413fa5cb91cb16b9",
+        "tree": "5249cb07059b009e890bece6f7d59daeb1cb94f6"
+      },
+      "retired": "2026-10-03",
+      "retiredReason": "T20-B2 added the settle-time termination declaration (AgentTool.terminateOnSettle), which changed the patched tree; the .3 artifact bytes and fork coordinates are kept here as history."
+    },
+    {
+      "patchLevel": "62bc57b+omp-desktop.2",
+      "base": {
+        "sha": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+        "version": "18.3.0"
+      },
+      "patch": {
+        "file": "0001-rpc-host-tool-transition-contract.patch",
+        "sha256": "4edbfadff9cc3238ae6bb7c206e7d8e0be33c2190068e6731fdb58e43ec9b545",
+        "bytes": 72910
+      },
+      "retired": "2026-09-28",
+      "retiredReason": "T20-R4-3 added the deterministic native-addon archive and the explicit bytecode build switch, which changed the patched tree; the .2 artifact and its file name are kept in git history, not in this tree."
+    },
+    {
+      "patchLevel": "d49918f+omp-desktop.1",
+      "base": {
+        "sha": "d49918fab2dba3986927f2d46721629ed0f3a02c",
+        "version": "18.2.7"
+      },
+      "patch": {
+        "sha256": "e08ca7fff29bbd03e298f4488888b2692adda1486e3fff80536a31dd8af6fd5c",
+        "bytes": 72978
+      },
+      "retired": "2026-09-27",
+      "retiredReason": "T20-R4A migrated the patch set to the new pinned base 62bc57be (omp/18.3.0); the 18.2.7 artifact is kept in git history, not in this tree."
+    }
+  ],
+  "notes": [
+    "This is an OMP Desktop-maintained patch level, not upstream OMP support: the runtime remains pinned at 62bc57be (omp/18.3.0) plus this patch set.",
+    "Rebuild the patch after any source edit with: git -C <checkout> -c core.abbrev=7 diff <base.sha> <fork.commit> > app/patches/oh-my-pi/0001-omp-desktop-runtime.patch, then refresh patch.sha256 and patch.bytes. The explicit core.abbrev=7 pins the index lines to 7 hex digits: a machine-level core.abbrev would otherwise change the patch bytes while preserving semantics, so the artifact could not be reproduced byte-for-byte elsewhere.",
+    "runner.initialize copies each ExtensionActions member onto the shared runtime explicitly; .5 therefore also copies the optional setTurnSystemPrompt action (with a refusing fallback), so a host that provides it is reachable through the extension API instead of the runtime's throwing stub.",
+    "The .5 patch artifact was regenerated on 2026-10-03 from fork commit 22f565c9403b5d5ce1870462529292d7a32fd550; it adds the optional ExtensionAPI.setTurnSystemPrompt action (AgentSession.setTurnSystemPrompt) so a trusted host with a host-confirmed mid-turn contract change (M5/T20-D's Agent -> Plan/Goal entry) can move the live run's system prompt before the next provider request. The action is optional and absent from every other ExtensionActions provider; ordinary runs are unchanged.",
+    "The .4 patch artifact was regenerated on 2026-10-03 from fork commit 512370a1b177cf45e4d12781104506ea372fb8a9; it adds the settle-time termination declaration (AgentTool.terminateOnSettle, RpcHostToolDefinition.terminateOnSettle) enforced at the loop's single settlement boundary, so a schema-validation rejection, a pre-execution hook rejection, an execution throw, a host error and a success all terminate identically for a declared tool.",
+    "The zero-side-effect property of a rejected mixed batch is unchanged by .4: a batch carrying a sole tool plus any sibling is still rejected whole with terminate false so the model can correct.",
+    "reproducible-sidecar-build: embed-native.ts writes the embedded addon tar.gz with fixed entry timestamps and a recomputed header checksum, because Bun.Archive stamps each entry with the current time. Without it, two builds of one fork commit produced different binaries \u2014 measured at T20-R4-3 on Bun 1.4.2 (first difference at byte 81260680).",
+    "explicit-bytecode-build-mode: bytecode stays on by default (upstream release behavior and the fast boot path). The desktop sidecar build passes `--bytecode` explicitly and records it as `build.bytecode` in the provenance manifest; measured reproducibility holds for bytecode on and off once the archive is deterministic.",
+    "2026-10-20: .7 promotes the validated automatic-memory candidate after explicit authorization for a local native commit. It has not been pushed or published; no upstream version, application version or storage schema changed."
+  ],
+  "status": {
+    "soleBatchContract": "not-strict",
+    "blocker": "F3: a `kCursorExecResolved` sibling was executed by the provider/editor bridge before the assistant message existed, so its side effect cannot be prevented or retracted by any loop-level patch; PI counts every toolCall block, so the batch is still rejected, but \"zero side effects in a rejected batch\" is unreachable at this layer.",
+    "mitigationsApplied": [
+      "batch admission counts every toolCall block of the assistant message (Cursor-resolved included), matching PI runtime.ts:2222",
+      "speculation is disabled for a provider call whose active tool set advertises a sole-declared tool, so no speculative physical work starts before the batch decision",
+      "a declared settle-terminating host tool terminates the run on every settled result path, including a schema-validation rejection that never reaches execute"
+    ],
+    "retractedClaims": [
+      "R3 lifted",
+      "T20-B may start"
+    ],
+    "scopeNote": {
+      "date": "2026-10-02",
+      "note": "Scope explanation only; it does not change patchLevel, the patch artifact, pins, capability ids or build outputs, and it does not turn the global not-strict fact into a general strict claim. The user excluded the Cursor + Plan/Goal combination from product scope on 2026-10-02: it is unsupported and refused by the ADR 0306 gate, so the F3 blocker above now describes that excluded combination. Non-Cursor providers do not produce the pre-executed blocks, so the non-Cursor route whose dispatch is decided by the patched loop stays in scope and is still held to the strict contract (all-toolCall counting, sole batches, settle-time termination). T20-B/C/D remain unstarted.",
+      "record": "docs/validation/M5-t20-non-cursor-scope.md"
+    }
+  }
+}

@@ -1,3 +1,4 @@
+import { WorktreeBadge, WorktreeDialogs, WorktreeProjectAction, WorktreeSessionActions } from "../features/worktree/WorktreeControls";
 import { IconClock } from "./icons";
 import {
   useCallback,
@@ -19,6 +20,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import { SessionHoverCard } from "../features/sessions/SessionHoverCard";
+import { SidebarSessionDate, SessionCopyActions } from "../features/sessions/SidebarSessionMetadata";
 import { useSessionHoverCard } from "../features/sessions/useSessionHoverCard";
 import { isDefaultSessionTitle, useAppStore } from "../stores/app-store";
 import {
@@ -40,6 +42,7 @@ import {
 } from "../lib/sidebar-project-reorder";
 import {
   sidebarSessionStatus,
+  sidebarProjectActivity,
   type SidebarSessionStatus,
 } from "../lib/sidebar-session-status";
 import { ErrorCodes } from "@pi-desktop/shared";
@@ -74,7 +77,6 @@ import {
   IconBranch,
   IconCheck,
   IconChevronDown,
-  IconCopy,
   IconCircleAlert,
   IconNewSession,
   IconFolder,
@@ -1206,6 +1208,7 @@ export function Sidebar({
    */
   const requestDeleteSession = (session: SessionSummary) => {
     if (armedDelete !== session.id) {
+      if (session.worktree) showToast(t("worktree.deleteLoss"), {variant: "info"});
       setArmedDelete(session.id);
       return;
     }
@@ -1267,16 +1270,6 @@ export function Sidebar({
     } catch (error) {
       reportError(error);
     }
-  };
-
-  const copyConversationId = async (session: SessionSummary) => {
-    try {
-      await navigator.clipboard.writeText(session.id);
-      showToast(t("chat.copied"));
-    } catch (error) {
-      reportError(error);
-    }
-    closeMenus();
   };
 
   const openSessionPath = async (session: SessionSummary) => {
@@ -1608,6 +1601,8 @@ export function Sidebar({
             <span className="thread-item-source" title="Native Pi session">Pi</span>
           ) : null}
           <span className="thread-item-title">{taskTitle(session.title)}</span>
+          <WorktreeBadge session={session} />
+          <SidebarSessionDate updatedAt={session.updatedAt} />
           {options?.global ? (
             <span className="thread-item-project">
               {owningProject}
@@ -1642,6 +1637,7 @@ export function Sidebar({
 
   const renderProjectGroup = (entry: ProjectEntry) => {
     const collapsedProject = entry.meta.collapsed ?? projectCollapsed[entry.key] ?? false;
+    const projectActivity = sidebarProjectActivity(entry.sessions, runningSessions, pendingPermissions);
     const projectId = projectDomId(entry.key);
     const isMenuOpen = projectMenu === entry.key;
 
@@ -1781,7 +1777,7 @@ export function Sidebar({
               <IconFolder size={13} aria-hidden />
             )}
             <span>{entry.name}</span>
-            {entry.active ? <span className="sidebar-project-active-dot" aria-label={t("project.active", { defaultValue: "Active" })} /> : null}
+            <span className="sidebar-project-activity">{projectActivity ? renderSessionStatus(projectActivity) : entry.active ? <span className="sidebar-project-active-dot" aria-label={t("project.active")} /> : null}</span>
           </TooltipButton>
           <span id={`${projectId}-path-description`} className="sr-only">
             {entry.path}
@@ -1983,17 +1979,14 @@ export function Sidebar({
                 {t("nav.createBranch")}
               </button>
             ) : null}
+            <WorktreeSessionActions session={session} running={Boolean(runningSessions[session.id])} onDone={() => closeMenus(false)} />
+            <SessionCopyActions projectPath={session.projectPath} onCopy={(kind) => {
+              const text = kind === "id" ? session.id : kind === "title" ? session.title : session.projectPath ?? "";
+              void navigator.clipboard.writeText(text).then(() => showToast(t("chat.copied"))).catch(reportError);
+              closeMenus();
+            }} />
             {settings?.developerMode === true ? (
               <>
-                <button
-                  type="button"
-                  role="menuitem"
-                  data-action="copy-conversation-id"
-                  onClick={() => void copyConversationId(session)}
-                >
-                  <IconCopy size={14} />
-                  {t("nav.copyConversationId")}
-                </button>
                 <button
                   type="button"
                   role="menuitem"
@@ -2024,6 +2017,7 @@ export function Sidebar({
         ) : null}
         {entry ? (
           <>
+            <WorktreeProjectAction projectPath={entry.path} onDone={() => closeMenus(false)} />
             <button
               ref={menuFirstItemRef}
               type="button"
@@ -2106,6 +2100,7 @@ export function Sidebar({
       data-window-blur={windowFocused ? undefined : "true"}
       onAnimationEnd={onAnimationEnd}
     >
+      <WorktreeDialogs />
       <div className="sidebar-header">
         <TooltipButton
           type="button"

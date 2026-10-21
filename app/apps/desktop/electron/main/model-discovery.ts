@@ -12,6 +12,8 @@
 export type DiscoveredModel = {
   modelId: string;
   displayName: string;
+  contextWindow?: number;
+  maxTokens?: number;
 };
 
 const DISCOVERY_TIMEOUT_MS = 10_000;
@@ -60,6 +62,22 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+/** Only whole positive token counts that the host can persist are usable. */
+function tokenLimit(...values: unknown[]): number | undefined {
+  return values.find((value): value is number =>
+    typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 0xffff_ffff,
+  );
+}
+
+function modelLimits(item: Record<string, unknown> | null): Pick<DiscoveredModel, "contextWindow" | "maxTokens"> {
+  const contextWindow = tokenLimit(item?.context_window, item?.context_length, item?.max_input_tokens, item?.inputTokenLimit);
+  const maxTokens = tokenLimit(item?.max_output_tokens, item?.outputTokenLimit);
+  return {
+    ...(contextWindow !== undefined ? { contextWindow } : {}),
+    ...(maxTokens !== undefined ? { maxTokens } : {}),
+  };
+}
+
 function dedupeSort(models: DiscoveredModel[]): DiscoveredModel[] {
   const seen = new Map<string, DiscoveredModel>();
   for (const model of models) {
@@ -88,7 +106,7 @@ export function normalizeModelList(
           typeof item?.displayName === "string" && item.displayName
             ? item.displayName
             : modelId;
-        return [{ modelId, displayName }];
+        return [{ modelId, displayName, ...modelLimits(item) }];
       }),
     );
   }
@@ -108,7 +126,7 @@ export function normalizeModelList(
         typeof item?.display_name === "string" && item.display_name
           ? item.display_name
           : modelId;
-      return [{ modelId, displayName }];
+      return [{ modelId, displayName, ...modelLimits(item) }];
     }),
   );
 }

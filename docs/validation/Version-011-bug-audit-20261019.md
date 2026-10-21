@@ -1,0 +1,133 @@
+# 0.1.1 发布后 Bug 复测（2026-10-19）
+
+**0.1.1 已正式发布，发布后复测已执行。13 个定向场景中 3 通过、10 未通过，零跳过。**
+这些场景用于核对 PI 版本差异中的修复在当前产品是否成立；UTF-16 的结果包含现有能力差距，不全是本次版本引入的回归。
+
+优先处理项是宿主 Edit 的等价路径移动导致源文件消失、工作面板差异执行 Git textconv，以及依赖审计告警。
+本次按用户顺序先发布、再测试；发现的问题尚未修复，稳定 tag 和安装包未替换。
+
+## 发布来源与资产
+
+- [正式 v0.1.1](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.1)，源码 `00c96c551755a238902c061dd0833c85d39ab075`。
+- [候选 39147487467](https://github.com/MisterBowie/omp-desktop/actions/runs/39147487467)：完整源码检查和 Mac ARM/Intel、Windows x64、Linux x64 全部成功；八份制品由严格验收器接受。
+- [发布 39151304224](https://github.com/MisterBowie/omp-desktop/actions/runs/39151304224)：原样晋升候选安装包，稳定 tag 与 latest 均已回读。
+- [资产回读 39152299594](https://github.com/MisterBowie/omp-desktop/actions/runs/39152299594)：独立 CI 完整下载 30 项公开资产，共 **1,988,005,616 字节**；GitHub SHA256/大小、SHA256SUMS、BUILD-RECORD、候选/控制面来源全部通过。五份更新清单一致，八项更新安装器的 SHA512/大小通过。
+- [公开资产回执](https://github.com/MisterBowie/omp-desktop/blob/codex/public-asset-readback-39152299594/docs/validation/Published-011-assets-39152299594.json)。本机仅完整下载并验证所用 ARM DMG；全量字节回读由上述 CI 执行。
+
+首次发布后验证使用 Node 24.14.0、pnpm 10.34.5、Electron 43.6.0。OMP 为 18.3.0 / `62bc57b+omp-desktop.6`，固定 fork `d648d27bcf0db16caecb876142d891cf49a51bc2`。
+正式 ARM DMG 为 224,485,431 字节，SHA256 `ddb6fa85d3f4d7bd54a3748faf8cef150d64495867b87556cb85d83be6eaad89`。
+
+## 已通过的发布后回归
+
+| 检查 | 实际结果与边界 |
+| --- | --- |
+| 桌面相关回归 | 48 个文件、419 项通过，零失败/跳过；覆盖草稿、命令派发、队列、会话侧栏、Todo、转录窗口、MCP、浏览器、模型绑定和文件链接等 |
+| 运行时相关回归 | 9 个文件、119 项通过，零失败/跳过；历史、规则、压缩输入/失败恢复、模型请求和连接恢复 |
+| 真实 OMP 会话与 worktree | 2 项通过，零跳过；正式包中的 OMP/宿主执行，验证 steer、Todo、Skill followUp、压缩/取消、审批、执行目录绑定、恢复、合并/删除与进程清理 |
+| 正式 0.1.1 新安装 | 8 个流程检查通过；实际 Composer、拒绝/允许、项目检查、取消子进程树、无重放恢复、新回合和数据隔离；2 次正常退出并清理 |
+| 升级和回退 | 实际 0.1.0 → 0.1.1 → 恢复关闭备份 → 0.1.0；项目和历史投影一致，存在 1 份 schema 21 自动备份，4 次正常退出、零残留 |
+| 真实 GitHub 更新检查 | 安装态 0.1.1 返回 `up-to-date` / `manual` |
+| 真实 Chromium 截图 | 6 个场景通过：长页、宽页、双轴、普通页面、HiDPI 与可见区域；使用现有匹配版本 Electron SDK 和与发布产品相同的截图源码 |
+
+原生流程使用正式安装包中的可执行文件；TypeScript 模块回归使用与稳定 tag 相同的产品源码。
+生产代码在发布后未修改。上述各类有重叠，不相加成一个“独立用例总数”；重复运行也不重复计数。
+
+## 13 个定向场景
+
+| ID | 路径 | 结果 | 实际观察 |
+| --- | --- | --- | --- |
+| B01 | Pi 兼容运行时 | 未通过 | 循环上下文与持久状态共享消息数组，修改上下文使状态长度由 1 变 2；复现共享数组缺陷，未声称真实服务已返回 HTTP 400 |
+| B02 | Pi 规则加载 | 未通过 | 32KiB 全局 AGENTS 消耗预算后，项目规则标记缺失 |
+| B03 | 桌面 BrowserHost → CDP | 未通过 | 从公开 BrowserHost 入口确认命令已到达 CDP，模拟推进五分钟后仍为 pending |
+| B04 | 桌面 MCP HTTP | 未通过 | 完整 SSE JSON-RPC 回复已到达，但未关闭流时仍等待，最终初始化超时 |
+| B05 | 桌面 MCP HTTP | 未通过 | 工具调用返回 TIMEOUT，却没有发送同一请求的 `notifications/cancelled`；HTTP 未立即 abort 仅保留为附加观察 |
+| B06 | Pi 原生历史读取 | 通过 | 损坏的非 UTF-8 尾行没有丢掉此前有效消息 |
+| B07 | Pi 模型请求适配 | 通过 | DeepSeek 请求经过实际适配器与受控 fetch，没有发送不支持的 reasoning_effort；没有调用真实模型 |
+| B08 | Pi 兼容路径／正式宿主 Read | 未通过 | 带 BOM 的 UTF-16 文本返回 `TOOL_BINARY_CONTENT` |
+| B09 | 上下文占用显示 | 未通过 | 输入 100、输出 30（包含思考 10）、总数 130，被计成 140 |
+| B10 | Pi 兼容路径／正式宿主 Edit | **未通过** | Read 获得有效 tag 后执行 `MV ./source.txt` 返回成功，随后原文件读取为 `ENOENT`；源文件已消失 |
+| B11 | 正式 OMP 原生 Read | 未通过（能力差距） | 确认执行目录正确，真实工具回包明确拒绝非 UTF-8 文本，未自动解码 UTF-16；不是成功读取 |
+| B12 | 工作面板 collectWorkspaceDiff | **未通过** | 差异采集实际执行了仓库配置的 textconv 辅助程序，测试标记文件被写入 |
+| B13 | 正式宿主持久队列 | 通过 | 宿主进程真实退出并重启后，附件记录和附件文件内容一致 |
+
+B01/B02 是 Pi 兼容路径；当前默认 OMP 的插话/跟进另由真实原生流程验证，不能混为同一实现。
+B08/B10 是宿主文件工具，B11 是 OMP 自己的 Read。UTF-16 Edit 的编码回写未单独宣称通过。
+B12 针对工作面板差异采集；worktree 合并使用的 Rust 差异命令已带 `--no-textconv`，两条路径应分别看待。
+
+已通过 Git 比较确认：宿主文件工具、MCP、规则链、Token 显示、工作面板 Git diff 的相关源文件与公开 0.1.0 完全相同；这是现有缺陷/未同步能力的证据，不把它们记成本轮会话功能修复完成。
+
+## 与 PI 官方修复逐项对照（本轮复跑）
+
+本轮将 OMP 0.1.1 的实际失败与 PI 官方 PR／版本记录对应。**9 个失败场景对应 PI 已修复的问题，另 1 个是 OMP 原生 UTF-16 能力差距；不能把 10 个失败都算作默认 OMP 引擎的 Bug。**
+PI 对照目标为 [0.21.0-beta.3](https://github.com/vastsa/PI-Desktop/releases/tag/v0.21.0-beta.3)，下表以该版本之前的官方修复记录为依据；没有运行 PI 的安装包，不声称完成两个安装包的并行对测。
+
+| 场景 | PI 官方修复 | OMP 0.1.1 的匹配证据与影响路径 |
+| --- | --- | --- |
+| B01 上下文数组共享 | [#856](https://github.com/vastsa/PI-Desktop/pull/856) | Pi 兼容运行时仍把持久消息活数组交给循环，复现同一根因；未实测真实服务的 HTTP 400 |
+| B02 项目规则被全局规则挤掉 | [#1495](https://github.com/vastsa/PI-Desktop/pull/1495) | Pi 规则加载仍共用 32KiB 预算，项目标记缺失；未将结果外推到 OMP 自己的规则加载器 |
+| B03 浏览器调用无限等待 | [#1619](https://github.com/vastsa/PI-Desktop/pull/1619) | 共享桌面 BrowserHost 的非截图 CDP 调用没有截止时间；尺寸限制修复不等于挂起恢复修复 |
+| B04 SSE 回复等到断流才交付 | [#1189](https://github.com/vastsa/PI-Desktop/pull/1189) | 共享桌面 MCP HTTP 收到完整回复后仍等 EOF，初始化超时 |
+| B05 超时不通知服务端取消 | [#1552](https://github.com/vastsa/PI-Desktop/pull/1552) | 共享桌面 MCP 返回 TIMEOUT，发送记录中取消通知为空；与 B04 是两个不同故障 |
+| B08 UTF-16 被误判为二进制 | [#1445](https://github.com/vastsa/PI-Desktop/pull/1445) | Pi 兼容宿主 Read 未先解码 BOM；Mac／Windows 结果相同。编码回写没有单独通过证据 |
+| B09 思考 Token 重复计入占用 | [#1553](https://github.com/vastsa/PI-Desktop/pull/1553) | 通用 UI 计算器在含 reasoningTokens 时把 130 算成 140；OMP 事件目前不提供该字段，未在默认 OMP 会话中复现显示超算 |
+| B10 等价路径移动删除源文件 | [#1451](https://github.com/vastsa/PI-Desktop/pull/1451) | Pi 兼容宿主 Edit 的有效 tagged MV 实际删除了临时源文件；优先修复数据丢失 |
+| B12 查看差异执行 textconv | [#1660](https://github.com/vastsa/PI-Desktop/pull/1660) | 共享工作面板差异采集缺少 `--no-textconv`，辅助程序确实执行；优先修复执行边界 |
+
+B11 与 B08 的用户症状同为无法直接读取 UTF-16，但 B11 来自 OMP 原生工具主动限制为 UTF-8，属于不同实现的能力差距，不冒充 PI 宿主的同一根因。
+B06 损坏历史尾行、B07 DeepSeek 请求参数、B13 队列附件重启保留这三个选定场景通过；不能因此宣称覆盖了它们所属的全部历史／模型／队列变体。
+
+本轮先复跑既有场景，再按上游实际契约收紧两项断言：B03 改走公开 BrowserHost，并确认已发送目标命令；B05 改查同一请求 id 的取消通知，而不把 HTTP abort 当作该 PR 的验收标准。两个辅助探针仅确认 B03/B05，不增加独立问题数量。
+OMP 原生 steer／Todo／Skill followUp／压缩，以及 worktree 两个流程再次通过。所有原生探针仍使用正式包中的宿主／OMP 与隔离临时目录，未请求付费模型；归属进程全部清理。重跑不与首次结果相加计数。
+
+本轮仅调整复测脚本与记录；产品源码、固定运行时、稳定 tag 和已发布安装包不变。新断言及本轮运行摘要见[结构化证据](Version-011-bug-audit-20261019.json)的 `upstreamComparison`。
+本轮 Node 仍为 24.14.0，最终定向命令退出 1（13 项，3 通过／10 失败／零跳过），原生两流程命令退出 0。另两个辅助探针退出 1，仅复核 B03/B05。
+脚本 `node --check` 与 `git diff --check` 退出 0。项目现有 Biome 配置排除了这份手动审计脚本，命令未处理文件并退出 1，不记为 lint 通过，也没有扩大配置范围。
+本轮尝试重新构建 JS，但全局 pnpm 已变为 11，获取项目固定版本失败，回退调用拒绝自动清空依赖；没有把构建记为通过。可选临时工具下载已停止且无残留。本轮使用既有已验证构建与正式原生包，相关产品源码与稳定 tag 的 Git 比较退出 0；未改锁文件或接受依赖重装。
+
+## Windows 正式包专项
+
+[最终运行 39152641469](https://github.com/MisterBowie/omp-desktop/actions/runs/39152641469)，
+[受限公开结果](https://github.com/MisterBowie/omp-desktop/blob/codex/published-bug-results-39152641469/docs/validation/Published-011-windows-39152641469.json)。
+已验证官方安装器 SHA256/大小，产品源码树与稳定 tag 一致。**5 项中 4 通过、1 未通过**；作业失败来自实际 UTF-16 断言，并非发布失败。
+
+| 检查 | 结果 |
+| --- | --- |
+| 最大化后进入全屏 | 通过；最大化状态已解除、界面绘制成功，采样得到 256 种颜色 |
+| 最小化后恢复最大化 | 通过；内容在工作区内，保留原生窗口边框容差 |
+| 宿主 UTF-16 Read | 未通过，与 Mac 宿主结果一致 |
+| PowerShell 输出/退出码 | 通过；标记输出保留，原生命令退出码 7 被正确回传 |
+| 正常退出与清理 | 通过，无归属进程残留 |
+
+运行器只有 **1 台显示器**，真实双屏最大化后 F11 的问题仍是未覆盖项；单屏结果不替代双屏证据。
+
+## 依赖审计
+
+对锁文件只读执行官方 npm 审计，未更改依赖或全局 registry。用户配置的镜像没有审计接口，已仅为本次命令指定官方 `https://registry.npmjs.org`。
+
+| 范围 | 告警记录 | 按公告 URL 去重 | 高 | 中 | 低 | 严重 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 全工作区 | 61 | 42 | 37 | 17 | 7 | 0 |
+| `pnpm audit --prod` 范围 | 14 | 14 | 5 | 6 | 3 | 0 |
+
+`--prod` 告警涉及 brace-expansion、js-yaml、undici。完整记录见[依赖审计摘要](Version-011-dependency-audit-20261019.json)。
+这些数字是依赖图审计结果，尚未逐条确认安装包内的可达性与可利用性；本次没有进行 Bun/Rust 依赖审计。
+
+## 覆盖边界与失败记录
+
+- 长会话已有窗口化/滚动/折叠回归通过；未建立 FPS 性能基准。菜单边缘、超长模型名等没有进行跨 DPI 人工视觉验收。
+- 已验证常规文件链接与历史恢复；未逐一复刻所有历史归档、旧链接迁移及消息删除合并变体。
+- 没有调用真实付费模型；模型请求使用模拟/本地提供方。
+- 桌面首轮 414 通过、1 个测试文件因 CWD 错误未加载；改为桌面包目录后 419 项全部通过。
+- Windows 首轮在缺少工作区依赖构建时停止；改用发布流程已有的 `build:js`。第二轮暴露测试夹具误用权限值，改为现有接口接受的 `auto`，仅用于独立测试目录。最终结果如上。
+- Mac 首次并发提取同一 DMG 返回资源忙，之后顺序提取。截图首轮缺少该工作树的 Electron SDK，随后只读使用已有匹配 SDK，六场景通过。
+- 最终 13 场景使用合法权限配置；B11 另行确认执行目录与真实工具回包，仍不通过，不额外计数。
+
+原始日志、截图、协议内容均保留本机；仓库只保存[脱敏结构化摘要](Version-011-bug-audit-20261019.json)和公开 CI 回执链接。
+
+复现定向场景时，在 `app/` 中先运行 `pnpm build:js`，再设置正式包中的 `OMP_RELEASE_HOST_BINARY` 和 `OMP_BUNDLED_RESOURCES`，执行：
+
+```sh
+node --test scripts/audit-released-bugs.mjs
+```
+
+该命令在当前版本有已知失败，不能将非零退出状态写成通过。会话/worktree 发布范围见[发布记录](Version-011-release-20261019.md)；后台命令、完整原生会话分支和单子代理停止仍未交付。

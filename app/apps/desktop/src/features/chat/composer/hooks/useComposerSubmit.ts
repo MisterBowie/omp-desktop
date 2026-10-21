@@ -212,6 +212,8 @@ export function useComposerSubmit({
         commandEnd === -1 ? undefined : commandEnd,
       );
       const command = name ? await resolveComposerCommand(name) : null;
+      // Command discovery may outlive a session switch; keep the source draft.
+      if (useAppStore.getState().activeSessionId !== activeSessionId) return;
       if (command && command.kind !== "template" && command.id) {
         const commandBody =
           commandEnd === -1 ? "" : serializedContent.slice(commandEnd).trim();

@@ -1,0 +1,243 @@
+{
+  "schema": "omp-desktop.source-snapshot/1",
+  "baseCommit": "df784ba4764133b4b8d3350ec7c8c1eb61861f05",
+  "nativeCommit": "edec3898d44071206ec201beebea432a2786bd8c",
+  "files": [
+    {
+      "path": "app/apps/desktop/electron/main/bootstrap/omp-sessions.ts",
+      "sha256": "aeeaf32550624aa7321448c6e34709f4145defe129fc1c0d36e39274a9c4986b"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/index.ts",
+      "sha256": "4061ca01e98d7e442a19138666759c40b26f7d43f1ad57fa8b5cbff30cfe5111"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/ipc/memory-ipc.ts",
+      "sha256": "25f38cab55252beb3cf53a57a957871ba62edfada4bb8a2844b7a13cdf0c48f9"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/ipc/register.ts",
+      "sha256": "03a540f49c0e42ad03d42e61858a05ce88abbbf778cae07cea27c84b1638a3c8"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/runtime/omp-memory.ts",
+      "sha256": "944b25f73198d5013bd1c8e07a877fcd809e715184ff542a43be1f4c35eae12c"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/runtime/omp-runtime.ts",
+      "sha256": "b9135cfe75a3a688e9451356db61c871077b87daf44e3702242d901edccef8b3"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/runtime/omp-session-wiring.ts",
+      "sha256": "749dd0a58e5f4ec06dcb9615319d08f078ab58cb025997f432747bc76b6fe95c"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/runtime/omp-session.ts",
+      "sha256": "d4a69bbb787c44ef3dfa36f168e0e25b07c3842d41a9889a40e2d7113bafdedf"
+    },
+    {
+      "path": "app/apps/desktop/src/features/settings/MemorySettingsPage.tsx",
+      "sha256": "4e5f02ba17ca5a3592cd15c61c7bffc096ff0acaca276ea1edc5501b8f4558a8"
+    },
+    {
+      "path": "app/apps/desktop/src/features/settings/SettingsPage.tsx",
+      "sha256": "729fd190fc87c0279bccdc05a142ceb256d496ead8929cec9cf1424b5996c9ae"
+    },
+    {
+      "path": "app/apps/desktop/src/features/settings/memory-settings.css",
+      "sha256": "00a0135150cae191c24661eb0aaae5ee61b9df3027a5200f4c9c82c992e6a3ee"
+    },
+    {
+      "path": "app/apps/desktop/src/lib/api.ts",
+      "sha256": "6f48cd43e83e797ac501a20d484cb32d5eb244e008cd65bc528809494da004ba"
+    },
+    {
+      "path": "app/apps/desktop/src/lib/settings-search.ts",
+      "sha256": "073986bcb46386c1f0279fcf3218876a52b190bb153e5b88c1af41b154cb4a12"
+    },
+    {
+      "path": "app/apps/desktop/test/omp-memory-native-e2e.test.mjs",
+      "sha256": "04975a214cf5931219bc56646339804d7ef4c3d80bed27ace21475650201a81f"
+    },
+    {
+      "path": "app/apps/desktop/test/omp-memory.test.mjs",
+      "sha256": "7badd6a99c2680c7ca389919ade1d910ab55619336be8fa8689e7a55e5360e8f"
+    },
+    {
+      "path": "app/apps/desktop/test/omp-session-bridge.test.mjs",
+      "sha256": "74e9c001a925340dfcf3d92e92280052d7a085237773e398608da1509f3f3ac0"
+    },
+    {
+      "path": "app/crates/host-core/src/rpc/mod.rs",
+      "sha256": "72f0937d790e95305204078cbe43ccd223c668f9a0ae1eba923f4c42173c9f65"
+    },
+    {
+      "path": "app/docs/adr/0304-omp-capability-source-ownership.md",
+      "sha256": "bbd94ae198456d195e908a11607c025a351e9976d1aa60136bec7b71d9c271cc"
+    },
+    {
+      "path": "app/docs/adr/0330-omp-automatic-memory.md",
+      "sha256": "e53d5e0d110efb3aa38ae8ae36c83714db4bf7b25e700afbb448cd948b97790e"
+    },
+    {
+      "path": "app/docs/adr/README.md",
+      "sha256": "8ebdf2634f83149c0982df71740261853af9fbb94a2fbf871197281ce7a4aff4"
+    },
+    {
+      "path": "app/docs/spec/03-runtime/22-automatic-memory.md",
+      "sha256": "e75b6e3563789e847c56c223f577a55b2f61e2bc4b48bff41b9c1f6e585dcb5d"
+    },
+    {
+      "path": "app/docs/spec/03-runtime/README.md",
+      "sha256": "383d27e36eefa648f15864a8022334b6b375929aac8d2cb2e4b2c1082de11063"
+    },
+    {
+      "path": "app/docs/spec/04-ux/06-settings-ia.md",
+      "sha256": "287d4798583a2be14dabc97699c7ddcab3945cfd35cb0114519516a240135e81"
+    },
+    {
+      "path": "app/docs/spec/06-delivery/04-e2e-test-plan.md",
+      "sha256": "786e112b511d76d3c19d6145499477e0aabcccb0affc61f14216fbe2abed720c"
+    },
+    {
+      "path": "app/docs/spec/NAV.md",
+      "sha256": "3575797aadf13baabbdca99670c167e44ab85a86f1a0de67cb0095d6ac6e9901"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/03-runtime/22-automatic-memory.md",
+      "sha256": "3478830255aa8eb4d6809235a46c28bf99cecb000e3b0f5f4cb5805d3d81b99e"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/03-runtime/README.md",
+      "sha256": "df894603c95908aa55d90f0a1ec54f466efee3f13441c0a557e8ab91c7aee44e"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/04-ux/06-settings-ia.md",
+      "sha256": "74408b8cd727b47540a0e31698691e32a5bdfc8d3b494db88c3eeaa361442829"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/NAV.md",
+      "sha256": "d98ce3fc27e9cb7b6befb19f6acbd69532627b2383726baed8912314aa702e07"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/de/index.ts",
+      "sha256": "93ef790358ed8d43375d0d7699c903a0cf2b92361dad47dbd6435bf6da038bf2"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/en/index.ts",
+      "sha256": "53cb0c4669af9bebbb09cc949eb36a77c04276f06509acd28c09dc8d3e967df8"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/es/index.ts",
+      "sha256": "2fbb2273751b01157527ad494c1d0db2fb19374416859cc38257adb4d3df5075"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/fr/index.ts",
+      "sha256": "65e9926efc2eb2e02bfa747fcfa327906e324e346f133b030ebe5ffdf0d73658"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/ko/index.ts",
+      "sha256": "6c650cc721234d25f21244b3ba1032de964b81bd429f41227fbd65b41fcca62d"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/tr/index.ts",
+      "sha256": "9590c6abf6c443e1bfed3b74b41fa1d6f7aa6fc352c4251f6000281498d9788b"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/zh-CN/index.ts",
+      "sha256": "60c9984659e30d74e075591f72dc621162e7c5163391acf0d66f425fdb4a519e"
+    },
+    {
+      "path": "app/packages/i18n/src/locales/zh-TW/index.ts",
+      "sha256": "7cad61628978471741ca0fcd27bb942c7431cd08f85aa7d519fbb936224fae6c"
+    },
+    {
+      "path": "app/packages/omp-runtime/extensions/omp-desktop-gate.ts",
+      "sha256": "c32792bc08423726c0a8d69b3ba7fd6781c7fa3e526fda9c00a74be8f9b25d67"
+    },
+    {
+      "path": "app/packages/omp-runtime/src/bundled.test.ts",
+      "sha256": "6b46ed6637303dc4e2dc7cffc7c3e890bff6476ad665bb2c3f38e50874e45e3c"
+    },
+    {
+      "path": "app/packages/omp-runtime/src/config-overlay.ts",
+      "sha256": "5d0489a565285943fe3459eba3d5342bd5690e9d6603b994f4ef50f3395aaa50"
+    },
+    {
+      "path": "app/packages/omp-runtime/src/index.ts",
+      "sha256": "7c186b64979503f0b1cccd1926178064535427efe39a36048daaaf6a8a3c5875"
+    },
+    {
+      "path": "app/packages/omp-runtime/src/memory-config.test.ts",
+      "sha256": "e41244ae0db91e45eb3710a70023f062834281354030a3fa57dd11b8a7dd3612"
+    },
+    {
+      "path": "app/packages/omp-runtime/src/memory-config.ts",
+      "sha256": "e3bc43d804c06b32f760894b18e627d64d34d363c6fa8d3468aa01a01e188ab4"
+    },
+    {
+      "path": "app/packages/omp-runtime/src/memory-policy.ts",
+      "sha256": "927f16f73e7f318e0ad9b6dbaa04590227ff2a56ec1bc0a6c82dc6d3be6b9c16"
+    },
+    {
+      "path": "app/packages/omp-runtime/src/process.test.ts",
+      "sha256": "f441e9e7f61a44f92200f14f73e5534c7a14f093371108fdbb25df83716faf89"
+    },
+    {
+      "path": "app/packages/omp-runtime/src/process.ts",
+      "sha256": "d36c0380b4b3d47d781edf217a860bd22106697b568ab3d2c0bb7a1065398ffe"
+    },
+    {
+      "path": "app/packages/omp-runtime/src/supervisor.ts",
+      "sha256": "aacad716b9abbecfe7d060c4c38ff465582b99f0438914999db584c232eb08b1"
+    },
+    {
+      "path": "app/packages/shared/src/engine.ts",
+      "sha256": "03c2646008387917df89f060dbe353b57ac4d51d11254f41d530afdf9257cdd4"
+    },
+    {
+      "path": "app/packages/shared/src/index.ts",
+      "sha256": "99882b4b862f9d18bed61778b701b493d3ba3c3bf01fde5327b46c4e8b69f703"
+    },
+    {
+      "path": "app/packages/shared/src/omp-memory.ts",
+      "sha256": "2621fb469b9fb5bc7a48b3b174eb20423d5babbef9d5962b04ee57e170ff3940"
+    },
+    {
+      "path": "app/packages/shared/src/protocol.ts",
+      "sha256": "f12c673ef38ceb6eb1341a94f56c19a595a1dde16264f58c5d1bdbd7fed44391"
+    },
+    {
+      "path": "app/patches/oh-my-pi/0001-omp-desktop-runtime.patch",
+      "sha256": "e951f63ae360212df37f83a7c4a965baad3d27ab05276136950c601c7441e5c0"
+    },
+    {
+      "path": "app/patches/oh-my-pi/0002-omp-desktop-memory-candidate.patch",
+      "sha256": "44cc1755fbf289c12d4b82b382cc4675ba272403623358c5ea826fab7a80672a"
+    },
+    {
+      "path": "app/patches/oh-my-pi/manifest.json",
+      "sha256": "ab031bc058d3ed2925b580fecda863028f1ccb2537f75c67d2cc517235156e78"
+    },
+    {
+      "path": "app/patches/oh-my-pi/memory-candidate.json",
+      "sha256": "86fc7272dc5b32ade52daca64c26cfbccbafb32eb9011c539d2052b72ff8ec66"
+    },
+    {
+      "path": "app/scripts/e2e-memory-settings.mjs",
+      "sha256": "403ad9c79f42fa3cbcd9b0b4a154c0f30a8c0b57a42d6ba4522d24346190a8f2"
+    },
+    {
+      "path": "app/scripts/e2e/memory-settings.tsx",
+      "sha256": "9da8aa06c1decb90db23e5335902c75f593bfb9830e14c02354f5160af7fddfa"
+    },
+    {
+      "path": "app/scripts/omp-memory-candidate.mjs",
+      "sha256": "6c203cb3be9f9ba79bb443ab5c8ee0b37751ef6eb82fc90a2b4de97f16d2ae78"
+    },
+    {
+      "path": "app/scripts/omp-memory-candidate.test.mjs",
+      "sha256": "f43d9ab1ffdd63a786244b43d3afbb0b97c4562c96b95e594e241dbb1c2237dd"
+    }
+  ]
+}

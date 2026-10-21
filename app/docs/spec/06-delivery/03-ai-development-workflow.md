@@ -18,13 +18,12 @@ The rules below govern every change to the PI-Desktop codebase and documentation
 - Architectural boundary changes (process model, IPC contract, storage ownership, security boundary) also require an ADR — see `docs/adr/README.md`.
 - Pure refactor that preserves behavior and API contracts does not require spec updates, but must still be committed (R2).
 
-### R2 — Commit-per-change
+### R2 — Explicit commit authorization
 
-> **Every completed logical change must be git committed.**
-
-- No large uncommitted piles of work. Each logical unit of work — a feature, a fix, a spec update, a chore — gets its own commit.
-- Uncommitted work at session end is a violation of this rule.
-- If a change is incomplete, either commit it as a draft with a `WIP:` prefix or roll it back.
+Commit only when the user asks, as required by `AGENTS.md` §17. Keep uncommitted
+request work in its dedicated worktree when no commit was requested. Source
+validation records identify the base commit and the tested file manifest; they
+do not claim a committed PR integration candidate.
 
 ### R3 — E2E coverage doc
 

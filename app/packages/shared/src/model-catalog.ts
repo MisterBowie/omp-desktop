@@ -146,6 +146,7 @@ export const CATALOG_DEFAULT_MAX_TOKENS = 8_192;
  * binding follows the published record, so a models.dev correction reaches a
  * binding that was saved before the fix; a `user` binding is the user's own
  * number and is never replaced, even when it equals the generic fallback.
+ * `provider` keeps the saved endpoint window above generic/catalog defaults.
  *
  * Older provider bindings name no source. They keep the rule this helper has
  * always applied: the generic 128k seed is treated as inherited when a
@@ -160,7 +161,7 @@ export function effectiveContextWindow(
   const configured = positiveTokenCount(configuredContextWindow);
 
   if (source === "catalog") return published ?? configured;
-  if (source === "user") return configured ?? published;
+  if (source === "user" || source === "provider") return configured ?? published;
   if (configured === undefined) return published;
   if (published !== undefined && configured === CATALOG_DEFAULT_CONTEXT_WINDOW) {
     return published;
@@ -215,7 +216,7 @@ export function resolveBindingContextWindow(
   const source = binding.contextWindowSource ?? undefined;
   const resolved = effectiveContextWindow(published, binding.contextWindow, source);
   if (resolved === undefined) return { catalogConfig, binding };
-  const inherited = source !== "user" && published !== undefined;
+  const inherited = source !== "user" && source !== "provider" && published !== undefined;
   return {
     catalogConfig: { ...catalogConfig, contextWindow: resolved },
     binding: {
@@ -237,9 +238,8 @@ export function bindingFromModelInfo(model: ModelInfo): ModelBinding {
     id: model.modelId,
     contextWindow:
       model.contextWindow || model.limit?.context || CATALOG_DEFAULT_CONTEXT_WINDOW,
-    // The snapshot is a catalog value, not a user answer: a later models.dev
-    // correction still reaches this binding.
-    contextWindowSource: "catalog",
+    // Keep endpoint provenance; catalog snapshots still follow later corrections.
+    contextWindowSource: model.contextWindowSource ?? "catalog",
     maxTokens: model.maxTokens || model.limit?.output || CATALOG_DEFAULT_MAX_TOKENS,
     thinkingLevels,
     defaultThinkingLevel: thinkingLevels.includes("medium")
@@ -249,6 +249,21 @@ export function bindingFromModelInfo(model: ModelInfo): ModelBinding {
     // reaches an already saved binding.
     supportsImages: null,
     supportsDocuments: null,
+  };
+}
+
+/** Adopt a refreshed endpoint limit without replacing an Advanced override. */
+export function bindingWithModelInfo(
+  binding: ModelBinding,
+  model?: Pick<ModelInfo, "contextWindow" | "contextWindowSource">,
+): ModelBinding {
+  if (model?.contextWindowSource !== "provider" || !model.contextWindow) return binding;
+  if (binding.contextWindowSource === "user") return binding;
+  if (!binding.contextWindowSource && binding.contextWindow !== CATALOG_DEFAULT_CONTEXT_WINDOW) return binding;
+  return {
+    ...binding,
+    contextWindow: model.contextWindow,
+    contextWindowSource: "provider",
   };
 }
 

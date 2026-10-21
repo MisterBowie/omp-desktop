@@ -2,6 +2,8 @@ import {
   IPC,
   ErrorCodes,
   resolveBindingContextWindow,
+  bindingWithModelInfo,
+  type ContextWindowSource,
   type ModelBinding,
   type ProviderReorderInput,
   type OAuthRespondInput,
@@ -256,6 +258,7 @@ export function registerProviderIpc({
           capabilities?: string[];
           input?: readonly ("text" | "image")[];
           contextWindow?: number;
+          contextWindowSource?: ContextWindowSource;
           maxTokens?: number;
           source?: "bundled" | "discovered" | "user";
         },
@@ -268,15 +271,29 @@ export function registerProviderIpc({
           baseUrl,
           modelId: model.modelId,
         });
-        const catalogModelConfig = modelsDevModel
+        const baseline = modelsDevModel
           ? modelConfigFromModelsDev(modelsDevModel, baseUrl)
           : genericModelConfig(model.modelId, baseUrl);
-        const storedModel = provider ? bindingForModel(provider, model.modelId) : undefined;
+        const providerWindow = model.contextWindowSource === "provider" ? model.contextWindow : undefined;
+        const catalogModelConfig = {
+          ...baseline,
+          ...(providerWindow !== undefined ? { contextWindow: providerWindow } : {}),
+          ...(model.maxTokens !== undefined ? { maxTokens: model.maxTokens } : {}),
+          limit: {
+            ...baseline.limit,
+            ...(providerWindow !== undefined ? { context: providerWindow, input: providerWindow } : {}),
+            ...(model.maxTokens !== undefined ? { output: model.maxTokens } : {}),
+          },
+        };
+        const savedBinding = provider ? bindingForModel(provider, model.modelId) : undefined;
+        const storedModel = savedBinding ? bindingWithModelInfo(savedBinding, model) : undefined;
         const resolvedModel = resolveBindingContextWindow(catalogModelConfig, storedModel);
         const modelConfig = modelConfigWithBinding(
           resolvedModel.catalogConfig,
           resolvedModel.binding,
         );
+        const contextWindowSource = resolvedModel.binding?.contextWindowSource ??
+          (providerWindow !== undefined ? "provider" : undefined);
         const info = modelsDevModel
           ? modelInfoFromModelsDev(modelsDevModel, provider?.id ?? "")
           : {
@@ -295,7 +312,9 @@ export function registerProviderIpc({
           displayName: info.displayName || modelConfig.name,
           providerId: provider?.id ?? "",
           contextWindow: modelConfig.contextWindow,
+          ...(contextWindowSource ? { contextWindowSource } : {}),
           maxTokens: modelConfig.maxTokens,
+          limit: catalogModelConfig.limit,
           // Published modalities, taken before the binding is applied. This
           // record is what the settings panel compares its checkboxes against,
           // so letting a stored override shape it would make the override its
@@ -422,7 +441,12 @@ export function registerProviderIpc({
         }
         if (cachedById.size > 0) {
           return {
-            models: [...cachedById.values()].map((model) => decorate(model)),
+            models: [...cachedById.values()].map((model) => decorate({
+              ...model,
+              ...(model.source === "discovered" && model.contextWindow !== undefined
+                ? { contextWindowSource: "provider" as const }
+                : {}),
+            })),
             source: "cache" as const,
           };
         }
@@ -464,10 +488,13 @@ export function registerProviderIpc({
             headers: req.headers ?? provider?.headers,
           });
           if (discovered.length > 0) {
-            const models = discovered.map((model) => decorate(model));
+            const models = discovered.map((model) => decorate({
+              ...model,
+              ...(model.contextWindow !== undefined ? { contextWindowSource: "provider" as const } : {}),
+            }));
             // Only what the endpoint actually served is cached; a configured id
             // it never offered must not be recorded as discovered.
-            await cacheForCurrentProvider(models);
+            await cacheForCurrentProvider(discovered);
             return {
               models: withConfiguredBindings(models),
               source: "remote" as const,

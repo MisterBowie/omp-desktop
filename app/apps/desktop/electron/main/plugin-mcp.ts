@@ -49,7 +49,7 @@ export type JsonRpcMessage = {
  * the client speak the same JSON-RPC dialect over a pipe or over HTTP.
  */
 export type McpTransport = {
-  send: (message: JsonRpcMessage) => Promise<void>;
+  send: (message: JsonRpcMessage, timeoutMs?: number) => Promise<void>;
   close: () => void;
 };
 
@@ -270,6 +270,55 @@ async function readBoundedHttpBody(response: Response): Promise<string> {
   return new TextDecoder().decode(body);
 }
 
+/** Deliver complete SSE events without waiting for a keep-alive body to end. */
+async function streamSseMessages(
+  response: Response,
+  onMessage: (message: JsonRpcMessage) => void,
+): Promise<void> {
+  const contentLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > MAX_HTTP_RESPONSE_BYTES) {
+    try {
+      await response.body?.cancel();
+    } catch {
+      // Preserve the size-limit error if cancellation also fails.
+    }
+    throw mcpError("LIMIT_EXCEEDED", "mcp server response is too large");
+  }
+  if (!response.body) return;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let bytes = 0;
+  const dispatch = () => {
+    for (;;) {
+      const boundary = /\r?\n\r?\n/.exec(buffer);
+      if (!boundary) return;
+      const event = buffer.slice(0, boundary.index);
+      buffer = buffer.slice(boundary.index + boundary[0].length);
+      for (const message of parseSseMessages(event)) onMessage(message);
+    }
+  };
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      bytes += value.byteLength;
+      if (bytes > MAX_HTTP_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw mcpError("LIMIT_EXCEEDED", "mcp server response is too large");
+      }
+      buffer += decoder.decode(value, { stream: true });
+      dispatch();
+    }
+    buffer += decoder.decode();
+    dispatch();
+    for (const message of parseSseMessages(buffer)) onMessage(message);
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 function headersForMcpRequest(
   headers: Record<string, string>,
   initialUrl: string,
@@ -298,11 +347,11 @@ function createHttpTransport(
   const activeControllers = new Set<AbortController>();
 
   return {
-    send: async (message) => {
+    send: async (message, timeoutMs = options.timeoutMs) => {
       if (closed) throw mcpError("UNAVAILABLE", "mcp session is closed");
       const controller = new AbortController();
       activeControllers.add(controller);
-      const timer = setTimeout(() => controller.abort(), options.timeoutMs);
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
       let url = options.url;
       try {
         for (let hop = 0; ; hop += 1) {
@@ -372,14 +421,14 @@ function createHttpTransport(
             return;
           }
           const contentType = response.headers.get("content-type") ?? "";
+          if (contentType.includes("text/event-stream")) {
+            await streamSseMessages(response, handlers.onMessage);
+            return;
+          }
           const body = await readBoundedHttpBody(response);
           if (!body.trim()) return;
-          const messages = contentType.includes("text/event-stream")
-            ? parseSseMessages(body)
-            : (() => {
-                const parsed = JSON.parse(body) as JsonRpcMessage | JsonRpcMessage[];
-                return Array.isArray(parsed) ? parsed : [parsed];
-              })();
+          const parsed = JSON.parse(body) as JsonRpcMessage | JsonRpcMessage[];
+          const messages = Array.isArray(parsed) ? parsed : [parsed];
           for (const entry of messages) handlers.onMessage(entry);
           return;
         }
@@ -649,10 +698,17 @@ export class McpServerClient {
     return new Promise<unknown>((resolvePromise, rejectPromise) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
+        if (method !== "initialize") {
+          void transport.send({
+            jsonrpc: "2.0",
+            method: "notifications/cancelled",
+            params: { requestId: id, reason: "timeout" },
+          }).catch(() => undefined);
+        }
         rejectPromise(mcpError("TIMEOUT", `mcp ${method} timed out after ${timeoutMs}ms`));
       }, timeoutMs);
       this.pending.set(id, { resolve: resolvePromise, reject: rejectPromise, timer });
-      void transport.send({ jsonrpc: "2.0", id, method, params }).catch((error: Error) => {
+      void transport.send({ jsonrpc: "2.0", id, method, params }, timeoutMs).catch((error: Error) => {
         const entry = this.pending.get(id);
         if (!entry) return;
         this.pending.delete(id);

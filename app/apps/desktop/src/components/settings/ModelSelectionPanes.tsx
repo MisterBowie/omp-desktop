@@ -15,6 +15,7 @@ import {
   bindingDefaultThinkingMenuLevels,
   bindingForCustomModel,
   bindingFromModelInfo,
+  bindingWithModelInfo,
   formatTokenCount,
   modelMatchesFilter,
   nativeWebSearchSupportedOn,
@@ -127,6 +128,8 @@ export function useModelSelection(
   const bindingsToPersist = useMemo(
     () =>
       models.map((binding) => {
+        const info = rows.find((row) => row.id.toLowerCase() === binding.id.toLowerCase())?.info;
+        binding = bindingWithModelInfo(binding, info);
         // Canonical order, because this is the same order the panel offers the
         // default in: picking the first entry of an insertion-ordered list here
         // would save a different default than the one the user was shown.
@@ -144,10 +147,10 @@ export function useModelSelection(
         }
         return { ...binding, thinkingLevels, defaultThinkingLevel };
       }),
-    [models],
+    [models, rows],
   );
 
-  return { rows, models, publishedLevelsById, bindingsToPersist, setModels };
+  return { rows, models: bindingsToPersist, publishedLevelsById, bindingsToPersist, setModels };
 }
 
 /**
@@ -532,6 +535,7 @@ export function ModelSelectionPanes({
                 : undefined;
               const followsCatalog =
                 binding.contextWindowSource !== "user" &&
+                binding.contextWindowSource !== "provider" &&
                 publishedContextWindow !== undefined;
               const publishedDocuments = info ? modelMatchesFilter(info, "pdf") : false;
               const expanded = expandedModelId === binding.id;

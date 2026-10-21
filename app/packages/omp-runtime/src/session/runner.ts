@@ -247,6 +247,49 @@ const DEFAULT_ABORT_TIMEOUT_MS = 5_000;
 const DEFAULT_TURN_FENCE_TIMEOUT_MS = 10_000;
 
 export class OmpSessionRunner {
+  private steeringInFlight = false;
+  private deferredTerminal: OmpFrame | null = null;
+
+  canSteer(expectedTurnId: string): boolean {
+    return this.disposed === null && this.run?.turnId === expectedTurnId && this.run.started && this.state === "running" && !this.stopping && !this.steeringInFlight;
+  }
+
+  async steer(message: string, expectedTurnId: string, userMessageId?: string | null): Promise<{ accepted: true; turnId: string }> {
+    this.throwIfDisposed();
+    const run = this.run;
+    if (!run || !this.canSteer(expectedTurnId)) {
+      throw Object.assign(new Error("The target turn cannot accept steering"), { errorCode: "TURN_NOT_FOUND" });
+    }
+    this.steeringInFlight = true;
+    if (userMessageId) this.converter.queueSteeringUserMessageId(userMessageId);
+    let answered = false;
+    try {
+      const result = await this.runtime.request({ type: "steer", message }, { timeoutMs: 15_000 });
+      answered = true;
+      if (result.success !== true) throw new Error(result.error ?? "The runtime refused steering");
+      return { accepted: true, turnId: run.turnId };
+    } catch (error) {
+      if (userMessageId) this.converter.discardSteeringUserMessageId(userMessageId);
+      // A timeout does not prove the command was rejected. Retire the process
+      // before another turn can consume an input whose admission is unknown.
+      if (!answered) {
+        this.state = "stopping";
+        this.pendingReclaim = true;
+        try {
+          const result = await this.teardown?.({ abortBash: this.run?.bashOpen ?? false });
+          this.pendingReclaim = !result?.reaped || !result.cleaned;
+        } finally {
+          if (this.run === run) this.onTransportFailure(new OmpRuntimeError("transport-failed", "Steering admission could not be confirmed; the runtime was retired"));
+        }
+      }
+      throw error;
+    } finally {
+      this.steeringInFlight = false;
+      const terminal = this.deferredTerminal;
+      this.deferredTerminal = null;
+      if (terminal && this.run === run) this.onFrame(terminal);
+    }
+  }
   private readonly sessionId: string;
   private readonly runtime: OmpSessionRuntime;
   private readonly emitEnvelope: (envelope: AgentEventEnvelope) => void;
@@ -1328,6 +1371,13 @@ export class OmpSessionRunner {
       return;
     }
     let events: AgentEvent[];
+    // An admitted control command must settle before a successor turn may
+    // start. A non-terminal native end belongs to its queued continuation.
+    if (frame.type === "agent_end" && frame.isTerminal !== false && this.steeringInFlight) {
+      this.deferredTerminal = frame;
+      return;
+    }
+    if (frame.type === "agent_start" && this.run?.started) return;
     try {
       events = this.converter.convert(frame);
     } catch (error) {
@@ -1343,6 +1393,7 @@ export class OmpSessionRunner {
       return;
     }
     for (const event of events) {
+      if (event.type === "status" && this.run) event.status.currentTurnId = this.run.turnId;
       this.trackRunState(event);
       this.emitEnvelope({
         sessionId: this.sessionId,
@@ -1350,6 +1401,11 @@ export class OmpSessionRunner {
         ts: this.now(),
         event,
       });
+      if (event.type === "agent_start" && this.run) {
+        this.emitEnvelope({ sessionId: this.sessionId, turnId: this.run.turnId, ts: this.now(), event: {
+          type: "status", status: { sessionId: this.sessionId, ...this.status() },
+        } });
+      }
       if (event.type === "agent_end") {
         // The run is over: any dialog it raised can no longer be answered into
         // it, so it is cancelled rather than left pending for the next run.

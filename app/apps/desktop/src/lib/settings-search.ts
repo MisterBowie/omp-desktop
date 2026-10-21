@@ -15,6 +15,7 @@ export type SettingsTabId =
   | "mcp"
   | "subagents"
   | "import"
+  | "memory"
   | "projects"
   | "remoteHosts"
   | "about";
@@ -50,6 +51,7 @@ export type SettingsNavEntry = {
 };
 
 export const SETTINGS_NAV: SettingsNavEntry[] = [
+  { id: "memory", labelKey: "memory.title", titleKey: "memory.title", group: "agent", keywordKeys: ["memory.autoSave", "memory.autoRead", "memory.browse"] },
   {
     id: "general",
     labelKey: "settings.nav.general",

@@ -1,0 +1,133 @@
+{
+  "baseCommit": "8233c81398c170808c99aedc7bb525b47eeac467",
+  "branch": "codex/provider-context-window",
+  "recordedAt": "2026-10-20T11:31:00+08:00",
+  "committed": false,
+  "files": [
+    {
+      "path": "app/apps/desktop/electron/main/ipc/provider-ipc.ts",
+      "bytes": 22050,
+      "sha256": "00ca7c6d22d1c292c5b6e31ebe9d5dba30155c5ad8486ae4e5b61a2b5d1ae389"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/model-discovery.ts",
+      "bytes": 6722,
+      "sha256": "027b7825033cc5f0f53b231cfc0af306abda451793bf288580dfc8981a43753e"
+    },
+    {
+      "path": "app/apps/desktop/src/components/settings/ModelSelectionPanes.tsx",
+      "bytes": 42911,
+      "sha256": "541735d7872d31ff085686fa94ff882b5128b4817d9975c4bfb0e24e156247b4"
+    },
+    {
+      "path": "app/apps/desktop/test/model-advanced-capabilities.test.mjs",
+      "bytes": 11514,
+      "sha256": "f22331cde48be69c6361d84db12b4de5d848d9d135ff116b052c59d41002e259"
+    },
+    {
+      "path": "app/apps/desktop/test/model-discovery-precedence.test.mjs",
+      "bytes": 3898,
+      "sha256": "dcc5865776c13832b15ee8ecd7020a01301432c3ad3ff22eee18adf79cef0591"
+    },
+    {
+      "path": "app/apps/desktop/test/model-discovery.test.mjs",
+      "bytes": 6254,
+      "sha256": "cdbcb36affb4a40b36fbb8cdb4d32552f40a696659199f8b0bf8dd1abcb45042"
+    },
+    {
+      "path": "app/apps/desktop/test/provider-discovery-limits.test.mjs",
+      "bytes": 8043,
+      "sha256": "166d45febd33e93186c986f748901a43df679a809d33e55024a11f0c5641249b"
+    },
+    {
+      "path": "app/crates/host-core/src/providers/catalog.rs",
+      "bytes": 22826,
+      "sha256": "e2e31a7b4f65fc572347d157f7d2facaf7d21450e3f9c0460a74dc5eca74765a"
+    },
+    {
+      "path": "app/crates/host-core/src/providers/model.rs",
+      "bytes": 8223,
+      "sha256": "6967fb838aa506efa88f32b413d70ec8d7394651cdd2f346f82f7c98664af76f"
+    },
+    {
+      "path": "app/docs/adr/0134-models-dev-sole-model-metadata-source.md",
+      "bytes": 6415,
+      "sha256": "598c2461d0faf7f1801ca954e00adbd55ac18dd31631d71aa37b4af9e78d9455"
+    },
+    {
+      "path": "app/docs/adr/README.md",
+      "bytes": 33107,
+      "sha256": "e1fee79f70cef12ecc9b9a4bbe83defd64f1d23003bcd4b3b475e344ed5a6213"
+    },
+    {
+      "path": "app/docs/adr/provider-published-token-limits.md",
+      "bytes": 2126,
+      "sha256": "e6ee8cc9e6d59ec5f26be3d1b25e6770f8cd58f6f4c527edf5bc70e6e387ec17"
+    },
+    {
+      "path": "app/docs/spec/03-runtime/11-provider-model-system.md",
+      "bytes": 36475,
+      "sha256": "3e1f14e608b61c0f07274fddf601c5bf8061002d4513a7cec1fd4c83bd6739d8"
+    },
+    {
+      "path": "app/docs/spec/03-runtime/12-provider-config-schema.md",
+      "bytes": 29993,
+      "sha256": "d7358e573743b8fd5846255e5155babf478cb072637f95f1175ef58edf444496"
+    },
+    {
+      "path": "app/docs/spec/03-runtime/13-model-catalog-and-selection.md",
+      "bytes": 30012,
+      "sha256": "be7a7518744427ec50bd74ec04f308042409f3ee15d66bacb4849fc665d07a0d"
+    },
+    {
+      "path": "app/docs/spec/06-delivery/04-e2e-test-plan.md",
+      "bytes": 952614,
+      "sha256": "b22e59698092c20abf67785fb7dbb54495f9d6e1ff3e629630f32d3db803d37d"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/03-runtime/11-provider-model-system.md",
+      "bytes": 33594,
+      "sha256": "864af2aa35a27fcca27db5e95b50a0e981927ec5007e65a132b5313d87fcdcbd"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/03-runtime/12-provider-config-schema.md",
+      "bytes": 22208,
+      "sha256": "fc8b6a1fec92b88ac5f1d5b11d0e1246941ac388c58a4bcf3d467b2d5d0cf1c2"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/03-runtime/13-model-catalog-and-selection.md",
+      "bytes": 17908,
+      "sha256": "1cafe8a7dee59e31333a9570e6a38b00ac807af7379cdddaaad06e99bff914c0"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/06-delivery/04-e2e-test-plan.md",
+      "bytes": 652857,
+      "sha256": "ba4ab4ce878b5f8e29bcb2d34de609ed795ee68d2dceca6c28e7a4913cb66b8a"
+    },
+    {
+      "path": "app/packages/shared/src/model-catalog.test.ts",
+      "bytes": 9477,
+      "sha256": "6899f2d437c90de4000adc545a5cd987ec3129e71a35e690a5e70825468c01dd"
+    },
+    {
+      "path": "app/packages/shared/src/model-catalog.ts",
+      "bytes": 13157,
+      "sha256": "036531037a84ca97c44789224c5a50de69ba470bdb25803afd55fa577ec6905b"
+    },
+    {
+      "path": "app/packages/shared/src/model-config-import.test.ts",
+      "bytes": 14311,
+      "sha256": "b68b163820f8de72afec0926dd749a51aa20f5ce6304a744f41a0c673ab79431"
+    },
+    {
+      "path": "app/packages/shared/src/model-config-import.ts",
+      "bytes": 34056,
+      "sha256": "5f04a96f6cbf540fad0cb4a2165fa41312e8c1ff71d7fa644a57e9b0153183c9"
+    },
+    {
+      "path": "app/packages/shared/src/types/models.ts",
+      "bytes": 7063,
+      "sha256": "830107e65f114d683cb9acc72078e791b76283ed0350f5c04040b7f0f3b67b56"
+    }
+  ]
+}

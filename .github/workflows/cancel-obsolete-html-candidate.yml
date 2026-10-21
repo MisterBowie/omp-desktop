@@ -1,0 +1,48 @@
+name: Cancel the superseded HTML 0.1.0 candidate
+
+on:
+  push:
+    tags: ['cancel-obsolete-html-39558120889']
+
+permissions:
+  contents: read
+
+jobs:
+  cancel-obsolete:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Validate the exact obsolete candidate before cancelling it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REPOSITORY" == MisterBowie/omp-desktop ]]
+          [[ "$GITHUB_REF_NAME" == cancel-obsolete-html-39558120889 ]]
+          [[ "$(node -p "require('./app/package.json').version")" == 0.1.3 ]]
+          gh api repos/MisterBowie/omp-desktop/actions/runs/39558120889 > "$RUNNER_TEMP/obsolete.json"
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          const run=JSON.parse(readFileSync(process.env.RUNNER_TEMP+'/obsolete.json'));
+          assert.equal(run.id,39558120889);
+          assert.equal(run.repository.full_name,'MisterBowie/omp-desktop');
+          assert.equal(run.path,'.github/workflows/release.yml');
+          assert.equal(run.event,'push');
+          assert.equal(run.head_branch,'release-check-0.1.0-a978aa2');
+          assert.equal(run.head_sha,'a978aa2e4833566bee793fbefb025dc7477c660e');
+          JS
+          status="$(node -p "JSON.parse(require('fs').readFileSync(process.env.RUNNER_TEMP+'/obsolete.json')).status")"
+          if [[ "$status" != completed ]]; then
+            gh api -X POST repos/MisterBowie/omp-desktop/actions/runs/39558120889/cancel
+            echo '::notice::Cancelled the superseded 0.1.0 HTML candidate; delivery remains 0.1.3.'
+          else
+            echo '::notice::The superseded candidate has already stopped; no action taken.'
+          fi

@@ -9,6 +9,54 @@
 
 ---
 
+### E2E-installed-process-ownership
+
+- **前提：** 夹具独有安装目录和原生进程身份，包含精确 Windows FILETIME 创建时间；
+  用户进程不作为终止目标。
+- **步骤：** 原父进程退出后复用其 PID，令更早创建的无关进程仍保留旧父编号。
+  同时覆盖创建时间相同/更晚的真实子进程、缺失身份、小数时间和独立归属的分离进程。
+- **预期：** 父子边必须有可校验的创建顺序，比较不得因数值舍入丢失精度。
+  更早的无关进程不被认领或终止；真实子进程和唯一运行目录证据仍能归属。
+  安装目录外可执行文件继续保留 Win32 清理器的既有拒绝规则。
+- **自动化：** `scripts/e2e/process-ownership.test.mjs` 与
+  `apps/desktop/test/installed-native-observation.test.mjs`；每个目标仍须通过真实
+  安装包验收，证明按序退出且没有自有进程残留。
+
+### E2E-OMP-session-controls
+
+- **前提：** 经校验的 OMP 18.3.0 打包资源、夹具独有 HOME/项目和本机脚本模型，
+  不读取用户数据、不调用付费服务。
+- **步骤：** 暂停模型流，在当前回合发送文本插话，创建并完成原生 Todo，排队一条
+  `/skill:` 跟进后释放模型流。通过一行历史分页恢复 Todo。压缩原生上下文，从摘要
+  继续对话；再次发起压缩并取消。
+- **预期：** 两条乐观输入分别归一化；插话沿用原宿主回合；FIFO 先持久化再经
+  OMP 派发，后续请求包含插话和跟进。原生历史包含压缩条目，后续请求使用摘要。
+  Todo 快照独立于返回分页，Skill 正文在跟进回复前经真实宿主工具按需读取。
+  取消压缩不显示成功，所有自有进程均回收。旧回合 ID 不能停止其他操作；不需要
+  Pi sidecar。
+- **自动化：** `OMP_BUNDLED_RESOURCES=<resources> node --test
+  apps/desktop/test/omp-session-operations-e2e.test.mjs`。
+- **补充契约：** 运行时测试覆盖迟到终止帧、准备期取消、不确定接纳、回收保留与
+  重试；IPC 测试证明附件在写入队列之前拒绝。
+- **边界：** 仅文本操作；完整分支与单独停止子代理仍明确不可用。跨平台安装态
+  界面验收须另行执行。宿主持久化 RPC 使用受控夹具；本场景验证先写入再派发
+  的顺序，不验收数据库重启恢复。
+- **规格：** 运行时规格 OMP 会话操作修订与对应 ADR。
+
+### E2E-OMP-session-ui
+
+- **步骤：** 展开清单，接收后台/子代理结果并切换会话；在原生历史读取完成前收到
+  新的 Todo 更新。经输入框 Hook 和 Store 提交运行中插话与跟进。在命令目录查询
+  期间切换会话；折叠含运行中隐藏行的项目组，查看会话日期并使用普通复制菜单。
+- **预期：** 展开后可滚动读取全部任务和阻塞原因。后台和子代理结果不覆盖其他
+  会话清单；新实时状态优先于迟到历史。插话使用当前回合且只有一条乐观输入，跟进
+  显示在所属队列。迟到命令查询不派发并保留原草稿。折叠项目仍显示运行状态，日期
+  本地化；临时会话不提供空项目路径复制。
+- **自动化：** `session-controls-ui.test.mjs`、`sidebar-session-metadata.test.mjs`、
+  `sidebar-session-date.test.mjs`、`skill-command-routing.test.mjs`；属于组件、Store、
+  SSR 和 IPC 契约验收，不代表安装态界面或截图验收。
+- **规格：** UI 信息架构、内置命令 Skill 修订、OMP 会话操作 ADR。
+
 ### E2E-browser-full-page-screenshot-bounds
 
 - **前提：** Electron、夹具独有的配置和暂存目录，以及生成的页面；不调用模型或用户配置。
@@ -5270,6 +5318,9 @@ eleven-tool-round desktop paths are verified by
 
 | 验收 | 应用场景 |
 |---|---|
+| A / E / F — OMP 隔离会话工作树 | E2E-OMP-WT |
+| A / E / F — OMP 文本操作与取消 | E2E-OMP-session-controls |
+| A / E / F — 会话 Todo、Skill 与侧栏交互 | E2E-OMP-session-ui |
 | A / E / F / Release — OMP 安装身份和用户流程 | E2E-OMP-installed-identity-and-workflow |
 | A / E / F / M7 — 安装后的编码、并发、长历史和故障恢复 | E2E-OMP-maintenance-daily |
 | E / F / Release / M7 — 安装包升级和关闭数据备份回退 | E2E-OMP-maintenance-upgrade |
@@ -8174,6 +8225,19 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   F (unread persistence), Quality (bounded localized menu).
 - **Milestone**: Post-M6 desktop shell maintenance.
 - **Status**: Draft; native E2E requires an explicitly authorized run.
+#### E2E-MODEL-provider-token-limits-survive-selection-and-restart
+
+- **步骤**：测试端点返回 `context_window: 872000`、`max_output_tokens: 128000`，
+  获取列表、选中、保存并重新读取。分别覆盖目录已知模型、网关未知 ID、历史继承的
+  128k 和 Advanced 手动 128k。端点改报 931000，再保存并核对运行时配置。
+- **预期**：新选择上下文为 872000、输出为 128000；缓存不请求网络。端点窗口以
+  `provider` 来源保存并跨运行时解析保留；刷新可更新继承值，用户及旧版显式值保留。
+  非正整数、超范围或非法限制忽略，不把输出值作为上下文。
+- **规格**：`03-runtime/13-model-catalog-and-selection.md`、
+  `03-runtime/12-provider-config-schema.md`、ADR `provider-published-token-limits`。
+- **状态**：发现、IPC、共享解析和宿主配置边界已自动化，覆盖见英文同名场景。
+  安装态 GUI/实际重启仍为手动场景；夹具不调用付费推理。
+
 #### E2E-MODEL-catalog-window-correction-reaches-saved-bindings：目录修正回流已保存绑定，且不覆盖用户手改值
 
 - **目标**：models.dev 修正某模型上限后回流到已保存的绑定（不必删除重建），
@@ -8612,3 +8676,40 @@ the latest destination. These assertions measure work counts, not device FPS.
   `providers::tests::a_stored_array_survives_an_entry_that_lost_a_field`）；
   宿主 RPC 路径由 `scripts/e2e-smoke.mjs` 覆盖提供商的创建与列举，但没有套件
   驱动手工编辑的 `config_json`。
+
+### E2E-OMP-WT：隔离会话生命周期
+
+- **前提**：当前宿主已构建、已验证的 OMP 资源、临时本地 Git 仓库与回环 FakeProvider。
+- **步骤**：通过项目菜单创建隔离会话；拒绝并批准原生写入；切换项目；取消真实子进程；重启宿主及 OMP；恢复历史；预览并确认合并；删除会话。
+- **预期**：创建全新会话及工作树，项目配置作用域不变；拒绝无副作用，批准只写工作树；取消回收子进程；目录缺失不回退原项目；原生历史继续绑定同一工作树；预览不改项目；合并要求当前令牌；只删除自有路径。宿主回归另覆盖脏项目、过期预览、冲突、升级备份、创建中/缺失状态及工具/回合独占。
+- **关联规格**：运行时执行目录补充、隔离会话 UI 补充及 ADR omp-session-worktrees。
+- **验收标准**：会话隔离、权限、持久化与取消。
+- **阶段**：T26 本机源码验收。
+- **状态**：组件/Store/IPC/真实宿主及原生进程边界已自动化；安装态 Electron UI、Windows/Linux 尚未运行。
+- **命令**：`node --test apps/desktop/test/worktree-*.test.mjs`；`OMP_BUNDLED_RESOURCES=<已验证资源> node --test apps/desktop/test/omp-worktree-e2e.test.mjs`；`cargo test -p host-core --locked`。
+
+## 发布后缺陷回归（2026-10-19）
+
+先将 `scripts/audit-released-bugs.mjs` 指向已发布源码及宿主，记录失败基线，
+再指向候选源码及新编译宿主复测。仅排除需要 OMP 原生缺失能力的
+`B11 OMP native Read`。12 个适用场景覆盖 SDK 循环所有权与提供方 wire ID、
+独立 AGENTS 预算、BrowserHost CDP 时限、增量 MCP SSE、超时取消通知、
+UTF-16 Read/Edit、上下文计数、规范路径同源移动和 Git textconv 禁用，另有
+历史尾部、提供方参数及附件持久化对照项。
+
+回归通过真实 Pi 适配器、Git 仓库和宿主 RPC，以及公开 BrowserHost/MCP 客户端
+执行，只在外部浏览器或网络边界受控替代。浏览器超时恢复还须验证新连接后拒绝
+旧回复。保留有效编码及权限检查。源码候选测试不代表已安装发行包或跨平台 GUI
+验收；两者单独记录。无需付费提供方。
+
+#### E2E-OMP-skill-install-branding：Skill 安装说明使用当前宿主名称
+
+- **步骤**：检查 Agent、Plan、Goal 在默认角色、自定义角色及空基础提示（原生 OMP
+  注入路径）下的拼装结果。检查插件辅助工具说明并加载内置插件开发 Skill，再在
+  隔离测试会话中请求安装 Skill。
+- **预期**：桌面自有身份与安装提示使用 `OMP Desktop (omp-desktop)`，不使用旧应用
+  名称。自定义角色保留，宿主上下文仍存在；Skill id、包名、安装位置、权限及外部
+  Skill 正文保持原有契约。
+- **覆盖**：已有模式、自定义角色、运行时和 Skill 加载测试，加上本机编译提示探针。
+  真实模型回复措辞仍为 Draft；提示检查不需要调用付费模型。
+- **关联规格**：`03-runtime/02-agent-runtime.md`（§7）。

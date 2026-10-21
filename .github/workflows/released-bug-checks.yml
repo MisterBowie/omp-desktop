@@ -1,0 +1,104 @@
+name: Test published OMP bug scenarios
+on:
+  push:
+    tags: ['bug-check-v*']
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+    working-directory: app
+jobs:
+  windows:
+    permissions:
+      contents: write
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: app/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - name: Require the published product tree
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REPOSITORY" == MisterBowie/omp-desktop ]]
+          [[ "$(node -p "require('./package.json').version")" == 0.1.2 ]]
+          git diff --exit-code v0.1.2 HEAD -- apps/desktop/electron apps/desktop/src packages crates
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:js
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install psutil==7.2.2
+      - name: Download the published installer and verify its digest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/MisterBowie/omp-desktop/releases/tags/v0.1.2 > "$RUNNER_TEMP/published-release.json"
+          gh release download v0.1.2 --repo MisterBowie/omp-desktop --pattern 'OMP-Desktop-Setup-0.1.2.exe' --dir .artifacts/published-installer
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const release=JSON.parse(readFileSync(process.env.RUNNER_TEMP+'/published-release.json'));
+          assert.equal(release.draft,false);assert.equal(release.prerelease,false);
+          const asset=release.assets.find(a=>a.name==='OMP-Desktop-Setup-0.1.2.exe');assert(asset);
+          const bytes=readFileSync('.artifacts/published-installer/'+asset.name);
+          assert.equal(bytes.length,asset.size);assert.equal('sha256:'+createHash('sha256').update(bytes).digest('hex'),asset.digest);
+          console.log('Verified published Windows installer digest');
+          JS
+      - name: Run isolated installed bug scenarios
+        run: |
+          export OMP_E2E_PYTHON="$(python -c 'import sys; print(sys.executable)')"
+          node scripts/e2e-released-bugs.mjs .artifacts/published-installer/OMP-Desktop-Setup-0.1.2.exe .artifacts/published-bug-checks
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: published-windows-bug-results
+          if-no-files-found: error
+          path: app/.artifacts/published-bug-checks/public-report.json
+      - name: Publish only the bounded fixture result
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ -f .artifacts/published-bug-checks/public-report.json ]]
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict';
+          import {readFileSync,writeFileSync} from 'node:fs';
+          const r=JSON.parse(readFileSync('.artifacts/published-bug-checks/public-report.json'));
+          assert.equal(r.version,'0.1.2');assert.equal(r.actualVersion,'0.1.2');assert.equal(r.platform,'win32');assert.equal(r.arch,'x64');
+          const allowed=new Set(['WIN-FULLSCREEN-MAXIMIZED','WIN-TASKBAR-RESTORE','UTF16-HOST-READ','POWERSHELL-OUTPUT-EXIT','ORDERED-EXIT']);
+          const number=n=>{assert(Number.isFinite(n)&&Math.abs(n)<1000000000);return n;};
+          const rect=r=>Object.fromEntries(['x','y','width','height'].map(k=>[k,number(r[k])]));
+          const checks=r.checks.map(c=>{
+            assert(allowed.has(c.id));assert(['passed','failed'].includes(c.status));
+            const out={id:c.id,status:c.status};
+            if(c.status==='failed')return {...out,errorType:['Error','AssertionError','TypeError','HostRpcError'].includes(c.errorType)?c.errorType:'other'};
+            const f=c.facts;
+            if(c.id==='WIN-FULLSCREEN-MAXIMIZED')out.facts={colors:number(f.colors),bytes:number(f.bytes)};
+            if(c.id==='WIN-TASKBAR-RESTORE')out.facts={bounds:rect(f.bounds),workArea:rect(f.workArea),maximized:f.maximized===true};
+            if(c.id==='UTF16-HOST-READ')out.facts={preserved:f.preserved===true};
+            if(c.id==='POWERSHELL-OUTPUT-EXIT')out.facts={outputPreserved:f.outputPreserved===true,exitCode:number(f.exitCode)};
+            if(c.id==='ORDERED-EXIT')out.facts={noOwnedProcesses:f.noOwnedProcesses===true};
+            return out;
+          });
+          assert.equal(new Set(checks.map(c=>c.id)).size,5);
+          const safe={version:r.version,platform:r.platform,arch:r.arch,monitorCount:number(r.monitorCount),dualMonitorQualified:r.dualMonitorQualified===true,cleaned:r.cleaned===true,checks};
+          if(r.fullscreenObservation){const f=r.fullscreenObservation;safe.fullscreenObservation={maximized:f.maximized===true,painted:f.painted===true,colors:number(f.colors),bytes:number(f.bytes)};}
+          if(r.restoreObservation){const f=r.restoreObservation;safe.restoreObservation={bounds:rect(f.bounds),workArea:rect(f.workArea),maximized:f.maximized===true};}
+          writeFileSync(process.env.RUNNER_TEMP+'/safe-bug-result.json',JSON.stringify({message:'test: record published Windows bug results',content:Buffer.from(JSON.stringify(safe,null,2)+'\n').toString('base64'),branch:'codex/published-bug-results-'+process.env.GITHUB_RUN_ID}));
+          JS
+          result_branch="codex/published-bug-results-$GITHUB_RUN_ID"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/heads/$result_branch" -f sha="$GITHUB_SHA" --silent
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/docs/validation/Published-012-windows-$GITHUB_RUN_ID.json" --input "$RUNNER_TEMP/safe-bug-result.json" --silent

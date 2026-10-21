@@ -8,7 +8,6 @@
  * provider absent and every behavioral assertion below fails on that fact.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { register } from "node:module";
 import test from "node:test";
 import { dirname, join } from "node:path";
@@ -213,20 +212,27 @@ test("the gate's prompt blocks are byte-identical to the PI prompt helpers", asy
   );
 });
 
-test("the production mode composer is byte-identical to the pinned PI source", async () => {
+test("the mode composer preserves pinned PI operating rules with the OMP host identity", async () => {
   const { composeModeSystemPrompt, DEFAULT_RUNTIME_SYSTEM_PROMPT } = await import(
     "../../../packages/agent-runtime/src/mode-prompts.ts"
   );
-  const appSource = readFileSync(join(here, "../../../packages/agent-runtime/src/mode-prompts.ts"), "utf8");
-  const pinnedSource = readFileSync(
+  const pinned = await import(pathToFileURL(
     join(here, "../../../../upstream/pi-desktop/packages/agent-runtime/src/mode-prompts.ts"),
-    "utf8",
-  );
-  assert.equal(
-    appSource,
-    pinnedSource,
-    "the composer must stay byte-identical to the fixed PI source (the state carries its output verbatim)",
-  );
+  ).href);
+  const { APP_NAME, PRODUCT_IDENTITY } = await import("@pi-desktop/shared");
+  const hostIdentity = `The host application is ${APP_NAME} (${PRODUCT_IDENTITY.protocolScheme}). Refer to this application as ${APP_NAME} in user-facing replies, including skill installation instructions and status messages.`;
+  assert.equal(DEFAULT_RUNTIME_SYSTEM_PROMPT, pinned.DEFAULT_RUNTIME_SYSTEM_PROMPT.replaceAll("PI-Desktop", APP_NAME));
+  for (const mode of ["agent", "plan", "goal"]) {
+    const operatingRules = pinned.composeModeSystemPrompt(mode, "").replaceAll("PI-Desktop", APP_NAME);
+    for (const base of [undefined, "", "  Custom persona mentioning PI-Desktop.\n\nKeep my text.  "]) {
+      const expectedBase = (base ?? DEFAULT_RUNTIME_SYSTEM_PROMPT).trim();
+      assert.equal(
+        composeModeSystemPrompt(mode, base),
+        [expectedBase, hostIdentity, operatingRules].filter(Boolean).join("\n\n"),
+        `${mode} may only add the OMP host identity and rename the pinned agent; all operating rules and custom text stay exact`,
+      );
+    }
+  }
 
   const blocks = {
     agent: composeModeSystemPrompt("agent", ""),
@@ -235,7 +241,7 @@ test("the production mode composer is byte-identical to the pinned PI source", a
   };
   for (const [mode, block] of Object.entries(blocks)) {
     assert.ok(block.length > 0, `${mode} must produce a block`);
-    assert.ok(!block.includes(DEFAULT_RUNTIME_SYSTEM_PROMPT), `${mode} must not carry the PI default base`);
+    assert.ok(!block.includes(DEFAULT_RUNTIME_SYSTEM_PROMPT), `${mode} must not carry the default persona`);
     assert.ok(!block.startsWith("\n") && !block.endsWith("\n"), `${mode} block must be trimmed for append`);
   }
   // The three blocks are mutually exclusive: only the Plan block names

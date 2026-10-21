@@ -192,6 +192,7 @@ function clearLocalSessionState(
       pendingPlans,
       planCheckpoints,
       sessionCompactions,
+      sessionTodos: withoutRecordKey(state.sessionTodos, id),
       sessionHistory,
       navStack,
       navIndex: Math.min(state.navIndex, navStack.length - 1),

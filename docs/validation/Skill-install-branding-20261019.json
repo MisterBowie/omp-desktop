@@ -1,0 +1,184 @@
+{
+  "date": "2026-10-19",
+  "status": "validated-uncommitted-source",
+  "baseRevision": "a173f5b7065c17bc6bbc9e8a189cfb37d2f5363f",
+  "branch": "codex/skill-install-branding",
+  "appVersion": "0.1.2",
+  "node": "24.14.0",
+  "pnpm": "10.34.5",
+  "codegraphPresent": false,
+  "commands": [
+    {
+      "command": "pnpm install --frozen-lockfile --prefer-offline --ignore-scripts --registry https://registry.npmjs.org --store-dir <existing-store>",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm build:js",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm exec vitest run src/mode-prompts.test.ts src/custom-system-prompt.test.ts src/plugin-skills-prompt.test.ts src/plugin-skills.test.ts src/subagent.test.ts src/project-instructions.test.ts src/runtime.test.ts",
+      "package": "agent-runtime",
+      "exitCode": 0,
+      "files": 7,
+      "passed": 275
+    },
+    {
+      "command": "node --test apps/desktop/test/plugin-skills.test.mjs apps/desktop/test/omp-skill-path-adapter.test.mjs apps/desktop/test/omp-mode-entry-unit.test.mjs apps/desktop/test/custom-system-prompt-launch.test.mjs",
+      "exitCode": 0,
+      "passed": 40,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "command": "pnpm --filter @pi-desktop/desktop typecheck",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm lint",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm docs:check",
+      "exitCode": 0,
+      "specPairs": 79,
+      "documentationPages": 517
+    },
+    {
+      "command": "node --input-type=module (compiled prompt probe)",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ],
+  "compiledPromptProbe": {
+    "modes": [
+      {
+        "mode": "agent",
+        "base": "default",
+        "hostIdentity": true
+      },
+      {
+        "mode": "agent",
+        "base": "empty",
+        "hostIdentity": true
+      },
+      {
+        "mode": "agent",
+        "base": "custom",
+        "hostIdentity": true
+      },
+      {
+        "mode": "plan",
+        "base": "default",
+        "hostIdentity": true
+      },
+      {
+        "mode": "plan",
+        "base": "empty",
+        "hostIdentity": true
+      },
+      {
+        "mode": "plan",
+        "base": "custom",
+        "hostIdentity": true
+      },
+      {
+        "mode": "goal",
+        "base": "default",
+        "hostIdentity": true
+      },
+      {
+        "mode": "goal",
+        "base": "empty",
+        "hostIdentity": true
+      },
+      {
+        "mode": "goal",
+        "base": "custom",
+        "hostIdentity": true
+      }
+    ],
+    "compiledRuntimeIdentity": true,
+    "helperTools": [
+      "BrowserPreview",
+      "PluginCheck",
+      "PluginScaffold",
+      "PluginPack"
+    ],
+    "deferredHelperCatalog": true,
+    "subagentIdentity": true,
+    "projectHeader": true,
+    "userBodyPreserved": true,
+    "builtinSkillName": "OMP Desktop plugin development",
+    "compatibilitySkillIdsPreserved": true,
+    "networkRequests": 0
+  },
+  "fileManifest": [
+    {
+      "path": "HANDOFF.md",
+      "sha256": "4c2e345d13f2f2ca9fe53fc73436088495bc4369bcaf881ddb6bb5fc459b2502"
+    },
+    {
+      "path": "app/apps/desktop/resources/skills/plugin-development.md",
+      "sha256": "cd217059cf9d9f7679a426faac9bbca243ca1a8fc0366039762b832570c5c443"
+    },
+    {
+      "path": "app/docs/spec/03-runtime/02-agent-runtime.md",
+      "sha256": "8c906dbf3ed9c779acd656105ad95b8f33be71ff8f931c58119cf6777ec8531b"
+    },
+    {
+      "path": "app/docs/spec/06-delivery/04-e2e-test-plan.md",
+      "sha256": "19a23b76eeb4728c7aeea5ecadfd37558f0a5f96582e952988d94b500ef00e77"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/03-runtime/02-agent-runtime.md",
+      "sha256": "563f45ba7504840b8ada9f46f57f24e32c29ed974398319eee3f1848d4df282b"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/06-delivery/04-e2e-test-plan.md",
+      "sha256": "8cf985f4698ce3f5597b7789246c650f407017d4b40e34dc71e8e3178e05161c"
+    },
+    {
+      "path": "app/packages/agent-runtime/src/mode-prompts.ts",
+      "sha256": "25d75bde1056d967f59b93ac9e209e5611901f8b9762bc2b44c9e36799318954"
+    },
+    {
+      "path": "app/packages/agent-runtime/src/project-instructions-prompt.ts",
+      "sha256": "15590259e34cc6ffb1004da8429d370cbd6f50ea640891805aa718eed30160bb"
+    },
+    {
+      "path": "app/packages/agent-runtime/src/runtime.test.ts",
+      "sha256": "16fdaadb528745614138faf2e9ba0f5be5c27f32e3399a9f78a99e842dfaffdb"
+    },
+    {
+      "path": "app/packages/agent-runtime/src/runtime.ts",
+      "sha256": "e5d7d9ebe4139c49d6fd472a9d218a86638bab948c83cf3db4413639711498d1"
+    },
+    {
+      "path": "app/packages/agent-runtime/src/subagent.ts",
+      "sha256": "cba692f91f36a55236d28d822e721cf7730d359e5b22aec8f393ed36d1f2dc9e"
+    },
+    {
+      "path": "docs/04-task-board.md",
+      "sha256": "4b7127ea5292958a4edb32a99e7c1da8a64a4f26f5cb5219585f575bbf8856cc"
+    },
+    {
+      "path": "docs/validation/Skill-install-branding-20261019.md",
+      "sha256": "c1920c026db4750b6052f89fc35e89776ec20a2ac7118a31a9ed7c8a30137960"
+    }
+  ],
+  "manifestExcludesSelf": true,
+  "earlierValidationAttempts": [
+    "Offline installs lacked cached packages; final frozen install reused the existing store and completed.",
+    "Extra probe fixtures initially lacked commandShell, used systemPrompt instead of prompt, and asserted a package reference absent from the document. Corrected to the real interfaces before the final passing probe."
+  ],
+  "limits": [
+    "No commit, push, package or release in this request. Published v0.1.2 remains unchanged.",
+    "Native OMP uses the updated empty-base mode block; no native fork or storage-schema changes.",
+    "No live-model wording or native installed GUI validation. No paid-model calls or user data changes.",
+    "Legacy compatibility ids and package names remain; external skill bodies, custom personas and historical messages are not rewritten."
+  ]
+}

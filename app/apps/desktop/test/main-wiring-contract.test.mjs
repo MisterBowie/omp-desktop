@@ -227,10 +227,11 @@ test("the OMP registry emits agent events without the Pi turn-ownership guard", 
   // `index.ts` cannot be imported outside Electron, and swapping the option
   // off is a one-word change no behavioural test in this suite would see.
   const index = read("index.ts");
-  const ompCall = callArgument(index, "wireOmpSessions");
+  assert.match(callArgument(index, "createOmpSessionServices"), /emitAgentEvent,/);
+  const ompCall = callArgument(read("bootstrap/omp-sessions.ts"), "wireOmpSessions");
   assert.match(
     ompCall,
-    /emitAgentEvent: \(envelope\) => emitAgentEvent\(envelope, \{ guardPiTurnOwnership: false \}\)/,
+    /emitAgentEvent: \(event\) => deps\.emitAgentEvent\(event, \{ guardPiTurnOwnership: false \}\)/,
     "wireOmpSessions must fan out OMP envelopes with the Pi guard disabled",
   );
   // The Pi paths keep the guarded default.

@@ -42,7 +42,8 @@
 
 在哈希之前、以及在寻址任何行之前，文件文本会被规范化：
 
-1. 去掉开头的 UTF-8 BOM，并保留它以便写入时恢复。
+1. 解码带 BOM 的 UTF-8 或有效 UTF-16 LE/BE，并保留编码、BOM 和字节序以便
+   写回时恢复。`Read` 仍拒绝畸形 UTF-16、含 NUL 的文本及二进制文件。
 2. 检测行尾并规范化为 `LF`；保留原本占主导的行尾以便写入时恢复。
 3. 去掉每一行末尾的 `[ \t\r]`，包括最后一行。
 
@@ -234,6 +235,10 @@ dest       := path | quoted_path
 | `PUT N.=M @name` / `PUT N* @name` | 无 | 用寄存器覆盖该范围或已解析的块。在跨度形式中 `@name` 是必需的。 |
 | `REM` | 无 | 删除由 `path` 命名的文件。 |
 | `MV DEST` | 无 | 在把其他所有操作应用到源之后，移动/重命名到 `DEST`。 |
+
+规范路径解析和权限检查后，若 `MV` 目标与源相同（包括路径归一化、大小写或
+符号链接别名），在任何文件系统改动前返回 `EDIT_NO_CHANGE`。组合 `PUT` +
+`MV` 同样原子拒绝，源字节及此前 Read 的来源凭据继续有效。
 
 ### 7.3 锚定规则
 
@@ -451,7 +456,7 @@ turn 与一个选择什么都不说的模型无法区分。
 | `EDIT_REGISTER_EMPTY` | 否 | 从未设置的寄存器粘贴 |
 | `EDIT_REGISTER_AMBIGUOUS` | 否 | 存在多个待粘贴匿名捕获时进行匿名粘贴 |
 | `EDIT_REPAIR_AMBIGUOUS` | 否 | 边界修复候选在最小代价上并列 |
-| `EDIT_NO_CHANGE` | 否 | 应用产生了完全相同的文本 |
+| `EDIT_NO_CHANGE` | 否 | 应用产生了完全相同的文本，或 `MV` 解析为源路径 |
 | `EDIT_AMPLIFICATION_LIMIT` | 否 | 下降展开超过膨胀上限 |
 
 这些全部属于 `Edit` 作用域，并且是对 [08-error-codes](/zh-CN/spec/03-runtime/08-error-codes)

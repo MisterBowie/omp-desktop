@@ -1,0 +1,392 @@
+{
+  "schema": "omp-desktop.same-version-skill-release/1",
+  "date": "2026-10-19",
+  "status": "released-and-publicly-verified",
+  "appVersion": "0.1.2",
+  "branch": "codex/skill-install-branding",
+  "productBrandingRevision": "058658d8d689b6d1b6746ab78416f655480c04a2",
+  "sourceRevision": "05cda4fb1b680656090bd6a8953913db4118c279",
+  "controllerRevision": "8471412c74e5fdfb617d215bc08be3a38972cb03",
+  "releaseId": 417222661,
+  "releaseTag": "v0.1.2+skill.05cda4fb1b680656090bd6a8953913db4118c279",
+  "releaseUrl": "https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.2%2Bskill.05cda4fb1b680656090bd6a8953913db4118c279",
+  "publishedAt": "2026-10-19T11:40:13Z",
+  "stable": true,
+  "latest": true,
+  "manualSameVersionReinstallRequired": true,
+  "candidate": {
+    "runId": 39238725050,
+    "runUrl": "https://github.com/MisterBowie/omp-desktop/actions/runs/39238725050",
+    "conclusion": "success",
+    "sourceGate": "success",
+    "nativeJobs": [
+      {
+        "id": 118014123870,
+        "name": "build (windows-latest, win32, x64, dist:win)",
+        "conclusion": "success"
+      },
+      {
+        "id": 118014123882,
+        "name": "build (macos-15-intel, darwin, x64, dist:mac)",
+        "conclusion": "success"
+      },
+      {
+        "id": 118014123948,
+        "name": "build (ubuntu-22.04, linux, x64, dist:linux)",
+        "conclusion": "success"
+      },
+      {
+        "id": 118014123953,
+        "name": "build (macos-15, darwin, arm64, dist:mac)",
+        "conclusion": "success"
+      }
+    ],
+    "artifacts": [
+      {
+        "id": 12182533447,
+        "name": "release-darwin-x64",
+        "digest": "sha256:79aa5970f6230cdcc9d9a4bd7fec192e10bd835b0531841a40216fd0730e1f0b",
+        "bytes": 463324323
+      },
+      {
+        "id": 12182298810,
+        "name": "validation-darwin-x64",
+        "digest": "sha256:1908c6402da1c5e59af1d6eb440f74741bf17f3f0476b1e7d8454c703351285e",
+        "bytes": 493469
+      },
+      {
+        "id": 12181726950,
+        "name": "validation-linux-x64",
+        "digest": "sha256:0146df01c67a26e0ecbf102f849785a9045cbb9068d37d2a74c44f8e9523fe4f",
+        "bytes": 869130
+      },
+      {
+        "id": 12181493937,
+        "name": "release-win32-x64",
+        "digest": "sha256:17d97c0ba4ee994297dc6284bfda8f9299db4927d6805e24e75e7b2a4a565ba7",
+        "bytes": 400977751
+      },
+      {
+        "id": 12180993965,
+        "name": "release-linux-x64",
+        "digest": "sha256:01b659904e920dc79fddc1bbf5c24a7aaaf30a095c7ce0ee5db87bbbefc80e16",
+        "bytes": 671904718
+      },
+      {
+        "id": 12180914840,
+        "name": "validation-win32-x64",
+        "digest": "sha256:94a5b4c91c7652c7be8dca90234c02b84acd046bc935f639c6c355a6f3528bb0",
+        "bytes": 353556
+      },
+      {
+        "id": 12180838390,
+        "name": "release-darwin-arm64",
+        "digest": "sha256:6276a68f44580a7bb4dbb00d5d267c0c4f72be11ede0a6769127825d26612a14",
+        "bytes": 447505407
+      },
+      {
+        "id": 12180833431,
+        "name": "validation-darwin-arm64",
+        "digest": "sha256:1ca328a77ae5360650da756a3278add4d01432f271eb65326d23b6dcab00be33",
+        "bytes": 437932
+      }
+    ]
+  },
+  "publication": {
+    "runId": 39246092021,
+    "controlTag": "publish-skill-v0.1.2-run-39238725050-attempt-2",
+    "conclusion": "success",
+    "readbackRunId": 39246092021,
+    "metadataTagGuardRunId": 39246071801,
+    "metadataTagGuard": "expected refusal; verify/build/publish skipped"
+  },
+  "publicAssetReadback": {
+    "version": "0.1.2",
+    "releaseTag": "v0.1.2+skill.05cda4fb1b680656090bd6a8953913db4118c279",
+    "sourceRevision": "05cda4fb1b680656090bd6a8953913db4118c279",
+    "candidateRunId": 39238725050,
+    "publicationRunId": 39246092021,
+    "readbackRunId": 39246092021,
+    "assetCount": 30,
+    "assetBytes": 1988207883,
+    "checksumManifest": true,
+    "buildRecord": true,
+    "sourceReceipts": true,
+    "verifiedUpdateArtifacts": 8,
+    "mergedMacFeedIdentical": true,
+    "protectedStableUnchanged": true,
+    "assets": [
+      {
+        "name": "BUILD-RECORD.json",
+        "bytes": 6499,
+        "sha256": "8c098b8205a1f607605ed630e3da79e7b0df42fcae9caee9c86d92c65bb253b8"
+      },
+      {
+        "name": "latest-linux.yml",
+        "bytes": 701,
+        "sha256": "e7230202ae820eb85fd3f77d480f801851eb902d27364e63806c3c4d55c76093"
+      },
+      {
+        "name": "latest-mac-arm64.yml",
+        "bytes": 517,
+        "sha256": "cb77773692f51357773d224d889388e4c321088b7d0d452183b80ef8c353e762"
+      },
+      {
+        "name": "latest-mac-x64.yml",
+        "bytes": 511,
+        "sha256": "e8efa4093e94012294f78700ec4643194417360df9755046661b9d1682896c94"
+      },
+      {
+        "name": "latest-mac.yml",
+        "bytes": 831,
+        "sha256": "097e90603cfd747ca4b9f7391881004d6fd0205ec3024dca7d87f177d4fee521"
+      },
+      {
+        "name": "latest.yml",
+        "bytes": 351,
+        "sha256": "7b826334db0c38688566822eec9bfab04d0949798f3529328c1d119b565cf3a9"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-arm64-mac.zip",
+        "bytes": 223410428,
+        "sha256": "d2514e60db947ab5f4dfa85b452eb301f768d796909c980447dd99faa4ca35f2"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-arm64-mac.zip.blockmap",
+        "bytes": 233422,
+        "sha256": "56be5bb3b5310c82017ff34914f5a2169efece4637b49505cbcb2e8941da9e9e"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-arm64.dmg",
+        "bytes": 224506737,
+        "sha256": "8c0f245474d754548f7cb523bc4b43306dec6dddbc0f279a8a04a9063e3a48e4"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-arm64.dmg.blockmap",
+        "bytes": 236199,
+        "sha256": "f9a9cd6c545535996ec7e22d5ccc1c5756047e843e48dba73f8468691db24fbe"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-x64-mac.zip",
+        "bytes": 231343220,
+        "sha256": "3fd9e5b17ff577c8647688cdfc166a5ec39ce1b2aadba8a4ada8eeaf9f671aad"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-x64-mac.zip.blockmap",
+        "bytes": 242401,
+        "sha256": "57e9517bc995ca03af9f86e1194f84265d1806b2751d8adb49c12b404de15073"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-x64.deb",
+        "bytes": 208093980,
+        "sha256": "3a9255e751ea93abf6aa07219ef05fac8673e7ed46d6edebc266b2809b61fb2d"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-x64.dmg",
+        "bytes": 232283749,
+        "sha256": "accca0d327c63bc40c7dc140803ed7127cd15c01838376ae74e568cd558ec52c"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-x64.dmg.blockmap",
+        "bytes": 242165,
+        "sha256": "9f63e54018709c6c786a0dae97389f4e5526fbc22099968042c682ec434a7bad"
+      },
+      {
+        "name": "OMP-Desktop-0.1.2-x86_64.AppImage",
+        "bytes": 250677609,
+        "sha256": "29b4a30ca8ab3b7a1829703d100134fe1a8a7f76c39d6e89dbb7bffa7c35b4ef"
+      },
+      {
+        "name": "omp-desktop-0.1.2-x86_64.rpm",
+        "bytes": 188757521,
+        "sha256": "dd2a6b9032bb289f505f7e587a300105af4f65e5fa1d71b862c3a942ead62f2f"
+      },
+      {
+        "name": "OMP-Desktop-Portable-0.1.2.exe",
+        "bytes": 200243688,
+        "sha256": "31bfbf55ee86f414ed8f446b5415fa9f84868b9735e485bf751cfc6ca773931c"
+      },
+      {
+        "name": "OMP-Desktop-Setup-0.1.2.exe",
+        "bytes": 200463931,
+        "sha256": "ab67e031d024915056112d0f4e44776506fad360a13714f13c5e8697757fda39"
+      },
+      {
+        "name": "OMP-Desktop-Setup-0.1.2.exe.blockmap",
+        "bytes": 208351,
+        "sha256": "1fb51c29392be470a6594a33d652b5f52c12e8946a4573f28f0b91d409e3396f"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.2-build.json",
+        "bytes": 2337,
+        "sha256": "12dee476d7290c33f71f0b1de43fe3f1114273bd5412ac73e612ce9a6adb3986"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.2-darwin-arm64.tar.gz",
+        "bytes": 418423,
+        "sha256": "dff933d8062391e34d9f91c45a9779a8affadca41c3813047ce13895cef3acb2"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.2-darwin-x64.tar.gz",
+        "bytes": 471998,
+        "sha256": "8c40fda775ba164c0c5e743c3afb06e1ec097687094a77ea2b5f3ff91b2f4f64"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.2-linux-x64.tar.gz",
+        "bytes": 850828,
+        "sha256": "b1a41506c2d46c0e98332aa8aa7beb287c06a08f4dd35b18338c67caee7d0387"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.2-publication.json",
+        "bytes": 7097,
+        "sha256": "febe998d18859ea244f1b916022fde04bf4f7038087720930a1b619f67940c91"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.2-staging.json",
+        "bytes": 4797,
+        "sha256": "41caca5696a0518b6c30fddb30da4601fefe1cde8af6f6713896e070adc2dac9"
+      },
+      {
+        "name": "omp-desktop-validation-0.1.2-win32-x64.tar.gz",
+        "bytes": 335070,
+        "sha256": "ba02b79c653a14f02697edf96d3aaab819d49c1ff1194a2dfe1d3df703090815"
+      },
+      {
+        "name": "pi-host-0.1.2-linux-x64.tar.gz",
+        "bytes": 25161572,
+        "sha256": "9714eb5a8effea0067899a0d4891eaeecdb2a45599b54cde83c2ea39743008b2"
+      },
+      {
+        "name": "pi-host-0.1.2-linux-x64.tar.gz.sha256",
+        "bytes": 97,
+        "sha256": "180505a074eeee5ab6f2e035839a3b1c115a4d17604f4862992afd0e43b7cddc"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "bytes": 2853,
+        "sha256": "ad05bdaa348de405c263c672febd921ca5bc16e2d3d4617b996318f16300f936"
+      }
+    ]
+  },
+  "updateFeeds": [
+    "latest-linux.yml",
+    "latest-mac-arm64.yml",
+    "latest-mac-x64.yml",
+    "latest-mac.yml",
+    "latest.yml"
+  ],
+  "originalStable": {
+    "tag": "v0.1.2",
+    "sourceRevision": "21969e58f7d97177795ce06f393e8853c45cfb20",
+    "releaseId": 416884992,
+    "assetCount": 30,
+    "assetBytes": 1988212725,
+    "tagAndAssetIdsSizesHashesUnchanged": true
+  },
+  "runtime": {
+    "ompVersion": "18.3.0",
+    "patchLevel": "62bc57b+omp-desktop.6",
+    "forkCommit": "d648d27bcf0db16caecb876142d891cf49a51bc2",
+    "storageSchema": 22
+  },
+  "localValidation": {
+    "node": "24.14.0",
+    "pnpm": "10.34.5",
+    "countsOverlapAndAreNotSummed": true,
+    "brandingRuntimePassed": 275,
+    "brandingDesktopPassed": 40,
+    "modeRuleParityPassed": 7,
+    "nativeRecoveryPassed": 2,
+    "cachedNativeModes": {
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0,
+      "fixtureOnly": true
+    },
+    "pidReuseBefore": {
+      "passed": 0,
+      "failed": 3
+    },
+    "pidReuseAfter": {
+      "passed": 3,
+      "failed": 0
+    },
+    "deliveryOwnershipDiagnosticsCombined": {
+      "tests": 77,
+      "passed": 73,
+      "failed": 0,
+      "skipped": 4,
+      "skipReason": "Linux /proc live tests on macOS; subsequently covered by successful source CI"
+    },
+    "workflowGuardPassed": 6,
+    "lintExitCode": 0,
+    "docsCheckExitCode": 0,
+    "specPairs": 79,
+    "documentationPages": 517
+  },
+  "earlierLocalFullDesktopAttempts": [
+    {
+      "tests": 3155,
+      "passed": 3057,
+      "failed": 72,
+      "skipped": 26,
+      "limitation": "local sandbox and missing native reference prerequisites"
+    },
+    {
+      "tests": 3157,
+      "passed": 3102,
+      "failed": 29,
+      "skipped": 26,
+      "limitation": "unbuilt local reference launcher; not a full passing suite"
+    }
+  ],
+  "failedCandidates": [
+    {
+      "sourceRevision": "058658d8d689b6d1b6746ab78416f655480c04a2",
+      "runId": 39223878851,
+      "reason": "old byte-identical PI mode source assertion"
+    },
+    {
+      "sourceRevision": "47f34c09d003c06972788a68130e2317c286d5a9",
+      "runId": 39228007571,
+      "reason": "native recovery assertion read durable row before asynchronous settlement"
+    },
+    {
+      "sourceRevision": "6d4b0dcd18f0a2c3e315e3daf300941eafe2db01",
+      "runId": 39232636595,
+      "reason": "Windows installed harness falsely claimed an older unrelated process after parent pid reuse",
+      "sourceGatePassed": true
+    }
+  ],
+  "failedPublicationRuns": [
+    {
+      "runId": 39245487590,
+      "reason": "workflow token forbidden when creating the new source tag",
+      "step": "Create or verify the stable tag at the accepted source"
+    }
+  ],
+  "diagnostics": {
+    "sourceParity": 39226953254,
+    "sourceRecovery": 39231699608,
+    "windowsCleanup": 39237902152,
+    "firstWindowsSameCause": 39239873061,
+    "publicationPermissions": 39245751368
+  },
+  "limits": [
+    "No paid or live remote model calls; live-model wording is not claimed.",
+    "Compatibility ids, external skill bodies, custom personas and historical messages are preserved.",
+    "Original native capability limits and dependency advisory remain as documented for v0.1.2."
+  ],
+  "originalPrecommitEvidence": "Skill-install-branding-20261019.json",
+  "finalLocalVerification": {
+    "command": "node --input-type=module (public receipt, API hashes, tags and original stable snapshot assertions)",
+    "exitCode": 0,
+    "assetCount": 30,
+    "assetBytes": 1988207883,
+    "originalStableUnchanged": true
+  },
+  "documentationVerification": {
+    "command": "python3 (JSON consistency and new document link assertions); git diff --check",
+    "exitCode": 0
+  }
+}

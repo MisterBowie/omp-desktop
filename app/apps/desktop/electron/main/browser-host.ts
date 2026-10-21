@@ -1,4 +1,5 @@
 import type { BrowserState } from "@pi-desktop/shared";
+import type { WebContents } from "electron";
 import type { BrowserPane } from "./browser-view";
 import { BrowserCdp } from "./browser-cdp";
 import { writeFileSync, mkdirSync } from "node:fs";
@@ -6,6 +7,7 @@ import { isAbsolute, join } from "node:path";
 
 export const BROWSER_PLUGIN_ID = "pi.browser";
 export const BROWSER_VIEW_ID = "browser";
+export const BROWSER_CDP_TIMEOUT_MS = 30_000;
 
 export type BrowserRect = {
   x: number;
@@ -175,16 +177,14 @@ export class BrowserHost {
   }
 
   async snapshot(): Promise<{ tree: string; url: string; title: string }> {
-    const wc = this.requireWebContents();
-    return this.cdp.snapshot(wc);
+    return this.cdpCall("snapshot", (wc) => this.cdp.snapshot(wc));
   }
 
   async screenshot(
     input: { fullPage?: boolean } = {},
     sessionId?: string,
   ): Promise<{ mimeType: string; data: string; path?: string }> {
-    const wc = this.requireWebContents();
-    const shot = await this.cdp.screenshot(wc, input);
+    const shot = await this.cdpCall("screenshot", (wc) => this.cdp.screenshot(wc, input));
     const scratch = this.deps.getScratchDir?.(sessionId ?? this.chromeSessionId ?? undefined);
     if (!scratch) return shot;
     try {
@@ -198,15 +198,15 @@ export class BrowserHost {
   }
 
   async click(uid: string): Promise<void> {
-    await this.cdp.click(this.requireWebContents(), uid);
+    await this.cdpCall("click", (wc) => this.cdp.click(wc, uid));
   }
 
   async fill(uid: string, text: string): Promise<void> {
-    await this.cdp.fill(this.requireWebContents(), uid, text);
+    await this.cdpCall("fill", (wc) => this.cdp.fill(wc, uid, text));
   }
 
   async evaluate(expression: string): Promise<unknown> {
-    return this.cdp.evaluate(this.requireWebContents(), expression);
+    return this.cdpCall("evaluate", (wc) => this.cdp.evaluate(wc, expression));
   }
 
   console(limit?: number): { messages: ReturnType<BrowserCdp["console"]> } {
@@ -215,7 +215,7 @@ export class BrowserHost {
   }
 
   async cdpCommand(method: string, params?: unknown): Promise<unknown> {
-    return this.cdp.send(this.requireWebContents(), method, params);
+    return this.cdpCall(`cdp ${method}`, (wc) => this.cdp.send(wc, method, params));
   }
 
   /**
@@ -289,6 +289,28 @@ export class BrowserHost {
     if (state) this.started = true;
     this.applyGuest();
     return state;
+  }
+
+  /** Bound the whole round trip, including attach, and recover a stalled guest. */
+  private cdpCall<T>(label: string, run: (wc: WebContents) => Promise<T>): Promise<T> {
+    const wc = this.requireWebContents();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        reject(Object.assign(
+          new Error(`browser ${label} timed out after ${BROWSER_CDP_TIMEOUT_MS}ms`),
+          { code: "TIMEOUT" },
+        ));
+        try {
+          this.cdp.detach(wc);
+        } catch {
+          // Preserve the timeout if the guest is already shutting down.
+        }
+      }, BROWSER_CDP_TIMEOUT_MS);
+    });
+    return Promise.race([Promise.resolve().then(() => run(wc)), timedOut]).finally(() => {
+      if (timer !== undefined) clearTimeout(timer);
+    });
   }
 
   private requireWebContents() {

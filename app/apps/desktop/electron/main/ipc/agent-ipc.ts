@@ -14,8 +14,8 @@ import type { PersistenceOutbox } from "../persistence-outbox";
 import type { ComposerCommandService } from "./composer-ipc";
 import type { IpcRegistrar } from "./types";
 import { withPromptEnhancementTimeout } from "../prompt-enhancement-timeout";
-import { refuseOutsidePiRuntime } from "../runtime/engine-router";
 import type { OmpSessionBridge } from "../runtime/omp-session";
+import { expandSkillCommand } from "@pi-desktop/shared";
 
 export type AgentIpcDependencies = {
   registrar: IpcRegistrar;
@@ -277,7 +277,16 @@ export function registerAgentIpc({
     // prompt that started it — and gated *before* the Pi runtime is required, so
     // another engine's session is refused with an accurate reason whether or not
     // the Pi sidecar happens to be running.
-    await engineRouter.requireForSession(req.sessionId, "steer");
+    const steerEngine = await engineRouter.requireForSession(req.sessionId, "steer");
+    if (steerEngine === "omp") {
+      if (!ompSessions) throw Object.assign(new Error("OMP backend unavailable"), {
+        errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE, engine: "omp", capability: "steer",
+      });
+      if (req.attachments?.length) throw Object.assign(new Error("OMP steering currently supports text input only"), { errorCode: ErrorCodes.INVALID_ARGUMENT });
+      const expanded = req.content.startsWith("/") ? expandSkillCommand(req.content,
+        await composerCommandService.buildComposerCommands(ompSessions.projectDirectory(req.sessionId))) : null;
+      return ompSessions.steer(req.sessionId, expanded?.expanded ?? req.content, req.expectedTurnId, isDurableUserMessageId(req.messageId) ? req.messageId : null, expanded !== null);
+    }
     if (!host || !sidecar) throw new Error("backend unavailable");
     // A steering input belongs to the turn it names: it is refused once that
     // turn was cancelled, has started finalizing, or no longer owns the session.
@@ -292,13 +301,16 @@ export function registerAgentIpc({
     const prepared = await preparePromptAttachments(
       dataDir, req.sessionId, context.projectPath, req.attachments ?? [], context.supportsVision,
     );
+    const skill = req.content.startsWith("/") ? expandSkillCommand(req.content,
+      await composerCommandService.buildComposerCommands(context.projectPath ?? null)) : null;
     const session = await host.call<{ session?: { messages?: UiMessage[] } }>("session.get", {
       id: req.sessionId, messageLimit: 1,
     });
     const message: UiMessage = {
       id: durableUserMessageId(req.messageId, session.session?.messages ?? []),
       role: "user",
-      content: req.content,
+      content: skill?.expanded ?? req.content,
+      ...(skill ? { command: skill.command } : {}),
       status: "complete",
       createdAt: new Date().toISOString(),
       steering: true,
@@ -308,7 +320,7 @@ export function registerAgentIpc({
     // never turn into a normal prompt or alter the next turn's configuration.
     return sidecar.call<{ accepted: boolean; turnId: string }>("agent.steer", {
       sessionId: req.sessionId, expectedTurnId: req.expectedTurnId, message,
-      content: appendPromptFallbackPaths(req.content, prepared),
+      content: appendPromptFallbackPaths(skill?.expanded ?? req.content, prepared),
       attachments: prepared.filter((attachment) => attachment.inlineData).map((attachment) => ({
         path: attachment.message.ref, name: attachment.message.name, kind: attachment.message.kind,
         mimeType: attachment.message.mimeType, size: attachment.message.size, data: attachment.inlineData,
@@ -382,8 +394,8 @@ export function registerAgentIpc({
     }
     if (promptEngine === "omp") {
       // The OMP runtime owns this session's transcript, its tools and its
-      // approvals; the Pi sidecar and the host turn queue are not part of this
-      // path at all. The user's row is echoed so the optimistic bubble settles,
+      // approvals. Queued inputs return through this same engine boundary;
+      // the Pi sidecar is never entered. The user's optimistic row settles,
       // but nothing is written to the desktop's own transcript (M2 decision:
       // one writer per session).
       if (!ompSessions) {
@@ -418,8 +430,7 @@ export function registerAgentIpc({
             runtimeVersion?: string | null;
           } | null;
         }>("session.getEngineRef", { id: req.sessionId })
-        .then((r) => r.engineRef ?? null)
-        .catch(() => null);
+        .then((r) => r.engineRef ?? null);
       // The renderer's optimistic user row is the only user row for this turn:
       // its id rides the prompt, and the runtime's own echo of the prompt is
       // reported back as `user_message_persisted` against that exact row (the
@@ -429,12 +440,15 @@ export function registerAgentIpc({
       // the plain behavior (the native frame becomes the user row) instead of
       // announcing a row the renderer never created.
       const userMessageId = isDurableUserMessageId(req.messageId) ? req.messageId : null;
+      const expanded = req.content.startsWith("/") ? expandSkillCommand(req.content,
+        await composerCommandService.buildComposerCommands(projectPath)) : null;
       logger.app("session", "info", "omp prompt accepted", {
         data: { sessionId: req.sessionId, projectPath },
       });
-      return ompSessions.prompt({
+      return await ompSessions.prompt({
         sessionId: req.sessionId,
-        content: req.content,
+        content: expanded?.expanded ?? req.content,
+        requiresSkill: expanded !== null,
         projectPath,
         providerId: typeof session.providerId === "string" ? session.providerId : null,
         modelId: typeof session.modelId === "string" ? session.modelId : null,
@@ -532,6 +546,42 @@ export function registerAgentIpc({
     );
     sidecar.setProjectInstructionRoot(req.sessionId, launch.projectPath);
 
+    // Slash expansion (D123, ADR 0024): templates expand before persistence
+    // so reseed replays exactly what the model saw; the typed form rides along
+    // as `command` for transcript display. Skill aliases are converted into a
+    // short model instruction that makes the existing Skill tool call
+    // explicit, while the typed form remains the visible transcript chip.
+    // Builtin/plugin slash aliases never reach this channel, and unknown
+    // /names stay literal text.
+    let promptContent = sessionMessage?.content ?? req.content;
+    let slashCommand: string | undefined;
+    if (!sessionMessage && req.content.startsWith("/")) {
+      try {
+        const root = await optionalWorkspaceRoot();
+        const commands = await composerCommandService.buildComposerCommands(
+          launch.projectPath ?? root,
+        );
+        const skill = expandSkillCommand(req.content, commands);
+        if (skill) {
+          promptContent = skill.expanded;
+          slashCommand = skill.command;
+        } else {
+          const templates = await loadComposerTemplatesCached(root);
+          const expansion = expandSlashInvocation(req.content, templates);
+          if (expansion) {
+            promptContent = expansion.expanded;
+            slashCommand = expansion.command;
+          }
+        }
+      } catch (error) {
+        if (req.content.startsWith("/skill:")) throw error;
+        logger.app("session", "warn", "slash expansion failed; sending literal text", {
+          sessionId: req.sessionId,
+          data: String(error),
+        });
+      }
+    }
+
     // Open a durable turn row, then persist the user message under it.
     const turn = await host.call<{ turnId?: string }>("session.beginTurn", {
       sessionId: req.sessionId,
@@ -545,52 +595,6 @@ export function registerAgentIpc({
     }
     activeTurns.set(req.sessionId, durableTurnId);
     activeTurnUsages.delete(req.sessionId);
-
-    // Slash expansion (D123, ADR 0024): templates expand before persistence
-    // so reseed replays exactly what the model saw; the typed form rides along
-    // as `command` for transcript display. Skill aliases are converted into a
-    // short model instruction that makes the existing Skill tool call
-    // explicit, while the typed form remains the visible transcript chip.
-    // Builtin/plugin slash aliases never reach this channel, and unknown
-    // /names stay literal text.
-    let promptContent = sessionMessage?.content ?? req.content;
-    let slashCommand: string | undefined;
-    if (!sessionMessage && req.content.startsWith("/")) {
-      try {
-        const root = await optionalWorkspaceRoot();
-        const commandEnd = req.content.search(/\s/);
-        const commandName = req.content.slice(
-          1,
-          commandEnd === -1 ? undefined : commandEnd,
-        );
-        const commands = await composerCommandService.buildComposerCommands(
-          launch.projectPath ?? root,
-        );
-        const command = commands.find((item) => item.name === commandName);
-        if (command?.kind === "skill" && command.skillId) {
-          const body = commandEnd === -1 ? "" : req.content.slice(commandEnd).trim();
-          promptContent = [
-            `Call the \`Skill\` tool with id ${JSON.stringify(command.skillId)} before answering this request. Follow the loaded skill instructions.`,
-            body,
-          ]
-            .filter(Boolean)
-            .join("\n\n");
-          slashCommand = req.content;
-        } else {
-          const templates = await loadComposerTemplatesCached(root);
-          const expansion = expandSlashInvocation(req.content, templates);
-          if (expansion) {
-            promptContent = expansion.expanded;
-            slashCommand = expansion.command;
-          }
-        }
-      } catch (error) {
-        logger.app("session", "warn", "slash expansion failed; sending literal text", {
-          sessionId: req.sessionId,
-          data: String(error),
-        });
-      }
-    }
 
     // The binding's image override already shaped this modelConfig, so the
     // transport gate and the settings switch cannot disagree.
@@ -733,10 +737,23 @@ export function registerAgentIpc({
     // Compaction rewrites the session's context inside its own runtime; the
     // engine is decided before the Pi runtime is required.
     const compactEngine = await engineRouter.requireForSession(req.sessionId, "prompt");
-    // Compaction is a Pi-runtime command in this release: an OMP session owns
-    // its own context management, and forwarding this to the Pi runtime would
-    // compact a transcript that runtime has never seen.
-    refuseOutsidePiRuntime(compactEngine, "compaction");
+    if (compactEngine === "omp") {
+      if (!ompSessions) throw Object.assign(new Error("OMP backend unavailable"), {
+        errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE, engine: "omp", capability: "prompt",
+      });
+      if (!host) throw new Error("host unavailable");
+      const release = await acquireSessionOperation(req.sessionId);
+      try {
+        const { session } = await host.call<{ session?: {
+          projectPath?: string; providerId?: string; modelId?: string; thinkingLevel?: string;
+        } }>("session.get", { id: req.sessionId });
+        if (!session) throw Object.assign(new Error("Session not found"), { errorCode: ErrorCodes.NOT_FOUND });
+        const { engineRef } = await host.call<{ engineRef?: {
+          nativeSessionId?: string; nativeSessionPath?: string; adapterVersion?: number; runtimeVersion?: string;
+        } }>("session.getEngineRef", { id: req.sessionId });
+        return await ompSessions.compact(req.sessionId, { ...session, ...engineRef });
+      } finally { release(); }
+    }
     if (!host || !sidecar) throw new Error("backend unavailable");
     if (activeTurns.has(req.sessionId)) {
       throw Object.assign(new Error("Session already has an active turn"), {
@@ -780,6 +797,8 @@ export function registerAgentIpc({
       // `abort_bash` only while a command is still running, then M2's process
       // teardown as the fallback. No desktop turn bookkeeping is touched: an
       // OMP turn is not the host's to finish.
+      if (req.turnId && !ompSessions.isCurrentTurn(req.sessionId, req.turnId)) return { ok: false, aborted: false };
+      if (ompSessions.status(req.sessionId).currentTurnId) agentHostBridge?.markAborting(req.sessionId);
       const outcome = await ompSessions.stop(req.sessionId);
       logger.app("session", "info", "omp abort finished", {
         data: {
@@ -931,21 +950,21 @@ export function registerAgentIpc({
   // headless module admits, orders, and drains it.
   handle(IPC.invoke.agentQueuePush, async (req: AgentQueuePushRequest) => {
     rejectNativeAgentOperation(req.sessionId);
-    // A queued entry becomes a turn, so it needs the same gate as a prompt —
-    // and the queue itself is host-owned machinery that drains into the Pi
-    // runtime, so an OMP session must not be admitted to it.
-    refuseOutsidePiRuntime(await engineRouter.requireForSession(req.sessionId, "prompt"), "the turn queue");
+    const engine = await engineRouter.requireForSession(req.sessionId, "followUp");
+    if (engine === "omp" && !ompSessions) throw Object.assign(new Error("OMP backend unavailable"), {
+      errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE, engine: "omp", capability: "followUp",
+    });
+    if (engine === "omp" && (req.attachments?.length || req.sessionMessageId)) {
+      throw Object.assign(new Error("OMP queued prompts currently support text input only"), { errorCode: ErrorCodes.INVALID_ARGUMENT });
+    }
     if (!agentHostBridge) throw new Error("agent host unavailable");
     return agentHostBridge.queue.push(req);
   });
   handle(IPC.invoke.agentQueueList, async (req: { sessionId: string }) => {
     rejectNativeAgentOperation(req.sessionId);
-    // A read: the queue drains into the session's engine, so a session this
-    // build cannot drive has no entries here — and none can be added (push is
-    // gated). Answering without the engine's queue is the truthful read, and it
-    // must not depend on the agent host being up.
     const engine = await engineRouter.engineForSession(req.sessionId);
-    if (engine !== "pi") return { entries: [] };
+    if (!engineRouter.capabilities(engine).followUp) return { entries: [] };
+    if (engine === "omp" && !agentHostBridge) return { entries: [] };
     if (!agentHostBridge) throw new Error("agent host unavailable");
     return { entries: agentHostBridge.queue.list(req.sessionId) };
   });
@@ -953,14 +972,14 @@ export function registerAgentIpc({
     // Cancels queued work, so it is gated by the engine of the owning session.
     // An unknown turn has no owner; the queue call reports that on its own.
     const owner = agentHostBridge?.queue.sessionOf(req.turnId) ?? null;
-    if (owner) refuseOutsidePiRuntime(await engineRouter.requireForSession(owner, "followUp"), "the turn queue");
+    if (owner) await engineRouter.requireForSession(owner, "followUp");
     if (!agentHostBridge) throw new Error("agent host unavailable");
     await agentHostBridge.queue.remove(req.turnId);
     return { ok: true };
   });
   handle(IPC.invoke.agentQueuePrioritize, async (req: { turnId: string }) => {
     const owner = agentHostBridge?.queue.sessionOf(req.turnId) ?? null;
-    if (owner) refuseOutsidePiRuntime(await engineRouter.requireForSession(owner, "followUp"), "the turn queue");
+    if (owner) await engineRouter.requireForSession(owner, "followUp");
     if (!agentHostBridge) throw new Error("agent host unavailable");
     await agentHostBridge.queue.prioritize(req.turnId);
     return { ok: true };

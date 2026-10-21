@@ -148,6 +148,7 @@ let handledFileRequestSeq = 0;
 export function FilesTab() {
   const { t } = useTranslation();
   const workspace = useAppStore((s) => s.workspace);
+  const sessionId = useAppStore((s) => s.sessions.find((session) => session.id === s.activeSessionId)?.worktree ? s.activeSessionId : undefined);
   const fileRequest = useAppStore((s) => s.workPanelFileRequest);
   const root = workspace?.path ?? null;
 
@@ -161,28 +162,34 @@ export function FilesTab() {
   // an actual root change: an unconditional [root] effect also runs on the
   // StrictMode remount, wiping the selection a chat file request just made
   // (first click landed on the tree instead of the file).
-  const prevRoot = useRef(root);
+  const scope = `${root}:${sessionId ?? ""}`;
+  const scopeRef = useRef({ key: scope });
+  if (scopeRef.current.key !== scope) scopeRef.current = { key: scope };
+  const scopeOwner = scopeRef.current;
+  const prevRoot = useRef(scope);
   useEffect(() => {
-    if (prevRoot.current === root) return;
-    prevRoot.current = root;
+    if (prevRoot.current === scope) return;
+    prevRoot.current = scope;
     setDirs({});
     setExpanded(new Set());
     setSelected(null);
     setFile(null);
     setFileError(false);
-  }, [root]);
+  }, [scope]);
 
   const loadDir = useCallback(
     async (rel: string) => {
       if (!root) return;
       try {
-        const res = await api.fsList(rel);
+        const res = await api.fsList(rel, sessionId);
+        if (scopeRef.current !== scopeOwner) return;
         setDirs((prev) => ({ ...prev, [rel]: { entries: res.entries } }));
       } catch {
+        if (scopeRef.current !== scopeOwner) return;
         setDirs((prev) => ({ ...prev, [rel]: { entries: [], error: true } }));
       }
     },
-    [root],
+    [root, scopeOwner, sessionId],
   );
 
   useEffect(() => {
@@ -210,11 +217,13 @@ export function FilesTab() {
     setFile(null);
     setFileError(false);
     try {
-      setFile(await api.fsRead(rel, mimeType));
+      const result = await api.fsRead(rel, mimeType, sessionId);
+      if (scopeRef.current === scopeOwner) setFile(result);
     } catch {
+      if (scopeRef.current !== scopeOwner) return;
       setFileError(true);
     }
-  }, []);
+  }, [scopeOwner, sessionId]);
 
   // Chat-initiated previews: open the file and expand its ancestor folders
   // so "back" lands on a tree that reveals it. Attachment blobs and absolute
@@ -340,7 +349,7 @@ export function FilesTab() {
             className="icon-btn icon-btn-square"
             tooltip={t("panel.files.reveal")}
             ariaLabel={t("panel.files.reveal")}
-            onClick={() => void api.fsReveal(selected)}
+            onClick={() => void api.fsReveal(selected, sessionId)}
           >
             <IconExternal size={14} />
           </TooltipButton>

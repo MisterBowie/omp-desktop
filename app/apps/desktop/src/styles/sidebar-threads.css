@@ -41,6 +41,16 @@
   white-space: nowrap;
 }
 
+.thread-item-date {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--ds-text-tertiary);
+  white-space: nowrap;
+}
+.sidebar-project-activity { position: relative; width: 12px; flex-shrink: 0; }
+.sidebar-project-activity .thread-item-status { left: 0; }
+
 .thread-item:hover,
 .thread-item.active,
 .project-group > .sidebar-session-group-header:hover {

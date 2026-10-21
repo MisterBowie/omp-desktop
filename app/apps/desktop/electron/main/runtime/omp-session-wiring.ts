@@ -14,6 +14,8 @@
  *      are persisted through `session.bindEngine`; renames, model switches and
  *      branches go through the host so a restart restores the same identity.
  */
+import { ompMemoryDirectory } from "@pi-desktop/omp-runtime";
+import { parseOmpMemorySettings, type OmpMemorySettings } from "@pi-desktop/shared";
 import { join } from "node:path";
 import { writeFileSync } from "node:fs";
 
@@ -71,6 +73,8 @@ export type OmpSessionWiringDeps = {
   capabilities?: OmpCapabilityProvider;
   /** The desktop's `session:turnEnded` broadcast (plugin lifecycle, M5/T19-B). */
   onTurnEnd?: (info: OmpTurnEndInfo) => void;
+  onIdle?: (sessionId: string) => void;
+  onMemoryMaintenanceIdle?: () => void;
 };
 
 function hostOrThrow(host: () => HostProcess | null): HostProcess {
@@ -203,6 +207,15 @@ export type WiredOmpSessions = {
   sessionDir: string;
 };
 
+/** Project identity stays with capabilities; only the host resolves execution paths. */
+export function createOmpExecutionRootResolver(host: () => HostProcess | null) {
+  return async (sessionId: string): Promise<string> => {
+    const result = await hostOrThrow(host).call<{path?: string}>("session.executionRoot", {sessionId});
+    if (!result.path) throw Object.assign(new Error("session execution root unavailable"), {errorCode: "WORKTREE_MISSING"});
+    return result.path;
+  };
+}
+
 /**
  * Build the OMP session registry wired to the host and the runtime adapter.
  */
@@ -217,6 +230,8 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
     resourcesPath: deps.resourcesPath ?? null,
     appPath: deps.appPath,
     sessionDir,
+    onMemoryMaintenanceIdle: deps.onMemoryMaintenanceIdle,
+    resolveExecutionRoot: createOmpExecutionRootResolver(deps.host),
     // The session's mode and effective permission mode, read from the host
     // session row on every prompt (M5/T20-B1). `inherit` is resolved here,
     // desktop-side, with the app's *current* default — never a startup
@@ -244,6 +259,10 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
     createSupervisor: (spec: OmpSessionRuntimeSpec) =>
       engineRuntime.ompRuntime.createSupervisor({
         sessionDir,
+        memory: async () => {
+          const settings = await hostOrThrow(deps.host).call<OmpMemorySettings>("memory.settings.get");
+          return { ...parseOmpMemorySettings(settings), dbPath: join(ompMemoryDirectory(dataRoot, spec.executionDirectory ?? spec.projectDirectory), "memory.db"), modelSelector: spec.providerId && spec.modelId ? `${spec.providerId}/${spec.modelId}` : undefined };
+        },
         // This bridge always wires a session policy and writes a valid state
         // before every prompt, so the runtime carries the mandatory channel:
         // the gate refuses a turn whose state cannot be read back as
@@ -271,6 +290,7 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
     ...(deps.hostTools ? { hostTools: deps.hostTools } : {}),
     ...(deps.capabilities ? { capabilities: deps.capabilities } : {}),
     ...(deps.onTurnEnd ? { onTurnEnd: deps.onTurnEnd } : {}),
+    ...(deps.onIdle ? { onIdle: deps.onIdle } : {}),
     persistNativeSession: async (info) => {
       const client = hostOrThrow(deps.host);
       await client.call("session.bindEngine", {

@@ -1,5 +1,6 @@
 mod scheduled_rpc;
 mod scheduled_tools;
+mod worktree_rpc;
 
 use std::io::{self, BufRead, BufReader as StdBufReader, Read, Write};
 use std::path::{Path, PathBuf};
@@ -901,6 +902,11 @@ fn resolve_persisted_project_workspace(
     state: &AppState,
     session_id: &str,
 ) -> Result<Option<String>, JsonRpcError> {
+    match crate::session_worktrees::lifecycle::tool_root(&state.db, session_id) {
+        Ok(Some(root)) => return Ok(Some(root.to_string_lossy().into_owned())),
+        Ok(None) => {}
+        Err(error) => return Err(worktree_rpc::to_rpc(error)),
+    }
     match sessions::get_session(&state.db, session_id) {
         Ok(Some(detail)) => Ok(detail.summary.project_path),
         // A tool request must name a persisted session: an unknown id never
@@ -914,6 +920,11 @@ fn resolve_tool_workspace(
     state: &AppState,
     session_id: &str,
 ) -> Result<Option<String>, JsonRpcError> {
+    match crate::session_worktrees::lifecycle::tool_root(&state.db, session_id) {
+        Ok(Some(root)) => return Ok(Some(root.to_string_lossy().into_owned())),
+        Ok(None) => {}
+        Err(error) => return Err(worktree_rpc::to_rpc(error)),
+    }
     match sessions::get_session(&state.db, session_id) {
         Ok(Some(detail)) => {
             if let Some(project_path) = detail.summary.project_path {
@@ -1708,6 +1719,27 @@ async fn handle_request(
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "removed": removed, "sessionsRemoved": sessions_removed }))
         }
+        "memory.settings.get" => {
+            let st = state.lock().await;
+            Ok(st
+                .db
+                .kv_get("ompMemory", "settings")
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                .unwrap_or_else(|| json!({"autoSave": false, "autoRead": false})))
+        }
+        "memory.settings.set" => {
+            let valid = params.as_object().is_some_and(|object| object.len() == 2)
+                && params.get("autoSave").is_some_and(Value::is_boolean)
+                && params.get("autoRead").is_some_and(Value::is_boolean);
+            if !valid {
+                return Err(rpc_err(1002, "Invalid memory settings", "INVALID_PARAMS"));
+            }
+            let st = state.lock().await;
+            st.db
+                .kv_set("ompMemory", "settings", &params)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(params)
+        }
         "project.memory.get" => {
             let path = params
                 .get("path")
@@ -2038,13 +2070,66 @@ async fn handle_request(
             }))
         }
 
+        method if method.starts_with("worktree.") => {
+            worktree_rpc::handle(&state, method, params).await
+        }
+        "session.executionRoot" => {
+            let id = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            let root = resolve_tool_workspace(&st, id)?;
+            Ok(json!({ "path": root }))
+        }
         "session.list" => {
             let st = state.lock().await;
             let sessions = sessions::list_sessions(&st.db)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            let badges = crate::session_worktrees::lifecycle::summaries(&st.db)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            let sessions: Vec<Value> = sessions
+                .into_iter()
+                .map(|summary| {
+                    let badge = badges.get(&summary.id);
+                    let mut value = json!(summary);
+                    if let Some(badge) = badge {
+                        value["worktree"] = json!(badge);
+                    }
+                    value
+                })
+                .collect();
             Ok(json!({ "sessions": sessions }))
         }
         "session.create" => {
+            let isolated = params
+                .get("isolated")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let isolated_project = if isolated {
+                Some(
+                    params
+                        .get("projectPath")
+                        .and_then(Value::as_str)
+                        .filter(|p| !p.trim().is_empty())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "isolated session needs projectPath", "INVALID_PARAMS")
+                        })?
+                        .to_string(),
+                )
+            } else {
+                None
+            };
+            if isolated && params.get("engine").and_then(Value::as_str) != Some("omp") {
+                return Err(rpc_err(
+                    1025,
+                    "isolated sessions require OMP in this build",
+                    "ENGINE_CAPABILITY_UNAVAILABLE",
+                ));
+            }
+            if let Some(project) = isolated_project.as_deref() {
+                worktree_rpc::ensure_absolute_project(project)?;
+            }
             let thinking_level = thinking_level_param(&params)?;
             let permission_parent = permission_parent_param(&params)?;
             let st = state.lock().await;
@@ -2095,6 +2180,14 @@ async fn handle_request(
             // internal fault: report its own code to direct RPC callers
             // (M5/T20-R3C).
             .map_err(session_write_rpc_err)?;
+            if let Some(project) = isolated_project {
+                drop(st);
+                let created =
+                    worktree_rpc::isolate_new_session(&state, &session.id, &project).await?;
+                let mut value = json!(session);
+                value["worktree"] = json!(created.worktree);
+                return Ok(json!({ "session": value, "worktree": created }));
+            }
             Ok(json!({ "session": session }))
         }
         "session.fork" => {
@@ -2133,6 +2226,16 @@ async fn handle_request(
                 .filter(|value| !value.is_empty())
                 .ok_or_else(|| rpc_err(1002, "projectPath required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            if crate::session_worktrees::registry::for_owner(&st.db, session_id, None)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                .is_some()
+            {
+                return Err(rpc_err(
+                    1025,
+                    "isolated sessions cannot move projects",
+                    "WORKTREE_MOVE_UNSUPPORTED",
+                ));
+            }
             let session = match sessions::move_session_project(&st.db, session_id, project_path)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
             {
@@ -2195,7 +2298,16 @@ async fn handle_request(
                 },
             )
             .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
-            Ok(json!({ "session": session }))
+            let mut value = json!(session);
+            if let Some(badge) = crate::session_worktrees::lifecycle::summaries(&st.db)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                .get(id)
+            {
+                if !value.is_null() {
+                    value["worktree"] = json!(badge);
+                }
+            }
+            Ok(json!({ "session": value }))
         }
         "session.configure" => {
             let id = params
@@ -2233,6 +2345,7 @@ async fn handle_request(
                 .get("id")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
+            worktree_rpc::remove_before_delete(&state, id).await?;
             let st = state.lock().await;
             let ok = sessions::delete_session(&st.db, id)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
@@ -2639,6 +2752,13 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            if st.tool_budget.session_is_held(session_id) {
+                return Err(rpc_err(
+                    1025,
+                    "worktree operation in progress",
+                    "WORKTREE_BUSY",
+                ));
+            }
             let provider = params.get("providerId").and_then(Value::as_str);
             let model = params.get("modelId").and_then(Value::as_str);
             let turn_id = match params.get("sessionMessageId").and_then(Value::as_str) {
@@ -6107,6 +6227,50 @@ mod tests {
         assert!(content.contains("temporary"), "{content}");
         assert_eq!(read.content["tag"].as_str().unwrap().len(), 4);
         assert!(!active_project.join("notes.txt").exists());
+    }
+
+    #[tokio::test]
+    async fn memory_settings_roundtrip_and_validation() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let defaults = handle_request(state.clone(), "memory.settings.get", json!({}), tx.clone())
+            .await
+            .unwrap();
+        assert_eq!(defaults, json!({"autoSave": false, "autoRead": false}));
+        for value in [
+            json!({"autoSave": "yes", "autoRead": false}),
+            json!({"autoSave": true}),
+            json!({"autoSave": true, "autoRead": false, "dbPath": "/tmp"}),
+        ] {
+            assert!(
+                handle_request(state.clone(), "memory.settings.set", value, tx.clone())
+                    .await
+                    .is_err()
+            );
+        }
+        let expected = json!({"autoSave": true, "autoRead": false});
+        handle_request(
+            state.clone(),
+            "memory.settings.set",
+            expected.clone(),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            handle_request(state.clone(), "memory.settings.get", json!({}), tx.clone())
+                .await
+                .unwrap(),
+            expected
+        );
+        let reopened = AppState::open(data_dir.path()).unwrap();
+        assert_eq!(
+            reopened.db.kv_get("ompMemory", "settings").unwrap(),
+            Some(expected)
+        );
     }
 
     #[tokio::test]

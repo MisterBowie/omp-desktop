@@ -616,3 +616,11 @@ Plugins → Load Development Plugin → choose directory
 存储库中的示例插件：
 
 - `examples/plugins/hello`
+
+## MCP 回复时限（2026-10-19）
+
+Streamable HTTP 在收到完整 SSE 消息时立即分派，不等待 EOF。UTF-8 和 CRLF
+允许跨块，HTTP 回复累计上限为 4 MiB。每个 HTTP 请求使用自己的客户端时限，
+包括较长的工具调用预算。HTTP 和 stdio 请求超时时，尽力发送携带请求 ID 和
+`timeout` 原因的 `notifications/cancelled`；`initialize` 除外。通知失败不
+替换原来的 `TIMEOUT`，已超时的工具调用不会重放。

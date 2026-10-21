@@ -1768,6 +1768,11 @@ test(
       true,
       "the recovery turn must settle",
     );
+    assert.equal(
+      await waitFor(() => readTurnRows(dataRoot, sessionId)[1]?.status === "completed"),
+      true,
+      "the recovered host turn must be durably completed after its advisory end event",
+    );
     const latest = postRequests(provider).at(-1);
     const recoveryTools = toolNamesOf(latest);
     assert.ok(recoveryTools.includes("SubmitPlan"), `the Plan catalogue must return: ${recoveryTools.join(", ")}`);
@@ -1851,6 +1856,11 @@ test(
       await waitFor(() => bridge.status(sessionId).isRunning === false && ends.length === 2),
       true,
       "the recovery turn must settle",
+    );
+    assert.equal(
+      await waitFor(() => readTurnRows(dataRoot, sessionId)[1]?.status === "completed"),
+      true,
+      "the recovered host turn must be durably completed after its advisory end event",
     );
     const latest = postRequests(provider).at(-1);
     const recoveryTools = toolNamesOf(latest);

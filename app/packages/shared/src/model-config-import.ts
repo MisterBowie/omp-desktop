@@ -839,7 +839,7 @@ function bindingFromGenericModel(
  * foreign config does not.
  */
 function importedContextWindowSource(value: unknown): ContextWindowSource | undefined {
-  return value === "catalog" || value === "user" ? value : undefined;
+  return value === "catalog" || value === "provider" || value === "user" ? value : undefined;
 }
 
 function bindingFromPiModel(value: unknown): ModelBinding | null {

@@ -1,0 +1,72 @@
+{
+  "endpoint": "http://127.0.0.1:3425/v1/models",
+  "method": "GET",
+  "totalModels": 43,
+  "claudeModels": [
+    {
+      "modelId": "factory/claude-fable-5",
+      "contextWindow": 867000,
+      "maxTokens": 128000
+    },
+    {
+      "modelId": "factory/claude-fable-5.1",
+      "contextWindow": 867000,
+      "maxTokens": 128000
+    },
+    {
+      "modelId": "factory/claude-haiku-4-5-20251001",
+      "contextWindow": 200000,
+      "maxTokens": 64000
+    },
+    {
+      "modelId": "factory/claude-haiku-5-5",
+      "contextWindow": 872000,
+      "maxTokens": 128000
+    },
+    {
+      "modelId": "factory/claude-opus-4-8",
+      "contextWindow": 867000,
+      "maxTokens": 128000
+    },
+    {
+      "modelId": "factory/claude-opus-5",
+      "contextWindow": 867000,
+      "maxTokens": 128000
+    },
+    {
+      "modelId": "factory/claude-opus-5-5",
+      "contextWindow": 872000,
+      "maxTokens": 128000
+    },
+    {
+      "modelId": "factory/claude-sonnet-4-6",
+      "contextWindow": 931000,
+      "maxTokens": 64000
+    },
+    {
+      "modelId": "factory/claude-sonnet-5",
+      "contextWindow": 872000,
+      "maxTokens": 128000
+    },
+    {
+      "modelId": "factory/claude-sonnet-5-5",
+      "contextWindow": 872000,
+      "maxTokens": 128000
+    },
+    {
+      "modelId": "group/auto-claude-fable-5-1",
+      "contextWindow": 867000,
+      "maxTokens": 128000
+    },
+    {
+      "modelId": "group/auto-claude-opus-5-5",
+      "contextWindow": 872000,
+      "maxTokens": 128000
+    },
+    {
+      "modelId": "group/auto-claude-sonnet-5-5",
+      "contextWindow": 872000,
+      "maxTokens": 128000
+    }
+  ]
+}

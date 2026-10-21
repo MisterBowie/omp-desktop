@@ -45,6 +45,7 @@ import {
   type UserMessage,
 } from "@earendil-works/pi-ai";
 import {
+  APP_NAME,
   DEFAULT_COMMAND_TIMEOUT_MS,
   OAUTH_AUTH_KIND,
   type TrustedExtensionCommand,
@@ -1781,7 +1782,7 @@ Delegation rules:
       "Editing workflow: use the built-in Edit or Write tool directly on the deliverable file whenever it is inside the advertised workspace. Use Edit for one small unique line-anchored change (path + tag + ops) and Write for a coherent whole-file rewrite. Do not invoke shell apply_patch, git apply, or patch commands; do not create or hand-edit unified-diff files in scratch or repeatedly repair their hunk headers. Treat an edit or shell patch failure as recoverable state: classify the error, perform the required fresh Read or use a complete reveal, regenerate the change, and retry with a corrected payload. A path may have three counted failures per prompt; stop after the third and report the exact mismatch instead of looping. Never issue concurrent Write/Edit calls for the same path. When a dedicated worktree is outside the advertised workspace, make one guarded, deterministic edit inside that worktree with Bash, then verify it with git diff or an equivalent check.",
       // Work panel browser preview (D100): workspace HTML files render
       // in the embedded browser with live reload on file changes.
-      `For user-visible HTML pages, call the BrowserPreview tool once after creating the page or making the first meaningful visual edit, using its workspace-relative path (e.g. \`index.html\` or \`demo/index.html\`) to show it in PI-Desktop's built-in browser panel. Reuse that preview while iterating: it live-reloads as you edit, so no repeat call or manual refresh is needed. Skip generated, test-only, and non-visual HTML files. If BrowserPreview is not in the current tool list, load it first with ${TOOL_SEARCH_NAME}.`,
+      `For user-visible HTML pages, call the BrowserPreview tool once after creating the page or making the first meaningful visual edit, using its workspace-relative path (e.g. \`index.html\` or \`demo/index.html\`) to show it in ${APP_NAME}'s built-in browser panel. Reuse that preview while iterating: it live-reloads as you edit, so no repeat call or manual refresh is needed. Skip generated, test-only, and non-visual HTML files. If BrowserPreview is not in the current tool list, load it first with ${TOOL_SEARCH_NAME}.`,
       // Shell dialect and scratch variable are selected by host-core.
       commandShellGuidance(this.commandShell, this.scratchDir),
       // Session scratch directory (D114): temp files must not dirty
@@ -2805,7 +2806,7 @@ Delegation rules:
       if (scheduledToolDescriptions[toolName]) return scheduledToolDescriptions[toolName];
       switch (toolName) {
         case "BrowserPreview":
-          return "Open a workspace HTML file in PI-Desktop's built-in browser panel. `path` is workspace-relative (e.g. \"demo/index.html\"). The preview live-reloads on later edits to the file or its sibling assets, so call once per page.";
+          return `Open a workspace HTML file in ${APP_NAME}'s built-in browser panel. \`path\` is workspace-relative (e.g. "demo/index.html"). The preview live-reloads on later edits to the file or its sibling assets, so call once per page.`;
         case "Read":
           return (
             "Read a bounded window from an existing regular text file, never a directory. " +
@@ -2842,13 +2843,13 @@ Delegation rules:
         case ASK_TOOL_NAME:
           return "Ask the user one or more questions. Each question has selectable options and the desktop card always provides a custom user-input option; unanswered questions are returned as empty answers.";
         case "PluginScaffold":
-          return "Create a PI-Desktop plugin from a template and load it for development. `directory` is workspace-relative and must be empty or new; `template` is one of panel-basic, agent-tool-basic, skill-pack, full-demo. Use this instead of hand-writing plugin files.";
+          return `Create an ${APP_NAME} plugin from a template and load it for development. \`directory\` is workspace-relative and must be empty or new; \`template\` is one of panel-basic, agent-tool-basic, skill-pack, full-demo. Use this instead of hand-writing plugin files.`;
         case "PluginCheck":
-          return "Validate a PI-Desktop plugin directory against every rule the installer enforces (manifest, entry file, panel, skills, permissions, package limits). `directory` is workspace-relative. Run this before packaging.";
+          return `Validate an ${APP_NAME} plugin directory against every rule the installer enforces (manifest, entry file, panel, skills, permissions, package limits). \`directory\` is workspace-relative. Run this before packaging.`;
         case "PluginPack":
-          return "Package a PI-Desktop plugin directory into an installable dist/<id>-<version>.piplug. `directory` is workspace-relative. Runs the same validation as PluginCheck first and refuses to package a plugin with errors. Never build a .piplug with shell tools — the installer only accepts uncompressed archives.";
+          return `Package an ${APP_NAME} plugin directory into an installable dist/<id>-<version>.piplug. \`directory\` is workspace-relative. Runs the same validation as PluginCheck first and refuses to package a plugin with errors. Never build a .piplug with shell tools — the installer only accepts uncompressed archives.`;
         default:
-          return `${toolName} tool via PI-Desktop host-core`;
+          return `${toolName} tool via ${APP_NAME} host-core`;
       }
     };
     // One entry per tool: the shapes diverge enough that a chain of ternaries
@@ -3542,11 +3543,11 @@ Delegation rules:
       case "BrowserPreview":
         return "Preview an HTML file in the built-in browser panel.";
       case "PluginCheck":
-        return "Validate a PI-Desktop plugin directory.";
+        return `Validate an ${APP_NAME} plugin directory.`;
       case "PluginScaffold":
-        return "Create a PI-Desktop plugin from a template.";
+        return `Create an ${APP_NAME} plugin from a template.`;
       case "PluginPack":
-        return "Validate and package a PI-Desktop plugin.";
+        return `Validate and package an ${APP_NAME} plugin.`;
       default:
         return this.compactToolDescription(tool.description);
     }
@@ -4102,7 +4103,7 @@ Delegation rules:
             if (!provider) {
               return this.subagentToolError(
                 toolCallId,
-                `The ${definition.name} subagent pins ${definition.model?.providerId}/${definition.model?.modelId}, which is not configured in PI-Desktop. Do this work yourself or delegate to another subagent.`,
+                `The ${definition.name} subagent pins ${definition.model?.providerId}/${definition.model?.modelId}, which is not configured in ${APP_NAME}. Do this work yourself or delegate to another subagent.`,
               );
             }
           } else if (this.isSessionModelOverride(modelOverride)) {
@@ -4134,7 +4135,7 @@ Delegation rules:
           if (!provider) {
             return this.subagentToolError(
               toolCallId,
-              `The ${definition.name} subagent pins ${definition.model?.providerId}/${definition.model?.modelId}, which is not configured in PI-Desktop. Do this work yourself or delegate to another subagent.`,
+              `The ${definition.name} subagent pins ${definition.model?.providerId}/${definition.model?.modelId}, which is not configured in ${APP_NAME}. Do this work yourself or delegate to another subagent.`,
             );
           }
         }
@@ -5940,7 +5941,8 @@ Delegation rules:
     this.setAgentMessages(messages);
     this.agent.state.tools = tools;
     return {
-      messages: this.agent.state.messages,
+      // The loop appends its messages; the message_end listener owns state.
+      messages: [...this.agent.state.messages],
       tools,
       systemPrompt: this.agent.state.systemPrompt,
     } as AgentContext;

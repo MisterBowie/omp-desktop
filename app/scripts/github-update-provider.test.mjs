@@ -7,23 +7,23 @@ const { GitHubProvider } = require("electron-updater/out/providers/GitHubProvide
 const updaterRequire = createRequire(require.resolve("electron-updater/package.json"));
 const semver = updaterRequire("semver");
 
-function fixture(stableAvailable = true) {
+function fixture(stableAvailable = true, tag = "v0.1.1", version = "0.1.1") {
   const requests = [];
   const base = "/MisterBowie/omp-desktop/releases";
   const atom = `<feed xmlns="http://www.w3.org/2005/Atom">
     <entry><title>Historical test package</title><link href="https://github.com${base}/tag/m7-test-20261015-46e7bf7"/><content type="html">0.15.3 test build</content></entry>
-    <entry><title>OMP Desktop 0.1.1</title><link href="https://github.com${base}/tag/v0.1.1"/><content type="html">Stable product release</content></entry>
+    <entry><title>OMP Desktop ${version}</title><link href="https://github.com${base}/tag/${tag}"/><content type="html">Stable product release</content></entry>
   </feed>`;
   const executor = { request: async options => {
     requests.push({ host: options.hostname, path: options.path });
     if (options.path === `${base}.atom`) return atom;
     if (options.path === `${base}/latest`) {
       if (!stableAvailable) throw new Error("404: no stable release");
-      return JSON.stringify({ tag_name: "v0.1.1" });
+      return JSON.stringify({ tag_name: tag });
     }
-    if (options.path === `${base}/download/v0.1.1/latest-mac.yml`) {
-      const file = { url: "OMP-Desktop-0.1.1-arm64-mac.zip", sha512: Buffer.alloc(64).toString("base64"), size: 1 };
-      return JSON.stringify({ version: "0.1.1", files: [file], path: file.url, sha512: file.sha512 });
+    if (options.path === `${base}/download/${tag}/latest-mac.yml`) {
+      const file = { url: `OMP-Desktop-${version}-arm64-mac.zip`, sha512: Buffer.alloc(64).toString("base64"), size: 1 };
+      return JSON.stringify({ version, files: [file], path: file.url, sha512: file.sha512 });
     }
     throw new Error(`Unexpected update request: ${options.path}`);
   } };
@@ -49,4 +49,14 @@ test("a missing stable release is an error, never a fallback into a historical t
   const { provider, requests } = fixture(false);
   await assert.rejects(provider.getLatestVersion(), /production release exists/);
   assert(requests.every(request => !request.path.includes("/download/")));
+});
+
+test("a source-bound revision keeps the installer version and resolves its own release assets", async () => {
+  const tag = `v0.1.2+skill.${"a".repeat(40)}`;
+  const { provider } = fixture(true, tag, "0.1.2");
+  const info = await provider.getLatestVersion();
+  assert.equal(info.version, "0.1.2"); assert.equal(info.tag, tag);
+  assert.equal(semver.prerelease(tag), null);
+  assert.equal(semver.gt(info.version, "0.1.2"), false, "same-version revisions require manual installation");
+  assert.equal(provider.resolveFiles(info)[0].url.href, `https://github.com/MisterBowie/omp-desktop/releases/download/${tag}/OMP-Desktop-0.1.2-arm64-mac.zip`);
 });

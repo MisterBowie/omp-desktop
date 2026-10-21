@@ -5,8 +5,9 @@
  * processes it started and must never signal anything else. Ownership here
  * rests only on evidence that is unique to *this* run:
  *
- *   - the process is a recorded spawn root or a ppid descendant of one, and
- *     still carries the start time it had when it was recorded (a recycled pid
+ *   - the process is a recorded spawn root or a ppid descendant of one (with
+ *     verifiable creation order along every parent edge), and still carries
+ *     the start time it had when it was recorded (a recycled pid
  *     is a different process; a root record without a recorded start time is
  *     not an identity and is refused rather than claimed by its number);
  *   - or the process carries the run's unique scratch root in one argv element
@@ -174,6 +175,18 @@ export function sameProcess(entry, procRoot = DEFAULT_PROC_ROOT) {
   return current !== null && String(current.starttime) === String(entry.starttime);
 }
 
+/** Compare native integer or decimal creation times without FILETIME rounding. */
+function compareStartTimes(left, right) {
+  const valid = value => typeof value === "string" && /^\d+(?:\.\d+)?$/.test(value);
+  if (!valid(left) || !valid(right)) return null;
+  const [leftWhole, leftFraction = ""] = left.split(".");
+  const [rightWhole, rightFraction = ""] = right.split(".");
+  const precision = Math.max(leftFraction.length, rightFraction.length);
+  const a = BigInt(leftWhole + leftFraction.padEnd(precision, "0"));
+  const b = BigInt(rightWhole + rightFraction.padEnd(precision, "0"));
+  return a === b ? 0 : a < b ? -1 : 1;
+}
+
 /**
  * The processes this run owns, per the rules in the module header.
  *
@@ -234,7 +247,17 @@ export function collectOwnedProcesses({ table, selfPid, roots = [], runRoots = [
       continue;
     }
     owned.set(pid, { ...entry, ownership: acceptedRoots.has(pid) ? "root" : "descendant" });
-    for (const childPid of childrenOf.get(pid) ?? []) queue.push(childPid);
+    for (const childPid of childrenOf.get(pid) ?? []) {
+      const child = table.get(childPid);
+      const order = compareStartTimes(child?.starttime, entry.starttime);
+      // Windows retains the original parent id after that parent exits. A
+      // later process can reuse it, so a numeric ppid alone is not ancestry.
+      if (order === null || order < 0) {
+        ignored.push({ pid: childPid, reason: order === null ? "parent-birth-unverified" : "parent-reused" });
+        continue;
+      }
+      queue.push(childPid);
+    }
   }
   if (runRoots.length > 0) {
     for (const entry of table.values()) {

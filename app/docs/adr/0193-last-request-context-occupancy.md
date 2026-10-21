@@ -25,7 +25,9 @@ the last assistant message:
 1. Occupancy, remaining capacity, used/window counts, turn total, provider
    input/output/cache/reasoning, and cache hit rate are the newest
    usage-bearing assistant message (the last model request). Occupancy is
-   `input + output + reasoning + cacheRead + cacheWrite` on that message.
+   `input + output + cacheRead + cacheWrite` on that message. Reasoning is
+   already included in output and must not be counted twice (correction,
+   2026-10-19); it remains separately visible in the provider breakdown.
 2. Completed-turn generation speed and the aggregate tool row still describe
    the visual turn (every fragment and tool call between the surrounding
    user messages).

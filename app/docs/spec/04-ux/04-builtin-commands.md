@@ -1,5 +1,17 @@
 # 04. Builtin Commands
 
+## Skill namespace amendment (2026-10-18)
+
+Skill entries use `/skill:<exact-id>` across builtin, user and plugin sources.
+This namespace is reserved for skills; it is not another builtin command. A
+legacy `/<id>` continues to resolve when no app/template command owns that name.
+The owning session's project catalog is checked again at dispatch. Unknown or
+disabled explicit skills are refused before runtime admission. Bodies stay
+on demand through Skill; OMP requires that loader in the target turn. Follow-up
+commands are resolved when dequeued; steering retains the target turn identity.
+A command-source response arriving after a session switch leaves the source
+draft intact and dispatches nothing to the newly selected session.
+
 ## 1. Goal
 
 Define the five first-party command palette entries available without plugins.

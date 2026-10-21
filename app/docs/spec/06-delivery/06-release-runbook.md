@@ -7,6 +7,51 @@
 
 ## OMP Desktop distribution identity (M6)
 
+### 0.1.2 maintenance release
+
+Version 0.1.2 ships the nine desktop/Pi-compatible bug fixes documented in the
+2026-10-19 regression record: message ownership, instruction budgets, CDP
+lifecycle, MCP streaming/cancellation, host UTF-16 editing, token accounting,
+canonical same-path moves and textconv-free workspace diffs. Native OMP remains
+18.3.0 / `62bc57b+omp-desktop.6`; native UTF-16 support is not added. Storage
+stays at schema 22, so 0.1.1 to 0.1.2 needs no schema migration. The dependency
+refresh retains one known build-tool advisory without an upstream fix.
+The immutable candidate must pass complete source and all four native gates
+before publication. A local missing-runtime smoke is not a passing gate.
+
+### Same-version Skill guidance revision
+
+The 2026-10-19 Skill guidance correction keeps application version **0.1.2**.
+After complete source and all four native gates pass, the dedicated
+`publish-skill-v0.1.2-run-<run-id>` controller publishes the accepted bytes under
+`v0.1.2+skill.<full-source-revision>`. This stable release has source-bound build
+metadata. The original `v0.1.2` source and public asset ids, sizes and SHA256
+digests are captured before publication and checked afterward. Ordinary
+publication still accepts only a plain stable-version tag; the revision path
+must be explicitly selected and cannot target that old tag.
+
+The new release becomes `releases/latest`, but feeds and installers still say
+0.1.2. Existing 0.1.2 installations therefore require a manual download and
+reinstall. The real GitHub update-provider fixture verifies the build tag's
+asset URLs and equal-version comparison. The linked readback job downloads
+every public asset, verifies source receipts and updater hashes, and checks
+that the original release is unchanged. Version, runtime pin, storage schema
+and historical artifacts retain their existing values.
+
+### 0.1.1 session and worktree release
+
+Version 0.1.1 ships native Todo projection, `/skill:` commands, sidebar reply
+dates/activity/copy actions, text steering, durable follow-ups, cancellable
+manual compaction and local session worktrees. It also includes the bounded
+browser screenshots. Full native conversation forks, per-child stop,
+background-command controls and worktree setup/include/port/child isolation
+remain unavailable.
+
+The host upgrades schema 21 to 22 with a pre-migration database backup. Existing
+sessions and native references are preserved. Returning to 0.1.0 requires closing
+the application and restoring that backup; an old binary cannot read schema 22.
+The native runtime stays at 18.3.0 / `62bc57b+omp-desktop.6`.
+
 ### Independent OMP releases from 0.1.0
 
 OMP Desktop's public versions and in-app changelog start at **0.1.0**. The
@@ -845,3 +890,24 @@ Shell smoke on each native runner:
 - Rollback, staged rollout, and prerelease channel policy remain open release
   work. Existing unsigned macOS installs may need one manual signed DMG before
   in-app updates succeed.
+
+## Post-publication bug audit
+
+The on-demand `scripts/audit-released-bugs.mjs` exercises regression scenarios
+after publication. Run it with Node 24 after `pnpm build:js`, setting
+`OMP_RELEASE_HOST_BINARY` to the published host executable and
+`OMP_BUNDLED_RESOURCES` to the matching installed Resources directory. It uses
+owned temporary projects and loopback/mock providers. A failing assertion is
+a reproduced defect; it must not be reported as a passing release check.
+
+The `bug-check-v*` workflow currently audits published v0.1.1 on Windows. It
+requires an unchanged product tree and verifies the official installer digest
+before running the isolated installed scenarios. Only fixed check IDs, bounded
+numeric window observations and statuses are published on a separate result
+branch. Raw logs and local fixture paths are excluded. A single-monitor runner
+does not qualify the physical dual-monitor fullscreen regression.
+
+The `readback-v0.1.1-*` workflow downloads every public v0.1.1 asset on an
+independent runner, verifies GitHub SHA256/size, checksum and build records,
+candidate/controller provenance and updater SHA512. Its result branch contains
+only public asset names, digests, byte counts and bounded verification facts.

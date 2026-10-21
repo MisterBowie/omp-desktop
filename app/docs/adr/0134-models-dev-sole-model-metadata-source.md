@@ -5,6 +5,10 @@
 - Deciders: PI-Desktop core
 - Amends: ADR 0027, ADR 0133, D136, D266
 
+2026-10-20 amendment: [Preserve endpoint-published token limits](provider-published-token-limits.md)
+allows validated endpoint context/output limits to replace the catalog baseline.
+The sole-source rule below continues to apply to other model metadata.
+
 ## Context
 
 The first models.dev integration still retained a second model metadata path in

@@ -178,6 +178,16 @@ export class OmpEventConverter {
    * frame (a refused or local-only prompt) discards it.
    */
   private pendingUserMessageId: string | undefined;
+  private readonly steeringUserMessageIds: string[] = [];
+
+  queueSteeringUserMessageId(messageId: string): void {
+    this.steeringUserMessageIds.push(messageId);
+  }
+
+  discardSteeringUserMessageId(messageId: string): void {
+    const index = this.steeringUserMessageIds.indexOf(messageId);
+    if (index >= 0) this.steeringUserMessageIds.splice(index, 1);
+  }
   /** Set from the assistant message itself, so a finished run can be named. */
   private modelId: string | undefined;
   private readonly parentToolCallId: string | undefined;
@@ -219,6 +229,7 @@ export class OmpEventConverter {
    */
   discardAdoptedUserMessageId(): void {
     this.pendingUserMessageId = undefined;
+    this.steeringUserMessageIds.length = 0;
   }
 
   /** The sequence the next minted id will use; carried across runtime replacement. */
@@ -461,14 +472,17 @@ export class OmpEventConverter {
     // under its own optimistic id, so the durable row is announced as PI's
     // `user_message_persisted` re-key of that exact row instead of a second
     // user row. The frame's own `message_end` then completes the same id.
-    if (role === "user" && this.pendingUserMessageId !== undefined) {
-      const optimisticMessageId = this.pendingUserMessageId;
+    const steering = role === "user" && this.pendingUserMessageId === undefined && this.steeringUserMessageIds.length > 0;
+    const optimisticMessageId = role === "user"
+      ? this.pendingUserMessageId ?? this.steeringUserMessageIds.shift()
+      : undefined;
+    if (optimisticMessageId !== undefined) {
       this.pendingUserMessageId = undefined;
       return [
         {
           type: "user_message_persisted",
           optimisticMessageId,
-          message: this.toUiMessage(id, message, "user", "complete"),
+          message: { ...this.toUiMessage(id, message, "user", "complete"), ...(steering ? { steering: true } : {}) },
         },
       ];
     }

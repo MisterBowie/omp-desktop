@@ -82,10 +82,13 @@ describe("loadProjectInstructions", () => {
     await writeFile(join(root, "AGENTS.md"), "中".repeat(20_000));
 
     const loaded = await loadProjectInstructions(root);
-    expect(Buffer.byteLength(loaded!.entries[0].content, "utf8")).toBeLessThanOrEqual(
+    const content = loaded!.entries[0].content;
+    const kept = content.split("\n\n[PI-Desktop truncated")[0];
+    expect(Buffer.byteLength(kept, "utf8")).toBeLessThanOrEqual(
       32 * 1024,
     );
-    expect(loaded!.entries[0].content.endsWith("中")).toBe(true);
+    expect(kept.endsWith("中")).toBe(true);
+    expect(content).toContain("loaded the first 32766 of 60000 bytes");
   });
 
   it("treats missing, blank, and out-of-workspace files as absent", async () => {
@@ -113,15 +116,41 @@ describe("loadInstructionChain", () => {
     });
   });
 
-  it("shares the 32 KiB byte budget between global and project instructions", async () => {
+  it("keeps project instructions when the global file fills its own budget", async () => {
     root = await mkdtemp(join(tmpdir(), "pi-desktop-instructions-"));
     const globalPath = join(root, "global-AGENTS.md");
     await writeFile(globalPath, "a".repeat(32 * 1024));
     await writeFile(join(root, "AGENTS.md"), "Use project conventions.");
 
     await expect(loadInstructionChain(root, undefined, globalPath)).resolves.toEqual({
-      entries: [{ source: "~/.pi/agent/AGENTS.md", content: "a".repeat(32 * 1024) }],
+      entries: [
+        { source: "~/.pi/agent/AGENTS.md", content: "a".repeat(32 * 1024) },
+        { source: "AGENTS.md", content: "Use project conventions." },
+      ],
     });
+  });
+
+  it("labels global truncation and independently retains a full project budget", async () => {
+    root = await mkdtemp(join(tmpdir(), "pi-desktop-instructions-"));
+    const globalPath = join(root, "global-AGENTS.md");
+    await writeFile(globalPath, "g".repeat(40_000));
+    await writeFile(join(root, "AGENTS.md"), "p".repeat(32 * 1024));
+    const chain = await loadInstructionChain(root, undefined, globalPath);
+    expect(chain!.entries).toHaveLength(2);
+    expect(chain!.entries[0].content).toContain(
+      "[PI-Desktop truncated ~/.pi/agent/AGENTS.md: loaded the first 32768 of 40000 bytes;",
+    );
+    expect(chain!.entries[1].content).toBe("p".repeat(32 * 1024));
+  });
+
+  it("does not load a nested file from the few bytes left after Unicode truncation", async () => {
+    root = await mkdtemp(join(tmpdir(), "pi-desktop-instructions-"));
+    await mkdir(join(root, "nested"));
+    await writeFile(join(root, "AGENTS.md"), "中".repeat(20_000));
+    await writeFile(join(root, "nested", "AGENTS.md"), "x");
+    const chain = await loadProjectInstructions(root, "nested/file.ts");
+    expect(chain!.entries).toHaveLength(1);
+    expect(chain!.entries[0].content).toContain("PI-Desktop truncated AGENTS.md");
   });
 });
 

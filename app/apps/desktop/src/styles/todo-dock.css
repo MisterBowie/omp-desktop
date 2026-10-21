@@ -1,0 +1,27 @@
+.todo-dock {
+  width: 100%;
+  margin: 0 0 6px;
+  flex-shrink: 0;
+  color: var(--ds-text-secondary);
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+.todo-dock-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  text-align: left;
+}
+.todo-dock-toggle > svg { margin-left: auto; flex-shrink: 0; }
+.todo-dock-toggle > svg.is-expanded { transform: rotate(180deg); }
+.todo-dock-current { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.todo-dock-list { max-height: 220px; overflow: auto; padding: 0 10px 8px; }
+.todo-dock-list ul { list-style: none; margin: 0; padding: 0; }
+.todo-dock-phase { margin: 6px 0; color: var(--ds-text-primary); font-weight: 600; }
+.todo-dock-row { display: flex; gap: 8px; padding: 4px 0; overflow-wrap: anywhere; }
+.todo-dock-symbol { width: 14px; flex-shrink: 0; }
+.todo-dock-blocker { display: block; color: var(--ds-text-tertiary); }
+.todo-abandoned { opacity: .6; text-decoration: line-through; }

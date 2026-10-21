@@ -1,0 +1,249 @@
+{
+  "schema": "omp-desktop.release-progress/1",
+  "date": "2026-10-20",
+  "version": "0.1.3",
+  "status": "first-source-gate-failed-fixture-repaired",
+  "branch": "codex/mnemopi-memory",
+  "includedThread": {
+    "id": "01a1574a-a5fe-7633-a5c2-53c9e0df2043",
+    "title": "排查 Claude 上下文识别",
+    "sourceWorktree": "/Users/vv/person/omp-desktop/.worktrees/provider-context-window",
+    "originalBase": "8233c81398c170808c99aedc7bb525b47eeac467"
+  },
+  "commits": {
+    "memory": "ce74c76e",
+    "provider": "bd3e6416",
+    "native": "edec3898d44071206ec201beebea432a2786bd8c"
+  },
+  "nativePatchLevel": "62bc57b+omp-desktop.7",
+  "nativePushed": true,
+  "mainAncestor": "a23bfb9befea327e7924efd3004e030a11b587d2",
+  "localChecks": {
+    "build": 0,
+    "desktopTypecheck": 0,
+    "lint": 0,
+    "docs": {
+      "exitCode": 0,
+      "localePairs": 80,
+      "pages": 521
+    },
+    "releaseDocs": 0,
+    "runtime": {
+      "passed": 565,
+      "failed": 0,
+      "files": 38
+    },
+    "desktop": {
+      "passed": 222,
+      "failed": 0,
+      "skipped": 0
+    },
+    "sharedSource": {
+      "passed": 500,
+      "files": 45
+    },
+    "agentRuntimeTargeted": {
+      "passed": 46,
+      "files": 3
+    },
+    "host": {
+      "passed": 648,
+      "failed": 0
+    },
+    "releaseScripts": {
+      "passed": 31,
+      "failed": 0
+    },
+    "nativeMemoryE2e": {
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    "memoryUiE2e": {
+      "ok": true,
+      "restart": true
+    },
+    "rustFmt": 0,
+    "clippy": 0,
+    "workflows": {
+      "yaml": 7,
+      "bash": 100,
+      "inlineJs": 4,
+      "ok": true
+    }
+  },
+  "evidence": [
+    {
+      "file": "Version-013-release-20261020/version-bump.log.gz",
+      "bytes": 335,
+      "sha256": "9b9f20b7aa8adbadbb30c7a0cce3f93a88edae558f0c99a25212a4dcc7743e51",
+      "uncompressedSha256": "24d5836518b3a44265ea20961a1b4c6d1097ebdf2acf750649e0f7f9fce4bf0f"
+    },
+    {
+      "file": "Version-013-release-20261020/build.log.gz",
+      "bytes": 4547,
+      "sha256": "3eea50cc4b206afdd7ed32f01b115e9b10201cc965f7f22bd94a34d942e99f15",
+      "uncompressedSha256": "ac6ce043887a171708a7ff96bc249ea2fd941f546d3b8cdbf320828e692c87e7"
+    },
+    {
+      "file": "Version-013-release-20261020/native-build.log.gz",
+      "bytes": 683,
+      "sha256": "ee47e7587bd3536d27b862c57a69bc37c33baf7ce6d6aa0e0b8c9d0a8309f39b",
+      "uncompressedSha256": "037830b970d15e17497105a07c48294b4b768841086c0c2862a18dac8b07830d"
+    },
+    {
+      "file": "Version-013-release-20261020/host-tests.log.gz",
+      "bytes": 13009,
+      "sha256": "cb87647cdee69a3a1c797686a3ce94baaef637bf9e60a0664c1ae9521bf757d4",
+      "uncompressedSha256": "298591e3f7e12cc313567073f9ddf3eb36d6135374e5d30992af0d667a18c70a"
+    },
+    {
+      "file": "Version-013-release-20261020/release-tests.log.gz",
+      "bytes": 1222,
+      "sha256": "913bc18ab1af4f8652c69e3de0252e9d5a25d55fdd3555f160adf94ddf4bf308",
+      "uncompressedSha256": "73233102068c8fa6332692ec922c173e0e4ad676d32ea254847ecd3b9af7069e"
+    },
+    {
+      "file": "Version-013-release-20261020/runtime-tests.log.gz",
+      "bytes": 330,
+      "sha256": "374edc7d470286f61aa243d76be05da5628ed9ec332eeeaa0599d760cc2dc568",
+      "uncompressedSha256": "14748dee5e14330690119a9f02367b692e40d6a5f79e45c34cc9d6d48ba2c0d6"
+    },
+    {
+      "file": "Version-013-release-20261020/shared-tests.log.gz",
+      "bytes": 215,
+      "sha256": "8db5ec64c8bf95d9c1a8e1e5b4f2bd5f0ed9f9e294fca1174581977f4575b08e",
+      "uncompressedSha256": "cb18d5df12c0058481f9dea69fa7317d51cd61967442d5b7b2419146359aa4f5"
+    },
+    {
+      "file": "Version-013-release-20261020/agent-tests.log.gz",
+      "bytes": 214,
+      "sha256": "caa710142eb2f89a9f9a87842bce7d0ba1597dc78c69357fe6d9141841dca809",
+      "uncompressedSha256": "1321b6d2cb9c0c7f78909c5f74b83c9286adbc1d78c2904be1cb52998a241937"
+    },
+    {
+      "file": "Version-013-release-20261020/desktop-tests.log.gz",
+      "bytes": 6864,
+      "sha256": "fa4e82849aa04ed5f10860dda1bec48fe089fd23313079d295b37d2daeef2fa1",
+      "uncompressedSha256": "fcb7ac682d0478168c2540b00e39f1671685b1875cc6e4054b97d7e1e3ddc83e"
+    },
+    {
+      "file": "Version-013-release-20261020/types.log.gz",
+      "bytes": 129,
+      "sha256": "3a6e948bd59041bd4fc8d33b3816e753a394079a7f2b8cb44ef5b6b24bac9005",
+      "uncompressedSha256": "a40e5da4c41e99306bc357571061f6a868abeb2f9d9fa1f209c6c5dd8e9450e9"
+    },
+    {
+      "file": "Version-013-release-20261020/lint.log.gz",
+      "bytes": 245,
+      "sha256": "ba145ace58744135257ff58a3c43d0307eeb2c2016efaca39024bbab870bd049",
+      "uncompressedSha256": "9dbe1cb21dd4e44da6ffe519adfe58548aef129c5535f0461027f3d6644c3e7c"
+    },
+    {
+      "file": "Version-013-release-20261020/docs.log.gz",
+      "bytes": 418,
+      "sha256": "4a92afc7d5ba4035de19dc4940ac53a486468d8c9362af3469c162352b8fba9a",
+      "uncompressedSha256": "72a1edcc80269bee79b4e34ac5b57a8ef150045f4567e25adece46adffe076f3"
+    },
+    {
+      "file": "Version-013-release-20261020/release-docs.log.gz",
+      "bytes": 162,
+      "sha256": "ebf93805c50d8c9f4e44b478d56d738116eaaf276d2e4688c7865211f1403f82",
+      "uncompressedSha256": "33d6bc6d9d60f6d125dfbf1bd80b1163b38aef6a958142e7e4d104fdb90777d5"
+    },
+    {
+      "file": "Version-013-release-20261020/fmt.log.gz",
+      "bytes": 20,
+      "sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "uncompressedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "Version-013-release-20261020/host-build.log.gz",
+      "bytes": 165,
+      "sha256": "fc3c849654b7dd8fba37663cf015401f4fe2cad2f86e46be0a84341f2c27e7ac",
+      "uncompressedSha256": "604ec920347c2127104d2661cc0dbfab3637ca210e67d52dd919aa49a3f3aaba"
+    },
+    {
+      "file": "Version-013-release-20261020/clippy.log.gz",
+      "bytes": 164,
+      "sha256": "a4fd7f0fede58d2b577d81f42ba5c7e39ecc42395b9b8613b59a4687e48cc072",
+      "uncompressedSha256": "7a952866a4ed344966a5fecc56ddca06affe13215914e666e786cff043cb0e8e"
+    },
+    {
+      "file": "Version-013-release-20261020/workflow-check.log.gz",
+      "bytes": 65,
+      "sha256": "89b6493950d3a91df4e3c5b74768324b63af86fb17dcf93d9347684d9f0708fc",
+      "uncompressedSha256": "18b2056c74f5788aaf61139c9a01a37da0ec5b1162eb501a8f23f52f8cb40301"
+    },
+    {
+      "file": "Version-013-release-20261020/native-e2e.log.gz",
+      "bytes": 201,
+      "sha256": "0cf6eb5c92e2cb7bea9da453ce72861f6c14917cf18166f304b72cead52053c7",
+      "uncompressedSha256": "4a76e1ae6010949cb671d308c1c346be88bfa3d7f53047960575fdadc44a770d"
+    },
+    {
+      "file": "Version-013-release-20261020/ui-e2e.log.gz",
+      "bytes": 64,
+      "sha256": "a831fcabe71ada140c7e11394ad10760b12642c6ad2159dc03db8c30fdef6f11",
+      "uncompressedSha256": "04d81aab3d221d14d139db991fbbe956afe86bcc936d2e759d684972879e208b"
+    }
+  ],
+  "candidateRun": 39369317625,
+  "published": false,
+  "paidModelCalled": false,
+  "userDataMigrated": false,
+  "userConfirmedVersion": true,
+  "candidateRuns": [
+    {
+      "id": 39369317625,
+      "sourceRevision": "5c27bd59f242e0f7429d52794170964b4cb529ac",
+      "tag": "release-check-0.1.3-memory-models-5c27bd59",
+      "sourceGate": "failure",
+      "failedTest": "app/apps/desktop/test/omp-session-ipc-result.test.mjs",
+      "diagnosticBranch": "codex/source-test-diagnostic-39369317625",
+      "cause": "Sibling IPC registrar mock omitted the newly imported memory registrar.",
+      "repair": "Add the explicit no-op sibling registrar; keep all existing real Result/error and Cursor-gate assertions.",
+      "published": false,
+      "nativeJobs": "Mac ARM success observed; other targets still running at repair time."
+    }
+  ],
+  "fixedLocalCandidate": {
+    "sourceRevision": "5c27bd59f242e0f7429d52794170964b4cb529ac",
+    "integration": {
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    "electronUi": {
+      "ok": true,
+      "restart": true
+    },
+    "strictPlanGoal": {
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "repairValidation": {
+    "ipcBefore": {
+      "passed": 0,
+      "failed": 1
+    },
+    "ipcAfter": {
+      "passed": 6,
+      "failed": 0
+    },
+    "combinedTargeted": {
+      "passed": 23,
+      "failed": 0,
+      "skipped": 0
+    },
+    "workflowSyntax": {
+      "yaml": 7,
+      "bash": 100,
+      "inlineJs": 4
+    },
+    "productRuntimeChanged": false,
+    "note": "Explicitly unset memory-test overrides in the parent shell before the installed smoke. InstalledApplication already uses a separate allowlisted child environment; no prior installed-host contamination is claimed."
+  }
+}

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createServer } from "node:http";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,6 +30,8 @@ const send = (msg) => process.stdout.write(JSON.stringify(msg) + "\\n");
 const text = (id, value, isError) =>
   send({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: value }], ...(isError ? { isError: true } : {}) } });
 let roundtripId = null;
+const cancellations = [];
+let heldId = null;
 process.stdin.setEncoding("utf8");
 let buffer = "";
 process.stdin.on("data", (chunk) => {
@@ -54,6 +56,10 @@ function handle(msg) {
     return;
   }
   if (msg.method === "notifications/initialized") return;
+  if (msg.method === "notifications/cancelled") {
+    cancellations.push(msg.params);
+    return;
+  }
   if (msg.method === "tools/list") {
     if (!msg.params || !msg.params.cursor) {
       send({
@@ -74,7 +80,11 @@ function handle(msg) {
   }
   if (msg.method === "tools/call") {
     const name = msg.params.name;
-    if (name === "echo") return text(msg.id, String(msg.params.arguments.text));
+    if (name === "echo") {
+      if (msg.params.arguments.hold) { heldId = msg.id; return; }
+      if (msg.params.arguments.cancellations) return text(msg.id, JSON.stringify({ heldId, cancellations }));
+      return text(msg.id, String(msg.params.arguments.text));
+    }
     if (name === "env") {
       return text(msg.id, [process.env.PI_PLUGIN_ID, process.env.STUB_TOKEN, process.env.PI_LEAKED_SECRET ?? "absent"].join("|"));
     }
@@ -98,6 +108,28 @@ function stdioPlugin() {
   writeFileSync(join(dir, "server.mjs"), STDIO_SERVER);
   return dir;
 }
+
+test("a timed-out stdio tool receives cancellation and the session remains callable", async (t) => {
+  const dir = stdioPlugin();
+  const client = new McpServerClient({
+    rootPath: dir,
+    server: { id: "stub", transport: "stdio", command: "node", args: ["./server.mjs"] },
+    values: { STUB_PID_FILE: join(dir, "pid") },
+    connectTimeoutMs: 5_000,
+    callTimeoutMs: 500,
+  });
+  t.after(() => { client.close(); rmSync(dir, { recursive: true, force: true }); });
+  await client.connect();
+  await assert.rejects(client.callTool("echo", { hold: true }), (error) => error.code === "TIMEOUT");
+  // Stdio ordering makes this receipt deterministic without polling or sleep.
+  const receipt = await client.callTool("echo", { cancellations: true });
+  const { heldId, cancellations } = JSON.parse(describeMcpContent(receipt.content));
+  assert.equal(cancellations.length, 1);
+  assert.equal(typeof cancellations[0].requestId, "number");
+  assert.equal(cancellations[0].requestId, heldId);
+  assert.equal(cancellations[0].reason, "timeout");
+  assert.equal(client.isConnected(), true);
+});
 
 test("a stdio mcp server is handshaken, paginated and callable", async (t) => {
   const dir = stdioPlugin();

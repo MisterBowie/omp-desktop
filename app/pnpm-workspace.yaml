@@ -23,16 +23,25 @@ overrides:
   '@tailwindcss/node>lightningcss': 1.33.0
   # Ships in the app. mermaid allows ^3.3.3 but resolves its own copy, so the
   # renderer would load an unpatched sanitizer next to our patched one.
-  dompurify@3: '>=3.4.13 <4' # detached-subtree XSS, via mermaid
-  # Build toolchain only (electron-builder, node-gyp) — never reaches users.
-  # Kept current so `pnpm audit` stays quiet and a finding that *does* reach
-  # users stands out.
-  brace-expansion@1: '>=1.1.17 <2' # GHSA via minimatch@3
-  brace-expansion@2: '>=2.1.4 <3' # GHSA via @electron/universal, jake
-  brace-expansion@5: '>=5.0.9 <6' # GHSA via app-builder-lib
-  fast-uri@3: '>=3.1.5 <4' # GHSA via ajv@8
-  undici@6: '>=6.28.0 <7' # GHSA via node-gyp@12
-  js-yaml@4: '>=4.3.1 <5' # CVE-2026-59870 via app-builder-lib
+  dompurify@3: '>=3.4.17 <4' # renderer and Mermaid sanitizer
+  # Both packaging tools and the Pi-compatible runtime consume these ranges.
+  brace-expansion@1: '>=1.1.21 <2' # GHSA via minimatch@3
+  brace-expansion@2: '>=2.1.7 <3' # GHSA via @electron/universal, jake
+  brace-expansion@5: '>=5.0.12 <6' # GHSA via app-builder-lib and pi-coding-agent
+  fast-uri@3: '>=3.1.8 <4' # GHSA via ajv@8
+  undici@6: '>=6.28.1 <7' # GHSA via node-gyp@12
+  undici@7: '>=7.29.1 <8' # pi-ai and Electron downloader
+  js-yaml@4: '>=4.3.2 <5' # electron-updater and app-builder-lib
+  '@xmldom/xmldom@0.8': '>=0.8.15 <0.9' # electron-builder plist parser
+  '@xmldom/xmldom@0.9': '>=0.9.12 <0.10'
+  http-cache-semantics@4: '>=4.3.0 <5' # Electron downloader cache policy
+  source-map-js@1: '>=1.2.2 <2' # Vite/PostCSS
+  vue@3: '>=3.5.42 <4' # VitePress server renderer
+  vitest@4: '>=4.1.11 <5' # redirect-mock arbitrary file reads
+  # rehype-katex 7 still requests 0.16; keep it and the renderer on the same
+  # patched line. Math rendering and trust restrictions are regression-tested.
+  # Pin the reviewed fix: 0.18.11 was deprecated for accidental breaking changes.
+  katex@0.16: '0.18.2'
   # Docs site only. vitepress 1.6.4 asks for vite ^5.4.14 and no vite 5 is
   # patched — the fixes for all four advisories (server.fs.deny bypass, esbuild
   # dev-server CORS, optimized-deps `.map` traversal, launch-editor UNC) land in

@@ -49,3 +49,14 @@ jobs:
       source-revision: ${{ needs.bind.outputs.revision }}
       artifact-run-id: ${{ needs.bind.outputs.run }}
       tag: ${{ needs.bind.outputs.tag }}
+
+  readback:
+    needs: [bind, publish]
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/readback-published-release.yml
+    with:
+      source-revision: ${{ needs.bind.outputs.revision }}
+      artifact-run-id: ${{ needs.bind.outputs.run }}
+      tag: ${{ needs.bind.outputs.tag }}

@@ -44,16 +44,17 @@ test("main opens only a resolved session scratch directory", () => {
   assert.doesNotMatch(handler, /input\.path/);
 });
 
-test("developer-mode conversation overflow copies the id then opens scratch", () => {
-  assert.match(sidebarSource, /data-action="copy-conversation-id"/);
-  assert.match(sidebarSource, /navigator\.clipboard\.writeText\(session\.id\)/);
+test("ordinary copy actions precede the developer-only scratch action", () => {
+  assert.match(sidebarSource, /<SessionCopyActions projectPath=\{session\.projectPath\}/);
+  assert.match(sidebarSource, /kind === "id" \? session\.id/);
+  assert.match(sidebarSource, /navigator\.clipboard\.writeText\(text\)/);
   assert.match(sidebarSource, /data-action="open-session-path"/);
   assert.match(sidebarSource, /api\.openSessionScratchPath\(session\.id\)/);
   assert.doesNotMatch(sidebarSource, /data-action="copy-session-path"/);
   assert.doesNotMatch(sidebarSource, /data-action="open-session-folder"/);
   assert.doesNotMatch(sidebarSource, /copySessionPath/);
 
-  const copyIndex = sidebarSource.indexOf('data-action="copy-conversation-id"');
+  const copyIndex = sidebarSource.indexOf('<SessionCopyActions projectPath={session.projectPath}');
   const openIndex = sidebarSource.indexOf('data-action="open-session-path"');
   const deleteIndex = sidebarSource.indexOf('data-action="delete-session"');
   assert.ok(copyIndex > 0 && openIndex > copyIndex && deleteIndex > openIndex);
@@ -62,7 +63,7 @@ test("developer-mode conversation overflow copies the id then opens scratch", ()
     sidebarSource.indexOf("settings?.developerMode === true"),
     deleteIndex,
   );
-  assert.match(developerBlock, /copy-conversation-id/);
+  assert.doesNotMatch(developerBlock, /SessionCopyActions/);
   assert.match(developerBlock, /open-session-path/);
 });
 

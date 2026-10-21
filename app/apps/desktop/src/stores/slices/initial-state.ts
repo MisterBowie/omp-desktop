@@ -61,6 +61,7 @@ export function createInitialState(): AppStateData {
     latestTurnResults: {},
     sessionOutcomes: {},
     sessionCompactions: {},
+    sessionTodos: {},
     providers: [],
     providerModels: {},
     plugins: [],

@@ -712,8 +712,13 @@ export function registerWorkspaceIpc({
     return browserHost.getState();
   });
 
-  const requireWorkspaceRoot = async () => {
+  const requireWorkspaceRoot = async (sessionId?: string) => {
     if (!host) throw new Error("host unavailable");
+    if (sessionId) {
+      const result = await host.call<{path?: string}>("session.executionRoot", {sessionId});
+      if (!result.path) throw Object.assign(new Error("session execution root unavailable"), {errorCode: "WORKTREE_MISSING"});
+      return result.path;
+    }
     const res = (await host.call("workspace.get")) as {
       workspace: { path: string } | null;
     };
@@ -726,8 +731,8 @@ export function registerWorkspaceIpc({
     return root;
   };
 
-  handle(IPC.invoke.fsList, async (input: { path?: string } = {}) => {
-    const root = await requireWorkspaceRoot();
+  handle(IPC.invoke.fsList, async (input: { path?: string; sessionId?: string } = {}) => {
+    const root = await requireWorkspaceRoot(input.sessionId);
     return { entries: await listDir(root, String(input.path ?? "")) };
   });
 
@@ -781,7 +786,8 @@ export function registerWorkspaceIpc({
     return [{ path: workspaceRoot, name, primary: true }];
   };
 
-  const optionalWorkspaceRoot = async (): Promise<string | null> => {
+  const optionalWorkspaceRoot = async (sessionId?: string): Promise<string | null> => {
+    if (sessionId) return requireWorkspaceRoot(sessionId);
     try {
       return await requireWorkspaceRoot();
     } catch {
@@ -791,12 +797,13 @@ export function registerWorkspaceIpc({
 
   handle(
     IPC.invoke.fsRead,
-    async (input: { path?: string; mimeType?: string } = {}) => {
+    async (input: { path?: string; mimeType?: string; sessionId?: string } = {}) => {
       const requested = String(input.path ?? "").trim();
       let workspaceRoot: string | null = null;
       try {
-        workspaceRoot = await requireWorkspaceRoot();
+        workspaceRoot = await requireWorkspaceRoot(input.sessionId);
       } catch (error) {
+        if (input.sessionId) throw error;
         if (!isAbsolute(requested) && !isAttachmentBlobRef(requested)) {
           throw error;
         }
@@ -824,12 +831,13 @@ export function registerWorkspaceIpc({
     },
   );
 
-  handle(IPC.invoke.fsReveal, async (input: { path?: string } = {}) => {
+  handle(IPC.invoke.fsReveal, async (input: { path?: string; sessionId?: string } = {}) => {
     const requested = String(input.path ?? "").trim();
     let workspaceRoot: string | null = null;
     try {
-      workspaceRoot = await requireWorkspaceRoot();
+      workspaceRoot = await requireWorkspaceRoot(input.sessionId);
     } catch (error) {
+      if (input.sessionId) throw error;
       if (!isAbsolute(requested) && !isAttachmentBlobRef(requested)) {
         throw error;
       }
@@ -887,9 +895,12 @@ export function registerWorkspaceIpc({
       const ref = String(input.ref ?? "").trim();
       if (!ref) return { match: null };
       const workspaceRoot = await optionalWorkspaceRoot();
+      const owner = input.sessionId && !input.sessionId.startsWith("native-pi:") && !input.sessionId.startsWith("remote:")
+        ? await host?.call<{session?: {worktree?: unknown}}>("session.get", {id: input.sessionId, messageLimit: 1}) : null;
+      const executionRoot = owner?.session?.worktree ? await requireWorkspaceRoot(input.sessionId) : workspaceRoot;
       return {
         match: await resolveChatFileRef(ref, {
-          project: projectRootsFor(workspaceRoot),
+          project: projectRootsFor(executionRoot),
           scratch: await sessionScratchRoot(input.sessionId),
           attachments: join(dataDir, "attachments"),
         }),

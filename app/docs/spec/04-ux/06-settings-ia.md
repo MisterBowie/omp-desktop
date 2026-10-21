@@ -807,3 +807,10 @@ the current window width:
 | Card radius | ~14px elevated stroke |
 | Toggle | **32×20** thumb 16, neutral accent on (not green) |
 | Open-target pill | leading VS Code glyph |
+
+### Automatic memory
+
+The Agent group contains a Memory destination with independent opt-in save and
+recall switches, cost/scope guidance, a project/worktree selector and a paginated
+text browser. A second click confirms clear for that exact scope; changing scope
+invalidates confirmation and late results. See [Automatic OMP memory](../03-runtime/22-automatic-memory.md).

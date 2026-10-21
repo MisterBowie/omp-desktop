@@ -70,6 +70,45 @@ function killSpy({ fail = {} } = {}) {
 /* Ownership                                                              */
 /* --------------------------------------------------------------------- */
 
+test("a reused parent PID never claims a process older than the current parent", () => {
+  const table = tableOf(
+    entryOf({ pid: 100, starttime: "133000000000000000" }),
+    entryOf({ pid: 500, ppid: 100, starttime: "133000000000000002" }),
+    entryOf({ pid: 501, ppid: 500, starttime: "133000000000000003" }),
+    // Its original parent exited before pid 500 became this run's root.
+    entryOf({ pid: 600, ppid: 500, starttime: "133000000000000001" }),
+    entryOf({ pid: 601, ppid: 600, starttime: "133000000000000004" }),
+  );
+  const snapshot = collectOwnedProcesses({ table, selfPid: 100, roots: [{ pid: 500, starttime: "133000000000000002" }] });
+  assert.deepEqual(snapshot.processes.map(p => p.pid), [500, 501]);
+  assert.ok(snapshot.ignored.some(p => p.pid === 600 && p.reason === "parent-reused"));
+});
+
+test("creation timestamp ordering preserves decimal precision and equal-time children", () => {
+  const birth = "1783000000.000000000000000002";
+  const table = tableOf(
+    entryOf({ pid: 100, starttime: "1" }),
+    entryOf({ pid: 500, ppid: 100, starttime: birth }),
+    entryOf({ pid: 501, ppid: 500, starttime: birth }),
+    entryOf({ pid: 600, ppid: 500, starttime: "1783000000.000000000000000001" }),
+  );
+  const snapshot = collectOwnedProcesses({ table, selfPid: 100, roots: [{ pid: 500, starttime: birth }] });
+  assert.deepEqual(snapshot.processes.map(p => p.pid), [500, 501]);
+});
+
+test("an unverifiable parent edge is refused while unique run-root evidence remains valid", () => {
+  const table = tableOf(
+    entryOf({ pid: 100, starttime: "1" }),
+    entryOf({ pid: 500, ppid: 100, starttime: "2" }),
+    entryOf({ pid: 501, ppid: 500, starttime: "" }),
+    entryOf({ pid: 600, ppid: 500, starttime: "1", argv: ["omp", `${RUN_ROOT}/owned-state`] }),
+  );
+  const snapshot = collectOwnedProcesses({ table, selfPid: 100, roots: [{ pid: 500, starttime: "2" }], runRoots: [RUN_ROOT] });
+  assert.deepEqual(snapshot.processes.map(p => p.pid), [500, 600]);
+  assert.equal(snapshot.processes.find(p => p.pid === 600).ownership, "argv-run-root");
+  assert.ok(snapshot.ignored.some(p => p.pid === 501 && p.reason === "parent-birth-unverified"));
+});
+
 test("the archived misclassification: a launcher that names the shared tree is not owned", () => {
   // Shape of the two real review runs: the Python verifier spawns the node
   // harness (this process), which spawns the Electron root. The verifier's
