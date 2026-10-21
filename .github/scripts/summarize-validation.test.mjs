@@ -42,3 +42,14 @@ test("process ancestry diagnostics detect a reused parent id without publishing 
  assert.equal(result.processes[0].childPredatesParent,true);
  assert.doesNotMatch(JSON.stringify(result),/PRIVATE|1234|5678|133000/);
 });
+
+test("memory validation exposes only fixed outcomes and public source coordinates",t=>{
+ const root=mkdtempSync(join(tmpdir(),"omp-memory-summary-"));t.after(()=>rmSync(root,{recursive:true,force:true}));
+ const dir=join(root,"validation-win32-x64","automatic-memory");mkdirSync(dir,{recursive:true});
+ writeFileSync(join(dir,"native.tap"),"# tests 1\n# pass 0\n# fail 1\n# skipped 0\nnot ok 1 - native Mnemopi persists across processes, isolates projects, obeys switches and clears without restoring old history\n  code: 'ENOENT'\n  error: PRIVATE_SECRET\n  stack: /PRIVATE/omp-memory-native-e2e.test.mjs:152:12\n");
+ writeFileSync(join(dir,"ui.txt"),'MEMORY_SETTINGS_PROBE '+JSON.stringify({ok:false,error:"PRIVATE_SECRET",restart:true}));
+ const [summary]=summarizeValidation(root);
+ assert.equal(summary.memory.nativePassed,false);assert.equal(summary.memory.uiPassed,false);assert.equal(summary.memory.uiRestart,true);
+ assert.deepEqual(summary.memory.nativeErrors,["ENOENT"]);assert(summary.memory.nativeSource.some(item=>item.line===152));
+ assert.doesNotMatch(JSON.stringify(summary),/PRIVATE|SECRET|restoring old history/);
+});
