@@ -1482,6 +1482,18 @@ HANDOFF、任务板、ADR 0307 与本节中记为**部分完成**（后续进度
 
 ### 18.1 读取
 
+首次发送的标题更新可能与提示词准备并发。一次性改名操作在同一条目已有提示词
+准备中或运行中时必须保留运行时。提交时捕获的引用仍为空，则复用当前存活 runner
+已经建立的原生身份，不得另建第二个会话。独立空闲改名仍回收运行时，清理未完成
+继续拒绝提示词。工具调用之间的助手正文在实时和历史投影中逐字保留，包括单独的
+`.`；只有思考或工具调用的消息不代表存在被省略的助手答案。
+
+DeepSeek 直连 Completions 路径的模型投影显式设置
+`compat.requiresAssistantContentForToolCalls: false`：没有正文的助手工具调用在
+后续请求中保持为空，与 Pi 的历史回传一致，不让 OMP 默认合成的 `.` 进入模型历史。
+真实正文（包括真实的点）、`reasoning_content`、工具 ID 和结果保持。此覆盖不影响
+Responses 或其他端点，不改写已保存的原生消息，也不隐藏文字。
+
 `OmpSessionBridge.readHistory` 把 `{ entries, leafId }` 投影成桌面行：从 `leafId`
 沿 `parentId` 走活动分支到根，消息 entry 经与实时流相同的转换器投影，行的 id 为
 `omp:<session>:entry:<entryId>`——跨读取稳定。工具行在其 `toolCallId` 于该分支唯一时以它作为行 id

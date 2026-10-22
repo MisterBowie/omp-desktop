@@ -1,0 +1,11 @@
+✔ native DeepSeek tool replay preserves empty content like Pi without inventing a dot (3472.897209ms)
+✔ native first send shares the title runtime and preserves text between tools in live and restored rows (4114.8085ms)
+✔ native OMP: steer, Todo history, namespaced Skill follow-up, compact, and cancel (16142.880708ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 17288.6555

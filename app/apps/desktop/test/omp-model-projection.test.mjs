@@ -22,6 +22,26 @@ const {
 
 const CANARY = "omp-m4-canary-not-a-real-key";
 
+test("disables synthetic tool-call prose only for DeepSeek Completions endpoints", () => {
+  const source = {
+    id: "fixture", baseUrl: "https://api.deepseek.com/v1", apiStyle: "chat_completions", authKind: "none",
+    models: [{ id: "deepseek-flash", providerCapabilities: { reasoning: true } }],
+  };
+  function document() {
+    const result = resolveProviderProjection(source, "deepseek-flash", null);
+    assert.equal(result.ok, true);
+    return parseYaml(projectModelsYaml(result.projection)).providers.fixture.models[0];
+  }
+  assert.equal(document().compat.requiresAssistantContentForToolCalls, false);
+  source.baseUrl = "https://relay.invalid/v1";
+  assert.equal(document().compat, undefined, "a relayed model keeps its endpoint's native compatibility");
+  source.baseUrl = "https://api.moonshot.ai/v1";
+  assert.equal(document().compat, undefined, "Kimi's tool-content requirements remain owned by OMP");
+  source.baseUrl = "https://api.deepseek.com/v1";
+  source.apiStyle = "responses";
+  assert.equal(document().compat, undefined, "a Completions override must not alter Responses");
+});
+
 test("projects published reasoning and image support into the actual OMP model document", () => {
   const source = {
     id: "fixture", baseUrl: "https://provider.invalid/v1", apiStyle: "chat_completions", authKind: "none",

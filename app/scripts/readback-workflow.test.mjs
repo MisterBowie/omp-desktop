@@ -10,7 +10,7 @@ import { parse } from "yaml";
 const workflow = parse(readFileSync(new URL("../../.github/workflows/readback-published-release.yml", import.meta.url), "utf8"));
 const script = workflow.jobs.readback.steps.find(step => step.id === "release").run;
 const revision = "a".repeat(40);
-for (const [tag, version] of [["v0.1.3", "0.1.3"], [`v0.1.2+skill.${revision}`, "0.1.2"], ["v0.1.3-extra", null]]) {
+for (const [tag, version] of [["v0.1.3", "0.1.3"], [`v0.1.2+skill.${revision}`, "0.1.2"], [`v0.1.4+chatfix.${revision}`, "0.1.4"], ["v0.1.3-extra", null]]) {
   test(`public readback binds its requested version: ${version ?? "invalid tag"}`, t => {
     const root = mkdtempSync(join(tmpdir(), "omp-readback-bind-"));
     t.after(() => rmSync(root, { recursive: true, force: true }));

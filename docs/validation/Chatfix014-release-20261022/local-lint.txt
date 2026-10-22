@@ -1,0 +1,13 @@
+
+> pi-desktop@0.1.4 lint /Users/vv/person/omp-desktop/.worktrees/fix-omp-first-response/app
+> pnpm lint:biome && pnpm -r --if-present lint
+
+
+> pi-desktop@0.1.4 lint:biome /Users/vv/person/omp-desktop/.worktrees/fix-omp-first-response/app
+> biome lint
+
+Checked 92 files in 171ms. No fixes applied.
+Scope: 12 of 13 workspace projects
+apps/desktop lint$ node ../../scripts/check-style-tokens.mjs
+apps/desktop lint: style tokens OK
+apps/desktop lint: Done

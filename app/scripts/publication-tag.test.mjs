@@ -15,6 +15,12 @@ test("same-version publication binds build metadata to the complete source revis
   });
   assert.throws(() => publicationTag({ tag, revision: "b".repeat(40), sameVersionRevision: true }));
 });
+test("chat reliability revisions keep 0.1.4 and bind their own immutable source", () => {
+  const chatTag = `v0.1.4+chatfix.${revision}`;
+  assert.equal(publicationTag({ tag: chatTag, revision, sameVersionRevision: true }).version, "0.1.4");
+  assert.throws(() => publicationTag({ tag: chatTag, revision }));
+  assert.throws(() => publicationTag({ tag: chatTag, revision: "b".repeat(40), sameVersionRevision: true }));
+});
 test("unsafe, abbreviated, prerelease and unrelated publication refs are refused", () => {
   for (const bad of ["v0.1.2+skill.aaaaaaa", "v0.1.2-beta.1", `v0.1.2+other.${revision}`, `refs/tags/${tag}`, tag + "/extra", tag + "\n"]) {
     assert.throws(() => publicationTag({ tag: bad, revision, sameVersionRevision: true }));

@@ -1,0 +1,62 @@
+name: Publish the accepted 0.1.4 chat reliability revision
+
+on:
+  push:
+    tags: ['publish-chatfix-v0.1.4-run-*']
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: omp-stable-publication
+  cancel-in-progress: false
+
+jobs:
+  bind:
+    runs-on: ubuntu-22.04
+    outputs:
+      revision: ${{ steps.bind.outputs.revision }}
+      run: ${{ steps.bind.outputs.run }}
+      tag: ${{ steps.bind.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Bind the accepted fixes while protecting the original 0.1.4 release
+        id: bind
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REPOSITORY" == MisterBowie/omp-desktop ]] || exit 1
+          [[ "$GITHUB_REF_NAME" =~ ^publish-chatfix-v0\.1\.4-run-([0-9]+)(-attempt-[0-9]+)?$ ]] || exit 1
+          source_run="${BASH_REMATCH[1]}"
+          [[ "$(node -p "require('./app/package.json').version")" == 0.1.4 ]] || exit 1
+          revision="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$source_run" --jq .head_sha)"
+          [[ "$revision" =~ ^[a-f0-9]{40}$ ]] || exit 1
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/commits/v0.1.4" --jq .sha)" == 87894e73dbc85d65555d3bf61c7d84caa2245a8b ]] || exit 1
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/v0.1.4" --jq .id)" == 419670366 ]] || exit 1
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          echo "run=$source_run" >> "$GITHUB_OUTPUT"
+          echo "tag=v0.1.4+chatfix.$revision" >> "$GITHUB_OUTPUT"
+  publish:
+    needs: bind
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/release-publish.yml
+    with:
+      source-revision: ${{ needs.bind.outputs.revision }}
+      artifact-run-id: ${{ needs.bind.outputs.run }}
+      tag: ${{ needs.bind.outputs.tag }}
+      same-version-revision: true
+  readback:
+    needs: [bind, publish]
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/readback-published-release.yml
+    with:
+      source-revision: ${{ needs.bind.outputs.revision }}
+      artifact-run-id: ${{ needs.bind.outputs.run }}
+      tag: ${{ needs.bind.outputs.tag }}

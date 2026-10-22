@@ -15,7 +15,7 @@
  * any other state.
  */
 
-import { THINKING_LEVELS, modalitiesWithProviderCapabilities, type ProviderModelCapabilities } from "@pi-desktop/shared";
+import { THINKING_LEVELS, isOfficialDeepSeekEndpoint, modalitiesWithProviderCapabilities, type ProviderModelCapabilities } from "@pi-desktop/shared";
 
 /** The OMP `Api` values this build knows how to project from a PI `apiStyle`. */
 const PI_STYLE_TO_OMP_API: Record<string, string> = {
@@ -48,6 +48,7 @@ export type OmpModelProjection = {
   maxTokens?: number;
   reasoning?: boolean;
   input?: Array<"text" | "image">;
+  compat?: { requiresAssistantContentForToolCalls: false };
   thinking?: { mode: "effort"; efforts: string[]; effortMap?: Record<string, string> };
 };
 
@@ -153,6 +154,10 @@ export function resolveProviderProjection(
     ...(model.maxTokens ? { maxTokens: model.maxTokens } : {}),
     ...(reasoning !== undefined ? { reasoning } : {}),
     ...(publishedInput || typeof model.supportsImages === "boolean" ? { input: imageInput ? ["text", "image"] : ["text"] } : {}),
+    // Direct DeepSeek accepts empty tool-call prose. OMP otherwise inserts a
+    // synthetic dot into replay history as if it were model-authored prose.
+    ...(api === "openai-completions" && isOfficialDeepSeekEndpoint({ baseUrl })
+      ? { compat: { requiresAssistantContentForToolCalls: false as const } } : {}),
     // Other transports keep OMP's native budget/adaptive/Google mode resolution.
     ...(reasoning && efforts.length && (capabilities?.thinkingLevels !== undefined || capabilities?.thinkingLevelMap !== undefined) &&
       (api === "openai-completions" || api === "openai-responses")
@@ -247,6 +252,10 @@ export function projectModelsYaml(projection: OmpModelProjection): string {
   if (projection.maxTokens !== undefined && projection.maxTokens > 0) lines.push(yamlField(8, "maxTokens", projection.maxTokens));
   if (projection.reasoning !== undefined) lines.push(yamlField(8, "reasoning", projection.reasoning));
   if (projection.input) lines.push(`        input: ${JSON.stringify(projection.input)}`);
+  if (projection.compat) {
+    lines.push("        compat:");
+    lines.push(yamlField(10, "requiresAssistantContentForToolCalls", projection.compat.requiresAssistantContentForToolCalls));
+  }
   if (projection.thinking) {
     lines.push("        thinking:");
     lines.push(yamlField(10, "mode", projection.thinking.mode));

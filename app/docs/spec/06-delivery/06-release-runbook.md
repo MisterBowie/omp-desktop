@@ -31,6 +31,17 @@ before publication. A local missing-runtime smoke is not a passing gate.
 
 ### Same-version Skill guidance revision
 
+The 2026-10-22 chat reliability revision follows the same protected-asset
+procedure, keeping application version **0.1.4**. Its controller is
+`publish-chatfix-v0.1.4-run-<run-id>` and its source-bound release tag is
+`v0.1.4+chatfix.<full-source-revision>`. It protects original source
+`87894e73dbc85d65555d3bf61c7d84caa2245a8b` and release id `419670366`; publication
+and full public readback compare every original asset identity and digest.
+Both first-response and DeepSeek replay regressions must pass with zero skips
+on every packaged target, with TAP retained under `chat-runtime-fixes` in its
+validation artifact. Existing strict Plan/Goal, memory and installed-product
+gates remain. Existing 0.1.4 installations require a manual download/reinstall.
+
 The 2026-10-19 Skill guidance correction keeps application version **0.1.2**.
 After complete source and all four native gates pass, the dedicated
 `publish-skill-v0.1.2-run-<run-id>` controller publishes the accepted bytes under

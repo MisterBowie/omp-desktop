@@ -22,6 +22,33 @@
   `apps/desktop/test/installed-native-observation.test.mjs`；每个目标仍须通过真实
   安装包验收，证明按序退出且没有自有进程残留。
 
+### E2E-OMP-DeepSeek-empty-tool-replay
+
+- **前提：** 已校验的原生资源、隔离的本机脚本模型，命中 OMP 的 DeepSeek 直连
+  端点识别逻辑；没有付费请求。
+- **步骤：** 流式返回思考和读取调用、不返回正文；再返回真实的点和第二次读取，
+  最后返回答案。以 Pi 序列化器对照第一条工具消息，检查原生后续两次请求体。
+- **预期：** 空正文仍为空，真实的点仍保留，思考和工具 ID 原样回传，工具不修改
+  夹具；停止后进程与临时数据回收。模型投影回归同时保证中转端点、Moonshot 和
+  Responses 沿用原生策略。
+- **自动化：** `OMP_BUNDLED_RESOURCES=<resources> node --test
+  apps/desktop/test/omp-deepseek-replay-e2e.test.mjs` 及
+  `apps/desktop/test/omp-model-projection.test.mjs`。
+
+### E2E-OMP-first-response
+
+- **前提：** 已校验的 OMP 资源、夹具独有项目/数据与本机脚本模型，不连接用户
+  应用实例或付费模型。
+- **步骤：** 冷启动标题更新，暂停其持久化；发送首次提问并暂停目录发现。完成
+  改名后放行提示词，在两次读取工具之间返回完整正文、单独的点和最终答案。
+  读取存活运行时的历史，回收运行时后再从文件读取。
+- **预期：** 一次提示词到达模型，改名不回收提示词借用的运行时；原生身份和
+  标题保持。渲染层结束事件投影及两种历史路径中的三段正文逐字一致，工具不修改
+  夹具，退出回收全部自有资源。
+- **自动化：** `OMP_BUNDLED_RESOURCES=<resources> node --test
+  apps/desktop/test/omp-first-response-e2e.test.mjs`；准备中及运行中两种可控时序另由
+  `omp-session-bridge.test.mjs` 验证。
+
 ### E2E-OMP-session-controls
 
 - **前提：** 经校验的 OMP 18.3.0 打包资源、夹具独有 HOME/项目和本机脚本模型，

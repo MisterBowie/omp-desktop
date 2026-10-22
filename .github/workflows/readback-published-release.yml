@@ -63,7 +63,7 @@ jobs:
           [[ "$GITHUB_REPOSITORY" == MisterBowie/omp-desktop ]]
           [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]]
           [[ "$RELEASE_REVISION" =~ ^[a-f0-9]{40}$ ]]
-          [[ "$RELEASE_TAG" == "v$RELEASE_VERSION" || "$RELEASE_TAG" == "v$RELEASE_VERSION+skill.$RELEASE_REVISION" ]]
+          [[ "$RELEASE_TAG" == "v$RELEASE_VERSION" || "$RELEASE_TAG" == "v$RELEASE_VERSION+skill.$RELEASE_REVISION" || "$RELEASE_TAG" == "v$RELEASE_VERSION+chatfix.$RELEASE_REVISION" ]]
           git diff --exit-code "$RELEASE_TAG" HEAD -- apps/desktop/electron apps/desktop/src packages crates
           mkdir -p .artifacts/published-readback/assets
           gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > .artifacts/published-readback/release.json
@@ -72,7 +72,7 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100" > .artifacts/published-readback/artifacts.json
           node scripts/verify-release-candidate.mjs .artifacts/published-readback/run.json .artifacts/published-readback/jobs.json .artifacts/published-readback/artifacts.json .artifacts/published-readback/accepted.json
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir .artifacts/published-readback/assets
-          if [[ "$RELEASE_TAG" == *+skill.* ]]; then
+          if [[ "$RELEASE_TAG" == *+* ]]; then
             gh api "repos/$GITHUB_REPOSITORY/commits/v$RELEASE_VERSION" > .artifacts/published-readback/protected-tag.json
             gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$RELEASE_VERSION" > .artifacts/published-readback/protected-release.json
           fi
@@ -109,7 +109,7 @@ jobs:
           const control=read('omp-desktop-validation-'+version+'-publication.json');assert.equal(control.version,version);assert.equal(control.sourceRevision,revision);assert.equal(control.candidateRunId,candidateRunId);
           assert.equal(control.releaseTag??'v'+version,tag);
           const escapedVersion=version.replaceAll('.',String.fromCharCode(92)+'.');
-          const prefix=(tag.includes('+')?'publish-skill-v':'publish-v')+escapedVersion+'-run-';
+          const prefix=(tag.includes('+chatfix.')?'publish-chatfix-v':tag.includes('+skill.')?'publish-skill-v':'publish-v')+escapedVersion+'-run-';
           assert.match(control.controllerRef,new RegExp('^'+prefix+candidateRunId+'(?:-attempt-\\d+)?$'));
           assert.equal(execFileSync('git',['rev-parse',control.controllerRef+'^{commit}'],{encoding:'utf8'}).trim(),control.controllerRevision);
           const script=execFileSync('git',['show',control.controllerRevision+':app/scripts/stage-release-inputs.mjs']);assert.equal(createHash('sha256').update(script).digest('hex'),control.stagingScriptSha256);
@@ -119,7 +119,12 @@ jobs:
             assert.equal(control.sameVersionRevision,true);
             const protectedTag=JSON.parse(readFileSync(join(root,'protected-tag.json'))),protectedRelease=JSON.parse(readFileSync(join(root,'protected-release.json')));
             const actual=stableReleaseSnapshot('v'+version,protectedTag.sha,protectedRelease);
-            assert.deepEqual(actual,control.protectedStable);assert.equal(actual.sourceRevision,'21969e58f7d97177795ce06f393e8853c45cfb20');assert.equal(actual.releaseId,416884992);
+            assert.deepEqual(actual,control.protectedStable);
+            if(tag.includes('+chatfix.')){
+              assert.equal(version,'0.1.4');assert.equal(actual.sourceRevision,'87894e73dbc85d65555d3bf61c7d84caa2245a8b');assert.equal(actual.releaseId,419670366);
+            }else{
+              assert.equal(actual.sourceRevision,'21969e58f7d97177795ce06f393e8853c45cfb20');assert.equal(actual.releaseId,416884992);
+            }
             protectedStableUnchanged=true;
           }
           const staging=join(root,'feed-validation');mkdirSync(staging);

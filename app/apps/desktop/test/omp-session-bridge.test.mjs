@@ -110,6 +110,9 @@ class FakeRuntime {
     if (command.type === "set_session_name" || command.type === "set_model" || command.type === "set_thinking_level") {
       return { success: true };
     }
+    if (command.type === "set_host_tools") {
+      return { success: true, data: { toolNames: command.tools.map((tool) => tool.name) } };
+    }
     if (command.type === "get_branch_messages") {
       return { success: true, data: { messages: [{ entryId: "entry-1", text: "root" }] } };
     }
@@ -181,7 +184,7 @@ function fakeSupervisor(runtime) {
   };
 }
 
-function bridgeHarness({ gate = "/repo/app/packages/omp-runtime/extensions/omp-desktop-gate.ts", launcher = "/repo/upstream/oh-my-pi/packages/coding-agent/scripts/omp", hostTurns, onTurnEnd } = {}) {
+function bridgeHarness({ gate = "/repo/app/packages/omp-runtime/extensions/omp-desktop-gate.ts", launcher = "/repo/upstream/oh-my-pi/packages/coding-agent/scripts/omp", hostTurns, onTurnEnd, hostTools, persistRename } = {}) {
   const runtimes = [];
   const supervisors = [];
   const envelopes = [];
@@ -224,8 +227,52 @@ function bridgeHarness({ gate = "/repo/app/packages/omp-runtime/extensions/omp-d
     gateResolver: () => gate,
     ...(hostTurns ? { hostTurns } : {}),
     ...(onTurnEnd ? { onTurnEnd } : {}),
+    ...(hostTools ? { hostTools } : {}),
+    ...(persistRename ? { persistRename } : {}),
   });
   return { bridge, runtime: firstRuntime, supervisor: firstSupervisor, runtimes, supervisors, envelopes, logs, sessionDir, nativeSessionId, nativeSessionPath };
+}
+
+for (const phase of ["preparing", "running"]) {
+  test(`first prompt survives automatic title cleanup while ${phase}`, async (t) => {
+    const renameReached = Promise.withResolvers();
+    const finishRename = Promise.withResolvers();
+    const catalogReached = Promise.withResolvers();
+    const finishCatalog = Promise.withResolvers();
+    const h = bridgeHarness({
+      persistRename: async () => { renameReached.resolve(); await finishRename.promise; },
+      hostTools: {
+        catalog: async () => { catalogReached.resolve(); await finishCatalog.promise; return []; },
+        executor: () => async () => { throw new Error("no tools are registered"); },
+      },
+    });
+    const projectPath = makeProject();
+    let reclaimed = 0;
+    h.supervisor.reclaimAll = async () => { reclaimed += 1; h.runtime.usable = false; return []; };
+    t.after(async () => { finishCatalog.resolve(); finishRename.resolve(); await h.bridge.dispose(); });
+    // The Composer starts its fallback title without awaiting it, then sends
+    // the first prompt. Both operations initially see an unstarted session.
+    const naming = h.bridge.rename(OMP_SESSION, "first question", { projectPath });
+    await renameReached.promise;
+    const prompting = h.bridge.prompt({ sessionId: OMP_SESSION, projectPath, content: "first question" });
+    // Observe rejections immediately, even while the controlled rename waits.
+    prompting.catch(() => undefined);
+    await catalogReached.promise;
+    if (phase === "running") { finishCatalog.resolve(); await prompting; }
+    finishRename.resolve();
+    assert.equal((await naming).ok, true);
+    finishCatalog.resolve();
+    assert.equal((await prompting).accepted, true);
+    assert.equal(reclaimed, 0, "a title operation must not reclaim a runtime borrowed by a prompt");
+    assert.equal(h.runtime.commands.filter((command) => command === "new_session").length, 1,
+      "the first prompt must reuse the native session created for its title");
+    assert.equal(h.runtime.commands.filter((command) => command === "prompt").length, 1);
+    h.runtime.push({ type: "message_start", message: { role: "assistant", content: [] } });
+    h.runtime.push({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "first answer" }] } });
+    h.runtime.push({ type: "agent_end" });
+    assert.ok(h.envelopes.some(({ event }) => event.type === "message_end" && event.message.content === "first answer"));
+    assert.equal(h.bridge.status(OMP_SESSION).isRunning, false);
+  });
 }
 
 test("explicit Skill commands refuse a missing loader before prompt or steering admission", async () => {

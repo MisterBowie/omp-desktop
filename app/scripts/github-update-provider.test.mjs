@@ -51,12 +51,14 @@ test("a missing stable release is an error, never a fallback into a historical t
   assert(requests.every(request => !request.path.includes("/download/")));
 });
 
-test("a source-bound revision keeps the installer version and resolves its own release assets", async () => {
-  const tag = `v0.1.2+skill.${"a".repeat(40)}`;
-  const { provider } = fixture(true, tag, "0.1.2");
+for (const [version, kind] of [["0.1.2", "skill"], ["0.1.4", "chatfix"]]) {
+test(`a ${kind} revision keeps the installer version and resolves its own release assets`, async () => {
+  const tag = `v${version}+${kind}.${"a".repeat(40)}`;
+  const { provider } = fixture(true, tag, version);
   const info = await provider.getLatestVersion();
-  assert.equal(info.version, "0.1.2"); assert.equal(info.tag, tag);
+  assert.equal(info.version, version); assert.equal(info.tag, tag);
   assert.equal(semver.prerelease(tag), null);
-  assert.equal(semver.gt(info.version, "0.1.2"), false, "same-version revisions require manual installation");
-  assert.equal(provider.resolveFiles(info)[0].url.href, `https://github.com/MisterBowie/omp-desktop/releases/download/${tag}/OMP-Desktop-0.1.2-arm64-mac.zip`);
+  assert.equal(semver.gt(info.version, version), false, "same-version revisions require manual installation");
+  assert.equal(provider.resolveFiles(info)[0].url.href, `https://github.com/MisterBowie/omp-desktop/releases/download/${tag}/OMP-Desktop-${version}-arm64-mac.zip`);
 });
+}

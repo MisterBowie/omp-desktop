@@ -7,12 +7,12 @@ export function publicationTag({ tag, revision, sameVersionRevision = false }) {
   assert(typeof revision === "string" && revision.length === 40 && /^[a-f0-9]{40}$/.test(revision), "fixed source revision required");
   assert.equal(typeof sameVersionRevision, "boolean");
   const pattern = sameVersionRevision
-    ? /^v(\d+\.\d+\.\d+)\+skill\.([a-f0-9]{40})$/
+    ? /^v(\d+\.\d+\.\d+)\+(skill|chatfix)\.([a-f0-9]{40})$/
     : /^v(\d+\.\d+\.\d+)$/;
   const match = pattern.exec(tag);
   assert(match, "invalid publication tag");
   assert.equal(match[0], tag, "complete publication tag required");
-  if (sameVersionRevision) assert.equal(match[2], revision, "revision tag source mismatch");
+  if (sameVersionRevision) assert.equal(match[3], revision, "revision tag source mismatch");
   return { version: match[1], tag, stableTag: `v${match[1]}`, sameVersionRevision };
 }
 

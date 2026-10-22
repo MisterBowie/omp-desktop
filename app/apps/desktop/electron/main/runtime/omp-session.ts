@@ -1433,7 +1433,11 @@ class SessionEntry {
     if (
       this.nativeSessionBound &&
       this.nativeSessionRunner === this.runner &&
-      this.nativeSessionId === spec.nativeSessionId &&
+      this.supervisor.currentRuntime() !== null &&
+      // A prompt captured before an overlapping rename persisted the binding
+      // still has an empty reference. Reuse the identity this entry already
+      // established instead of creating a second native session for the send.
+      ((!spec.nativeSessionId && !spec.nativeSessionPath) || this.nativeSessionId === spec.nativeSessionId) &&
       this.nativeSessionPath
     ) {
       return;
@@ -2890,7 +2894,10 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       result = { ok: true };
       return result;
     } finally {
-      if (startedForOperation) {
+      // A first-send title update can start the runtime just before the prompt
+      // borrows it. Preparation counts as busy even before a live turn exists;
+      // ownership has passed to that prompt, so rename must not close it.
+      if (startedForOperation && !entry.isBusy() && entries.get(sessionId) === entry) {
         const cleanup = await disposeSession(sessionId, "rename finished");
         if (!cleanup.ok) {
           const cleanupFailure = cleanup.failures.map((failure) => failure.detail).join("; ");

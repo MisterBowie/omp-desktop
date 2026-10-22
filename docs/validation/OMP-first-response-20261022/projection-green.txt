@@ -1,0 +1,8 @@
+
+ RUN  v4.1.12 /Users/vv/person/omp-desktop/.worktrees/fix-omp-first-response/app/packages/omp-runtime
+
+
+ Test Files  2 passed (2)
+      Tests  50 passed (50)
+   Start at  00:33:03
+   Duration  1.84s (transform 839ms, setup 0ms, import 1.19s, tests 1.52s, environment 0ms)

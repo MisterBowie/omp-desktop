@@ -1,0 +1,5 @@
+
+> pi-desktop@0.1.4 check:release-docs /Users/vv/person/omp-desktop/.worktrees/fix-omp-first-response/app
+> node scripts/check-release-docs.mjs
+
+Release documentation is aligned with 0.1.4 (0.1.x line).

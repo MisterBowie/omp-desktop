@@ -123,11 +123,13 @@ jobs:
           import { writeFileSync } from 'node:fs';
           import { formatChangelogNotes } from './packages/shared/dist/changelog.js';
           const version = process.env.RELEASE_VERSION;
+          const chatfix = process.env.RELEASE_TAG.includes('+chatfix.');
           const revision = process.env.SAME_VERSION_REVISION === 'true' ? [
-            '### Skill installation guidance revision / Skill 安装提示修正版',
+            chatfix ? '### Chat reliability revision / 首次回复与 DeepSeek 工具历史修正版' : '### Skill installation guidance revision / Skill 安装提示修正版',
             '',
-            '- Skill installation guidance, built-in plugin skills and desktop-owned agent identity now use OMP Desktop (omp-desktop).',
-            '- Skill 安装说明、内置插件 Skill 和桌面自有 Agent 身份统一使用 OMP Desktop（omp-desktop）。',
+            chatfix ? '- Keep the runtime alive when automatic chat naming overlaps the first prompt, and preserve the same native session.' : '- Skill installation guidance, built-in plugin skills and desktop-owned agent identity now use OMP Desktop (omp-desktop).',
+            chatfix ? '- 修复首次提问与自动改名并发时误回收运行时，保留同一个原生会话。' : '- Skill 安装说明、内置插件 Skill 和桌面自有 Agent 身份统一使用 OMP Desktop（omp-desktop）。',
+            ...(chatfix ? ['- Preserve empty DeepSeek tool-call prose without adding synthetic dots to model history; retain real text and reasoning.', '- DeepSeek 无正文工具调用保持为空，不再向模型历史补点；真实正文与思考保留。'] : []),
             `- The application version remains ${version}. This source-bound build has its own release tag; install it manually over ${version}, because the updater does not offer a higher version. Existing stable tags and files remain available.`,
             `- 应用版本仍为 ${version}。本修订使用绑定源码的独立发布标签；同版本请手动覆盖安装，自动更新不会提示更高版本。原稳定标签和文件保留。`,
             '',
@@ -168,7 +170,9 @@ jobs:
             fi
           else
             title="OMP Desktop $RELEASE_VERSION"
-            if [[ "$SAME_VERSION_REVISION" == true ]]; then title="$title — Skill guidance revision"; fi
+            if [[ "$SAME_VERSION_REVISION" == true ]]; then
+              if [[ "$RELEASE_TAG" == *+chatfix.* ]]; then title="$title — Chat reliability revision"; else title="$title — Skill guidance revision"; fi
+            fi
             gh release create "$RELEASE_TAG" "$GITHUB_WORKSPACE"/release-dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "$title" --notes-file ../release-notes.md
             gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
           fi

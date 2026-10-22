@@ -1,0 +1,3 @@
+
+> @pi-desktop/desktop@0.1.4 typecheck /Users/vv/person/omp-desktop/.worktrees/fix-omp-first-response/app/apps/desktop
+> tsc -p tsconfig.json --noEmit

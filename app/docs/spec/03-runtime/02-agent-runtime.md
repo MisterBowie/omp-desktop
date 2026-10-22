@@ -2464,6 +2464,23 @@ history projection** of the runtime's canonical entries.
 
 ### 18.1 The read
 
+First-send title updates may overlap prompt preparation. A one-shot rename
+must retain its runtime once a prompt is preparing or running on that entry.
+A prompt whose captured reference is still empty reuses the native identity
+already established on that live runner; it must not create a second session.
+Idle standalone renames still reclaim their runtime, and incomplete cleanup
+continues to refuse prompts. Assistant text between tool calls is projected
+verbatim in live and restored history, including a literal `.`; reasoning and
+tool-only messages do not imply an omitted assistant answer.
+
+For the direct DeepSeek Completions route, model projection explicitly sets
+`compat.requiresAssistantContentForToolCalls: false`: an assistant tool-call
+message with no prose stays empty in subsequent provider requests, matching
+Pi's replay behavior. OMP's default synthetic `.` must not be introduced into
+model history. Real text (including a real dot), `reasoning_content`, tool ids
+and tool results remain unchanged. This override does not apply to Responses
+or unrelated endpoints; it does not rewrite saved native messages or hide text.
+
 `OmpSessionBridge.readHistory` projects `{ entries, leafId }` into desktop rows:
 the active branch is walked from `leafId` to the root through `parentId`, message
 entries are projected through the same converter the live stream uses, and a

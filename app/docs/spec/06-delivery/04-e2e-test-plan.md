@@ -23,6 +23,37 @@
   `apps/desktop/test/installed-native-observation.test.mjs`; full native installer
   acceptance still proves ordered exit and zero owned survivors on every target.
 
+### E2E-OMP-DeepSeek-empty-tool-replay
+
+- **Preconditions:** Verified native resources and an isolated loopback provider
+  matching OMP's direct DeepSeek endpoint classifier; no paid requests.
+- **Steps:** Stream reasoning and a read call without prose, then a genuine dot
+  with a second read call, then an answer. Compare the first tool message with
+  Pi's serializer and inspect both subsequent native provider request bodies.
+- **Expected:** The empty message stays empty, genuine dot text stays a dot,
+  reasoning and call ids round-trip, and tools leave the fixture unchanged.
+  Native stop reaps the process and its scratch data. Model-projection tests
+  also preserve the native policy for relays, Moonshot and Responses.
+- **Automation:** `OMP_BUNDLED_RESOURCES=<resources> node --test
+  apps/desktop/test/omp-deepseek-replay-e2e.test.mjs` and
+  `apps/desktop/test/omp-model-projection.test.mjs`.
+
+### E2E-OMP-first-response
+
+- **Preconditions:** Verified OMP resources, fixture-owned project/data and a
+  local scripted provider; no user instance or paid model.
+- **Steps:** Start a cold title update, hold its persistence, send the first
+  prompt and hold catalog discovery. Finish the rename, then release the
+  prompt. Return full text, a literal dot and a final answer across two reads.
+  Read the live history, reclaim the runtime and read the file again.
+- **Expected:** One prompt reaches the provider; rename does not reclaim its
+  borrowed runtime. The original native identity and title remain. All three
+  assistant texts match in renderer terminal projection and both history paths;
+  tools do not change the fixture, and disposal reaps all owned resources.
+- **Automation:** `OMP_BUNDLED_RESOURCES=<resources> node --test
+  apps/desktop/test/omp-first-response-e2e.test.mjs`; controlled preparation and
+  running orderings also run in `omp-session-bridge.test.mjs`.
+
 ### E2E-OMP-session-controls
 
 - **Preconditions:** Verified OMP 18.3.0 packaged resources, fixture-owned

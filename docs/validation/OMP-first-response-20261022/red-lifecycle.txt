@@ -1,0 +1,39 @@
+✖ first prompt survives automatic title cleanup while preparing (4.537625ms)
+✖ first prompt survives automatic title cleanup while running (2.793ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1133.252625
+
+✖ failing tests:
+
+test at test/omp-session-bridge.test.mjs:237:3
+✖ first prompt survives automatic title cleanup while preparing (4.537625ms)
+  Error: the OMP runtime is not available after start
+      at SessionEntry.runtimeHandle (file:///Users/vv/person/omp-desktop/.worktrees/fix-omp-first-response/app/apps/desktop/electron/main/runtime/omp-session.ts:1415:27)
+      at SessionEntry.registerHostTools (file:///Users/vv/person/omp-desktop/.worktrees/fix-omp-first-response/app/apps/desktop/electron/main/runtime/omp-session.ts:2159:26)
+      at SessionEntry.prompt (file:///Users/vv/person/omp-desktop/.worktrees/fix-omp-first-response/app/apps/desktop/electron/main/runtime/omp-session.ts:1686:16)
+      at async Object.prompt (file:///Users/vv/person/omp-desktop/.worktrees/fix-omp-first-response/app/apps/desktop/electron/main/runtime/omp-session.ts:2653:14) {
+    errorCode: 'NOT_STARTED'
+  }
+
+test at test/omp-session-bridge.test.mjs:237:3
+✖ first prompt survives automatic title cleanup while running (2.793ms)
+  AssertionError [ERR_ASSERTION]: a title operation must not reclaim a runtime borrowed by a prompt
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file:///Users/vv/person/omp-desktop/.worktrees/fix-omp-first-response/app/apps/desktop/test/omp-session-bridge.test.mjs:266:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
