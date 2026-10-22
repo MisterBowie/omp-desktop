@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "categories": [
+    "ASSERTION"
+  ],
+  "locations": [
+    {
+      "path": "app/packages/omp-runtime/src/process.test.ts",
+      "lines": [
+        0,
+        26,
+        257,
+        259
+      ]
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+
+> @pi-desktop/omp-runtime@0.1.4 test /Users/vv/person/omp-desktop/.worktrees/fix-omp-first-response/app/packages/omp-runtime
+> vitest run
+
+
+ RUN  v4.1.12 /Users/vv/person/omp-desktop/.worktrees/fix-omp-first-response/app/packages/omp-runtime
+
+(node:13969) [DEP0187] DeprecationWarning: Passing invalid argument types to fs.existsSync is deprecated
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ src/pinned-runtime.test.ts (1 test | 1 failed) 3372ms
+     × starts, negotiates v2, answers, and is reclaimed with its scratch root 3370ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/pinned-runtime.test.ts > pinned runtime smoke > starts, negotiates v2, answers, and is reclaimed with its scratch root
+OmpRuntimeError: OMP runtime reports an unreadable version (exit 1), this build requires 18.3.0
+ ❯ OmpRuntimeProcess.start src/process.ts:194:15
+    192|       const mismatch = runtimeVersionMismatch(probe.version, expected);
+    193|       if (mismatch) {
+    194|         throw new OmpRuntimeError(
+       |               ^
+    195|           "version-mismatch",
+    196|           `OMP runtime reports ${mismatch.reported ?? `an unreadable v…
+ ❯ OmpRuntimeSupervisor.startRuntime src/supervisor.ts:563:23
+ ❯ OmpRuntimeSupervisor.start src/supervisor.ts:433:14
+ ❯ src/pinned-runtime.test.ts:83:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 37 passed (38)
+      Tests  1 failed | 558 passed | 6 skipped (565)
+   Start at  09:28:08
+   Duration  18.37s (transform 4.74s, setup 0ms, import 11.26s, tests 56.75s, environment 2ms)
+
+/Users/vv/person/omp-desktop/.worktrees/fix-omp-first-response/app/packages/omp-runtime:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @pi-desktop/omp-runtime@0.1.4 test: `vitest run`
+Exit status 1

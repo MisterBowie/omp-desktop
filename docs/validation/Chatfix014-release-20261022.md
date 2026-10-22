@@ -5,8 +5,12 @@
 用户要求“把首次不回复和补点这两个修复一起提交，打包发布，保持当前版本号”。
 本任务仍在 `.worktrees/fix-omp-first-response` / `codex/fix-omp-first-response`；
 应用所有版本入口保持 **0.1.4**，schema 22、固定原生 `.7` / `edec389` 不变。
-本机修复和发布准备已通过验证；当前还没有提交固定候选或发布新安装包。
-远端结果只能在实际完成后补入本记录。
+本机修复和发布准备已通过验证，两项修复合并提交为
+`b6834d050f36f20094636277fb87301d889c14bd`，最新 `origin/main`
+`a23bfb9befea327e7924efd3004e030a11b587d2` 为其祖先。候选标签
+`release-check-0.1.4-chatfix-20261022` 已推送，
+[run39703805424](https://github.com/MisterBowie/omp-desktop/actions/runs/39703805424)
+的完整源码测试失败；本候选拒绝发布。尚未发布新安装包，远端结果只能在实际完成后补入本记录。
 
 ## 改动与保留行为
 
@@ -55,7 +59,25 @@ Release ID `419670366`，28 项资产。发布前/后对比完整资产快照，
 
 ## 待完成交付
 
-1. 合并提交两项修复并推送固定候选；记录 commit/base/run。
+1. 合并提交两项修复并推送固定候选：已完成，来源见上。
 2. 全部源码与 Mac ARM/Intel、Windows x64、Linux x64 打包/安装验收全部成功。
 3. 晋升源码绑定修订，下载核对全部公开资产、更新 feed、来源回执和原 0.1.4 保护快照。
 4. 回填真实结果和用户下载入口；本机已安装应用不作为构建输出替换。
+
+## 首轮源码门失败与同步修正
+
+run39703805424 的 `verify` 在完整 `pnpm -r --if-present test` 失败。
+仓库现有安全诊断仅输出公共源码坐标：`packages/omp-runtime/src/process.test.ts:259`，
+对应“reports the runtime's stderr as diagnostics only”，类别 `ASSERTION`；原始日志不转存。
+该测试在 stdout 回复完成后立即读取另一个 stderr 管道，两个独立管道没有到达顺序保证。
+mock 仍先写 stderr 再写 stdout，产品仍按独立数据事件采集；没有产品实现变化。
+
+仅使用已有的有界 `waitFor` 等待诊断文本到达后保留原有内容断言。不跳过测试、
+不降低内容要求、不改产品时限。原 22 项进程测试本机通过；完整运行时首轮 558 通过、
+1 失败、6 跳过，唯一失败是已初始化但未构建的参考源码 launcher 版本不可读。
+随后以 `OMP_SIDECAR_TEST_RESOURCES="/Applications/OMP Desktop.app/Contents/Resources"`
+显式指定通过生产校验的本机 0.1.4 原生包，`pnpm --filter @pi-desktop/omp-runtime test`
+实际 **565/565、零跳过**，exit 0；`pnpm lint` exit 0。没有使用未构建源码冒充原生通过。
+
+两个聊天修复仍在同一 `b6834d05` 提交；测试同步修正另作可审阅提交，随后生成新固定候选，
+完整源码与四平台均重跑。首轮失败候选和其安全诊断保留，不用于交付。

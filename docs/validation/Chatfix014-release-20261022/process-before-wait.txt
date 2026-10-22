@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /Users/vv/person/omp-desktop/.worktrees/fix-omp-first-response/app/packages/omp-runtime
+
+(node:6757) [DEP0187] DeprecationWarning: Passing invalid argument types to fs.existsSync is deprecated
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ Test Files  1 passed (1)
+      Tests  22 passed (22)
+   Start at  09:26:40
+   Duration  19.02s (transform 819ms, setup 0ms, import 1.36s, tests 17.56s, environment 0ms)

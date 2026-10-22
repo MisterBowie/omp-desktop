@@ -256,6 +256,9 @@ describe("request lifecycle", () => {
     const started = await startMock("stderr");
     await withRuntime(started, async () => {
       await started.process.request({ type: "stderr_noise" });
+      // stdout and stderr are separate pipes: the response does not prove
+      // that the diagnostic data event has reached the parent yet.
+      expect(await waitFor(() => started.process.diagnostics().stderrTail.includes("diagnostic line"))).toBe(true);
       expect(started.process.diagnostics().stderrTail).toContain("diagnostic line");
     });
   });
