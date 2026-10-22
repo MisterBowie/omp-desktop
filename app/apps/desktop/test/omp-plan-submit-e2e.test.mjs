@@ -2017,6 +2017,7 @@ test(
     const turn = async (label, mode) => {
       await host.call("session.configure", { id: sessionId, mode });
       const before = posts().length;
+      const endsBefore = ends.length;
       provider.script([
         {
           text: `${label} inspecting`,
@@ -2027,7 +2028,13 @@ test(
       ]);
       const accepted = await promptThrough(host, bridge, sessionId, `${label}: read the seed, then stop.`);
       assert.equal(accepted.accepted, true, `${label} prompt is accepted`);
-      assert.equal(await waitFor(() => bridge.status(sessionId).isRunning === false), true, `${label} settles`);
+      // Runner idle precedes the durable settlement announcement; the row is
+      // inspected below, so wait for this turn's own announcement first.
+      assert.equal(
+        await waitFor(() => bridge.status(sessionId).isRunning === false && ends.length === endsBefore + 1),
+        true,
+        `${label} settles`,
+      );
       const requests = posts().slice(before);
       assert.equal(requests.length, 2, `${label} makes one tool round plus the final text`);
       const first = requests[0];

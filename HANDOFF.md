@@ -20,11 +20,12 @@
 
 | 分支 / 工作树 | 内容 | 状态 |
 | --- | --- | --- |
-| `codex/fix-omp-first-response`（`.worktrees/fix-omp-first-response`，已推送） | 首次发送不回复、DeepSeek 空正文补点两项聊天修复（`b6834d05`、`a8e7872f`） | 本地 ARM64 测试包已交给用户自测，产物在该工作树的 `app/apps/desktop/release/`。第二个远端候选 run39706079958 的完整源码门失败（`omp-plan-submit-e2e.test.mjs`、`omp-skill-path-e2e.test.mjs`），见看板 R07；[发布记录](https://github.com/MisterBowie/omp-desktop/blob/codex/fix-omp-first-response/docs/validation/Chatfix014-release-20261022.md) |
-| `codex/fix-omp-user-subagents`（`.worktrees/fix-omp-user-subagents`） | 设置中启用的用户子代理投影到 OMP 原生 `task` 发现目录 | 本地验证通过（129 项回归、2 项原生 mock 回归），待提交（R06） |
+| `codex/chatfix-revision`（`.worktrees/chatfix-revision`） | 同版本修订候选：首次发送不回复与 DeepSeek 补点（`b6834d05`、`a8e7872f`）、用户子代理接入（`f10a7c13`，R06）、源码门测试竞态修复（R07） | 本机验证通过；等远端候选整轮通过和用户本地测试确认后发布（R08）。证据：[首次回复](docs/validation/OMP-first-response-20261022.md)、[补点](docs/validation/OMP-dot-replay-20261022.md)、[chatfix 发布记录](docs/validation/Chatfix014-release-20261022.md)、[子代理](docs/validation/OMP-user-subagents-20261022.md)、[R07](docs/validation/Chatfix-source-gate-races-20261022.md) |
+| `codex/fix-omp-first-response`（`.worktrees/fix-omp-first-response`，已推送） | 上一轮 chatfix 分支，已并入修订线 | 用户自测的本地 ARM64 包来自 `a8e7872f`，不含子代理修复；修订线发布后移除该工作树 |
 
-发版方式：两项修复按**同版本修订** `0.1.4+chatfix.<SHA>` 发布（用户 2026-10-22 选择），原 `v0.1.4`
-标签与资产保持不变；已安装用户需手动覆盖安装。用户本地测试通过并确认后才晋升发布。
+发版方式：修订线按**同版本修订** `0.1.4+chatfix.<SHA>` 发布（用户 2026-10-22 选择），原 `v0.1.4`
+标签与资产保持不变；已安装用户需手动覆盖安装。远端候选整轮通过、用户本地测试确认后才晋升发布。
+2026-10-22 修复分支的原始过程记录见 [docs/history/fix-branch-notes-20261022.md](docs/history/fix-branch-notes-20261022.md)。
 
 ## 2026-10-22 用户决定
 
@@ -39,7 +40,7 @@
 
 ## 下一步
 
-1. 提交 R06、修复 R07，形成同版本修订候选并本地验证；用户确认本地测试后按同版本修订流程发布。
+1. 修订线 `codex/chatfix-revision` 跑远端候选（完整源码门与四目标）；整轮通过且用户确认本地测试后，按同版本修订流程发布，再把修订线并入 `main`。
 2. 在修订候选之上用独立分支完成 R09–R11。
 3. 下一阶段做 R12（删除 Pi 遗留代码）；R13（OMP 上游升级与 fork 精简）单独立项。
 

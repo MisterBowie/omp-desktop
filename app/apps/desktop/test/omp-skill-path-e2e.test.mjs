@@ -424,6 +424,9 @@ test(
       envelopes.some((entry) => entry.event.type === "message_end" && JSON.stringify(entry.event.message).includes("first answer")),
     );
     assert.equal(firstDone, true, "the first turn must complete");
+    // `message_end` precedes `agent_end`; a prompt sent in between is refused
+    // as running, so wait for the run to settle before the next prompt.
+    assert.equal(await waitFor(() => bridge.status("e2e-memory-edit-session").isRunning === false), true, "the first turn must settle");
 
     // The edit is visible on the very next prompt — the state is rewritten
     // per prompt from live host-core reads.
@@ -435,6 +438,7 @@ test(
       envelopes.some((entry) => entry.event.type === "message_end" && JSON.stringify(entry.event.message).includes("second answer")),
     );
     assert.equal(secondDone, true, "the second turn must complete");
+    assert.equal(await waitFor(() => bridge.status("e2e-memory-edit-session").isRunning === false), true, "the second turn must settle");
 
     const systems = systemMessages(provider).map((entry) => entry.text);
     assert.equal(systems.filter((text) => text.includes(firstMemory)).length, 1, "the first prompt carries the first memory");
@@ -660,6 +664,9 @@ test(
     );
     assert.equal(firstDone, true, `the first turn must complete; timeline:\n${envelopeTimeline(envelopes)}`);
     const endsAfterFirst = envelopes.filter((entry) => entry.event.type === "message_end").length;
+    // `message_end` precedes `agent_end`; a prompt sent in between is refused
+    // as running, so wait for the run to settle before the next prompt.
+    assert.equal(await waitFor(() => bridge.status("e2e-space-session").isRunning === false), true, "the first turn must settle");
 
     // The run-root getter is a T19-C supervisor surface: on the baseline it is
     // absent, which is itself the observable red — guarded so the absence

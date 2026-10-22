@@ -16,9 +16,9 @@ R01–R05 的执行记录与检查结果见 [Project-consolidation-20261022](val
 | R03 | HANDOFF 与看板精简，过程记录原样归档到 `docs/history/` | 审查发现 | `codex/project-consolidation` | 已完成 |
 | R04 | 受控 fork 记录与规则：范围文档修订、`source-baseline.json` 补 `.6`/`.7`、ADR 0305 与运行时规格更正、上游升级流程改为 fork 实际流程、新增补丁须 ADR 和用户授权 | 用户决定 3 | `codex/project-consolidation` | 已完成 |
 | R05 | `~/.agents` 有意共享写入范围文档与 `AGENTS.md` | 用户决定 4 | `codex/project-consolidation` | 已完成 |
-| R06 | 用户子代理接入 OMP 原生 `task` | 用户反馈 | `codex/fix-omp-user-subagents` | 本地验证通过，待提交 |
-| R07 | chatfix 第二候选 run39706079958 完整源码门两项失败：`omp-plan-submit-e2e.test.mjs`、`omp-skill-path-e2e.test.mjs` | 远端诊断 | 修订线 | 待处理 |
-| R08 | `0.1.4+chatfix` 同版本修订发布（含 R06、R07） | 用户决定 2 | 修订线 | 等用户本地测试与确认 |
+| R06 | 用户子代理接入 OMP 原生 `task`（[证据](validation/OMP-user-subagents-20261022.md)） | 用户反馈 | `codex/chatfix-revision`（`f10a7c13`） | 已完成：129 项回归、2 项原生 mock、类型检查与 lint 复跑通过 |
+| R07 | chatfix 第二候选 run39706079958 完整源码门两项失败：`omp-plan-submit-e2e.test.mjs`、`omp-skill-path-e2e.test.mjs`（[证据](validation/Chatfix-source-gate-races-20261022.md)） | 远端诊断 | `codex/chatfix-revision` | 本机已修复：两处测试同步竞态，产品代码不变；远端候选待跑 |
+| R08 | `0.1.4+chatfix` 同版本修订发布（含 R06、R07） | 用户决定 2 | `codex/chatfix-revision` | 等远端候选整轮通过和用户本地测试确认 |
 | R09 | 图片附件接入 OMP（OMP RPC `prompt.images`） | 用户决定 5 | `codex/omp-dead-controls` | 待处理 |
 | R10 | 全局指令改存 OMP Desktop 数据目录并注入 OMP；不再写 `~/.pi/agent/AGENTS.md`；不自动迁移 | 用户决定 5 | `codex/omp-dead-controls` | 待处理 |
 | R11 | 隐藏 OAuth 厂商登录入口（OMP 模型投影不支持 OAuth） | 用户决定 5 | `codex/omp-dead-controls` | 待处理 |
