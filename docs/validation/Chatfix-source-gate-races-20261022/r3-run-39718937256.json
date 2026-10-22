@@ -1,0 +1,59 @@
+{
+  "run": {
+    "id": 39718937256,
+    "tag": "release-check-0.1.4-chatfix-20261022-r3",
+    "head_sha": "37fff5c42b5bc8c67d4557d34daea334920496c4",
+    "conclusion": "failure"
+  },
+  "jobs": [
+    {
+      "name": "guard",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "name": "build (ubuntu-22.04, linux, x64, dist:linux)",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "name": "build (macos-15-intel, darwin, x64, dist:mac)",
+      "conclusion": "failure",
+      "failed_steps": [
+        "Run actions/upload-artifact@v7",
+        "Run actions/upload-artifact@v7"
+      ]
+    },
+    {
+      "name": "build (windows-latest, win32, x64, dist:win)",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "name": "verify",
+      "conclusion": "failure",
+      "failed_steps": [
+        "Run pnpm -r --if-present test"
+      ]
+    },
+    {
+      "name": "build (macos-15, darwin, arm64, dist:mac)",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "name": "publish",
+      "conclusion": "skipped",
+      "failed_steps": []
+    }
+  ],
+  "annotations": {
+    "build (macos-15-intel, darwin, x64, dist:mac)": [
+      "Failed to CreateArtifact: Unable to make request: ENOTFOUND (x2)"
+    ],
+    "verify": [
+      "Process completed with exit code 1."
+    ]
+  },
+  "source": "GitHub public REST API: actions/runs/39718937256/jobs and check-runs/{job}/annotations, read 2026-10-22"
+}

@@ -20,7 +20,7 @@
 
 | 分支 / 工作树 | 内容 | 状态 |
 | --- | --- | --- |
-| `codex/chatfix-revision`（`.worktrees/chatfix-revision`） | 同版本修订候选：首次发送不回复与 DeepSeek 补点（`b6834d05`、`a8e7872f`）、用户子代理接入（`f10a7c13`，R06）、源码门测试竞态修复（R07） | 本机验证通过；等远端候选整轮通过和用户本地测试确认后发布（R08）。证据：[首次回复](docs/validation/OMP-first-response-20261022.md)、[补点](docs/validation/OMP-dot-replay-20261022.md)、[chatfix 发布记录](docs/validation/Chatfix014-release-20261022.md)、[子代理](docs/validation/OMP-user-subagents-20261022.md)、[R07](docs/validation/Chatfix-source-gate-races-20261022.md) |
+| `codex/chatfix-revision`（`.worktrees/chatfix-revision`） | 同版本修订候选：首次发送不回复与 DeepSeek 补点（`b6834d05`、`a8e7872f`）、用户子代理接入（`f10a7c13`，R06）、源码门测试修复（R07） | r3 远端候选（run39718937256）失败：R06 后两处补丁运行时 e2e 夹具未应答 `agents.active`（已修，完整源码门本机 0 失败），另有 macOS x64 产物上传网络故障；等 r4 整轮通过和用户本地测试确认后发布（R08）。证据：[首次回复](docs/validation/OMP-first-response-20261022.md)、[补点](docs/validation/OMP-dot-replay-20261022.md)、[chatfix 发布记录](docs/validation/Chatfix014-release-20261022.md)、[子代理](docs/validation/OMP-user-subagents-20261022.md)、[R07](docs/validation/Chatfix-source-gate-races-20261022.md) |
 | `codex/fix-omp-first-response`（`.worktrees/fix-omp-first-response`，已推送） | 上一轮 chatfix 分支，已并入修订线 | 用户自测的本地 ARM64 包来自 `a8e7872f`，不含子代理修复；修订线发布后移除该工作树 |
 
 发版方式：修订线按**同版本修订** `0.1.4+chatfix.<SHA>` 发布（用户 2026-10-22 选择），原 `v0.1.4`

@@ -239,6 +239,9 @@ test(
           }
           case "skills.active":
             return { skills: [] };
+          case "agents.active":
+            // Each launch reads the enabled Settings subagents (R06); none here.
+            return { subagents: [] };
           case "project.group.context":
             return { context: null };
           case "project.memory.get":
