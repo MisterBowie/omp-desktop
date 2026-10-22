@@ -2,6 +2,7 @@ import type { ChangelogEntry, ChangelogLocale } from "./changelog.js";
 
 const unified014: Record<ChangelogLocale, string[]> = {
   "en": [
+    "Load enabled user subagents into OMP with their configured models and native tool grants; refresh edits without changing chat identity.",
     "Fix first replies interrupted by automatic chat naming and keep the native session identity.",
     "Keep empty DeepSeek tool-call text empty instead of adding dots to model history.",
     "Use OMP for every new chat; retire Pi history import and remote Pi hosts.",
@@ -12,6 +13,7 @@ const unified014: Record<ChangelogLocale, string[]> = {
     "Announce completion after durable turn settlement."
   ],
   "zh-CN": [
+    "已启用的用户子智能体接入 OMP，使用指定模型与原生工具授权；配置更新保留原会话身份。",
     "修复自动改名打断首次回复的问题，并保持原生会话身份。",
     "DeepSeek 无正文工具调用保持为空，不再向模型历史补点。",
     "新会话统一使用 OMP，关闭 Pi 历史导入和远程 Pi Host。",
@@ -22,6 +24,7 @@ const unified014: Record<ChangelogLocale, string[]> = {
     "回合持久化结算后再通知完成，避免恢复状态竞态。"
   ],
   "zh-TW": [
+    "已啟用的使用者子代理接入 OMP，使用指定模型與原生工具授權；設定更新保留原對話身分。",
     "修正自動改名中斷首次回覆的問題，並保持原生對話身分。",
     "DeepSeek 無正文工具呼叫保持為空，不再向模型歷史補點。",
     "新對話統一使用 OMP，關閉 Pi 歷史匯入和遠端 Pi Host。",
@@ -32,6 +35,7 @@ const unified014: Record<ChangelogLocale, string[]> = {
     "回合持久化結算後再通知完成，避免復原狀態競態。"
   ],
   "de": [
+    "Aktivierte Benutzeragenten mit ihren Modellen und nativen Werkzeugrechten in OMP laden; Änderungen erhalten die Chatidentität.",
     "Unterbrechungen der ersten Antwort durch automatische Chatnamen beheben und die native Sitzungsidentität erhalten.",
     "Leeren DeepSeek-Werkzeugtext leer lassen, statt Punkte in den Modellverlauf einzufügen.",
     "Neue Chats verwenden OMP; Pi-Verlaufsimporte und entfernte Pi-Hosts entfallen.",
@@ -42,6 +46,7 @@ const unified014: Record<ChangelogLocale, string[]> = {
     "Den Abschluss nach dauerhafter Speicherung des Durchlaufs melden."
   ],
   "es": [
+    "Carga los subagentes de usuario activos en OMP con sus modelos y permisos nativos; los cambios conservan la identidad del chat.",
     "Evita que el nombre automático interrumpa la primera respuesta y conserva la identidad de la sesión nativa.",
     "Mantiene vacío el texto de herramientas de DeepSeek sin añadir puntos al historial del modelo.",
     "Los chats nuevos usan OMP; se retiran la importación Pi y los hosts Pi remotos.",
@@ -52,6 +57,7 @@ const unified014: Record<ChangelogLocale, string[]> = {
     "Notifica la finalización después de guardar el estado del turno."
   ],
   "fr": [
+    "Charge les sous-agents utilisateur actifs dans OMP avec leurs modèles et droits natifs ; les modifications conservent l’identité du chat.",
     "Empêche le nommage automatique d’interrompre la première réponse et conserve l’identité de la session native.",
     "Conserve le texte vide des appels d’outils DeepSeek sans ajouter de points à l’historique du modèle.",
     "Les nouveaux échanges utilisent OMP ; les imports Pi et les hôtes Pi distants sont retirés.",
@@ -62,6 +68,7 @@ const unified014: Record<ChangelogLocale, string[]> = {
     "Annonce la fin du tour après l’enregistrement durable de son état."
   ],
   "ko": [
+    "활성 사용자 하위 에이전트를 지정 모델과 기본 도구 권한으로 OMP에 연결하고 설정 변경 시 대화 식별자를 유지합니다.",
     "자동 대화 이름 지정이 첫 응답을 중단하는 문제를 수정하고 원래 세션 식별자를 유지합니다.",
     "DeepSeek 도구 호출의 빈 본문을 유지하고 모델 기록에 마침표를 추가하지 않습니다.",
     "새 대화는 OMP를 사용하며 Pi 기록 가져오기와 원격 Pi 호스트를 종료합니다.",
@@ -72,6 +79,7 @@ const unified014: Record<ChangelogLocale, string[]> = {
     "턴 상태가 영구 저장된 후 완료를 알립니다."
   ],
   "tr": [
+    "Etkin kullanıcı alt ajanlarını modelleri ve yerel araç izinleriyle OMP’ye yükler; değişikliklerde sohbet kimliğini korur.",
     "Otomatik sohbet adlandırmanın ilk yanıtı kesmesini düzeltir ve yerel oturum kimliğini korur.",
     "DeepSeek araç çağrılarının boş metnini korur, model geçmişine nokta eklemez.",
     "Yeni sohbetler OMP kullanır; Pi geçmiş içe aktarma ve uzak Pi sunucuları kaldırılır.",

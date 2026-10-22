@@ -74,6 +74,7 @@ import {
   type OmpUiRecord,
   type OmpUiRequest,
   type SubagentListEntry,
+  parseSubagentSnapshots,
 } from "@pi-desktop/omp-runtime";
 import { composeModeSystemPrompt } from "@pi-desktop/agent-runtime";
 import {
@@ -146,6 +147,8 @@ export type OmpSessionBridgeOptions = {
    * projection; the registry does not read providers or secrets itself.
    */
   createSupervisor: (spec: OmpSessionRuntimeSpec) => OmpRuntimeSupervisor;
+  /** Refresh launch-owned inputs; true requires an idle process replacement. */
+  refreshRuntimeConfiguration?: (supervisor: OmpRuntimeSupervisor, spec: OmpSessionRuntimeSpec) => Promise<boolean>;
   /** Absolute launcher path, or null when this build has none. */
   launcher: string | null;
   isPackaged: boolean;
@@ -803,6 +806,7 @@ type PendingDialog = { request: OmpUiRequest; sessionId: string; generation: num
  */
 class SessionEntry {
   private preparingPrompt = false;
+  private readonly refreshRuntimeConfiguration: OmpSessionBridgeOptions["refreshRuntimeConfiguration"];
   private compaction: OmpManualCompaction | null = null;
 
   isCompacting(): boolean { return this.compaction?.active ?? false; }
@@ -1042,8 +1046,10 @@ class SessionEntry {
     noteNativeSession: (nativeSessionId: string | null) => void;
     onTurnEnd?: OmpSessionBridgeOptions["onTurnEnd"];
     hostTurns?: OmpSessionBridgeOptions["hostTurns"];
+    refreshRuntimeConfiguration?: OmpSessionBridgeOptions["refreshRuntimeConfiguration"];
   }) {
     this.sessionId = deps.sessionId;
+    this.refreshRuntimeConfiguration = deps.refreshRuntimeConfiguration;
     this.projectDirectory = deps.projectDirectory;
     this.executionDirectory = deps.executionDirectory ?? deps.projectDirectory;
     this.supervisor = deps.supervisor;
@@ -1443,7 +1449,14 @@ class SessionEntry {
       return;
     }
     if (this.nativeSessionBuild) return this.nativeSessionBuild;
-    this.nativeSessionBuild = this.establishNativeSession(gate, spec);
+    // A launch-input refresh may replace the process after this prompt captured
+    // an empty host reference. The entry's validated identity still owns the
+    // conversation and must be restored rather than creating a second one.
+    const restoreSpec = !spec.nativeSessionId && !spec.nativeSessionPath && this.nativeSessionId && this.nativeSessionPath
+      ? { ...spec, nativeSessionId: this.nativeSessionId, nativeSessionPath: this.nativeSessionPath,
+          adapterVersion: ENGINE_ADAPTER_VERSION, runtimeVersion: this.runtimeVersion }
+      : spec;
+    this.nativeSessionBuild = this.establishNativeSession(gate, restoreSpec);
     try {
       await this.nativeSessionBuild;
     } finally {
@@ -1643,6 +1656,13 @@ class SessionEntry {
     if (this.agentPresentationReset) await this.agentPresentationReset;
     if (policy && policy.mode === "agent" && this.lastPromptMode !== null && this.lastPromptMode !== "agent") {
       await this.ensureAgentPresentationReset();
+    }
+    if (this.refreshRuntimeConfiguration) {
+      const changed = await this.refreshRuntimeConfiguration(this.supervisor, spec);
+      this.assertOpen();
+      if (this.stopEpoch !== epoch) throw new OmpRuntimeError("stopping", "a stop was requested while refreshing runtime configuration");
+      if (changed) await this.resetIdleRuntime("refresh the subagent configuration", true);
+      if (this.stopEpoch !== epoch) throw new OmpRuntimeError("stopping", "a stop was requested while refreshing runtime configuration");
     }
     await this.ensureNativeSession(gate, spec);
     const runner = await this.ensureRunner(gate);
@@ -1931,7 +1951,7 @@ class SessionEntry {
    */
   private ensureAgentPresentationReset(): Promise<void> {
     if (this.agentPresentationReset) return this.agentPresentationReset;
-    const reset = this.resetAgentPresentationAfterContract();
+    const reset = this.resetIdleRuntime("restore the Agent tool presentation");
     this.agentPresentationReset = reset;
     void reset
       .finally(() => {
@@ -1941,11 +1961,27 @@ class SessionEntry {
     return reset;
   }
 
-  private async resetAgentPresentationAfterContract(): Promise<void> {
+  private async resetIdleRuntime(reason: string, preserveChildren = false): Promise<void> {
     const runner = this.runner;
     if (!runner) return;
     if (runner.runState() !== "idle" || runner.isStopping()) {
       throw new OmpRuntimeError("not-started", "the runtime is running; stop it before prompting again");
+    }
+    if (preserveChildren) {
+      const epoch = this.stopEpoch;
+      // The parent's turn can be idle while detached children still run. Use
+      // the raw live snapshot, including children whose event attribution has
+      // not arrived, rather than the renderer-filtered registry.
+      const response = await this.runtimeHandle().request({ type: "get_subagents" }, { timeoutMs: 10_000 });
+      const snapshots = response.success === false ? null : parseSubagentSnapshots(response.data);
+      if (snapshots === null) throw this.stateRefusal("cannot verify background subagents before refreshing runtime configuration");
+      if (snapshots.some(child => child.status === "running" || child.status === "pending")) {
+        throw Object.assign(new Error("background subagents are running; finish or stop them before refreshing runtime configuration"), { errorCode: ErrorCodes.AGENT_BUSY });
+      }
+      this.assertOpen();
+      if (this.stopEpoch !== epoch || this.runner !== runner || runner.runState() !== "idle" || runner.isStopping()) {
+        throw new OmpRuntimeError("stopping", "the runtime changed while refreshing configuration");
+      }
     }
     const stop = await this.supervisor.stop({ abortBash: false });
     if (stop.reaped && (!stop.cleaned || this.supervisor.pendingCleanup.length > 0)) {
@@ -1953,11 +1989,11 @@ class SessionEntry {
     }
     if (!stop.reaped || this.supervisor.pendingCleanup.length > 0) {
       throw this.stateRefusal(
-        "the OMP runtime could not be reclaimed to restore the Agent tool presentation; refusing to prompt",
+        `the OMP runtime could not be reclaimed to ${reason}; refusing to prompt`,
       );
     }
     this.retireRunner();
-    this.logger?.app("omp", "info", "omp runtime rebuilt to restore the Agent tool presentation", {
+    this.logger?.app("omp", "info", `omp runtime rebuilt to ${reason}`, {
       data: { sessionId: this.sessionId },
     });
   }
@@ -2610,6 +2646,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       persistNativeSession: options.persistNativeSession,
       sessionDir: options.sessionDir,
       binding,
+      ...(options.refreshRuntimeConfiguration ? { refreshRuntimeConfiguration: options.refreshRuntimeConfiguration } : {}),
       ...(options.hostTools ? { hostTools: options.hostTools } : {}),
       ...(options.capabilities ? { capabilities: options.capabilities } : {}),
       ...(options.sessionPolicy ? { sessionPolicy: options.sessionPolicy } : {}),

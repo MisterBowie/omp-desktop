@@ -82,6 +82,7 @@ class FakeRuntime {
   promptFailure = undefined;
   /** Scripted session state for the lifecycle commands (new_session/get_state). */
   stateResponse = undefined;
+  subagentSnapshots = [];
 
   async request(command) {
     // The turn fence is answered transparently and never logged: the command
@@ -113,6 +114,7 @@ class FakeRuntime {
     if (command.type === "set_host_tools") {
       return { success: true, data: { toolNames: command.tools.map((tool) => tool.name) } };
     }
+    if (command.type === "get_subagents") return { success: true, data: { subagents: this.subagentSnapshots } };
     if (command.type === "get_branch_messages") {
       return { success: true, data: { messages: [{ entryId: "entry-1", text: "root" }] } };
     }
@@ -145,6 +147,7 @@ class FakeRuntime {
 /** A supervisor standing in for M2's, with a scripted lifecycle. */
 function fakeSupervisor(runtime) {
   return {
+    pendingCleanup: [],
     started: 0,
     stopped: [],
     /** Ordered call log: proves the working directory precedes the start. */
@@ -184,7 +187,7 @@ function fakeSupervisor(runtime) {
   };
 }
 
-function bridgeHarness({ gate = "/repo/app/packages/omp-runtime/extensions/omp-desktop-gate.ts", launcher = "/repo/upstream/oh-my-pi/packages/coding-agent/scripts/omp", hostTurns, onTurnEnd, hostTools, persistRename } = {}) {
+function bridgeHarness({ gate = "/repo/app/packages/omp-runtime/extensions/omp-desktop-gate.ts", launcher = "/repo/upstream/oh-my-pi/packages/coding-agent/scripts/omp", hostTurns, onTurnEnd, hostTools, persistRename, refreshRuntimeConfiguration } = {}) {
   const runtimes = [];
   const supervisors = [];
   const envelopes = [];
@@ -229,9 +232,85 @@ function bridgeHarness({ gate = "/repo/app/packages/omp-runtime/extensions/omp-d
     ...(onTurnEnd ? { onTurnEnd } : {}),
     ...(hostTools ? { hostTools } : {}),
     ...(persistRename ? { persistRename } : {}),
+    ...(refreshRuntimeConfiguration ? { refreshRuntimeConfiguration } : {}),
   });
   return { bridge, runtime: firstRuntime, supervisor: firstSupervisor, runtimes, supervisors, envelopes, logs, sessionDir, nativeSessionId, nativeSessionPath };
 }
+
+test("runtime configuration refresh restores the entry's validated identity when the prompt has no reference", async t => {
+  let changed = false;
+  const h = bridgeHarness({ refreshRuntimeConfiguration: async () => changed });
+  const stop = h.supervisor.stop.bind(h.supervisor);
+  h.supervisor.stop = async options => { const result = await stop(options); h.supervisor.started = 0; return result; };
+  t.after(() => h.bridge.dispose());
+  const project = makeProject();
+  await h.bridge.prompt({ sessionId: OMP_SESSION, projectPath: project, content: "first" });
+  h.runtime.push({ type: "agent_end", messages: [] });
+  changed = true;
+  const before = h.runtime.commands.length;
+  await h.bridge.prompt({ sessionId: OMP_SESSION, projectPath: project, content: "changed configuration" });
+  assert.deepEqual(h.runtime.commands.slice(before, before + 3), ["get_subagents", "switch_session", "get_state"]);
+  assert.equal(h.runtime.commands.filter(command => command === "new_session").length, 1);
+  assert.equal(h.supervisor.stopped.length, 1);
+});
+
+test("a stop during runtime configuration loading refuses the pending prompt before startup", async t => {
+  const entered = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  const h = bridgeHarness({ refreshRuntimeConfiguration: async () => { entered.resolve(); await release.promise; return true; } });
+  t.after(() => h.bridge.dispose());
+  const pending = h.bridge.prompt({ sessionId: OMP_SESSION, projectPath: makeProject(), content: "must not run" });
+  const refused = assert.rejects(pending, error => error.code === "stopping");
+  await entered.promise;
+  await h.bridge.stop(OMP_SESSION);
+  release.resolve();
+  await refused;
+  assert.equal(h.supervisor.started, 0);
+  assert.ok(!h.runtime.commands.includes("prompt"));
+});
+
+test("configuration changes do not reclaim a running turn", async t => {
+  let changed = false;
+  const h = bridgeHarness({ refreshRuntimeConfiguration: async () => changed });
+  t.after(() => h.bridge.dispose());
+  const project = makeProject();
+  await h.bridge.prompt({ sessionId: OMP_SESSION, projectPath: project, content: "running" });
+  changed = true;
+  await assert.rejects(h.bridge.prompt({ sessionId: OMP_SESSION, projectPath: project, content: "new settings" }), /runtime is running/);
+  assert.equal(h.supervisor.stopped.length, 0);
+  assert.equal(h.runtime.commands.filter(command => command === "prompt").length, 1);
+});
+
+test("a failed configuration reclaim refuses the next prompt and retains runtime ownership", async t => {
+  let changed = false;
+  const h = bridgeHarness({ refreshRuntimeConfiguration: async () => changed });
+  t.after(() => h.bridge.dispose());
+  const project = makeProject();
+  await h.bridge.prompt({ sessionId: OMP_SESSION, projectPath: project, content: "first" });
+  h.runtime.push({ type: "agent_end", messages: [] });
+  changed = true;
+  const stop = h.supervisor.stop;
+  h.supervisor.stop = async () => ({ reaped: false, cleaned: false });
+  await assert.rejects(h.bridge.prompt({ sessionId: OMP_SESSION, projectPath: project, content: "cannot run" }), /could not be reclaimed/);
+  assert.equal(h.runtime.commands.filter(command => command === "prompt").length, 1);
+  assert.equal(h.supervisors.length, 1);
+  h.supervisor.stop = stop;
+});
+
+test("configuration refresh preserves detached children even when the parent turn is idle and attribution is missing", async t => {
+  let changed = false;
+  const h = bridgeHarness({ refreshRuntimeConfiguration: async () => changed });
+  t.after(() => h.bridge.dispose());
+  const project = makeProject();
+  await h.bridge.prompt({ sessionId: OMP_SESSION, projectPath: project, content: "first" });
+  h.runtime.push({ type: "agent_end", messages: [] });
+  h.runtime.subagentSnapshots = [{ id: "detached-child", index: 0, agent: "task", agentSource: "bundled", status: "running", lastUpdate: 1 }];
+  changed = true;
+  await assert.rejects(h.bridge.prompt({ sessionId: OMP_SESSION, projectPath: project, content: "new configuration" }), error => error.errorCode === ErrorCodes.AGENT_BUSY);
+  assert.equal(h.supervisor.stopped.length, 0);
+  assert.equal(h.runtime.commands.filter(command => command === "prompt").length, 1);
+  h.runtime.subagentSnapshots = [];
+});
 
 for (const phase of ["preparing", "running"]) {
   test(`first prompt survives automatic title cleanup while ${phase}`, async (t) => {

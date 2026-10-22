@@ -1,5 +1,44 @@
 # 02. Agent Runtime
 
+## OMP user subagent definitions (2026-10-22 amendment)
+
+Enabled global user definitions from Settings now reach OMP's native `task`.
+The host's `agents.active` result for the bound project is the activation
+authority; shared parsing and provider-id/vendor/name matching are reused.
+No Pi worker or second task scheduler is started.
+
+Before launch, valid definitions are converted to native Markdown under the
+synthetic `HOME/PI_CONFIG_DIR/agent/agents`. OMP discovers that directory
+independently of `PI_CODING_AGENT_DIR`, where the isolated `models.yml` lives.
+Each definition's primary and explicit fallback pins use private provider aliases,
+configured endpoint metadata and only the required credentials. No pin silently
+falls back to the parent model. An unpinned definition uses the bound parent.
+Definition output caps narrow model limits. Secrets never enter agent documents,
+diagnostics or the configuration fingerprint, and owned cleanup removes both
+configuration directories. Real user configuration is not changed.
+
+Declared file/search/shell grants map to native tool names; omitted grants stay
+read-only. `inherit` includes available native tools and declares inherited host
+tool names, while actual child availability remains owned by OMP. It does not
+implement Pi-only tools or add a second host-tool transport. Nested `task`, user
+questions and desktop mode transitions are excluded. Every child retains the
+parent's existing execution-time permission gate. Non-inherited per-child
+permission overrides are unavailable and excluded with a diagnostic; native
+watchdogs apply rather than Pi's per-definition idle/total-duration settings.
+Malformed or unresolvable definitions are omitted with diagnostics. A nearest
+project `.omp/agents` definition with a configured user's name refuses admission
+with `OMP_SUBAGENT_CONFLICT`, preventing native project precedence from silently
+replacing the configured model, prompt or grant.
+
+Definitions and public binding metadata are re-read before each explicit prompt.
+A changed catalog rebuilds an idle process before dispatch; the same validated
+native session is restored, including when the captured host reference is empty.
+Running turns and detached children are not reclaimed for configuration edits;
+the raw live child snapshot is checked even when the parent turn is idle.
+Stop during loading
+prevents dispatch; failed reclamation refuses continuation and retains ownership.
+Native child events, transcripts, cancellation and result rendering are unchanged.
+
 
 ## OMP-only product (2026-10-21 amendment)
 

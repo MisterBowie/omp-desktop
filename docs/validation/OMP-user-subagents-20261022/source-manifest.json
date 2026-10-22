@@ -1,0 +1,97 @@
+{
+  "base": "a8ee2f839bcfb9c8a0e1f6111493091c4b1043e3",
+  "branch": "codex/fix-omp-user-subagents",
+  "status": "uncommitted local validation",
+  "files": [
+    {
+      "path": "HANDOFF.md",
+      "bytes": 250532,
+      "sha256": "606a2d541883f4f01733e2e4eb81568aefb4c418f141e129dd5742217a02b029"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/runtime/omp-model-projection.ts",
+      "bytes": 13709,
+      "sha256": "8b2b93e71c8a18383044200392fea3eca4289f99200ddf850dbb9036ce557f2e"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/runtime/omp-session-wiring.ts",
+      "bytes": 16502,
+      "sha256": "2ecfc86aea0b79a30f2834d599d5345cefe4b5ba9fbf942cac9f31e0e55cee68"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/runtime/omp-session.ts",
+      "bytes": 161969,
+      "sha256": "15a396baf64cd23dd0c44e30b2722d3c5de3433be97b0370159e50ac965e0131"
+    },
+    {
+      "path": "app/apps/desktop/electron/main/runtime/omp-user-subagents.ts",
+      "bytes": 9733,
+      "sha256": "996ef59292e29b56b7a63a72c636dcffbdf6976e6a256ab7c493606d9fc6582e"
+    },
+    {
+      "path": "app/apps/desktop/test/omp-session-bridge.test.mjs",
+      "bytes": 129677,
+      "sha256": "a1c55695c23fe475f41004a9e8b55ef4cebb1e90b413ccc70286a43a5471e74d"
+    },
+    {
+      "path": "app/apps/desktop/test/omp-user-subagents-e2e.test.mjs",
+      "bytes": 8737,
+      "sha256": "ca94feff4b331ca2b61bdfb797ef671c13d40c51b0398852267ac4736b16bffc"
+    },
+    {
+      "path": "app/apps/desktop/test/omp-user-subagents.test.mjs",
+      "bytes": 7917,
+      "sha256": "2593df41667bd48511b7466fade71ab320e8a7e00306317d59ad9c7c91fdad6e"
+    },
+    {
+      "path": "app/docs/adr/0303-omp-subagent-surfacing.md",
+      "bytes": 16440,
+      "sha256": "68c95c5cc01595c6da21816d3623dd515baccfcb8734aa3910772415f3565c79"
+    },
+    {
+      "path": "app/docs/spec/03-runtime/02-agent-runtime.md",
+      "bytes": 166435,
+      "sha256": "779d1f4e04355ba35b4d6422a04bc36257caebbb9215045143fa6dfce54d9020"
+    },
+    {
+      "path": "app/docs/spec/06-delivery/04-e2e-test-plan.md",
+      "bytes": 963931,
+      "sha256": "5eb2fe6cf98f39fc46226dc3c4441c2d50a866505d9134ca25ffda1701cbe052"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/03-runtime/02-agent-runtime.md",
+      "bytes": 118556,
+      "sha256": "8383904c3a37f90ab575cfa40f456eb3e170d410488338971d6298ebb17813b0"
+    },
+    {
+      "path": "app/docs/zh-CN/spec/06-delivery/04-e2e-test-plan.md",
+      "bytes": 662181,
+      "sha256": "31c5f92b853a6f851b360c3150a45976d874e6819d7c0c2f9c46fb204a5760e9"
+    },
+    {
+      "path": "app/packages/shared/src/changelog.test.ts",
+      "bytes": 4511,
+      "sha256": "2c85fcb1fdacf7ede437c00bf85a71dfa24543ee8b66d06dc9f0ca9dab7c8ae8"
+    },
+    {
+      "path": "app/packages/shared/src/omp-changelog.ts",
+      "bytes": 23947,
+      "sha256": "eaf246bac3d322941461a478071bd622afe2f4648db6efa77bb108682d53d889"
+    },
+    {
+      "path": "docs/04-task-board.md",
+      "bytes": 143548,
+      "sha256": "aa4bcfa0d2a8d8e8820df8fce1e3f41fc025ee1824f42d9e3481326a126b2c09"
+    },
+    {
+      "path": "docs/05-user-guide.md",
+      "bytes": 13538,
+      "sha256": "231dd456b09a47f64e9c5103bc66513a8884af32ea421b7d801a530437f3eb45"
+    },
+    {
+      "path": "docs/validation/OMP-user-subagents-20261022.md",
+      "bytes": 7280,
+      "sha256": "3d74b9a313e7ac899d24b65a698c856121281578588f4dd785ffc9ba9f6e6e34"
+    }
+  ]
+}

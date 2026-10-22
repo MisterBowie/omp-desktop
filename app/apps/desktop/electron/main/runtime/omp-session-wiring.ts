@@ -41,7 +41,9 @@ import {
   projectModelsYaml,
   resolveProviderProjection,
   type ProviderProjectionSource,
+  type OmpModelProjection,
 } from "./omp-model-projection";
+import { loadOmpUserSubagents, ompSubagentModels, writeOmpUserSubagents, type OmpUserSubagentSnapshot } from "./omp-user-subagents";
 
 /** A provider row with the fields the projection resolver needs. */
 type ProjectionProvider = {
@@ -156,6 +158,7 @@ export async function projectSessionModels(
   host: () => HostProcess | null,
   spec: OmpSessionRuntimeSpec,
   paths: OmpRunPaths,
+  additionalModels: readonly OmpModelProjection[] = [],
 ): Promise<void> {
   const client = hostOrThrow(host);
   if (!spec.providerId || !spec.modelId) {
@@ -199,7 +202,7 @@ export async function projectSessionModels(
   if (error) {
     throw Object.assign(new Error(error.message), { errorCode: error.errorCode });
   }
-  writeFileSync(join(paths.agentDir, "models.yml"), projectModelsYaml(projection), "utf8");
+  writeFileSync(join(paths.agentDir, "models.yml"), projectModelsYaml(projection, additionalModels), { encoding: "utf8", mode: 0o600 });
 }
 
 export type WiredOmpSessions = {
@@ -223,6 +226,13 @@ export function createOmpExecutionRootResolver(host: () => HostProcess | null) {
 export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
   const { engineRuntime, dataRoot } = deps;
   const sessionDir = ensureSessionStateDir(dataRoot);
+  const configurations = new WeakMap<object, { pending: OmpUserSubagentSnapshot | null; fingerprint: string | null }>();
+  const loadSubagents = async (spec: OmpSessionRuntimeSpec) => {
+    const catalog = deps.hostTools ? await deps.hostTools.catalog(spec.projectDirectory) : [];
+    const snapshot = await loadOmpUserSubagents(hostOrThrow(deps.host), spec, catalog.map(tool => tool.definition.name));
+    for (const diagnostic of snapshot.diagnostics) deps.logger?.app("runtime", "warn", "subagent unavailable", { data: diagnostic });
+    return snapshot;
+  };
 
   const bridge = createOmpSessionBridge({
     launcher: engineRuntime.ompRuntime.launcher,
@@ -257,8 +267,16 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
         return { mode, permissionMode: resolveEffectivePermissionMode(permissionMode, defaultPermissionMode) };
       },
     },
-    createSupervisor: (spec: OmpSessionRuntimeSpec) =>
-      engineRuntime.ompRuntime.createSupervisor({
+    refreshRuntimeConfiguration: async (supervisor, spec) => {
+      const state = configurations.get(supervisor);
+      if (!state) throw new Error("OMP runtime configuration is unavailable");
+      const snapshot = await loadSubagents(spec);
+      state.pending = snapshot;
+      return state.fingerprint !== null && state.fingerprint !== snapshot.fingerprint;
+    },
+    createSupervisor: (spec: OmpSessionRuntimeSpec) => {
+      const state: { pending: OmpUserSubagentSnapshot | null; fingerprint: string | null } = { pending: null, fingerprint: null };
+      const supervisor = engineRuntime.ompRuntime.createSupervisor({
         sessionDir,
         memory: async () => {
           const settings = await hostOrThrow(deps.host).call<OmpMemorySettings>("memory.settings.get");
@@ -279,9 +297,18 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
           ? { modelSelector: `${spec.providerId}/${spec.modelId}` }
           : {}),
         prepareRun: async (paths) => {
-          await projectSessionModels(deps.host, spec, paths);
+          const snapshot = state.pending ?? await loadSubagents(spec);
+          await projectSessionModels(deps.host, spec, paths, await ompSubagentModels(hostOrThrow(deps.host), snapshot));
+          // OMP task discovery uses HOME/PI_CONFIG_DIR/agent, independently
+          // of PI_CODING_AGENT_DIR (which owns models.yml and session state).
+          await writeOmpUserSubagents(join(paths.configRoot, "agent"), snapshot);
+          state.fingerprint = snapshot.fingerprint;
+          state.pending = null;
         },
-      }),
+      });
+      configurations.set(supervisor, state);
+      return supervisor;
+    },
     emitAgentEvent: deps.emitAgentEvent,
     gateResolver: () => engineRuntime.gateExtension,
     // The durable host turn lifecycle (M5/T20-B2): the bridge opens one host

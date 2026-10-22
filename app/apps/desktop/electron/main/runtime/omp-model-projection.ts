@@ -218,13 +218,21 @@ function yamlField(indent: number, key: string, value: string | number | boolean
  * no key; every other projected endpoint carries `auth: apiKey` and the key the
  * desktop's secret store supplied.
  */
-export function projectModelsYaml(projection: OmpModelProjection): string {
+export function projectModelsYaml(projection: OmpModelProjection, additional: readonly OmpModelProjection[] = []): string {
+  const models = [projection, ...additional];
+  if (new Set(models.map(model => model.providerId)).size !== models.length) {
+    throw Object.assign(new Error("duplicate projected provider id"), { errorCode: "OMP_PROJECTION_INVALID" });
+  }
+  return `providers:\n${models.map(projectProviderYaml).join("")}`;
+}
+
+function projectProviderYaml(projection: OmpModelProjection): string {
   const error = projectionError(projection);
   if (error) {
     throw Object.assign(new Error(error.message), { errorCode: error.errorCode });
   }
   const provider = projection.providerId;
-  const lines: string[] = ["providers:"];
+  const lines: string[] = [];
   // The provider id is a YAML mapping key; quote it so an arbitrary id (a
   // colon, spaces, or other YAML-significant characters) is always a single
   // key, matching what the pinned runtime's YAML parser produces.

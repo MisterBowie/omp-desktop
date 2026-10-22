@@ -8,6 +8,23 @@
 
 ## 1. Goals
 
+### E2E-OMP-user-subagents
+
+- **Steps:** Return an enabled global `code-implement` document from the host
+  registry; delegate through native `task` to a separate local fake provider.
+  Attempt an undeclared shell call, perform an allowed write, then edit the
+  document to inherit tools and run again. Disable it and send another prompt.
+- **Expected:** The configured provider/model, prompt and grant reach the child;
+  undeclared shell access has no side effect; inherited native Bash is available;
+  nested delegation stays absent. Edits and disablement rebuild an idle process,
+  preserve native identity and reclaim prior configuration. No real model is used.
+- **Automation:** `OMP_BUNDLED_RESOURCES=<resources> node --test
+  apps/desktop/test/omp-user-subagents-e2e.test.mjs`. Unit/bridge tests additionally
+  cover malformed/unresolvable definitions, empty keys, alias isolation, scoped
+  host activation, project name collision, stop during loading and failed cleanup.
+- **Boundary:** Verified bundled OMP plus production wiring and source gate;
+  this is not installed GUI, cross-platform packaging or paid-model acceptance.
+
 ### E2E-installed-process-ownership
 
 - **Preconditions:** A fixture-owned install root and native process identities,

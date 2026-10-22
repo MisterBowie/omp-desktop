@@ -9,6 +9,20 @@
 
 ---
 
+### E2E-OMP-user-subagents
+
+- **步骤：** 宿主目录返回启用的全局 `code-implement` 文档，经原生 `task` 委派到
+  独立本地假供应商；尝试未声明 Shell，执行已授权写入；编辑为继承工具后重跑，
+  随后禁用该定义并再次发送。
+- **预期：** 子会话使用配置的供应商/模型、提示词和工具授权；未声明 Shell 无副作用，
+  原生 Bash 可显式继承，嵌套委派仍不可用。编辑与禁用重建空闲进程，保留原生身份
+  并回收旧配置；不调用真实模型。
+- **自动化：** `OMP_BUNDLED_RESOURCES=<resources> node --test
+  apps/desktop/test/omp-user-subagents-e2e.test.mjs`。单元与桥接另覆盖损坏/无法解析的
+  定义、空密钥、别名隔离、宿主范围过滤、项目同名冲突、加载中停止与回收失败。
+- **边界：** 已验证的内置 OMP、生产接线和源码 gate；不宣称安装态 GUI、跨平台
+  打包或真实付费模型验收。
+
 ### E2E-installed-process-ownership
 
 - **前提：** 夹具独有安装目录和原生进程身份，包含精确 Windows FILETIME 创建时间；

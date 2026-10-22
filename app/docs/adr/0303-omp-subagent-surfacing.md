@@ -34,6 +34,24 @@ existing renderer from the OMP frames, not to build a second subagent UI.
 
 ## Decision
 
+### 2026-10-22 amendment: desktop user definitions
+
+The desktop's enabled global user catalog is now a configuration input to the
+native orchestrator. Host activation, shared definition parsing and provider
+identity resolution are reused; native Markdown and the required model bindings
+are written into run-owned discovery/configuration roots before launch. Private
+provider aliases isolate definition caps and fallback pins. Native project name
+collisions refuse admission instead of changing the configured worker implicitly.
+The Pi task engine remains retired. No transcript, child-event or scheduling
+protocol is introduced. An idle runtime is replaced when these launch inputs
+change; its validated native identity survives replacement even when the current
+prompt has not received the host's persisted reference yet. Stop and reclaim
+failures keep the existing fail-closed lifecycle.
+
+Native tool availability and the parent gate remain authoritative; this adapter
+does not claim Pi-only child tools, per-child policy overrides or Pi watchdogs.
+See the runtime spec's dated amendment and `omp-user-subagents-e2e.test.mjs`.
+
 ### 1. OMP is the only subagent orchestrator for OMP sessions
 
 An OMP session's children are spawned by OMP's native `task` tool and reported
