@@ -1,0 +1,23 @@
+{
+  "sourceRevision": "a8e7872f07164e414a6422b2596bcc1a443d4677",
+  "version": "0.1.4",
+  "platform": "darwin",
+  "arch": "arm64",
+  "assets": [
+    {
+      "name": "OMP-Desktop-0.1.4-arm64.dmg",
+      "bytes": 218921180,
+      "sha256": "a4574e1168008e99974e01a763bf46adfdc0de3923e8ce4b1d1c9a2e45047a8a",
+      "path": "/Users/vv/person/omp-desktop/.worktrees/fix-omp-first-response/app/apps/desktop/release/OMP-Desktop-0.1.4-arm64.dmg"
+    },
+    {
+      "name": "OMP-Desktop-0.1.4-arm64-mac.zip",
+      "bytes": 217864519,
+      "sha256": "da19ec5991d3daf938e782da504a411e4c16d06ddd52e36f22e09d4ffc765b32",
+      "path": "/Users/vv/person/omp-desktop/.worktrees/fix-omp-first-response/app/apps/desktop/release/OMP-Desktop-0.1.4-arm64-mac.zip"
+    }
+  ],
+  "signed": false,
+  "published": false,
+  "manualTestPending": true
+}

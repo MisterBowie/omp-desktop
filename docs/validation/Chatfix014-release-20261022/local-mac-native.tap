@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: native DeepSeek tool replay preserves empty content like Pi without inventing a dot
+ok 1 - native DeepSeek tool replay preserves empty content like Pi without inventing a dot
+  ---
+  duration_ms: 3107.197084
+  type: 'test'
+  ...
+# Subtest: native first send shares the title runtime and preserves text between tools in live and restored rows
+ok 2 - native first send shares the title runtime and preserves text between tools in live and restored rows
+  ---
+  duration_ms: 3579.869
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4878.478709

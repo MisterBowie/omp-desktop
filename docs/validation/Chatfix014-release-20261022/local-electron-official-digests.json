@@ -1,0 +1,7 @@
+{
+  "release": "https://github.com/electron/electron/releases/tag/v43.6.0",
+  "archive": "electron-v43.6.0-darwin-arm64.zip",
+  "archiveSha256": "5183a2b15d013517386edd9f1ea8e3402755f6c3ea17893f92acb20052f3a2e7",
+  "checksumAssetId": 543640097,
+  "checksumSha256": "4c03c44586d47b827433ad68bed9267552ec3db8579ba0f4c19c763f61b671e4"
+}
