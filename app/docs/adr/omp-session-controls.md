@@ -1,6 +1,6 @@
 # ADR: OMP text steering, follow-up turns and manual compaction
 
-- Status: Accepted for the implemented text-control scope
+- Status: Accepted for the implemented text-control scope (attachment boundary amended by ADR 0332)
 - Date: 2026-10-18
 - Runtime: OMP 18.3.0, existing patch level `62bc57b+omp-desktop.6`
 
@@ -38,8 +38,9 @@ only transcript writer; no desktop compaction record is fabricated.
 
 ## Boundaries
 
-Steering and queued inputs support text only. Attachments and collaboration
-queue payloads are rejected before durable admission. Native `branch` is a
+Steering and queued inputs supported text only when this was decided; ADR 0332
+(2026-10-22) now admits their attachments. Collaboration queue payloads are
+still rejected before durable admission. Native `branch` is a
 redo-from-user operation that changes the parent's active native session, not
 a copy-through-message fork; `branch` stays closed. The pinned RPC has no
 targeted child-stop command; that operation also stays closed. Neither is

@@ -1245,6 +1245,7 @@ sklm: {
     vendorDisconnected: "로그인 필요",
     vendorDisconnectedDesc:
       "이 계정에 사용할 수 있는 자격 증명이 없습니다. 계정을 삭제한 후 다시 추가하세요.",
+    vendorDisconnectedRemoveDesc: "이 계정에 사용할 수 있는 자격 증명이 없습니다. 계정을 삭제하세요.",
     vendorSubscription: "구독",
     vendorSignedInGeneric: "로그인됨",
     vendorAccountNumber: "계정 {{number}}",

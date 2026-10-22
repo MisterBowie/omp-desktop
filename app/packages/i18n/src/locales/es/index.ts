@@ -1230,6 +1230,7 @@ sklm: {
     "vendorConnected": "Conectado",
     "vendorDisconnected": "Necesita iniciar sesión",
     "vendorDisconnectedDesc": "A esta cuenta no le quedan credenciales utilizables. Elimínelo y agregue la cuenta nuevamente.",
+    "vendorDisconnectedRemoveDesc": "A esta cuenta no le quedan credenciales utilizables. Elimínela.",
     "vendorSubscription": "Suscripción",
     "vendorSignedInGeneric": "Inicia sesión",
     "vendorAccountNumber": "cuenta {{number}}",

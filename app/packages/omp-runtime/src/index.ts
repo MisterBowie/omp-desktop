@@ -185,6 +185,7 @@ export {
 } from "./session/ui-requests.js";
 export {
   OmpSessionRunner,
+  type OmpPromptImage,
   type OmpRunState,
   type OmpSessionRunnerOptions,
   type OmpSessionRuntime,

@@ -32,6 +32,7 @@
 import type {
   AgentEvent,
   AppError,
+  MessageAttachment,
   MessageUsage,
   UiMessage,
   UiMessageRole,
@@ -122,6 +123,12 @@ export type OmpEventConverterOptions = {
    */
   parentToolCallId?: string;
   agentName?: string;
+  /**
+   * Persist one inline user image and return its attachment ref. The runtime
+   * may re-encode an image it receives, so the row must name the bytes the
+   * runtime kept, stored by the desktop. Without a store, images stay off rows.
+   */
+  storeImage?: (bytes: Buffer, mimeType: string) => string | null;
 };
 
 type StreamingMessage = {
@@ -192,6 +199,7 @@ export class OmpEventConverter {
   private modelId: string | undefined;
   private readonly parentToolCallId: string | undefined;
   private readonly agentName: string | undefined;
+  private readonly storeImage: OmpEventConverterOptions["storeImage"];
 
   constructor(options: OmpEventConverterOptions) {
     this.sessionId = options.sessionId;
@@ -200,6 +208,7 @@ export class OmpEventConverter {
     this.contextId = options.contextId;
     this.parentToolCallId = options.parentToolCallId;
     this.agentName = options.agentName;
+    this.storeImage = options.storeImage;
   }
 
   /** The run's message ids, in creation order. */
@@ -601,6 +610,7 @@ export class OmpEventConverter {
     status: UiMessage["status"],
   ): UiMessage {
     const { content, thinking } = splitContent(message.content);
+    const attachments = role === "user" && this.storeImage ? userImageAttachments(message.content, this.storeImage) : [];
     const usage = usageOf(message);
     const modelId = stringOr(message.model, undefined);
     const providerId = stringOr(message.provider, undefined);
@@ -616,6 +626,7 @@ export class OmpEventConverter {
       ...(this.parentToolCallId ? { parentToolCallId: this.parentToolCallId } : {}),
       ...(this.agentName ? { agentName: this.agentName } : {}),
       ...(usage ? { usage } : {}),
+      ...(attachments.length ? { attachments } : {}),
       ...(role === "assistant" && status === "error" ? {
         // Provider diagnostics are untrusted payload too. Charge a bounded
         // diagnostic in the fixed envelope before sharing the row text budget.
@@ -679,12 +690,38 @@ function splitContent(content: unknown): { content: string; thinking?: string } 
     } else if (part.type === "thinking" && typeof part.thinking === "string") {
       thinking.push(part.thinking);
     }
-    // toolCall parts belong to their tool row; image and provider-specific
-    // parts have no desktop row in M3 and are counted by the caller.
+    // toolCall parts belong to their tool row; user images become attachment
+    // rows (`userImageAttachments`); other image and provider-specific parts
+    // have no desktop row.
   }
   const joined = text.join("\n");
   const reasoning = thinking.join("\n");
   return { content: joined, ...(reasoning ? { thinking: reasoning } : {}) };
+}
+
+/** A user's inline images as attachment rows, each stored under the ref the store returns. */
+function userImageAttachments(
+  content: unknown,
+  store: (bytes: Buffer, mimeType: string) => string | null,
+): MessageAttachment[] {
+  if (!Array.isArray(content)) return [];
+  const attachments: MessageAttachment[] = [];
+  for (const part of content) {
+    if (!isRecord(part) || part.type !== "image" || typeof part.data !== "string" || typeof part.mimeType !== "string") continue;
+    const bytes = Buffer.from(part.data, "base64");
+    if (bytes.length === 0) continue;
+    let ref: string | null;
+    try {
+      ref = store(bytes, part.mimeType);
+    } catch {
+      // A store failure must not break the transcript; the text row remains.
+      continue;
+    }
+    if (!ref) continue;
+    const extension = part.mimeType.split("/")[1]?.replace(/[^a-z0-9]/gi, "") || "image";
+    attachments.push({ kind: "image", name: `image-${attachments.length + 1}.${extension}`, ref, mimeType: part.mimeType, size: bytes.length });
+  }
+  return attachments;
 }
 
 // ---------------------------------------------------------------------------

@@ -20,6 +20,7 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
+| 0332 | [OMP input attachments and desktop-owned global instructions](0332-omp-input-attachments-and-global-instructions.md) | Accepted |
 | 0331 | [OMP as the only product execution engine](0331-omp-only-product.md) | Accepted |
 | 0330 | [Native Mnemopi with desktop-owned preferences](0330-omp-automatic-memory.md) | Accepted |
 | 0315 | [Independent OMP versions and capability-based update delivery](0315-omp-independent-releases-and-update-delivery.md) | Accepted |
@@ -63,7 +64,7 @@ Each ADR includes:
 | 0034 | Merge the command palette into global search | Accepted |
 | 0035 | Surface the OS locale through the preload bridge | Accepted |
 | 0036 | Split Settings into AI and Shortcuts destinations | Accepted |
-| 0037 | Resolve project instructions in Electron main | Accepted |
+| 0037 | Resolve project instructions in Electron main | Accepted (global file location superseded in part by ADR 0332) |
 | 0038 | Bridge plugin-declared MCP servers in Electron main | Accepted |
 | 0039 | Activate plugin skills and ship plugin authoring as a first-party devkit | Accepted (skill delivery revised by D174) |
 | 0040 | Resident plugin services and the inter-plugin message bus | Accepted |
@@ -351,7 +352,7 @@ Each ADR includes:
 | registry-header-variable-spelling | [Remote header variables accept the registry's `{name}` spelling](registry-header-variable-spelling.md) | Proposed |
 | provider-system-certificates | [Desktop sidecar uses OS-trusted certificates](provider-system-certificates.md) | Accepted |
 | image-generation-capability | [Image generation as a configured Agent capability](image-generation-capability.md) | Accepted |
-| omp-session-controls | [OMP text steering, follow-up turns and manual compaction](omp-session-controls.md) | Accepted (text controls; fork and child stop remain closed) |
+| omp-session-controls | [OMP text steering, follow-up turns and manual compaction](omp-session-controls.md) | Accepted (text controls; attachments admitted by ADR 0332; fork and child stop remain closed) |
 | omp-session-worktrees | [OMP session worktrees retain project identity](omp-session-worktrees.md) | Accepted (local OMP session worktrees) |
 
 | provider-published-token-limits | [Preserve endpoint-published model limits and capabilities](provider-published-token-limits.md) | Accepted |

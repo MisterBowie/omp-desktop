@@ -11,7 +11,7 @@ import {
   assertFeedbackIssueUrl,
   buildBugReportUrl,
 } from "@pi-desktop/shared";
-import { globalInstructionPath } from "@pi-desktop/agent-runtime";
+import { globalInstructionsPath } from "../runtime/omp-global-instructions";
 import type { HostProcess } from "../host-process";
 import type { AppUpdaterController } from "../updater";
 import type { IpcRegistrar } from "./types";
@@ -23,6 +23,8 @@ export type AppIpcDependencies = {
   togglePluginLauncher: () => Promise<void>;
   safeOpenExternal: (url: unknown) => Promise<void>;
   updater: AppUpdaterController;
+  /** App data directory; the global instructions file lives here, not in a Pi or OMP folder. */
+  dataDir: string;
 };
 
 /** Register app, instruction, launcher and update channels. */
@@ -33,6 +35,7 @@ export function registerAppIpc({
   togglePluginLauncher,
   safeOpenExternal,
   updater,
+  dataDir,
 }: AppIpcDependencies): void {
   const { handle, handleWithEvent } = registrar;
 
@@ -125,7 +128,7 @@ export function registerAppIpc({
   ) => {
     const path =
       scope === "global"
-        ? globalInstructionPath()
+        ? globalInstructionsPath(dataDir)
         : projectPath
           ? join(projectPath, "AGENTS.md")
           : null;

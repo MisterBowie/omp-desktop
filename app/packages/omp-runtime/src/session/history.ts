@@ -35,7 +35,7 @@
 import type { UiMessage } from "@pi-desktop/shared";
 import { readTodoPhases, todoPhasesFromResult, type SessionTodoPhase } from "@pi-desktop/shared";
 
-import { OmpEventConverter } from "./events.js";
+import { OmpEventConverter, type OmpEventConverterOptions } from "./events.js";
 
 /** The error code every malformed-transcript refusal carries. */
 export const OMP_HISTORY_INVALID = "OMP_HISTORY_INVALID";
@@ -80,6 +80,8 @@ export type OmpHistoryOptions = {
   messageBefore?: number;
   messageAround?: string;
   contentLimit?: number;
+  /** Persists inline user images for restored rows (see `OmpEventConverterOptions.storeImage`). */
+  storeImage?: OmpEventConverterOptions["storeImage"];
 };
 
 const DEFAULT_MESSAGE_LIMIT = 100;
@@ -122,7 +124,7 @@ export function projectOmpHistory(
     if (snapshot !== undefined) todoPhases = snapshot;
   }
 
-  const converter = new OmpEventConverter({ sessionId: options.sessionId });
+  const converter = new OmpEventConverter({ sessionId: options.sessionId, ...(options.storeImage ? { storeImage: options.storeImage } : {}) });
   const all: UiMessage[] = [];
   const entryIds: string[] = [];
   const toolCallIds = new Map<string, number>();

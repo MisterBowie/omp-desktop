@@ -1245,6 +1245,7 @@ sklm: {
     vendorDisconnected: "Oturum açılmalı",
     vendorDisconnectedDesc:
       "Bu hesabın kullanılabilir kimliği kalmadı. Kaldırıp hesabı yeniden ekleyin.",
+    vendorDisconnectedRemoveDesc: "Bu hesabın kullanılabilir kimliği kalmadı. Hesabı kaldırın.",
     vendorSubscription: "Abonelik",
     vendorSignedInGeneric: "Oturum açıldı",
     vendorAccountNumber: "hesap {{number}}",

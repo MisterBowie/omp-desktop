@@ -22,6 +22,11 @@ import {
 } from "./VendorAccountDialog";
 import { VendorPickerDialog } from "./VendorPickerDialog";
 
+// OMP chats cannot use OAuth credentials: the model projection refuses OAuth
+// providers (`omp-model-projection.ts`). New sign-ins stay hidden until it can;
+// existing accounts remain listed so they can be inspected or removed.
+const OAUTH_SIGN_IN_AVAILABLE = false;
+
 /** A login in flight, together with the dialog reporting on it. */
 type ActiveLogin = { vendor: OAuthVendor; session: OAuthLoginSession };
 
@@ -203,8 +208,9 @@ export function VendorAccountsSection() {
     [login, loadVendors, refreshProviders, showToast, t],
   );
 
-  // Nothing to offer until the runtime reports at least one OAuth vendor.
-  if (!vendors || vendors.length === 0) return null;
+  // Nothing to offer until the runtime reports at least one OAuth vendor, and
+  // nothing to manage while sign-in is hidden and no account exists.
+  if (!vendors || vendors.length === 0 || (!OAUTH_SIGN_IN_AVAILABLE && accounts.length === 0)) return null;
 
   const editingProvider = editingAccount
     ? providers.find((candidate) => candidate.id === editingAccount.account.providerId) ?? null
@@ -221,16 +227,18 @@ export function VendorAccountsSection() {
             ) : null}
           </div>
         </div>
-        <Button
-          variant="primary"
-          disabled={login !== null}
-          onClick={() => setPicking(true)}
-        >
-          <span className="vendor-btn-inner">
-            <IconKey size={14} />
-            <span>{t("settings.vendorAddAccount")}</span>
-          </span>
-        </Button>
+        {OAUTH_SIGN_IN_AVAILABLE ? (
+          <Button
+            variant="primary"
+            disabled={login !== null}
+            onClick={() => setPicking(true)}
+          >
+            <span className="vendor-btn-inner">
+              <IconKey size={14} />
+              <span>{t("settings.vendorAddAccount")}</span>
+            </span>
+          </Button>
+        ) : null}
       </div>
 
       <div className="settings-panel provider-list-panel">
@@ -283,7 +291,7 @@ export function VendorAccountsSection() {
                     </div>
                     {!connected ? (
                       <div className="vendor-account-status">
-                        {t("settings.vendorDisconnectedDesc")}
+                        {t(OAUTH_SIGN_IN_AVAILABLE ? "settings.vendorDisconnectedDesc" : "settings.vendorDisconnectedRemoveDesc")}
                       </div>
                     ) : null}
                   </div>

@@ -9,6 +9,29 @@
 
 ---
 
+### E2E-OMP-image-input
+
+- **步骤：** 投影本地假视觉模型，经桥接发送带内联 PNG 和渲染层用户行 ID 的提示词，
+  然后读回原生历史。
+- **预期：** 供应商请求以图片内容携带该图片（OMP 可能重新编码）；实时持久化行与
+  恢复后的行都引用同一个 `attachments/<sha256>`，即运行时实际保存字节的副本；
+  不调用真实模型。
+- **自动化：** `OMP_BUNDLED_RESOURCES=<resources> node --test
+  apps/desktop/test/omp-image-prompt-e2e.test.mjs`。IPC 测试覆盖视觉/纯文本模型、插话、
+  会话根目录外路径、内联预算与排队附件。
+- **边界：** 已验证的内置 OMP 与生产准备逻辑；不宣称安装态 GUI 或真实付费模型验收。
+
+### E2E-OMP-global-instructions
+
+- **步骤：** 启动一次带全局指令金丝雀的运行，再启动一次不带指令的运行。
+- **预期：** OMP 把金丝雀作为用户级 `AGENTS.md` 载入系统提示词；不带指令的运行中
+  没有该内容。设置编辑器读写 `<data>/AGENTS.md`，不读写 `~/.pi/agent/AGENTS.md`。
+- **自动化：** `OMP_BUNDLED_RESOURCES=<resources> node --test
+  apps/desktop/test/omp-global-instructions-e2e.test.mjs` 与
+  `node --test apps/desktop/test/omp-global-instructions.test.mjs`。
+- **边界：** 已验证的内置 OMP；修改后的刷新复用 E2E-OMP-user-subagents 覆盖的启动
+  指纹路径。
+
 ### E2E-OMP-user-subagents
 
 - **步骤：** 宿主目录返回启用的全局 `code-implement` 文档，经原生 `task` 委派到
@@ -78,10 +101,11 @@
 - **自动化：** `OMP_BUNDLED_RESOURCES=<resources> node --test
   apps/desktop/test/omp-session-operations-e2e.test.mjs`。
 - **补充契约：** 运行时测试覆盖迟到终止帧、准备期取消、不确定接纳、回收保留与
-  重试；IPC 测试证明附件在写入队列之前拒绝。
-- **边界：** 仅文本操作；完整分支与单独停止子代理仍明确不可用。跨平台安装态
-  界面验收须另行执行。宿主持久化 RPC 使用受控夹具；本场景验证先写入再派发
-  的顺序，不验收数据库重启恢复。
+  重试；IPC 测试证明附件进入 OMP 提示词路径排队（`E2E-OMP-image-input`），协作
+  消息来源在写入队列之前拒绝。
+- **边界：** 附件由 `E2E-OMP-image-input` 覆盖；完整分支与单独停止子代理仍明确
+  不可用。跨平台安装态界面验收须另行执行。宿主持久化 RPC 使用受控夹具；本场景
+  验证先写入再派发的顺序，不验收数据库重启恢复。
 - **规格：** 运行时规格 OMP 会话操作修订与对应 ADR。
 
 ### E2E-OMP-session-ui
@@ -3609,14 +3633,15 @@ IPC 请求无法关闭。
   3. 打开项目视图并使用项目的更多菜单来编辑和保存其
      显示 `AGENTS.md`。
   4. 在新会话或空闲会话中提交提示。
-- **预期**：全局编辑器仅针对 `~/.pi/agent/AGENTS.md`。的
+- **预期**：全局编辑器仅针对应用数据目录中的 `<data>/AGENTS.md`（ADR 0332），
+  不读写 `~/.pi/agent/AGENTS.md`。
   项目编辑器只能从已知项目的项目中使用 - 查看更多
   菜单并仅针对该项目的根 `AGENTS.md`。两位编辑均显示
   他们解析的路径，保留键入的文本，并通过专用的保存
   IPC 而不是一般文件写入 API。全球内容先于项目
   下一个运行时的内容；保存的项目内容跟随它并采取
   冲突的优先顺序。项目编辑器是一个视口级对话框。
-- **链接规格**：`03-runtime/02-agent-runtime.md`、ADR 0037
+- **链接规格**：`03-runtime/02-agent-runtime.md`、ADR 0037、ADR 0332
 - **接受**：C (chat/stream)、D（工作空间）、F（持久性）
 - **里程碑**：M5
 - **状态**：单位覆盖（`project-instructions.test.ts`）； UI 之旅草案

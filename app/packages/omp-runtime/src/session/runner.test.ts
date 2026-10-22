@@ -229,6 +229,37 @@ describe("prompting", () => {
     expect(envelopes.every((e) => e.sessionId === "omp-1" && e.turnId === started.turnId)).toBe(true);
   });
 
+  it("sends inline images in the runtime's own prompt and steer commands, never in the fence or a text prompt", async () => {
+    const record = (runtime: { request: (command: OmpFrame) => Promise<unknown> }) => {
+      const sent = { fence: [] as OmpFrame[], user: [] as OmpFrame[] };
+      const request = runtime.request.bind(runtime);
+      runtime.request = async (command) => {
+        if (command.type === "prompt" && parseTurnCommand(command.message)) sent.fence.push(command);
+        else if (command.type === "prompt" || command.type === "steer") sent.user.push(command);
+        return request(command);
+      };
+      return sent;
+    };
+    const image = { data: "aGk=", mimeType: "image/png" };
+    const native = { type: "image", data: "aGk=", mimeType: "image/png" };
+    const withImages = harness();
+    const sent = record(withImages.runtime);
+    const started = await withImages.runner.prompt("look", { images: [image] });
+    withImages.runtime.push({ type: "agent_start" });
+    await withImages.runner.steer("and this", started.turnId, null, [image]);
+    expect(sent.user).toEqual([
+      { type: "prompt", message: "look", images: [native] },
+      { type: "steer", message: "and this", images: [native] },
+    ]);
+    expect(sent.fence).toHaveLength(1);
+    expect(sent.fence[0]).not.toHaveProperty("images");
+
+    const textOnly = harness();
+    const plain = record(textOnly.runtime);
+    await textOnly.runner.prompt("plain");
+    expect(plain.user).toEqual([{ type: "prompt", message: "plain" }]);
+  });
+
   it("refuses a second prompt while the first is stopping", async () => {
     const { runtime, runner } = harness();
     await runner.prompt("one");

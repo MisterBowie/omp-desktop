@@ -1,0 +1,84 @@
+{
+  "steps": [
+    {
+      "name": "fixture",
+      "root": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-dead-controls-ui-8Mis4g",
+      "dataDir": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-dead-controls-ui-8Mis4g/data",
+      "home": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-dead-controls-ui-8Mis4g/home",
+      "imageBytes": 187,
+      "imageSha256": "8999b23fd67d16af853573fb8db7876913fa1e2d5d4e6903da21c0f3e1979835"
+    },
+    {
+      "name": "seeded",
+      "providerId": "378bfbbf-7177-4ef4-a412-3291cbf7abc8"
+    },
+    {
+      "name": "launched:first"
+    },
+    {
+      "name": "r11-hidden-without-accounts",
+      "vendorCount": 8,
+      "addAccount": false,
+      "vendorSection": false
+    },
+    {
+      "name": "r10-editor",
+      "path": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-dead-controls-ui-8Mis4g/data/AGENTS.md",
+      "initialValueLength": 0,
+      "savedBytes": 61,
+      "piUntouched": true
+    },
+    {
+      "name": "r09-live",
+      "chatRequests": 2,
+      "sentMime": "image/webp",
+      "sentBase64Length": 415,
+      "liveImages": [
+        {
+          "w": 300,
+          "h": 200,
+          "alt": "image-1.webp"
+        }
+      ],
+      "instructionsInSystemPrompt": true
+    },
+    {
+      "name": "quit:first",
+      "outcome": "timeout"
+    },
+    {
+      "name": "seeded-oauth-account",
+      "vendorId": "anthropic"
+    },
+    {
+      "name": "launched:second"
+    },
+    {
+      "name": "r09-restored",
+      "restoredImages": [
+        {
+          "w": 300,
+          "h": 200,
+          "alt": "image-1.webp"
+        }
+      ]
+    },
+    {
+      "name": "r11-existing-account-listed",
+      "addAccount": false,
+      "vendorSection": true,
+      "vendorName": true,
+      "removeAdvice": true,
+      "reAddAdvice": false
+    },
+    {
+      "name": "quit:second",
+      "outcome": "timeout"
+    },
+    {
+      "name": "attachment-store",
+      "blobs": 2
+    }
+  ],
+  "ok": true
+}

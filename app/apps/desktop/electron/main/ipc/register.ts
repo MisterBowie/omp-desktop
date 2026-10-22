@@ -232,6 +232,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     togglePluginLauncher,
     safeOpenExternal,
     updater,
+    dataDir,
   });
   registerNotificationIpc({
     registrar,

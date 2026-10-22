@@ -14,10 +14,12 @@
  *      are persisted through `session.bindEngine`; renames, model switches and
  *      branches go through the host so a restart restores the same identity.
  */
-import { ompMemoryDirectory } from "@pi-desktop/omp-runtime";
+import { MAX_SESSION_RECORD_BYTES, ompMemoryDirectory } from "@pi-desktop/omp-runtime";
 import { parseOmpMemorySettings, type OmpMemorySettings } from "@pi-desktop/shared";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { writeFileSync } from "node:fs";
+import { readGlobalInstructions, writeOmpGlobalInstructions } from "./omp-global-instructions";
 
 import { ENGINE_ADAPTER_VERSION, type AgentEventEnvelope } from "@pi-desktop/shared";
 import type { HostProcess } from "../host-process";
@@ -44,6 +46,7 @@ import {
   type OmpModelProjection,
 } from "./omp-model-projection";
 import { loadOmpUserSubagents, ompSubagentModels, writeOmpUserSubagents, type OmpUserSubagentSnapshot } from "./omp-user-subagents";
+import { ensureAttachmentBlob } from "../prompt-attachments";
 
 /** A provider row with the fields the projection resolver needs. */
 type ProjectionProvider = {
@@ -205,6 +208,27 @@ export async function projectSessionModels(
   writeFileSync(join(paths.agentDir, "models.yml"), projectModelsYaml(projection, additionalModels), { encoding: "utf8", mode: 0o600 });
 }
 
+/**
+ * Inline image bytes one OMP input may carry. The runtime stores the whole user
+ * message as one native record, base64 inflates it by a third, and the history
+ * reader refuses a record above `MAX_SESSION_RECORD_BYTES`; half that ceiling
+ * keeps the record readable. Images past the budget go as file references.
+ */
+export const OMP_INLINE_IMAGE_BUDGET_BYTES = Math.floor(MAX_SESSION_RECORD_BYTES / 2);
+
+/** Whether the session's model is projected to OMP with image input. */
+export async function ompModelAcceptsImages(
+  client: Pick<HostProcess, "call">,
+  providerId: string | null | undefined,
+  modelId: string | null | undefined,
+): Promise<boolean> {
+  if (!providerId || !modelId) return false;
+  const provider = await client.call<{ provider?: ProjectionProvider | null }>("providers.get", { id: providerId });
+  if (!provider?.provider) return false;
+  const resolved = resolveProviderProjection(provider.provider, modelId, null);
+  return resolved.ok && resolved.projection.input?.includes("image") === true;
+}
+
 export type WiredOmpSessions = {
   bridge: OmpSessionBridge;
   /** Persistent native-session directory (survives stop/reclaim). */
@@ -226,12 +250,16 @@ export function createOmpExecutionRootResolver(host: () => HostProcess | null) {
 export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
   const { engineRuntime, dataRoot } = deps;
   const sessionDir = ensureSessionStateDir(dataRoot);
-  const configurations = new WeakMap<object, { pending: OmpUserSubagentSnapshot | null; fingerprint: string | null }>();
-  const loadSubagents = async (spec: OmpSessionRuntimeSpec) => {
+  // Launch-owned inputs: a change replaces an idle runtime before the next prompt.
+  type LaunchInputs = { subagents: OmpUserSubagentSnapshot; instructions: string | null; fingerprint: string };
+  const configurations = new WeakMap<object, { pending: LaunchInputs | null; fingerprint: string | null }>();
+  const loadLaunchInputs = async (spec: OmpSessionRuntimeSpec): Promise<LaunchInputs> => {
     const catalog = deps.hostTools ? await deps.hostTools.catalog(spec.projectDirectory) : [];
-    const snapshot = await loadOmpUserSubagents(hostOrThrow(deps.host), spec, catalog.map(tool => tool.definition.name));
-    for (const diagnostic of snapshot.diagnostics) deps.logger?.app("runtime", "warn", "subagent unavailable", { data: diagnostic });
-    return snapshot;
+    const subagents = await loadOmpUserSubagents(hostOrThrow(deps.host), spec, catalog.map(tool => tool.definition.name));
+    for (const diagnostic of subagents.diagnostics) deps.logger?.app("runtime", "warn", "subagent unavailable", { data: diagnostic });
+    const instructions = await readGlobalInstructions(dataRoot);
+    const fingerprint = createHash("sha256").update(JSON.stringify([subagents.fingerprint, instructions])).digest("hex");
+    return { subagents, instructions, fingerprint };
   };
 
   const bridge = createOmpSessionBridge({
@@ -241,6 +269,8 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
     resourcesPath: deps.resourcesPath ?? null,
     appPath: deps.appPath,
     sessionDir,
+    // Restored and live user rows name the image bytes the runtime kept.
+    storeImage: (bytes) => ensureAttachmentBlob(dataRoot, bytes),
     onMemoryMaintenanceIdle: deps.onMemoryMaintenanceIdle,
     resolveExecutionRoot: createOmpExecutionRootResolver(deps.host),
     // The session's mode and effective permission mode, read from the host
@@ -270,12 +300,12 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
     refreshRuntimeConfiguration: async (supervisor, spec) => {
       const state = configurations.get(supervisor);
       if (!state) throw new Error("OMP runtime configuration is unavailable");
-      const snapshot = await loadSubagents(spec);
-      state.pending = snapshot;
-      return state.fingerprint !== null && state.fingerprint !== snapshot.fingerprint;
+      const inputs = await loadLaunchInputs(spec);
+      state.pending = inputs;
+      return state.fingerprint !== null && state.fingerprint !== inputs.fingerprint;
     },
     createSupervisor: (spec: OmpSessionRuntimeSpec) => {
-      const state: { pending: OmpUserSubagentSnapshot | null; fingerprint: string | null } = { pending: null, fingerprint: null };
+      const state: { pending: LaunchInputs | null; fingerprint: string | null } = { pending: null, fingerprint: null };
       const supervisor = engineRuntime.ompRuntime.createSupervisor({
         sessionDir,
         memory: async () => {
@@ -297,12 +327,14 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
           ? { modelSelector: `${spec.providerId}/${spec.modelId}` }
           : {}),
         prepareRun: async (paths) => {
-          const snapshot = state.pending ?? await loadSubagents(spec);
-          await projectSessionModels(deps.host, spec, paths, await ompSubagentModels(hostOrThrow(deps.host), snapshot));
+          const inputs = state.pending ?? await loadLaunchInputs(spec);
+          await projectSessionModels(deps.host, spec, paths, await ompSubagentModels(hostOrThrow(deps.host), inputs.subagents));
           // OMP task discovery uses HOME/PI_CONFIG_DIR/agent, independently
           // of PI_CODING_AGENT_DIR (which owns models.yml and session state).
-          await writeOmpUserSubagents(join(paths.configRoot, "agent"), snapshot);
-          state.fingerprint = snapshot.fingerprint;
+          await writeOmpUserSubagents(join(paths.configRoot, "agent"), inputs.subagents);
+          // The desktop's global instructions become the run's user-level AGENTS.md.
+          await writeOmpGlobalInstructions(paths.home, inputs.instructions);
+          state.fingerprint = inputs.fingerprint;
           state.pending = null;
         },
       });

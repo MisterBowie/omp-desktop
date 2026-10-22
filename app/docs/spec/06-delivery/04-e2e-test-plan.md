@@ -8,6 +8,33 @@
 
 ## 1. Goals
 
+### E2E-OMP-image-input
+
+- **Steps:** Project a local fake vision model, prompt the bridge with an inline
+  PNG and a renderer user-row id, then read the native history back.
+- **Expected:** The provider request carries the image as image content (OMP may
+  re-encode it); the persisted live row and the restored row name the same
+  `attachments/<sha256>` copy of the bytes the runtime kept. No real model is used.
+- **Automation:** `OMP_BUNDLED_RESOURCES=<resources> node --test
+  apps/desktop/test/omp-image-prompt-e2e.test.mjs`. IPC tests cover vision vs
+  text-only models, steering, out-of-root paths, the inline budget and queued
+  attachments.
+- **Boundary:** Verified bundled OMP and production preparation; not installed GUI
+  or paid-model acceptance.
+
+### E2E-OMP-global-instructions
+
+- **Steps:** Start a run whose launch writes desktop global instructions with a
+  canary, then a run without them.
+- **Expected:** OMP loads the canary as user-level `AGENTS.md` into the system
+  prompt; the run without instructions carries none. The settings editor reads
+  and writes `<data>/AGENTS.md`, never `~/.pi/agent/AGENTS.md`.
+- **Automation:** `OMP_BUNDLED_RESOURCES=<resources> node --test
+  apps/desktop/test/omp-global-instructions-e2e.test.mjs` and
+  `node --test apps/desktop/test/omp-global-instructions.test.mjs`.
+- **Boundary:** Verified bundled OMP; refresh on edit reuses the launch-fingerprint
+  path covered by E2E-OMP-user-subagents.
+
 ### E2E-OMP-user-subagents
 
 - **Steps:** Return an enabled global `code-implement` document from the host
@@ -91,11 +118,13 @@
   apps/desktop/test/omp-session-operations-e2e.test.mjs`.
 - **Additional contracts:** Runtime tests cover delayed terminal frames,
   preparation cancellation, uncertain admission, retained reclamation and retry.
-  IPC tests reject unsupported attachments before durable queue admission.
-- **Boundary:** Text controls only; full-fork and individual child stop remain
-  explicitly unavailable. Host persistence RPC uses a controlled fixture; this
-  scenario checks write-before-dispatch ordering, not database restart recovery.
-  Cross-platform installed UI acceptance is separate.
+  IPC tests queue attachments for the OMP prompt path (`E2E-OMP-image-input`)
+  and reject collaboration-message origins before durable queue admission.
+- **Boundary:** Attachments are covered by `E2E-OMP-image-input`; full-fork
+  and individual child stop remain explicitly unavailable. Host persistence RPC
+  uses a controlled fixture; this scenario checks write-before-dispatch
+  ordering, not database restart recovery. Cross-platform installed UI
+  acceptance is separate.
 - **Specs:** Runtime spec OMP session-controls amendment; OMP session-controls ADR.
 
 ### E2E-OMP-session-ui
@@ -5591,14 +5620,15 @@ identify the platform validation still needed.
   3. Open the Projects view and use a project's more menu to edit and save its
      displayed `AGENTS.md`.
   4. Submit a prompt in a new or idle session.
-- **Expected**: The global editor targets only `~/.pi/agent/AGENTS.md`. The
+- **Expected**: The global editor targets only the app data directory's
+  `<data>/AGENTS.md` (ADR 0332), never `~/.pi/agent/AGENTS.md`. The
   project editor is available only from a known project's Projects-view more
   menu and targets only that project's root `AGENTS.md`. Both editors show
   their resolved paths, preserve the typed text, and save through the dedicated
   IPC rather than a general file write API. Global content precedes project
   content in the next runtime; the saved project content follows it and takes
   precedence on conflicts. The project editor is a viewport-level dialog.
-- **Specs linked**: `03-runtime/02-agent-runtime.md`, ADR 0037
+- **Specs linked**: `03-runtime/02-agent-runtime.md`, ADR 0037, ADR 0332
 - **Acceptance**: C (chat/stream), D (workspace), F (persistence)
 - **Milestone**: M5
 - **Status**: Unit-covered (`project-instructions.test.ts`); UI journey Draft

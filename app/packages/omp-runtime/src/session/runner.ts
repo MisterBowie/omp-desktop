@@ -25,7 +25,7 @@ import type { AgentEvent, AgentEventEnvelope, AppError, UiMessage } from "@pi-de
 
 import { OmpRuntimeError } from "../errors.js";
 import type { OmpFrame } from "../protocol.js";
-import { appError, OmpEventConverter } from "./events.js";
+import { appError, OmpEventConverter, type OmpEventConverterOptions } from "./events.js";
 import {
   OmpHostToolCalls,
   type OmpHostToolCounters,
@@ -86,6 +86,13 @@ export type OmpSessionRuntime = {
 };
 
 export type OmpRunState = "idle" | "running" | "stopping";
+
+/** One inline image for a user input; sent as the runtime's own `ImageContent`. */
+export type OmpPromptImage = { data: string; mimeType: string };
+
+function imageContent(images: readonly OmpPromptImage[] | undefined): { images?: { type: "image"; data: string; mimeType: string }[] } {
+  return images?.length ? { images: images.map(({ data, mimeType }) => ({ type: "image", data, mimeType })) } : {};
+}
 
 export type OmpStopOutcome = {
   /** The runtime acknowledged the in-protocol abort. */
@@ -149,6 +156,8 @@ export type OmpSessionRunnerOptions = {
    * seed counters still order turns and messages inside one context.
    */
   contextId?: string;
+  /** Persists inline user images for live rows (see `OmpEventConverterOptions.storeImage`). */
+  storeImage?: OmpEventConverterOptions["storeImage"];
   /**
    * The native session id this runner's entry owns, read live (the entry
    * persists it when the native session is created or restored, after the
@@ -254,7 +263,7 @@ export class OmpSessionRunner {
     return this.disposed === null && this.run?.turnId === expectedTurnId && this.run.started && this.state === "running" && !this.stopping && !this.steeringInFlight;
   }
 
-  async steer(message: string, expectedTurnId: string, userMessageId?: string | null): Promise<{ accepted: true; turnId: string }> {
+  async steer(message: string, expectedTurnId: string, userMessageId?: string | null, images?: readonly OmpPromptImage[]): Promise<{ accepted: true; turnId: string }> {
     this.throwIfDisposed();
     const run = this.run;
     if (!run || !this.canSteer(expectedTurnId)) {
@@ -264,7 +273,7 @@ export class OmpSessionRunner {
     if (userMessageId) this.converter.queueSteeringUserMessageId(userMessageId);
     let answered = false;
     try {
-      const result = await this.runtime.request({ type: "steer", message }, { timeoutMs: 15_000 });
+      const result = await this.runtime.request({ type: "steer", message, ...imageContent(images) }, { timeoutMs: 15_000 });
       answered = true;
       if (result.success !== true) throw new Error(result.error ?? "The runtime refused steering");
       return { accepted: true, turnId: run.turnId };
@@ -408,6 +417,7 @@ export class OmpSessionRunner {
       now: this.now,
       ...(options.messageSequenceSeed !== undefined ? { sequenceSeed: options.messageSequenceSeed } : {}),
       ...(options.contextId !== undefined ? { contextId: options.contextId } : {}),
+      ...(options.storeImage ? { storeImage: options.storeImage } : {}),
     });
     this.onTurnEnd = options.onTurnEnd;
     this.subagents = new SubagentTracker({ sessionId: this.sessionId, now: this.now });
@@ -680,6 +690,8 @@ export class OmpSessionRunner {
        * execution prompt, which no renderer bubble announced.
        */
       userMessageId?: string | null;
+      /** Inline images that ride the prompt beside its text. */
+      images?: readonly OmpPromptImage[];
     } = {},
   ): Promise<{ accepted: boolean; turnId: string; generation: number; hostTurnId: string | null }> {
     this.throwIfDisposed();
@@ -754,7 +766,7 @@ export class OmpSessionRunner {
       // prompt instead of submitting it after the abort. Nothing can interleave
       // between this synchronous check and the write below.
       if (!this.isCurrentRun(run)) throw this.refuseCanceledPreparation(run);
-      const response = await this.runtime.request({ type: "prompt", message }, { timeoutMs: 30_000 });
+      const response = await this.runtime.request({ type: "prompt", message, ...imageContent(options.images) }, { timeoutMs: 30_000 });
       if (response.success === false) {
         throw new OmpRuntimeError(
           "not-started",

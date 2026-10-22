@@ -65,6 +65,7 @@ import {
   type OmpConversionDiagnostics,
   type OmpHostToolDefinition,
   type OmpHostToolExecutor,
+  type OmpPromptImage,
   type OmpRunState,
   type OmpRuntimeSupervisor,
   type OmpSessionRuntime,
@@ -149,6 +150,8 @@ export type OmpSessionBridgeOptions = {
   createSupervisor: (spec: OmpSessionRuntimeSpec) => OmpRuntimeSupervisor;
   /** Refresh launch-owned inputs; true requires an idle process replacement. */
   refreshRuntimeConfiguration?: (supervisor: OmpRuntimeSupervisor, spec: OmpSessionRuntimeSpec) => Promise<boolean>;
+  /** Stores inline user images under the desktop attachment store and returns their refs. */
+  storeImage?: (bytes: Buffer, mimeType: string) => string | null;
   /** Absolute launcher path, or null when this build has none. */
   launcher: string | null;
   isPackaged: boolean;
@@ -360,6 +363,8 @@ export type OmpPromptInput = {
    * absent for prompts no renderer row announced (approved-plan execution).
    */
   userMessageId?: string | null;
+  /** Inline images prepared at the IPC boundary; non-inline attachments are already file references in `content`. */
+  images?: readonly OmpPromptImage[];
   /**
    * Called once with the durable host turn id after its row exists and the
    * stop/dispose re-check has passed, immediately before the prompt is handed
@@ -712,7 +717,7 @@ export type OperationContext = {
 export type OmpSessionBridge = {
   gatePath(): string | null;
   prompt(input: OmpPromptInput): Promise<OmpPromptResult>;
-  steer(sessionId: string, content: string, expectedTurnId: string, userMessageId?: string | null, requiresSkill?: boolean): Promise<{ accepted: true; turnId: string }>;
+  steer(sessionId: string, content: string, expectedTurnId: string, userMessageId?: string | null, requiresSkill?: boolean, images?: readonly OmpPromptImage[]): Promise<{ accepted: true; turnId: string }>;
   compact(sessionId: string, context: OperationContext): Promise<{ accepted: true }>;
   /**
    * Read one session's native transcript, read-only and without a turn.
@@ -807,6 +812,7 @@ type PendingDialog = { request: OmpUiRequest; sessionId: string; generation: num
 class SessionEntry {
   private preparingPrompt = false;
   private readonly refreshRuntimeConfiguration: OmpSessionBridgeOptions["refreshRuntimeConfiguration"];
+  private readonly storeImage: OmpSessionBridgeOptions["storeImage"];
   private compaction: OmpManualCompaction | null = null;
 
   isCompacting(): boolean { return this.compaction?.active ?? false; }
@@ -815,14 +821,14 @@ class SessionEntry {
     return this.runner?.status().currentTurnId === turnId || this.hostTurn?.hostTurnId === turnId;
   }
 
-  async steer(content: string, expectedTurnId: string, userMessageId?: string | null, requiresSkill = false): Promise<{ accepted: true; turnId: string }> {
+  async steer(content: string, expectedTurnId: string, userMessageId?: string | null, requiresSkill = false, images: readonly OmpPromptImage[] = []): Promise<{ accepted: true; turnId: string }> {
     this.assertOpen();
     this.assertNotCompacting();
     const runner = this.activeRunner();
     if (!runner || this.stopping || !runner.canSteer(expectedTurnId)) throw Object.assign(new Error("The target turn has ended"), { errorCode: ErrorCodes.TURN_NOT_FOUND });
     if (requiresSkill) this.assertSkillLoader();
     if (userMessageId) this.notePromptUserRow(userMessageId);
-    return runner.steer(content, expectedTurnId, userMessageId);
+    return runner.steer(content, expectedTurnId, userMessageId, images);
   }
 
   assertNotCompacting(): void {
@@ -1047,9 +1053,11 @@ class SessionEntry {
     onTurnEnd?: OmpSessionBridgeOptions["onTurnEnd"];
     hostTurns?: OmpSessionBridgeOptions["hostTurns"];
     refreshRuntimeConfiguration?: OmpSessionBridgeOptions["refreshRuntimeConfiguration"];
+    storeImage?: OmpSessionBridgeOptions["storeImage"];
   }) {
     this.sessionId = deps.sessionId;
     this.refreshRuntimeConfiguration = deps.refreshRuntimeConfiguration;
+    this.storeImage = deps.storeImage;
     this.projectDirectory = deps.projectDirectory;
     this.executionDirectory = deps.executionDirectory ?? deps.projectDirectory;
     this.supervisor = deps.supervisor;
@@ -1348,6 +1356,7 @@ class SessionEntry {
       generationSeed: this.generationSeed,
       messageSequenceSeed: this.messageSequenceSeed,
       contextId: this.contextId,
+      ...(this.storeImage ? { storeImage: this.storeImage } : {}),
       // Read live: the native session is established after the runner exists,
       // and a structured start refusal is attributed by this identity.
       nativeSessionIdentity: () => this.nativeSessionId,
@@ -1639,6 +1648,7 @@ class SessionEntry {
     onHostTurnBound?: (hostTurnId: string) => void,
     userMessageId?: string | null,
     requiresSkill = false,
+    images: readonly OmpPromptImage[] = [],
   ): Promise<OmpPromptResult> {
     this.assertOpen();
     this.assertNotCompacting();
@@ -1661,7 +1671,7 @@ class SessionEntry {
       const changed = await this.refreshRuntimeConfiguration(this.supervisor, spec);
       this.assertOpen();
       if (this.stopEpoch !== epoch) throw new OmpRuntimeError("stopping", "a stop was requested while refreshing runtime configuration");
-      if (changed) await this.resetIdleRuntime("refresh the subagent configuration", true);
+      if (changed) await this.resetIdleRuntime("refresh its launch configuration", true);
       if (this.stopEpoch !== epoch) throw new OmpRuntimeError("stopping", "a stop was requested while refreshing runtime configuration");
     }
     await this.ensureNativeSession(gate, spec);
@@ -1814,7 +1824,7 @@ class SessionEntry {
       if (userMessageId) this.notePromptUserRow(userMessageId);
       started = await runner.prompt(
         content,
-        admission ? { admission, hostTurnId, userMessageId } : { hostTurnId, userMessageId },
+        admission ? { admission, hostTurnId, userMessageId, images } : { hostTurnId, userMessageId, images },
       );
     } catch (error) {
       // The runner refused or the transport failed. This path owns the host
@@ -2647,6 +2657,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       sessionDir: options.sessionDir,
       binding,
       ...(options.refreshRuntimeConfiguration ? { refreshRuntimeConfiguration: options.refreshRuntimeConfiguration } : {}),
+      ...(options.storeImage ? { storeImage: options.storeImage } : {}),
       ...(options.hostTools ? { hostTools: options.hostTools } : {}),
       ...(options.capabilities ? { capabilities: options.capabilities } : {}),
       ...(options.sessionPolicy ? { sessionPolicy: options.sessionPolicy } : {}),
@@ -2691,7 +2702,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     if (memoryMaintenance) await waitForMemoryMaintenance();
     const entry = entryFor(spec);
     try {
-      return await entry.prompt(gate, spec, input.content, input.onHostTurnBound, input.userMessageId ?? null, input.requiresSkill);
+      return await entry.prompt(gate, spec, input.content, input.onHostTurnBound, input.userMessageId ?? null, input.requiresSkill, input.images ?? []);
     } finally {
       wakeQueueIfIdle(entry);
     }
@@ -2788,6 +2799,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       messageBefore: input.messageBefore,
       messageAround: input.messageAround,
       contentLimit: input.contentLimit,
+      ...(options.storeImage ? { storeImage: options.storeImage } : {}),
     });
     return {
       messages: projection.messages,
@@ -2863,10 +2875,10 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     return entryFor(spec).compact(gate, spec);
   }
 
-  async function steer(sessionId: string, content: string, expectedTurnId: string, userMessageId?: string | null, requiresSkill = false): Promise<{ accepted: true; turnId: string }> {
+  async function steer(sessionId: string, content: string, expectedTurnId: string, userMessageId?: string | null, requiresSkill = false, images: readonly OmpPromptImage[] = []): Promise<{ accepted: true; turnId: string }> {
     const entry = entryOf(sessionId);
     if (!entry) throw Object.assign(new Error("The target turn has ended"), { errorCode: ErrorCodes.TURN_NOT_FOUND });
-    return entry.steer(content, expectedTurnId, userMessageId, requiresSkill);
+    return entry.steer(content, expectedTurnId, userMessageId, requiresSkill, images);
   }
 
   async function rename(

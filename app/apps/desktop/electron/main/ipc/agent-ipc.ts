@@ -15,6 +15,7 @@ import type { ComposerCommandService } from "./composer-ipc";
 import type { IpcRegistrar } from "./types";
 import { withPromptEnhancementTimeout } from "../prompt-enhancement-timeout";
 import type { OmpSessionBridge } from "../runtime/omp-session";
+import { OMP_INLINE_IMAGE_BUDGET_BYTES, ompModelAcceptsImages } from "../runtime/omp-session-wiring";
 import { expandSkillCommand } from "@pi-desktop/shared";
 
 export type AgentIpcDependencies = {
@@ -114,6 +115,31 @@ export function registerAgentIpc({
       agentHostBridge = getAgentHostBridge();
       return fn(...args);
     });
+  };
+  // OMP inputs keep the Pi attachment semantics: images go inline only for a
+  // model projected with image input and within the per-input budget; every
+  // other attachment becomes a file reference the runtime can read.
+  const prepareOmpInput = async (
+    client: HostProcess,
+    sessionId: string,
+    projectPath: string | null,
+    content: string,
+    attachments: AgentPromptRequest["attachments"],
+    model: { providerId?: unknown; modelId?: unknown },
+  ): Promise<{ content: string; images?: { data: string; mimeType: string }[] }> => {
+    if (!attachments?.length) return { content };
+    const acceptsImages = await ompModelAcceptsImages(
+      client,
+      typeof model.providerId === "string" ? model.providerId : null,
+      typeof model.modelId === "string" ? model.modelId : null,
+    );
+    const prepared = await preparePromptAttachments(dataDir, sessionId, projectPath ?? undefined, attachments, acceptsImages, {
+      inlineBudgetBytes: OMP_INLINE_IMAGE_BUDGET_BYTES,
+    });
+    const images = prepared.flatMap((attachment) =>
+      attachment.inlineData ? [{ data: attachment.inlineData, mimeType: attachment.message.mimeType ?? "application/octet-stream" }] : [],
+    );
+    return { content: appendPromptFallbackPaths(content, prepared), ...(images.length ? { images } : {}) };
   };
   handle(IPC.invoke.promptEnhance, async (req: PromptEnhancementRequest) => {
     if (!host) throw new Error("backend unavailable");
@@ -282,10 +308,15 @@ export function registerAgentIpc({
       if (!ompSessions) throw Object.assign(new Error("OMP backend unavailable"), {
         errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE, engine: "omp", capability: "steer",
       });
-      if (req.attachments?.length) throw Object.assign(new Error("OMP steering currently supports text input only"), { errorCode: ErrorCodes.INVALID_ARGUMENT });
       const expanded = req.content.startsWith("/") ? expandSkillCommand(req.content,
         await composerCommandService.buildComposerCommands(ompSessions.projectDirectory(req.sessionId))) : null;
-      return ompSessions.steer(req.sessionId, expanded?.expanded ?? req.content, req.expectedTurnId, isDurableUserMessageId(req.messageId) ? req.messageId : null, expanded !== null);
+      let input: { content: string; images?: { data: string; mimeType: string }[] } = { content: expanded?.expanded ?? req.content };
+      if (req.attachments?.length) {
+        if (!host) throw new Error("host unavailable");
+        const steerSession = (await host.call<{ session?: { providerId?: unknown; modelId?: unknown } }>("session.get", { id: req.sessionId, messageLimit: 1 })).session ?? {};
+        input = await prepareOmpInput(host, req.sessionId, ompSessions.projectDirectory(req.sessionId), input.content, req.attachments, steerSession);
+      }
+      return ompSessions.steer(req.sessionId, input.content, req.expectedTurnId, isDurableUserMessageId(req.messageId) ? req.messageId : null, expanded !== null, input.images);
     }
     if (!host || !sidecar) throw new Error("backend unavailable");
     // A steering input belongs to the turn it names: it is refused once that
@@ -400,14 +431,6 @@ export function registerAgentIpc({
           capability: "prompt",
         });
       }
-      if (req.attachments?.length) {
-        // Attachments need a projection into the runtime's message format that
-        // this release does not implement; silently dropping them would prompt
-        // with less than the user attached.
-        throw Object.assign(new Error("OMP sessions do not accept attachments yet"), {
-          errorCode: ErrorCodes.INVALID_ARGUMENT,
-        });
-      }
       const projectPath =
         typeof session.projectPath === "string" && session.projectPath.trim()
           ? session.projectPath.trim()
@@ -440,9 +463,10 @@ export function registerAgentIpc({
       logger.app("session", "info", "omp prompt accepted", {
         data: { sessionId: req.sessionId, projectPath },
       });
+      const input = await prepareOmpInput(host, req.sessionId, projectPath, expanded?.expanded ?? req.content, req.attachments, session);
       return await ompSessions.prompt({
         sessionId: req.sessionId,
-        content: expanded?.expanded ?? req.content,
+        content: input.content,
         requiresSkill: expanded !== null,
         projectPath,
         providerId: typeof session.providerId === "string" ? session.providerId : null,
@@ -453,6 +477,7 @@ export function registerAgentIpc({
         adapterVersion: engineRef?.adapterVersion ?? null,
         runtimeVersion: engineRef?.runtimeVersion ?? null,
         userMessageId,
+        ...(input.images ? { images: input.images } : {}),
       });
     }
     if (!sidecar) throw new Error("sidecar unavailable");
@@ -949,8 +974,8 @@ export function registerAgentIpc({
     if (engine === "omp" && !ompSessions) throw Object.assign(new Error("OMP backend unavailable"), {
       errorCode: ErrorCodes.ENGINE_CAPABILITY_UNAVAILABLE, engine: "omp", capability: "followUp",
     });
-    if (engine === "omp" && (req.attachments?.length || req.sessionMessageId)) {
-      throw Object.assign(new Error("OMP queued prompts currently support text input only"), { errorCode: ErrorCodes.INVALID_ARGUMENT });
+    if (engine === "omp" && req.sessionMessageId) {
+      throw Object.assign(new Error("OMP does not yet persist collaboration-message origins"), { errorCode: ErrorCodes.INVALID_ARGUMENT });
     }
     if (!agentHostBridge) throw new Error("agent host unavailable");
     return agentHostBridge.queue.push(req);

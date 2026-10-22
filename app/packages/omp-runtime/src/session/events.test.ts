@@ -6,6 +6,7 @@
  * captures in `app/experiments/omp-bridge/fixtures/`), so a runtime upgrade
  * that changes a field name fails here rather than in the transcript.
  */
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import { OmpEventConverter } from "./events.js";
@@ -595,6 +596,48 @@ describe("admitted prompt identity (R5)", () => {
     expect(end).toHaveLength(1);
     expect(end[0]).toMatchObject({ type: "message_end", message: { id: liveId, role: "user", status: "complete" } });
     expect(c.runMessageIds()).toContain(liveId);
+  });
+
+  it("stores the user's inline images and carries them on the persisted row; without a store they stay off", () => {
+    const stored: { bytes: Buffer; mimeType: string }[] = [];
+    const c = new OmpEventConverter({
+      sessionId: "s1",
+      now: () => 1_000,
+      storeImage: (bytes, mimeType) => {
+        stored.push({ bytes, mimeType });
+        return `attachments/${createHash("sha256").update(bytes).digest("hex")}`;
+      },
+    });
+    c.adoptUserMessageId("11111111-2222-4333-8444-555555555555");
+    const webp = Buffer.from("UklGRhwAAABXRUJQVlA4IBAAAAAwAQCdASoBAAEAAQAcJaQAA3AA/v89WAAAAA==", "base64");
+    const user = {
+      role: "user",
+      content: [{ type: "text", text: "what is this?" }, { type: "image", data: webp.toString("base64"), mimeType: "image/webp" }],
+      timestamp: 1_000,
+    };
+    // The persisted echo replaces the optimistic row, so it must carry the
+    // image the runtime kept; a restored history converts the same frame.
+    const [persisted] = c.convert({ type: "message_start", message: user });
+    expect(stored).toEqual([{ bytes: webp, mimeType: "image/webp" }]);
+    expect(persisted).toMatchObject({
+      type: "user_message_persisted",
+      message: {
+        content: "what is this?",
+        attachments: [{
+          kind: "image", name: "image-1.webp", ref: `attachments/${createHash("sha256").update(webp).digest("hex")}`,
+          mimeType: "image/webp", size: webp.length,
+        }],
+      },
+    });
+    const assistant = c.convert({
+      type: "message_start",
+      message: { role: "assistant", content: [{ type: "image", data: webp.toString("base64"), mimeType: "image/webp" }], timestamp: 1_000 },
+    });
+    expect(assistant[0].type === "message_start" ? assistant[0].message.attachments : "missing").toBeUndefined();
+    expect(stored).toHaveLength(1);
+
+    const [unstored] = converter().convert({ type: "message_start", message: user });
+    expect(unstored.type === "message_start" ? unstored.message.attachments : "missing").toBeUndefined();
   });
 
   it("consumes the binding once: a later user frame is an ordinary row", () => {

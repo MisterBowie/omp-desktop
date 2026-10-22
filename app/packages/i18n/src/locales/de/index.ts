@@ -1230,6 +1230,7 @@ sklm: {
     "vendorConnected": "Verbunden",
     "vendorDisconnected": "Anmeldung erforderlich",
     "vendorDisconnectedDesc": "Für dieses Konto sind keine verwendbaren Anmeldeinformationen übrig. Entfernen Sie es und fügen Sie das Konto erneut hinzu.",
+    "vendorDisconnectedRemoveDesc": "Für dieses Konto sind keine verwendbaren Anmeldeinformationen übrig. Entfernen Sie es.",
     "vendorSubscription": "Abonnement",
     "vendorSignedInGeneric": "Angemeldet",
     "vendorAccountNumber": "Konto {{number}}",

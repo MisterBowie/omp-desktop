@@ -1230,6 +1230,7 @@ sklm: {
     vendorConnected: "已連線",
     vendorDisconnected: "需要重新登入",
     vendorDisconnectedDesc: "此賬戶已沒有可用憑據，請移除後重新新增。",
+    vendorDisconnectedRemoveDesc: "此賬戶已沒有可用憑據，請移除。",
     vendorSubscription: "訂閱制",
     vendorSignedInGeneric: "已登入",
     vendorAccountNumber: "賬戶 {{number}}",

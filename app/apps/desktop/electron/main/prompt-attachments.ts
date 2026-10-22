@@ -157,7 +157,8 @@ function displayPromptPath(
     : promptPath.absolute;
 }
 
-function ensureAttachmentBlob(dataRoot: string, bytes: Buffer): string {
+/** Store bytes once under `attachments/<sha256>` and return that ref. */
+export function ensureAttachmentBlob(dataRoot: string, bytes: Buffer): string {
   const hash = createHash("sha256").update(bytes).digest("hex");
   const root = join(dataRoot, "attachments");
   mkdirSync(root, { recursive: true });
@@ -224,8 +225,11 @@ export async function preparePromptAttachments(
   projectPath: string | undefined,
   attachments: readonly AgentPromptAttachment[],
   supportsVision: boolean,
+  /** Total inline image bytes for this input; images past it become file references. */
+  options: { inlineBudgetBytes?: number } = {},
 ): Promise<PreparedPromptAttachment[]> {
   const prepared: PreparedPromptAttachment[] = [];
+  let inlineBudget = options.inlineBudgetBytes ?? Number.POSITIVE_INFINITY;
   for (const attachment of attachments) {
     const source = resolvePromptPath(dataRoot, sessionId, projectPath, attachment.path);
     if (!source) {
@@ -251,7 +255,8 @@ export async function preparePromptAttachments(
     }
 
     const size = statSync(source.absolute).size;
-    const inline = supportsVision && size <= MAX_INLINE_IMAGE_BYTES;
+    const inline = supportsVision && size <= MAX_INLINE_IMAGE_BYTES && size <= inlineBudget;
+    if (inline) inlineBudget -= size;
     const bytes = inline ? await readFile(source.absolute) : undefined;
     const ref =
       source.root === "attachment" && attachment.path.trim().startsWith("attachments/")

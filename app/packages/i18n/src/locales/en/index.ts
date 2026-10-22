@@ -1244,6 +1244,7 @@ sklm: {
     vendorDisconnected: "Needs sign-in",
     vendorDisconnectedDesc:
       "This account has no usable credential left. Remove it and add the account again.",
+    vendorDisconnectedRemoveDesc: "This account has no usable credential left. Remove it.",
     vendorSubscription: "Subscription",
     vendorSignedInGeneric: "Signed in",
     vendorAccountNumber: "account {{number}}",

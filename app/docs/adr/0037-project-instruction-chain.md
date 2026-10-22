@@ -1,6 +1,6 @@
 # ADR 0037: Resolve project instructions in Electron main
 
-- Status: Accepted
+- Status: Accepted; global-file location superseded in part by ADR 0332
 - Date: 2026-07-30
 - Related: [Agent runtime](../spec/03-runtime/02-agent-runtime.md)
 

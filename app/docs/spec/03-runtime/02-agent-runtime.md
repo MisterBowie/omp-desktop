@@ -1,5 +1,36 @@
 # 02. Agent Runtime
 
+## OMP attachments, global instructions and OAuth sign-in (2026-10-22 amendment)
+
+**Attachments.** OMP prompts, steering input and host-queued follow-ups accept
+the composer's attachments. Electron main prepares them with the same rules as
+the earlier runtime: paths must resolve inside the session's scratch,
+attachment store or bound project; images go inline only when the session's
+projected model declares image input, at most 10 MB each and 32 MiB per input
+(half the native session reader's record ceiling, because the runtime stores a
+user message as one base64 record); every other attachment, and images past the
+budget, become file references appended to the text. Inline images ride the
+runtime's own `prompt`/`steer` `images` field; the turn-fence handshake never
+carries them. OMP may re-encode an image (for example to WebP); the desktop
+stores the bytes the runtime kept under `attachments/<sha256>` and the live and
+restored user rows name that copy, so the transcript shows what the model saw.
+Collaboration-message origins remain refused.
+
+**Global instructions.** Settings → Instructions edits `<data>/AGENTS.md` in the
+app's data directory; the user's real `~/.pi/agent/AGENTS.md` is no longer read
+or written, and nothing is migrated. Each run receives the trimmed content
+(32 KiB budget, truncation labelled) as its user-level
+`<synthetic HOME>/.agents/AGENTS.md`, which OMP loads natively before the
+project's own instruction files. The content is part of the launch fingerprint:
+an edit rebuilds an idle runtime before the next prompt, restoring the same
+native session. Project instructions stay the project's own files.
+
+**OAuth.** OMP model projection refuses OAuth providers, so the vendor sign-in
+entry is hidden. Existing vendor accounts stay listed for inspection, testing
+and removal; an account without a usable credential is told to remove it rather
+than add it again, and the section is hidden when there are none.
+
+
 ## OMP user subagent definitions (2026-10-22 amendment)
 
 Enabled global user definitions from Settings now reach OMP's native `task`.
@@ -78,8 +109,9 @@ amendment supersedes earlier closed-capability descriptions for these paths.
   become success through a delayed result. Failed reclamation blocks reuse
   and remains retryable through Stop. Start/end events drive the existing
   localized UI. Summary history stays native; no desktop checkpoint is invented.
-- Text-only controls reject attachments before queue admission or native
-  dispatch. `branch` and individual child stop remain unavailable: native
+- Steering and queued follow-ups carry attachments since the 2026-10-22
+  amendment (ADR 0332); collaboration-message origins are still rejected before
+  queue admission. `branch` and individual child stop remain unavailable: native
   redo-from-user branching and parent abort do not satisfy those contracts.
 
 See [OMP session controls ADR](../../adr/omp-session-controls.md) and
@@ -1453,6 +1485,12 @@ project instruction chain (§7.3) is appended last, so a delegate follows the
 same project rules as its session.
 
 ### 7.3 Project instruction chain
+
+OMP runs, the only executing engine since ADR 0331, do not use this chain:
+Settings edits the desktop-owned `<data>/AGENTS.md`, which each OMP run loads as
+user-level context, and OMP discovers project instruction files natively (see
+the 2026-10-22 amendment). The rest of this section describes the retired Pi
+runtime.
 
 The Electron main process first resolves the global
 `~/.pi/agent/AGENTS.md`, then project instruction files inside the

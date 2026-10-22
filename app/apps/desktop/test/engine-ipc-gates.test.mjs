@@ -196,15 +196,18 @@ test("queue reorder refuses a Pi owner before mutating its FIFO", async () => {
   assert.deepEqual(bridgeCalls.filter((e) => e.op === "reorder"), [{op: "reorder", turnId: "omp-turn", direction: "up"}]);
 });
 
-test("OMP text controls work without a Pi sidecar and reject unsupported queued attachments", async () => {
+test("OMP controls work without a Pi sidecar and queue attachments for the OMP prompt path", async () => {
   const h = harness({ engineFor: () => "omp", withSidecar: false, withOmp: true });
   await h.handlers.get(IPC.invoke.agentSteer)({ sessionId: OMP_SESSION, content: "correction", expectedTurnId: "live" });
   await h.handlers.get(IPC.invoke.agentQueuePush)({ sessionId: OMP_SESSION, content: "next" });
+  // The queue drains through agentPrompt, which prepares attachments for OMP.
+  await h.handlers.get(IPC.invoke.agentQueuePush)({ sessionId: OMP_SESSION, content: "next", attachments: [{ path: "shot.png" }] });
   await assert.rejects(
-    h.handlers.get(IPC.invoke.agentQueuePush)({ sessionId: OMP_SESSION, content: "next", attachments: [{ path: "/unread" }] }),
+    h.handlers.get(IPC.invoke.agentQueuePush)({ sessionId: OMP_SESSION, content: "relay", sessionMessageId: "m1" }),
     (error) => error.errorCode === ErrorCodes.INVALID_ARGUMENT,
   );
-  assert.deepEqual(h.bridgeCalls.map(({ op }) => op), ["ompSteer", "push"]);
+  assert.deepEqual(h.bridgeCalls.map(({ op }) => op), ["ompSteer", "push", "push"]);
+  assert.deepEqual(h.bridgeCalls[2].request.attachments, [{ path: "shot.png" }]);
   assert.deepEqual(h.sidecarCalls, []);
 });
 

@@ -1230,6 +1230,7 @@ sklm: {
     "vendorConnected": "Connecté",
     "vendorDisconnected": "Connexion nécessaire",
     "vendorDisconnectedDesc": "Ce compte n'a plus d'identifiant utilisable. Supprimez-le et ajoutez à nouveau le compte.",
+    "vendorDisconnectedRemoveDesc": "Ce compte n'a plus d'identifiant utilisable. Supprimez-le.",
     "vendorSubscription": "Abonnement",
     "vendorSignedInGeneric": "Connecté au compte",
     "vendorAccountNumber": "{{number}}",
