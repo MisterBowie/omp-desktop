@@ -1,5 +1,12 @@
 # 目标架构与实现路径
 
+> 2026-10-22 状态：本文是 2026-09-21 的初始设计，保留为历史，以下与现状不同：
+>
+> - 接入路径已定为 `omp --mode rpc-ui` 子进程加受信扩展 gate（M1 结论，见 [decisions/001-omp-transport.md](decisions/001-omp-transport.md)），没有采用 SDK bridge 或 ACP。
+> - OMP 是唯一执行引擎（2026-10-21 决定）。下图中的“原 Pi runtime”分支已关闭，遗留代码待删除（[任务看板](04-task-board.md) R12）。
+> - 运行时是受控补丁 fork（2026-10-22 承认，ADR 0305/0307）。第 10 节的升级按 [07-environment-and-upstream.md](07-environment-and-upstream.md) 第 8 节执行。
+> - 实际模块与契约以 `app/docs/adr/0300`–`0331` 和 `app/docs/spec/03-runtime/02-agent-runtime.md` 为准。
+
 本文是拟实现设计。现有代码事实见 `01-source-audit.md`，最终接口选择必须通过 M1 实验。
 
 ## 1. 保留桌面，隔离引擎差异

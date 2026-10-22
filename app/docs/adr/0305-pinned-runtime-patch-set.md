@@ -8,7 +8,7 @@
   patch-set mechanism stands; the claim that the patch level satisfies PI's
   transition-tool contract does **not** — see "Unresolved (F3)".
 - Date: 2026-09-25 (F3 revision 2026-09-25; R4A base migration 2026-09-27;
-  scope revision 2026-10-02)
+  scope revision 2026-10-02; fork governance update 2026-10-22)
 - Scope: how this project extends the pinned `upstream/oh-my-pi` runtime.
   T20-B/C/D remain declared, not claimed. The R3 blocker is not lifted **for the
   Cursor + Plan/Goal combination**, which the user excluded from product scope on
@@ -21,6 +21,37 @@
   `app/scripts/omp-patch.mjs`,
   `apps/desktop/test/omp-patch.test.mjs`,
   `experiments/omp-bridge/t20-feasibility.mjs`.
+
+## Status update (2026-10-22): controlled fork governance
+
+This section supersedes the stale statements below; the rest of the ADR is kept
+as the record of the original decision.
+
+- **Current level.** The manifest is authoritative. As of 2026-10-22 it pins
+  `62bc57b+omp-desktop.7` on the same `omp/18.3.0` base: 13 capability ids over
+  31 files, adding the settle-time termination declaration (ADR 0310), the live
+  system-prompt action (ADR 0311), reproducible sidecar builds and the bytecode
+  switch (ADR 0307), inline LSP diagnostics (ADR 0314) and the Mnemopi memory
+  family (ADR 0330) to the four capabilities in section 3. Levels `.1`–`.6` are
+  in `manifest.history`; the dated records are in `docs/source-baseline.json`.
+- **Fork, not only a patch file.** Release builds compile the self-maintained
+  fork commit `MisterBowie/oh-my-pi` named by the manifest through
+  `scripts/omp-sidecar.mjs` (ADR 0307). `scripts/omp-patch.mjs` remains the
+  verification path against the pinned submodule; packaging does not consume
+  `--apply` as section 2 states. The Consequences claim "without forking the
+  runtime" no longer holds.
+- **Not minimal any more.** `.7` adds a desktop-scoped memory management RPC
+  whose `list` reads Mnemopi's private tables directly, and desktop task names
+  appear in patched comments. The claims that the patch "does not touch …
+  session storage" and that "nothing in the patch knows about … any desktop
+  product name" describe `.4`, not the current level.
+- **Governance (user decision 2026-10-22).** The fork is accepted as a
+  controlled fork. A new or enlarged patch requires its own ADR and explicit
+  user authorization, and desktop business logic is not added to OMP core.
+  Moving to the current upstream and shrinking the patch (memory `list` through
+  the backend interface, upstreamable generic hooks, the bytecode switch,
+  `--verify` running every manifest suite) is a separately planned stage; until
+  it lands, upgrading the pinned runtime is not considered proven.
 
 ## Context
 

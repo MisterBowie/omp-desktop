@@ -2132,7 +2132,8 @@ session's grant lifetime, ADR 0309 §6):
 
 The runtime source stays at the pinned upstream commit; this project's
 additions to it live in `app/patches/oh-my-pi/` as a numbered patch set
-(`<base-short-sha>+omp-desktop.<n>`, currently `62bc57b+omp-desktop.3`, pinned to
+(`<base-short-sha>+omp-desktop.<n>`; the manifest is authoritative and pins
+`62bc57b+omp-desktop.7` as of 2026-10-22, on
 `62bc57be1b03ef0802a33cf7f5f530e534527531` / `omp/18.3.0`) with a
 manifest that records the base SHA, the expected runtime version, the patch
 level, the patch checksum, byte count and the capability ids.
@@ -2141,15 +2142,19 @@ application path: it validates the manifest against the source checkout, copies
 exactly the tracked tree of the pinned commit into a scratch directory, applies
 the patch, optionally copies the per-worktree dependency payload, optionally
 verifies the result, and removes every scratch it created on every path.
-Packaging (M6/T21) consumes `--apply --out <dir> --prepare-build`; nothing else
-re-implements patch application and the submodule is never edited by hand.
+Release packaging builds the controlled fork commit instead (§17, ADR 0307);
+`omp-patch.mjs` stays the verification path, nothing else re-implements patch
+application, and the submodule is never edited by hand.
 T20-R4A re-cut the same patch set against the new base: the added and removed
 line multisets are unchanged, and the single hunk that had to be re-anchored is
 the `agent-loop.ts` comment `hub wait` → `wait` (see
 `docs/validation/M5-omp-18-3-patch-migration.md`).
 
-The patch set adds four capabilities the desktop declares on its own host tools,
-none of which names a desktop product:
+The original patch set added the four capabilities below, which the desktop
+declares on its own host tools. Later levels added settle-time termination, the
+live system-prompt action, reproducible builds, inline LSP diagnostics and the
+Mnemopi memory family; the manifest's `capabilities` and the 2026-10-22 status
+update in ADR 0305 list them all:
 
 - `rpc-host-tool-concurrency` — `RpcHostToolDefinition.concurrency?: "shared" |
   "exclusive"`, omitted normalizes to `"shared"`, and any other value rejects the
@@ -2290,8 +2295,9 @@ T21 whole/T22/T23/T24).
 ## 17. Bundled sidecar build and admission (M5/T20-R4B; reproducible builds since M6/T20-R4-3; packaged-resource acceptance since M6/T21-A, ADR 0307)
 
 A packaged build runs exactly one OMP runtime, and that runtime is a build
-product of this project rather than the upstream tag: `omp/18.3.0` plus patch
-level `62bc57b+omp-desktop.3`, carried by the controlled fork commit recorded in
+product of this project rather than the upstream tag: `omp/18.3.0` plus the patch
+level recorded in the manifest (`62bc57b+omp-desktop.7` as of 2026-10-22),
+carried by the controlled fork commit recorded in
 `app/patches/oh-my-pi/manifest.json`.
 
 * **Build.** `scripts/omp-sidecar.mjs` is the only entry point. It refuses a
