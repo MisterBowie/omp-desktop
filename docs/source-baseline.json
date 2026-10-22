@@ -205,6 +205,62 @@
       },
       "productImpact": "Same upstream base (62bc57be / omp 18.3.0). The desktop pins move to patchLevel 62bc57b+omp-desktop.5 / fork 3648331, and @pi-desktop/shared's patch-level/fork-commit expectations plus the bundled-sidecar manifest move with them. The .4 artifact and fork coordinates stay in the manifest history. The Cursor product gate (ADR 0306) stays in force; the plan/goal engine capabilities remain closed (T20-D).",
       "evidence": "docs/validation/M5-t20-d-mode-entry.md"
+    },
+    {
+      "date": "2026-10-16",
+      "task": "LSP coding integration (0.15.3-lsp.1, ADR 0314)",
+      "repository": "MisterBowie/oh-my-pi",
+      "from": {
+        "branch": "codex/omp-desktop-18.3.0-patch-5",
+        "commit": "36483311dfff67be7504f591974df93fc512a45a",
+        "tree": "7ba57b6d06fb8fe7e3f6352c67692e56cf39c3cd",
+        "patchLevel": "62bc57b+omp-desktop.5",
+        "patchSha256": "645242861412c8f2810cab397824413129ccbd5e5b7a94ca70caf0e76795895b",
+        "patchBytes": 118548
+      },
+      "to": {
+        "repository": "https://github.com/MisterBowie/oh-my-pi",
+        "branch": "codex/omp-desktop-18.3.0-patch-6",
+        "commit": "d648d27bcf0db16caecb876142d891cf49a51bc2",
+        "tree": "dab846754da313b09470a5d37aa1e255633d58cb",
+        "baseCommit": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+        "baseVersion": "18.3.0",
+        "patchLevel": "62bc57b+omp-desktop.6",
+        "patchFile": "app/patches/oh-my-pi/0001-omp-desktop-runtime.patch",
+        "patchSha256": "530d083f8cba5a82800aaf9e56acd72dd6d23e657acaa733c385724f436d002d",
+        "patchBytes": 123397,
+        "note": "adds inline-lsp-diagnostics: the lsp.diagnosticsDeferred setting (default true keeps upstream behavior); false settles write/edit diagnostics within the bounded, cancellable tool result so late diagnostics cannot start an unowned continuation after agent_end"
+      },
+      "productImpact": "Same upstream base. Desktop pins move to 62bc57b+omp-desktop.6 / fork d648d27; shipped in 0.1.0 through 0.1.2. Recorded retroactively on 2026-10-22; the facts come from manifest.history and the cited evidence.",
+      "evidence": "docs/validation/LSP-coding-local-20261016.md"
+    },
+    {
+      "date": "2026-10-20",
+      "task": "OMP automatic memory (0.1.3, ADR 0330)",
+      "repository": "MisterBowie/oh-my-pi",
+      "from": {
+        "branch": "codex/omp-desktop-18.3.0-patch-6",
+        "commit": "d648d27bcf0db16caecb876142d891cf49a51bc2",
+        "tree": "dab846754da313b09470a5d37aa1e255633d58cb",
+        "patchLevel": "62bc57b+omp-desktop.6",
+        "patchSha256": "530d083f8cba5a82800aaf9e56acd72dd6d23e657acaa733c385724f436d002d",
+        "patchBytes": 123397
+      },
+      "to": {
+        "repository": "https://github.com/MisterBowie/oh-my-pi",
+        "branch": "codex/mnemopi-memory",
+        "commit": "edec3898d44071206ec201beebea432a2786bd8c",
+        "tree": "d7b02053ea0735d8405c56ca499372414c96503c",
+        "baseCommit": "62bc57be1b03ef0802a33cf7f5f530e534527531",
+        "baseVersion": "18.3.0",
+        "patchLevel": "62bc57b+omp-desktop.7",
+        "patchFile": "app/patches/oh-my-pi/0001-omp-desktop-runtime.patch",
+        "patchSha256": "e951f63ae360212df37f83a7c4a965baad3d27ab05276136950c601c7441e5c0",
+        "patchBytes": 139512,
+        "note": "adds the Mnemopi family: memory management RPC v1 (status/list/search/clear; list reads Mnemopi's private tables directly), mnemopi.retainFromSessionStart, autoRecall=false also suppressing compaction recall, and get_state memoryRpcVersion/memoryMaintenanceSafe; committed after explicit user authorization"
+      },
+      "productImpact": "Same upstream base. Desktop pins and the three release workflow refs move to 62bc57b+omp-desktop.7 / fork edec389; shipped in 0.1.3 and 0.1.4. The 2026-10-22 user decision accepts the controlled fork and requires an ADR plus user authorization for any new or enlarged patch. Recorded retroactively on 2026-10-22.",
+      "evidence": "docs/validation/OMP-automatic-memory-20261020.md"
     }
   ]
 }

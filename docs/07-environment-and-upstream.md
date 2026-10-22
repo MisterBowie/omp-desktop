@@ -134,3 +134,23 @@ git -c http.proxy=http://127.0.0.1:7897 submodule update --init --recursive
 6. PI-Desktop 的差异以 `app/` 为前缀应用并审阅冲突；通过验证后才更新参考子模块指针。记录新旧 SHA、验证结果和回退方式，更新产品锁定版本。
 
 原生会话格式变化先备份再验证。版本回退不能简单等同于把可执行文件换回去，需要确认旧版本是否能读取新格式。
+
+### 8.1 OMP 受控 fork 的升级与改补丁（2026-10-22 补充）
+
+OMP 运行时不是上游标签本身，而是受控 fork `MisterBowie/oh-my-pi` 的固定提交，等于上游基线加
+`app/patches/oh-my-pi/0001-omp-desktop-runtime.patch`。新增或扩大补丁须先有 ADR 并取得用户授权。
+升级到新上游或调整补丁时按下列顺序，在单独 worktree 中执行：
+
+1. 在 fork 中从新上游标签建分支，逐个重放现有补丁并解决冲突；fork 提交是编辑来源，补丁文件用
+   `git -c core.abbrev=7 diff <base> <fork.commit>` 重新导出。
+2. 同步移动以下锁定位置，缺一项都会被测试拒绝：`upstream/oh-my-pi` 子模块指针；
+   `app/patches/oh-my-pi/manifest.json`（基线、fork 提交/tree、补丁 SHA-256/字节数、文件与能力列表，
+   旧级别移入 `history`）；`app/packages/shared/src/engine.ts` 的 `OMP_RUNTIME_VERSION`、
+   `OMP_RUNTIME_BASE_SHA`、`OMP_RUNTIME_PATCH_LEVEL`、`OMP_RUNTIME_FORK_COMMIT`；
+   `.github/workflows/release.yml`、`three-platform-test-packages.yml`、`mac-preview-package.yml` 中的 fork `ref`。
+3. 验证：`node scripts/omp-patch.mjs --check`；`--apply --out <dir> --prepare-build --verify`。`--verify`
+   目前只跑两个套件，清单 `verification.targetedSuites` 中的其余套件须手动运行（看板 R13 计划修正）；
+   再跑 `node experiments/omp-bridge/t20-feasibility.mjs --patched`、桌面全量测试和四平台原生发布门。
+4. 在 `docs/source-baseline.json` 的 `upgrades` 中新增日期化记录，不改写旧记录。
+5. 回退：恢复上一级别的锁定提交即可。打包产物启动时校验运行时来源，与锁定不一致的运行时会被拒绝；
+   会话格式变化仍按上文先备份再验证。

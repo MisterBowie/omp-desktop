@@ -1349,7 +1349,7 @@ T20-B/C/D 在本门落地时尚未开始：本门是这些工作的前置条件�
 ## 17. bundled sidecar 的构建与准入（M5/T20-R4B；自 M6/T20-R4-3 起为可复现构建；自 M6/T21-A 起含打包资源验收，ADR 0307）
 
 打包构建只运行一个 OMP 运行时，而该运行时是本项目的构建产物，而不是上游标签：`omp/18.3.0`
-加上 patch level `62bc57b+omp-desktop.3`，由 `app/patches/oh-my-pi/manifest.json` 记录的自有 fork
+加上清单记录的 patch level（2026-10-22 为 `62bc57b+omp-desktop.7`），由 `app/patches/oh-my-pi/manifest.json` 记录的自有 fork
 提交承载。
 
 * **构建。** `scripts/omp-sidecar.mjs` 是唯一入口。源码检出的 `origin` 不是清单中的 fork 仓库、

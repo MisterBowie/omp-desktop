@@ -3,6 +3,8 @@ upstream/*
 !upstream/pi-desktop/
 !upstream/oh-my-pi/
 .local-worktrees/
+.worktrees/
+.pnpm-store/
 .dev-data/
 .artifacts/
 .env
