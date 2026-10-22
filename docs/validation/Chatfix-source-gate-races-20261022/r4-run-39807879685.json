@@ -1,0 +1,54 @@
+{
+  "run": {
+    "id": 39807879685,
+    "tag": "release-check-0.1.4-chatfix-20261022-r4",
+    "head_sha": "852ca1b952ae64e0bcc660ffe89a3c0da06867d9",
+    "conclusion": "success"
+  },
+  "jobs": [
+    {
+      "name": "guard",
+      "conclusion": "success",
+      "started_at": "2026-10-22T15:46:00Z",
+      "completed_at": "2026-10-22T15:46:11Z"
+    },
+    {
+      "name": "verify",
+      "conclusion": "success",
+      "started_at": "2026-10-22T15:46:13Z",
+      "completed_at": "2026-10-22T16:03:53Z"
+    },
+    {
+      "name": "build (ubuntu-22.04, linux, x64, dist:linux)",
+      "conclusion": "success",
+      "started_at": "2026-10-22T15:46:13Z",
+      "completed_at": "2026-10-22T16:12:07Z"
+    },
+    {
+      "name": "build (macos-15-intel, darwin, x64, dist:mac)",
+      "conclusion": "success",
+      "started_at": "2026-10-22T15:46:14Z",
+      "completed_at": "2026-10-22T16:26:40Z"
+    },
+    {
+      "name": "build (windows-latest, win32, x64, dist:win)",
+      "conclusion": "success",
+      "started_at": "2026-10-22T15:46:13Z",
+      "completed_at": "2026-10-22T16:24:29Z"
+    },
+    {
+      "name": "build (macos-15, darwin, arm64, dist:mac)",
+      "conclusion": "success",
+      "started_at": "2026-10-22T15:46:14Z",
+      "completed_at": "2026-10-22T16:12:03Z"
+    },
+    {
+      "name": "publish",
+      "conclusion": "skipped",
+      "started_at": "2026-10-22T16:26:41Z",
+      "completed_at": "2026-10-22T16:26:40Z"
+    }
+  ],
+  "artifacts_expire": "2027-01-20T15:45:53Z",
+  "source": "GitHub public REST API: actions/runs/39807879685/jobs and /artifacts, read 2026-10-23"
+}
