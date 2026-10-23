@@ -1,0 +1,62 @@
+{
+  "identity": {
+    "package": {
+      "name": "omp-desktop",
+      "version": "0.1.4",
+      "homepage": "https://github.com/MisterBowie/omp-desktop"
+    },
+    "arch": "arm64",
+    "asarSha256": "7abe64bd1613275cc8aab4a8542be1b509b68a235735118da00a91124ea70b66",
+    "update": {
+      "owner": "MisterBowie",
+      "repo": "omp-desktop",
+      "provider": "github",
+      "updaterCacheDirName": "omp-desktop-updater"
+    },
+    "icons": 3,
+    "licenses": {
+      "staticFiles": [
+        {
+          "file": "Bun-LICENSE.md",
+          "bytes": 5613,
+          "sha256": "b9caf52728691b4057e371232c221a132883198be2f3d2ddf92c90404c984b1a"
+        },
+        {
+          "file": "OMP-LICENSE.txt",
+          "bytes": 1144,
+          "sha256": "16c45f9d667442781f03fa198914cc39abcaa48ec5ed8f644643e554ca2fbf63"
+        },
+        {
+          "file": "OMP-THIRD-PARTY-NOTICES.txt",
+          "bytes": 1076433,
+          "sha256": "83ed283000678eeac9c538e5b4f3710a2917e92d8f126d5b7dbfe29d494348e7"
+        },
+        {
+          "file": "PI-Desktop-LICENSE.txt",
+          "bytes": 7652,
+          "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118"
+        },
+        {
+          "file": "README.txt",
+          "bytes": 1466,
+          "sha256": "3e8a3850acb754c14fd4bab8d47143ccb699b78c339b837e027d40e5ce96eaac"
+        },
+        {
+          "file": "SOURCES.json",
+          "bytes": 1331,
+          "sha256": "b05289e4b389c0ad7d5adabc0a1558b85edb56c865d55f4c130169c22d664064"
+        }
+      ],
+      "components": 919,
+      "rustComponents": 106,
+      "originalFiles": 972,
+      "noticeSha256": "d20e1af73c298cae579a19b24f22fc1abdfeee43c87a3e396a7abe5777473025",
+      "inventorySha256": "d091530c9948e4e3851134e0ddc24e9173c7953a3683925bf0d10ab7cb15d3fd"
+    }
+  },
+  "compiledFiles": 177,
+  "mismatches": [],
+  "markers": {
+    "subagentCatalog": true
+  }
+}
