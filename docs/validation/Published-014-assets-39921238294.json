@@ -1,0 +1,158 @@
+{
+  "version": "0.1.4",
+  "releaseTag": "v0.1.4+chatfix.852ca1b952ae64e0bcc660ffe89a3c0da06867d9",
+  "sourceRevision": "852ca1b952ae64e0bcc660ffe89a3c0da06867d9",
+  "candidateRunId": 39807879685,
+  "publicationRunId": 39921238294,
+  "readbackRunId": 39921238294,
+  "assetCount": 28,
+  "assetBytes": 1949719683,
+  "checksumManifest": true,
+  "buildRecord": true,
+  "sourceReceipts": true,
+  "verifiedUpdateArtifacts": 8,
+  "mergedMacFeedIdentical": true,
+  "protectedStableUnchanged": true,
+  "assets": [
+    {
+      "name": "BUILD-RECORD.json",
+      "bytes": 6164,
+      "sha256": "5e578c5d6f36161d40ec3c81d20a4aceacfb153f8bf67f1d6c63f1d53a5e5c38"
+    },
+    {
+      "name": "latest-linux.yml",
+      "bytes": 701,
+      "sha256": "2ea927bbb81592914f10c246f855f01ff490d35cdd3668627303c9e40919bf86"
+    },
+    {
+      "name": "latest-mac-arm64.yml",
+      "bytes": 517,
+      "sha256": "fc0418c9165744fa57de4854098360ed0a82c4d7bc9aee543558a17739ef48a4"
+    },
+    {
+      "name": "latest-mac-x64.yml",
+      "bytes": 511,
+      "sha256": "e004788b305179a3a42938671900be1f8661c35fb03aaf755160067a4716c8ee"
+    },
+    {
+      "name": "latest-mac.yml",
+      "bytes": 831,
+      "sha256": "0f0398915d2d28252ee449096da6aae8e6497d190218c540d30530de3d7319f0"
+    },
+    {
+      "name": "latest.yml",
+      "bytes": 351,
+      "sha256": "6eec98256f38c16ceda80d97f2593c2c1282a36b1d1cd3fea6085af56c5fc7de"
+    },
+    {
+      "name": "OMP-Desktop-0.1.4-arm64-mac.zip",
+      "bytes": 220516753,
+      "sha256": "794bc831c05f84025d5d6f1826a042c24dd664a70090dcfda98d26175c1e3a5d"
+    },
+    {
+      "name": "OMP-Desktop-0.1.4-arm64-mac.zip.blockmap",
+      "bytes": 228438,
+      "sha256": "bd56906f27ffb4153efb1b374e091df5a3ccff3968f7d3c5746edf66dcfe98e8"
+    },
+    {
+      "name": "OMP-Desktop-0.1.4-arm64.dmg",
+      "bytes": 221599025,
+      "sha256": "224437b2a322d204a17c23bd6d30cf8eefe70b236733afb5d76e10aa1df636cd"
+    },
+    {
+      "name": "OMP-Desktop-0.1.4-arm64.dmg.blockmap",
+      "bytes": 232078,
+      "sha256": "17f419442e8a63352691357d7743de3e7406d7a8d6f4800c91a287189d82afd7"
+    },
+    {
+      "name": "OMP-Desktop-0.1.4-x64-mac.zip",
+      "bytes": 228445986,
+      "sha256": "598b00fdb6e3d28621ee14fc05ef915777f3f7f0b514547afe3c79d1d6a58aa9"
+    },
+    {
+      "name": "OMP-Desktop-0.1.4-x64-mac.zip.blockmap",
+      "bytes": 240467,
+      "sha256": "4ea25946f7408126b5b4143e91f042eab54796e026a4b4ba4f1991e8319596f8"
+    },
+    {
+      "name": "OMP-Desktop-0.1.4-x64.deb",
+      "bytes": 205610260,
+      "sha256": "134c63297ac36db94cf8a02732a15e85a81ea9526b5722db1fe9eb4eff5c1e0d"
+    },
+    {
+      "name": "OMP-Desktop-0.1.4-x64.dmg",
+      "bytes": 229436235,
+      "sha256": "e26f912972cafb2484d015b9deb8e7899d9d208ed47a3972be2b5a6d7fa6ce49"
+    },
+    {
+      "name": "OMP-Desktop-0.1.4-x64.dmg.blockmap",
+      "bytes": 239398,
+      "sha256": "80a70271bc33b462bf7420af65bb46b35d9e463020c1383a18f76c938f6d7233"
+    },
+    {
+      "name": "OMP-Desktop-0.1.4-x86_64.AppImage",
+      "bytes": 247693075,
+      "sha256": "3104af1f4015f4c5f758625fd0f70f7553c99f0dbb64adc7205bc79869c45fe8"
+    },
+    {
+      "name": "omp-desktop-0.1.4-x86_64.rpm",
+      "bytes": 187001253,
+      "sha256": "2eea022df8361756f5c07651f243f8aa7e24bb30ee7f974abb936048a6a72950"
+    },
+    {
+      "name": "OMP-Desktop-Portable-0.1.4.exe",
+      "bytes": 197972388,
+      "sha256": "5e9a4df3f07b16f1636c6454918d841214db58a296894a83ae2ccc1d1c7424fa"
+    },
+    {
+      "name": "OMP-Desktop-Setup-0.1.4.exe",
+      "bytes": 198192636,
+      "sha256": "e8049a3af118fb9010d993c2b17ba0afe0f5300d784c1c71b2cbde0b0b156032"
+    },
+    {
+      "name": "OMP-Desktop-Setup-0.1.4.exe.blockmap",
+      "bytes": 206130,
+      "sha256": "bb31fcccfbfe39a8678e43fee9efe6e4f7f89f313eeb20d83710147b89b90fc8"
+    },
+    {
+      "name": "omp-desktop-validation-0.1.4-build.json",
+      "bytes": 2341,
+      "sha256": "f9f7a65d3217412beef2e95c492c1f9ddd4c7e1713bb1f9f5f5a3601ff6947c1"
+    },
+    {
+      "name": "omp-desktop-validation-0.1.4-darwin-arm64.tar.gz",
+      "bytes": 2812534,
+      "sha256": "f6d6ce5648a1aa217359695d78eb6421f14834c13b385d69e16ec56af269d87a"
+    },
+    {
+      "name": "omp-desktop-validation-0.1.4-darwin-x64.tar.gz",
+      "bytes": 2865007,
+      "sha256": "7162cb5f026113f59b3075dcc1128e284e0f1e740f597fb5f7bff59026cc0a84"
+    },
+    {
+      "name": "omp-desktop-validation-0.1.4-linux-x64.tar.gz",
+      "bytes": 3682240,
+      "sha256": "0ef9e694c230f2c8b1b74ae1d4c4cffd3fb75a17cb125c5628c09e341c9a8bbc"
+    },
+    {
+      "name": "omp-desktop-validation-0.1.4-publication.json",
+      "bytes": 6672,
+      "sha256": "292abf4669f5f44a36ea0bbaf25b698fe81f892f2835f3a9cf284a61824ff3e0"
+    },
+    {
+      "name": "omp-desktop-validation-0.1.4-staging.json",
+      "bytes": 4025,
+      "sha256": "8cae515c2931efd46170331284b8202a42b5187d4826da0a22d42e50177df763"
+    },
+    {
+      "name": "omp-desktop-validation-0.1.4-win32-x64.tar.gz",
+      "bytes": 2721015,
+      "sha256": "92531579def5f9b76e40ad71687f4b203abde0bb464927a228bc1f6d16d01d9a"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "bytes": 2652,
+      "sha256": "076dd83fb1bf5b2ebaf958e9928381dd93a94b18a3744b1c1187a10e8438c4ac"
+    }
+  ]
+}
