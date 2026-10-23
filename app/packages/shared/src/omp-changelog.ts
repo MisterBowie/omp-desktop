@@ -1,13 +1,74 @@
 import type { ChangelogEntry, ChangelogLocale } from "./changelog.js";
 
-const unified014: Record<ChangelogLocale, string[]> = {
+const unified015: Record<ChangelogLocale, string[]> = {
   "en": [
     "Load enabled user subagents into OMP with their configured models and native tool grants; refresh edits without changing chat identity.",
     "Send pasted and attached images to OMP chats inline for image-capable models, as file references otherwise, and keep them visible after reopening.",
     "Keep global instructions in OMP Desktop’s own data folder and apply them to every OMP chat.",
     "Hide OAuth sign-in, which OMP chats cannot use; existing vendor accounts can still be removed.",
     "Fix first replies interrupted by automatic chat naming and keep the native session identity.",
-    "Keep empty DeepSeek tool-call text empty instead of adding dots to model history.",
+    "Keep empty DeepSeek tool-call text empty instead of adding dots to model history."
+  ],
+  "zh-CN": [
+    "已启用的用户子智能体接入 OMP，使用指定模型与原生工具授权；配置更新保留原会话身份。",
+    "OMP 会话支持粘贴和附加图片：支持图片的模型直接接收图片，其他模型改用文件引用；重新打开后图片仍可见。",
+    "全局指令改存 OMP Desktop 自己的数据目录，并作用于所有 OMP 会话。",
+    "隐藏 OMP 会话无法使用的 OAuth 登录入口；已有厂商账户仍可删除。",
+    "修复自动改名打断首次回复的问题，并保持原生会话身份。",
+    "DeepSeek 无正文工具调用保持为空，不再向模型历史补点。"
+  ],
+  "zh-TW": [
+    "已啟用的使用者子代理接入 OMP，使用指定模型與原生工具授權；設定更新保留原對話身分。",
+    "OMP 對話支援貼上與附加圖片：支援圖片的模型直接接收圖片，其他模型改用檔案參照；重新開啟後圖片仍可見。",
+    "全域指令改存於 OMP Desktop 自己的資料資料夾，並套用至所有 OMP 對話。",
+    "隱藏 OMP 對話無法使用的 OAuth 登入入口；既有廠商帳戶仍可刪除。",
+    "修正自動改名中斷首次回覆的問題，並保持原生對話身分。",
+    "DeepSeek 無正文工具呼叫保持為空，不再向模型歷史補點。"
+  ],
+  "de": [
+    "Aktivierte Benutzeragenten mit ihren Modellen und nativen Werkzeugrechten in OMP laden; Änderungen erhalten die Chatidentität.",
+    "Eingefügte und angehängte Bilder an OMP-Chats senden: direkt an bildfähige Modelle, sonst als Dateiverweis; nach dem erneuten Öffnen bleiben sie sichtbar.",
+    "Globale Anweisungen im eigenen Datenordner von OMP Desktop speichern und auf alle OMP-Chats anwenden.",
+    "Die für OMP-Chats unbrauchbare OAuth-Anmeldung ausblenden; vorhandene Anbieterkonten lassen sich weiterhin entfernen.",
+    "Unterbrechungen der ersten Antwort durch automatische Chatnamen beheben und die native Sitzungsidentität erhalten.",
+    "Leeren DeepSeek-Werkzeugtext leer lassen, statt Punkte in den Modellverlauf einzufügen."
+  ],
+  "es": [
+    "Carga los subagentes de usuario activos en OMP con sus modelos y permisos nativos; los cambios conservan la identidad del chat.",
+    "Envía imágenes pegadas o adjuntas a los chats OMP: directamente a modelos compatibles con imágenes y como referencia de archivo en otro caso; siguen visibles al reabrir.",
+    "Guarda las instrucciones globales en la carpeta de datos propia de OMP Desktop y las aplica a todos los chats OMP.",
+    "Oculta el inicio de sesión OAuth, que los chats OMP no pueden usar; las cuentas de proveedor existentes aún se pueden eliminar.",
+    "Evita que el nombre automático interrumpa la primera respuesta y conserva la identidad de la sesión nativa.",
+    "Mantiene vacío el texto de herramientas de DeepSeek sin añadir puntos al historial del modelo."
+  ],
+  "fr": [
+    "Charge les sous-agents utilisateur actifs dans OMP avec leurs modèles et droits natifs ; les modifications conservent l’identité du chat.",
+    "Envoie les images collées ou jointes aux échanges OMP : directement aux modèles compatibles, sinon comme référence de fichier ; elles restent visibles à la réouverture.",
+    "Conserve les instructions globales dans le dossier de données propre à OMP Desktop et les applique à tous les échanges OMP.",
+    "Masque la connexion OAuth, inutilisable dans les échanges OMP ; les comptes fournisseur existants restent supprimables.",
+    "Empêche le nommage automatique d’interrompre la première réponse et conserve l’identité de la session native.",
+    "Conserve le texte vide des appels d’outils DeepSeek sans ajouter de points à l’historique du modèle."
+  ],
+  "ko": [
+    "활성 사용자 하위 에이전트를 지정 모델과 기본 도구 권한으로 OMP에 연결하고 설정 변경 시 대화 식별자를 유지합니다.",
+    "붙여 넣거나 첨부한 이미지를 OMP 대화로 보냅니다. 이미지 지원 모델에는 직접, 그 외에는 파일 참조로 보내며 다시 열어도 표시됩니다.",
+    "전역 지침을 OMP Desktop 전용 데이터 폴더에 저장하고 모든 OMP 대화에 적용합니다.",
+    "OMP 대화에서 사용할 수 없는 OAuth 로그인을 숨깁니다. 기존 공급자 계정은 계속 삭제할 수 있습니다.",
+    "자동 대화 이름 지정이 첫 응답을 중단하는 문제를 수정하고 원래 세션 식별자를 유지합니다.",
+    "DeepSeek 도구 호출의 빈 본문을 유지하고 모델 기록에 마침표를 추가하지 않습니다."
+  ],
+  "tr": [
+    "Etkin kullanıcı alt ajanlarını modelleri ve yerel araç izinleriyle OMP’ye yükler; değişikliklerde sohbet kimliğini korur.",
+    "Yapıştırılan ve eklenen görüntüleri OMP sohbetlerine gönderir: görüntü destekleyen modellere doğrudan, diğerlerine dosya başvurusu olarak; yeniden açınca görünür kalır.",
+    "Genel talimatları OMP Desktop’ın kendi veri klasöründe tutar ve tüm OMP sohbetlerine uygular.",
+    "OMP sohbetlerinin kullanamadığı OAuth girişini gizler; mevcut sağlayıcı hesapları yine silinebilir.",
+    "Otomatik sohbet adlandırmanın ilk yanıtı kesmesini düzeltir ve yerel oturum kimliğini korur.",
+    "DeepSeek araç çağrılarının boş metnini korur, model geçmişine nokta eklemez."
+  ]
+};
+
+const unified014: Record<ChangelogLocale, string[]> = {
+  "en": [
     "Use OMP for every new chat; retire Pi history import and remote Pi hosts.",
     "Fix automatic memory capture and preserve project, worktree and temporary scopes.",
     "Improve memory settings spacing, search controls and narrow-window layouts.",
@@ -16,12 +77,6 @@ const unified014: Record<ChangelogLocale, string[]> = {
     "Announce completion after durable turn settlement."
   ],
   "zh-CN": [
-    "已启用的用户子智能体接入 OMP，使用指定模型与原生工具授权；配置更新保留原会话身份。",
-    "OMP 会话支持粘贴和附加图片：支持图片的模型直接接收图片，其他模型改用文件引用；重新打开后图片仍可见。",
-    "全局指令改存 OMP Desktop 自己的数据目录，并作用于所有 OMP 会话。",
-    "隐藏 OMP 会话无法使用的 OAuth 登录入口；已有厂商账户仍可删除。",
-    "修复自动改名打断首次回复的问题，并保持原生会话身份。",
-    "DeepSeek 无正文工具调用保持为空，不再向模型历史补点。",
     "新会话统一使用 OMP，关闭 Pi 历史导入和远程 Pi Host。",
     "修复自动记忆保存，正确保留项目、worktree 和临时会话范围。",
     "改善记忆设置间距、搜索控件与窄窗口布局。",
@@ -30,12 +85,6 @@ const unified014: Record<ChangelogLocale, string[]> = {
     "回合持久化结算后再通知完成，避免恢复状态竞态。"
   ],
   "zh-TW": [
-    "已啟用的使用者子代理接入 OMP，使用指定模型與原生工具授權；設定更新保留原對話身分。",
-    "OMP 對話支援貼上與附加圖片：支援圖片的模型直接接收圖片，其他模型改用檔案參照；重新開啟後圖片仍可見。",
-    "全域指令改存於 OMP Desktop 自己的資料資料夾，並套用至所有 OMP 對話。",
-    "隱藏 OMP 對話無法使用的 OAuth 登入入口；既有廠商帳戶仍可刪除。",
-    "修正自動改名中斷首次回覆的問題，並保持原生對話身分。",
-    "DeepSeek 無正文工具呼叫保持為空，不再向模型歷史補點。",
     "新對話統一使用 OMP，關閉 Pi 歷史匯入和遠端 Pi Host。",
     "修正自動記憶儲存，正確保留專案、worktree 與暫時對話範圍。",
     "改善記憶設定間距、搜尋控制項與窄視窗版面。",
@@ -44,12 +93,6 @@ const unified014: Record<ChangelogLocale, string[]> = {
     "回合持久化結算後再通知完成，避免復原狀態競態。"
   ],
   "de": [
-    "Aktivierte Benutzeragenten mit ihren Modellen und nativen Werkzeugrechten in OMP laden; Änderungen erhalten die Chatidentität.",
-    "Eingefügte und angehängte Bilder an OMP-Chats senden: direkt an bildfähige Modelle, sonst als Dateiverweis; nach dem erneuten Öffnen bleiben sie sichtbar.",
-    "Globale Anweisungen im eigenen Datenordner von OMP Desktop speichern und auf alle OMP-Chats anwenden.",
-    "Die für OMP-Chats unbrauchbare OAuth-Anmeldung ausblenden; vorhandene Anbieterkonten lassen sich weiterhin entfernen.",
-    "Unterbrechungen der ersten Antwort durch automatische Chatnamen beheben und die native Sitzungsidentität erhalten.",
-    "Leeren DeepSeek-Werkzeugtext leer lassen, statt Punkte in den Modellverlauf einzufügen.",
     "Neue Chats verwenden OMP; Pi-Verlaufsimporte und entfernte Pi-Hosts entfallen.",
     "Automatische Erinnerungen reparieren und Projekt-, Worktree- und temporäre Bereiche erhalten.",
     "Abstände, Suche und schmale Fenster in den Erinnerungseinstellungen verbessern.",
@@ -58,12 +101,6 @@ const unified014: Record<ChangelogLocale, string[]> = {
     "Den Abschluss nach dauerhafter Speicherung des Durchlaufs melden."
   ],
   "es": [
-    "Carga los subagentes de usuario activos en OMP con sus modelos y permisos nativos; los cambios conservan la identidad del chat.",
-    "Envía imágenes pegadas o adjuntas a los chats OMP: directamente a modelos compatibles con imágenes y como referencia de archivo en otro caso; siguen visibles al reabrir.",
-    "Guarda las instrucciones globales en la carpeta de datos propia de OMP Desktop y las aplica a todos los chats OMP.",
-    "Oculta el inicio de sesión OAuth, que los chats OMP no pueden usar; las cuentas de proveedor existentes aún se pueden eliminar.",
-    "Evita que el nombre automático interrumpa la primera respuesta y conserva la identidad de la sesión nativa.",
-    "Mantiene vacío el texto de herramientas de DeepSeek sin añadir puntos al historial del modelo.",
     "Los chats nuevos usan OMP; se retiran la importación Pi y los hosts Pi remotos.",
     "Corrige la memoria automática y conserva los ámbitos de proyecto, worktree y chats temporales.",
     "Mejora el espaciado, la búsqueda y el diseño de ventanas estrechas en Memoria.",
@@ -72,12 +109,6 @@ const unified014: Record<ChangelogLocale, string[]> = {
     "Notifica la finalización después de guardar el estado del turno."
   ],
   "fr": [
-    "Charge les sous-agents utilisateur actifs dans OMP avec leurs modèles et droits natifs ; les modifications conservent l’identité du chat.",
-    "Envoie les images collées ou jointes aux échanges OMP : directement aux modèles compatibles, sinon comme référence de fichier ; elles restent visibles à la réouverture.",
-    "Conserve les instructions globales dans le dossier de données propre à OMP Desktop et les applique à tous les échanges OMP.",
-    "Masque la connexion OAuth, inutilisable dans les échanges OMP ; les comptes fournisseur existants restent supprimables.",
-    "Empêche le nommage automatique d’interrompre la première réponse et conserve l’identité de la session native.",
-    "Conserve le texte vide des appels d’outils DeepSeek sans ajouter de points à l’historique du modèle.",
     "Les nouveaux échanges utilisent OMP ; les imports Pi et les hôtes Pi distants sont retirés.",
     "Corrige la mémoire automatique et préserve les domaines projet, worktree et échange temporaire.",
     "Améliore les espacements, la recherche et les réglages Mémoire en fenêtre étroite.",
@@ -86,12 +117,6 @@ const unified014: Record<ChangelogLocale, string[]> = {
     "Annonce la fin du tour après l’enregistrement durable de son état."
   ],
   "ko": [
-    "활성 사용자 하위 에이전트를 지정 모델과 기본 도구 권한으로 OMP에 연결하고 설정 변경 시 대화 식별자를 유지합니다.",
-    "붙여 넣거나 첨부한 이미지를 OMP 대화로 보냅니다. 이미지 지원 모델에는 직접, 그 외에는 파일 참조로 보내며 다시 열어도 표시됩니다.",
-    "전역 지침을 OMP Desktop 전용 데이터 폴더에 저장하고 모든 OMP 대화에 적용합니다.",
-    "OMP 대화에서 사용할 수 없는 OAuth 로그인을 숨깁니다. 기존 공급자 계정은 계속 삭제할 수 있습니다.",
-    "자동 대화 이름 지정이 첫 응답을 중단하는 문제를 수정하고 원래 세션 식별자를 유지합니다.",
-    "DeepSeek 도구 호출의 빈 본문을 유지하고 모델 기록에 마침표를 추가하지 않습니다.",
     "새 대화는 OMP를 사용하며 Pi 기록 가져오기와 원격 Pi 호스트를 종료합니다.",
     "자동 메모리를 수정하고 프로젝트, worktree, 임시 대화 범위를 유지합니다.",
     "메모리 설정의 간격, 검색 및 좁은 창 레이아웃을 개선합니다.",
@@ -100,12 +125,6 @@ const unified014: Record<ChangelogLocale, string[]> = {
     "턴 상태가 영구 저장된 후 완료를 알립니다."
   ],
   "tr": [
-    "Etkin kullanıcı alt ajanlarını modelleri ve yerel araç izinleriyle OMP’ye yükler; değişikliklerde sohbet kimliğini korur.",
-    "Yapıştırılan ve eklenen görüntüleri OMP sohbetlerine gönderir: görüntü destekleyen modellere doğrudan, diğerlerine dosya başvurusu olarak; yeniden açınca görünür kalır.",
-    "Genel talimatları OMP Desktop’ın kendi veri klasöründe tutar ve tüm OMP sohbetlerine uygular.",
-    "OMP sohbetlerinin kullanamadığı OAuth girişini gizler; mevcut sağlayıcı hesapları yine silinebilir.",
-    "Otomatik sohbet adlandırmanın ilk yanıtı kesmesini düzeltir ve yerel oturum kimliğini korur.",
-    "DeepSeek araç çağrılarının boş metnini korur, model geçmişine nokta eklemez.",
     "Yeni sohbetler OMP kullanır; Pi geçmiş içe aktarma ve uzak Pi sunucuları kaldırılır.",
     "Otomatik belleği düzeltir; proje, worktree ve geçici sohbet kapsamlarını korur.",
     "Bellek ayarlarındaki boşlukları, aramayı ve dar pencere düzenini iyileştirir.",
@@ -218,6 +237,7 @@ const fixes: Record<ChangelogLocale, string[]> = {
 };
 
 const release = (locale: ChangelogLocale, highlights: string[], previous: string[]): readonly ChangelogEntry[] => [
+  { version: "0.1.5", date: "2026-10-23", highlights: unified015[locale] },
   { version: "0.1.4", date: "2026-10-21", highlights: unified014[locale] },
   { version: "0.1.3", date: "2026-10-20", highlights: memoryAndModels[locale] },
   { version: "0.1.2", date: "2026-10-19", highlights: fixes[locale] },
