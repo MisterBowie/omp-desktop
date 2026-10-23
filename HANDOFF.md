@@ -20,7 +20,7 @@
 
 | 分支 / 工作树 | 内容 | 状态 |
 | --- | --- | --- |
-| `codex/chatfix-revision`（`.worktrees/chatfix-revision`） | 同版本修订候选：首次发送不回复与 DeepSeek 补点（`b6834d05`、`a8e7872f`）、用户子代理接入（`f10a7c13`，R06）、源码门测试修复（R07） | r4 远端候选（run39807879685，`852ca1b9`）整轮通过：完整源码门与四目标构建成功，未发布。r4 源码的本地 Mac ARM 测试包在本工作树 `app/apps/desktop/release/`，已通过包内与安装态自动验收，等用户手动测试确认后按同版本修订发布（R08）。r3 失败原因（R06 后两处夹具未应答 `agents.active`；macOS x64 产物上传网络故障）见 R07。证据：[首次回复](docs/validation/OMP-first-response-20261022.md)、[补点](docs/validation/OMP-dot-replay-20261022.md)、[chatfix 发布记录](docs/validation/Chatfix014-release-20261022.md)、[子代理](docs/validation/OMP-user-subagents-20261022.md)、[R07](docs/validation/Chatfix-source-gate-races-20261022.md)、[r4 本地包](docs/validation/Chatfix014-local-r4-20261023.md) |
+| `codex/chatfix-revision`（`.worktrees/chatfix-revision`） | 同版本修订候选：首次发送不回复与 DeepSeek 补点（`b6834d05`、`a8e7872f`）、用户子代理接入（`f10a7c13`，R06）、源码门测试修复（R07） | r4 远端候选（run39807879685，`852ca1b9`）整轮通过：完整源码门与四目标构建成功，未发布。r4 源码的本地 Mac ARM 测试包 DMG 已按用户要求移到 `~/Downloads/OMP-Desktop-0.1.4-chatfix-r4-arm64.dmg`（ZIP 仍在本工作树 `app/apps/desktop/release/`），已通过包内与安装态自动验收，等用户手动测试确认后按同版本修订发布（R08）。r3 失败原因（R06 后两处夹具未应答 `agents.active`；macOS x64 产物上传网络故障）见 R07。证据：[首次回复](docs/validation/OMP-first-response-20261022.md)、[补点](docs/validation/OMP-dot-replay-20261022.md)、[chatfix 发布记录](docs/validation/Chatfix014-release-20261022.md)、[子代理](docs/validation/OMP-user-subagents-20261022.md)、[R07](docs/validation/Chatfix-source-gate-races-20261022.md)、[r4 本地包](docs/validation/Chatfix014-local-r4-20261023.md) |
 | `codex/fix-omp-first-response`（`.worktrees/fix-omp-first-response`，已推送） | 上一轮 chatfix 分支，已并入修订线 | 用户自测的本地 ARM64 包来自 `a8e7872f`，不含子代理修复；修订线发布后移除该工作树 |
 
 发版方式：修订线按**同版本修订** `0.1.4+chatfix.<SHA>` 发布（用户 2026-10-22 选择），原 `v0.1.4`
@@ -40,7 +40,7 @@
 
 ## 下一步
 
-1. 用户安装 r4 本地测试包（`.worktrees/chatfix-revision/app/apps/desktop/release/OMP-Desktop-0.1.4-arm64.dmg`）做手动测试；确认后推送 `publish-chatfix-v0.1.4-run-39807879685`，发布 r4 远端候选的产物，再把修订线并入 `main`。
+1. 用户安装 r4 本地测试包（`~/Downloads/OMP-Desktop-0.1.4-chatfix-r4-arm64.dmg`）做手动测试；确认后推送 `publish-chatfix-v0.1.4-run-39807879685`，发布 r4 远端候选的产物，再把修订线并入 `main`。
 2. R09–R11 已在 `codex/omp-dead-controls` 完成（`99119561`，未并入修订线）。用户决定是否进入同一修订发布：并入则合入修订线并重跑远端候选；否则修订发布后从新的 `main` 另行发布。
 3. 下一阶段做 R12（删除 Pi 遗留代码）；R13（OMP 上游升级与 fork 精简）单独立项。
 

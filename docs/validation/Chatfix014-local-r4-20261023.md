@@ -23,7 +23,8 @@
 | OMP-Desktop-0.1.4-arm64.dmg | 221369823 | 1811b05cd291f9520a6e7ca3e3df4de20ead04867b010d9dde6ae90d4fe1f014 |
 | OMP-Desktop-0.1.4-arm64-mac.zip | 220270311 | 8a89b167399f0e820ef3d09468614df05ee44cc4346e87cc7cf7535f681a5c01 |
 
-产物位置：`.worktrees/chatfix-revision/app/apps/desktop/release/`。
+产物构建在 `.worktrees/chatfix-revision/app/apps/desktop/release/`。DMG 之后按用户要求移到
+`~/Downloads/OMP-Desktop-0.1.4-chatfix-r4-arm64.dmg`（SHA-256 不变），ZIP 仍在原目录。
 
 ## 本机验收
 
