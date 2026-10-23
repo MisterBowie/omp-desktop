@@ -18,10 +18,10 @@ R01–R05 的执行记录与检查结果见 [Project-consolidation-20261022](val
 | R05 | `~/.agents` 有意共享写入范围文档与 `AGENTS.md` | 用户决定 4 | `codex/project-consolidation` | 已完成 |
 | R06 | 用户子代理接入 OMP 原生 `task`（[证据](validation/OMP-user-subagents-20261022.md)） | 用户反馈 | `codex/chatfix-revision`（`f10a7c13`） | 已完成：129 项回归、2 项原生 mock、类型检查与 lint 复跑通过 |
 | R07 | chatfix 源码门失败：第二候选 run39706079958 两处测试竞态（`omp-plan-submit-e2e`、`omp-skill-path-e2e`）；第三候选 r3 run39718937256 两处补丁运行时 e2e 夹具未应答 R06 新增的 `agents.active`（[证据](validation/Chatfix-source-gate-races-20261022.md)） | 远端诊断、本机复现 | `codex/chatfix-revision` | 已完成：本机与 r4 远端候选的完整源码门均通过，产品代码不变 |
-| R08 | `0.1.4+chatfix` 同版本修订发布（含 R06、R07） | 用户决定 2 | `codex/chatfix-revision` | r4（run39807879685，`852ca1b9`）整轮通过，未发布；r4 源码本地测试包已通过包内与安装态验收（[证据](validation/Chatfix014-local-r4-20261023.md)），等用户手动测试确认 |
-| R09 | 图片附件接入 OMP（OMP RPC `prompt.images`） | 用户决定 5 | `codex/omp-dead-controls` | 待处理 |
-| R10 | 全局指令改存 OMP Desktop 数据目录并注入 OMP；不再写 `~/.pi/agent/AGENTS.md`；不自动迁移 | 用户决定 5 | `codex/omp-dead-controls` | 待处理 |
-| R11 | 隐藏 OAuth 厂商登录入口（OMP 模型投影不支持 OAuth） | 用户决定 5 | `codex/omp-dead-controls` | 待处理 |
+| R08 | `0.1.4+chatfix` 同版本修订发布（含 R06、R07） | 用户决定 2 | `codex/chatfix-revision` | 已完成：用户 2026-10-23 确认 r4 本地包测试通过；r4（run39807879685，`852ca1b9`）原始制品发布为 `v0.1.4+chatfix.852ca1b9…`（release421581255，run39921238294 发布与 28 项资产回读成功），原 v0.1.4 不变；修订线已并入 `main`（[证据](validation/Chatfix014-release-20261022.md)） |
+| R09 | 图片附件接入 OMP（OMP RPC `prompt.images`） | 用户决定 5 | `codex/omp-dead-controls` | 分支已完成（`99119561`），未并入 `main`；用户 2026-10-23 决定不进入 chatfix 修订，另行发布。状态与证据以该分支为准 |
+| R10 | 全局指令改存 OMP Desktop 数据目录并注入 OMP；不再写 `~/.pi/agent/AGENTS.md`；不自动迁移 | 用户决定 5 | `codex/omp-dead-controls` | 同 R09 |
+| R11 | 隐藏 OAuth 厂商登录入口（OMP 模型投影不支持 OAuth） | 用户决定 5 | `codex/omp-dead-controls` | 同 R09 |
 | R12 | 删除 Pi 遗留代码：Pi 执行路径、`apps/pi-host`、remote/RACP 客户端、IPC 中的 Pi 分支（约 1 MB） | 用户决定 6 | — | 下一阶段 |
 | R13 | OMP 上游升级与 fork 精简：补丁重放到当前上游；记忆 `list` 改走后端接口；可上游化的通用补丁精简；`omp-patch --verify` 读取清单中的全部套件；退役 `0002` 候选补丁 | 用户决定 3 | — | 单独阶段 |
 | R14 | 发布流程整理建议：移除一次性 workflow；诊断结果改用 artifact，不再推诊断分支和标签 | 审查建议 | — | 未决，用户本轮保持现有发布方式 |

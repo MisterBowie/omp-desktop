@@ -5,12 +5,12 @@
 任务状态见[任务看板](docs/04-task-board.md)，范围与决定见[范围与决策](docs/00-scope-and-decisions.md)，
 证据见 `docs/validation/`。
 
-## 当前状态（2026-10-22）
+## 当前状态（2026-10-23）
 
 | 项 | 值 |
 | --- | --- |
-| 正式版本 | **0.1.4**：[GitHub Release v0.1.4](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.4)，产品源码 `87894e73`，发布记录 `31ea1375`（[发布证据](docs/validation/Unified-014-release-20261021.md)） |
-| 主线 | `main` 指向已验证并发布的最新代码，已推送 `origin/main`。根目录检出固定在 `main`，只作协调，不在其中开发 |
+| 正式版本 | **0.1.4 同版本修订** `v0.1.4+chatfix.852ca1b9…`：[GitHub Release](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.4%2Bchatfix.852ca1b952ae64e0bcc660ffe89a3c0da06867d9)（`releases/latest`），产品源码 `852ca1b9`，2026-10-23 发布（[发布证据](docs/validation/Chatfix014-release-20261022.md)）。含首次发送不回复与 DeepSeek 补点修复、用户子代理接入 OMP 原生 `task`。原 [v0.1.4](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.4)（`87894e73`，[证据](docs/validation/Unified-014-release-20261021.md)）标签与资产保持不变 |
+| 主线 | `main` 指向已验证并发布的最新代码（修订线已并入），已推送 `origin/main`。根目录检出固定在 `main`，只作协调，不在其中开发 |
 | 执行引擎 | OMP 是唯一执行引擎（2026-10-21 决定）。Pi 执行入口已关闭，遗留代码待删除（看板 R12） |
 | OMP 运行时 | 上游 OMP 18.3.0（`62bc57be`）+ 受控 fork `MisterBowie/oh-my-pi@edec3898`，补丁 `62bc57b+omp-desktop.7`；以 `app/patches/oh-my-pi/manifest.json` 为准 |
 | 数据 | 存储 schema 22；数据目录 `~/.omp-desktop`；全局能力目录 `~/.agents` 与 PI-Desktop 等工具有意共享（2026-10-22 决定） |
@@ -20,11 +20,10 @@
 
 | 分支 / 工作树 | 内容 | 状态 |
 | --- | --- | --- |
-| `codex/chatfix-revision`（`.worktrees/chatfix-revision`） | 同版本修订候选：首次发送不回复与 DeepSeek 补点（`b6834d05`、`a8e7872f`）、用户子代理接入（`f10a7c13`，R06）、源码门测试修复（R07） | r4 远端候选（run39807879685，`852ca1b9`）整轮通过：完整源码门与四目标构建成功，未发布。r4 源码的本地 Mac ARM 测试包 DMG 已按用户要求移到 `~/Downloads/OMP-Desktop-0.1.4-chatfix-r4-arm64.dmg`（ZIP 仍在本工作树 `app/apps/desktop/release/`），已通过包内与安装态自动验收，等用户手动测试确认后按同版本修订发布（R08）。r3 失败原因（R06 后两处夹具未应答 `agents.active`；macOS x64 产物上传网络故障）见 R07。证据：[首次回复](docs/validation/OMP-first-response-20261022.md)、[补点](docs/validation/OMP-dot-replay-20261022.md)、[chatfix 发布记录](docs/validation/Chatfix014-release-20261022.md)、[子代理](docs/validation/OMP-user-subagents-20261022.md)、[R07](docs/validation/Chatfix-source-gate-races-20261022.md)、[r4 本地包](docs/validation/Chatfix014-local-r4-20261023.md) |
-| `codex/fix-omp-first-response`（`.worktrees/fix-omp-first-response`，已推送） | 上一轮 chatfix 分支，已并入修订线 | 用户自测的本地 ARM64 包来自 `a8e7872f`，不含子代理修复；修订线发布后移除该工作树 |
+| `codex/omp-dead-controls`（`.worktrees/omp-dead-controls`，已推送） | R09–R11：图片附件接入 OMP、全局指令改存数据目录并注入 OMP、隐藏 OAuth 登录入口（`99119561`）；基于修订线 `852ca1b9` | 已提交；该分支记录完整源码门本机 0 失败、原生 e2e 与真实 Electron 界面验收通过。用户 2026-10-23 决定不进入 chatfix 修订，另行发布；尚未合入最新 `main`，也没有远端候选。证据在该分支的 `docs/validation/OMP-dead-controls-20261022.md` |
 
-发版方式：修订线按**同版本修订** `0.1.4+chatfix.<SHA>` 发布（用户 2026-10-22 选择），原 `v0.1.4`
-标签与资产保持不变；已安装用户需手动覆盖安装。远端候选整轮通过、用户本地测试确认后才晋升发布。
+发版方式：同版本修订按 `0.1.4+<名称>.<完整源码 SHA>` 发布，原稳定标签与资产保持不变，已安装用户需手动覆盖
+安装；固定 `release-check-*` 远端候选整轮通过、用户本地测试确认后才由 `publish-*` 控制标签晋升原始制品。
 2026-10-22 修复分支的原始过程记录见 [docs/history/fix-branch-notes-20261022.md](docs/history/fix-branch-notes-20261022.md)。
 
 ## 2026-10-22 用户决定
@@ -40,9 +39,9 @@
 
 ## 下一步
 
-1. 用户安装 r4 本地测试包（`~/Downloads/OMP-Desktop-0.1.4-chatfix-r4-arm64.dmg`）做手动测试；确认后推送 `publish-chatfix-v0.1.4-run-39807879685`，发布 r4 远端候选的产物，再把修订线并入 `main`。
-2. R09–R11 已在 `codex/omp-dead-controls` 完成（`99119561`，未并入修订线）。用户决定是否进入同一修订发布：并入则合入修订线并重跑远端候选；否则修订发布后从新的 `main` 另行发布。
-3. 下一阶段做 R12（删除 Pi 遗留代码）；R13（OMP 上游升级与 fork 精简）单独立项。
+1. R09–R11 单独发布：`codex/omp-dead-controls` 先合入最新 `main`（文档冲突以 `main` 的发布事实为准），复跑
+   受影响门；再由用户决定版本形式（新的同版本修订，或 0.1.5），建固定远端候选并给用户本地测试包，确认后发布。
+2. 下一阶段做 R12（删除 Pi 遗留代码）；R13（OMP 上游升级与 fork 精简）单独立项。
 
 ## 工作约定
 

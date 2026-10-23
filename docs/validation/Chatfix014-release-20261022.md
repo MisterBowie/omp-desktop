@@ -1,7 +1,8 @@
 # 首次回复与 DeepSeek 空正文修复：0.1.4 同版本发布
 
-最新状态：**本地 Mac ARM 0.1.4 测试包已构建并通过包内专项验收，等用户自行测试。**
-正式发布未完成；第二候选完整源码门仍有失败，须定位并通过后才可晋升。下方保留各轮事实。
+最新状态：**已正式发布**（2026-10-23）：r4 候选 run39807879685 的原始制品发布为
+[`v0.1.4+chatfix.852ca1b9…`](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.4%2Bchatfix.852ca1b952ae64e0bcc660ffe89a3c0da06867d9)，
+原 v0.1.4 不变。结果见末尾“正式发布与公开资产回读”。下方保留各轮事实。
 
 ## 授权与当前状态
 
@@ -127,3 +128,35 @@ run39706079958 的 Mac ARM/Linux 打包安装任务成功，但完整源码测�
 `omp-plan-submit-e2e.test.mjs:1988,2059,2099` 和 `omp-skill-path-e2e.test.mjs:617,679`。
 这只是失败坐标，根因尚未定位；下一步须独立复现，不把它们视为已通过。Windows/Mac Intel
 仍构建中，当前不具备正式发布条件，不晋升任何失败候选。
+
+## 后续候选
+
+第二候选的两处失败已定位为测试竞态并修复（R07）；R06 用户子代理接入并入本修订线后，r3
+run39718937256 因两处补丁运行时 e2e 夹具未应答 `agents.active` 失败，修复后 r4
+[run39807879685](https://github.com/MisterBowie/omp-desktop/actions/runs/39807879685)（源码
+`852ca1b952ae64e0bcc660ffe89a3c0da06867d9`，标签 `release-check-0.1.4-chatfix-20261022-r4`）完整源码门与
+四目标构建、安装验收整轮通过。过程见 [R07](Chatfix-source-gate-races-20261022.md)，r4 源码本地 Mac ARM
+测试包见 [r4 本地包](Chatfix014-local-r4-20261023.md)。
+
+## 正式发布与公开资产回读（2026-10-23）
+
+用户已安装 r4 本地测试包手动测试，2026-10-23 确认通过并要求发布 r4；R09–R11 不进入本次修订，另行发布。
+
+- 晋升控制标签 `publish-chatfix-v0.1.4-run-39807879685` 为轻量标签，直接指向已接受源码 `852ca1b9`
+  （该提交到修订线头只改文档，`.github` 与 `app/` 无差异），于 2026-10-23T07:57:09Z 推送。
+- [发布运行 run39921238294](https://github.com/MisterBowie/omp-desktop/actions/runs/39921238294)：bind、
+  publish、readback 三个作业全部成功（07:57:14Z–08:00:25Z）。发布的是 r4 远端候选的原始制品，没有重新构建，
+  也不是本地测试包。
+- 公开发布：[OMP Desktop 0.1.4 — Chat reliability revision](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.4%2Bchatfix.852ca1b952ae64e0bcc660ffe89a3c0da06867d9)，
+  标签 `v0.1.4+chatfix.852ca1b952ae64e0bcc660ffe89a3c0da06867d9` 精确指向源码 `852ca1b9`，release421581255，
+  发布于 2026-10-23T07:59:01Z（北京时间 15:59:01），非草稿、非预发行，`releases/latest` 已指向该标签。
+- 工作流回读完整下载 28 个公开资产，共 1,949,719,683 字节：SHA256SUMS、BUILD-RECORD、来源收据一致，8 个
+  更新制品摘要通过，Mac 合并 feed 字节一致，原稳定版保护快照不变。回执提交在
+  `codex/public-asset-readback-39921238294`（`48e8777d`），副本为本目录 `published-readback-receipt.json`。
+- 本机独立核对（只读公开 API，脚本未入库）：原 `v0.1.4` 仍指向 `87894e73`，release419670366 的 28 项资产
+  ID、名称、大小与摘要和发布前保存的 `protected-release-before.json` 完全相同；新发布 28 项资产均有 GitHub
+  SHA-256 摘要，与公开 `SHA256SUMS.txt` 的 27 项条目及回读回执逐项一致，没有 Pi Host 资产。结果为本目录
+  `published-public-check.json`，运行与作业结论为 `publication-run.json`。
+
+应用内版本仍为 0.1.4，更新器不会把本修订视为更高版本；已安装 0.1.4 的用户需从上方发布页手动下载覆盖安装。
+本机 `/Applications` 中是用户自测的 r4 本地包，未被替换。全程没有真实付费模型请求。本修订的发布步骤已全部完成。
