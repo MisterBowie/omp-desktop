@@ -19,9 +19,9 @@ R01–R05 的执行记录与检查结果见 [Project-consolidation-20261022](val
 | R06 | 用户子代理接入 OMP 原生 `task`（[证据](validation/OMP-user-subagents-20261022.md)） | 用户反馈 | `codex/chatfix-revision`（`f10a7c13`） | 已完成：129 项回归、2 项原生 mock、类型检查与 lint 复跑通过 |
 | R07 | chatfix 源码门失败：第二候选 run39706079958 两处测试竞态（`omp-plan-submit-e2e`、`omp-skill-path-e2e`）；第三候选 r3 run39718937256 两处补丁运行时 e2e 夹具未应答 R06 新增的 `agents.active`（[证据](validation/Chatfix-source-gate-races-20261022.md)） | 远端诊断、本机复现 | `codex/chatfix-revision` | 已完成：本机与 r4 远端候选的完整源码门均通过，产品代码不变 |
 | R08 | `0.1.4+chatfix` 同版本修订发布（含 R06、R07） | 用户决定 2 | `codex/chatfix-revision` | 已完成：用户 2026-10-23 确认 r4 本地包测试通过；r4（run39807879685，`852ca1b9`）原始制品发布为 `v0.1.4+chatfix.852ca1b9…`（release421581255，run39921238294 发布与 28 项资产回读成功），原 v0.1.4 不变；修订线已并入 `main`（[证据](validation/Chatfix014-release-20261022.md)） |
-| R09 | 图片附件接入 OMP（OMP RPC `prompt.images`） | 用户决定 5 | `codex/omp-dead-controls` | 已完成（`99119561`）：Main 准备附件，视觉模型内联（单张 10 MB、单次 32 MiB），其余改为文件引用；用户行显示运行时保存的副本；原生 e2e 与真实界面通过。已合入最新 `main`；用户 2026-10-23 决定不进入 chatfix 修订，改以 0.1.5 正式版发布：候选 run39956958677（`4194e804`）整轮通过，本地 arm64 包 8/8 冒烟通过，等用户确认后发布（[证据](validation/Version-015-local-20261023.md)） |
-| R10 | 全局指令改存 OMP Desktop 数据目录并注入 OMP；不再写 `~/.pi/agent/AGENTS.md`；不自动迁移 | 用户决定 5 | `codex/omp-dead-controls` | 已完成：编辑 `<data>/AGENTS.md`，每次运行投影为用户级 `.agents/AGENTS.md`，修改后重建空闲运行时；原生 e2e 与真实界面通过；已合入最新 `main` |
-| R11 | 隐藏 OAuth 厂商登录入口（OMP 模型投影不支持 OAuth） | 用户决定 5 | `codex/omp-dead-controls` | 已完成：隐藏“添加账户”，没有账户时隐藏区域，失效账户只提示移除；真实界面通过；已合入最新 `main` |
+| R09 | 图片附件接入 OMP（OMP RPC `prompt.images`） | 用户决定 5 | `codex/omp-dead-controls` | 已完成并发布（`99119561`）：Main 准备附件，视觉模型内联（单张 10 MB、单次 32 MiB），其余改为文件引用；用户行显示运行时保存的副本；原生 e2e 与真实界面通过。用户决定不进入 chatfix 修订，改以 0.1.5 正式版发布：候选 run39956958677（`4194e804`）整轮通过，用户本机安装本地包确认通过，`v0.1.5` 由 run39995862915 发布并回读 28 项资产，旧版本未改动（[证据](validation/Release-015-20261023.md)） |
+| R10 | 全局指令改存 OMP Desktop 数据目录并注入 OMP；不再写 `~/.pi/agent/AGENTS.md`；不自动迁移 | 用户决定 5 | `codex/omp-dead-controls` | 已完成：编辑 `<data>/AGENTS.md`，每次运行投影为用户级 `.agents/AGENTS.md`，修改后重建空闲运行时；原生 e2e 与真实界面通过；已随 0.1.5 发布（见 R09）并入 `main` |
+| R11 | 隐藏 OAuth 厂商登录入口（OMP 模型投影不支持 OAuth） | 用户决定 5 | `codex/omp-dead-controls` | 已完成：隐藏“添加账户”，没有账户时隐藏区域，失效账户只提示移除；真实界面通过；已随 0.1.5 发布（见 R09）并入 `main` |
 | R12 | 删除 Pi 遗留代码：Pi 执行路径、`apps/pi-host`、remote/RACP 客户端、IPC 中的 Pi 分支（约 1 MB） | 用户决定 6 | — | 下一阶段 |
 | R13 | OMP 上游升级与 fork 精简：补丁重放到当前上游；记忆 `list` 改走后端接口；可上游化的通用补丁精简；`omp-patch --verify` 读取清单中的全部套件；退役 `0002` 候选补丁 | 用户决定 3 | — | 单独阶段 |
 | R14 | 发布流程整理建议：移除一次性 workflow；诊断结果改用 artifact，不再推诊断分支和标签 | 审查建议 | — | 未决，用户本轮保持现有发布方式 |
