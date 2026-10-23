@@ -31,6 +31,29 @@ export async function inspect(application) {
       activeSessionId: document.querySelector('[data-sidebar-session-row][aria-current="page"], [data-sidebar-session-row].active')?.getAttribute("data-sidebar-session-row") };
   })()`);
 }
+/**
+ * Whether a piece of reply text is actually rendered.
+ *
+ * `body.innerText` is not usable here: message rows carry
+ * `content-visibility: auto`, and in a hidden window Chromium can report the
+ * visible reply as skipped until the next layout. Check the DOM text, then
+ * prove the text node itself has a non-empty box and is visible.
+ */
+export async function showsText(application, expectedText) {
+  return application.renderer.evaluate(`(() => {
+    const needle = ${JSON.stringify(expectedText)};
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!node.nodeValue.includes(needle)) continue;
+      const element = node.parentElement;
+      if (!element) continue;
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      if (rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none") return true;
+    }
+    return false;
+  })()`);
+}
 export async function selectSession(application, sessionId) {
   await until(async () => {
     return application.renderer.evaluate(`(() => {
@@ -71,7 +94,7 @@ export async function idle(application, sessionId, expectedText) {
       const status = (await invoke(application, "agentGetStatus", [sessionId])).status;
       const ui = await inspect(application);
       last = { status, ui };
-      return !status.isRunning && !ui.stop && !ui.permission && (!expectedText || ui.text.includes(expectedText)) ? ui : false;
+      return !status.isRunning && !ui.stop && !ui.permission && (!expectedText || await showsText(application, expectedText)) ? ui : false;
     }, `turn completed: ${expectedText || "stopped"}`);
   } catch (error) {
     try {

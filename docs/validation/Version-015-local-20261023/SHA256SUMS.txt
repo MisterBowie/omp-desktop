@@ -1,0 +1,14 @@
+bb33e6d3eb722592d480627eeacfb2bf366a803b9064f45bec78287309a90209  ./installed-smoke/01-installed-ready.png
+0d5df2dc2b0d4cba251a07abb420eda6947332506cbef111b21ef6cb6f2269d0  ./installed-smoke/02-deny-pending.png
+e8864474315b3f1c7c1d4a5262fb62fa1bb8a52685b02e940a04d34f53d38c2c  ./installed-smoke/03-approved-write.png
+a2a9dde0695e98d03cdd95b1bba4f55ffa9e45c88480c6067c75b974876ad511  ./installed-smoke/04-long-tool-before-stop.png
+ddad8b4df1b9c24959a7b65ec4f88c16fafd8e9a4a61a1c6d877544b6860e87d  ./installed-smoke/05-stopped.png
+250bdcfdf27581edf36b0b761fb96ada9fa120c16a4bf29c8c6e0be68122786b  ./installed-smoke/06-recovered-history.png
+164eb68bfd3ba0592deb25f9ff400bf3b1dae6f90f9091e13a2856cb10deba59  ./installed-smoke/07-post-restart-turn.png
+7daf4f9659d4e438c593bdd6badaf5b8a8d70075961a3686dfe2a591f2cadd15  ./installed-smoke/application-output.txt
+54a7920a069862222da5f5955103be0abb5689377572bfcc34b2a39146437437  ./installed-smoke/installed-smoke.json
+d06688f57ef95dddb9dd4062ade1d490d0aa6f270c91c6e11e67c1ad36c83ad2  ./installed-smoke/native-after-quit.jsonl
+d06688f57ef95dddb9dd4062ade1d490d0aa6f270c91c6e11e67c1ad36c83ad2  ./installed-smoke/native-after-restart.jsonl
+98e5dbaba66ab845e4e20c307abe7aeb0a0998982bd29187f6ca859316b8c5d5  ./installed-smoke/native-before-quit.jsonl
+8cf5df0ac9e42884f5e5f2ee874353ca0dfb3b8b005dc4676dfc909595f87526  ./installed-smoke/progress.json
+4370e75d70cbc682b9d148d49fa1cb03b66491a19643cc8b276b7ffebb630655  ./installed-smoke/workflow-facts.json
