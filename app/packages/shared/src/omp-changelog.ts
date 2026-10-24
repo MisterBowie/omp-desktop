@@ -1,5 +1,32 @@
 import type { ChangelogEntry, ChangelogLocale } from "./changelog.js";
 
+const unified016: Record<ChangelogLocale, string[]> = {
+  "en": [
+    "Add a close button to chat error cards; a closed card stays hidden until the app restarts, and the reply before it stays visible."
+  ],
+  "zh-CN": [
+    "会话中的错误卡片新增关闭按钮；关闭后在应用重启前不再显示，之前的回复保持可见。"
+  ],
+  "zh-TW": [
+    "對話中的錯誤卡片新增關閉按鈕；關閉後在應用程式重新啟動前不再顯示，先前的回覆保持可見。"
+  ],
+  "de": [
+    "Fehlerkarten im Chat lassen sich schließen; eine geschlossene Karte bleibt bis zum Neustart der App ausgeblendet, die vorherige Antwort bleibt sichtbar."
+  ],
+  "es": [
+    "Las tarjetas de error del chat se pueden cerrar; una tarjeta cerrada permanece oculta hasta reiniciar la app y la respuesta anterior sigue visible."
+  ],
+  "fr": [
+    "Les cartes d’erreur du chat peuvent être fermées ; une carte fermée reste masquée jusqu’au redémarrage de l’app et la réponse précédente reste visible."
+  ],
+  "ko": [
+    "대화의 오류 카드를 닫을 수 있습니다. 닫은 카드는 앱을 다시 시작할 때까지 숨겨지며 이전 응답은 계속 표시됩니다."
+  ],
+  "tr": [
+    "Sohbetteki hata kartları kapatılabilir; kapatılan kart uygulama yeniden başlatılana kadar gizli kalır, önceki yanıt görünür kalır."
+  ]
+};
+
 const unified015: Record<ChangelogLocale, string[]> = {
   "en": [
     "Load enabled user subagents into OMP with their configured models and native tool grants; refresh edits without changing chat identity.",
@@ -237,6 +264,7 @@ const fixes: Record<ChangelogLocale, string[]> = {
 };
 
 const release = (locale: ChangelogLocale, highlights: string[], previous: string[]): readonly ChangelogEntry[] => [
+  { version: "0.1.6", date: "2026-10-24", highlights: unified016[locale] },
   { version: "0.1.5", date: "2026-10-23", highlights: unified015[locale] },
   { version: "0.1.4", date: "2026-10-21", highlights: unified014[locale] },
   { version: "0.1.3", date: "2026-10-20", highlights: memoryAndModels[locale] },
