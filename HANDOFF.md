@@ -19,7 +19,7 @@
 ## 进行中
 
 R15 转录错误卡片关闭按钮（`codex/dismiss-error-card`）：源码、组件测试与本地开发版界面验证通过，按用户 2026-10-24 要求已并入 `main`（`cf1b42ad`，已推送）（[证据](docs/validation/Error-card-dismiss-20261024.md)）。
-0.1.6 发版（`codex/release-016`，`.worktrees/release-016`）：版本面与更新记录已升到 0.1.6，待远端候选与用户本地测试。
+0.1.6 发版（`codex/release-016`，`.worktrees/release-016`）：版本面与更新记录已升到 0.1.6（`f0c9399a`）；远端候选 r2 run40086409361 整轮通过（r1 一次源码测试时序抖动，见本地包记录）；本地 arm64 测试包 `~/Downloads/OMP-Desktop-0.1.6-arm64.dmg` 已通过自动验收，待用户确认后推 `publish-v0.1.6-run-40086409361`。
 `codex/omp-dead-controls` 已随 0.1.5 并入 `main`。
 
 发版方式：正式版按 `v<版本>` 发布并推送更新源；同版本修订按 `0.1.4+<名称>.<完整源码 SHA>` 发布，原稳定标签与
