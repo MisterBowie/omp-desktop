@@ -418,6 +418,7 @@ export const de = {
     "showErrorDetails": "Details anzeigen",
     "hideErrorDetails": "Details ausblenden",
     "copyErrorDetails": "Details kopieren",
+    "dismissError": "Fehler schließen",
     "errorProvider": "KI-Anbieter",
     "errorModel": "Modell",
     "previewFile": "Vorschau im Seitenbereich",

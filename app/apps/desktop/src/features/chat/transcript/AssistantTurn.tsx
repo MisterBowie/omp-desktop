@@ -42,6 +42,7 @@ import {
   MessageMeta,
 } from "./shared";
 import { activityItemsEqual, ActivityGroup } from "./ActivityGroup";
+import { dismissTranscriptError } from "./dismissed-errors";
 import { GeneratedImages } from "./GeneratedImages";
 import { MessageRow } from "./MessageRow";
 import { assistantTurnMenuItems } from "./menu-items";
@@ -354,7 +355,10 @@ export const AssistantTurn = memo(function AssistantTurn({
           </div>
         ) : null}
         {part.message.error ? (
-          <AssistantErrorMessage message={part.message} />
+          <AssistantErrorMessage
+            message={part.message}
+            onDismiss={() => dismissTranscriptError(part.message)}
+          />
         ) : null}
       </div>
     );

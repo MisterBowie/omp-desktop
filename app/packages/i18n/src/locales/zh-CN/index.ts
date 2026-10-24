@@ -419,6 +419,7 @@ export const zhCN = {
     showErrorDetails: "显示详情",
     hideErrorDetails: "隐藏详情",
     copyErrorDetails: "复制详情",
+    dismissError: "关闭错误提示",
     errorProvider: "AI 服务",
     errorModel: "模型",
     previewFile: "在侧边面板预览",

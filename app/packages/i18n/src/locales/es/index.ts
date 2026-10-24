@@ -418,6 +418,7 @@ export const es = {
     "showErrorDetails": "Mostrar detalles",
     "hideErrorDetails": "Ocultar detalles",
     "copyErrorDetails": "Copiar detalles",
+    "dismissError": "Cerrar error",
     "errorProvider": "Proveedor de IA",
     "errorModel": "Modelo",
     "previewFile": "Vista previa en el panel lateral",

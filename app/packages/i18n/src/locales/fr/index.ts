@@ -418,6 +418,7 @@ export const fr = {
     "showErrorDetails": "Afficher les détails",
     "hideErrorDetails": "Masquer les détails",
     "copyErrorDetails": "Copier les détails",
+    "dismissError": "Fermer l’erreur",
     "errorProvider": "Fournisseur d'IA",
     "errorModel": "Modèle",
     "previewFile": "Aperçu dans le panneau latéral",

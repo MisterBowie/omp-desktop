@@ -1,4 +1,4 @@
-import { memo, type MouseEvent as ReactMouseEvent } from "react";
+import { memo, useMemo, type MouseEvent as ReactMouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { PlanningState, UiMessage } from "@pi-desktop/shared";
 import { proposalKindForMode } from "@pi-desktop/shared";
@@ -16,6 +16,10 @@ import {
   WorkingIndicator,
 } from "./ActivityGroup";
 import { TranscriptHistory, TranscriptTail } from "./AssistantTurn";
+import {
+  useDismissedTranscriptErrors,
+  withoutDismissedErrors,
+} from "./dismissed-errors";
 import { useTranscriptScroll } from "./hooks/useTranscriptScroll";
 import type { TranscriptSearchTarget } from "../../../lib/transcript-reading";
 import { TranscriptSearchContext } from "../../../lib/transcript-search-context";
@@ -116,6 +120,13 @@ function TranscriptBody({
   const compactions = useAppStore((state) =>
     sessionId ? state.sessionCompactions[sessionId] : undefined,
   );
+  // Only the rendered rows drop closed error cards; the outcome card and the
+  // copy menu keep reading `messages`, so a closed failure is not re-announced.
+  const dismissedErrors = useDismissedTranscriptErrors();
+  const visibleMessages = useMemo(
+    () => withoutDismissedErrors(messages, dismissedErrors),
+    [messages, dismissedErrors],
+  );
   const {
     scrollRef,
     wrapRef,
@@ -136,7 +147,7 @@ function TranscriptBody({
     disclosureAnchorNotifier,
   } = useTranscriptScroll({
     sessionId,
-    messages,
+    messages: visibleMessages,
     compactions,
     hasMoreBefore,
     onLoadOlder,

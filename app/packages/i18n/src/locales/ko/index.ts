@@ -427,6 +427,7 @@ export const ko = {
     showErrorDetails: "세부 정보 표시",
     hideErrorDetails: "세부 정보 숨기기",
     copyErrorDetails: "세부 정보 복사",
+    dismissError: "오류 닫기",
     errorProvider: "AI 프로바이더",
     errorModel: "모델",
     previewFile: "사이드 패널에서 미리 보기",

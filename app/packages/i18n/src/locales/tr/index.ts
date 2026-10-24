@@ -427,6 +427,7 @@ export const tr = {
     showErrorDetails: "Ayrıntıları göster",
     hideErrorDetails: "Ayrıntıları gizle",
     copyErrorDetails: "Ayrıntıları kopyala",
+    dismissError: "Hatayı kapat",
     errorProvider: "AI servisi",
     errorModel: "Model",
     previewFile: "Yan panelde önizle",

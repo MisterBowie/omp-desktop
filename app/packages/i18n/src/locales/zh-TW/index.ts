@@ -419,6 +419,7 @@ export const zhTW = {
     showErrorDetails: "顯示詳情",
     hideErrorDetails: "隱藏詳情",
     copyErrorDetails: "複製詳情",
+    dismissError: "關閉錯誤提示",
     errorProvider: "AI 服務",
     errorModel: "模型",
     previewFile: "在側邊面板預覽",

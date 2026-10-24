@@ -1719,6 +1719,23 @@
   transform: rotate(90deg);
 }
 
+.message-error-dismiss {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  color: var(--ds-text-muted);
+}
+
+.message-error-dismiss:hover,
+.message-error-dismiss:focus-visible {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
 .message-error-details {
   margin-top: 12px;
 }

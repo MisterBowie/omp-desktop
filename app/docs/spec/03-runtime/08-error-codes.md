@@ -454,9 +454,11 @@ failing layer is visible during the retry loop as well as in the log record.
 The assistant error card offers a localized
 Continue action that resends the continuation prompt (`继续当前任务` /
 `Continue the current task`) in the same session without truncating the failed
-turn. The session-scoped failed-turn recovery card is used only when no
-structured assistant error is present; neither failure surface offers
-Regenerate.
+turn. Its Close control hides the card in the main transcript for the rest of
+the app run without editing the transcript, so the closed error still counts
+as the turn's structured failure. The session-scoped failed-turn recovery card
+is used only when no structured assistant error is present; neither failure
+surface offers Regenerate.
 
 ## 6. i18n key convention
 

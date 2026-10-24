@@ -57,6 +57,7 @@ import {
   IconTerminal,
   IconVideo,
   IconWrench,
+  IconX,
 } from "../../../components/icons";
 import { TooltipButton } from "../../../components/ui";
 
@@ -145,7 +146,14 @@ export function MessageMeta({
   );
 }
 
-export function AssistantErrorMessage({ message }: { message: UiMessage }) {
+export function AssistantErrorMessage({
+  message,
+  onDismiss,
+}: {
+  message: UiMessage;
+  /** Offered only where the transcript can hide the card it closes. */
+  onDismiss?: () => void;
+}) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(true);
   const detailsToggleRef = useRef<HTMLButtonElement | null>(null);
@@ -233,6 +241,17 @@ export function AssistantErrorMessage({ message }: { message: UiMessage }) {
             >
               {t("errors.action.openSettings")}
             </button>
+          ) : null}
+          {onDismiss ? (
+            <TooltipButton
+              type="button"
+              className="message-error-dismiss"
+              tooltip={t("chat.dismissError")}
+              ariaLabel={t("chat.dismissError")}
+              onClick={onDismiss}
+            >
+              <IconX size={13} aria-hidden="true" />
+            </TooltipButton>
           ) : null}
         </div>
       </div>

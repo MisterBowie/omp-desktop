@@ -425,6 +425,7 @@ export const en = {
     showErrorDetails: "Show details",
     hideErrorDetails: "Hide details",
     copyErrorDetails: "Copy details",
+    dismissError: "Close error",
     errorProvider: "AI provider",
     errorModel: "Model",
     previewFile: "Preview in the side panel",
