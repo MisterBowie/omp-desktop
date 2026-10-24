@@ -1,0 +1,18 @@
+Debugger listening on ws://127.0.0.1:62466/c95b3a4b-0525-4d51-bfa2-2612ef3081a4
+For help, see: https://nodejs.org/learn/getting-started/debugging
+Debugger attached.
+
+DevTools listening on ws://127.0.0.1:62467/devtools/browser/bfd05f7f-29a8-4df7-87b0-461b987aa7e9
+2026-10-24 18:02:27.601 OMP Desktop[25195:69489073] NSWindow does not support nonactivating panel styleMask 0x80
+2026-10-24 18:02:27.620 OMP Desktop[25195:69489073] NSWindow does not support nonactivating panel styleMask 0x80
+Debugger ending on ws://127.0.0.1:62466/c95b3a4b-0525-4d51-bfa2-2612ef3081a4
+For help, see: https://nodejs.org/learn/getting-started/debugging
+Debugger listening on ws://127.0.0.1:62639/1bfc86ea-e6cb-4fc0-ae86-ff0e77122627
+For help, see: https://nodejs.org/learn/getting-started/debugging
+
+DevTools listening on ws://127.0.0.1:62640/devtools/browser/3aaa3922-a85e-43ed-b177-f3300a812603
+Debugger attached.
+2026-10-24 18:02:41.776 OMP Desktop[26971:69495887] NSWindow does not support nonactivating panel styleMask 0x80
+2026-10-24 18:02:41.791 OMP Desktop[26971:69495887] NSWindow does not support nonactivating panel styleMask 0x80
+Debugger ending on ws://127.0.0.1:62639/1bfc86ea-e6cb-4fc0-ae86-ff0e77122627
+For help, see: https://nodejs.org/learn/getting-started/debugging
