@@ -49,9 +49,22 @@
 | `node scripts/check-architecture.mjs`、`pnpm lint`（`app`） | 均 exit 0 |
 | `git diff --check` | 通过 |
 
+## 本地开发版界面验证（2026-10-24 17:35）
+
+- 开发版从本工作树启动（`node ../../scripts/dev-electron.mjs --remoteDebuggingPort 9339`，端口只监听
+  127.0.0.1），数据目录 `~/.omp-desktop-dev`、userData `OMP Desktop Dev`，与安装版和其运行中的实例互不影响。
+- macOS 开发包装是改名后的 Electron，`app.isPackaged` 为 true，只接受资源目录下经来源校验的运行时；
+  `OMP_DESKTOP_RUNTIME` 不生效。已将安装版 0.1.5 的 `omp-runtime/`（fork `edec3898`，补丁
+  `62bc57b+omp-desktop.7`）以 APFS 克隆放进 `app/.cache/electron-dev/.../Resources/`（生成目录，未入库）。
+  `host-core` 由 `cargo +stable build -p host-core --locked` 在工作树构建。
+- 本机假模型服务（127.0.0.1:18739，补全请求一律返回不可重试的 400）作为开发档案里的服务商；没有调用真实模型。
+  通过 CDP 在真实窗口中：发送一条消息 → 假服务只收到 1 次请求 → 出现 `OMP_MODEL_ERROR` 卡片，标题栏末尾有
+  关闭按钮 → 点击后卡片消失、用户消息保留、未出现 TurnOutcomeCard → 切到另一会话再切回，卡片仍关闭。
+  截图仅留本机，未提交（含本机路径）。
+- 仍未覆盖：浅色主题外观、窄窗口换行、重启后持久化错误重新出现（按设计如此）。
+
 ## 未执行
 
-- 未启动 Electron 实例目视确认按钮位置与深浅色主题；不使用用户正在运行的 OMP Desktop。
 - 未跑 Electron E2E：改动只在渲染层，没有跨进程行为；US-UI-60c 新增步骤留待发版前的界面验收。
 - 未打包、未发布；是否随 0.1.6 或同版本修订发布由用户决定，届时补更新记录（八种语言）。
 
