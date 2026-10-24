@@ -5,11 +5,11 @@
 任务状态见[任务看板](docs/04-task-board.md)，范围与决定见[范围与决策](docs/00-scope-and-decisions.md)，
 证据见 `docs/validation/`。
 
-## 当前状态（2026-10-24）
+## 当前状态（2026-10-25）
 
 | 项 | 值 |
 | --- | --- |
-| 正式版本 | **0.1.5**：[GitHub Release v0.1.5](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.5)（`releases/latest`），产品源码 `4194e804`，2026-10-24 01:34（北京时间）发布，更新源已指向 0.1.5（[发布证据](docs/validation/Release-015-20261023.md)）。含图片附件接入 OMP、全局指令改存数据目录、隐藏 OAuth 登录入口（R09–R11）。此前版本：[0.1.4 同版本修订](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.4%2Bchatfix.852ca1b952ae64e0bcc660ffe89a3c0da06867d9)（`852ca1b9`，[证据](docs/validation/Chatfix014-release-20261022.md)）与 [v0.1.4](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.4)（`87894e73`，[证据](docs/validation/Unified-014-release-20261021.md)），标签与资产均未改动 |
+| 正式版本 | **0.1.6**：[GitHub Release v0.1.6](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.6)（`releases/latest`），产品源码 `f0c9399a`，2026-10-25 00:26（北京时间）发布，更新源已指向 0.1.6（[发布证据](docs/validation/Release-016-20261024.md)）。含转录错误卡片关闭按钮（R15）。此前版本：[v0.1.5](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.5)（`4194e804`，R09–R11，[证据](docs/validation/Release-015-20261023.md)）、[0.1.4 同版本修订](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.4%2Bchatfix.852ca1b952ae64e0bcc660ffe89a3c0da06867d9)（`852ca1b9`，[证据](docs/validation/Chatfix014-release-20261022.md)）与 [v0.1.4](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.4)（`87894e73`，[证据](docs/validation/Unified-014-release-20261021.md)），标签与资产均未改动 |
 | 主线 | `main` 指向已验证并发布的最新代码（修订线已并入），已推送 `origin/main`。根目录检出固定在 `main`，只作协调，不在其中开发 |
 | 执行引擎 | OMP 是唯一执行引擎（2026-10-21 决定）。Pi 执行入口已关闭，遗留代码待删除（看板 R12） |
 | OMP 运行时 | 上游 OMP 18.3.0（`62bc57be`）+ 受控 fork `MisterBowie/oh-my-pi@edec3898`，补丁 `62bc57b+omp-desktop.7`；以 `app/patches/oh-my-pi/manifest.json` 为准 |
@@ -18,9 +18,7 @@
 
 ## 进行中
 
-R15 转录错误卡片关闭按钮（`codex/dismiss-error-card`）：源码、组件测试与本地开发版界面验证通过，按用户 2026-10-24 要求已并入 `main`（`cf1b42ad`，已推送）（[证据](docs/validation/Error-card-dismiss-20261024.md)）。
-0.1.6 发版（`codex/release-016`，`.worktrees/release-016`）：版本面与更新记录已升到 0.1.6（`f0c9399a`）；远端候选 r2 run40086409361 整轮通过（r1 一次源码测试时序抖动，见本地包记录）；本地 arm64 测试包 `~/Downloads/OMP-Desktop-0.1.6-arm64.dmg` 已通过自动验收，待用户确认后推 `publish-v0.1.6-run-40086409361`。
-`codex/omp-dead-controls` 已随 0.1.5 并入 `main`。
+当前没有进行中的分支。R15（`codex/dismiss-error-card`）与 0.1.6 版本面（`codex/release-016`）已随 0.1.6 发布并入 `main`。
 
 发版方式：正式版按 `v<版本>` 发布并推送更新源；同版本修订按 `0.1.4+<名称>.<完整源码 SHA>` 发布，原稳定标签与
 资产保持不变，已安装用户需手动覆盖。固定 `release-check-*` 远端候选整轮通过、用户本地测试确认后才由
@@ -50,11 +48,10 @@ R15 并入 `main` 后以 **0.1.6 正式版**发布：版本面、Cargo 与 `APP_
 
 ## 下一步
 
-0. 0.1.6 候选：固定 `release-check-0.1.6-*` 远端候选整轮通过后，用户本地测试 macOS arm64 包，确认后推
-   `publish-v0.1.6-run-<候选运行 ID>` 发布并回读；发布后 `main` 快进到发布源码。
 1. 下一阶段做 R12（删除 Pi 遗留代码）；从 `main` 新建分支和工作树。
 2. R13（OMP 上游升级与 fork 精简）单独立项。
-3. 0.1.5 发布后若用户反馈问题，从 `main` 建修复分支，按同版本修订或 0.1.6 另行发布。
+3. R15 调查中发现、尚未处理：OMP 自动重试事件未映射到“重试中”状态；思考等级与模型不匹配的提示不可操作、
+   “继续”原样重发；被拒发送的错误卡片显示在后续回合下方。需要时从 `main` 建修复分支。
 
 ## 工作约定
 

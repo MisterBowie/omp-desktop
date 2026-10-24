@@ -1,0 +1,201 @@
+{
+  "run": 40111213547,
+  "jobs": [
+    {
+      "name": "bind",
+      "conclusion": "success",
+      "started_at": "2026-10-24T16:21:56Z",
+      "completed_at": "2026-10-24T16:22:06Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Read the immutable candidate selected by the publication tag",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "publish / publish",
+      "conclusion": "success",
+      "started_at": "2026-10-24T16:22:08Z",
+      "completed_at": "2026-10-24T16:26:10Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify publication tag and original-release protection",
+          "conclusion": "success"
+        },
+        {
+          "name": "Bind the accepted source, native jobs and immutable artifacts",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run pnpm/action-setup@v6",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run pnpm install --frozen-lockfile --ignore-scripts",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/download-artifact@v8",
+          "conclusion": "success"
+        },
+        {
+          "name": "Stage every candidate artifact in the published namespace",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/download-artifact@v8",
+          "conclusion": "success"
+        },
+        {
+          "name": "Preserve the accepted native evidence",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify every installer hash and merge update feeds",
+          "conclusion": "success"
+        },
+        {
+          "name": "Prepare product release notes",
+          "conclusion": "success"
+        },
+        {
+          "name": "Create or verify the stable tag at the accepted source",
+          "conclusion": "success"
+        },
+        {
+          "name": "Publish the complete stable release",
+          "conclusion": "success"
+        },
+        {
+          "name": "Read back the public stable update channel",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run pnpm/action-setup@v6",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "readback / readback",
+      "conclusion": "success",
+      "started_at": "2026-10-24T16:26:12Z",
+      "completed_at": "2026-10-24T16:27:07Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run pnpm/action-setup@v6",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run pnpm install --frozen-lockfile --ignore-scripts",
+          "conclusion": "success"
+        },
+        {
+          "name": "Bind the requested release version",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download the complete published release and revalidate its candidate",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify actual public bytes, manifests, source receipts and feeds",
+          "conclusion": "success"
+        },
+        {
+          "name": "Publish only the public asset receipt",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/upload-artifact@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run pnpm/action-setup@v6",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ]
+}
