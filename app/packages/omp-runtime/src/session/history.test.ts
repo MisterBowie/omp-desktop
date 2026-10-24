@@ -47,6 +47,28 @@ describe("projectOmpHistory", () => {
     expect(projection.hasMoreAfter).toBe(false);
   });
 
+  it("leaves out attempts a provider retry superseded and keeps the outcome", () => {
+    const failed = (attempt: number, status: string) => ({
+      role: "assistant", content: [], stopReason: "error", errorMessage: "503 No available accounts", timestamp: attempt,
+      retryRecovery: { kind: "auto-retry", status, attempt, recovery: "plain", note: "error; retried" },
+    });
+    const entries = [
+      entry("user", null, textMessage("user", "hello")),
+      entry("try-1", "user", failed(1, "superseded")),
+      entry("try-2", "try-1", failed(2, "superseded")),
+      entry("final", "try-2", { role: "assistant", content: [], stopReason: "error", errorMessage: "503 No available accounts", timestamp: 3 }),
+      entry("again", "final", textMessage("user", "retry later")),
+      entry("try-3", "again", failed(1, "recovered")),
+      entry("answer", "try-3", textMessage("assistant", "recovered answer")),
+    ];
+    const result = projectOmpHistory(entries, "answer", { sessionId: "s" });
+    expect(result.messages.map((message) => message.id)).toEqual([
+      "omp:s:entry:user", "omp:s:entry:final", "omp:s:entry:again", "omp:s:entry:answer",
+    ]);
+    expect(result.messages[1]).toMatchObject({ status: "error", error: { code: "OMP_MODEL_ERROR" } });
+    expect(result.messageCount).toBe(4);
+  });
+
   it("retains a native provider failure and an aborted reply on history reads", () => {
     const entries = [
       entry("user", null, textMessage("user", "show provider error")),

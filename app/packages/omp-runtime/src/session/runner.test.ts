@@ -1487,3 +1487,84 @@ describe("a stop cancels the turn-fence preparation (third repair)", () => {
     expect(runner.runState()).toBe("idle");
   });
 });
+
+describe("OMP provider retries", () => {
+  const failedAttempt = (timestamp: number) => ({
+    role: "assistant",
+    content: [],
+    stopReason: "error",
+    errorMessage: "503 No available accounts",
+    timestamp,
+  });
+
+  it("withdraws each superseded attempt and reports the retry as the run's activity", async () => {
+    const { runner, runtime, envelopes } = harness();
+    await runner.prompt("hello");
+    runtime.push({ type: "agent_start" });
+    runtime.push({ type: "message_start", message: failedAttempt(1) });
+    runtime.push({ type: "message_end", message: failedAttempt(1) });
+    const failed = envelopes.flatMap(({ event }) => event.type === "message_end" ? [event.message] : []);
+    expect(failed).toHaveLength(1);
+    expect(failed[0].error?.code).toBe("OMP_MODEL_ERROR");
+
+    runtime.push({ type: "auto_retry_start", attempt: 1, maxAttempts: 10, delayMs: 500, errorMessage: "503 No available accounts" });
+    const withdrawn = envelopes.at(-2)?.event;
+    expect(withdrawn).toMatchObject({ type: "message_end", message: { id: failed[0].id, content: "", status: "error" } });
+    expect(withdrawn?.type === "message_end" && withdrawn.message.error).toBeUndefined();
+    const retrying = envelopes.at(-1)?.event;
+    expect(retrying).toMatchObject({
+      type: "status",
+      status: { isRunning: true, activity: { phase: "retrying", attempt: 1, retryDelayMs: 500, error: { code: "PROVIDER_ERROR", providerStatus: 503 } } },
+    });
+    expect(runner.status().activity).toMatchObject({ phase: "retrying", attempt: 1 });
+
+    // The retried request answers: its stream replaces the retry status.
+    runtime.push({ type: "message_start", message: { role: "assistant", content: [], timestamp: 2 } });
+    expect(runner.status().activity).toBeUndefined();
+    expect(envelopes.at(-1)?.event).toMatchObject({ type: "status", status: { isRunning: true } });
+    expect(envelopes.at(-1)?.event.type === "status" && envelopes.at(-1)?.event.status.activity).toBeFalsy();
+    runtime.push({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "ok" }], stopReason: "stop", timestamp: 2 } });
+    runtime.push({ type: "auto_retry_end", success: true, attempt: 1 });
+    expect(envelopes.at(-1)?.event).toMatchObject({ type: "status" });
+    runtime.push({ type: "agent_end" });
+    expect(runner.status()).toMatchObject({ isRunning: false });
+    expect(runner.status().activity).toBeUndefined();
+    runner.dispose();
+  });
+
+  it("keeps the terminal error when the retry budget runs out", async () => {
+    const { runner, runtime, envelopes } = harness();
+    await runner.prompt("hello");
+    runtime.push({ type: "agent_start" });
+    runtime.push({ type: "message_start", message: failedAttempt(1) });
+    runtime.push({ type: "message_end", message: failedAttempt(1) });
+    runtime.push({ type: "auto_retry_start", attempt: 1, maxAttempts: 1, delayMs: 0, errorMessage: "503 No available accounts" });
+    runtime.push({ type: "message_start", message: failedAttempt(2) });
+    runtime.push({ type: "message_end", message: failedAttempt(2) });
+    runtime.push({ type: "auto_retry_end", success: false, attempt: 1, finalError: "503 No available accounts" });
+    runtime.push({ type: "agent_end" });
+    const ends = envelopes.flatMap(({ event }) => event.type === "message_end" ? [event.message] : []);
+    // First attempt: shown, then withdrawn. Final attempt: shown and kept.
+    expect(ends.map((message) => [message.status, Boolean(message.error)])).toEqual([
+      ["error", true], ["error", false], ["error", true],
+    ]);
+    expect(ends[0].id).toBe(ends[1].id);
+    expect(ends[2].id).not.toBe(ends[0].id);
+    expect(runner.status().activity).toBeUndefined();
+    runner.dispose();
+  });
+
+  it("never withdraws a terminal error that no retry followed", async () => {
+    const { runner, runtime, envelopes } = harness();
+    await runner.prompt("hello");
+    runtime.push({ type: "agent_start" });
+    runtime.push({ type: "message_start", message: failedAttempt(1) });
+    runtime.push({ type: "message_end", message: failedAttempt(1) });
+    runtime.push({ type: "agent_end" });
+    const before = envelopes.length;
+    // A late retry frame after the run closed is attributed to no run.
+    runtime.push({ type: "auto_retry_start", attempt: 1, delayMs: 0, errorMessage: "503" });
+    expect(envelopes.slice(before).some(({ event }) => event.type === "message_end")).toBe(false);
+    runner.dispose();
+  });
+});

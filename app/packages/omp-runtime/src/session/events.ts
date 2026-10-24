@@ -188,6 +188,11 @@ export class OmpEventConverter {
    */
   private pendingUserMessageId: string | undefined;
   private readonly steeringUserMessageIds: string[] = [];
+  /**
+   * The newest assistant attempt that ended in an error, until either a
+   * retry supersedes it or another assistant message starts.
+   */
+  private failedAttempt: { id: string; createdAt: string } | null = null;
 
   queueSteeringUserMessageId(messageId: string): void {
     this.steeringUserMessageIds.push(messageId);
@@ -216,6 +221,31 @@ export class OmpEventConverter {
   /** The run's message ids, in creation order. */
   runMessageIds(): string[] {
     return [...this.messageIds];
+  }
+
+  /**
+   * Withdraw the failed attempt the runtime has just decided to retry.
+   *
+   * OMP reports a failed provider attempt as a terminal assistant error and
+   * only afterwards announces `auto_retry_start`; it then marks that entry
+   * `retryRecovery` and keeps it out of the model context. The live row is
+   * withdrawn the way an empty aborted row is — an empty, error-free failed
+   * `message_end` for the same id — so a long outage shows one retry status
+   * instead of a stack of error cards. A later attempt's terminal error is
+   * not withdrawn unless another retry follows it.
+   */
+  retractFailedAttempt(): AgentEvent[] {
+    const failed = this.failedAttempt;
+    if (!failed) return [];
+    this.failedAttempt = null;
+    const index = this.messageIds.indexOf(failed.id);
+    if (index >= 0) this.messageIds.splice(index, 1);
+    return [
+      {
+        type: "message_end",
+        message: { id: failed.id, role: "assistant", content: "", createdAt: failed.createdAt, status: "error" },
+      },
+    ];
   }
 
   /**
@@ -363,6 +393,7 @@ export class OmpEventConverter {
           this.note("a non-terminal agent_end was reported as a status, not a completion");
           return [];
         }
+        this.failedAttempt = null;
         return [{ type: "agent_end", messageIds: this.runMessageIds() }];
       }
 
@@ -478,7 +509,10 @@ export class OmpEventConverter {
     }
     const id = this.mintId();
     this.streaming = { id, role, startedAt: this.now() };
-    if (role === "assistant") this.modelId = stringOr(message.model, this.modelId);
+    if (role === "assistant") {
+      this.modelId = stringOr(message.model, this.modelId);
+      this.failedAttempt = null;
+    }
     // The admitted prompt's native echo: the renderer already shows this input
     // under its own optimistic id, so the durable row is announced as PI's
     // `user_message_persisted` re-key of that exact row instead of a second
@@ -572,12 +606,12 @@ export class OmpEventConverter {
     if (role === "assistant") {
       const streaming = this.streaming?.role === "assistant" ? this.streaming : null;
       this.streaming = null;
-      return this.finishAssistant(
-        streaming?.id ?? this.mintId(),
-        message,
-        assistantStatus(message),
-        streaming?.startedAt,
-      );
+      const id = streaming?.id ?? this.mintId();
+      const status = assistantStatus(message);
+      const events = this.finishAssistant(id, message, status, streaming?.startedAt);
+      const finished = events[0]?.type === "message_end" ? events[0].message : undefined;
+      this.failedAttempt = status === "error" && finished ? { id, createdAt: finished.createdAt } : null;
+      return events;
     }
     const id = this.streaming?.role === role ? this.streaming.id : this.mintId();
     this.streaming = null;

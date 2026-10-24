@@ -135,6 +135,7 @@ export function projectOmpHistory(
   }
   for (const entry of branch) {
     if (entry.type !== "message") continue;
+    if (isRetriedAttempt(entry)) continue;
     const toolCallId = toolCallIdOf(entry);
     const projected = converter.convertEntry(entry, {
       // A durable tool row must answer to the same identity as the live tool
@@ -280,4 +281,19 @@ function toolCallIdOf(entry: EntryRecord): string | null {
   if (typeof message !== "object" || message === null) return null;
   const toolCallId = (message as { toolCallId?: unknown }).toolCallId;
   return typeof toolCallId === "string" && toolCallId.length > 0 ? toolCallId : null;
+}
+
+/**
+ * An assistant attempt the runtime retried and superseded.
+ *
+ * OMP marks every failed attempt of a retry saga with `retryRecovery` once
+ * the saga ends and keeps those entries out of the model context; the
+ * transcript follows the same rule, so a reopened session shows the reply or
+ * the one terminal error, not each failed attempt.
+ */
+function isRetriedAttempt(entry: EntryRecord): boolean {
+  const message = entry.message;
+  if (typeof message !== "object" || message === null) return false;
+  const { role, retryRecovery } = message as { role?: unknown; retryRecovery?: unknown };
+  return role === "assistant" && typeof retryRecovery === "object" && retryRecovery !== null;
 }

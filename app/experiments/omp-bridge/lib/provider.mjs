@@ -7,6 +7,10 @@
  *
  * Scripted turn shape:
  *   { text?, thinking?, toolCalls?: [{ id, name, args }], finish?: "stop"|"tool_calls", delayMs? }
+ *   or a refused request: { httpStatus, errorMessage? } answers with that status
+ *   and an OpenAI-style JSON error body instead of a stream;
+ *   or a broken stream: { dropStream: true, text? } sends the head and any text,
+ *   then destroys the socket before the stream finishes.
  * Turns are consumed in order; the last one repeats.
  */
 import { createServer } from "node:http";
@@ -142,6 +146,11 @@ export class FakeProvider {
 
   async #streamCompletion(res, body) {
     const turn = this.#nextTurn(body);
+    if (turn.httpStatus) {
+      res.writeHead(turn.httpStatus, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: { message: turn.errorMessage ?? "fake provider refused the request", type: "api_error" } }));
+      return;
+    }
     const id = `chatcmpl-fake-${++this.toolCallSeq}`;
     res.writeHead(200, {
       "content-type": "text/event-stream",
@@ -162,6 +171,10 @@ export class FakeProvider {
     const emit = async () => {
       if (turn.thinking) send({ reasoning_content: turn.thinking });
       if (turn.text) send({ content: turn.text });
+      if (turn.dropStream) {
+        res.socket?.destroy();
+        return;
+      }
       if (turn.toolCalls?.length) {
         send({
           tool_calls: turn.toolCalls.map((call, index) => ({

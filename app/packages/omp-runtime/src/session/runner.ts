@@ -49,6 +49,7 @@ import {
 import { classifyUiRequest } from "./ui-requests.js";
 import { parseStartRefusalNotice, type OmpStartRefusal } from "./start-refusal.js";
 import { parseTurnFailureNotice, type OmpTurnFailure } from "./turn-failure.js";
+import { retryActivityFromFrame, type RetryActivity } from "./retry-activity.js";
 import {
   mintTurnToken,
   OMP_TURN_COMMAND,
@@ -332,6 +333,8 @@ export class OmpSessionRunner {
 
   private state: OmpRunState = "idle";
   private run: RunRecord | null = null;
+  /** The runtime's provider retry in progress for the current run, if any. */
+  private retryActivity: RetryActivity | null = null;
   private lastClosedGeneration = 0;
   private readonly bashCallIds = new Set<string>();
   /** Parent `task` tool call → the generation/turn that spawned it, so a child
@@ -440,11 +443,13 @@ export class OmpSessionRunner {
     isRunning: boolean;
     currentTurnId?: string;
     pendingToolConfirmations: number;
+    activity?: RetryActivity;
   } {
     return {
       isRunning: this.state === "running",
       ...(this.run ? { currentTurnId: this.run.turnId } : {}),
       pendingToolConfirmations: this.ui.open().length,
+      ...(this.retryActivity && this.state === "running" ? { activity: this.retryActivity } : {}),
     };
   }
 
@@ -1390,6 +1395,10 @@ export class OmpSessionRunner {
       return;
     }
     if (frame.type === "agent_start" && this.run?.started) return;
+    if (frame.type === "auto_retry_start" || frame.type === "auto_retry_end") {
+      this.onAutoRetry(frame);
+      return;
+    }
     try {
       events = this.converter.convert(frame);
     } catch (error) {
@@ -1403,6 +1412,11 @@ export class OmpSessionRunner {
         },
       });
       return;
+    }
+    // The retried request is answering: the retry status gives way to its stream.
+    if (this.retryActivity && events.some((event) => event.type === "message_start" && event.message.role === "assistant")) {
+      this.retryActivity = null;
+      events.push({ type: "status", status: { sessionId: this.sessionId, ...this.status() } });
     }
     for (const event of events) {
       if (event.type === "status" && this.run) event.status.currentTurnId = this.run.turnId;
@@ -1424,6 +1438,32 @@ export class OmpSessionRunner {
         this.cancelOpenDialogs("the run ended before the dialog was answered");
         this.closeRun(this.run?.generation ?? 0, this.state === "stopping" ? "aborted" : "completed");
       }
+    }
+  }
+
+  /**
+   * Reflect OMP's provider retry in the run's status.
+   *
+   * `auto_retry_start` withdraws the failed attempt it supersedes and shows
+   * the retry (attempt, backoff, error); `auto_retry_end` clears it. Either way
+   * one `status` event carries the change, the same channel `agent_start` uses.
+   */
+  private onAutoRetry(frame: OmpFrame): void {
+    const events: AgentEvent[] = [];
+    if (frame.type === "auto_retry_start") {
+      events.push(...this.converter.retractFailedAttempt());
+      this.retryActivity = retryActivityFromFrame(frame as Record<string, unknown>, this.now());
+    } else {
+      this.retryActivity = null;
+    }
+    events.push({ type: "status", status: { sessionId: this.sessionId, ...this.status() } });
+    for (const event of events) {
+      this.emitEnvelope({
+        sessionId: this.sessionId,
+        ...(this.run ? { turnId: this.run.turnId } : {}),
+        ts: this.now(),
+        event,
+      });
     }
   }
 
@@ -1685,6 +1725,7 @@ export class OmpSessionRunner {
     this.lastClosedGeneration = Math.max(this.lastClosedGeneration, generation);
     this.state = "idle";
     this.run = null;
+    this.retryActivity = null;
     this.bashCallIds.clear();
     // A binding whose user frame never arrived dies with its run: a later
     // prompt must not be re-keyed onto the row of a prompt that was refused.

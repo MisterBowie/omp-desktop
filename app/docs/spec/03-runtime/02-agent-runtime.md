@@ -170,6 +170,24 @@ must not turn either state into a successful empty reply. Diagnostic message
 content is bounded to 4096 serialized UTF-8 bytes and counted in the existing
 shared row budget. The native transcript is never rewritten by projection.
 
+### OMP provider retry projection
+
+OMP owns provider retries. A short outage is absorbed inside its transport;
+when that gives up, the attempt ends as an assistant error and the runtime
+announces `auto_retry_start` (attempt, backoff, error) before the next
+attempt, then `auto_retry_end` when the retry saga succeeds or exhausts its
+budget. The adapter maps these onto the existing `retrying` activity
+(ADR 0206): `auto_retry_start` sets `{ phase: "retrying", attempt,
+retryDelayMs, error }` on the run's `status` (error code `PROVIDER_RATE_LIMITED`
+for HTTP 429, otherwise `PROVIDER_ERROR`, with the leading HTTP status as
+`providerStatus`), and the activity clears on `auto_retry_end`, when the
+retried request starts streaming, or when the run ends. The failed attempt a
+retry supersedes is withdrawn from the live transcript with an empty,
+error-free failed `message_end` for its id; the attempt that ends the saga
+keeps its error row. History reads skip assistant entries the runtime marked
+`retryRecovery`, the same rule OMP applies to its model context, so a
+reopened session shows the reply or the one terminal error.
+
 ## 3. Core objects
 
 ### 3.1 PiRuntime (Node)
