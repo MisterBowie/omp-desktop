@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "categories": [
+    "ASSERTION"
+  ],
+  "locations": [
+    {
+      "path": "app/apps/desktop/test/omp-plan-submit-e2e.test.mjs",
+      "lines": [
+        1113,
+        1232
+      ]
+    }
+  ]
+}
