@@ -18,7 +18,7 @@
 
 ## 进行中
 
-`codex/dismiss-error-card`（`.worktrees/dismiss-error-card`）：R15 转录错误卡片关闭按钮，源码与组件测试完成，未并入 `main`、未打包；待用户确认合并与发版方式（[证据](docs/validation/Error-card-dismiss-20261024.md)）。
+R15 转录错误卡片关闭按钮（`codex/dismiss-error-card`）：源码、组件测试与本地开发版界面验证通过，按用户 2026-10-24 要求已并入 `main`，发版进行中（[证据](docs/validation/Error-card-dismiss-20261024.md)）。
 `codex/omp-dead-controls` 已随 0.1.5 并入 `main`。
 
 发版方式：正式版按 `v<版本>` 发布并推送更新源；同版本修订按 `0.1.4+<名称>.<完整源码 SHA>` 发布，原稳定标签与

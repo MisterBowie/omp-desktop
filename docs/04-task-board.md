@@ -25,7 +25,7 @@ R01–R05 的执行记录与检查结果见 [Project-consolidation-20261022](val
 | R12 | 删除 Pi 遗留代码：Pi 执行路径、`apps/pi-host`、remote/RACP 客户端、IPC 中的 Pi 分支（约 1 MB） | 用户决定 6 | — | 下一阶段 |
 | R13 | OMP 上游升级与 fork 精简：补丁重放到当前上游；记忆 `list` 改走后端接口；可上游化的通用补丁精简；`omp-patch --verify` 读取清单中的全部套件；退役 `0002` 候选补丁 | 用户决定 3 | — | 单独阶段 |
 | R14 | 发布流程整理建议：移除一次性 workflow；诊断结果改用 artifact，不再推诊断分支和标签 | 审查建议 | — | 未决，用户本轮保持现有发布方式 |
-| R15 | 转录错误卡片可关闭：关闭按钮按行 id 与失败签名在本次运行内隐藏卡片，不改转录与主机数据（[证据](validation/Error-card-dismiss-20261024.md)） | 用户反馈 | `codex/dismiss-error-card` | 源码与组件测试完成，待用户确认并入 `main` 及发版方式 |
+| R15 | 转录错误卡片可关闭：关闭按钮按行 id 与失败签名在本次运行内隐藏卡片，不改转录与主机数据（[证据](validation/Error-card-dismiss-20261024.md)） | 用户反馈 | `codex/dismiss-error-card` | 已完成：源码、组件测试与本地开发版界面验证通过；用户 2026-10-24 要求并入 `main` 并发版，发版进行中 |
 
 ## 准备工作
 
