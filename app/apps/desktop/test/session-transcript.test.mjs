@@ -319,3 +319,42 @@ test("two identical prompts are two rows, keyed only by id", () => {
   ], { replacedLiveMessageIds: ["live:9"] });
   assert.deepEqual(merged.map((row) => row.id), ["entry:1", "entry:2", "entry:3", "entry:4"]);
 });
+
+test("a refused prompt's local error keeps its place when later turns are re-read without an anchor", () => {
+  // Every live row of the turns around the refusal was replaced by its durable
+  // twin, so the renderer-local error rows share no id with the page.
+  const durable = [
+    at("entry:u1", "2026-10-24T01:51:57.323Z", { role: "user" }),
+    at("entry:a1", "2026-10-24T01:52:10.465Z"),
+    at("entry:u3", "2026-10-24T01:53:19.418Z", { role: "user" }),
+    at("entry:a3", "2026-10-24T01:54:13.298Z"),
+  ];
+  const refused = (id, createdAt) =>
+    at(id, createdAt, { content: "", status: "error", isError: true, error: { code: "OMP_PROJECTION_INVALID", message: "x" } });
+  const live = [
+    at("live:a1", "2026-10-24T01:52:10.465Z"),
+    refused("local:e1", "2026-10-24T01:52:34.100Z"),
+    refused("local:e2", "2026-10-24T01:52:49.200Z"),
+    at("live:u3", "2026-10-24T01:53:19.418Z", { role: "user" }),
+    at("live:a3", "2026-10-24T01:54:13.298Z"),
+    at("live:a4", "2026-10-24T01:55:05.000Z", { status: "streaming" }),
+  ];
+  assert.deepEqual(
+    mergeLiveSessionMessages(durable, live, {
+      replacedLiveMessageIds: ["live:a1", "live:u3", "live:a3"],
+    }).map((row) => row.id),
+    ["entry:u1", "entry:a1", "local:e1", "local:e2", "entry:u3", "entry:a3", "live:a4"],
+  );
+});
+
+test("unanchored live rows newer than the page, or without a time, still trail it", () => {
+  const durable = [at("entry:u1", "2026-10-24T01:00:00.000Z", { role: "user" })];
+  const live = [
+    at("local:late", "2026-10-24T01:00:05.000Z", { content: "", isError: true }),
+    at("local:untimed", "", { content: "", isError: true }),
+  ];
+  assert.deepEqual(
+    mergeLiveSessionMessages(durable, live).map((row) => row.id),
+    ["entry:u1", "local:late", "local:untimed"],
+  );
+});

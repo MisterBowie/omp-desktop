@@ -254,14 +254,45 @@ export function mergeLiveSessionMessages(
     }
   }
 
+  // The remaining rows share no anchor with the page. A settled one that
+  // predates a durable row (a refused prompt's renderer-local error, kept
+  // while the turns after it were re-read under durable ids) goes in front of
+  // the first later durable row instead of after the whole page. In-flight
+  // rows and rows newer than the page still trail it, in live order.
+  const trailing: UiMessage[] = [];
   for (const message of liveNormalized) {
-    if (!used.has(message.id)) push(message);
+    if (used.has(message.id)) continue;
+    const at = isInFlightMessage(message)
+      ? -1
+      : firstLaterDurableIndex(merged, durableIds, message.createdAt);
+    if (at < 0) {
+      trailing.push(message);
+      continue;
+    }
+    used.add(message.id);
+    merged.splice(at, 0, message);
   }
+  for (const message of trailing) push(message);
 
   const unchanged =
     merged.length === durable.length &&
     merged.every((message, index) => message === durable[index]);
   return unchanged ? durable : merged;
+}
+
+/** Index of the first durable row created after `createdAt`, or -1. */
+function firstLaterDurableIndex(
+  merged: readonly UiMessage[],
+  durableIds: ReadonlySet<string>,
+  createdAt: string | undefined,
+): number {
+  const time = createdAt ? Date.parse(createdAt) : Number.NaN;
+  if (Number.isNaN(time)) return -1;
+  return merged.findIndex((row) => {
+    if (!durableIds.has(row.id) || !row.createdAt) return false;
+    const rowTime = Date.parse(row.createdAt);
+    return !Number.isNaN(rowTime) && rowTime > time;
+  });
 }
 
 function isInFlightMessage(message: UiMessage): boolean {

@@ -179,8 +179,11 @@ transcript-file line first, index transaction second.
   revalidation of a running or just-completed session stitches the
   bounded durable page onto the live snapshot in chronological order so older
   live rows stay before that page and the in-flight or not-yet-flushed tail
-  stays after it (D317, D324). Live provenance is cleared only once that page
-  already contains every live row.
+  stays after it (D317, D324). A settled live row that shares no id with the
+  page, such as a refused prompt's renderer-local error, goes in front of the
+  first durable row created after it rather than after the whole page, so a
+  re-read of later turns under durable ids cannot move it below them. Live
+  provenance is cleared only once that page already contains every live row.
 - orphaned session restore: a live JSONL whose sessions row is gone is
   reinserted at host boot and on `session.appendMessage`; a queued outbox
   drains after that restore, and `session.delete` drops that session's
