@@ -176,6 +176,11 @@ export class FakeProvider {
       if (turn.delayMs) await new Promise((r) => setTimeout(r, turn.delayMs));
       const finish = turn.finish ?? (turn.toolCalls?.length ? "tool_calls" : "stop");
       send({}, finish);
+      // `usage: { prompt_tokens, completion_tokens }` on a turn is reported the
+      // way `stream_options.include_usage` hosts do: one usage-only trailing chunk.
+      if (turn.usage) {
+        res.write(`data: ${JSON.stringify({ id, object: "chat.completion.chunk", created: now(), model: this.model, choices: [], usage: turn.usage })}\n\n`);
+      }
       res.write("data: [DONE]\n\n");
       res.end();
     };

@@ -992,7 +992,13 @@ function boundedToolResult(message: OmpMessage, budget: ByteBudget): unknown {
   return marked;
 }
 
-/** Only the usage fields the pinned runtime actually reports. */
+/**
+ * Only the usage fields the pinned runtime actually reports. Providers seed
+ * each streaming assistant message with all-zero usage and fill it in when
+ * the request ends, so all zeros means "not reported yet" (or never, for an
+ * aborted request) — it is omitted, matching `usageFromPi`, so the composer
+ * ring keeps the last real reading instead of dropping to 0% used.
+ */
 function usageOf(message: OmpMessage | undefined): MessageUsage | undefined {
   const usage = message?.usage;
   if (!usage || typeof usage !== "object") return undefined;
@@ -1001,6 +1007,7 @@ function usageOf(message: OmpMessage | undefined): MessageUsage | undefined {
   const cacheRead = numberOr(usage.cacheRead, 0);
   const cacheWrite = numberOr(usage.cacheWrite, 0);
   const total = numberOr(usage.totalTokens, input + output + cacheRead + cacheWrite);
+  if (total <= 0 && input <= 0 && output <= 0 && cacheRead <= 0 && cacheWrite <= 0) return undefined;
   return {
     inputTokens: input,
     outputTokens: output,

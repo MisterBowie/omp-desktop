@@ -139,6 +139,16 @@ apps/desktop/electron/* (supervisor)
 crates/host-core (tool execution + permissions)
 ```
 
+### OMP usage projection
+
+OMP providers seed every streaming assistant message with all-zero usage and
+fill it in when the request ends; an aborted request can end with the zeros
+still in place. The adapter treats all-zero usage as not reported and omits
+`usage`, on live frames, `turn_end` and history entries alike, matching the Pi
+mapping (`usageFromPi`). A streaming row therefore never becomes the newest
+usage-bearing message (D355): the composer context ring keeps the last real
+reading while the next request streams instead of dropping to 0% used.
+
 ### OMP terminal message projection
 
 The OMP adapter reads the native assistant `stopReason` on both final live

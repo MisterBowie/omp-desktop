@@ -82,6 +82,22 @@
   apps/desktop/test/omp-deepseek-replay-e2e.test.mjs` and
   `apps/desktop/test/omp-model-projection.test.mjs`.
 
+### E2E-OMP-context-ring-keeps-last-usage
+
+- **Preconditions:** Verified OMP resources and a local scripted provider that
+  reports streamed usage (`stream_options.include_usage` style); no paid model.
+- **Steps:** Prompt once; the first request reads a file and reports usage, and
+  the second request streams thinking and is held before it finishes. Inspect
+  the composer inspector's reading while it is held, then release it.
+- **Expected:** No streaming assistant row carries the runtime's all-zero usage
+  placeholder. While the second request streams, the inspector keeps the first
+  request's usage (the ring does not jump to 100% remaining / 0% used); once
+  the second request reports, the inspector moves to it.
+- **Automation:** `OMP_BUNDLED_RESOURCES=<resources> node --test
+  apps/desktop/test/omp-context-usage-e2e.test.mjs`; the placeholder on
+  `message_start`, aborted `message_end`, `turn_end` and history entries also
+  runs in `packages/omp-runtime` (`events.test.ts`).
+
 ### E2E-OMP-first-response
 
 - **Preconditions:** Verified OMP resources, fixture-owned project/data and a

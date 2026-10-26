@@ -83,6 +83,30 @@ describe("message streaming", () => {
     expect(usage && "reasoningTokens" in usage).toBe(false);
   });
 
+  it("drops the all-zero usage placeholder a request starts with", () => {
+    // Providers seed every streaming assistant message with zero usage
+    // (`createInitialResponsesAssistantMessage`) and fill it in at the end.
+    // Forwarding the placeholder made the composer ring read 0% used for the
+    // whole request and jump back once the real usage arrived.
+    const c = converter();
+    const zero = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0 };
+    const placeholder = { role: "assistant", content: [], usage: zero };
+    const start = c.convert({ type: "message_start", message: placeholder });
+    expect(start[0].type === "message_start" && "usage" in start[0].message).toBe(false);
+
+    const aborted = c.convert({
+      type: "message_end",
+      message: { ...placeholder, stopReason: "aborted" },
+    });
+    expect(aborted[0].type === "message_end" && "usage" in aborted[0].message).toBe(false);
+
+    const turnEnd = c.convert({ type: "turn_end", message: placeholder, toolResults: [] });
+    expect(turnEnd).toEqual([{ type: "turn_end" }]);
+
+    const entry = c.convertEntry({ id: "e1", message: placeholder });
+    expect(entry && "usage" in entry).toBe(false);
+  });
+
   it("keeps the message id stable when the turn ends with a final message", () => {
     const c = converter();
     const message = { role: "assistant", content: [{ type: "text", text: "done" }] };
