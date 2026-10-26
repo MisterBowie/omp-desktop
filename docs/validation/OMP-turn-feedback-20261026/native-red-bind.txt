@@ -1,0 +1,29 @@
+✖ native OMP runs a stale stored thinking level at the composer's clamped level (3503.921ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4135.220208
+
+✖ failing tests:
+
+test at test/omp-thinking-level-e2e.test.mjs:24:1
+✖ native OMP runs a stale stored thinking level at the composer's clamped level (3503.921ms)
+  AssertionError [ERR_ASSERTION]: the fresh runtime runs at the clamped level, not its own default
+  
+  'high' !== 'low'
+  
+      at TestContext.<anonymous> (file:///Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/apps/desktop/test/omp-thinking-level-e2e.test.mjs:77:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async Test.run (node:internal/test_runner/test:1088:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:332:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'high',
+    expected: 'low',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

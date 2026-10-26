@@ -1,0 +1,50 @@
+Architecture metrics
+Source files: 1611
+Total LOC: 461446
+
+Largest 30 source files
+  crates/host-core/src/rpc/mod.rs (9090 LOC)
+  packages/agent-runtime/src/runtime.test.ts (8705 LOC)
+  packages/agent-runtime/src/runtime.ts (7836 LOC)
+  crates/host-core/src/sessions.rs (7229 LOC)
+  apps/desktop/electron/main/plugin-runtime.ts (5694 LOC)
+  crates/host-core/src/tools/mod.rs (4565 LOC)
+  apps/desktop/electron/main/runtime/omp-session.ts (3546 LOC)
+  apps/desktop/test/omp-session-bridge.test.mjs (2844 LOC)
+  scripts/e2e-omp-plan-ui.mjs (2543 LOC)
+  packages/shared/src/changelog.ts (2523 LOC)
+  apps/desktop/src/components/Sidebar.tsx (2425 LOC)
+  packages/i18n/src/locales/en/index.ts (2368 LOC)
+  packages/i18n/src/locales/ko/index.ts (2361 LOC)
+  packages/i18n/src/locales/tr/index.ts (2361 LOC)
+  packages/i18n/src/locales/zh-CN/index.ts (2325 LOC)
+  packages/i18n/src/locales/zh-TW/index.ts (2323 LOC)
+  packages/i18n/src/locales/de/index.ts (2321 LOC)
+  packages/i18n/src/locales/es/index.ts (2321 LOC)
+  packages/i18n/src/locales/fr/index.ts (2321 LOC)
+  apps/desktop/test/omp-plan-submit-e2e.test.mjs (2257 LOC)
+  crates/host-core/src/plugins/tests.rs (2186 LOC)
+  packages/omp-runtime/extensions/omp-desktop-gate.ts (2135 LOC)
+  packages/plugin-sdk/src/index.ts (2066 LOC)
+  apps/desktop/electron/main/bootstrap/window.ts (1992 LOC)
+  crates/host-core/src/transcripts.rs (1983 LOC)
+  packages/omp-runtime/src/session/runner.ts (1866 LOC)
+  scripts/e2e-three-column-layout.mjs (1783 LOC)
+  scripts/e2e-plan-ui.mjs (1751 LOC)
+  apps/desktop/resources/plugins/pi.file-manager/main.js (1741 LOC)
+  crates/host-core/src/db/tests.rs (1655 LOC)
+
+LOC thresholds
+  >500: 210
+  >1000: 54
+  >2000: 23
+
+Enforced limits
+  apps/desktop/electron/main/index.ts: 1442 / 1500
+  apps/desktop/src/stores/app-store.ts: 755 / 1000
+  New TS/TSX limit: 800 LOC
+  Rust limit: 1000 LOC
+  Rust exemptions: 9
+  New TS/TSX files checked: 0
+
+Architecture check passed

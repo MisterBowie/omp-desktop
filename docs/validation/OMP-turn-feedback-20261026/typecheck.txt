@@ -1,0 +1,4 @@
+
+> @pi-desktop/desktop@0.1.6 typecheck /Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/apps/desktop
+> tsc -p tsconfig.json --noEmit
+

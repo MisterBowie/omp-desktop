@@ -1,0 +1,27 @@
+✖ native OMP runs a stale stored thinking level at the composer's clamped level (573.199292ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1544.810917
+
+✖ failing tests:
+
+test at test/omp-thinking-level-e2e.test.mjs:24:1
+✖ native OMP runs a stale stored thinking level at the composer's clamped level (573.199292ms)
+  Error: thinking level off is not supported by model local-model
+      at projectSessionModels (file:///Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/apps/desktop/electron/main/runtime/omp-session-wiring.ts:186:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async OmpRuntimeSupervisor.startRuntime (file:///Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/packages/omp-runtime/src/supervisor.ts:533:36)
+      at async OmpRuntimeSupervisor.start (file:///Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/packages/omp-runtime/src/supervisor.ts:433:14)
+      at async SessionEntry.buildRunner (file:///Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/apps/desktop/electron/main/runtime/omp-session.ts:1362:7)
+      at async SessionEntry.ensureRunner (file:///Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/apps/desktop/electron/main/runtime/omp-session.ts:1316:14)
+      at async SessionEntry.establishNativeSession (file:///Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/apps/desktop/electron/main/runtime/omp-session.ts:1490:5)
+      at async SessionEntry.ensureNativeSession (file:///Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/apps/desktop/electron/main/runtime/omp-session.ts:1482:7)
+      at async SessionEntry.prompt (file:///Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/apps/desktop/electron/main/runtime/omp-session.ts:1719:5)
+      at async Object.prompt (file:///Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/apps/desktop/electron/main/runtime/omp-session.ts:2748:14) {
+    errorCode: 'OMP_PROJECTION_INVALID'
+  }

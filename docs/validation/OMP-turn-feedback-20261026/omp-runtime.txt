@@ -1,0 +1,15 @@
+
+> @pi-desktop/omp-runtime@0.1.6 test /Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/packages/omp-runtime
+> vitest run
+
+
+ RUN  v4.1.10 /Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/packages/omp-runtime
+
+(node:51698) [DEP0187] DeprecationWarning: Passing invalid argument types to fs.existsSync is deprecated
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ Test Files  39 passed (39)
+      Tests  568 passed | 6 skipped (574)
+   Start at  09:16:54
+   Duration  18.56s (transform 5.61s, setup 0ms, import 13.17s, tests 53.59s, environment 3ms)
+

@@ -1,0 +1,29 @@
+HEAD 5d743122
+﹣ native coding returns real LSP diagnostics after write and default hashline edit, then navigates (0.4805ms) # requires a verified packaged runtime and real typescript-language-server
+﹣ native Mnemopi persists across processes, isolates projects, obeys switches and clears without restoring old history (1.11825ms) # requires OMP_MEMORY_TEST_RUNTIME
+﹣ accepts the real packaged runtime resources (0.069542ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ refuses a swapped tool gate (0.088125ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ refuses a binary whose bytes no longer match the manifest (0.362125ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ refuses a resources tree with no runtime binary (0.122166ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ refuses a runtime built for another platform or architecture (0.138792ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ refuses a manifest that is not the pinned one (0.355ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ a failed acceptance retains an unreclaimable root and restores the environment (0.1585ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+﹣ a failed acceptance deletes only a root whose runs were all reclaimed (0.095625ms) # set OMP_T21_RESOURCES to a real electron-builder Resources directory to run the tamper cases
+✔ a stale stored thinking level runs at the composer's clamped level instead of refusing the prompt (0.187834ms)
+✔ only a stale canonical level is clamped; omit leaves the runtime default and unknown values still refuse (0.088542ms)
+✔ native OMP provider retry shows a retrying status and withdraws the superseded attempt (36687.737916ms)
+✔ a fresh runtime is put on the session's resolved thinking level before the prompt (1.478417ms)
+✔ a restored runtime already at the session's level, or a session on omit, gets no thinking command (4.330375ms)
+✔ a refused or unresolvable thinking level is logged and the prompt still runs (3.524833ms)
+✔ a running session receives the clamped level while the host keeps the chosen one (2.671459ms)
+✔ choosing omit on a running session persists it without a runtime command (1.610292ms)
+✔ native OMP runs a stale stored thinking level at the composer's clamped level (3865.906042ms)
+ℹ tests 3260
+ℹ suites 0
+ℹ pass 3250
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 10
+ℹ todo 0
+ℹ duration_ms 235314.664666
+exit=0

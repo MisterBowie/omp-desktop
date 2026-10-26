@@ -1,0 +1,48 @@
+✔ the snapshot assembles builtin, plugin, then user skills in PI order (15.691625ms)
+✔ activation scope filters plugin skills out of the catalog (0.399041ms)
+✔ group memory wins and the legacy fallback answers when the group has none (3.354959ms)
+✔ a failed memory read is best-effort: the catalog still arrives (0.719167ms)
+✔ edits and removals are visible on the very next snapshot (4.464ms)
+✔ the gate's prompt blocks are byte-identical to the PI prompt helpers (54.606583ms)
+✔ the mode composer preserves pinned PI operating rules with the OMP host identity (398.2065ms)
+✔ M5/T20-C end-to-end: PI execution-time permissions on the patched runtime (133092.002708ms)
+(node:10701) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ T20-B2 plan submission (patched): valid, schema-rejected, mixed-batch, duplicate and revision (12561.872083ms)
+✔ T20-B2 mixed batch [bash, SubmitPlan] is rejected whole, does not terminate, and ordinary tools still run (7266.03575ms)
+✔ T20-B2 approval dispatch: queued execution runs in OMP with the approved instruction, exactly once (11895.207875ms)
+✔ T20-B2 rejected approval never executes, and a restart does not replay a queued one (11031.699041ms)
+✔ T20-B2 Stop during the durable host begin refuses the prompt before it is sent, settles its row aborted, and the next turn recovers (5985.727791ms)
+✔ T20-B2 a real terminal delivered before the prompt response still closes its own durable host turn (11693.998625ms)
+✔ T20-B2 an approved execution settles from a terminal that beats the dispatch prompt return, and a refused begin interrupts it (12596.784291ms)
+✔ T20-D model-side mode entry: EnterPlanMode switches the same live turn, then SubmitPlan ends it (6980.461ms)
+✔ T20-D model-side mode entry: EnterGoalMode switches to Goal and SubmitGoal publishes the goal artifact (5165.537625ms)
+✔ T20-D model-side mode entry: a mixed Enter batch is rejected whole, then a sole retry enters (5070.674458ms)
+✔ T20-D failure boundary: a committed Enter whose catalogue rebuild fails stops the turn and recovers in Plan (5038.568459ms)
+✔ T20-D failure boundary: an unreadable committed Enter reply stops the turn and recovers in Goal (5095.787708ms)
+✔ T20-D generation safety: a stopped Enter's late catalogue answer never changes the successor Agent turn (7534.602ms)
+✔ T20-D lifecycle (B13/B2): real Agent→Plan→Goal→Agent→Plan configuration moves one native session's contract catalogue with no residue (7727.325333ms)
+✔ T20-D Goal (D1): SubmitGoal publishes .pi/goal with exact bytes, approval runs a plain agent turn that self-stops (11152.463917ms)
+✔ an explicit runtime path wins and is the only candidate considered (6.428708ms)
+✔ an unusable explicit path is an error, not a reason to search elsewhere (8.98925ms)
+✔ a packaged build admits only a resource that matches its provenance (6.001667ms)
+✔ a packaged build ignores every development channel (4.811542ms)
+✔ a packaged build refuses a tampered or absent provenance manifest (22.650542ms)
+✔ an unpackaged build finds the pinned submodule launcher by walking up (2.939292ms)
+✔ this worktree resolves its own pinned launcher (0.537958ms)
+✔ the product identity is independent of the fork it came from (0.296292ms)
+✔ the data-directory resolver never lands on the fork's directory (8.501791ms)
+✔ development builds disable automatic updates and the feed is this product's (1.016417ms)
+✔ a refused bundled resource keeps its reason instead of a generic missing runtime (2.201333ms)
+✔ a packaged build resolves the gate only from verified resources (7.800458ms)
+✔ M5/T20-B1 end-to-end: production mode/policy state and contract catalog on the patched runtime (139448.168833ms)
+✔ M5/T20-B1 third repair: a stop during turn-fence preparation never submits the canceled prompt (128341.722458ms)
+✔ before_agent_start: ctx.abort refuses the prompt and a throwing handler does not (21013.464542ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 38
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 245044.646333

@@ -1,0 +1,149 @@
+✔ disables synthetic tool-call prose only for DeepSeek Completions endpoints (7.06625ms)
+✔ projects published reasoning and image support into the actual OMP model document (2.467917ms)
+✔ maps the supported PI api styles to OMP api values (0.094541ms)
+✔ refuses unsupported and absent api styles (0.086792ms)
+✔ projects exactly one provider and one model, auth: none carries no key (0.164333ms)
+✔ projects an apiKey binding with the credential and never elsewhere (0.104833ms)
+✔ fails closed on an empty or incompatible projection (0.236083ms)
+✔ R4: resolves a valid provider/model binding (0.089625ms)
+✔ R4: refuses a disabled provider (0.060708ms)
+✔ R4: refuses a model not in the provider's configured models (0.093834ms)
+✔ R4: refuses a key-auth provider without a stored secret (0.061875ms)
+✔ R4: refuses OAuth and basic auth instead of downgrading to auth:none (0.060333ms)
+✔ R4: refuses an incompatible thinking level (0.047292ms)
+✖ a stale stored thinking level runs at the composer's clamped level instead of refusing the prompt (0.107541ms)
+✖ only a stale canonical level is clamped; omit leaves the runtime default and unknown values still refuse (0.072125ms)
+✔ R4: projects provider headers into the yaml (0.124083ms)
+✔ F5: rejects unknown and empty authKind instead of downgrading to auth:none (0.04875ms)
+✔ F5: a key-auth provider with no key fails closed via needsKey (0.078416ms)
+✔ F5: quotes a provider id containing a colon (0.083125ms)
+✔ G1: a model change reclaims the old runtime before persisting the new binding (4.800291ms)
+✔ G1: a failed reclaim leaves the host untouched (1.253958ms)
+✔ G1: a failed host persist on thinking reverts the runtime and reports a clean failure (1.014584ms)
+✔ G1: a failed thinking revert is reported as inconsistent (1.192667ms)
+✔ G1: mode and permissionMode are persisted through the single host call (1.512ms)
+✖ a fresh runtime is put on the session's resolved thinking level before the prompt (2.144833ms)
+✔ a restored runtime already at the session's level, or a session on omit, gets no thinking command (2.535875ms)
+✖ a refused or unresolvable thinking level is logged and the prompt still runs (1.47875ms)
+✖ a running session receives the clamped level while the host keeps the chosen one (0.831791ms)
+✖ choosing omit on a running session persists it without a runtime command (1.327875ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 23
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 907.837459
+
+✖ failing tests:
+
+test at test/omp-model-projection.test.mjs:192:1
+✖ a stale stored thinking level runs at the composer's clamped level instead of refusing the prompt (0.107541ms)
+  TypeError [Error]: effectiveThinkingLevel is not a function
+      at TestContext.<anonymous> (file:///Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/apps/desktop/test/omp-model-projection.test.mjs:198:16)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1081:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:763:18)
+      at Test.postRun (node:internal/test_runner/test:1210:19)
+      at Test.run (node:internal/test_runner/test:1138:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:763:7)
+
+test at test/omp-model-projection.test.mjs:207:1
+✖ only a stale canonical level is clamped; omit leaves the runtime default and unknown values still refuse (0.072125ms)
+  TypeError [Error]: effectiveThinkingLevel is not a function
+      at TestContext.<anonymous> (file:///Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/apps/desktop/test/omp-model-projection.test.mjs:210:18)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1081:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:763:18)
+      at Test.postRun (node:internal/test_runner/test:1210:19)
+      at Test.run (node:internal/test_runner/test:1138:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:763:7)
+
+test at test/omp-session-configure.test.mjs:172:1
+✖ a fresh runtime is put on the session's resolved thinking level before the prompt (2.144833ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   {
+  -     modelId: 'm',
+  -     providerId: 'p',
+  -     thinkingLevel: 'off'
+  -   }
+  - ]
+  
+      at TestContext.<anonymous> (file:///Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/apps/desktop/test/omp-session-configure.test.mjs:182:10)
+      at async Test.run (node:internal/test_runner/test:1088:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:763:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ { providerId: 'p', modelId: 'm', thinkingLevel: 'off' } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test/omp-session-configure.test.mjs:201:1
+✖ a refused or unresolvable thinking level is logged and the prompt still runs (1.47875ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   'thinking level not applied'
+  - ]
+  
+      at TestContext.<anonymous> (file:///Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/apps/desktop/test/omp-session-configure.test.mjs:211:12)
+      at async Test.run (node:internal/test_runner/test:1088:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:763:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ 'thinking level not applied' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test/omp-session-configure.test.mjs:215:1
+✖ a running session receives the clamped level while the host keeps the chosen one (0.831791ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+  +   'off'
+  -   'low'
+    ]
+  
+      at TestContext.<anonymous> (file:///Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/apps/desktop/test/omp-session-configure.test.mjs:220:10)
+      at async Test.run (node:internal/test_runner/test:1088:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:763:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'off' ],
+    expected: [ 'low' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test/omp-session-configure.test.mjs:224:1
+✖ choosing omit on a running session persists it without a runtime command (1.327875ms)
+  AssertionError [ERR_ASSERTION]: OMP has no omit level; the running level stays until the next runtime
+  + actual - expected
+  
+  + [
+  +   'omit'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/apps/desktop/test/omp-session-configure.test.mjs:229:10)
+      at async Test.run (node:internal/test_runner/test:1088:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:763:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'omit' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
