@@ -1,0 +1,32 @@
+$ env -u SSH_ASKPASS OMP_BUNDLED_RESOURCES=<0.1.6 Resources> node --test test/omp-desktop-capabilities.test.mjs test/omp-execution-policy-e2e.test.mjs test/omp-runtime-launcher.test.mjs test/omp-runtime-state-e2e.test.mjs test/omp-session-turn-fence-e2e.test.mjs test/omp-worktree-e2e.test.mjs   # after local reference clones + cargo build -p host-core, node v24.6.0
+✔ the snapshot assembles builtin, plugin, then user skills in PI order (3.232125ms)
+✔ activation scope filters plugin skills out of the catalog (0.328792ms)
+✔ group memory wins and the legacy fallback answers when the group has none (0.439833ms)
+✔ a failed memory read is best-effort: the catalog still arrives (0.2765ms)
+✔ edits and removals are visible on the very next snapshot (0.29725ms)
+✔ the gate's prompt blocks are byte-identical to the PI prompt helpers (24.848875ms)
+✔ the mode composer preserves pinned PI operating rules with the OMP host identity (254.181416ms)
+✔ M5/T20-C end-to-end: PI execution-time permissions on the patched runtime (96776.714917ms)
+✔ an explicit runtime path wins and is the only candidate considered (2.461833ms)
+✔ an unusable explicit path is an error, not a reason to search elsewhere (1.584875ms)
+✔ a packaged build admits only a resource that matches its provenance (5.805167ms)
+✔ a packaged build ignores every development channel (3.3505ms)
+✔ a packaged build refuses a tampered or absent provenance manifest (26.078375ms)
+✔ an unpackaged build finds the pinned submodule launcher by walking up (2.061375ms)
+✔ this worktree resolves its own pinned launcher (0.230792ms)
+✔ the product identity is independent of the fork it came from (0.305667ms)
+✔ the data-directory resolver never lands on the fork's directory (9.00125ms)
+✔ development builds disable automatic updates and the feed is this product's (16.914834ms)
+✔ a refused bundled resource keeps its reason instead of a generic missing runtime (4.60025ms)
+✔ a packaged build resolves the gate only from verified resources (13.788709ms)
+✔ M5/T20-B1 end-to-end: production mode/policy state and contract catalog on the patched runtime (96783.7955ms)
+✔ M5/T20-B1 third repair: a stop during turn-fence preparation never submits the canceled prompt (88044.752416ms)
+✔ isolated OMP: approval, project switch, cancellation, native restore, reviewed merge and deletion (15647.438958ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 97879.390584

@@ -1,0 +1,10 @@
+$ pnpm --filter @pi-desktop/omp-runtime test   # node v24.6.0, pnpm 10.34.5
+(node:78956) [DEP0187] DeprecationWarning: Passing invalid argument types to fs.existsSync is deprecated
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ Test Files  38 passed (38)
+      Tests  562 passed | 6 skipped (568)
+   Start at  11:04:49
+   Duration  18.17s (transform 4.17s, setup 0ms, import 10.28s, tests 52.06s, environment 2ms)
+
+exit=0

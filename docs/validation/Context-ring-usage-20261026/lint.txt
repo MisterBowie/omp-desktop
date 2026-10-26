@@ -1,0 +1,10 @@
+$ pnpm lint   # node v24.6.0, pnpm 10.34.5
+> pi-desktop@0.1.6 lint:biome /Users/vv/person/omp-desktop/.worktrees/context-ring-usage/app
+> biome lint
+
+Checked 92 files in 71ms. No fixes applied.
+Scope: 12 of 13 workspace projects
+apps/desktop lint$ node ../../scripts/check-style-tokens.mjs
+apps/desktop lint: style tokens OK
+apps/desktop lint: Done
+exit=0

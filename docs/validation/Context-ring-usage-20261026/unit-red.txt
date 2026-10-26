@@ -1,0 +1,35 @@
+$ npx vitest run src/session/events.test.ts -t placeholder   # before fix, node v24.6.0
+
+ RUN  v4.1.12 /Users/vv/person/omp-desktop/.worktrees/context-ring-usage/app/packages/omp-runtime
+
+ ❯ src/session/events.test.ts (40 tests | 1 failed | 39 skipped) 8ms
+     × drops the all-zero usage placeholder a request starts with 7ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/events.test.ts > message streaming > drops the all-zero usage placeholder a request starts with
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/session/events.test.ts:95:78
+     93|     const placeholder = { role: "assistant", content: [], usage: zero …
+     94|     const start = c.convert({ type: "message_start", message: placehol…
+     95|     expect(start[0].type === "message_start" && "usage" in start[0].me…
+       |                                                                              ^
+     96|
+     97|     const aborted = c.convert({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 39 skipped (40)
+   Start at  10:58:44
+   Duration  216ms (transform 70ms, setup 0ms, import 87ms, tests 8ms, environment 0ms)
+
+exit=1

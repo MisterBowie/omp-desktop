@@ -1,0 +1,4 @@
+$ cargo build -p host-core --locked   # needed by omp-worktree-e2e
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 22.23s
+cargo build -p host-core --locked  54.27s user 6.83s system 274% cpu 22.292 total
+exit=0

@@ -1,0 +1,10 @@
+$ node scripts/check-architecture.mjs   # node v24.6.0, pnpm 10.34.5
+  apps/desktop/electron/main/index.ts: 1442 / 1500
+  apps/desktop/src/stores/app-store.ts: 755 / 1000
+  New TS/TSX limit: 800 LOC
+  Rust limit: 1000 LOC
+  Rust exemptions: 9
+  New TS/TSX files checked: 0
+
+Architecture check passed
+exit=0

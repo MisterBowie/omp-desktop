@@ -1,0 +1,12 @@
+$ pnpm --filter @pi-desktop/omp-runtime typecheck   # node v24.6.0, pnpm 10.34.5
+
+> @pi-desktop/omp-runtime@0.1.6 typecheck /Users/vv/person/omp-desktop/.worktrees/context-ring-usage/app/packages/omp-runtime
+> tsc -p tsconfig.json --noEmit
+
+exit=0
+$ pnpm --filter @pi-desktop/desktop typecheck   # node v24.6.0, pnpm 10.34.5
+
+> @pi-desktop/desktop@0.1.6 typecheck /Users/vv/person/omp-desktop/.worktrees/context-ring-usage/app/apps/desktop
+> tsc -p tsconfig.json --noEmit
+
+exit=0

@@ -1,0 +1,42 @@
+$ OMP_BUNDLED_RESOURCES=<0.1.6 Resources> node --test test/omp-context-usage-e2e.test.mjs
+# packages/omp-runtime/src/session/events.ts restored to HEAD 583f516b and @pi-desktop/omp-runtime rebuilt (before fix); node v24.6.0
+✖ native context ring keeps the last reported usage while the next request streams (3750.619375ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4636.036959
+
+✖ failing tests:
+
+test at test/omp-context-usage-e2e.test.mjs:23:1
+✖ native context ring keeps the last reported usage while the next request streams (3750.619375ms)
+  AssertionError [ERR_ASSERTION]: the ring keeps the last reported request
+  + actual - expected
+  
+    {
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+  +   inputTokens: 0,
+  +   outputTokens: 0,
+  +   totalTokens: 0
+  -   inputTokens: 12000,
+  -   outputTokens: 400,
+  -   totalTokens: 12400
+    }
+  
+      at TestContext.<anonymous> (file:///Users/vv/person/omp-desktop/.worktrees/context-ring-usage/app/apps/desktop/test/omp-context-usage-e2e.test.mjs:97:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async Test.run (node:internal/test_runner/test:1088:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:332:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0 },
+    expected: { inputTokens: 12000, outputTokens: 400, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 12400 },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+exit=1

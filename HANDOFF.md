@@ -18,7 +18,11 @@
 
 ## 进行中
 
-当前没有进行中的分支。R15（`codex/dismiss-error-card`）与 0.1.6 版本面（`codex/release-016`）已随 0.1.6 发布并入 `main`。
+R15（`codex/dismiss-error-card`）与 0.1.6 版本面（`codex/release-016`）已随 0.1.6 发布并入 `main`。
+
+- R17 `codex/context-ring-usage`：上下文圆环思考中显示 100% 的修复，已验证，2026-10-26 按用户要求快进并入本地 `main`
+  （未推送 `origin`）并打本地测试包；发布方式待用户决定（[证据](docs/validation/Context-ring-usage-20261026.md)）。
+- R16 `codex/omp-turn-feedback`（`.worktrees/omp-turn-feedback`）仍未并入，与 R17 改动相邻的看板与 HANDOFF 行并入时需手工合并。
 
 发版方式：正式版按 `v<版本>` 发布并推送更新源；同版本修订按 `0.1.4+<名称>.<完整源码 SHA>` 发布，原稳定标签与
 资产保持不变，已安装用户需手动覆盖。固定 `release-check-*` 远端候选整轮通过、用户本地测试确认后才由
