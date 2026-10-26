@@ -1,0 +1,7 @@
+$ hdiutil verify OMP-Desktop-0.1.6-arm64.dmg
+已验证CRC32 $35D9FF66
+hdiutil: verify: checksum of "OMP-Desktop-0.1.6-arm64.dmg" is VALID
+exit=0
+$ unzip -tq OMP-Desktop-0.1.6-arm64-mac.zip
+No errors detected in compressed data of OMP-Desktop-0.1.6-arm64-mac.zip.
+exit=0

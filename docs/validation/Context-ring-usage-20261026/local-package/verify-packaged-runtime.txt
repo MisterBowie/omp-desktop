@@ -1,0 +1,10 @@
+$ node scripts/verify-packaged-runtime.mjs --resources <DMG>/OMP Desktop.app/Contents/Resources
+PACKAGED-RUNTIME-OK run omp/18.3.0 darwin/arm64
+  resources  : <DMG>/OMP Desktop.app/Contents/Resources
+  binary     : /private<DMG>/OMP Desktop.app/Contents/Resources/omp-runtime/omp (218929280 B, sha256 98a005a6ad86001aaad0f970c281eb0f764984a615d6805831930fc536d69469)
+  gate       : /private<DMG>/OMP Desktop.app/Contents/Resources/omp-runtime/extensions/omp-desktop-gate.js (53747 B, sha256 449b291e08f0a01ad186cd1be30441b540ce20725b639ec62f6d2df82bff82de)
+  provenance : patchLevel 62bc57b+omp-desktop.7, fork edec3898d44071206ec201beebea432a2786bd8c
+  runtime    : v2 negotiated, get_state ok, gate load control refused
+  child env  : the child environment is not readable on this host (no /proc/PID/environ)
+  stop       : stopped=true reaped=true cleaned=true, leftover runs 0
+exit=0

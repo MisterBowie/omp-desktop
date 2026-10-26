@@ -1,0 +1,11 @@
+$ OMP_SIDECAR_SOURCE=<root>/.omp-sidecar-edec389 CSC_IDENTITY_AUTO_DISCOVERY=false pnpm --filter @pi-desktop/desktop run dist:mac --arm64   # HEAD 90cdafa8, node v24.6.0, pnpm 10.34.5, bun 1.4.2
+RELEASE-PACKAGE darwin/arm64: preflight /opt/homebrew/Cellar/node/24.6.0/bin/node /Users/vv/person/omp-desktop/.worktrees/context-ring-usage/app/scripts/omp-sidecar.mjs --preflight --platform darwin --arch arm64
+OMP-SIDECAR-PREFLIGHT built darwin/arm64 in app/apps/desktop/resources/omp-runtime
+RELEASE-PACKAGE: dependency notices {"components":919,"files":972,"bytes":2854387}
+RELEASE-PACKAGE darwin/arm64: electron-builder --mac --arm64 --publish never
+  • skipped macOS application code signing  reason=, see https://electron.build/code-signing CSC_IDENTITY_AUTO_DISCOVERY=false
+  • building        target=macOS zip arch=arm64 file=release/OMP-Desktop-0.1.6-arm64-mac.zip
+  • building        target=DMG arch=arm64 file=release/OMP-Desktop-0.1.6-arm64.dmg
+  • building block map  blockMapFile=release/OMP-Desktop-0.1.6-arm64.dmg.blockmap
+  • building block map  blockMapFile=release/OMP-Desktop-0.1.6-arm64-mac.zip.blockmap
+exit=0 elapsed=131s

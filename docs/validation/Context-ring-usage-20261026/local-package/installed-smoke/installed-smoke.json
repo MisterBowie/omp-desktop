@@ -1,0 +1,3330 @@
+{
+  "schemaVersion": 1,
+  "platform": "darwin",
+  "arch": "arm64",
+  "startedAt": "2026-10-26T03:29:28.685Z",
+  "sourceRevision": "90cdafa840c9cca364389c3e77df2d989eb9d6fd",
+  "installer": {
+    "path": "/Users/vv/person/omp-desktop/.worktrees/context-ring-usage/app/apps/desktop/release/OMP-Desktop-0.1.6-arm64.dmg",
+    "bytes": 221366582,
+    "sha256": "8cbbefcbe778975e44c878ca6d03ee7fbc50ed5aa5ca95cf6fe3219dd1b2af78"
+  },
+  "runRoot": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP",
+  "payload": {
+    "verified": true,
+    "platform": "darwin",
+    "arch": "arm64",
+    "appDir": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app",
+    "info": {
+      "NSHumanReadableCopyright": "Copyright © 2026 vastsa",
+      "CFBundleInfoDictionaryVersion": "6.0",
+      "NSAudioCaptureUsageDescription": "This app needs access to audio capture",
+      "CFBundleIconFile": "icon.icns",
+      "CFBundleName": "OMP Desktop",
+      "DTSDKName": "macosx15.5",
+      "NSSupportsAutomaticGraphicsSwitching": true,
+      "NSBluetoothAlwaysUsageDescription": "This app needs access to Bluetooth",
+      "NSPrincipalClass": "AtomApplication",
+      "LSApplicationCategoryType": "public.app-category.developer-tools",
+      "CFBundleDisplayName": "OMP Desktop",
+      "NSHighResolutionCapable": true,
+      "NSRequiresAquaSystemAppearance": false,
+      "DTSDKBuild": "24F74",
+      "NSCameraUsageDescription": "This app needs access to the camera",
+      "CFBundleShortVersionString": "0.1.6",
+      "CFBundlePackageType": "APPL",
+      "NSBluetoothPeripheralUsageDescription": "This app needs access to Bluetooth",
+      "DTXcodeBuild": "16F6",
+      "NSBonjourServices": [
+        "_http._tcp",
+        "_https._tcp"
+      ],
+      "CFBundleVersion": "0.1.6",
+      "NSPrefersDisplaySafeAreaCompatibilityMode": false,
+      "NSMainNibFile": "MainMenu",
+      "NSMicrophoneUsageDescription": "OMP Desktop plugins may use the microphone after you grant them audio access. / 在你授权后，OMP Desktop 插件可以使用麦克风。",
+      "CFBundleIdentifier": "net.misterbowie.omp-desktop",
+      "LSEnvironment": {
+        "MallocNanoZone": "0"
+      },
+      "ElectronAsarIntegrity": {
+        "Resources/app.asar": {
+          "hash": "e4a7f9300ea2dd97d6ec98251871eecde608ad05abb3d2f77f82daa396316a9a",
+          "algorithm": "SHA256"
+        }
+      },
+      "DTXcode": "1640",
+      "NSQuitAlwaysKeepsWindows": false,
+      "NSAppTransportSecurity": {
+        "NSAllowsLocalNetworking": true,
+        "NSAllowsArbitraryLoads": true,
+        "NSExceptionDomains": {
+          "127.0.0.1": {
+            "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
+            "NSTemporaryExceptionRequiresForwardSecrecy": false,
+            "NSIncludesSubdomains": false,
+            "NSTemporaryExceptionMinimumTLSVersion": "1.0",
+            "NSTemporaryExceptionAllowsInsecureHTTPSLoads": false
+          },
+          "localhost": {
+            "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
+            "NSTemporaryExceptionRequiresForwardSecrecy": false,
+            "NSIncludesSubdomains": false,
+            "NSTemporaryExceptionMinimumTLSVersion": "1.0",
+            "NSTemporaryExceptionAllowsInsecureHTTPSLoads": false
+          }
+        }
+      },
+      "CFBundleExecutable": "OMP Desktop",
+      "LSMinimumSystemVersion": "12.0",
+      "NSLocalNetworkUsageDescription": "OMP Desktop needs local network access so agents can reach OpenAI-compatible providers, Ollama, and other AI endpoints running on your LAN. / OMP Desktop 需要本地网络访问权限，以便助手请求同一局域网中的 OpenAI 兼容服务、Ollama 等本地 AI 端点。",
+      "DTCompiler": "com.apple.compilers.llvm.clang.1_0"
+    },
+    "resources": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources",
+    "executable": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+    "package": {
+      "name": "omp-desktop",
+      "version": "0.1.6",
+      "homepage": "https://github.com/MisterBowie/omp-desktop"
+    },
+    "asarSha256": "555c9c73c16e04c5bfe3a18852f0dbbd8c685b9ecc767ed3a2141a433a4e89f9",
+    "update": {
+      "owner": "MisterBowie",
+      "repo": "omp-desktop",
+      "provider": "github",
+      "updaterCacheDirName": "omp-desktop-updater"
+    },
+    "icons": [
+      {
+        "file": "tray-icon.png",
+        "sha256": "9a45a776234e72e22066abadcb45ba4ec562b34f32a596be8f3d60c869530d03"
+      },
+      {
+        "file": "icon.icns",
+        "sha256": "2b7027bd16358469604db5d8ce25bb16f9891a4f1b1c5095845c55d4b778cfb2"
+      },
+      {
+        "file": "tray-icon-mac.png",
+        "sha256": "f7cac2c801a7e7d1f0b9806642c0871d8aa1d9c1c3b1ad4bf0ed0da2615a29a7"
+      }
+    ],
+    "licenses": {
+      "staticFiles": [
+        {
+          "file": "Bun-LICENSE.md",
+          "bytes": 5613,
+          "sha256": "b9caf52728691b4057e371232c221a132883198be2f3d2ddf92c90404c984b1a"
+        },
+        {
+          "file": "OMP-LICENSE.txt",
+          "bytes": 1144,
+          "sha256": "16c45f9d667442781f03fa198914cc39abcaa48ec5ed8f644643e554ca2fbf63"
+        },
+        {
+          "file": "OMP-THIRD-PARTY-NOTICES.txt",
+          "bytes": 1076433,
+          "sha256": "83ed283000678eeac9c538e5b4f3710a2917e92d8f126d5b7dbfe29d494348e7"
+        },
+        {
+          "file": "PI-Desktop-LICENSE.txt",
+          "bytes": 7652,
+          "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118"
+        },
+        {
+          "file": "README.txt",
+          "bytes": 1466,
+          "sha256": "3e8a3850acb754c14fd4bab8d47143ccb699b78c339b837e027d40e5ce96eaac"
+        },
+        {
+          "file": "SOURCES.json",
+          "bytes": 1331,
+          "sha256": "b05289e4b389c0ad7d5adabc0a1558b85edb56c865d55f4c130169c22d664064"
+        }
+      ],
+      "components": 919,
+      "rustComponents": 106,
+      "originalFiles": 972,
+      "noticeSha256": "d20e1af73c298cae579a19b24f22fc1abdfeee43c87a3e396a7abe5777473025",
+      "inventorySha256": "d091530c9948e4e3851134e0ddc24e9173c7953a3683925bf0d10ab7cb15d3fd"
+    },
+    "scope": "Actual Electron payload metadata/resources; no installed UI workflow claimed by this inspection alone"
+  },
+  "installerMethod": "read-only DMG mount and actual bundle copy into the owned Applications directory",
+  "identity": {
+    "isPackaged": true,
+    "name": "OMP Desktop",
+    "version": "0.1.6",
+    "resources": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources",
+    "executable": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+    "arch": "arm64",
+    "userData": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/profile",
+    "home": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/home",
+    "dataRoot": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/home/.omp-desktop",
+    "electron": "43.6.0"
+  },
+  "workflow": {
+    "externalBoundary": "loopback FakeProvider only",
+    "nativeFolderChooserCovered": false,
+    "checks": [
+      "project and OMP session created through public preload IPC, selected through sidebar",
+      "denied write preserved exact original bytes",
+      "allow-once performed the real write after approval",
+      "real project executable passed and its tool result reached the provider",
+      "Composer Stop ended the running turn and reaped all three observed external processes",
+      "same installed profile recovered identical native history without model/tool replay",
+      "a fresh turn completed after recovery",
+      "default .omp-desktop data root selected without a data override; existing PI/OMP fixtures unchanged and not imported"
+    ],
+    "steps": {
+      "project": true,
+      "deny": true,
+      "allowOnce": true,
+      "projectTest": true,
+      "stopTree": true,
+      "recoveryNoReplay": true,
+      "freshTurn": true,
+      "defaultIsolation": true
+    },
+    "sessionId": "bb0534c6-5e5e-4fe3-b807-5d01288d0c95",
+    "projectTest": {
+      "answer": 42,
+      "cwd": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/workspace 中文 with spaces 'quoted'",
+      "home": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/home/.omp-desktop/omp-runtime/run-VJKUT9/home",
+      "PATH": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/home/.bun/bin:/usr/local/bin:/usr/bin:/bin",
+      "USERPROFILE": null
+    },
+    "longTree": [
+      {
+        "pid": 35561,
+        "ppid": 35116,
+        "level": 0,
+        "starttime": "1792985386.547714",
+        "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node"
+      },
+      {
+        "pid": 35562,
+        "ppid": 35561,
+        "level": 1,
+        "starttime": "1792985386.620964",
+        "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node"
+      },
+      {
+        "pid": 35563,
+        "ppid": 35562,
+        "level": 2,
+        "starttime": "1792985386.824126",
+        "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node"
+      }
+    ],
+    "beforeRestart": {
+      "file": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/home/.omp-desktop/omp-sessions/2026-10-26T03-29-44-070Z_01a17641-c486-7002-b1ef-c422f346a1f8.jsonl",
+      "bytes": 11420,
+      "sha256": "a5819e8e1dfd60c42bbddd981480fcbfeb74df521c41aae16f3b06367138108f",
+      "messages": [
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:e45e11f6",
+          "role": "user",
+          "createdAt": "2026-10-26T03:29:44.127Z",
+          "status": "complete",
+          "content": "INSTALLED_DENY Fix answer.mjs to return 42."
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:da42721a",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:44.162Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": ""
+        },
+        {
+          "id": "call_fake_1_0",
+          "role": "tool",
+          "createdAt": "2026-10-26T03:29:44.405Z",
+          "toolCallId": "call_fake_1_0",
+          "toolName": "write",
+          "toolStatus": "error",
+          "isError": true,
+          "status": "complete",
+          "content": "",
+          "toolResult": {
+            "content": [
+              {
+                "type": "text",
+                "text": "denied by user (Deny)"
+              }
+            ],
+            "details": {}
+          }
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:183f6aee",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:44.438Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": "INSTALLED_DENIED_DONE"
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:6c824b3b",
+          "role": "user",
+          "createdAt": "2026-10-26T03:29:44.654Z",
+          "status": "complete",
+          "content": "INSTALLED_ALLOW Fix answer.mjs to return 42."
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:80cc3190",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:44.679Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": ""
+        },
+        {
+          "id": "call_fake_3_0",
+          "role": "tool",
+          "createdAt": "2026-10-26T03:29:44.778Z",
+          "toolCallId": "call_fake_3_0",
+          "toolName": "write",
+          "toolStatus": "success",
+          "isError": false,
+          "status": "complete",
+          "content": "",
+          "toolResult": {
+            "content": [
+              {
+                "type": "text",
+                "text": "[answer.mjs#392A]\nSuccessfully wrote 32 bytes to answer.mjs"
+              }
+            ],
+            "details": {
+              "resolvedPath": "/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/workspace 中文 with spaces 'quoted'/answer.mjs"
+            }
+          }
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:a5bdca4d",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:44.802Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": "INSTALLED_ALLOWED_DONE"
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:d14b8fd8",
+          "role": "user",
+          "createdAt": "2026-10-26T03:29:45.127Z",
+          "status": "complete",
+          "content": "INSTALLED_TEST Run the project check."
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:888de619",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:45.155Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": ""
+        },
+        {
+          "id": "call_fake_5_0",
+          "role": "tool",
+          "createdAt": "2026-10-26T03:29:46.223Z",
+          "toolCallId": "call_fake_5_0",
+          "toolName": "bash",
+          "toolStatus": "success",
+          "isError": false,
+          "status": "complete",
+          "content": "",
+          "toolResult": {
+            "content": [
+              {
+                "type": "text",
+                "text": "INSTALLED_PROJECT_TEST_PASSED\n\n\nWall time: 0.97 seconds"
+              }
+            ],
+            "details": {
+              "timeoutSeconds": 600,
+              "wallTimeMs": 972.0690829999999
+            }
+          }
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:580a0d4c",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:46.247Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": "INSTALLED_TEST_DONE"
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:d7780050",
+          "role": "user",
+          "createdAt": "2026-10-26T03:29:46.443Z",
+          "status": "complete",
+          "content": "INSTALLED_STOP Start the long process tree."
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:2048b4fd",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:46.468Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": ""
+        },
+        {
+          "id": "call_fake_7_0",
+          "role": "tool",
+          "createdAt": "2026-10-26T03:29:49.670Z",
+          "toolCallId": "call_fake_7_0",
+          "toolName": "bash",
+          "toolStatus": "error",
+          "isError": true,
+          "status": "complete",
+          "content": "",
+          "toolResult": {
+            "content": [
+              {
+                "type": "text",
+                "text": "Command aborted"
+              }
+            ],
+            "details": {}
+          }
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:91ac0eea",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:49.696Z",
+          "status": "aborted",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": ""
+        }
+      ],
+      "writeCalls": [
+        {
+          "id": "call_fake_1_0",
+          "name": "write"
+        },
+        {
+          "id": "call_fake_3_0",
+          "name": "write"
+        }
+      ],
+      "writeResults": [
+        {
+          "toolCallId": "call_fake_1_0",
+          "isError": true
+        },
+        {
+          "toolCallId": "call_fake_3_0",
+          "isError": false
+        }
+      ]
+    },
+    "afterQuit": {
+      "file": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/home/.omp-desktop/omp-sessions/2026-10-26T03-29-44-070Z_01a17641-c486-7002-b1ef-c422f346a1f8.jsonl",
+      "bytes": 11627,
+      "sha256": "69116ccfe7a3b1efd94a42b22beb0f0bdbcd089f25a196cd28c06b6d6de7c5d7",
+      "messages": [
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:e45e11f6",
+          "role": "user",
+          "createdAt": "2026-10-26T03:29:44.127Z",
+          "status": "complete",
+          "content": "INSTALLED_DENY Fix answer.mjs to return 42."
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:da42721a",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:44.162Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": ""
+        },
+        {
+          "id": "call_fake_1_0",
+          "role": "tool",
+          "createdAt": "2026-10-26T03:29:44.405Z",
+          "toolCallId": "call_fake_1_0",
+          "toolName": "write",
+          "toolStatus": "error",
+          "isError": true,
+          "status": "complete",
+          "content": "",
+          "toolResult": {
+            "content": [
+              {
+                "type": "text",
+                "text": "denied by user (Deny)"
+              }
+            ],
+            "details": {}
+          }
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:183f6aee",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:44.438Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": "INSTALLED_DENIED_DONE"
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:6c824b3b",
+          "role": "user",
+          "createdAt": "2026-10-26T03:29:44.654Z",
+          "status": "complete",
+          "content": "INSTALLED_ALLOW Fix answer.mjs to return 42."
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:80cc3190",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:44.679Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": ""
+        },
+        {
+          "id": "call_fake_3_0",
+          "role": "tool",
+          "createdAt": "2026-10-26T03:29:44.778Z",
+          "toolCallId": "call_fake_3_0",
+          "toolName": "write",
+          "toolStatus": "success",
+          "isError": false,
+          "status": "complete",
+          "content": "",
+          "toolResult": {
+            "content": [
+              {
+                "type": "text",
+                "text": "[answer.mjs#392A]\nSuccessfully wrote 32 bytes to answer.mjs"
+              }
+            ],
+            "details": {
+              "resolvedPath": "/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/workspace 中文 with spaces 'quoted'/answer.mjs"
+            }
+          }
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:a5bdca4d",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:44.802Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": "INSTALLED_ALLOWED_DONE"
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:d14b8fd8",
+          "role": "user",
+          "createdAt": "2026-10-26T03:29:45.127Z",
+          "status": "complete",
+          "content": "INSTALLED_TEST Run the project check."
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:888de619",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:45.155Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": ""
+        },
+        {
+          "id": "call_fake_5_0",
+          "role": "tool",
+          "createdAt": "2026-10-26T03:29:46.223Z",
+          "toolCallId": "call_fake_5_0",
+          "toolName": "bash",
+          "toolStatus": "success",
+          "isError": false,
+          "status": "complete",
+          "content": "",
+          "toolResult": {
+            "content": [
+              {
+                "type": "text",
+                "text": "INSTALLED_PROJECT_TEST_PASSED\n\n\nWall time: 0.97 seconds"
+              }
+            ],
+            "details": {
+              "timeoutSeconds": 600,
+              "wallTimeMs": 972.0690829999999
+            }
+          }
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:580a0d4c",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:46.247Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": "INSTALLED_TEST_DONE"
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:d7780050",
+          "role": "user",
+          "createdAt": "2026-10-26T03:29:46.443Z",
+          "status": "complete",
+          "content": "INSTALLED_STOP Start the long process tree."
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:2048b4fd",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:46.468Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": ""
+        },
+        {
+          "id": "call_fake_7_0",
+          "role": "tool",
+          "createdAt": "2026-10-26T03:29:49.670Z",
+          "toolCallId": "call_fake_7_0",
+          "toolName": "bash",
+          "toolStatus": "error",
+          "isError": true,
+          "status": "complete",
+          "content": "",
+          "toolResult": {
+            "content": [
+              {
+                "type": "text",
+                "text": "Command aborted"
+              }
+            ],
+            "details": {}
+          }
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:91ac0eea",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:49.696Z",
+          "status": "aborted",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": ""
+        }
+      ],
+      "writeCalls": [
+        {
+          "id": "call_fake_1_0",
+          "name": "write"
+        },
+        {
+          "id": "call_fake_3_0",
+          "name": "write"
+        }
+      ],
+      "writeResults": [
+        {
+          "toolCallId": "call_fake_1_0",
+          "isError": true
+        },
+        {
+          "toolCallId": "call_fake_3_0",
+          "isError": false
+        }
+      ]
+    },
+    "exitRecords": [
+      {
+        "type": "custom",
+        "customType": "session_exit",
+        "data": {
+          "reason": "dispose",
+          "kind": "normal",
+          "recordedAt": "2026-10-26T03:29:52.706Z"
+        },
+        "id": "316679db",
+        "parentId": "91ac0eea",
+        "timestamp": "2026-10-26T03:29:52.707Z"
+      }
+    ],
+    "afterRestart": {
+      "file": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/home/.omp-desktop/omp-sessions/2026-10-26T03-29-44-070Z_01a17641-c486-7002-b1ef-c422f346a1f8.jsonl",
+      "bytes": 11627,
+      "sha256": "69116ccfe7a3b1efd94a42b22beb0f0bdbcd089f25a196cd28c06b6d6de7c5d7",
+      "messages": [
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:e45e11f6",
+          "role": "user",
+          "createdAt": "2026-10-26T03:29:44.127Z",
+          "status": "complete",
+          "content": "INSTALLED_DENY Fix answer.mjs to return 42."
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:da42721a",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:44.162Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": ""
+        },
+        {
+          "id": "call_fake_1_0",
+          "role": "tool",
+          "createdAt": "2026-10-26T03:29:44.405Z",
+          "toolCallId": "call_fake_1_0",
+          "toolName": "write",
+          "toolStatus": "error",
+          "isError": true,
+          "status": "complete",
+          "content": "",
+          "toolResult": {
+            "content": [
+              {
+                "type": "text",
+                "text": "denied by user (Deny)"
+              }
+            ],
+            "details": {}
+          }
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:183f6aee",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:44.438Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": "INSTALLED_DENIED_DONE"
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:6c824b3b",
+          "role": "user",
+          "createdAt": "2026-10-26T03:29:44.654Z",
+          "status": "complete",
+          "content": "INSTALLED_ALLOW Fix answer.mjs to return 42."
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:80cc3190",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:44.679Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": ""
+        },
+        {
+          "id": "call_fake_3_0",
+          "role": "tool",
+          "createdAt": "2026-10-26T03:29:44.778Z",
+          "toolCallId": "call_fake_3_0",
+          "toolName": "write",
+          "toolStatus": "success",
+          "isError": false,
+          "status": "complete",
+          "content": "",
+          "toolResult": {
+            "content": [
+              {
+                "type": "text",
+                "text": "[answer.mjs#392A]\nSuccessfully wrote 32 bytes to answer.mjs"
+              }
+            ],
+            "details": {
+              "resolvedPath": "/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/workspace 中文 with spaces 'quoted'/answer.mjs"
+            }
+          }
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:a5bdca4d",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:44.802Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": "INSTALLED_ALLOWED_DONE"
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:d14b8fd8",
+          "role": "user",
+          "createdAt": "2026-10-26T03:29:45.127Z",
+          "status": "complete",
+          "content": "INSTALLED_TEST Run the project check."
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:888de619",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:45.155Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": ""
+        },
+        {
+          "id": "call_fake_5_0",
+          "role": "tool",
+          "createdAt": "2026-10-26T03:29:46.223Z",
+          "toolCallId": "call_fake_5_0",
+          "toolName": "bash",
+          "toolStatus": "success",
+          "isError": false,
+          "status": "complete",
+          "content": "",
+          "toolResult": {
+            "content": [
+              {
+                "type": "text",
+                "text": "INSTALLED_PROJECT_TEST_PASSED\n\n\nWall time: 0.97 seconds"
+              }
+            ],
+            "details": {
+              "timeoutSeconds": 600,
+              "wallTimeMs": 972.0690829999999
+            }
+          }
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:580a0d4c",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:46.247Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": "INSTALLED_TEST_DONE"
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:d7780050",
+          "role": "user",
+          "createdAt": "2026-10-26T03:29:46.443Z",
+          "status": "complete",
+          "content": "INSTALLED_STOP Start the long process tree."
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:2048b4fd",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:46.468Z",
+          "status": "complete",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": ""
+        },
+        {
+          "id": "call_fake_7_0",
+          "role": "tool",
+          "createdAt": "2026-10-26T03:29:49.670Z",
+          "toolCallId": "call_fake_7_0",
+          "toolName": "bash",
+          "toolStatus": "error",
+          "isError": true,
+          "status": "complete",
+          "content": "",
+          "toolResult": {
+            "content": [
+              {
+                "type": "text",
+                "text": "Command aborted"
+              }
+            ],
+            "details": {}
+          }
+        },
+        {
+          "id": "omp:bb0534c6-5e5e-4fe3-b807-5d01288d0c95:entry:91ac0eea",
+          "role": "assistant",
+          "createdAt": "2026-10-26T03:29:49.696Z",
+          "status": "aborted",
+          "modelId": "local-model",
+          "providerId": "61a201f1-2db5-4b81-93fa-6a1b5fba9a83",
+          "content": ""
+        }
+      ],
+      "writeCalls": [
+        {
+          "id": "call_fake_1_0",
+          "name": "write"
+        },
+        {
+          "id": "call_fake_3_0",
+          "name": "write"
+        }
+      ],
+      "writeResults": [
+        {
+          "toolCallId": "call_fake_1_0",
+          "isError": true
+        },
+        {
+          "toolCallId": "call_fake_3_0",
+          "isError": false
+        }
+      ]
+    },
+    "providerRequests": [
+      {
+        "method": "POST",
+        "url": "/v1/chat/completions",
+        "at": 1792985384166,
+        "model": "local-model",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "<system-reminder>\nToday: 2026-10-26; current working directory: '/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/workspace 中文 with spaces 'quoted''. Do not repeat this information in your reply.\n</system-reminder>"
+              },
+              {
+                "type": "text",
+                "text": "INSTALLED_DENY Fix answer.mjs to return 42."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "method": "POST",
+        "url": "/v1/chat/completions",
+        "at": 1792985384439,
+        "model": "local-model",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "<system-reminder>\nToday: 2026-10-26; current working directory: '/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/workspace 中文 with spaces 'quoted''. Do not repeat this information in your reply.\n</system-reminder>"
+              },
+              {
+                "type": "text",
+                "text": "INSTALLED_DENY Fix answer.mjs to return 42."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+              {
+                "id": "call_fake_1_0",
+                "type": "function",
+                "function": {
+                  "name": "write",
+                  "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": "denied by user (Deny)",
+            "tool_call_id": "call_fake_1_0"
+          }
+        ]
+      },
+      {
+        "method": "POST",
+        "url": "/v1/chat/completions",
+        "at": 1792985384680,
+        "model": "local-model",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "<system-reminder>\nToday: 2026-10-26; current working directory: '/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/workspace 中文 with spaces 'quoted''. Do not repeat this information in your reply.\n</system-reminder>"
+              },
+              {
+                "type": "text",
+                "text": "INSTALLED_DENY Fix answer.mjs to return 42."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+              {
+                "id": "call_fake_1_0",
+                "type": "function",
+                "function": {
+                  "name": "write",
+                  "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": "denied by user (Deny)",
+            "tool_call_id": "call_fake_1_0"
+          },
+          {
+            "role": "assistant",
+            "content": "INSTALLED_DENIED_DONE"
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "INSTALLED_ALLOW Fix answer.mjs to return 42."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "method": "POST",
+        "url": "/v1/chat/completions",
+        "at": 1792985384803,
+        "model": "local-model",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "<system-reminder>\nToday: 2026-10-26; current working directory: '/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/workspace 中文 with spaces 'quoted''. Do not repeat this information in your reply.\n</system-reminder>"
+              },
+              {
+                "type": "text",
+                "text": "INSTALLED_DENY Fix answer.mjs to return 42."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+              {
+                "id": "call_fake_1_0",
+                "type": "function",
+                "function": {
+                  "name": "write",
+                  "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": "denied by user (Deny)",
+            "tool_call_id": "call_fake_1_0"
+          },
+          {
+            "role": "assistant",
+            "content": "INSTALLED_DENIED_DONE"
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "INSTALLED_ALLOW Fix answer.mjs to return 42."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+              {
+                "id": "call_fake_3_0",
+                "type": "function",
+                "function": {
+                  "name": "write",
+                  "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": "[answer.mjs#392A]\nSuccessfully wrote 32 bytes to answer.mjs",
+            "tool_call_id": "call_fake_3_0"
+          }
+        ]
+      },
+      {
+        "method": "POST",
+        "url": "/v1/chat/completions",
+        "at": 1792985385158,
+        "model": "local-model",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "<system-reminder>\nToday: 2026-10-26; current working directory: '/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/workspace 中文 with spaces 'quoted''. Do not repeat this information in your reply.\n</system-reminder>"
+              },
+              {
+                "type": "text",
+                "text": "INSTALLED_DENY Fix answer.mjs to return 42."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+              {
+                "id": "call_fake_1_0",
+                "type": "function",
+                "function": {
+                  "name": "write",
+                  "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": "denied by user (Deny)",
+            "tool_call_id": "call_fake_1_0"
+          },
+          {
+            "role": "assistant",
+            "content": "INSTALLED_DENIED_DONE"
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "INSTALLED_ALLOW Fix answer.mjs to return 42."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+              {
+                "id": "call_fake_3_0",
+                "type": "function",
+                "function": {
+                  "name": "write",
+                  "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": "[answer.mjs#392A]\nSuccessfully wrote 32 bytes to answer.mjs",
+            "tool_call_id": "call_fake_3_0"
+          },
+          {
+            "role": "assistant",
+            "content": "INSTALLED_ALLOWED_DONE"
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "INSTALLED_TEST Run the project check."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "method": "POST",
+        "url": "/v1/chat/completions",
+        "at": 1792985386248,
+        "model": "local-model",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "<system-reminder>\nToday: 2026-10-26; current working directory: '/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/workspace 中文 with spaces 'quoted''. Do not repeat this information in your reply.\n</system-reminder>"
+              },
+              {
+                "type": "text",
+                "text": "INSTALLED_DENY Fix answer.mjs to return 42."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+              {
+                "id": "call_fake_1_0",
+                "type": "function",
+                "function": {
+                  "name": "write",
+                  "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": "denied by user (Deny)",
+            "tool_call_id": "call_fake_1_0"
+          },
+          {
+            "role": "assistant",
+            "content": "INSTALLED_DENIED_DONE"
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "INSTALLED_ALLOW Fix answer.mjs to return 42."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+              {
+                "id": "call_fake_3_0",
+                "type": "function",
+                "function": {
+                  "name": "write",
+                  "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": "[answer.mjs#392A]\nSuccessfully wrote 32 bytes to answer.mjs",
+            "tool_call_id": "call_fake_3_0"
+          },
+          {
+            "role": "assistant",
+            "content": "INSTALLED_ALLOWED_DONE"
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "INSTALLED_TEST Run the project check."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+              {
+                "id": "call_fake_5_0",
+                "type": "function",
+                "function": {
+                  "name": "bash",
+                  "arguments": "{\"command\":\"'/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node' '/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/workspace 中文 with spaces '\\\\''quoted'\\\\''/check.mjs'\",\"timeout\":600}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": "INSTALLED_PROJECT_TEST_PASSED\n\n\nWall time: 0.97 seconds",
+            "tool_call_id": "call_fake_5_0"
+          }
+        ]
+      },
+      {
+        "method": "POST",
+        "url": "/v1/chat/completions",
+        "at": 1792985386473,
+        "model": "local-model",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "<system-reminder>\nToday: 2026-10-26; current working directory: '/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/workspace 中文 with spaces 'quoted''. Do not repeat this information in your reply.\n</system-reminder>"
+              },
+              {
+                "type": "text",
+                "text": "INSTALLED_DENY Fix answer.mjs to return 42."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+              {
+                "id": "call_fake_1_0",
+                "type": "function",
+                "function": {
+                  "name": "write",
+                  "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": "denied by user (Deny)",
+            "tool_call_id": "call_fake_1_0"
+          },
+          {
+            "role": "assistant",
+            "content": "INSTALLED_DENIED_DONE"
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "INSTALLED_ALLOW Fix answer.mjs to return 42."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+              {
+                "id": "call_fake_3_0",
+                "type": "function",
+                "function": {
+                  "name": "write",
+                  "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": "[answer.mjs#392A]\nSuccessfully wrote 32 bytes to answer.mjs",
+            "tool_call_id": "call_fake_3_0"
+          },
+          {
+            "role": "assistant",
+            "content": "INSTALLED_ALLOWED_DONE"
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "INSTALLED_TEST Run the project check."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+              {
+                "id": "call_fake_5_0",
+                "type": "function",
+                "function": {
+                  "name": "bash",
+                  "arguments": "{\"command\":\"'/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node' '/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/workspace 中文 with spaces '\\\\''quoted'\\\\''/check.mjs'\",\"timeout\":600}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": "INSTALLED_PROJECT_TEST_PASSED\n\n\nWall time: 0.97 seconds",
+            "tool_call_id": "call_fake_5_0"
+          },
+          {
+            "role": "assistant",
+            "content": "INSTALLED_TEST_DONE"
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "INSTALLED_STOP Start the long process tree."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "method": "POST",
+        "url": "/v1/chat/completions",
+        "at": 1792985399582,
+        "model": "local-model",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "<system-reminder>\nToday: 2026-10-26; current working directory: '/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/workspace 中文 with spaces 'quoted''. Do not repeat this information in your reply.\n</system-reminder>"
+              },
+              {
+                "type": "text",
+                "text": "INSTALLED_DENY Fix answer.mjs to return 42."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+              {
+                "id": "call_fake_1_0",
+                "type": "function",
+                "function": {
+                  "name": "write",
+                  "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": "denied by user (Deny)",
+            "tool_call_id": "call_fake_1_0"
+          },
+          {
+            "role": "assistant",
+            "content": "INSTALLED_DENIED_DONE"
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "INSTALLED_ALLOW Fix answer.mjs to return 42."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+              {
+                "id": "call_fake_3_0",
+                "type": "function",
+                "function": {
+                  "name": "write",
+                  "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": "[answer.mjs#392A]\nSuccessfully wrote 32 bytes to answer.mjs",
+            "tool_call_id": "call_fake_3_0"
+          },
+          {
+            "role": "assistant",
+            "content": "INSTALLED_ALLOWED_DONE"
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "INSTALLED_TEST Run the project check."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+              {
+                "id": "call_fake_5_0",
+                "type": "function",
+                "function": {
+                  "name": "bash",
+                  "arguments": "{\"command\":\"'/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node' '/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/workspace 中文 with spaces '\\\\''quoted'\\\\''/check.mjs'\",\"timeout\":600}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": "INSTALLED_PROJECT_TEST_PASSED\n\n\nWall time: 0.97 seconds",
+            "tool_call_id": "call_fake_5_0"
+          },
+          {
+            "role": "assistant",
+            "content": "INSTALLED_TEST_DONE"
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "INSTALLED_STOP Start the long process tree."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+              {
+                "id": "call_fake_7_0",
+                "type": "function",
+                "function": {
+                  "name": "bash",
+                  "arguments": "{\"command\":\"'/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node' '/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/workspace 中文 with spaces '\\\\''quoted'\\\\''/long-tree.mjs'\",\"timeout\":600}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": "Command aborted",
+            "tool_call_id": "call_fake_7_0"
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "INSTALLED_RESTART Reply after the restart."
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "isolation": {
+      "defaultProductDataRoot": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/home/.omp-desktop",
+      "dataOverrideAtLaunch": null,
+      "unchanged": [
+        {
+          "path": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/home/.pi-desktop/pi.sqlite",
+          "sha256": "56286703b81690c899baa8eb056ae98143b20c7bc74d8edaa6d07326a2a23a3e"
+        },
+        {
+          "path": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/home/.pi-desktop/secrets/.machine-key",
+          "sha256": "56286703b81690c899baa8eb056ae98143b20c7bc74d8edaa6d07326a2a23a3e"
+        },
+        {
+          "path": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/home/.omp/agent/settings.json",
+          "sha256": "b635dee2da5dcb902b9a3e965491e84544e744d209bfb6f071be9a6fb77d105e"
+        },
+        {
+          "path": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/home/.agents/AGENTS.md",
+          "sha256": "56286703b81690c899baa8eb056ae98143b20c7bc74d8edaa6d07326a2a23a3e"
+        }
+      ]
+    }
+  },
+  "bootAndOrderedQuit": true,
+  "cleaned": true,
+  "launches": [
+    {
+      "identity": {
+        "isPackaged": true,
+        "name": "OMP Desktop",
+        "version": "0.1.6",
+        "resources": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources",
+        "executable": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+        "arch": "arm64",
+        "userData": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/profile",
+        "home": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/home",
+        "dataRoot": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/home/.omp-desktop",
+        "electron": "43.6.0"
+      },
+      "rendererUrl": "file:///private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/%E5%BA%94%E7%94%A8%20with%20spaces%20'quoted'/OMP%20Desktop.app/Contents/Resources/app.asar/out/renderer/index.html",
+      "windowActivation": {
+        "visible": true,
+        "rendererUrl": "file:///private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/%E5%BA%94%E7%94%A8%20with%20spaces%20'quoted'/OMP%20Desktop.app/Contents/Resources/app.asar/out/renderer/index.html"
+      }
+    },
+    {
+      "identity": {
+        "isPackaged": true,
+        "name": "OMP Desktop",
+        "version": "0.1.6",
+        "resources": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources",
+        "executable": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+        "arch": "arm64",
+        "userData": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/profile",
+        "home": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/home",
+        "dataRoot": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/home/.omp-desktop",
+        "electron": "43.6.0"
+      },
+      "rendererUrl": "file:///private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/%E5%BA%94%E7%94%A8%20with%20spaces%20'quoted'/OMP%20Desktop.app/Contents/Resources/app.asar/out/renderer/index.html",
+      "windowActivation": {
+        "visible": true,
+        "rendererUrl": "file:///private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/%E5%BA%94%E7%94%A8%20with%20spaces%20'quoted'/OMP%20Desktop.app/Contents/Resources/app.asar/out/renderer/index.html"
+      }
+    }
+  ],
+  "processReports": [
+    {
+      "label": "ready",
+      "processes": [
+        {
+          "pid": 33606,
+          "ppid": 32087,
+          "pgid": 33606,
+          "starttime": "1792985373.039229",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 34288,
+          "ppid": 1,
+          "pgid": 34286,
+          "starttime": "1792985375.76491",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler"
+          ],
+          "environ": null,
+          "ownership": "argv-run-root"
+        },
+        {
+          "pid": 34308,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985375.801558",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 34311,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985375.805167",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 34360,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985375.965103",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 34361,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985375.965675",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 34625,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985376.69272",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 34630,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985376.91123",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 34631,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985377.148213",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        }
+      ],
+      "ignored": [],
+      "protectedAncestors": [
+        {
+          "pid": 31484,
+          "ppid": 94379,
+          "pgid": 31484,
+          "starttime": "1792985367.386792",
+          "state": "R",
+          "exe": "/bin/zsh",
+          "comm": "/bin/zsh",
+          "cmdline": "/bin/zsh",
+          "argv": [
+            "/bin/zsh"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 94379,
+          "ppid": 95769,
+          "pgid": 95649,
+          "starttime": "1792984497.43656",
+          "state": "R",
+          "exe": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "comm": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "cmdline": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "argv": [
+            "/Users/vv/.local/share/claude/versions/2.1.309"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 95769,
+          "ppid": 95649,
+          "pgid": 95649,
+          "starttime": "1792976292.692833",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "comm": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "cmdline": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "argv": [
+            "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 95649,
+          "ppid": 90535,
+          "pgid": 95649,
+          "starttime": "1792976292.284797",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "comm": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "cmdline": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "argv": [
+            "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 90535,
+          "ppid": 1,
+          "pgid": 90535,
+          "starttime": "1792976285.726038",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "comm": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "cmdline": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "argv": [
+            "/Applications/Paseo.app/Contents/MacOS/Paseo"
+          ],
+          "environ": null
+        }
+      ]
+    },
+    {
+      "label": "long-tool-running",
+      "processes": [
+        {
+          "pid": 33606,
+          "ppid": 32087,
+          "pgid": 33606,
+          "starttime": "1792985373.039229",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 34288,
+          "ppid": 1,
+          "pgid": 34286,
+          "starttime": "1792985375.76491",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 34308,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985375.801558",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 34311,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985375.805167",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 34360,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985375.965103",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 34361,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985375.965675",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 34625,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985376.69272",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 34630,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985376.91123",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 34631,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985377.148213",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 35116,
+          "ppid": 33606,
+          "pgid": 35116,
+          "starttime": "1792985381.155136",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/omp-runtime/omp",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/omp-runtime/omp",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/omp-runtime/omp",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/omp-runtime/omp"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 35561,
+          "ppid": 35116,
+          "pgid": 35561,
+          "starttime": "1792985386.547714",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 35562,
+          "ppid": 35561,
+          "pgid": 35561,
+          "starttime": "1792985386.620964",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 35563,
+          "ppid": 35562,
+          "pgid": 35561,
+          "starttime": "1792985386.824126",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/project-tools/project-node"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        }
+      ],
+      "ignored": [],
+      "protectedAncestors": [
+        {
+          "pid": 31484,
+          "ppid": 94379,
+          "pgid": 31484,
+          "starttime": "1792985367.386792",
+          "state": "R",
+          "exe": "/bin/zsh",
+          "comm": "/bin/zsh",
+          "cmdline": "/bin/zsh",
+          "argv": [
+            "/bin/zsh"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 94379,
+          "ppid": 95769,
+          "pgid": 95649,
+          "starttime": "1792984497.43656",
+          "state": "R",
+          "exe": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "comm": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "cmdline": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "argv": [
+            "/Users/vv/.local/share/claude/versions/2.1.309"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 95769,
+          "ppid": 95649,
+          "pgid": 95649,
+          "starttime": "1792976292.692833",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "comm": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "cmdline": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "argv": [
+            "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 95649,
+          "ppid": 90535,
+          "pgid": 95649,
+          "starttime": "1792976292.284797",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "comm": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "cmdline": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "argv": [
+            "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 90535,
+          "ppid": 1,
+          "pgid": 90535,
+          "starttime": "1792976285.726038",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "comm": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "cmdline": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "argv": [
+            "/Applications/Paseo.app/Contents/MacOS/Paseo"
+          ],
+          "environ": null
+        }
+      ]
+    },
+    {
+      "label": "before-ordered-quit",
+      "processes": [
+        {
+          "pid": 33606,
+          "ppid": 32087,
+          "pgid": 33606,
+          "starttime": "1792985373.039229",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 34288,
+          "ppid": 1,
+          "pgid": 34286,
+          "starttime": "1792985375.76491",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 34308,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985375.801558",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 34311,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985375.805167",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 34360,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985375.965103",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 34361,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985375.965675",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 34625,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985376.69272",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 34630,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985376.91123",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 34631,
+          "ppid": 33606,
+          "pgid": 33606,
+          "starttime": "1792985377.148213",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 35116,
+          "ppid": 33606,
+          "pgid": 35116,
+          "starttime": "1792985381.155136",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/omp-runtime/omp",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/omp-runtime/omp",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/omp-runtime/omp",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/omp-runtime/omp"
+          ],
+          "environ": null,
+          "ownership": "root"
+        }
+      ],
+      "ignored": [
+        {
+          "pid": 35561,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35562,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35563,
+          "reason": "root-gone"
+        }
+      ],
+      "protectedAncestors": [
+        {
+          "pid": 31484,
+          "ppid": 94379,
+          "pgid": 31484,
+          "starttime": "1792985367.386792",
+          "state": "R",
+          "exe": "/bin/zsh",
+          "comm": "/bin/zsh",
+          "cmdline": "/bin/zsh",
+          "argv": [
+            "/bin/zsh"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 94379,
+          "ppid": 95769,
+          "pgid": 95649,
+          "starttime": "1792984497.43656",
+          "state": "R",
+          "exe": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "comm": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "cmdline": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "argv": [
+            "/Users/vv/.local/share/claude/versions/2.1.309"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 95769,
+          "ppid": 95649,
+          "pgid": 95649,
+          "starttime": "1792976292.692833",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "comm": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "cmdline": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "argv": [
+            "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 95649,
+          "ppid": 90535,
+          "pgid": 95649,
+          "starttime": "1792976292.284797",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "comm": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "cmdline": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "argv": [
+            "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 90535,
+          "ppid": 1,
+          "pgid": 90535,
+          "starttime": "1792976285.726038",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "comm": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "cmdline": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "argv": [
+            "/Applications/Paseo.app/Contents/MacOS/Paseo"
+          ],
+          "environ": null
+        }
+      ]
+    },
+    {
+      "label": "wait-exit",
+      "processes": [],
+      "ignored": [
+        {
+          "pid": 33606,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34288,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34308,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34311,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34360,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34361,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34625,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34630,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34631,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35116,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35561,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35562,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35563,
+          "reason": "root-gone"
+        }
+      ],
+      "protectedAncestors": [
+        {
+          "pid": 31484,
+          "ppid": 94379,
+          "pgid": 31484,
+          "starttime": "1792985367.386792",
+          "state": "R",
+          "exe": "/bin/zsh",
+          "comm": "/bin/zsh",
+          "cmdline": "/bin/zsh",
+          "argv": [
+            "/bin/zsh"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 94379,
+          "ppid": 95769,
+          "pgid": 95649,
+          "starttime": "1792984497.43656",
+          "state": "R",
+          "exe": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "comm": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "cmdline": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "argv": [
+            "/Users/vv/.local/share/claude/versions/2.1.309"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 95769,
+          "ppid": 95649,
+          "pgid": 95649,
+          "starttime": "1792976292.692833",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "comm": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "cmdline": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "argv": [
+            "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 95649,
+          "ppid": 90535,
+          "pgid": 95649,
+          "starttime": "1792976292.284797",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "comm": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "cmdline": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "argv": [
+            "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 90535,
+          "ppid": 1,
+          "pgid": 90535,
+          "starttime": "1792976285.726038",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "comm": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "cmdline": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "argv": [
+            "/Applications/Paseo.app/Contents/MacOS/Paseo"
+          ],
+          "environ": null
+        }
+      ]
+    },
+    {
+      "label": "ordered-quit",
+      "nativeConfirmationBypassedOnlyAtTeardown": true,
+      "noOwnedProcessesRemain": true
+    },
+    {
+      "label": "ready",
+      "processes": [
+        {
+          "pid": 36332,
+          "ppid": 32087,
+          "pgid": 36332,
+          "starttime": "1792985393.787123",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 36571,
+          "ppid": 1,
+          "pgid": 36569,
+          "starttime": "1792985394.578184",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler"
+          ],
+          "environ": null,
+          "ownership": "argv-run-root"
+        },
+        {
+          "pid": 36572,
+          "ppid": 36332,
+          "pgid": 36332,
+          "starttime": "1792985394.647299",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 36573,
+          "ppid": 36332,
+          "pgid": 36332,
+          "starttime": "1792985394.649511",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 36574,
+          "ppid": 36332,
+          "pgid": 36332,
+          "starttime": "1792985394.974091",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 36575,
+          "ppid": 36332,
+          "pgid": 36332,
+          "starttime": "1792985394.975728",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 36579,
+          "ppid": 36332,
+          "pgid": 36332,
+          "starttime": "1792985395.035343",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 36580,
+          "ppid": 36332,
+          "pgid": 36332,
+          "starttime": "1792985395.143654",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        },
+        {
+          "pid": 36581,
+          "ppid": 36332,
+          "pgid": 36332,
+          "starttime": "1792985395.298277",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        }
+      ],
+      "ignored": [
+        {
+          "pid": 33606,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34288,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34308,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34311,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34360,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34361,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34625,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34630,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34631,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35116,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35561,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35562,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35563,
+          "reason": "root-gone"
+        }
+      ],
+      "protectedAncestors": [
+        {
+          "pid": 31484,
+          "ppid": 94379,
+          "pgid": 31484,
+          "starttime": "1792985367.386792",
+          "state": "R",
+          "exe": "/bin/zsh",
+          "comm": "/bin/zsh",
+          "cmdline": "/bin/zsh",
+          "argv": [
+            "/bin/zsh"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 94379,
+          "ppid": 95769,
+          "pgid": 95649,
+          "starttime": "1792984497.43656",
+          "state": "R",
+          "exe": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "comm": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "cmdline": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "argv": [
+            "/Users/vv/.local/share/claude/versions/2.1.309"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 95769,
+          "ppid": 95649,
+          "pgid": 95649,
+          "starttime": "1792976292.692833",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "comm": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "cmdline": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "argv": [
+            "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 95649,
+          "ppid": 90535,
+          "pgid": 95649,
+          "starttime": "1792976292.284797",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "comm": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "cmdline": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "argv": [
+            "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 90535,
+          "ppid": 1,
+          "pgid": 90535,
+          "starttime": "1792976285.726038",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "comm": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "cmdline": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "argv": [
+            "/Applications/Paseo.app/Contents/MacOS/Paseo"
+          ],
+          "environ": null
+        }
+      ]
+    },
+    {
+      "label": "before-ordered-quit",
+      "processes": [
+        {
+          "pid": 36332,
+          "ppid": 32087,
+          "pgid": 36332,
+          "starttime": "1792985393.787123",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/MacOS/OMP Desktop"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 36571,
+          "ppid": 1,
+          "pgid": 36569,
+          "starttime": "1792985394.578184",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 36572,
+          "ppid": 36332,
+          "pgid": 36332,
+          "starttime": "1792985394.647299",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 36573,
+          "ppid": 36332,
+          "pgid": 36332,
+          "starttime": "1792985394.649511",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 36574,
+          "ppid": 36332,
+          "pgid": 36332,
+          "starttime": "1792985394.974091",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 36575,
+          "ppid": 36332,
+          "pgid": 36332,
+          "starttime": "1792985394.975728",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/bin/pi-desktop-host-core"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 36579,
+          "ppid": 36332,
+          "pgid": 36332,
+          "starttime": "1792985395.035343",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 36580,
+          "ppid": 36332,
+          "pgid": 36332,
+          "starttime": "1792985395.143654",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper.app/Contents/MacOS/OMP Desktop Helper"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 36581,
+          "ppid": 36332,
+          "pgid": 36332,
+          "starttime": "1792985395.298277",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Frameworks/OMP Desktop Helper (Renderer).app/Contents/MacOS/OMP Desktop Helper (Renderer)"
+          ],
+          "environ": null,
+          "ownership": "root"
+        },
+        {
+          "pid": 36826,
+          "ppid": 36332,
+          "pgid": 36826,
+          "starttime": "1792985397.520125",
+          "state": "R",
+          "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/omp-runtime/omp",
+          "comm": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/omp-runtime/omp",
+          "cmdline": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/omp-runtime/omp",
+          "argv": [
+            "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-XBYXKP/应用 with spaces 'quoted'/OMP Desktop.app/Contents/Resources/omp-runtime/omp"
+          ],
+          "environ": null,
+          "ownership": "descendant"
+        }
+      ],
+      "ignored": [
+        {
+          "pid": 33606,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34288,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34308,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34311,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34360,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34361,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34625,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34630,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34631,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35116,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35561,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35562,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35563,
+          "reason": "root-gone"
+        }
+      ],
+      "protectedAncestors": [
+        {
+          "pid": 31484,
+          "ppid": 94379,
+          "pgid": 31484,
+          "starttime": "1792985367.386792",
+          "state": "R",
+          "exe": "/bin/zsh",
+          "comm": "/bin/zsh",
+          "cmdline": "/bin/zsh",
+          "argv": [
+            "/bin/zsh"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 94379,
+          "ppid": 95769,
+          "pgid": 95649,
+          "starttime": "1792984497.43656",
+          "state": "R",
+          "exe": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "comm": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "cmdline": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "argv": [
+            "/Users/vv/.local/share/claude/versions/2.1.309"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 95769,
+          "ppid": 95649,
+          "pgid": 95649,
+          "starttime": "1792976292.692833",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "comm": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "cmdline": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "argv": [
+            "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 95649,
+          "ppid": 90535,
+          "pgid": 95649,
+          "starttime": "1792976292.284797",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "comm": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "cmdline": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "argv": [
+            "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 90535,
+          "ppid": 1,
+          "pgid": 90535,
+          "starttime": "1792976285.726038",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "comm": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "cmdline": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "argv": [
+            "/Applications/Paseo.app/Contents/MacOS/Paseo"
+          ],
+          "environ": null
+        }
+      ]
+    },
+    {
+      "label": "wait-exit",
+      "processes": [],
+      "ignored": [
+        {
+          "pid": 33606,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34288,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34308,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34311,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34360,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34361,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34625,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34630,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34631,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35116,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35561,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35562,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35563,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36332,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36571,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36572,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36573,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36574,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36575,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36579,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36580,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36581,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36826,
+          "reason": "root-gone"
+        }
+      ],
+      "protectedAncestors": [
+        {
+          "pid": 31484,
+          "ppid": 94379,
+          "pgid": 31484,
+          "starttime": "1792985367.386792",
+          "state": "R",
+          "exe": "/bin/zsh",
+          "comm": "/bin/zsh",
+          "cmdline": "/bin/zsh",
+          "argv": [
+            "/bin/zsh"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 94379,
+          "ppid": 95769,
+          "pgid": 95649,
+          "starttime": "1792984497.43656",
+          "state": "R",
+          "exe": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "comm": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "cmdline": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "argv": [
+            "/Users/vv/.local/share/claude/versions/2.1.309"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 95769,
+          "ppid": 95649,
+          "pgid": 95649,
+          "starttime": "1792976292.692833",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "comm": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "cmdline": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "argv": [
+            "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 95649,
+          "ppid": 90535,
+          "pgid": 95649,
+          "starttime": "1792976292.284797",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "comm": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "cmdline": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "argv": [
+            "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 90535,
+          "ppid": 1,
+          "pgid": 90535,
+          "starttime": "1792976285.726038",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "comm": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "cmdline": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "argv": [
+            "/Applications/Paseo.app/Contents/MacOS/Paseo"
+          ],
+          "environ": null
+        }
+      ]
+    },
+    {
+      "label": "ordered-quit",
+      "nativeConfirmationBypassedOnlyAtTeardown": true,
+      "noOwnedProcessesRemain": true
+    },
+    {
+      "label": "cleanup-before",
+      "processes": [],
+      "ignored": [
+        {
+          "pid": 33606,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34288,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34308,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34311,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34360,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34361,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34625,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34630,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 34631,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35116,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35561,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35562,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 35563,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36332,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36571,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36572,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36573,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36574,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36575,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36579,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36580,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36581,
+          "reason": "root-gone"
+        },
+        {
+          "pid": 36826,
+          "reason": "root-gone"
+        }
+      ],
+      "protectedAncestors": [
+        {
+          "pid": 31484,
+          "ppid": 94379,
+          "pgid": 31484,
+          "starttime": "1792985367.386792",
+          "state": "R",
+          "exe": "/bin/zsh",
+          "comm": "/bin/zsh",
+          "cmdline": "/bin/zsh",
+          "argv": [
+            "/bin/zsh"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 94379,
+          "ppid": 95769,
+          "pgid": 95649,
+          "starttime": "1792984497.43656",
+          "state": "R",
+          "exe": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "comm": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "cmdline": "/Users/vv/.local/share/claude/versions/2.1.309",
+          "argv": [
+            "/Users/vv/.local/share/claude/versions/2.1.309"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 95769,
+          "ppid": 95649,
+          "pgid": 95649,
+          "starttime": "1792976292.692833",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "comm": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "cmdline": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "argv": [
+            "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 95649,
+          "ppid": 90535,
+          "pgid": 95649,
+          "starttime": "1792976292.284797",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "comm": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "cmdline": "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
+          "argv": [
+            "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper"
+          ],
+          "environ": null
+        },
+        {
+          "pid": 90535,
+          "ppid": 1,
+          "pgid": 90535,
+          "starttime": "1792976285.726038",
+          "state": "R",
+          "exe": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "comm": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "cmdline": "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          "argv": [
+            "/Applications/Paseo.app/Contents/MacOS/Paseo"
+          ],
+          "environ": null
+        }
+      ]
+    }
+  ],
+  "finishedAt": "2026-10-26T03:30:04.075Z"
+}

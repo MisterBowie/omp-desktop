@@ -66,6 +66,35 @@
 - 用户 2026-10-26 要求并入 `main` 并本地打包：分支快进并入本地 `main`，未推送 `origin`，未发布。是否随 0.1.7 或
   同版本修订发布由用户决定，届时补更新记录（八种语言）。本地包的记录另见下方“本地包”一节。
 
+## 本地包（2026-10-26）
+
+用户要求并入 `main` 后本地打包。包未签名、未公证，版本面仍为 0.1.6，只用于本机测试，不是发布产物。
+
+- 源码：`main` `90cdafa8`（`fc01746f` 修复加验证记录），在本工作树构建。
+- 命令：`OMP_SIDECAR_SOURCE=<根目录>/.omp-sidecar-edec389 CSC_IDENTITY_AUTO_DISCOVERY=false pnpm --filter @pi-desktop/desktop run dist:mac --arm64`，
+  exit 0（131 s）。Node v24.6.0、pnpm 10.34.5、Bun 1.4.2、Electron 43.6.0。
+- 运行时：受控 fork `edec3898`，OMP 18.3.0、`62bc57b+omp-desktop.7`；二进制 SHA-256 `98a005a6…`，与 0.1.6 本地包记录相同。
+
+| 文件 | 字节 | SHA-256 |
+| --- | ---: | --- |
+| OMP-Desktop-0.1.6-arm64.dmg | 221366582 | 8cbbefcbe778975e44c878ca6d03ee7fbc50ed5aa5ca95cf6fe3219dd1b2af78 |
+| OMP-Desktop-0.1.6-arm64-mac.zip | 220275515 | 19f4d5bdaba86792ed6b15f6c65616b9d4b101ed464476cf8a178ff9cdfb0050 |
+
+DMG 复制为 `~/Downloads/OMP-Desktop-0.1.6-ctxring-90cdafa8-arm64.dmg`（SHA-256 相同），不覆盖已发布 0.1.6 的
+`~/Downloads/OMP-Desktop-0.1.6-arm64.dmg`；ZIP 在工作树 `app/apps/desktop/release/`。
+
+| 检查 | 结果 | 附件 |
+| --- | --- | --- |
+| DMG `hdiutil verify` / ZIP `unzip -tq` | VALID / 无错误 | [archive-verify](Context-ring-usage-20261026/local-package/archive-verify.txt) |
+| 解出 DMG 内 `app.asar`，查看 `out/main/index.js` 的 `usageOf` | 含全 0 用量返回 `undefined` 的判断（注释已被构建去除） | — |
+| `verify-packaged-runtime --resources <DMG 内 Resources>` | exit 0：18.3.0、协议 v2、`get_state` 通过、缺少 gate 被拒绝、停止/回收/清理完成 | [verify-packaged-runtime](Context-ring-usage-20261026/local-package/verify-packaged-runtime.txt) |
+| `verify-installed-product --app <DMG 内应用>` | exit 0，`verified: true`，版本 0.1.6 | [verify-installed-product](Context-ring-usage-20261026/local-package/verify-installed-product.txt) |
+| 安装态冒烟 `scripts/e2e-installed-smoke.mjs <DMG> <证据目录>` | exit 0，**8/8**（36 s）：建项目与 OMP 会话；拒绝写入后原字节不变；允许一次后真实写入；项目命令结果回到模型；Stop 回收外部进程树；重启恢复同一原生历史且不重放；恢复后新回合完成；默认数据根为隔离 HOME 下的 `.omp-desktop` | [installed-smoke](Context-ring-usage-20261026/local-package/installed-smoke.txt)、[原始输出](Context-ring-usage-20261026/local-package/installed-smoke/) |
+
+所有模型都是 127.0.0.1 FakeProvider，没有真实模型调用。冒烟的假服务商不报告用量：包内运行时写入原生转录的 8 条
+助手消息都是全 0 `usage`（`native-after-restart.jsonl`），即服务商不报告时运行时保留的占位，与根因一致。圆环行为
+因此在包内没有自动覆盖，需用户安装后用真实模型确认：思考与工具循环期间圆环保持上次读数。
+
 ## 遗留
 
 - `omp-plan-submit-e2e.test.mjs` 不稳定：本分支三次运行中两次各有一项（不同用例）失败或取消，基线一次通过。失败均为

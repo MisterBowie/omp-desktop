@@ -1,0 +1,2 @@
+$ node scripts/e2e-installed-smoke.mjs apps/desktop/release/OMP-Desktop-0.1.6-arm64.dmg <evidence>/installed-smoke
+exit=0 elapsed=36s
