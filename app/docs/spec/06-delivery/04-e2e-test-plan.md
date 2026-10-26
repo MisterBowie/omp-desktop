@@ -130,6 +130,22 @@
   apps/desktop/test/omp-first-response-e2e.test.mjs`; controlled preparation and
   running orderings also run in `omp-session-bridge.test.mjs`.
 
+### E2E-OMP-provider-retry
+
+- **Preconditions:** Verified OMP resources and a local scripted provider that
+  answers HTTP 503 until the runner reports a retry; no paid model.
+- **Steps:** Prompt once; when the retrying status arrives, let the provider
+  answer. Read the native entries back through history projection.
+- **Expected:** The retry reaches the desktop as a running `retrying` status
+  (attempt 1, a backoff, `PROVIDER_ERROR` with provider status 503), not as a
+  stack of error rows. The superseded attempt is withdrawn with an empty,
+  error-free failed `message_end`; the reply streams and clears the status; the
+  reopened history shows only the user prompt and the reply.
+- **Automation:** `OMP_BUNDLED_RESOURCES=<resources> node --test
+  apps/desktop/test/omp-provider-retry-e2e.test.mjs`; mapping, clearing and
+  history filtering also run in `packages/omp-runtime` (`runner.test.ts`,
+  `retry-activity.test.ts`, `history.test.ts`).
+
 ### E2E-OMP-thinking-level
 
 - **Preconditions:** Verified OMP resources and a local scripted provider whose
