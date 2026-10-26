@@ -188,6 +188,26 @@ keeps its error row. History reads skip assistant entries the runtime marked
 `retryRecovery`, the same rule OMP applies to its model context, so a
 reopened session shows the reply or the one terminal error.
 
+### OMP thinking level
+
+An OMP session runs at the thinking level the composer shows. The stored
+session level is resolved against the binding's enabled ladder with the
+composer's rule: no level and `omit` send nothing (OMP keeps its own level),
+a declared level is kept, and a canonical level the ladder does not carry
+takes the nearest supported one (walk up, then down). A level made stale by a
+later capability edit therefore no longer refuses the prompt with
+`OMP_PROJECTION_INVALID`; only a non-canonical value is still refused. The
+stored value stays what the user chose.
+
+Every OMP process starts at its own default (or the level a restored native
+session last recorded), so after binding or restoring the native session the
+desktop sends the resolved level with `set_thinking_level` when it differs from
+the level `get_state` reports. This covers the first prompt, a model switch, an
+idle reclaim and an application restart. A refused or unresolvable level is
+logged and the prompt proceeds at the runtime's level rather than failing the
+send. A change on a running runtime sends the resolved level; `omit` sends
+nothing, so the running level stays until the next process starts.
+
 ## 3. Core objects
 
 ### 3.1 PiRuntime (Node)

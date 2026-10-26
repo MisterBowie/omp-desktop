@@ -14,6 +14,7 @@ import { register } from "node:module";
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers", "ts-import-hooks.mjs")));
 const {
+  effectiveThinkingLevel,
   ompApiForStyle,
   projectionError,
   projectModelsYaml,
@@ -186,6 +187,33 @@ test("R4: refuses an incompatible thinking level", () => {
   const result = resolveProviderProjection(source(), "acme-x", "max");
   assert.equal(result.ok, false);
   assert.match(result.error.message, /not supported/);
+});
+
+test("a stale stored thinking level runs at the composer's clamped level instead of refusing the prompt", () => {
+  // The reported case: a binding whose enabled ladder no longer carries `off`
+  // while the session still stores it. The composer shows `low`; the projection
+  // refused `off` and the send failed on every retry.
+  const stale = source({ models: [{ id: "claude", thinkingLevels: ["low", "medium", "high", "xhigh", "max"] }] });
+  assert.equal(resolveProviderProjection(stale, "claude", "off").ok, false);
+  assert.equal(effectiveThinkingLevel(stale, "claude", "off"), "low");
+  assert.equal(resolveProviderProjection(stale, "claude", effectiveThinkingLevel(stale, "claude", "off")).ok, true);
+  // Same nearest-supported rule as the composer: walk up first, then down.
+  const sparse = source({ models: [{ id: "m", thinkingLevels: ["low", "high"] }] });
+  assert.equal(effectiveThinkingLevel(sparse, "m", "medium"), "high");
+  assert.equal(effectiveThinkingLevel(sparse, "m", "max"), "high");
+  assert.equal(effectiveThinkingLevel(sparse, "m", "low"), "low");
+});
+
+test("only a stale canonical level is clamped; omit leaves the runtime default and unknown values still refuse", () => {
+  const declared = source();
+  for (const requested of [null, undefined, "", "omit"]) {
+    assert.equal(effectiveThinkingLevel(declared, "acme-x", requested), null, `${requested} sends no level`);
+  }
+  assert.equal(effectiveThinkingLevel(declared, "acme-x", "high"), "high");
+  assert.equal(effectiveThinkingLevel(source({ models: [{ id: "acme-x" }] }), "acme-x", "max"), "max", "an undeclared ladder is not second-guessed");
+  assert.equal(effectiveThinkingLevel(declared, "acme-y", "max"), "max", "an unknown model is left to the projection's refusal");
+  assert.equal(effectiveThinkingLevel(declared, "acme-x", "turbo"), "turbo");
+  assert.equal(resolveProviderProjection(declared, "acme-x", effectiveThinkingLevel(declared, "acme-x", "turbo")).ok, false);
 });
 
 test("R4: projects provider headers into the yaml", () => {

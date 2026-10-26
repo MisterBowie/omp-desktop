@@ -114,6 +114,9 @@ export type OmpSessionRuntimeSpec = {
   runtimeVersion?: string | null;
 };
 
+/** The binding fields that decide a session's thinking level. */
+export type OmpThinkingBinding = { providerId: string | null; modelId: string | null; thinkingLevel: string | null };
+
 /** A native session whose `get_state` handles were validated, ready to persist. */
 export type NativeSessionBoundInfo = {
   sessionId: string;
@@ -150,6 +153,12 @@ export type OmpSessionBridgeOptions = {
   createSupervisor: (spec: OmpSessionRuntimeSpec) => OmpRuntimeSupervisor;
   /** Refresh launch-owned inputs; true requires an idle process replacement. */
   refreshRuntimeConfiguration?: (supervisor: OmpRuntimeSupervisor, spec: OmpSessionRuntimeSpec) => Promise<boolean>;
+  /**
+   * The thinking level a binding runs at (the composer's clamped value), or
+   * null to leave the runtime's own default (`omit`, no level). Without it the
+   * stored level is applied verbatim.
+   */
+  resolveThinkingLevel?: (binding: OmpThinkingBinding) => Promise<string | null>;
   /** Stores inline user images under the desktop attachment store and returns their refs. */
   storeImage?: (bytes: Buffer, mimeType: string) => string | null;
   /** Absolute launcher path, or null when this build has none. */
@@ -814,6 +823,7 @@ type PendingDialog = { request: OmpUiRequest; sessionId: string; generation: num
 class SessionEntry {
   private preparingPrompt = false;
   private readonly refreshRuntimeConfiguration: OmpSessionBridgeOptions["refreshRuntimeConfiguration"];
+  private readonly resolveThinkingLevel: OmpSessionBridgeOptions["resolveThinkingLevel"];
   private readonly storeImage: OmpSessionBridgeOptions["storeImage"];
   private compaction: OmpManualCompaction | null = null;
 
@@ -1065,10 +1075,12 @@ class SessionEntry {
     onTurnEnd?: OmpSessionBridgeOptions["onTurnEnd"];
     hostTurns?: OmpSessionBridgeOptions["hostTurns"];
     refreshRuntimeConfiguration?: OmpSessionBridgeOptions["refreshRuntimeConfiguration"];
+    resolveThinkingLevel?: OmpSessionBridgeOptions["resolveThinkingLevel"];
     storeImage?: OmpSessionBridgeOptions["storeImage"];
   }) {
     this.sessionId = deps.sessionId;
     this.refreshRuntimeConfiguration = deps.refreshRuntimeConfiguration;
+    this.resolveThinkingLevel = deps.resolveThinkingLevel;
     this.storeImage = deps.storeImage;
     this.projectDirectory = deps.projectDirectory;
     this.executionDirectory = deps.executionDirectory ?? deps.projectDirectory;
@@ -1539,6 +1551,7 @@ class SessionEntry {
       // the successor (PI's grants are per desktop session; ours additionally
       // refuse to cross a native-identity replacement).
       this.noteNativeSession(this.nativeSessionId);
+      await this.applyThinkingLevel(runtime, spec, (stateData as { thinkingLevel?: unknown } | undefined)?.thinkingLevel);
       return;
     }
 
@@ -1577,6 +1590,35 @@ class SessionEntry {
       nativeSessionPath: canonicalPath,
       runtimeVersion: this.runtimeVersion,
     });
+    await this.applyThinkingLevel(runtime, spec, (stateData as { thinkingLevel?: unknown } | undefined)?.thinkingLevel);
+  }
+
+  /**
+   * Put a freshly bound runtime on the session's thinking level.
+   *
+   * Every runtime starts at its own default, so without this the level the
+   * user picked held only when it was changed while a runtime was running;
+   * the next process (first prompt, model switch, restart, idle reclaim) ran
+   * at the default whatever the composer showed. A refusal is logged and the
+   * prompt proceeds at the runtime's level rather than failing the send.
+   */
+  private async applyThinkingLevel(runtime: OmpSessionRuntime, spec: OmpSessionRuntimeSpec, current: unknown): Promise<void> {
+    let level: string | null;
+    try {
+      level = this.resolveThinkingLevel
+        ? await this.resolveThinkingLevel({ providerId: spec.providerId, modelId: spec.modelId, thinkingLevel: spec.thinkingLevel })
+        : spec.thinkingLevel === "omit" ? null : spec.thinkingLevel;
+    } catch (error) {
+      this.logger?.app("omp", "warn", "thinking level unresolved", { data: { sessionId: this.sessionId, error: String((error as Error)?.message ?? error) } });
+      return;
+    }
+    if (!level || level === current) return;
+    const result = await runtime
+      .request({ type: "set_thinking_level", level }, { timeoutMs: 20_000 })
+      .catch((error: unknown) => ({ success: false as const, error: String((error as Error)?.message ?? error) }));
+    if (result.success === false) {
+      this.logger?.app("omp", "warn", "thinking level not applied", { data: { sessionId: this.sessionId, level, error: result.error ?? null } });
+    }
   }
 
   surfaceUiRequest(request: OmpUiRequest, sessionId: string, generation: number): void {
@@ -2669,6 +2711,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       sessionDir: options.sessionDir,
       binding,
       ...(options.refreshRuntimeConfiguration ? { refreshRuntimeConfiguration: options.refreshRuntimeConfiguration } : {}),
+      ...(options.resolveThinkingLevel ? { resolveThinkingLevel: options.resolveThinkingLevel } : {}),
       ...(options.storeImage ? { storeImage: options.storeImage } : {}),
       ...(options.hostTools ? { hostTools: options.hostTools } : {}),
       ...(options.capabilities ? { capabilities: options.capabilities } : {}),
@@ -3065,10 +3108,14 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       if (thinkingChanged) {
         // Thinking is a runtime state that does not need re-projection: apply it
         // to a running runtime, persist, and revert on a failed persist. The
-        // prior level is always a valid string (the session default is "off").
-        const oldLevel = entry.binding.thinkingLevel ?? "off";
-        if (entry.activeRunner()) {
-          const result = await runtimeOf(entry).request({ type: "set_thinking_level", level: thinkingLevel }, { timeoutMs: 20_000 });
+        // runtime receives the level the binding runs at (`omit` sends nothing,
+        // an undeclared level is clamped); the stored value is what was chosen.
+        const runtimeLevel = (level: string | null) => options.resolveThinkingLevel
+          ? options.resolveThinkingLevel({ providerId: entry.binding.providerId, modelId: entry.binding.modelId, thinkingLevel: level })
+          : Promise.resolve(level === "omit" ? null : level);
+        const applied = entry.activeRunner() ? await runtimeLevel(thinkingLevel) : null;
+        if (applied) {
+          const result = await runtimeOf(entry).request({ type: "set_thinking_level", level: applied }, { timeoutMs: 20_000 });
           if (result.success === false) {
             return { ok: false, reason: result.error ?? "the runtime refused the thinking change" };
           }
@@ -3079,8 +3126,10 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
           // Revert the runtime thinking so the transcript and the DB never fork.
           let rolledBack = true;
           let rollbackError: string | null = null;
-          if (entry.activeRunner()) {
+          if (applied && entry.activeRunner()) {
             try {
+              // The prior level is always a valid string (the session default is "off").
+              const oldLevel = (await runtimeLevel(entry.binding.thinkingLevel)) ?? "off";
               const revert = await runtimeOf(entry).request({ type: "set_thinking_level", level: oldLevel }, { timeoutMs: 20_000 });
               rolledBack = revert.success !== false;
               if (revert.success === false) rollbackError = revert.error ?? "the runtime refused the revert";

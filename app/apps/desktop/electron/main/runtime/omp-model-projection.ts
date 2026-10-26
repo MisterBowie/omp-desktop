@@ -15,7 +15,7 @@
  * any other state.
  */
 
-import { THINKING_LEVELS, isOfficialDeepSeekEndpoint, modalitiesWithProviderCapabilities, type ProviderModelCapabilities } from "@pi-desktop/shared";
+import { THINKING_LEVELS, isOfficialDeepSeekEndpoint, modalitiesWithProviderCapabilities, nearestSupportedThinkingLevel, type ProviderModelCapabilities, type ThinkingLevel } from "@pi-desktop/shared";
 
 /** The OMP `Api` values this build knows how to project from a PI `apiStyle`. */
 const PI_STYLE_TO_OMP_API: Record<string, string> = {
@@ -82,6 +82,29 @@ const PROJECTABLE_AUTH_KINDS: Record<string, "key" | "none"> = {
   api_key_and_base_url: "key",
   none: "none",
 };
+
+/**
+ * The thinking level a session runs at on one model binding.
+ *
+ * The composer shows the stored level clamped onto the model's enabled ladder,
+ * and the run follows what it shows: no level and `omit` leave the runtime's
+ * own default (`null`), a declared level is kept, and a canonical level the
+ * ladder does not carry takes the nearest supported one. A stored level that
+ * a later capability edit made stale therefore no longer refuses the prompt.
+ * Anything else is returned unchanged so the projection still refuses it.
+ */
+export function effectiveThinkingLevel(
+  source: Pick<ProviderProjectionSource, "models">,
+  modelId: string,
+  requested: string | null | undefined,
+): string | null {
+  if (!requested || requested === "omit") return null;
+  const levels = source.models?.find((entry) => entry.id === modelId)?.thinkingLevels;
+  if (!levels || levels.length === 0 || levels.includes(requested)) return requested;
+  if (!(THINKING_LEVELS as readonly string[]).includes(requested)) return requested;
+  const enabled = THINKING_LEVELS.filter((level) => levels.includes(level));
+  return nearestSupportedThinkingLevel(requested as ThinkingLevel, enabled);
+}
 
 /**
  * Resolve the minimal projection for one provider/model binding, fail-closed.

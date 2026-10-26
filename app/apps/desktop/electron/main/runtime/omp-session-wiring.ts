@@ -42,11 +42,13 @@ import {
   type OmpHostTurnLifecycle,
   type OmpSessionBridge,
   type OmpSessionRuntimeSpec,
+  type OmpThinkingBinding,
   type OmpTurnEndInfo,
 } from "./omp-session";
 import {
   projectionError,
   projectModelsYaml,
+  effectiveThinkingLevel,
   resolveProviderProjection,
   type ProviderProjectionSource,
   type OmpModelProjection,
@@ -179,8 +181,9 @@ async function sessionTargetUrl(host: () => HostProcess | null, spec: OmpSession
  * The provider id and model id come from the session's durable binding, never
  * from the renderer; the secret is read at this boundary and written only into
  * `paths.agentDir/models.yml`, which the stop path deletes. A disabled provider,
- * an unknown model, a missing key, an unsupported auth kind, or an incompatible
- * thinking level is refused here, before any prompt is sent.
+ * an unknown model, a missing key, an unsupported auth kind, or a non-canonical
+ * thinking level is refused here, before any prompt is sent. A canonical level
+ * the model's ladder no longer carries is clamped as the composer shows it.
  */
 export async function projectSessionModels(
   host: () => HostProcess | null,
@@ -204,7 +207,7 @@ export async function projectSessionModels(
       errorCode: "OMP_PROJECTION_FAILED",
     });
   }
-  const resolved = resolveProviderProjection(row, spec.modelId, spec.thinkingLevel);
+  const resolved = resolveProviderProjection(row, spec.modelId, effectiveThinkingLevel(row, spec.modelId, spec.thinkingLevel));
   if (!resolved.ok) {
     throw Object.assign(new Error(resolved.error.message), { errorCode: resolved.error.errorCode });
   }
@@ -259,6 +262,20 @@ export type WiredOmpSessions = {
   /** Persistent native-session directory (survives stop/reclaim). */
   sessionDir: string;
 };
+
+/**
+ * The thinking level a binding runs at, read from the host's provider row with
+ * the same clamp the projection applies, or null when nothing is sent (no
+ * binding, an unknown provider, `omit`, no level). Exported so the E2E drives
+ * the production resolver.
+ */
+export function createOmpThinkingLevelResolver(host: () => HostProcess | null) {
+  return async (binding: OmpThinkingBinding): Promise<string | null> => {
+    if (!binding.providerId || !binding.modelId) return null;
+    const provider = await hostOrThrow(host).call<{ provider?: ProjectionProvider | null }>("providers.get", { id: binding.providerId });
+    return provider?.provider ? effectiveThinkingLevel(provider.provider, binding.modelId, binding.thinkingLevel) : null;
+  };
+}
 
 /** Project identity stays with capabilities; only the host resolves execution paths. */
 export function createOmpExecutionRootResolver(host: () => HostProcess | null) {
@@ -338,6 +355,7 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
         return { mode, permissionMode: resolveEffectivePermissionMode(permissionMode, defaultPermissionMode) };
       },
     },
+    resolveThinkingLevel: createOmpThinkingLevelResolver(deps.host),
     refreshRuntimeConfiguration: async (supervisor, spec) => {
       const state = configurations.get(supervisor);
       if (!state) throw new Error("OMP runtime configuration is unavailable");

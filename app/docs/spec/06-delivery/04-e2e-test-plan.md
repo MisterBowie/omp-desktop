@@ -130,6 +130,23 @@
   apps/desktop/test/omp-first-response-e2e.test.mjs`; controlled preparation and
   running orderings also run in `omp-session-bridge.test.mjs`.
 
+### E2E-OMP-thinking-level
+
+- **Preconditions:** Verified OMP resources and a local scripted provider whose
+  binding enables `low`/`medium`/`high` only; no paid model.
+- **Steps:** Prompt a new session that still stores `off`, through the
+  production projection and thinking resolver. Then change the level to
+  `medium` on the running session and prompt again.
+- **Expected:** The first send is accepted (no `OMP_PROJECTION_INVALID`); the
+  fresh runtime reports `low` from `get_state` instead of its own default and
+  the provider request carries `reasoning_effort: "low"`. The second request
+  carries `medium`.
+- **Automation:** `OMP_BUNDLED_RESOURCES=<resources> node --test
+  apps/desktop/test/omp-thinking-level-e2e.test.mjs`; projection and bridge
+  tests cover `omit`, restored sessions already at the level, refusals and the
+  stored value in `omp-model-projection.test.mjs` and
+  `omp-session-configure.test.mjs`.
+
 ### E2E-OMP-session-controls
 
 - **Preconditions:** Verified OMP 18.3.0 packaged resources, fixture-owned
