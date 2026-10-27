@@ -89,6 +89,8 @@ export type OmpMarketplaceLauncher = { path: string | null; error: string | null
 export type OmpMarketplaceServiceDeps = {
   dataRoot: string;
   launcher: () => OmpMarketplaceLauncher;
+  /** Chromium proxy list for a URL (`session.resolveProxy`), used in system proxy mode. */
+  systemProxy?: (url: string) => Promise<string>;
   networkProxy?: () => NetworkProxySettings;
   log?: (level: "info" | "warn" | "error", message: string, data?: string) => void;
   /** Test seams. */
@@ -113,11 +115,41 @@ export type OmpMarketplaceService = {
   dispose(): void;
 };
 
-function proxyFor(settings: NetworkProxySettings | undefined): { url: string; bypass: string } | undefined {
-  if (!settings || settings.mode !== "custom") return undefined;
-  const assignments = proxyEnvAssignments(settings);
-  const url = assignments.ALL_PROXY;
-  return url ? { url, bypass: assignments.NO_PROXY ?? "" } : undefined;
+/** Hosts the CLI never sends through a resolved system proxy. */
+const SYSTEM_PROXY_BYPASS = "localhost,127.0.0.1,::1";
+
+/**
+ * The first usable entry of a Chromium proxy list (`PROXY h:p; DIRECT`) as a
+ * URL git and the runtime understand, or null for DIRECT/unsupported.
+ */
+export function proxyUrlFromChromiumList(list: string): string | null {
+  for (const entry of list.split(";")) {
+    const [kind, hostPort] = entry.trim().split(/\s+/);
+    if (!kind || !hostPort) continue;
+    const scheme = { PROXY: "http", HTTP: "http", HTTPS: "https", SOCKS: "socks5", SOCKS5: "socks5" }[kind.toUpperCase()];
+    if (scheme) return `${scheme}://${hostPort}`;
+  }
+  return null;
+}
+
+async function proxyFor(deps: OmpMarketplaceServiceDeps): Promise<{ url: string; bypass: string } | undefined> {
+  const settings = deps.networkProxy?.();
+  if (settings?.mode === "custom") {
+    const assignments = proxyEnvAssignments(settings);
+    const url = assignments.ALL_PROXY;
+    return url ? { url, bypass: assignments.NO_PROXY ?? "" } : undefined;
+  }
+  if (settings?.mode === "direct") return undefined;
+  // System mode: git does not read the OS proxy, so resolve it the way the
+  // desktop's own network stack would for a typical source host.
+  try {
+    const list = await deps.systemProxy?.("https://github.com/");
+    const url = list ? proxyUrlFromChromiumList(list) : null;
+    return url ? { url, bypass: SYSTEM_PROXY_BYPASS } : undefined;
+  } catch (error) {
+    deps.log?.("warn", "OMP marketplace system proxy unresolved", (error as Error).message);
+    return undefined;
+  }
 }
 
 export function createOmpMarketplaceService(deps: OmpMarketplaceServiceDeps): OmpMarketplaceService {
@@ -144,7 +176,7 @@ export function createOmpMarketplaceService(deps: OmpMarketplaceServiceDeps): Om
       });
     }
     ensureOmpMarketplaceStore(store);
-    const proxy = proxyFor(deps.networkProxy?.());
+    const proxy = await proxyFor(deps);
     const result = await runCli({
       launcher: launcher.path,
       store,

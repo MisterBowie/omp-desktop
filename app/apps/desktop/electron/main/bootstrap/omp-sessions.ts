@@ -1,4 +1,5 @@
 /** Product composition for OMP sessions; the application entry only supplies services. */
+import { session } from "electron";
 import { createOmpMemoryService } from "../runtime/omp-memory";
 import { createOmpMarketplaceService } from "../runtime/omp-marketplace";
 import { currentNetworkProxy } from "../network-proxy";
@@ -37,6 +38,7 @@ export function createOmpSessionServices(deps: OmpSessionServicesDeps) {
     dataRoot: deps.dataRoot,
     launcher: () => ({ path: engineRuntime.ompRuntime.launcher, error: engineRuntime.ompRuntime.launcherError }),
     networkProxy: currentNetworkProxy,
+    systemProxy: (url) => session.defaultSession.resolveProxy(url),
     log: (level, message, data) => deps.logger.app("runtime", level, message, { data }),
   });
   const { bridge: ompSessions } = wireOmpSessions({

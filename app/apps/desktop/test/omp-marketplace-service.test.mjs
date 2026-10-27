@@ -138,27 +138,40 @@ test("an unavailable runtime is reported in state and refused for commands", asy
   assert.equal(cli.calls.length, 0);
 });
 
-test("only a custom desktop proxy reaches the CLI", async (t) => {
+test("the CLI gets the custom proxy, the resolved system proxy, or none in direct mode", async (t) => {
   const cli = fakeCli();
   let proxy = { mode: "system" };
+  let systemList = "PROXY 127.0.0.1:7897; DIRECT";
   const service = createOmpMarketplaceService({
     dataRoot: scratch(t),
     launcher: () => ({ path: "/bin/omp", error: null }),
     runCli: cli.runCli,
     networkProxy: () => proxy,
+    systemProxy: async () => systemList,
   });
-  const direct = service.updateSources();
-  await tick();
-  assert.equal(cli.calls[0].proxy, undefined);
-  cli.finish();
-  await direct;
+  const run = async () => {
+    const pending = service.updateSources();
+    await tick();
+    const call = cli.calls.at(-1);
+    cli.finish();
+    await pending;
+    return call.proxy;
+  };
+  // System mode: git ignores the OS proxy, so the desktop resolves it.
+  assert.equal((await run()).url, "http://127.0.0.1:7897");
+  systemList = "DIRECT";
+  assert.equal(await run(), undefined);
+  systemList = "SOCKS5 127.0.0.1:1080";
+  assert.equal((await run()).url, "socks5://127.0.0.1:1080");
+  // Direct mode never consults the system proxy.
+  proxy = { mode: "direct" };
+  systemList = "PROXY 127.0.0.1:7897";
+  assert.equal(await run(), undefined);
+  // A custom proxy wins over the system one.
   proxy = { mode: "custom", url: "http://127.0.0.1:7890" };
-  const viaProxy = service.updateSources();
-  await tick();
-  assert.equal(cli.calls[1].proxy.url, "http://127.0.0.1:7890");
-  assert.equal(typeof cli.calls[1].proxy.bypass, "string");
-  cli.finish();
-  await viaProxy;
+  const custom = await run();
+  assert.equal(custom.url, "http://127.0.0.1:7890");
+  assert.equal(typeof custom.bypass, "string");
 });
 
 test("the answer is the state re-read from OMP's registries", async (t) => {

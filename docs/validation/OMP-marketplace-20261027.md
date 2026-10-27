@@ -94,3 +94,14 @@ DMG 复制为 `~/Downloads/OMP-Desktop-0.1.6-marketplace-5c6582b7-arm64.dmg`；Z
 | `scripts/e2e-installed-smoke.mjs <DMG> <证据目录>` | exit 0，8/8 检查（建会话、拒绝写入不改字节、允许一次后写入、项目命令结果回到模型、Stop 回收进程、重启恢复原生历史、恢复后新回合、默认数据根隔离） | [installed-smoke](OMP-marketplace-20261027/local-package/installed-smoke/) |
 
 安装包内未单独跑插件市场界面；市场界面已在开发构建的真实窗口中验证（见上文）。所有模型为本地 FakeProvider。
+
+## 2026-10-27 修复：添加 GitHub 源一直“正在添加…”
+
+- 现象（用户反馈）：添加 `anthropics/claude-plugins-official` 长时间停在“正在添加…”。
+- 根因：桌面网络代理为默认的“系统”模式时，市场 CLI 不带任何代理变量；git 不读 macOS 系统代理（本机为
+  127.0.0.1:7897），且 CLI 的 HOME 是隔离存储，用户 `~/.gitconfig` 也不生效，于是 `git clone` 直连 GitHub，极慢。
+  进程快照可见 `git clone --depth 1 … claude-plugins-official.git` 运行 1 分 39 秒仍在 `index-pack`。
+- 修复：系统模式下用 `session.defaultSession.resolveProxy("https://github.com/")` 解析系统代理，转换为
+  `http://`/`https://`/`socks5://` 地址交给 CLI（绕过 localhost）；直连模式不带代理；自定义模式不变。
+- 验证：`omp-marketplace-service.test.mjs` 新增模式优先级用例，与 `main-wiring-contract` 共 14/14；desktop
+  typecheck exit 0；真实运行时经系统代理添加该源：34 s 完成，315 个插件。
