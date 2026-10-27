@@ -456,6 +456,8 @@ export const es = {
     "usageContextAriaRemaining": "restante",
     "usageContextAriaUsed": "usado",
     "usageTurnTotal": "Este turno",
+    "usageTurnAria": "Este turno: {{speed}}, {{count}} tokens. Mostrar desglose.",
+    "usageTotal": "Total",
     "usageThroughputLabel": "Velocidad de generación",
     "usageThroughput": "{{count}} tokens/s",
     "usageThroughputEstimated": "≈ {{count}} tokens/s",

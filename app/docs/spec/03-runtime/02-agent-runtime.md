@@ -149,6 +149,17 @@ mapping (`usageFromPi`). A streaming row therefore never becomes the newest
 usage-bearing message (D355): the composer context ring keeps the last real
 reading while the next request streams instead of dropping to 0% used.
 
+### OMP response duration projection
+
+The pinned runtime ends every model request with `message_end` (it never sends
+a `message_update` "done"), and its providers stamp the request's own measured
+`duration` on that final assistant message. The adapter maps it to
+`responseDurationMs`, rounded to the whole milliseconds host-core persists, on
+live terminal rows and history entries alike, so generation speed (output
+tokens per second) uses the same measurement before and after reload. A stream
+that ends without a measurement (for example an abort before the provider
+settles) falls back to the adapter's stopwatch from the stream's first frame.
+
 ### OMP terminal message projection
 
 The OMP adapter reads the native assistant `stopReason` on both final live

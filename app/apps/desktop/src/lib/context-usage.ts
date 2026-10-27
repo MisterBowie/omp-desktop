@@ -39,6 +39,41 @@ export function contextOccupancyTokens(usage: MessageUsage): number {
   return occupancy > 0 ? occupancy : usageTokenTotal(usage);
 }
 
+export type TurnUsageBreakdown = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  totalTokens: number;
+};
+
+/**
+ * Token composition of one visual turn, built from the `usage` that
+ * `assistantTurnUsage` already summed across the turn's assistant messages.
+ *
+ * `totalTokens` is deliberately the sum of the four buckets and never the
+ * provider-reported `usage.totalTokens`, which can be rounded or omit cache
+ * buckets. Reasoning tokens are already part of `outputTokens`, so they are
+ * never added again. Subagent spend stays out: only the parent messages'
+ * usage is aggregated here, consistent with ADR 0171.
+ *
+ * This is a turn aggregate, unlike the composer context inspector, which
+ * describes only the newest model request (D355 / ADR 0193).
+ */
+export function turnUsageBreakdown(usage?: MessageUsage): TurnUsageBreakdown {
+  const inputTokens = positiveTokenCount(usage?.inputTokens);
+  const outputTokens = positiveTokenCount(usage?.outputTokens);
+  const cacheReadTokens = positiveTokenCount(usage?.cacheReadTokens);
+  const cacheWriteTokens = positiveTokenCount(usage?.cacheWriteTokens);
+  return {
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheWriteTokens,
+    totalTokens: inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens,
+  };
+}
+
 export function latestMessageUsage(messages: UiMessage[]): MessageUsage | undefined {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     if (messages[index].usage) return messages[index].usage;

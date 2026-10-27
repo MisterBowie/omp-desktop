@@ -465,6 +465,8 @@ export const tr = {
     usageContextAriaRemaining: "kaldı",
     usageContextAriaUsed: "kullanıldı",
     usageTurnTotal: "Bu tur",
+    usageTurnAria: "Bu tur: {{speed}}, {{count}} token. Ayrıntıları göster.",
+    usageTotal: "Toplam",
     usageThroughputLabel: "Üretim hızı",
     usageThroughput: "{{count}} token/sn",
     usageThroughputEstimated: "≈ {{count}} token/sn",

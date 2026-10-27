@@ -1,0 +1,101 @@
+$ (cd app) pnpm --filter @pi-desktop/omp-runtime test
+# exit 0
+
+> @pi-desktop/omp-runtime@0.1.6 test /Users/vv/person/omp-desktop/.worktrees/token-throughput/app/packages/omp-runtime
+> vitest run
+
+
+ RUN  v4.1.12 /Users/vv/person/omp-desktop/.worktrees/token-throughput/app/packages/omp-runtime
+
+ ✓ src/desktop-state.test.ts (32 tests) 34ms
+ ✓ src/session/gate-desktop-state.test.ts (27 tests) 41ms
+ ✓ src/session/gate-mode-transition.test.ts (19 tests) 63ms
+ ✓ src/session/gate-permissions.test.ts (22 tests) 99ms
+ ✓ src/session/gate-delegate-ownership.test.ts (9 tests) 26ms
+ ✓ src/session/gate-admission.test.ts (13 tests) 24ms
+ ✓ src/session/subagent-runner.test.ts (20 tests) 21ms
+ ✓ src/session/runner.test.ts (51 tests) 390ms
+ ✓ src/session/host-tools.test.ts (18 tests) 266ms
+ ✓ src/session/subagents.test.ts (24 tests) 10ms
+ ✓ src/session/ui-requests.test.ts (22 tests) 16ms
+ ✓ src/bundled.test.ts (26 tests) 163ms
+ ✓ src/session/gate.test.ts (16 tests) 6ms
+ ✓ src/session/gate-review-matrix.test.ts (2 tests) 15ms
+ ✓ src/session/native-session-file.test.ts (16 tests) 27ms
+ ✓ src/session/tool-paths.test.ts (14 tests) 19ms
+ ✓ src/session/history.test.ts (12 tests) 8ms
+ ✓ src/session/events.test.ts (43 tests) 1750ms
+ ✓ src/session/turn-end.test.ts (10 tests) 263ms
+ ✓ src/session/host-tool-runner.test.ts (9 tests) 211ms
+ ✓ src/session/turn-fence.test.ts (7 tests) 4ms
+ ✓ src/protocol.test.ts (16 tests) 28ms
+ ✓ src/isolation.test.ts (10 tests) 40ms
+ ✓ src/session/subagent-frames.test.ts (22 tests) 20ms
+ ✓ src/session/turn-admission.test.ts (5 tests) 6ms
+ ✓ src/session/mode-transition.test.ts (8 tests) 77ms
+ ✓ src/session/compaction.test.ts (5 tests) 12ms
+ ✓ src/session/start-refusal.test.ts (3 tests) 3ms
+ ✓ src/supervisor-lifecycle.test.ts (17 tests) 3384ms
+     ✓ adopts a process the failed handshake could not stop  414ms
+     ✓ reports the plain failure when the handshake's process was reaped  2917ms
+ ✓ src/bundled-smoke.test.ts (9 tests | 6 skipped) 3456ms
+     ✓ refuses a runtime that reports a version other than the pinned one  3358ms
+ ✓ src/memory-config.test.ts (7 tests) 4ms
+ ✓ src/session/todo-history.test.ts (1 test) 3ms
+ ✓ src/pinned-runtime.test.ts (1 test) 2134ms
+     ✓ starts, negotiates v2, answers, and is reclaimed with its scratch root  2132ms
+ ✓ src/marketplace/marketplace.test.ts (18 tests) 5627ms
+     ✓ runs `plugin …` inside the store with the isolated environment  3904ms
+     ✓ lifts OMP's failure line without terminal escapes  1325ms
+     ✓ stops a command that outlives its timeout  307ms
+ ✓ src/launcher.test.ts (8 tests) 4808ms
+     ✓ reads the runtime's version line  3167ms
+     ✓ reports an unreadable answer as no version instead of inventing one  1334ms
+     ✓ fails typed and bounded when the launcher hangs  302ms
+ ✓ src/desktop-state-supervisor.test.ts (6 tests) 7300ms
+     ✓ points OMP_DESKTOP_STATE at the owned run root and reports the run root  2990ms
+     ✓ does not let an embedder's extraEnv redirect the state path  1077ms
+     ✓ removes the state file with the run root on stop  1079ms
+     ✓ enables the mandatory channel at spawn by default  1075ms
+     ✓ opts a standalone fixture out only through the explicit option  1076ms
+ ✓ src/config-overlay.test.ts (9 tests) 9785ms
+     ✓ passes a run-scoped --config overlay that forces the source boundary  4393ms
+     ✓ derives the overlay path per run instead of encoding it in constructor args  2150ms
+     ✓ keeps the overlay last so no earlier flag or config word can outrank it  1079ms
+     ✓ rewrites the overlay after prepareRun so an embedder hook cannot weaken it  1070ms
+     ✓ never writes through a filesystem alias a hook plants at the overlay path  1075ms
+ ✓ src/supervisor.test.ts (10 tests) 12482ms
+     ✓ starts nothing until asked, then reports a running runtime  3782ms
+     ✓ coalesces concurrent starts into one runtime  1076ms
+     ✓ stops the runtime and removes the directory it created  1078ms
+     ✓ reports a failed cleanup instead of claiming the run was reclaimed  1078ms
+     ✓ hides the operator's environment from the runtime  1074ms
+     ✓ terminates a detached command tree only when asked  1125ms
+     ✓ terminates a bare pid that is not a group leader  1116ms
+     ✓ reclaims every runtime it owns on shutdown  1077ms
+     ✓ creates the state directory under the product's data root only  1074ms
+ ✓ src/process.test.ts (22 tests) 20451ms
+     ✓ reaches a negotiated v2 session against the mock runtime  4389ms
+     ✓ times out a runtime that never becomes ready and reaps it  431ms
+     ✓ matches responses by id and forwards events  1069ms
+     ✓ reassembles a response larger than one line  1100ms
+     ✓ distinguishes a real deadline from a broken stream  1364ms
+     ✓ refuses to send a chunk frame to the runtime  1066ms
+     ✓ reports the runtime's stderr as diagnostics only  1069ms
+     ✓ stops in protocol before breaking the bridge  1081ms
+     ✓ sends abort_bash when the caller knows a command is running  1080ms
+     ✓ escalates to SIGKILL when the runtime ignores SIGTERM and EOF  965ms
+     ✓ reclaims a descendant that outlives the group leader  3207ms
+     ✓ runs one stop sequence when several callers stop at once  1076ms
+     ✓ does not cache a stop whose process group survived  1030ms
+     ✓ is idempotent and reports the same verdict twice  1085ms
+
+ Test Files  39 passed (39)
+      Tests  583 passed | 6 skipped (589)
+   Start at  16:00:23
+   Duration  21.82s (transform 2.97s, setup 0ms, import 9.95s, tests 73.08s, environment 3ms)
+
+
+--- stderr ---
+(node:95953) [DEP0187] DeprecationWarning: Passing invalid argument types to fs.existsSync is deprecated
+(Use `node --trace-deprecation ...` to show where the warning was created)

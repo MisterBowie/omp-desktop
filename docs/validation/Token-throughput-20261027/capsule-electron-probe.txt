@@ -1,0 +1,174 @@
+$ (cd app) node /tmp/pi-compare/capsule-probe/run.mjs "/Users/vv/person/omp-desktop/.worktrees/token-throughput/docs/validation/Token-throughput-20261027"
+# exit 0
+{
+ "zhClosed": {
+  "model": "deepseek-chat",
+  "capsuleText": "81 tokens/s·17.2K",
+  "capsuleAria": "本轮：平均 81 tokens/s，共 17.2K tokens，查看明细",
+  "capsuleExpanded": "false",
+  "capsuleRect": {
+   "x": 132.578125,
+   "y": 210.3984375,
+   "width": 166.3125,
+   "height": 20
+  },
+  "legacyChip": null,
+  "popoverOpen": false,
+  "popoverRect": null,
+  "popoverRows": [],
+  "popoverTotal": null,
+  "popoverHead": null
+ },
+ "zhHoverOpen": {
+  "model": "deepseek-chat",
+  "capsuleText": "81 tokens/s·17.2K",
+  "capsuleAria": "本轮：平均 81 tokens/s，共 17.2K tokens，查看明细",
+  "capsuleExpanded": "true",
+  "capsuleRect": {
+   "x": 132.578125,
+   "y": 210.3984375,
+   "width": 166.3125,
+   "height": 20
+  },
+  "legacyChip": null,
+  "popoverOpen": true,
+  "popoverRect": {
+   "x": 132.578125,
+   "y": 51.0703125,
+   "width": 268,
+   "height": 151.328125
+  },
+  "popoverRows": [
+   [
+    "缓存读取",
+    "12,096"
+   ],
+   [
+    "输入",
+    "3,402"
+   ],
+   [
+    "输出",
+    "1,704"
+   ]
+  ],
+  "popoverTotal": "17,202",
+  "popoverHead": "17.2K"
+ },
+ "zhAfterPointerLeave": {
+  "model": "deepseek-chat",
+  "capsuleText": "81 tokens/s·17.2K",
+  "capsuleAria": "本轮：平均 81 tokens/s，共 17.2K tokens，查看明细",
+  "capsuleExpanded": "false",
+  "capsuleRect": {
+   "x": 132.578125,
+   "y": 210.3984375,
+   "width": 166.3125,
+   "height": 20
+  },
+  "legacyChip": null,
+  "popoverOpen": false,
+  "popoverRect": null,
+  "popoverRows": [],
+  "popoverTotal": null,
+  "popoverHead": null
+ },
+ "zhAfterEscape": {
+  "model": "deepseek-chat",
+  "capsuleText": "81 tokens/s·17.2K",
+  "capsuleAria": "本轮：平均 81 tokens/s，共 17.2K tokens，查看明细",
+  "capsuleExpanded": "false",
+  "capsuleRect": {
+   "x": 132.578125,
+   "y": 210.3984375,
+   "width": 166.3125,
+   "height": 20
+  },
+  "legacyChip": null,
+  "popoverOpen": false,
+  "popoverRect": null,
+  "popoverRows": [],
+  "popoverTotal": null,
+  "popoverHead": null
+ },
+ "enClosed": {
+  "model": "deepseek-chat",
+  "capsuleText": "81 tokens/s·17.2K",
+  "capsuleAria": "This turn: 81 tokens/s, 17.2K tokens. Show breakdown.",
+  "capsuleExpanded": "false",
+  "capsuleRect": {
+   "x": 132.578125,
+   "y": 210.3984375,
+   "width": 166.3125,
+   "height": 20
+  },
+  "legacyChip": null,
+  "popoverOpen": false,
+  "popoverRect": null,
+  "popoverRows": [],
+  "popoverTotal": null,
+  "popoverHead": null
+ },
+ "enHoverOpen": {
+  "model": "deepseek-chat",
+  "capsuleText": "81 tokens/s·17.2K",
+  "capsuleAria": "This turn: 81 tokens/s, 17.2K tokens. Show breakdown.",
+  "capsuleExpanded": "true",
+  "capsuleRect": {
+   "x": 132.578125,
+   "y": 210.3984375,
+   "width": 166.3125,
+   "height": 20
+  },
+  "legacyChip": null,
+  "popoverOpen": true,
+  "popoverRect": {
+   "x": 132.578125,
+   "y": 51.0703125,
+   "width": 268,
+   "height": 151.328125
+  },
+  "popoverRows": [
+   [
+    "Cache read",
+    "12,096"
+   ],
+   [
+    "Input",
+    "3,402"
+   ],
+   [
+    "Output",
+    "1,704"
+   ]
+  ],
+  "popoverTotal": "17,202",
+  "popoverHead": "17.2K"
+ },
+ "streaming": {
+  "model": null,
+  "capsuleText": null,
+  "capsuleAria": null,
+  "capsuleExpanded": null,
+  "capsuleRect": null,
+  "legacyChip": null,
+  "popoverOpen": false,
+  "popoverRect": null,
+  "popoverRows": [],
+  "popoverTotal": null,
+  "popoverHead": null
+ },
+ "stoppedWithoutUsage": {
+  "model": "deepseek-chat",
+  "capsuleText": null,
+  "capsuleAria": null,
+  "capsuleExpanded": null,
+  "capsuleRect": null,
+  "legacyChip": "约 45 tokens/s",
+  "popoverOpen": false,
+  "popoverRect": null,
+  "popoverRows": [],
+  "popoverTotal": null,
+  "popoverHead": null
+ }
+}

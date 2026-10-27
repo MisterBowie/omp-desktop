@@ -1756,7 +1756,26 @@ Single message render — either user (plaintext) or assistant (markdown streami
   copies all contentful fragments in order; Fork and Regenerate target the last
   contentful fragment so existing durable transcript semantics remain intact
   (D157).
-- Assistant meta: optional model badge under the answer. The compact
+- Assistant meta: optional model badge under the answer, followed immediately
+  by the turn usage capsule whenever that completed visual turn has usage. The
+  capsule always shows the turn's average generation speed and compact total
+  tokens; hovering or keyboard-focusing it opens a fixed-position popover with
+  the compact total, the cache-read/input/output composition bar, exact
+  cache-read/input/output counts (cache write only when non-zero), and an
+  exact total. The total is `input + output + cacheRead + cacheWrite` summed
+  across the turn's rendered assistant message fragments; `output` already
+  carries the reasoning tokens, so `reasoningTokens` is never added again, and
+  subagent spend is not included (D103). A model request that renders no
+  message fragment (only a thinking row, or a silent tool call) is not counted.
+  Speed is summed output tokens over summed response duration; OMP rows carry
+  the runtime's measured request duration. No meta row, and therefore no
+  capsule, renders while the turn is streaming. The capsule's accessible name
+  states the speed and total and that activating it shows the breakdown. The
+  popover portals to the document body, clamps to the conversation pane,
+  repositions on scroll, resize, and pane geometry, closes on pointer leave
+  after a short grace delay (unless the trigger still has keyboard focus),
+  Escape, or an outside pointer press, and disables its transition under
+  reduced motion. The compact
   Codex-style context inspector lives in the composer right toolbar,
   immediately left of the model × reasoning chip, and always mirrors the
   newest assistant turn that reported usage (D347). Occupancy, remaining
@@ -1764,8 +1783,9 @@ Single message render — either user (plaintext) or assistant (markdown streami
   input/output/cache/reasoning/hit-rate are that turn's newest usage-bearing
   assistant message (the last model request), using
   `input + output + cacheRead + cacheWrite` (D355). They are not
-  the sum of every model call in the visual tool-loop. It is hidden until that
-  usage exists. The trigger keeps a small capacity ring beside the
+  the sum of every model call in the visual tool-loop, and this last-request
+  occupancy stays deliberately distinct from the capsule's turn aggregate. It
+  is hidden until that usage exists. The trigger keeps a small capacity ring beside the
   percentage and omits the redundant `Context` label; the leading figure
   (ring arc, percentage, token label, popover heading, tooltip, and
   `aria-label`) follows `settings.contextUsageDisplay` — `"remaining"`

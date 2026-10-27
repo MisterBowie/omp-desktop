@@ -1,0 +1,18 @@
+$ (cd app) pnpm --filter @pi-desktop/i18n test
+# exit 0
+
+> @pi-desktop/i18n@0.1.6 test /Users/vv/person/omp-desktop/.worktrees/token-throughput/app/packages/i18n
+> vitest run
+
+
+ RUN  v4.1.12 /Users/vv/person/omp-desktop/.worktrees/token-throughput/app/packages/i18n
+
+ ✓ test/user-facing-copy.test.mjs (7 tests) 2ms
+ ✓ test/renderer-keys.test.mjs (9 tests) 3ms
+ ✓ test/catalogs.test.mjs (9 tests) 82ms
+
+ Test Files  3 passed (3)
+      Tests  25 passed (25)
+   Start at  16:06:38
+   Duration  492ms (transform 759ms, setup 0ms, import 974ms, tests 87ms, environment 0ms)
+

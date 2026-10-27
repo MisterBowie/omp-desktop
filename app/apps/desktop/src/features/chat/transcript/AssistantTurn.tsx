@@ -14,6 +14,7 @@ import {
   assistantTurnContent,
   assistantTurnMessages,
   assistantTurnResponseDuration,
+  assistantTurnResponseOutputIsEstimated,
   assistantTurnResponseOutputTokens,
   assistantTurnUsage,
   reuseReadonlyMap,
@@ -392,6 +393,7 @@ export const AssistantTurn = memo(function AssistantTurn({
             usage={usage}
             responseDurationMs={responseDurationMs}
             responseOutputTokens={responseOutputTokens}
+            responseOutputEstimated={assistantTurnResponseOutputIsEstimated(entry)}
           />
         ) : null}
         {complete && actionMessage ? (

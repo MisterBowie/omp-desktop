@@ -107,6 +107,63 @@ describe("message streaming", () => {
     expect(entry && "usage" in entry).toBe(false);
   });
 
+  it("carries the runtime's measured request duration for generation speed", () => {
+    // The pinned runtime ends a stream with `message_end` (never a
+    // `message_update` "done"), and providers stamp the request's own
+    // `duration` on that final message. Generation speed divides output tokens
+    // by it, so a missing value leaves the speed blank. host-core stores the
+    // field as whole milliseconds, so a fractional measurement is rounded.
+    let now = 1_000;
+    const c = new OmpEventConverter({ sessionId: "s1", now: () => now });
+    const partial = { role: "assistant", content: [], timestamp: 1_000 };
+    c.convert({ type: "message_start", message: partial });
+    now = 6_000;
+    const end = c.convert({
+      type: "message_end",
+      message: {
+        ...partial,
+        content: [{ type: "text", text: "done" }],
+        stopReason: "stop",
+        usage: { input: 100, output: 400, cacheRead: 0, cacheWrite: 0, totalTokens: 500 },
+        duration: 4_000.4,
+      },
+    });
+    expect(end[0]).toMatchObject({
+      type: "message_end",
+      message: { status: "complete", responseDurationMs: 4_000, usage: { outputTokens: 400 } },
+    });
+  });
+
+  it("times a stream the runtime did not measure from its first frame", () => {
+    let now = 1_000;
+    const c = new OmpEventConverter({ sessionId: "s1", now: () => now });
+    const partial = { role: "assistant", content: [] };
+    c.convert({ type: "message_start", message: partial });
+    now = 3_500;
+    const end = c.convert({
+      type: "message_end",
+      message: { ...partial, content: [{ type: "text", text: "partial" }], stopReason: "aborted" },
+    });
+    expect(end[0]).toMatchObject({
+      type: "message_end",
+      message: { status: "aborted", responseDurationMs: 2_500 },
+    });
+  });
+
+  it("reads the measured request duration back from history entries", () => {
+    const row = converter().convertEntry({
+      id: "e1",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "done" }],
+        stopReason: "stop",
+        usage: { input: 10, output: 50, cacheRead: 0, cacheWrite: 0, totalTokens: 60 },
+        duration: 1_250,
+      },
+    });
+    expect(row).toMatchObject({ role: "assistant", status: "complete", responseDurationMs: 1_250 });
+  });
+
   it("keeps the message id stable when the turn ends with a final message", () => {
     const c = converter();
     const message = { role: "assistant", content: [{ type: "text", text: "done" }] };

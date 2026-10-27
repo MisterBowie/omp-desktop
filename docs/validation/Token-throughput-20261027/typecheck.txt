@@ -1,0 +1,10 @@
+$ (cd app) pnpm --filter @pi-desktop/desktop typecheck && pnpm --filter @pi-desktop/omp-runtime typecheck
+# exit 0
+
+> @pi-desktop/desktop@0.1.6 typecheck /Users/vv/person/omp-desktop/.worktrees/token-throughput/app/apps/desktop
+> tsc -p tsconfig.json --noEmit
+
+
+> @pi-desktop/omp-runtime@0.1.6 typecheck /Users/vv/person/omp-desktop/.worktrees/token-throughput/app/packages/omp-runtime
+> tsc -p tsconfig.json --noEmit
+

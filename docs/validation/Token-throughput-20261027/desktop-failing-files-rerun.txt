@@ -1,0 +1,136 @@
+$ (cd app/apps/desktop) env -u SSH_ASKPASS node --test test/npm-executable.test.mjs test/omp-desktop-capabilities.test.mjs test/omp-execution-policy-e2e.test.mjs test/omp-runtime-launcher.test.mjs test/omp-runtime-state-e2e.test.mjs test/omp-session-turn-fence-e2e.test.mjs test/omp-worktree-e2e.test.mjs
+# exit 1
+✔ selected npm uses its directory PATH for both stages, without inheriting secrets or config (1289.267ms)
+✔ symlinked npm keeps the selected bin directory, not the real npm-cli directory (813.279375ms)
+✔ invalid selections and missing Node are unavailable; no-dependency skips remain unchanged (4.255791ms)
+✔ missing default npm and missing default Node produce structured unavailable failures (18.881667ms)
+✔ npm --version nonzero and timeout reject the selected tool (10799.892125ms)
+✔ registry/network/nonzero install failures never masquerade as unavailable tools (1643.944042ms)
+✔ selected executable still cannot install an unsafe resolved lockfile (808.317916ms)
+✔ Windows selected .cmd uses adjacent node + npm-cli with shell disabled even for metacharacters (3.9985ms)
+✔ version validation rejects empty, unrelated, Node and oversized output without disclosing stdout (5109.208958ms)
+✔ Node validation requires the leading v (1117.119125ms)
+✔ short install budgets cap validation and include its time in both install stages (7758.527584ms)
+✔ timeout kills resistant descendants after their group leader exits with ignored stdio (1526.382666ms)
+✔ the snapshot assembles builtin, plugin, then user skills in PI order (1.570583ms)
+✔ activation scope filters plugin skills out of the catalog (0.370542ms)
+✔ group memory wins and the legacy fallback answers when the group has none (0.365958ms)
+✔ a failed memory read is best-effort: the catalog still arrives (0.225458ms)
+✔ edits and removals are visible on the very next snapshot (0.263791ms)
+✔ the gate's prompt blocks are byte-identical to the PI prompt helpers (23.514292ms)
+✖ the mode composer preserves pinned PI operating rules with the OMP host identity (257.549042ms)
+✖ M5/T20-C end-to-end: PI execution-time permissions on the patched runtime (2.751667ms)
+✔ an explicit runtime path wins and is the only candidate considered (1.521959ms)
+✔ an unusable explicit path is an error, not a reason to search elsewhere (1.560041ms)
+✔ a packaged build admits only a resource that matches its provenance (4.603459ms)
+✔ a packaged build ignores every development channel (2.401083ms)
+✔ a packaged build refuses a tampered or absent provenance manifest (18.357959ms)
+✔ an unpackaged build finds the pinned submodule launcher by walking up (1.322542ms)
+✖ this worktree resolves its own pinned launcher (0.76625ms)
+✔ the product identity is independent of the fork it came from (0.190875ms)
+✔ the data-directory resolver never lands on the fork's directory (13.547541ms)
+✔ development builds disable automatic updates and the feed is this product's (0.554709ms)
+✔ a refused bundled resource keeps its reason instead of a generic missing runtime (2.032875ms)
+✔ a packaged build resolves the gate only from verified resources (3.175375ms)
+✖ M5/T20-B1 end-to-end: production mode/policy state and contract catalog on the patched runtime (2.37475ms)
+✖ M5/T20-B1 third repair: a stop during turn-fence preparation never submits the canceled prompt (2.832ms)
+✖ isolated OMP: approval, project switch, cancellation, native restore, reviewed merge and deletion (1.215125ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 29
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 31048.40825
+
+✖ failing tests:
+
+test at test/omp-desktop-capabilities.test.mjs:215:1
+✖ the mode composer preserves pinned PI operating rules with the OMP host identity (257.549042ms)
+  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/Users/vv/person/omp-desktop/.worktrees/token-throughput/upstream/pi-desktop/packages/agent-runtime/src/mode-prompts.ts' imported from /Users/vv/person/omp-desktop/.worktrees/token-throughput/app/apps/desktop/test/omp-desktop-capabilities.test.mjs
+      at finalizeResolution (node:internal/modules/esm/resolve:274:11)
+      at moduleResolve (node:internal/modules/esm/resolve:864:10)
+      at defaultResolve (node:internal/modules/esm/resolve:990:11)
+      at nextResolve (node:internal/modules/esm/hooks:748:28)
+      at resolve (file:///Users/vv/person/omp-desktop/.worktrees/token-throughput/app/apps/desktop/test/helpers/ts-import-hooks.mjs:15:12)
+      at nextResolve (node:internal/modules/esm/hooks:748:28)
+      at Hooks.resolve (node:internal/modules/esm/hooks:240:30)
+      at MessagePort.handleMessage (node:internal/modules/esm/worker:201:24)
+      at [nodejs.internal.kHybridDispatch] (node:internal/event_target:827:20)
+      at MessagePort.<anonymous> (node:internal/per_context/messageport:23:28) {
+    code: 'ERR_MODULE_NOT_FOUND',
+    url: 'file:///Users/vv/person/omp-desktop/.worktrees/token-throughput/upstream/pi-desktop/packages/agent-runtime/src/mode-prompts.ts'
+  }
+
+test at test/omp-execution-policy-e2e.test.mjs:102:1
+✖ M5/T20-C end-to-end: PI execution-time permissions on the patched runtime (2.751667ms)
+  Error [PatchError]: source does not look like the OMP checkout: /Users/vv/person/omp-desktop/.worktrees/token-throughput/upstream/oh-my-pi
+      at validateSource (file:///Users/vv/person/omp-desktop/.worktrees/token-throughput/app/scripts/omp-patch.mjs:201:11)
+      at preparePatchedTree (file:///Users/vv/person/omp-desktop/.worktrees/token-throughput/app/scripts/omp-patch.mjs:585:22)
+      at TestContext.<anonymous> (file:///Users/vv/person/omp-desktop/.worktrees/token-throughput/app/apps/desktop/test/omp-execution-policy-e2e.test.mjs:109:28)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1081:25)
+      at Test.start (node:internal/test_runner/test:978:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:332:17)
+
+test at test/omp-runtime-launcher.test.mjs:261:1
+✖ this worktree resolves its own pinned launcher (0.76625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '/Users/vv/person/omp-desktop/upstream/oh-my-pi/packages/coding-agent/scripts/omp'
+  - '/Users/vv/person/omp-desktop/.worktrees/token-throughput/upstream/oh-my-pi/packages/coding-agent/scripts/omp'
+  
+      at TestContext.<anonymous> (file:///Users/vv/person/omp-desktop/.worktrees/token-throughput/app/apps/desktop/test/omp-runtime-launcher.test.mjs:268:10)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1081:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:763:18)
+      at Test.postRun (node:internal/test_runner/test:1210:19)
+      at Test.run (node:internal/test_runner/test:1138:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:763:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '/Users/vv/person/omp-desktop/upstream/oh-my-pi/packages/coding-agent/scripts/omp',
+    expected: '/Users/vv/person/omp-desktop/.worktrees/token-throughput/upstream/oh-my-pi/packages/coding-agent/scripts/omp',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/omp-runtime-state-e2e.test.mjs:170:1
+✖ M5/T20-B1 end-to-end: production mode/policy state and contract catalog on the patched runtime (2.37475ms)
+  Error [PatchError]: source does not look like the OMP checkout: /Users/vv/person/omp-desktop/.worktrees/token-throughput/upstream/oh-my-pi
+      at validateSource (file:///Users/vv/person/omp-desktop/.worktrees/token-throughput/app/scripts/omp-patch.mjs:201:11)
+      at preparePatchedTree (file:///Users/vv/person/omp-desktop/.worktrees/token-throughput/app/scripts/omp-patch.mjs:585:22)
+      at TestContext.<anonymous> (file:///Users/vv/person/omp-desktop/.worktrees/token-throughput/app/apps/desktop/test/omp-runtime-state-e2e.test.mjs:178:28)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1081:25)
+      at Test.start (node:internal/test_runner/test:978:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:332:17)
+
+test at test/omp-session-turn-fence-e2e.test.mjs:100:1
+✖ M5/T20-B1 third repair: a stop during turn-fence preparation never submits the canceled prompt (2.832ms)
+  Error [PatchError]: source does not look like the OMP checkout: /Users/vv/person/omp-desktop/.worktrees/token-throughput/upstream/oh-my-pi
+      at validateSource (file:///Users/vv/person/omp-desktop/.worktrees/token-throughput/app/scripts/omp-patch.mjs:201:11)
+      at preparePatchedTree (file:///Users/vv/person/omp-desktop/.worktrees/token-throughput/app/scripts/omp-patch.mjs:585:22)
+      at TestContext.<anonymous> (file:///Users/vv/person/omp-desktop/.worktrees/token-throughput/app/apps/desktop/test/omp-session-turn-fence-e2e.test.mjs:106:28)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1081:25)
+      at Test.start (node:internal/test_runner/test:978:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:332:17)
+
+test at test/omp-worktree-e2e.test.mjs:20:1
+✖ isolated OMP: approval, project switch, cancellation, native restore, reviewed merge and deletion (1.215125ms)
+  AssertionError [ERR_ASSERTION]: build the current host before running this acceptance test
+      at TestContext.<anonymous> (file:///Users/vv/person/omp-desktop/.worktrees/token-throughput/app/apps/desktop/test/omp-worktree-e2e.test.mjs:24:12)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1081:25)
+      at Test.start (node:internal/test_runner/test:978:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:332:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

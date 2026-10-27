@@ -1,0 +1,15 @@
+$ (cd app) pnpm lint
+# exit 0
+
+> pi-desktop@0.1.6 lint /Users/vv/person/omp-desktop/.worktrees/token-throughput/app
+> pnpm lint:biome && pnpm -r --if-present lint
+
+
+> pi-desktop@0.1.6 lint:biome /Users/vv/person/omp-desktop/.worktrees/token-throughput/app
+> biome lint
+
+Checked 94 files in 61ms. No fixes applied.
+Scope: 12 of 13 workspace projects
+apps/desktop lint$ node ../../scripts/check-style-tokens.mjs
+apps/desktop lint: style tokens OK
+apps/desktop lint: Done

@@ -15,7 +15,7 @@ const { OmpRuntimeSupervisor, ensureSessionStateDir, findGateExtension, verifyBu
 const { createOmpSessionBridge } = await import("../electron/main/runtime/omp-session.ts");
 const { projectMessageEnd, upsertLiveSessionMessage } = await import("../src/lib/session-transcript.ts");
 const { latestTurnContextInspector } = await import("../src/lib/latest-turn-context.ts");
-const { calculateContextUsage } = await import("../src/lib/context-usage.ts");
+const { calculateContextUsage, calculateTokenRate } = await import("../src/lib/context-usage.ts");
 
 // E2E-OMP-context-ring-keeps-last-usage: every model request starts with the
 // provider's all-zero usage placeholder. The composer ring must keep the last
@@ -106,4 +106,80 @@ test("native context ring keeps the last reported usage while the next request s
   const after = latestTurnContextInspector(messages, {}, []);
   assert.deepEqual(after?.usage, assistantEnds[1].usage);
   assert.ok(after.usage.inputTokens > firstUsage.inputTokens, "the ring moves to the newest request once it reports");
+});
+
+// E2E-OMP-turn-generation-speed: the runtime measures each model request and
+// stamps the duration on the final assistant message. Live and restored rows
+// must both carry it, or generation speed (tokens/s) has no denominator.
+test("native turns carry the measured request duration for generation speed in live and restored rows", {
+  skip: !process.env.OMP_BUNDLED_RESOURCES && "requires verified native resources",
+  timeout: 60_000,
+}, async (t) => {
+  const resources = verifyBundledRuntime({ resourcesPath: process.env.OMP_BUNDLED_RESOURCES });
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "omp-generation-speed-")));
+  const ended = Promise.withResolvers();
+  let provider;
+  let supervisor;
+  let bridge;
+  t.after(async () => {
+    const disposed = await bridge?.dispose();
+    const stopped = await supervisor?.stop();
+    await provider?.close();
+    rmSync(root, { recursive: true, force: true });
+    if (disposed) assert.equal(disposed.ok, true);
+    if (stopped) {
+      assert.equal(stopped.reaped, true);
+      assert.equal(stopped.cleaned, true);
+    }
+  });
+  provider = await FakeProvider.start();
+  const sessionDir = ensureSessionStateDir(root);
+  const streamMs = 400;
+  provider.script([
+    { thinking: "Answer directly.", text: "The fixture is in place.", finish: "stop", delayMs: streamMs,
+      usage: { prompt_tokens: 1_200, completion_tokens: 80 } },
+  ]);
+  supervisor = new OmpRuntimeSupervisor({
+    dataRoot: root, launcherPath: resources.path, sessionDir,
+    desktopStateRequired: false,
+    args: ["--model", "m1fake/local-model", "--trusted-extension", findGateExtension(here)],
+    extraEnv: { OMP_DESKTOP_GATE_TOOLS: "read", OMP_DESKTOP_GATE_MODE: "allow" },
+    prepareRun: (paths) => writeModelsConfig(paths.agentDir, { baseUrl: provider.baseUrl }),
+  });
+  let nativeRef;
+  let messages = [];
+  const assistantEnds = [];
+  bridge = createOmpSessionBridge({
+    createSupervisor: () => supervisor, launcher: resources.path, isPackaged: false, appPath: here,
+    sessionDir, gateResolver: () => findGateExtension(here),
+    persistNativeSession: (value) => { nativeRef = value; },
+    hostTools: { catalog: async () => [], executor: () => async () => { throw new Error("No host tools registered"); } },
+    emitAgentEvent: ({ event }) => {
+      if (event.type === "message_start") messages = upsertLiveSessionMessage(messages, event.message);
+      if (event.type === "message_end") {
+        messages = projectMessageEnd(messages, event);
+        if (event.message.role === "assistant") assistantEnds.push(event.message);
+      }
+      if (event.type === "agent_end") ended.resolve();
+    },
+  });
+
+  const sessionId = "generation-speed";
+  assert.equal((await bridge.prompt({ sessionId, projectPath: root, content: "Check the fixture" })).accepted, true);
+  await ended.promise;
+
+  assert.equal(assistantEnds.length, 1);
+  const live = assistantEnds[0];
+  assert.equal(live.usage?.outputTokens, 80);
+  assert.ok(Number.isInteger(live.responseDurationMs), `whole milliseconds: ${live.responseDurationMs}`);
+  assert.ok(live.responseDurationMs >= streamMs, `the request was held ${streamMs} ms: ${live.responseDurationMs}`);
+  const inspector = latestTurnContextInspector(messages, {}, []);
+  assert.equal(inspector?.responseDurationMs, live.responseDurationMs);
+  const speed = calculateTokenRate(inspector.usage.outputTokens, inspector.responseDurationMs);
+  assert.ok(speed > 0 && speed <= 80 / (streamMs / 1_000), `generation speed ${speed} tokens/s`);
+
+  const history = await bridge.readHistory({ sessionId, projectPath: root, ...nativeRef, adapterVersion: 1 });
+  const restored = history.messages.filter((message) => message.role === "assistant");
+  assert.equal(restored.length, 1);
+  assert.equal(restored[0].responseDurationMs, live.responseDurationMs, "the restored row keeps the native measurement");
 });

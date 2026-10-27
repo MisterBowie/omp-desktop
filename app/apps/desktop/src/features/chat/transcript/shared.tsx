@@ -32,7 +32,10 @@ import { useVerifiedChatText } from "../../../hooks/use-verified-chat-text";
 import { isHtmlFilePath } from "../../../lib/chat-links";
 import type { SourcePositionProps } from "../../../lib/markdown-source";
 import { getToolAction, type ToolAction } from "../../../lib/tool-display";
-import { calculateTokenRate } from "../../../lib/context-usage";
+import {
+  calculateTokenRate,
+  turnUsageBreakdown,
+} from "../../../lib/context-usage";
 import { useAppStore } from "../../../stores/app-store";
 import { Markdown, useCopy } from "../../../components/Markdown";
 import {
@@ -60,6 +63,7 @@ import {
   IconX,
 } from "../../../components/icons";
 import { TooltipButton } from "../../../components/ui";
+import { TurnUsageCapsule } from "./TurnUsageCapsule";
 
 /**
  * Legacy message navigation reveals the row it names, at message precision.
@@ -113,19 +117,25 @@ export function MessageMeta({
   usage,
   responseDurationMs,
   responseOutputTokens,
+  responseOutputEstimated,
 }: {
   modelId?: string;
   usage?: MessageUsage;
   responseDurationMs?: number;
   responseOutputTokens?: number;
+  responseOutputEstimated?: boolean;
 }) {
   const { t } = useTranslation();
   const throughput = calculateTokenRate(
     responseOutputTokens ?? usage?.outputTokens ?? 0,
     responseDurationMs,
   );
+  // Completed turns with usage show the full turn capsule (speed and total);
+  // only usage-less turns keep the legacy estimated-throughput chip.
+  const showTurnUsage =
+    usage !== undefined && turnUsageBreakdown(usage).totalTokens > 0;
   const showThroughput = !usage && throughput !== undefined;
-  if (!modelId && !showThroughput) {
+  if (!modelId && !showThroughput && !showTurnUsage) {
     return null;
   }
   return (
@@ -134,6 +144,13 @@ export function MessageMeta({
         <span className="message-meta-chip model" title={modelId}>
           {modelId}
         </span>
+      ) : null}
+      {usage && showTurnUsage ? (
+        <TurnUsageCapsule
+          usage={usage}
+          throughput={throughput}
+          estimated={responseOutputEstimated}
+        />
       ) : null}
       {showThroughput ? (
         <span className="message-meta-chip throughput">

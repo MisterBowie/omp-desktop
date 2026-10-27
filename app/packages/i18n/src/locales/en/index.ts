@@ -463,6 +463,8 @@ export const en = {
     usageContextAriaRemaining: "remaining",
     usageContextAriaUsed: "used",
     usageTurnTotal: "This turn",
+    usageTurnAria: "This turn: {{speed}}, {{count}} tokens. Show breakdown.",
+    usageTotal: "Total",
     usageThroughputLabel: "Generation speed",
     usageThroughput: "{{count}} tokens/s",
     usageThroughputEstimated: "≈ {{count}} tokens/s",

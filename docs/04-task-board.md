@@ -28,6 +28,7 @@ R01–R05 的执行记录与检查结果见 [Project-consolidation-20261022](val
 | R15 | 转录错误卡片可关闭：关闭按钮按行 id 与失败签名在本次运行内隐藏卡片，不改转录与主机数据（[证据](validation/Error-card-dismiss-20261024.md)） | 用户反馈 | `codex/dismiss-error-card` | 已完成：源码、组件测试与本地开发版界面验证通过；已并入 `main`（`cf1b42ad`）。用户 2026-10-24 决定以 0.1.6 正式版发布：r2 候选 run40086409361 整轮通过，`v0.1.6`（`f0c9399a`）由 run40111213547 发布并回读 28 项资产，旧版本未改动（[发布证据](validation/Release-016-20261024.md)） |
 | R17 | 上下文圆环思考中显示 100%：OMP 每次请求开始时的全 0 占位用量被当作最新用量；适配层改为省略全 0 用量（与 Pi 一致），流式期间圆环保持上次读数（[证据](validation/Context-ring-usage-20261026.md)） | 用户反馈 | `codex/context-ring-usage` | 已完成：单元、原生运行时 e2e（0.1.6 资源）与桌面全量通过（`omp-plan-submit-e2e` 时序不稳定，与本改动无关），修复前反向验证失败；用户 2026-10-26 要求并入 `main`（快进，未推送）并本地打包；未做真实窗口验证，发布方式待用户决定 |
 | R18 | 集成 OMP 插件市场：插件页改由 OMP 自身 `omp plugin` CLI 管理插件源与安装，存储隔离在数据目录；会话完整加载插件（含 MCP、hooks、工具模块，用户 2026-10-27 决定先放开、审批另议）；移除旧 PI-Desktop 目录市场（[ADR 0333](../app/docs/adr/0333-omp-plugin-marketplace.md)，[证据](validation/OMP-marketplace-20261027.md)） | 用户请求 | `codex/omp-marketplace` | 已实现并验证：真实运行时 e2e、桌面全量、类型检查、架构检查与真实窗口安装烟测通过；用户 2026-10-27 要求并入 `main`（快进 `5c6582b7`，未推送）并本地打包，安装态冒烟 8/8；ADR 0333 状态仍为 Proposed；host-core `market.*` 删除归入 R12，扩展截图待重新生成 |
+| R19 | OMP 会话 token/s 生成速度：适配层把 OMP 原生 `duration` 映射为 `responseDurationMs`（实时与历史，整数毫秒，缺失时秒表回退并修正置空顺序）；移植上游 0.21.0 每轮用量胶囊（速度 · 总量，悬停看构成）（[证据](validation/Token-throughput-20261027.md)） | 用户请求 | `codex/token-throughput` | 已实现并验证：单元与原生运行时 e2e 修复前反向失败、修复后通过；真实 Electron 渲染胶囊交互与截图；桌面全量 3240 通过、0 失败（1 项 npm 超时取消，与本改动无关）。按用户要求提交并快进合并到本地 `main`（未推送），待用户测试；未做安装包与真实模型验证 |
 
 ## 准备工作
 

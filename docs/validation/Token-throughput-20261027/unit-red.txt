@@ -1,0 +1,135 @@
+$ (cd app/packages/omp-runtime) npx vitest run src/session/events.test.ts -t "duration|first frame"
+# exit 1
+
+ RUN  v4.1.12 /Users/vv/person/omp-desktop/.worktrees/token-throughput/app/packages/omp-runtime
+
+ ❯ src/session/events.test.ts (43 tests | 3 failed | 40 skipped) 10ms
+     ↓ streams text and thinking deltas under one message id
+     ↓ omits reasoning tokens the runtime never reports
+     ↓ drops the all-zero usage placeholder a request starts with
+     × carries the runtime's measured request duration for generation speed 8ms
+     × times a stream the runtime did not measure from its first frame 1ms
+     × reads the measured request duration back from history entries 1ms
+     ↓ keeps the message id stable when the turn ends with a final message
+     ↓ reports a failed turn as a typed error plus a terminal row
+     ↓ preserves the native error on message_end after a failed stream update
+     ↓ keeps native aborted completions distinct from successful and failed replies
+     ↓ bounds a provider diagnostic while retaining its typed durable error
+     ↓ marks an aborted turn as aborted without inventing an error
+     ↓ preserves OMP-only fields instead of folding them into args
+     ↓ forwards a partial result verbatim
+     ↓ keeps an argument-stream projection reachable
+     ↓ reports a denied call with the runtime's own reason
+     ↓ folds toolResult messages into the tool row
+     ↓ refuses to route a tool frame without an id
+     ↓ completes only on a terminal agent_end and lists the run's message ids
+     ↓ reports usage on turn_end
+     ↓ surfaces an error notice and counts informational ones
+     ↓ counts unmapped kinds instead of throwing
+     ↓ ignores a frame that is not an object
+     ↓ bounds a large ASCII string result to the whole-row budget
+     ↓ bounds multiple text parts and drops non-text blocks
+     ↓ shares one budget across content and details
+     ↓ preserves valid Unicode while bounding CJK and emoji text
+     ↓ never splits a surrogate pair when a leading ASCII char pushes the cut inside one
+     ↓ charges JSON escaping, not raw code units
+     ↓ charges object keys and stops adding them past the budget
+     ↓ charges array values and non-string scalars
+     ↓ bounds a string-form assistant message instead of bypassing truncation
+     ↓ shares the budget across assistant content and thinking
+     ↓ preserves small supported payloads exactly
+     ↓ keeps the entry id stable across reads and a fresh converter (reset)
+     ↓ preserves a short final answer when oversized thinking spends the budget
+     ↓ keeps a short final answer with escapes when the budget is tight
+     ↓ keeps a short final answer through the live message_end path
+     ↓ marks a large string that precedes later fields as truncated
+     ↓ re-keys the renderer's optimistic user row instead of minting a second one
+     ↓ stores the user's inline images and carries them on the persisted row; without a store they stay off
+     ↓ consumes the binding once: a later user frame is an ordinary row
+     ↓ never re-keys without an admission, and a discarded binding stays discarded
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 40 skipped (43)
+   Start at  15:59:36
+   Duration  332ms (transform 180ms, setup 0ms, import 195ms, tests 10ms, environment 0ms)
+
+
+--- stderr ---
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/events.test.ts > message streaming > carries the runtime's measured request duration for generation speed
+AssertionError: expected { type: 'message_end', …(1) } to match object { type: 'message_end', …(1) }
+(4 matching properties omitted from actual)
+
+- Expected
++ Received
+
+@@ -1,8 +1,7 @@
+  {
+    "message": {
+-     "responseDurationMs": 4000,
+      "status": "complete",
+      "usage": {
+        "outputTokens": 400,
+      },
+    },
+
+ ❯ src/session/events.test.ts:131:20
+    129|       },
+    130|     });
+    131|     expect(end[0]).toMatchObject({
+       |                    ^
+    132|       type: "message_end",
+    133|       message: { status: "complete", responseDurationMs: 4_000, usage:…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/session/events.test.ts > message streaming > times a stream the runtime did not measure from its first frame
+AssertionError: expected { type: 'message_end', …(1) } to match object { type: 'message_end', …(1) }
+(4 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "message": {
+-     "responseDurationMs": 2500,
+      "status": "aborted",
+    },
+    "type": "message_end",
+  }
+
+ ❯ src/session/events.test.ts:147:20
+    145|       message: { ...partial, content: [{ type: "text", text: "partial"…
+    146|     });
+    147|     expect(end[0]).toMatchObject({
+       |                    ^
+    148|       type: "message_end",
+    149|       message: { status: "aborted", responseDurationMs: 2_500 },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/session/events.test.ts > message streaming > reads the measured request duration back from history entries
+AssertionError: expected { id: 'omp:s1:entry:e1', …(5) } to match object { role: 'assistant', …(2) }
+(9 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "responseDurationMs": 1250,
+    "role": "assistant",
+    "status": "complete",
+  }
+
+ ❯ src/session/events.test.ts:164:17
+    162|       },
+    163|     });
+    164|     expect(row).toMatchObject({ role: "assistant", status: "complete",…
+       |                 ^
+    165|   });
+    166|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

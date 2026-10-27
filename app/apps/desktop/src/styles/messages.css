@@ -1095,6 +1095,210 @@
   text-overflow: ellipsis;
 }
 
+/* Turn usage capsule: the completed turn's speed and total stay visible; the
+   composition and exact counts live in the hover/focus popover. */
+.turn-usage-capsule {
+  display: inline-flex;
+  min-height: 20px;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--ds-tile);
+  padding: 0 8px;
+  color: var(--ds-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-xs);
+  line-height: var(--leading-compact);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.turn-usage-capsule:hover,
+.turn-usage-capsule[data-open="true"] {
+  background: var(--ds-tile-hover);
+  color: var(--ds-text-primary);
+  box-shadow: inset 0 0 0 1px var(--ds-border-subtle);
+}
+
+.turn-usage-capsule:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--ds-text-primary) 44%, transparent);
+  outline-offset: 2px;
+}
+
+/* The bar is a flex row of proportional segments. Segment order matches the
+   popover rows: cache read, input, output, then cache write when present. */
+.turn-usage-bar {
+  display: flex;
+  width: 36px;
+  height: 4px;
+  flex: 0 0 36px;
+  gap: 1px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
+}
+
+.turn-usage-seg {
+  min-width: 1px;
+  flex-basis: 0;
+  border-radius: var(--radius-full);
+}
+
+.turn-usage-seg.cache {
+  background: color-mix(in oklab, var(--ds-text-primary) 24%, transparent);
+}
+
+.turn-usage-seg.input {
+  background: color-mix(in oklab, var(--ds-text-primary) 51%, transparent);
+}
+
+.turn-usage-seg.output {
+  background: color-mix(in oklab, var(--ds-text-primary) 86%, transparent);
+}
+
+.turn-usage-seg.write {
+  background: color-mix(in oklab, var(--ds-text-primary) 36%, transparent);
+}
+
+.turn-usage-separator {
+  color: var(--ds-text-faint);
+}
+
+.turn-usage-total {
+  color: var(--ds-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.turn-usage-capsule:hover .turn-usage-total,
+.turn-usage-capsule[data-open="true"] .turn-usage-total {
+  color: var(--ds-text-secondary);
+}
+
+.turn-usage-popover {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  width: min(268px, calc(100vw - 32px));
+  flex-direction: column;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-md-plus);
+  background: var(--ds-bg-elevated-opaque);
+  padding: 12px;
+  color: var(--ds-text-primary);
+  box-shadow: var(--ds-shadow-dialog);
+  font-size: var(--text-xs);
+  line-height: var(--leading-body);
+  text-align: left;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  visibility: hidden;
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-ease-out),
+    transform var(--motion-duration-fast) var(--motion-ease-out),
+    visibility 0s linear var(--motion-duration-fast);
+}
+
+.turn-usage-popover.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.turn-usage-popover-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.turn-usage-popover-title {
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-compact);
+}
+
+.turn-usage-popover-total {
+  color: var(--ds-text-primary);
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-strong);
+  line-height: var(--leading-compact);
+  font-variant-numeric: tabular-nums;
+}
+
+.turn-usage-popover .turn-usage-bar {
+  width: 100%;
+  flex: 0 0 auto;
+  height: 4px;
+  gap: 2px;
+  margin: 11px 0 8px;
+}
+
+.turn-usage-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+}
+
+.turn-usage-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 2px 0;
+  font-size: var(--text-xs);
+  line-height: var(--leading-body);
+}
+
+.turn-usage-row dt {
+  margin: 0;
+  color: var(--ds-text-muted);
+  font-weight: var(--font-weight-normal);
+}
+
+.turn-usage-row dd {
+  margin: 0;
+  color: var(--ds-text-secondary);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.turn-usage-popover-footer {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-compact);
+}
+
+.turn-usage-popover-footer strong {
+  color: var(--ds-text-primary);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .turn-usage-capsule,
+  .turn-usage-popover {
+    transition: none;
+  }
+}
+
 .context-inspector {
   position: relative;
   display: inline-flex;

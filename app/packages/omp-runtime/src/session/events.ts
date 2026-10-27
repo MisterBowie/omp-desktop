@@ -74,6 +74,8 @@ type OmpMessage = {
   /** Present on `role: "toolResult"` messages; distinguishes a failed tool. */
   isError?: boolean;
   timestamp?: number;
+  /** Provider-measured request time in ms, stamped on the final assistant message. */
+  duration?: number;
 };
 
 type OmpAssistantMessageEvent = {
@@ -509,13 +511,13 @@ export class OmpEventConverter {
     }
     if (update.type === "done") {
       const finished = update.message ?? message;
-      return this.finishAssistant(streaming.id, finished, assistantStatus(finished));
+      return this.finishAssistant(streaming.id, finished, assistantStatus(finished), streaming.startedAt);
     }
     if (update.type === "error") {
       const failed = update.error ?? message;
       const aborted = update.reason === "aborted";
       return [
-        ...this.finishAssistant(streaming.id, failed, aborted ? "aborted" : "error"),
+        ...this.finishAssistant(streaming.id, failed, aborted ? "aborted" : "error", streaming.startedAt),
         ...(aborted
           ? []
           : [
@@ -568,37 +570,40 @@ export class OmpEventConverter {
       return [];
     }
     if (role === "assistant") {
-      const id = this.streaming?.role === "assistant" ? this.streaming.id : this.mintId();
+      const streaming = this.streaming?.role === "assistant" ? this.streaming : null;
       this.streaming = null;
-      return this.finishAssistant(id, message, assistantStatus(message));
+      return this.finishAssistant(
+        streaming?.id ?? this.mintId(),
+        message,
+        assistantStatus(message),
+        streaming?.startedAt,
+      );
     }
     const id = this.streaming?.role === role ? this.streaming.id : this.mintId();
     this.streaming = null;
     return [{ type: "message_end", message: this.toUiMessage(id, message, role, "complete") }];
   }
 
-  /** The desktop's completion for an assistant message, with its usage. */
+  /**
+   * The desktop's completion for an assistant message, with its usage and the
+   * duration generation speed divides by: the provider's own measurement when
+   * the runtime stamped one, else this converter's stopwatch from the stream's
+   * first frame (an aborted or failed stream can end unmeasured).
+   */
   private finishAssistant(
     id: string,
     message: OmpMessage,
     status: "complete" | "error" | "aborted",
+    startedAt: number | undefined,
   ): AgentEvent[] {
-    const streaming = this.streaming;
     const ui = this.toUiMessage(id, message, "assistant", status);
-    const durationMs =
-      streaming && streaming.id === id
-        ? Math.max(0, this.now() - streaming.startedAt)
-        : undefined;
+    const responseDurationMs =
+      ui.responseDurationMs ??
+      (startedAt !== undefined ? Math.max(0, this.now() - startedAt) : undefined);
     return [
       {
         type: "message_end",
-        message: {
-          ...ui,
-          // A stopped stream still has a measured duration: the desktop uses it
-          // for throughput when the provider reported no final usage.
-          ...(durationMs !== undefined ? { responseDurationMs: durationMs } : {}),
-          ...(durationMs !== undefined ? { responseOutputTokens: ui.usage?.outputTokens } : {}),
-        },
+        message: responseDurationMs !== undefined ? { ...ui, responseDurationMs } : ui,
       },
     ];
   }
@@ -614,6 +619,7 @@ export class OmpEventConverter {
     const usage = usageOf(message);
     const modelId = stringOr(message.model, undefined);
     const providerId = stringOr(message.provider, undefined);
+    const responseDurationMs = role === "assistant" ? measuredDurationMs(message) : undefined;
     const fixed = {
       id,
       role,
@@ -626,6 +632,7 @@ export class OmpEventConverter {
       ...(this.parentToolCallId ? { parentToolCallId: this.parentToolCallId } : {}),
       ...(this.agentName ? { agentName: this.agentName } : {}),
       ...(usage ? { usage } : {}),
+      ...(responseDurationMs !== undefined ? { responseDurationMs } : {}),
       ...(attachments.length ? { attachments } : {}),
       ...(role === "assistant" && status === "error" ? {
         // Provider diagnostics are untrusted payload too. Charge a bounded
@@ -1015,6 +1022,17 @@ function usageOf(message: OmpMessage | undefined): MessageUsage | undefined {
     ...(typeof usage.cacheWrite === "number" ? { cacheWriteTokens: usage.cacheWrite } : {}),
     totalTokens: total,
   };
+}
+
+/**
+ * The request time a provider measured for a final assistant message, in the
+ * whole milliseconds host-core persists; absent while the message streams.
+ */
+function measuredDurationMs(message: OmpMessage): number | undefined {
+  const duration = message.duration;
+  return typeof duration === "number" && Number.isFinite(duration) && duration > 0
+    ? Math.round(duration)
+    : undefined;
 }
 
 function toolMetaOf(
