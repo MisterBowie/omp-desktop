@@ -19,13 +19,9 @@ export {
   type StoreMarketplace,
 } from "./store.js";
 export {
-  buildDeclarativeView,
   inspectPluginComponents,
-  MARKETPLACE_VIEW_DIR,
   marketplaceRunSnapshot,
   projectMarketplacePlugins,
-  safeDeclaredPath,
-  VIEW_CONVENTIONAL_DIRS,
   type MarketplaceRunPlugin,
   type MarketplaceRunSnapshot,
 } from "./view.js";

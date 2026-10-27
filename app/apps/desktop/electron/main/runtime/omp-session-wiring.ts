@@ -15,7 +15,6 @@
  *      branches go through the host so a restart restores the same identity.
  */
 import {
-  MARKETPLACE_VIEW_DIR,
   MAX_SESSION_RECORD_BYTES,
   ompMemoryDirectory,
   projectMarketplacePlugins,
@@ -351,14 +350,9 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
           await writeOmpUserSubagents(join(paths.configRoot, "agent"), inputs.subagents);
           // The desktop's global instructions become the run's user-level AGENTS.md.
           await writeOmpGlobalInstructions(paths.home, inputs.instructions);
-          // Installed marketplace plugins arrive as declarative views only.
+          // Installed marketplace plugins load in full from the store (ADR 0333).
           if (inputs.marketplace) {
-            const projected = projectMarketplacePlugins({
-              snapshot: inputs.marketplace,
-              configRoot: paths.configRoot,
-              viewRoot: join(paths.runRoot, MARKETPLACE_VIEW_DIR),
-            });
-            for (const diagnostic of projected.diagnostics) deps.logger?.app("runtime", "warn", "marketplace plugin not projected", { data: diagnostic });
+            projectMarketplacePlugins({ snapshot: inputs.marketplace, configRoot: paths.configRoot });
           }
           state.fingerprint = inputs.fingerprint;
           state.pending = null;

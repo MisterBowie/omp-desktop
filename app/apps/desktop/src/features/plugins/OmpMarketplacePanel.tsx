@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import { Button, Input, TooltipButton, cx } from "../../components/ui";
 import { IconCheck, IconInfo, IconPlus, IconRefresh, IconSearch, IconTrash, IconTriangleAlert } from "../../components/icons";
 import { monogram } from "./model";
-import { OMP_COMPONENT_LABEL_KEYS, ompWithheldKinds, type OmpMarketItem } from "./omp-market-model";
+import { OMP_COMPONENT_LABEL_KEYS, ompExecutableKinds, type OmpMarketItem } from "./omp-market-model";
 import type { OmpMarketplaceModel } from "./useOmpMarketplace";
 
 /** The source a first-time user is offered: Anthropic's Claude Code plugin directory. */
@@ -219,7 +219,7 @@ export function OmpMarketplacePanel({ market, t }: { market: OmpMarketplaceModel
       ) : (
         <div className="plugins-card-grid" role="list">
           {visibleItems.map((item) => {
-            const withheld = ompWithheldKinds(item);
+            const executable = ompExecutableKinds(item);
             const version = item.installed?.version ?? item.plugin?.version;
             return (
               <article
@@ -263,10 +263,10 @@ export function OmpMarketplacePanel({ market, t }: { market: OmpMarketplaceModel
                     </span>
                   </span>
                   <span className="plugins-card-desc">{item.plugin?.description ?? ""}</span>
-                  {withheld.length > 0 ? (
-                    <span className="plugins-omp-withheld">
-                      {t("plugins.ompMarket.withheldBadge", {
-                        kinds: withheld.map((kind) => t(OMP_COMPONENT_LABEL_KEYS[kind])).join(", "),
+                  {executable.length > 0 ? (
+                    <span className="plugins-omp-executable">
+                      {t("plugins.ompMarket.executableBadge", {
+                        kinds: executable.map((kind) => t(OMP_COMPONENT_LABEL_KEYS[kind])).join(", "),
                       })}
                     </span>
                   ) : null}

@@ -1,7 +1,8 @@
-# ADR 0333: OMP plugin marketplace as declarative-only run views
+# ADR 0333: OMP plugin marketplace driven by the runtime's own CLI
 
-- Status: Proposed on 2026-10-27; implemented on `codex/omp-marketplace`, awaiting
-  user acceptance before merge.
+- Status: Proposed on 2026-10-27; implemented on `codex/omp-marketplace`.
+  On 2026-10-27 the user asked to load plugin MCP servers, hooks and tools
+  now and leave their approval design for later.
 - Related: ADR 0304 (capability-source ownership), ADR 0331 (OMP-only product),
   ADR 0332 (desktop-owned global instructions).
 
@@ -13,10 +14,7 @@ packages. Nothing it installed reached an OMP chat. OMP ships its own
 marketplace (`omp plugin marketplace add|remove|update`, `omp plugin
 install|uninstall|enable|disable|upgrade`), compatible with Claude Code plugin
 catalogs. An installed OMP plugin can carry skills, commands, agents and rules,
-but also MCP servers, hook scripts, custom tool modules, LSP and DAP servers.
-OMP imports tool modules at session start, even with `--trusted-extension`, so
-loading a plugin directory as-is would run third-party code outside the
-desktop's approval path.
+and also MCP servers, hook scripts, custom tool modules, LSP and DAP servers.
 
 ## Decision
 
@@ -35,13 +33,12 @@ desktop's approval path.
    names and `name@marketplace` ids are checked before the CLI runs. One queue
    keeps two CLI runs from racing on OMP's registries. Shutdown aborts the
    running command and refuses new ones.
-4. **Sessions see declarative views only.** Each run gets its own
-   `installed_plugins.json` pointing at a view directory in the run root. A view
-   holds links to `skills/`, `commands/`, `agents/`, `rules/`, manifest-declared
-   skill/command paths inside the plugin root, and a sanitized manifest. MCP
-   servers, hooks, tool modules, LSP/DAP and `package.json` extension entries
-   are absent, so they cannot load. The UI lists which components load and
-   which are withheld.
+4. **Sessions load installed plugins in full.** Each run gets its own
+   `installed_plugins.json` naming the enabled plugins' install directories in
+   the store. OMP then loads every component, including MCP servers, hooks,
+   tool modules, LSP and DAP servers. The UI lists the components that run
+   programs on each card and in the detail sheet, and the marketplace notice
+   asks users to install only plugins they trust.
 5. **Changes apply at the next prompt.** The store's run snapshot is part of
    the launch fingerprint, so an idle runtime is rebuilt before it runs with a
    stale plugin set. Runs set `marketplace.autoUpdate: off`; only explicit user
@@ -51,10 +48,13 @@ desktop's approval path.
 
 ## Consequences
 
-- Marketplace skills, commands, agents and rules work in OMP chats. Plugins
-  whose value is an MCP server, hook or tool module install but contribute
-  only their declarative parts. Opening those would need a separate approval
-  design.
+- Plugin code runs without a per-plugin approval. OMP imports tool modules
+  and starts MCP servers when a session starts, before any prompt, so the
+  desktop's tool approval cannot stop them. Hooks run on the runtime's tool
+  events. Installing a plugin is the trust decision.
+- Plugin MCP servers are started by OMP, next to the desktop's own MCP
+  servers. Whether their tool calls pass through the desktop permission gate
+  is not verified. A later decision should settle MCP ownership and approval.
 - The store is separate from the user's OMP data. Plugins installed with a CLI
   `omp` are not visible in the desktop, and the reverse holds, matching the
   isolation rule.

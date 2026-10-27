@@ -67,9 +67,9 @@ export function ompMarketCategories(items: readonly OmpMarketItem[]): string[] {
   return [...seen].sort((a, b) => a.localeCompare(b));
 }
 
-/** Withheld kinds to flag on a card: the install's real report wins over catalog metadata. */
-export function ompWithheldKinds(item: OmpMarketItem): OmpMarketComponentKind[] {
-  return item.installed ? item.installed.components.withheld : (item.plugin?.declaresWithheld ?? []);
+/** Executable kinds to flag on a card: the install's real report wins over catalog metadata. */
+export function ompExecutableKinds(item: OmpMarketItem): OmpMarketComponentKind[] {
+  return item.installed ? item.installed.components.executable : (item.plugin?.declaresExecutable ?? []);
 }
 
 export const OMP_COMPONENT_LABEL_KEYS: Record<OmpMarketComponentKind, string> = {

@@ -10,8 +10,8 @@
 export type OmpMarketSourceType = "github" | "git" | "url" | "local";
 
 /**
- * Plugin components. The first four are declarative content OMP Desktop loads
- * into sessions; the rest are withheld until a later decision opens them.
+ * Plugin components. The first four are declarative content; the rest run
+ * programs or connect to servers when a session loads the plugin.
  */
 export type OmpMarketComponentKind =
   | "skills"
@@ -69,13 +69,13 @@ export type OmpMarketPlugin = {
   keywords: string[];
   installable: boolean;
   unavailableReason?: OmpMarketUnavailableReason;
-  /** Withheld component kinds the catalog entry itself declares. */
-  declaresWithheld: OmpMarketComponentKind[];
+  /** Executable component kinds the catalog entry itself declares. */
+  declaresExecutable: OmpMarketComponentKind[];
 };
 
 export type OmpMarketInstalledComponents = {
   loaded: Partial<Record<OmpMarketLoadedComponent, number>>;
-  withheld: OmpMarketComponentKind[];
+  executable: OmpMarketComponentKind[];
 };
 
 export type OmpMarketInstalledPlugin = {

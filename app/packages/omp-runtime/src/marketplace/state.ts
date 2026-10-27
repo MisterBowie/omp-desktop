@@ -72,11 +72,11 @@ function pluginFromCatalog(marketplace: string, sourceType: string, entry: Store
         : entry.sourceKind === "relative" && sourceType === "url"
           ? "relative-source-in-url-catalog"
           : undefined;
-  const declaresWithheld: OmpMarketComponentKind[] = [];
-  if (entry.declares.mcp) declaresWithheld.push("mcp");
-  if (entry.declares.hooks) declaresWithheld.push("hooks");
-  if (entry.declares.lsp) declaresWithheld.push("lsp");
-  if (entry.declares.dap) declaresWithheld.push("dap");
+  const declaresExecutable: OmpMarketComponentKind[] = [];
+  if (entry.declares.mcp) declaresExecutable.push("mcp");
+  if (entry.declares.hooks) declaresExecutable.push("hooks");
+  if (entry.declares.lsp) declaresExecutable.push("lsp");
+  if (entry.declares.dap) declaresExecutable.push("dap");
   const description = bounded(entry.description, MAX_TEXT);
   const version = bounded(entry.version, 64);
   const authorName = bounded(entry.authorName);
@@ -98,7 +98,7 @@ function pluginFromCatalog(marketplace: string, sourceType: string, entry: Store
     keywords: entry.keywords.slice(0, 20).map((word) => word.slice(0, 64)),
     installable: unavailableReason === undefined,
     ...(unavailableReason ? { unavailableReason } : {}),
-    declaresWithheld,
+    declaresExecutable,
   };
 }
 
@@ -164,7 +164,7 @@ export function readOmpMarketState(store: OmpMarketplaceStore, options: OmpMarke
         installedAt: plugin.installedAt,
         lastUpdated: plugin.lastUpdated,
         enabled: plugin.enabled,
-        components: plugin.installPath ? inspectPluginComponents(plugin.installPath) : { loaded: {}, withheld: [] },
+        components: plugin.installPath ? inspectPluginComponents(plugin.installPath) : { loaded: {}, executable: [] },
         ...(catalogVersion && isNewerCatalogVersion(plugin.version, catalogVersion) ? { updateVersion: catalogVersion } : {}),
         ...(plugin.installPath ? {} : { broken: true }),
       });

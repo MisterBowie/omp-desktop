@@ -475,7 +475,7 @@ export function installCaptureRig(): CaptureRig {
             category: "development",
             keywords: ["review"],
             installable: true,
-            declaresWithheld: [],
+            declaresExecutable: [],
           },
           {
             id: "commit-helper@claude-plugins-official",
@@ -487,7 +487,7 @@ export function installCaptureRig(): CaptureRig {
             category: "productivity",
             keywords: [],
             installable: true,
-            declaresWithheld: ["hooks"],
+            declaresExecutable: ["hooks"],
           },
           {
             id: "db-explorer@claude-plugins-official",
@@ -499,7 +499,7 @@ export function installCaptureRig(): CaptureRig {
             keywords: [],
             installable: false,
             unavailableReason: "npm-source",
-            declaresWithheld: ["mcp"],
+            declaresExecutable: ["mcp"],
           },
         ],
         installed: [
@@ -511,7 +511,7 @@ export function installCaptureRig(): CaptureRig {
             installedAt: "2026-10-01T09:00:00.000Z",
             lastUpdated: "2026-10-01T09:00:00.000Z",
             enabled: true,
-            components: { loaded: { skills: 1, commands: 2, agents: 1 }, withheld: ["mcp"] },
+            components: { loaded: { skills: 1, commands: 2, agents: 1 }, executable: ["mcp"] },
             updateVersion: "1.2.0",
           },
         ],

@@ -5,7 +5,6 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { mockPathEntries } from "../test-harness.js";
 import {
-  buildDeclarativeView,
   ensureOmpMarketplaceStore,
   inspectPluginComponents,
   isNewerCatalogVersion,
@@ -20,7 +19,6 @@ import {
   readStoreInstalled,
   readStoreMarketplaces,
   runOmpPluginCli,
-  safeDeclaredPath,
   storeCatalogPath,
   type OmpMarketplaceStore,
 } from "./index.js";
@@ -179,87 +177,13 @@ describe("registry readers", () => {
   });
 });
 
-describe("declarative plugin view", () => {
-  it("links only declarative content and sanitizes the manifest", () => {
-    const root = scratch("view");
-    const plugin = join(root, "plugin");
-    writeFullPlugin(plugin);
-    const view = join(root, "view");
-    buildDeclarativeView(plugin, view, "demo");
-
-    expect(readdirSync(view).sort()).toEqual([".claude-plugin", "agents", "commands", "custom-skills", "extra", "rules", "skills"]);
-    for (const absent of [".mcp.json", "hooks", "tools", ".lsp.json", ".dap.yaml", "package.json"]) {
-      expect(existsSync(join(view, absent))).toBe(false);
-    }
-    const manifest = JSON.parse(readFileSync(join(view, ".claude-plugin", "plugin.json"), "utf8"));
-    expect(manifest).toEqual({
-      name: "demo",
-      version: "1.0.0",
-      description: "Demo",
-      author: { name: "A", email: "a@example.invalid" },
-      skills: ["./custom-skills"],
-      commands: ["./extra/run.md"],
-    });
-    expect(lstatSync(join(view, "skills")).isSymbolicLink()).toBe(true);
-    expect(readFileSync(join(view, "skills", "demo-skill", "SKILL.md"), "utf8")).toContain("demo-skill");
-    // A declared command file is copied alone; its siblings stay out.
-    expect(lstatSync(join(view, "extra")).isDirectory()).toBe(true);
-    expect(readdirSync(join(view, "extra"))).toEqual(["run.md"]);
-  });
-
-  it("refuses declared paths that escape, hide, or reach withheld directories", () => {
-    const root = scratch("safe");
-    expect(safeDeclaredPath(root, "./skills/x")).toBe(join("skills", "x"));
-    for (const bad of ["../x", "/abs", "./", ".", "./.claude-plugin", "./hooks/pre", "tools", "node_modules/x", "extensions"]) {
-      expect(safeDeclaredPath(root, bad)).toBeNull();
-    }
-  });
-
-  it("does not follow a conventional directory that links outside the plugin", () => {
-    const root = scratch("escape");
-    const plugin = join(root, "plugin");
-    mkdirSync(plugin);
-    const outside = join(root, "outside-skills");
-    write(join(outside, "x", "SKILL.md"), "x");
-    symlinkSync(outside, join(plugin, "skills"));
-    const view = join(root, "view");
-    buildDeclarativeView(plugin, view, "p");
-    expect(existsSync(join(view, "skills"))).toBe(false);
-  });
-
-  it("mirrors manifest presence so the agent model dialect is unchanged", () => {
-    const root = scratch("dialect");
-    const plugin = join(root, "plugin");
-    write(join(plugin, ".omp-plugin", "plugin.json"), "{not json");
-    const view = join(root, "view");
-    buildDeclarativeView(plugin, view, "p");
-    expect(readFileSync(join(view, ".omp-plugin", "plugin.json"), "utf8").trim()).toBe("{}");
-    expect(existsSync(join(view, ".claude-plugin"))).toBe(false);
-  });
-
-  it("keeps a root-catalog skill selection for a plugin sourced at its marketplace root", () => {
-    const root = scratch("rootcat");
-    const plugin = join(root, "plugin");
-    json(join(plugin, ".claude-plugin", "marketplace.json"), {
-      name: "m",
-      owner: { name: "o" },
-      plugins: [{ name: "p", source: "./", skills: ["./picked", "./hooks"], mcpServers: { s: {} } }],
-    });
-    write(join(plugin, "picked", "a", "SKILL.md"), "a");
-    const view = join(root, "view");
-    buildDeclarativeView(plugin, view, "p");
-    expect(JSON.parse(readFileSync(join(view, ".claude-plugin", "marketplace.json"), "utf8"))).toEqual({
-      plugins: [{ name: "p", source: "./", skills: ["./picked"] }],
-    });
-    expect(existsSync(join(view, "picked", "a", "SKILL.md"))).toBe(true);
-  });
-
-  it("reports loaded and withheld components", () => {
+describe("plugin components", () => {
+  it("reports loaded and executable components", () => {
     const plugin = join(scratch("inspect"), "plugin");
     writeFullPlugin(plugin);
     expect(inspectPluginComponents(plugin)).toEqual({
       loaded: { skills: 1, commands: 1, agents: 1, rules: 1 },
-      withheld: ["mcp", "hooks", "tools", "lsp", "dap", "extensions"],
+      executable: ["mcp", "hooks", "tools", "lsp", "dap", "extensions"],
     });
   });
 });
@@ -276,20 +200,18 @@ describe("run projection", () => {
     json(store.installedRegistry, { version: 2, plugins: registry });
   }
 
-  it("projects enabled installs as views and nothing else", () => {
+  it("projects enabled installs at their store directories and nothing else", () => {
     const store = makeStore();
     installed(store, { "a@m": { version: "1.0.0" }, "b@m": { version: "1.0.0", enabled: false } });
     const snapshot = marketplaceRunSnapshot(store);
     expect(snapshot.plugins.map((p) => p.id)).toEqual(["a@m"]);
     const run = scratch("run");
     const configRoot = join(run, "home", ".omp-runtime-x");
-    const result = projectMarketplacePlugins({ snapshot, configRoot, viewRoot: join(run, "views") });
-    expect(result).toEqual({ projected: ["a@m"], diagnostics: [] });
+    const result = projectMarketplacePlugins({ snapshot, configRoot });
+    expect(result).toEqual({ projected: ["a@m"] });
     const registry = JSON.parse(readFileSync(join(configRoot, "plugins", "installed_plugins.json"), "utf8"));
     expect(registry.version).toBe(2);
-    const entry = registry.plugins["a@m"][0];
-    expect(entry.installPath).toBe(join(run, "views", "0-a"));
-    expect(existsSync(join(entry.installPath, "tools"))).toBe(false);
+    expect(registry.plugins["a@m"][0].installPath).toBe(snapshot.plugins[0]?.installPath);
     // The run never receives the store's lockfile or node_modules tree.
     expect(readdirSync(join(configRoot, "plugins"))).toEqual(["installed_plugins.json"]);
   });
@@ -297,7 +219,7 @@ describe("run projection", () => {
   it("writes nothing when no plugin is enabled", () => {
     const store = makeStore();
     const run = scratch("empty");
-    const result = projectMarketplacePlugins({ snapshot: marketplaceRunSnapshot(store), configRoot: join(run, "cfg"), viewRoot: join(run, "views") });
+    const result = projectMarketplacePlugins({ snapshot: marketplaceRunSnapshot(store), configRoot: join(run, "cfg") });
     expect(result.projected).toEqual([]);
     expect(existsSync(join(run, "cfg"))).toBe(false);
   });
@@ -312,17 +234,6 @@ describe("run projection", () => {
     const third = marketplaceRunSnapshot(store).fingerprint;
     expect(new Set([first, second, third]).size).toBe(3);
     expect(marketplaceRunSnapshot(store).fingerprint).toBe(third);
-  });
-
-  it("skips a plugin whose view cannot be built", () => {
-    const store = makeStore();
-    installed(store, { "a@m": { version: "1.0.0" } });
-    const snapshot = marketplaceRunSnapshot(store);
-    const run = scratch("blocked");
-    write(join(run, "views", "0-a"), "a file where the view directory belongs");
-    const result = projectMarketplacePlugins({ snapshot, configRoot: join(run, "cfg"), viewRoot: join(run, "views") });
-    expect(result.projected).toEqual([]);
-    expect(result.diagnostics[0]).toMatch(/^a@m: view not built/);
   });
 });
 
@@ -365,7 +276,7 @@ describe("market state", () => {
     expect(byId["n@gitm"]).toMatchObject({ installable: false, unavailableReason: "npm-source" });
     expect(byId["r@urlm"]).toMatchObject({ installable: false, unavailableReason: "relative-source-in-url-catalog" });
     expect(state.installed).toEqual([
-      expect.objectContaining({ id: "a@gitm", updateVersion: "1.2.0", enabled: true, components: expect.objectContaining({ withheld: expect.arrayContaining(["mcp", "tools"]) }) }),
+      expect.objectContaining({ id: "a@gitm", updateVersion: "1.2.0", enabled: true, components: expect.objectContaining({ executable: expect.arrayContaining(["mcp", "tools"]) }) }),
     ]);
     expect(diagnostics).toEqual([]);
   });

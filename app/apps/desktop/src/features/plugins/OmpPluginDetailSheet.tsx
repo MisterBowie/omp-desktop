@@ -4,7 +4,7 @@ import { Button, TooltipButton } from "../../components/ui";
 import { IconLink, IconTriangleAlert, IconX } from "../../components/icons";
 import { openHttpUrl } from "../../lib/open-http-url";
 import { formatDate, monogram } from "./model";
-import { OMP_COMPONENT_LABEL_KEYS, OMP_UNAVAILABLE_KEYS, ompWithheldKinds } from "./omp-market-model";
+import { OMP_COMPONENT_LABEL_KEYS, OMP_UNAVAILABLE_KEYS, ompExecutableKinds } from "./omp-market-model";
 import type { OmpMarketplaceModel } from "./useOmpMarketplace";
 
 function KindList({ kinds, t }: { kinds: readonly OmpMarketComponentKind[]; t: TFunction }) {
@@ -26,7 +26,7 @@ export function OmpPluginDetailSheet({ market, t, locale }: { market: OmpMarketp
   const { plugin, installed } = item;
   const disabled = market.busy !== null || !market.state?.available;
   const running = market.busy?.target === item.id;
-  const withheld = ompWithheldKinds(item);
+  const executable = ompExecutableKinds(item);
   const loaded = installed
     ? OMP_MARKET_LOADED_COMPONENTS.filter((kind) => (installed.components.loaded[kind] ?? 0) > 0)
     : [];
@@ -181,15 +181,15 @@ export function OmpPluginDetailSheet({ market, t, locale }: { market: OmpMarketp
             {installed ? <p className="plugins-omp-hint">{t("plugins.ompMarket.appliesNextMessage")}</p> : null}
           </section>
 
-          {withheld.length > 0 ? (
+          {executable.length > 0 ? (
             <section className="plugins-callout">
               <span className="plugins-callout-icon" aria-hidden>
                 <IconTriangleAlert size={15} />
               </span>
               <div>
-                <h3 className="plugins-callout-title">{t("plugins.ompMarket.withheldTitle")}</h3>
-                <p className="plugins-callout-body">{t("plugins.ompMarket.withheldBody")}</p>
-                <KindList kinds={withheld} t={t} />
+                <h3 className="plugins-callout-title">{t("plugins.ompMarket.executableTitle")}</h3>
+                <p className="plugins-callout-body">{t("plugins.ompMarket.executableBody")}</p>
+                <KindList kinds={executable} t={t} />
               </div>
             </section>
           ) : null}

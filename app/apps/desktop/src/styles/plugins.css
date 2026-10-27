@@ -1228,7 +1228,7 @@
   color: var(--ds-text-primary);
 }
 
-.plugins-omp-withheld {
+.plugins-omp-executable {
   color: var(--ds-text-muted);
   font-size: var(--text-xs);
 }

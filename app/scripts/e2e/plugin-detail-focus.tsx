@@ -35,7 +35,7 @@ function Probe() {
 
 const plugin = {
   id: "focus@fixture", name: "focus", marketplace: "fixture", description: "Test marketplace card",
-  version: "1.0.0", keywords: [], installable: true, declaresWithheld: ["mcp"],
+  version: "1.0.0", keywords: [], installable: true, declaresExecutable: ["mcp"],
 } as const;
 const before: OmpMarketState = {
   available: true,
@@ -48,7 +48,7 @@ const after: OmpMarketState = {
   installed: [{
     id: plugin.id, name: plugin.name, marketplace: plugin.marketplace, version: "1.0.0",
     installedAt: "2026-10-27T00:00:00Z", lastUpdated: "2026-10-27T00:00:00Z", enabled: true,
-    components: { loaded: { skills: 2 }, withheld: ["mcp"] },
+    components: { loaded: { skills: 2 }, executable: ["mcp"] },
   }],
 };
 
@@ -68,7 +68,7 @@ Object.assign(globalThis, { pluginDetailFocusProbe: async () => {
   const root = createRoot(container);
   flushSync(() => root.render(<I18nextProvider i18n={i18n}><Probe /></I18nextProvider>));
   await settle(() => !!document.querySelector(".plugins-card-hit"));
-  check(document.body.textContent?.includes("Not loaded: MCP servers") ?? false, "Card does not flag the withheld MCP server");
+  check(document.body.textContent?.includes("Runs: MCP servers") ?? false, "Card does not flag the MCP server it runs");
   const card = find(".plugins-card-hit");
   const open = async () => {
     card.focus(); card.click();

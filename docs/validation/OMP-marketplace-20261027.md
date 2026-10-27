@@ -49,3 +49,23 @@
 2. host-core `market.*` 与目录模块删除归入 R12。
 3. `settings-extensions` 截图需重新生成。
 4. GitHub/git 远程源只经 OMP 自身逻辑，未做联网实测。
+
+## 2026-10-27 修订：完整加载插件
+
+用户决定“先不管审批逻辑，先能用 MCP、hooks 等”。改动：
+
+- `projectMarketplacePlugins` 不再构建声明式视图，运行注册表直接指向存储中的安装目录；删除
+  `buildDeclarativeView`、`safeDeclaredPath`、`MARKETPLACE_VIEW_DIR` 等视图代码。
+- 组件报告 `withheld` 改名 `executable`（目录元数据 `declaresWithheld` → `declaresExecutable`），界面改为
+  “会运行：…”与“会运行程序”提示；市场说明改为“插件会完整加载……请只安装可信的插件”（八种语言）。
+- ADR 0333 改写为完整加载，并记录风险：工具模块与 MCP 在会话启动时运行，桌面审批拦不住；插件 MCP
+  工具调用是否经过桌面权限闸门未验证。上文“只加载声明式内容”的描述已被本节取代。
+
+| 命令（`app/` 下） | 结果 |
+| --- | --- |
+| `node --test test/omp-marketplace-e2e.test.mjs`（0.1.6 资源） | exit 0：产品路径下插件命令、技能、子代理、规则进入会话，MCP 服务被启动，工具模块被导入（标记文件均写出）。hooks 未被触发验证（假模型不调用工具） |
+| `npx vitest run src/marketplace` | exit 0，18/18 |
+| `pnpm --filter @pi-desktop/omp-runtime test` | exit 0，580 通过、6 跳过 |
+| 两个 typecheck、`check-architecture`、`biome lint`（改动文件）、`e2e-plugin-detail-focus` | 均 exit 0 |
+| 桌面全量 | 3246 项：3235 通过、0 失败、10 跳过、1 取消（`npm-executable` 15 s 超时，全量负载下两次出现；单独重跑 12/12） |
+| 真实窗口烟测（重建后） | 通过：卡片显示“会运行：MCP 服务”，详情页“会运行程序”提示，“停用/卸载”按钮 |

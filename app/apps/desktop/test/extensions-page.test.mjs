@@ -113,7 +113,7 @@ test("the marketplace tab is the OMP marketplace and says what sessions load", (
   assert.doesNotMatch(pageSrc, /MarketplaceSourceSettings|api\.market[A-Z]|applyAutoUpdates/);
   assert.match(pageSrc, /<OmpMarketplacePanel market=\{market\}/);
   assert.match(pageSrc, /plugins\.ompMarket\.scopeNotice/);
-  assert.match(pageSrc, /plugins\.ompMarket\.withheldBadge/);
+  assert.match(pageSrc, /plugins\.ompMarket\.executableBadge/);
   assert.match(pageSrc, /api\.ompMarketInstall\(item\.id\)/);
   assert.match(pageSrc, /window\.confirm\(t\("plugins\.ompMarket\.uninstallConfirm"/);
   assert.match(pageSrc, /window\.confirm\(t\("plugins\.ompMarket\.removeSourceConfirm"/);

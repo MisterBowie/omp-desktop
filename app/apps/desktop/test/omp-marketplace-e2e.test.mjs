@@ -5,12 +5,8 @@
  * through the product's marketplace service, and real runs then show what a
  * session gets from it:
  *
- *   - through the declarative view (the product path), the plugin's command,
- *     skill and agent reach the session, while its MCP server is never spawned
- *     and its custom tool module is never imported;
- *   - through the raw install directory (the control), the same runtime does
- *     spawn and import them — so the markers can fail, and the view is what
- *     keeps them out.
+ *   the plugin's command, skill, agent and rule reach the session, its MCP
+ *   server is spawned and its custom tool module is imported.
  *
  * Only the model provider is a fixture.
  */
@@ -27,7 +23,6 @@ register(pathToFileURL(join(here, "helpers/ts-import-hooks.mjs")));
 const { FakeProvider } = await import("../../../experiments/omp-bridge/lib/provider.mjs");
 const { writeModelsConfig } = await import("../../../experiments/omp-bridge/lib/models-config.mjs");
 const {
-  MARKETPLACE_VIEW_DIR,
   OmpRuntimeSupervisor,
   ensureSessionStateDir,
   findGateExtension,
@@ -129,7 +124,7 @@ async function runSession(t, resources, project) {
   };
 }
 
-test("an installed marketplace plugin reaches sessions as declarative content only", {
+test("an installed marketplace plugin loads in full, including MCP servers and tool modules", {
   skip: !process.env.OMP_BUNDLED_RESOURCES && "requires verified native resources",
   timeout: 240_000,
 }, async (t) => {
@@ -153,40 +148,26 @@ test("an installed marketplace plugin reaches sessions as declarative content on
   assert.equal(installed.installed.length, 1);
   assert.deepEqual(installed.installed[0].components, {
     loaded: { skills: 1, commands: 1, agents: 1, rules: 1 },
-    withheld: ["mcp", "hooks", "tools"],
+    executable: ["mcp", "hooks", "tools"],
   });
   await assert.rejects(service.install("demo@fixture-market"), /already installed/);
   const snapshot = service.runSnapshot();
   assert.equal(snapshot.plugins.length, 1);
 
   // Product projection: the same call the session wiring makes in prepareRun.
-  const viewed = await runSession(t, resources, (paths) => {
+  const loaded = await runSession(t, resources, (paths) => {
     const projected = projectMarketplacePlugins({
       snapshot: service.runSnapshot(),
       configRoot: paths.configRoot,
-      viewRoot: join(paths.runRoot, MARKETPLACE_VIEW_DIR),
     });
-    assert.deepEqual(projected, { projected: ["demo@fixture-market"], diagnostics: [] });
+    assert.deepEqual(projected, { projected: ["demo@fixture-market"] });
   });
-  assert.ok(viewed.commandNames.includes("demo:hello"), `plugin command listed: ${viewed.commandNames.join(", ")}`);
-  assert.ok(`${viewed.system}\n${viewed.tools}`.includes(`${CANARY}-SKILL`), "plugin skill reaches the model");
-  assert.ok(`${viewed.system}\n${viewed.tools}`.includes(`${CANARY}-AGENT`), "plugin agent reaches the task tool");
-  assert.ok(viewed.system.includes(`${CANARY}-RULE-BODY`), "an always-apply plugin rule reaches the system prompt");
-  assert.equal(existsSync(markers.mcp), false, "the plugin's MCP server is never spawned");
-  assert.equal(existsSync(markers.tool), false, "the plugin's tool module is never imported");
-  assert.equal(viewed.tools.includes("canary"), false, "no MCP or custom tool named canary is offered");
-
-  // Control: the raw install directory, as OMP would read it without the view.
-  const raw = await runSession(t, resources, (paths) => {
-    mkdirSync(join(paths.configRoot, "plugins"), { recursive: true });
-    writeFileSync(
-      join(paths.configRoot, "plugins", "installed_plugins.json"),
-      JSON.stringify({ version: 2, plugins: { "demo@fixture-market": [{ scope: "user", installPath: snapshot.plugins[0].installPath, version: "1.0.0" }] } }),
-    );
-  });
-  assert.ok(raw.commandNames.includes("demo:hello"));
-  assert.equal(existsSync(markers.mcp), true, "control: the raw plugin's MCP server is spawned, so the probe can fail");
-  assert.equal(existsSync(markers.tool), true, "control: the raw plugin's tool module is imported, so the probe can fail");
+  assert.ok(loaded.commandNames.includes("demo:hello"), `plugin command listed: ${loaded.commandNames.join(", ")}`);
+  assert.ok(`${loaded.system}\n${loaded.tools}`.includes(`${CANARY}-SKILL`), "plugin skill reaches the model");
+  assert.ok(`${loaded.system}\n${loaded.tools}`.includes(`${CANARY}-AGENT`), "plugin agent reaches the task tool");
+  assert.ok(loaded.system.includes(`${CANARY}-RULE-BODY`), "an always-apply plugin rule reaches the system prompt");
+  assert.equal(existsSync(markers.mcp), true, "the plugin's MCP server is spawned");
+  assert.equal(existsSync(markers.tool), true, "the plugin's tool module is imported");
 
   // Uninstalling empties what the next run loads.
   const removed = await service.uninstall("demo@fixture-market");

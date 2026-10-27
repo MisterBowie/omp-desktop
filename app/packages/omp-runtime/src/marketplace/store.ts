@@ -179,7 +179,7 @@ export type StoreCatalogPlugin = {
   keywords: string[];
   /** `relative` for a `./path` string, otherwise the object source's kind. */
   sourceKind: "relative" | "github" | "url" | "git-subdir" | "npm" | "unknown";
-  /** Withheld component metadata keys the entry declares. */
+  /** Executable component metadata keys the entry declares. */
   declares: { hooks: boolean; mcp: boolean; lsp: boolean; dap: boolean };
 };
 
