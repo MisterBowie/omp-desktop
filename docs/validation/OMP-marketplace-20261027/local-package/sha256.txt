@@ -1,0 +1,2 @@
+8a298d1d2ad3dfa4a3b90f647db6c652e33ab493fc0f65ac9c1abbbbb7c0f3d1  apps/desktop/release/OMP-Desktop-0.1.6-arm64.dmg
+b6e4b9d89a4644a24b2ad8bb87edaef110cd68d42f92af85977aee7985d95276  apps/desktop/release/OMP-Desktop-0.1.6-arm64-mac.zip

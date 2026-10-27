@@ -69,3 +69,28 @@
 | 两个 typecheck、`check-architecture`、`biome lint`（改动文件）、`e2e-plugin-detail-focus` | 均 exit 0 |
 | 桌面全量 | 3246 项：3235 通过、0 失败、10 跳过、1 取消（`npm-executable` 15 s 超时，全量负载下两次出现；单独重跑 12/12） |
 | 真实窗口烟测（重建后） | 通过：卡片显示“会运行：MCP 服务”，详情页“会运行程序”提示，“停用/卸载”按钮 |
+
+## 本地测试包（2026-10-27）
+
+用户要求并入 `main` 并本地打包。`codex/omp-marketplace` 快进并入本地 `main`（`5c6582b7`），未推送 `origin`，
+未发布。包未签名、未公证，版本面仍为 0.1.6，只用于本机测试。
+
+- 命令（工作树 `app/`）：`OMP_SIDECAR_SOURCE=<根目录>/.omp-sidecar-edec389 CSC_IDENTITY_AUTO_DISCOVERY=false pnpm --filter @pi-desktop/desktop run dist:mac --arm64`，exit 0（约 128 s）。
+- 运行时：受控 fork `edec3898`，OMP 18.3.0。
+
+| 文件 | 字节 | SHA-256 |
+| --- | ---: | --- |
+| OMP-Desktop-0.1.6-arm64.dmg | 221374283 | 8a298d1d2ad3dfa4a3b90f647db6c652e33ab493fc0f65ac9c1abbbbb7c0f3d1 |
+| OMP-Desktop-0.1.6-arm64-mac.zip | 220281698 | b6e4b9d89a4644a24b2ad8bb87edaef110cd68d42f92af85977aee7985d95276 |
+
+DMG 复制为 `~/Downloads/OMP-Desktop-0.1.6-marketplace-5c6582b7-arm64.dmg`；ZIP 在工作树 `app/apps/desktop/release/`。
+
+| 检查 | 结果 | 附件 |
+| --- | --- | --- |
+| `hdiutil verify` | VALID | [archive-verify](OMP-marketplace-20261027/local-package/archive-verify.txt) |
+| 解出 `app.asar`，`out/main/index.js` 含 `pi-desktop/omp-market/install` | 是 | — |
+| `verify-packaged-runtime --resources <DMG 内 Resources>` | exit 0 | [verify-packaged-runtime](OMP-marketplace-20261027/local-package/verify-packaged-runtime.txt) |
+| `verify-installed-product --app <DMG 内应用>` | exit 0 | [verify-installed-product](OMP-marketplace-20261027/local-package/verify-installed-product.txt) |
+| `scripts/e2e-installed-smoke.mjs <DMG> <证据目录>` | exit 0，8/8 检查（建会话、拒绝写入不改字节、允许一次后写入、项目命令结果回到模型、Stop 回收进程、重启恢复原生历史、恢复后新回合、默认数据根隔离） | [installed-smoke](OMP-marketplace-20261027/local-package/installed-smoke/) |
+
+安装包内未单独跑插件市场界面；市场界面已在开发构建的真实窗口中验证（见上文）。所有模型为本地 FakeProvider。
