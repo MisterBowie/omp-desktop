@@ -1,22 +1,22 @@
 import { Button, TooltipButton, cx } from "../components/ui";
-import { IconCloudDown, IconDownload, IconMore, IconPlug } from "../components/icons";
+import { IconDownload, IconMore, IconPlug, IconRefresh } from "../components/icons";
 import { AnchoredMenu } from "../components/settings/AnchoredMenu";
 import { SearchField } from "../features/plugins/presentation";
 import { InstalledPluginsPanel } from "../features/plugins/InstalledPluginsPanel";
-import { MarketplacePanel } from "../features/plugins/MarketplacePanel";
-import { PluginDetailSheet } from "../features/plugins/PluginDetailSheet";
+import { OmpMarketplacePanel } from "../features/plugins/OmpMarketplacePanel";
+import { OmpPluginDetailSheet } from "../features/plugins/OmpPluginDetailSheet";
 import { PluginDialogs } from "../features/plugins/PluginDialogs";
 import { usePluginsPage } from "../features/plugins/usePluginsPage";
+import { useOmpMarketplace } from "../features/plugins/useOmpMarketplace";
 
 export function PluginsPage() {
   const page = usePluginsPage();
+  const market = useOmpMarketplace();
   const {
     t,
+    locale,
     tab,
     setTab,
-    refreshMarket,
-    query,
-    setQuery,
     headerMenu,
     setHeaderMenu,
     overflowActions,
@@ -25,10 +25,8 @@ export function PluginsPage() {
     installedQuery,
     filteredInstalled,
     setInstalledQuery,
-    marketLoading,
-    market,
-    applyAutoUpdates,
   } = page;
+  const sourceCount = market.state?.sources.length ?? 0;
 
   return (
     <div className="thread-scroll">
@@ -47,10 +45,13 @@ export function PluginsPage() {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => void refreshMarket(query, { refreshRemote: true })}
+                disabled={sourceCount === 0 || market.busy !== null || !market.state?.available}
+                onClick={() => market.updateSources()}
               >
-                <IconCloudDown size={14} />
-                {t("plugins.refreshMarket")}
+                <IconRefresh size={14} />
+                {market.busy?.action === "updateSources"
+                  ? t("plugins.ompMarket.updatingSources")
+                  : t("plugins.ompMarket.updateSources")}
               </Button>
             ) : tab === "installed" ? (
               <Button variant="primary" size="sm" onClick={() => setTab("market")}>
@@ -99,22 +100,6 @@ export function PluginsPage() {
           </div>
         </div>
 
-        {stats.updates > 0 ? (
-          <div className="plugins-alert" role="status">
-            <span className="plugins-alert-icon" aria-hidden>
-              <IconCloudDown size={15} />
-            </span>
-            <div className="plugins-alert-copy">
-              <span className="plugins-alert-title">
-                {t("plugins.updatesReady", { count: stats.updates })}
-              </span>
-            </div>
-            <Button variant="secondary" size="sm" onClick={() => void applyAutoUpdates()}>
-              {t("plugins.applyAutoUpdates")}
-            </Button>
-          </div>
-        ) : null}
-
         <div className="plugins-toolbar">
           <div className="plugins-segment" role="tablist" aria-label={t("plugins.title")}>
             <button
@@ -139,8 +124,8 @@ export function PluginsPage() {
               onClick={() => setTab("market")}
             >
               {t("plugins.tabMarket")}
-              {market.length ? (
-                <span className="plugins-segment-count">{market.length}</span>
+              {market.items.length ? (
+                <span className="plugins-segment-count">{market.items.length}</span>
               ) : null}
             </button>
           </div>
@@ -164,14 +149,14 @@ export function PluginsPage() {
             ) : null
           ) : (
             <div className="plugins-toolbar-end">
-              {marketLoading ? (
+              {market.busy ? (
                 <span className="plugins-result-count" aria-live="polite">
-                  {t("plugins.marketLoading")}
+                  {t("plugins.ompMarket.working")}
                 </span>
               ) : null}
               <SearchField
-                value={query}
-                onChange={setQuery}
+                value={market.query}
+                onChange={market.setQuery}
                 placeholder={t("plugins.marketSearchPlaceholder")}
               />
             </div>
@@ -180,11 +165,11 @@ export function PluginsPage() {
         {tab === "installed" ? (
           <InstalledPluginsPanel {...page} />
         ) : (
-          <MarketplacePanel {...page} />
+          <OmpMarketplacePanel market={market} t={t} />
         )}
       </div>
 
-      <PluginDetailSheet {...page} />
+      {tab === "market" ? <OmpPluginDetailSheet market={market} t={t} locale={locale} /> : null}
       <PluginDialogs {...page} />
     </div>
   );

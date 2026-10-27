@@ -22,6 +22,7 @@ R15（`codex/dismiss-error-card`）与 0.1.6 版本面（`codex/release-016`）�
 
 - R17 `codex/context-ring-usage`：上下文圆环思考中显示 100% 的修复，已验证，2026-10-26 按用户要求快进并入本地 `main`
   （未推送 `origin`）并打本地测试包；发布方式待用户决定（[证据](docs/validation/Context-ring-usage-20261026.md)）。
+- R18 `codex/omp-marketplace`（`.worktrees/omp-marketplace`）：OMP 插件市场集成，已验证，ADR 0333 待用户确认后并入（[证据](docs/validation/OMP-marketplace-20261027.md)）。
 - R16 `codex/omp-turn-feedback`（`.worktrees/omp-turn-feedback`）仍未并入，与 R17 改动相邻的看板与 HANDOFF 行并入时需手工合并。
 
 发版方式：正式版按 `v<版本>` 发布并推送更新源；同版本修订按 `0.1.4+<名称>.<完整源码 SHA>` 发布，原稳定标签与

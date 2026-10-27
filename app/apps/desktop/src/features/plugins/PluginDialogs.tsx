@@ -1,6 +1,5 @@
 import { Button, cx } from "../../components/ui";
 import { IconCheck, IconShield, IconSparkles, IconTriangleAlert } from "../../components/icons";
-import { PluginInstallDialog } from "../../components/plugins/PluginInstallDialog";
 import { PluginSettingsSheet } from "../../components/plugins/PluginSettingsSheet";
 import { useAppStore } from "../../stores/app-store";
 import {
@@ -15,19 +14,10 @@ import type { PluginPermissionReview } from "@pi-desktop/shared";
 
 export function PluginDialogs({
   t,
-  pendingInstall,
-  setPendingInstall,
   pendingReview,
   setPendingReview,
   confirmReview,
-  autoUpdate,
-  setAutoUpdate,
   busyId,
-  confirmInstall,
-  installJob,
-  cancelInstallDownload,
-  retryInstall,
-  closeInstallDialog,
   settingsPlugin,
   setSettingsPlugin,
   refreshPlugins,
@@ -93,80 +83,6 @@ export function PluginDialogs({
           </div>
         </div>
     ) : null}
-    {pendingInstall ? (
-        <div className="plugins-modal-backdrop" role="presentation">
-          <div
-            className="plugins-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label={t("plugins.permissionReview")}
-          >
-            <header className="plugins-modal-head">
-              <span className="plugins-modal-icon" aria-hidden>
-                <IconShield size={17} />
-              </span>
-              <div>
-                <h2 className="plugins-modal-title">
-                  {t("plugins.permissionReviewTitle", { name: pendingInstall.name })}
-                </h2>
-                {pendingInstall.version ? (
-                  <p className="plugins-modal-subtitle">
-                    {t("plugins.installingVersion", { version: pendingInstall.version })}
-                  </p>
-                ) : null}
-              </div>
-            </header>
-
-            <div className="plugins-modal-body">
-              <p className="plugins-modal-lede">{t("plugins.permissionReviewBody")}</p>
-              <PermissionGroups
-                t={t}
-                permissions={pendingInstall.permissions}
-                newPermissions={pendingInstall.newPermissions}
-              />
-            </div>
-
-            <div className="plugins-switch-row">
-              <span className="plugins-switch-label">
-                {t("plugins.enableAutoUpdateOnInstall")}
-              </span>
-              <button
-                type="button"
-                className={cx("settings-toggle", autoUpdate && "on")}
-                role="switch"
-                aria-checked={autoUpdate}
-                aria-label={t("plugins.enableAutoUpdateOnInstall")}
-                onClick={() => setAutoUpdate((on) => !on)}
-              >
-                <span className="settings-toggle-thumb" />
-              </button>
-            </div>
-
-            <div className="plugins-modal-actions">
-              <Button variant="secondary" onClick={() => setPendingInstall(null)}>
-                {t("plugins.cancel")}
-              </Button>
-              <Button
-                variant="primary"
-                disabled={busyId === pendingInstall.id}
-                onClick={() => void confirmInstall()}
-              >
-                {busyId === pendingInstall.id
-                  ? t("plugins.installing")
-                  : t("plugins.acceptInstall")}
-              </Button>
-            </div>
-          </div>
-        </div>
-    ) : null}
-      {installJob ? (
-        <PluginInstallDialog
-          job={installJob}
-          onCancel={cancelInstallDownload}
-          onRetry={retryInstall}
-          onClose={closeInstallDialog}
-        />
-      ) : null}
       {settingsPlugin ? (
         <PluginSettingsSheet
           plugin={settingsPlugin}

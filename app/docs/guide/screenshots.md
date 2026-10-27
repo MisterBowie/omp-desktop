@@ -154,9 +154,7 @@ Settings is a full-page destination with a searchable tab rail.
 
 ![Model configuration provider defaults](../public/screenshots/app/en/settings-models.webp)
 
-![Extensions marketplace with the catalog source picker](../public/screenshots/app/en/settings-extensions.webp)
-
-![Extensions marketplace with a custom catalog URL](../public/screenshots/app/en/settings-extensions-custom.webp)
+![Plugins marketplace with OMP marketplace sources](../public/screenshots/app/en/settings-extensions.webp)
 
 ## Regenerating these frames
 

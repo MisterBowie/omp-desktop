@@ -26,7 +26,7 @@ const panelSrc = readFileSync(join(desktopRoot, "electron/main/plugin-panel-host
 const mainSrc = readMainSourceSync();
 const pageSrc = readPluginsSourceSync();
 const protocolSrc = readFileSync(join(repoRoot, "packages/shared/src/protocol.ts"), "utf8");
-const marketIpcSrc = readMainModuleSync("ipc/market-ipc.ts");
+const ompMarketIpcSrc = readMainModuleSync("ipc/omp-market-ipc.ts");
 const catalogSliceSrc = readStoreModuleSync("slices/catalog-slice.ts");
 const registrySrc = readFileSync(join(repoRoot, "crates/host-core/src/plugins/registry.rs"), "utf8");
 const marketplaceSrc = readFileSync(join(repoRoot, "crates/host-core/src/plugins/marketplace.rs"), "utf8");
@@ -129,64 +129,51 @@ test("plugin panels use sandboxed isolated host windows", () => {
   assert.match(runtimeSrc, /desktop\.invoke/);
 });
 
-test("plugins page includes marketplace install and auto-update controls", () => {
+test("the plugins page marketplace tab drives the OMP marketplace (ADR 0333)", () => {
   assert.match(pageSrc, /tabMarket/);
-  assert.match(pageSrc, /marketInstall/);
-  assert.match(pageSrc, /applyAutoUpdates|marketApplyUpdates|checkUpdates/);
-  assert.match(pageSrc, /permissionReview|grantedPermissions/);
+  assert.match(pageSrc, /api\.ompMarketInstall\(/);
+  assert.match(pageSrc, /api\.ompMarketUpgrade\(/);
+  assert.match(pageSrc, /api\.ompMarketSetEnabled\(/);
+  // The PI catalog, its downloads and its update flow are no longer reachable.
+  assert.doesNotMatch(pageSrc, /api\.market[A-Z]|grantedPermissions: pendingInstall/);
+  assert.match(ompMarketIpcSrc, /IPC\.invoke\.ompMarketInstall, \(id\) => changed\("ompMarket\.install", marketplace\.install\(id\)\)/);
 });
 
-test("plugins page refreshes installed update metadata when it opens", () => {
-  assert.match(pageSrc, /useEffect\(\(\) => \{[\s\S]*api\.marketCheckUpdates\(false\)[\s\S]*refreshPlugins\(\)/);
-  assert.match(
-    marketIpcSrc,
-    /IPC\.invoke\.marketCheckUpdates[\s\S]*refreshRemote: payload\?\.refreshRemote \?\? true/,
-  );
+test("plugins page re-reads installed plugins when it opens", () => {
+  assert.match(pageSrc, /useEffect\(\(\) => \{\s*void refreshPlugins\(\);\s*\}, \[refreshPlugins\]\)/);
   assert.match(
     catalogSliceSrc,
     /const existing = catalogRuntime\.getPluginRefresh\(\);\s*if \(existing\) return existing/,
   );
 });
 
-test("shared protocol declares marketplace and package install IPC", () => {
+test("shared protocol declares the OMP marketplace and package install IPC", () => {
   for (const channel of [
     "pluginInstallFromPackage",
-    "marketSearch",
-    "marketInstall",
-    "marketCheckUpdates",
-    "marketApplyUpdates",
-    "marketRefresh",
+    "ompMarketState",
+    "ompMarketAddSource",
+    "ompMarketRemoveSource",
+    "ompMarketUpdateSources",
+    "ompMarketInstall",
+    "ompMarketUninstall",
+    "ompMarketSetEnabled",
+    "ompMarketUpgrade",
     "pluginOpenPanel",
     "pluginSetAutoUpdate",
   ]) {
     assert.match(protocolSrc, new RegExp(channel));
   }
-});
-
-
-test("plugins page can refresh the official marketplace repository", () => {
-  assert.match(pageSrc, /marketRefresh|refreshMarket|refreshRemote/);
-  assert.match(pageSrc, /pi-desktop-plugins|marketSource/);
-});
-
-
-test("marketplace detail pane renders readme changelog and versions", () => {
-  assert.match(pageSrc, /marketGetDetail/);
-  assert.match(pageSrc, /viewDetails|detailTitle|readmeMarkdown|versions/);
-  assert.match(pageSrc, /installVersion|selectedVersion|changelog/);
+  for (const retired of ["marketSearch", "marketInstall", "marketCheckUpdates", "marketApplyUpdates", "marketRefresh", "marketGetDetail", "marketCancelInstall"]) {
+    assert.doesNotMatch(protocolSrc, new RegExp(`\\b${retired}:`));
+  }
 });
 
 // A publisher can list a version before uploading its package. The host then
 // refuses the download, so the UI must not offer an install that can only end
 // in PLUGIN_MARKET_INVALID.
-test("marketplace blocks install for a version with no published package", () => {
-  assert.match(pageSrc, /function versionInstallable\(/);
-  assert.match(pageSrc, /const packagePending = item\.installable === false/);
-  assert.match(pageSrc, /disabled=\{busyId === item\.id \|\| packagePending\}/);
-  assert.match(pageSrc, /disabled=\{busyId === detail\.id \|\| detailPackagePending\}/);
-  assert.match(pageSrc, /t\("plugins\.packagePending"\)/);
-  assert.match(pageSrc, /t\("plugins\.packagePendingHint", \{/);
-
+// The host-core catalog still serves the bundled plugins (ADR 0241) after the
+// PI marketplace UI was retired (ADR 0333), so its install rules stay guarded.
+test("host-core blocks install for a catalog version with no published package", () => {
   const hostSrc = marketplaceSrc;
   assert.match(hostSrc, /fn has_package_metadata\(version: &MarketVersion\) -> bool/);
   // `installable` is the single answer every install affordance reads, so it
@@ -195,10 +182,6 @@ test("marketplace blocks install for a version with no published package", () =>
   assert.match(hostSrc, /installable: latest_version\s*\n\s*\.map\(\|version\| \{/);
   assert.match(hostSrc, /has_package_metadata\(version\)\s*\n\s*&& host_supports_version\(version\)/);
   assert.match(hostSrc, /package_host_allowed\(&version\.url, &catalog_url\)\.is_ok\(\)/);
-  for (const catalog of Object.values(catalogs)) {
-    assert.equal(typeof catalog.plugins.packagePending, "string");
-    assert.equal(typeof catalog.plugins.packagePendingHint, "string");
-  }
 });
 
 // Plugin source now lives in publisher repositories, so a package URL is no
@@ -230,32 +213,21 @@ test("marketplace package downloads stay inside the host allowlist", () => {
 
 // A withdrawn version is a distribution signal, not permission to disable
 // software somebody is relying on.
-test("a withdrawn version is never offered and never silently disabled", () => {
+test("host-core never offers a withdrawn version and never silently disables it", () => {
   const hostSrc = marketplaceSrc + "\n" + modelSrc;
   assert.match(hostSrc, /\.filter\(\|version\| !version\.yanked\)/);
   assert.match(hostSrc, /PLUGIN_MARKET_YANKED/);
   assert.match(hostSrc, /PLUGIN_HOST_TOO_OLD/);
   assert.match(hostSrc, /pub struct PluginYankNotice/);
 
-  assert.match(pageSrc, /function versionWithdrawn\(/);
-  assert.match(pageSrc, /const detailWithdrawn = versionWithdrawn\(activeVersion\)/);
-  assert.match(pageSrc, /t\("plugins\.withdrawnHint", \{ version: installTarget \}\)/);
-  for (const catalog of Object.values(catalogs)) {
-    assert.equal(typeof catalog.plugins.withdrawn, "string");
-    assert.equal(typeof catalog.plugins.withdrawnHint, "string");
-    assert.equal(typeof catalog.plugins.withdrawnReason, "string");
-  }
 });
 
 // The verified shield is a claim about a publisher, so it must come from the
 // center rather than from text a publisher can write.
-test("verified trust is not something a catalog entry can grant itself", () => {
+test("host-core verified trust is not something a catalog entry can grant itself", () => {
   const hostSrc = marketplaceSrc;
   assert.match(hostSrc, /fn resolve_trust\(&self, entry: &MarketCatalogEntry\) -> String/);
   assert.match(hostSrc, /"verified" if self\.is_trusted_channel\(\) => "verified"/);
   assert.match(hostSrc, /"verified" => "community"/);
 
-  assert.match(pageSrc, /function showsVerifiedBadge\(/);
-  assert.match(pageSrc, /\{showsVerifiedBadge\(item\) \?/);
-  assert.match(pageSrc, /\{showsVerifiedBadge\(detail\) \?/);
 });

@@ -20,6 +20,7 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
+| 0333 | [OMP plugin marketplace as declarative-only run views](0333-omp-plugin-marketplace.md) | Proposed |
 | 0332 | [OMP input attachments and desktop-owned global instructions](0332-omp-input-attachments-and-global-instructions.md) | Accepted |
 | 0331 | [OMP as the only product execution engine](0331-omp-only-product.md) | Accepted |
 | 0330 | [Native Mnemopi with desktop-owned preferences](0330-omp-automatic-memory.md) | Accepted |

@@ -1,7 +1,6 @@
 import { Button, TooltipButton, cx } from "../../components/ui";
 import {
   IconCircleAlert,
-  IconCloudDown,
   IconMore,
   IconPanel,
   IconPlug,
@@ -31,7 +30,6 @@ export function InstalledPluginsPanel({
   rowMenu,
   setRowMenu,
   busyId,
-  queueInstall,
   projects,
   currentProjectPath,
   run,
@@ -96,7 +94,6 @@ export function InstalledPluginsPanel({
                     {group.rows.map((plugin) => {
                       const broken = group.id === "attention";
                       const menuOpen = rowMenu === plugin.id;
-                      const update = plugin.updateAvailable;
                       return (
                         <div
                           key={plugin.id}
@@ -141,26 +138,6 @@ export function InstalledPluginsPanel({
                             />
                           </div>
                           <div className="plugins-row-controls">
-                            {update ? (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                disabled={busyId === plugin.id}
-                                onClick={() =>
-                                  queueInstall({
-                                    id: plugin.id,
-                                    name: plugin.name,
-                                    version: update.version,
-                                    permissions: plugin.permissions ?? [],
-                                    newPermissions: update.permissionDiff ?? [],
-                                  })
-                                }
-                              >
-                                {busyId === plugin.id
-                                  ? t("plugins.updating")
-                                  : t("plugins.updateNow")}
-                              </Button>
-                            ) : null}
                             <ScopeControl
                               target={plugin}
                               label={plugin.name}
@@ -250,25 +227,6 @@ export function InstalledPluginsPanel({
                                         {t("plugins.reload")}
                                       </button>
                                     ) : null}
-                                    <button
-                                      type="button"
-                                      role="menuitem"
-                                      onClick={() => {
-                                        setRowMenu(null);
-                                        void run(async () => {
-                                          await api.setPluginAutoUpdate(
-                                            plugin.id,
-                                            !plugin.autoUpdate,
-                                          );
-                                          await refreshPlugins();
-                                        });
-                                      }}
-                                    >
-                                      <IconCloudDown size={14} />
-                                      {plugin.autoUpdate
-                                        ? t("plugins.disableAutoUpdate")
-                                        : t("plugins.enableAutoUpdate")}
-                                    </button>
                                     {/* A bundled plugin belongs to the
                                         application: the host refuses the
                                         removal, so the action is not offered

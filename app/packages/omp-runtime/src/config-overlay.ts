@@ -53,6 +53,10 @@ export function sourceIsolationOverlayYaml(memory?: OmpMemoryLaunchConfig): stri
     "  diagnosticsDeferred: false",
     "mcp:",
     "  enableProjectConfig: false",
+    "# Marketplace plugins arrive as run-scoped declarative views (ADR 0333): a run",
+    "# never refreshes catalogs or upgrades plugins on its own.",
+    "marketplace:",
+    '  autoUpdate: "off"',
     ...memoryOverlayLines(memory),
     "",
   ].join("\n");

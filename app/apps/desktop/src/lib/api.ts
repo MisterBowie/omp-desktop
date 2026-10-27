@@ -63,9 +63,7 @@ import type {
   PluginViewMeta,
   PluginScenicThemesDestinationMeta,
   PluginTheme,
-  MarketPluginSummary,
-  MarketPluginDetail,
-  PluginInstallResult,
+  OmpMarketState,
   PluginInstallProgress,
   ProjectRecord,
   ProjectGroupRecord,
@@ -1169,44 +1167,16 @@ export const api = {
       visible,
       sessionId,
     }),
-  marketRefresh: (force = true) =>
-    invoke<{
-      providerId: string;
-      name?: string;
-      homepage?: string;
-      updatedAt?: string;
-      pluginCount: number;
-      sourceUrl: string;
-    }>(IPC.invoke.marketRefresh, { force }),
-  marketSearch: (query = "", category = "") =>
-    invoke<{
-      plugins: MarketPluginSummary[];
-      providerId: string;
-      sourceUrl: string;
-    }>(IPC.invoke.marketSearch, { query, category }),
-  marketGetDetail: (id: string) =>
-    invoke<{ plugin: MarketPluginDetail }>(IPC.invoke.marketGetDetail, id),
-  marketInstall: (input: {
-    id: string;
-    version?: string;
-    enable?: boolean;
-    autoUpdate?: boolean;
-    grantedPermissions?: string[];
-  }) =>
-    invoke<{ result: PluginInstallResult }>(IPC.invoke.marketInstall, input),
-  marketCheckUpdates: (refreshRemote = true) =>
-    invoke<{ updates: unknown[]; plugins: PluginSummary[] }>(
-      IPC.invoke.marketCheckUpdates,
-      { refreshRemote },
-    ),
-  marketApplyUpdates: (onlyAuto = true) =>
-    invoke<{ results: PluginInstallResult[]; plugins: PluginSummary[] }>(
-      IPC.invoke.marketApplyUpdates,
-      { onlyAuto },
-    ),
-  /** Ask the running install to stop. Only a download can be interrupted. */
-  marketCancelInstall: (id: string) =>
-    invoke<{ cancelled: boolean; id: string }>(IPC.invoke.marketCancelInstall, { id }),
+  /** OMP plugin marketplace (ADR 0333). Mutations answer with the re-read state. */
+  ompMarketState: () => invoke<OmpMarketState>(IPC.invoke.ompMarketState),
+  ompMarketAddSource: (source: string) => invoke<OmpMarketState>(IPC.invoke.ompMarketAddSource, source),
+  ompMarketRemoveSource: (name: string) => invoke<OmpMarketState>(IPC.invoke.ompMarketRemoveSource, name),
+  ompMarketUpdateSources: (name?: string) => invoke<OmpMarketState>(IPC.invoke.ompMarketUpdateSources, name),
+  ompMarketInstall: (id: string) => invoke<OmpMarketState>(IPC.invoke.ompMarketInstall, id),
+  ompMarketUninstall: (id: string) => invoke<OmpMarketState>(IPC.invoke.ompMarketUninstall, id),
+  ompMarketSetEnabled: (id: string, enabled: boolean) =>
+    invoke<OmpMarketState>(IPC.invoke.ompMarketSetEnabled, id, enabled),
+  ompMarketUpgrade: (id: string) => invoke<OmpMarketState>(IPC.invoke.ompMarketUpgrade, id),
   /** Import a pi CLI extension file or directory as a development plugin (spec 16 §3). */
   importPiExtension: () =>
     invoke<

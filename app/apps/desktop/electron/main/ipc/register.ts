@@ -25,6 +25,7 @@ import { registerScheduledIpc } from "./scheduled-ipc";
 import { registerWorktreeIpc } from "./worktree-ipc";
 import { registerSessionIpc } from "./session-ipc";
 import { registerMemoryIpc } from "./memory-ipc";
+import { registerOmpMarketIpc } from "./omp-market-ipc";
 import { registerSettingsIpc } from "./settings-ipc";
 import { registerSkillsIpc } from "./skills-ipc";
 import { registerAgentImportIpc } from "./agent-import-ipc";
@@ -57,6 +58,7 @@ export type RegisterIpcDependencies = {
   /** OMP conversation bridge (M3/T11-T13); absent in builds without a runtime. */
   ompSessions?: OmpSessionBridge | null;
   ompMemory?: import("../runtime/omp-memory").OmpMemoryService;
+  ompMarketplace?: import("../runtime/omp-marketplace").OmpMarketplaceService;
   getNotificationViewingSessionId: () => string | null;
   setNotificationViewingSessionId: (sessionId: string | null) => void;
   activeUserSubagentDocuments: (...args: any[]) => Promise<any>;
@@ -244,6 +246,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
   });
   registerWorktreeIpc({registrar, getHost, ompSessions, acquireSessionOperation});
   if (dependencies.ompMemory) registerMemoryIpc(registrar, dependencies.ompMemory);
+  if (dependencies.ompMarketplace) registerOmpMarketIpc(registrar, dependencies.ompMarketplace, sendToRenderer);
   registerSessionIpc({
     registrar,
     getHost,
@@ -463,7 +466,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
 
   registerMarketIpc({
     registrar,
-    getHost,
     plugins,
     agentExtensions,
     optionalWorkspaceRoot,

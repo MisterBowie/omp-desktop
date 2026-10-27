@@ -91,7 +91,6 @@ SCENES = (
     "dark-settings",
     "settings-models",
     "settings-extensions",
-    "settings-extensions-custom",
     # Dark home is grouped with the home scenes on the page.
     "dark-home",
 )

@@ -1,0 +1,8 @@
+
+> @pi-desktop/omp-runtime@0.1.6 typecheck /Users/vv/person/omp-desktop/.worktrees/omp-marketplace/app/packages/omp-runtime
+> tsc -p tsconfig.json --noEmit
+
+
+> @pi-desktop/desktop@0.1.6 typecheck /Users/vv/person/omp-desktop/.worktrees/omp-marketplace/app/apps/desktop
+> tsc -p tsconfig.json --noEmit
+

@@ -141,7 +141,7 @@ const previewSource = await readFile(
   "utf8",
 );
 const pluginSheetSource = await readFile(
-  new URL("../src/features/plugins/PluginDetailSheet.tsx", import.meta.url),
+  new URL("../src/features/plugins/OmpPluginDetailSheet.tsx", import.meta.url),
   "utf8",
 );
 const workPanelSource = await readFile(
@@ -174,7 +174,6 @@ test("plugin homepage and repository links follow the link-open setting", () => 
     /import \{ openHttpUrl \} from "\.\.\/\.\.\/lib\/open-http-url"/,
   );
   assert.match(pluginSheetSource, /openHttpUrl\(link\.url\)/);
-  assert.match(pluginSheetSource, /openHttpUrl\(activeVersion\.provenance!\.sourceRepository\)/);
   assert.doesNotMatch(pluginSheetSource, /openUrlInWorkPanel\(/);
 });
 

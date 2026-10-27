@@ -26,10 +26,6 @@ const settingsComponents = new Map(
     .map((name) => [name, readFileSync(join(settingsDir, name), "utf8")]),
 );
 const pageSrc = readPluginsSourceSync();
-const marketSettingsSrc = readFileSync(
-  join(here, "../src/components/plugins/MarketplaceSourceSettings.tsx"),
-  "utf8",
-);
 const settingsPageSrc = readSettingsSourceSync();
 const electronMainSrc = readMainSourceSync();
 const hostCapabilitySources = [
@@ -112,13 +108,15 @@ test("the extensions page uses tabs instead of the removed capability overview",
   assert.match(pageSrc, /className="plugins-segment"/);
 });
 
-test("marketplace source settings omit redundant explanatory copy", () => {
-  assert.match(marketSettingsSrc, /marketProviderTitle/);
-  assert.doesNotMatch(
-    marketSettingsSrc,
-    /marketProviderDesc|marketProviderMirrorHint|marketActiveSource|plugins-market-settings-active/,
-  );
-  assert.match(marketSettingsSrc, /marketCustomUrlDesc/);
+test("the marketplace tab is the OMP marketplace and says what sessions load", () => {
+  // ADR 0333: the PI catalog, its channel settings and its update flow are gone.
+  assert.doesNotMatch(pageSrc, /MarketplaceSourceSettings|api\.market[A-Z]|applyAutoUpdates/);
+  assert.match(pageSrc, /<OmpMarketplacePanel market=\{market\}/);
+  assert.match(pageSrc, /plugins\.ompMarket\.scopeNotice/);
+  assert.match(pageSrc, /plugins\.ompMarket\.withheldBadge/);
+  assert.match(pageSrc, /api\.ompMarketInstall\(item\.id\)/);
+  assert.match(pageSrc, /window\.confirm\(t\("plugins\.ompMarket\.uninstallConfirm"/);
+  assert.match(pageSrc, /window\.confirm\(t\("plugins\.ompMarket\.removeSourceConfirm"/);
 });
 
 test("installed plugin rows keep secondary detail behind a disclosure", () => {
@@ -133,12 +131,6 @@ test("extension row actions stay visible and labelled", () => {
   assert.match(styles, /\.ui-tooltip\s*\{[\s\S]*?position:\s*fixed;/);
   const actionBlock = styles.match(/\.ext-row-actions\s*\{[^}]*\}/)?.[0] ?? "";
   assert.match(actionBlock, /opacity:\s*1/);
-});
-
-test("the client hides development-only demo plugins from marketplace results", () => {
-  assert.match(pageSrc, /function isClientVisibleMarketPlugin/);
-  assert.match(pageSrc, /!plugin\.id\.startsWith\("demo\."\)/);
-  assert.match(pageSrc, /setMarket\(\(res\.plugins \?\? \[\]\)\.filter\(isClientVisibleMarketPlugin\)\)/);
 });
 
 test("Settings exposes three independent Agent capability destinations", () => {

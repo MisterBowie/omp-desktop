@@ -16,6 +16,7 @@ export * from "./types/settings.js";
 export * from "./types/plugins.js";
 export * from "./types/capabilities.js";
 export * from "./types/marketplace.js";
+export * from "./types/omp-marketplace.js";
 export * from "./types/composer.js";
 export * from "./types/platform.js";
 export * from "./types/workpanel.js";

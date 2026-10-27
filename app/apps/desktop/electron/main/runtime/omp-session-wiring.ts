@@ -14,7 +14,13 @@
  *      are persisted through `session.bindEngine`; renames, model switches and
  *      branches go through the host so a restart restores the same identity.
  */
-import { MAX_SESSION_RECORD_BYTES, ompMemoryDirectory } from "@pi-desktop/omp-runtime";
+import {
+  MARKETPLACE_VIEW_DIR,
+  MAX_SESSION_RECORD_BYTES,
+  ompMemoryDirectory,
+  projectMarketplacePlugins,
+  type MarketplaceRunSnapshot,
+} from "@pi-desktop/omp-runtime";
 import { parseOmpMemorySettings, type OmpMemorySettings } from "@pi-desktop/shared";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
@@ -81,6 +87,8 @@ export type OmpSessionWiringDeps = {
   onTurnEnd?: (info: OmpTurnEndInfo) => void;
   onIdle?: (sessionId: string) => void;
   onMemoryMaintenanceIdle?: () => void;
+  /** Marketplace plugins a run started now would load (ADR 0333). */
+  marketplacePlugins?: () => MarketplaceRunSnapshot;
 };
 
 function hostOrThrow(host: () => HostProcess | null): HostProcess {
@@ -251,15 +259,24 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
   const { engineRuntime, dataRoot } = deps;
   const sessionDir = ensureSessionStateDir(dataRoot);
   // Launch-owned inputs: a change replaces an idle runtime before the next prompt.
-  type LaunchInputs = { subagents: OmpUserSubagentSnapshot; instructions: string | null; fingerprint: string };
+  type LaunchInputs = {
+    subagents: OmpUserSubagentSnapshot;
+    instructions: string | null;
+    marketplace: MarketplaceRunSnapshot | null;
+    fingerprint: string;
+  };
   const configurations = new WeakMap<object, { pending: LaunchInputs | null; fingerprint: string | null }>();
   const loadLaunchInputs = async (spec: OmpSessionRuntimeSpec): Promise<LaunchInputs> => {
     const catalog = deps.hostTools ? await deps.hostTools.catalog(spec.projectDirectory) : [];
     const subagents = await loadOmpUserSubagents(hostOrThrow(deps.host), spec, catalog.map(tool => tool.definition.name));
     for (const diagnostic of subagents.diagnostics) deps.logger?.app("runtime", "warn", "subagent unavailable", { data: diagnostic });
     const instructions = await readGlobalInstructions(dataRoot);
-    const fingerprint = createHash("sha256").update(JSON.stringify([subagents.fingerprint, instructions])).digest("hex");
-    return { subagents, instructions, fingerprint };
+    const marketplace = deps.marketplacePlugins?.() ?? null;
+    for (const diagnostic of marketplace?.diagnostics ?? []) deps.logger?.app("runtime", "warn", "marketplace plugin unavailable", { data: diagnostic });
+    const fingerprint = createHash("sha256")
+      .update(JSON.stringify([subagents.fingerprint, instructions, marketplace?.fingerprint ?? null]))
+      .digest("hex");
+    return { subagents, instructions, marketplace, fingerprint };
   };
 
   const bridge = createOmpSessionBridge({
@@ -334,6 +351,15 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
           await writeOmpUserSubagents(join(paths.configRoot, "agent"), inputs.subagents);
           // The desktop's global instructions become the run's user-level AGENTS.md.
           await writeOmpGlobalInstructions(paths.home, inputs.instructions);
+          // Installed marketplace plugins arrive as declarative views only.
+          if (inputs.marketplace) {
+            const projected = projectMarketplacePlugins({
+              snapshot: inputs.marketplace,
+              configRoot: paths.configRoot,
+              viewRoot: join(paths.runRoot, MARKETPLACE_VIEW_DIR),
+            });
+            for (const diagnostic of projected.diagnostics) deps.logger?.app("runtime", "warn", "marketplace plugin not projected", { data: diagnostic });
+          }
           state.fingerprint = inputs.fingerprint;
           state.pending = null;
         },

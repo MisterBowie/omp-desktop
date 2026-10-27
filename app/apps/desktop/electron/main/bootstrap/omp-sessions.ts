@@ -1,5 +1,7 @@
 /** Product composition for OMP sessions; the application entry only supplies services. */
 import { createOmpMemoryService } from "../runtime/omp-memory";
+import { createOmpMarketplaceService } from "../runtime/omp-marketplace";
+import { currentNetworkProxy } from "../network-proxy";
 import { createDesktopEngineRuntimeForApp } from "../runtime/engine-runtime";
 import { wireOmpSessions, type OmpSessionWiringDeps } from "../runtime/omp-session-wiring";
 import { createOmpHostToolAdapter, createHostPlansEndpoints, type OmpHostToolAdapterDeps } from "../runtime/omp-host-tools";
@@ -31,8 +33,15 @@ export function createOmpSessionServices(deps: OmpSessionServicesDeps) {
   const engineRuntime = createDesktopEngineRuntimeForApp({
     dataRoot: deps.dataRoot, app: deps.app, getHost: deps.host, piRuntimeLive: deps.piRuntimeLive,
   });
+  const ompMarketplace = createOmpMarketplaceService({
+    dataRoot: deps.dataRoot,
+    launcher: () => ({ path: engineRuntime.ompRuntime.launcher, error: engineRuntime.ompRuntime.launcherError }),
+    networkProxy: currentNetworkProxy,
+    log: (level, message, data) => deps.logger.app("runtime", level, message, { data }),
+  });
   const { bridge: ompSessions } = wireOmpSessions({
     dataRoot: deps.dataRoot,
+    marketplacePlugins: () => ompMarketplace.runSnapshot(),
     host: deps.host,
     engineRuntime,
     logger: deps.logger,
@@ -82,11 +91,12 @@ export function createOmpSessionServices(deps: OmpSessionServicesDeps) {
   const sessionsWithMemoryShutdown = {
     ...ompSessions,
     dispose: async (reason?: string) => {
+      ompMarketplace.dispose();
       let memoryFailed = false;
       try { await ompMemory.dispose(); } catch { memoryFailed = true; }
       const result = await ompSessions.dispose(reason);
       return memoryFailed ? { ok: false, failures: [...result.failures, { sessionId: "omp-memory-service", detail: "memory runtime reclaim incomplete" }] } : result;
     },
   };
-  return { engineRuntime, ompSessions: sessionsWithMemoryShutdown, ompMemory };
+  return { engineRuntime, ompSessions: sessionsWithMemoryShutdown, ompMemory, ompMarketplace };
 }

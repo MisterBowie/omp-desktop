@@ -23,13 +23,6 @@ const scheduledSource = await readFile(
   "utf8",
 );
 const pluginsPageSource = await readPluginsSource();
-const marketplaceSettingsSource = await readFile(
-  new URL(
-    "../src/components/plugins/MarketplaceSourceSettings.tsx",
-    import.meta.url,
-  ),
-  "utf8",
-);
 const vendorAccountsSource = await readFile(
   new URL("../src/components/settings/VendorAccountsSection.tsx", import.meta.url),
   "utf8",
@@ -418,12 +411,12 @@ test("settings rail uses short parallel labels and descriptive page titles", () 
   assert.match(settingsPageSource, /titleKey: entry\.titleKey/);
 });
 
-test("marketplace source settings live inside the Plugins marketplace surface", () => {
-  assert.match(pluginsPageSource, /<MarketplaceSourceSettings/);
-  assert.match(marketplaceSettingsSource, /api\.marketRefresh\(true\)/);
-  assert.match(marketplaceSettingsSource, /settings\.marketProvider/);
-  assert.match(marketplaceSettingsSource, /<SettingsMenuSelect/);
-  assert.doesNotMatch(marketplaceSettingsSource, /<Select/);
+test("marketplace sources live inside the Plugins marketplace surface", () => {
+  // ADR 0333: OMP marketplace sources are managed on the marketplace tab; the
+  // retired PI catalog channel picker has no settings surface.
+  assert.match(pluginsPageSource, /<SourcesSection market=\{market\}/);
+  assert.match(pluginsPageSource, /api\.ompMarketAddSource\(source\)/);
+  assert.doesNotMatch(pluginsPageSource, /MarketplaceSourceSettings|settings\.marketProvider/);
   assert.doesNotMatch(settingsPageSource, /ExtensionMarketSection/);
   assert.doesNotMatch(settingsPageSource, /tab === "extensions"/);
 });

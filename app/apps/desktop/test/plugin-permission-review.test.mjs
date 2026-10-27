@@ -166,15 +166,10 @@ test("the renderer holds the declaration until the user answers", () => {
   assert.match(confirm, /await api\.confirmLoadDevPlugin\(\{/);
   assert.match(confirm, /grantedPermissions: review\.permissions/);
 
-  // One permission list for both reviews: the risk tiers and labels live in a
-  // single component, so the two flows cannot disagree about what is risky.
+  // The development review renders the shared risk-tier list.
   assert.match(pluginsUiSrc, /function PermissionGroups\(/);
   const dialogs = slice(pluginsUiSrc, "export function PluginDialogs(", "\n/* ");
-  assert.equal(
-    dialogs.match(/<PermissionGroups/g)?.length,
-    2,
-    "both the install review and the development review render the shared list",
-  );
+  assert.match(dialogs, /<PermissionGroups/);
   assert.match(dialogs, /plugins\.devReviewTitle/);
   assert.match(dialogs, /plugins\.devReviewNewTitle/);
   assert.match(dialogs, /t\("plugins\.devReviewAccept"\)/);

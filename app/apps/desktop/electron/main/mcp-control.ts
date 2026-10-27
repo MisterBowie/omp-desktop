@@ -259,8 +259,7 @@ const CONTROL_OPERATION_SPECS: OperationSpec[] = [
   spec("subagentList", "subagent/list", "List user-owned Subagents.", "read", ["query"]),
   spec("subagentCatalog", "subagent/catalog", "Read the effective Subagent catalog.", "read", ["query"]),
   spec("subagentRead", "subagent/read", "Read a user-owned Subagent.", "read", ["input"]),
-  spec("marketSearch", "market/search", "Search the plugin marketplace.", "read", ["query"]),
-  spec("marketGetDetail", "market/getDetail", "Read marketplace plugin details.", "read", ["input"]),
+  spec("ompMarketState", "omp-market/state", "Read OMP marketplace sources and installed plugins.", "read", []),
   spec("commandPaletteSearch", "commandPalette/search", "Search command-palette commands.", "read", ["query"]),
   // Trusted extensions (spec 16 §10.2): reads and session-scoped command runs
   // are exposed; enablement, paths, and removal stay local (blocked below).

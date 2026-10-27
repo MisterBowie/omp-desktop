@@ -153,7 +153,6 @@ import { createWorkPanelRuntime } from "./bootstrap/work-panel";
 import { createCloseBehaviorRuntime } from "./bootstrap/close-behavior";
 import { registerShutdownHandlers, type ShutdownState } from "./bootstrap/shutdown";
 import { registerDiagnosticsIpc } from "./ipc/diagnostics-ipc";
-import { registerMarketIpc } from "./ipc/market-ipc";
 import { registerMcpIpc } from "./ipc/mcp-ipc";
 import { registerPluginIpc } from "./ipc/plugin-ipc";
 import { registerPluginUiIpc } from "./ipc/plugin-ui-ipc";
@@ -1166,7 +1165,7 @@ runtimeLifecycle = createRuntimeLifecycle({
 });
 const { bootHostStatus, runtimeArch, bootBackends } = runtimeLifecycle;
 
-const { engineRuntime, ompSessions, ompMemory } = createOmpSessionServices({
+const { engineRuntime, ompSessions, ompMemory, ompMarketplace } = createOmpSessionServices({
   dataRoot: dataDir,
   app,
   host: () => host,
@@ -1194,6 +1193,7 @@ function registerIpc() {
     engineRouter: engineRuntime.engineRouter,
     ompSessions,
     ompMemory,
+    ompMarketplace,
     getBackendRouter: () => startupState.backendRouter,
     getNotificationViewingSessionId: () => notificationViewingSessionId,
     setNotificationViewingSessionId: (sessionId: string | null) => {

@@ -143,9 +143,7 @@ MCP 服务、技能和子智能体独立于插件管理，各自可以全局启�
 
 ![模型配置中的默认模型与 AI 服务](../../public/screenshots/app/zh/settings-models.webp)
 
-![扩展市场中的插件目录源选择](../../public/screenshots/app/zh/settings-extensions.webp)
-
-![扩展市场中的自定义插件目录地址](../../public/screenshots/app/zh/settings-extensions-custom.webp)
+![插件市场中的 OMP 市场源](../../public/screenshots/app/zh/settings-extensions.webp)
 
 ## 如何重新生成
 

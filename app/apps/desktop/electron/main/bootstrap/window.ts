@@ -1847,27 +1847,18 @@ export async function createWindow({
               document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
             `);
             await new Promise((r) => setTimeout(r, 200));
-            // Plugins marketplace: the source picker lives beside the catalog,
-            // including the custom URL row that only appears for that source.
+            // Plugins marketplace: OMP sources are managed beside the catalog
+            // (ADR 0333).
             await setPage("plugins");
             await windowState.mainWindow!.webContents.executeJavaScript(
               `document.querySelector('#plugins-tab-market')?.dispatchEvent(new MouseEvent('click',{bubbles:true}))`,
             );
             await new Promise((r) => setTimeout(r, 350));
+            await windowState.mainWindow!.webContents.executeJavaScript(
+              `document.querySelector('.plugins-omp-sources')?.scrollIntoView({ block: 'start' })`,
+            );
+            await new Promise((r) => setTimeout(r, 200));
             await shot("pi-settings-extensions");
-            await windowState.mainWindow!.webContents.executeJavaScript(`
-              (() => {
-                const select = document.querySelector('.plugins-market-settings select');
-                if (!select) return;
-                const setter = Object.getOwnPropertyDescriptor(
-                  window.HTMLSelectElement.prototype, 'value',
-                )?.set;
-                setter?.call(select, 'custom');
-                select.dispatchEvent(new Event('change', { bubbles: true }));
-              })()
-            `);
-            await new Promise((r) => setTimeout(r, 350));
-            await shot("pi-settings-extensions-custom");
             await setPage("chat");
             await setTheme("light");
             await new Promise((r) => setTimeout(r, 250));

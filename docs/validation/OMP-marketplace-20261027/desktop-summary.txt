@@ -1,0 +1,11 @@
+✖ npm --version nonzero and timeout reject the selected tool (15003.907875ms)
+ℹ tests 3246
+ℹ suites 0
+ℹ pass 3235
+ℹ fail 0
+ℹ cancelled 1
+ℹ skipped 10
+ℹ todo 0
+ℹ duration_ms 227732.13225
+✖ failing tests:
+✖ npm --version nonzero and timeout reject the selected tool (15003.907875ms)

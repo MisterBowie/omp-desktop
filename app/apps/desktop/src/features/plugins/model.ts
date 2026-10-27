@@ -1,5 +1,4 @@
 import type {
-  MarketPluginSummary,
   PluginCapability,
   PluginFsPolicy,
   PluginSummary,
@@ -8,17 +7,16 @@ import type {
 export type TabId = "installed" | "market";
 
 /**
- * Always-visible sections of the installed index. Broken plugins come first and
- * pending updates second, so the two states that need a decision are never
- * buried under the plugins that are simply working.
+ * Always-visible sections of the installed index. Broken plugins come first, so
+ * the state that needs a decision is never buried under the plugins that are
+ * simply working.
  */
-export type GroupId = "attention" | "updates" | "active" | "disabled";
+export type GroupId = "attention" | "active" | "disabled";
 
-export const GROUP_ORDER: GroupId[] = ["attention", "updates", "active", "disabled"];
+export const GROUP_ORDER: GroupId[] = ["attention", "active", "disabled"];
 
 export const GROUP_LABEL_KEYS: Record<GroupId, string> = {
   attention: "plugins.groupAttention",
-  updates: "plugins.groupUpdates",
   active: "plugins.groupActive",
   disabled: "plugins.groupDisabled",
 };
@@ -135,13 +133,6 @@ export function orderPermissions(permissions: readonly string[] | undefined): st
   );
 }
 
-export function formatBytes(size?: number): string {
-  if (!size || size <= 0) return "—";
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(2)} MB`;
-}
-
 export function formatDate(value: string | undefined, locale: string): string {
   if (!value) return "—";
   const parsed = new Date(value);
@@ -157,47 +148,6 @@ export function formatDate(value: string | undefined, locale: string): string {
   }
 }
 
-export function shortSha(value?: string): string {
-  if (!value) return "—";
-  return value.length > 12 ? `${value.slice(0, 12)}…` : value;
-}
-
-/**
- * A catalog version is installable only once its package is published and
- * while it is still offered. The host refuses the download otherwise, so every
- * install affordance reads this instead of offering a button that can only
- * fail.
- */
-export function versionInstallable(
-  version?: { url?: string; shasum?: string; yanked?: boolean } | null,
-): boolean {
-  return !!version?.url?.trim() && !!version?.shasum?.trim() && !version.yanked;
-}
-
-/**
- * Withdrawn is a different refusal from not-yet-published: the version existed
- * and was pulled, so the sheet explains it rather than telling the user to wait
- * for an upload that will never come.
- */
-export function versionWithdrawn(version?: { yanked?: boolean } | null): boolean {
-  return !!version?.yanked;
-}
-
-/**
- * Whether a marketplace entry may render the verified shield.
- *
- * Catalog v2 carries an explicit tier that only the plugin center can issue,
- * and the host already downgrades a claim it cannot attribute to the official
- * source. A v1 entry has no tier, so its maintainer-written boolean still
- * decides. Rendering `trust` first keeps the badge from being something a
- * publisher can grant themselves.
- */
-export function showsVerifiedBadge(entry?: { trust?: string; verified?: boolean } | null): boolean {
-  if (!entry) return false;
-  if (entry.trust) return entry.trust === "verified";
-  return !!entry.verified;
-}
-
 /** Single-glyph stand-in for a marketplace icon we deliberately do not fetch. */
 export function monogram(name: string): string {
   const first = [...name.trim()][0];
@@ -210,13 +160,7 @@ export function matchesQuery(query: string, ...fields: Array<string | undefined>
   return fields.some((field) => field?.toLocaleLowerCase().includes(needle));
 }
 
-/** Development-only sample plugins are fixtures, not client product offerings. */
-export function isClientVisibleMarketPlugin(plugin: Pick<MarketPluginSummary, "id">): boolean {
-  return !plugin.id.startsWith("demo.");
-}
-
 export function groupOf(plugin: PluginSummary): GroupId {
   if (plugin.status === "error" || plugin.status === "load_error") return "attention";
-  if (plugin.updateAvailable) return "updates";
   return plugin.enabled ? "active" : "disabled";
 }

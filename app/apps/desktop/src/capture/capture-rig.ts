@@ -57,8 +57,7 @@ export function installCaptureRig(): CaptureRig {
   const originalRefreshNotifications =
     useAppStore.getState().refreshNotifications;
   const originalListPluginServices = api.listPluginServices;
-  const originalMarketSearch = api.marketSearch;
-  const originalMarketDetail = api.marketGetDetail;
+  const originalOmpMarketState = api.ompMarketState;
   const originalListMcpServers = api.listMcpServers;
   const originalListUserSkills = api.listUserSkills;
   const originalListUserSubagents = api.listUserSubagents;
@@ -448,115 +447,72 @@ export function installCaptureRig(): CaptureRig {
       if (count <= 0) {
         useAppStore.setState({ plugins: [] });
         (api as any).listPluginServices = originalListPluginServices;
-        (api as any).marketSearch = originalMarketSearch;
-        (api as any).marketGetDetail = originalMarketDetail;
+        (api as any).ompMarketState = originalOmpMarketState;
         return;
       }
-      (api as any).marketGetDetail = async (id: string) => ({
-        plugin: {
-          id,
-          name: "Git Insights",
-          description: "Summarizes repository activity into a review panel.",
-          author: "Pi Labs",
-          latestVersion: "1.5.0",
-          downloads: 12840,
-          updatedAt: "2026-08-21T09:00:00.000Z",
-          categories: ["productivity"],
-          permissionSummary: ["fs.read", "fs.write", "ui.panel", "notify"],
-          permissions: ["fs.read", "fs.write", "ui.panel", "notify"],
-          verified: true,
-          trust: "verified",
-          installed: true,
-          installedVersion: "1.4.2",
-          updateAvailable: true,
-          installable: true,
-          homepage: "https://example.invalid/git-insights",
-          repository: "https://github.com/example/git-insights",
-          safetyNotes: "Writes only under docs/ and Markdown files in the workspace.",
-          readmeMarkdown: "# Git Insights\n\nA review panel for repository activity.",
-          versions: [
-            {
-              version: "1.5.0",
-              publishedAt: "2026-08-21T09:00:00.000Z",
-              changelog: "Adds a per-author heatmap.",
-              shasum: "capture",
-              url: "https://example.invalid/git-insights-1.5.0.piplug",
-              size: 48210,
-            },
-            {
-              version: "1.4.2",
-              publishedAt: "2026-07-02T09:00:00.000Z",
-              changelog: "Fixes a stale cache after branch switches.",
-              shasum: "capture",
-              url: "https://example.invalid/git-insights-1.4.2.piplug",
-              size: 47100,
-            },
-          ],
-        },
-      });
-      // The marketplace tab searches the catalog over IPC, which is offline
-      // in the capture rig; stand in with a card per trust tier and state.
-      (api as any).marketSearch = async () => ({
+      // The marketplace tab reads OMP's registries over IPC, which hold nothing
+      // in the capture rig; stand in with one source and a card per state.
+      (api as any).ompMarketState = async () => ({
+        available: true,
+        sources: [
+          {
+            name: "claude-plugins-official",
+            sourceType: "github",
+            sourceUri: "anthropics/claude-plugins-official",
+            updatedAt: "2026-10-20T09:00:00.000Z",
+            ownerName: "Anthropic",
+            pluginCount: 3,
+          },
+        ],
         plugins: [
           {
-            id: "pi.git-insights",
-            name: "Git Insights",
-            description: "Summarizes repository activity into a review panel.",
-            author: "Pi Labs",
-            latestVersion: "1.5.0",
-            downloads: 12840,
-            updatedAt: "2026-08-21T09:00:00.000Z",
-            categories: ["productivity"],
-            permissionSummary: ["fs.read", "fs.write", "ui.panel"],
-            verified: true,
-            trust: "verified",
-            installed: true,
-            installedVersion: "1.4.2",
-            updateAvailable: true,
+            id: "code-review@claude-plugins-official",
+            name: "code-review",
+            marketplace: "claude-plugins-official",
+            description: "Reviews the current diff with a dedicated subagent and slash command.",
+            version: "1.2.0",
+            authorName: "Anthropic",
+            category: "development",
+            keywords: ["review"],
             installable: true,
+            declaresWithheld: [],
           },
           {
-            id: "pi.markdown-tools",
-            name: "Markdown Tools",
-            description: "Formats tables and normalizes headings on demand.",
-            author: "Community",
-            latestVersion: "0.9.0",
-            downloads: 3210,
-            updatedAt: "2026-07-30T09:00:00.000Z",
-            categories: ["editing"],
-            permissionSummary: ["clipboard.read", "clipboard.write"],
-            trust: "community",
-            installed: true,
-            installedVersion: "0.9.0",
+            id: "commit-helper@claude-plugins-official",
+            name: "commit-helper",
+            marketplace: "claude-plugins-official",
+            description: "Drafts commit messages and checks them before you commit.",
+            version: "0.4.0",
+            authorName: "Anthropic",
+            category: "productivity",
+            keywords: [],
             installable: true,
+            declaresWithheld: ["hooks"],
           },
           {
-            id: "pi.deploy-preview",
-            name: "Deploy Preview",
-            description:
-              "Builds a preview deployment for the current branch and links it in the transcript.",
-            author: "Pi Labs",
-            latestVersion: "0.4.1",
-            downloads: 980,
-            updatedAt: "2026-08-02T09:00:00.000Z",
-            categories: ["productivity"],
-            permissionSummary: ["net.fetch", "ui.panel"],
-            verified: true,
-            trust: "verified",
-            installable: true,
-          },
-          {
-            id: "pi.sql-explorer",
-            name: "SQL Explorer",
-            description: "Browse local databases and paste query results into chat.",
-            author: "Data Tools",
-            latestVersion: "2.1.0",
-            downloads: 5602,
-            updatedAt: "2026-08-15T09:00:00.000Z",
-            categories: ["data"],
-            permissionSummary: ["fs.read", "process.spawn"],
-            trust: "community",
+            id: "db-explorer@claude-plugins-official",
+            name: "db-explorer",
+            marketplace: "claude-plugins-official",
+            description: "Browse local databases from the conversation.",
+            version: "2.1.0",
+            category: "data",
+            keywords: [],
             installable: false,
+            unavailableReason: "npm-source",
+            declaresWithheld: ["mcp"],
+          },
+        ],
+        installed: [
+          {
+            id: "code-review@claude-plugins-official",
+            name: "code-review",
+            marketplace: "claude-plugins-official",
+            version: "1.1.0",
+            installedAt: "2026-10-01T09:00:00.000Z",
+            lastUpdated: "2026-10-01T09:00:00.000Z",
+            enabled: true,
+            components: { loaded: { skills: 1, commands: 2, agents: 1 }, withheld: ["mcp"] },
+            updateVersion: "1.2.0",
           },
         ],
       });
@@ -1104,8 +1060,7 @@ export function installCaptureRig(): CaptureRig {
         refreshNotifications: originalRefreshNotifications,
       });
       api.listPluginServices = originalListPluginServices;
-      api.marketSearch = originalMarketSearch;
-      api.marketGetDetail = originalMarketDetail;
+      api.ompMarketState = originalOmpMarketState;
       api.listMcpServers = originalListMcpServers;
       api.listUserSkills = originalListUserSkills;
       api.listUserSubagents = originalListUserSubagents;
