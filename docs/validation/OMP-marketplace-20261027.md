@@ -105,3 +105,6 @@ DMG 复制为 `~/Downloads/OMP-Desktop-0.1.6-marketplace-5c6582b7-arm64.dmg`；Z
   `http://`/`https://`/`socks5://` 地址交给 CLI（绕过 localhost）；直连模式不带代理；自定义模式不变。
 - 验证：`omp-marketplace-service.test.mjs` 新增模式优先级用例，与 `main-wiring-contract` 共 14/14；desktop
   typecheck exit 0；真实运行时经系统代理添加该源：34 s 完成，315 个插件。
+- 重新打本地测试包（`dc973e52`）：`dist:mac --arm64` exit 0；DMG SHA-256 `9e24e40d111a738a129b32a3f9aac51183a2caa75afd338dae61f9db4f12ddda`，
+  `hdiutil verify` VALID，`verify-installed-product` exit 0；复制为
+  `~/Downloads/OMP-Desktop-0.1.6-marketplace-dc973e52-arm64.dmg`。
