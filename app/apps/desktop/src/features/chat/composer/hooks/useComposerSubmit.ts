@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import type { TFunction } from "i18next";
 import {
   canonicalThinkingLevel,
+  type ComposerCommand,
   restoreInlineComposerFileReferenceTokens,
   serializeComposerFileReferences,
   serializeInlineComposerFileReferences,
@@ -203,6 +204,15 @@ export function useComposerSubmit({
     }
     invalidatePromptEnhancement();
     const submittedDraftKey = draftKey;
+    // Commands are awaited, so the user may keep typing into the same draft.
+    // Clear only while the visible editor still holds the submitted text; newer
+    // input is kept. A draft that is no longer visible is cleared as before.
+    const clearSubmittedDraft = (key: string, submittedText: string) => {
+      const editor = draft.ref.current;
+      const visibleKey = draftKeyForSession(useAppStore.getState().activeSessionId);
+      if (visibleKey === key && editor && readEditorValue(editor) !== submittedText) return;
+      draft.clearDraftForKey(key);
+    };
     // Slash dispatch stays local for builtin and extension commands, while
     // templates, skills, and unknown aliases continue as normal prompt text.
     if (!steering && serializedContent.startsWith("/")) {
@@ -211,7 +221,17 @@ export function useComposerSubmit({
         1,
         commandEnd === -1 ? undefined : commandEnd,
       );
-      const command = name ? await resolveComposerCommand(name) : null;
+      let command: ComposerCommand | null = null;
+      if (name) {
+        try {
+          command = await resolveComposerCommand(name);
+        } catch {
+          // The command list failed, so this name may still be a command. Refuse
+          // the send rather than deliver it to the model; the draft stays.
+          showToast(t("chat.commandSourceUnavailable"), { variant: "error" });
+          return;
+        }
+      }
       // Command discovery may outlive a session switch; keep the source draft.
       if (useAppStore.getState().activeSessionId !== activeSessionId) return;
       if (command && command.kind !== "template" && command.id) {
@@ -237,7 +257,7 @@ export function useComposerSubmit({
               ),
               draft.draftSnapshot(visibleCommandBody),
             );
-            if (accepted) draft.clearDraftForKey(submittedDraftKey);
+            if (accepted) clearSubmittedDraft(submittedDraftKey, text);
           } catch (error) {
             showToast(error instanceof Error ? error.message : String(error), {
               variant: "error",
@@ -248,7 +268,7 @@ export function useComposerSubmit({
         if (command.kind === "extension") {
           try {
             await runExtensionCommand(command.name, commandBody);
-            draft.clearDraftForKey(submittedDraftKey);
+            clearSubmittedDraft(submittedDraftKey, text);
           } catch (error) {
             showToast(error instanceof Error ? error.message : String(error), {
               variant: "error",
@@ -260,7 +280,7 @@ export function useComposerSubmit({
           try {
             if (command.kind === "builtin") await runPaletteCommand(command.id);
             else await api.executeCommand(command.id);
-            draft.clearDraftForKey(submittedDraftKey);
+            clearSubmittedDraft(submittedDraftKey, text);
           } catch (error) {
             showToast(error instanceof Error ? error.message : String(error), {
               variant: "error",

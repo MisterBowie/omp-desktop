@@ -401,6 +401,7 @@ export const tr = {
     running: "Çalışıyor…",
     loadingSession: "Sohbet yükleniyor…",
     pasteInProgress: "Yapıştırılan içerik hâlâ kaydediliyor. Biraz sonra yeniden deneyin.",
+    commandSourceUnavailable: "Komutlar yüklenemedi, bu yüzden ileti gönderilmedi. Taslağınız korundu.",
     loadingEarlierMessages: "Önceki iletiler yükleniyor…",
     loadLaterMessages: "Sonraki mesajları yükle",
     showEarlierMessages: "Önceki iletileri göster",

@@ -562,6 +562,9 @@ export function useAppShellRuntime() {
     const offQueueChanged = api.onAgentQueueChanged((event) =>
       useAppStore.getState().applyQueueChanged(event),
     );
+    // Dialogs a reload dropped from the renderer queues are still open in the runtime.
+    // Best effort: a failure means no OMP runtime, where nothing can be waiting.
+    void api.resurfaceOpenRequests().catch(() => undefined);
     const offPlansChanged = api.onPlansChanged(handlePlansChanged);
     // Host-pushed toasts (plugin runtime etc.) are informational.
     const offToast = api.onToast((message) => showToast(message));

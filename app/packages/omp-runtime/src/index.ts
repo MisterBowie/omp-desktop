@@ -24,6 +24,7 @@ export {
   removeOwnedRunRoot,
   type OmpRuntimeEnv,
   type OmpRuntimeEnvOptions,
+  type OmpProxyPolicy,
 } from "./isolation.js";
 export { OmpRuntimeError, isFatalTransportError, type OmpRuntimeErrorCode } from "./errors.js";
 export {

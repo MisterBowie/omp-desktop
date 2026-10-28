@@ -31,6 +31,7 @@ import {
   verifyBundledRuntime,
   type BundledSidecarProvenance,
   type OmpReclaimResult,
+  type OmpProxyPolicy,
   type OmpRunPaths,
   type OmpMemoryLaunchConfig,
 } from "@pi-desktop/omp-runtime";
@@ -198,6 +199,8 @@ export type OmpRuntimeAdapter = {
      * runtime's lifetime (see `OmpRuntimeSupervisorOptions`).
      */
     desktopStateRequired?: boolean;
+    /** Resolved at each start; see `OmpRuntimeSupervisorOptions.proxy`. */
+    proxy?: () => Promise<OmpProxyPolicy | undefined>;
   }): OmpRuntimeSupervisor;
 };
 
@@ -238,6 +241,7 @@ export function createOmpRuntimeAdapter(
       ...(createOptions.desktopStateRequired !== undefined
         ? { desktopStateRequired: createOptions.desktopStateRequired }
         : {}),
+      ...(createOptions.proxy ? { proxy: createOptions.proxy } : {}),
     });
   };
 

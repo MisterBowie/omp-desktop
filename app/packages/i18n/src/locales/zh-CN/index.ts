@@ -393,6 +393,7 @@ export const zhCN = {
     running: "正在处理…",
     loadingSession: "正在加载会话…",
     pasteInProgress: "粘贴内容仍在保存中，请稍后再发送。",
+    commandSourceUnavailable: "无法加载指令，因此消息未发送。草稿已保留。",
     loadingEarlierMessages: "正在加载更早的消息…",
     loadLaterMessages: "加载后续消息",
     showEarlierMessages: "显示更早的消息",

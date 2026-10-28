@@ -246,6 +246,9 @@ test(
             return { context: null };
           case "project.memory.get":
             return { memory: { content: "" } };
+          case "providers.get":
+            // The launch resolves the session's provider endpoint for its proxy policy.
+            return { provider: params.id === PROJECT_PROVIDER ? { id: PROJECT_PROVIDER, enabled: true, apiStyle: "chat_completions", authKind: "none", baseUrl: provider.baseUrl } : null };
           default:
             throw new Error(`unexpected host call: ${method}`);
         }
@@ -312,6 +315,7 @@ test(
     const interactions = { onEnvelope: null };
 
     const { bridge } = wireOmpSessions({
+      resolveProxy: async () => undefined,
       dataRoot,
       host: () => fakeHost,
       engineRuntime,
@@ -355,6 +359,14 @@ test(
         );
         assert.equal(seen, true, `${label}: the gate must raise an approval card`);
         card = sliceOf().find((entry) => entry.event.type === "tool_permission_request").event.request;
+        // A renderer reload drops its in-memory queues while the runtime keeps
+        // waiting: re-surfacing must emit the same open card once more.
+        const cardsBefore = sliceOf().filter((entry) => entry.event.type === "tool_permission_request").length;
+        const reissued = bridge.resurfaceOpenRequests();
+        const cardsAfter = sliceOf().filter((entry) => entry.event.type === "tool_permission_request");
+        assert.equal(reissued, 1, `${label}: exactly the open approval must be re-surfaced`);
+        assert.equal(cardsAfter.length, cardsBefore + 1, `${label}: the card is emitted again`);
+        assert.equal(cardsAfter.at(-1).event.request.requestId, card.requestId, `${label}: the re-emitted card is the open one`);
         const resolved = bridge.resolvePermission(card.requestId, options.answer);
         assert.equal(resolved.ok, true, `${label}: the card must resolve (${options.answer})`);
       }

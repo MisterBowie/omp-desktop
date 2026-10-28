@@ -241,7 +241,11 @@ impl Database {
         for raw in paths {
             let path = canonical_project_path(raw)
                 .ok_or_else(|| anyhow!("project group root path must not be blank"))?;
-            if !Path::new(&path).is_dir() {
+            // A root the group already stores may have been renamed or removed
+            // outside the app. It stays a member, so only a folder being added
+            // must exist on disk.
+            let stored = current.roots.iter().any(|root| root.path == path);
+            if !stored && !Path::new(&path).is_dir() {
                 return Err(anyhow!("project group root is not a directory: {path}"));
             }
             if selected.iter().any(|candidate| candidate == &path) {

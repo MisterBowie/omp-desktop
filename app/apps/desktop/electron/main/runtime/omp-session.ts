@@ -754,6 +754,8 @@ export type OmpSessionBridge = {
   isBusy(sessionId: string): boolean;
   withIdleRuntimes<T>(operation: () => Promise<T>): Promise<T>;
   isCurrentTurn(sessionId: string, turnId: string): boolean;
+  /** Re-emit the dialogs still awaiting an answer; returns how many. */
+  resurfaceOpenRequests(): number;
   hasPendingRequest(requestId: string): boolean;
   hasKnownRequest(requestId: string): boolean;
   workingDirectory(sessionId: string): string | null;
@@ -819,6 +821,16 @@ class SessionEntry {
   isBusy(): boolean { return this.preparingPrompt || this.compaction?.busy === true || this.stopping !== null || this.runnerState() !== "idle"; }
   isCurrentTurn(turnId: string): boolean {
     return this.runner?.status().currentTurnId === turnId || this.hostTurn?.hostTurnId === turnId;
+  }
+
+  /**
+   * Re-emit every dialog still waiting for an answer. The renderer keeps its
+   * queues in memory, so a reload drops them while the runtime keeps waiting.
+   */
+  resurfaceOpenRequests(): number {
+    const open = [...this.approvalRequests.values(), ...this.askRequests.values()];
+    for (const dialog of open) this.surfaceUiRequest(dialog.request, dialog.sessionId, dialog.generation);
+    return open.length;
   }
 
   async steer(content: string, expectedTurnId: string, userMessageId?: string | null, requiresSkill = false, images: readonly OmpPromptImage[] = []): Promise<{ accepted: true; turnId: string }> {
@@ -3485,6 +3497,11 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
     hasKnownRequest,
     workingDirectory,
     projectDirectory: (sessionId) => entryOf(sessionId)?.projectDirectory ?? null,
+    resurfaceOpenRequests: () => {
+      let count = 0;
+      for (const entry of entries.values()) count += entry.resurfaceOpenRequests();
+      return count;
+    },
     listSubagents,
     readSubagentTranscript,
     stopSubagent,

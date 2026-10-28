@@ -959,6 +959,9 @@ export function registerAgentIpc({
     return bridge.readSubagentTranscript(req.sessionId, req.subagentId, req.fromByte);
   });
 
+  // Without an OMP runtime nothing can be waiting, so there is nothing to re-emit.
+  handle(IPC.invoke.ompResurfaceOpenRequests, async () => ompSessions?.resurfaceOpenRequests() ?? 0);
+
   handle(IPC.invoke.ompSubagentStop, async (req: { sessionId: string; subagentId: string }) => {
     const bridge = await requireOmpSubagentAccess(req.sessionId);
     // Refused unconditionally by the bridge: the pinned runtime has no per-child

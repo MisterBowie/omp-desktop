@@ -15,7 +15,6 @@ import { resolve } from "node:path";
 import {
   ErrorCodes,
   OMP_RUNTIME_VERSION,
-  proxyEnvAssignments,
   type NetworkProxySettings,
   type OmpMarketState,
 } from "@pi-desktop/shared";
@@ -32,6 +31,7 @@ import {
   type MarketplaceRunSnapshot,
   type OmpMarketplaceStore,
 } from "@pi-desktop/omp-runtime";
+import { ompProxyPolicy } from "./omp-network-proxy";
 
 /** Error code for a CLI run that OMP itself rejected. */
 export const OMP_MARKET_COMMAND_FAILED = "OMP_MARKET_COMMAND_FAILED";
@@ -115,43 +115,6 @@ export type OmpMarketplaceService = {
   dispose(): void;
 };
 
-/** Hosts the CLI never sends through a resolved system proxy. */
-const SYSTEM_PROXY_BYPASS = "localhost,127.0.0.1,::1";
-
-/**
- * The first usable entry of a Chromium proxy list (`PROXY h:p; DIRECT`) as a
- * URL git and the runtime understand, or null for DIRECT/unsupported.
- */
-export function proxyUrlFromChromiumList(list: string): string | null {
-  for (const entry of list.split(";")) {
-    const [kind, hostPort] = entry.trim().split(/\s+/);
-    if (!kind || !hostPort) continue;
-    const scheme = { PROXY: "http", HTTP: "http", HTTPS: "https", SOCKS: "socks5", SOCKS5: "socks5" }[kind.toUpperCase()];
-    if (scheme) return `${scheme}://${hostPort}`;
-  }
-  return null;
-}
-
-async function proxyFor(deps: OmpMarketplaceServiceDeps): Promise<{ url: string; bypass: string } | undefined> {
-  const settings = deps.networkProxy?.();
-  if (settings?.mode === "custom") {
-    const assignments = proxyEnvAssignments(settings);
-    const url = assignments.ALL_PROXY;
-    return url ? { url, bypass: assignments.NO_PROXY ?? "" } : undefined;
-  }
-  if (settings?.mode === "direct") return undefined;
-  // System mode: git does not read the OS proxy, so resolve it the way the
-  // desktop's own network stack would for a typical source host.
-  try {
-    const list = await deps.systemProxy?.("https://github.com/");
-    const url = list ? proxyUrlFromChromiumList(list) : null;
-    return url ? { url, bypass: SYSTEM_PROXY_BYPASS } : undefined;
-  } catch (error) {
-    deps.log?.("warn", "OMP marketplace system proxy unresolved", (error as Error).message);
-    return undefined;
-  }
-}
-
 export function createOmpMarketplaceService(deps: OmpMarketplaceServiceDeps): OmpMarketplaceService {
   const store = ompMarketplaceStore(deps.dataRoot);
   const runCli = deps.runCli ?? runOmpPluginCli;
@@ -176,7 +139,14 @@ export function createOmpMarketplaceService(deps: OmpMarketplaceServiceDeps): Om
       });
     }
     ensureOmpMarketplaceStore(store);
-    const proxy = await proxyFor(deps);
+    // git does not read the OS proxy, so system mode resolves it for a typical source host.
+    const proxy = await ompProxyPolicy({
+      settings: deps.networkProxy?.(),
+      targetUrl: "https://github.com/",
+      systemProxy: deps.systemProxy,
+      label: "OMP marketplace",
+      log: deps.log,
+    });
     const result = await runCli({
       launcher: launcher.path,
       store,

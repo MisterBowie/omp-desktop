@@ -19,6 +19,7 @@ import {
   ompMemoryDirectory,
   projectMarketplacePlugins,
   type MarketplaceRunSnapshot,
+  type OmpProxyPolicy,
 } from "@pi-desktop/omp-runtime";
 import { parseOmpMemorySettings, type OmpMemorySettings } from "@pi-desktop/shared";
 import { createHash } from "node:crypto";
@@ -88,6 +89,8 @@ export type OmpSessionWiringDeps = {
   onMemoryMaintenanceIdle?: () => void;
   /** Marketplace plugins a run started now would load (ADR 0333). */
   marketplacePlugins?: () => MarketplaceRunSnapshot;
+  /** The network policy a runtime for `targetUrl` launches behind (system mode asks the OS). */
+  resolveProxy: (targetUrl: string) => Promise<OmpProxyPolicy | undefined>;
 };
 
 function hostOrThrow(host: () => HostProcess | null): HostProcess {
@@ -152,6 +155,21 @@ export function resolveEffectivePermissionMode(
     return defaultPermissionMode;
   }
   return "ask";
+}
+
+/**
+ * The base URL of the session's provider, the endpoint its model requests go
+ * to. Null when the session has no binding or its projection is invalid; the
+ * projection in prepareRun refuses that start with the actionable error.
+ */
+async function sessionTargetUrl(host: () => HostProcess | null, spec: OmpSessionRuntimeSpec): Promise<string | null> {
+  if (!spec.providerId || !spec.modelId) return null;
+  const { provider } = await hostOrThrow(host).call<{ provider?: ProjectionProvider | null }>("providers.get", {
+    id: spec.providerId,
+  });
+  if (!provider) return null;
+  const resolved = resolveProviderProjection(provider, spec.modelId, spec.thinkingLevel);
+  return resolved.ok ? resolved.projection.baseUrl : null;
 }
 
 /**
@@ -262,9 +280,15 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
     subagents: OmpUserSubagentSnapshot;
     instructions: string | null;
     marketplace: MarketplaceRunSnapshot | null;
+    proxy: OmpProxyPolicy | undefined;
     fingerprint: string;
   };
   const configurations = new WeakMap<object, { pending: LaunchInputs | null; fingerprint: string | null }>();
+  /** The proxy a runtime for this session launches behind; decided at each use. */
+  const sessionProxy = async (spec: OmpSessionRuntimeSpec): Promise<OmpProxyPolicy | undefined> => {
+    const targetUrl = await sessionTargetUrl(deps.host, spec);
+    return targetUrl ? deps.resolveProxy(targetUrl) : undefined;
+  };
   const loadLaunchInputs = async (spec: OmpSessionRuntimeSpec): Promise<LaunchInputs> => {
     const catalog = deps.hostTools ? await deps.hostTools.catalog(spec.projectDirectory) : [];
     const subagents = await loadOmpUserSubagents(hostOrThrow(deps.host), spec, catalog.map(tool => tool.definition.name));
@@ -272,10 +296,11 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
     const instructions = await readGlobalInstructions(dataRoot);
     const marketplace = deps.marketplacePlugins?.() ?? null;
     for (const diagnostic of marketplace?.diagnostics ?? []) deps.logger?.app("runtime", "warn", "marketplace plugin unavailable", { data: diagnostic });
+    const proxy = await sessionProxy(spec);
     const fingerprint = createHash("sha256")
-      .update(JSON.stringify([subagents.fingerprint, instructions, marketplace?.fingerprint ?? null]))
+      .update(JSON.stringify([subagents.fingerprint, instructions, marketplace?.fingerprint ?? null, proxy ?? null]))
       .digest("hex");
-    return { subagents, instructions, marketplace, fingerprint };
+    return { subagents, instructions, marketplace, proxy, fingerprint };
   };
 
   const bridge = createOmpSessionBridge({
@@ -342,6 +367,7 @@ export function wireOmpSessions(deps: OmpSessionWiringDeps): WiredOmpSessions {
         ...(spec.providerId && spec.modelId
           ? { modelSelector: `${spec.providerId}/${spec.modelId}` }
           : {}),
+        proxy: () => sessionProxy(spec),
         prepareRun: async (paths) => {
           const inputs = state.pending ?? await loadLaunchInputs(spec);
           await projectSessionModels(deps.host, spec, paths, await ompSubagentModels(hostOrThrow(deps.host), inputs.subagents));

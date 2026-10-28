@@ -392,6 +392,7 @@ export const es = {
     "running": "Trabajando...",
     "loadingSession": "Cargando conversación...",
     "pasteInProgress": "Todavía guardando el contenido pegado. Inténtalo de nuevo en un momento.",
+    "commandSourceUnavailable": "No se pudieron cargar los comandos, así que el mensaje no se envió. Se conservó el borrador.",
     "loadingEarlierMessages": "Cargando mensajes anteriores…",
     loadLaterMessages: "Cargar mensajes posteriores",
     "showEarlierMessages": "Mostrar mensajes anteriores",

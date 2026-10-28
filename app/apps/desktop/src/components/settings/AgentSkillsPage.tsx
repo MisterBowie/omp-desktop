@@ -8,6 +8,7 @@ import {
 import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
 import { useHostCollection } from "../../hooks/use-host-collection";
+import { useRowBusy } from "../../hooks/use-row-busy";
 import {
   AgentCapabilityPage,
   AgentProjectPicker,
@@ -91,7 +92,7 @@ export function AgentSkillsPage() {
   );
   const [filter, setFilter] = useState<CapabilityFilter>("all");
   const [search, setSearch] = useState("");
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const { busyKeys, begin, end } = useRowBusy();
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [editor, setEditor] = useState<SkillEditorState | null>(null);
   const [view, setView] = useState<"skills" | "market">("skills");
@@ -122,9 +123,8 @@ export function AgentSkillsPage() {
    */
   const toggle = async (skill: UserSkillRecord, level: AgentCapabilityLevel) => {
     const key = rowKey(level, skill.id);
-    if (busyId === key) return;
+    if (!begin(key)) return;
     const next = !skill.enabled;
-    setBusyId(key);
     patchRow(level, skill.id, { enabled: next });
     try {
       await api.setUserSkillEnabled(skill.id, next, levelQuery(level));
@@ -138,7 +138,7 @@ export function AgentSkillsPage() {
       patchRow(level, skill.id, { enabled: skill.enabled });
       showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
     } finally {
-      setBusyId(null);
+      end(key);
     }
   };
 
@@ -165,7 +165,7 @@ export function AgentSkillsPage() {
 
   const openEdit = async (skill: UserSkillRecord, level: AgentCapabilityLevel) => {
     const key = rowKey(level, skill.id);
-    setBusyId(key);
+    if (!begin(key)) return;
     try {
       const result = await api.readUserSkill(skill.id, levelQuery(level));
       setEditor({
@@ -176,7 +176,7 @@ export function AgentSkillsPage() {
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
     } finally {
-      setBusyId(null);
+      end(key);
     }
   };
 
@@ -220,7 +220,7 @@ export function AgentSkillsPage() {
 
   const remove = async (skill: UserSkillRecord, level: AgentCapabilityLevel) => {
     const key = rowKey(level, skill.id);
-    setBusyId(key);
+    if (!begin(key)) return;
     try {
       await api.removeUserSkill(skill.id, levelQuery(level));
       await load();
@@ -230,7 +230,7 @@ export function AgentSkillsPage() {
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
     } finally {
-      setBusyId(null);
+      end(key);
       setArmed(null);
     }
   };
@@ -243,7 +243,8 @@ export function AgentSkillsPage() {
       showToast(t("settings.selectProjectFirst"), { variant: "error" });
       return;
     }
-    setBusyId(sourceKind === "dir" ? "import-dir" : "import");
+    const importKey = sourceKind === "dir" ? "import-dir" : "import";
+    if (!begin(importKey)) return;
     try {
       const result = await api.importUserSkill({
         level,
@@ -263,7 +264,7 @@ export function AgentSkillsPage() {
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
     } finally {
-      setBusyId(null);
+      end(importKey);
     }
   };
 
@@ -314,7 +315,7 @@ export function AgentSkillsPage() {
       return;
     }
     const key = rowKey(level, skill.id);
-    setBusyId(key);
+    if (!begin(key)) return;
     try {
       const result = await api.transferUserSkill({
         id: skill.id,
@@ -337,14 +338,14 @@ export function AgentSkillsPage() {
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
     } finally {
-      setBusyId(null);
+      end(key);
     }
   };
 
   const renderRow = (skill: UserSkillRecord, level: AgentCapabilityLevel) => {
     const key = rowKey(level, skill.id);
     const name = skill.name || skill.id;
-    const busy = busyId === key;
+    const busy = busyKeys.has(key);
     const isArmed = armed === key;
     const items: CapabilityMenuItem[] = [
       {
@@ -457,7 +458,7 @@ export function AgentSkillsPage() {
   const importButton = (level: AgentCapabilityLevel) => (
     <>
       <CapabilityButton
-        busy={busyId === "import"}
+        busy={busyKeys.has("import")}
         title={
           level === "project"
             ? t("settings.capabilityImportToProject")
@@ -469,7 +470,7 @@ export function AgentSkillsPage() {
         {t("settings.importSkillFile")}
       </CapabilityButton>
       <CapabilityButton
-        busy={busyId === "import-dir"}
+        busy={busyKeys.has("import-dir")}
         title={
           level === "project"
             ? t("settings.capabilityImportToProject")

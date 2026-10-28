@@ -401,6 +401,7 @@ export const ko = {
     running: "작업 중…",
     loadingSession: "대화 불러오는 중…",
     pasteInProgress: "붙여넣은 내용을 아직 저장 중입니다. 잠시 후 다시 시도하세요.",
+    commandSourceUnavailable: "명령을 불러오지 못해 메시지를 보내지 않았습니다. 초안은 유지됩니다.",
     loadingEarlierMessages: "이전 메시지 불러오는 중…",
     loadLaterMessages: "이후 메시지 불러오기",
     showEarlierMessages: "이전 메시지 표시",

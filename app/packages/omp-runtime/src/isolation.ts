@@ -78,6 +78,9 @@ export const PROXY_ENV_KEYS = [
   "NODE_USE_ENV_PROXY",
 ] as const;
 
+/** A proxy the child is launched behind: every proxy variable points at `url`. */
+export type OmpProxyPolicy = { url: string; bypass: string };
+
 /** Home-relative directories the runtime discovers; created empty in our HOME. */
 export const HOME_DISCOVERY_DIRS = [".agent", ".agents", ".omp", ".claude", ".config"] as const;
 
@@ -100,7 +103,7 @@ export type OmpRuntimeEnvOptions = {
   /** Base environment; defaults to `process.env`. */
   baseEnv?: NodeJS.ProcessEnv;
   /** Explicit proxy policy. Omitted means "no proxy variables at all". */
-  proxy?: { url: string; bypass: string };
+  proxy?: OmpProxyPolicy;
   /**
    * Extra variables for this child (build settings, test seams).
    *

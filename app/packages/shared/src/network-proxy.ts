@@ -196,7 +196,12 @@ export function validateNetworkProxy(
 ): { ok: true; value: NetworkProxySettings } | { ok: false; error: string } {
   const settings = normalizeNetworkProxy(value);
   if (settings.mode !== "custom") {
+    // The saved address and bypass survive a switch to system or direct, so
+    // switching back to custom restores them. Only custom mode reads them.
     const next: NetworkProxySettings = { mode: settings.mode };
+    const saved = settings.url ? parseProxyUrl(settings.url) : null;
+    if (saved?.ok) next.url = saved.value.href;
+    if (settings.bypass?.trim()) next.bypass = settings.bypass.trim();
     if (settings.allowFakeIp) next.allowFakeIp = true;
     return { ok: true, value: next };
   }

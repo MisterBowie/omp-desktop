@@ -2,6 +2,7 @@
 import { session } from "electron";
 import { createOmpMemoryService } from "../runtime/omp-memory";
 import { createOmpMarketplaceService } from "../runtime/omp-marketplace";
+import { ompProxyPolicy } from "../runtime/omp-network-proxy";
 import { currentNetworkProxy } from "../network-proxy";
 import { createDesktopEngineRuntimeForApp } from "../runtime/engine-runtime";
 import { wireOmpSessions, type OmpSessionWiringDeps } from "../runtime/omp-session-wiring";
@@ -44,6 +45,13 @@ export function createOmpSessionServices(deps: OmpSessionServicesDeps) {
   const { bridge: ompSessions } = wireOmpSessions({
     dataRoot: deps.dataRoot,
     marketplacePlugins: () => ompMarketplace.runSnapshot(),
+    resolveProxy: (targetUrl) => ompProxyPolicy({
+      settings: currentNetworkProxy(),
+      targetUrl,
+      systemProxy: (url) => session.defaultSession.resolveProxy(url),
+      label: "OMP session",
+      log: (level, message, data) => deps.logger.app("runtime", level, message, { data }),
+    }),
     host: deps.host,
     engineRuntime,
     logger: deps.logger,

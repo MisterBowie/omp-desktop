@@ -60,6 +60,7 @@ test("settings user agent reaches native task with its own provider, prompt and 
   };
   const gate = findGateExtension(here);
   const { bridge } = wireOmpSessions({
+    resolveProxy: async () => undefined,
     dataRoot: root, host: () => host, isPackaged: false, appPath: here,
     emitAgentEvent: event => envelopes.push(event),
     engineRuntime: { gateExtension: gate, ompRuntime: {

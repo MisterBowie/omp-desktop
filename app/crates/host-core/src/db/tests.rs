@@ -1471,6 +1471,54 @@ fn project_group_update_adjusts_roots_without_orphaning_chats() {
 }
 
 #[test]
+fn project_group_saves_after_a_stored_root_was_renamed_outside_the_app() {
+    let dir = tempfile::tempdir().unwrap();
+    let primary = dir.path().join("acme");
+    let docs = dir.path().join("docs");
+    std::fs::create_dir_all(&primary).unwrap();
+    std::fs::create_dir_all(&docs).unwrap();
+    let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+    let group = db
+        .create_project_group(
+            "Acme",
+            &[
+                primary.to_string_lossy().into(),
+                docs.to_string_lossy().into(),
+            ],
+        )
+        .unwrap();
+    let stored: Vec<String> = group.roots.iter().map(|root| root.path.clone()).collect();
+
+    // The primary folder is renamed outside the app, so its stored root is gone.
+    std::fs::rename(&primary, dir.path().join("acme-renamed")).unwrap();
+
+    // A save that only changes the name keeps the stored roots and must succeed.
+    let renamed = db
+        .update_project_group(&group.id, "Acme renamed", &stored)
+        .unwrap();
+    assert_eq!(renamed.name, "Acme renamed");
+    assert_eq!(renamed.primary_path, group.primary_path);
+    let renamed_roots: Vec<String> = renamed.roots.iter().map(|root| root.path.clone()).collect();
+    assert_eq!(renamed_roots, stored);
+
+    // A folder being added must still exist on disk.
+    let missing = dir.path().join("nowhere");
+    assert!(db
+        .update_project_group(
+            &group.id,
+            "Acme renamed",
+            &[
+                stored[0].clone(),
+                stored[1].clone(),
+                missing.to_string_lossy().into(),
+            ],
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("not a directory"));
+}
+
+#[test]
 fn editing_a_legacy_project_with_an_extra_folder_upgrades_it_to_a_group() {
     let dir = tempfile::tempdir().unwrap();
     let primary = dir.path().join("primary");

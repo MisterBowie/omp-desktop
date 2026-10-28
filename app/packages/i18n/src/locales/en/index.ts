@@ -399,6 +399,7 @@ export const en = {
     running: "Working…",
     loadingSession: "Loading conversation…",
     pasteInProgress: "Still saving the pasted content. Try again in a moment.",
+    commandSourceUnavailable: "Couldn't load commands, so the message wasn't sent. Your draft was kept.",
     loadingEarlierMessages: "Loading earlier messages…",
     loadLaterMessages: "Load later messages",
     showEarlierMessages: "Show earlier messages",

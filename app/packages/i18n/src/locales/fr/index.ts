@@ -392,6 +392,7 @@ export const fr = {
     "running": "Travailler…",
     "loadingSession": "Chargement de la conversation…",
     "pasteInProgress": "Toujours enregistrer le contenu collé. Réessayez dans un instant.",
+    "commandSourceUnavailable": "Impossible de charger les commandes, le message n'a donc pas été envoyé. Votre brouillon a été conservé.",
     "loadingEarlierMessages": "Chargement des messages précédents…",
     loadLaterMessages: "Charger les messages suivants",
     "showEarlierMessages": "Afficher les messages précédents",

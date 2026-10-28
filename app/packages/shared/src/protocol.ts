@@ -285,6 +285,8 @@ export const IPC = {
     ompSubagentList: "pi-desktop/omp-subagent/list",
     ompSubagentRead: "pi-desktop/omp-subagent/read",
     ompSubagentStop: "pi-desktop/omp-subagent/stop",
+    /** Re-emit OMP dialogs still awaiting an answer, for a renderer that reloaded. */
+    ompResurfaceOpenRequests: "pi-desktop/omp/resurfaceOpenRequests",
     /** OMP plugin marketplace (ADR 0333); every mutation runs the runtime's own CLI. */
     ompMarketState: "pi-desktop/omp-market/state",
     ompMarketAddSource: "pi-desktop/omp-market/addSource",

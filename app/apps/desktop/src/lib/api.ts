@@ -865,6 +865,7 @@ export const api = {
     invoke(IPC.invoke.askToolResolve, resolution),
   listOmpSubagents: (sessionId: string) =>
     invoke<OmpSubagentListItem[]>(IPC.invoke.ompSubagentList, sessionId),
+  resurfaceOpenRequests: () => invoke<number>(IPC.invoke.ompResurfaceOpenRequests),
   readOmpSubagent: (sessionId: string, subagentId: string, fromByte?: number) =>
     invoke<{
       cursor: { fromByte: number; nextByte: number; reset: boolean };

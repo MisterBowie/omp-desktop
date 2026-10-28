@@ -66,14 +66,25 @@ describe("parseProxyUrl", () => {
 });
 
 describe("validateNetworkProxy", () => {
-  it("defaults unknown values to system and drops custom URL for non-custom modes", () => {
+  it("defaults unknown values to system and keeps the custom URL for non-custom modes", () => {
     expect(validateNetworkProxy(undefined)).toEqual({
       ok: true,
       value: { mode: "system" },
     });
     expect(validateNetworkProxy({ mode: "direct", url: "socks5://127.0.0.1:1080" })).toEqual({
       ok: true,
-      value: { mode: "direct" },
+      value: { mode: "direct", url: "socks5://127.0.0.1:1080" },
+    });
+  });
+  it("keeps the saved custom address and bypass across system and direct", () => {
+    const saved = { mode: "custom", url: "socks5://127.0.0.1:1080", bypass: "localhost" } as const;
+    expect(validateNetworkProxy({ ...saved, mode: "system" })).toEqual({
+      ok: true,
+      value: { mode: "system", url: "socks5://127.0.0.1:1080", bypass: "localhost" },
+    });
+    expect(validateNetworkProxy({ ...saved, mode: "direct" })).toEqual({
+      ok: true,
+      value: { mode: "direct", url: "socks5://127.0.0.1:1080", bypass: "localhost" },
     });
   });
   it("preserves the explicit fake-IP market opt-in without widening other modes", () => {

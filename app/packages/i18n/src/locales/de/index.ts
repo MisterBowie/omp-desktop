@@ -392,6 +392,7 @@ export const de = {
     "running": "Funktioniert…",
     "loadingSession": "Konversation wird geladen…",
     "pasteInProgress": "Der eingefügte Inhalt wird weiterhin gespeichert. Versuchen Sie es gleich noch einmal.",
+    "commandSourceUnavailable": "Befehle konnten nicht geladen werden, daher wurde die Nachricht nicht gesendet. Dein Entwurf wurde behalten.",
     "loadingEarlierMessages": "Frühere Nachrichten laden…",
     loadLaterMessages: "Spätere Nachrichten laden",
     "showEarlierMessages": "Frühere Nachrichten anzeigen",

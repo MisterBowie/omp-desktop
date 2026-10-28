@@ -61,7 +61,7 @@ export function NetworkProxySection({
     if (mode === saved.mode) return;
     setTestState("idle");
     if (mode !== "custom") {
-      void persist({ mode, allowFakeIp: saved.allowFakeIp });
+      void persist({ ...saved, mode });
       return;
     }
     const parsed = parseProxyUrl(urlDraft);

@@ -106,9 +106,10 @@ function filterFiles(entries: FsIndexEntry[], query: string): AutocompleteItem[]
 
 /**
  * Resolve a typed "/name" against the merged command and skill list at send
- * time (builtin/plugin dispatch and skill validation); templates and unknown
- * names return as-is/null and stay on the prompt path. Reuses the menu's TTL
- * cache when warm.
+ * time (builtin/plugin dispatch and skill validation). Unknown names resolve to
+ * null and templates are returned as-is; both stay on the prompt path. A list
+ * that cannot be loaded rejects instead, so an outage is never mistaken for
+ * "not a command". Reuses the menu's TTL cache when warm.
  */
 export async function resolveComposerCommand(
   name: string,
@@ -119,12 +120,8 @@ export async function resolveComposerCommand(
     commandsCache.key !== key ||
     Date.now() - commandsCache.at > SOURCE_TTL_MS
   ) {
-    try {
-      const res = await api.composerCommands();
-      commandsCache = { key, at: Date.now(), commands: res.commands };
-    } catch {
-      return null;
-    }
+    const res = await api.composerCommands();
+    commandsCache = { key, at: Date.now(), commands: res.commands };
   }
   return commandsCache.commands.find((c) => c.name === name) ?? null;
 }

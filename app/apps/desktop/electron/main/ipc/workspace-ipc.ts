@@ -288,11 +288,6 @@ export function registerWorkspaceIpc({
             .map((path) => resolve(path)),
         ),
       ];
-      if (safeFolders.some((path) => !existsSync(path) || !statSync(path).isDirectory())) {
-        throw Object.assign(new Error("project group folders must be directories"), {
-          errorCode: ErrorCodes.INVALID_ARGUMENT,
-        });
-      }
       const updated = await host.call("project.group.update", {
         groupId,
         name,

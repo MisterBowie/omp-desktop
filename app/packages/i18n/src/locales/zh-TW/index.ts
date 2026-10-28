@@ -393,6 +393,7 @@ export const zhTW = {
     running: "正在處理…",
     loadingSession: "正在載入會話…",
     pasteInProgress: "貼上內容仍在儲存中，請稍後再發送。",
+    commandSourceUnavailable: "無法載入指令，因此訊息未傳送。草稿已保留。",
     loadingEarlierMessages: "正在載入更早的訊息…",
     loadLaterMessages: "載入後續訊息",
     showEarlierMessages: "顯示更早的訊息",

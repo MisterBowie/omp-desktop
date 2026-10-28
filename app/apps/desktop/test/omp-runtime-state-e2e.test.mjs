@@ -297,6 +297,9 @@ test(
             }
             return { session: { ...session } };
           }
+          case "providers.get":
+            // The launch resolves the session's provider endpoint for its proxy policy.
+            return { provider: params.id === PROJECT_PROVIDER ? { id: PROJECT_PROVIDER, enabled: true, apiStyle: "chat_completions", authKind: "none", baseUrl: provider.baseUrl } : null };
           case "skills.active":
             return { skills: [] };
           case "agents.active":
@@ -386,6 +389,7 @@ test(
     });
 
     const { bridge } = wireOmpSessions({
+      resolveProxy: async () => undefined,
       dataRoot,
       host: () => fakeHost,
       engineRuntime,
@@ -420,6 +424,7 @@ test(
       }),
     };
     const refusalBridge = wireOmpSessions({
+      resolveProxy: async () => undefined,
       dataRoot: refusalDataRoot,
       host: () => fakeHost,
       engineRuntime: refusalEngineRuntime,

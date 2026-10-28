@@ -39,6 +39,7 @@ import {
   isPathInside,
   makeRuntimeConfigDirName,
   prepareOmpRuntimeHome,
+  type OmpProxyPolicy,
 } from "./isolation.js";
 import { resolveOmpLauncher } from "./launcher.js";
 import {
@@ -123,6 +124,12 @@ export type OmpRuntimeSupervisorOptions = {
    * and credential-shaped names are still decided by `buildOmpRuntimeEnv`.
    */
   extraEnv?: NodeJS.ProcessEnv;
+  /**
+   * Resolved at every start, before the child environment is built. The
+   * embedder decides the policy; `undefined` launches the child with no proxy
+   * variables at all.
+   */
+  proxy?: () => Promise<OmpProxyPolicy | undefined>;
   /**
    * Persistent directory the runtime writes its native session transcripts
    * into (M4/T14). It is app-owned and survives stop/reclaim, unlike the
@@ -462,6 +469,8 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
     const codingAgentDir = join(runRoot, "agent");
     mkdirSync(codingAgentDir, { recursive: true });
 
+    // Resolved per start, so a changed network setting applies to the next launch.
+    const proxy = this.options.proxy ? await this.options.proxy() : undefined;
     const { env, configRoot } = buildOmpRuntimeEnv({
       home,
       configDirName,
@@ -469,6 +478,7 @@ export class OmpRuntimeSupervisor implements EngineRuntimeHandle {
       launchDir: join(runRoot, "cwd"),
       ...(this.options.pathEntries ? { pathEntries: this.options.pathEntries } : {}),
       ...(this.options.extraEnv ? { extraEnv: this.options.extraEnv } : {}),
+      ...(proxy ? { proxy } : {}),
     });
     const launchDir = join(runRoot, "cwd");
     mkdirSync(launchDir, { recursive: true });

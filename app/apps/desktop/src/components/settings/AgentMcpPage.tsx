@@ -9,6 +9,7 @@ import {
 import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
 import { useHostCollection } from "../../hooks/use-host-collection";
+import { useRowBusy } from "../../hooks/use-row-busy";
 import {
   AgentCapabilityPage,
   AgentProjectPicker,
@@ -110,11 +111,11 @@ export function AgentMcpPage() {
     setServers((current) => ({ ...current, statuses: update(current.statuses) }));
   const [filter, setFilter] = useState<CapabilityFilter>("all");
   const [search, setSearch] = useState("");
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const { busyKeys, begin, end } = useRowBusy();
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [editor, setEditor] = useState<McpEditorState | null>(null);
   const [saving, setSaving] = useState(false);
-  const [testingId, setTestingId] = useState<string | null>(null);
+  const testingRows = useRowBusy();
   const [authorizingId, setAuthorizingId] = useState<string | null>(null);
   const pendingOAuthRef = useRef<{ unsubscribe: () => void } | null>(null);
 
@@ -205,9 +206,8 @@ export function AgentMcpPage() {
 
   const toggle = async (server: McpServerRecord, level: AgentCapabilityLevel) => {
     const key = rowKey(level, server.id);
-    if (busyId) return;
+    if (!begin(key)) return;
     const next = !server.enabled;
-    setBusyId(key);
     // Flip locally first: the host is the authority, but a round-trip of latency
     // on a switch reads as a broken control.
     patchRow(level, server.id, { enabled: next });
@@ -223,13 +223,12 @@ export function AgentMcpPage() {
       patchRow(level, server.id, { enabled: server.enabled });
       showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
     } finally {
-      setBusyId(null);
+      end(key);
     }
   };
 
   const testConnection = async (server: McpServerRecord, level: AgentCapabilityLevel) => {
-    if (testingId) return;
-    setTestingId(server.id);
+    if (!testingRows.begin(server.id)) return;
     try {
       const result = await api.testMcpServer(server.id, {
         level,
@@ -253,7 +252,7 @@ export function AgentMcpPage() {
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
     } finally {
-      setTestingId(null);
+      testingRows.end(server.id);
     }
   };
 
@@ -321,7 +320,7 @@ export function AgentMcpPage() {
 
   const remove = async (server: McpServerRecord, level: AgentCapabilityLevel) => {
     const key = rowKey(level, server.id);
-    setBusyId(key);
+    if (!begin(key)) return;
     try {
       await api.removeMcpServer(server.id, levelQuery(level));
       await load();
@@ -331,7 +330,7 @@ export function AgentMcpPage() {
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
     } finally {
-      setBusyId(null);
+      end(key);
       setArmed(null);
     }
   };
@@ -389,7 +388,7 @@ export function AgentMcpPage() {
       return;
     }
     const key = rowKey(level, server.id);
-    setBusyId(key);
+    if (!begin(key)) return;
     try {
       const result = await api.transferMcpServer({
         id: server.id,
@@ -412,7 +411,7 @@ export function AgentMcpPage() {
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
     } finally {
-      setBusyId(null);
+      end(key);
     }
   };
 
@@ -420,8 +419,8 @@ export function AgentMcpPage() {
     const key = rowKey(level, server.id);
     const name = server.label || server.id;
     const status = statusFor(statuses, server);
-    const busy = busyId === key;
-    const testing = testingId === server.id;
+    const busy = busyKeys.has(key);
+    const testing = testingRows.busyKeys.has(server.id);
     const authorizing = authorizingId === server.id;
     const isArmed = armed === key;
     const isHttp = server.transport === "http";
@@ -628,6 +627,7 @@ export function AgentMcpPage() {
     );
   }
 
+  const editingTesting = editor?.editing ? testingRows.busyKeys.has(editor.editing.id) : false;
   return (
     <AgentCapabilityPage
       toolbar={
@@ -715,13 +715,13 @@ export function AgentMcpPage() {
           editing={editor.editing}
           saving={saving}
           status={editor.editing ? statusFor(statuses, editor.editing) : undefined}
-          testing={testingId === editor.editing?.id}
+          testing={editingTesting}
           projects={[]}
           currentProjectPath={selectedProjectPath}
           managementLevel={editor.level}
           managementProjectName={projectName}
           onClose={() => {
-            if (!saving && !testingId) setEditor(null);
+            if (!saving && !editingTesting) setEditor(null);
           }}
           onSave={() => void save()}
           onTest={() => {
