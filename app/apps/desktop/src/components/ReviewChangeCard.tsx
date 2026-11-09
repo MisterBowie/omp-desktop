@@ -1,6 +1,7 @@
-import { memo, useId, useState } from "react";
+import { memo, useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
+  DiffHunk,
   ReviewChangeStatus,
   ReviewRollbackStatus,
   UiMessage,
@@ -17,6 +18,29 @@ const STATUS_MARKS: Record<ReviewChangeStatus, string> = {
   modified: "M",
   deleted: "D",
 };
+
+/** The recorded hunks of one change, shared by PI snapshots and OMP results. */
+export function ReviewDiffHunks({ hunks }: { hunks: DiffHunk[] }) {
+  return (
+    <div className="review-change-diff">
+      {hunks.map((hunk, hunkIndex) => (
+        <div className="diff-hunk" key={`${hunk.header}-${hunkIndex}`}>
+          <div className="diff-line hunk">
+            <span className="diff-line-text">{hunk.header}</span>
+          </div>
+          {hunk.lines.map((line, lineIndex) => (
+            <div className={cx("diff-line", line.type)} key={lineIndex}>
+              <span className="diff-line-sign" aria-hidden>
+                {line.type === "add" ? "+" : line.type === "del" ? "−" : " "}
+              </span>
+              <span className="diff-line-text">{line.text}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function DiffBody({ message, compact }: { message: UiMessage; compact: boolean }) {
   const { t } = useTranslation();
@@ -45,23 +69,7 @@ function DiffBody({ message, compact }: { message: UiMessage; compact: boolean }
       ) : change.truncated ? (
         <div className="review-change-note">{t("panel.review.tooLarge")}</div>
       ) : change.hunks.length > 0 ? (
-        <div className="review-change-diff">
-          {change.hunks.map((hunk, hunkIndex) => (
-            <div className="diff-hunk" key={`${hunk.header}-${hunkIndex}`}>
-              <div className="diff-line hunk">
-                <span className="diff-line-text">{hunk.header}</span>
-              </div>
-              {hunk.lines.map((line, lineIndex) => (
-                <div className={cx("diff-line", line.type)} key={lineIndex}>
-                  <span className="diff-line-sign" aria-hidden>
-                    {line.type === "add" ? "+" : line.type === "del" ? "−" : " "}
-                  </span>
-                  <span className="diff-line-text">{line.text}</span>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
+        <ReviewDiffHunks hunks={change.hunks} />
       ) : (
         <div className="review-change-note">{t("panel.review.noLineDetails")}</div>
       )}
@@ -106,14 +114,20 @@ function DiffBody({ message, compact }: { message: UiMessage; compact: boolean }
 export const ReviewChangeCard = memo(function ReviewChangeCard({
   message,
   compact = false,
+  openRequest,
 }: {
   message: UiMessage;
   compact?: boolean;
+  /** Each new value expands the diff once; the user can collapse it again. */
+  openRequest?: number;
 }) {
   const { t } = useTranslation();
   const change = reviewChangeFromMessage(message);
   const detailsId = useId();
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (openRequest !== undefined) setOpen(true);
+  }, [openRequest]);
 
   if (!change) return null;
 
@@ -136,6 +150,7 @@ export const ReviewChangeCard = memo(function ReviewChangeCard({
       className={cx("review-change-card", compact && "is-compact", open && "open")}
       data-state={change.state}
       data-status={change.status}
+      data-review-key={change.snapshotId}
     >
       <button
         type="button"

@@ -79,7 +79,15 @@ export type ChatFileOpenDestination =
 
 export type ChatFileOpenOptions = {
   destination?: ChatFileOpenDestination;
+  /**
+   * Accept only an exact path match. A recorded file change names one exact
+   * file; if it has since moved or been removed, a same-named file elsewhere
+   * must not open in its place.
+   */
+  exact?: boolean;
 };
+
+const EXACT_MATCHES = new Set(["exact-relative", "exact-absolute"]);
 
 /**
  * Load the bundled file view on demand when a user explicitly opens a project
@@ -148,7 +156,11 @@ function useResolveChatFileRef() {
   const showToast = useAppStore((s) => s.showToast);
 
   return useCallback(
-    async (path: string, baseDir?: string): Promise<ResolvedChatFileRef | null> => {
+    async (
+      path: string,
+      baseDir?: string,
+      { exact = false }: { exact?: boolean } = {},
+    ): Promise<ResolvedChatFileRef | null> => {
       const state = useAppStore.getState();
       const ownerId = state.activeSessionId;
       if (ownerId?.startsWith("remote:")) return null;
@@ -165,7 +177,7 @@ function useResolveChatFileRef() {
         return null;
       }
       const match = result.match;
-      if (!match) {
+      if (!match || (exact && !EXACT_MATCHES.has(match.matchedBy))) {
         showToast(t("chat.fileRefMissing", { name: raw }), { variant: "error" });
         return null;
       }
@@ -219,7 +231,7 @@ export function useOpenChatFileRef() {
     ) => {
       const destination = options?.destination;
       void (async () => {
-        const resolved = await resolveRef(path, baseDir);
+        const resolved = await resolveRef(path, baseDir, { exact: options?.exact });
         if (!resolved) return;
         const current = useAppStore.getState();
         if (
@@ -306,6 +318,33 @@ export function useOpenChatFileRef() {
       t,
       workspacePath,
     ],
+  );
+}
+
+/**
+ * Show a reference's file in the system file manager. The host resolves the
+ * reference and refuses anything outside the session's allowed roots, exactly
+ * as it does for opening.
+ */
+export function useRevealChatFileRef() {
+  const { t } = useTranslation();
+  const resolveRef = useResolveChatFileRef();
+  const sessionId = useAppStore((s) => s.activeSessionId);
+  const showToast = useAppStore((s) => s.showToast);
+
+  return useCallback(
+    (path: string, { exact = false }: { exact?: boolean } = {}) => {
+      void (async () => {
+        const resolved = await resolveRef(path, undefined, { exact });
+        if (!resolved || useAppStore.getState().activeSessionId !== sessionId) return;
+        try {
+          await api.fsReveal(resolved.absolutePath, sessionId ?? undefined);
+        } catch {
+          showToast(t("chat.fileRevealFailed"), { variant: "error" });
+        }
+      })();
+    },
+    [resolveRef, sessionId, showToast, t],
   );
 }
 

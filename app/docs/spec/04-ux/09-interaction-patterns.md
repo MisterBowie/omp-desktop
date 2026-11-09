@@ -533,6 +533,16 @@ may be retained while exactly one workspace supplies the visible shell context.
   after that session is selected; its event never renders in the currently
   visible session. A successful workspace artifact cannot create or activate
   the singleton Review tab; it appears only after the user opens it.
+- An OMP native `edit` or `write` result carries no review snapshot, so it
+  never renders an InlineReviewCard; its tool row's own detail already shows
+  the diff. Review still lists it, read-only and in message order: one row per
+  file an `edit` reported, with added, modified, deleted, or renamed status and
+  exact counts and hunks read from OMP's own diff. A `write` is listed as
+  written with its path only, because OMP reports neither the previous content
+  nor whether the file was new. Counts a result cannot prove (a delete whose
+  snapshot was pruned, a result cut by the row budget, a write) stay blank and
+  add nothing to the toolbar totals. OMP rows never offer rollback, and a live
+  row and its restored history row yield the same entries.
 - Each session retains `{open, tabs, activeTabId, browserResource}` in renderer
   memory. Selecting another session swaps the visible context atomically and
   switching back restores it; selecting a workspace without an active

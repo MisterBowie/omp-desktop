@@ -5,6 +5,7 @@ import type {
   ReviewChangeStatus,
   UiMessage,
 } from "@pi-desktop/shared";
+import { ompReviewChangesFromMessage, type OmpReviewChange } from "./omp-review-changes.ts";
 
 const REVIEW_CHANGE_TOOLS = new Set(["Write", "Edit"]);
 const REVIEW_CHANGE_STATUSES = new Set<ReviewChangeStatus>([
@@ -141,6 +142,46 @@ export function reviewChangesFromMessages(
     const change = reviewChangeFromMessage(message);
     return change ? [{ message, change }] : [];
   });
+}
+
+/**
+ * One row of the Review tab: a PI snapshot (reversible through the host) or a
+ * read-only change read from an OMP native edit/write result.
+ */
+export type ReviewTabEntry =
+  | { kind: "snapshot"; key: string; message: UiMessage; change: ReviewChange }
+  | { kind: "omp"; key: string; message: UiMessage; change: OmpReviewChange };
+
+/** Every recorded change of the session, in message order. */
+export function reviewTabEntriesFromMessages(messages: UiMessage[]): ReviewTabEntry[] {
+  return messages.flatMap((message): ReviewTabEntry[] => {
+    const change = reviewChangeFromMessage(message);
+    if (change) return [{ kind: "snapshot", key: change.snapshotId, message, change }];
+    return ompReviewChangesFromMessage(message).map((omp) => ({
+      kind: "omp",
+      key: `omp:${omp.key}`,
+      message,
+      change: omp,
+    }));
+  });
+}
+
+/** Totals only count lines a change actually reported; unknown counts add nothing. */
+export function summarizeReviewTabEntries(entries: ReviewTabEntry[]): ReviewChangesSummary {
+  return entries.reduce<ReviewChangesSummary>(
+    (summary, entry) => {
+      summary.changeCount += 1;
+      summary.additions += entry.change.additions ?? 0;
+      summary.deletions += entry.change.deletions ?? 0;
+      if (entry.kind === "snapshot" && entry.change.state === "rolledBack") {
+        summary.rolledBackCount += 1;
+      } else {
+        summary.activeCount += 1;
+      }
+      return summary;
+    },
+    { changeCount: 0, activeCount: 0, rolledBackCount: 0, additions: 0, deletions: 0 },
+  );
 }
 
 export function summarizeReviewChanges(

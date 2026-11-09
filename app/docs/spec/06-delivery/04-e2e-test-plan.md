@@ -3757,6 +3757,67 @@ identify the platform validation still needed.
 - **Milestone**: M5
 - **Status**: Unit-covered (`chat-review-entry.test.mjs`); full UI scenario Draft
 
+#### E2E-REVIEW-omp-native-changes-listed-read-only: OMP edits and writes appear in Review without rollback
+
+- **Preconditions**: An OMP session bound to a scratch project with existing
+  files.
+- **Steps**: 1) Have the session write a new file and overwrite an existing
+  one. 2) Have it edit two files in one `edit` call, delete a file, rename a
+  file, and update one more file. 3) Open Review from the work panel launcher
+  and inspect every row collapsed and expanded. 4) Reload the session history
+  and repeat.
+- **Expected**: Review lists one read-only row per changed file in message
+  order: modified rows with exact +/− counts and hunks from OMP's own diff, a
+  deleted row with the removed lines, a renamed row shown as
+  `source → destination`, and each write as written with its path only and a
+  note that OMP reported no previous content. No row offers rollback and no
+  InlineReviewCard is added to the transcript. Live rows and restored history
+  rows yield the same entries. Toolbar totals count only the lines the rows
+  prove.
+- **Specs linked**: `04-ux/08-component-spec.md`,
+  `04-ux/09-interaction-patterns.md`
+- **Acceptance**: Quality (OMP review)
+- **Milestone**: M5
+- **Status**: Automated on the pinned runtime with a scripted local provider
+  (`omp-review-changes-e2e.test.mjs`); adapter and mounted Review tab
+  covered by `omp-review-changes.test.mjs` and
+  `omp-review-tab-mounted.test.mjs`. A rendered desktop journey is Draft.
+
+#### E2E-CHAT-turn-changed-files-summary: A finished turn lists the files it changed
+
+- **Preconditions**: An OMP session bound to a project with existing files.
+- **Steps**: 1) Ask for a change that edits two files and writes a new one;
+  watch the turn while it streams. 2) After the reply finishes, inspect the
+  area below the answer: only the summary header is visible. Click it to
+  expand, click again to collapse, then focus it and repeat with Enter and
+  Space. 3) Ask for a change touching more than twelve files across several
+  directories; confirm its card starts collapsed independently, then expand
+  it. 4) Click a row, then the `View all N files in Review` link. 5) Right-
+  click a row and choose `Open file`, then `Show in folder`; repeat on a
+  deleted file and on a file outside the project. 6) Ask a question that
+  writes no files. 7) Switch sessions and come back.
+- **Expected**: Nothing is added while the turn streams. A finished turn that
+  changed files shows one borderless `Changes this turn` card below its
+  answer, collapsed, with its file count and the summed `+`/`−` of proven
+  lines. Expanded, each path appears once, workspace-relative, with its merged
+  status letter (`W` for a whole-file write, which shows no counts); up to four
+  files use relaxed rows, more use dense rows with a directory count, and rows
+  past 12 fold into `+N more`. A row click opens Review scrolled to that file
+  with its changes expanded; the link opens Review without expanding. Every
+  earlier finished turn keeps its own card, a turn without changes has none,
+  and the per-call tool rows are unchanged. The row menu opens the file's
+  current contents in the in-app preview and shows it in the system file
+  manager without opening Review; both actions are disabled for a deleted
+  file, and a file outside the allowed roots reports that it cannot be found.
+- **Specs linked**: `04-ux/08-component-spec.md`
+- **Acceptance**: Quality (turn changed files)
+- **Milestone**: M5
+- **Status**: Component-covered (`turn-changes-card.test.mjs`: aggregation,
+  collapsed mount under the reply, row and view-all requests, Review focus,
+  dense and capped lists, no card for live, failed, or change-free turns, row
+  menu items, exact open and reveal through a stubbed host, and a mounted
+  right-click); a rendered desktop journey is Draft.
+
 #### E2E-058: Built-in interactive terminal is absent
 
 - **Preconditions**: A workspace is open and the Agent has completed a Bash
@@ -8298,6 +8359,8 @@ identify the platform validation still needed.
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118, E2E-121, E2E-146, E2E-146a, E2E-155, E2E-159, E2E-176, E2E-194, E2E-195 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-102c, E2E-102d, E2E-102e, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119, E2E-121, E2E-122, E2E-123, E2E-142, E2E-148, E2E-151, E2E-153, E2E-158, E2E-187, E2E-196c, E2E-196b, E2E-196, E2E-PLUGIN-fs-root-follows-the-calling-session |
 | Quality | E2E-CHAT-running-status-survives-output-pauses, E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-021a, E2E-024N, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-147, E2E-148, E2E-150, E2E-151, E2E-153, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-168, E2E-172, E2E-173, E2E-174, E2E-011g, E2E-176, E2E-177, E2E-178, E2E-179, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-196, E2E-201, E2E-204, E2E-202, E2E-203, E2E-205, E2E-206, E2E-207, E2E-208, E2E-209, E2E-210, E2E-218, E2E-259, E2E-219, E2E-250, E2E-252, E2E-102i, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-fs-root-follows-the-calling-session, E2E-SUBAGENT-resume-a-settled-delegation |
+| Quality (OMP review) | E2E-REVIEW-omp-native-changes-listed-read-only |
+| Quality (turn changed files) | E2E-CHAT-turn-changed-files-summary |
 | Quality (project ordering) | E2E-253 |
 | C — Conversation & stream (IME slash alias) | E2E-255 |
 | E — Tools & permissions (Skill residency) | E2E-254 |
@@ -8344,6 +8407,7 @@ identify the platform validation still needed.
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
 | M5 | E2E-CHAT-running-status-survives-output-pauses, E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-AGENTS-001, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-094, E2E-095, E2E-143, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-177, E2E-178, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-204, E2E-208, E2E-CHAT-content-width-handles, E2E-250, E2E-252, E2E-102i |
+| M5 (OMP review) | E2E-REVIEW-omp-native-changes-listed-read-only, E2E-CHAT-turn-changed-files-summary |
 | M5 (project ordering) | E2E-253 |
 | M2 (IME slash alias) | E2E-255 |
 | M5 (Skill residency) | E2E-254 |

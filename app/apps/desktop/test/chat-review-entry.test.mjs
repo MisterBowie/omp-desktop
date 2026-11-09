@@ -168,7 +168,8 @@ test("chat renders one message-owned card immediately after its tool row", () =>
   assert.doesNotMatch(transcriptSource, /workspaceDiff|findWorkspaceChange/);
   assert.match(cardSource, /aria-expanded=\{open\}/);
   assert.match(cardSource, /chat\.reviewChangeShow/);
-  assert.match(cardSource, /change\.hunks\.map/);
+  assert.match(cardSource, /<ReviewDiffHunks hunks=\{change\.hunks\} \/>/);
+  assert.match(cardSource, /hunks\.map\(\(hunk, hunkIndex\)/);
   assert.match(cardSource, /workspaceReviewRollback|rollbackWorkspaceChange/);
   assert.match(
     storeSource,
@@ -182,8 +183,9 @@ test("chat renders one message-owned card immediately after its tool row", () =>
 });
 
 test("Review is a session change history and no longer refreshes a Git diff", () => {
-  assert.match(reviewSource, /reviewChangesFromMessages\(messages\)/);
+  assert.match(reviewSource, /reviewTabEntriesFromMessages\(messages\)/);
   assert.match(reviewSource, /<ReviewChangeCard/);
+  assert.match(reviewSource, /<OmpReviewChangeCard/);
   assert.match(reviewSource, /panel\.review\.noChanges/);
   assert.doesNotMatch(reviewSource, /workspaceDiff|refreshWorkspaceDiff|api\.workspaceDiff/);
   assert.doesNotMatch(appSource, /reviewRev|refreshWorkspaceDiff|workspaceDiff/);

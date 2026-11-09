@@ -51,6 +51,7 @@ import {
   useChatTextActions,
   useTranscriptMenu,
 } from "./TranscriptMenu";
+import { TurnChangesCard } from "./TurnChangesCard";
 import { TurnProcess } from "./TurnProcess";
 
 type AssistantTurnProps = {
@@ -296,6 +297,13 @@ export const AssistantTurn = memo(function AssistantTurn({
       ),
     [entry.parts],
   );
+  const turnTools = useMemo(
+    () =>
+      turnAllActivityItems.flatMap((item) =>
+        item.kind === "tool" ? [item.message] : [],
+      ),
+    [turnAllActivityItems],
+  );
   const rawDelegationStatuses = useMemo(
     () =>
       collectDelegationStatuses(turnAllActivityItems, { turnLive: isActive }),
@@ -387,6 +395,10 @@ export const AssistantTurn = memo(function AssistantTurn({
         {turnAllActivityItems.filter((item) => item.kind === "tool" && item.message.toolName === "GenerateImages").map((item) => (
           <GeneratedImages key={item.message.id} message={item.message} />
         ))}
+        {/* Only under a finished reply, so a streaming turn never grows it. */}
+        {complete && actionMessage ? (
+          <TurnChangesCard turnId={entry.id} tools={turnTools} />
+        ) : null}
         {!isActive && metaMessage ? (
           <MessageMeta
             modelId={modelId}
