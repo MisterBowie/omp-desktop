@@ -1,5 +1,80 @@
 import type { ChangelogEntry, ChangelogLocale } from "./changelog.js";
 
+const unified017: Record<ChangelogLocale, string[]> = {
+  "en": [
+    "Browse and install plugins from Claude Code–compatible marketplaces through OMP; installed plugins load in full in OMP chats, including their MCP servers and hooks, from the next message.",
+    "Show the generation speed of OMP replies and a per-turn usage capsule with speed and token totals; hover it for the cache, input, and output breakdown.",
+    "List the files OMP edits or writes in the Review tab, and add a collapsible “Changes this turn” card under each finished reply; right-click a file to open it or show it in its folder.",
+    "OMP chats follow the desktop network setting (custom proxy, system proxy, or direct) from the next message; switching modes keeps the saved proxy address.",
+    "Keep the context ring on the last reported usage while a reply streams instead of dropping to 0%.",
+    "Bring open approval and question dialogs back after the window reloads, and keep a draft typed while a slash command runs.",
+    "Keep sidebar row menus inside the window, show a compact relative time on sidebar sessions, and save project groups even when a stored folder was renamed or removed."
+  ],
+  "zh-CN": [
+    "通过 OMP 浏览并安装 Claude Code 兼容市场中的插件；已安装的插件在 OMP 会话中完整加载，包括其 MCP 服务器与 hooks，下一条消息起生效。",
+    "显示 OMP 回复的生成速度，并在每轮回复下显示用量胶囊（速度与 token 总数）；悬停可查看缓存、输入与输出明细。",
+    "“审阅”标签列出 OMP 编辑或写入的文件；每条完成的回复下方新增可折叠的“本轮改动”卡片，右键文件可打开或在文件夹中打开。",
+    "OMP 会话遵循桌面网络设置（自定义代理、系统代理或直连），下一条消息起生效；切换模式会保留已保存的代理地址。",
+    "回复生成期间，上下文圆环保持显示最近一次报告的用量，不再跌到 0%。",
+    "窗口重新加载后，未处理的审批与提问对话框会重新出现；斜杠命令运行期间输入的草稿会被保留。",
+    "侧栏行菜单不再超出窗口；侧栏会话显示简短的相对时间；已保存的文件夹被改名或删除后，项目分组仍可保存。"
+  ],
+  "zh-TW": [
+    "透過 OMP 瀏覽並安裝 Claude Code 相容市集中的外掛；已安裝的外掛在 OMP 對話中完整載入，包括其 MCP 伺服器與 hooks，下一則訊息起生效。",
+    "顯示 OMP 回覆的生成速度，並在每輪回覆下顯示用量膠囊（速度與 token 總數）；滑鼠停留可查看快取、輸入與輸出明細。",
+    "「審閱」分頁列出 OMP 編輯或寫入的檔案；每則完成的回覆下方新增可摺疊的「本輪改動」卡片，右鍵檔案可開啟或在資料夾中開啟。",
+    "OMP 對話遵循桌面網路設定（自訂代理、系統代理或直連），下一則訊息起生效；切換模式會保留已儲存的代理位址。",
+    "回覆生成期間，上下文圓環維持顯示最近一次回報的用量，不再跌到 0%。",
+    "視窗重新載入後，未處理的核准與提問對話框會重新出現；斜線命令執行期間輸入的草稿會被保留。",
+    "側邊欄列選單不再超出視窗；側邊欄對話顯示簡短的相對時間；已儲存的資料夾被改名或刪除後，專案群組仍可儲存。"
+  ],
+  "de": [
+    "Plugins aus Claude Code–kompatiblen Marktplätzen über OMP durchsuchen und installieren; installierte Plugins werden ab der nächsten Nachricht vollständig in OMP-Chats geladen, einschließlich ihrer MCP-Server und Hooks.",
+    "Die Generierungsgeschwindigkeit von OMP-Antworten und eine Verbrauchskapsel pro Durchlauf mit Geschwindigkeit und Token-Summe anzeigen; beim Überfahren erscheint die Aufteilung in Cache, Eingabe und Ausgabe.",
+    "Der Tab „Überprüfen“ listet die Dateien, die OMP bearbeitet oder schreibt; unter jeder fertigen Antwort zeigt eine einklappbare Karte „Änderungen in diesem Durchlauf“ die Dateien, per Rechtsklick lassen sie sich öffnen oder im Ordner anzeigen.",
+    "OMP-Chats folgen ab der nächsten Nachricht der Netzwerkeinstellung der App (eigener Proxy, System-Proxy oder direkt); beim Wechsel des Modus bleibt die gespeicherte Proxy-Adresse erhalten.",
+    "Der Kontextring behält während einer laufenden Antwort den zuletzt gemeldeten Verbrauch, statt auf 0 % zu fallen.",
+    "Offene Freigabe- und Rückfragedialoge erscheinen nach dem Neuladen des Fensters wieder; ein während eines Slash-Befehls getippter Entwurf bleibt erhalten.",
+    "Menüs von Seitenleistenzeilen bleiben im Fenster, Sitzungen in der Seitenleiste zeigen eine kurze relative Zeit, und Projektgruppen lassen sich auch speichern, wenn ein gespeicherter Ordner umbenannt oder entfernt wurde."
+  ],
+  "es": [
+    "Explora e instala plugins de marketplaces compatibles con Claude Code a través de OMP; los plugins instalados se cargan por completo en los chats de OMP, incluidos sus servidores MCP y hooks, desde el siguiente mensaje.",
+    "Muestra la velocidad de generación de las respuestas de OMP y una cápsula de uso por turno con la velocidad y el total de tokens; al pasar el cursor se ve el desglose de caché, entrada y salida.",
+    "La pestaña Revisar enumera los archivos que OMP edita o escribe, y bajo cada respuesta terminada aparece una tarjeta plegable «Cambios de este turno»; con clic derecho puedes abrir un archivo o mostrarlo en la carpeta.",
+    "Los chats de OMP siguen la configuración de red de la app (proxy personalizado, proxy del sistema o directo) desde el siguiente mensaje; al cambiar de modo se conserva la dirección del proxy guardada.",
+    "El anillo de contexto mantiene el último uso informado mientras se genera una respuesta, en lugar de caer al 0 %.",
+    "Los diálogos de aprobación y de pregunta abiertos vuelven a aparecer tras recargar la ventana, y se conserva el borrador escrito mientras se ejecuta un comando de barra.",
+    "Los menús de las filas de la barra lateral se mantienen dentro de la ventana, las sesiones muestran un tiempo relativo breve y los grupos de proyectos se guardan aunque una carpeta guardada se haya renombrado o eliminado."
+  ],
+  "fr": [
+    "Parcourez et installez via OMP des plugins issus de marketplaces compatibles Claude Code ; les plugins installés sont chargés entièrement dans les chats OMP, y compris leurs serveurs MCP et hooks, dès le message suivant.",
+    "Affichage de la vitesse de génération des réponses OMP et d’une capsule d’utilisation par tour avec la vitesse et le total de tokens ; le survol détaille le cache, l’entrée et la sortie.",
+    "L’onglet Réviser liste les fichiers modifiés ou écrits par OMP, et une carte repliable « Modifications de ce tour » apparaît sous chaque réponse terminée ; un clic droit sur un fichier permet de l’ouvrir ou de l’afficher dans le dossier.",
+    "Les chats OMP suivent le réglage réseau de l’app (proxy personnalisé, proxy système ou direct) dès le message suivant ; changer de mode conserve l’adresse du proxy enregistrée.",
+    "L’anneau de contexte conserve la dernière utilisation signalée pendant la génération d’une réponse au lieu de tomber à 0 %.",
+    "Les dialogues d’approbation et de question ouverts réapparaissent après le rechargement de la fenêtre, et un brouillon saisi pendant une commande slash est conservé.",
+    "Les menus des lignes de la barre latérale restent dans la fenêtre, les sessions affichent un temps relatif court et les groupes de projets s’enregistrent même si un dossier enregistré a été renommé ou supprimé."
+  ],
+  "ko": [
+    "OMP를 통해 Claude Code 호환 마켓플레이스의 플러그인을 찾아보고 설치할 수 있습니다. 설치한 플러그인은 다음 메시지부터 MCP 서버와 hooks를 포함해 OMP 대화에 모두 로드됩니다.",
+    "OMP 응답의 생성 속도와 턴별 사용량 캡슐(속도, 토큰 합계)을 표시합니다. 마우스를 올리면 캐시, 입력, 출력 내역을 볼 수 있습니다.",
+    "검토 탭에 OMP가 편집하거나 작성한 파일이 표시되고, 완료된 응답 아래에 접을 수 있는 ‘이번 턴의 변경’ 카드가 추가됩니다. 파일을 오른쪽 클릭하면 열거나 폴더에서 볼 수 있습니다.",
+    "OMP 대화는 다음 메시지부터 앱의 네트워크 설정(사용자 지정 프록시, 시스템 프록시, 직접 연결)을 따릅니다. 모드를 바꿔도 저장된 프록시 주소는 유지됩니다.",
+    "응답이 생성되는 동안 컨텍스트 링이 0%로 떨어지지 않고 마지막으로 보고된 사용량을 유지합니다.",
+    "창을 다시 불러온 뒤에도 열려 있던 승인 및 질문 대화 상자가 다시 표시되고, 슬래시 명령 실행 중에 입력한 초안이 유지됩니다.",
+    "사이드바 행 메뉴가 창 밖으로 벗어나지 않고, 사이드바 세션에 짧은 상대 시간이 표시되며, 저장된 폴더의 이름이 바뀌거나 삭제되어도 프로젝트 그룹을 저장할 수 있습니다."
+  ],
+  "tr": [
+    "Claude Code uyumlu pazar yerlerindeki eklentiler OMP üzerinden göz atılıp kurulabilir; kurulan eklentiler bir sonraki mesajdan itibaren MCP sunucuları ve hook'ları dahil OMP sohbetlerinde tamamen yüklenir.",
+    "OMP yanıtlarının üretim hızı ve her tur için hız ile toplam token gösteren bir kullanım kapsülü görüntülenir; üzerine gelindiğinde önbellek, girdi ve çıktı dökümü görünür.",
+    "İnceleme sekmesi OMP'nin düzenlediği veya yazdığı dosyaları listeler; tamamlanan her yanıtın altına daraltılabilir bir “Bu turdaki değişiklikler” kartı eklenir, bir dosyaya sağ tıklayarak onu açabilir veya klasörde gösterebilirsiniz.",
+    "OMP sohbetleri bir sonraki mesajdan itibaren uygulamanın ağ ayarını (özel proxy, sistem proxy'si veya doğrudan) izler; mod değiştirildiğinde kayıtlı proxy adresi korunur.",
+    "Bağlam halkası, yanıt üretilirken %0'a düşmek yerine en son bildirilen kullanımı gösterir.",
+    "Açık onay ve soru pencereleri pencere yeniden yüklendikten sonra yeniden görünür; bir eğik çizgi komutu çalışırken yazılan taslak korunur.",
+    "Kenar çubuğu satır menüleri pencerenin içinde kalır, kenar çubuğundaki oturumlar kısa bir göreli zaman gösterir ve kayıtlı bir klasör yeniden adlandırılsa veya kaldırılsa bile proje grupları kaydedilebilir."
+  ]
+};
+
 const unified016: Record<ChangelogLocale, string[]> = {
   "en": [
     "Add a close button to chat error cards; a closed card stays hidden until the app restarts, and the reply before it stays visible."
@@ -264,6 +339,7 @@ const fixes: Record<ChangelogLocale, string[]> = {
 };
 
 const release = (locale: ChangelogLocale, highlights: string[], previous: string[]): readonly ChangelogEntry[] => [
+  { version: "0.1.7", date: "2026-11-09", highlights: unified017[locale] },
   { version: "0.1.6", date: "2026-10-24", highlights: unified016[locale] },
   { version: "0.1.5", date: "2026-10-23", highlights: unified015[locale] },
   { version: "0.1.4", date: "2026-10-21", highlights: unified014[locale] },
