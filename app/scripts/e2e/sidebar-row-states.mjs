@@ -196,6 +196,85 @@ export async function checkSidebarRowStates({ cdp, check, waitFor, seed }) {
         `${theme} returning from settings restores conversation selection and independent workspace context`,
       );
     }
+    // E2E-021c: bottom-edge row menus open beside their anchor and stay inside
+    // the viewport, for both the right-click and the overflow-button entry.
+    const rowMenuSelector = ".sidebar-row-menu.sidebar-floating-menu:not(.sidebar-section-menu)";
+    const measureRowMenu = () => cdp.evaluate(`(() => {
+      const menu = document.querySelector(${JSON.stringify(rowMenuSelector)});
+      if (!menu) return null;
+      const rect = menu.getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom, viewportHeight: window.innerHeight };
+    })()`);
+    const pressEscape = async () => {
+      for (const type of ["keyDown", "keyUp"]) {
+        await cdp.send("Input.dispatchKeyEvent", {
+          type, key: "Escape", code: "Escape", windowsVirtualKeyCode: 27,
+        });
+      }
+    };
+    const assertMenuBesideAnchor = (bounds, anchor, label) => {
+      const inside = bounds.top >= 8 && bounds.bottom <= bounds.viewportHeight - 8;
+      const roomBelow = anchor.bottom + 4 + (bounds.bottom - bounds.top) <= bounds.viewportHeight - 8;
+      const gap = roomBelow ? bounds.top - anchor.bottom : anchor.top - bounds.bottom;
+      check(inside && gap >= 3 && gap <= 5, label, JSON.stringify({ bounds, anchor, roomBelow, gap }));
+    };
+    const checkBottomRowMenu = async ({ name, rowSelector, contextTarget, trigger }) => {
+      const target = await point(contextTarget);
+      for (const [type, buttons] of [["mousePressed", 2], ["mouseReleased", 0]]) {
+        await cdp.send("Input.dispatchMouseEvent", {
+          type, x: target.x, y: target.y, button: "right", buttons, clickCount: 1,
+        });
+      }
+      const contextMenu = await waitFor(() => measureRowMenu(), `bottom ${name} context menu opens`);
+      assertMenuBesideAnchor(contextMenu, { top: target.y, bottom: target.y },
+        `right-click menu stays beside the bottom ${name} row`);
+      await pressEscape();
+      await waitFor(async () => !(await measureRowMenu()), `${name} context menu closes`);
+
+      await hover(rowSelector);
+      await waitFor(
+        () => cdp.evaluate(`getComputedStyle(document.querySelector(${JSON.stringify(trigger)})).pointerEvents === "auto"`),
+        `bottom ${name} overflow button is revealed`,
+      );
+      await click(trigger);
+      const overflowMenu = await waitFor(() => measureRowMenu(), `bottom ${name} overflow menu opens`);
+      const triggerBox = await cdp.evaluate(`(() => {
+        const box = document.querySelector(${JSON.stringify(trigger)}).getBoundingClientRect();
+        return { top: box.top, bottom: box.bottom };
+      })()`);
+      assertMenuBesideAnchor(overflowMenu, triggerBox, `overflow menu stays beside the bottom ${name} row`);
+      await pressEscape();
+      await waitFor(async () => !(await measureRowMenu()), `${name} overflow menu closes`);
+    };
+
+    const bottomProjectKey = await cdp.evaluate(`(() => {
+      const header = [...document.querySelectorAll(".project-group > .sidebar-session-group-header")].at(-1);
+      if (!header) return null;
+      header.scrollIntoView({ block: "end" });
+      return header.closest(".project-group")?.getAttribute("data-sidebar-project-group") ?? null;
+    })()`);
+    if (!bottomProjectKey) throw new Error("Missing bottom project row");
+    await checkBottomRowMenu({
+      name: "project",
+      rowSelector: header(bottomProjectKey),
+      contextTarget: header(bottomProjectKey),
+      trigger: `${group(bottomProjectKey)} .project-more`,
+    });
+
+    const bottomSessionId = await cdp.evaluate(`(() => {
+      const item = [...document.querySelectorAll("[data-sidebar-session-row]")].at(-1);
+      if (!item) return null;
+      item.scrollIntoView({ block: "end" });
+      return item.getAttribute("data-sidebar-session-row");
+    })()`);
+    if (!bottomSessionId) throw new Error("Missing bottom session row");
+    await checkBottomRowMenu({
+      name: "session",
+      rowSelector: `${row(bottomSessionId)} .thread-item-main`,
+      contextTarget: `${row(bottomSessionId)} .thread-item-main`,
+      trigger: `${row(bottomSessionId)} .thread-item-more`,
+    });
+
     await cdp.send("Emulation.setEmulatedMedia", {
       features: [{ name: "prefers-reduced-motion", value: "reduce" }],
     });

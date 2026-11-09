@@ -176,7 +176,7 @@ test("sidebar section toolbars open create actions from context menus", () => {
   assert.match(sidebarSource, /addEventListener\("pointerdown"/);
 });
 
-test("sidebar floating menus open to the anchor's right", () => {
+test("sidebar floating menus stay anchored to triggers and pointer positions", () => {
   const triggerPlacement = sidebarSource.match(
     /const placeMenu = useCallback\([\s\S]*?\n  }, \[\]\);/,
   )?.[0] ?? "";
@@ -184,14 +184,21 @@ test("sidebar floating menus open to the anchor's right", () => {
     /const placeMenuAtPoint = useCallback\([\s\S]*?\n  }, \[\]\);/,
   )?.[0] ?? "";
 
+  assert.match(triggerPlacement, /const anchor = \{ top: rect\.top, bottom: rect\.bottom \}/);
+  assert.match(triggerPlacement, /placeSidebarFloatingMenuTop\(/);
   assert.match(triggerPlacement, /left:\s*Math\.max\(/);
   assert.match(triggerPlacement, /rect\.right \+ 4/);
   assert.doesNotMatch(triggerPlacement, /window\.innerWidth/);
   assert.doesNotMatch(triggerPlacement, /right:\s*Math\.max/);
+  assert.match(pointPlacement, /const anchor = \{ top: y, bottom: y \}/);
+  assert.match(pointPlacement, /placeSidebarFloatingMenuTop\(/);
   assert.match(pointPlacement, /left:\s*Math\.max\(/);
   assert.match(pointPlacement, /x \+ 4/);
   assert.doesNotMatch(pointPlacement, /window\.innerWidth/);
   assert.match(sidebarSource, /placeMenuAtPoint\(event\.clientX, event\.clientY\)/);
+  assert.match(sidebarSource, /menu\.getBoundingClientRect\(\)\.height/);
+  assert.match(sidebarSource, /new ResizeObserver\(reposition\)/);
+  assert.equal((sidebarSource.match(/ref=\{floatingMenuRef\}/g) ?? []).length, 3);
   assert.match(sidebarSource, /left: menuPosition\.left/);
   assert.doesNotMatch(sidebarSource, /right: menuPosition\.right/);
 });
@@ -205,6 +212,8 @@ test("portaled sort menu does not stretch to the viewport edge", () => {
 
   assert.match(basePopoverRule, /position:\s*fixed;/);
   assert.doesNotMatch(basePopoverRule, /position:\s*absolute;/);
+  assert.match(basePopoverRule, /max-height:\s*min\(360px,\s*calc\(100vh - 16px\)\);/);
+  assert.match(basePopoverRule, /overflow-y:\s*auto;/);
   assert.match(floatingPopoverRule, /top:\s*auto;/);
   assert.match(floatingPopoverRule, /right:\s*auto;/);
   assert.match(globalStyles, /\.sidebar-floating-menu\s*\{[^}]*width:\s*max-content;/s);

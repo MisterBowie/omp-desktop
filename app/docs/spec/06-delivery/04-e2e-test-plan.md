@@ -2339,13 +2339,18 @@ identify the platform validation still needed.
 
 #### E2E-021: Delete session works
 
-- **Preconditions**: Session exists.
-- **Steps**: 1) Delete a session. 2) Observe session list.
-- **Expected**: Session removed from list; data gone.
-- **Specs linked**: `03-runtime/04-data-storage.md`
+- **Preconditions**: A session exists near the bottom of the expanded Sidebar.
+- **Steps**: 1) Open its overflow menu. 2) Verify the menu and Delete action stay
+  inside the window. 3) Repeat in a short window and scroll the menu to its last
+  action. 4) Delete the session and observe the session list.
+- **Expected**: The menu stays within the viewport, the last action is reachable,
+  and the deleted session disappears from the list with its data removed.
+- **Specs linked**: `03-runtime/04-data-storage.md`,
+  `04-ux/09-interaction-patterns.md`
 - **Acceptance**: F (delete session)
 - **Milestone**: M2
-- **Status**: Draft
+- **Status**: Unit-covered (`sidebar-floating-menu.test.mjs`,
+  `sidebar-navigation.test.mjs`); rendered viewport scenario Draft
 
 #### E2E-021a: Rename session title persists without changing activity
 
@@ -2395,6 +2400,16 @@ identify the platform validation still needed.
 - **Milestone**: M2
 - **Status**: Unit-covered (`session-scratch-path.test.mjs`); desktop journey
   Draft (run only in a capable environment when this surface changes)
+
+#### E2E-021c: Bottom-edge sidebar menus stay beside their anchor
+
+- **Preconditions**: The expanded Sidebar shows a session or project in its lowest visible row, with insufficient room below it for the row menu.
+- **Steps**: 1) Right-click the row and inspect the menu. 2) Close it, open the row's overflow button, and inspect the menu again. 3) Verify every action remains inside the viewport.
+- **Expected**: Both entry points place the menu immediately above the row when it cannot fit below, using the rendered menu height. When there is enough room, the menu opens below its anchor. No menu is displaced to a distant viewport edge or clipped.
+- **Specs linked**: `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`
+- **Acceptance**: Quality (sidebar interaction)
+- **Milestone**: M2
+- **Status**: Unit-covered (`sidebar-floating-menu.test.mjs`, `sidebar-navigation.test.mjs`); rendered viewport scenario Draft
 
 #### E2E-036: Localized import grouping starts collapsed
 
@@ -8361,6 +8376,7 @@ identify the platform validation still needed.
 | Quality | E2E-CHAT-running-status-survives-output-pauses, E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-021a, E2E-024N, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-147, E2E-148, E2E-150, E2E-151, E2E-153, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-168, E2E-172, E2E-173, E2E-174, E2E-011g, E2E-176, E2E-177, E2E-178, E2E-179, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-196, E2E-201, E2E-204, E2E-202, E2E-203, E2E-205, E2E-206, E2E-207, E2E-208, E2E-209, E2E-210, E2E-218, E2E-259, E2E-219, E2E-250, E2E-252, E2E-102i, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-fs-root-follows-the-calling-session, E2E-SUBAGENT-resume-a-settled-delegation |
 | Quality (OMP review) | E2E-REVIEW-omp-native-changes-listed-read-only |
 | Quality (turn changed files) | E2E-CHAT-turn-changed-files-summary |
+| Quality (sidebar menu placement) | E2E-021c |
 | Quality (project ordering) | E2E-253 |
 | C — Conversation & stream (IME slash alias) | E2E-255 |
 | E — Tools & permissions (Skill residency) | E2E-254 |
@@ -8404,6 +8420,7 @@ identify the platform validation still needed.
 |---|---|
 | M1 | E2E-001, E2E-002, E2E-003, E2E-028, E2E-029 |
 | M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-008d, E2E-008e, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-020, E2E-021, E2E-021a, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-COMPOSER-narrow-controls, E2E-144, E2E-005J, E2E-201, E2E-202, E2E-207, E2E-206 |
+| M2 (sidebar menu placement) | E2E-021c |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
 | M5 | E2E-CHAT-running-status-survives-output-pauses, E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-AGENTS-001, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-094, E2E-095, E2E-143, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-177, E2E-178, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-204, E2E-208, E2E-CHAT-content-width-handles, E2E-250, E2E-252, E2E-102i |

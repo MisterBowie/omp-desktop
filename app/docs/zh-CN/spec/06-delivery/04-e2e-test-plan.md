@@ -1164,13 +1164,26 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 
 #### E2E-021：删除会话作品
 
-- **先决条件**：会话存在。
-- **步骤**：1) 删除会话。 2) 观察会话列表。
-- **预期**：会话已从列表中删除；数据不见了。
-- **链接规格**：`03-runtime/04-data-storage.md`
+- **先决条件**：展开的侧边栏底部附近有一个会话。
+- **步骤**：1) 打开该会话的溢出菜单。 2) 确认菜单和“删除”操作均处于窗口范围内。
+  3) 在较短的窗口中重复，并滚动菜单到最后一项。 4) 删除会话并观察会话列表。
+- **预期**：菜单保持在视口内，最后一项可访问；删除后会话从列表消失且数据已移除。
+- **链接规格**：`03-runtime/04-data-storage.md`、
+  `04-ux/09-interaction-patterns.md`
 - **接受**：F（删除会话）
 - **里程碑**：M2
-- **状态**：草案
+- **状态**：单元测试覆盖（`sidebar-floating-menu.test.mjs`、
+  `sidebar-navigation.test.mjs`）；视口交互场景仍为草案
+
+#### E2E-021c：底部侧边栏菜单贴近锚点显示
+
+- **先决条件**：展开的侧边栏中，最底部可见会话或项目行下方空间不足以容纳行菜单。
+- **步骤**：1) 右键该行并查看菜单。2) 关闭菜单，再打开该行的溢出按钮菜单。3) 确认所有操作都处于视口内。
+- **预期**：两种入口在下方空间不足时，都会按菜单实际高度紧贴该行上方显示；空间足够时则显示在锚点下方。菜单不会跳到远离该行的位置或被裁切。
+- **链接规格**：`04-ux/08-component-spec.md`、`04-ux/09-interaction-patterns.md`
+- **接受**：品质（侧边栏交互）
+- **里程碑**：M2
+- **状态**：单元测试覆盖（`sidebar-floating-menu.test.mjs`、`sidebar-navigation.test.mjs`）；视口交互场景仍为草案
 
 #### E2E-036：本地化导入分组开始折叠
 
@@ -5465,6 +5478,7 @@ eleven-tool-round desktop paths are verified by
 | 品质 | E2E-CHAT-running-status-survives-output-pauses、E2E-032、E2E-033、E2E-039、E2E-043、E2E-044、E2E-045、E2E-046、E2E-047、E2E-048、E2E-048A、E2E-049、E2E-050、E2E-053、E2E-055、 E2E-056、E2E-057、E2E-058、E2E-059、E2E-060、E2E-061、E2E-062、E2E-063、E2E-064、E2E-065、E2E-066、E2E-067、E2E-068、E2E-069、 E2E-070、E2E-071、E2E-072、E2E-073、E2E-074、E2E-075、E2E-076、E2E-077、E2E-078、E2E-079、E2E-080、E2E-081、E2E-082、E2E-083、 E2E-084、E2E-085、E2E-086、E2E-092、E2E-093、E2E-094、E2E-095、E2E-096、E2E-097、E2E-098、E2E-099、E2E-100、E2E-101、E2E-102、 E2E-102a、E2E-102b、E2E-103、E2E-AGENTS-001、E2E-024N、E2E-024O、E2E-059a、E2E-060b、E2E-060c、E2E-060d、E2E-061a、E2E-073a、E2E-111、 E2E-114、E2E-117、E2E-118、E2E-119、E2E-120、E2E-122、E2E-123、E2E-142、E2E-143、E2E-144、E2E-145、E2E-146、E2E-147、E2E-148、E2E-150、E2E-151、E2E-153、E2E-194、E2E-195、E2E-199、E2E-200、E2E-201、E2E-202、E2E-203、E2E-204、E2E-209、E2E-210、E2E-250、E2E-PLUGIN-imported-pi-package-skills、E2E-SUBAGENT-resume-a-settled-delegation |
 | 品质（OMP 审阅） | E2E-REVIEW-omp-native-changes-listed-read-only |
 | 品质（本轮改动文件） | E2E-CHAT-turn-changed-files-summary |
+| 品质（侧边栏菜单定位） | E2E-021c |
 | 品质（项目排序） | E2E-253 |
 | C — 对话和直播（输入法斜杠别名） | E2E-255 |
 | E——工具和权限（Skill 常驻） | E2E-254 |
@@ -5508,6 +5522,7 @@ eleven-tool-round desktop paths are verified by
 |---|---|
 | M1 | E2E-001、E2E-002、E2E-003、E2E-028、E2E-029 |
 | M2 | E2E-004、E2E-005、E2E-006、E2E-007、E2E-008、E2E-008d、E2E-009、E2E-010、E2E-011、E2E-011a、E2E-011b、E2E-020、E2E-021、E2E-027、E2E-031、 E2E-036、E2E-037、E2E-042、E2E-087、E2E-088、E2E-088b、E2E-089、E2E-090、E2E-144、E2E-005J、E2E-201 |
+| M2（侧边栏菜单定位） | E2E-021c |
 | M3 | E2E-012、E2E-013、E2E-014、E2E-015、E2E-016、E2E-017、E2E-018、E2E-019、E2E-040 |
 | M4 | E2E-022、E2E-023、E2E-024、E2E-025、E2E-026、E2E-030、E2E-038 |
 | M5 | E2E-CHAT-running-status-survives-output-pauses、E2E-008a、E2E-032、E2E-033、E2E-034、E2E-039、E2E-043、E2E-044、E2E-045、E2E-046、E2E-047、E2E-048、E2E-048A、E2E-049、E2E-050、 E2E-051、E2E-052、E2E-053、E2E-054、E2E-055、E2E-056、E2E-057、E2E-058、E2E-059、E2E-060、E2E-061、E2E-062、E2E-063、E2E-064、 E2E-065、E2E-066、E2E-067、E2E-068、E2E-069、E2E-070、E2E-071、E2E-072、E2E-073、E2E-074、E2E-075、E2E-076、E2E-077、E2E-078、 E2E-079、E2E-080、E2E-081、E2E-082、E2E-083、E2E-084、E2E-085、E2E-086、E2E-092、E2E-093、E2E-096、E2E-097、E2E-098、E2E-099、 E2E-100、E2E-101、E2E-102、E2E-102a、E2E-102b、E2E-AGENTS-001、E2E-059a、E2E-060b、E2E-060c、E2E-061a、E2E-073a、E2E-094、E2E-095、E2E-143、E2E-145、E2E-146、E2E-147、E2E-194、E2E-195、E2E-204、E2E-250 |
