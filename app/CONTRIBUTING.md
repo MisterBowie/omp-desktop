@@ -1,9 +1,9 @@
-# Contributing to PI-Desktop
+# Contributing to OMP Desktop
 
-Thanks for helping improve PI-Desktop. This guide applies to human and AI
+Thanks for helping improve OMP Desktop. This guide applies to human and AI
 contributors working on the repository.
 
-PI-Desktop is released software with real users. Prefer small, reviewable
+OMP Desktop is released software with real users. Prefer small, reviewable
 changes that preserve existing behavior, user data, security boundaries, and
 public interfaces.
 
@@ -15,7 +15,8 @@ Read the documents relevant to your change:
 - [`CLAUDE.md`](CLAUDE.md) — Claude Code / Cowork mirror of the non-negotiables.
   When you change either policy file, update the other, set the same
   `Policy-Sync:` token, and run `pnpm check:agent-policy`.
-- [`README.md`](README.md) — product overview and development context.
+- [`../README.md`](../README.md) — product overview, and [`README.md`](README.md) —
+  source layout and development setup.
 - [`docs/spec/00-baseline.md`](docs/spec/00-baseline.md) — frozen architecture
   and product decisions.
 - Relevant documents under [`docs/spec/`](docs/spec/) and
@@ -64,8 +65,8 @@ git switch main
 git fetch origin main
 git merge --ff-only origin/main
 git worktree add -b <type>/<short-description> \
-  ../PI-Desktop-worktrees/<short-description> origin/main
-cd ../PI-Desktop-worktrees/<short-description>
+  .worktrees/<short-description> origin/main
+cd .worktrees/<short-description>
 ```
 
 That fast-forward fails once local `main` carries its own integration merge of
@@ -76,6 +77,10 @@ If the primary checkout has uncommitted work or is being used for another
 branch, leave it untouched and create the request worktree directly from the
 fetched `origin/main` instead. Never discard unrelated work to satisfy this
 sequence.
+
+The repository root holds planning documents; the product source lives in
+`app/`. Run pnpm and Cargo commands from the `app/` directory of your
+worktree.
 
 ## Plan and Implement
 
@@ -93,7 +98,7 @@ While editing:
 
 - Keep one logical concern per change and avoid unrelated cleanup.
 - Preserve the process boundary: Renderer → Preload IPC → Electron Main → Rust
-  host core / agent runtime.
+  host core / OMP runtime.
 - Keep SQLite ownership in Rust host core and keep Electron Main a thin
   orchestrator.
 - Update the relevant specification when behavior changes.
@@ -168,7 +173,7 @@ From a clean primary checkout:
 git fetch origin main
 git switch main
 git merge origin/main
-git worktree remove ../PI-Desktop-worktrees/<short-description>
+git worktree remove .worktrees/<short-description>
 git branch -d <type>/<short-description>
 git worktree prune
 ```

@@ -1,34 +1,31 @@
 # Security Policy
 
-PI-Desktop is an early-preview, local-first desktop application. We take
-security reports seriously and appreciate responsible disclosure.
+OMP Desktop is a local-first desktop application for the Oh My Pi (OMP) coding
+agent. We take security reports seriously and appreciate responsible
+disclosure.
 
 ## Supported Versions
 
 Security fixes are provided for the latest release published on the
-[GitHub Releases page](https://github.com/vastsa/PI-Desktop/releases). Older
-releases and development builds may not receive security fixes.
+[GitHub Releases page](https://github.com/MisterBowie/omp-desktop/releases).
+Older releases and development builds may not receive security fixes.
 
 ## Reporting a Vulnerability
 
 **Please do not report security vulnerabilities through public GitHub issues,
 pull requests, or discussions.**
 
-Send a private report to **hhxk666@gmail.com** with the subject:
+Report privately through GitHub's private vulnerability reporting form:
 
-```text
-[PI-Desktop Security] <short description>
-```
+<https://github.com/MisterBowie/omp-desktop/security/advisories/new>
 
-If private vulnerability reporting is enabled for this repository, you may
-also use GitHub's private security advisory form:
-
-<https://github.com/vastsa/PI-Desktop/security/advisories/new>
+If the form is not available, open an issue that asks for a private contact
+without including any vulnerability details.
 
 Please include as much of the following information as you can:
 
 - A clear description of the vulnerability and its security impact.
-- The affected PI-Desktop version, operating system, and installation type.
+- The affected OMP Desktop version, operating system, and package type.
 - Reproduction steps or a minimal proof of concept.
 - The affected component, feature, configuration, or extension boundary.
 - Any relevant logs, screenshots, stack traces, or suggested remediation.
@@ -36,8 +33,7 @@ Please include as much of the following information as you can:
 Please remove API keys, access tokens, passwords, private source code, personal
 data, and other sensitive information before sending a report. Do not test
 against other users, access data that does not belong to you, or perform
-destructive actions. PI-Desktop does not currently operate a bug bounty
-program.
+destructive actions. OMP Desktop does not operate a bug bounty program.
 
 ## Response and Disclosure
 
@@ -52,13 +48,14 @@ with their permission.
 
 ## Scope
 
-Reports are generally in scope when they affect the PI-Desktop application,
+Reports are generally in scope when they affect the OMP Desktop application,
 official release artifacts, Electron main or preload boundaries, the Rust host
-core, the agent runtime, or the handling of credentials, permissions, local
-files, plugins, MCP servers, or IPC/RPC messages.
+core, the bundled OMP runtime integration and its tool permission gate, or the
+handling of credentials, permissions, local files, plugins, MCP servers, or
+IPC/RPC messages.
 
-Issues that affect only a third-party provider, model service, operating
-system, dependency, or user-installed extension should also be reported to the
-relevant maintainer. They are still in scope for PI-Desktop if the application
-introduces an exploitable integration, permission, sandbox, or credential
-handling weakness.
+Issues that affect only the upstream Oh My Pi runtime, PI-Desktop, a
+third-party provider, model service, operating system, dependency, or
+user-installed plugin should also be reported to the relevant maintainer. They
+are still in scope for OMP Desktop if the application introduces an exploitable
+integration, permission, sandbox, or credential handling weakness.

@@ -1,82 +1,227 @@
-# OMP Desktop 项目工作区
+<div align="center">
 
-目标：以 `vastsa/PI-Desktop` 为桌面产品基线，保留其界面和主要交互，接入 `can1357/oh-my-pi` 的 Agent 能力，再按需求增加或修改功能。
+<img src="app/docs/image/readme/logo.png" alt="OMP Desktop" width="108" />
 
-当前正式版本 **0.1.4**，OMP 是唯一执行引擎。下载与更新统一使用 [GitHub Releases](https://github.com/MisterBowie/omp-desktop/releases/latest)。
-同版本修订（如 `0.1.4+chatfix.<SHA>`）不会被应用内更新识别，已安装用户需手动下载覆盖安装。
-当前状态、进行中的工作和下一步见 [HANDOFF.md](HANDOFF.md)；各版本验收记录在 `docs/validation/`。
-从 schema 22 回退 0.1.0 需先关闭应用并恢复升级前备份。
-应用内更新和平台签名前提见 [发布手册](app/docs/zh-CN/spec/06-delivery/06-release-runbook.md)。
+# OMP Desktop
 
-项目仓库：[MisterBowie/omp-desktop](https://github.com/MisterBowie/omp-desktop)。克隆完整项目：
+**A desktop app for the [Oh My Pi](https://github.com/can1357/oh-my-pi) coding agent.**
+
+Projects, sessions, approvals, and reviews in one window, with the OMP runtime built in.
+
+[![Release](https://img.shields.io/github/v/release/MisterBowie/omp-desktop?label=release)](https://github.com/MisterBowie/omp-desktop/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/MisterBowie/omp-desktop/total?label=downloads)](https://github.com/MisterBowie/omp-desktop/releases)
+[![License](https://img.shields.io/badge/license-LGPL--3.0-blue)](app/LICENSE)
+![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
+
+**[Download](https://github.com/MisterBowie/omp-desktop/releases/latest)** ·
+[Features](#features) ·
+[Install](#install) ·
+[Build from source](#build-from-source) ·
+[简体中文](README.zh-CN.md)
+
+</div>
+
+OMP Desktop runs the Oh My Pi (OMP) agent in a desktop workspace. The app ships
+its own OMP runtime and talks to it over OMP's structured RPC protocol, so
+messages, tool calls, approvals, and subagents keep their structure instead of
+being scraped from a terminal. The interface is derived from
+[PI-Desktop](https://github.com/vastsa/PI-Desktop).
+
+> **Status:** 0.1.x release line. Builds are not code-signed yet; see [Install](#install).
+
+## Features
+
+### Work in projects
+
+- Sessions are grouped by project in the sidebar. A session stays bound to the
+  project, engine, and runtime version it was created with, so switching
+  projects never moves a running session.
+- Sessions persist across restarts. Reopening one reads OMP's native history
+  without running any tool again.
+- Start an isolated session in its own local Git worktree, then preview a merge
+  back into the project or sync new project commits into it.
+- Reference files with `@`, run slash commands and `/skill:` commands, and paste
+  or attach images.
+
+### Stay in control
+
+- Choose a permission mode per session: **Ask every time**, **Accept edits**, or
+  **Auto**. Approval is enforced before a tool runs, so a denied write never
+  touches the file.
+- Approve once, approve for the whole chat, or deny. Requests left unanswered
+  are denied automatically.
+- Switch between **Agent**, **Plan**, and **Goal** modes.
+- Steer a running turn or queue follow-ups. **Stop** ends the turn together with
+  its background tasks and child processes.
+
+### See what the agent did
+
+- Follow subagents started by OMP's `task` tool, each with its own progress and
+  result.
+- OMP's Todo list stays visible above the composer.
+- The **Review** tab lists the files OMP edited or wrote, and a
+  **Changes this turn** card under each finished reply links to them.
+- See generation speed, per-turn token usage, and a context ring that shows how
+  much of the model's context is in use.
+- Get language-server diagnostics after Write and Edit when a matching server is
+  installed for the project.
+- Browse project files and preview pages in the work panel's built-in browser.
+
+### Extend it
+
+- Install plugins from Claude Code–compatible marketplaces through OMP. Their
+  skills, commands, subagents, rules, MCP servers, and hooks load into OMP chats.
+- Manage skills, MCP servers, and subagents. Global ones live in `~/.agents`,
+  which is shared on purpose with other tools that read it.
+- Turn on automatic memory saving and recall for each project or worktree (both
+  are off by default).
+- Set global instructions that apply to every OMP chat.
+
+### Use your own models
+
+- Bring your own API key. Presets cover OpenAI, Anthropic, Google Gemini,
+  DeepSeek, OpenRouter, Mistral, Qwen, Kimi, and more. Any other endpoint,
+  including a local model server, works if it speaks the OpenAI Chat
+  Completions, OpenAI Responses, Anthropic Messages, or Google Generative AI
+  format.
+- Switch models and reasoning levels inside a session. Provider-published
+  context and output limits are used unless you set your own.
+- Send model traffic through a custom proxy, the system proxy, or a direct
+  connection.
+
+The interface is available in English, Simplified Chinese, Traditional Chinese,
+German, Spanish, French, Korean, and Turkish.
+
+## Install
+
+Download the package for your platform from the
+[latest release](https://github.com/MisterBowie/omp-desktop/releases/latest).
+
+| Platform | Architecture | Package |
+| --- | --- | --- |
+| macOS | Apple Silicon | `OMP-Desktop-<version>-arm64.dmg` or `-arm64-mac.zip` |
+| macOS | Intel | `OMP-Desktop-<version>-x64.dmg` or `-x64-mac.zip` |
+| Windows | x64 | `OMP-Desktop-Setup-<version>.exe` (installer) or `OMP-Desktop-Portable-<version>.exe` |
+| Linux | x64 | `OMP-Desktop-<version>-x86_64.AppImage`, `.deb`, or `.rpm` |
+
+Each release publishes `SHA256SUMS.txt` for checking downloads.
+
+**macOS.** Builds are not signed or notarized yet. If macOS refuses to open the
+app, allow it under **System Settings → Privacy & Security**. If macOS reports
+that the app is damaged, move it to `/Applications` and run:
+
+```sh
+xattr -r -d com.apple.quarantine "/Applications/OMP Desktop.app"
+```
+
+The ZIP package includes the same steps in `OMP-Desktop-macOS-opening-help.txt`
+and a helper, `OMP-Desktop-macOS-open.command`. Only do this for a package
+downloaded from this repository's releases.
+
+**Windows.** The agent's shell tool uses Git for Windows (Git Bash).
+
+**Linux.** Packages need glibc 2.35 or newer (Ubuntu 22.04, Debian 12,
+Fedora 36, or later).
+
+### Updates
+
+OMP Desktop checks this repository's stable releases. The Windows installer and
+the Linux AppImage download and install updates inside the app. On macOS, and
+for the Windows portable, `.deb`, and `.rpm` packages, the app announces the new
+version and opens its download page.
+
+## Your data
+
+- OMP Desktop keeps its data in `~/.omp-desktop`, separate from PI-Desktop and
+  the OMP command line. It does not import or change their sessions or settings.
+- API keys are stored encrypted in that folder, in files only your user account
+  can read.
+- There is no account and no analytics. Crash dumps stay on your computer.
+- Model requests go to the provider you configure, through the proxy setting you
+  choose. Update checks contact GitHub.
+
+To back up, quit the app and copy the whole `~/.omp-desktop` folder, keeping
+file permissions. On macOS, also copy `~/Library/Application Support/OMP Desktop`.
+
+## Known limitations
+
+- Builds are not code-signed, so macOS updates are installed by hand.
+- Sessions cannot be branched yet.
+- Provider OAuth sign-in is not available; use API keys.
+- Sessions from PI-Desktop or the OMP command line are not imported.
+
+## Build from source
+
+Requirements:
+
+- Node.js 24 (22.19 or newer) and pnpm 10
+- Rust stable, for the desktop host (`host-core`)
+- To build the bundled OMP runtime: Bun 1.4 or newer, Rust
+  `nightly-2026-08-12`, and a checkout of
+  [MisterBowie/oh-my-pi](https://github.com/MisterBowie/oh-my-pi) at the commit
+  pinned in [`app/patches/oh-my-pi/manifest.json`](app/patches/oh-my-pi/manifest.json)
 
 ```bash
-git clone --recurse-submodules git@github.com:MisterBowie/omp-desktop.git
-cd omp-desktop
-nvm use 24
+git clone --recurse-submodules https://github.com/MisterBowie/omp-desktop.git
+cd omp-desktop/app
+pnpm install
+pnpm build:js
+cargo build -p host-core --locked
 ```
 
-已有克隆可运行 `git submodule update --init --recursive` 获取固定版本的上游参考源码。
+Run the checks:
 
-## 从这里开始
-
-1. 阅读 [HANDOFF.md](HANDOFF.md)：当前状态、进行中的工作和下一步。
-2. 阅读 [项目范围与决策](docs/00-scope-and-decisions.md)。
-3. 按 [实施计划](docs/03-implementation-plan.md) 和 [任务看板](docs/04-task-board.md) 逐阶段执行。
-4. 通过 [验收规范](docs/05-validation-and-release.md) 留下证据，再推进下一阶段。
-
-## 目录
-
-```text
-omp-desktop/
-  README.md                 项目入口
-  AGENTS.md                 执行模型必须遵守的工作约定
-  HANDOFF.md                当前状态、进行中的工作和下一步
-  .nvmrc                    Node 24
-  docs/
-    00-scope-and-decisions.md
-    01-source-audit.md
-    02-target-architecture.md
-    03-implementation-plan.md
-    04-task-board.md
-    05-validation-and-release.md
-    06-executor-prompts.md
-    07-environment-and-upstream.md
-    source-baseline.json     实际拉取的提交和版本
-    history/                 已归档的交接与看板过程记录
-    validation/              各阶段与各版本的验收证据
-  app/                      本仓库直接管理的桌面产品源码
-  upstream/pi-desktop/       PI-Desktop 原始基线子模块
-  upstream/oh-my-pi/         OMP 源码参考子模块
-  .worktrees/               每个请求的专用工作树（不纳入版本控制）
+```bash
+pnpm typecheck
+pnpm lint
+pnpm test
 ```
 
-根目录统一管理规划文档和 `app/` 源码；`app/` 不是子模块，也不再是上游仓库的 worktree。两个 `upstream/` 子模块固定到分析时的提交，供核对和实验使用。`app/` 首次导入保留了 PI-Desktop 的完整源码、许可证和版权，导入基线见 `docs/source-baseline.json`。
+Build an unsigned package for the current platform:
 
-本机最初准备的开发 worktree 已保留到 `.local-worktrees/pi-desktop-baseline/`，它被忽略且不上传。新的开发任务应在本项目仓库创建专用分支和 worktree，再进入其中的 `app/` 构建。
+```bash
+OMP_SIDECAR_SOURCE=/path/to/oh-my-pi pnpm --filter @pi-desktop/desktop run dist:mac   # or dist:win, dist:linux
+```
 
-## 当前默认选择
+Packaging refuses an OMP checkout that does not match the manifest. Published
+releases are built by GitHub Actions ([`release.yml`](.github/workflows/release.yml));
+the steps are in the [release runbook](app/docs/spec/06-delivery/06-release-runbook.md).
+More about the source tree is in [`app/README.md`](app/README.md).
 
-- 首个验证平台：本机 macOS Apple Silicon。
-- Node：使用现有 NVM，执行 `nvm use 24`，不重复安装。
-- 产品路线：fork PI-Desktop + 独立 OMP 适配层。
-- 运行时首选验证路径：OMP 独立进程及 `rpc-ui`，结合已有审批机制和受信扩展；是否需要 SDK 桥接由实验决定。
-- 旧 Pi 引擎先保留作为对照；未经能力验证的功能不宣称支持。
-- 当前开发与验证在专用本机工作树执行，不调用付费模型。GitHub 正式发布单独授权。
+## Repository layout
 
-## 文档导航
-
-| 文档 | 用途 |
+| Path | Contents |
 | --- | --- |
-| [范围与决策](docs/00-scope-and-decisions.md) | 目标、非目标、取舍和待验证事项 |
-| [源码核对](docs/01-source-audit.md) | 真实文件位置、已确认接口和兼容风险 |
-| [目标架构](docs/02-target-architecture.md) | 进程、数据、权限、会话和事件设计 |
-| [实施计划](docs/03-implementation-plan.md) | 阶段依赖、交付物和退出条件 |
-| [任务看板](docs/04-task-board.md) | 可直接分配给模型的任务及状态 |
-| [验收与发布](docs/05-validation-and-release.md) | 测试矩阵、故障场景和打包要求 |
-| [执行提示词](docs/06-executor-prompts.md) | 分阶段任务指令和完成报告模板 |
-| [环境与上游](docs/07-environment-and-upstream.md) | 启动准备、版本固定、Git 和上游更新方法 |
+| `app/` | Product source: Electron app, Rust host, OMP adapter, packages, specs, and ADRs |
+| `app/patches/oh-my-pi/` | Manifest of the controlled OMP fork that the app bundles |
+| `docs/` | Plans, task board, and validation evidence for each release (in Chinese) |
+| `upstream/pi-desktop`, `upstream/oh-my-pi` | Pinned reference submodules; product code is not changed there |
+| `HANDOFF.md` | Current status and next steps |
+| `AGENTS.md` | Rules for coding agents working in this repository |
 
-文档中的“拟新增”路径是设计建议，不代表当前已有实现。最终以锁定提交的源码和验证记录为准。
+## Contributing
 
-`app/` 的上游代码遵循 [LGPL-3.0](app/LICENSE)，OMP 主项目遵循其 [MIT 许可证](upstream/oh-my-pi/LICENSE)，第三方组件另有声明。当前验收状态以 [HANDOFF.md](HANDOFF.md) 与日期化验证记录为准。
+Bug reports and feature requests are welcome in
+[Issues](https://github.com/MisterBowie/omp-desktop/issues). Read
+[CONTRIBUTING.md](app/CONTRIBUTING.md) before opening a pull request. Report
+security problems privately as described in [SECURITY.md](app/SECURITY.md).
+
+## Acknowledgements
+
+- [PI-Desktop](https://github.com/vastsa/PI-Desktop): the desktop app OMP
+  Desktop is derived from.
+- [Oh My Pi](https://github.com/can1357/oh-my-pi): the agent runtime bundled
+  with the app.
+- [pi](https://github.com/badlogic/pi-mono): the agent toolkit both projects
+  build on.
+
+OMP Desktop is an independent project. It is not affiliated with or endorsed by
+these projects.
+
+## License
+
+The desktop app in `app/` is licensed under the
+[GNU Lesser General Public License v3.0](app/LICENSE), inherited from
+PI-Desktop, and keeps its copyright notices. The bundled OMP runtime is under
+the [MIT License](https://github.com/can1357/oh-my-pi/blob/main/LICENSE).
+Third-party notices ship inside every package.
