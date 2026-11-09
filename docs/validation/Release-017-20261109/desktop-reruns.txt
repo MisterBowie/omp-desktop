@@ -1,0 +1,32 @@
+✔ the entry never verifies an implicit path (57.676875ms)
+✔ a missing, non-directory, or non-packaged resources path is refused (80.594542ms)
+✔ the gate control accepts only the refusal that names the missing gate (1.106583ms)
+✔ a gate control run that cannot be reclaimed is reported with its ownership (9.085541ms)
+✔ the acceptance root survives a reclamation that cannot complete (0.501416ms)
+✔ a complete reclamation removes the acceptance root (0.309ms)
+✔ an ownership held by an earlier step withholds the acceptance root (0.220041ms)
+✔ accepts the real packaged runtime resources (472.081334ms)
+✔ refuses a swapped tool gate (356.11025ms)
+✔ refuses a binary whose bytes no longer match the manifest (781.768792ms)
+✔ refuses a resources tree with no runtime binary (200.624958ms)
+✔ refuses a runtime built for another platform or architecture (406.676208ms)
+✔ refuses a manifest that is not the pinned one (440.885459ms)
+✔ a failed acceptance retains an unreclaimable root and restores the environment (315.960333ms)
+✔ a failed acceptance deletes only a root whose runs were all reclaimed (110.273583ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3361.454209
+✔ isolated OMP: approval, project switch, cancellation, native restore, reviewed merge and deletion (14265.485708ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15357.934708

@@ -5,11 +5,11 @@
 任务状态见[任务看板](docs/04-task-board.md)，范围与决定见[范围与决策](docs/00-scope-and-decisions.md)，
 证据见 `docs/validation/`。
 
-## 当前状态（2026-10-25）
+## 当前状态（2026-11-09）
 
 | 项 | 值 |
 | --- | --- |
-| 正式版本 | **0.1.6**：[GitHub Release v0.1.6](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.6)（`releases/latest`），产品源码 `f0c9399a`，2026-10-25 00:26（北京时间）发布，更新源已指向 0.1.6（[发布证据](docs/validation/Release-016-20261024.md)）。含转录错误卡片关闭按钮（R15）。此前版本：[v0.1.5](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.5)（`4194e804`，R09–R11，[证据](docs/validation/Release-015-20261023.md)）、[0.1.4 同版本修订](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.4%2Bchatfix.852ca1b952ae64e0bcc660ffe89a3c0da06867d9)（`852ca1b9`，[证据](docs/validation/Chatfix014-release-20261022.md)）与 [v0.1.4](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.4)（`87894e73`，[证据](docs/validation/Unified-014-release-20261021.md)），标签与资产均未改动 |
+| 正式版本 | **0.1.7**：[GitHub Release v0.1.7](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.7)（`releases/latest`），产品源码 `60cf1aab`，2026-11-09 17:37（北京时间）发布，更新源已指向 0.1.7（[发布证据](docs/validation/Release-017-20261109.md)）。含 R17–R22。此前版本：[v0.1.6](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.6)（`f0c9399a`，R15，[证据](docs/validation/Release-016-20261024.md)）、[v0.1.5](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.5)（`4194e804`，R09–R11，[证据](docs/validation/Release-015-20261023.md)）、[0.1.4 同版本修订](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.4%2Bchatfix.852ca1b952ae64e0bcc660ffe89a3c0da06867d9)（`852ca1b9`，[证据](docs/validation/Chatfix014-release-20261022.md)）与 [v0.1.4](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.4)（`87894e73`，[证据](docs/validation/Unified-014-release-20261021.md)），标签与资产均未改动 |
 | 主线 | `main` 指向已验证并发布的最新代码（修订线已并入），已推送 `origin/main`。根目录检出固定在 `main`，只作协调，不在其中开发 |
 | 执行引擎 | OMP 是唯一执行引擎（2026-10-21 决定）。Pi 执行入口已关闭，遗留代码待删除（看板 R12） |
 | OMP 运行时 | 上游 OMP 18.3.0（`62bc57be`）+ 受控 fork `MisterBowie/oh-my-pi@edec3898`，补丁 `62bc57b+omp-desktop.7`；以 `app/patches/oh-my-pi/manifest.json` 为准 |
@@ -18,21 +18,22 @@
 
 ## 进行中
 
-R15（`codex/dismiss-error-card`）与 0.1.6 版本面（`codex/release-016`）已随 0.1.6 发布并入 `main`。
+R17–R22 与 0.1.7 版本面（`codex/release-017`）已随 0.1.7 发布并入 `main` 并推送。各项证据：R17 [上下文圆环](docs/validation/Context-ring-usage-20261026.md)、R18 [插件市场](docs/validation/OMP-marketplace-20261027.md)、R19 [生成速度](docs/validation/Token-throughput-20261027.md)、R20 [P0 差距修复](docs/validation/P0-gap-fixes-20261028.md)、R21 [侧栏菜单](docs/validation/Sidebar-menu-viewport-20261105.md)、R22 [审阅改动](docs/validation/OMP-review-changes-20261105.md)。
 
-- R17 `codex/context-ring-usage`：上下文圆环思考中显示 100% 的修复，已验证，2026-10-26 按用户要求快进并入本地 `main`
-  （未推送 `origin`）并打本地测试包；发布方式待用户决定（[证据](docs/validation/Context-ring-usage-20261026.md)）。
-- R18 `codex/omp-marketplace`（`.worktrees/omp-marketplace`）：OMP 插件市场集成（完整加载 MCP/hooks/工具），已验证，2026-10-27 按用户要求快进并入本地 `main`（未推送）并打本地测试包 `~/Downloads/OMP-Desktop-0.1.6-marketplace-dc973e52-arm64.dmg`（含系统代理修复）；发布方式待定（[证据](docs/validation/OMP-marketplace-20261027.md)）。
-- R19 `codex/token-throughput`（`.worktrees/token-throughput`）：OMP 会话 token/s。根因是适配层从不填 `responseDurationMs`；现映射 OMP 原生 `duration`，并移植上游 0.21.0 每轮用量胶囊。已验证；按用户要求提交并快进合并到本地 `main`（未推送），待用户测试（[证据](docs/validation/Token-throughput-20261027.md)）。
-- R20 `codex/p0-gap-fixes`（`.worktrees/p0-gap-fixes`）：上游对比 P0 修复与侧栏会话时间，已验证（[证据](docs/validation/P0-gap-fixes-20261028.md)）；2026-10-29 按用户要求快进并入本地 `main`（`21205c02`，未推送）并打本地测试包 `~/Downloads/OMP-Desktop-0.1.6-p0gap-21205c02-arm64.dmg`（SHA-256 `5bb7043d9cfce137cd95408e1fac73c22ec2c2ffbf9a5b918a4945f77e5c2766`）；待用户本地安装验收。
-- R21 `codex/sidebar-menu-viewport`（`.worktrees/sidebar-menu-viewport`）：侧栏靠下行的右键/更多菜单底部被窗口遮挡，照搬 PI-Desktop 上游修复（实测高度定位、放不下时翻到锚点上方、限高滚动）与其单元测试，已验证（[证据](docs/validation/Sidebar-menu-viewport-20261105.md)）；未提交、未合并。另发现 `test:e2e:layout` 种子依赖已禁用的 `session.import`，整套布局 E2E 在 `main` 上无法运行，需另立任务。 2026-11-09 与 R22 合打本地测试包 `~/Downloads/OMP-Desktop-0.1.6-review-sidebar-20261109-arm64.dmg`（SHA-256 `ad834590…a20484`），待用户验收。
-- R22 `codex/omp-review-changes`（`.worktrees/omp-review-changes`）：OMP 会话的“审阅”标签原先始终为空，现以只读方式列出 OMP 原生 `edit`/`write` 的文件改动（第一步）；第二步移植上游回复下方的“本轮改动”卡片，已验证（[证据](docs/validation/OMP-review-changes-20261105.md)）；未提交、未合并。2026-11-06 又在变动列表行上加右键“打开文件 / 在文件夹中打开”（只接受精确路径），最新本地测试包 `~/Downloads/OMP-Desktop-0.1.6-review-changes-menu-20261106-arm64.dmg`（SHA-256 `0c8fbdd5…35d2e9`，不含 R21）。2026-11-09 另打 R21+R22 合并测试包 `~/Downloads/OMP-Desktop-0.1.6-review-sidebar-20261109-arm64.dmg`（SHA-256 `ad834590…a20484`，临时分离工作树 `.worktrees/preview-r21-r22`），待用户验收。
+- R23 README 截图（`codex/release-017`）：用户 2026-11-09 要求重拍 OMP Desktop 截图并突出特有功能；用已发布的 0.1.7 安装包驱动真实 OMP 会话（只有模型是本机假服务）截取，进行中。
+- R21 发现的遗留问题：`test:e2e:layout` 种子依赖已禁用的 `session.import`，整套布局 E2E 在 `main` 上无法运行，需另立任务。
 - R16 `codex/omp-turn-feedback`（`.worktrees/omp-turn-feedback`）仍未并入，与 R17 改动相邻的看板与 HANDOFF 行并入时需手工合并。
 
 发版方式：正式版按 `v<版本>` 发布并推送更新源；同版本修订按 `0.1.4+<名称>.<完整源码 SHA>` 发布，原稳定标签与
 资产保持不变，已安装用户需手动覆盖。固定 `release-check-*` 远端候选整轮通过、用户本地测试确认后才由
 `publish-*` 控制标签晋升原始制品。
 2026-10-22 修复分支的原始过程记录见 [docs/history/fix-branch-notes-20261022.md](docs/history/fix-branch-notes-20261022.md)。
+
+## 2026-11-09 用户决定
+
+1. R22、R21 合并进 `main`，0.1.6 之后的全部改动（R17–R22）以 **0.1.7 正式版**发布到 GitHub。
+2. README 等按正式项目重写：根目录 README 为产品主页（英文、简体中文），`app/README` 为源码说明，`SECURITY.md` 改用本仓库私密漏洞报告。
+3. README 需要 OMP Desktop 自己的截图，重点展示特有功能。
 
 ## 2026-10-22 用户决定
 

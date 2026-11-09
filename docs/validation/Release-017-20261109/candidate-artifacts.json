@@ -1,0 +1,165 @@
+{
+  "total_count": 8,
+  "artifacts": [
+    {
+      "id": 13662835790,
+      "node_id": "MDg6QXJ0aWZhY3QxMzY2MjgzNTc5MA==",
+      "name": "validation-darwin-arm64",
+      "size_in_bytes": 2847664,
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/artifacts/13662835790",
+      "archive_download_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/artifacts/13662835790/zip",
+      "expired": false,
+      "digest": "sha256:20ac20893febe1b0d05de7bd63bf1e71ed2694beacc9da99c3883138a0babda8",
+      "created_at": "2026-11-09T09:24:04Z",
+      "updated_at": "2026-11-09T09:24:04Z",
+      "expires_at": "2027-02-07T08:55:57Z",
+      "workflow_run": {
+        "id": 42589522754,
+        "repository_id": 1379942898,
+        "head_repository_id": 1379942898,
+        "head_branch": "release-check-0.1.7-r17-r22-20261109",
+        "head_sha": "60cf1aabca532df2862d5e36fc19062632537cbd"
+      }
+    },
+    {
+      "id": 13662692650,
+      "node_id": "MDg6QXJ0aWZhY3QxMzY2MjY5MjY1MA==",
+      "name": "validation-win32-x64",
+      "size_in_bytes": 2751853,
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/artifacts/13662692650",
+      "archive_download_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/artifacts/13662692650/zip",
+      "expired": false,
+      "digest": "sha256:b7735b61765df28376f99a55de969947b38323f4c527465e020853e7fd4c72c2",
+      "created_at": "2026-11-09T09:31:30Z",
+      "updated_at": "2026-11-09T09:31:30Z",
+      "expires_at": "2027-02-07T08:55:57Z",
+      "workflow_run": {
+        "id": 42589522754,
+        "repository_id": 1379942898,
+        "head_repository_id": 1379942898,
+        "head_branch": "release-check-0.1.7-r17-r22-20261109",
+        "head_sha": "60cf1aabca532df2862d5e36fc19062632537cbd"
+      }
+    },
+    {
+      "id": 13662476346,
+      "node_id": "MDg6QXJ0aWZhY3QxMzY2MjQ3NjM0Ng==",
+      "name": "validation-linux-x64",
+      "size_in_bytes": 3487275,
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/artifacts/13662476346",
+      "archive_download_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/artifacts/13662476346/zip",
+      "expired": false,
+      "digest": "sha256:71dfd1064335619fbeecd373ace332d5225268c1cdb562ce868260a62a7e9c43",
+      "created_at": "2026-11-09T09:18:06Z",
+      "updated_at": "2026-11-09T09:18:06Z",
+      "expires_at": "2027-02-07T08:55:57Z",
+      "workflow_run": {
+        "id": 42589522754,
+        "repository_id": 1379942898,
+        "head_repository_id": 1379942898,
+        "head_branch": "release-check-0.1.7-r17-r22-20261109",
+        "head_sha": "60cf1aabca532df2862d5e36fc19062632537cbd"
+      }
+    },
+    {
+      "id": 13662471280,
+      "node_id": "MDg6QXJ0aWZhY3QxMzY2MjQ3MTI4MA==",
+      "name": "release-linux-x64",
+      "size_in_bytes": 639694386,
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/artifacts/13662471280",
+      "archive_download_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/artifacts/13662471280/zip",
+      "expired": false,
+      "digest": "sha256:ad764639fc91eb496a133d346472431663bc492fb31baff1515197ea52c7bfd1",
+      "created_at": "2026-11-09T09:18:04Z",
+      "updated_at": "2026-11-09T09:18:04Z",
+      "expires_at": "2027-02-07T08:55:57Z",
+      "workflow_run": {
+        "id": 42589522754,
+        "repository_id": 1379942898,
+        "head_repository_id": 1379942898,
+        "head_branch": "release-check-0.1.7-r17-r22-20261109",
+        "head_sha": "60cf1aabca532df2862d5e36fc19062632537cbd"
+      }
+    },
+    {
+      "id": 13662193109,
+      "node_id": "MDg6QXJ0aWZhY3QxMzY2MjE5MzEwOQ==",
+      "name": "release-darwin-x64",
+      "size_in_bytes": 457593665,
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/artifacts/13662193109",
+      "archive_download_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/artifacts/13662193109/zip",
+      "expired": false,
+      "digest": "sha256:902c35d01d5fd3e34792d03b96688074ec1333f7f26bcdc43eba9cc1fb000b4d",
+      "created_at": "2026-11-09T09:29:06Z",
+      "updated_at": "2026-11-09T09:29:06Z",
+      "expires_at": "2027-02-07T08:55:57Z",
+      "workflow_run": {
+        "id": 42589522754,
+        "repository_id": 1379942898,
+        "head_repository_id": 1379942898,
+        "head_branch": "release-check-0.1.7-r17-r22-20261109",
+        "head_sha": "60cf1aabca532df2862d5e36fc19062632537cbd"
+      }
+    },
+    {
+      "id": 13662032706,
+      "node_id": "MDg6QXJ0aWZhY3QxMzY2MjAzMjcwNg==",
+      "name": "release-darwin-arm64",
+      "size_in_bytes": 441789956,
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/artifacts/13662032706",
+      "archive_download_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/artifacts/13662032706/zip",
+      "expired": false,
+      "digest": "sha256:613642844e6ad0579a24a44f708d968179c04f1f3c46cc2eb5e601ac8bf5b6f0",
+      "created_at": "2026-11-09T09:24:01Z",
+      "updated_at": "2026-11-09T09:24:01Z",
+      "expires_at": "2027-02-07T08:55:57Z",
+      "workflow_run": {
+        "id": 42589522754,
+        "repository_id": 1379942898,
+        "head_repository_id": 1379942898,
+        "head_branch": "release-check-0.1.7-r17-r22-20261109",
+        "head_sha": "60cf1aabca532df2862d5e36fc19062632537cbd"
+      }
+    },
+    {
+      "id": 13661813992,
+      "node_id": "MDg6QXJ0aWZhY3QxMzY2MTgxMzk5Mg==",
+      "name": "validation-darwin-x64",
+      "size_in_bytes": 2896717,
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/artifacts/13661813992",
+      "archive_download_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/artifacts/13661813992/zip",
+      "expired": false,
+      "digest": "sha256:4cdc1e54f86d2868ecc7a2237c67a0d4c902e470745e2b6764ec552a1d2ea2a6",
+      "created_at": "2026-11-09T09:29:09Z",
+      "updated_at": "2026-11-09T09:29:09Z",
+      "expires_at": "2027-02-07T08:55:57Z",
+      "workflow_run": {
+        "id": 42589522754,
+        "repository_id": 1379942898,
+        "head_repository_id": 1379942898,
+        "head_branch": "release-check-0.1.7-r17-r22-20261109",
+        "head_sha": "60cf1aabca532df2862d5e36fc19062632537cbd"
+      }
+    },
+    {
+      "id": 13661563952,
+      "node_id": "MDg6QXJ0aWZhY3QxMzY2MTU2Mzk1Mg==",
+      "name": "release-win32-x64",
+      "size_in_bytes": 396476699,
+      "url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/artifacts/13661563952",
+      "archive_download_url": "https://api.github.com/repos/MisterBowie/omp-desktop/actions/artifacts/13661563952/zip",
+      "expired": false,
+      "digest": "sha256:7ca4722c3a76b1eefdd309a716817a9c91e111da1614ce66b88d9b074c58b203",
+      "created_at": "2026-11-09T09:31:28Z",
+      "updated_at": "2026-11-09T09:31:28Z",
+      "expires_at": "2027-02-07T08:55:57Z",
+      "workflow_run": {
+        "id": 42589522754,
+        "repository_id": 1379942898,
+        "head_repository_id": 1379942898,
+        "head_branch": "release-check-0.1.7-r17-r22-20261109",
+        "head_sha": "60cf1aabca532df2862d5e36fc19062632537cbd"
+      }
+    }
+  ]
+}

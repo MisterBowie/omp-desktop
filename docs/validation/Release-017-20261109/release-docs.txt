@@ -1,0 +1,5 @@
+
+> pi-desktop@0.1.7 check:release-docs /Users/vv/person/omp-desktop/.worktrees/release-017/app
+> node scripts/check-release-docs.mjs
+
+Release documentation is aligned with 0.1.7 (0.1.x line).
