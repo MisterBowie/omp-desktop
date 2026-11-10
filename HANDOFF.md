@@ -21,7 +21,8 @@
 R17–R22 与 0.1.7 版本面（`codex/release-017`）已随 0.1.7 发布并入 `main` 并推送。各项证据：R17 [上下文圆环](docs/validation/Context-ring-usage-20261026.md)、R18 [插件市场](docs/validation/OMP-marketplace-20261027.md)、R19 [生成速度](docs/validation/Token-throughput-20261027.md)、R20 [P0 差距修复](docs/validation/P0-gap-fixes-20261028.md)、R21 [侧栏菜单](docs/validation/Sidebar-menu-viewport-20261105.md)、R22 [审阅改动](docs/validation/OMP-review-changes-20261105.md)。
 
 - R23 README 截图：已完成。用 0.1.7 安装包驱动真实 OMP 会话（只有模型是本机假服务）截取审阅、审批、子智能体、插件市场四个场景的中英文截图，脚本 `app/scripts/readme-screenshots.mjs` 可重复生成（[证据](docs/validation/Release-017-20261109.md)）。
-- 截图时发现、待处理：审批等待期间工具调用前的回复文字重复显示一次；项目位于符号链接目录（如 `/tmp`）时“本轮改动”显示绝对路径、“审阅”行末尾多一个斜杠。
+- R24 `codex/omp-stream-start-text`（`.worktrees/omp-stream-start-text`，叠在 R16 上）：审批等待期间回复文字重复显示已修复并验证（[证据](docs/validation/OMP-stream-start-text-20261110.md)），未合并，随 R16 进入 0.1.8。
+- 截图时发现、待处理：项目位于符号链接目录（如 `/tmp`）时“本轮改动”显示绝对路径、“审阅”行末尾多一个斜杠。
 - R21 发现的遗留问题：`test:e2e:layout` 种子依赖已禁用的 `session.import`，整套布局 E2E 在 `main` 上无法运行，需另立任务。
 - R16 `codex/omp-turn-feedback`（`.worktrees/omp-turn-feedback`）：R15 调查遗留的三项回合反馈（被拒发送的错误卡片按时间顺序放置、OMP 自动重试显示为“重试中”、会话按界面显示的思考等级运行），2026-10-26 已实现并验证（[证据](docs/validation/OMP-turn-feedback-20261026.md)）。2026-11-10 按用户要求变基到 `main`（0.1.7 之后），准备随 0.1.8 发布，重新验证中。
 
