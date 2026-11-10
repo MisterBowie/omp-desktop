@@ -1,0 +1,123 @@
+{
+  "pending": {
+    "messages": [
+      {
+        "id": "omp:7d08a627-5836-4662-9f3e-42d4c603694b:entry:1f1f7d3e",
+        "role": "user",
+        "status": "complete",
+        "content": "PROBE_PROMPT"
+      }
+    ],
+    "dom": [
+      {
+        "text": "PROBE_PREAMBLE create the tag and push it",
+        "chain": [
+          "p",
+          "div.prose-chat",
+          "div.message-bubble.assistant-turn-fragment.streaming#omp:7d08a627-5836-4662-9f3e-42d4c603694b:e149ce04-f019-4c7c-b443-5170a5d1478d:2",
+          "div.message-col",
+          "div.message-row.assistant.assistant-turn.streaming",
+          "div.thread-content",
+          "div.thread-scroll",
+          "div.thread-wrap"
+        ]
+      }
+    ]
+  },
+  "events": [
+    {
+      "type": "agent_start",
+      "keys": "sessionId,turnId,ts,event"
+    },
+    {
+      "type": "status",
+      "keys": "sessionId,turnId,ts,event"
+    },
+    {
+      "type": "turn_start",
+      "keys": "sessionId,turnId,ts,event"
+    },
+    {
+      "type": "user_message_persisted",
+      "id": "omp:7d08a627-5836-4662-9f3e-42d4c603694b:e149ce04-f019-4c7c-b443-5170a5d1478d:1",
+      "status": "complete",
+      "role": "user",
+      "content": "PROBE_PROMPT",
+      "keys": "sessionId,turnId,ts,event"
+    },
+    {
+      "type": "message_end",
+      "id": "omp:7d08a627-5836-4662-9f3e-42d4c603694b:e149ce04-f019-4c7c-b443-5170a5d1478d:1",
+      "status": "complete",
+      "role": "user",
+      "content": "PROBE_PROMPT",
+      "keys": "sessionId,turnId,ts,event"
+    },
+    {
+      "type": "message_start",
+      "id": "omp:7d08a627-5836-4662-9f3e-42d4c603694b:e149ce04-f019-4c7c-b443-5170a5d1478d:2",
+      "status": "streaming",
+      "role": "assistant",
+      "content": "",
+      "keys": "sessionId,turnId,ts,event"
+    },
+    {
+      "type": "message_update",
+      "stream": "delta",
+      "deltaText": "PROBE_PREAMBLE create the tag and push it",
+      "id": "omp:7d08a627-5836-4662-9f3e-42d4c603694b:e149ce04-f019-4c7c-b443-5170a5d1478d:2",
+      "status": "streaming",
+      "role": "assistant",
+      "content": "",
+      "keys": "sessionId,turnId,ts,event"
+    },
+    {
+      "type": "tool_permission_request",
+      "keys": "sessionId,ts,event"
+    }
+  ],
+  "finished": {
+    "messages": [
+      {
+        "id": "omp:7d08a627-5836-4662-9f3e-42d4c603694b:entry:1f1f7d3e",
+        "role": "user",
+        "status": "complete",
+        "content": "PROBE_PROMPT"
+      },
+      {
+        "id": "omp:7d08a627-5836-4662-9f3e-42d4c603694b:entry:fa5b9cbf",
+        "role": "assistant",
+        "status": "complete",
+        "content": "PROBE_PREAMBLE create the tag and push it"
+      },
+      {
+        "id": "call_fake_1_0",
+        "role": "tool",
+        "status": "complete",
+        "toolName": "bash",
+        "content": ""
+      },
+      {
+        "id": "omp:7d08a627-5836-4662-9f3e-42d4c603694b:entry:f57a4179",
+        "role": "assistant",
+        "status": "complete",
+        "content": "PROBE_DONE"
+      }
+    ],
+    "dom": [
+      {
+        "text": "PROBE_PREAMBLE create the tag and push it",
+        "chain": [
+          "p",
+          "div.prose-chat",
+          "div.message-bubble.assistant-turn-fragment#omp:7d08a627-5836-4662-9f3e-42d4c603694b:e149ce04-f019-4c7c-b443-5170a5d1478d:2",
+          "div.turn-process-body",
+          "section.turn-process.open",
+          "div.message-col",
+          "div.message-row.assistant.assistant-turn",
+          "div.thread-content"
+        ]
+      }
+    ]
+  }
+}

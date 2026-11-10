@@ -1,0 +1,9 @@
+
+ RUN  v4.1.10 /Users/vv/person/omp-desktop/.worktrees/omp-turn-feedback/app/packages/omp-runtime
+
+
+ Test Files  4 passed (4)
+      Tests  113 passed (113)
+   Start at  10:34:07
+   Duration  1.94s (transform 991ms, setup 0ms, import 1.62s, tests 2.01s, environment 0ms)
+
