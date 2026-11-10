@@ -1,5 +1,56 @@
 import type { ChangelogEntry, ChangelogLocale } from "./changelog.js";
 
+const unified018: Record<ChangelogLocale, string[]> = {
+  "en": [
+    "OMP chats run at the thinking level the composer shows, also after a model switch or a restart; a level the model does not offer moves to the nearest supported one instead of blocking the message.",
+    "Provider retries show as a “Retrying in …” status with the attempt count instead of a stack of error cards, and the failed attempt a retry replaced is removed.",
+    "The error card of a message that could not be sent stays in its place in the conversation instead of appearing under later replies.",
+    "Reply text written before a tool that waits for approval no longer shows twice."
+  ],
+  "zh-CN": [
+    "OMP 会话按输入框显示的思考等级运行，换模型或重启后也一样；模型不支持的等级会改用最接近的可用等级，不再阻止发送。",
+    "服务商重试显示为“将在…秒后重试”状态并标明次数，不再堆叠错误卡片；被重试取代的失败尝试会被移除。",
+    "发送失败的消息，其错误卡片留在会话中原来的位置，不再出现在后续回复下方。",
+    "等待审批的工具调用之前的回复文字不再重复显示。"
+  ],
+  "zh-TW": [
+    "OMP 對話依輸入框顯示的思考等級執行，換模型或重新啟動後也一樣；模型不支援的等級會改用最接近的可用等級，不再阻止傳送。",
+    "服務商重試顯示為「將在…秒後重試」狀態並標明次數，不再堆疊錯誤卡片；被重試取代的失敗嘗試會被移除。",
+    "傳送失敗的訊息，其錯誤卡片留在對話中原本的位置，不再出現在後續回覆下方。",
+    "等待核准的工具呼叫之前的回覆文字不再重複顯示。"
+  ],
+  "de": [
+    "OMP-Chats laufen mit der Denkstufe, die das Eingabefeld anzeigt, auch nach einem Modellwechsel oder Neustart; eine Stufe, die das Modell nicht anbietet, wechselt zur nächstliegenden unterstützten, statt die Nachricht zu blockieren.",
+    "Wiederholungen beim Anbieter erscheinen als Status „Erneuter Versuch in …“ mit Versuchszähler statt als Stapel von Fehlerkarten, und der fehlgeschlagene Versuch, den eine Wiederholung ersetzt hat, wird entfernt.",
+    "Die Fehlerkarte einer Nachricht, die nicht gesendet werden konnte, bleibt an ihrer Stelle im Gespräch, statt unter späteren Antworten zu erscheinen.",
+    "Antworttext vor einem Tool, das auf Freigabe wartet, wird nicht mehr doppelt angezeigt."
+  ],
+  "es": [
+    "Los chats de OMP usan el nivel de razonamiento que muestra el compositor, también tras cambiar de modelo o reiniciar; un nivel que el modelo no ofrece pasa al compatible más cercano en lugar de bloquear el mensaje.",
+    "Los reintentos del proveedor se muestran como un estado «Reintentando en…» con el número de intento en lugar de una pila de tarjetas de error, y se quita el intento fallido que un reintento sustituyó.",
+    "La tarjeta de error de un mensaje que no se pudo enviar se queda en su lugar de la conversación en vez de aparecer bajo respuestas posteriores.",
+    "El texto de respuesta escrito antes de una herramienta que espera aprobación ya no aparece dos veces."
+  ],
+  "fr": [
+    "Les chats OMP utilisent le niveau de réflexion affiché dans la zone de saisie, y compris après un changement de modèle ou un redémarrage ; un niveau que le modèle ne propose pas passe au niveau pris en charge le plus proche au lieu de bloquer le message.",
+    "Les nouvelles tentatives du fournisseur s’affichent comme un état « Nouvelle tentative dans … » avec le numéro de tentative au lieu d’une pile de cartes d’erreur, et la tentative échouée remplacée est retirée.",
+    "La carte d’erreur d’un message qui n’a pas pu être envoyé reste à sa place dans la conversation au lieu d’apparaître sous les réponses suivantes.",
+    "Le texte de réponse écrit avant un outil en attente d’approbation ne s’affiche plus deux fois."
+  ],
+  "ko": [
+    "OMP 대화가 입력창에 표시된 사고 수준으로 실행되며, 모델을 바꾸거나 다시 시작한 뒤에도 같습니다. 모델이 지원하지 않는 수준은 메시지를 막지 않고 가장 가까운 지원 수준으로 바뀝니다.",
+    "제공자 재시도가 오류 카드 더미 대신 시도 횟수가 표시된 ‘… 후 재시도’ 상태로 나타나며, 재시도로 대체된 실패한 시도는 제거됩니다.",
+    "보내지 못한 메시지의 오류 카드가 이후 응답 아래로 가지 않고 대화의 원래 위치에 남습니다.",
+    "승인을 기다리는 도구 호출 앞의 응답 텍스트가 더 이상 두 번 표시되지 않습니다."
+  ],
+  "tr": [
+    "OMP sohbetleri, model değiştirildikten veya yeniden başlatıldıktan sonra da giriş alanında görünen düşünme düzeyiyle çalışır; modelin sunmadığı bir düzey mesajı engellemek yerine desteklenen en yakın düzeye geçer.",
+    "Sağlayıcı yeniden denemeleri, hata kartı yığını yerine deneme sayısıyla birlikte “… içinde yeniden deneniyor” durumu olarak görünür ve yeniden denemenin yerini aldığı başarısız deneme kaldırılır.",
+    "Gönderilemeyen bir mesajın hata kartı, sonraki yanıtların altında görünmek yerine sohbetteki yerinde kalır.",
+    "Onay bekleyen bir araçtan önce yazılan yanıt metni artık iki kez görünmez."
+  ]
+};
+
 const unified017: Record<ChangelogLocale, string[]> = {
   "en": [
     "Browse and install plugins from Claude Code–compatible marketplaces through OMP; installed plugins load in full in OMP chats, including their MCP servers and hooks, from the next message.",
@@ -339,6 +390,7 @@ const fixes: Record<ChangelogLocale, string[]> = {
 };
 
 const release = (locale: ChangelogLocale, highlights: string[], previous: string[]): readonly ChangelogEntry[] => [
+  { version: "0.1.8", date: "2026-11-10", highlights: unified018[locale] },
   { version: "0.1.7", date: "2026-11-09", highlights: unified017[locale] },
   { version: "0.1.6", date: "2026-10-24", highlights: unified016[locale] },
   { version: "0.1.5", date: "2026-10-23", highlights: unified015[locale] },
