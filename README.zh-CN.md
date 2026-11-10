@@ -19,6 +19,10 @@
 [从源码构建](#从源码构建) ·
 [English](README.md)
 
+<br />
+
+<img src="app/docs/image/readme/omp-review-zh.webp" alt="OMP 会话：Todo 清单、“本轮改动”卡片，以及显示 diff 的“审阅”标签" width="100%" />
+
 </div>
 
 OMP Desktop 在桌面工作区中运行 Oh My Pi（OMP）智能体。应用自带 OMP 运行时，通过 OMP
@@ -45,6 +49,8 @@ OMP Desktop 在桌面工作区中运行 Oh My Pi（OMP）智能体。应用自�
 - 可在**智能体**、**规划**和**目标**模式之间切换。
 - 运行中可以插话或排队跟进。**停止**会同时结束该回合的后台任务和子进程。
 
+<img src="app/docs/image/readme/omp-approval-zh.webp" alt="git push 在审批卡片上等待批准，批准前不会执行" width="100%" />
+
 ### 看清智能体做了什么
 
 - 跟踪 OMP `task` 工具启动的子智能体，各自显示进度和结果。
@@ -54,6 +60,8 @@ OMP Desktop 在桌面工作区中运行 Oh My Pi（OMP）智能体。应用自�
 - 项目装有对应的语言服务器时，Write 和 Edit 之后会返回 LSP 诊断。
 - 在工作面板中浏览项目文件，并用内置浏览器预览页面。
 
+<img src="app/docs/image/readme/omp-subagents-zh.webp" alt="通过 OMP task 工具启动的三个 scout 子智能体，以树状图显示在主智能体下" width="100%" />
+
 ### 扩展
 
 - 通过 OMP 安装 Claude Code 兼容市场中的插件，其技能、命令、子智能体、规则、MCP 服务器和
@@ -61,6 +69,8 @@ OMP Desktop 在桌面工作区中运行 Oh My Pi（OMP）智能体。应用自�
 - 管理技能、MCP 服务器和子智能体。全局配置位于 `~/.agents`，有意与其他读取该目录的工具共享。
 - 可按项目或 worktree 开启自动记忆的保存与读取（默认均关闭）。
 - 设置作用于所有 OMP 会话的全局指令。
+
+<img src="app/docs/image/readme/omp-marketplace-zh.webp" alt="插件市场中一个 Claude Code 兼容插件源及其四个插件" width="100%" />
 
 ### 使用你自己的模型
 
@@ -71,6 +81,9 @@ OMP Desktop 在桌面工作区中运行 Oh My Pi（OMP）智能体。应用自�
 - 模型请求可走自定义代理、系统代理或直连。
 
 界面支持英语、简体中文、繁体中文、德语、西班牙语、法语、韩语和土耳其语。
+
+<sub>截图为 OMP Desktop 0.1.7 运行真实 OMP 会话的画面，模型由本机脚本模拟，由
+[`app/scripts/readme-screenshots.mjs`](app/scripts/readme-screenshots.mjs) 生成。</sub>
 
 ## 安装
 

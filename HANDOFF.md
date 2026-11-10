@@ -20,7 +20,8 @@
 
 R17–R22 与 0.1.7 版本面（`codex/release-017`）已随 0.1.7 发布并入 `main` 并推送。各项证据：R17 [上下文圆环](docs/validation/Context-ring-usage-20261026.md)、R18 [插件市场](docs/validation/OMP-marketplace-20261027.md)、R19 [生成速度](docs/validation/Token-throughput-20261027.md)、R20 [P0 差距修复](docs/validation/P0-gap-fixes-20261028.md)、R21 [侧栏菜单](docs/validation/Sidebar-menu-viewport-20261105.md)、R22 [审阅改动](docs/validation/OMP-review-changes-20261105.md)。
 
-- R23 README 截图（`codex/release-017`）：用户 2026-11-09 要求重拍 OMP Desktop 截图并突出特有功能；用已发布的 0.1.7 安装包驱动真实 OMP 会话（只有模型是本机假服务）截取，进行中。
+- R23 README 截图：已完成。用 0.1.7 安装包驱动真实 OMP 会话（只有模型是本机假服务）截取审阅、审批、子智能体、插件市场四个场景的中英文截图，脚本 `app/scripts/readme-screenshots.mjs` 可重复生成（[证据](docs/validation/Release-017-20261109.md)）。
+- 截图时发现、待处理：审批等待期间工具调用前的回复文字重复显示一次；项目位于符号链接目录（如 `/tmp`）时“本轮改动”显示绝对路径、“审阅”行末尾多一个斜杠。
 - R21 发现的遗留问题：`test:e2e:layout` 种子依赖已禁用的 `session.import`，整套布局 E2E 在 `main` 上无法运行，需另立任务。
 - R16 `codex/omp-turn-feedback`（`.worktrees/omp-turn-feedback`）仍未并入，与 R17 改动相邻的看板与 HANDOFF 行并入时需手工合并。
 

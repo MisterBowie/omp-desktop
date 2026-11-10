@@ -19,6 +19,10 @@ Projects, sessions, approvals, and reviews in one window, with the OMP runtime b
 [Build from source](#build-from-source) ·
 [简体中文](README.zh-CN.md)
 
+<br />
+
+<img src="app/docs/image/readme/omp-review-en.webp" alt="An OMP session with its todo list, the Changes this turn card, and the Review tab showing the diff" width="100%" />
+
 </div>
 
 OMP Desktop runs the Oh My Pi (OMP) agent in a desktop workspace. The app ships
@@ -54,6 +58,8 @@ being scraped from a terminal. The interface is derived from
 - Steer a running turn or queue follow-ups. **Stop** ends the turn together with
   its background tasks and child processes.
 
+<img src="app/docs/image/readme/omp-approval-en.webp" alt="A git push waiting on the approval card before it runs" width="100%" />
+
 ### See what the agent did
 
 - Follow subagents started by OMP's `task` tool, each with its own progress and
@@ -67,6 +73,8 @@ being scraped from a terminal. The interface is derived from
   installed for the project.
 - Browse project files and preview pages in the work panel's built-in browser.
 
+<img src="app/docs/image/readme/omp-subagents-en.webp" alt="Three scout subagents started through OMP's task tool, shown as a tree under the main agent" width="100%" />
+
 ### Extend it
 
 - Install plugins from Claude Code–compatible marketplaces through OMP. Their
@@ -76,6 +84,8 @@ being scraped from a terminal. The interface is derived from
 - Turn on automatic memory saving and recall for each project or worktree (both
   are off by default).
 - Set global instructions that apply to every OMP chat.
+
+<img src="app/docs/image/readme/omp-marketplace-en.webp" alt="The plugin marketplace listing a Claude Code–compatible source with four plugins" width="100%" />
 
 ### Use your own models
 
@@ -91,6 +101,10 @@ being scraped from a terminal. The interface is derived from
 
 The interface is available in English, Simplified Chinese, Traditional Chinese,
 German, Spanish, French, Korean, and Turkish.
+
+<sub>Screenshots show OMP Desktop 0.1.7 running real OMP sessions against a local
+scripted model. They are produced by
+[`app/scripts/readme-screenshots.mjs`](app/scripts/readme-screenshots.mjs).</sub>
 
 ## Install
 
