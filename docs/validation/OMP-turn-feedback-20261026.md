@@ -83,3 +83,24 @@ R15 调查（[证据](Error-card-dismiss-20261024.md)“遗留”）发现、当
 - OMP 没有 `omit` 等级：运行中选 `omit` 不发送命令，当前进程保持原等级，下一个进程起才回到 OMP 默认。
 - 持久化失败的回滚：旧值解析为空（`omit` 或无等级）时仍按原逻辑回到 `off`，不一定等于运行时此前的实际等级。
   只在主机写入失败时发生。
+
+## 变基到 0.1.7 之后的 `main` 并复验（2026-11-10）
+
+用户 2026-11-10 要求把 R16 变基合并，随 0.1.8 发布。
+
+- `git rebase main`（`main` 为 0.1.7 发布后的 `2cc27eb3`）。代码冲突只有一处：`packages/omp-runtime/src/session/events.ts`
+  的助手 `message_end` 分支，R19 给 `finishAssistant` 增加了 `startedAt` 参数，R16 在同一处记录失败尝试；合并后两者都保留
+  （`finishAssistant(id, message, status, streaming?.startedAt)` 并设置 `failedAttempt`）。其余冲突为 HANDOFF 与看板行，手工合并。
+- 变基后提交：`b76961cd`、`90f51b5c`、`9223e482`、`4ec21bea`、`6ae8c22c`。`pnpm-lock.yaml` 未变，沿用原依赖。
+- 原生资源：0.1.7 本地包 Resources 副本（OMP 18.3.0，fork `edec3898`）。全部使用本机假服务商。
+
+| 命令 | 结果 |
+| --- | --- |
+| `pnpm build:js`、desktop 与 omp-runtime typecheck、`cargo +stable build -p host-core --locked` | 均 exit 0 |
+| `vitest run` 4 个文件（`retry-activity`、`runner`、`history`、`events`，`packages/omp-runtime`） | exit 0，113/113 |
+| `node --test` 5 个文件（`session-transcript`、`omp-model-projection`、`omp-session-configure`、`omp-provider-retry-e2e`、`omp-thinking-level-e2e`） | exit 0，49/49（含两个真实运行时 e2e） |
+| 工作区全量 `pnpm -r --if-present test` | exit 1：其余包全部通过；desktop 3296 项 3285 通过、10 跳过、1 失败 |
+| 上述失败 `omp-marketplace-e2e`（R18）：与 R24 的 e2e 同时运行时卡住 45 分钟，测试自带的 240 秒超时未生效；手动结束后报“插件的 MCP 服务器未启动” | 单独重跑 exit 0，1/1，8.7 秒（`rebase-20261110-…` 与 `Release-018-20261110/r16-marketplace-e2e-rerun.txt`）。该测试直接驱动运行时，不经过 R16 改动的代码；记为负载下的测试稳定性问题，待查 |
+| `cargo test -p host-core --locked` | exit 0，653 通过 |
+
+复验通过后，与叠在其上的 R24 一起快进并入本地 `main`（`d8bef50b`）。

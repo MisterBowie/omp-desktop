@@ -21,12 +21,13 @@
 R17–R22 与 0.1.7 版本面（`codex/release-017`）已随 0.1.7 发布并入 `main` 并推送。各项证据：R17 [上下文圆环](docs/validation/Context-ring-usage-20261026.md)、R18 [插件市场](docs/validation/OMP-marketplace-20261027.md)、R19 [生成速度](docs/validation/Token-throughput-20261027.md)、R20 [P0 差距修复](docs/validation/P0-gap-fixes-20261028.md)、R21 [侧栏菜单](docs/validation/Sidebar-menu-viewport-20261105.md)、R22 [审阅改动](docs/validation/OMP-review-changes-20261105.md)。
 
 - R23 README 截图：已完成。用 0.1.7 安装包驱动真实 OMP 会话（只有模型是本机假服务）截取审阅、审批、子智能体、插件市场四个场景的中英文截图，脚本 `app/scripts/readme-screenshots.mjs` 可重复生成（[证据](docs/validation/Release-017-20261109.md)）。
-- R24 `codex/omp-stream-start-text`（`.worktrees/omp-stream-start-text`，叠在 R16 上）：审批等待期间回复文字重复显示已修复并验证（[证据](docs/validation/OMP-stream-start-text-20261110.md)），未合并，随 R16 进入 0.1.8。
-- R25 `codex/omp-ask-custom-answer`（`.worktrees/omp-ask-custom-answer`，基于 `main`）：用户 2026-11-11 反馈回答提问后整轮“失败”。原因是提问卡的“输入其他答案”在 OMP 侧被回成取消，OMP 按用户中止结束回合。已改为经运行时 `Other (type your own)` → `editor` 两步投递（`e52961dc`），测试与本地包真实窗口验证通过（[证据](docs/validation/OMP-ask-typed-answer-20261111.md)），未合并，发布方式待定。
+- R24 `codex/omp-stream-start-text`：审批等待期间回复文字重复显示已修复，并入本地 `main`（[证据](docs/validation/OMP-stream-start-text-20261110.md)）。
+- **0.1.8**（`codex/release-018`，`.worktrees/release-018`）：R16 + R24，版本面与更新记录 `a59e980d`。本地测试包 `~/Downloads/OMP-Desktop-0.1.8-arm64.dmg`（SHA-256 `21f63a79…4a0c`）安装冒烟与全量测试通过，等待用户用真实模型试用确认后推送候选并发布（[证据](docs/validation/Release-018-20261110.md)）。
+- R25 `codex/omp-ask-custom-answer`：用户 2026-11-11 反馈回答提问后整轮“失败”。原因是提问卡的“输入其他答案”在 OMP 侧被回成取消，OMP 按用户中止结束回合。已改为经运行时 `Other (type your own)` → `editor` 两步投递（`e52961dc`），测试与本地包真实窗口验证通过（[证据](docs/validation/OMP-ask-typed-answer-20261111.md)），已并入本地 `main`（`3ac9ef66`，未推送）。
 - R26 `codex/omp-turn-failure-late-frames`：0.1.8 两次候选都失败在 T20-D 用例。查明是 0.1.7 已有的竞态：模式切换失败后紧接的下一条消息可能没送到模型却显示完成。用户 2026-11-11 决定先修好再发；runner 已改为等待失败回合的终止帧（`f0843924`），验证通过（[证据](docs/validation/OMP-turn-failure-settle-20261111.md)）。
 - 截图时发现、待处理：项目位于符号链接目录（如 `/tmp`）时“本轮改动”显示绝对路径、“审阅”行末尾多一个斜杠。
 - R21 发现的遗留问题：`test:e2e:layout` 种子依赖已禁用的 `session.import`，整套布局 E2E 在 `main` 上无法运行，需另立任务。
-- R16 `codex/omp-turn-feedback`（`.worktrees/omp-turn-feedback`）：R15 调查遗留的三项回合反馈（被拒发送的错误卡片按时间顺序放置、OMP 自动重试显示为“重试中”、会话按界面显示的思考等级运行），2026-10-26 已实现并验证（[证据](docs/validation/OMP-turn-feedback-20261026.md)）。2026-11-10 按用户要求变基到 `main`（0.1.7 之后），准备随 0.1.8 发布，重新验证中。
+- R16 `codex/omp-turn-feedback`：三项回合反馈修复，2026-11-10 变基复验通过后与 R24 一起并入本地 `main`（`d8bef50b`，未推送）（[证据](docs/validation/OMP-turn-feedback-20261026.md)）。
 
 发版方式：正式版按 `v<版本>` 发布并推送更新源；同版本修订按 `0.1.4+<名称>.<完整源码 SHA>` 发布，原稳定标签与
 资产保持不变，已安装用户需手动覆盖。固定 `release-check-*` 远端候选整轮通过、用户本地测试确认后才由
