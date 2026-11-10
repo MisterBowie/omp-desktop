@@ -146,6 +146,20 @@
   history filtering also run in `packages/omp-runtime` (`runner.test.ts`,
   `retry-activity.test.ts`, `history.test.ts`).
 
+### E2E-OMP-reply-text-once-while-approval-waits
+
+- **Preconditions:** Verified OMP resources, the gate in ask mode for `bash`, and
+  a local scripted provider whose reply carries thinking and text before a
+  `bash` call; no paid model.
+- **Steps:** Prompt once. When the approval request arrives, rebuild the live
+  assistant row from `message_start` plus every delta, then deny the call.
+- **Expected:** While the approval waits, the live row holds the reply text and
+  the thinking exactly once. The turn completes after the denial, and the final
+  `message_end` rows carry the reply text and the follow-up reply.
+- **Automation:** `OMP_BUNDLED_RESOURCES=<resources> node --test
+  apps/desktop/test/omp-stream-start-text-e2e.test.mjs`; the start-frame
+  mapping also runs in `packages/omp-runtime` (`events.test.ts`).
+
 ### E2E-OMP-thinking-level
 
 - **Preconditions:** Verified OMP resources and a local scripted provider whose

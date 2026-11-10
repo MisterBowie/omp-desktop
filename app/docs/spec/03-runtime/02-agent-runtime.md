@@ -149,6 +149,16 @@ mapping (`usageFromPi`). A streaming row therefore never becomes the newest
 usage-bearing message (D355): the composer context ring keeps the last real
 reading while the next request streams instead of dropping to 0% used.
 
+### OMP live message start
+
+The pinned runtime serializes an assistant `message_start` after its stream has
+already taken the first chunk, so the frame can restate text or thinking that
+the following `text_delta` / `thinking_delta` frames also carry. The adapter
+announces an assistant row with an empty body and builds the live text and
+thinking from deltas alone; `message_end` still carries the final message.
+Restating the start body showed the first chunk twice, and the doubled text
+stayed on screen while a gated tool from the same reply waited for approval.
+
 ### OMP response duration projection
 
 The pinned runtime ends every model request with `message_end` (it never sends

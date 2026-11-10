@@ -531,7 +531,13 @@ export class OmpEventConverter {
         },
       ];
     }
-    return [{ type: "message_start", message: this.toUiMessage(id, message, role, "streaming") }];
+    const started = this.toUiMessage(id, message, role, "streaming");
+    // The runtime serializes `message_start` after its stream has already
+    // taken the first chunk, and that chunk also arrives as a text/thinking
+    // delta. The live body is built from deltas alone; restating it here made
+    // the renderer show the first chunk twice until `message_end`.
+    if (role === "assistant") return [{ type: "message_start", message: { ...started, content: "", thinking: undefined } }];
+    return [{ type: "message_start", message: started }];
   }
 
   private onMessageUpdate(frame: Record<string, unknown>): AgentEvent[] {

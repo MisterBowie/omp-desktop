@@ -33,7 +33,7 @@ describe("message streaming", () => {
     expect(id).toMatch(/^omp:s1:/);
     expect(start[0]).toMatchObject({
       type: "message_start",
-      message: { role: "assistant", content: "hi", status: "streaming", modelId: "local-model" },
+      message: { role: "assistant", content: "", status: "streaming", modelId: "local-model" },
     });
 
     const thinking = c.convert({
@@ -66,6 +66,46 @@ describe("message streaming", () => {
         usage: { inputTokens: 10, outputTokens: 2, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 12 },
       },
     });
+  });
+
+  it("announces an assistant row without the chunk its first deltas will carry", () => {
+    // The runtime serializes `message_start` after its stream already took the
+    // first chunk; the same text and thinking then arrive as deltas. The live
+    // row must hold each chunk once, not the restated start body plus deltas.
+    const c = converter();
+    const partial = {
+      role: "assistant",
+      content: [
+        { type: "thinking", thinking: "plan the tag" },
+        { type: "text", text: "I'll tag and push." },
+      ],
+      model: "local-model",
+      timestamp: 1_000,
+    };
+
+    const start = c.convert({ type: "message_start", message: partial });
+    expect(start[0]).toMatchObject({ type: "message_start", message: { role: "assistant", content: "", status: "streaming" } });
+    expect(start[0].type === "message_start" && start[0].message.thinking).toBeUndefined();
+
+    const thinking = c.convert({
+      type: "message_update",
+      message: partial,
+      assistantMessageEvent: { type: "thinking_delta", delta: "plan the tag" },
+    });
+    const text = c.convert({
+      type: "message_update",
+      message: partial,
+      assistantMessageEvent: { type: "text_delta", delta: "I'll tag and push." },
+    });
+    const live = [...start, ...thinking, ...text].reduce(
+      (row, event) => {
+        if (event.type === "message_start") return { content: event.message.content, thinking: event.message.thinking ?? "" };
+        if (event.type !== "message_update") return row;
+        return { content: row.content + (event.deltaText ?? ""), thinking: row.thinking + (event.deltaThinking ?? "") };
+      },
+      { content: "", thinking: "" },
+    );
+    expect(live).toEqual({ content: "I'll tag and push.", thinking: "plan the tag" });
   });
 
   it("omits reasoning tokens the runtime never reports", () => {
