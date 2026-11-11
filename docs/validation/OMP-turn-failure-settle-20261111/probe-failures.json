@@ -1,0 +1,92 @@
+{
+  "candidate_c21c8467_run7": {
+    "postCount": 1,
+    "toolsOfLastRequest": [
+      "read",
+      "bash",
+      "edit",
+      "ask",
+      "eval",
+      "glob",
+      "grep",
+      "task",
+      "wait",
+      "todo",
+      "web_search",
+      "write",
+      "EnterPlanMode",
+      "EnterGoalMode"
+    ],
+    "ends": [
+      "error",
+      "completed"
+    ],
+    "timeline": [
+      "agent_start",
+      "status",
+      "turn_start",
+      "message_start",
+      "message_end",
+      "message_start",
+      "message_update",
+      "message_end",
+      "tool_start",
+      "error={\"code\":\"OMP_RUNTIME_TURN_FAILED\",\"message\":\"EnterGoalMode: EnterGoalMode returned an unreadable transition result; the committed state cannot be confirmed\",\"details\":{\"failureId\":\"omp-turn-failure-1794385844357-0\",\"code\":\"transition-apply-failed\",\"at\":1794385844357}}",
+      "turn_end",
+      "turn_start",
+      "message_start",
+      "message_end",
+      "turn_end",
+      "agent_end"
+    ],
+    "turnRows": [
+      "error",
+      "completed"
+    ]
+  },
+  "baseline_0.1.7_2cc27eb3_run3": {
+    "postCount": 1,
+    "toolsOfLastRequest": [
+      "read",
+      "bash",
+      "edit",
+      "ask",
+      "eval",
+      "glob",
+      "grep",
+      "task",
+      "wait",
+      "todo",
+      "web_search",
+      "write",
+      "EnterPlanMode",
+      "EnterGoalMode"
+    ],
+    "ends": [
+      "error",
+      "completed"
+    ],
+    "timeline": [
+      "agent_start",
+      "status",
+      "turn_start",
+      "message_start",
+      "message_end",
+      "message_start",
+      "message_update",
+      "message_end",
+      "tool_start",
+      "error={\"code\":\"OMP_RUNTIME_TURN_FAILED\",\"message\":\"EnterGoalMode: EnterGoalMode returned an unreadable transition result; the committed state cannot be confirmed\",\"details\":{\"failureId\":\"omp-turn-failure-1794386007939-0\",\"code\":\"transition-apply-failed\",\"at\":1794386007939}}",
+      "turn_end",
+      "turn_start",
+      "message_start",
+      "message_end",
+      "turn_end",
+      "agent_end"
+    ],
+    "turnRows": [
+      "error",
+      "completed"
+    ]
+  }
+}

@@ -1,0 +1,72 @@
+## candidate c21c8467 (source runtime)
+cand run 1 exit=0 40s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+cand run 2 exit=1 45s ℹ tests 1 ℹ pass 0 ℹ fail 1 
+cand run 3 exit=0 47s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+cand run 4 exit=0 36s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+cand run 5 exit=0 33s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+cand run 6 exit=0 35s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+cand run 7 exit=1 38s ℹ tests 1 ℹ pass 0 ℹ fail 1 
+cand PROBE captured in run 7
+cand-DONE
+
+[exited with code 0]
+## baseline 0.1.7 2cc27eb3 (source runtime)
+base run 1 exit=0 37s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+base run 2 exit=0 35s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+base run 3 exit=1 33s ℹ tests 1 ℹ pass 0 ℹ fail 1 
+base PROBE captured in run 3
+base-DONE
+
+[exited with code 0]
+## fix (source runtime)
+fix run 1 exit=0 36s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 2 exit=0 32s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 3 exit=0 35s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 4 exit=0 32s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 5 exit=0 37s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 6 exit=0 35s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 7 exit=0 37s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 8 exit=0 33s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 9 exit=0 30s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 10 exit=0 33s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 11 exit=0 33s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 12 exit=0 33s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 13 exit=0 34s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 14 exit=0 32s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 15 exit=0 31s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 16 exit=0 35s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 17 exit=0 34s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 18 exit=0 32s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 19 exit=0 31s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix run 20 exit=0 32s ℹ tests 1 ℹ pass 1 ℹ fail 0 
+fix-DONE
+
+[exited with code 0]
+## packaged runtime A/B (0.1.8 Resources, 12 rounds)
+round 1 base exit=0 17s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 1 cand exit=0 10s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 2 base exit=0 10s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 2 cand exit=0 11s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 3 base exit=0 11s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 3 cand exit=0 13s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 4 base exit=0 11s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 4 cand exit=0 11s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 5 base exit=0 8s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 5 cand exit=0 10s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 6 base exit=0 12s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 6 cand exit=0 11s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 7 base exit=0 10s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 7 cand exit=0 11s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 8 base exit=0 11s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 8 cand exit=0 15s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 9 base exit=0 11s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 9 cand exit=0 12s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 10 base exit=0 11s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 10 cand exit=0 9s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 11 base exit=0 10s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 11 cand exit=0 8s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 12 base exit=0 12s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+round 12 cand exit=0 16s ℹ pass 1 ℹ fail 0 ℹ skipped 0  
+AB-DONE
+
+[exited with code 0]
