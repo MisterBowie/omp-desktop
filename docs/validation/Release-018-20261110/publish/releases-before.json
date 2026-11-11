@@ -1838,5 +1838,187 @@
         "digest": "sha256:825751fb3ec3d1be2acc78b9cb4f0cfb279c30b3fc062ec3419c06b96175fbed"
       }
     ]
+  },
+  {
+    "id": 413690689,
+    "tag_name": "m7-test-20261015-46e7bf7",
+    "target_commitish": "main",
+    "draft": false,
+    "prerelease": true,
+    "published_at": "2026-10-15T10:43:43Z",
+    "assets": [
+      {
+        "id": 643531822,
+        "name": "BUILD-RECORD.json",
+        "size": 13764,
+        "digest": "sha256:86b1665e029d4afc78cf642625bd1eed92a7ba7dc97ca5a108dc7319307b973c"
+      },
+      {
+        "id": 643531827,
+        "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-darwin-arm64-maintenance.json.gz",
+        "size": 1186951,
+        "digest": "sha256:8e33c6ad00f9eef5e3ea182041738e7018b0e574fc81c40da50227933b9cb25e"
+      },
+      {
+        "id": 643531821,
+        "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-darwin-arm64-validation.json.gz",
+        "size": 408014,
+        "digest": "sha256:303d4788aa706ff0f4777f38835e0d8e966139214028e272e305676f886bb865"
+      },
+      {
+        "id": 643531828,
+        "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64-maintenance.json.gz",
+        "size": 1123167,
+        "digest": "sha256:3303bba723ae9f720d1e2605749e6ee3c1acd623ccc9083f309bacdcdee9df25"
+      },
+      {
+        "id": 643531817,
+        "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64-validation.json.gz",
+        "size": 394224,
+        "digest": "sha256:01d9b54fdf4b7d7c4d08421d083d33f89973af4ba8e8730a61f2d6fb46117c86"
+      },
+      {
+        "id": 643531856,
+        "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64.AppImage",
+        "size": 250508801,
+        "digest": "sha256:77fc4d7a8bf3329196a38b2b4a3910bd9bd9bd05e69dd255626e3abfa5d7caa8"
+      },
+      {
+        "id": 643531864,
+        "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64.deb",
+        "size": 208062120,
+        "digest": "sha256:6e8b1cbc75ed889257771ca14aba3a2bdb60e63ce809afd976705bf43e43ced3"
+      },
+      {
+        "id": 643531865,
+        "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-linux-x64.rpm",
+        "size": 188629721,
+        "digest": "sha256:7bf491cfcd1b6691d0341a412e9d1550ae616f9817517e8f0b417cf3196f571f"
+      },
+      {
+        "id": 643531880,
+        "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-macos-arm64.dmg",
+        "size": 224628084,
+        "digest": "sha256:bf84e48063cbe445df6a6b090b3ef87e114ed8a6621d4cba3fa61dd9e8d5314e"
+      },
+      {
+        "id": 643531881,
+        "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-macos-arm64.zip",
+        "size": 223439950,
+        "digest": "sha256:83b5dbe94bc0732b6b63c804144b93a84d8e716c091d1bb12fb202729664c026"
+      },
+      {
+        "id": 643532781,
+        "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-win32-x64-maintenance.json.gz",
+        "size": 1065319,
+        "digest": "sha256:d8ecfe5f778cd072a41223f01a1ccba35aa7fe5328eff506e802f596d357d634"
+      },
+      {
+        "id": 643532787,
+        "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-win32-x64-validation.json.gz",
+        "size": 317298,
+        "digest": "sha256:99128cd6edcdb9650d7f3b5c01f6bd6ee3d60e28ce83058c55684589994cf84c"
+      },
+      {
+        "id": 643532807,
+        "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-windows-x64-portable.exe",
+        "size": 200216594,
+        "digest": "sha256:8e47022386d85f0a3d12493e24b4684612e389356de97b7f5276cf4066586e6d"
+      },
+      {
+        "id": 643532814,
+        "name": "OMP-Desktop-0.15.3-m7.1-m7-test-20261015-46e7bf7-windows-x64-setup.exe",
+        "size": 200454507,
+        "digest": "sha256:3c7b6a8028d064ab743a99284c0c61947534629572904c85f22c179a38c9da14"
+      },
+      {
+        "id": 643532816,
+        "name": "SHA256SUMS.txt",
+        "size": 1804,
+        "digest": "sha256:7292164fd9cd94425f1d964f9027dffe2b69b71ca9c91c00900a7fe64db19641"
+      }
+    ]
+  },
+  {
+    "id": 413539333,
+    "tag_name": "m6-test-20261015-438b389",
+    "target_commitish": "main",
+    "draft": false,
+    "prerelease": true,
+    "published_at": "2026-10-15T07:44:22Z",
+    "assets": [
+      {
+        "id": 643106556,
+        "name": "BUILD-RECORD.json",
+        "size": 9518,
+        "digest": "sha256:a6927a063634a1830abcd57f09edd810c7b6acfec6a9c86bd66ac2cdd69eab97"
+      },
+      {
+        "id": 643106548,
+        "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-darwin-arm64-validation.json.gz",
+        "size": 404188,
+        "digest": "sha256:ffa7ab7fb338b8939ede8555bf55749c69193b686a3d5127bff1d938bc62713b"
+      },
+      {
+        "id": 643106554,
+        "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64-validation.json.gz",
+        "size": 392569,
+        "digest": "sha256:5159736fafbdbbd5d825fc637cb644fb2eaac352fd7a15b1a349eb3b0d2694da"
+      },
+      {
+        "id": 643106555,
+        "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64.AppImage",
+        "size": 250508963,
+        "digest": "sha256:f7b5dcb1ce8c77374bf9beb99c19ac94921c8b53cc16980ee656f12852a6ba8f"
+      },
+      {
+        "id": 643106553,
+        "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64.deb",
+        "size": 208061040,
+        "digest": "sha256:36b567f773444ba8861a4601fc05f68c0dbcbbdada55e04b9caad2b25676cfee"
+      },
+      {
+        "id": 643106591,
+        "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-linux-x64.rpm",
+        "size": 188635149,
+        "digest": "sha256:07a7186bb7358b18589fc66c1ca232caf7b0552678995390420c592da0359694"
+      },
+      {
+        "id": 643106593,
+        "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-macos-arm64.dmg",
+        "size": 224617896,
+        "digest": "sha256:b243c9752c39d917ba3dae23b53a3f198e890be51406ea215500251eee4bec8d"
+      },
+      {
+        "id": 643106599,
+        "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-macos-arm64.zip",
+        "size": 223436337,
+        "digest": "sha256:bc00654aa86dbc4298f0612796e3271fa8a0db82220c47eaa693f4e24a604440"
+      },
+      {
+        "id": 643107050,
+        "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-win32-x64-validation.json.gz",
+        "size": 314088,
+        "digest": "sha256:31a244614c4bb16fae510c5a9df89f9fa11317cd92afe096976cb46267ab49c8"
+      },
+      {
+        "id": 643107074,
+        "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-windows-x64-portable.exe",
+        "size": 200222084,
+        "digest": "sha256:24812a665e3ff7638b0edd6b0fcb25477afdae0378dacf8ad1dee5a5353b7892"
+      },
+      {
+        "id": 643107139,
+        "name": "OMP-Desktop-0.15.2-m6-test-20261015-438b389-windows-x64-setup.exe",
+        "size": 200459885,
+        "digest": "sha256:7367103bbc2564c6d5051d4e652e8f196b0c02d25aaec241028595be553c332c"
+      },
+      {
+        "id": 643107163,
+        "name": "SHA256SUMS.txt",
+        "size": 1316,
+        "digest": "sha256:e5290b09193aae5593a9ee81a69acf8dc154d3a3da271d758450e292649a5a0e"
+      }
+    ]
   }
 ]

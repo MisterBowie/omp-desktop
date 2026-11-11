@@ -5,12 +5,12 @@
 任务状态见[任务看板](docs/04-task-board.md)，范围与决定见[范围与决策](docs/00-scope-and-decisions.md)，
 证据见 `docs/validation/`。
 
-## 当前状态（2026-11-09）
+## 当前状态（2026-11-11）
 
 | 项 | 值 |
 | --- | --- |
-| 正式版本 | **0.1.7**：[GitHub Release v0.1.7](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.7)（`releases/latest`），产品源码 `60cf1aab`，2026-11-09 17:37（北京时间）发布，更新源已指向 0.1.7（[发布证据](docs/validation/Release-017-20261109.md)）。含 R17–R22。此前版本：[v0.1.6](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.6)（`f0c9399a`，R15，[证据](docs/validation/Release-016-20261024.md)）、[v0.1.5](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.5)（`4194e804`，R09–R11，[证据](docs/validation/Release-015-20261023.md)）、[0.1.4 同版本修订](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.4%2Bchatfix.852ca1b952ae64e0bcc660ffe89a3c0da06867d9)（`852ca1b9`，[证据](docs/validation/Chatfix014-release-20261022.md)）与 [v0.1.4](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.4)（`87894e73`，[证据](docs/validation/Unified-014-release-20261021.md)），标签与资产均未改动 |
-| 主线 | `main` 指向已验证并发布的最新代码（修订线已并入），已推送 `origin/main`。根目录检出固定在 `main`，只作协调，不在其中开发 |
+| 正式版本 | **0.1.8**：[GitHub Release v0.1.8](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.8)（`releases/latest`），产品源码 `a746e7b7`，2026-11-11 18:43（北京时间）发布，更新源已指向 0.1.8（[发布证据](docs/validation/Release-018-20261110.md)）。含 R16、R24、R25、R26。此前版本：[v0.1.7](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.7)（`60cf1aab`，R17–R22，[证据](docs/validation/Release-017-20261109.md)）、[v0.1.6](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.6)（`f0c9399a`，R15，[证据](docs/validation/Release-016-20261024.md)）、[v0.1.5](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.5)（`4194e804`，R09–R11，[证据](docs/validation/Release-015-20261023.md)）、[0.1.4 同版本修订](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.4%2Bchatfix.852ca1b952ae64e0bcc660ffe89a3c0da06867d9)（`852ca1b9`，[证据](docs/validation/Chatfix014-release-20261022.md)）与 [v0.1.4](https://github.com/MisterBowie/omp-desktop/releases/tag/v0.1.4)（`87894e73`，[证据](docs/validation/Unified-014-release-20261021.md)），标签与资产均未改动 |
+| 主线 | `main` 指向已验证并发布的最新代码（含 0.1.8 发布分支），已推送 `origin/main`。根目录检出固定在 `main`，只作协调，不在其中开发 |
 | 执行引擎 | OMP 是唯一执行引擎（2026-10-21 决定）。Pi 执行入口已关闭，遗留代码待删除（看板 R12） |
 | OMP 运行时 | 上游 OMP 18.3.0（`62bc57be`）+ 受控 fork `MisterBowie/oh-my-pi@edec3898`，补丁 `62bc57b+omp-desktop.7`；以 `app/patches/oh-my-pi/manifest.json` 为准 |
 | 数据 | 存储 schema 22；数据目录 `~/.omp-desktop`；全局能力目录 `~/.agents` 与 PI-Desktop 等工具有意共享（2026-10-22 决定） |
@@ -22,9 +22,9 @@ R17–R22 与 0.1.7 版本面（`codex/release-017`）已随 0.1.7 发布并入 
 
 - R23 README 截图：已完成。用 0.1.7 安装包驱动真实 OMP 会话（只有模型是本机假服务）截取审阅、审批、子智能体、插件市场四个场景的中英文截图，脚本 `app/scripts/readme-screenshots.mjs` 可重复生成（[证据](docs/validation/Release-017-20261109.md)）。
 - R24 `codex/omp-stream-start-text`：审批等待期间回复文字重复显示已修复，并入本地 `main`（[证据](docs/validation/OMP-stream-start-text-20261110.md)）。
-- **0.1.8**（`codex/release-018`，`.worktrees/release-018`）：R16 + R24 + R25 + R26。前两次远端候选因 R26 所修的竞态间歇失败，未发布任何内容。R26 并入 `main`（`a2976eb9`）后，发布分支变基并在更新记录增加 R26（`a746e7b7`）。新本地包 `~/Downloads/OMP-Desktop-0.1.8-arm64.dmg`（SHA-256 `0586b4d0…60ef`）验收通过，用户已确认发布，下一步推送新候选（[证据](docs/validation/Release-018-20261110.md)）。
-- R25 `codex/omp-ask-custom-answer`：用户 2026-11-11 反馈回答提问后整轮“失败”。原因是提问卡的“输入其他答案”在 OMP 侧被回成取消，OMP 按用户中止结束回合。已改为经运行时 `Other (type your own)` → `editor` 两步投递（`e52961dc`），测试与本地包真实窗口验证通过（[证据](docs/validation/OMP-ask-typed-answer-20261111.md)），已并入本地 `main`（`3ac9ef66`，未推送），随 0.1.8 发布。
-- R26 `codex/omp-turn-failure-late-frames`：0.1.8 两次候选都失败在 T20-D 用例。查明是 0.1.7 已有的竞态：模式切换失败后紧接的下一条消息可能没送到模型却显示完成。用户 2026-11-11 决定先修好再发；runner 已改为等待失败回合的终止帧（`f0843924`），验证通过，已并入本地 `main`（`a2976eb9`，未推送），随 0.1.8 发布（[证据](docs/validation/OMP-turn-failure-settle-20261111.md)）。
+- **0.1.8 已发布**（`codex/release-018`，`.worktrees/release-018`）：R16 + R24 + R25 + R26。前两次候选因 R26 所修的竞态失败，未发布任何内容；第三次候选 run42998711279 整轮通过后，经 run43005740813 发布。公开资产、更新源和旧版本已核对（[证据](docs/validation/Release-018-20261110.md)）。远端 `codex/release-018` 仍停在变基前的 `c21c8467`：强制更新被本机权限规则拦下，等用户决定更新还是删除。
+- R25 `codex/omp-ask-custom-answer`：用户 2026-11-11 反馈回答提问后整轮“失败”。原因是提问卡的“输入其他答案”在 OMP 侧被回成取消，OMP 按用户中止结束回合。已改为经运行时 `Other (type your own)` → `editor` 两步投递（`e52961dc`），测试与本地包真实窗口验证通过（[证据](docs/validation/OMP-ask-typed-answer-20261111.md)），已并入 `main`，随 0.1.8 发布。
+- R26 `codex/omp-turn-failure-late-frames`：0.1.8 两次候选都失败在 T20-D 用例。查明是 0.1.7 已有的竞态：模式切换失败后紧接的下一条消息可能没送到模型却显示完成。用户 2026-11-11 决定先修好再发；runner 已改为等待失败回合的终止帧（`f0843924`），验证通过，已并入 `main`，随 0.1.8 发布（[证据](docs/validation/OMP-turn-failure-settle-20261111.md)）。
 - 截图时发现、待处理：项目位于符号链接目录（如 `/tmp`）时“本轮改动”显示绝对路径、“审阅”行末尾多一个斜杠。
 - R21 发现的遗留问题：`test:e2e:layout` 种子依赖已禁用的 `session.import`，整套布局 E2E 在 `main` 上无法运行，需另立任务。
 - R16 `codex/omp-turn-feedback`：三项回合反馈修复，2026-11-10 变基复验通过后与 R24 一起并入本地 `main`（`d8bef50b`，未推送）（[证据](docs/validation/OMP-turn-feedback-20261026.md)）。
@@ -37,6 +37,7 @@ R17–R22 与 0.1.7 版本面（`codex/release-017`）已随 0.1.7 发布并入 
 ## 2026-11-11 用户决定
 
 1. R25（OMP 提问卡输入其他答案后整轮中止）合入 `main`，与 R16、R24 一起进 **0.1.8**。
+2. 用户试用 R25 本地包后确认“可以发布”。候选失败后，在“先发后修”和“先修好再发”中选择后者：R26 修复后随 0.1.8 发布。
 
 ## 2026-11-10 用户决定
 
@@ -75,7 +76,7 @@ R15 并入 `main` 后以 **0.1.6 正式版**发布：版本面、Cargo 与 `APP_
 
 1. 下一阶段做 R12（删除 Pi 遗留代码）；从 `main` 新建分支和工作树。
 2. R13（OMP 上游升级与 fork 精简）单独立项。
-3. R16：用户决定发布方式后，做真实窗口验收（被拒卡片位置、重试中状态、过时思考等级可发送），再并入 `main`。
+3. 远端 `codex/release-018` 停在 `c21c8467`，需要用户决定强制更新或删除。已合并的 `.worktrees/omp-turn-feedback`（R16）、`.worktrees/omp-stream-start-text`（R24）、`.worktrees/release-018`、`.worktrees/omp-turn-failure-late-frames`（R26）可清理。
 
 ## 工作约定
 

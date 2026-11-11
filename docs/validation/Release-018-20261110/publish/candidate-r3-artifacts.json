@@ -1,0 +1,58 @@
+[
+  {
+    "id": 13847745231,
+    "name": "release-darwin-arm64",
+    "size_in_bytes": 441822038,
+    "expired": false,
+    "expires_at": "2027-02-09T09:51:40Z"
+  },
+  {
+    "id": 13847653026,
+    "name": "release-darwin-x64",
+    "size_in_bytes": 457645601,
+    "expired": false,
+    "expires_at": "2027-02-09T09:51:40Z"
+  },
+  {
+    "id": 13847643121,
+    "name": "validation-darwin-x64",
+    "size_in_bytes": 2902525,
+    "expired": false,
+    "expires_at": "2027-02-09T09:51:40Z"
+  },
+  {
+    "id": 13847610684,
+    "name": "validation-win32-x64",
+    "size_in_bytes": 2757423,
+    "expired": false,
+    "expires_at": "2027-02-09T09:51:40Z"
+  },
+  {
+    "id": 13847221946,
+    "name": "validation-darwin-arm64",
+    "size_in_bytes": 2851912,
+    "expired": false,
+    "expires_at": "2027-02-09T09:51:40Z"
+  },
+  {
+    "id": 13847186842,
+    "name": "release-win32-x64",
+    "size_in_bytes": 396484815,
+    "expired": false,
+    "expires_at": "2027-02-09T09:51:40Z"
+  },
+  {
+    "id": 13846711127,
+    "name": "release-linux-x64",
+    "size_in_bytes": 639712653,
+    "expired": false,
+    "expires_at": "2027-02-09T09:51:40Z"
+  },
+  {
+    "id": 13845604343,
+    "name": "validation-linux-x64",
+    "size_in_bytes": 3491630,
+    "expired": false,
+    "expires_at": "2027-02-09T09:51:40Z"
+  }
+]

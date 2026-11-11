@@ -1,0 +1,91 @@
+{
+  "id": 441554866,
+  "tag": "v0.1.8",
+  "target_commitish": "main",
+  "draft": false,
+  "prerelease": false,
+  "published_at": "2026-11-11T10:43:36Z",
+  "latest_tag": "v0.1.8",
+  "asset_count": 28,
+  "total_bytes": 1949855534,
+  "assets_without_digest": [],
+  "pi_host_assets": [],
+  "feed_versions": {
+    "latest.yml": "0.1.8",
+    "latest-linux.yml": "0.1.8",
+    "latest-mac.yml": "0.1.8",
+    "latest-mac-arm64.yml": "0.1.8",
+    "latest-mac-x64.yml": "0.1.8"
+  },
+  "sha256sums_entries": 27,
+  "sha256sums_mismatches": [],
+  "assets_not_in_sums": [],
+  "older_releases": [
+    {
+      "tag": "v0.1.7",
+      "id": 438946026,
+      "assets": 28,
+      "unchanged": true
+    },
+    {
+      "tag": "v0.1.6",
+      "id": 422844159,
+      "assets": 28,
+      "unchanged": true
+    },
+    {
+      "tag": "v0.1.5",
+      "id": 422130570,
+      "assets": 28,
+      "unchanged": true
+    },
+    {
+      "tag": "v0.1.4+chatfix.852ca1b952ae64e0bcc660ffe89a3c0da06867d9",
+      "id": 421581255,
+      "assets": 28,
+      "unchanged": true
+    },
+    {
+      "tag": "v0.1.4",
+      "id": 419670366,
+      "assets": 28,
+      "unchanged": true
+    },
+    {
+      "tag": "v0.1.3",
+      "id": 418039584,
+      "assets": 30,
+      "unchanged": true
+    },
+    {
+      "tag": "v0.1.2+skill.05cda4fb1b680656090bd6a8953913db4118c279",
+      "id": 417222661,
+      "assets": 30,
+      "unchanged": true
+    },
+    {
+      "tag": "v0.1.2",
+      "id": 416884992,
+      "assets": 30,
+      "unchanged": true
+    },
+    {
+      "tag": "v0.1.1",
+      "id": 416604911,
+      "assets": 30,
+      "unchanged": true
+    },
+    {
+      "tag": "v0.1.0",
+      "id": 414681465,
+      "assets": 30,
+      "unchanged": true
+    },
+    {
+      "tag": "m7-test-20261015-46e7bf7",
+      "id": 413690689,
+      "assets": 15,
+      "unchanged": true
+    }
+  ]
+}

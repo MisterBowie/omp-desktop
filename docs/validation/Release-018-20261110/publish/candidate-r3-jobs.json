@@ -1,0 +1,51 @@
+[
+  {
+    "id": 130449174305,
+    "name": "guard",
+    "conclusion": "success",
+    "started_at": "2026-11-11T09:51:42Z",
+    "completed_at": "2026-11-11T09:51:55Z"
+  },
+  {
+    "id": 130449291214,
+    "name": "verify",
+    "conclusion": "success",
+    "started_at": "2026-11-11T09:51:57Z",
+    "completed_at": "2026-11-11T10:13:03Z"
+  },
+  {
+    "id": 130449291289,
+    "name": "build (macos-15, darwin, arm64, dist:mac)",
+    "conclusion": "success",
+    "started_at": "2026-11-11T09:57:00Z",
+    "completed_at": "2026-11-11T10:25:47Z"
+  },
+  {
+    "id": 130449291322,
+    "name": "build (windows-latest, win32, x64, dist:win)",
+    "conclusion": "success",
+    "started_at": "2026-11-11T09:51:57Z",
+    "completed_at": "2026-11-11T10:23:26Z"
+  },
+  {
+    "id": 130449291354,
+    "name": "build (macos-15-intel, darwin, x64, dist:mac)",
+    "conclusion": "success",
+    "started_at": "2026-11-11T09:51:59Z",
+    "completed_at": "2026-11-11T10:37:41Z"
+  },
+  {
+    "id": 130449291375,
+    "name": "build (ubuntu-22.04, linux, x64, dist:linux)",
+    "conclusion": "success",
+    "started_at": "2026-11-11T09:51:57Z",
+    "completed_at": "2026-11-11T10:15:00Z"
+  },
+  {
+    "id": 130470850498,
+    "name": "publish",
+    "conclusion": "skipped",
+    "started_at": "2026-11-11T10:37:42Z",
+    "completed_at": "2026-11-11T10:37:42Z"
+  }
+]
