@@ -398,7 +398,7 @@ const fixes: Record<ChangelogLocale, string[]> = {
 };
 
 const release = (locale: ChangelogLocale, highlights: string[], previous: string[]): readonly ChangelogEntry[] => [
-  { version: "0.1.8", date: "2026-11-10", highlights: unified018[locale] },
+  { version: "0.1.8", date: "2026-11-11", highlights: unified018[locale] },
   { version: "0.1.7", date: "2026-11-09", highlights: unified017[locale] },
   { version: "0.1.6", date: "2026-10-24", highlights: unified016[locale] },
   { version: "0.1.5", date: "2026-10-23", highlights: unified015[locale] },
