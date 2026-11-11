@@ -1,0 +1,60 @@
+[
+  {
+    "id": 130364307164,
+    "name": "guard",
+    "conclusion": "success",
+    "started_at": "2026-11-11T06:27:56Z",
+    "completed_at": "2026-11-11T06:28:06Z",
+    "failed_steps": []
+  },
+  {
+    "id": 130364380247,
+    "name": "verify",
+    "conclusion": "success",
+    "started_at": "2026-11-11T06:28:07Z",
+    "completed_at": "2026-11-11T06:54:05Z",
+    "failed_steps": []
+  },
+  {
+    "id": 130364380259,
+    "name": "build (windows-latest, win32, x64, dist:win)",
+    "conclusion": "success",
+    "started_at": "2026-11-11T06:28:08Z",
+    "completed_at": "2026-11-11T07:04:51Z",
+    "failed_steps": []
+  },
+  {
+    "id": 130364380267,
+    "name": "build (macos-15, darwin, arm64, dist:mac)",
+    "conclusion": "success",
+    "started_at": "2026-11-11T06:28:08Z",
+    "completed_at": "2026-11-11T06:45:21Z",
+    "failed_steps": []
+  },
+  {
+    "id": 130364380294,
+    "name": "build (ubuntu-22.04, linux, x64, dist:linux)",
+    "conclusion": "success",
+    "started_at": "2026-11-11T06:28:07Z",
+    "completed_at": "2026-11-11T06:50:00Z",
+    "failed_steps": []
+  },
+  {
+    "id": 130364380324,
+    "name": "build (macos-15-intel, darwin, x64, dist:mac)",
+    "conclusion": "failure",
+    "started_at": "2026-11-11T06:28:08Z",
+    "completed_at": "2026-11-11T07:04:16Z",
+    "failed_steps": [
+      "Verify packaged runtime and actual installed workflow"
+    ]
+  },
+  {
+    "id": 130377911401,
+    "name": "publish",
+    "conclusion": "skipped",
+    "started_at": "2026-11-11T07:04:52Z",
+    "completed_at": "2026-11-11T07:04:51Z",
+    "failed_steps": []
+  }
+]

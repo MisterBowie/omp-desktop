@@ -22,9 +22,9 @@ R17–R22 与 0.1.7 版本面（`codex/release-017`）已随 0.1.7 发布并入 
 
 - R23 README 截图：已完成。用 0.1.7 安装包驱动真实 OMP 会话（只有模型是本机假服务）截取审阅、审批、子智能体、插件市场四个场景的中英文截图，脚本 `app/scripts/readme-screenshots.mjs` 可重复生成（[证据](docs/validation/Release-017-20261109.md)）。
 - R24 `codex/omp-stream-start-text`：审批等待期间回复文字重复显示已修复，并入本地 `main`（[证据](docs/validation/OMP-stream-start-text-20261110.md)）。
-- **0.1.8**（`codex/release-018`，`.worktrees/release-018`）：R16 + R24 + R25。2026-11-11 变基到含 R25 的 `main`（`3ac9ef66`），更新记录增加 R25（`32fdd9fb`）。新的本地测试包 `~/Downloads/OMP-Desktop-0.1.8-arm64.dmg`（SHA-256 `edbf85a3…f880`，替换 11-10 的 `21f63a79…4a0c`）安装冒烟、R25 窗口复核与全量测试通过，等待用户用真实模型试用确认后推送候选并发布（[证据](docs/validation/Release-018-20261110.md)）。
+- **0.1.8**（`codex/release-018`，`.worktrees/release-018`）：R16 + R24 + R25 + R26。前两次远端候选因 R26 所修的竞态间歇失败，未发布任何内容。R26 并入 `main`（`a2976eb9`）后，发布分支变基并在更新记录增加 R26（`a746e7b7`）。新本地包 `~/Downloads/OMP-Desktop-0.1.8-arm64.dmg`（SHA-256 `0586b4d0…60ef`）验收通过，用户已确认发布，下一步推送新候选（[证据](docs/validation/Release-018-20261110.md)）。
 - R25 `codex/omp-ask-custom-answer`：用户 2026-11-11 反馈回答提问后整轮“失败”。原因是提问卡的“输入其他答案”在 OMP 侧被回成取消，OMP 按用户中止结束回合。已改为经运行时 `Other (type your own)` → `editor` 两步投递（`e52961dc`），测试与本地包真实窗口验证通过（[证据](docs/validation/OMP-ask-typed-answer-20261111.md)），已并入本地 `main`（`3ac9ef66`，未推送），随 0.1.8 发布。
-- R26 `codex/omp-turn-failure-late-frames`：0.1.8 两次候选都失败在 T20-D 用例。查明是 0.1.7 已有的竞态：模式切换失败后紧接的下一条消息可能没送到模型却显示完成。用户 2026-11-11 决定先修好再发；runner 已改为等待失败回合的终止帧（`f0843924`），验证通过（[证据](docs/validation/OMP-turn-failure-settle-20261111.md)）。
+- R26 `codex/omp-turn-failure-late-frames`：0.1.8 两次候选都失败在 T20-D 用例。查明是 0.1.7 已有的竞态：模式切换失败后紧接的下一条消息可能没送到模型却显示完成。用户 2026-11-11 决定先修好再发；runner 已改为等待失败回合的终止帧（`f0843924`），验证通过，已并入本地 `main`（`a2976eb9`，未推送），随 0.1.8 发布（[证据](docs/validation/OMP-turn-failure-settle-20261111.md)）。
 - 截图时发现、待处理：项目位于符号链接目录（如 `/tmp`）时“本轮改动”显示绝对路径、“审阅”行末尾多一个斜杠。
 - R21 发现的遗留问题：`test:e2e:layout` 种子依赖已禁用的 `session.import`，整套布局 E2E 在 `main` 上无法运行，需另立任务。
 - R16 `codex/omp-turn-feedback`：三项回合反馈修复，2026-11-10 变基复验通过后与 R24 一起并入本地 `main`（`d8bef50b`，未推送）（[证据](docs/validation/OMP-turn-feedback-20261026.md)）。

@@ -1,0 +1,1134 @@
+[
+  {
+    "target": "darwin-arm64",
+    "runtimeReportValid": true,
+    "runtimeGetState": true,
+    "smokeReportExists": true,
+    "cleaned": true,
+    "orderedQuit": true,
+    "completedChecks": 8,
+    "steps": {
+      "project": true,
+      "deny": true,
+      "allowOnce": true,
+      "projectTest": true,
+      "stopTree": true,
+      "recoveryNoReplay": true,
+      "freshTurn": true,
+      "defaultIsolation": true
+    },
+    "progress": "ready",
+    "errorClasses": [],
+    "normalQuits": 2,
+    "failureSource": [],
+    "diagnosticCodes": [],
+    "strict": {
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0
+    },
+    "failedStrictNumbers": [],
+    "strictFailures": [],
+    "memory": {
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "failures": [],
+      "stages": [
+        {
+          "stage": "start-1",
+          "event": "begin",
+          "elapsedMs": 5
+        },
+        {
+          "stage": "start-1",
+          "event": "end",
+          "elapsedMs": 666
+        },
+        {
+          "stage": "prompt-1",
+          "event": "begin",
+          "elapsedMs": 723
+        },
+        {
+          "stage": "prompt-1",
+          "event": "end",
+          "elapsedMs": 768
+        },
+        {
+          "stage": "prompt-2",
+          "event": "begin",
+          "elapsedMs": 768
+        },
+        {
+          "stage": "prompt-2",
+          "event": "end",
+          "elapsedMs": 775
+        },
+        {
+          "stage": "prompt-3",
+          "event": "begin",
+          "elapsedMs": 775
+        },
+        {
+          "stage": "prompt-3",
+          "event": "end",
+          "elapsedMs": 781
+        },
+        {
+          "stage": "prompt-4",
+          "event": "begin",
+          "elapsedMs": 782
+        },
+        {
+          "stage": "prompt-4",
+          "event": "end",
+          "elapsedMs": 788
+        },
+        {
+          "stage": "stop-1",
+          "event": "begin",
+          "elapsedMs": 790
+        },
+        {
+          "stage": "stop-1",
+          "event": "end",
+          "elapsedMs": 1823
+        },
+        {
+          "stage": "start-2",
+          "event": "begin",
+          "elapsedMs": 1823
+        },
+        {
+          "stage": "start-2",
+          "event": "end",
+          "elapsedMs": 2479
+        },
+        {
+          "stage": "prompt-5",
+          "event": "begin",
+          "elapsedMs": 2494
+        },
+        {
+          "stage": "prompt-5",
+          "event": "end",
+          "elapsedMs": 2538
+        },
+        {
+          "stage": "stop-2",
+          "event": "begin",
+          "elapsedMs": 2538
+        },
+        {
+          "stage": "stop-2",
+          "event": "end",
+          "elapsedMs": 3569
+        },
+        {
+          "stage": "start-3",
+          "event": "begin",
+          "elapsedMs": 3569
+        },
+        {
+          "stage": "start-3",
+          "event": "end",
+          "elapsedMs": 4217
+        },
+        {
+          "stage": "prompt-6",
+          "event": "begin",
+          "elapsedMs": 4219
+        },
+        {
+          "stage": "prompt-6",
+          "event": "end",
+          "elapsedMs": 4256
+        },
+        {
+          "stage": "stop-3",
+          "event": "begin",
+          "elapsedMs": 4257
+        },
+        {
+          "stage": "stop-3",
+          "event": "end",
+          "elapsedMs": 5293
+        },
+        {
+          "stage": "start-4",
+          "event": "begin",
+          "elapsedMs": 5293
+        },
+        {
+          "stage": "start-4",
+          "event": "end",
+          "elapsedMs": 5953
+        },
+        {
+          "stage": "stop-4",
+          "event": "begin",
+          "elapsedMs": 5971
+        },
+        {
+          "stage": "stop-4",
+          "event": "end",
+          "elapsedMs": 7000
+        },
+        {
+          "stage": "start-5",
+          "event": "begin",
+          "elapsedMs": 7000
+        },
+        {
+          "stage": "start-5",
+          "event": "end",
+          "elapsedMs": 7649
+        },
+        {
+          "stage": "stop-5",
+          "event": "begin",
+          "elapsedMs": 7653
+        },
+        {
+          "stage": "stop-5",
+          "event": "end",
+          "elapsedMs": 8685
+        },
+        {
+          "stage": "start-6",
+          "event": "begin",
+          "elapsedMs": 8685
+        },
+        {
+          "stage": "start-6",
+          "event": "end",
+          "elapsedMs": 9373
+        },
+        {
+          "stage": "prompt-7",
+          "event": "begin",
+          "elapsedMs": 9376
+        },
+        {
+          "stage": "prompt-7",
+          "event": "end",
+          "elapsedMs": 9428
+        },
+        {
+          "stage": "stop-6",
+          "event": "begin",
+          "elapsedMs": 9429
+        },
+        {
+          "stage": "stop-6",
+          "event": "end",
+          "elapsedMs": 10459
+        },
+        {
+          "stage": "settings",
+          "event": "begin",
+          "elapsedMs": 10459
+        },
+        {
+          "stage": "settings",
+          "event": "end",
+          "elapsedMs": 12143
+        },
+        {
+          "stage": "list",
+          "event": "begin",
+          "elapsedMs": 12144
+        },
+        {
+          "stage": "list",
+          "event": "end",
+          "elapsedMs": 14061
+        },
+        {
+          "stage": "search",
+          "event": "begin",
+          "elapsedMs": 14061
+        },
+        {
+          "stage": "search",
+          "event": "end",
+          "elapsedMs": 15762
+        },
+        {
+          "stage": "clear",
+          "event": "begin",
+          "elapsedMs": 15762
+        },
+        {
+          "stage": "clear",
+          "event": "end",
+          "elapsedMs": 17479
+        },
+        {
+          "stage": "empty",
+          "event": "begin",
+          "elapsedMs": 17479
+        },
+        {
+          "stage": "empty",
+          "event": "end",
+          "elapsedMs": 19186
+        },
+        {
+          "stage": "stop-1",
+          "event": "begin",
+          "elapsedMs": 19187
+        },
+        {
+          "stage": "stop-1",
+          "event": "end",
+          "elapsedMs": 19187
+        },
+        {
+          "stage": "stop-2",
+          "event": "begin",
+          "elapsedMs": 19187
+        },
+        {
+          "stage": "stop-2",
+          "event": "end",
+          "elapsedMs": 19187
+        },
+        {
+          "stage": "stop-3",
+          "event": "begin",
+          "elapsedMs": 19187
+        },
+        {
+          "stage": "stop-3",
+          "event": "end",
+          "elapsedMs": 19187
+        },
+        {
+          "stage": "stop-4",
+          "event": "begin",
+          "elapsedMs": 19187
+        },
+        {
+          "stage": "stop-4",
+          "event": "end",
+          "elapsedMs": 19187
+        },
+        {
+          "stage": "stop-5",
+          "event": "begin",
+          "elapsedMs": 19187
+        },
+        {
+          "stage": "stop-5",
+          "event": "end",
+          "elapsedMs": 19187
+        },
+        {
+          "stage": "stop-6",
+          "event": "begin",
+          "elapsedMs": 19187
+        },
+        {
+          "stage": "stop-6",
+          "event": "end",
+          "elapsedMs": 19187
+        }
+      ],
+      "nativePresent": true,
+      "nativePassed": true,
+      "nativeSource": [],
+      "nativeErrors": [],
+      "nativeTimeout": false,
+      "nativePhase": "management-clear",
+      "uiPresent": true,
+      "uiProbePresent": true,
+      "uiPassed": true,
+      "uiRestart": true,
+      "uiErrors": []
+    },
+    "memoryUi": {
+      "ok": true,
+      "restart": true
+    }
+  },
+  {
+    "target": "darwin-x64",
+    "runtimeReportValid": true,
+    "runtimeGetState": true,
+    "smokeReportExists": false,
+    "cleaned": false,
+    "orderedQuit": false,
+    "completedChecks": 0,
+    "steps": {
+      "project": false,
+      "deny": false,
+      "allowOnce": false,
+      "projectTest": false,
+      "stopTree": false,
+      "recoveryNoReplay": false,
+      "freshTurn": false,
+      "defaultIsolation": false
+    },
+    "progress": "UNKNOWN",
+    "errorClasses": [],
+    "normalQuits": 0,
+    "failureSource": [],
+    "diagnosticCodes": [],
+    "strict": {
+      "tests": 15,
+      "pass": 14,
+      "fail": 1,
+      "skipped": 0
+    },
+    "failedStrictNumbers": [
+      12
+    ],
+    "strictFailures": [
+      {
+        "number": 12,
+        "approvalInTimeline": false,
+        "noReportedErrors": false,
+        "source": [],
+        "diagnosticCodes": [
+          "ERR_ASSERTION"
+        ],
+        "failureType": "testCodeFailure",
+        "code": "ERR_ASSERTION",
+        "lines": [
+          {
+            "line": 1790,
+            "column": 1
+          },
+          {
+            "line": 1869,
+            "column": 12
+          }
+        ],
+        "expected": true,
+        "actual": false
+      }
+    ]
+  },
+  {
+    "target": "win32-x64",
+    "runtimeReportValid": true,
+    "runtimeGetState": true,
+    "smokeReportExists": true,
+    "cleaned": true,
+    "orderedQuit": true,
+    "completedChecks": 8,
+    "steps": {
+      "project": true,
+      "deny": true,
+      "allowOnce": true,
+      "projectTest": true,
+      "stopTree": true,
+      "recoveryNoReplay": true,
+      "freshTurn": true,
+      "defaultIsolation": true
+    },
+    "progress": "ready",
+    "errorClasses": [],
+    "normalQuits": 2,
+    "failureSource": [],
+    "diagnosticCodes": [],
+    "processCleanup": {
+      "lastSnapshot": "cleanup-before",
+      "survivorCount": 0,
+      "processes": [],
+      "controls": []
+    },
+    "strict": {
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0
+    },
+    "failedStrictNumbers": [],
+    "strictFailures": [],
+    "memory": {
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "failures": [],
+      "stages": [
+        {
+          "stage": "start-1",
+          "event": "begin",
+          "elapsedMs": 14
+        },
+        {
+          "stage": "start-1",
+          "event": "end",
+          "elapsedMs": 3958
+        },
+        {
+          "stage": "prompt-1",
+          "event": "begin",
+          "elapsedMs": 3962
+        },
+        {
+          "stage": "prompt-1",
+          "event": "end",
+          "elapsedMs": 4026
+        },
+        {
+          "stage": "prompt-2",
+          "event": "begin",
+          "elapsedMs": 4026
+        },
+        {
+          "stage": "prompt-2",
+          "event": "end",
+          "elapsedMs": 4041
+        },
+        {
+          "stage": "prompt-3",
+          "event": "begin",
+          "elapsedMs": 4041
+        },
+        {
+          "stage": "prompt-3",
+          "event": "end",
+          "elapsedMs": 4079
+        },
+        {
+          "stage": "prompt-4",
+          "event": "begin",
+          "elapsedMs": 4079
+        },
+        {
+          "stage": "prompt-4",
+          "event": "end",
+          "elapsedMs": 4092
+        },
+        {
+          "stage": "stop-1",
+          "event": "begin",
+          "elapsedMs": 4112
+        },
+        {
+          "stage": "stop-1",
+          "event": "end",
+          "elapsedMs": 5276
+        },
+        {
+          "stage": "start-2",
+          "event": "begin",
+          "elapsedMs": 5276
+        },
+        {
+          "stage": "start-2",
+          "event": "end",
+          "elapsedMs": 7980
+        },
+        {
+          "stage": "prompt-5",
+          "event": "begin",
+          "elapsedMs": 7987
+        },
+        {
+          "stage": "prompt-5",
+          "event": "end",
+          "elapsedMs": 8076
+        },
+        {
+          "stage": "stop-2",
+          "event": "begin",
+          "elapsedMs": 8077
+        },
+        {
+          "stage": "stop-2",
+          "event": "end",
+          "elapsedMs": 9329
+        },
+        {
+          "stage": "start-3",
+          "event": "begin",
+          "elapsedMs": 9329
+        },
+        {
+          "stage": "start-3",
+          "event": "end",
+          "elapsedMs": 13360
+        },
+        {
+          "stage": "prompt-6",
+          "event": "begin",
+          "elapsedMs": 13368
+        },
+        {
+          "stage": "prompt-6",
+          "event": "end",
+          "elapsedMs": 13419
+        },
+        {
+          "stage": "stop-3",
+          "event": "begin",
+          "elapsedMs": 13420
+        },
+        {
+          "stage": "stop-3",
+          "event": "end",
+          "elapsedMs": 14598
+        },
+        {
+          "stage": "start-4",
+          "event": "begin",
+          "elapsedMs": 14598
+        },
+        {
+          "stage": "start-4",
+          "event": "end",
+          "elapsedMs": 17308
+        },
+        {
+          "stage": "stop-4",
+          "event": "begin",
+          "elapsedMs": 17312
+        },
+        {
+          "stage": "stop-4",
+          "event": "end",
+          "elapsedMs": 18453
+        },
+        {
+          "stage": "start-5",
+          "event": "begin",
+          "elapsedMs": 18453
+        },
+        {
+          "stage": "start-5",
+          "event": "end",
+          "elapsedMs": 22152
+        },
+        {
+          "stage": "stop-5",
+          "event": "begin",
+          "elapsedMs": 22159
+        },
+        {
+          "stage": "stop-5",
+          "event": "end",
+          "elapsedMs": 23428
+        },
+        {
+          "stage": "start-6",
+          "event": "begin",
+          "elapsedMs": 23428
+        },
+        {
+          "stage": "start-6",
+          "event": "end",
+          "elapsedMs": 26158
+        },
+        {
+          "stage": "prompt-7",
+          "event": "begin",
+          "elapsedMs": 26165
+        },
+        {
+          "stage": "prompt-7",
+          "event": "end",
+          "elapsedMs": 26268
+        },
+        {
+          "stage": "stop-6",
+          "event": "begin",
+          "elapsedMs": 26269
+        },
+        {
+          "stage": "stop-6",
+          "event": "end",
+          "elapsedMs": 27404
+        },
+        {
+          "stage": "settings",
+          "event": "begin",
+          "elapsedMs": 27404
+        },
+        {
+          "stage": "settings",
+          "event": "end",
+          "elapsedMs": 32666
+        },
+        {
+          "stage": "list",
+          "event": "begin",
+          "elapsedMs": 32667
+        },
+        {
+          "stage": "list",
+          "event": "end",
+          "elapsedMs": 36674
+        },
+        {
+          "stage": "search",
+          "event": "begin",
+          "elapsedMs": 36674
+        },
+        {
+          "stage": "search",
+          "event": "end",
+          "elapsedMs": 40712
+        },
+        {
+          "stage": "clear",
+          "event": "begin",
+          "elapsedMs": 40712
+        },
+        {
+          "stage": "clear",
+          "event": "end",
+          "elapsedMs": 46077
+        },
+        {
+          "stage": "empty",
+          "event": "begin",
+          "elapsedMs": 46077
+        },
+        {
+          "stage": "empty",
+          "event": "end",
+          "elapsedMs": 50381
+        },
+        {
+          "stage": "stop-1",
+          "event": "begin",
+          "elapsedMs": 50382
+        },
+        {
+          "stage": "stop-1",
+          "event": "end",
+          "elapsedMs": 50382
+        },
+        {
+          "stage": "stop-2",
+          "event": "begin",
+          "elapsedMs": 50382
+        },
+        {
+          "stage": "stop-2",
+          "event": "end",
+          "elapsedMs": 50382
+        },
+        {
+          "stage": "stop-3",
+          "event": "begin",
+          "elapsedMs": 50382
+        },
+        {
+          "stage": "stop-3",
+          "event": "end",
+          "elapsedMs": 50382
+        },
+        {
+          "stage": "stop-4",
+          "event": "begin",
+          "elapsedMs": 50382
+        },
+        {
+          "stage": "stop-4",
+          "event": "end",
+          "elapsedMs": 50382
+        },
+        {
+          "stage": "stop-5",
+          "event": "begin",
+          "elapsedMs": 50382
+        },
+        {
+          "stage": "stop-5",
+          "event": "end",
+          "elapsedMs": 50382
+        },
+        {
+          "stage": "stop-6",
+          "event": "begin",
+          "elapsedMs": 50382
+        },
+        {
+          "stage": "stop-6",
+          "event": "end",
+          "elapsedMs": 50382
+        }
+      ],
+      "nativePresent": true,
+      "nativePassed": true,
+      "nativeSource": [],
+      "nativeErrors": [],
+      "nativeTimeout": false,
+      "nativePhase": "management-clear",
+      "uiPresent": true,
+      "uiProbePresent": true,
+      "uiPassed": true,
+      "uiRestart": true,
+      "uiErrors": []
+    },
+    "memoryUi": {
+      "ok": true,
+      "restart": true
+    }
+  },
+  {
+    "target": "linux-x64",
+    "runtimeReportValid": true,
+    "runtimeGetState": true,
+    "smokeReportExists": true,
+    "cleaned": true,
+    "orderedQuit": true,
+    "completedChecks": 8,
+    "steps": {
+      "project": true,
+      "deny": true,
+      "allowOnce": true,
+      "projectTest": true,
+      "stopTree": true,
+      "recoveryNoReplay": true,
+      "freshTurn": true,
+      "defaultIsolation": true
+    },
+    "progress": "ready",
+    "errorClasses": [],
+    "normalQuits": 2,
+    "failureSource": [],
+    "diagnosticCodes": [],
+    "strict": {
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0
+    },
+    "failedStrictNumbers": [],
+    "strictFailures": [],
+    "memory": {
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "failures": [],
+      "stages": [
+        {
+          "stage": "start-1",
+          "event": "begin",
+          "elapsedMs": 6
+        },
+        {
+          "stage": "start-1",
+          "event": "end",
+          "elapsedMs": 1209
+        },
+        {
+          "stage": "prompt-1",
+          "event": "begin",
+          "elapsedMs": 1229
+        },
+        {
+          "stage": "prompt-1",
+          "event": "end",
+          "elapsedMs": 1275
+        },
+        {
+          "stage": "prompt-2",
+          "event": "begin",
+          "elapsedMs": 1275
+        },
+        {
+          "stage": "prompt-2",
+          "event": "end",
+          "elapsedMs": 1286
+        },
+        {
+          "stage": "prompt-3",
+          "event": "begin",
+          "elapsedMs": 1286
+        },
+        {
+          "stage": "prompt-3",
+          "event": "end",
+          "elapsedMs": 1297
+        },
+        {
+          "stage": "prompt-4",
+          "event": "begin",
+          "elapsedMs": 1297
+        },
+        {
+          "stage": "prompt-4",
+          "event": "end",
+          "elapsedMs": 1508
+        },
+        {
+          "stage": "stop-1",
+          "event": "begin",
+          "elapsedMs": 1513
+        },
+        {
+          "stage": "stop-1",
+          "event": "end",
+          "elapsedMs": 2620
+        },
+        {
+          "stage": "start-2",
+          "event": "begin",
+          "elapsedMs": 2620
+        },
+        {
+          "stage": "start-2",
+          "event": "end",
+          "elapsedMs": 3781
+        },
+        {
+          "stage": "prompt-5",
+          "event": "begin",
+          "elapsedMs": 3796
+        },
+        {
+          "stage": "prompt-5",
+          "event": "end",
+          "elapsedMs": 3852
+        },
+        {
+          "stage": "stop-2",
+          "event": "begin",
+          "elapsedMs": 3852
+        },
+        {
+          "stage": "stop-2",
+          "event": "end",
+          "elapsedMs": 5177
+        },
+        {
+          "stage": "start-3",
+          "event": "begin",
+          "elapsedMs": 5177
+        },
+        {
+          "stage": "start-3",
+          "event": "end",
+          "elapsedMs": 6388
+        },
+        {
+          "stage": "prompt-6",
+          "event": "begin",
+          "elapsedMs": 6391
+        },
+        {
+          "stage": "prompt-6",
+          "event": "end",
+          "elapsedMs": 6436
+        },
+        {
+          "stage": "stop-3",
+          "event": "begin",
+          "elapsedMs": 6455
+        },
+        {
+          "stage": "stop-3",
+          "event": "end",
+          "elapsedMs": 7557
+        },
+        {
+          "stage": "start-4",
+          "event": "begin",
+          "elapsedMs": 7557
+        },
+        {
+          "stage": "start-4",
+          "event": "end",
+          "elapsedMs": 8680
+        },
+        {
+          "stage": "stop-4",
+          "event": "begin",
+          "elapsedMs": 8706
+        },
+        {
+          "stage": "stop-4",
+          "event": "end",
+          "elapsedMs": 9809
+        },
+        {
+          "stage": "start-5",
+          "event": "begin",
+          "elapsedMs": 9810
+        },
+        {
+          "stage": "start-5",
+          "event": "end",
+          "elapsedMs": 11059
+        },
+        {
+          "stage": "stop-5",
+          "event": "begin",
+          "elapsedMs": 11065
+        },
+        {
+          "stage": "stop-5",
+          "event": "end",
+          "elapsedMs": 12177
+        },
+        {
+          "stage": "start-6",
+          "event": "begin",
+          "elapsedMs": 12177
+        },
+        {
+          "stage": "start-6",
+          "event": "end",
+          "elapsedMs": 13521
+        },
+        {
+          "stage": "prompt-7",
+          "event": "begin",
+          "elapsedMs": 13535
+        },
+        {
+          "stage": "prompt-7",
+          "event": "end",
+          "elapsedMs": 13579
+        },
+        {
+          "stage": "stop-6",
+          "event": "begin",
+          "elapsedMs": 13580
+        },
+        {
+          "stage": "stop-6",
+          "event": "end",
+          "elapsedMs": 14711
+        },
+        {
+          "stage": "settings",
+          "event": "begin",
+          "elapsedMs": 14712
+        },
+        {
+          "stage": "settings",
+          "event": "end",
+          "elapsedMs": 17311
+        },
+        {
+          "stage": "list",
+          "event": "begin",
+          "elapsedMs": 17312
+        },
+        {
+          "stage": "list",
+          "event": "end",
+          "elapsedMs": 19907
+        },
+        {
+          "stage": "search",
+          "event": "begin",
+          "elapsedMs": 19907
+        },
+        {
+          "stage": "search",
+          "event": "end",
+          "elapsedMs": 22546
+        },
+        {
+          "stage": "clear",
+          "event": "begin",
+          "elapsedMs": 22546
+        },
+        {
+          "stage": "clear",
+          "event": "end",
+          "elapsedMs": 24951
+        },
+        {
+          "stage": "empty",
+          "event": "begin",
+          "elapsedMs": 24952
+        },
+        {
+          "stage": "empty",
+          "event": "end",
+          "elapsedMs": 27183
+        },
+        {
+          "stage": "stop-1",
+          "event": "begin",
+          "elapsedMs": 27184
+        },
+        {
+          "stage": "stop-1",
+          "event": "end",
+          "elapsedMs": 27184
+        },
+        {
+          "stage": "stop-2",
+          "event": "begin",
+          "elapsedMs": 27184
+        },
+        {
+          "stage": "stop-2",
+          "event": "end",
+          "elapsedMs": 27184
+        },
+        {
+          "stage": "stop-3",
+          "event": "begin",
+          "elapsedMs": 27184
+        },
+        {
+          "stage": "stop-3",
+          "event": "end",
+          "elapsedMs": 27184
+        },
+        {
+          "stage": "stop-4",
+          "event": "begin",
+          "elapsedMs": 27184
+        },
+        {
+          "stage": "stop-4",
+          "event": "end",
+          "elapsedMs": 27184
+        },
+        {
+          "stage": "stop-5",
+          "event": "begin",
+          "elapsedMs": 27184
+        },
+        {
+          "stage": "stop-5",
+          "event": "end",
+          "elapsedMs": 27184
+        },
+        {
+          "stage": "stop-6",
+          "event": "begin",
+          "elapsedMs": 27184
+        },
+        {
+          "stage": "stop-6",
+          "event": "end",
+          "elapsedMs": 27184
+        }
+      ],
+      "nativePresent": true,
+      "nativePassed": true,
+      "nativeSource": [],
+      "nativeErrors": [],
+      "nativeTimeout": false,
+      "nativePhase": "management-clear",
+      "uiPresent": true,
+      "uiProbePresent": true,
+      "uiPassed": true,
+      "uiRestart": true,
+      "uiErrors": []
+    },
+    "memoryUi": {
+      "ok": true,
+      "restart": true
+    }
+  }
+]

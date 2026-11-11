@@ -1,0 +1,1387 @@
+{
+  "externalBoundary": "loopback FakeProvider only",
+  "nativeFolderChooserCovered": false,
+  "checks": [
+    "project and OMP session created through public preload IPC, selected through sidebar",
+    "denied write preserved exact original bytes",
+    "allow-once performed the real write after approval",
+    "real project executable passed and its tool result reached the provider",
+    "Composer Stop ended the running turn and reaped all three observed external processes",
+    "same installed profile recovered identical native history without model/tool replay",
+    "a fresh turn completed after recovery",
+    "default .omp-desktop data root selected without a data override; existing PI/OMP fixtures unchanged and not imported"
+  ],
+  "steps": {
+    "project": true,
+    "deny": true,
+    "allowOnce": true,
+    "projectTest": true,
+    "stopTree": true,
+    "recoveryNoReplay": true,
+    "freshTurn": true,
+    "defaultIsolation": true
+  },
+  "sessionId": "58521ed9-45ab-4830-9147-523d576a9f71",
+  "projectTest": {
+    "answer": 42,
+    "cwd": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/workspace 中文 with spaces 'quoted'",
+    "home": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/home/.omp-desktop/omp-runtime/run-53lBsr/home",
+    "PATH": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/home/.bun/bin:/usr/local/bin:/usr/bin:/bin",
+    "USERPROFILE": null
+  },
+  "longTree": [
+    {
+      "pid": 94989,
+      "ppid": 94709,
+      "level": 0,
+      "starttime": "1794389792.448642",
+      "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/project-tools/project-node"
+    },
+    {
+      "pid": 94990,
+      "ppid": 94989,
+      "level": 1,
+      "starttime": "1794389792.500125",
+      "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/project-tools/project-node"
+    },
+    {
+      "pid": 94991,
+      "ppid": 94990,
+      "level": 2,
+      "starttime": "1794389792.526257",
+      "exe": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/project-tools/project-node"
+    }
+  ],
+  "beforeRestart": {
+    "file": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/home/.omp-desktop/omp-sessions/2026-11-11T09-36-30-037Z_01a1c9f7-4d55-708b-a979-4492ddb2e5be.jsonl",
+    "bytes": 11569,
+    "sha256": "07bdeb43b69e12a88d3b7f83d894559769b4e602f7896d3d097eaa6009f9c10b",
+    "messages": [
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:ff8a1dde",
+        "role": "user",
+        "createdAt": "2026-11-11T09:36:30.067Z",
+        "status": "complete",
+        "content": "INSTALLED_DENY Fix answer.mjs to return 42."
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:158cdc6b",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:30.099Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 6,
+        "content": ""
+      },
+      {
+        "id": "call_fake_1_0",
+        "role": "tool",
+        "createdAt": "2026-11-11T09:36:30.321Z",
+        "toolCallId": "call_fake_1_0",
+        "toolName": "write",
+        "toolStatus": "error",
+        "isError": true,
+        "status": "complete",
+        "content": "",
+        "toolResult": {
+          "content": [
+            {
+              "type": "text",
+              "text": "denied by user (Deny)"
+            }
+          ],
+          "details": {}
+        }
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:4d34fc70",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:30.347Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 3,
+        "content": "INSTALLED_DENIED_DONE"
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:9496e293",
+        "role": "user",
+        "createdAt": "2026-11-11T09:36:30.667Z",
+        "status": "complete",
+        "content": "INSTALLED_ALLOW Fix answer.mjs to return 42."
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:65a8b3ce",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:30.691Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 2,
+        "content": ""
+      },
+      {
+        "id": "call_fake_3_0",
+        "role": "tool",
+        "createdAt": "2026-11-11T09:36:30.777Z",
+        "toolCallId": "call_fake_3_0",
+        "toolName": "write",
+        "toolStatus": "success",
+        "isError": false,
+        "status": "complete",
+        "content": "",
+        "toolResult": {
+          "content": [
+            {
+              "type": "text",
+              "text": "[answer.mjs#392A]\nSuccessfully wrote 32 bytes to answer.mjs"
+            }
+          ],
+          "details": {
+            "resolvedPath": "/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/workspace 中文 with spaces 'quoted'/answer.mjs"
+          }
+        }
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:fdf4d301",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:30.808Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 2,
+        "content": "INSTALLED_ALLOWED_DONE"
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:2847dd0d",
+        "role": "user",
+        "createdAt": "2026-11-11T09:36:31.060Z",
+        "status": "complete",
+        "content": "INSTALLED_TEST Run the project check."
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:d3a30d7b",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:31.085Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 2,
+        "content": ""
+      },
+      {
+        "id": "call_fake_5_0",
+        "role": "tool",
+        "createdAt": "2026-11-11T09:36:32.155Z",
+        "toolCallId": "call_fake_5_0",
+        "toolName": "bash",
+        "toolStatus": "success",
+        "isError": false,
+        "status": "complete",
+        "content": "",
+        "toolResult": {
+          "content": [
+            {
+              "type": "text",
+              "text": "INSTALLED_PROJECT_TEST_PASSED\n\n\nWall time: 0.99 seconds"
+            }
+          ],
+          "details": {
+            "timeoutSeconds": 600,
+            "wallTimeMs": 989.930875
+          }
+        }
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:710b7698",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:32.179Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 2,
+        "content": "INSTALLED_TEST_DONE"
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:18dac621",
+        "role": "user",
+        "createdAt": "2026-11-11T09:36:32.345Z",
+        "status": "complete",
+        "content": "INSTALLED_STOP Start the long process tree."
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:2a7582cf",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:32.369Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 2,
+        "content": ""
+      },
+      {
+        "id": "call_fake_7_0",
+        "role": "tool",
+        "createdAt": "2026-11-11T09:36:32.930Z",
+        "toolCallId": "call_fake_7_0",
+        "toolName": "bash",
+        "toolStatus": "error",
+        "isError": true,
+        "status": "complete",
+        "content": "",
+        "toolResult": {
+          "content": [
+            {
+              "type": "text",
+              "text": "Command aborted"
+            }
+          ],
+          "details": {}
+        }
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:798759d5",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:32.955Z",
+        "status": "aborted",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "content": ""
+      }
+    ],
+    "writeCalls": [
+      {
+        "id": "call_fake_1_0",
+        "name": "write"
+      },
+      {
+        "id": "call_fake_3_0",
+        "name": "write"
+      }
+    ],
+    "writeResults": [
+      {
+        "toolCallId": "call_fake_1_0",
+        "isError": true
+      },
+      {
+        "toolCallId": "call_fake_3_0",
+        "isError": false
+      }
+    ]
+  },
+  "afterQuit": {
+    "file": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/home/.omp-desktop/omp-sessions/2026-11-11T09-36-30-037Z_01a1c9f7-4d55-708b-a979-4492ddb2e5be.jsonl",
+    "bytes": 11776,
+    "sha256": "81c4bb18f49f90a227a7e4f7bda9928a82a8edc9580b6b3c3a6eecd5d4144286",
+    "messages": [
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:ff8a1dde",
+        "role": "user",
+        "createdAt": "2026-11-11T09:36:30.067Z",
+        "status": "complete",
+        "content": "INSTALLED_DENY Fix answer.mjs to return 42."
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:158cdc6b",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:30.099Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 6,
+        "content": ""
+      },
+      {
+        "id": "call_fake_1_0",
+        "role": "tool",
+        "createdAt": "2026-11-11T09:36:30.321Z",
+        "toolCallId": "call_fake_1_0",
+        "toolName": "write",
+        "toolStatus": "error",
+        "isError": true,
+        "status": "complete",
+        "content": "",
+        "toolResult": {
+          "content": [
+            {
+              "type": "text",
+              "text": "denied by user (Deny)"
+            }
+          ],
+          "details": {}
+        }
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:4d34fc70",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:30.347Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 3,
+        "content": "INSTALLED_DENIED_DONE"
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:9496e293",
+        "role": "user",
+        "createdAt": "2026-11-11T09:36:30.667Z",
+        "status": "complete",
+        "content": "INSTALLED_ALLOW Fix answer.mjs to return 42."
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:65a8b3ce",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:30.691Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 2,
+        "content": ""
+      },
+      {
+        "id": "call_fake_3_0",
+        "role": "tool",
+        "createdAt": "2026-11-11T09:36:30.777Z",
+        "toolCallId": "call_fake_3_0",
+        "toolName": "write",
+        "toolStatus": "success",
+        "isError": false,
+        "status": "complete",
+        "content": "",
+        "toolResult": {
+          "content": [
+            {
+              "type": "text",
+              "text": "[answer.mjs#392A]\nSuccessfully wrote 32 bytes to answer.mjs"
+            }
+          ],
+          "details": {
+            "resolvedPath": "/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/workspace 中文 with spaces 'quoted'/answer.mjs"
+          }
+        }
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:fdf4d301",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:30.808Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 2,
+        "content": "INSTALLED_ALLOWED_DONE"
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:2847dd0d",
+        "role": "user",
+        "createdAt": "2026-11-11T09:36:31.060Z",
+        "status": "complete",
+        "content": "INSTALLED_TEST Run the project check."
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:d3a30d7b",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:31.085Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 2,
+        "content": ""
+      },
+      {
+        "id": "call_fake_5_0",
+        "role": "tool",
+        "createdAt": "2026-11-11T09:36:32.155Z",
+        "toolCallId": "call_fake_5_0",
+        "toolName": "bash",
+        "toolStatus": "success",
+        "isError": false,
+        "status": "complete",
+        "content": "",
+        "toolResult": {
+          "content": [
+            {
+              "type": "text",
+              "text": "INSTALLED_PROJECT_TEST_PASSED\n\n\nWall time: 0.99 seconds"
+            }
+          ],
+          "details": {
+            "timeoutSeconds": 600,
+            "wallTimeMs": 989.930875
+          }
+        }
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:710b7698",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:32.179Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 2,
+        "content": "INSTALLED_TEST_DONE"
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:18dac621",
+        "role": "user",
+        "createdAt": "2026-11-11T09:36:32.345Z",
+        "status": "complete",
+        "content": "INSTALLED_STOP Start the long process tree."
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:2a7582cf",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:32.369Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 2,
+        "content": ""
+      },
+      {
+        "id": "call_fake_7_0",
+        "role": "tool",
+        "createdAt": "2026-11-11T09:36:32.930Z",
+        "toolCallId": "call_fake_7_0",
+        "toolName": "bash",
+        "toolStatus": "error",
+        "isError": true,
+        "status": "complete",
+        "content": "",
+        "toolResult": {
+          "content": [
+            {
+              "type": "text",
+              "text": "Command aborted"
+            }
+          ],
+          "details": {}
+        }
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:798759d5",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:32.955Z",
+        "status": "aborted",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "content": ""
+      }
+    ],
+    "writeCalls": [
+      {
+        "id": "call_fake_1_0",
+        "name": "write"
+      },
+      {
+        "id": "call_fake_3_0",
+        "name": "write"
+      }
+    ],
+    "writeResults": [
+      {
+        "toolCallId": "call_fake_1_0",
+        "isError": true
+      },
+      {
+        "toolCallId": "call_fake_3_0",
+        "isError": false
+      }
+    ]
+  },
+  "exitRecords": [
+    {
+      "type": "custom",
+      "customType": "session_exit",
+      "data": {
+        "reason": "dispose",
+        "kind": "normal",
+        "recordedAt": "2026-11-11T09:36:34.708Z"
+      },
+      "id": "b8a89abc",
+      "parentId": "798759d5",
+      "timestamp": "2026-11-11T09:36:34.708Z"
+    }
+  ],
+  "afterRestart": {
+    "file": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/home/.omp-desktop/omp-sessions/2026-11-11T09-36-30-037Z_01a1c9f7-4d55-708b-a979-4492ddb2e5be.jsonl",
+    "bytes": 11776,
+    "sha256": "81c4bb18f49f90a227a7e4f7bda9928a82a8edc9580b6b3c3a6eecd5d4144286",
+    "messages": [
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:ff8a1dde",
+        "role": "user",
+        "createdAt": "2026-11-11T09:36:30.067Z",
+        "status": "complete",
+        "content": "INSTALLED_DENY Fix answer.mjs to return 42."
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:158cdc6b",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:30.099Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 6,
+        "content": ""
+      },
+      {
+        "id": "call_fake_1_0",
+        "role": "tool",
+        "createdAt": "2026-11-11T09:36:30.321Z",
+        "toolCallId": "call_fake_1_0",
+        "toolName": "write",
+        "toolStatus": "error",
+        "isError": true,
+        "status": "complete",
+        "content": "",
+        "toolResult": {
+          "content": [
+            {
+              "type": "text",
+              "text": "denied by user (Deny)"
+            }
+          ],
+          "details": {}
+        }
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:4d34fc70",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:30.347Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 3,
+        "content": "INSTALLED_DENIED_DONE"
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:9496e293",
+        "role": "user",
+        "createdAt": "2026-11-11T09:36:30.667Z",
+        "status": "complete",
+        "content": "INSTALLED_ALLOW Fix answer.mjs to return 42."
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:65a8b3ce",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:30.691Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 2,
+        "content": ""
+      },
+      {
+        "id": "call_fake_3_0",
+        "role": "tool",
+        "createdAt": "2026-11-11T09:36:30.777Z",
+        "toolCallId": "call_fake_3_0",
+        "toolName": "write",
+        "toolStatus": "success",
+        "isError": false,
+        "status": "complete",
+        "content": "",
+        "toolResult": {
+          "content": [
+            {
+              "type": "text",
+              "text": "[answer.mjs#392A]\nSuccessfully wrote 32 bytes to answer.mjs"
+            }
+          ],
+          "details": {
+            "resolvedPath": "/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/workspace 中文 with spaces 'quoted'/answer.mjs"
+          }
+        }
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:fdf4d301",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:30.808Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 2,
+        "content": "INSTALLED_ALLOWED_DONE"
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:2847dd0d",
+        "role": "user",
+        "createdAt": "2026-11-11T09:36:31.060Z",
+        "status": "complete",
+        "content": "INSTALLED_TEST Run the project check."
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:d3a30d7b",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:31.085Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 2,
+        "content": ""
+      },
+      {
+        "id": "call_fake_5_0",
+        "role": "tool",
+        "createdAt": "2026-11-11T09:36:32.155Z",
+        "toolCallId": "call_fake_5_0",
+        "toolName": "bash",
+        "toolStatus": "success",
+        "isError": false,
+        "status": "complete",
+        "content": "",
+        "toolResult": {
+          "content": [
+            {
+              "type": "text",
+              "text": "INSTALLED_PROJECT_TEST_PASSED\n\n\nWall time: 0.99 seconds"
+            }
+          ],
+          "details": {
+            "timeoutSeconds": 600,
+            "wallTimeMs": 989.930875
+          }
+        }
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:710b7698",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:32.179Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 2,
+        "content": "INSTALLED_TEST_DONE"
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:18dac621",
+        "role": "user",
+        "createdAt": "2026-11-11T09:36:32.345Z",
+        "status": "complete",
+        "content": "INSTALLED_STOP Start the long process tree."
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:2a7582cf",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:32.369Z",
+        "status": "complete",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "responseDurationMs": 2,
+        "content": ""
+      },
+      {
+        "id": "call_fake_7_0",
+        "role": "tool",
+        "createdAt": "2026-11-11T09:36:32.930Z",
+        "toolCallId": "call_fake_7_0",
+        "toolName": "bash",
+        "toolStatus": "error",
+        "isError": true,
+        "status": "complete",
+        "content": "",
+        "toolResult": {
+          "content": [
+            {
+              "type": "text",
+              "text": "Command aborted"
+            }
+          ],
+          "details": {}
+        }
+      },
+      {
+        "id": "omp:58521ed9-45ab-4830-9147-523d576a9f71:entry:798759d5",
+        "role": "assistant",
+        "createdAt": "2026-11-11T09:36:32.955Z",
+        "status": "aborted",
+        "modelId": "local-model",
+        "providerId": "682e1480-14d1-4268-bb69-5cbc56e5e78c",
+        "content": ""
+      }
+    ],
+    "writeCalls": [
+      {
+        "id": "call_fake_1_0",
+        "name": "write"
+      },
+      {
+        "id": "call_fake_3_0",
+        "name": "write"
+      }
+    ],
+    "writeResults": [
+      {
+        "toolCallId": "call_fake_1_0",
+        "isError": true
+      },
+      {
+        "toolCallId": "call_fake_3_0",
+        "isError": false
+      }
+    ]
+  },
+  "providerRequests": [
+    {
+      "method": "POST",
+      "url": "/v1/chat/completions",
+      "at": 1794389790102,
+      "model": "local-model",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\nToday: 2026-11-11; current working directory: '/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/workspace 中文 with spaces 'quoted''. Do not repeat this information in your reply.\n</system-reminder>"
+            },
+            {
+              "type": "text",
+              "text": "INSTALLED_DENY Fix answer.mjs to return 42."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "url": "/v1/chat/completions",
+      "at": 1794389790349,
+      "model": "local-model",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\nToday: 2026-11-11; current working directory: '/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/workspace 中文 with spaces 'quoted''. Do not repeat this information in your reply.\n</system-reminder>"
+            },
+            {
+              "type": "text",
+              "text": "INSTALLED_DENY Fix answer.mjs to return 42."
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_fake_1_0",
+              "type": "function",
+              "function": {
+                "name": "write",
+                "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "denied by user (Deny)",
+          "tool_call_id": "call_fake_1_0"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "url": "/v1/chat/completions",
+      "at": 1794389790692,
+      "model": "local-model",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\nToday: 2026-11-11; current working directory: '/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/workspace 中文 with spaces 'quoted''. Do not repeat this information in your reply.\n</system-reminder>"
+            },
+            {
+              "type": "text",
+              "text": "INSTALLED_DENY Fix answer.mjs to return 42."
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_fake_1_0",
+              "type": "function",
+              "function": {
+                "name": "write",
+                "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "denied by user (Deny)",
+          "tool_call_id": "call_fake_1_0"
+        },
+        {
+          "role": "assistant",
+          "content": "INSTALLED_DENIED_DONE"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "INSTALLED_ALLOW Fix answer.mjs to return 42."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "url": "/v1/chat/completions",
+      "at": 1794389790809,
+      "model": "local-model",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\nToday: 2026-11-11; current working directory: '/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/workspace 中文 with spaces 'quoted''. Do not repeat this information in your reply.\n</system-reminder>"
+            },
+            {
+              "type": "text",
+              "text": "INSTALLED_DENY Fix answer.mjs to return 42."
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_fake_1_0",
+              "type": "function",
+              "function": {
+                "name": "write",
+                "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "denied by user (Deny)",
+          "tool_call_id": "call_fake_1_0"
+        },
+        {
+          "role": "assistant",
+          "content": "INSTALLED_DENIED_DONE"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "INSTALLED_ALLOW Fix answer.mjs to return 42."
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_fake_3_0",
+              "type": "function",
+              "function": {
+                "name": "write",
+                "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "[answer.mjs#392A]\nSuccessfully wrote 32 bytes to answer.mjs",
+          "tool_call_id": "call_fake_3_0"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "url": "/v1/chat/completions",
+      "at": 1794389791086,
+      "model": "local-model",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\nToday: 2026-11-11; current working directory: '/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/workspace 中文 with spaces 'quoted''. Do not repeat this information in your reply.\n</system-reminder>"
+            },
+            {
+              "type": "text",
+              "text": "INSTALLED_DENY Fix answer.mjs to return 42."
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_fake_1_0",
+              "type": "function",
+              "function": {
+                "name": "write",
+                "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "denied by user (Deny)",
+          "tool_call_id": "call_fake_1_0"
+        },
+        {
+          "role": "assistant",
+          "content": "INSTALLED_DENIED_DONE"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "INSTALLED_ALLOW Fix answer.mjs to return 42."
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_fake_3_0",
+              "type": "function",
+              "function": {
+                "name": "write",
+                "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "[answer.mjs#392A]\nSuccessfully wrote 32 bytes to answer.mjs",
+          "tool_call_id": "call_fake_3_0"
+        },
+        {
+          "role": "assistant",
+          "content": "INSTALLED_ALLOWED_DONE"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "INSTALLED_TEST Run the project check."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "url": "/v1/chat/completions",
+      "at": 1794389792180,
+      "model": "local-model",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\nToday: 2026-11-11; current working directory: '/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/workspace 中文 with spaces 'quoted''. Do not repeat this information in your reply.\n</system-reminder>"
+            },
+            {
+              "type": "text",
+              "text": "INSTALLED_DENY Fix answer.mjs to return 42."
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_fake_1_0",
+              "type": "function",
+              "function": {
+                "name": "write",
+                "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "denied by user (Deny)",
+          "tool_call_id": "call_fake_1_0"
+        },
+        {
+          "role": "assistant",
+          "content": "INSTALLED_DENIED_DONE"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "INSTALLED_ALLOW Fix answer.mjs to return 42."
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_fake_3_0",
+              "type": "function",
+              "function": {
+                "name": "write",
+                "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "[answer.mjs#392A]\nSuccessfully wrote 32 bytes to answer.mjs",
+          "tool_call_id": "call_fake_3_0"
+        },
+        {
+          "role": "assistant",
+          "content": "INSTALLED_ALLOWED_DONE"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "INSTALLED_TEST Run the project check."
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_fake_5_0",
+              "type": "function",
+              "function": {
+                "name": "bash",
+                "arguments": "{\"command\":\"'/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/project-tools/project-node' '/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/workspace 中文 with spaces '\\\\''quoted'\\\\''/check.mjs'\",\"timeout\":600}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "INSTALLED_PROJECT_TEST_PASSED\n\n\nWall time: 0.99 seconds",
+          "tool_call_id": "call_fake_5_0"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "url": "/v1/chat/completions",
+      "at": 1794389792370,
+      "model": "local-model",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\nToday: 2026-11-11; current working directory: '/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/workspace 中文 with spaces 'quoted''. Do not repeat this information in your reply.\n</system-reminder>"
+            },
+            {
+              "type": "text",
+              "text": "INSTALLED_DENY Fix answer.mjs to return 42."
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_fake_1_0",
+              "type": "function",
+              "function": {
+                "name": "write",
+                "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "denied by user (Deny)",
+          "tool_call_id": "call_fake_1_0"
+        },
+        {
+          "role": "assistant",
+          "content": "INSTALLED_DENIED_DONE"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "INSTALLED_ALLOW Fix answer.mjs to return 42."
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_fake_3_0",
+              "type": "function",
+              "function": {
+                "name": "write",
+                "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "[answer.mjs#392A]\nSuccessfully wrote 32 bytes to answer.mjs",
+          "tool_call_id": "call_fake_3_0"
+        },
+        {
+          "role": "assistant",
+          "content": "INSTALLED_ALLOWED_DONE"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "INSTALLED_TEST Run the project check."
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_fake_5_0",
+              "type": "function",
+              "function": {
+                "name": "bash",
+                "arguments": "{\"command\":\"'/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/project-tools/project-node' '/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/workspace 中文 with spaces '\\\\''quoted'\\\\''/check.mjs'\",\"timeout\":600}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "INSTALLED_PROJECT_TEST_PASSED\n\n\nWall time: 0.99 seconds",
+          "tool_call_id": "call_fake_5_0"
+        },
+        {
+          "role": "assistant",
+          "content": "INSTALLED_TEST_DONE"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "INSTALLED_STOP Start the long process tree."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "url": "/v1/chat/completions",
+      "at": 1794389799508,
+      "model": "local-model",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\nToday: 2026-11-11; current working directory: '/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/workspace 中文 with spaces 'quoted''. Do not repeat this information in your reply.\n</system-reminder>"
+            },
+            {
+              "type": "text",
+              "text": "INSTALLED_DENY Fix answer.mjs to return 42."
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_fake_1_0",
+              "type": "function",
+              "function": {
+                "name": "write",
+                "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "denied by user (Deny)",
+          "tool_call_id": "call_fake_1_0"
+        },
+        {
+          "role": "assistant",
+          "content": "INSTALLED_DENIED_DONE"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "INSTALLED_ALLOW Fix answer.mjs to return 42."
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_fake_3_0",
+              "type": "function",
+              "function": {
+                "name": "write",
+                "arguments": "{\"path\":\"answer.mjs\",\"content\":\"export const answer = () => 42;\\n\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "[answer.mjs#392A]\nSuccessfully wrote 32 bytes to answer.mjs",
+          "tool_call_id": "call_fake_3_0"
+        },
+        {
+          "role": "assistant",
+          "content": "INSTALLED_ALLOWED_DONE"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "INSTALLED_TEST Run the project check."
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_fake_5_0",
+              "type": "function",
+              "function": {
+                "name": "bash",
+                "arguments": "{\"command\":\"'/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/project-tools/project-node' '/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/workspace 中文 with spaces '\\\\''quoted'\\\\''/check.mjs'\",\"timeout\":600}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "INSTALLED_PROJECT_TEST_PASSED\n\n\nWall time: 0.99 seconds",
+          "tool_call_id": "call_fake_5_0"
+        },
+        {
+          "role": "assistant",
+          "content": "INSTALLED_TEST_DONE"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "INSTALLED_STOP Start the long process tree."
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_fake_7_0",
+              "type": "function",
+              "function": {
+                "name": "bash",
+                "arguments": "{\"command\":\"'/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/project-tools/project-node' '/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/workspace 中文 with spaces '\\\\''quoted'\\\\''/long-tree.mjs'\",\"timeout\":600}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "Command aborted",
+          "tool_call_id": "call_fake_7_0"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "INSTALLED_RESTART Reply after the restart."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "isolation": {
+    "defaultProductDataRoot": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/home/.omp-desktop",
+    "dataOverrideAtLaunch": null,
+    "unchanged": [
+      {
+        "path": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/home/.pi-desktop/pi.sqlite",
+        "sha256": "56286703b81690c899baa8eb056ae98143b20c7bc74d8edaa6d07326a2a23a3e"
+      },
+      {
+        "path": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/home/.pi-desktop/secrets/.machine-key",
+        "sha256": "56286703b81690c899baa8eb056ae98143b20c7bc74d8edaa6d07326a2a23a3e"
+      },
+      {
+        "path": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/home/.omp/agent/settings.json",
+        "sha256": "b635dee2da5dcb902b9a3e965491e84544e744d209bfb6f071be9a6fb77d105e"
+      },
+      {
+        "path": "/private/var/folders/sy/dfvmk27d1hdbrm5h8p4qwm3m0000gn/T/omp-installed-jSM7DB/home/.agents/AGENTS.md",
+        "sha256": "56286703b81690c899baa8eb056ae98143b20c7bc74d8edaa6d07326a2a23a3e"
+      }
+    ]
+  }
+}

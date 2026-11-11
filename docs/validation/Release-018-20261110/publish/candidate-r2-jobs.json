@@ -1,0 +1,60 @@
+[
+  {
+    "id": 130380239004,
+    "name": "guard",
+    "conclusion": "success",
+    "started_at": "2026-11-11T07:10:55Z",
+    "completed_at": "2026-11-11T07:11:06Z",
+    "failed_steps": []
+  },
+  {
+    "id": 130380315462,
+    "name": "build (windows-latest, win32, x64, dist:win)",
+    "conclusion": "success",
+    "started_at": "2026-11-11T07:11:08Z",
+    "completed_at": "2026-11-11T07:45:21Z",
+    "failed_steps": []
+  },
+  {
+    "id": 130380315469,
+    "name": "build (macos-15, darwin, arm64, dist:mac)",
+    "conclusion": "success",
+    "started_at": "2026-11-11T07:11:08Z",
+    "completed_at": "2026-11-11T07:37:35Z",
+    "failed_steps": []
+  },
+  {
+    "id": 130380315509,
+    "name": "build (macos-15-intel, darwin, x64, dist:mac)",
+    "conclusion": "success",
+    "started_at": "2026-11-11T07:11:09Z",
+    "completed_at": "2026-11-11T08:04:21Z",
+    "failed_steps": []
+  },
+  {
+    "id": 130380315526,
+    "name": "build (ubuntu-22.04, linux, x64, dist:linux)",
+    "conclusion": "success",
+    "started_at": "2026-11-11T07:11:07Z",
+    "completed_at": "2026-11-11T07:38:01Z",
+    "failed_steps": []
+  },
+  {
+    "id": 130380315557,
+    "name": "verify",
+    "conclusion": "failure",
+    "started_at": "2026-11-11T07:11:08Z",
+    "completed_at": "2026-11-11T07:26:49Z",
+    "failed_steps": [
+      "Run pnpm -r --if-present test"
+    ]
+  },
+  {
+    "id": 130401194219,
+    "name": "publish",
+    "conclusion": "skipped",
+    "started_at": "2026-11-11T08:04:22Z",
+    "completed_at": "2026-11-11T08:04:22Z",
+    "failed_steps": []
+  }
+]
