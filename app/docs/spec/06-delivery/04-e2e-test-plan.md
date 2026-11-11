@@ -247,6 +247,26 @@
   a successful dependency install alone is insufficient. Linux uses Xvfb. The generated images and
   JSON report are retained in that target's validation artifact.
 
+### E2E-OMP-ask-typed-answer
+
+- **Preconditions:** Patched OMP tree from the pinned submodule with its build
+  payload, production session bridge and approval gate, local scripted model;
+  no paid provider.
+- **Steps:** The model calls OMP's `ask` tool with one recommended option; the
+  bridge raises the card; the user answers once with typed text and once with a
+  listed option.
+- **Expected:** The card lists the model's options without the runtime's
+  `Other (type your own)` row and offers a typed answer. Either answer is
+  delivered (`outcome: answered`), with no second card for the runtime's
+  `editor` follow-up; the model's next request carries the answer in the `ask`
+  tool result; the turn ends `completed`, not aborted.
+- **Automation:** `node --test apps/desktop/test/omp-ask-custom-answer-e2e.test.mjs`
+  (needs the submodule's installed dependencies). Bridge and unit coverage:
+  `apps/desktop/test/omp-session-bridge.test.mjs`,
+  `packages/omp-runtime/src/session/ui-requests.test.ts`,
+  `apps/desktop/test/asktool-card-custom-answer.test.mjs`.
+- **Boundary:** Patched source tree, not the packaged runtime or installed GUI.
+
 ### E2E-OMP-coding-LSP
 
 - **Preconditions:** Verified native OMP resources, real TypeScript language

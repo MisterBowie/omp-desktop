@@ -1339,6 +1339,80 @@ test("an answer the runtime's select cannot carry is failed closed too", async (
   assert.equal(bridge.status(OMP_SESSION).pendingToolConfirmations, 0);
 });
 
+// The frame the runtime's `ask` tool sends over RPC for one single-select
+// question: the recommended option carries its suffix and the tool appends its
+// own free-text entry, which it follows with an `editor` dialog when picked.
+const OMP_ASK_SELECT = {
+  type: "extension_ui_request",
+  id: "q-ask",
+  method: "select",
+  title: "Which scenario?",
+  options: ["Mac to Windows (Recommended)", "Inside one Windows app", "Other (type your own)"],
+  optionDetails: [{ description: "LAN share, cloud drive" }, { description: "drag and drop" }, {}],
+};
+
+test("an OMP ask question offers a typed answer and delivers it through the runtime's editor follow-up", async () => {
+  const { bridge, runtime, envelopes } = bridgeHarness();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "how do I move files?", projectPath: makeProject() });
+  runtime.push(OMP_ASK_SELECT);
+  const asks = envelopes.filter((entry) => entry.event.type === "asktool_request");
+  assert.equal(asks.length, 1);
+  // The runtime's free-text option is the card's own typed answer, not a row.
+  assert.deepEqual(asks[0].event.request.questions, [{
+    question: "Which scenario?",
+    options: ["Mac to Windows (Recommended)", "Inside one Windows app"],
+    multiSelect: false,
+    allowCustom: true,
+  }]);
+
+  const resolution = bridge.resolveAsk({ requestId: "q-ask", sessionId: OMP_SESSION, answers: [["over Wi-Fi to a PC"]] });
+  assert.deepEqual(resolution, { ok: true, outcome: "answered" });
+  assert.deepEqual(runtime.written, [
+    { type: "extension_ui_response", id: "q-ask", value: "Other (type your own)" },
+  ]);
+
+  // The tool asks for the text next; it is answered without another card.
+  runtime.push({ type: "extension_ui_request", id: "q-ask-text", method: "editor", title: "Which scenario?", promptStyle: true });
+  assert.deepEqual(runtime.written.at(-1), { type: "extension_ui_response", id: "q-ask-text", value: "over Wi-Fi to a PC" });
+  assert.equal(envelopes.filter((entry) => entry.event.type === "asktool_request").length, 1);
+  assert.equal(bridge.hasPendingRequest("q-ask"), false);
+  assert.equal(bridge.hasPendingRequest("q-ask-text"), false);
+  assert.equal(bridge.status(OMP_SESSION).pendingToolConfirmations, 0);
+});
+
+test("an OMP ask question still answers a listed option by its exact label", async () => {
+  const { bridge, runtime } = bridgeHarness();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "how do I move files?", projectPath: makeProject() });
+  runtime.push(OMP_ASK_SELECT);
+  const resolution = bridge.resolveAsk({ requestId: "q-ask", sessionId: OMP_SESSION, answers: [["Mac to Windows (Recommended)"]] });
+  assert.deepEqual(resolution, { ok: true, outcome: "answered" });
+  assert.deepEqual(runtime.written, [
+    { type: "extension_ui_response", id: "q-ask", value: "Mac to Windows (Recommended)" },
+  ]);
+  // No typed answer is waiting, so a later free-text dialog is not answered with one.
+  runtime.push({ type: "extension_ui_request", id: "q-later", method: "editor", title: "Notes" });
+  assert.deepEqual(runtime.written.at(-1), { type: "extension_ui_response", id: "q-later", cancelled: true });
+});
+
+test("a select without the runtime's free-text option tells the card not to offer a typed answer", async () => {
+  const { bridge, runtime, envelopes } = bridgeHarness();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "which file?", projectPath: makeProject() });
+  runtime.push({ type: "extension_ui_request", id: "q-plain", method: "select", title: "Which file?", options: ["a.ts", "b.ts"] });
+  const ask = envelopes.find((entry) => entry.event.type === "asktool_request");
+  assert.equal(ask.event.request.questions[0].allowCustom, false);
+  assert.deepEqual(ask.event.request.questions[0].options, ["a.ts", "b.ts"]);
+});
+
+test("a free-text dialog the desktop cannot present is failed closed instead of stranding the turn", async () => {
+  const { bridge, runtime, envelopes } = bridgeHarness();
+  await bridge.prompt({ sessionId: OMP_SESSION, content: "name it", projectPath: makeProject() });
+  runtime.push({ type: "extension_ui_request", id: "q-input", method: "input", title: "Name?" });
+  assert.deepEqual(runtime.written, [{ type: "extension_ui_response", id: "q-input", cancelled: true }]);
+  assert.equal(bridge.hasPendingRequest("q-input"), false);
+  assert.equal(bridge.status(OMP_SESSION).pendingToolConfirmations, 0);
+  assert.equal(envelopes.some((entry) => entry.event.type === "asktool_request"), false);
+});
+
 test("a confirmation answers yes/no and a dismissal is a cancellation", async () => {
   const { bridge, runtime } = bridgeHarness();
   await bridge.prompt({ sessionId: OMP_SESSION, content: "proceed?", projectPath: makeProject() });

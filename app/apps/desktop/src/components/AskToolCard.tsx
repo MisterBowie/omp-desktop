@@ -179,17 +179,19 @@ export function AskToolCard({ request, queued = 0 }: { request: PendingAsk; queu
             </button>
           );
         })}
-        <button
-          type="button"
-          className={`asktool-option asktool-custom-option ${currentDraft.customSelected ? "selected" : ""}`}
-          aria-pressed={current.multiSelect ? currentDraft.customSelected : undefined}
-          aria-checked={!current.multiSelect ? currentDraft.customSelected : undefined}
-          role={current.multiSelect ? "checkbox" : "radio"}
-          onClick={() => selectOption(CUSTOM_OPTION)}
-        >
-          <span className="asktool-option-mark" aria-hidden>{currentDraft.customSelected ? "✓" : ""}</span>
-          <span>{t("askTool.customOption")}</span>
-        </button>
+        {current.allowCustom !== false ? (
+          <button
+            type="button"
+            className={`asktool-option asktool-custom-option ${currentDraft.customSelected ? "selected" : ""}`}
+            aria-pressed={current.multiSelect ? currentDraft.customSelected : undefined}
+            aria-checked={!current.multiSelect ? currentDraft.customSelected : undefined}
+            role={current.multiSelect ? "checkbox" : "radio"}
+            onClick={() => selectOption(CUSTOM_OPTION)}
+          >
+            <span className="asktool-option-mark" aria-hidden>{currentDraft.customSelected ? "✓" : ""}</span>
+            <span>{t("askTool.customOption")}</span>
+          </button>
+        ) : null}
       </div>
       {currentDraft.customSelected ? (
         <input

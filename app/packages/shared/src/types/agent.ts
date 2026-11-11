@@ -189,6 +189,12 @@ export type AskToolQuestion = {
   question: string;
   options: string[];
   multiSelect?: boolean;
+  /**
+   * `false` when the asker can only return one of `options`, so the card must
+   * not offer a typed answer it cannot deliver. Absent means a typed answer is
+   * accepted.
+   */
+  allowCustom?: boolean;
 };
 
 export type AskToolRequest = {

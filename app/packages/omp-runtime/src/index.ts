@@ -175,9 +175,11 @@ export {
   type OmpEventConverterOptions,
 } from "./session/events.js";
 export {
+  OMP_ASK_FREE_TEXT_OPTION,
   OmpUiRequests,
   classifyUiRequest,
   descriptorRisk,
+  offersFreeText,
   responseFor,
   type OmpUiDecision,
   type OmpUiRecord,

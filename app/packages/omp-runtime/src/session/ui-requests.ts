@@ -29,6 +29,11 @@
  *     forgets it, so nothing is left waiting on a UI that will not come back.
  *   - **Every refusal is recorded.** `records()` is the diagnostic trail the
  *     validation report cites: answered, refused-unknown, refused-late.
+ *   - **A typed answer travels the runtime's own way.** The `ask` tool's
+ *     `select` cannot carry free text: it offers `OMP_ASK_FREE_TEXT_OPTION`,
+ *     and only after that option is picked does it raise an `editor` dialog
+ *     for the text. `resolve(…, { freeText })` picks the option and holds the
+ *     text for exactly that follow-up dialog (see `answerFollowUp`).
  */
 import type { Risk } from "@pi-desktop/shared";
 
@@ -40,6 +45,19 @@ import {
   parseApprovalDescriptor,
   type OmpApprovalDescriptor,
 } from "./approval-protocol.js";
+
+/**
+ * The option the runtime's `ask` tool appends to every question it asks
+ * through a `select` (`OTHER_OPTION` in the tool). Picking it makes the tool
+ * raise an `editor` dialog for the user's own answer. It is a fixed protocol
+ * label, never localised, and the tool reserves it from model-supplied options.
+ */
+export const OMP_ASK_FREE_TEXT_OPTION = "Other (type your own)";
+
+/** Whether a `select` offers the runtime's free-text follow-up. */
+export function offersFreeText(options: readonly string[] | undefined): boolean {
+  return options?.includes(OMP_ASK_FREE_TEXT_OPTION) ?? false;
+}
 
 /** Frames this module writes back to the runtime. */
 export type OmpUiResponseFrame = Record<string, unknown> & { type: "extension_ui_response" };
@@ -117,6 +135,8 @@ export class OmpUiRequests {
   private readonly pending = new Map<string, Pending>();
   private readonly trail: OmpUiRecord[] = [];
   private generation = 0;
+  /** A typed answer waiting for the free-text dialog its `select` will raise. */
+  private followUp: { sourceId: string; generation: number; text: string } | null = null;
 
   constructor(options: OmpUiRequestsOptions) {
     this.sessionId = options.sessionId;
@@ -134,7 +154,51 @@ export class OmpUiRequests {
   /** Start a run: every later request belongs to this generation. */
   beginRun(): number {
     this.generation += 1;
+    this.followUp = null;
     return this.generation;
+  }
+
+  /**
+   * Answer the free-text dialog a typed `select` answer is waiting for.
+   *
+   * Only the very next question of the same run can take the text, and only
+   * when it is an `input`/`editor` dialog: any other question drops the text
+   * unused, so it can never answer a dialog it was not typed for. An approval
+   * raised meanwhile by a parallel tool call is presented as usual and leaves
+   * the text waiting; it can never receive it. Returns true when the request
+   * was answered here and must not be presented.
+   */
+  answerFollowUp(request: OmpUiRequest): boolean {
+    const followUp = this.followUp;
+    if (!followUp || request.kind === "notice" || request.kind === "approval") return false;
+    this.followUp = null;
+    if (
+      followUp.generation !== this.generation ||
+      request.kind !== "question" ||
+      (request.method !== "editor" && request.method !== "input")
+    ) {
+      return false;
+    }
+    if (!this.write({ type: "extension_ui_response", id: request.frameId, value: followUp.text })) {
+      this.record({
+        frameId: request.frameId,
+        kind: "question",
+        generation: followUp.generation,
+        outcome: "refused-stale",
+        decision: "allow-once",
+        detail: "the runtime transport is gone; the typed answer was not delivered",
+      });
+      return true;
+    }
+    this.record({
+      frameId: request.frameId,
+      kind: "question",
+      generation: followUp.generation,
+      outcome: "answered",
+      decision: "allow-once",
+      detail: `typed answer for ${followUp.sourceId}`,
+    });
+    return true;
   }
 
   /**
@@ -225,10 +289,10 @@ export class OmpUiRequests {
   resolve(
     requestId: string,
     decision: OmpUiDecision,
-    options: { generation?: number; value?: string } = {},
+    options: { generation?: number; value?: string; freeText?: string } = {},
   ):
     | { ok: true; frame: OmpUiResponseFrame }
-    | { ok: false; reason: "unknown" | "stale" | "duplicate"; detail: string } {
+    | { ok: false; reason: "unknown" | "stale" | "duplicate" | "unsupported"; detail: string } {
     const entry = this.pending.get(requestId);
     if (!entry) {
       const previous = this.trail.find((record) => record.frameId === requestId);
@@ -285,15 +349,29 @@ export class OmpUiRequests {
       });
       return { ok: false, reason: "duplicate", detail: "request already answered" };
     }
+    const typed = options.freeText;
+    if (
+      typed !== undefined &&
+      !(entry.request.kind === "question" && entry.request.method === "select" && offersFreeText(entry.request.options))
+    ) {
+      // Nothing would ever take the text: refuse and leave the dialog open for
+      // an answer it can carry (or a cancel), rather than inventing one.
+      this.record({
+        frameId: requestId,
+        kind: entry.request.kind,
+        generation: entry.generation,
+        outcome: "refused-unknown",
+        decision,
+        detail: "this dialog cannot carry a typed answer",
+      });
+      return { ok: false, reason: "unsupported", detail: "this dialog cannot carry a typed answer" };
+    }
     // Consume before writing: one decision authorises at most one execution,
     // and a failed write must not leave a request that can be answered again.
     entry.answered = true;
     this.pending.delete(requestId);
-    const frame = responseFor(
-      entry.request,
-      decision,
-      options.value === undefined ? {} : { value: options.value },
-    );
+    const value = typed !== undefined ? OMP_ASK_FREE_TEXT_OPTION : options.value;
+    const frame = responseFor(entry.request, decision, value === undefined ? {} : { value });
     if (!this.write(frame)) {
       this.record({
         frameId: requestId,
@@ -304,6 +382,9 @@ export class OmpUiRequests {
         detail: "the runtime transport is gone; the decision was not delivered",
       });
       return { ok: false, reason: "stale", detail: "the runtime is no longer reachable" };
+    }
+    if (typed !== undefined) {
+      this.followUp = { sourceId: requestId, generation: entry.generation, text: typed };
     }
     this.record({
       frameId: requestId,
@@ -322,6 +403,7 @@ export class OmpUiRequests {
    * runtime treats a cancel as "no decision", which denies the tool call.
    */
   cancelPending(reason: string, options: { timedOut?: boolean } = {}): string[] {
+    this.followUp = null;
     const cancelled: string[] = [];
     for (const frameId of [...this.pending.keys()]) {
       if (this.cancel(frameId, reason, options)) cancelled.push(frameId);

@@ -45,6 +45,7 @@ import {
   DESKTOP_STATE_FILE,
   MAX_DESKTOP_STATE_SKILLS,
   MAX_MEMORY_CHARS,
+  OMP_ASK_FREE_TEXT_OPTION,
   OmpSessionRunner,
   OmpManualCompaction,
   OmpRuntimeError,
@@ -75,6 +76,7 @@ import {
   type OmpUiRecord,
   type OmpUiRequest,
   type SubagentListEntry,
+  offersFreeText,
   parseSubagentSnapshots,
 } from "@pi-desktop/omp-runtime";
 import { composeModeSystemPrompt } from "@pi-desktop/agent-runtime";
@@ -1645,7 +1647,14 @@ class SessionEntry {
         requestId: request.frameId,
         sessionId,
         toolCallId: request.frameId,
-        questions: [{ question: request.title, options: request.options ?? [], multiSelect: false }],
+        questions: [{
+          question: request.title,
+          // The runtime's free-text option is the card's own typed answer:
+          // listing it too would let the user pick it without any text.
+          options: (request.options ?? []).filter((option) => option !== OMP_ASK_FREE_TEXT_OPTION),
+          multiSelect: false,
+          allowCustom: offersFreeText(request.options),
+        }],
       };
       this.askRequests.set(request.frameId, { request, sessionId, generation });
       this.rememberRequest(request.frameId, "ask");
@@ -1671,6 +1680,9 @@ class SessionEntry {
     this.logger?.app("omp", "warn", "unsupported OMP dialog", {
       data: { sessionId, frameId: request.frameId, kind: request.kind },
     });
+    // No card will ever answer it, and the requester is blocked inside the
+    // runtime: fail closed now instead of leaving the turn waiting forever.
+    if (request.kind === "question") this.runner?.cancelUiRequest(request.frameId, "the desktop has no card for this dialog");
   }
 
   riskForApproval(request: OmpUiRequest): Risk {
@@ -3260,7 +3272,10 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
         return result.ok ? { ok: true, outcome: "answered" } : { ok: false, reason: "refused", detail: result.detail ?? "the runtime refused the answer" };
       }
       const offered = pending.request.options ?? [];
-      if (!offered.includes(chosen)) {
+      // A typed answer (or the free-text option's own label, which the card
+      // never lists) travels through the runtime's free-text follow-up.
+      const typed = chosen === OMP_ASK_FREE_TEXT_OPTION || !offered.includes(chosen);
+      if (typed && !offersFreeText(offered)) {
         return cancel("the answer is not one of the options this dialog can return");
       }
       entry.askRequests.delete(resolution.requestId);
@@ -3268,7 +3283,7 @@ export function createOmpSessionBridge(options: OmpSessionBridgeOptions): OmpSes
       const result = runner.resolveUiRequest(resolution.requestId, "allow-once", {
         sessionId: pending.sessionId,
         generation: pending.generation,
-        value: chosen,
+        ...(typed ? { freeText: chosen } : { value: chosen }),
       });
       return result.ok ? { ok: true, outcome: "answered" } : { ok: false, reason: "refused", detail: result.detail ?? "the runtime refused the answer" };
     }

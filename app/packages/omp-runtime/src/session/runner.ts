@@ -1005,6 +1005,8 @@ export class OmpSessionRunner {
    *
    * `value` names the option a question's user actually picked; approvals
    * ignore it, because their meaning is the decision, not a label.
+   * `freeText` is an answer the user typed instead: it is delivered through the
+   * runtime's own free-text follow-up (see `OmpUiRequests.answerFollowUp`).
    *
    * `sessionId` and `generation` are the identity the *desktop* stored when it
    * surfaced the request. Supplying them is how a decision is bound to the
@@ -1015,13 +1017,14 @@ export class OmpSessionRunner {
   resolveUiRequest(
     requestId: string,
     decision: OmpUiDecision,
-    options: { value?: string; sessionId?: string; generation?: number } = {},
+    options: { value?: string; freeText?: string; sessionId?: string; generation?: number } = {},
   ): { ok: boolean; reason?: string; detail?: string } {
     if (options.sessionId !== undefined && options.sessionId !== this.sessionId) {
       return { ok: false, reason: "unknown", detail: "the decision names another session" };
     }
     const result = this.ui.resolve(requestId, decision, {
       ...(options.value === undefined ? {} : { value: options.value }),
+      ...(options.freeText === undefined ? {} : { freeText: options.freeText }),
       ...(options.generation === undefined ? {} : { generation: options.generation }),
     });
     for (const record of this.ui.records().slice(-1)) this.onUiRecord?.(record);
@@ -1306,6 +1309,12 @@ export class OmpSessionRunner {
               ? "the run was stopping when the dialog arrived"
               : "no run is active for this dialog",
           );
+          for (const record of this.ui.records().slice(-1)) this.onUiRecord?.(record);
+          return;
+        }
+        // The free-text dialog an `ask` question raises once the user typed an
+        // answer: the text is already known, so it is answered, not presented.
+        if (this.ui.answerFollowUp(classified)) {
           for (const record of this.ui.records().slice(-1)) this.onUiRecord?.(record);
           return;
         }

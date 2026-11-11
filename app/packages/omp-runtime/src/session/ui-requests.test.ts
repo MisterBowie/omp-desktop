@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { encodeApprovalDescriptor, OMP_APPROVAL_OPTIONS } from "./approval-protocol.js";
 import {
+  OMP_ASK_FREE_TEXT_OPTION,
   OmpUiRequests,
   classifyUiRequest,
   responseFor,
@@ -308,6 +309,81 @@ describe("question answers", () => {
     requests.observe({ type: "extension_ui_request", id: "q-2", method: "confirm", title: "sure?", message: "really" });
     requests.resolve("q-2", "deny");
     expect(written[0]).toMatchObject({ confirmed: false });
+  });
+
+  describe("typed answers", () => {
+    const askFrame = (id: string) => ({
+      type: "extension_ui_request",
+      id,
+      method: "select",
+      title: "Which scenario?",
+      options: ["Mac to Windows (Recommended)", "Inside one app", OMP_ASK_FREE_TEXT_OPTION],
+    });
+    const editorFrame = (id: string) => ({ type: "extension_ui_request", id, method: "editor", title: "Which scenario?" });
+    const classified = (frame: unknown) => classifyUiRequest(frame) as OmpUiRequest;
+
+    it("picks the free-text option, then answers the editor the runtime raises with the text", () => {
+      const { requests, written } = harness();
+      requests.beginRun();
+      requests.observe(askFrame("q-1"));
+      expect(requests.resolve("q-1", "allow-once", { freeText: "send it over LAN" })).toMatchObject({ ok: true });
+      expect(written[0]).toEqual({ type: "extension_ui_response", id: "q-1", value: OMP_ASK_FREE_TEXT_OPTION });
+
+      expect(requests.answerFollowUp(classified(editorFrame("e-1")))).toBe(true);
+      expect(written[1]).toEqual({ type: "extension_ui_response", id: "e-1", value: "send it over LAN" });
+      expect(requests.open()).toEqual([]);
+      expect(requests.records().at(-1)).toMatchObject({ frameId: "e-1", outcome: "answered" });
+      // The text answers one dialog only.
+      expect(requests.answerFollowUp(classified(editorFrame("e-2")))).toBe(false);
+      expect(written).toHaveLength(2);
+    });
+
+    it("drops the text when the next question is not the free-text follow-up", () => {
+      const { requests, written } = harness();
+      requests.observe(askFrame("q-1"));
+      requests.resolve("q-1", "allow-once", { freeText: "typed" });
+      expect(requests.answerFollowUp(classified({ ...askFrame("q-2"), title: "Another?" }))).toBe(false);
+      expect(requests.answerFollowUp(classified(editorFrame("e-1")))).toBe(false);
+      expect(written).toHaveLength(1);
+    });
+
+    it("keeps the text past an approval a parallel tool raises, and never gives it to the approval", () => {
+      const { requests, written } = harness();
+      requests.observe(askFrame("q-1"));
+      requests.resolve("q-1", "allow-once", { freeText: "typed" });
+      expect(requests.answerFollowUp(classified(gateApprovalFrame("ui-1")))).toBe(false);
+      expect(written).toHaveLength(1);
+      expect(requests.answerFollowUp(classified(editorFrame("e-1")))).toBe(true);
+      expect(written[1]).toEqual({ type: "extension_ui_response", id: "e-1", value: "typed" });
+    });
+
+    it("never carries the text into a later run", () => {
+      const { requests, written } = harness();
+      requests.beginRun();
+      requests.observe(askFrame("q-1"));
+      requests.resolve("q-1", "allow-once", { freeText: "typed" });
+      requests.beginRun();
+      expect(requests.answerFollowUp(classified(editorFrame("e-1")))).toBe(false);
+      expect(written).toHaveLength(1);
+    });
+
+    it("forgets the text when the run is stopped", () => {
+      const { requests, written } = harness();
+      requests.observe(askFrame("q-1"));
+      requests.resolve("q-1", "allow-once", { freeText: "typed" });
+      requests.cancelPending("the run was stopped");
+      expect(requests.answerFollowUp(classified(editorFrame("e-1")))).toBe(false);
+      expect(written).toHaveLength(1);
+    });
+
+    it("refuses a typed answer for a select without the free-text option and keeps it open", () => {
+      const { requests, written } = harness();
+      requests.observe({ type: "extension_ui_request", id: "q-1", method: "select", title: "Which file?", options: ["a.ts", "b.ts"] });
+      expect(requests.resolve("q-1", "allow-once", { freeText: "c.ts" })).toMatchObject({ ok: false, reason: "unsupported" });
+      expect(written).toEqual([]);
+      expect(requests.open().map((entry) => entry.requestId)).toEqual(["q-1"]);
+      expect(requests.answerFollowUp(classified(editorFrame("e-1")))).toBe(false);
+    });
   });
 
   it("cancels a free-text dialog it cannot present", () => {
