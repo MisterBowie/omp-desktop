@@ -1,0 +1,63 @@
+{
+  "typed": "从 Mac 通过局域网把文件传到另一台 Windows 电脑",
+  "isolatedHome": "<isolated harness HOME under the system temp dir>",
+  "dataRoot": "<isolated HOME>/.omp-desktop",
+  "sessionId": "5cd0cd97-7464-45bc-95d1-58cd2110fc7e",
+  "cardShown": {
+    "question": "「Windows app 传文件」具体指哪种场景？",
+    "options": [
+      "Mac → Windows 电脑传文件 (Recommended)",
+      "给 Windows 上的某个程序喂文件"
+    ],
+    "custom": "输入其他答案",
+    "input": false,
+    "inputValue": null
+  },
+  "providerChatRequests": 2,
+  "askToolResultSeenByModel": "User provided custom input: 从 Mac 通过局域网把文件传到另一台 Windows 电脑",
+  "cardGone": true,
+  "ui": {
+    "replyShown": true,
+    "interruptedShown": false,
+    "errorCards": 0,
+    "sidebarRow": {
+      "className": "thread-item active  ",
+      "text": "Windows 应用传文件方法\n1m"
+    }
+  },
+  "status": {
+    "isRunning": false,
+    "state": null
+  },
+  "native": [
+    {
+      "role": "user",
+      "tool": null,
+      "isError": null,
+      "stopReason": null,
+      "text": "和项目无关 windows app 如何传文件？"
+    },
+    {
+      "role": "assistant",
+      "tool": null,
+      "isError": null,
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "role": "toolResult",
+      "tool": "ask",
+      "isError": false,
+      "stopReason": null,
+      "text": "User provided custom input: 从 Mac 通过局域网把文件传到另一台 Windows 电脑"
+    },
+    {
+      "role": "assistant",
+      "tool": null,
+      "isError": null,
+      "stopReason": "stop",
+      "text": "收到你的回答，下面按这个场景给出步骤。"
+    }
+  ],
+  "result": "pass"
+}
