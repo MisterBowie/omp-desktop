@@ -218,6 +218,20 @@ logged and the prompt proceeds at the runtime's level rather than failing the
 send. A change on a running runtime sends the resolved level; `omit` sends
 nothing, so the running level stays until the next process starts.
 
+### OMP failed-turn settlement
+
+A structured turn failure (a host-confirmed mode transition whose result
+cannot be applied) closes the desktop turn at once with
+`OMP_RUNTIME_TURN_FAILED`, while the runtime is still unwinding the aborted
+loop and emits that run's own `agent_end` afterwards. The next prompt in the
+session waits for that `agent_end` before it is submitted: a prompt sent into
+the dying loop is consumed without a model request, and the stale `agent_end`
+would close the new turn as `completed`. If the terminal does not arrive, the
+runner sends `abort` once more and waits again; a run that still does not end
+refuses the prompt with a `not-started` error rather than losing it, and the
+user's resend is not held again. When the terminal already arrived, the
+prompt is sent immediately.
+
 ## 3. Core objects
 
 ### 3.1 PiRuntime (Node)

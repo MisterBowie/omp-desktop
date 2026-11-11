@@ -177,6 +177,12 @@ export type OmpSessionRunnerOptions = {
    */
   turnFenceTimeoutMs?: number;
   /**
+   * How long the next prompt waits for the runtime to end a run the desktop
+   * already failed (a structured turn failure) before it aborts that run, and
+   * again after the abort before the prompt is refused.
+   */
+  turnFailureSettleTimeoutMs?: number;
+  /**
    * The desktop's host-tool executor (M5/T19-B). When set, `host_tool_call`
    * frames are served through it — executed at most once, cancelled by
    * `host_tool_cancel`/stop/dispose/transport failure, and answered with a
@@ -255,6 +261,7 @@ type RunRecord = {
 const DEFAULT_CONVERGE_TIMEOUT_MS = 10_000;
 const DEFAULT_ABORT_TIMEOUT_MS = 5_000;
 const DEFAULT_TURN_FENCE_TIMEOUT_MS = 10_000;
+const DEFAULT_TURN_FAILURE_SETTLE_TIMEOUT_MS = 5_000;
 
 export class OmpSessionRunner {
   private steeringInFlight = false;
@@ -314,6 +321,12 @@ export class OmpSessionRunner {
   private readonly convergeTimeoutMs: number;
   private readonly abortTimeoutMs: number;
   private readonly turnFenceTimeoutMs: number;
+  private readonly turnFailureSettleTimeoutMs: number;
+  /**
+   * The terminal `agent_end` the runtime still owes for a run the desktop
+   * closed early on a structured turn failure (see `settleFailedRun`).
+   */
+  private failedRunEnd: { settled: Promise<boolean>; settle: (settled: boolean) => void } | null = null;
   private readonly nativeSessionIdentity: OmpSessionRunnerOptions["nativeSessionIdentity"];
 
   private readonly converter: OmpEventConverter;
@@ -414,6 +427,7 @@ export class OmpSessionRunner {
     this.convergeTimeoutMs = options.convergeTimeoutMs ?? DEFAULT_CONVERGE_TIMEOUT_MS;
     this.abortTimeoutMs = options.abortTimeoutMs ?? DEFAULT_ABORT_TIMEOUT_MS;
     this.turnFenceTimeoutMs = options.turnFenceTimeoutMs ?? DEFAULT_TURN_FENCE_TIMEOUT_MS;
+    this.turnFailureSettleTimeoutMs = options.turnFailureSettleTimeoutMs ?? DEFAULT_TURN_FAILURE_SETTLE_TIMEOUT_MS;
     this.nativeSessionIdentity = options.nativeSessionIdentity;
     this.converter = new OmpEventConverter({
       sessionId: this.sessionId,
@@ -700,6 +714,9 @@ export class OmpSessionRunner {
     } = {},
   ): Promise<{ accepted: boolean; turnId: string; generation: number; hostTurnId: string | null }> {
     this.throwIfDisposed();
+    // Only a failed run's pending terminal defers the prompt; every other
+    // check below stays synchronous with the call.
+    if (this.failedRunEnd) await this.settleFailedRun();
     if (this.pendingReclaim) {
       throw new OmpRuntimeError(
         "stopping",
@@ -1255,6 +1272,7 @@ export class OmpSessionRunner {
    */
   dispose(reason = "the session was closed"): number {
     const cancelled = this.cancelOpenDialogs(reason).length;
+    this.failedRunEnd?.settle(false);
     this.hostTools.cancelAll(reason);
     // A live turn torn down by a dispose ends as "aborted": the run closes
     // through the same choke point as every other end, so the announcement
@@ -1393,6 +1411,7 @@ export class OmpSessionRunner {
       // A frame that arrives with no run in flight belongs to a run that was
       // already closed: attributing it to whatever runs next is exactly the
       // cross-run contamination the generation exists to prevent.
+      if (frame.type === "agent_end" && frame.isTerminal !== false) this.failedRunEnd?.settle(true);
       this.lateFrames += 1;
       return;
     }
@@ -1613,6 +1632,67 @@ export class OmpSessionRunner {
       // to settle the durable host turn as failed.
       whenCardsPresented: false,
     });
+    // The desktop closed the run before the runtime's aborted loop ended, so
+    // its own `agent_end` is still on the way, unless steering already held
+    // it back (that frame was received and is dropped with the run).
+    if (!this.deferredTerminal) this.expectFailedRunEnd();
+  }
+
+  private expectFailedRunEnd(): void {
+    let settle: (settled: boolean) => void = () => undefined;
+    const settled = new Promise<boolean>((resolve) => {
+      settle = resolve;
+    });
+    const pending = {
+      settled,
+      settle: (value: boolean) => {
+        if (this.failedRunEnd === pending) this.failedRunEnd = null;
+        settle(value);
+      },
+    };
+    this.failedRunEnd = pending;
+  }
+
+  /**
+   * Wait for the runtime to end a run the desktop already failed.
+   *
+   * A structured turn failure closes the generation at once, but the runtime
+   * is still unwinding the aborted loop and emits its own `agent_end` after.
+   * A prompt sent before that terminal lands in the dying loop: the runtime
+   * consumes it without calling the model, and the stale `agent_end` closes
+   * the new generation as completed. The next prompt therefore waits for that
+   * terminal; if it does not come, the run is aborted once more, and a run
+   * that still does not end refuses this prompt (visibly) instead of
+   * swallowing it. The refusal is one-shot, so a resend is not held again.
+   */
+  private async settleFailedRun(): Promise<void> {
+    const pending = this.failedRunEnd;
+    if (!pending) return;
+    const within = (ms: number) =>
+      new Promise<"ended" | "released" | "timeout">((resolve) => {
+        const timer = setTimeout(() => resolve("timeout"), ms);
+        void pending.settled.then((ended) => {
+          clearTimeout(timer);
+          resolve(ended ? "ended" : "released");
+        });
+      });
+    const released = () => new OmpRuntimeError("stopping", "the session runner was closed while the previous turn was ending");
+    let outcome = await within(this.turnFailureSettleTimeoutMs);
+    if (outcome === "ended") return;
+    if (outcome === "released") throw released();
+    try {
+      await this.runtime.request({ type: "abort" }, { timeoutMs: this.abortTimeoutMs });
+    } catch {
+      // Whether the abort was answered or not, the terminal decides below.
+    }
+    outcome = await within(this.turnFailureSettleTimeoutMs);
+    if (outcome === "ended") return;
+    if (outcome === "released") throw released();
+    if (this.failedRunEnd === pending) this.failedRunEnd = null;
+    throw new OmpRuntimeError(
+      "not-started",
+      "the previous turn has not finished ending in the runtime; send the message again",
+    );
   }
 
   private trackRunState(event: AgentEvent): void {

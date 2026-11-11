@@ -16,6 +16,7 @@ import { serveTurnFenceCommand } from "./turn-fence-testkit.js";
 import { admissionDigest, encodeTurnAdmission, type OmpTurnAdmission } from "./turn-admission.js";
 import type { OmpUiRecord } from "./ui-requests.js";
 import { encodeApprovalDescriptor, OMP_APPROVAL_OPTIONS } from "./approval-protocol.js";
+import { encodeTurnFailure, OMP_TURN_FAILURE_KIND, OMP_TURN_FAILURE_VERSION } from "./turn-failure.js";
 
 class FakeRuntime implements OmpSessionRuntime {
   readonly pid = 4242;
@@ -95,6 +96,7 @@ function harness(
       reason: "completed" | "aborted" | "error";
       hostTurnId: string | null;
     }) => void;
+    turnFailureSettleTimeoutMs?: number;
   } = {},
 ) {
   const runtime = new FakeRuntime();
@@ -112,6 +114,7 @@ function harness(
     teardown: options.teardown,
     nativeSessionIdentity: options.nativeSessionIdentity,
     onTurnEnd: options.onTurnEnd,
+    ...(options.turnFailureSettleTimeoutMs === undefined ? {} : { turnFailureSettleTimeoutMs: options.turnFailureSettleTimeoutMs }),
   });
   return { runtime, envelopes, requests, runner };
 }
@@ -706,6 +709,100 @@ describe("run isolation", () => {
     const secondTurnId = "omp-turn:omp-1:2";
     runtime.push({ type: "message_start", message: { role: "assistant", content: [{ type: "text", text: "ok" }] } });
     expect(envelopes.at(-1)?.turnId).toBe(secondTurnId);
+  });
+});
+
+describe("turn failure settlement", () => {
+  const NATIVE = "native-1";
+
+  /** The gate's structured mid-turn failure for the run that armed `turnToken`. */
+  function failureFrame(turnToken: string | undefined): Record<string, unknown> {
+    return {
+      type: "extension_ui_request",
+      id: "ui-turn-failure",
+      method: "notify",
+      message: encodeTurnFailure({
+        v: OMP_TURN_FAILURE_VERSION,
+        kind: OMP_TURN_FAILURE_KIND,
+        sessionId: NATIVE,
+        turnToken: turnToken ?? null,
+        code: "transition-apply-failed",
+        reason: "EnterGoalMode returned an unreadable transition result",
+        failureId: "failure-1",
+        at: 1_700_000_000_000,
+      }),
+    };
+  }
+
+  /** A run that started and then failed through the gate's descriptor. */
+  async function failedRun(settleTimeoutMs?: number) {
+    const ends: Array<{ turnId: string; reason: string }> = [];
+    const h = harness({
+      nativeSessionIdentity: () => NATIVE,
+      onTurnEnd: (info) => ends.push({ turnId: info.turnId, reason: info.reason }),
+      ...(settleTimeoutMs === undefined ? {} : { turnFailureSettleTimeoutMs: settleTimeoutMs }),
+    });
+    await h.runner.prompt("enter goal");
+    h.runtime.push({ type: "agent_start" });
+    h.runtime.push(failureFrame(h.runtime.handshakes.at(-1)));
+    expect(h.runner.runState()).toBe("idle");
+    expect(ends).toEqual([{ turnId: "omp-turn:omp-1:1", reason: "error" }]);
+    return { ...h, ends, userPrompts: () => h.runtime.commands.filter((command) => command === "prompt").length };
+  }
+
+  it("holds the next prompt until the failed run's own agent_end, which then cannot end the new run", async () => {
+    const { runtime, runner, ends, userPrompts } = await failedRun(1_000);
+    const next = runner.prompt("recovery");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    // The runtime is still finishing the aborted loop: nothing is submitted
+    // into it, so the user's message cannot be swallowed by the dying run.
+    expect(userPrompts()).toBe(1);
+    expect(runtime.handshakes).toHaveLength(1);
+
+    runtime.push({ type: "turn_end" });
+    runtime.push({ type: "agent_end", messages: [] });
+    await expect(next).resolves.toMatchObject({ accepted: true, turnId: "omp-turn:omp-1:2" });
+    expect(userPrompts()).toBe(2);
+    expect(runner.runState()).toBe("running");
+    expect(ends).toHaveLength(1);
+
+    runtime.push({ type: "agent_start" });
+    runtime.push({ type: "agent_end", messages: [] });
+    expect(ends).toEqual([
+      { turnId: "omp-turn:omp-1:1", reason: "error" },
+      { turnId: "omp-turn:omp-1:2", reason: "completed" },
+    ]);
+  });
+
+  it("does not wait when the failed run's terminal already arrived", async () => {
+    const { runtime, runner, userPrompts } = await failedRun(1_000);
+    runtime.push({ type: "agent_end", messages: [] });
+    expect(runner.lateFrameCount()).toBe(1);
+    await runner.prompt("recovery");
+    expect(userPrompts()).toBe(2);
+    expect(runtime.commands).not.toContain("abort");
+    expect(runner.runState()).toBe("running");
+  });
+
+  it("aborts a failed run that never settles and refuses the prompt instead of losing it", async () => {
+    const { runtime, runner, ends, userPrompts } = await failedRun(20);
+    await expect(runner.prompt("recovery")).rejects.toMatchObject({ code: "not-started" });
+    expect(runtime.commands).toContain("abort");
+    expect(userPrompts()).toBe(1);
+    expect(runner.runState()).toBe("idle");
+    expect(ends).toHaveLength(1);
+    // The refusal is one-shot: the user's resend is not held again.
+    await runner.prompt("recovery again");
+    expect(userPrompts()).toBe(2);
+  });
+
+  it("releases a held prompt when the runner is disposed", async () => {
+    const { runner, userPrompts } = await failedRun(1_000);
+    const next = runner.prompt("recovery");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    runner.dispose("the session was closed");
+    await expect(next).rejects.toThrow();
+    expect(userPrompts()).toBe(1);
   });
 });
 
