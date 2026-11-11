@@ -22,7 +22,7 @@ R17–R22 与 0.1.7 版本面（`codex/release-017`）已随 0.1.7 发布并入 
 
 - R23 README 截图：已完成。用 0.1.7 安装包驱动真实 OMP 会话（只有模型是本机假服务）截取审阅、审批、子智能体、插件市场四个场景的中英文截图，脚本 `app/scripts/readme-screenshots.mjs` 可重复生成（[证据](docs/validation/Release-017-20261109.md)）。
 - R24 `codex/omp-stream-start-text`：审批等待期间回复文字重复显示已修复，并入本地 `main`（[证据](docs/validation/OMP-stream-start-text-20261110.md)）。
-- **0.1.8 已发布**（`codex/release-018`，`.worktrees/release-018`）：R16 + R24 + R25 + R26。前两次候选因 R26 所修的竞态失败，未发布任何内容；第三次候选 run42998711279 整轮通过后，经 run43005740813 发布。公开资产、更新源和旧版本已核对（[证据](docs/validation/Release-018-20261110.md)）。远端 `codex/release-018` 仍停在变基前的 `c21c8467`：强制更新被本机权限规则拦下，等用户决定更新还是删除。
+- **0.1.8 已发布**（`codex/release-018`，`.worktrees/release-018`）：R16 + R24 + R25 + R26。前两次候选因 R26 所修的竞态失败，未发布任何内容；第三次候选 run42998711279 整轮通过后，经 run43005740813 发布。公开资产、更新源和旧版本已核对（[证据](docs/validation/Release-018-20261110.md)）。远端 `codex/release-018` 经用户同意已强制更新到发布后的提交。
 - R25 `codex/omp-ask-custom-answer`：用户 2026-11-11 反馈回答提问后整轮“失败”。原因是提问卡的“输入其他答案”在 OMP 侧被回成取消，OMP 按用户中止结束回合。已改为经运行时 `Other (type your own)` → `editor` 两步投递（`e52961dc`），测试与本地包真实窗口验证通过（[证据](docs/validation/OMP-ask-typed-answer-20261111.md)），已并入 `main`，随 0.1.8 发布。
 - R26 `codex/omp-turn-failure-late-frames`：0.1.8 两次候选都失败在 T20-D 用例。查明是 0.1.7 已有的竞态：模式切换失败后紧接的下一条消息可能没送到模型却显示完成。用户 2026-11-11 决定先修好再发；runner 已改为等待失败回合的终止帧（`f0843924`），验证通过，已并入 `main`，随 0.1.8 发布（[证据](docs/validation/OMP-turn-failure-settle-20261111.md)）。
 - 截图时发现、待处理：项目位于符号链接目录（如 `/tmp`）时“本轮改动”显示绝对路径、“审阅”行末尾多一个斜杠。
@@ -76,7 +76,7 @@ R15 并入 `main` 后以 **0.1.6 正式版**发布：版本面、Cargo 与 `APP_
 
 1. 下一阶段做 R12（删除 Pi 遗留代码）；从 `main` 新建分支和工作树。
 2. R13（OMP 上游升级与 fork 精简）单独立项。
-3. 远端 `codex/release-018` 停在 `c21c8467`，需要用户决定强制更新或删除。已合并的 `.worktrees/omp-turn-feedback`（R16）、`.worktrees/omp-stream-start-text`（R24）、`.worktrees/release-018`、`.worktrees/omp-turn-failure-late-frames`（R26）可清理。
+3. 已合并的 `.worktrees/omp-turn-feedback`（R16）、`.worktrees/omp-stream-start-text`（R24）、`.worktrees/release-018` 暂保留（用户 2026-11-12 决定先不处理）。
 
 ## 工作约定
 
